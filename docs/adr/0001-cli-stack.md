@@ -1,6 +1,7 @@
 # 0001 CLI stack (Phase 1)
 
-- Status: Proposed
+- Status: Accepted
+- Accepted with: #8 scaffold PR (#25)
 - Date: 2026-09-03
 - Deciders: Software Developer (author), Software Architect (review), Project Manager (aware)
 
@@ -19,7 +20,7 @@ Acceptance of this ADR (Status to Accepted) is expected with the #8 scaffold PR 
 | Runtime | Node.js **20+** |
 | Language | TypeScript |
 | Package manager | **npm** (zero-friction for agents; no pnpm bootstrap required) |
-| Package layout | **`cli/` as the npm package** -- `cli/package.json` owns the package; binary name `arggon` via `"bin"` |
+| Package layout | **Root package.json** owns the install (one install for agents); TypeScript under `cli/`; binary `arggon` via root bin |
 | CLI framework | **commander** -- widely known, stable argv parsing, easy JSON-friendly subcommands |
 | Frontmatter / YAML (later) | Ecosystem libs (e.g. gray-matter, yaml); **zod** for frontmatter validation when validate lands |
 | Tests | **vitest** (placeholders in scaffold) |
@@ -29,7 +30,8 @@ Acceptance of this ADR (Status to Accepted) is expected with the #8 scaffold PR 
 ### Locked layout (from engineering.md)
 
 ```text
-cli/                  # TypeScript package (not cmd/ or src/ at repo root)
+package.json          # npm install at repo root (one install for agents)
+cli/                  # TypeScript sources (not a nested package)
 fixtures/
   tasks-valid/
   tasks-invalid/
@@ -41,7 +43,7 @@ Binary name: **`arggon`** (matches [`docs/convention.md`](../convention.md) exam
 
 - Agents and humans need **Node 20+** to run or develop the CLI.
 - Distribution for Phase 1 is **npm / npx** (and local `npm link` / `npm run`); a single-binary ship is deferred.
-- Scaffold, hello-world entrypoint, README run instructions, and lint/test placeholders land in a **separate** PR for [#8](https://github.com/Arggon/ArggonManager/issues/8) after this ADR is reviewed -- this PR is docs-only.
+- Scaffold (#8) uses root package.json + `cli/` sources + root `fixtures/`; Accepted with the #8 scaffold PR once Architect signs off on this change set.
 - Strong DX: YAML/frontmatter ecosystem, fast iteration, easy JSON stdout for agents.
 
 ## Alternatives considered
