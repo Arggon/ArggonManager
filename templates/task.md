@@ -1,7 +1,7 @@
 ---
 type: task
 status: todo
-id: task-<slug>
+id: task-<inner-slug>
 parent: <story-id>
 labels: []
 created: "YYYY-MM-DD"
@@ -9,9 +9,9 @@ updated: "YYYY-MM-DD"
 ---
 
 <!--
-  Placement (v0): tasks/<initiative-id>/<epic-id>/<story-id>/task-<slug>.md
-  Leaves live only under a story. id is the filename stem: task-<slug>.
-  CLI `arggon create task <slug>` adds the task- prefix (do not pass it twice).
+  Placement (v0): tasks/<initiative-id>/<epic-id>/<story-id>/task-<inner-slug>.md
+  Leaves live only under a story. id is the filename stem: task-<inner-slug>.
+  CLI `arggon create task <inner-slug>` adds the task- prefix (do not pass it twice).
   parent MUST be the story id. Omit assignee when unassigned. Omit blocked_reason unless status is blocked.
 -->
 
