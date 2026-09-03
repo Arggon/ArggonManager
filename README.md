@@ -21,6 +21,8 @@ tasks/
 
 Each item is a Markdown file with **YAML frontmatter** (status and other fields). Updating work means editing the file and committing — same flow for developers, QA, and agents.
 
+**Convention (v0) is locked.** See [`docs/convention.md`](docs/convention.md) for folder layout, frontmatter schema, statuses, and claim rules. A sample tree lives under [`tasks/`](tasks/).
+
 ## Who it’s for
 
 - Builders who want tasks next to the code
@@ -49,8 +51,12 @@ Each item is a Markdown file with **YAML frontmatter** (status and other fields)
 ---
 type: task
 status: todo
-assignee: 
-parent: story-onboarding
+id: task-rate-limit
+assignee:
+parent: story-login
+labels: [security]
+created: 2026-09-03
+updated: 2026-09-03
 ---
 
 # Add login rate limiting
@@ -62,11 +68,11 @@ parent: story-onboarding
 - [ ] ...
 ```
 
-*(Exact fields still being locked in.)*
+Exact v0 fields are documented in [`docs/convention.md`](docs/convention.md) (layout, schema, and status transitions are locked).
 
 ## Contributing
 
-Ideas on folder layout, frontmatter schema, and CLI UX are especially useful right now. Open an issue.
+Ideas on folder layout, frontmatter schema, and CLI UX are especially useful right now. Open an issue. Please follow the [task convention](docs/convention.md) when proposing sample trees or templates.
 
 ## License
 
