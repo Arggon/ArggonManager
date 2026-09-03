@@ -10,16 +10,38 @@ export type InitOptions = {
   force: boolean;
 };
 
+function ensureTemplates(root: string, force: boolean): string[] {
+  const templatesDest = join(root, "templates");
+  const templatesSrc = bundledTemplatesDir();
+  if (!existsSync(templatesSrc)) {
+    throw new Error(`Bundled templates not found at ${templatesSrc}`);
+  }
+  mkdirSync(templatesDest, { recursive: true });
+  const restored: string[] = [];
+  for (const name of readdirSync(templatesSrc)) {
+    if (!name.endsWith(".md")) continue;
+    const dest = join(templatesDest, name);
+    if (existsSync(dest) && !force) continue;
+    copyFileSync(join(templatesSrc, name), dest);
+    restored.push(name);
+  }
+  return restored;
+}
+
 export function runInit(opts: InitOptions): void {
   const root = resolve(opts.dir);
   const tasksDir = join(root, "tasks");
   const conventionPath = join(tasksDir, ".convention.yml");
-  const templatesDest = join(root, "templates");
-  const templatesSrc = bundledTemplatesDir();
 
   const already = existsSync(conventionPath);
   if (already && !opts.force) {
+    const restored = ensureTemplates(root, false);
     console.log(`arggon init: already initialized at ${conventionPath}`);
+    if (restored.length > 0) {
+      console.log(`arggon init: restored missing templates: ${restored.join(", ")}`);
+    } else {
+      console.log("arggon init: templates/ already complete");
+    }
     console.log("Next: create work with `arggon create` (coming soon), or copy from templates/.");
     return;
   }
@@ -32,17 +54,7 @@ export function runInit(opts: InitOptions): void {
 
   mkdirSync(tasksDir, { recursive: true });
   writeFileSync(conventionPath, CONVENTION_YML, "utf8");
-
-  mkdirSync(templatesDest, { recursive: true });
-  if (!existsSync(templatesSrc)) {
-    throw new Error(`Bundled templates not found at ${templatesSrc}`);
-  }
-  for (const name of readdirSync(templatesSrc)) {
-    if (!name.endsWith(".md")) continue;
-    const dest = join(templatesDest, name);
-    if (existsSync(dest) && !opts.force) continue;
-    copyFileSync(join(templatesSrc, name), dest);
-  }
+  ensureTemplates(root, opts.force);
 
   console.log(`arggon init: ready in ${root}`);
   console.log("  - tasks/.convention.yml (version: 0)");

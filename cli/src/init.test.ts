@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, existsSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -18,6 +18,14 @@ describe("init", () => {
     runInit({ dir, force: false });
     runInit({ dir, force: false });
     expect(existsSync(join(dir, "tasks/.convention.yml"))).toBe(true);
+  });
+
+  it("restores missing templates when already initialized", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-"));
+    runInit({ dir, force: false });
+    unlinkSync(join(dir, "templates/task.md"));
+    runInit({ dir, force: false });
+    expect(existsSync(join(dir, "templates/task.md"))).toBe(true);
   });
 
   it("errors when tasks/ exists without convention unless --force", () => {
