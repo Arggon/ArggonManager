@@ -5,6 +5,7 @@ import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
 import { runInit, type InitResult } from "./init.js";
 import { bindJsonProgram, failJson, jsonEnabled, successJson } from "./json.js";
+import { runList, WORK_ITEM_STATUSES, WORK_ITEM_TYPES } from "./list.js";
 
 const program = new Command();
 
@@ -131,6 +132,32 @@ program
         console.error(`arggon create: ${message}`);
         process.exitCode = 1;
       }
+    },
+  );
+
+program
+  .command("list")
+  .description("List work items from tasks/ with optional filters")
+  .option("--status <status>", `exact v0 status (${WORK_ITEM_STATUSES.join(" | ")})`)
+  .option("--type <type>", `exact v0 type (${WORK_ITEM_TYPES.join(" | ")})`)
+  .option(
+    "--assignee <login>",
+    "exact assignee login; @me resolves via GITHUB_USER, then GITHUB_ACTOR, then `gh api user`",
+  )
+  .option("--json", "machine-readable JSON on stdout (errors still on stderr)", false)
+  .option("--dir <path>", "tree root (look for tasks/ here; no walk-up)", ".")
+  .action(
+    (opts: { status?: string; type?: string; assignee?: string; json?: boolean; dir: string }) => {
+      const result = runList({
+        dir: opts.dir,
+        status: opts.status,
+        type: opts.type,
+        assignee: opts.assignee,
+        json: Boolean(opts.json),
+      });
+      if (result.stdout) process.stdout.write(result.stdout);
+      if (result.stderr) process.stderr.write(result.stderr);
+      process.exitCode = result.exitCode;
     },
   );
 

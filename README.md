@@ -99,12 +99,33 @@ Root install; TypeScript in cli/:
 npm install
 npm run arggon -- hello
 npm run arggon -- init /path/to/repo
+npm run arggon -- list
 npm run build
 npm test
 npm run lint
 ```
 
-`arggon init` creates `tasks/.convention.yml` and copies `templates/` (no overwrite unless `--force`; already-initialized repos are a no-op).
+`arggon init` creates `tasks/.convention.yml` and copies `templates/` (no overwrite unless --force; already-initialized repos are a no-op).
+
+### `arggon list`
+
+Walks `tasks/` under --dir (default: cwd; no walk-up), detects work items by frontmatter `type:`, and prints a table (or --json). Listing order is lexicographic by `id`. Filters compose with AND.
+
+```bash
+arggon list
+arggon list --status todo
+arggon list --type bug --assignee @me
+arggon list --json
+arggon list --dir /path/to/repo --type task --status in_progress
+```
+
+- --status <status>: exact v0 status (`todo`, `in_progress`, `blocked`, `done`, `cancelled`)
+- --type <type>: exact v0 type (`initiative`, `epic`, `story`, `task`, `bug`)
+- --assignee <login>: exact assignee. Special @me resolves via `GITHUB_USER`, then `GITHUB_ACTOR`, then `gh api user -q .login`
+- --json: pretty JSON on stdout (`schemaVersion: 0`); errors still go to stderr
+- --dir <path>: tree root; look for `tasks/` in that directory only (no walk-up)
+
+Empty results exit `0`. Missing `tasks/`, invalid enums, unresolvable @me, or broken YAML in a work-item file exit non-zero.
 
 `arggon create <type> <title>` writes a work item under `tasks/` from the templates. Non-initiative types need `--parent <id>`. Defaults: `status: todo`, `created`/`updated` today. Flags: `--id`, `--assignee`, `--status` (not `done`), `--blocked-reason`.
 
