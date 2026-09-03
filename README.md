@@ -21,7 +21,7 @@ tasks/
 
 Each item is a Markdown file with **YAML frontmatter** (status and other fields). Updating work means editing the file and committing — same flow for developers, QA, and agents.
 
-**Convention (v0) is locked.** See [`docs/convention.md`](docs/convention.md) for folder layout, frontmatter schema, statuses, and claim rules. A sample tree lives under [`tasks/`](tasks/).
+**Convention (v0) is locked.** See [`docs/convention.md`](docs/convention.md) for folder layout, frontmatter schema, statuses, and claim rules. A sample tree lives under [`tasks/launch-mvp/`](tasks/launch-mvp/) (plus [`tasks/.convention.yml`](tasks/.convention.yml)). Copy-paste templates for each type live in [`templates/`](templates/).
 
 ## Who it’s for
 
@@ -71,8 +71,21 @@ Exact v0 fields are documented in [`docs/convention.md`](docs/convention.md) (la
 
 ## Docs
 
+- [Task convention](docs/convention.md) — folder layout, frontmatter schema, statuses (v0 locked)
 - [Engineering conventions](docs/engineering.md) — repo structure, review bar, testing, ADRs (Phase 1)
-- Task convention (`docs/convention.md`) — locked via the convention/schema PR when merged
+- Sample tree: [`tasks/launch-mvp/`](tasks/launch-mvp/)
+
+## Templates
+
+v0 stubs (YAML frontmatter + Context / Acceptance / Notes) live in [`templates/`](templates/):
+
+- [`templates/initiative.md`](templates/initiative.md)
+- [`templates/epic.md`](templates/epic.md)
+- [`templates/story.md`](templates/story.md)
+- [`templates/task.md`](templates/task.md)
+- [`templates/bug.md`](templates/bug.md)
+
+Copy a stub into `tasks/` per [`docs/convention.md`](docs/convention.md). Future CLI `arggon create` should copy from these templates.
 
 ## Contributing
 
