@@ -7,9 +7,9 @@ export type ItemType = "initiative" | "epic" | "story" | "task" | "bug";
 export type Status = "todo" | "in_progress" | "blocked" | "done" | "cancelled";
 
 /**
- * Normalized work item used by list/create/update JSON output.
+ * Normalized work item used by list/get/create/update JSON output.
  * Optional frontmatter fields are `null` here so the JSON shape is stable.
- * `path` is the posix repo-relative file path (not a frontmatter field).
+ * `path` is the repo-relative file path (not a frontmatter field).
  */
 export type WorkItem = {
   id: string;
@@ -25,8 +25,8 @@ export type WorkItem = {
   blocked_reason: string | null;
 };
 
-/** One validate finding. `path` is posix, repo-relative (file or directory). */
-export type Issue = {
+/** One validate finding. `path` is repo-relative (file or directory). */
+export type ValidateIssue = {
   path: string;
   message: string;
   code: string;
