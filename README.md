@@ -69,6 +69,11 @@ updated: "2026-09-03"
 
 Exact v0 fields are documented in [`docs/convention.md`](docs/convention.md) (layout, schema, and status transitions are locked). Omit `assignee` when unassigned (do not write an empty `assignee:`).
 
+## Docs
+
+- [Engineering conventions](docs/engineering.md) — repo structure, review bar, testing, ADRs (Phase 1)
+- Task convention (`docs/convention.md`) — locked via the convention/schema PR when merged
+
 ## Contributing
 
 Ideas on folder layout, frontmatter schema, and CLI UX are especially useful right now. Open an issue. Please follow the [task convention](docs/convention.md) when proposing sample trees or templates.
