@@ -1,17 +1,16 @@
-<!--
-  Placement (v0): tasks/<initiative-id>/<initiative-id>.md (required index).
-  Initiatives are roots: omit parent and assignee when unassigned.
-  Future CLI: `arggon create initiative` copies this template.
--->
 ---
 type: initiative
 status: todo
 id: <id>
-title: ""
 labels: []
 created: "YYYY-MM-DD"
 updated: "YYYY-MM-DD"
 ---
+
+<!--
+  Placement (v0): tasks/<id>/<id>.md (initiative index; required).
+  No parent. Omit assignee when unassigned.
+-->
 
 # <title>
 
@@ -21,8 +20,6 @@ updated: "YYYY-MM-DD"
 
 ## Acceptance
 
-- [ ] <criterion>
+- [ ] 
 
 ## Notes
-
-<!-- Optional. -->
