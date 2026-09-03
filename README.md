@@ -89,7 +89,7 @@ Copy a stub into `tasks/` per [`docs/convention.md`](docs/convention.md). Future
 
 ## CLI (Phase 1 scaffold)
 
-Requires **Node.js 20+**. Stack: [docs/adr/0001-cli-stack.md](docs/adr/0001-cli-stack.md) (Proposed until Architect accepts).
+Requires **Node.js 20+**. Stack: [docs/adr/0001-cli-stack.md](docs/adr/0001-cli-stack.md) (ADR 0001 Accepted with this scaffold).
 
 Root install; TypeScript in cli/:
 
