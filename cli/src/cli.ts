@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { runInit, type InitResult } from "./init.js";
-import { bindJsonProgram, failJson, jsonEnabled, successJson } from "./json.js";
-
-const HELLO_MESSAGE = "arggon: hello from Phase 1 scaffold";
+import { emitJson, failJson, jsonRequested, JSON_SCHEMA_VERSION } from "./json.js";
 
 const program = new Command();
 
@@ -11,20 +9,29 @@ program
   .name("arggon")
   .description("Git-native task CLI for ArggonManager")
   .version("0.0.0")
-  .option("--json", "machine-readable JSON on stdout", false);
+  .option("--json", "emit one JSON object on stdout (agent contract)", false);
 
-bindJsonProgram(program);
+function useJson(cmdOpts?: { json?: unknown }): boolean {
+  return jsonRequested(program.opts()) || jsonRequested(cmdOpts);
+}
 
 program
   .command("hello")
   .description("Sanity-check that the CLI runs")
-  .option("--json", "machine-readable JSON on stdout", false)
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action((opts: { json?: boolean }) => {
-    if (jsonEnabled(opts)) {
-      successJson("hello", { message: HELLO_MESSAGE }, 0);
+    const message = "arggon: hello from Phase 1 scaffold";
+    if (useJson(opts)) {
+      emitJson({
+        ok: true,
+        schemaVersion: JSON_SCHEMA_VERSION,
+        conventionVersion: 0,
+        command: "hello",
+        message,
+      });
       return;
     }
-    console.log(HELLO_MESSAGE);
+    console.log(message);
   });
 
 program
@@ -32,30 +39,31 @@ program
   .description("Scaffold tasks/ convention (+ templates) in a repo")
   .argument("[dir]", "target directory", ".")
   .option("-f, --force", "overwrite existing convention/templates", false)
-  .option("--json", "machine-readable JSON on stdout", false)
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action((dir: string, opts: { force: boolean; json?: boolean }) => {
-    const json = jsonEnabled(opts);
+    const json = useJson(opts);
     try {
       const result = runInit({ dir, force: Boolean(opts.force) });
       if (json) {
-        successJson(
-          "init",
-          {
-            root: result.root,
-            alreadyInitialized: result.alreadyInitialized,
-            force: result.force,
-            created: result.created,
-            restored: result.restored,
-          },
-          0,
-        );
+        emitJson({
+          ok: true,
+          schemaVersion: JSON_SCHEMA_VERSION,
+          conventionVersion: 0,
+          command: "init",
+          root: result.root,
+          alreadyInitialized: result.alreadyInitialized,
+          force: result.force,
+          created: result.created,
+          restored: result.restored,
+          conventionPath: result.conventionPath,
+        });
         return;
       }
       printInitHuman(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (json) {
-        failJson({ command: "init", message, code: "INIT_FAILED" });
+        failJson({ command: "init", message });
         return;
       }
       console.error(`arggon init: ${message}`);
