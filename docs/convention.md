@@ -319,6 +319,20 @@ Independent of children — **no rollup** in v0.
 
 ---
 
+## Templates
+
+Copy-paste stubs for each v0 work-item type live in [`templates/`](../templates/). Fill placeholders and place the file under `tasks/` per [Folder layout](#folder-layout). Future CLI `arggon create` should copy from these templates.
+
+| Type | Template |
+| --- | --- |
+| Initiative | [`templates/initiative.md`](../templates/initiative.md) |
+| Epic | [`templates/epic.md`](../templates/epic.md) |
+| Story | [`templates/story.md`](../templates/story.md) |
+| Task | [`templates/task.md`](../templates/task.md) |
+| Bug | [`templates/bug.md`](../templates/bug.md) |
+
+Templates default to `status: todo`, omit `assignee` (never an empty string), and omit `blocked_reason`. Dates are quoted `"YYYY-MM-DD"` placeholders.
+
 ## Sample tree
 
 See [`tasks/launch-mvp/`](../tasks/launch-mvp/) for a small valid v0 example (initiative → epics → stories → tasks/bugs), plus [`tasks/.convention.yml`](../tasks/.convention.yml).
