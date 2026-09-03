@@ -87,6 +87,22 @@ v0 stubs (YAML frontmatter + Context / Acceptance / Notes) live in [`templates/`
 
 Copy a stub into `tasks/` per [`docs/convention.md`](docs/convention.md). Future CLI `arggon create` should copy from these templates.
 
+## CLI (Phase 1 scaffold)
+
+Requires **Node.js 20+**. Stack: [docs/adr/0001-cli-stack.md](docs/adr/0001-cli-stack.md) (Proposed until Architect accepts).
+
+Root install; TypeScript in cli/:
+
+```bash
+npm install
+npm run arggon -- hello
+npm run build
+npm test
+npm run lint
+```
+
+Fixtures: [fixtures/](fixtures/).
+
 ## Contributing
 
 Ideas on folder layout, frontmatter schema, and CLI UX are especially useful right now. Open an issue. Please follow the [task convention](docs/convention.md) when proposing sample trees or templates.
