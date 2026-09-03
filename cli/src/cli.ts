@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { readConventionVersion } from "./convention.js";
+import { runCreate } from "./create.js";
 import { runInit, type InitResult } from "./init.js";
 import { bindJsonProgram, failJson, jsonEnabled, successJson } from "./json.js";
 
@@ -68,6 +69,47 @@ program
       process.exitCode = 1;
     }
   });
+
+program
+  .command("create")
+  .description("Create a work item under tasks/")
+  .argument("<type>", "initiative | epic | story | task | bug")
+  .argument("<title>", "title (id is slugified; override with --id)")
+  .option("-p, --parent <id>", "parent item id (required except initiative)")
+  .option("--id <id>", "override id stem (CLI still adds task-/bug- for leaves)")
+  .option("--assignee <login>", "assignee (omit when unassigned)")
+  .option("--status <status>", "status (default: todo)", "todo")
+  .option("--blocked-reason <text>", "required when --status blocked")
+  .action(
+    (
+      type: string,
+      title: string,
+      opts: {
+        parent?: string;
+        id?: string;
+        assignee?: string;
+        status?: string;
+        blockedReason?: string;
+      },
+    ) => {
+      try {
+        runCreate({
+          cwd: process.cwd(),
+          type,
+          title,
+          parent: opts.parent,
+          id: opts.id,
+          assignee: opts.assignee,
+          status: opts.status,
+          blockedReason: opts.blockedReason,
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`arggon create: ${message}`);
+        process.exitCode = 1;
+      }
+    },
+  );
 
 function printInitHuman(result: InitResult): void {
   if (result.alreadyInitialized && !result.force) {

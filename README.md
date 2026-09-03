@@ -2,7 +2,7 @@
 
 **Git-native project management for builders and agents.**
 
-Tasks live _inside_ the repository as Markdown. Create a file, open a branch, update YAML — the whole team (and any agent) stays in sync. No separate board to drift out of date.
+Tasks live *inside* the repository as Markdown. Create a file, open a branch, update YAML — the whole team (and any agent) stays in sync. No separate board to drift out of date.
 
 > **Status:** early design — convention + CLI first.
 
@@ -38,11 +38,11 @@ Each item is a Markdown file with **YAML frontmatter** (status and other fields)
 
 ## What’s shipping (phased)
 
-| Phase | Deliverable                                       |
-| ----- | ------------------------------------------------- |
+| Phase | Deliverable |
+| --- | --- |
 | **1** | Folder + frontmatter **convention** and templates |
-| **1** | **CLI** to create, list, and update tasks         |
-| **2** | Viewer / board UI over the tree                   |
+| **1** | **CLI** to create, list, and update tasks |
+| **2** | Viewer / board UI over the tree |
 | **3** | Agent hooks / SDK so agents follow the same rules |
 
 ## Example task file
@@ -61,11 +61,9 @@ updated: "2026-09-03"
 # Add login rate limiting
 
 ## Context
-
 ...
 
 ## Acceptance
-
 - [ ] ...
 ```
 
@@ -74,7 +72,6 @@ Exact v0 fields are documented in [`docs/convention.md`](docs/convention.md) (la
 ## Docs
 
 - [Task convention](docs/convention.md) — folder layout, frontmatter schema, statuses (v0 locked)
-- [JSON output contract](docs/json-output.md) — `--json` envelope, schemaVersion 1, WorkItem / validate payloads
 - [Engineering conventions](docs/engineering.md) — repo structure, review bar, testing, ADRs (Phase 1)
 - Sample tree: [`tasks/launch-mvp/`](tasks/launch-mvp/)
 
@@ -90,7 +87,7 @@ v0 stubs (YAML frontmatter + Context / Acceptance / Notes) live in [`templates/`
 
 Copy a stub into `tasks/` per [`docs/convention.md`](docs/convention.md). Future CLI `arggon create` should copy from these templates.
 
-## CLI (Phase 1 scaffold)
+## CLI (Phase 1)
 
 Requires **Node.js 20+**. Stack: [docs/adr/0001-cli-stack.md](docs/adr/0001-cli-stack.md) (ADR 0001 Accepted with this scaffold).
 
@@ -107,24 +104,17 @@ npm run lint
 
 `arggon init` creates `tasks/.convention.yml` and copies `templates/` (no overwrite unless `--force`; already-initialized repos are a no-op).
 
-Global `--json` prints one JSON object on stdout (agent contract). It is a formatter on the same domain objects other commands use — it does not walk `tasks/`. See [docs/json-output.md](docs/json-output.md).
-
-```bash
-arggon --json hello
-```
-
 Fixtures: [fixtures/](fixtures/).
 
 ## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 Ideas on folder layout, frontmatter schema, and CLI UX are especially useful right now. Open an issue. Please follow the [task convention](docs/convention.md) when proposing sample trees or templates.
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+TBD — OSI-approved license before a public release.
 
 ---
 
 Built in the open by [Arggon](https://github.com/Arggon).
+`arggon create <type> <title>` writes a work item under tasks/ from templates. See `arggon create --help`.
