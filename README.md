@@ -64,6 +64,11 @@ parent: story-onboarding
 
 *(Exact fields still being locked in.)*
 
+## Docs
+
+- [Engineering conventions](docs/engineering.md) — repo structure, review bar, testing, ADRs (Phase 1)
+- Task convention (`docs/convention.md`) — locked via the convention/schema PR when merged
+
 ## Contributing
 
 Ideas on folder layout, frontmatter schema, and CLI UX are especially useful right now. Open an issue.
