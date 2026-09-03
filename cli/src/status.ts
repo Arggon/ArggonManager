@@ -35,6 +35,26 @@ export function assertAssignee(assignee: string): void {
   }
 }
 
+export function isClaimable(type: ItemType): boolean {
+  return CLAIMABLE_TYPES.has(type);
+}
+
+/** Claim = claimable type + assignee set + status in_progress. */
+export function isClaimed(type: ItemType, status: Status, assignee?: string | null): boolean {
+  return isClaimable(type) && status === "in_progress" && Boolean(assignee);
+}
+
+/** v0 unclaim: in_progress -> todo and clear assignee. */
+export function unclaim(status: Status): { status: "todo"; assignee: null } {
+  if (status !== "in_progress") {
+    throw new Error("unclaim is only valid from in_progress (v0 update default)");
+  }
+  if (!canTransition(status, "todo")) {
+    throw new Error("cannot unclaim from this status");
+  }
+  return { status: "todo", assignee: null };
+}
+
 export function assertClaimAndBlocked(opts: {
   type: ItemType;
   status: Status;

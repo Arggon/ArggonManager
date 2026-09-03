@@ -2,8 +2,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
-import { itemId, slugify } from "./ids.js";
-import { assertClaimAndBlocked, canTransition } from "./status.js";
+import { firstDuplicateId, itemId, slugify } from "./ids.js";
+import { itemsById, loadItems } from "./items.js";
+import { assertClaimAndBlocked, canTransition, isClaimed, unclaim } from "./status.js";
 
 describe("ids", () => {
   it("slugifies titles", () => {
@@ -21,6 +22,11 @@ describe("ids", () => {
   it("rejects container ids with leaf prefixes", () => {
     expect(() => itemId("story", "task-nope")).toThrow(/must not start/);
   });
+
+  it("detects global id uniqueness violations", () => {
+    expect(firstDuplicateId(["auth", "story-login", "auth"])).toBe("auth");
+    expect(firstDuplicateId(["auth", "story-login"])).toBeUndefined();
+  });
 });
 
 describe("status", () => {
@@ -34,6 +40,13 @@ describe("status", () => {
       assignee: "arggon",
     });
     assertClaimAndBlocked({ type: "initiative", status: "in_progress" });
+    expect(isClaimed("task", "in_progress", "arggon")).toBe(true);
+    expect(isClaimed("initiative", "in_progress", null)).toBe(false);
+  });
+
+  it("unclaims in_progress to todo and clears assignee", () => {
+    expect(unclaim("in_progress")).toEqual({ status: "todo", assignee: null });
+    expect(() => unclaim("todo")).toThrow(/in_progress/);
   });
 
   it("requires blocked_reason only when blocked", () => {
@@ -70,5 +83,36 @@ describe("frontmatter", () => {
     expect(again.data.id).toBe("task-rate-limit");
     expect(again.data.labels).toEqual(["security"]);
     expect(again.data.title).toBe("Add login rate limiting");
+  });
+
+  it("round-trips unknown x-* keys", () => {
+    const raw = `---
+type: task
+status: todo
+id: task-x
+x-agent: grok
+---
+
+# Hi
+`;
+    const { data, body } = parseFrontmatter(raw);
+    expect(data["x-agent"]).toBe("grok");
+    const out = stringifyFrontmatter(data, body);
+    expect(out).toContain("x-agent: grok");
+    expect(parseFrontmatter(out).data["x-agent"]).toBe("grok");
+  });
+});
+
+describe("items (shared tree scan)", () => {
+  it("walks the sample tasks/ fixture once", () => {
+    const items = loadItems(join(process.cwd(), "tasks"));
+    const byId = itemsById(items);
+    expect(byId.get("launch-mvp")?.type).toBe("initiative");
+    expect(byId.get("auth")?.type).toBe("epic");
+    expect(byId.get("story-login")?.type).toBe("story");
+    expect(byId.get("task-rate-limit")?.type).toBe("task");
+    expect(byId.get("bug-empty-password-500")?.type).toBe("bug");
+    expect(byId.size).toBe(items.length);
+    expect(firstDuplicateId(items.map((i) => i.id))).toBeUndefined();
   });
 });
