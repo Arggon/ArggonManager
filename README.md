@@ -96,10 +96,13 @@ Root install; TypeScript in cli/:
 ```bash
 npm install
 npm run arggon -- hello
+npm run arggon -- init /path/to/repo
 npm run build
 npm test
 npm run lint
 ```
+
+`arggon init` creates `tasks/.convention.yml` and copies `templates/` (no overwrite unless `--force`; already-initialized repos are a no-op).
 
 Fixtures: [fixtures/](fixtures/).
 
