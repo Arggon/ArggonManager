@@ -6,8 +6,8 @@ title: Secure session cookies
 parent: story-login
 labels: [security]
 assignee: arggon
-created: 2026-09-03
-updated: 2026-09-03
+created: "2026-09-03"
+updated: "2026-09-03"
 ---
 
 # Secure session cookies

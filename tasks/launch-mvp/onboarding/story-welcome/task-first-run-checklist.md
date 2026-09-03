@@ -5,8 +5,8 @@ id: task-first-run-checklist
 title: First-run checklist UI
 parent: story-welcome
 labels: [ux]
-created: 2026-09-03
-updated: 2026-09-03
+created: "2026-09-03"
+updated: "2026-09-03"
 ---
 
 # First-run checklist UI

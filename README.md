@@ -52,11 +52,10 @@ Each item is a Markdown file with **YAML frontmatter** (status and other fields)
 type: task
 status: todo
 id: task-rate-limit
-assignee:
 parent: story-login
 labels: [security]
-created: 2026-09-03
-updated: 2026-09-03
+created: "2026-09-03"
+updated: "2026-09-03"
 ---
 
 # Add login rate limiting
@@ -68,7 +67,7 @@ updated: 2026-09-03
 - [ ] ...
 ```
 
-Exact v0 fields are documented in [`docs/convention.md`](docs/convention.md) (layout, schema, and status transitions are locked).
+Exact v0 fields are documented in [`docs/convention.md`](docs/convention.md) (layout, schema, and status transitions are locked). Omit `assignee` when unassigned (do not write an empty `assignee:`).
 
 ## Contributing
 

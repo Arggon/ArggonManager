@@ -7,8 +7,8 @@ parent: story-oauth
 labels: [auth]
 assignee: arggon
 blocked_reason: Waiting on OAuth app credentials from ops
-created: 2026-09-03
-updated: 2026-09-03
+created: "2026-09-03"
+updated: "2026-09-03"
 ---
 
 # Add Google OAuth provider

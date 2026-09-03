@@ -5,8 +5,8 @@ id: auth
 title: Authentication
 parent: launch-mvp
 labels: [security]
-created: 2026-09-03
-updated: 2026-09-03
+created: "2026-09-03"
+updated: "2026-09-03"
 ---
 
 # Authentication

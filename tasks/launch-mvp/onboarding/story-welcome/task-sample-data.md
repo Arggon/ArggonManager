@@ -5,8 +5,8 @@ id: task-sample-data
 title: Ship sample tasks tree
 parent: story-welcome
 labels: [docs]
-created: 2026-09-03
-updated: 2026-09-03
+created: "2026-09-03"
+updated: "2026-09-03"
 ---
 
 # Ship sample tasks tree

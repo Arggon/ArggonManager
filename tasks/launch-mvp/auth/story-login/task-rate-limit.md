@@ -5,8 +5,8 @@ id: task-rate-limit
 title: Add login rate limiting
 parent: story-login
 labels: [security]
-created: 2026-09-03
-updated: 2026-09-03
+created: "2026-09-03"
+updated: "2026-09-03"
 ---
 
 # Add login rate limiting

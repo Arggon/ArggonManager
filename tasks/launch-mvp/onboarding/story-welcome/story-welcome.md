@@ -5,8 +5,8 @@ id: story-welcome
 title: Welcome experience
 parent: onboarding
 labels: [ux]
-created: 2026-09-03
-updated: 2026-09-03
+created: "2026-09-03"
+updated: "2026-09-03"
 ---
 
 # Welcome experience

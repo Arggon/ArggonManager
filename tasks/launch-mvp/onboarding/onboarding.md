@@ -5,8 +5,8 @@ id: onboarding
 title: Onboarding
 parent: launch-mvp
 labels: [ux]
-created: 2026-09-03
-updated: 2026-09-03
+created: "2026-09-03"
+updated: "2026-09-03"
 ---
 
 # Onboarding

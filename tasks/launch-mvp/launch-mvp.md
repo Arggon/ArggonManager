@@ -4,8 +4,8 @@ status: in_progress
 id: launch-mvp
 title: Launch MVP
 labels: [phase-1, public]
-created: 2026-09-03
-updated: 2026-09-03
+created: "2026-09-03"
+updated: "2026-09-03"
 ---
 
 # Launch MVP

@@ -6,8 +6,8 @@ title: Email/password login
 parent: auth
 labels: [auth]
 assignee: arggon
-created: 2026-09-03
-updated: 2026-09-03
+created: "2026-09-03"
+updated: "2026-09-03"
 ---
 
 # Email/password login

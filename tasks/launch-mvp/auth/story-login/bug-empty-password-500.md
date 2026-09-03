@@ -5,8 +5,8 @@ id: bug-empty-password-500
 title: Empty password returns HTTP 500
 parent: story-login
 labels: [bug, auth]
-created: 2026-09-03
-updated: 2026-09-03
+created: "2026-09-03"
+updated: "2026-09-03"
 ---
 
 # Empty password returns HTTP 500
