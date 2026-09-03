@@ -168,6 +168,13 @@ describe("create", () => {
     ).toThrow(/requires --assignee/);
   });
 
+  it("rejects creating as done", () => {
+    const dir = primed();
+    expect(() => runCreate({ cwd: dir, type: "initiative", title: "X", status: "done" })).toThrow(
+      /status done/,
+    );
+  });
+
   it("rejects duplicate ids against an existing tree", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-create-sample-"));
     runInit({ dir, force: false });

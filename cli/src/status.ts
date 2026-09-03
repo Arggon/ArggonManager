@@ -26,6 +26,15 @@ export function assertStatus(value: string): asserts value is Status {
   }
 }
 
+/** Create may not skip the claim step: todo ↛ done. */
+export const CREATE_STATUSES = ["todo", "in_progress", "blocked", "cancelled"] as const;
+
+export function assertCreatableStatus(status: Status): void {
+  if (!(CREATE_STATUSES as readonly Status[]).includes(status)) {
+    throw new Error(`cannot create with status ${status} (claim first, then complete via update)`);
+  }
+}
+
 export function assertAssignee(assignee: string): void {
   if (assignee === "") {
     throw new Error("assignee must not be an empty string (omit it when unassigned)");

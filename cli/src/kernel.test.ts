@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { firstDuplicateId, itemId, slugify } from "./ids.js";
 import { itemsById, loadItems } from "./items.js";
+import { assertParentEdge, expectedParentType } from "./relations.js";
 import { assertClaimAndBlocked, canTransition, isClaimed, unclaim } from "./status.js";
 
 describe("ids", () => {
@@ -114,5 +115,23 @@ describe("items (shared tree scan)", () => {
     expect(byId.get("bug-empty-password-500")?.type).toBe("bug");
     expect(byId.size).toBe(items.length);
     expect(firstDuplicateId(items.map((i) => i.id))).toBeUndefined();
+  });
+});
+
+describe("relations (hierarchy edges)", () => {
+  it("maps child type to required parent type", () => {
+    expect(expectedParentType("initiative")).toBeNull();
+    expect(expectedParentType("epic")).toBe("initiative");
+    expect(expectedParentType("story")).toBe("epic");
+    expect(expectedParentType("task")).toBe("story");
+    expect(expectedParentType("bug")).toBe("story");
+  });
+
+  it("rejects skip-level and rooted parents", () => {
+    assertParentEdge("initiative", null);
+    assertParentEdge("epic", "initiative");
+    expect(() => assertParentEdge("initiative", "epic")).toThrow(/cannot have a parent/);
+    expect(() => assertParentEdge("task", "initiative")).toThrow(/must live under a story/);
+    expect(() => assertParentEdge("epic", undefined)).toThrow(/requires parent type initiative/);
   });
 });

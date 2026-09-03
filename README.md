@@ -2,7 +2,7 @@
 
 **Git-native project management for builders and agents.**
 
-Tasks live *inside* the repository as Markdown. Create a file, open a branch, update YAML — the whole team (and any agent) stays in sync. No separate board to drift out of date.
+Tasks live _inside_ the repository as Markdown. Create a file, open a branch, update YAML — the whole team (and any agent) stays in sync. No separate board to drift out of date.
 
 > **Status:** early design — convention + CLI first.
 
@@ -38,11 +38,11 @@ Each item is a Markdown file with **YAML frontmatter** (status and other fields)
 
 ## What’s shipping (phased)
 
-| Phase | Deliverable |
-| --- | --- |
+| Phase | Deliverable                                       |
+| ----- | ------------------------------------------------- |
 | **1** | Folder + frontmatter **convention** and templates |
-| **1** | **CLI** to create, list, and update tasks |
-| **2** | Viewer / board UI over the tree |
+| **1** | **CLI** to create, list, and update tasks         |
+| **2** | Viewer / board UI over the tree                   |
 | **3** | Agent hooks / SDK so agents follow the same rules |
 
 ## Example task file
@@ -61,9 +61,11 @@ updated: "2026-09-03"
 # Add login rate limiting
 
 ## Context
+
 ...
 
 ## Acceptance
+
 - [ ] ...
 ```
 
@@ -85,7 +87,7 @@ v0 stubs (YAML frontmatter + Context / Acceptance / Notes) live in [`templates/`
 - [`templates/task.md`](templates/task.md)
 - [`templates/bug.md`](templates/bug.md)
 
-Copy a stub into `tasks/` per [`docs/convention.md`](docs/convention.md). Future CLI `arggon create` should copy from these templates.
+Copy a stub into `tasks/` per [`docs/convention.md`](docs/convention.md), or use `arggon create` (copies from these templates).
 
 ## CLI (Phase 1)
 
@@ -104,6 +106,10 @@ npm run lint
 
 `arggon init` creates `tasks/.convention.yml` and copies `templates/` (no overwrite unless `--force`; already-initialized repos are a no-op).
 
+`arggon create <type> <title>` writes a work item under `tasks/` from the templates. Non-initiative types need `--parent <id>`. Defaults: `status: todo`, `created`/`updated` today. Flags: `--id`, `--assignee`, `--status` (not `done`), `--blocked-reason`.
+
+Shared kernel: `cli/src/paths.ts`, `frontmatter.ts`, `ids.ts`, `status.ts`, `items.ts`, `relations.ts`.
+
 Fixtures: [fixtures/](fixtures/).
 
 ## Contributing
@@ -117,4 +123,3 @@ TBD — OSI-approved license before a public release.
 ---
 
 Built in the open by [Arggon](https://github.com/Arggon).
-`arggon create <type> <title>` writes a work item under tasks/ from templates. See `arggon create --help`.

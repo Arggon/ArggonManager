@@ -4,15 +4,14 @@ import { stringifyFrontmatter, type Frontmatter } from "./frontmatter.js";
 import { innerSlug, isItemType, itemId, slugify, type ItemType } from "./ids.js";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
 import { bundledTemplatesDir, findTasksDir, newItemPath, repoRootFromTasks } from "./paths.js";
-import { assertAssignee, assertClaimAndBlocked, assertStatus, type Status } from "./status.js";
-
-const PARENT_TYPE: Record<ItemType, ItemType | null> = {
-  initiative: null,
-  epic: "initiative",
-  story: "epic",
-  task: "story",
-  bug: "story",
-};
+import { assertParentEdge, expectedParentType } from "./relations.js";
+import {
+  assertAssignee,
+  assertClaimAndBlocked,
+  assertCreatableStatus,
+  assertStatus,
+  type Status,
+} from "./status.js";
 
 export type CreateOptions = {
   cwd: string;
@@ -49,6 +48,7 @@ export function runCreate(opts: CreateOptions): CreateResult {
   const statusRaw = opts.status ?? "todo";
   assertStatus(statusRaw);
   const status: Status = statusRaw;
+  assertCreatableStatus(status);
   if (opts.assignee !== undefined) assertAssignee(opts.assignee);
   assertClaimAndBlocked({
     type,
@@ -57,7 +57,7 @@ export function runCreate(opts: CreateOptions): CreateResult {
     blockedReason: opts.blockedReason,
   });
 
-  const requiredParent = PARENT_TYPE[type];
+  const requiredParent = expectedParentType(type);
   if (requiredParent === null) {
     if (opts.parent) throw new Error("initiative cannot have --parent");
   } else if (!opts.parent) {
@@ -82,11 +82,7 @@ export function runCreate(opts: CreateOptions): CreateResult {
     if (!parentItem) {
       throw new Error(`parent '${opts.parent}' not found under tasks/`);
     }
-    if (parentItem.type !== requiredParent) {
-      throw new Error(
-        `parent '${opts.parent}' is type ${parentItem.type}, but ${type} must live under a ${requiredParent}`,
-      );
-    }
+    assertParentEdge(type, parentItem.type);
   }
 
   const filePath = newItemPath({

@@ -9,5 +9,6 @@ Shared kernel (import these; do not fork schema logic):
 - `ids.ts` — kebab ids, uniqueness helpers, task-/bug- prefixes
 - `status.ts` — statuses, transitions, claim / blocked_reason rules
 - `items.ts` — walk the tasks tree (shared reader for create/list/update/validate)
+- `relations.ts` — parent-type edges (epic→initiative, story→epic, task/bug→story)
 
 Commands: `hello`, `init`, `create`.
