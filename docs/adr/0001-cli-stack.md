@@ -1,7 +1,7 @@
 # 0001 CLI stack (Phase 1)
 
-- Status: Proposed
-- Scaffold PR: seeks Architect **Accepted** with #8 implementation
+- Status: Accepted
+- Accepted with: #8 scaffold PR (#25)
 - Date: 2026-09-03
 - Deciders: Software Developer (author), Software Architect (review), Project Manager (aware)
 
@@ -43,7 +43,7 @@ Binary name: **`arggon`** (matches [`docs/convention.md`](../convention.md) exam
 
 - Agents and humans need **Node 20+** to run or develop the CLI.
 - Distribution for Phase 1 is **npm / npx** (and local `npm link` / `npm run`); a single-binary ship is deferred.
-- Scaffold (#8) uses root package.json + `cli/` sources + root `fixtures/`; ADR stays Proposed until Architect accepts with the scaffold PR.
+- Scaffold (#8) uses root package.json + `cli/` sources + root `fixtures/`; Accepted with the #8 scaffold PR once Architect signs off on this change set.
 - Strong DX: YAML/frontmatter ecosystem, fast iteration, easy JSON stdout for agents.
 
 ## Alternatives considered
