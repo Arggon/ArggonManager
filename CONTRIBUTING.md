@@ -50,4 +50,4 @@ Follow claim rules in the convention: for `story` / `task` / `bug`, `in_progress
 
 ## License
 
-License is tracked in issue #18 — do not assume a license until that lands.
+MIT — see [LICENSE](LICENSE).
