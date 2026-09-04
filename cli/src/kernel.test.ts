@@ -102,6 +102,24 @@ x-agent: grok
     expect(out).toContain("x-agent: grok");
     expect(parseFrontmatter(out).data["x-agent"]).toBe("grok");
   });
+
+  it("omits nulled official keys instead of writing literal null", () => {
+    const out = stringifyFrontmatter(
+      {
+        type: "task",
+        status: "todo",
+        id: "task-x",
+        title: "X",
+        assignee: null,
+        blocked_reason: null,
+        labels: [],
+      },
+      "# X\n",
+    );
+    expect(out).not.toContain("assignee");
+    expect(out).not.toContain("blocked_reason");
+    expect(out).not.toContain("null");
+  });
 });
 
 describe("items (shared tree scan)", () => {

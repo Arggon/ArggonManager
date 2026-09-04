@@ -199,4 +199,45 @@ describe("CLI --json", () => {
     expect(result.stdout).toMatch(/id\s+type\s+status\s+assignee\s+title/);
     expect(result.stdout).toContain("launch-mvp");
   });
+
+  it("arggon update --json emits the contract {item} payload", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-json-update-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    const result = runCli(["update", "launch-mvp", "--title", "Launch MVP v2", "--json"], dir);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body).toMatchObject({
+      ok: true,
+      schemaVersion: JSON_SCHEMA_VERSION,
+      conventionVersion: 0,
+      command: "update",
+    });
+    expect(body.item).toMatchObject({
+      id: "launch-mvp",
+      type: "initiative",
+      title: "Launch MVP v2",
+      path: "tasks/launch-mvp/launch-mvp.md",
+    });
+  });
+
+  it("arggon update --json errors with UPDATE_FAILED on unknown id", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-json-update-err-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    const result = runCli(["update", "nope", "--status", "todo", "--json"], dir);
+    expect(result.status).toBe(1);
+    const body = parseStdout(result.stdout);
+    expect(body.ok).toBe(false);
+    expect(body.command).toBe("update");
+    expect(body.error).toMatchObject({ code: "UPDATE_FAILED" });
+  });
+
+  it("arggon update without --json stays human-readable", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-human-update-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    const result = runCli(["update", "launch-mvp", "--status", "in_progress"], dir);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("arggon update: initiative launch-mvp (status)");
+  });
 });
