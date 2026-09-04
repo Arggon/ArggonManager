@@ -108,6 +108,8 @@ Fixtures: [fixtures/](fixtures/).
 
 ## Contributing
 
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 Ideas on folder layout, frontmatter schema, and CLI UX are especially useful right now. Open an issue. Please follow the [task convention](docs/convention.md) when proposing sample trees or templates.
 
 ## License
