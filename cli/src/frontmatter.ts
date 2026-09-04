@@ -63,6 +63,8 @@ const OFFICIAL_ORDER = [
   "blocked_reason",
 ] as const;
 
+const OFFICIAL_KEYS: Set<string> = new Set(OFFICIAL_ORDER);
+
 export function stringifyFrontmatter(data: Frontmatter, body: string): string {
   const lines: string[] = [FENCE];
   const seen = new Set<string>();
@@ -75,7 +77,7 @@ export function stringifyFrontmatter(data: Frontmatter, body: string): string {
     seen.add(key);
   }
   const extras = Object.keys(data)
-    .filter((k) => !seen.has(k) && data[k] !== undefined)
+    .filter((k) => !seen.has(k) && !OFFICIAL_KEYS.has(k) && data[k] !== undefined)
     .sort();
   for (const key of extras) {
     lines.push(`${key}: ${formatValue(key, data[key])}`);

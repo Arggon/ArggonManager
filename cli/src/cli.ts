@@ -6,6 +6,7 @@ import { runCreate } from "./create.js";
 import { runInit, type InitResult } from "./init.js";
 import { bindJsonProgram, failJson, jsonEnabled, successJson } from "./json.js";
 import { formatListTable, runList } from "./list.js";
+import { runUpdate } from "./update.js";
 
 const program = new Command();
 
@@ -178,6 +179,70 @@ program
       process.exitCode = 1;
     }
   });
+
+program
+  .command("update")
+  .description("Update frontmatter fields of a work item")
+  .argument("<id>", "work item id")
+  .option("--title <title>", "new title (non-empty)")
+  .option("--status <status>", "new status (must follow v0 transitions)")
+  .option("--assignee <login>", "new assignee (claimable types need one when in_progress)")
+  .option("--unassign", "clear assignee (in_progress -> todo does this by default)", false)
+  .option("--labels <csv>", "replace the full labels list (comma-separated)")
+  .option("--blocked-reason <text>", "required when status becomes blocked")
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action(
+    (
+      id: string,
+      opts: {
+        title?: string;
+        status?: string;
+        assignee?: string;
+        unassign?: boolean;
+        labels?: string;
+        blockedReason?: string;
+        json?: boolean;
+      },
+    ) => {
+      const json = jsonEnabled(opts);
+      try {
+        const result = runUpdate({
+          cwd: process.cwd(),
+          id,
+          title: opts.title,
+          status: opts.status,
+          assignee: opts.assignee,
+          unassign: opts.unassign,
+          labels: opts.labels,
+          blockedReason: opts.blockedReason,
+        });
+        if (json) {
+          successJson(
+            "update",
+            { item: toContractWorkItem(result.item, result.root) },
+            readConventionVersion(result.root),
+          );
+          return;
+        }
+        const what = result.changed.length > 0 ? ` (${result.changed.join(", ")})` : "";
+        console.log(`arggon update: ${result.item.type} ${result.id}${what}`);
+        console.log(`  ${result.path}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (json) {
+          failJson({
+            command: "update",
+            message,
+            code: "UPDATE_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
+        console.error(`arggon update: ${message}`);
+        process.exitCode = 1;
+      }
+    },
+  );
 
 function printInitHuman(result: InitResult): void {
   if (result.alreadyInitialized && !result.force) {
