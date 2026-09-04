@@ -126,4 +126,77 @@ describe("CLI --json", () => {
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("arggon create: initiative launch-mvp");
   });
+
+  it("arggon --json list emits the v1 envelope with full WorkItems", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-json-list-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    const result = runCli(["--json", "list"], dir);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toMatch(/\n$/);
+    expect(result.stdout.trim().split("\n")).toHaveLength(1);
+    const body = parseStdout(result.stdout);
+    expect(body).toMatchObject({
+      ok: true,
+      schemaVersion: JSON_SCHEMA_VERSION,
+      conventionVersion: 0,
+      command: "list",
+    });
+    expect(Array.isArray(body.items)).toBe(true);
+    expect((body.items as Array<{ id: string }>).map((i) => i.id)).toEqual(["auth", "launch-mvp"]);
+    expect((body.items as Array<Record<string, unknown>>)[0]).toEqual({
+      id: "auth",
+      type: "epic",
+      status: "todo",
+      title: "Auth",
+      assignee: null,
+      parent: "launch-mvp",
+      labels: [],
+      created: expect.any(String),
+      updated: expect.any(String),
+      path: "tasks/launch-mvp/auth/auth.md",
+      blocked_reason: null,
+    });
+  });
+
+  it("arggon list --json (flag after command) also works and filters compose", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-json-list-filter-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    const result = runCli(["list", "--type", "initiative", "--json"], dir);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body.ok).toBe(true);
+    expect((body.items as Array<{ id: string }>).map((i) => i.id)).toEqual(["launch-mvp"]);
+  });
+
+  it("arggon list --json on an empty tree is ok:true with items:[]", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-json-list-empty-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    const result = runCli(["list", "--json"], dir);
+    expect(result.status).toBe(0);
+    expect(parseStdout(result.stdout)).toMatchObject({ ok: true, command: "list", items: [] });
+  });
+
+  it("arggon list --json errors with LIST_FAILED on bad filter", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-json-list-err-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    const result = runCli(["list", "--status", "wip", "--json"], dir);
+    expect(result.status).toBe(1);
+    const body = parseStdout(result.stdout);
+    expect(body.ok).toBe(false);
+    expect(body.command).toBe("list");
+    expect(body.error).toMatchObject({ code: "LIST_FAILED" });
+  });
+
+  it("arggon list without --json prints a table", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-human-list-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    const result = runCli(["list"], dir);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toMatch(/id\s+type\s+status\s+assignee\s+title/);
+    expect(result.stdout).toContain("launch-mvp");
+  });
 });

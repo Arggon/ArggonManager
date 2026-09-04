@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { runList, splitFrontmatter } from "./list.js";
+import { toContractWorkItem } from "./contract.js";
+import { formatListTable, runList } from "./list.js";
 
 function write(root: string, rel: string, content: string): void {
   const full = join(root, rel);
@@ -119,7 +120,7 @@ parent: story-login
 x-custom: keep-me
 ---
 
-Body without an H1 should fall back to id.
+Body without an H1 has no title (contract null).
 `,
   );
   write(
@@ -152,32 +153,11 @@ assignee: me-user
   return root;
 }
 
-describe("splitFrontmatter", () => {
-  it("parses YAML and body", () => {
-    const result = splitFrontmatter(`---
-type: task
-title: Hello
----
-
-# Body
-`);
-    expect(result.yamlError).toBeNull();
-    expect(result.data?.type).toBe("task");
-    expect(result.body).toContain("# Body");
-  });
-});
-
 describe("runList", () => {
   it("walks nested tree and sorts lexicographically by id", () => {
     const dir = makeTree();
-    const result = runList({ dir });
-    expect(result.exitCode).toBe(0);
-    const ids = result.stdout
-      .trim()
-      .split("\n")
-      .slice(1)
-      .map((line) => line.split(/\s{2,}/)[0]);
-    expect(ids).toEqual([
+    const { items } = runList({ cwd: dir });
+    expect(items.map((i) => i.id)).toEqual([
       "auth",
       "bug-empty-password-500",
       "launch-mvp",
@@ -192,133 +172,124 @@ describe("runList", () => {
 
   it("composes filters with AND", () => {
     const dir = makeTree();
-    const result = runList({ dir, type: "task", status: "todo" });
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain("task-rate-limit");
-    expect(result.stdout).toContain("task-h1-only");
-    expect(result.stdout).not.toContain("task-mine");
-    expect(result.stdout).not.toContain("bug-empty-password-500");
+    const { items } = runList({ cwd: dir, type: "task", status: "todo" });
+    const ids = items.map((i) => i.id);
+    expect(ids).toContain("task-rate-limit");
+    expect(ids).toContain("task-h1-only");
+    expect(ids).not.toContain("task-mine");
+    expect(ids).not.toContain("bug-empty-password-500");
   });
 
-  it("emits stable --json schema", () => {
+  it("returns kernel items with stable fields", () => {
     const dir = makeTree();
-    const result = runList({ dir, json: true });
-    expect(result.exitCode).toBe(0);
-    const parsed = JSON.parse(result.stdout) as {
-      schemaVersion: number;
-      items: Array<Record<string, unknown>>;
-    };
-    expect(parsed.schemaVersion).toBe(0);
-    const item = parsed.items.find((entry) => entry.id === "task-rate-limit");
-    expect(item).toEqual({
+    const { root, items } = runList({ cwd: dir });
+    expect(root).toBe(dir);
+    const task = items.find((i) => i.id === "task-rate-limit");
+    expect(task).toMatchObject({
+      type: "task",
+      status: "todo",
+      parent: "story-login",
+      labels: ["security"],
+    });
+    expect(task?.title).toBeUndefined();
+    const bug = items.find((i) => i.id === "bug-empty-password-500");
+    expect(bug).toMatchObject({ assignee: "bob", blockedReason: "Waiting on repro" });
+  });
+
+  it("maps to the full contract shape with nulls", () => {
+    const dir = makeTree();
+    const { root, items } = runList({ cwd: dir });
+    const task = toContractWorkItem(
+      items.find((i) => i.id === "task-rate-limit")!,
+      root,
+    );
+    expect(task).toEqual({
       id: "task-rate-limit",
       type: "task",
       status: "todo",
-      title: "Add login rate limiting",
+      title: null,
       assignee: null,
       parent: "story-login",
       labels: ["security"],
+      created: null,
+      updated: null,
       path: "tasks/launch-mvp/auth/story-login/task-rate-limit.md",
+      blocked_reason: null,
     });
-    expect(Object.keys(item!)).toEqual([
-      "id",
-      "type",
-      "status",
-      "title",
-      "assignee",
-      "parent",
-      "labels",
-      "path",
-    ]);
   });
 
-  it("returns empty list with exit 0", () => {
+  it("returns an empty list (no failure)", () => {
     const dir = makeTree();
-    const table = runList({ dir, type: "bug", status: "done" });
-    expect(table.exitCode).toBe(0);
-    expect(table.stdout).toBe("id  type  status  assignee  title\n");
-
-    const json = runList({ dir, type: "bug", status: "done", json: true });
-    expect(json.exitCode).toBe(0);
-    expect(JSON.parse(json.stdout)).toEqual({ schemaVersion: 0, items: [] });
+    const { items } = runList({ cwd: dir, type: "bug", status: "done" });
+    expect(items).toEqual([]);
+    expect(formatListTable(items)).toBe("id  type  status  assignee  title\n");
   });
 
   it("errors when tasks/ is missing", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-list-empty-"));
-    const result = runList({ dir });
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).toMatch(/tasks\/ not found/);
+    expect(() => runList({ cwd: dir })).toThrow(/No tasks\/ convention/);
   });
 
   it("errors on invalid enum values", () => {
     const dir = makeTree();
-    const badType = runList({ dir, type: "feature" });
-    expect(badType.exitCode).toBe(1);
-    expect(badType.stderr).toMatch(/unknown type/);
-    expect(badType.stderr).toMatch(/initiative/);
-
-    const badStatus = runList({ dir, status: "wip" });
-    expect(badStatus.exitCode).toBe(1);
-    expect(badStatus.stderr).toMatch(/unknown status/);
-    expect(badStatus.stderr).toMatch(/in_progress/);
+    expect(() => runList({ cwd: dir, type: "feature" })).toThrow(/unknown type/);
+    expect(() => runList({ cwd: dir, type: "feature" })).toThrow(/initiative/);
+    expect(() => runList({ cwd: dir, status: "wip" })).toThrow(/unknown status/);
+    expect(() => runList({ cwd: dir, status: "wip" })).toThrow(/in_progress/);
   });
 
-  it("falls back title: frontmatter, then H1, then id", () => {
+  it("leaves title undefined when frontmatter has none (no H1 fallback)", () => {
     const dir = makeTree();
-    const result = runList({ dir, json: true });
-    const items = (JSON.parse(result.stdout) as { items: Array<{ id: string; title: string }> })
-      .items;
-    expect(items.find((i) => i.id === "launch-mvp")?.title).toBe("Launch MVP");
-    expect(items.find((i) => i.id === "task-h1-only")?.title).toBe("Derived from H1");
-    expect(items.find((i) => i.id === "task-no-title")?.title).toBe("task-no-title");
+    const { root, items } = runList({ cwd: dir });
+    const byId = new Map(items.map((i) => [i.id, i]));
+    expect(byId.get("launch-mvp")?.title).toBe("Launch MVP");
+    expect(byId.get("task-h1-only")?.title).toBeUndefined();
+    expect(byId.get("task-no-title")?.title).toBeUndefined();
+    // Contract renders them as null; tables fall back to id.
+    expect(toContractWorkItem(byId.get("task-h1-only")!, root).title).toBeNull();
+    expect(formatListTable([byId.get("task-h1-only")!])).toContain("task-h1-only  task");
   });
 
   it("skips markdown without type:", () => {
     const dir = makeTree();
-    const result = runList({ dir, json: true });
-    const paths = (JSON.parse(result.stdout) as { items: Array<{ path: string }> }).items.map(
-      (i) => i.path,
-    );
+    const { items } = runList({ cwd: dir });
+    const paths = items.map((i) => i.filePath);
     expect(paths.some((p) => p.endsWith("notes.md"))).toBe(false);
     expect(paths.some((p) => p.endsWith("README.md"))).toBe(false);
   });
 
   it("resolves @me via GITHUB_USER", () => {
     const dir = makeTree();
-    const result = runList(
-      { dir, assignee: "@me", json: true },
+    const { items } = runList(
+      { cwd: dir, assignee: "@me" },
       { env: { ...process.env, GITHUB_USER: "me-user" } },
     );
-    expect(result.exitCode).toBe(0);
-    const items = (JSON.parse(result.stdout) as { items: Array<{ id: string }> }).items;
     expect(items.map((i) => i.id)).toEqual(["task-mine"]);
   });
 
   it("errors when @me cannot be resolved", () => {
     const dir = makeTree();
-    const result = runList(
-      { dir, assignee: "@me" },
-      {
-        env: { ...process.env, GITHUB_USER: "", GITHUB_ACTOR: "" },
-        resolveMe: () => undefined,
-      },
-    );
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).toMatch(/@me/);
+    expect(() =>
+      runList(
+        { cwd: dir, assignee: "@me" },
+        {
+          env: { ...process.env, GITHUB_USER: "", GITHUB_ACTOR: "" },
+          resolveMe: () => undefined,
+        },
+      ),
+    ).toThrow(/@me/);
   });
 
   it("filters assigned vs unassigned", () => {
     const dir = makeTree();
-    const assigned = runList({ dir, assignee: "alice", json: true });
-    expect(
-      (JSON.parse(assigned.stdout) as { items: Array<{ id: string }> }).items.map((i) => i.id),
-    ).toEqual(["auth"]);
+    const { items: assigned } = runList({ cwd: dir, assignee: "alice" });
+    expect(assigned.map((i) => i.id)).toEqual(["auth"]);
 
-    const table = runList({ dir, type: "task", status: "todo" });
-    expect(table.stdout).toMatch(/task-rate-limit\s+task\s+todo\s+-\s+/);
+    const { items: todos } = runList({ cwd: dir, type: "task", status: "todo" });
+    expect(formatListTable(todos)).toMatch(/task-rate-limit\s+task\s+todo\s+-\s+/);
   });
 
-  it("fails on broken YAML in a work-item-looking file", () => {
+  it("fails on invalid items with file context", () => {
     const dir = makeTree();
     write(
       dir,
@@ -332,18 +303,14 @@ id: task-broken
 # Broken
 `,
     );
-    const result = runList({ dir });
-    expect(result.exitCode).toBe(1);
-    expect(result.stderr).toMatch(/task-broken\.md/);
-    expect(result.stderr).toMatch(/invalid YAML/i);
+    expect(() => runList({ cwd: dir })).toThrow(/task-broken\.md/);
   });
 
-  it("shows unassigned as - in table and null in JSON", () => {
+  it("shows unassigned as - in table and null in contract", () => {
     const dir = makeTree();
-    const table = runList({ dir, type: "task", status: "todo" });
-    expect(table.stdout).toMatch(/task-h1-only\s+task\s+todo\s+-\s+Derived from H1/);
-    const json = runList({ dir, type: "initiative", json: true });
-    const item = (JSON.parse(json.stdout) as { items: Array<{ assignee: unknown }> }).items[0];
-    expect(item.assignee).toBeNull();
+    const { root, items: todos } = runList({ cwd: dir, type: "task", status: "todo" });
+    expect(formatListTable(todos)).toMatch(/task-h1-only\s+task\s+todo\s+-\s+task-h1-only/);
+    const { items: initiatives } = runList({ cwd: dir, type: "initiative" });
+    expect(toContractWorkItem(initiatives[0]!, root).assignee).toBeNull();
   });
 });
