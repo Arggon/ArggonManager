@@ -5,6 +5,7 @@ import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
 import { runInit, type InitResult } from "./init.js";
 import { bindJsonProgram, failJson, jsonEnabled, successJson } from "./json.js";
+import { formatListTable, runList } from "./list.js";
 
 const program = new Command();
 
@@ -133,6 +134,50 @@ program
       }
     },
   );
+
+program
+  .command("list")
+  .description("List work items under tasks/ with optional filters")
+  .option("--status <status>", "exact v0 status (todo | in_progress | blocked | done | cancelled)")
+  .option("--type <type>", "exact v0 type (initiative | epic | story | task | bug)")
+  .option(
+    "--assignee <login>",
+    "exact assignee login; @me resolves via GITHUB_USER, then GITHUB_ACTOR, then `gh api user`",
+  )
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { status?: string; type?: string; assignee?: string; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runList({
+        cwd: process.cwd(),
+        status: opts.status,
+        type: opts.type,
+        assignee: opts.assignee,
+      });
+      if (json) {
+        successJson(
+          "list",
+          { items: result.items.map((item) => toContractWorkItem(item, result.root)) },
+          readConventionVersion(result.root),
+        );
+        return;
+      }
+      process.stdout.write(formatListTable(result.items));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "list",
+          message,
+          code: "LIST_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon list: ${message}`);
+      process.exitCode = 1;
+    }
+  });
 
 function printInitHuman(result: InitResult): void {
   if (result.alreadyInitialized && !result.force) {

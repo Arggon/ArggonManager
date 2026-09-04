@@ -99,12 +99,32 @@ Root install; TypeScript in cli/:
 npm install
 npm run arggon -- hello
 npm run arggon -- init /path/to/repo
+npm run arggon -- list
 npm run build
 npm test
 npm run lint
 ```
 
-`arggon init` creates `tasks/.convention.yml` and copies `templates/` (no overwrite unless `--force`; already-initialized repos are a no-op).
+`arggon init` creates `tasks/.convention.yml` and copies `templates/` (no overwrite unless --force; already-initialized repos are a no-op).
+
+### `arggon list`
+
+Finds `tasks/` with walk-up from cwd (same as `create`), loads work items with the shared kernel, and prints a table (or `--json`). Listing order is lexicographic by `id`. Filters compose with AND.
+
+```bash
+arggon list
+arggon list --status todo
+arggon list --type bug --assignee @me
+arggon list --json
+arggon --json list --type task --status in_progress
+```
+
+- --status <status>: exact v0 status (`todo`, `in_progress`, `blocked`, `done`, `cancelled`)
+- --type <type>: exact v0 type (`initiative`, `epic`, `story`, `task`, `bug`)
+- --assignee <login>: exact assignee. Special @me resolves via `GITHUB_USER`, then `GITHUB_ACTOR`, then `gh api user -q .login`
+- --json: one compact JSON object on stdout (envelope v1: `ok`, `schemaVersion: 1`, `conventionVersion`, `command: "list"`, `items: WorkItem[]`); failures emit `ok: false` with `code: "LIST_FAILED"`
+
+Empty results exit `0` (`items: []` with `--json`). Missing `tasks/`, invalid enums, unresolvable @me, or unreadable work-item files exit non-zero.
 
 `arggon create <type> <title>` writes a work item under `tasks/` from the templates. Non-initiative types need `--parent <id>`. Defaults: `status: todo`, `created`/`updated` today. Flags: `--id`, `--assignee`, `--status` (not `done`), `--blocked-reason`.
 
