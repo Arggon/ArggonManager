@@ -84,4 +84,46 @@ describe("CLI --json", () => {
     expect(body.error).toMatchObject({ code: "INIT_FAILED" });
     expect(result.stdout.trim().startsWith("{")).toBe(true);
   });
+
+  it("arggon create --json emits the contract {item} payload", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-json-create-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    const result = runCli(["create", "initiative", "Launch MVP", "--json"], dir);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body).toMatchObject({
+      ok: true,
+      schemaVersion: JSON_SCHEMA_VERSION,
+      conventionVersion: 0,
+      command: "create",
+    });
+    expect(body.item).toMatchObject({
+      id: "launch-mvp",
+      type: "initiative",
+      status: "todo",
+      title: "Launch MVP",
+      parent: null,
+      path: "tasks/launch-mvp/launch-mvp.md",
+    });
+    expect(existsSync(join(dir, "tasks/launch-mvp/launch-mvp.md"))).toBe(true);
+  });
+
+  it("arggon create --json errors with CREATE_FAILED on unknown parent", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-json-create-err-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    const result = runCli(["create", "epic", "Auth", "--parent", "nope", "--json"], dir);
+    expect(result.status).toBe(1);
+    const body = parseStdout(result.stdout);
+    expect(body.ok).toBe(false);
+    expect(body.command).toBe("create");
+    expect(body.error).toMatchObject({ code: "CREATE_FAILED" });
+  });
+
+  it("arggon create without --json stays human-readable", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-human-create-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    const result = runCli(["create", "initiative", "Launch MVP"], dir);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("arggon create: initiative launch-mvp");
+  });
 });

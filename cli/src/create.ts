@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { stringifyFrontmatter, type Frontmatter } from "./frontmatter.js";
 import { innerSlug, isItemType, itemId, slugify, type ItemType } from "./ids.js";
-import { itemsById, loadItems, type WorkItem } from "./items.js";
+import { itemsById, loadItems, tryLoadItem, type WorkItem } from "./items.js";
 import { bundledTemplatesDir, findTasksDir, newItemPath, repoRootFromTasks } from "./paths.js";
 import { assertParentEdge, expectedParentType } from "./relations.js";
 import {
@@ -28,6 +28,10 @@ export type CreateOptions = {
 export type CreateResult = {
   id: string;
   path: string;
+  /** Repo root (parent of tasks/). */
+  root: string;
+  /** The created item, reloaded from disk. */
+  item: WorkItem;
 };
 
 export function formatDate(d: Date): string {
@@ -124,9 +128,11 @@ export function runCreate(opts: CreateOptions): CreateResult {
   mkdirSync(dirname(filePath), { recursive: true });
   writeFileSync(filePath, stringifyFrontmatter(data, body), "utf8");
 
-  console.log(`arggon create: ${type} ${id}`);
-  console.log(`  ${filePath}`);
-  return { id, path: filePath };
+  const created = tryLoadItem(filePath);
+  if (!created) {
+    throw new Error(`Created item is unreadable: ${filePath}`);
+  }
+  return { id, path: filePath, root: repoRootFromTasks(tasksDir), item: created };
 }
 
 function resolveTemplate(tasksDir: string, type: ItemType): string {

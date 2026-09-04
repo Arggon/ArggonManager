@@ -1,7 +1,7 @@
 import { cpSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { runCreate } from "./create.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { runInit } from "./init.js";
@@ -193,5 +193,24 @@ describe("create", () => {
         id: "rate-limit",
       }),
     ).toThrow(/already exists/);
+  });
+
+  it("returns the created WorkItem and prints nothing (CLI prints)", () => {
+    const dir = primed();
+    const log = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    try {
+      const result = runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
+      expect(log).not.toHaveBeenCalled();
+      expect(result.root).toBe(dir);
+      expect(result.item).toMatchObject({
+        id: "launch-mvp",
+        type: "initiative",
+        status: "todo",
+        title: "Launch MVP",
+      });
+      expect(result.item.filePath).toBe(result.path);
+    } finally {
+      log.mockRestore();
+    }
   });
 });

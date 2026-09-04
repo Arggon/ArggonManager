@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { readConventionVersion } from "./convention.js";
+import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
 import { runInit, type InitResult } from "./init.js";
 import { bindJsonProgram, failJson, jsonEnabled, successJson } from "./json.js";
@@ -80,6 +81,7 @@ program
   .option("--assignee <login>", "assignee (omit when unassigned)")
   .option("--status <status>", "status (default: todo)", "todo")
   .option("--blocked-reason <text>", "required when --status blocked")
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (
       type: string,
@@ -90,10 +92,12 @@ program
         assignee?: string;
         status?: string;
         blockedReason?: string;
+        json?: boolean;
       },
     ) => {
+      const json = jsonEnabled(opts);
       try {
-        runCreate({
+        const result = runCreate({
           cwd: process.cwd(),
           type,
           title,
@@ -103,8 +107,27 @@ program
           status: opts.status,
           blockedReason: opts.blockedReason,
         });
+        if (json) {
+          successJson(
+            "create",
+            { item: toContractWorkItem(result.item, result.root) },
+            readConventionVersion(result.root),
+          );
+          return;
+        }
+        console.log(`arggon create: ${result.item.type} ${result.id}`);
+        console.log(`  ${result.path}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
+        if (json) {
+          failJson({
+            command: "create",
+            message,
+            code: "CREATE_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
         console.error(`arggon create: ${message}`);
         process.exitCode = 1;
       }
