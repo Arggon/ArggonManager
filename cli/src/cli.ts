@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import { readConventionVersion } from "./convention.js";
 import { runInit, type InitResult } from "./init.js";
-import { emitJson, failJson, jsonRequested, JSON_SCHEMA_VERSION } from "./json.js";
+import { bindJsonProgram, failJson, jsonEnabled, successJson } from "./json.js";
 
 const program = new Command();
 
@@ -11,9 +12,7 @@ program
   .version("0.0.0")
   .option("--json", "emit one JSON object on stdout (agent contract)", false);
 
-function useJson(cmdOpts?: { json?: unknown }): boolean {
-  return jsonRequested(program.opts()) || jsonRequested(cmdOpts);
-}
+bindJsonProgram(program);
 
 program
   .command("hello")
@@ -21,14 +20,8 @@ program
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action((opts: { json?: boolean }) => {
     const message = "arggon: hello from Phase 1 scaffold";
-    if (useJson(opts)) {
-      emitJson({
-        ok: true,
-        schemaVersion: JSON_SCHEMA_VERSION,
-        conventionVersion: 0,
-        command: "hello",
-        message,
-      });
+    if (jsonEnabled(opts)) {
+      successJson("hello", { message }, readConventionVersion(process.cwd()));
       return;
     }
     console.log(message);
@@ -41,29 +34,34 @@ program
   .option("-f, --force", "overwrite existing convention/templates", false)
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action((dir: string, opts: { force: boolean; json?: boolean }) => {
-    const json = useJson(opts);
+    const json = jsonEnabled(opts);
     try {
       const result = runInit({ dir, force: Boolean(opts.force) });
       if (json) {
-        emitJson({
-          ok: true,
-          schemaVersion: JSON_SCHEMA_VERSION,
-          conventionVersion: 0,
-          command: "init",
-          root: result.root,
-          alreadyInitialized: result.alreadyInitialized,
-          force: result.force,
-          created: result.created,
-          restored: result.restored,
-          conventionPath: result.conventionPath,
-        });
+        successJson(
+          "init",
+          {
+            root: result.root,
+            alreadyInitialized: result.alreadyInitialized,
+            force: result.force,
+            created: result.created,
+            restored: result.restored,
+            conventionPath: result.conventionPath,
+          },
+          readConventionVersion(result.root),
+        );
         return;
       }
       printInitHuman(result);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (json) {
-        failJson({ command: "init", message });
+        failJson({
+          command: "init",
+          message,
+          code: "INIT_FAILED",
+          conventionVersion: readConventionVersion(dir),
+        });
         return;
       }
       console.error(`arggon init: ${message}`);

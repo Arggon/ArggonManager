@@ -2,10 +2,11 @@
 
 Stable machine-readable stdout for agents and scripts. Every `--json` response is **exactly one JSON object** on stdout (plus a trailing newline).
 
-`--json` is a **global** flag on the root program:
+`--json` is a **global** flag on the root program, also accepted after the subcommand:
 
 ```bash
 arggon --json <command>
+arggon <command> --json
 ```
 
 Example: `arggon --json hello`.
@@ -235,6 +236,7 @@ Empty tree: `"items": []` with `ok: true`.
 
 ## Implementation notes
 
-- Formatter: `cli/src/json.ts` (`JSON_SCHEMA_VERSION`, envelope types, `emitJson`, `failJson`, `jsonEnabled`).
+- Formatter: `cli/src/json.ts` (`JSON_SCHEMA_VERSION`, envelope types, `emitJson`, `successJson`, `failJson`, `bindJsonProgram` + `jsonEnabled`).
+- Convention version: `cli/src/convention.ts` (`CONVENTION_VERSION`, `readConventionVersion` reads `tasks/.convention.yml`).
 - Domain types: `cli/src/types.ts` (`WorkItem`, `Issue`).
 - Global flag: `arggon --json <command>` (before the subcommand). `arggon <command> --json` is also accepted.

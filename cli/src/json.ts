@@ -1,4 +1,5 @@
 import type { Command } from "commander";
+import { CONVENTION_VERSION } from "./convention.js";
 
 export type { Issue, ItemType, Status, WorkItem } from "./types.js";
 
@@ -54,7 +55,7 @@ export function failJson(opts: FailJsonOptions): void {
   emitJson({
     ok: false,
     schemaVersion: JSON_SCHEMA_VERSION,
-    conventionVersion: opts.conventionVersion ?? 0,
+    conventionVersion: opts.conventionVersion ?? CONVENTION_VERSION,
     command: opts.command,
     error,
   });
@@ -65,7 +66,7 @@ export function failJson(opts: FailJsonOptions): void {
 export function successJson(
   command: string,
   payload: Record<string, unknown> = {},
-  conventionVersion = 0,
+  conventionVersion = CONVENTION_VERSION,
 ): void {
   emitJson({
     ok: true,
