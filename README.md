@@ -114,7 +114,7 @@ Ideas on folder layout, frontmatter schema, and CLI UX are especially useful rig
 
 ## License
 
-TBD — OSI-approved license before a public release.
+MIT — see [LICENSE](LICENSE).
 
 ---
 
