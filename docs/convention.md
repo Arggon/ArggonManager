@@ -233,17 +233,17 @@ Claim applies **only** to claimable types: **`story` | `task` | `bug`**.
 
 **Claim** = (`type` ∈ {story, task, bug}) ∧ `assignee` set ∧ `status: in_progress`.
 
+Concurrency / conflict handling (refuse steal unless `--force`, unclaim recovery, stale deferred): see [`claim.md`](claim.md).
+
 ### Unclaim (v0 CLI `update` default)
 
-`in_progress` → `todo` **clears** `assignee` to null (omit or `null`). Documented as the CLI `update` default.
+`in_progress` → `todo` **clears** `assignee` to null (omit or `null`). Documented as the CLI `update` default. See also [`claim.md`](claim.md).
 
 ### Reopen / status policy
 
 - **`validate` ALLOWS** `done|cancelled` → `todo` (schema permits).
 - **Playbook:** agents **MUST NOT** reopen; humans may via documented escape hatch (`arggon reopen` / `--force`).
 - No status rollup — parent status is independent of children.
-
-Full claim concurrency / conflict handling is deferred to a later issue (#16).
 
 ### `blocked_reason`
 

@@ -74,6 +74,7 @@ Exact v0 fields are documented in [`docs/convention.md`](docs/convention.md) (la
 ## Docs
 
 - [Task convention](docs/convention.md) — folder layout, frontmatter schema, statuses (v0 locked)
+- [Claim / concurrency](docs/claim.md) — claim definition, conflict/`--force`, unclaim recovery
 - [Engineering conventions](docs/engineering.md) — repo structure, review bar, testing, ADRs (Phase 1)
 - Sample tree: [`tasks/launch-mvp/`](tasks/launch-mvp/)
 
@@ -128,7 +129,7 @@ Empty results exit `0` (`items: []` with `--json`). Missing `tasks/`, invalid en
 
 `arggon create <type> <title>` writes a work item under `tasks/` from the templates. Non-initiative types need `--parent <id>`. Defaults: `status: todo`, `created`/`updated` today. Flags: `--id`, `--assignee`, `--status` (not `done`), `--blocked-reason`.
 
-`arggon update <id>` edits frontmatter in place (only requested fields). Enforces v0 status transitions, the claim rule (`in_progress` on story/task/bug needs `--assignee`), and `blocked_reason` rules; always touches `updated`. Transitions `in_progress` → `todo` clear `assignee` by default (override with explicit `--assignee`); leaving `blocked` clears `blocked_reason`. Reassigning a claimed item fails with a claim conflict (see #16). Flags: `--title`, `--status`, `--assignee`, `--unassign`, `--labels <csv>` (replace), `--blocked-reason`, `--json` (envelope v1 `{ item }`, failures `UPDATE_FAILED`).
+`arggon update <id>` edits frontmatter in place (only requested fields). Enforces v0 status transitions, the claim rule (`in_progress` on story/task/bug needs `--assignee`), and `blocked_reason` rules; always touches `updated`. Transitions `in_progress` → `todo` clear `assignee` by default (override with explicit `--assignee`); leaving `blocked` clears `blocked_reason`. Reassigning a claimed item fails with a claim conflict unless `--force` (see [docs/claim.md](docs/claim.md)). Flags: `--title`, `--status`, `--assignee`, `--unassign`, `--labels <csv>` (replace), `--blocked-reason`, `--force`, `--json` (envelope v1 `{ item }`, failures `UPDATE_FAILED`).
 
 Shared kernel: `cli/src/paths.ts`, `frontmatter.ts`, `ids.ts`, `status.ts`, `items.ts`, `relations.ts`.
 
