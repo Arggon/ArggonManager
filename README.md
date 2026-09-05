@@ -100,6 +100,7 @@ npm install
 npm run arggon -- hello
 npm run arggon -- init /path/to/repo
 npm run arggon -- list
+npm run arggon -- validate
 npm run build
 npm test
 npm run lint
@@ -128,6 +129,19 @@ Empty results exit `0` (`items: []` with `--json`). Missing `tasks/`, invalid en
 
 `arggon create <type> <title>` writes a work item under `tasks/` from the templates. Non-initiative types need `--parent <id>`. Defaults: `status: todo`, `created`/`updated` today. Flags: `--id`, `--assignee`, `--status` (not `done`), `--blocked-reason`.
 
+### `arggon validate`
+
+Checks `tasks/` frontmatter and tree integrity (schema, parents, naming, claim/blocked rules). Uses the shared items soft-scan (`walkTasksTree` / `softTryLoadItem`) so broken YAML still reports a file path. Exits non-zero when there are errors; warnings alone stay exit 0. Suitable for CI before commit.
+
+```bash
+arggon validate
+arggon validate --json
+npm run arggon -- validate
+```
+
+- `--json`: v1 envelope with `errors` / `warnings` (and `VALIDATE_FAILED` when failed)
+
+
 Shared kernel: `cli/src/paths.ts`, `frontmatter.ts`, `ids.ts`, `status.ts`, `items.ts`, `relations.ts`.
 
 Validate: `arggon validate` / `arggon validate --json` (CI gate; docs/json-output.md).
@@ -145,3 +159,4 @@ TBD — OSI-approved license before a public release.
 ---
 
 Built in the open by [Arggon](https://github.com/Arggon).
+
