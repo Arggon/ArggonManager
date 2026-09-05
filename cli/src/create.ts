@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { formatDate } from "./dates.js";
 import { stringifyFrontmatter, type Frontmatter } from "./frontmatter.js";
 import { innerSlug, isItemType, itemId, slugify, type ItemType } from "./ids.js";
 import { itemsById, loadItems, tryLoadItem, type WorkItem } from "./items.js";
@@ -34,12 +35,6 @@ export type CreateResult = {
   item: WorkItem;
 };
 
-export function formatDate(d: Date): string {
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 export function runCreate(opts: CreateOptions): CreateResult {
   if (!isItemType(opts.type)) {
