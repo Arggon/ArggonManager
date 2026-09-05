@@ -46,14 +46,13 @@ Any shared parsing should live with the CLI kernel (or a future extracted packag
 
 ## 4. Out of scope until Phase 1 CLI is stable
 
-Do **not** start a viewer package while these are still in flight:
+Do **not** start a viewer package while these are still in flight ([#15](https://github.com/Arggon/ArggonManager/issues/15) playbook is already merged):
 
 | Issue | Topic |
 | --- | --- |
 | [#12](https://github.com/Arggon/ArggonManager/issues/12) | `arggon update` |
 | [#13](https://github.com/Arggon/ArggonManager/issues/13) | `arggon validate` |
 | [#16](https://github.com/Arggon/ArggonManager/issues/16) | Claim / concurrency |
-| [#15](https://github.com/Arggon/ArggonManager/issues/15) | Agent playbook |
 
 Also aligns with [`docs/engineering.md`](./engineering.md) Phase 2 boundary notes: no pre-building viewer packages in Phase 1.
 
