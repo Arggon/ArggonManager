@@ -1,11 +1,11 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { basename, dirname, join, relative, sep } from "node:path";
-import { readConventionVersion, CONVENTION_VERSION } from "./convention.js";
-import { parseFrontmatter, stringArrayField, stringField } from "./frontmatter.js";
-import { assertValidId, isItemType, type ItemType } from "./ids.js";
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { basename, join, relative, sep } from "node:path";
+import { CONVENTION_VERSION, readConventionVersion } from "./convention.js";
+import { assertValidId } from "./ids.js";
+import { softTryLoadItem, walkTasksTree, type WorkItem } from "./items.js";
 import { findTasksDir, newItemPath, repoRootFromTasks } from "./paths.js";
 import { assertParentEdge, expectedParentType } from "./relations.js";
-import { ASSIGNEE_PATTERN, assertClaimAndBlocked, isStatus, type Status } from "./status.js";
+import { ASSIGNEE_PATTERN, assertClaimAndBlocked } from "./status.js";
 import type { Issue } from "./types.js";
 
 export type ValidateOptions = {
@@ -19,92 +19,18 @@ export type ValidateResult = {
   warnings: Issue[];
 };
 
-type SoftItem = {
-  type: ItemType;
-  status: Status;
-  id: string;
-  title?: string;
-  assignee?: string | null;
-  parent?: string | null;
-  labels: string[];
-  blockedReason?: string;
-  filePath: string;
-  containerDir: string;
-  relPath: string;
-};
+type SoftItem = WorkItem & { relPath: string };
 
 function posixRel(root: string, abs: string): string {
   return relative(root, abs).split(sep).join("/");
 }
 
-function push(errors: Issue[], path: string, message: string, code: string): void {
-  errors.push({ path, message, code });
+function push(bucket: Issue[], path: string, message: string, code: string): void {
+  bucket.push({ path, message, code });
 }
 
-/** Collect every file and directory under tasks/ (skipping dotfiles). */
-function walkTree(dir: string): { files: string[]; dirs: string[] } {
-  const files: string[] = [];
-  const dirs: string[] = [];
-  if (!existsSync(dir)) return { files, dirs };
-  const stack = [dir];
-  while (stack.length > 0) {
-    const cur = stack.pop()!;
-    for (const name of readdirSync(cur)) {
-      if (name.startsWith(".")) continue;
-      const full = join(cur, name);
-      const st = statSync(full);
-      if (st.isDirectory()) {
-        dirs.push(full);
-        stack.push(full);
-      } else {
-        files.push(full);
-      }
-    }
-  }
-  return { files, dirs };
-}
-
-function softLoad(filePath: string, root: string, errors: Issue[]): SoftItem | null {
-  const rel = posixRel(root, filePath);
-  let raw: string;
-  try {
-    raw = readFileSync(filePath, "utf8");
-  } catch (err) {
-    push(errors, rel, err instanceof Error ? err.message : String(err), "READ_FAILED");
-    return null;
-  }
-  if (!raw.startsWith("---")) return null;
-
-  let data: Record<string, unknown>;
-  try {
-    ({ data } = parseFrontmatter(raw));
-  } catch (err) {
-    push(errors, rel, err instanceof Error ? err.message : String(err), "BROKEN_YAML");
-    return null;
-  }
-
-  const typeRaw = stringField(data, "type");
-  if (!typeRaw) return null; // not a work item
-  if (!isItemType(typeRaw)) {
-    push(errors, rel, `unknown type '${typeRaw}'`, "UNKNOWN_TYPE");
-    return null;
-  }
-
-  const id = stringField(data, "id");
-  if (!id) {
-    push(errors, rel, "missing required field id", "MISSING_ID");
-    return null;
-  }
-
-  const statusRaw = stringField(data, "status");
-  if (!statusRaw) {
-    push(errors, rel, "missing required field status", "MISSING_STATUS");
-    return null;
-  }
-  if (!isStatus(statusRaw)) {
-    push(errors, rel, `unknown status '${statusRaw}'`, "UNKNOWN_STATUS");
-    return null;
-  }
+function checkItemShape(item: SoftItem, errors: Issue[]): void {
+  const { relPath: rel, filePath, type, id, status, assignee, blockedReason, data } = item;
 
   try {
     assertValidId(id);
@@ -112,7 +38,7 @@ function softLoad(filePath: string, root: string, errors: Issue[]): SoftItem | n
     push(errors, rel, err instanceof Error ? err.message : String(err), "INVALID_ID");
   }
 
-  if (typeRaw !== "task" && typeRaw !== "bug") {
+  if (type !== "task" && type !== "bug") {
     if (id.startsWith("task-") || id.startsWith("bug-")) {
       push(
         errors,
@@ -122,9 +48,9 @@ function softLoad(filePath: string, root: string, errors: Issue[]): SoftItem | n
       );
     }
   } else {
-    const prefix = typeRaw === "task" ? "task-" : "bug-";
+    const prefix = type === "task" ? "task-" : "bug-";
     if (!id.startsWith(prefix)) {
-      push(errors, rel, `${typeRaw} id must start with ${prefix}`, "INVALID_ID_PREFIX");
+      push(errors, rel, `${type} id must start with ${prefix}`, "INVALID_ID_PREFIX");
     }
   }
 
@@ -132,103 +58,24 @@ function softLoad(filePath: string, root: string, errors: Issue[]): SoftItem | n
   if (stem !== id) {
     push(errors, rel, `filename stem '${stem}' must equal id '${id}'`, "ID_FILENAME_MISMATCH");
   }
-
-  if (typeRaw === "task" && !stem.startsWith("task-")) {
+  if (type === "task" && !stem.startsWith("task-")) {
     push(errors, rel, "task filename must start with task-", "TYPE_FILENAME_MISMATCH");
   }
-  if (typeRaw === "bug" && !stem.startsWith("bug-")) {
+  if (type === "bug" && !stem.startsWith("bug-")) {
     push(errors, rel, "bug filename must start with bug-", "TYPE_FILENAME_MISMATCH");
   }
 
-  const assigneeField = data.assignee;
-  if (assigneeField === "") {
+  if (data.assignee === "") {
     push(errors, rel, "assignee must not be an empty string", "INVALID_ASSIGNEE");
   }
-  const assignee = stringField(data, "assignee") ?? null;
   if (assignee && !ASSIGNEE_PATTERN.test(assignee)) {
     push(errors, rel, `invalid assignee '${assignee}'`, "INVALID_ASSIGNEE");
   }
 
-  const blockedReason = stringField(data, "blocked_reason");
   try {
-    assertClaimAndBlocked({
-      type: typeRaw,
-      status: statusRaw,
-      assignee,
-      blockedReason,
-    });
+    assertClaimAndBlocked({ type, status, assignee, blockedReason });
   } catch (err) {
     push(errors, rel, err instanceof Error ? err.message : String(err), "CLAIM_OR_BLOCKED");
-  }
-
-  // Unknown unnamespaced keys → warning
-  const official = new Set([
-    "type",
-    "status",
-    "id",
-    "title",
-    "assignee",
-    "parent",
-    "labels",
-    "created",
-    "updated",
-    "blocked_reason",
-  ]);
-  for (const key of Object.keys(data)) {
-    if (!official.has(key) && !key.startsWith("x-") && key !== "extensions") {
-      // warnings collected by caller via side channel — use a deferred list
-    }
-  }
-
-  let labels: string[] = [];
-  try {
-    labels = stringArrayField(data, "labels");
-  } catch (err) {
-    push(errors, rel, err instanceof Error ? err.message : String(err), "INVALID_LABELS");
-  }
-
-  return {
-    type: typeRaw,
-    status: statusRaw,
-    id,
-    title: stringField(data, "title"),
-    assignee,
-    parent: stringField(data, "parent") ?? null,
-    labels,
-    blockedReason,
-    filePath,
-    containerDir: dirname(filePath),
-    relPath: rel,
-  };
-}
-
-function collectWarnings(
-  filePath: string,
-  root: string,
-  data: Record<string, unknown>,
-  warnings: Issue[],
-): void {
-  const official = new Set([
-    "type",
-    "status",
-    "id",
-    "title",
-    "assignee",
-    "parent",
-    "labels",
-    "created",
-    "updated",
-    "blocked_reason",
-  ]);
-  const rel = posixRel(root, filePath);
-  for (const key of Object.keys(data)) {
-    if (!official.has(key) && !key.startsWith("x-") && key !== "extensions") {
-      warnings.push({
-        path: rel,
-        message: `unknown unnamespaced frontmatter key '${key}'`,
-        code: "UNKNOWN_KEY",
-      });
-    }
   }
 }
 
@@ -249,25 +96,29 @@ export function runValidate(opts: ValidateOptions): ValidateResult {
     return { root, conventionVersion, errors, warnings };
   }
 
-  const { files, dirs } = walkTree(tasksDir);
+  const { files, dirs } = walkTasksTree(tasksDir);
   const items: SoftItem[] = [];
 
   for (const file of files) {
     if (!file.endsWith(".md")) continue;
-    // Re-parse for warnings after softLoad
-    const item = softLoad(file, root, errors);
-    if (!item) {
-      // may still be a typed file that failed earlier — try warning parse if type present
+    const rel = posixRel(root, file);
+    const loaded = softTryLoadItem(file);
+    if (loaded.kind === "skip") continue;
+    if (loaded.kind === "fatal") {
+      for (const issue of loaded.issues) {
+        push(errors, rel, issue.message, issue.code);
+      }
       continue;
     }
-    try {
-      const raw = readFileSync(file, "utf8");
-      const { data } = parseFrontmatter(raw);
-      collectWarnings(file, root, data, warnings);
-    } catch {
-      /* already reported */
+    for (const issue of loaded.issues) {
+      push(errors, rel, issue.message, issue.code);
     }
-    items.push(item);
+    for (const key of loaded.unknownKeys) {
+      push(warnings, rel, `unknown unnamespaced frontmatter key '${key}'`, "UNKNOWN_KEY");
+    }
+    const soft: SoftItem = { ...loaded.item, relPath: rel };
+    checkItemShape(soft, errors);
+    items.push(soft);
   }
 
   const byId = new Map<string, SoftItem>();
@@ -318,7 +169,6 @@ export function runValidate(opts: ValidateOptions): ValidateResult {
             "PARENT_TYPE",
           );
         }
-        // filesystem parent must match parent's container
         const expectedPath = newItemPath({
           tasksDir,
           type: item.type,
@@ -347,18 +197,8 @@ export function runValidate(opts: ValidateOptions): ValidateResult {
         );
       }
     }
-
-    // Leaves only under story (also caught by parent type + path)
-    if (item.type === "task" || item.type === "bug") {
-      const parentDir = dirname(item.filePath);
-      const index = join(parentDir, `${basename(parentDir)}.md`);
-      if (existsSync(index)) {
-        // parent index type checked via parent edge when parent resolves
-      }
-    }
   }
 
-  // Every directory under tasks/ is a container and needs index <dirname>.md
   for (const dir of dirs) {
     const name = basename(dir);
     if (name.startsWith(".")) continue;
@@ -368,7 +208,6 @@ export function runValidate(opts: ValidateOptions): ValidateResult {
     }
   }
 
-  // Unknown directories under a story: only index + task-*.md / bug-*.md
   for (const item of items) {
     if (item.type !== "story") continue;
     const dir = item.containerDir;

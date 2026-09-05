@@ -27,6 +27,159 @@ export type WorkItem = {
   body: string;
 };
 
+const OFFICIAL_KEYS = new Set([
+  "type",
+  "status",
+  "id",
+  "title",
+  "assignee",
+  "parent",
+  "labels",
+  "created",
+  "updated",
+  "blocked_reason",
+]);
+
+/** One soft-load finding (path added by caller). */
+export type SoftIssue = {
+  code: string;
+  message: string;
+};
+
+export type SoftLoadResult =
+  | { kind: "skip" }
+  | { kind: "fatal"; issues: SoftIssue[] }
+  | {
+      kind: "item";
+      item: WorkItem;
+      /** Non-fatal schema issues discovered while loading. */
+      issues: SoftIssue[];
+      /** Unnamespaced unknown keys (callers may warn). */
+      unknownKeys: string[];
+    };
+
+/** Collect every file and directory under tasks/ (skipping dotfiles). Shared by validate. */
+export function walkTasksTree(dir: string): { files: string[]; dirs: string[] } {
+  const files: string[] = [];
+  const dirs: string[] = [];
+  if (!existsSync(dir)) return { files, dirs };
+  const stack = [dir];
+  while (stack.length > 0) {
+    const cur = stack.pop()!;
+    for (const name of readdirSync(cur)) {
+      if (name.startsWith(".")) continue;
+      const full = join(cur, name);
+      const st = statSync(full);
+      if (st.isDirectory()) {
+        dirs.push(full);
+        stack.push(full);
+      } else {
+        files.push(full);
+      }
+    }
+  }
+  return { files, dirs };
+}
+
+/**
+ * Soft-load a work item without throwing.
+ * Broken YAML / missing required fields are fatal; other schema issues attach to the item.
+ * One parse path — unknown keys returned for the caller to warn on.
+ */
+export function softTryLoadItem(filePath: string): SoftLoadResult {
+  let raw: string;
+  try {
+    raw = readFileSync(filePath, "utf8");
+  } catch (err) {
+    return {
+      kind: "fatal",
+      issues: [{ code: "READ_FAILED", message: err instanceof Error ? err.message : String(err) }],
+    };
+  }
+  if (!raw.startsWith("---")) return { kind: "skip" };
+
+  let data: Frontmatter;
+  let body: string;
+  try {
+    ({ data, body } = parseFrontmatter(raw));
+  } catch (err) {
+    return {
+      kind: "fatal",
+      issues: [{ code: "BROKEN_YAML", message: err instanceof Error ? err.message : String(err) }],
+    };
+  }
+
+  const typeRaw = stringField(data, "type");
+  if (!typeRaw) return { kind: "skip" };
+  if (!isItemType(typeRaw)) {
+    return {
+      kind: "fatal",
+      issues: [{ code: "UNKNOWN_TYPE", message: `unknown type '${typeRaw}'` }],
+    };
+  }
+
+  const issues: SoftIssue[] = [];
+  const id = stringField(data, "id");
+  if (!id) {
+    return {
+      kind: "fatal",
+      issues: [{ code: "MISSING_ID", message: "missing required field id" }],
+    };
+  }
+  const statusRaw = stringField(data, "status");
+  if (!statusRaw) {
+    return {
+      kind: "fatal",
+      issues: [{ code: "MISSING_STATUS", message: "missing required field status" }],
+    };
+  }
+  if (!isStatus(statusRaw)) {
+    return {
+      kind: "fatal",
+      issues: [{ code: "UNKNOWN_STATUS", message: `unknown status '${statusRaw}'` }],
+    };
+  }
+
+  let labels: string[] = [];
+  try {
+    labels = stringArrayField(data, "labels");
+  } catch (err) {
+    issues.push({
+      code: "INVALID_LABELS",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  const extras: Frontmatter = {};
+  const unknownKeys: string[] = [];
+  for (const [k, v] of Object.entries(data)) {
+    if (!OFFICIAL_KEYS.has(k)) {
+      extras[k] = v;
+      if (!k.startsWith("x-") && k !== "extensions") unknownKeys.push(k);
+    }
+  }
+
+  const item: WorkItem = {
+    type: typeRaw,
+    status: statusRaw,
+    id,
+    title: stringField(data, "title"),
+    assignee: stringField(data, "assignee") ?? null,
+    parent: stringField(data, "parent") ?? null,
+    labels,
+    created: stringField(data, "created"),
+    updated: stringField(data, "updated"),
+    blockedReason: stringField(data, "blocked_reason"),
+    extras,
+    filePath,
+    containerDir: dirname(filePath),
+    data,
+    body,
+  };
+
+  return { kind: "item", item, issues, unknownKeys };
+}
+
 export function loadItems(tasksDir: string): WorkItem[] {
   const items: WorkItem[] = [];
   walk(tasksDir, items);
@@ -50,52 +203,18 @@ function walk(dir: string, items: WorkItem[]): void {
 }
 
 export function tryLoadItem(filePath: string): WorkItem | null {
-  const raw = readFileSync(filePath, "utf8");
-  if (!raw.startsWith("---")) return null;
-  const { data, body } = parseFrontmatter(raw);
-  const typeRaw = stringField(data, "type");
-  if (!typeRaw || !isItemType(typeRaw)) return null;
-  const id = stringField(data, "id");
-  if (!id) {
-    throw new Error(`${filePath}: work item missing id`);
+  const result = softTryLoadItem(filePath);
+  if (result.kind === "skip") return null;
+  if (result.kind === "fatal") {
+    if (result.issues.some((i) => i.code === "UNKNOWN_TYPE")) return null;
+    throw new Error(`${filePath}: ${result.issues[0]?.message ?? "invalid work item"}`);
   }
-  const statusRaw = stringField(data, "status");
-  if (!statusRaw || !isStatus(statusRaw)) {
-    throw new Error(`${filePath}: invalid or missing status`);
+  if (result.issues.length > 0) {
+    // Strict loader used by list/create: labels errors still throw
+    const labelsErr = result.issues.find((i) => i.code === "INVALID_LABELS");
+    if (labelsErr) throw new Error(`${filePath}: ${labelsErr.message}`);
   }
-  const official = new Set([
-    "type",
-    "status",
-    "id",
-    "title",
-    "assignee",
-    "parent",
-    "labels",
-    "created",
-    "updated",
-    "blocked_reason",
-  ]);
-  const extras: Frontmatter = {};
-  for (const [k, v] of Object.entries(data)) {
-    if (!official.has(k)) extras[k] = v;
-  }
-  return {
-    type: typeRaw,
-    status: statusRaw,
-    id,
-    title: stringField(data, "title"),
-    assignee: stringField(data, "assignee") ?? null,
-    parent: stringField(data, "parent") ?? null,
-    labels: stringArrayField(data, "labels"),
-    created: stringField(data, "created"),
-    updated: stringField(data, "updated"),
-    blockedReason: stringField(data, "blocked_reason"),
-    extras,
-    filePath,
-    containerDir: dirname(filePath),
-    data,
-    body,
-  };
+  return result.item;
 }
 
 export function itemsById(items: WorkItem[]): Map<string, WorkItem> {
