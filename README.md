@@ -75,6 +75,7 @@ Exact v0 fields are documented in [`docs/convention.md`](docs/convention.md) (la
 
 - [Task convention](docs/convention.md) — folder layout, frontmatter schema, statuses (v0 locked)
 - [Engineering conventions](docs/engineering.md) — repo structure, review bar, testing, ADRs (Phase 1)
+- [Phase 2 viewer spike](docs/viewer-spike.md) — proposed constraints for board/viewer over `tasks/` (towards #19; not an ADR)
 - Sample tree: [`tasks/launch-mvp/`](tasks/launch-mvp/)
 
 ## Templates
