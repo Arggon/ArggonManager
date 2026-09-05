@@ -150,6 +150,17 @@ describe("update", () => {
     );
   });
 
+
+  it("rejects invalid or duplicate --labels", () => {
+    const { dir, id } = primedTask();
+    expect(() => runUpdate({ cwd: dir, id, labels: "Foo Bar,Foo Bar", now: NOW })).toThrow(
+      /kebab-case/,
+    );
+    expect(() => runUpdate({ cwd: dir, id, labels: "ok,ok", now: NOW })).toThrow(
+      /duplicate label/,
+    );
+  });
+
   it("errors when nothing is requested", () => {
     const { dir, id } = primedTask();
     expect(() => runUpdate({ cwd: dir, id, now: NOW })).toThrow(/nothing to update/);

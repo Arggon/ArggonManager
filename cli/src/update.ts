@@ -9,6 +9,7 @@ import {
   TRANSITIONS,
 } from "./status.js";
 import { formatDate } from "./dates.js";
+import { assertLabels } from "./ids.js";
 import { itemsById, loadItems, tryLoadItem, type WorkItem } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 
@@ -65,6 +66,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     if (!title) throw new Error("title must not be empty");
   }
   const labels = opts.labels !== undefined ? parseLabels(opts.labels) : undefined;
+  if (labels !== undefined) assertLabels(labels);
 
   const requested =
     title !== undefined ||
