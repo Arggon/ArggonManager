@@ -12,3 +12,5 @@ Shared kernel (import these; do not fork schema logic):
 - `relations.ts` — parent-type edges (epic→initiative, story→epic, task/bug→story)
 
 Commands: `hello`, `init`, `create`.
+
+- validate.ts — schema + tree integrity

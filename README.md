@@ -143,3 +143,4 @@ TBD — OSI-approved license before a public release.
 ---
 
 Built in the open by [Arggon](https://github.com/Arggon).
+arggon validate checks frontmatter + tree integrity. Use --json for CI (docs/json-output.md).
