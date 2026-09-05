@@ -77,6 +77,35 @@ function checkItemShape(item: SoftItem, errors: Issue[]): void {
   } catch (err) {
     push(errors, rel, err instanceof Error ? err.message : String(err), "CLAIM_OR_BLOCKED");
   }
+
+  for (const field of ["created", "updated"] as const) {
+    const value = item[field];
+    if (value !== undefined && !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      push(
+        errors,
+        rel,
+        `${field} must be YYYY-MM-DD (got ${JSON.stringify(value)})`,
+        "INVALID_DATE",
+      );
+    }
+  }
+
+  const labelPattern = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+  const seenLabels = new Set<string>();
+  for (const label of item.labels) {
+    if (!labelPattern.test(label)) {
+      push(
+        errors,
+        rel,
+        `label must be kebab-case ASCII (got ${JSON.stringify(label)})`,
+        "INVALID_LABELS",
+      );
+    }
+    if (seenLabels.has(label)) {
+      push(errors, rel, `duplicate label ${JSON.stringify(label)}`, "INVALID_LABELS");
+    }
+    seenLabels.add(label);
+  }
 }
 
 export function runValidate(opts: ValidateOptions): ValidateResult {
@@ -113,8 +142,13 @@ export function runValidate(opts: ValidateOptions): ValidateResult {
     for (const issue of loaded.issues) {
       push(errors, rel, issue.message, issue.code);
     }
+    const reserved = new Set(["order", "rank", "depends_on", "blocked_by", "priority", "estimate"]);
     for (const key of loaded.unknownKeys) {
-      push(warnings, rel, `unknown unnamespaced frontmatter key '${key}'`, "UNKNOWN_KEY");
+      if (reserved.has(key)) {
+        push(errors, rel, `reserved frontmatter key '${key}' is invalid in v0`, "RESERVED_KEY");
+      } else {
+        push(warnings, rel, `unknown unnamespaced frontmatter key '${key}'`, "UNKNOWN_KEY");
+      }
     }
     const soft: SoftItem = { ...loaded.item, relPath: rel };
     checkItemShape(soft, errors);
