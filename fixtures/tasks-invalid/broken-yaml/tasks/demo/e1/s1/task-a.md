@@ -1,9 +1,11 @@
 ---
 type: task
 status: todo
-this line is not valid frontmatter
 id: task-a
 parent: s1
+title: task a
+created: "2026-09-03"
+updated: "2026-09-03"
 ---
 
-# x
+# task-a
