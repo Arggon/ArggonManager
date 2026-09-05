@@ -4,8 +4,16 @@ import { readConventionVersion } from "./convention.js";
 import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
 import { runInit, type InitResult } from "./init.js";
-import { bindJsonProgram, failJson, jsonEnabled, successJson } from "./json.js";
+import {
+  bindJsonProgram,
+  emitJson,
+  failJson,
+  JSON_SCHEMA_VERSION,
+  jsonEnabled,
+  successJson,
+} from "./json.js";
 import { formatListTable, runList } from "./list.js";
+import { formatValidateHuman, runValidate } from "./validate.js";
 
 const program = new Command();
 
@@ -175,6 +183,55 @@ program
         return;
       }
       console.error(`arggon list: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("validate")
+  .description("Validate tasks/ frontmatter and tree integrity")
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runValidate({ cwd: process.cwd() });
+      if (json) {
+        const payload = {
+          ok: result.errors.length === 0,
+          schemaVersion: JSON_SCHEMA_VERSION,
+          conventionVersion: result.conventionVersion,
+          command: "validate",
+          errors: result.errors,
+          warnings: result.warnings,
+        };
+        if (result.errors.length > 0) {
+          emitJson({
+            ...payload,
+            error: {
+              message: `validate failed with ${result.errors.length} error(s)`,
+              code: "VALIDATE_FAILED",
+            },
+          });
+          process.exitCode = 1;
+          return;
+        }
+        emitJson(payload);
+        return;
+      }
+      process.stdout.write(formatValidateHuman(result));
+      if (result.errors.length > 0) process.exitCode = 1;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "validate",
+          message,
+          code: "VALIDATE_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon validate: ${message}`);
       process.exitCode = 1;
     }
   });
