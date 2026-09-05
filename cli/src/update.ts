@@ -8,7 +8,7 @@ import {
   isClaimed,
   TRANSITIONS,
 } from "./status.js";
-import { formatDate } from "./create.js";
+import { formatDate } from "./dates.js";
 import { itemsById, loadItems, tryLoadItem, type WorkItem } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 

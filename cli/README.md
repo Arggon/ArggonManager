@@ -10,5 +10,6 @@ Shared kernel (import these; do not fork schema logic):
 - `status.ts` — statuses, transitions, claim / blocked_reason rules
 - `items.ts` — walk the tasks tree (shared reader for create/list/update/validate)
 - `relations.ts` — parent-type edges (epic→initiative, story→epic, task/bug→story)
+- `dates.ts` — v0 `YYYY-MM-DD` helpers (`formatDate`)
 
-Commands: `hello`, `init`, `create`.
+Commands: `hello`, `init`, `create`, `update`.
