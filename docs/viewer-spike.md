@@ -70,7 +70,7 @@ Also aligns with [`docs/engineering.md`](./engineering.md) Phase 2 boundary note
 
 1. **Stack for the viewer** — which UI stack (and package layout) once an ADR is written?
 2. **Local-only vs hosted** — desktop/local static app over a checkout, vs any hosted UI?
-3. **Edit path** — thin edits via **CLI** (`update` / claim) vs **direct file write** in the working tree (still git-native, still convention-valid)?
+3. **Edit path** — later ADR should **prefer CLI writes** (`arggon update` / claim) over direct file writes. Direct edits remain valid if they pass `validate`, but the viewer should not grow a private write API.
 
 These decisions belong in a follow-up ADR before code lands.
 
