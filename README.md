@@ -130,6 +130,8 @@ Empty results exit `0` (`items: []` with `--json`). Missing `tasks/`, invalid en
 
 Shared kernel: `cli/src/paths.ts`, `frontmatter.ts`, `ids.ts`, `status.ts`, `items.ts`, `relations.ts`.
 
+Validate: `arggon validate` / `arggon validate --json` (CI gate; docs/json-output.md).
+
 Fixtures: [fixtures/](fixtures/).
 
 ## Contributing
