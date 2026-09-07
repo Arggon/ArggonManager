@@ -150,6 +150,21 @@ npm run arggon -- validate
 
 Validate: `arggon validate` / `arggon validate --json` (CI gate; docs/json-output.md).
 
+### `arggon board`
+
+Writes a static, self-contained read-only HTML board (columns = v0 statuses; cards show type, id, title, assignee, labels, parent, `blocked_reason`) from the same kernel read path as `list`. No server, no client JS, no writes to `tasks/` — the output is a generated snapshot; git files remain the source of truth. Stack decision: [docs/adr/0002-board-viewer-v0.md](docs/adr/0002-board-viewer-v0.md).
+
+```bash
+arggon board                  # writes board.html in cwd
+arggon board --out report/board.html
+arggon board --json           # v1 envelope: { path, itemCount }
+```
+
+- `--out <file>`: output path (default `board.html`); parent directories must exist
+- `--json`: one JSON object on stdout; failures emit `code: "BOARD_FAILED"`
+
+The board is a snapshot: re-run after tree changes to refresh. The generated file is a build artifact — safe to gitignore; deleting it loses nothing.
+
 Fixtures: [fixtures/](fixtures/).
 
 ## Contributing
@@ -163,4 +178,3 @@ TBD — OSI-approved license before a public release.
 ---
 
 Built in the open by [Arggon](https://github.com/Arggon).
-
