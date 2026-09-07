@@ -175,7 +175,7 @@ A Phase 1 eng change is done when:
 
 ## Phase 2 / 3 (boundary notes only)
 
-- **Phase 2 (viewer/board):** read-only or thin write API over the same tree; must not invent a parallel schema.
+- **Phase 2 (viewer/board):** read-only or thin write API over the same tree; must not invent a parallel schema. Spike constraints: [`docs/viewer-spike.md`](./viewer-spike.md) (towards #19; ADR required before adding a package).
 - **Phase 3 (agent hooks/SDK):** must call the same validate/claim rules as the CLI; no private agent dialect.
 
 Details belong in later ADRs — do not pre-build those packages in Phase 1.
