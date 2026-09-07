@@ -74,7 +74,9 @@ Exact v0 fields are documented in [`docs/convention.md`](docs/convention.md) (la
 ## Docs
 
 - [Task convention](docs/convention.md) — folder layout, frontmatter schema, statuses (v0 locked)
+- [Agent playbook](docs/agents.md) — find, claim, create, PR loop for humans and agents
 - [Engineering conventions](docs/engineering.md) — repo structure, review bar, testing, ADRs (Phase 1)
+- [Phase 2 viewer spike](docs/viewer-spike.md) — proposed constraints for board/viewer over `tasks/` (towards #19; not an ADR)
 - Sample tree: [`tasks/launch-mvp/`](tasks/launch-mvp/)
 
 ## Templates
@@ -100,6 +102,7 @@ npm install
 npm run arggon -- hello
 npm run arggon -- init /path/to/repo
 npm run arggon -- list
+npm run arggon -- validate
 npm run build
 npm test
 npm run lint
@@ -132,6 +135,20 @@ Empty results exit `0` (`items: []` with `--json`). Missing `tasks/`, invalid en
 
 Shared kernel: `cli/src/paths.ts`, `frontmatter.ts`, `ids.ts`, `status.ts`, `items.ts`, `relations.ts`, `dates.ts`.
 
+### `arggon validate`
+
+Checks `tasks/` frontmatter and tree integrity (schema, parents, naming, claim/blocked rules). Uses the shared items soft-scan (`walkTasksTree` / `softTryLoadItem`) so broken YAML still reports a file path. Exits non-zero when there are errors; warnings alone stay exit 0. Suitable for CI before commit.
+
+```bash
+arggon validate
+arggon validate --json
+npm run arggon -- validate
+```
+
+- `--json`: v1 envelope with `errors` / `warnings` (and `VALIDATE_FAILED` when failed)
+
+Validate: `arggon validate` / `arggon validate --json` (CI gate; docs/json-output.md).
+
 Fixtures: [fixtures/](fixtures/).
 
 ## Contributing
@@ -145,3 +162,4 @@ TBD — OSI-approved license before a public release.
 ---
 
 Built in the open by [Arggon](https://github.com/Arggon).
+
