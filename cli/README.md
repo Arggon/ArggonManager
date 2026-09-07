@@ -10,7 +10,9 @@ Shared kernel (import these; do not fork schema logic):
 - `status.ts` — statuses, transitions, claim / blocked_reason rules
 - `items.ts` — walk + soft-load (`walkTasksTree`, `softTryLoadItem`, `loadItems`) for create/list/update/validate
 - `relations.ts` — parent-type edges (epic→initiative, story→epic, task/bug→story)
+- `dates.ts` — v0 `YYYY-MM-DD` helpers (`formatDate`)
 
-Commands: `hello`, `init`, `create`, `list`, `validate`.
+Commands: `hello`, `init`, `create`, `list`, `update`, `validate`.
 
+- `update.ts` — in-place frontmatter edits (status transitions, claim rule, labels)
 - `validate.ts` — schema + tree integrity; consumes shared items soft-scan

@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
-import { firstDuplicateId, itemId, slugify } from "./ids.js";
+import { assertLabels, firstDuplicateId, itemId, slugify } from "./ids.js";
 import { itemsById, loadItems } from "./items.js";
 import { assertParentEdge, expectedParentType } from "./relations.js";
 import { assertClaimAndBlocked, canTransition, isClaimed, unclaim } from "./status.js";
@@ -27,6 +27,13 @@ describe("ids", () => {
   it("detects global id uniqueness violations", () => {
     expect(firstDuplicateId(["auth", "story-login", "auth"])).toBe("auth");
     expect(firstDuplicateId(["auth", "story-login"])).toBeUndefined();
+  });
+
+  it("validates labels as kebab-case unique ASCII", () => {
+    assertLabels([]);
+    assertLabels(["phase-1", "security"]);
+    expect(() => assertLabels(["Foo Bar"])).toThrow(/kebab-case/);
+    expect(() => assertLabels(["ok", "ok"])).toThrow(/duplicate label/);
   });
 });
 
@@ -101,6 +108,24 @@ x-agent: grok
     const out = stringifyFrontmatter(data, body);
     expect(out).toContain("x-agent: grok");
     expect(parseFrontmatter(out).data["x-agent"]).toBe("grok");
+  });
+
+  it("omits nulled official keys instead of writing literal null", () => {
+    const out = stringifyFrontmatter(
+      {
+        type: "task",
+        status: "todo",
+        id: "task-x",
+        title: "X",
+        assignee: null,
+        blocked_reason: null,
+        labels: [],
+      },
+      "# X\n",
+    );
+    expect(out).not.toContain("assignee");
+    expect(out).not.toContain("blocked_reason");
+    expect(out).not.toContain("null");
   });
 });
 

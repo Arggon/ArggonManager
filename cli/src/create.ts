@@ -12,6 +12,7 @@ import {
   assertStatus,
   type Status,
 } from "./status.js";
+import { formatDate } from "./dates.js";
 
 export type CreateOptions = {
   cwd: string;
@@ -33,13 +34,6 @@ export type CreateResult = {
   /** The created item, reloaded from disk. */
   item: WorkItem;
 };
-
-export function formatDate(d: Date): string {
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 export function runCreate(opts: CreateOptions): CreateResult {
   if (!isItemType(opts.type)) {

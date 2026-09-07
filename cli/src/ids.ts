@@ -65,3 +65,22 @@ export function firstDuplicateId(ids: readonly string[]): string | undefined {
   }
   return undefined;
 }
+
+const LABEL_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/** Convention v0: labels are kebab-case ASCII and unique (case-sensitive). */
+export function assertLabels(labels: readonly string[]): void {
+  const seen = new Set<string>();
+  for (const label of labels) {
+    if (!LABEL_PATTERN.test(label)) {
+      throw new Error(
+        `label '${label}' must be kebab-case ASCII (a-z, 0-9, hyphens)`,
+      );
+    }
+    if (seen.has(label)) {
+      throw new Error(`duplicate label '${label}'`);
+    }
+    seen.add(label);
+  }
+}
+
