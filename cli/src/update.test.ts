@@ -125,8 +125,44 @@ describe("update", () => {
     const { dir, id } = primedTask();
     runUpdate({ cwd: dir, id, status: "in_progress", assignee: "alice", now: NOW });
     expect(() => runUpdate({ cwd: dir, id, assignee: "bob", now: NOW })).toThrow(
-      /claim conflict.*claimed by 'alice'/,
+      /claim conflict.*claimed by 'alice'.*--force/,
     );
+    // unchanged on disk
+    expect(fm(join(dir, "tasks/launch-mvp/auth/story-login/task-rate-limit.md")).data.assignee).toBe(
+      "alice",
+    );
+  });
+
+  it("allows claim reassignment with --force", () => {
+    const { dir, id } = primedTask();
+    runUpdate({ cwd: dir, id, status: "in_progress", assignee: "alice", now: NOW });
+    const result = runUpdate({
+      cwd: dir,
+      id,
+      assignee: "bob",
+      force: true,
+      now: LATER,
+    });
+    expect(fm(result.path).data.assignee).toBe("bob");
+    expect(fm(result.path).data.status).toBe("in_progress");
+    expect(result.changed).toContain("assignee");
+  });
+
+  it("--force still enforces transitions, claim rule, and blocked_reason", () => {
+    const { dir, id } = primedTask();
+    // illegal transition even with force
+    expect(() =>
+      runUpdate({ cwd: dir, id, status: "done", force: true, now: NOW }),
+    ).toThrow(/cannot transition status todo -> done/);
+    runUpdate({ cwd: dir, id, status: "in_progress", assignee: "alice", now: NOW });
+    // claim rule: cannot unassign while staying in_progress, even with force
+    expect(() =>
+      runUpdate({ cwd: dir, id, unassign: true, force: true, now: NOW }),
+    ).toThrow(/requires --assignee/);
+    // blocked_reason still required
+    expect(() =>
+      runUpdate({ cwd: dir, id, status: "blocked", force: true, now: NOW }),
+    ).toThrow(/status blocked requires --blocked-reason/);
   });
 
   it("supports --unassign and --labels replace", () => {

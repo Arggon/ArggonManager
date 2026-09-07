@@ -198,6 +198,7 @@ program
   .option("--unassign", "clear assignee (in_progress -> todo does this by default)", false)
   .option("--labels <csv>", "replace the full labels list (comma-separated)")
   .option("--blocked-reason <text>", "required when status becomes blocked")
+  .option("--force", "allow reassignment of an already-claimed item", false)
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (
@@ -209,6 +210,7 @@ program
         unassign?: boolean;
         labels?: string;
         blockedReason?: string;
+        force?: boolean;
         json?: boolean;
       },
     ) => {
@@ -223,6 +225,7 @@ program
           unassign: opts.unassign,
           labels: opts.labels,
           blockedReason: opts.blockedReason,
+          force: Boolean(opts.force),
         });
         if (json) {
           successJson(

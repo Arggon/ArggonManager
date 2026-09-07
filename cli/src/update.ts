@@ -24,6 +24,8 @@ export type UpdateOptions = {
   /** Replace the full labels list (comma-separated). */
   labels?: string;
   blockedReason?: string;
+  /** Allow reassignment of an already-claimed item (claim steal). */
+  force?: boolean;
   now?: Date;
 };
 
@@ -49,7 +51,7 @@ function parseLabels(raw: string): string[] {
  * Update frontmatter fields of one work item. Only requested fields change,
  * plus convention side-effects (unclaim clears assignee, unblocking clears
  * blocked_reason). Returns data; the CLI prints. Throws on unknown id,
- * invalid enums, illegal transitions, claim-rule violations, or claim steal.
+ * invalid enums, illegal transitions, claim-rule violations, or claim steal (unless --force).
  */
 export function runUpdate(opts: UpdateOptions): UpdateResult {
   const id = opts.id.trim();
@@ -95,16 +97,17 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     }
   }
 
-  // Claim steal guard (#16 owns full concurrency; update refuses silent stomps).
+  // Claim steal guard: refuse reassignment unless --force (docs/claim.md).
   const currentAssignee = item.assignee ?? null;
   if (
     isClaimed(item.type, item.status, currentAssignee) &&
     opts.assignee !== undefined &&
-    opts.assignee !== currentAssignee
+    opts.assignee !== currentAssignee &&
+    !opts.force
   ) {
     throw new Error(
       `claim conflict: '${id}' is claimed by '${currentAssignee}' (status in_progress). ` +
-        `Unclaim first (\`arggon update ${id} --status todo\`) or coordinate (see #16).`,
+        `Unclaim first (\`arggon update ${id} --status todo\`), coordinate, or pass --force.`,
     );
   }
 
