@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import { runBoard, displayPath } from "./board.js";
 import { readConventionVersion } from "./convention.js";
 import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
@@ -300,6 +301,47 @@ program
         return;
       }
       console.error(`arggon validate: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("board")
+  .description(
+    "Write a static read-only HTML board from tasks/ (git files stay the source of truth)",
+  )
+  .option("--out <file>", "output HTML file (default: board.html)")
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { out?: string; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runBoard({ cwd: process.cwd(), out: opts.out });
+      if (json) {
+        successJson(
+          "board",
+          { path: displayPath(result.outPath, process.cwd()), itemCount: result.itemCount },
+          readConventionVersion(result.root),
+        );
+        return;
+      }
+      console.log(
+        `arggon board: wrote ${displayPath(result.outPath, process.cwd())} (${result.itemCount} item(s))`,
+      );
+      console.log(
+        "  Open it in a browser. Re-run after tree changes — tasks/ remains the source of truth.",
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "board",
+          message,
+          code: "BOARD_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon board: ${message}`);
       process.exitCode = 1;
     }
   });

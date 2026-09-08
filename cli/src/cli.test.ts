@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -239,5 +239,47 @@ describe("CLI --json", () => {
     const result = runCli(["update", "launch-mvp", "--status", "in_progress"], dir);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("arggon update: initiative launch-mvp (status)");
+  });
+
+  it("arggon board --json writes the HTML and emits the envelope", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-json-board-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    const result = runCli(["board", "--json"], dir);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body).toMatchObject({
+      ok: true,
+      schemaVersion: JSON_SCHEMA_VERSION,
+      conventionVersion: 0,
+      command: "board",
+      path: "board.html",
+      itemCount: 2,
+    });
+    const html = readFileSync(join(dir, "board.html"), "utf8");
+    expect(html).toContain("<!doctype html>");
+    expect(html).toContain("launch-mvp");
+    expect(html).toContain('data-status="in_progress"');
+  });
+
+  it("arggon board honors --out and stays human-readable without --json", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-human-board-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    const result = runCli(["board", "--out", "my-board.html"], dir);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("arggon board: wrote my-board.html (1 item(s))");
+    expect(existsSync(join(dir, "my-board.html"))).toBe(true);
+  });
+
+  it("arggon board --json errors with BOARD_FAILED without tasks/", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-json-board-err-"));
+    const result = runCli(["board", "--json"], dir);
+    expect(result.status).toBe(1);
+    const body = parseStdout(result.stdout);
+    expect(body.ok).toBe(false);
+    expect(body.command).toBe("board");
+    expect(body.error).toMatchObject({ code: "BOARD_FAILED" });
   });
 });
