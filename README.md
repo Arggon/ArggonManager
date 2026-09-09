@@ -6,6 +6,28 @@ Tasks live _inside_ the repository as Markdown. Create a file, open a branch, up
 
 > **Status:** early design — convention + CLI first.
 
+## Demo
+
+A 30-second tour — list, claim, create, finish, validate, board (autoplay below; also available as [MP4](docs/assets/arggon-demo.mp4)):
+
+![ArggonManager demo](docs/assets/arggon-demo.gif)
+
+**`arggon list`** — the whole plan, right from the repo:
+
+![arggon list output](docs/assets/cli-list.png)
+
+**`arggon create` / `arggon update`** — claim and move work by editing files:
+
+![arggon create and update](docs/assets/cli-create-update.png)
+
+**`arggon update --status done` + `arggon validate`** — finish work and verify the tree (CI-ready):
+
+![arggon validate](docs/assets/cli-validate.png)
+
+**`arggon board`** — a static, self-contained HTML snapshot of the same tree:
+
+![arggon board](docs/assets/board.png)
+
 ## The idea
 
 Work is a **folder tree** that mirrors Agile structure:
