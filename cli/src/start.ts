@@ -125,7 +125,14 @@ export function defaultStartGit(): StartGit {
     },
     commitFile(cwd: string, file: string, message: string): void {
       git(["add", "--", file], cwd);
-      git(["commit", "-m", message], cwd);
+      try {
+        git(["commit", "-m", message], cwd);
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        throw new Error(
+          `${detail} (if this is an identity error, set \`git config user.name\` / \`git config user.email\`)`,
+        );
+      }
     },
     pushBranch(cwd: string, branch: string): void {
       git(["push", "-u", "origin", branch], cwd);

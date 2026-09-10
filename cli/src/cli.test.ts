@@ -37,6 +37,10 @@ function initGitTree(): string {
 
 function primeGitWorkTree(dir: string): void {
   expect(runGit(["init"], dir).status).toBe(0);
+  // Local identity: the CI runner has no global user.name/user.email,
+  // and `start` commits the claim with plain `git commit`.
+  expect(runGit(["config", "user.email", "t@t"], dir).status).toBe(0);
+  expect(runGit(["config", "user.name", "t"], dir).status).toBe(0);
   expect(runCli(["init", dir]).status).toBe(0);
   expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
   expect(runGit(["add", "-A"], dir).status).toBe(0);
