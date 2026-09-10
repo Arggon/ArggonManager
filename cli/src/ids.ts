@@ -68,14 +68,12 @@ export function firstDuplicateId(ids: readonly string[]): string | undefined {
 
 const LABEL_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-/** Convention v0: labels are kebab-case ASCII and unique (case-sensitive). */
+/** Convention: labels are kebab-case ASCII and unique (case-sensitive). */
 export function assertLabels(labels: readonly string[]): void {
   const seen = new Set<string>();
   for (const label of labels) {
     if (!LABEL_PATTERN.test(label)) {
-      throw new Error(
-        `label '${label}' must be kebab-case ASCII (a-z, 0-9, hyphens)`,
-      );
+      throw new Error(`label '${label}' must be kebab-case ASCII (a-z, 0-9, hyphens)`);
     }
     if (seen.has(label)) {
       throw new Error(`duplicate label '${label}'`);
@@ -84,3 +82,13 @@ export function assertLabels(labels: readonly string[]): void {
   }
 }
 
+/** Working branch names are single non-blank tokens (no whitespace). Patterns land in #49. */
+export const BRANCH_PATTERN = /^\S+$/;
+
+export function assertBranchName(branch: string): void {
+  if (!BRANCH_PATTERN.test(branch)) {
+    throw new Error(
+      `invalid branch name ${JSON.stringify(branch)} (must be a single non-blank token)`,
+    );
+  }
+}

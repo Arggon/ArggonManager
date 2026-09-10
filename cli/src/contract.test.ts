@@ -29,6 +29,7 @@ describe("toContractWorkItem", () => {
       status: "todo",
       title: "Add login rate limiting",
       assignee: null,
+      branch: null,
       parent: "story-login",
       labels: ["security"],
       created: "2026-09-03",
@@ -46,5 +47,14 @@ describe("toContractWorkItem", () => {
     expect(item.title).toBeNull();
     expect(item.created).toBeNull();
     expect(item.updated).toBeNull();
+    expect(item.branch).toBeNull();
+  });
+
+  it("maps a set branch through", () => {
+    const item = toContractWorkItem(
+      { ...KERNEL_ITEM, branch: "feat/task-rate-limit" },
+      "/tmp/repo",
+    );
+    expect(item.branch).toBe("feat/task-rate-limit");
   });
 });

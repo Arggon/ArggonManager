@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
 import { CONVENTION_VERSION, readConventionVersion } from "./convention.js";
-import { assertValidId } from "./ids.js";
+import { assertValidId, BRANCH_PATTERN } from "./ids.js";
 import { softTryLoadItem, walkTasksTree, type WorkItem } from "./items.js";
 import { findTasksDir, newItemPath, repoRootFromTasks } from "./paths.js";
 import { assertParentEdge, expectedParentType } from "./relations.js";
@@ -70,6 +70,15 @@ function checkItemShape(item: SoftItem, errors: Issue[]): void {
   }
   if (assignee && !ASSIGNEE_PATTERN.test(assignee)) {
     push(errors, rel, `invalid assignee '${assignee}'`, "INVALID_ASSIGNEE");
+  }
+
+  if (item.branch !== undefined && !BRANCH_PATTERN.test(item.branch)) {
+    push(
+      errors,
+      rel,
+      `invalid branch name ${JSON.stringify(item.branch)} (must be a single non-blank token)`,
+      "INVALID_BRANCH",
+    );
   }
 
   try {

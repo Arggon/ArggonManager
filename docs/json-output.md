@@ -34,7 +34,7 @@ Command-specific fields sit next to this envelope (not nested under a generic `d
 - **Breaking** changes bump `schemaVersion`.
 - Clients **MUST ignore** unknown fields.
 - This CLI emits **`schemaVersion: 1` only**.
-- Distinct from the convention **tree** version in [`docs/convention.md`](./convention.md). A v0 tree with JSON schema 1 is `{ schemaVersion: 1, conventionVersion: 0 }`.
+- Distinct from the convention **tree** version in [`docs/convention.md`](./convention.md). A v0 tree with JSON schema 1 is `{ schemaVersion: 1, conventionVersion: 0 }`; a v1 tree (with `branch`) reports `conventionVersion: 1`.
 
 ### Failures (`ok: false`)
 
@@ -56,7 +56,7 @@ Empty success stays `ok: true` (e.g. future `list` with no items → `items: []`
 
 ### `WorkItem`
 
-Stable fields aligned with convention v0. **Always present** so agents need not special-case missing keys:
+Stable fields aligned with convention v0 plus the additive v1 `branch`. **Always present** so agents need not special-case missing keys:
 
 | Field            | Type                                                          | Notes                                                                       |
 | ---------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -65,6 +65,7 @@ Stable fields aligned with convention v0. **Always present** so agents need not 
 | `status`         | `todo` \| `in_progress` \| `blocked` \| `done` \| `cancelled` |                                                                             |
 | `title`          | `string` \| `null`                                            | Canonical title when known                                                  |
 | `assignee`       | `string` \| `null`                                            |                                                                             |
+| `branch`         | `string` \| `null`                                            | Working branch (v1, additive); `null` when unset                            |
 | `parent`         | `string` \| `null`                                            |                                                                             |
 | `labels`         | `string[]`                                                    |                                                                             |
 | `created`        | `string` \| `null`                                            | `YYYY-MM-DD`                                                                |

@@ -54,4 +54,9 @@ describe("validate", () => {
     const result = runValidate({ cwd: join(invalidRoot, "missing-index") });
     expect(result.errors.some((e) => e.code === "MISSING_INDEX")).toBe(true);
   });
+
+  it("reports invalid branch with INVALID_BRANCH", () => {
+    const result = runValidate({ cwd: join(invalidRoot, "invalid-branch") });
+    expect(result.errors.some((e) => e.code === "INVALID_BRANCH")).toBe(true);
+  });
 });

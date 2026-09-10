@@ -128,9 +128,9 @@ describe("update", () => {
       /claim conflict.*claimed by 'alice'.*--force/,
     );
     // unchanged on disk
-    expect(fm(join(dir, "tasks/launch-mvp/auth/story-login/task-rate-limit.md")).data.assignee).toBe(
-      "alice",
-    );
+    expect(
+      fm(join(dir, "tasks/launch-mvp/auth/story-login/task-rate-limit.md")).data.assignee,
+    ).toBe("alice");
   });
 
   it("allows claim reassignment with --force", () => {
@@ -151,18 +151,18 @@ describe("update", () => {
   it("--force still enforces transitions, claim rule, and blocked_reason", () => {
     const { dir, id } = primedTask();
     // illegal transition even with force
-    expect(() =>
-      runUpdate({ cwd: dir, id, status: "done", force: true, now: NOW }),
-    ).toThrow(/cannot transition status todo -> done/);
+    expect(() => runUpdate({ cwd: dir, id, status: "done", force: true, now: NOW })).toThrow(
+      /cannot transition status todo -> done/,
+    );
     runUpdate({ cwd: dir, id, status: "in_progress", assignee: "alice", now: NOW });
     // claim rule: cannot unassign while staying in_progress, even with force
-    expect(() =>
-      runUpdate({ cwd: dir, id, unassign: true, force: true, now: NOW }),
-    ).toThrow(/requires --assignee/);
+    expect(() => runUpdate({ cwd: dir, id, unassign: true, force: true, now: NOW })).toThrow(
+      /requires --assignee/,
+    );
     // blocked_reason still required
-    expect(() =>
-      runUpdate({ cwd: dir, id, status: "blocked", force: true, now: NOW }),
-    ).toThrow(/status blocked requires --blocked-reason/);
+    expect(() => runUpdate({ cwd: dir, id, status: "blocked", force: true, now: NOW })).toThrow(
+      /status blocked requires --blocked-reason/,
+    );
   });
 
   it("supports --unassign and --labels replace", () => {
@@ -186,19 +186,42 @@ describe("update", () => {
     );
   });
 
-
   it("rejects invalid or duplicate --labels", () => {
     const { dir, id } = primedTask();
     expect(() => runUpdate({ cwd: dir, id, labels: "Foo Bar,Foo Bar", now: NOW })).toThrow(
       /kebab-case/,
     );
-    expect(() => runUpdate({ cwd: dir, id, labels: "ok,ok", now: NOW })).toThrow(
-      /duplicate label/,
-    );
+    expect(() => runUpdate({ cwd: dir, id, labels: "ok,ok", now: NOW })).toThrow(/duplicate label/);
   });
 
   it("errors when nothing is requested", () => {
     const { dir, id } = primedTask();
     expect(() => runUpdate({ cwd: dir, id, now: NOW })).toThrow(/nothing to update/);
+  });
+
+  it("sets, clears, and unclaims the branch", () => {
+    const { dir, id } = primedTask();
+    const set = runUpdate({ cwd: dir, id, branch: "feat/task-rate-limit", now: NOW });
+    expect(fm(set.path).data.branch).toBe("feat/task-rate-limit");
+    expect(set.changed).toContain("branch");
+    expect(set.item.branch).toBe("feat/task-rate-limit");
+
+    const cleared = runUpdate({ cwd: dir, id, branch: "", now: LATER });
+    expect(fm(cleared.path).data.branch).toBeUndefined();
+    expect(cleared.item.branch).toBeUndefined();
+
+    runUpdate({ cwd: dir, id, status: "in_progress", assignee: "arggon", now: NOW });
+    const claimed = runUpdate({ cwd: dir, id, branch: "feat/task-rate-limit", now: NOW });
+    expect(claimed.item.branch).toBe("feat/task-rate-limit");
+    const unclaimed = runUpdate({ cwd: dir, id, status: "todo", now: LATER });
+    expect(fm(unclaimed.path).data.branch).toBeUndefined();
+    expect(unclaimed.changed).toEqual(expect.arrayContaining(["status", "assignee", "branch"]));
+  });
+
+  it("rejects blank branch names", () => {
+    const { dir, id } = primedTask();
+    expect(() => runUpdate({ cwd: dir, id, branch: "not a branch", now: NOW })).toThrow(
+      /single non-blank token/,
+    );
   });
 });

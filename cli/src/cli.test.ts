@@ -94,7 +94,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 0,
+      conventionVersion: 1,
       command: "create",
     });
     expect(body.item).toMatchObject({
@@ -140,7 +140,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 0,
+      conventionVersion: 1,
       command: "list",
     });
     expect(Array.isArray(body.items)).toBe(true);
@@ -151,6 +151,7 @@ describe("CLI --json", () => {
       status: "todo",
       title: "Auth",
       assignee: null,
+      branch: null,
       parent: "launch-mvp",
       labels: [],
       created: expect.any(String),
@@ -196,7 +197,7 @@ describe("CLI --json", () => {
     expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
     const result = runCli(["list"], dir);
     expect(result.status).toBe(0);
-    expect(result.stdout).toMatch(/id\s+type\s+status\s+assignee\s+title/);
+    expect(result.stdout).toMatch(/id\s+type\s+status\s+assignee\s+branch\s+title/);
     expect(result.stdout).toContain("launch-mvp");
   });
 
@@ -210,7 +211,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 0,
+      conventionVersion: 1,
       command: "update",
     });
     expect(body.item).toMatchObject({
@@ -230,6 +231,17 @@ describe("CLI --json", () => {
     expect(body.ok).toBe(false);
     expect(body.command).toBe("update");
     expect(body.error).toMatchObject({ code: "UPDATE_FAILED" });
+  });
+
+  it("arggon update --branch --json sets the working branch", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-json-update-branch-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    const result = runCli(["update", "launch-mvp", "--branch", "feat/launch-mvp", "--json"], dir);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body).toMatchObject({ ok: true, command: "update" });
+    expect(body.item).toMatchObject({ id: "launch-mvp", branch: "feat/launch-mvp" });
   });
 
   it("arggon update without --json stays human-readable", () => {
@@ -252,7 +264,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 0,
+      conventionVersion: 1,
       command: "board",
       path: "board.html",
       itemCount: 2,

@@ -11,6 +11,7 @@ function item(overrides: Partial<WorkItem> & Pick<WorkItem, "id" | "type" | "sta
   return {
     title: null,
     assignee: null,
+    branch: null,
     parent: null,
     labels: [],
     created: "2026-09-07",
@@ -106,6 +107,18 @@ describe("renderBoardHtml", () => {
       { generatedAt: GENERATED_AT },
     );
     expect(html.indexOf("task-a")).toBeLessThan(html.indexOf("task-b"));
+  });
+
+  it("renders a branch badge when set and none otherwise", () => {
+    const html = renderBoardHtml(
+      [
+        item({ id: "task-a", type: "task", status: "in_progress", branch: "feat/task-a" }),
+        item({ id: "task-b", type: "task", status: "todo" }),
+      ],
+      { generatedAt: GENERATED_AT },
+    );
+    expect(html).toContain("⑂ feat/task-a");
+    expect(html).not.toContain("⑂ -");
   });
 });
 

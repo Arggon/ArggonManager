@@ -79,6 +79,7 @@ export function renderBoardHtml(
         const assignee = item.assignee
           ? `<div class="assignee">@${esc(item.assignee)}</div>`
           : `<div class="assignee unassigned">unassigned</div>`;
+        const branch = item.branch ? `<div class="branch">⑂ ${esc(item.branch)}</div>` : "";
         const reason = item.blocked_reason
           ? `<div class="blocked-reason">${esc(item.blocked_reason)}</div>`
           : "";
@@ -93,6 +94,7 @@ export function renderBoardHtml(
   <div class="title">${title}</div>
   ${breadcrumb}
   ${assignee}
+  ${branch}
   ${labels}
   ${reason}
 </div>`;
@@ -138,6 +140,7 @@ header .meta { color: #59636e; font-size: 13px; }
 .parent::before { content: "↳ "; }
 .assignee { color: #424a53; font-size: 12px; }
 .assignee.unassigned { color: #a0a6ad; }
+.branch { color: #8250df; font-size: 12px; font-family: ui-monospace, monospace; }
 .labels { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
 .label { background: #e7ebef; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
 .blocked-reason { margin-top: 6px; color: #9a3412; background: #fff1e7; border-radius: 4px; padding: 4px 6px; font-size: 12px; }

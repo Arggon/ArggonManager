@@ -82,12 +82,13 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
 
 /** Human-readable table for CLI stdout. Missing titles fall back to id. */
 export function formatListTable(items: WorkItem[]): string {
-  const headers = ["id", "type", "status", "assignee", "title"] as const;
+  const headers = ["id", "type", "status", "assignee", "branch", "title"] as const;
   const rows = items.map((item) => [
     item.id,
     item.type,
     item.status,
     item.assignee ?? "-",
+    item.branch ?? "-",
     item.title ?? item.id,
   ]);
   const all = [headers.map((h) => h), ...rows];
