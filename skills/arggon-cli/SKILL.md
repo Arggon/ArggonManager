@@ -53,7 +53,7 @@ node dist/cli.js board --json                                        # {path, it
 
 1. **Locate work:** `list --status todo --json`. Completion: `ok:true` and an `items` array (possibly empty — empty is success, not an error).
 2. **Claim before editing:** `update <id> --status in_progress --assignee <login>` on a `story`/`task`/`bug`. Completion: returned `item.status == "in_progress"` with your assignee. If the claim is taken (`UPDATE_FAILED`), pick another item — never `--force`.
-3. **Branch** `feat/<id>` / `fix/<id>` / `docs/<id>`, one claimed item per branch.
+3. **Branch** with `branch <id>` (resolves `branch_patterns`, runs `git checkout -b`, records the field; re-running attaches), one claimed item per branch. Manual fallback: `feat/<id>` / `fix/<id>` / `docs/<id>`.
 4. **Record findings:** `create task|bug "<title>" --parent <story-id>`. Completion: returned `item.id` + `path` under the parent story. Leaves get the `task-`/`bug-` prefix automatically (even with `--id`).
 5. **Finish:** complete the acceptance checklist in the Markdown body, then `update <id> --status done`. Never jump `todo` → `done`, never reopen `done`/`cancelled`.
 6. **Verify:** `validate --json` must show `ok:true` before committing.

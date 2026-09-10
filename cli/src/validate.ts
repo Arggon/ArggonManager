@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
-import { CONVENTION_VERSION, readConventionVersion } from "./convention.js";
+import { CONVENTION_VERSION, readConventionConfig, readConventionVersion } from "./convention.js";
 import { assertValidId, BRANCH_PATTERN } from "./ids.js";
 import { softTryLoadItem, walkTasksTree, type WorkItem } from "./items.js";
 import { findTasksDir, newItemPath, repoRootFromTasks } from "./paths.js";
@@ -132,6 +132,17 @@ export function runValidate(opts: ValidateOptions): ValidateResult {
       "CONVENTION_VERSION",
     );
     return { root, conventionVersion, errors, warnings };
+  }
+
+  try {
+    readConventionConfig(root);
+  } catch (err) {
+    push(
+      errors,
+      "tasks/.convention.yml",
+      err instanceof Error ? err.message : String(err),
+      "INVALID_BRANCH_PATTERN",
+    );
   }
 
   const { files, dirs } = walkTasksTree(tasksDir);

@@ -19,12 +19,12 @@ This flag is a formatter only. It does not walk `tasks/` or parse frontmatter. C
 
 Every success or failure payload includes:
 
-| Field               | Type    | Notes                                                                                          |
-| ------------------- | ------- | ---------------------------------------------------------------------------------------------- |
-| `ok`                | boolean | `true` on success; `false` on failure                                                          |
-| `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.     |
-| `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                 |
-| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `validate` \| `create` \| `update` \| … |
+| Field               | Type    | Notes                                                                                                            |
+| ------------------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
+| `ok`                | boolean | `true` on success; `false` on failure                                                                            |
+| `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.                       |
+| `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                                   |
+| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `validate` \| `create` \| `update` \| `branch` \| `board` |
 
 Command-specific fields sit next to this envelope (not nested under a generic `data` key).
 
@@ -34,7 +34,7 @@ Command-specific fields sit next to this envelope (not nested under a generic `d
 - **Breaking** changes bump `schemaVersion`.
 - Clients **MUST ignore** unknown fields.
 - This CLI emits **`schemaVersion: 1` only**.
-- Distinct from the convention **tree** version in [`docs/convention.md`](./convention.md). A v0 tree with JSON schema 1 is `{ schemaVersion: 1, conventionVersion: 0 }`; a v1 tree (with `branch`) reports `conventionVersion: 1`.
+- Distinct from the convention **tree** version in [`docs/convention.md`](./convention.md). A v0 tree with JSON schema 1 is `{ schemaVersion: 1, conventionVersion: 0 }`; a v1 tree (with `branch`) reports `conventionVersion: 1`; a v2 tree (with `branch_patterns`) reports `conventionVersion: 2`.
 
 ### Failures (`ok: false`)
 
@@ -125,6 +125,16 @@ Enums match [`docs/convention.md`](./convention.md) v0.
 | Field  | Type       |
 | ------ | ---------- |
 | `item` | `WorkItem` |
+
+### `branch`
+
+| Field     | Type       | Notes                                                |
+| --------- | ---------- | ---------------------------------------------------- |
+| `item`    | `WorkItem` | Item with the persisted `branch` field               |
+| `branch`  | `string`   | Resolved working branch name                         |
+| `created` | `boolean`  | `true` when `git checkout -b` ran; `false` on attach |
+
+Failures use `error.code: "BRANCH_FAILED"` (unknown id, bad `branch_patterns`, non-git tree, or branch exists without matching the recorded field).
 
 ---
 

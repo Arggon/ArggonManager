@@ -295,10 +295,20 @@ status: cancelled
 Add `tasks/.convention.yml`:
 
 ```yaml
-version: 1
+version: 2
+branch_patterns:
+  initiative: "feat/{id}"
+  epic: "feat/{id}"
+  story: "feat/{id}"
+  task: "feat/{id}"
+  bug: "fix/{id}"
 ```
 
 Omit = `0`. Layout is a tree concern. Per-file schema is optional and defaults to the tree version.
+
+### Branch patterns (v2)
+
+`branch_patterns` maps each work-item type to a branch-name template with `{id}` (required) and `{type}` (optional) placeholders. Missing keys fall back to the defaults above (`feat/{id}` everywhere, `fix/{id}` for bugs); unknown top-level keys are ignored. `arggon branch <id>` resolves the item's pattern (or its recorded `branch` field) and runs `git checkout -b`. Malformed patterns (missing `{id}`, unknown type, non-mapping section) fail `validate` with `INVALID_BRANCH_PATTERN`.
 
 ### Extension namespace
 
@@ -320,6 +330,7 @@ These names are reserved for a future version — do not invent them as unknown 
 - Breaking changes bump `version`.
 - `validate` **rejects** trees with a higher convention version than it supports.
 - **v1** = v0 + official `branch` field. New trees are scaffolded at v1; v0 trees (explicit `version: 0` or omitted) remain fully supported.
+- **v2** = v1 + `branch_patterns` config in `tasks/.convention.yml`. New trees are scaffolded at v2 with explicit per-type patterns; older trees keep working (missing patterns fall back to defaults).
 
 ### Listing order (v0)
 
