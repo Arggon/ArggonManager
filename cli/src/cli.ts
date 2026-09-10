@@ -413,21 +413,26 @@ program
     "--out <file>",
     "output HTML file (default: board.html at the repo root; relative --out resolves from cwd)",
   )
+  .option("--github", "overlay live GitHub PR state on cards with a branch (read-only)", false)
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { out?: string; json?: boolean }) => {
+  .action((opts: { out?: string; github?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
-      const result = runBoard({ cwd: process.cwd(), out: opts.out });
+      const result = runBoard({ cwd: process.cwd(), out: opts.out, github: opts.github });
       if (json) {
         successJson(
           "board",
-          { path: displayPath(result.outPath, process.cwd()), itemCount: result.itemCount },
+          {
+            path: displayPath(result.outPath, process.cwd()),
+            itemCount: result.itemCount,
+            ...(opts.github ? { github: true, prCount: result.prCount } : {}),
+          },
           readConventionVersion(result.root),
         );
         return;
       }
       console.log(
-        `arggon board: wrote ${displayPath(result.outPath, process.cwd())} (${result.itemCount} item(s))`,
+        `arggon board: wrote ${displayPath(result.outPath, process.cwd())} (${result.itemCount} item(s)${opts.github ? `, ${result.prCount} PR(s) linked` : ""})`,
       );
       console.log(
         "  Open it in a browser. Re-run after tree changes — tasks/ remains the source of truth.",
