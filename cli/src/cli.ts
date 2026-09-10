@@ -2,6 +2,7 @@
 import { Command } from "commander";
 import { displayPath, runBoard } from "./board.js";
 import { runBranch } from "./branch.js";
+import { runStart } from "./start.js";
 import { readConventionVersion } from "./convention.js";
 import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
@@ -345,6 +346,60 @@ program
         return;
       }
       console.error(`arggon branch: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("start")
+  .description("Claim an item, check out its branch, commit, push, and optionally open a draft PR")
+  .argument("<id>", "work item id")
+  .option("--assignee <login>", "claim as this login (default: GITHUB_USER / GITHUB_ACTOR)")
+  .option("--open-pr", "open a draft PR after pushing", false)
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((id: string, opts: { assignee?: string; openPr?: boolean; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runStart({
+        cwd: process.cwd(),
+        id,
+        assignee: opts.assignee,
+        openPr: Boolean(opts.openPr),
+      });
+      if (json) {
+        successJson(
+          "start",
+          {
+            item: toContractWorkItem(result.item, result.root),
+            branch: result.branch,
+            created: result.created,
+            pushed: result.pushed,
+            prUrl: result.prUrl,
+          },
+          readConventionVersion(result.root),
+        );
+        return;
+      }
+      console.log(`arggon start: ${result.item.type} ${result.id} → ${result.branch}`);
+      if (result.prUrl) {
+        console.log(`  draft PR: ${result.prUrl}`);
+      } else if (result.pushed) {
+        console.log(`  pushed (no PR; pass --open-pr)`);
+      } else {
+        console.log(`  already started; nothing to publish`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "start",
+          message,
+          code: "START_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon start: ${message}`);
       process.exitCode = 1;
     }
   });
