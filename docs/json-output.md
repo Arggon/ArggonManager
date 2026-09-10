@@ -19,12 +19,12 @@ This flag is a formatter only. It does not walk `tasks/` or parse frontmatter. C
 
 Every success or failure payload includes:
 
-| Field               | Type    | Notes                                                                                                            |
-| ------------------- | ------- | ---------------------------------------------------------------------------------------------------------------- |
-| `ok`                | boolean | `true` on success; `false` on failure                                                                            |
-| `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.                       |
-| `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                                   |
-| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `validate` \| `create` \| `update` \| `branch` \| `board` |
+| Field               | Type    | Notes                                                                                                                       |
+| ------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `ok`                | boolean | `true` on success; `false` on failure                                                                                       |
+| `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.                                  |
+| `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                                              |
+| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `validate` \| `create` \| `update` \| `branch` \| `start` \| `board` |
 
 Command-specific fields sit next to this envelope (not nested under a generic `data` key).
 
@@ -135,6 +135,18 @@ Enums match [`docs/convention.md`](./convention.md) v0.
 | `created` | `boolean`  | `true` when `git checkout -b` ran; `false` on attach |
 
 Failures use `error.code: "BRANCH_FAILED"` (unknown id, bad `branch_patterns`, non-git tree, or branch exists without matching the recorded field).
+
+### `start`
+
+| Field     | Type           | Notes                                                |
+| --------- | -------------- | ---------------------------------------------------- |
+| `item`    | `WorkItem`     | Item as claimed (with the persisted `branch` field)  |
+| `branch`  | `string`       | Working branch name                                  |
+| `created` | `boolean`      | `true` when `git checkout -b` ran; `false` on attach |
+| `pushed`  | `boolean`      | `true` when the branch was pushed this run           |
+| `prUrl`   | `string\|null` | Draft PR URL with `--open-pr`; `null` otherwise      |
+
+Failures use `error.code: "START_FAILED"` (unknown id, taken claim — never forced, dirty tree, existing branch, non-git tree, or gh failure).
 
 ---
 
