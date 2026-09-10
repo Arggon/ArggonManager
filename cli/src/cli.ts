@@ -310,7 +310,7 @@ program
   .description(
     "Write a static read-only HTML board from tasks/ (git files stay the source of truth)",
   )
-  .option("--out <file>", "output HTML file (default: board.html)")
+  .option("--out <file>", "output HTML file (default: board.html at the repo root; relative --out resolves from cwd)")
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action((opts: { out?: string; json?: boolean }) => {
     const json = jsonEnabled(opts);

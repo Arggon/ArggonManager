@@ -122,6 +122,18 @@ describe("runBoard", () => {
     expect(html).toContain("<!doctype html>");
     expect(html).toContain(GENERATED_AT);
   });
+
+  it("defaults the output to board.html at the repo root when cwd is a subdirectory", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-root-"));
+    mkdirSync(join(dir, "tasks"));
+    writeFileSync(join(dir, "tasks/.convention.yml"), "version: 0\n");
+    const sub = join(dir, "a", "b");
+    mkdirSync(sub, { recursive: true });
+    const result = runBoard({ cwd: sub, generatedAt: GENERATED_AT });
+    expect(result.root).toBe(dir);
+    expect(result.outPath).toBe(join(dir, "board.html"));
+    expect(existsSync(result.outPath)).toBe(true);
+  });
 });
 
 describe("displayPath", () => {

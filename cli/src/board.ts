@@ -36,7 +36,7 @@ export function runBoard(opts: BoardOptions): BoardResult {
       generatedAt: opts.generatedAt ?? new Date().toISOString(),
     },
   );
-  const outPath = resolve(opts.cwd, opts.out ?? DEFAULT_BOARD_FILE);
+  const outPath = opts.out ? resolve(opts.cwd, opts.out) : resolve(root, DEFAULT_BOARD_FILE);
   writeFileSync(outPath, html, "utf8");
   return { root, outPath, itemCount: items.length };
 }

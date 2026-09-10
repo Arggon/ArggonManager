@@ -263,6 +263,19 @@ describe("CLI --json", () => {
     expect(html).toContain('data-status="in_progress"');
   });
 
+  it("arggon board from a subdirectory writes board.html at the repo root", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-subdir-board-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    const sub = join(dir, "docs");
+    mkdirSync(sub);
+    const result = runCli(["board", "--json"], sub);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body.path).toBe(join(dir, "board.html"));
+    expect(existsSync(join(dir, "board.html"))).toBe(true);
+    expect(existsSync(join(sub, "board.html"))).toBe(false);
+  });
+
   it("arggon board honors --out and stays human-readable without --json", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-human-board-"));
     expect(runCli(["init", dir]).status).toBe(0);

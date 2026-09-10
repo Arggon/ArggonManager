@@ -177,12 +177,12 @@ Validate: `arggon validate` / `arggon validate --json` (CI gate; docs/json-outpu
 Writes a static, self-contained read-only HTML board (columns = v0 statuses; cards show type, id, title, assignee, labels, parent, `blocked_reason`) from the same kernel read path as `list`. No server, no client JS, no writes to `tasks/` — the output is a generated snapshot; git files remain the source of truth. Stack decision: [docs/adr/0002-board-viewer-v0.md](docs/adr/0002-board-viewer-v0.md).
 
 ```bash
-arggon board                  # writes board.html in cwd
-arggon board --out report/board.html
+arggon board                  # writes board.html at the repo root (where tasks/ lives)
+arggon board --out report/board.html   # explicit path, relative to cwd
 arggon board --json           # v1 envelope: { path, itemCount }
 ```
 
-- `--out <file>`: output path (default `board.html`); parent directories must exist
+- `--out <file>`: output path (default `board.html` at the repo root regardless of cwd); parent directories must exist
 - `--json`: one JSON object on stdout; failures emit `code: "BOARD_FAILED"`
 
 The board is a snapshot: re-run after tree changes to refresh. The generated file is a build artifact — safe to gitignore; deleting it loses nothing.
