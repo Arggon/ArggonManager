@@ -71,6 +71,27 @@ function initStartTree(ghOk: boolean): { dir: string; env: Record<string, string
   return { dir, env: { PATH: `${bin}:${process.env.PATH ?? ""}` } };
 }
 
+/** Branched item plus a mocked `gh pr list` on PATH (no git needed for the overlay). */
+function initBoardGhTree(ghOk: boolean): { dir: string; env: Record<string, string> } {
+  const outer = mkdtempSync(join(tmpdir(), "arggon-board-gh-"));
+  const dir = join(outer, "work");
+  mkdirSync(dir, { recursive: true });
+  expect(runCli(["init", dir]).status).toBe(0);
+  expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+  expect(runCli(["update", "launch-mvp", "--branch", "feat/launch-mvp"], dir).status).toBe(0);
+  const bin = join(outer, "bin");
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(
+    join(bin, "gh"),
+    ghOk
+      ? '#!/bin/sh\necho \'[{"number":42,"headRefName":"feat/launch-mvp","url":"https://github.com/o/r/pull/42","isDraft":false,"state":"OPEN","statusCheckRollup":[{"status":"COMPLETED","conclusion":"SUCCESS"}]}]\'\n'
+      : '#!/bin/sh\necho "auth required" >&2\nexit 1\n',
+    "utf8",
+  );
+  chmodSync(join(bin, "gh"), 0o755);
+  return { dir, env: { PATH: `${bin}:${process.env.PATH ?? ""}` } };
+}
+
 function parseStdout(stdout: string): Record<string, unknown> {
   const trimmed = stdout.trim();
   expect(trimmed.length).toBeGreaterThan(0);
@@ -359,6 +380,28 @@ describe("CLI --json", () => {
     expect(body.ok).toBe(false);
     expect(body.command).toBe("board");
     expect(body.error).toMatchObject({ code: "BOARD_FAILED" });
+  });
+
+  it("arggon board --github overlays PR state with a mocked gh", () => {
+    const { dir, env } = initBoardGhTree(true);
+    const result = runCli(["board", "--github", "--json"], dir, env);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body).toMatchObject({ ok: true, command: "board", github: true, prCount: 1 });
+    const html = readFileSync(join(dir, "board.html"), "utf8");
+    expect(html).toContain("#42 · open · ✓");
+    expect(html).toContain("live GitHub overlay (1 PR(s))");
+  });
+
+  it("arggon board --github fails with BOARD_FAILED without gh auth", () => {
+    const { dir, env } = initBoardGhTree(false);
+    const result = runCli(["board", "--github", "--json"], dir, env);
+    expect(result.status).toBe(1);
+    const body = parseStdout(result.stdout);
+    expect(body.ok).toBe(false);
+    expect(body.command).toBe("board");
+    expect(body.error).toMatchObject({ code: "BOARD_FAILED" });
+    expect(String((body.error as { message: string }).message)).toMatch(/plain `arggon board`/);
   });
 
   it("arggon branch creates, checks out, and records the branch", () => {

@@ -184,10 +184,12 @@ Writes a static, self-contained read-only HTML board (columns = v0 statuses; car
 arggon board                  # writes board.html at the repo root (where tasks/ lives)
 arggon board --out report/board.html   # explicit path, relative to cwd
 arggon board --json           # v1 envelope: { path, itemCount }
+arggon board --github         # overlay live GitHub PR state on cards with a branch (read-only)
 ```
 
 - `--out <file>`: output path (default `board.html` at the repo root regardless of cwd); parent directories must exist
 - `--json`: one JSON object on stdout; failures emit `code: "BOARD_FAILED"`
+- `--github`: one `gh pr list` read matched by head ref name → per-card badge (`#N · draft/open/merged/closed` + checks `✓/✗/…`, neutral `○ no PR` without branch or PR); without gh auth fails clearly suggesting plain `board`; never writes to `tasks/`
 
 The board is a snapshot: re-run after tree changes to refresh. The generated file is a build artifact — safe to gitignore; deleting it loses nothing.
 

@@ -148,6 +148,17 @@ Failures use `error.code: "BRANCH_FAILED"` (unknown id, bad `branch_patterns`, n
 
 Failures use `error.code: "START_FAILED"` (unknown id, taken claim — never forced, dirty tree, existing branch, non-git tree, or gh failure).
 
+### `board`
+
+| Field       | Type      | Notes                                                      |
+| ----------- | --------- | ---------------------------------------------------------- |
+| `path`      | `string`  | Output HTML path (display form)                            |
+| `itemCount` | `number`  | Items rendered                                             |
+| `github`    | `boolean` | Present and `true` only with `--github`                    |
+| `prCount`   | `number`  | PRs matched to card branches; present only with `--github` |
+
+With `--github` the board overlays live PR state (number, draft/ready, checks) on cards with a `branch`, matched by head ref name; cards without a branch or PR get a neutral badge. Without the flag the board is a fully offline snapshot. Failures use `error.code: "BOARD_FAILED"` (missing tasks/, or without gh auth — run plain `board` for the offline snapshot).
+
 ---
 
 ## Example payloads

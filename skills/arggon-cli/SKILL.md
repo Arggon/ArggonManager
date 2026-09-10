@@ -47,6 +47,7 @@ node dist/cli.js update <id> --status blocked --blocked-reason "..." # blocked (
 node dist/cli.js update <id> --status todo                           # unclaim (clears assignee)
 node dist/cli.js validate --json                                     # ok:false iff errors.length > 0; warnings alone keep ok:true
 node dist/cli.js board --json                                        # {path, itemCount}; HTML defaults to repo root
+node dist/cli.js board --github --json                             # + live PR overlay {github, prCount}; needs gh auth
 ```
 
 ## Procedure
@@ -64,6 +65,7 @@ node dist/cli.js board --json                                        # {path, it
 - `update --status blocked` without `--blocked-reason` is rejected; `blocked_reason` must be absent otherwise.
 - `WorkItem.path` in JSON is posix, relative to the repo root (not cwd).
 - `board` without `--out` writes `board.html` at the repo root (where `tasks/` lives), wherever you run it; explicit `--out` resolves from cwd and parent dirs must exist.
+- `board --github` overlays live PR state on cards with a `branch` (one `gh pr list` read, matched by head ref name; neutral badge without branch or PR); without gh auth it fails suggesting plain `board`. Never writes to `tasks/` in any path.
 - `list` filters compose with AND; unknown `--status`/`--type` values fail instead of returning empty.
 - Run inside the repo tree: outside it every command fails fast (e.g. `LIST_FAILED`) — `cd` into the repo first.
 - Conventions can evolve: check `conventionVersion` in any envelope; v0 rules are in `docs/convention.md`.
