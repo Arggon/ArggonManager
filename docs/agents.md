@@ -47,13 +47,11 @@ Defaults: `status: todo`, quoted `YYYY-MM-DD` timestamps, omit `assignee` when u
 
 ## 4. Branch naming
 
-Tie the branch to the work item `id`:
+Generate the branch from the work item `id` following the configured patterns (`tasks/.convention.yml`, `branch_patterns`):
 
-- `feat/<id>`
-- `fix/<id>`
-- `docs/<id>`
+- `npm run arggon -- branch <id>`
 
-Examples: `feat/task-rate-limit`, `fix/bug-empty-password-500`.
+This checks out the branch and records it in the item's `branch` field. If the right branch already exists and matches, it attaches to it. Defaults follow `feat/<id>` / `fix/<id>` / `docs/<id>` (e.g. `feat/task-rate-limit`, `fix/bug-empty-password-500`).
 
 One primary claimable id per branch when possible. Open a PR early; keep it small.
 
