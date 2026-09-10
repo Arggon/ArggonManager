@@ -187,7 +187,7 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
     );
   }
 
-  const claimed = runUpdate({
+  runUpdate({
     cwd: opts.cwd,
     id,
     status: "in_progress",
