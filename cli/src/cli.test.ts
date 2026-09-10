@@ -18,6 +18,22 @@ function runCli(args: string[], cwd = root) {
   });
 }
 
+function runGit(args: string[], cwd: string) {
+  return spawnSync("git", args, { encoding: "utf8", cwd });
+}
+
+function initGitTree(): string {
+  const dir = mkdtempSync(join(tmpdir(), "arggon-git-branch-"));
+  expect(runGit(["init"], dir).status).toBe(0);
+  expect(runCli(["init", dir]).status).toBe(0);
+  expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+  expect(runGit(["add", "-A"], dir).status).toBe(0);
+  expect(
+    runGit(["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "init"], dir).status,
+  ).toBe(0);
+  return dir;
+}
+
 function parseStdout(stdout: string): Record<string, unknown> {
   const trimmed = stdout.trim();
   expect(trimmed.length).toBeGreaterThan(0);
@@ -94,7 +110,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 1,
+      conventionVersion: 2,
       command: "create",
     });
     expect(body.item).toMatchObject({
@@ -140,7 +156,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 1,
+      conventionVersion: 2,
       command: "list",
     });
     expect(Array.isArray(body.items)).toBe(true);
@@ -211,7 +227,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 1,
+      conventionVersion: 2,
       command: "update",
     });
     expect(body.item).toMatchObject({
@@ -264,7 +280,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 1,
+      conventionVersion: 2,
       command: "board",
       path: "board.html",
       itemCount: 2,
@@ -306,5 +322,43 @@ describe("CLI --json", () => {
     expect(body.ok).toBe(false);
     expect(body.command).toBe("board");
     expect(body.error).toMatchObject({ code: "BOARD_FAILED" });
+  });
+
+  it("arggon branch creates, checks out, and records the branch", () => {
+    const dir = initGitTree();
+    const result = runCli(["branch", "launch-mvp"], dir);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(
+      "arggon branch: initiative launch-mvp → feat/launch-mvp (created)",
+    );
+    expect(runGit(["branch", "--show-current"], dir).stdout.trim()).toBe("feat/launch-mvp");
+  });
+
+  it("arggon branch --json attaches to the recorded branch", () => {
+    const dir = initGitTree();
+    expect(runCli(["branch", "launch-mvp"], dir).status).toBe(0);
+    const result = runCli(["branch", "launch-mvp", "--json"], dir);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body).toMatchObject({
+      ok: true,
+      schemaVersion: JSON_SCHEMA_VERSION,
+      conventionVersion: 2,
+      command: "branch",
+      branch: "feat/launch-mvp",
+      created: false,
+    });
+    expect(body.item).toMatchObject({ id: "launch-mvp", branch: "feat/launch-mvp" });
+  });
+
+  it("arggon branch --json fails with BRANCH_FAILED on mismatch", () => {
+    const dir = initGitTree();
+    expect(runGit(["branch", "feat/launch-mvp"], dir).status).toBe(0);
+    const result = runCli(["branch", "launch-mvp", "--json"], dir);
+    expect(result.status).toBe(1);
+    const body = parseStdout(result.stdout);
+    expect(body.ok).toBe(false);
+    expect(body.command).toBe("branch");
+    expect(body.error).toMatchObject({ code: "BRANCH_FAILED" });
   });
 });

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { runBoard, displayPath } from "./board.js";
+import { displayPath, runBoard } from "./board.js";
+import { runBranch } from "./branch.js";
 import { readConventionVersion } from "./convention.js";
 import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
@@ -304,6 +305,46 @@ program
         return;
       }
       console.error(`arggon validate: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("branch")
+  .description("Check out the working branch for an item (generated from branch_patterns)")
+  .argument("<id>", "work item id")
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((id: string, opts: { json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runBranch({ cwd: process.cwd(), id });
+      if (json) {
+        successJson(
+          "branch",
+          {
+            item: toContractWorkItem(result.item, result.root),
+            branch: result.branch,
+            created: result.created,
+          },
+          readConventionVersion(result.root),
+        );
+        return;
+      }
+      console.log(
+        `arggon branch: ${result.item.type} ${result.id} → ${result.branch} (${result.created ? "created" : "attached"})`,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "branch",
+          message,
+          code: "BRANCH_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon branch: ${message}`);
       process.exitCode = 1;
     }
   });
