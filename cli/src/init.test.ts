@@ -15,7 +15,7 @@ describe("init", () => {
   it("scaffolds tasks/.convention.yml and templates", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-"));
     const result = runInit({ dir, force: false });
-    expect(readFileSync(join(dir, "tasks/.convention.yml"), "utf8")).toContain("version: 0");
+    expect(readFileSync(join(dir, "tasks/.convention.yml"), "utf8")).toContain("version: 1");
     expect(existsSync(join(dir, "templates/task.md"))).toBe(true);
     expect(existsSync(join(dir, "templates/initiative.md"))).toBe(true);
     expect(result.alreadyInitialized).toBe(false);

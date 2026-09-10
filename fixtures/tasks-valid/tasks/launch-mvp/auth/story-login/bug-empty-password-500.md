@@ -4,6 +4,7 @@ status: todo
 id: bug-empty-password-500
 title: Empty password returns HTTP 500
 parent: story-login
+branch: fix/bug-empty-password-500
 labels: [bug, auth]
 created: "2026-09-03"
 updated: "2026-09-03"

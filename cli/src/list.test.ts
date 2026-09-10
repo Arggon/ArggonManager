@@ -209,6 +209,7 @@ describe("runList", () => {
       status: "todo",
       title: null,
       assignee: null,
+      branch: null,
       parent: "story-login",
       labels: ["security"],
       created: null,
@@ -222,7 +223,7 @@ describe("runList", () => {
     const dir = makeTree();
     const { items } = runList({ cwd: dir, type: "bug", status: "done" });
     expect(items).toEqual([]);
-    expect(formatListTable(items)).toBe("id  type  status  assignee  title\n");
+    expect(formatListTable(items)).toBe("id  type  status  assignee  branch  title\n");
   });
 
   it("errors when tasks/ is missing", () => {
@@ -256,6 +257,30 @@ describe("runList", () => {
     const paths = items.map((i) => i.filePath);
     expect(paths.some((p) => p.endsWith("notes.md"))).toBe(false);
     expect(paths.some((p) => p.endsWith("README.md"))).toBe(false);
+  });
+
+  it("round-trips branch through table and contract", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-list-branch-"));
+    mkdirSync(join(dir, "tasks"), { recursive: true });
+    write(dir, "tasks/.convention.yml", "version: 1\n");
+    write(
+      dir,
+      "tasks/a/a.md",
+      `---
+type: initiative
+status: in_progress
+id: a
+title: A
+branch: feat/a
+---
+
+# A
+`,
+    );
+    const { root, items } = runList({ cwd: dir });
+    expect(items[0]?.branch).toBe("feat/a");
+    expect(formatListTable(items)).toContain("feat/a");
+    expect(toContractWorkItem(items[0]!, root).branch).toBe("feat/a");
   });
 
   it("resolves @me via GITHUB_USER", () => {
@@ -309,7 +334,7 @@ id: task-broken
   it("shows unassigned as - in table and null in contract", () => {
     const dir = makeTree();
     const { root, items: todos } = runList({ cwd: dir, type: "task", status: "todo" });
-    expect(formatListTable(todos)).toMatch(/task-h1-only\s+task\s+todo\s+-\s+task-h1-only/);
+    expect(formatListTable(todos)).toMatch(/task-h1-only\s+task\s+todo\s+-\s+-\s+task-h1-only/);
     const { items: initiatives } = runList({ cwd: dir, type: "initiative" });
     expect(toContractWorkItem(initiatives[0]!, root).assignee).toBeNull();
   });

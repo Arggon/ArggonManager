@@ -56,6 +56,7 @@ const OFFICIAL_ORDER = [
   "id",
   "title",
   "assignee",
+  "branch",
   "parent",
   "labels",
   "created",
@@ -71,6 +72,7 @@ export function stringifyFrontmatter(data: Frontmatter, body: string): string {
   for (const key of OFFICIAL_ORDER) {
     if (!(key in data) || data[key] === undefined) continue;
     if (key === "assignee" && (data[key] === null || data[key] === "")) continue;
+    if (key === "branch" && (data[key] === null || data[key] === "")) continue;
     if (key === "parent" && data[key] === null) continue;
     if (key === "blocked_reason" && (data[key] === null || data[key] === "")) continue;
     lines.push(`${key}: ${formatValue(key, data[key])}`);

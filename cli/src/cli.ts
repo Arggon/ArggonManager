@@ -196,6 +196,7 @@ program
   .option("--title <title>", "new title (non-empty)")
   .option("--status <status>", "new status (must follow v0 transitions)")
   .option("--assignee <login>", "new assignee (claimable types need one when in_progress)")
+  .option("--branch <name>", "set working branch (empty string clears; unclaim clears by default)")
   .option("--unassign", "clear assignee (in_progress -> todo does this by default)", false)
   .option("--labels <csv>", "replace the full labels list (comma-separated)")
   .option("--blocked-reason <text>", "required when status becomes blocked")
@@ -208,6 +209,7 @@ program
         title?: string;
         status?: string;
         assignee?: string;
+        branch?: string;
         unassign?: boolean;
         labels?: string;
         blockedReason?: string;
@@ -223,6 +225,7 @@ program
           title: opts.title,
           status: opts.status,
           assignee: opts.assignee,
+          branch: opts.branch,
           unassign: opts.unassign,
           labels: opts.labels,
           blockedReason: opts.blockedReason,
@@ -310,7 +313,10 @@ program
   .description(
     "Write a static read-only HTML board from tasks/ (git files stay the source of truth)",
   )
-  .option("--out <file>", "output HTML file (default: board.html at the repo root; relative --out resolves from cwd)")
+  .option(
+    "--out <file>",
+    "output HTML file (default: board.html at the repo root; relative --out resolves from cwd)",
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action((opts: { out?: string; json?: boolean }) => {
     const json = jsonEnabled(opts);

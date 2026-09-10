@@ -1,8 +1,9 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { bundledTemplatesDir } from "./paths.js";
+import { CONVENTION_VERSION } from "./convention.js";
 
-const CONVENTION_YML = `version: 0
+const CONVENTION_YML = `version: ${CONVENTION_VERSION}
 `;
 
 export type InitOptions = {
