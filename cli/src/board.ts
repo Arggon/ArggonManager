@@ -1,6 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import { toContractWorkItem } from "./contract.js";
+import { ghPrListJson } from "./get-open-prs.js";
 import { loadItems } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 import { STATUSES } from "./status.js";
@@ -13,32 +14,128 @@ export type BoardOptions = {
   out?: string;
   /** ISO timestamp rendered into the header (injectable for tests). */
   generatedAt?: string;
+  /** When true, overlay live GitHub PR state on cards with a `branch` (read-only). */
+  github?: boolean;
+  /** Injectable GitHub reader (tests pass a fake; default shells out to `gh`). */
+  gh?: BoardGithub;
 };
 
 export type BoardResult = {
   root: string;
   outPath: string;
   itemCount: number;
+  /** PRs matched to card branches (0 unless `github` is on). */
+  prCount: number;
 };
+
+/** Live PR state for one branch, matched by head ref name. */
+export type PrInfo = {
+  branch: string;
+  number: number;
+  url: string;
+  /** OPEN | MERGED | CLOSED (as reported by `gh pr list`). */
+  state: "OPEN" | "MERGED" | "CLOSED";
+  isDraft: boolean;
+  /** Aggregated from statusCheckRollup: no checks -> "unknown". */
+  checks: "passing" | "failing" | "pending" | "unknown";
+};
+
+/** GitHub reader, injectable for tests. Never writes. */
+export interface BoardGithub {
+  listPrs(cwd: string): PrInfo[];
+}
+
+type GhPrJson = {
+  number?: number;
+  headRefName?: string;
+  url?: string;
+  state?: string;
+  isDraft?: boolean;
+  statusCheckRollup?: { status?: string; conclusion?: string | null }[];
+};
+
+function toPrInfo(entry: GhPrJson): PrInfo | null {
+  if (typeof entry.number !== "number" || typeof entry.headRefName !== "string") return null;
+  const state = entry.state === "MERGED" || entry.state === "CLOSED" ? entry.state : "OPEN";
+  return {
+    branch: entry.headRefName,
+    number: entry.number,
+    url: typeof entry.url === "string" ? entry.url : "",
+    state,
+    isDraft: entry.isDraft === true,
+    checks: summarizeChecks(entry.statusCheckRollup ?? []),
+  };
+}
+
+export function summarizeChecks(
+  rollup: { status?: string; conclusion?: string | null }[],
+): PrInfo["checks"] {
+  if (rollup.length === 0) return "unknown";
+  const conclusions = rollup.map((c) => (c.conclusion ?? "").toUpperCase());
+  if (conclusions.some((c) => c === "FAILURE" || c === "TIMED_OUT" || c === "ACTION_REQUIRED")) {
+    return "failing";
+  }
+  const pending = rollup.some((c) => (c.status ?? "").toUpperCase() !== "COMPLETED");
+  if (pending || conclusions.some((c) => c === "" || c === "PENDING" || c === "STALE")) {
+    return "pending";
+  }
+  return "passing";
+}
+
+export function defaultBoardGithub(): BoardGithub {
+  return {
+    listPrs(cwd: string): PrInfo[] {
+      // Single gh invocation contract lives in get-open-prs.ts (limit + JSON);
+      // this wrapper only adds the overlay UX context on failure.
+      let entries: GhPrJson[];
+      try {
+        entries = ghPrListJson({
+          cwd,
+          fields: "number,headRefName,url,isDraft,state,statusCheckRollup",
+        }) as GhPrJson[];
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
+        throw new Error(
+          `GitHub overlay unavailable: ${detail} (or run plain \`arggon board\` for the offline snapshot)`,
+        );
+      }
+      const prs: PrInfo[] = [];
+      for (const entry of entries) {
+        const pr = toPrInfo(entry);
+        if (pr) prs.push(pr);
+      }
+      return prs;
+    },
+  };
+}
 
 /**
  * Load items from the shared kernel (same read path as `list`) and write a
  * static, self-contained HTML board. Read-only: nothing is read back from the
- * file, and no item in tasks/ is modified.
+ * file, and no item in tasks/ is modified. With `github`, live PR state is
+ * overlaid on cards with a `branch` (matched by head ref name); the overlay
+ * never writes either.
  */
 export function runBoard(opts: BoardOptions): BoardResult {
   const tasksDir = findTasksDir(opts.cwd);
   const root = repoRootFromTasks(tasksDir);
   const items = loadItems(tasksDir).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  let overlay = new Map<string, PrInfo>();
+  if (opts.github) {
+    const reader = opts.gh ?? defaultBoardGithub();
+    overlay = new Map(reader.listPrs(root).map((pr) => [pr.branch, pr]));
+  }
   const html = renderBoardHtml(
     items.map((item) => toContractWorkItem(item, root)),
     {
       generatedAt: opts.generatedAt ?? new Date().toISOString(),
+      prs: overlay,
+      live: opts.github === true,
     },
   );
-  const outPath = resolve(opts.cwd, opts.out ?? DEFAULT_BOARD_FILE);
+  const outPath = opts.out ? resolve(opts.cwd, opts.out) : resolve(root, DEFAULT_BOARD_FILE);
   writeFileSync(outPath, html, "utf8");
-  return { root, outPath, itemCount: items.length };
+  return { root, outPath, itemCount: items.length, prCount: overlay.size };
 }
 
 const TYPE_COLORS: Record<WorkItem["type"], string> = {
@@ -58,6 +155,39 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
+/** Badge for the live GitHub overlay. No branch or no matching PR -> neutral badge. */
+function prBadge(pr: PrInfo | undefined): string {
+  if (!pr) return `<div class="pr nopr">○ no PR</div>`;
+  const kind =
+    pr.state === "MERGED"
+      ? "merged"
+      : pr.state === "CLOSED"
+        ? "closed"
+        : pr.isDraft
+          ? "draft"
+          : "open";
+  const label =
+    pr.state === "MERGED"
+      ? "merged"
+      : pr.state === "CLOSED"
+        ? "closed"
+        : pr.isDraft
+          ? "draft"
+          : "open";
+  const checks =
+    pr.checks === "passing"
+      ? " · ✓"
+      : pr.checks === "failing"
+        ? " · ✗"
+        : pr.checks === "pending"
+          ? " · …"
+          : "";
+  const text = `#${pr.number} · ${label}${checks}`;
+  return pr.url
+    ? `<div class="pr ${kind}"><a href="${escapeHtml(pr.url)}">${escapeHtml(text)}</a></div>`
+    : `<div class="pr ${kind}">${escapeHtml(text)}</div>`;
+}
+
 /**
  * Pure renderer for the static board. Columns are the v0 statuses in enum
  * order; every card shows its own status (no rollup). All dynamic text is
@@ -65,10 +195,15 @@ export function escapeHtml(value: string): string {
  */
 export function renderBoardHtml(
   items: WorkItem[],
-  opts: { generatedAt: string; repoName?: string } = { generatedAt: "" },
+  opts: { generatedAt: string; repoName?: string; prs?: Map<string, PrInfo>; live?: boolean } = {
+    generatedAt: "",
+  },
 ): string {
   const esc = escapeHtml;
   const sorted = [...items].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const prs = opts.prs ?? new Map<string, PrInfo>();
+  // Offline snapshot stays byte-identical: the PR line only renders with the live overlay on.
+  const showPr = opts.live === true;
 
   const columns = STATUSES.map((status) => {
     const cards = sorted
@@ -79,6 +214,8 @@ export function renderBoardHtml(
         const assignee = item.assignee
           ? `<div class="assignee">@${esc(item.assignee)}</div>`
           : `<div class="assignee unassigned">unassigned</div>`;
+        const branch = item.branch ? `<div class="branch">⑂ ${esc(item.branch)}</div>` : "";
+        const pr = showPr ? prBadge(item.branch ? prs.get(item.branch) : undefined) : "";
         const reason = item.blocked_reason
           ? `<div class="blocked-reason">${esc(item.blocked_reason)}</div>`
           : "";
@@ -93,6 +230,8 @@ export function renderBoardHtml(
   <div class="title">${title}</div>
   ${breadcrumb}
   ${assignee}
+  ${branch}
+  ${pr}
   ${labels}
   ${reason}
 </div>`;
@@ -109,6 +248,7 @@ export function renderBoardHtml(
     (status) => `${status}: ${sorted.filter((item) => item.status === status).length}`,
   ).join(" · ");
   const repo = opts.repoName ? ` — ${esc(opts.repoName)}` : "";
+  const live = showPr ? ` · live GitHub overlay (${prs.size} PR(s))` : "";
 
   return `<!doctype html>
 <html lang="en">
@@ -138,6 +278,15 @@ header .meta { color: #59636e; font-size: 13px; }
 .parent::before { content: "↳ "; }
 .assignee { color: #424a53; font-size: 12px; }
 .assignee.unassigned { color: #a0a6ad; }
+.branch { color: #8250df; font-size: 12px; font-family: ui-monospace, monospace; }
+.pr { font-size: 12px; margin-top: 2px; }
+.pr a { color: inherit; text-decoration: none; }
+.pr a:hover { text-decoration: underline; }
+.pr.nopr { color: #a0a6ad; }
+.pr.draft { color: #8c919a; }
+.pr.open { color: #1a7f37; font-weight: 600; }
+.pr.merged { color: #8250df; }
+.pr.closed { color: #cf222e; }
 .labels { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
 .label { background: #e7ebef; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
 .blocked-reason { margin-top: 6px; color: #9a3412; background: #fff1e7; border-radius: 4px; padding: 4px 6px; font-size: 12px; }
@@ -146,7 +295,7 @@ header .meta { color: #59636e; font-size: 13px; }
 <body>
 <header>
   <h1>arggon board${repo}</h1>
-  <div class="meta">generated ${esc(opts.generatedAt)} · ${sorted.length} item(s) · ${counts} · read-only snapshot; git files under tasks/ remain the source of truth</div>
+  <div class="meta">generated ${esc(opts.generatedAt)} · ${sorted.length} item(s) · ${counts} · read-only snapshot; git files under tasks/ remain the source of truth${live}</div>
 </header>
 <main class="board">
 ${columns}

@@ -143,18 +143,26 @@ arggon list --status todo
 arggon list --type bug --assignee @me
 arggon list --json
 arggon --json list --type task --status in_progress
+arggon list --filter "status:todo !label:security"
 ```
 
 - --status <status>: exact v0 status (`todo`, `in_progress`, `blocked`, `done`, `cancelled`)
 - --type <type>: exact v0 type (`initiative`, `epic`, `story`, `task`, `bug`)
 - --assignee <login>: exact assignee. Special @me resolves via `GITHUB_USER`, then `GITHUB_ACTOR`, then `gh api user -q .login`
+- --filter <expr>: compact filter ANDed with the flags (fields `status`, `type`, `assignee`, `label`, `parent`; `!` negates; quotes allow spaces, e.g. `assignee:"Jane Doe"`); unknown fields are usage errors
 - --json: one compact JSON object on stdout (envelope v1: `ok`, `schemaVersion: 1`, `conventionVersion`, `command: "list"`, `items: WorkItem[]`); failures emit `ok: false` with `code: "LIST_FAILED"`
 
 Empty results exit `0` (`items: []` with `--json`). Missing `tasks/`, invalid enums, unresolvable @me, or unreadable work-item files exit non-zero.
 
 `arggon create <type> <title>` writes a work item under `tasks/` from the templates. Non-initiative types need `--parent <id>`. Defaults: `status: todo`, `created`/`updated` today. Flags: `--id`, `--assignee`, `--status` (not `done`), `--blocked-reason`.
 
-`arggon update <id>` edits frontmatter in place (only requested fields). Enforces v0 status transitions, the claim rule (`in_progress` on story/task/bug needs `--assignee`), and `blocked_reason` rules; always touches `updated`. Transitions `in_progress` → `todo` clear `assignee` by default (override with explicit `--assignee`); leaving `blocked` clears `blocked_reason`. Reassigning a claimed item fails with a claim conflict unless `--force` (see [docs/claim.md](docs/claim.md)). Flags: `--title`, `--status`, `--assignee`, `--unassign`, `--labels <csv>` (replace), `--blocked-reason`, `--force`, `--json` (envelope v1 `{ item }`, failures `UPDATE_FAILED`).
+`arggon update <id>` edits frontmatter in place (only requested fields). Enforces v0 status transitions, the claim rule (`in_progress` on story/task/bug needs `--assignee`), and `blocked_reason` rules; always touches `updated`. Transitions `in_progress` → `todo` clear `assignee` **and `branch`** by default (override with explicit `--assignee` / `--branch`); leaving `blocked` clears `blocked_reason`. Reassigning a claimed item fails with a claim conflict unless `--force` (see [docs/claim.md](docs/claim.md)). Flags: `--title`, `--status`, `--assignee`, `--branch <name>` (empty clears), `--unassign`, `--labels <csv>` (replace), `--blocked-reason`, `--force`, `--json` (envelope v1 `{ item }`, failures `UPDATE_FAILED`).
+
+`arggon branch <id>` checks out the working branch for an item: uses the recorded `branch` field when set (attach), else generates it from `branch_patterns` in `tasks/.convention.yml` (`{id}`/`{type}` placeholders; defaults `feat/{id}`, `fix/{id}` for bugs) and persists it. Fails clearly when the branch exists without matching the field. Flags: `--json` (envelope `{ item, branch, created }`, failures `BRANCH_FAILED`).
+
+`arggon start <id>` claims (`in_progress` + `--assignee`, never `--force`), checks out the branch, commits the claim, pushes, and with `--open-pr` opens a draft PR with the item id in the body. Refuses dirty trees and taken claims. Flags: `--assignee` (default `GITHUB_USER`/`GITHUB_ACTOR`), `--open-pr`, `--json` (envelope `{ item, branch, created, pushed, prUrl }`, failures `START_FAILED`).
+
+`arggon next` suggests the next claimable item: unclaimed `todo` of claimable type (story/task/bug), lexicographic by id, with parent chain and reason. Empty pool exits `0` with a friendly message. Flags: `--json` (envelope `{ suggestion: { item, parentChain, reason } | null }`, failures `NEXT_FAILED`).
 
 Shared kernel: `cli/src/paths.ts`, `frontmatter.ts`, `ids.ts`, `status.ts`, `items.ts`, `relations.ts`, `dates.ts`.
 
@@ -177,13 +185,15 @@ Validate: `arggon validate` / `arggon validate --json` (CI gate; docs/json-outpu
 Writes a static, self-contained read-only HTML board (columns = v0 statuses; cards show type, id, title, assignee, labels, parent, `blocked_reason`) from the same kernel read path as `list`. No server, no client JS, no writes to `tasks/` — the output is a generated snapshot; git files remain the source of truth. Stack decision: [docs/adr/0002-board-viewer-v0.md](docs/adr/0002-board-viewer-v0.md).
 
 ```bash
-arggon board                  # writes board.html in cwd
-arggon board --out report/board.html
+arggon board                  # writes board.html at the repo root (where tasks/ lives)
+arggon board --out report/board.html   # explicit path, relative to cwd
 arggon board --json           # v1 envelope: { path, itemCount }
+arggon board --github         # overlay live GitHub PR state on cards with a branch (read-only)
 ```
 
-- `--out <file>`: output path (default `board.html`); parent directories must exist
+- `--out <file>`: output path (default `board.html` at the repo root regardless of cwd); parent directories must exist
 - `--json`: one JSON object on stdout; failures emit `code: "BOARD_FAILED"`
+- `--github`: one `gh pr list` read matched by head ref name → per-card badge (`#N · draft/open/merged/closed` + checks `✓/✗/…`, neutral `○ no PR` without branch or PR); without gh auth fails clearly suggesting plain `board`; never writes to `tasks/`
 
 The board is a snapshot: re-run after tree changes to refresh. The generated file is a build artifact — safe to gitignore; deleting it loses nothing.
 

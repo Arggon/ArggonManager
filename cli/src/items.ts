@@ -15,6 +15,8 @@ export type WorkItem = {
   id: string;
   title?: string;
   assignee?: string | null;
+  /** Working branch name (v1 field); omit/null = none. */
+  branch?: string;
   parent?: string | null;
   labels: string[];
   created?: string;
@@ -33,6 +35,7 @@ const OFFICIAL_KEYS = new Set([
   "id",
   "title",
   "assignee",
+  "branch",
   "parent",
   "labels",
   "created",
@@ -165,6 +168,7 @@ export function softTryLoadItem(filePath: string): SoftLoadResult {
     id,
     title: stringField(data, "title"),
     assignee: stringField(data, "assignee") ?? null,
+    branch: stringField(data, "branch"),
     parent: stringField(data, "parent") ?? null,
     labels,
     created: stringField(data, "created"),

@@ -19,12 +19,12 @@ This flag is a formatter only. It does not walk `tasks/` or parse frontmatter. C
 
 Every success or failure payload includes:
 
-| Field               | Type    | Notes                                                                                          |
-| ------------------- | ------- | ---------------------------------------------------------------------------------------------- |
-| `ok`                | boolean | `true` on success; `false` on failure                                                          |
-| `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.     |
-| `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                 |
-| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `validate` \| `create` \| `update` \| … |
+| Field               | Type    | Notes                                                                                                                                 |
+| ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `ok`                | boolean | `true` on success; `false` on failure                                                                                                 |
+| `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.                                            |
+| `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                                                        |
+| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `validate` \| `create` \| `update` \| `branch` \| `start` \| `board` \| `sync` |
 
 Command-specific fields sit next to this envelope (not nested under a generic `data` key).
 
@@ -34,7 +34,7 @@ Command-specific fields sit next to this envelope (not nested under a generic `d
 - **Breaking** changes bump `schemaVersion`.
 - Clients **MUST ignore** unknown fields.
 - This CLI emits **`schemaVersion: 1` only**.
-- Distinct from the convention **tree** version in [`docs/convention.md`](./convention.md). A v0 tree with JSON schema 1 is `{ schemaVersion: 1, conventionVersion: 0 }`.
+- Distinct from the convention **tree** version in [`docs/convention.md`](./convention.md). A v0 tree with JSON schema 1 is `{ schemaVersion: 1, conventionVersion: 0 }`; a v1 tree (with `branch`) reports `conventionVersion: 1`; a v2 tree (with `branch_patterns`) reports `conventionVersion: 2`.
 
 ### Failures (`ok: false`)
 
@@ -56,7 +56,7 @@ Empty success stays `ok: true` (e.g. future `list` with no items → `items: []`
 
 ### `WorkItem`
 
-Stable fields aligned with convention v0. **Always present** so agents need not special-case missing keys:
+Stable fields aligned with convention v0 plus the additive v1 `branch`. **Always present** so agents need not special-case missing keys:
 
 | Field            | Type                                                          | Notes                                                                       |
 | ---------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -65,6 +65,7 @@ Stable fields aligned with convention v0. **Always present** so agents need not 
 | `status`         | `todo` \| `in_progress` \| `blocked` \| `done` \| `cancelled` |                                                                             |
 | `title`          | `string` \| `null`                                            | Canonical title when known                                                  |
 | `assignee`       | `string` \| `null`                                            |                                                                             |
+| `branch`         | `string` \| `null`                                            | Working branch (v1, additive); `null` when unset                            |
 | `parent`         | `string` \| `null`                                            |                                                                             |
 | `labels`         | `string[]`                                                    |                                                                             |
 | `created`        | `string` \| `null`                                            | `YYYY-MM-DD`                                                                |
@@ -124,6 +125,67 @@ Enums match [`docs/convention.md`](./convention.md) v0.
 | Field  | Type       |
 | ------ | ---------- |
 | `item` | `WorkItem` |
+
+### `branch`
+
+| Field     | Type       | Notes                                                |
+| --------- | ---------- | ---------------------------------------------------- |
+| `item`    | `WorkItem` | Item with the persisted `branch` field               |
+| `branch`  | `string`   | Resolved working branch name                         |
+| `created` | `boolean`  | `true` when `git checkout -b` ran; `false` on attach |
+
+Failures use `error.code: "BRANCH_FAILED"` (unknown id, bad `branch_patterns`, non-git tree, or branch exists without matching the recorded field).
+
+### `start`
+
+| Field     | Type           | Notes                                                |
+| --------- | -------------- | ---------------------------------------------------- |
+| `item`    | `WorkItem`     | Item as claimed (with the persisted `branch` field)  |
+| `branch`  | `string`       | Working branch name                                  |
+| `created` | `boolean`      | `true` when `git checkout -b` ran; `false` on attach |
+| `pushed`  | `boolean`      | `true` when the branch was pushed this run           |
+| `prUrl`   | `string\|null` | Draft PR URL with `--open-pr`; `null` otherwise      |
+
+Failures use `error.code: "START_FAILED"` (unknown id, taken claim — never forced, dirty tree, existing branch, non-git tree, or gh failure).
+
+### `next`
+
+| Field                    | Type             | Notes                                                          |
+| ------------------------ | ---------------- | -------------------------------------------------------------- |
+| `suggestion`             | `object \| null` | One suggestion object, or `null` when the todo pool is empty   |
+| `suggestion.item`        | `WorkItem`       | Suggested unclaimed todo (claimable type, lexicographic by id) |
+| `suggestion.parentChain` | `string[]`       | Parent ids root-first                                          |
+| `suggestion.reason`      | `string`         | Why this item was chosen                                       |
+
+Empty pool is success (`ok: true`, `suggestion: null`). Failures use `error.code: "NEXT_FAILED"` (missing tasks/, unreadable items).
+
+### `board`
+
+| Field       | Type      | Notes                                                      |
+| ----------- | --------- | ---------------------------------------------------------- |
+| `path`      | `string`  | Output HTML path (display form)                            |
+| `itemCount` | `number`  | Items rendered                                             |
+| `github`    | `boolean` | Present and `true` only with `--github`                    |
+| `prCount`   | `number`  | PRs matched to card branches; present only with `--github` |
+
+With `--github` the board overlays live PR state (number, draft/ready, checks) on cards with a `branch`, matched by head ref name; cards without a branch or PR get a neutral badge. Without the flag the board is a fully offline snapshot. Failures use `error.code: "BOARD_FAILED"` (missing tasks/, or without gh auth — run plain `board` for the offline snapshot).
+
+### `sync`
+
+| Field         | Type                             | Notes                                                                 |
+| ------------- | -------------------------------- | --------------------------------------------------------------------- |
+| `mode`        | `"check" \| "write"`             | `--write` requested; check is the default                             |
+| `matched`     | `string[]`                       | Items whose branch matches an open PR (write: incl. filled)           |
+| `unmatched`   | `string[]`                       | Items with a recorded branch but no open PR on it                     |
+| `pending`     | `string[]`                       | Check mode: fill available (see `suggestions`) or candidates disagree |
+| `ambiguous`   | `{ id, branch, prs }[]`          | Multiple open PRs share one head branch — reported, never guessed     |
+| `suggestions` | `{ id, branch, pr }[]`           | Empty-branch leaves a `--write` run can (check) or did (write) fill   |
+| `filled`      | `Record<string, string> \| null` | Write mode: id -> branch actually written                             |
+| `exit_code`   | `0 \| 1`                         | Mirrors the process exit code                                         |
+
+Matching: items with a `branch` reconcile by exact head-ref equality (any type); empty `branch` fields are fill candidates only for leaves (`task`/`bug`) whose id starts a branch path segment and is not immediately followed by a letter or digit. Trailing hyphen suffixes deliberately still match — `feat/task-1-work` references `task-1` (this is what makes `chore/{id}-{type}` patterns fillable) — while `feat/task-12` does not reference `task-1`, and a longer id is never matched by its hyphen prefix (`feat/task-1` does not reference `task-1-work`). `--write` fills only empty fields — it never overwrites a set branch, never touches `status`, and never resolves ambiguity.
+
+**Exit-code semantics (differs from `ok`):** the process exits non-zero when check mode finds sync needed (`pending`/`ambiguous`) or the run errored, so `arggon sync --check` works as a CI gate after `arggon sync --write`. `ok` stays `true` for those — it is `false` only when the sync itself failed. Failures use `error.code: "SYNC_FAILED"` (missing tasks/, conflicting flags, or gh unavailable).
 
 ---
 

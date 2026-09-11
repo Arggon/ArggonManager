@@ -54,4 +54,14 @@ describe("validate", () => {
     const result = runValidate({ cwd: join(invalidRoot, "missing-index") });
     expect(result.errors.some((e) => e.code === "MISSING_INDEX")).toBe(true);
   });
+
+  it("reports invalid branch with INVALID_BRANCH", () => {
+    const result = runValidate({ cwd: join(invalidRoot, "invalid-branch") });
+    expect(result.errors.some((e) => e.code === "INVALID_BRANCH")).toBe(true);
+  });
+
+  it("reports bad branch_patterns with INVALID_BRANCH_PATTERN", () => {
+    const result = runValidate({ cwd: join(invalidRoot, "invalid-branch-patterns") });
+    expect(result.errors.some((e) => e.code === "INVALID_BRANCH_PATTERN")).toBe(true);
+  });
 });

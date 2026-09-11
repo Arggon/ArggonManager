@@ -14,6 +14,7 @@ export function toContractWorkItem(item: KernelWorkItem, rootDir: string): Contr
     status: item.status,
     title: item.title ?? null,
     assignee: item.assignee ?? null,
+    branch: item.branch ?? null,
     parent: item.parent ?? null,
     labels: [...item.labels],
     created: item.created ?? null,

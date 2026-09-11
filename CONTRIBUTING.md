@@ -10,15 +10,15 @@ Thanks for helping with ArggonManager. Work is **convention-first**: the repo (`
 
 ## Issues and PRs
 
-- Prefer a **linked GitHub issue** for anything beyond a typo.
+- Prefer a **work item in `tasks/`** (`arggon create task|bug`) for anything beyond a typo — the tree is the issue tracker; GitHub issues are not used (see `docs/agents.md` §0).
 - Keep PRs **small** and focused; one concern per PR when possible.
-- Use `Closes #N` only when the PR fully finishes the issue.
+- Reference the work item id in the PR; move the item to `done` only when the PR fully finishes it.
 - Branch names: `docs/…`, `feat/…`, `fix/…`, `chore/…` (see engineering.md).
 - Commits: imperative mood (`docs: …`, `cli: …`, `test: …`).
 
 ### PR checklist
 
-- [ ] Linked issue (or clear docs-only / chore reason)
+- [ ] Linked work item in `tasks/` (or clear docs-only / chore reason)
 - [ ] Matches `docs/convention.md` if you touch `tasks/` or templates
 - [ ] CLI behavior changes include tests when the CLI is involved
 - [ ] User-facing changes update README and/or docs in the same PR

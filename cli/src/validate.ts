@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
-import { CONVENTION_VERSION, readConventionVersion } from "./convention.js";
-import { assertValidId } from "./ids.js";
+import { CONVENTION_VERSION, readConventionConfig, readConventionVersion } from "./convention.js";
+import { assertValidId, BRANCH_PATTERN } from "./ids.js";
 import { softTryLoadItem, walkTasksTree, type WorkItem } from "./items.js";
 import { findTasksDir, newItemPath, repoRootFromTasks } from "./paths.js";
 import { assertParentEdge, expectedParentType } from "./relations.js";
@@ -72,6 +72,15 @@ function checkItemShape(item: SoftItem, errors: Issue[]): void {
     push(errors, rel, `invalid assignee '${assignee}'`, "INVALID_ASSIGNEE");
   }
 
+  if (item.branch !== undefined && !BRANCH_PATTERN.test(item.branch)) {
+    push(
+      errors,
+      rel,
+      `invalid branch name ${JSON.stringify(item.branch)} (must be a single non-blank token)`,
+      "INVALID_BRANCH",
+    );
+  }
+
   try {
     assertClaimAndBlocked({ type, status, assignee, blockedReason });
   } catch (err) {
@@ -123,6 +132,17 @@ export function runValidate(opts: ValidateOptions): ValidateResult {
       "CONVENTION_VERSION",
     );
     return { root, conventionVersion, errors, warnings };
+  }
+
+  try {
+    readConventionConfig(root);
+  } catch (err) {
+    push(
+      errors,
+      "tasks/.convention.yml",
+      err instanceof Error ? err.message : String(err),
+      "INVALID_BRANCH_PATTERN",
+    );
   }
 
   const { files, dirs } = walkTasksTree(tasksDir);

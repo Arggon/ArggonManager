@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
-import { assertLabels, firstDuplicateId, itemId, slugify } from "./ids.js";
+import { assertBranchName, assertLabels, firstDuplicateId, itemId, slugify } from "./ids.js";
 import { itemsById, loadItems } from "./items.js";
 import { assertParentEdge, expectedParentType } from "./relations.js";
 import { assertClaimAndBlocked, canTransition, isClaimed, unclaim } from "./status.js";
@@ -34,6 +34,13 @@ describe("ids", () => {
     assertLabels(["phase-1", "security"]);
     expect(() => assertLabels(["Foo Bar"])).toThrow(/kebab-case/);
     expect(() => assertLabels(["ok", "ok"])).toThrow(/duplicate label/);
+  });
+
+  it("validates branch names as single non-blank tokens", () => {
+    assertBranchName("feat/task-rate-limit");
+    assertBranchName("fix/bug-1");
+    expect(() => assertBranchName("")).toThrow(/single non-blank token/);
+    expect(() => assertBranchName("not a branch")).toThrow(/single non-blank token/);
   });
 });
 
@@ -79,7 +86,7 @@ describe("status", () => {
 describe("frontmatter", () => {
   it("round-trips a sample task file", () => {
     const raw = readFileSync(
-      join(process.cwd(), "tasks/launch-mvp/auth/story-login/task-rate-limit.md"),
+      join(process.cwd(), "fixtures/tasks-valid/tasks/launch-mvp/auth/story-login/task-rate-limit.md"),
       "utf8",
     );
     const { data, body } = parseFrontmatter(raw);
@@ -131,7 +138,7 @@ x-agent: grok
 
 describe("items (shared tree scan)", () => {
   it("walks the sample tasks/ fixture once", () => {
-    const items = loadItems(join(process.cwd(), "tasks"));
+    const items = loadItems(join(process.cwd(), "fixtures/tasks-valid/tasks"));
     const byId = itemsById(items);
     expect(byId.get("launch-mvp")?.type).toBe("initiative");
     expect(byId.get("auth")?.type).toBe("epic");

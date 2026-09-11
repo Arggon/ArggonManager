@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { runBoard, displayPath } from "./board.js";
+import { displayPath, runBoard } from "./board.js";
+import { runBranch } from "./branch.js";
+import { runStart } from "./start.js";
 import { readConventionVersion } from "./convention.js";
 import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
@@ -14,9 +16,10 @@ import {
   successJson,
 } from "./json.js";
 import { formatListTable, runList } from "./list.js";
+import { runNext } from "./next.js";
+import { runSync } from "./sync-command.js";
 import { runUpdate } from "./update.js";
 import { formatValidateHuman, runValidate } from "./validate.js";
-
 const program = new Command();
 
 program
@@ -154,37 +157,97 @@ program
     "--assignee <login>",
     "exact assignee login; @me resolves via GITHUB_USER, then GITHUB_ACTOR, then `gh api user`",
   )
+  .option(
+    "--filter <expr>",
+    'compact filter (e.g. "status:todo !label:security"); fields status, type, assignee, label, parent; ! negates; quotes allow spaces',
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { status?: string; type?: string; assignee?: string; json?: boolean }) => {
+  .action(
+    (opts: {
+      status?: string;
+      type?: string;
+      assignee?: string;
+      filter?: string;
+      json?: boolean;
+    }) => {
+      const json = jsonEnabled(opts);
+      try {
+        const result = runList({
+          cwd: process.cwd(),
+          status: opts.status,
+          type: opts.type,
+          assignee: opts.assignee,
+          filter: opts.filter,
+        });
+        if (json) {
+          successJson(
+            "list",
+            { items: result.items.map((item) => toContractWorkItem(item, result.root)) },
+            readConventionVersion(result.root),
+          );
+          return;
+        }
+        process.stdout.write(formatListTable(result.items));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (json) {
+          failJson({
+            command: "list",
+            message,
+            code: "LIST_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
+        console.error(`arggon list: ${message}`);
+        process.exitCode = 1;
+      }
+    },
+  );
+
+program
+  .command("next")
+  .description("Suggest the next claimable item (unclaimed todo, lexicographic by id)")
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
-      const result = runList({
-        cwd: process.cwd(),
-        status: opts.status,
-        type: opts.type,
-        assignee: opts.assignee,
-      });
+      const result = runNext({ cwd: process.cwd() });
+      const suggestion = result.suggestion
+        ? {
+            item: toContractWorkItem(result.suggestion.item, result.root),
+            parentChain: result.suggestion.parentChain,
+            reason: result.suggestion.reason,
+          }
+        : null;
       if (json) {
-        successJson(
-          "list",
-          { items: result.items.map((item) => toContractWorkItem(item, result.root)) },
-          readConventionVersion(result.root),
-        );
+        successJson("next", { suggestion }, readConventionVersion(result.root));
         return;
       }
-      process.stdout.write(formatListTable(result.items));
+      if (!result.suggestion) {
+        console.log("arggon next: todo pool is empty — nothing claimable.");
+        console.log('  Create work with `arggon create task "<title>" --parent <story-id>`.');
+        return;
+      }
+      const item = result.suggestion.item;
+      console.log(`arggon next: ${item.id} — ${item.title ?? item.id}`);
+      console.log(
+        `  type: ${item.type} · parent: ${result.suggestion.parentChainDisplay.join(" > ") || "(none)"}`,
+      );
+      console.log(`  why: ${result.suggestion.reason}`);
+      console.log(`  next: arggon start ${item.id} --assignee <login>`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (json) {
         failJson({
-          command: "list",
+          command: "next",
           message,
-          code: "LIST_FAILED",
+          code: "NEXT_FAILED",
           conventionVersion: readConventionVersion(process.cwd()),
         });
         return;
       }
-      console.error(`arggon list: ${message}`);
+      console.error(`arggon next: ${message}`);
       process.exitCode = 1;
     }
   });
@@ -196,6 +259,7 @@ program
   .option("--title <title>", "new title (non-empty)")
   .option("--status <status>", "new status (must follow v0 transitions)")
   .option("--assignee <login>", "new assignee (claimable types need one when in_progress)")
+  .option("--branch <name>", "set working branch (empty string clears; unclaim clears by default)")
   .option("--unassign", "clear assignee (in_progress -> todo does this by default)", false)
   .option("--labels <csv>", "replace the full labels list (comma-separated)")
   .option("--blocked-reason <text>", "required when status becomes blocked")
@@ -208,6 +272,7 @@ program
         title?: string;
         status?: string;
         assignee?: string;
+        branch?: string;
         unassign?: boolean;
         labels?: string;
         blockedReason?: string;
@@ -223,6 +288,7 @@ program
           title: opts.title,
           status: opts.status,
           assignee: opts.assignee,
+          branch: opts.branch,
           unassign: opts.unassign,
           labels: opts.labels,
           blockedReason: opts.blockedReason,
@@ -306,26 +372,128 @@ program
   });
 
 program
-  .command("board")
-  .description(
-    "Write a static read-only HTML board from tasks/ (git files stay the source of truth)",
-  )
-  .option("--out <file>", "output HTML file (default: board.html)")
+  .command("branch")
+  .description("Check out the working branch for an item (generated from branch_patterns)")
+  .argument("<id>", "work item id")
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { out?: string; json?: boolean }) => {
+  .action((id: string, opts: { json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
-      const result = runBoard({ cwd: process.cwd(), out: opts.out });
+      const result = runBranch({ cwd: process.cwd(), id });
       if (json) {
         successJson(
-          "board",
-          { path: displayPath(result.outPath, process.cwd()), itemCount: result.itemCount },
+          "branch",
+          {
+            item: toContractWorkItem(result.item, result.root),
+            branch: result.branch,
+            created: result.created,
+          },
           readConventionVersion(result.root),
         );
         return;
       }
       console.log(
-        `arggon board: wrote ${displayPath(result.outPath, process.cwd())} (${result.itemCount} item(s))`,
+        `arggon branch: ${result.item.type} ${result.id} → ${result.branch} (${result.created ? "created" : "attached"})`,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "branch",
+          message,
+          code: "BRANCH_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon branch: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("start")
+  .description("Claim an item, check out its branch, commit, push, and optionally open a draft PR")
+  .argument("<id>", "work item id")
+  .option("--assignee <login>", "claim as this login (default: GITHUB_USER / GITHUB_ACTOR)")
+  .option("--open-pr", "open a draft PR after pushing", false)
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((id: string, opts: { assignee?: string; openPr?: boolean; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runStart({
+        cwd: process.cwd(),
+        id,
+        assignee: opts.assignee,
+        openPr: Boolean(opts.openPr),
+      });
+      if (json) {
+        successJson(
+          "start",
+          {
+            item: toContractWorkItem(result.item, result.root),
+            branch: result.branch,
+            created: result.created,
+            pushed: result.pushed,
+            prUrl: result.prUrl,
+          },
+          readConventionVersion(result.root),
+        );
+        return;
+      }
+      console.log(`arggon start: ${result.item.type} ${result.id} → ${result.branch}`);
+      if (result.prUrl) {
+        console.log(`  draft PR: ${result.prUrl}`);
+      } else if (result.pushed) {
+        console.log(`  pushed (no PR; pass --open-pr)`);
+      } else {
+        console.log(`  already started; nothing to publish`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "start",
+          message,
+          code: "START_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon start: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("board")
+  .description(
+    "Write a static read-only HTML board from tasks/ (git files stay the source of truth)",
+  )
+  .option(
+    "--out <file>",
+    "output HTML file (default: board.html at the repo root; relative --out resolves from cwd)",
+  )
+  .option("--github", "overlay live GitHub PR state on cards with a branch (read-only)", false)
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { out?: string; github?: boolean; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runBoard({ cwd: process.cwd(), out: opts.out, github: opts.github });
+      if (json) {
+        successJson(
+          "board",
+          {
+            path: displayPath(result.outPath, process.cwd()),
+            itemCount: result.itemCount,
+            ...(opts.github ? { github: true, prCount: result.prCount } : {}),
+          },
+          readConventionVersion(result.root),
+        );
+        return;
+      }
+      console.log(
+        `arggon board: wrote ${displayPath(result.outPath, process.cwd())} (${result.itemCount} item(s)${opts.github ? `, ${result.prCount} PR(s) linked` : ""})`,
       );
       console.log(
         "  Open it in a browser. Re-run after tree changes — tasks/ remains the source of truth.",
@@ -366,5 +534,93 @@ function printInitHuman(result: InitResult): void {
   console.log("  1. Add an initiative under tasks/<slug>/<slug>.md (see docs/convention.md)");
   console.log("  2. Or use templates/ as stubs until `arggon create` lands");
 }
+
+program
+  .command("sync")
+  .description("Reconcile task branch fields with open GitHub PRs")
+  .option("--check", "check mode: report matches without modifying (default)", false)
+  .option("--write", "write mode: fill empty branch fields from PRs", false)
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .option("--repo <owner/repo>", "GitHub repository (default: detected from origin remote)")
+  .action((opts: { check?: boolean; write?: boolean; json?: boolean; repo?: string }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runSync({
+        check: opts.check,
+        write: opts.write,
+        repo: opts.repo,
+      });
+      const payload = {
+        mode: result.mode,
+        matched: result.matched,
+        unmatched: result.unmatched,
+        pending: result.pending,
+        ambiguous: result.ambiguous,
+        suggestions: result.suggestions,
+        filled: result.filled,
+        errors: result.errors,
+        exit_code: result.exit_code,
+      };
+      if (json) {
+        if (result.errors.length > 0) {
+          failJson({
+            command: "sync",
+            message: result.errors.join("; "),
+            code: "SYNC_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+        } else {
+          successJson("sync", payload, readConventionVersion(process.cwd()));
+        }
+      } else {
+        console.log(
+          `arggon sync (${result.mode}): ${result.exit_code === 0 ? "in sync" : "sync needed"}`,
+        );
+        for (const id of result.matched) {
+          console.log(`  matched:   ${id}`);
+        }
+        for (const s of result.suggestions) {
+          console.log(`  fillable:  ${s.id} <- ${s.branch} (#${s.pr})`);
+        }
+        for (const id of result.pending) {
+          if (!result.suggestions.some((s) => s.id === id)) {
+            console.log(`  pending:   ${id} (candidates disagree; pick a branch manually)`);
+          }
+        }
+        for (const id of result.unmatched) {
+          console.log(`  unmatched: ${id} (no open PR)`);
+        }
+        for (const amb of result.ambiguous) {
+          console.log(`  ambiguous: ${amb.id} (PRs ${amb.prs.join(", ")})`);
+        }
+        for (const [id, branch] of Object.entries(result.filled ?? {})) {
+          console.log(`  filled:    ${id} -> ${branch}`);
+        }
+        if (result.suggestions.length > 0 && result.mode === "check") {
+          console.log(
+            `next: arggon sync --write fills ${result.suggestions.length} empty branch field(s)`,
+          );
+        }
+        if (result.errors.length > 0) {
+          console.error(`  errors: ${result.errors.join("; ")}`);
+        }
+      }
+      // CI gate: non-zero when sync is needed (--check) or sync could not finish.
+      process.exitCode = result.exit_code;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "sync",
+          message,
+          code: "SYNC_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon sync: ${message}`);
+      process.exitCode = 1;
+    }
+  });
 
 program.parse();

@@ -17,6 +17,8 @@ export type WorkItem = {
   status: Status;
   title: string | null;
   assignee: string | null;
+  /** Working branch name (v1 field, additive); null when unset. */
+  branch: string | null;
   parent: string | null;
   labels: string[];
   created: string | null;

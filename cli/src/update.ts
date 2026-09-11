@@ -9,7 +9,7 @@ import {
   TRANSITIONS,
 } from "./status.js";
 import { formatDate } from "./dates.js";
-import { assertLabels } from "./ids.js";
+import { assertBranchName, assertLabels } from "./ids.js";
 import { itemsById, loadItems, tryLoadItem, type WorkItem } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 
@@ -19,6 +19,8 @@ export type UpdateOptions = {
   title?: string;
   status?: string;
   assignee?: string;
+  /** Set working branch (v1); empty string clears it. */
+  branch?: string;
   /** Clear assignee (subject to the claim rule for the resulting status). */
   unassign?: boolean;
   /** Replace the full labels list (comma-separated). */
@@ -69,16 +71,27 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   }
   const labels = opts.labels !== undefined ? parseLabels(opts.labels) : undefined;
   if (labels !== undefined) assertLabels(labels);
+  let branchRequest: string | null | undefined;
+  if (opts.branch !== undefined) {
+    const trimmed = opts.branch.trim();
+    if (trimmed) {
+      assertBranchName(trimmed);
+      branchRequest = trimmed;
+    } else {
+      branchRequest = null;
+    }
+  }
 
   const requested =
     title !== undefined ||
     opts.status !== undefined ||
     opts.assignee !== undefined ||
+    branchRequest !== undefined ||
     opts.unassign === true ||
     labels !== undefined ||
     opts.blockedReason !== undefined;
   if (!requested) {
-    throw new Error("nothing to update (pass --title, --status, --assignee, --labels, ...)");
+    throw new Error("nothing to update (pass --title, --status, --assignee, --branch, ...)");
   }
 
   const tasksDir = findTasksDir(opts.cwd);
@@ -123,6 +136,17 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     newAssignee = currentAssignee;
   }
 
+  // Branch: explicit > unclaim default (in_progress -> todo) > keep.
+  const currentBranch = item.branch ?? null;
+  let newBranch: string | null;
+  if (branchRequest !== undefined) {
+    newBranch = branchRequest;
+  } else if (newStatus === "todo" && item.status === "in_progress") {
+    newBranch = null;
+  } else {
+    newBranch = currentBranch;
+  }
+
   // blocked_reason: required when blocked, forbidden otherwise.
   let newReason: string | null;
   if (newStatus === "blocked") {
@@ -158,6 +182,10 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   if (newAssignee !== currentAssignee) {
     data.assignee = newAssignee;
     changed.push("assignee");
+  }
+  if (newBranch !== currentBranch) {
+    data.branch = newBranch;
+    changed.push("branch");
   }
   if (labels !== undefined && labels.join("\u0000") !== item.labels.join("\u0000")) {
     data.labels = labels;

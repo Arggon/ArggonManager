@@ -1,5 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,12 +17,79 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const cli = resolve(root, "cli/src/cli.ts");
 const tsx = resolve(root, "node_modules/tsx/dist/cli.mjs");
 
-function runCli(args: string[], cwd = root) {
+function runCli(args: string[], cwd = root, env: Record<string, string> = {}) {
   return spawnSync(process.execPath, [tsx, cli, ...args], {
     encoding: "utf8",
     cwd,
-    env: { ...process.env },
+    env: { ...process.env, ...env },
   });
+}
+
+function runGit(args: string[], cwd: string) {
+  return spawnSync("git", args, { encoding: "utf8", cwd });
+}
+
+function initGitTree(): string {
+  const dir = mkdtempSync(join(tmpdir(), "arggon-git-branch-"));
+  primeGitWorkTree(dir);
+  return dir;
+}
+
+function primeGitWorkTree(dir: string): void {
+  expect(runGit(["init"], dir).status).toBe(0);
+  // Local identity: the CI runner has no global user.name/user.email,
+  // and `start` commits the claim with plain `git commit`.
+  expect(runGit(["config", "user.email", "t@t"], dir).status).toBe(0);
+  expect(runGit(["config", "user.name", "t"], dir).status).toBe(0);
+  expect(runCli(["init", dir]).status).toBe(0);
+  expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+  expect(runGit(["add", "-A"], dir).status).toBe(0);
+  expect(
+    runGit(["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "init"], dir).status,
+  ).toBe(0);
+}
+
+/** Git tree with a pushable origin and a mocked `gh` on PATH (both outside the work tree). */
+function initStartTree(ghOk: boolean): { dir: string; env: Record<string, string> } {
+  const outer = mkdtempSync(join(tmpdir(), "arggon-start-box-"));
+  const dir = join(outer, "work");
+  mkdirSync(dir, { recursive: true });
+  primeGitWorkTree(dir);
+  const remote = join(outer, "remote.git");
+  expect(runGit(["init", "--bare", remote], outer).status).toBe(0);
+  expect(runGit(["remote", "add", "origin", remote], dir).status).toBe(0);
+  const bin = join(outer, "bin");
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(
+    join(bin, "gh"),
+    ghOk
+      ? '#!/bin/sh\necho "https://github.com/o/r/pull/1"\n'
+      : '#!/bin/sh\necho "auth required" >&2\nexit 1\n',
+    "utf8",
+  );
+  chmodSync(join(bin, "gh"), 0o755);
+  return { dir, env: { PATH: `${bin}:${process.env.PATH ?? ""}` } };
+}
+
+/** Branched item plus a mocked `gh pr list` on PATH (no git needed for the overlay). */
+function initBoardGhTree(ghOk: boolean): { dir: string; env: Record<string, string> } {
+  const outer = mkdtempSync(join(tmpdir(), "arggon-board-gh-"));
+  const dir = join(outer, "work");
+  mkdirSync(dir, { recursive: true });
+  expect(runCli(["init", dir]).status).toBe(0);
+  expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+  expect(runCli(["update", "launch-mvp", "--branch", "feat/launch-mvp"], dir).status).toBe(0);
+  const bin = join(outer, "bin");
+  mkdirSync(bin, { recursive: true });
+  writeFileSync(
+    join(bin, "gh"),
+    ghOk
+      ? '#!/bin/sh\necho \'[{"number":42,"headRefName":"feat/launch-mvp","url":"https://github.com/o/r/pull/42","isDraft":false,"state":"OPEN","statusCheckRollup":[{"status":"COMPLETED","conclusion":"SUCCESS"}]}]\'\n'
+      : '#!/bin/sh\necho "auth required" >&2\nexit 1\n',
+    "utf8",
+  );
+  chmodSync(join(bin, "gh"), 0o755);
+  return { dir, env: { PATH: `${bin}:${process.env.PATH ?? ""}` } };
 }
 
 function parseStdout(stdout: string): Record<string, unknown> {
@@ -94,7 +168,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 0,
+      conventionVersion: 2,
       command: "create",
     });
     expect(body.item).toMatchObject({
@@ -140,7 +214,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 0,
+      conventionVersion: 2,
       command: "list",
     });
     expect(Array.isArray(body.items)).toBe(true);
@@ -151,6 +225,7 @@ describe("CLI --json", () => {
       status: "todo",
       title: "Auth",
       assignee: null,
+      branch: null,
       parent: "launch-mvp",
       labels: [],
       created: expect.any(String),
@@ -196,7 +271,7 @@ describe("CLI --json", () => {
     expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
     const result = runCli(["list"], dir);
     expect(result.status).toBe(0);
-    expect(result.stdout).toMatch(/id\s+type\s+status\s+assignee\s+title/);
+    expect(result.stdout).toMatch(/id\s+type\s+status\s+assignee\s+branch\s+title/);
     expect(result.stdout).toContain("launch-mvp");
   });
 
@@ -210,7 +285,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 0,
+      conventionVersion: 2,
       command: "update",
     });
     expect(body.item).toMatchObject({
@@ -230,6 +305,17 @@ describe("CLI --json", () => {
     expect(body.ok).toBe(false);
     expect(body.command).toBe("update");
     expect(body.error).toMatchObject({ code: "UPDATE_FAILED" });
+  });
+
+  it("arggon update --branch --json sets the working branch", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-json-update-branch-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    const result = runCli(["update", "launch-mvp", "--branch", "feat/launch-mvp", "--json"], dir);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body).toMatchObject({ ok: true, command: "update" });
+    expect(body.item).toMatchObject({ id: "launch-mvp", branch: "feat/launch-mvp" });
   });
 
   it("arggon update without --json stays human-readable", () => {
@@ -252,7 +338,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 0,
+      conventionVersion: 2,
       command: "board",
       path: "board.html",
       itemCount: 2,
@@ -261,6 +347,19 @@ describe("CLI --json", () => {
     expect(html).toContain("<!doctype html>");
     expect(html).toContain("launch-mvp");
     expect(html).toContain('data-status="in_progress"');
+  });
+
+  it("arggon board from a subdirectory writes board.html at the repo root", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-subdir-board-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    const sub = join(dir, "docs");
+    mkdirSync(sub);
+    const result = runCli(["board", "--json"], sub);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body.path).toBe(join(dir, "board.html"));
+    expect(existsSync(join(dir, "board.html"))).toBe(true);
+    expect(existsSync(join(sub, "board.html"))).toBe(false);
   });
 
   it("arggon board honors --out and stays human-readable without --json", () => {
@@ -281,5 +380,182 @@ describe("CLI --json", () => {
     expect(body.ok).toBe(false);
     expect(body.command).toBe("board");
     expect(body.error).toMatchObject({ code: "BOARD_FAILED" });
+  });
+
+  it("arggon board --github overlays PR state with a mocked gh", () => {
+    const { dir, env } = initBoardGhTree(true);
+    const result = runCli(["board", "--github", "--json"], dir, env);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body).toMatchObject({ ok: true, command: "board", github: true, prCount: 1 });
+    const html = readFileSync(join(dir, "board.html"), "utf8");
+    expect(html).toContain("#42 · open · ✓");
+    expect(html).toContain("live GitHub overlay (1 PR(s))");
+  });
+
+  it("arggon board --github fails with BOARD_FAILED without gh auth", () => {
+    const { dir, env } = initBoardGhTree(false);
+    const result = runCli(["board", "--github", "--json"], dir, env);
+    expect(result.status).toBe(1);
+    const body = parseStdout(result.stdout);
+    expect(body.ok).toBe(false);
+    expect(body.command).toBe("board");
+    expect(body.error).toMatchObject({ code: "BOARD_FAILED" });
+    expect(String((body.error as { message: string }).message)).toMatch(/plain `arggon board`/);
+  });
+
+  it("arggon next suggests the lexicographic unclaimed todo with reason", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-next-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Work", "--parent", "login"], dir).status).toBe(0);
+    const result = runCli(["next"], dir);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("arggon next: login — Login");
+    expect(result.stdout).toContain("why:");
+    expect(result.stdout).toContain("arggon start login --assignee <login>");
+  });
+
+  it("arggon next --json emits one suggestion object", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-next-json-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Work", "--parent", "login"], dir).status).toBe(0);
+    const result = runCli(["next", "--json"], dir);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body).toMatchObject({ ok: true, command: "next" });
+    const suggestion = body.suggestion as Record<string, unknown>;
+    expect(suggestion).toMatchObject({
+      parentChain: ["launch-mvp", "auth"],
+      reason: expect.any(String),
+    });
+    expect(suggestion.item as Record<string, unknown>).toMatchObject({ id: "login" });
+  });
+
+  it("arggon next exits 0 with a friendly message on an empty pool", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-next-empty-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Work", "--parent", "login"], dir).status).toBe(0);
+    // Claim everything claimable: the pool drains, containers don't count.
+    expect(
+      runCli(["update", "login", "--status", "in_progress", "--assignee", "bob"], dir).status,
+    ).toBe(0);
+    expect(
+      runCli(["update", "task-work", "--status", "in_progress", "--assignee", "bob"], dir).status,
+    ).toBe(0);
+    const human = runCli(["next"], dir);
+    expect(human.status).toBe(0);
+    expect(human.stdout).toContain("todo pool is empty");
+    const boxed = runCli(["next", "--json"], dir);
+    expect(boxed.status).toBe(0);
+    expect(parseStdout(boxed.stdout)).toMatchObject({ ok: true, suggestion: null });
+  });
+
+  it("arggon branch creates, checks out, and records the branch", () => {
+    const dir = initGitTree();
+    const result = runCli(["branch", "launch-mvp"], dir);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain(
+      "arggon branch: initiative launch-mvp → feat/launch-mvp (created)",
+    );
+    expect(runGit(["branch", "--show-current"], dir).stdout.trim()).toBe("feat/launch-mvp");
+  });
+
+  it("arggon branch --json attaches to the recorded branch", () => {
+    const dir = initGitTree();
+    expect(runCli(["branch", "launch-mvp"], dir).status).toBe(0);
+    const result = runCli(["branch", "launch-mvp", "--json"], dir);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body).toMatchObject({
+      ok: true,
+      schemaVersion: JSON_SCHEMA_VERSION,
+      conventionVersion: 2,
+      command: "branch",
+      branch: "feat/launch-mvp",
+      created: false,
+    });
+    expect(body.item).toMatchObject({ id: "launch-mvp", branch: "feat/launch-mvp" });
+  });
+
+  it("arggon branch --json fails with BRANCH_FAILED on mismatch", () => {
+    const dir = initGitTree();
+    expect(runGit(["branch", "feat/launch-mvp"], dir).status).toBe(0);
+    const result = runCli(["branch", "launch-mvp", "--json"], dir);
+    expect(result.status).toBe(1);
+    const body = parseStdout(result.stdout);
+    expect(body.ok).toBe(false);
+    expect(body.command).toBe("branch");
+    expect(body.error).toMatchObject({ code: "BRANCH_FAILED" });
+  });
+
+  it("arggon start claims, branches, pushes, and opens a draft PR", () => {
+    const { dir, env } = initStartTree(true);
+    const result = runCli(
+      ["start", "launch-mvp", "--assignee", "arggon", "--open-pr", "--json"],
+      dir,
+      env,
+    );
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body).toMatchObject({
+      ok: true,
+      schemaVersion: JSON_SCHEMA_VERSION,
+      conventionVersion: 2,
+      command: "start",
+      branch: "feat/launch-mvp",
+      created: true,
+      pushed: true,
+      prUrl: "https://github.com/o/r/pull/1",
+    });
+    expect(body.item).toMatchObject({
+      id: "launch-mvp",
+      status: "in_progress",
+      assignee: "arggon",
+      branch: "feat/launch-mvp",
+    });
+    expect(runGit(["branch", "--show-current"], dir).stdout.trim()).toBe("feat/launch-mvp");
+  });
+
+  it("arggon start fails with START_FAILED without gh auth", () => {
+    const { dir, env } = initStartTree(false);
+    const result = runCli(
+      ["start", "launch-mvp", "--assignee", "arggon", "--open-pr", "--json"],
+      dir,
+      env,
+    );
+    expect(result.status).toBe(1);
+    const body = parseStdout(result.stdout);
+    expect(body.ok).toBe(false);
+    expect(body.command).toBe("start");
+    expect(body.error).toMatchObject({ code: "START_FAILED" });
+    expect(String((body.error as { message: string }).message)).toMatch(/gh auth status/);
+  });
+
+  it("arggon start never forces a taken claim", () => {
+    const { dir, env } = initStartTree(true);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Work", "--parent", "login"], dir).status).toBe(0);
+    expect(
+      runCli(["update", "task-work", "--status", "in_progress", "--assignee", "alice"], dir).status,
+    ).toBe(0);
+    expect(runGit(["add", "-A"], dir).status).toBe(0);
+    expect(
+      runGit(["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "claim"], dir).status,
+    ).toBe(0);
+    const result = runCli(["start", "task-work", "--assignee", "bob", "--json"], dir, env);
+    expect(result.status).toBe(1);
+    const body = parseStdout(result.stdout);
+    expect(body.error).toMatchObject({ code: "START_FAILED" });
+    expect(String((body.error as { message: string }).message)).toMatch(/claim conflict/);
   });
 });

@@ -154,7 +154,7 @@ Use a 4-digit monotonic number. Title is kebab-case.
 
 - **Branches:** `type/short-kebab` — `docs/…`, `feat/…`, `fix/…`, `chore/…`
 - **Commits:** imperative, scoped when helpful (`docs:`, `cli:`, `test:`)
-- **PRs:** problem + approach + test plan; link issues with `Closes #N` only when fully done
+- **PRs:** problem + approach + test plan; reference the `tasks/` work item id — move it to `done` only when fully done (issues live in `tasks/`, not GitHub; see `docs/agents.md` §0)
 - **Convention vs engineering:** schema/layout/status → `docs/convention.md`; process/structure/review/ADR → `docs/engineering.md` or `docs/adr/`
 - **Agents and humans** follow the same PR and claim rules; agent-only shortcuts are out of scope unless an ADR says otherwise
 
@@ -169,7 +169,7 @@ A Phase 1 eng change is done when:
 3. Tests/fixtures cover the change (once CLI exists)
 4. Docs/ADR updated in the same PR when contracts change
 5. No known validate false-pass for the new behavior
-6. Follow-ups filed as issues (not TODOs left only in code) when deferred
+6. Follow-ups filed as `tasks/` items (not GitHub issues, not TODOs left only in code) when deferred
 
 ---
 

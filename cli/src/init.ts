@@ -1,9 +1,15 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { bundledTemplatesDir } from "./paths.js";
+import { CONVENTION_VERSION, DEFAULT_BRANCH_PATTERNS } from "./convention.js";
+import type { ItemType } from "./ids.js";
 
-const CONVENTION_YML = `version: 0
-`;
+const CONVENTION_YML =
+  `version: ${CONVENTION_VERSION}\n` +
+  `branch_patterns:\n` +
+  (Object.keys(DEFAULT_BRANCH_PATTERNS) as ItemType[])
+    .map((type) => `  ${type}: "${DEFAULT_BRANCH_PATTERNS[type]}"\n`)
+    .join("");
 
 export type InitOptions = {
   dir: string;
