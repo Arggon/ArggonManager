@@ -1,7 +1,7 @@
-import { execFileSync } from "node:child_process";
 import { writeFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import { toContractWorkItem } from "./contract.js";
+import { ghPrListJson } from "./get-open-prs.js";
 import { loadItems } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 import { STATUSES } from "./status.js";
@@ -82,57 +82,23 @@ export function summarizeChecks(
   return "passing";
 }
 
-function gh(args: string[], cwd: string): string {
-  try {
-    return execFileSync("gh", args, {
-      encoding: "utf8",
-      cwd,
-      stdio: ["ignore", "pipe", "pipe"],
-    }).trim();
-  } catch (err) {
-    if (
-      err !== null &&
-      typeof err === "object" &&
-      "code" in err &&
-      (err.code === "ENOENT" || err.code === -2)
-    ) {
-      throw new Error(
-        "GitHub overlay unavailable: `gh` not found (install gh and run `gh auth login`, or run plain `arggon board` for the offline snapshot)",
-      );
-    }
-    const stderr =
-      err !== null && typeof err === "object" && "stderr" in err ? String(err.stderr).trim() : "";
-    const message = err instanceof Error ? err.message : String(err);
-    throw new Error(
-      `GitHub overlay unavailable${stderr ? `: ${stderr}` : ` (${message})`} (check \`gh auth status\`, or run plain \`arggon board\` for the offline snapshot)`,
-    );
-  }
-}
-
 export function defaultBoardGithub(): BoardGithub {
   return {
     listPrs(cwd: string): PrInfo[] {
-      const out = gh(
-        [
-          "pr",
-          "list",
-          "--limit",
-          "100",
-          "--json",
-          "number,headRefName,url,isDraft,state,statusCheckRollup",
-        ],
-        cwd,
-      );
-      if (!out) return [];
+      // Single gh invocation contract lives in get-open-prs.ts (limit + JSON);
+      // this wrapper only adds the overlay UX context on failure.
       let entries: GhPrJson[];
       try {
-        entries = JSON.parse(out) as GhPrJson[];
-      } catch {
+        entries = ghPrListJson({
+          cwd,
+          fields: "number,headRefName,url,isDraft,state,statusCheckRollup",
+        }) as GhPrJson[];
+      } catch (err) {
+        const detail = err instanceof Error ? err.message : String(err);
         throw new Error(
-          "GitHub overlay unavailable: `gh pr list` returned unparseable JSON (check `gh auth status`, or run plain `arggon board` for the offline snapshot)",
+          `GitHub overlay unavailable: ${detail} (or run plain \`arggon board\` for the offline snapshot)`,
         );
       }
-      if (!Array.isArray(entries)) return [];
       const prs: PrInfo[] = [];
       for (const entry of entries) {
         const pr = toPrInfo(entry);

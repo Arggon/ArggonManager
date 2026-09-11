@@ -1,9 +1,10 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-sync-gh-reader
 title: "sync gh reader polish: PR list limit, --repo validation, board reader duplication"
 assignee: arggondev
+branch: fix/bug-sync-gh-reader
 parent: story-github
 labels: []
 created: "2026-09-11"

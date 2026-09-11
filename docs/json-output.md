@@ -19,11 +19,11 @@ This flag is a formatter only. It does not walk `tasks/` or parse frontmatter. C
 
 Every success or failure payload includes:
 
-| Field               | Type    | Notes                                                                                                                       |
-| ------------------- | ------- | --------------------------------------------------------------------------------------------------------------------------- |
-| `ok`                | boolean | `true` on success; `false` on failure                                                                                       |
-| `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.                                  |
-| `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                                              |
+| Field               | Type    | Notes                                                                                                                                 |
+| ------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `ok`                | boolean | `true` on success; `false` on failure                                                                                                 |
+| `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.                                            |
+| `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                                                        |
 | `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `validate` \| `create` \| `update` \| `branch` \| `start` \| `board` \| `sync` |
 
 Command-specific fields sit next to this envelope (not nested under a generic `data` key).
@@ -161,18 +161,18 @@ With `--github` the board overlays live PR state (number, draft/ready, checks) o
 
 ### `sync`
 
-| Field         | Type                                     | Notes                                                          |
-| ------------- | ---------------------------------------- | -------------------------------------------------------------- |
-| `mode`        | `"check" \| "write"`                     | `--write` requested; check is the default                      |
-| `matched`     | `string[]`                               | Items whose branch matches an open PR (write: incl. filled)    |
-| `unmatched`   | `string[]`                               | Items with a recorded branch but no open PR on it              |
-| `pending`     | `string[]`                               | Check mode: fill available (see `suggestions`) or candidates disagree |
-| `ambiguous`   | `{ id, branch, prs }[]`                  | Multiple open PRs share one head branch — reported, never guessed |
-| `suggestions` | `{ id, branch, pr }[]`                   | Empty-branch leaves a `--write` run can (check) or did (write) fill |
-| `filled`      | `Record<string, string> \| null`         | Write mode: id -> branch actually written                      |
-| `exit_code`   | `0 \| 1`                                 | Mirrors the process exit code                                  |
+| Field         | Type                             | Notes                                                                 |
+| ------------- | -------------------------------- | --------------------------------------------------------------------- |
+| `mode`        | `"check" \| "write"`             | `--write` requested; check is the default                             |
+| `matched`     | `string[]`                       | Items whose branch matches an open PR (write: incl. filled)           |
+| `unmatched`   | `string[]`                       | Items with a recorded branch but no open PR on it                     |
+| `pending`     | `string[]`                       | Check mode: fill available (see `suggestions`) or candidates disagree |
+| `ambiguous`   | `{ id, branch, prs }[]`          | Multiple open PRs share one head branch — reported, never guessed     |
+| `suggestions` | `{ id, branch, pr }[]`           | Empty-branch leaves a `--write` run can (check) or did (write) fill   |
+| `filled`      | `Record<string, string> \| null` | Write mode: id -> branch actually written                             |
+| `exit_code`   | `0 \| 1`                         | Mirrors the process exit code                                         |
 
-Matching: items with a `branch` reconcile by exact head-ref equality (any type); empty `branch` fields are fill candidates only for leaves (`task`/`bug`) whose id a PR's head branch references as a whole segment. `--write` fills only empty fields — it never overwrites a set branch, never touches `status`, and never resolves ambiguity.
+Matching: items with a `branch` reconcile by exact head-ref equality (any type); empty `branch` fields are fill candidates only for leaves (`task`/`bug`) whose id starts a branch path segment and is not immediately followed by a letter or digit. Trailing hyphen suffixes deliberately still match — `feat/task-1-work` references `task-1` (this is what makes `chore/{id}-{type}` patterns fillable) — while `feat/task-12` does not reference `task-1`, and a longer id is never matched by its hyphen prefix (`feat/task-1` does not reference `task-1-work`). `--write` fills only empty fields — it never overwrites a set branch, never touches `status`, and never resolves ambiguity.
 
 **Exit-code semantics (differs from `ok`):** the process exits non-zero when check mode finds sync needed (`pending`/`ambiguous`) or the run errored, so `arggon sync --check` works as a CI gate after `arggon sync --write`. `ok` stays `true` for those — it is `false` only when the sync itself failed. Failures use `error.code: "SYNC_FAILED"` (missing tasks/, conflicting flags, or gh unavailable).
 

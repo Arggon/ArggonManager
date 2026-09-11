@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { execFileSync } from "node:child_process";
-import { getOpenPRs, getOpenPRsForRepo } from "./get-open-prs.js";
+import { getOpenPRs, getOpenPRsForRepo, parseRepoSlug } from "./get-open-prs.js";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -11,7 +11,7 @@ type MockFn = ReturnType<typeof vi.fn>;
 function createPrsMock(
   prListOutput: string | null,
   apiOutput: string | null,
-  gitRemoteUrl: string | null
+  gitRemoteUrl: string | null,
 ): MockFn {
   return vi.fn((cmd: string, args: string[]) => {
     // Git commands (from detectRepo via execGit)
@@ -43,14 +43,25 @@ function createGhOnlyMock(prListOutput: string): MockFn {
   });
 }
 
+describe("parseRepoSlug", () => {
+  it("accepts owner/name", () => {
+    expect(parseRepoSlug("octocat/hello-world")).toEqual({ owner: "octocat", repo: "hello-world" });
+  });
+
+  it("rejects slugs that are not exactly owner/name", () => {
+    for (const bad of ["foo", "a/b/c", "/repo", "owner/", "owner /repo", ""]) {
+      expect(() => parseRepoSlug(bad)).toThrow(/Invalid --repo ".*": expected "owner\/name"/);
+    }
+  });
+});
+
 describe("getOpenPRs", () => {
   function withGitRepo(testDir: string): void {
     execFileSync("git", ["init", "--quiet"], { cwd: testDir, encoding: "utf8" });
-    execFileSync(
-      "git",
-      ["remote", "add", "origin", "https://github.com/arggon/test.git"],
-      { cwd: testDir, encoding: "utf8" }
-    );
+    execFileSync("git", ["remote", "add", "origin", "https://github.com/arggon/test.git"], {
+      cwd: testDir,
+      encoding: "utf8",
+    });
   }
 
   it("throws when repo cannot be detected and no explicit repo provided", () => {
@@ -59,7 +70,7 @@ describe("getOpenPRs", () => {
 
     const execGh = vi.fn();
     expect(() => getOpenPRs(null, dir, execGh as unknown as typeof execFileSync)).toThrow(
-      /Cannot determine GitHub repository/
+      /Cannot determine GitHub repository/,
     );
   });
 
@@ -77,7 +88,7 @@ describe("getOpenPRs", () => {
         },
       ]),
       null, // api not used
-      "https://github.com/arggon/test.git"
+      "https://github.com/arggon/test.git",
     );
 
     const result = getOpenPRs(null, dir, execGh as unknown as typeof execFileSync);
@@ -105,7 +116,7 @@ describe("getOpenPRs", () => {
           url: "https://github.com/arggon/test/pull/99",
         },
       ]),
-      "https://github.com/arggon/test.git"
+      "https://github.com/arggon/test.git",
     );
 
     const result = getOpenPRs(null, dir, execGh as unknown as typeof execFileSync);
@@ -126,13 +137,24 @@ describe("getOpenPRs", () => {
     const execGh = createPrsMock(
       null, // pr list fails
       null, // api fails
-      "https://github.com/arggon/test.git"
+      "https://github.com/arggon/test.git",
     );
 
-    expect(() => getOpenPRs(null, dir, execGh as unknown as typeof execFileSync)).toThrow(/GitHub API error/);
+    expect(() => getOpenPRs(null, dir, execGh as unknown as typeof execFileSync)).toThrow(
+      /GitHub API error/,
+    );
   });
 
-  it("uses explicit repo without detecting from git", () => {
+  it("rejects a malformed --repo slug up front with an actionable error", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-prs-"));
+    const execGh = vi.fn();
+    expect(() => getOpenPRs("foo", dir, execGh as unknown as typeof execFileSync)).toThrow(
+      /Invalid --repo "foo": expected "owner\/name"/,
+    );
+    expect(execGh).not.toHaveBeenCalled();
+  });
+
+  it("uses explicit repo without detecting from git and passes --limit 100", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-prs-"));
     // No .git directory, but explicit repo provided
 
@@ -144,7 +166,7 @@ describe("getOpenPRs", () => {
           headRefName: "feat/explicit",
           url: "https://github.com/explicit/repo/pull/1",
         },
-      ])
+      ]),
     );
 
     const result = getOpenPRs("explicit/repo", dir, execGh as unknown as typeof execFileSync);
@@ -157,10 +179,12 @@ describe("getOpenPRs", () => {
       },
     ]);
     // Should NOT call git remote get-url since repo is explicit
-    expect(execGh).not.toHaveBeenCalledWith(
-      "git",
-      expect.any(Array),
-      expect.any(Object)
+    expect(execGh).not.toHaveBeenCalledWith("git", expect.any(Array), expect.any(Object));
+    // gh default cap is 30: the shared reader always asks for 100
+    expect(execGh).toHaveBeenCalledWith(
+      "gh",
+      expect.arrayContaining(["--limit", "100"]),
+      expect.any(Object),
     );
   });
 });
@@ -181,13 +205,23 @@ describe("getOpenPRsForRepo", () => {
           headRefName: "feat/two",
           url: "https://github.com/owner/repo/pull/20",
         },
-      ])
+      ]),
     );
 
     const result = getOpenPRsForRepo("owner", "repo", execGh as unknown as typeof execFileSync);
     expect(result).toEqual([
-      { number: 10, title: "PR One", headRefName: "feat/one", url: "https://github.com/owner/repo/pull/10" },
-      { number: 20, title: "PR Two", headRefName: "feat/two", url: "https://github.com/owner/repo/pull/20" },
+      {
+        number: 10,
+        title: "PR One",
+        headRefName: "feat/one",
+        url: "https://github.com/owner/repo/pull/10",
+      },
+      {
+        number: 20,
+        title: "PR Two",
+        headRefName: "feat/two",
+        url: "https://github.com/owner/repo/pull/20",
+      },
     ]);
   });
 

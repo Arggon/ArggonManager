@@ -11,7 +11,9 @@ import { parseFrontmatter } from "./frontmatter.js";
 type MockFn = ReturnType<typeof vi.fn>;
 
 /** Create a mock for the gh executor that returns the given PR list. */
-function createGhMock(prs: Array<{ number: number; title: string; headRefName: string; url: string }>): MockFn {
+function createGhMock(
+  prs: Array<{ number: number; title: string; headRefName: string; url: string }>,
+): MockFn {
   return vi.fn((cmd: string, args: string[]) => {
     if (cmd === "gh" && args[0] === "pr" && args[1] === "list") {
       return JSON.stringify(prs);
@@ -63,13 +65,27 @@ describe("sync command", () => {
     const now = new Date("2026-01-01");
     runCreate({ cwd: dir, type: "initiative", title: "Test Initiative", now });
     runCreate({ cwd: dir, type: "epic", title: "Test Epic", parent: "test-initiative", now });
-    runCreate({ cwd: dir, type: "story", title: "Test Story", parent: "test-epic", id: "story-test", now });
+    runCreate({
+      cwd: dir,
+      type: "story",
+      title: "Test Story",
+      parent: "test-epic",
+      id: "story-test",
+      now,
+    });
     return dir;
   }
 
   /** Create a task under the story, then force its branch field (null keeps it unset). */
   function createTask(dir: string, id: string, branch: string | null): string {
-    runCreate({ cwd: dir, type: "task", title: `Task ${id}`, parent: "story-test", id, now: new Date("2026-01-01") });
+    runCreate({
+      cwd: dir,
+      type: "task",
+      title: `Task ${id}`,
+      parent: "story-test",
+      id,
+      now: new Date("2026-01-01"),
+    });
     const path = filePath(dir, id);
     setFrontmatter(path, { branch });
     return path;
@@ -86,10 +102,24 @@ describe("sync command", () => {
     expect(execGh).not.toHaveBeenCalled();
   });
 
+  it("reports an actionable error for a malformed --repo slug without calling gh", () => {
+    const dir = createTestRepo();
+    const execGh = createGhMock([]);
+
+    const result = runSync(
+      { check: true, cwd: dir, repo: "foo" },
+      execGh as unknown as typeof execFileSync,
+    );
+
+    expect(result.exit_code).toBe(1);
+    expect(result.errors[0]).toMatch(/Invalid --repo "foo": expected "owner\/name"/);
+    expect(execGh).not.toHaveBeenCalled();
+  });
+
   it("throws when --check and --write are combined", () => {
     const dir = createTestRepo();
     expect(() => runSync({ check: true, write: true, cwd: dir })).toThrow(
-      /either --check or --write/
+      /either --check or --write/,
     );
   });
 
@@ -97,7 +127,10 @@ describe("sync command", () => {
     const dir = createTestRepo();
     const execGh = createGhMock([]);
 
-    const result = runSync({ check: true, cwd: dir, repo: "test/test" }, execGh as unknown as typeof execFileSync);
+    const result = runSync(
+      { check: true, cwd: dir, repo: "test/test" },
+      execGh as unknown as typeof execFileSync,
+    );
 
     expect(result.exit_code).toBe(0);
     expect(result.matched).toEqual([]);
@@ -120,7 +153,10 @@ describe("sync command", () => {
       },
     ]);
 
-    const result = runSync({ check: true, cwd: dir, repo: "test/test" }, execGh as unknown as typeof execFileSync);
+    const result = runSync(
+      { check: true, cwd: dir, repo: "test/test" },
+      execGh as unknown as typeof execFileSync,
+    );
 
     expect(result.exit_code).toBe(0);
     expect(result.matched).toEqual(["task-with-branch"]);
@@ -135,7 +171,10 @@ describe("sync command", () => {
 
     const execGh = createGhMock([]);
 
-    const result = runSync({ check: true, cwd: dir, repo: "test/test" }, execGh as unknown as typeof execFileSync);
+    const result = runSync(
+      { check: true, cwd: dir, repo: "test/test" },
+      execGh as unknown as typeof execFileSync,
+    );
 
     expect(result.exit_code).toBe(0);
     expect(result.matched).toEqual([]);
@@ -155,7 +194,10 @@ describe("sync command", () => {
       },
     ]);
 
-    const result = runSync({ check: true, cwd: dir, repo: "test/test" }, execGh as unknown as typeof execFileSync);
+    const result = runSync(
+      { check: true, cwd: dir, repo: "test/test" },
+      execGh as unknown as typeof execFileSync,
+    );
 
     expect(result.exit_code).toBe(1);
     expect(result.matched).toEqual([]);
@@ -182,7 +224,10 @@ describe("sync command", () => {
       },
     ]);
 
-    const result = runSync({ check: true, cwd: dir, repo: "test/test" }, execGh as unknown as typeof execFileSync);
+    const result = runSync(
+      { check: true, cwd: dir, repo: "test/test" },
+      execGh as unknown as typeof execFileSync,
+    );
 
     expect(result.exit_code).toBe(0);
     expect(result.pending).toEqual([]);
@@ -209,7 +254,10 @@ describe("sync command", () => {
       },
     ]);
 
-    const result = runSync({ check: true, cwd: dir, repo: "test/test" }, execGh as unknown as typeof execFileSync);
+    const result = runSync(
+      { check: true, cwd: dir, repo: "test/test" },
+      execGh as unknown as typeof execFileSync,
+    );
 
     expect(result.exit_code).toBe(1);
     expect(result.matched).toEqual([]);
@@ -235,7 +283,10 @@ describe("sync command", () => {
       },
     ]);
 
-    const result = runSync({ check: true, cwd: dir, repo: "test/test" }, execGh as unknown as typeof execFileSync);
+    const result = runSync(
+      { check: true, cwd: dir, repo: "test/test" },
+      execGh as unknown as typeof execFileSync,
+    );
 
     expect(result.exit_code).toBe(1);
     expect(result.pending).toEqual(["task-split"]);
@@ -257,7 +308,10 @@ describe("sync command", () => {
       },
     ]);
 
-    const result = runSync({ check: true, cwd: dir, repo: "test/test" }, execGh as unknown as typeof execFileSync);
+    const result = runSync(
+      { check: true, cwd: dir, repo: "test/test" },
+      execGh as unknown as typeof execFileSync,
+    );
 
     expect(result.pending).toEqual(["task-a12"]);
     expect(result.suggestions).toEqual([{ id: "task-a12", branch: "feat/task-a12", pr: 70 }]);
@@ -276,7 +330,10 @@ describe("sync command", () => {
       },
     ]);
 
-    const result = runSync({ write: true, cwd: dir, repo: "test/test" }, execGh as unknown as typeof execFileSync);
+    const result = runSync(
+      { write: true, cwd: dir, repo: "test/test" },
+      execGh as unknown as typeof execFileSync,
+    );
 
     expect(result.exit_code).toBe(0);
     expect(result.matched).toEqual(["task-to-fill"]);
@@ -305,7 +362,10 @@ describe("sync command", () => {
       },
     ]);
 
-    const result = runSync({ write: true, cwd: dir, repo: "test/test" }, execGh as unknown as typeof execFileSync);
+    const result = runSync(
+      { write: true, cwd: dir, repo: "test/test" },
+      execGh as unknown as typeof execFileSync,
+    );
 
     expect(result.exit_code).toBe(0);
     expect(result.filled).toEqual({ "task-fill-me": "feat/task-fill-me" });
@@ -340,7 +400,10 @@ describe("sync command", () => {
       },
     ]);
 
-    const result = runSync({ write: true, cwd: dir, repo: "test/test" }, execGh as unknown as typeof execFileSync);
+    const result = runSync(
+      { write: true, cwd: dir, repo: "test/test" },
+      execGh as unknown as typeof execFileSync,
+    );
 
     expect(result.exit_code).toBe(1);
     expect(result.filled).toBeNull();
@@ -372,7 +435,10 @@ describe("sync command", () => {
       },
     ]);
 
-    const result = runSync({ write: true, cwd: dir, repo: "test/test" }, execGh as unknown as typeof execFileSync);
+    const result = runSync(
+      { write: true, cwd: dir, repo: "test/test" },
+      execGh as unknown as typeof execFileSync,
+    );
 
     expect(result.exit_code).toBe(0);
     expect(result.filled).toEqual({ "bug-empty-input": "fix/bug-empty-input" });
@@ -399,7 +465,10 @@ describe("sync command", () => {
       },
     ]);
 
-    const result = runSync({ write: true, cwd: dir, repo: "test/test" }, execGh as unknown as typeof execFileSync);
+    const result = runSync(
+      { write: true, cwd: dir, repo: "test/test" },
+      execGh as unknown as typeof execFileSync,
+    );
 
     // The epic reconciles against its recorded branch...
     expect(result.matched).toContain("test-epic");
@@ -415,7 +484,10 @@ describe("sync command", () => {
       throw new Error("gh: auth required");
     });
 
-    const result = runSync({ check: true, cwd: dir, repo: "test/test" }, execGh as unknown as typeof execFileSync);
+    const result = runSync(
+      { check: true, cwd: dir, repo: "test/test" },
+      execGh as unknown as typeof execFileSync,
+    );
 
     expect(result.exit_code).toBe(1);
     expect(result.errors[0]).toMatch(/GitHub API error/);
