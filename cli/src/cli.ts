@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import { displayPath, runBoard } from "./board.js";
+import { startBoardServer } from "./board-serve.js";
 import { runBranch } from "./branch.js";
 import { runStart } from "./start.js";
 import { readConventionVersion } from "./convention.js";
@@ -538,9 +539,57 @@ program
     "--group-by <field>",
     "prototype (ADR 0003): group cards within each column by milestone",
   )
+  .option("--serve", "serve the board locally (127.0.0.1) with live reload; edits go through the update path", false)
+  .option("--port <port>", "port for --serve (default: a free ephemeral port)")
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { out?: string; github?: boolean; groupBy?: string; json?: boolean }) => {
+  .action((opts: { out?: string; github?: boolean; groupBy?: string; serve?: boolean; port?: string; json?: boolean }) => {
     const json = jsonEnabled(opts);
+    if (opts.serve) {
+      const jsonFailed = (message: string) => {
+        if (json) {
+          failJson({
+            command: "board",
+            message,
+            code: "BOARD_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
+        console.error(`arggon board: ${message}`);
+        process.exitCode = 1;
+      };
+      if (opts.github) {
+        jsonFailed("cannot combine --serve with --github (the served board renders fresh per request)");
+        return;
+      }
+      let port: number | undefined;
+      if (opts.port !== undefined) {
+        port = Number.parseInt(opts.port, 10);
+        if (!Number.isInteger(port) || port < 0 || port > 65535) {
+          jsonFailed(`invalid --port '${opts.port}' (expected 0-65535)`);
+          return;
+        }
+      }
+      try {
+        const handle = startBoardServer({ cwd: process.cwd(), port, groupBy: opts.groupBy });
+        void handle.ready.then(() => {
+          if (json) {
+            successJson(
+              "board",
+              { serving: true, url: handle.url, port: handle.port },
+              readConventionVersion(handle.root),
+            );
+            return;
+          }
+          console.log(
+            `arggon board: serving ${displayPath(handle.root, process.cwd())} on ${handle.url} (binds 127.0.0.1 only, Ctrl-C to stop)`,
+          );
+        });
+      } catch (err) {
+        jsonFailed(err instanceof Error ? err.message : String(err));
+      }
+      return;
+    }
     try {
       const result = runBoard({
         cwd: process.cwd(),
