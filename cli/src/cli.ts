@@ -16,9 +16,9 @@ import {
   successJson,
 } from "./json.js";
 import { formatListTable, runList } from "./list.js";
+import { runSync } from "./sync-command.js";
 import { runUpdate } from "./update.js";
 import { formatValidateHuman, runValidate } from "./validate.js";
-
 const program = new Command();
 
 program
@@ -473,5 +473,91 @@ function printInitHuman(result: InitResult): void {
   console.log("  1. Add an initiative under tasks/<slug>/<slug>.md (see docs/convention.md)");
   console.log("  2. Or use templates/ as stubs until `arggon create` lands");
 }
+
+program
+  .command("sync")
+  .description("Reconcile task branch fields with open GitHub PRs")
+  .option("--check", "check mode: report matches without modifying (default)", false)
+  .option("--write", "write mode: fill empty branch fields from PRs", false)
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .option("--repo <owner/repo>", "GitHub repository (default: detected from origin remote)")
+  .action((opts: { check?: boolean; write?: boolean; json?: boolean; repo?: string }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runSync({
+        check: opts.check,
+        write: opts.write,
+        repo: opts.repo,
+      });
+      const payload = {
+        mode: result.mode,
+        matched: result.matched,
+        unmatched: result.unmatched,
+        pending: result.pending,
+        ambiguous: result.ambiguous,
+        suggestions: result.suggestions,
+        filled: result.filled,
+        errors: result.errors,
+        exit_code: result.exit_code,
+      };
+      if (json) {
+        if (result.errors.length > 0) {
+          failJson({
+            command: "sync",
+            message: result.errors.join("; "),
+            code: "SYNC_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+        } else {
+          successJson("sync", payload, readConventionVersion(process.cwd()));
+        }
+      } else {
+        console.log(
+          `arggon sync (${result.mode}): ${result.exit_code === 0 ? "in sync" : "sync needed"}`
+        );
+        for (const id of result.matched) {
+          console.log(`  matched:   ${id}`);
+        }
+        for (const s of result.suggestions) {
+          console.log(`  fillable:  ${s.id} <- ${s.branch} (#${s.pr})`);
+        }
+        for (const id of result.pending) {
+          if (!result.suggestions.some((s) => s.id === id)) {
+            console.log(`  pending:   ${id} (candidates disagree; pick a branch manually)`);
+          }
+        }
+        for (const id of result.unmatched) {
+          console.log(`  unmatched: ${id} (no open PR)`);
+        }
+        for (const amb of result.ambiguous) {
+          console.log(`  ambiguous: ${amb.id} (PRs ${amb.prs.join(", ")})`);
+        }
+        for (const [id, branch] of Object.entries(result.filled ?? {})) {
+          console.log(`  filled:    ${id} -> ${branch}`);
+        }
+        if (result.suggestions.length > 0 && result.mode === "check") {
+          console.log(`next: arggon sync --write fills ${result.suggestions.length} empty branch field(s)`);
+        }
+        if (result.errors.length > 0) {
+          console.error(`  errors: ${result.errors.join("; ")}`);
+        }
+      }
+      // CI gate: non-zero when sync is needed (--check) or sync could not finish.
+      process.exitCode = result.exit_code;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "sync",
+          message,
+          code: "SYNC_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon sync: ${message}`);
+      process.exitCode = 1;
+    }
+  });
 
 program.parse();
