@@ -75,6 +75,14 @@ An item is **done** when:
 
 Do **not** jump `todo` → `done` — claim first (`in_progress`), then complete.
 
+### Auto-done on merge
+
+The `auto-done` workflow (`.github/workflows/auto-done.yml`) mirrors `start` on the done side: when a PR referencing `task-*`/`bug-*` ids merges into `main`, it flips claimed items to `done` through `arggon update` and commits the flip to `main` as `github-actions[bot]`. Limits you must still cover yourself:
+
+- It only performs the legal `in_progress` → `done` transition. Items still `todo` or `blocked` when the PR merges are skipped with a warning annotation — claim before merging, or mark them manually.
+- It never edits acceptance checklists and never touches containers (story/epic/initiative) — tick the checklist in the item body before the PR merges.
+- Reference the item id in the PR title or body (the id is what the workflow greps for).
+
 ### Blocked
 
 Set `status: blocked`, keep `assignee` on claimable types, and set non-empty `blocked_reason` per convention:
