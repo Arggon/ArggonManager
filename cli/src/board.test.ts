@@ -2,7 +2,14 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { displayPath, escapeHtml, renderBoardHtml, runBoard, summarizeChecks } from "./board.js";
+import {
+  displayPath,
+  escapeHtml,
+  evaluateDrop,
+  renderBoardHtml,
+  runBoard,
+  summarizeChecks,
+} from "./board.js";
 import type { BoardGithub, PrInfo } from "./board.js";
 import type { WorkItem } from "./types.js";
 
@@ -147,6 +154,118 @@ describe("runBoard", () => {
     expect(result.root).toBe(dir);
     expect(result.outPath).toBe(join(dir, "board.html"));
     expect(existsSync(result.outPath)).toBe(true);
+  });
+});
+
+describe("evaluateDrop", () => {
+  const card = (overrides: Partial<Parameters<typeof evaluateDrop>[0]> = {}) => ({
+    id: "task-a",
+    type: "task",
+    status: "todo",
+    assignee: null as string | null,
+    ...overrides,
+  });
+
+  it("allows transitions the CLI update path allows", () => {
+    expect(evaluateDrop(card({ assignee: "arggon" }), "in_progress")).toEqual({
+      ok: true,
+      reason: "",
+    });
+    expect(evaluateDrop(card(), "cancelled")).toEqual({ ok: true, reason: "" });
+    expect(evaluateDrop(card({ status: "in_progress", assignee: "arggon" }), "done")).toEqual({
+      ok: true,
+      reason: "",
+    });
+    expect(evaluateDrop(card({ status: "done" }), "todo")).toEqual({ ok: true, reason: "" });
+    expect(evaluateDrop(card({ status: "cancelled" }), "todo")).toEqual({
+      ok: true,
+      reason: "",
+    });
+  });
+
+  it("refuses illegal transitions with the CLI rule message", () => {
+    expect(evaluateDrop(card(), "done")).toEqual({
+      ok: false,
+      reason: "cannot transition todo -> done (allowed: in_progress, cancelled)",
+    });
+    expect(evaluateDrop(card({ status: "blocked" }), "done")).toEqual({
+      ok: false,
+      reason: "cannot transition blocked -> done (allowed: in_progress, cancelled)",
+    });
+  });
+
+  it("refuses drops into the card's own column", () => {
+    expect(evaluateDrop(card(), "todo")).toEqual({
+      ok: false,
+      reason: "task-a is already in that column",
+    });
+  });
+
+  it("enforces the claim rule on claimable types but not containers", () => {
+    expect(evaluateDrop(card({ type: "story" }), "in_progress")).toEqual({
+      ok: false,
+      reason:
+        "story 'task-a' with status in_progress requires --assignee (claim first: arggon update task-a --assignee <login>)",
+    });
+    expect(evaluateDrop(card({ assignee: "arggon" }), "in_progress")).toEqual({
+      ok: true,
+      reason: "",
+    });
+    expect(evaluateDrop(card({ type: "epic" }), "in_progress")).toEqual({
+      ok: true,
+      reason: "",
+    });
+    expect(evaluateDrop(card({ type: "initiative" }), "in_progress")).toEqual({
+      ok: true,
+      reason: "",
+    });
+  });
+
+  it("lets blocked through (the reason prompt is drop-flow UI) and refuses unknown statuses", () => {
+    expect(evaluateDrop(card({ status: "in_progress", assignee: "arggon" }), "blocked")).toEqual({
+      ok: true,
+      reason: "",
+    });
+    expect(evaluateDrop(card({ status: "archived" }), "todo").ok).toBe(false);
+  });
+});
+
+describe("renderBoardHtml drag-and-drop", () => {
+  it("marks cards draggable with id/type/status/assignee data attributes", () => {
+    const html = renderBoardHtml(
+      [
+        item({ id: "task-a", type: "task", status: "in_progress", assignee: "arggon" }),
+        item({ id: "task-b", type: "task", status: "todo" }),
+      ],
+      { generatedAt: GENERATED_AT },
+    );
+    expect(html).toContain(
+      '<div class="card" draggable="true" data-id="task-a" data-type="task" data-status="in_progress" data-assignee="arggon">',
+    );
+    expect(html).toContain(
+      '<div class="card" draggable="true" data-id="task-b" data-type="task" data-status="todo">',
+    );
+    expect(html).not.toContain('data-status="todo" data-assignee');
+  });
+
+  it("embeds the drop rules and update endpoint in the page script", () => {
+    const html = renderBoardHtml([item({ id: "task-a", type: "task", status: "todo" })], {
+      generatedAt: GENERATED_AT,
+    });
+    expect(html).toContain("<script>");
+    expect(html).toContain(evaluateDrop.toString());
+    expect(html).toContain('"/api/update"');
+    expect(html).toContain("blocked_reason");
+    expect(html).toContain('id="board-toast"');
+  });
+
+  it("keeps counts re-computable by tagging the meta counts span", () => {
+    const html = renderBoardHtml([item({ id: "task-a", type: "task", status: "todo" })], {
+      generatedAt: GENERATED_AT,
+    });
+    expect(html).toContain(
+      '<span id="status-counts">todo: 1 · in_progress: 0 · blocked: 0 · done: 0 · cancelled: 0</span>',
+    );
   });
 });
 
