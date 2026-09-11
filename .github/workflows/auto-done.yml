@@ -99,8 +99,21 @@ jobs:
             if gh pr merge "$branch" --auto --squash > /dev/null 2>&1; then
               echo "auto-merge armed for $branch (lands when cli passes)"
             else
-              echo "auto-merge not enabled on this repo; watching checks"
-              gh pr checks "$branch" --watch --interval 15
+              echo "auto-merge not enabled; watching checks"
+              # Freshly created PRs may not have checks registered yet, so a
+              # single --watch can die instantly; give it a few tries.
+              watched=0
+              for attempt in 1 2 3 4 5; do
+                if gh pr checks "$branch" --watch --interval 15; then
+                  watched=1
+                  break
+                fi
+                sleep 10
+              done
+              if [ "$watched" != 1 ]; then
+                echo "::error::checks for $branch did not pass"
+                exit 1
+              fi
               gh pr merge "$branch" --squash || { sleep 20; gh pr merge "$branch" --squash; }
             fi
           else
