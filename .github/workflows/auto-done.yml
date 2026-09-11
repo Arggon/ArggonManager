@@ -80,13 +80,14 @@ jobs:
             esac
           done
 
-          if [ "$changed" = 1 ] && ! git diff --cached --quiet; then
+          if [ "$changed" = 1 ]; then
             # main is protected (required `cli` check), and a direct bot push
             # never carries that check, so land the flip through a PR whose
             # own `cli` run satisfies the rule. Squash: linear history.
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add tasks/
+            if git diff --cached --quiet; then echo "no status flips to commit"; exit 0; fi
             git commit -m "chore(auto): mark items done (PR #$PR merged)"
             branch="chore/auto-done-${GITHUB_RUN_ID}"
             git push origin "HEAD:$branch"
