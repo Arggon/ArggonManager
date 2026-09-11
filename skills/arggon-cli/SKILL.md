@@ -47,9 +47,13 @@ node dist/cli.js update <id> --status blocked --blocked-reason "..." # blocked (
 node dist/cli.js update <id> --status todo                           # unclaim (clears assignee)
 node dist/cli.js validate --json                                     # ok:false iff errors.length > 0; warnings alone keep ok:true
 node dist/cli.js board --json                                        # {path, itemCount}; HTML defaults to repo root
+node dist/cli.js board --serve --json                                # local live-reload server on 127.0.0.1: {serving, url, port}
+node dist/cli.js sync --check --json                                 # reconcile open GitHub PRs into tasks/ (non-zero when pending)
 node dist/cli.js board --github --json                             # + live PR overlay {github, prCount}; needs gh auth
 node dist/cli.js next --json                                         # {suggestion: {item, parentChain, reason} | null}
-node dist/cli.js report --json                                       # {groups} per-epic leaf counts; display only
+node dist/cli.js report --json                                       # {groups} per-epic leaf counts; --format markdown for standups
+node dist/cli.js instructions --json                                 # agent wiring snippets extracted from docs/agents.md
+node dist/cli.js mcp                                                 # stdio MCP server exposing list/create/update (agent rules)
 ```
 
 ## Procedure
@@ -66,6 +70,7 @@ node dist/cli.js report --json                                       # {groups} 
 - `in_progress` on a claimable type without `assignee` is rejected; initiatives/epics may be `in_progress` unassigned.
 - `update --status blocked` without `--blocked-reason` is rejected; `blocked_reason` must be absent otherwise.
 - `WorkItem.path` in JSON is posix, relative to the repo root (not cwd).
+- `update` cascades: a terminal status (done/cancelled) auto-completes ancestor containers whose whole subtree is terminal. Opt out with `--no-cascade`; the flipped ids come back as `autoCompleted` in the envelope.
 - `board` without `--out` writes `board.html` at the repo root (where `tasks/` lives), wherever you run it; explicit `--out` resolves from cwd and parent dirs must exist.
 - `board --github` overlays live PR state on cards with a `branch` (one `gh pr list` read, matched by head ref name; neutral badge without branch or PR); without gh auth it fails suggesting plain `board`. Never writes to `tasks/` in any path.
 - `list` filters compose with AND; unknown `--status`/`--type` values fail instead of returning empty.

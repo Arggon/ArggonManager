@@ -75,6 +75,8 @@ An item is **done** when:
 
 Do **not** jump `todo` → `done` — claim first (`in_progress`), then complete.
 
+**Automatic container completion:** updates that reach a terminal state (`done`/`cancelled`) auto-complete any ancestor container whose entire subtree is terminal (up to the initiative; see the exception in `docs/convention.md`). Use `--no-cascade` when ancestors must not be touched.
+
 ### Auto-done on merge
 
 The `auto-done` workflow (`.github/workflows/auto-done.yml`) mirrors `start` on the done side: when a PR referencing `task-*`/`bug-*` ids merges into `main`, it flips claimed items to `done` through `arggon update`, runs the test suite on the flip tree, and lands the change as a squashed `github-actions[bot]` PR (the workflow posts the required `cli` check on the flip commit itself — bot pushes/PRs don't trigger CI). Limits you must still cover yourself:
@@ -121,6 +123,33 @@ Wire it up with any MCP client config:
   "args": ["mcp"]
 }
 ```
+
+## Documentation maintenance (docs, ADRs, specs, plans)
+
+Agents and humans keep the docs alive **in the same PR as the change** — never as a TODO, a review comment, or a follow-up that blocks release.
+
+### What to update, by change type
+
+| Change | Update (same PR) |
+| --- | --- |
+| New or changed CLI command / flag | `README.md` (user-facing section) **and** `docs/json-output.md` (payload section + the `command` enum in the envelope table) |
+| JSON contract field or shape | `docs/json-output.md` (`WorkItem` table or the command section). Additive fields note their additivity; breaking changes bump `schemaVersion` |
+| Task-tree / frontmatter / validate behavior | `docs/convention.md` — non-negotiable, see the review bar in `docs/engineering.md` |
+| Cross-cutting decision (stack, identity, schema model, new top-level package) | ADR under `docs/adr/` — see the ADR process in `docs/engineering.md` (4-digit id, `Proposed` in the PR, `Accepted` on merge, supersede instead of rewriting) |
+| Non-trivial feature worth design review | Spec in `docs/specs/` + implementation plan in `docs/plans/` (see below) |
+| Agent playbook rules themselves | This file (`docs/agents.md`) |
+
+### Specs and plans (for non-trivial features)
+
+- **Spec** (`docs/specs/spec-<slug>-NNN.md`): the reviewable contract — purpose, synopsis, flags, JSON shapes, invariants ("never overwrites", "pure read"), and acceptance criteria. Write it **before** implementing; frontmatter carries `spec_id`, `title`, `status` (`proposed` → `implemented`), `created`.
+- **Plan** (`docs/plans/plan-<slug>-NNN.md`): the implementation breakdown derived from the spec — ordered tasks, each with verifiable acceptance criteria and a link back to the spec. Frontmatter: `plan_id`, `spec`, `status`.
+- When the feature lands, flip both statuses in the same PR as the implementation (never leave a shipped feature `proposed`).
+
+### Verification before opening the PR
+
+- `grep` the new command/flag/field across `README.md`, `docs/json-output.md`, `docs/convention.md`, `docs/agents.md` — every hit must match the implemented behavior.
+- `arggon validate` passes.
+- If the change made any doc statement false, that doc edit belongs in this PR.
 
 ## Reference integrations
 

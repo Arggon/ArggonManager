@@ -2,7 +2,7 @@
 plan_id: plan-sync-001
 title: Plan de implementación para arggon sync (issue #52)
 spec: docs/specs/spec-sync-001.md
-status: proposed
+status: implemented
 created: 2026-09-10
 ---
 

@@ -184,22 +184,41 @@ Validate: `arggon validate` / `arggon validate --json` (CI gate; docs/json-outpu
 
 ### `arggon board`
 
-Writes a static, self-contained read-only HTML board (columns = v0 statuses; cards show type, id, title, assignee, labels, parent, `blocked_reason`) from the same kernel read path as `list`. No server, no client JS, no writes to `tasks/` — the output is a generated snapshot; git files remain the source of truth. Stack decision: [docs/adr/0002-board-viewer-v0.md](docs/adr/0002-board-viewer-v0.md).
+Writes a self-contained HTML board (columns = v0 statuses; cards show type, id, title, assignee, labels, parent, `blocked_reason`, `milestone`) from the same kernel read path as `list`. No writes to `tasks/` — the output is a generated snapshot; git files remain the source of truth. Stack decision: [docs/adr/0002-board-viewer-v0.md](docs/adr/0002-board-viewer-v0.md). Drag-and-drop is a client-side pre-check: the embedded script applies exactly the CLI drop rules, and every edit routes through the kernel update path — never raw file writes from the browser.
 
 ```bash
 arggon board                  # writes board.html at the repo root (where tasks/ lives)
 arggon board --out report/board.html   # explicit path, relative to cwd
 arggon board --json           # v1 envelope: { path, itemCount }
 arggon board --github         # overlay live GitHub PR state on cards with a branch (read-only)
+arggon board --group-by milestone      # prototype (ADR 0003): group cards within each column
+arggon board --serve          # local live-reload server on 127.0.0.1 (edits via the update path)
+arggon board --serve --port 4173       # pick the port
 ```
 
 - `--out <file>`: output path (default `board.html` at the repo root regardless of cwd); parent directories must exist
 - `--json`: one JSON object on stdout; failures emit `code: "BOARD_FAILED"`
 - `--github`: one `gh pr list` read matched by head ref name → per-card badge (`#N · draft/open/merged/closed` + checks `✓/✗/…`, neutral `○ no PR` without branch or PR); without gh auth fails clearly suggesting plain `board`; never writes to `tasks/`
+- `--group-by milestone`: prototype per [ADR 0003](docs/adr/0003-milestone-field.md); items without a milestone group last
+- `--serve`: serves the board locally, **bound to 127.0.0.1 only**, and reloads the page whenever any file under `tasks/` changes; drag-and-drop posts to the update endpoint, which runs the same kernel update rules as the CLI. `--serve --json` emits the standard envelope once (`{ serving, url, port }`)
 
-The board is a snapshot: re-run after tree changes to refresh. The generated file is a build artifact — safe to gitignore; deleting it loses nothing.
+The static export is a snapshot: re-run after tree changes to refresh (or use `--serve`). The generated file is a build artifact — safe to gitignore; deleting it loses nothing.
 
-`arggon report` aggregates leaf (task/bug) statuses per story, grouped by epic, for display only (never writes). Every story gets a row — leafless stories show zeros with `(empty — no leaves)`, storiless epics `(empty — no stories)` — and `cancelled` has its own explicit column. Flags: `--json` (envelope `{ groups }` mirroring the table rows exactly, failures `REPORT_FAILED`).
+`arggon report` aggregates leaf (task/bug) statuses per story, grouped by epic, for display only (never writes). Every story gets a row — leafless stories show zeros with `(empty — no leaves)`, storiless epics `(empty — no stories)` — and `cancelled` has its own explicit column. Flags: `--format markdown` (standup summary: per-epic progress with `(done + cancelled)/total` plus a Blocked section with reasons) and `--json` (envelope `{ groups }` mirroring the table rows exactly, failures `REPORT_FAILED`).
+
+Closing work is easy on containers too: when an update reaches a terminal state and an ancestor's entire subtree is terminal, the ancestor auto-completes as `done` (cascade up to the initiative; opt out with `--no-cascade`).
+
+### `arggon sync`
+
+Reconciles `tasks/` with the repo's open GitHub PRs: `--check` (default, CI-safe) reports matched/unmatched items and exits non-zero when sync is pending; `--write` fills **only empty** `branch` fields — never overwrites a set branch, never guesses an ambiguous match, never touches status. Flags: `--repo <owner/repo>`, `--json`. Failures: `SYNC_FAILED`.
+
+### `arggon instructions`
+
+Prints the agent wiring (install commands, pre-commit hook, CI gate, `AGENTS.md` snippet) extracted at runtime from `docs/agents.md` — the CLI never duplicates the playbook text, so doc and command cannot drift. Flags: `--json` (`{ source, snippets: { install, precommit, ci, agent } }`, failures `INSTRUCTIONS_FAILED`).
+
+### `arggon mcp`
+
+Starts a stdio MCP server (JSON-RPC 2.0) exposing `arggon_list`, `arggon_create`, and `arggon_update` with the same rules and JSON envelopes as the CLI. The MCP layer always runs with agent playbook rules: no reopening `done`/`cancelled`, no claim stealing. See [docs/agents.md](docs/agents.md) §MCP server.
 
 Fixtures: [fixtures/](fixtures/).
 

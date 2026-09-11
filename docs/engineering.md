@@ -4,7 +4,7 @@ Technical direction for ArggonManager: how we structure the repo, what “done�
 
 This document is owned by **Software Architect**. It complements [`docs/convention.md`](./convention.md) (task tree / frontmatter schema). Product/feature acceptance stays with **Project Manager**. Implementation stays with **Software Developer**. UI QA (Phase 2+) stays with **UI Tester**.
 
-**Status:** draft for Phase 1 (convention + CLI). Stack choice for the CLI is tracked in [#8](https://github.com/Arggon/ArggonManager/issues/8) — paths below stay stack-agnostic until that ADR lands.
+**Status:** active. Phase 1 (convention + CLI) is implemented — stack per [ADR 0001](./adr/0001-cli-stack.md), board per [ADR 0002](./adr/0002-board-viewer-v0.md). This doc evolves in the same PRs as the behavior it governs.
 
 ---
 
@@ -22,24 +22,20 @@ This document is owned by **Software Architect**. It complements [`docs/conventi
 
 ```text
 tasks/                  # git-native work tree (see docs/convention.md)
+cli/                    # CLI package: TypeScript sources (cli/src), one module per command
+  src/                  # kernel (items/status/update/rules), commands, tests co-located
+dist/                   # compiled bin (gitignored; npm run build)
 docs/
   convention.md         # task layout + frontmatter + statuses (source of truth for CLI validate/create)
   engineering.md        # this file
+  agents.md             # agent playbook (claims, PRs, JSON contract, MCP)
+  json-output.md        # --json contract (schemaVersion 1)
   adr/                  # architecture decision records (see below)
-README.md
-```
-
-### Proposed code layout (pending #8)
-
-Until the CLI stack is chosen, reserve this shape; rename language-specific dirs in the #8 ADR if needed:
-
-```text
-cli/                    # Phase 1 CLI package (name may become cmd/, src/, etc. per stack)
-  …                     # create / list / update / validate / claim
-fixtures/               # or cli/testdata/ — golden trees for validate + integration tests
-  tasks-valid/          # minimal valid tree (may mirror or subset tasks/launch-mvp)
-  tasks-invalid/        # one case per reject rule
-.github/workflows/      # lint + test when scaffold exists
+  specs/  plans/        # feature specs and implementation plans (see docs/agents.md)
+templates/              # scaffolded by arggon init
+skills/arggon-cli/      # agent skill for the CLI (keep in sync with docs/json-output.md)
+fixtures/               # golden trees for validate + integration tests
+.github/workflows/      # ci.yml (build+test+lint), auto-done.yml
 ```
 
 **Boundaries**
@@ -51,7 +47,7 @@ fixtures/               # or cli/testdata/ — golden trees for validate + integ
 | CLI behavior | `cli/` (or stack equivalent) | Phase 2 board UI, Phase 3 SDK |
 | Durable decisions | `docs/adr/` | Long debate only in PR threads |
 
-**Out of Phase 1:** viewer/board UI, agent SDK/hooks, SaaS backend. Do not add those packages “for later” without an ADR.
+**Shipped beyond the original Phase 1 scope** (each behind its own ADR/PR): static board + drag-and-drop + local serve (ADR 0002), GitHub reconciliation (`sync`), stdio MCP server. **Still out without an ADR:** hosted/SaaS anything, a parallel task schema, or an agent-only dialect of the rules.
 
 **Sample tree:** `tasks/launch-mvp/` (or successor) is both product demo and a **fixture**. Changing convention requires updating samples and CLI tests in the same change set when the CLI exists.
 
@@ -89,9 +85,7 @@ A PR merges only when **all** applicable bars pass:
 
 ---
 
-## Testing expectations (Phase 1 CLI)
-
-Once #8 scaffold exists:
+## Testing expectations
 
 | Layer | Required | Notes |
 | --- | --- | --- |
@@ -104,7 +98,6 @@ Once #8 scaffold exists:
 
 - Convention changes that alter validate semantics ship with fixture updates in the **same** PR.
 - Do not skip tests with “docs only” if the PR changes CLI behavior.
-- Placeholders (lint/test stubs) are acceptable in the #8 scaffold PR; real coverage is required before claiming validate/create complete.
 
 ---
 
@@ -175,8 +168,8 @@ A Phase 1 eng change is done when:
 
 ## Phase 2 / 3 (boundary notes only)
 
-- **Phase 2 (viewer/board):** read-only or thin write API over the same tree; must not invent a parallel schema. Spike constraints: [`docs/viewer-spike.md`](./viewer-spike.md) (towards #19; ADR required before adding a package).
-- **Phase 3 (agent hooks/SDK):** must call the same validate/claim rules as the CLI; no private agent dialect.
+- **Viewer/board (shipped):** the static board and the local `--serve` route go through the same kernel read/update paths; drag-and-drop parity with the CLI rules is test-enforced. Spike constraints: [`docs/viewer-spike.md`](./viewer-spike.md).
+- **Agent hooks (partially shipped):** the stdio MCP server and the `agent` caller flag enforce the same validate/claim rules as the CLI; no private agent dialect. A fuller SDK still requires an ADR.
 
 Details belong in later ADRs — do not pre-build those packages in Phase 1.
 
@@ -184,6 +177,7 @@ Details belong in later ADRs — do not pre-build those packages in Phase 1.
 
 ## Related
 
-- Task convention: [`docs/convention.md`](./convention.md) (see also PR that locks v0)
-- CLI stack + scaffold: [#8](https://github.com/Arggon/ArggonManager/issues/8)
-- Claim concurrency: [#16](https://github.com/Arggon/ArggonManager/issues/16)
+- Task convention: [`docs/convention.md`](./convention.md)
+- CLI stack: [ADR 0001](./adr/0001-cli-stack.md) · board: [ADR 0002](./adr/0002-board-viewer-v0.md) · milestone field (Proposed): [ADR 0003](./adr/0003-milestone-field.md)
+- Claim concurrency: [`docs/claim.md`](./claim.md)
+- Agent playbook: [`docs/agents.md`](./agents.md) · JSON contract: [`docs/json-output.md`](./json-output.md)

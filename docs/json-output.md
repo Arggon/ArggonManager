@@ -26,7 +26,7 @@ Every success or failure payload includes:
 | `ok`                | boolean | `true` on success; `false` on failure                                                                                                 |
 | `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.                                            |
 | `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                                                        |
-| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `validate` \| `create` \| `update` \| `branch` \| `start` \| `board` \| `sync` |
+| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `branch` \| `start` \| `board` \| `sync` \| `instructions` \| `mcp` |
 
 Command-specific fields sit next to this envelope (not nested under a generic `data` key).
 
@@ -74,6 +74,7 @@ Stable fields aligned with convention v0 plus the additive v1 `branch`. **Always
 | `updated`        | `string` \| `null`                                            | `YYYY-MM-DD`                                                                |
 | `path`           | `string`                                                      | Posix path relative to repo/tree root, e.g. `tasks/launch-mvp/auth/auth.md` |
 | `blocked_reason` | `string` \| `null`                                            |                                                                             |
+| `milestone`      | `string` \| `null`                                            | Prototype per ADR 0003 (official in v3); additive within `schemaVersion: 1` |
 
 Enums match [`docs/convention.md`](./convention.md) v0.
 
@@ -89,7 +90,19 @@ Enums match [`docs/convention.md`](./convention.md) v0.
 
 ## Command payloads
 
-`list` / `validate` / `create` / `update` are specified here so those commands can emit the same envelope later. **This PR does not implement those commands.**
+Every command that loads domain objects emits this envelope; `--json` is a formatter, human output lives in the CLI entrypoint.
+
+### `instructions`
+
+| Field              | Type                            | Notes                                                         |
+| ------------------ | ------------------------------- | ------------------------------------------------------------- |
+| `source`           | `string`                        | Playbook doc the snippets were extracted from (`docs/agents.md`) |
+| `snippets.install` | `{ language, body }`            | Prerequisite shell commands, one per line                     |
+| `snippets.precommit` | `{ language, body }`          | `.git/hooks/pre-commit` gate                                  |
+| `snippets.ci`      | `{ language, body }`            | CI validate job                                               |
+| `snippets.agent`   | `{ language, body }`            | AGENTS.md wiring snippet                                      |
+
+Snippets are extracted from the playbook at runtime; failures use `error.code: "INSTRUCTIONS_FAILED"`.
 
 ### `hello`
 
@@ -107,13 +120,13 @@ Enums match [`docs/convention.md`](./convention.md) v0.
 | `created`            | `string[]` | Paths created/overwritten this run (posix, relative to `root`)                  |
 | `restored`           | `string[]` | Missing templates restored when already initialized (posix, relative to `root`) |
 
-### `list` (contract; command may land later)
+### `list`
 
 | Field   | Type         | Notes                                 |
 | ------- | ------------ | ------------------------------------- |
 | `items` | `WorkItem[]` | Lexicographic by `id`, per convention |
 
-### `validate` (contract; command may land later)
+### `validate`
 
 | Field      | Type      | Notes |
 | ---------- | --------- | ----- |
@@ -179,12 +192,16 @@ Human output supports `--format table` (default) and `--format markdown` (standu
 
 ### `board`
 
-| Field       | Type      | Notes                                                      |
-| ----------- | --------- | ---------------------------------------------------------- |
-| `path`      | `string`  | Output HTML path (display form)                            |
-| `itemCount` | `number`  | Items rendered                                             |
-| `github`    | `boolean` | Present and `true` only with `--github`                    |
-| `prCount`   | `number`  | PRs matched to card branches; present only with `--github` |
+| Field       | Type      | Notes                                                                |
+| ----------- | --------- | -------------------------------------------------------------------- |
+| `path`      | `string`  | Output HTML path (display form); absent with `--serve`                |
+| `itemCount` | `number`  | Items rendered                                                       |
+| `groupBy`   | `string`  | Present with `--group-by` (prototype: `milestone`)                    |
+| `serving`   | `boolean` | Present and `true` only with `--serve`                                |
+| `url`       | `string`  | `--serve` only: loopback base URL (`http://127.0.0.1:<port>`)         |
+| `port`      | `number`  | `--serve` only: bound port                                            |
+| `github`    | `boolean` | Present and `true` only with `--github` (not combinable with `--serve`) |
+| `prCount`   | `number`  | PRs matched to card branches; present only with `--github`            |
 
 With `--github` the board overlays live PR state (number, draft/ready, checks) on cards with a `branch`, matched by head ref name; cards without a branch or PR get a neutral badge. Without the flag the board is a fully offline snapshot. Failures use `error.code: "BOARD_FAILED"` (missing tasks/, or without gh auth — run plain `board` for the offline snapshot).
 
