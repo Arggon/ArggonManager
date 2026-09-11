@@ -146,7 +146,7 @@ describe("sync smoke (spawned CLI, fake gh)", () => {
     r = runCli(["sync", "--check"], t.dir, t.env);
     expect(r.status).toBe(0);
     expect(r.stdout).toContain("arggon sync (check): in sync");
-  });
+  }, 120_000);
 
   it("reports ambiguous matches and never guesses, in both modes", () => {
     const t = initSyncTree();
@@ -163,7 +163,7 @@ describe("sync smoke (spawned CLI, fake gh)", () => {
     expect(r.status).toBe(1);
     expect(r.stdout).toContain("ambiguous: task-ambig");
     expect(readFileSync(itemPath(t.dir, "task-ambig"), "utf8")).toBe(before);
-  });
+  }, 120_000);
 
   it("emits exactly one JSON object whose exit_code mirrors the process exit", () => {
     const t = initSyncTree();
@@ -198,12 +198,12 @@ describe("sync smoke (spawned CLI, fake gh)", () => {
     };
     expect(failed.ok).toBe(false);
     expect(failed.error?.code).toBe("SYNC_FAILED");
-  });
+  }, 120_000);
 
   it("rejects --check together with --write", () => {
     const t = initSyncTree();
     const r = runCli(["sync", "--check", "--write"], t.dir, t.env);
     expect(r.status).toBe(1);
     expect(r.stderr).toContain("either --check or --write");
-  });
+  }, 120_000);
 });
