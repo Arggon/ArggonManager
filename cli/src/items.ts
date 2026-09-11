@@ -22,6 +22,8 @@ export type WorkItem = {
   created?: string;
   updated?: string;
   blockedReason?: string;
+  /** Milestone target date, quoted YYYY-MM-DD (prototype per ADR 0003; official in v3). */
+  milestone?: string | null;
   extras: Frontmatter;
   filePath: string;
   containerDir: string;
@@ -42,6 +44,13 @@ const OFFICIAL_KEYS = new Set([
   "updated",
   "blocked_reason",
 ]);
+
+/**
+ * Forward-declared keys: not official in v0 (so they live in extras and
+ * round-trip), but known to the tooling - no UNKNOWN_KEY warning. milestone
+ * is the ADR 0003 prototype field, proposed as official in convention v3.
+ */
+const PROTOTYPE_KEYS = new Set(["milestone"]);
 
 /** One soft-load finding (path added by caller). */
 export type SoftIssue = {
@@ -158,7 +167,9 @@ export function softTryLoadItem(filePath: string): SoftLoadResult {
   for (const [k, v] of Object.entries(data)) {
     if (!OFFICIAL_KEYS.has(k)) {
       extras[k] = v;
-      if (!k.startsWith("x-") && k !== "extensions") unknownKeys.push(k);
+      if (!k.startsWith("x-") && k !== "extensions" && !PROTOTYPE_KEYS.has(k)) {
+        unknownKeys.push(k);
+      }
     }
   }
 
@@ -174,6 +185,7 @@ export function softTryLoadItem(filePath: string): SoftLoadResult {
     created: stringField(data, "created"),
     updated: stringField(data, "updated"),
     blockedReason: stringField(data, "blocked_reason"),
+    milestone: stringField(data, "milestone") ?? null,
     extras,
     filePath,
     containerDir: dirname(filePath),

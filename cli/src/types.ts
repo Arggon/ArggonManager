@@ -25,6 +25,11 @@ export type WorkItem = {
   updated: string | null;
   path: string;
   blocked_reason: string | null;
+  /**
+   * Milestone target date (prototype per ADR 0003; official field in
+   * convention v3). Additive within schemaVersion 1, like `branch` in v1.
+   */
+  milestone: string | null;
 };
 
 /** One validate finding. `path` is posix, repo-relative (file or directory). */

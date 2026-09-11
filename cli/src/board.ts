@@ -16,6 +16,8 @@ export type BoardOptions = {
   generatedAt?: string;
   /** When true, overlay live GitHub PR state on cards with a `branch` (read-only). */
   github?: boolean;
+  /** Prototype (ADR 0003): group cards within each column by `milestone`. */
+  groupBy?: string;
   /** Injectable GitHub reader (tests pass a fake; default shells out to `gh`). */
   gh?: BoardGithub;
 };
@@ -26,6 +28,8 @@ export type BoardResult = {
   itemCount: number;
   /** PRs matched to card branches (0 unless `github` is on). */
   prCount: number;
+  /** Set when the board was rendered grouped (prototype: "milestone"). */
+  groupBy?: "milestone";
 };
 
 /** Live PR state for one branch, matched by head ref name. */
@@ -119,6 +123,13 @@ export function defaultBoardGithub(): BoardGithub {
 export function runBoard(opts: BoardOptions): BoardResult {
   const tasksDir = findTasksDir(opts.cwd);
   const root = repoRootFromTasks(tasksDir);
+  let groupBy: BoardResult["groupBy"];
+  if (opts.groupBy !== undefined) {
+    if (opts.groupBy !== "milestone") {
+      throw new Error(`unknown --group-by field '${opts.groupBy}' (supported: milestone)`);
+    }
+    groupBy = "milestone";
+  }
   const items = loadItems(tasksDir).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   let overlay = new Map<string, PrInfo>();
   if (opts.github) {
@@ -131,11 +142,14 @@ export function runBoard(opts: BoardOptions): BoardResult {
       generatedAt: opts.generatedAt ?? new Date().toISOString(),
       prs: overlay,
       live: opts.github === true,
+      groupBy,
     },
   );
   const outPath = opts.out ? resolve(opts.cwd, opts.out) : resolve(root, DEFAULT_BOARD_FILE);
   writeFileSync(outPath, html, "utf8");
-  return { root, outPath, itemCount: items.length, prCount: overlay.size };
+  return groupBy
+    ? { root, outPath, itemCount: items.length, prCount: overlay.size, groupBy }
+    : { root, outPath, itemCount: items.length, prCount: overlay.size };
 }
 
 const TYPE_COLORS: Record<WorkItem["type"], string> = {
@@ -273,11 +287,21 @@ export function evaluateDrop(
 /**
  * Pure renderer for the static board. Columns are the v0 statuses in enum
  * order; every card shows its own status (no rollup). All dynamic text is
- * HTML-escaped. Sorted lexicographically by id within each column.
+ * HTML-escaped. Sorted lexicographically by id within each column. With
+ * `groupBy: "milestone"` (ADR 0003 prototype), cards inside each column are
+ * grouped under milestone headers sorted ascending; items without a
+ * milestone group last under a "no milestone" header - only when the column
+ * also has milestone items, so milestone-less columns render as before.
  */
 export function renderBoardHtml(
   items: WorkItem[],
-  opts: { generatedAt: string; repoName?: string; prs?: Map<string, PrInfo>; live?: boolean } = {
+  opts: {
+    generatedAt: string;
+    repoName?: string;
+    prs?: Map<string, PrInfo>;
+    live?: boolean;
+    groupBy?: "milestone";
+  } = {
     generatedAt: "",
   },
 ): string {
@@ -286,28 +310,35 @@ export function renderBoardHtml(
   const prs = opts.prs ?? new Map<string, PrInfo>();
   // Offline snapshot stays byte-identical: the PR line only renders with the live overlay on.
   const showPr = opts.live === true;
+  const groupByMilestone = opts.groupBy === "milestone";
+
+  const NO_MILESTONE = null;
+  const milestoneOf = (item: WorkItem): string | null =>
+    typeof item.milestone === "string" && item.milestone !== "" ? item.milestone : NO_MILESTONE;
 
   const columns = STATUSES.map((status) => {
-    const cards = sorted
-      .filter((item) => item.status === status)
-      .map((item) => {
-        const title = esc(item.title ?? item.id);
-        const breadcrumb = item.parent ? `<div class="parent">${esc(item.parent)}</div>` : "";
-        const assignee = item.assignee
-          ? `<div class="assignee">@${esc(item.assignee)}</div>`
-          : `<div class="assignee unassigned">unassigned</div>`;
-        const branch = item.branch ? `<div class="branch">⑂ ${esc(item.branch)}</div>` : "";
-        const pr = showPr ? prBadge(item.branch ? prs.get(item.branch) : undefined) : "";
-        const reason = item.blocked_reason
-          ? `<div class="blocked-reason">${esc(item.blocked_reason)}</div>`
+    const columnItems = sorted.filter((item) => item.status === status);
+    const renderCard = (item: WorkItem): string => {
+      const title = esc(item.title ?? item.id);
+      const breadcrumb = item.parent ? `<div class="parent">${esc(item.parent)}</div>` : "";
+      const assignee = item.assignee
+        ? `<div class="assignee">@${esc(item.assignee)}</div>`
+        : `<div class="assignee unassigned">unassigned</div>`;
+      const branch = item.branch ? `<div class="branch">⑂ ${esc(item.branch)}</div>` : "";
+      const pr = showPr ? prBadge(item.branch ? prs.get(item.branch) : undefined) : "";
+      const reason = item.blocked_reason
+        ? `<div class="blocked-reason">${esc(item.blocked_reason)}</div>`
+        : "";
+      const milestone = milestoneOf(item)
+        ? `<div class="milestone">⚑ ${esc(milestoneOf(item)!)}</div>`
+        : "";
+      const labels =
+        item.labels.length > 0
+          ? `<div class="labels">${item.labels
+              .map((label) => `<span class="label">${esc(label)}</span>`)
+              .join("")}</div>`
           : "";
-        const labels =
-          item.labels.length > 0
-            ? `<div class="labels">${item.labels
-                .map((label) => `<span class="label">${esc(label)}</span>`)
-                .join("")}</div>`
-            : "";
-        return `<div class="card" draggable="true" data-id="${esc(item.id)}" data-type="${esc(item.type)}" data-status="${esc(item.status)}"${item.assignee ? ` data-assignee="${esc(item.assignee)}"` : ""}>
+      return `<div class="card" draggable="true" data-id="${esc(item.id)}" data-type="${esc(item.type)}" data-status="${esc(item.status)}"${item.assignee ? ` data-assignee="${esc(item.assignee)}"` : ""}${milestoneOf(item) ? ` data-milestone="${esc(milestoneOf(item)!)}"` : ""}>
   <div class="card-head"><span class="type" data-type="${esc(item.type)}" style="--type-color: ${TYPE_COLORS[item.type]}">${esc(item.type)}</span><code>${esc(item.id)}</code></div>
   <div class="title">${title}</div>
   ${breadcrumb}
@@ -315,13 +346,49 @@ export function renderBoardHtml(
   ${branch}
   ${pr}
   ${labels}
+  ${milestone}
   ${reason}
 </div>`;
+    };
+
+    // Groups render in this order: milestones ascending, then no-milestone.
+    let groups: Array<{ key: string | null; items: WorkItem[] }>;
+    if (groupByMilestone) {
+      const byKey = new Map<string | null, WorkItem[]>();
+      for (const item of columnItems) {
+        const key = milestoneOf(item);
+        const bucket = byKey.get(key);
+        if (bucket) bucket.push(item);
+        else byKey.set(key, [item]);
+      }
+      const withMilestone = [...byKey.keys()]
+        .filter((key): key is string => key !== NO_MILESTONE)
+        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+        .map((key) => ({ key, items: byKey.get(key)! }));
+      const bare = byKey.get(NO_MILESTONE);
+      groups =
+        bare && withMilestone.length > 0
+          ? [...withMilestone, { key: NO_MILESTONE, items: bare }]
+          : bare
+            ? [{ key: NO_MILESTONE, items: bare }]
+            : withMilestone;
+    } else {
+      groups = columnItems.length > 0 ? [{ key: NO_MILESTONE, items: columnItems }] : [];
+    }
+
+    const cards = groups
+      .map(({ key, items: groupItems }) => {
+        const body = groupItems.map(renderCard).join("\n");
+        // The "no milestone" header only appears when it shares a column
+        // with milestone groups; a milestone-less column renders as before.
+        if (key === NO_MILESTONE && groups.length === 1) return body;
+        const label = key === NO_MILESTONE ? "no milestone" : `⚑ ${esc(key)}`;
+        const cls = key === NO_MILESTONE ? "mgroup-head none" : "mgroup-head";
+        return `<div class="${cls}">${label}</div>\n${body}`;
       })
       .join("\n");
-    const count = sorted.filter((item) => item.status === status).length;
     return `<section class="column" data-status="${status}">
-  <h2>${status} <span class="count">${count}</span></h2>
+  <h2>${status} <span class="count">${columnItems.length}</span></h2>
   ${cards || '<div class="empty">—</div>'}
 </section>`;
   }).join("\n");
@@ -372,6 +439,10 @@ header .meta { color: #59636e; font-size: 13px; }
 .labels { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
 .label { background: #e7ebef; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
 .blocked-reason { margin-top: 6px; color: #9a3412; background: #fff1e7; border-radius: 4px; padding: 4px 6px; font-size: 12px; }
+.milestone { color: #0550ae; font-size: 12px; margin-top: 2px; }
+.mgroup-head { margin: 10px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #0550ae; }
+.mgroup-head:first-child { margin-top: 0; }
+.mgroup-head.none { color: #8c919a; }
 .card[draggable="true"] { cursor: grab; }
 .card.dragging { opacity: 0.5; }
 .column.over { outline: 2px dashed #8c919a; outline-offset: -4px; }
