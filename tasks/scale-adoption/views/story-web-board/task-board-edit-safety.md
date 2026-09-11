@@ -18,9 +18,9 @@ The board must not become a side door around the claim rules.
 
 ## Acceptance
 
-- [ ] Claim conflict (already-assigned item) is rejected; `--force` stays CLI-only
-- [ ] `in_progress` without assignee rejected for story/task/bug
-- [ ] `blocked` requires a non-empty reason via a board prompt
+- [x] Claim conflict (already-assigned item) is rejected; `--force` stays CLI-only
+- [x] `in_progress` without assignee rejected for story/task/bug
+- [x] `blocked` requires a non-empty reason via a board prompt
 
 ## Board edit cases (E2E contract)
 

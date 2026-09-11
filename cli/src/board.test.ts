@@ -228,6 +228,39 @@ describe("evaluateDrop", () => {
     });
     expect(evaluateDrop(card({ status: "archived" }), "todo").ok).toBe(false);
   });
+
+  it("rejects reassignment of a claimed item with the CLI claim-conflict message", () => {
+    const claimed = { status: "in_progress", assignee: "alice" };
+    expect(evaluateDrop(card(claimed), "blocked", { assignee: "bob" })).toEqual({
+      ok: false,
+      reason:
+        "claim conflict: 'task-a' is claimed by 'alice' (status in_progress). " +
+        "Unclaim first (arggon update task-a --status todo) or coordinate.",
+    });
+  });
+
+  it("refuses force on the board route, even smuggled past a claim conflict", () => {
+    expect(evaluateDrop(card(), "in_progress", { assignee: "bob", force: true })).toEqual({
+      ok: false,
+      reason: "--force is CLI-only: board edits route through the update path without force",
+    });
+    const claimed = { status: "in_progress", assignee: "alice" };
+    const smuggled = evaluateDrop(card(claimed), "blocked", { assignee: "bob", force: true });
+    expect(smuggled.ok).toBe(false);
+    expect(smuggled.reason).toContain("is CLI-only");
+  });
+
+  it("allows claiming via the board by passing the prompted assignee", () => {
+    expect(evaluateDrop(card(), "in_progress", { assignee: "bob" })).toEqual({
+      ok: true,
+      reason: "",
+    });
+    expect(evaluateDrop(card({ type: "epic" }), "in_progress", { assignee: null })).toEqual({
+      ok: true,
+      reason: "",
+    });
+    expect(evaluateDrop(card({ type: "story" }), "in_progress", { assignee: null }).ok).toBe(false);
+  });
 });
 
 describe("renderBoardHtml drag-and-drop", () => {
@@ -257,6 +290,16 @@ describe("renderBoardHtml drag-and-drop", () => {
     expect(html).toContain('"/api/update"');
     expect(html).toContain("blocked_reason");
     expect(html).toContain('id="board-toast"');
+  });
+
+  it("wires the claim prompt into the drop flow and never sends force", () => {
+    const html = renderBoardHtml([item({ id: "task-a", type: "task", status: "todo" })], {
+      generatedAt: GENERATED_AT,
+    });
+    expect(html).toContain("--assignee required to claim ");
+    expect(html).toContain("body.assignee = edit.assignee;");
+    expect(html).not.toMatch(/body\.force/);
+    expect(html).toContain("requires --assignee");
   });
 
   it("keeps counts re-computable by tagging the meta counts span", () => {
