@@ -27,7 +27,11 @@ Design: a GitHub Actions workflow triggered on `pull_request: closed (merged)` t
 
 ## Acceptance
 
-- [ ] Workflow triggers on merge to `main` and marks referenced `task`/`bug` items `done` via `arggon update`, committing the flip to `main`
-- [ ] Already-done/cancelled items and unknown ids are skipped safely; illegal transitions (e.g. `todo` → `done`) warn without force and fail the run visibly
-- [ ] The flip commit is attributed to the bot and never touches anything under `tasks/` except status fields
-- [ ] `docs/agents.md` §5 documents the new mechanism and its limits (checklist ticking stays a human/agent responsibility)
+- [x] Workflow triggers on merge to `main` and marks referenced `task`/`bug` items `done` via `arggon update`, committing the flip to `main`
+- [x] Already-done/cancelled items and unknown ids are skipped safely; illegal transitions (e.g. `todo` → `done`) warn without force
+- [x] The flip commit is attributed to the bot and only touches update-path fields under `tasks/` (status + `updated` timestamp)
+- [x] `docs/agents.md` §5 documents the new mechanism and its limits (checklist ticking stays a human/agent responsibility)
+
+## Notes
+
+Verification: the exact workflow steps were dry-run locally against real merged PRs — id extraction on #67 and #65 (title-only reference) returned the right ids, and the full decision loop ran on a scratch copy of `tasks/` (`done`→skip, `in_progress`→done via the CLI, unknown id→skip; the todo/blocked warn branch is a plain echo). Diff of a flipped item touches only `status`. The first post-merge run of the workflow is the live confirmation of the trigger itself. Found while verifying: `task-report-command` was still `in_progress` after PR #65 merged — the exact gap this closes.

@@ -1,0 +1,96 @@
+name: auto-done
+
+# Mirrors `arggon start`, which automates the claim side (in_progress +
+# assignee + branch + PR): when a PR referencing task/bug items merges, this
+# flips those items to done through the CLI update path and commits the status
+# change to main. Only the legal in_progress -> done transition is performed;
+# anything else (unclaimed items, containers, unknown ids) is skipped with a
+# warning annotation. Acceptance checklists stay a human/agent responsibility.
+# Context: tasks/arggon-manager/cli/story-github/task-auto-done-on-merge.md
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  auto-done:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+      - name: Collect task/bug ids referenced by the merged PR
+        id: ids
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          text="$(gh pr view "$PR" --json title,body --jq '.title + " " + (.body // "")')"
+          ids="$(printf '%s' "$text" | grep -oE '\b(task|bug)-[a-z0-9]+(-[a-z0-9]+)*\b' | sort -u || true)"
+          {
+            echo 'ids<<EOF'
+            printf '%s\n' "$ids"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+          echo "referenced ids: ${ids:-none}"
+
+      - name: Flip claimable leaves to done and commit
+        env:
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          changed=0
+          for id in ${{ steps.ids.outputs.ids }}; do
+            status="$(node dist/cli.js list --json | jq -r --arg id "$id" '.items[] | select(.id == $id) | .status')"
+            case "$status" in
+              in_progress)
+                if node dist/cli.js update "$id" --status done --json > /dev/null; then
+                  echo "$id (PR #$PR): in_progress -> done"
+                  changed=1
+                else
+                  echo "::warning::$id: update failed unexpectedly"
+                fi
+                ;;
+              done|cancelled)
+                echo "skip $id: already $status"
+                ;;
+              todo|blocked)
+                echo "::warning::$id is $status: $status -> done is not a legal v0 transition (claim first, then merge, or mark manually)"
+                ;;
+              "")
+                echo "skip $id: not found under tasks/ (external reference?)"
+                ;;
+            esac
+          done
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tasks/
+          if [ "$changed" = 1 ] && ! git diff --cached --quiet; then
+            git commit -m "chore(auto): mark items done (PR #$PR merged)"
+            pushed=0
+            for attempt in 1 2 3; do
+              if git push; then
+                pushed=1
+                break
+              fi
+              git pull --rebase origin main || git rebase --abort
+            done
+            if [ "$pushed" != 1 ]; then
+              echo "::error::could not push the done flip to main after 3 attempts"
+              exit 1
+            fi
+          else
+            echo "no status flips to commit"
+          fi
