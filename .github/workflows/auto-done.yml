@@ -14,7 +14,8 @@ on:
 
 permissions:
   contents: write
-  pull-requests: read
+  # write: the landing flow opens the flip PR (and merges it) as the bot.
+  pull-requests: write
 
 jobs:
   auto-done:
