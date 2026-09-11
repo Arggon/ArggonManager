@@ -160,6 +160,8 @@ Empty results exit `0` (`items: []` with `--json`). Missing `tasks/`, invalid en
 
 `arggon start <id>` claims (`in_progress` + `--assignee`, never `--force`), checks out the branch, commits the claim, pushes, and with `--open-pr` opens a draft PR with the item id in the body. Refuses dirty trees and taken claims. Flags: `--assignee` (default `GITHUB_USER`/`GITHUB_ACTOR`), `--open-pr`, `--json` (envelope `{ item, branch, created, pushed, prUrl }`, failures `START_FAILED`).
 
+`arggon next` suggests the next claimable item: unclaimed `todo` of claimable type (story/task/bug), lexicographic by id, with parent chain and reason. Empty pool exits `0` with a friendly message. Flags: `--json` (envelope `{ suggestion: { item, parentChain, reason } | null }`, failures `NEXT_FAILED`).
+
 Shared kernel: `cli/src/paths.ts`, `frontmatter.ts`, `ids.ts`, `status.ts`, `items.ts`, `relations.ts`, `dates.ts`.
 
 ### `arggon validate`

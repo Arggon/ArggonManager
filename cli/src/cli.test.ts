@@ -404,6 +404,61 @@ describe("CLI --json", () => {
     expect(String((body.error as { message: string }).message)).toMatch(/plain `arggon board`/);
   });
 
+  it("arggon next suggests the lexicographic unclaimed todo with reason", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-next-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Work", "--parent", "login"], dir).status).toBe(0);
+    const result = runCli(["next"], dir);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("arggon next: login — Login");
+    expect(result.stdout).toContain("why:");
+    expect(result.stdout).toContain("arggon start login --assignee <login>");
+  });
+
+  it("arggon next --json emits one suggestion object", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-next-json-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Work", "--parent", "login"], dir).status).toBe(0);
+    const result = runCli(["next", "--json"], dir);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body).toMatchObject({ ok: true, command: "next" });
+    const suggestion = body.suggestion as Record<string, unknown>;
+    expect(suggestion).toMatchObject({
+      parentChain: ["launch-mvp", "auth"],
+      reason: expect.any(String),
+    });
+    expect(suggestion.item as Record<string, unknown>).toMatchObject({ id: "login" });
+  });
+
+  it("arggon next exits 0 with a friendly message on an empty pool", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-next-empty-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Work", "--parent", "login"], dir).status).toBe(0);
+    // Claim everything claimable: the pool drains, containers don't count.
+    expect(
+      runCli(["update", "login", "--status", "in_progress", "--assignee", "bob"], dir).status,
+    ).toBe(0);
+    expect(
+      runCli(["update", "task-work", "--status", "in_progress", "--assignee", "bob"], dir).status,
+    ).toBe(0);
+    const human = runCli(["next"], dir);
+    expect(human.status).toBe(0);
+    expect(human.stdout).toContain("todo pool is empty");
+    const boxed = runCli(["next", "--json"], dir);
+    expect(boxed.status).toBe(0);
+    expect(parseStdout(boxed.stdout)).toMatchObject({ ok: true, suggestion: null });
+  });
+
   it("arggon branch creates, checks out, and records the branch", () => {
     const dir = initGitTree();
     const result = runCli(["branch", "launch-mvp"], dir);

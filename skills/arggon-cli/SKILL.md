@@ -48,6 +48,7 @@ node dist/cli.js update <id> --status todo                           # unclaim (
 node dist/cli.js validate --json                                     # ok:false iff errors.length > 0; warnings alone keep ok:true
 node dist/cli.js board --json                                        # {path, itemCount}; HTML defaults to repo root
 node dist/cli.js board --github --json                             # + live PR overlay {github, prCount}; needs gh auth
+node dist/cli.js next --json                                         # {suggestion: {item, parentChain, reason} | null}
 ```
 
 ## Procedure

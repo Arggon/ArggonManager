@@ -16,7 +16,7 @@ Shared kernel (import these; do not fork schema logic):
 - `get-open-prs.ts` — open PR list via `gh pr list` (with `gh api` fallback)
 - `sync-types.ts` — PR↔item matching + result aggregation (`matchItem`, `toSyncResult`)
 
-Commands: `hello`, `init`, `create`, `list`, `update`, `validate`, `branch`, `start`, `board`, `sync`.
+Commands: `hello`, `init`, `create`, `list`, `next`, `update`, `validate`, `branch`, `start`, `board`, `sync`.
 
 - `update.ts` — in-place frontmatter edits (status transitions, claim rule, labels)
 - `validate.ts` — schema + tree integrity; consumes shared items soft-scan
