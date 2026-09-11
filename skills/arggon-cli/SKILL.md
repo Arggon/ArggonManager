@@ -69,6 +69,7 @@ node dist/cli.js mcp                                                 # stdio MCP
 - `update --labels a,b` REPLACES the full labels list; labels must be kebab-case, unique (validated server-side).
 - `update --depends-on a,b` REPLACES the dependency list (empty clears); `--add-depends-on <id>` appends one; unknown ids fail. Dependencies are advisory — they gate suggestions, never updates (`WorkItem.depends_on` in JSON).
 - `in_progress` on a claimable type without `assignee` is rejected; initiatives/epics may be `in_progress` unassigned.
+- Claims carry a soft lease (`WorkItem.claimed_at`, ISO date-time): set on claim (`update`/`start`), cleared on release; reporting only. `list --stale --older-than 7d` (`<number><d|h|m>`) reports stale claims — claims without `claimed_at` count as stale. `update --steal --reason "<why>" --assignee <you>` is a human-only takeover (agents are refused, like `--force`) and appends a dated note to the body.
 - `update --status blocked` without `--blocked-reason` is rejected; `blocked_reason` must be absent otherwise.
 - `WorkItem.path` in JSON is posix, relative to the repo root (not cwd).
 - `update` cascades: a terminal status (done/cancelled) auto-completes ancestor containers whose whole subtree is terminal. Opt out with `--no-cascade`; the flipped ids come back as `autoCompleted` in the envelope.

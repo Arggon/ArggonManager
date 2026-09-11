@@ -1,8 +1,10 @@
 ---
 type: story
-status: todo
+status: done
 id: story-claim-leases
 title: Claim leases and staleness
+assignee: Arggon
+branch: feat/story-claim-leases
 parent: agent-coordination
 labels: []
 created: "2026-09-11"
@@ -21,5 +23,5 @@ A claim today is eternal. Adding `claimed_at` (set by `start`/claim updates) mak
 
 ## Acceptance
 
-- [ ] `claimed_at` is additive, set on claim, cleared on unclaim; `--json` exposes it
-- [ ] Stale claims are listable; stealing a stale claim requires a human with `--reason`
+- [x] `claimed_at` is additive, set on claim, cleared on unclaim; `--json` exposes it
+- [x] Stale claims are listable; stealing a stale claim requires a human with `--reason`

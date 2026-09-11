@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-claimed-at
 title: claimed_at field set by start
+assignee: Arggon
 parent: story-claim-leases
 labels: []
 created: "2026-09-11"
@@ -23,5 +24,5 @@ Additive field, same treatment as `branch`: written by `start` and by claim upda
 
 ## Acceptance
 
-- [ ] `claimed_at` (date-time) written on claim, cleared on `todo`; `WorkItem.claimed_at` in the JSON contract
-- [ ] Update rules unaffected: `claimed_at` never gates transitions, only reporting
+- [x] `claimed_at` (date-time) written on claim, cleared on `todo`; `WorkItem.claimed_at` in the JSON contract
+- [x] Update rules unaffected: `claimed_at` never gates transitions, only reporting

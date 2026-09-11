@@ -23,5 +23,6 @@ export function toContractWorkItem(item: KernelWorkItem, rootDir: string): Contr
     blocked_reason: item.blockedReason ?? null,
     milestone: item.milestone ?? null,
     depends_on: [...item.dependsOn],
+    claimed_at: item.claimedAt ?? null,
   };
 }

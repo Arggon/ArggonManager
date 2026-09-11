@@ -36,6 +36,12 @@ export type WorkItem = {
    * computed inverse and is never stored.
    */
   depends_on: string[];
+  /**
+   * Soft lease on a claim (ISO date-time): set when a claimable item is
+   * claimed (in_progress + assignee), cleared when the claim is released.
+   * Additive within schemaVersion 1; reporting only, never gates transitions.
+   */
+  claimed_at: string | null;
 };
 
 /** One validate finding. `path` is posix, repo-relative (file or directory). */

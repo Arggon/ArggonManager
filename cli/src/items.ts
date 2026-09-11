@@ -26,6 +26,12 @@ export type WorkItem = {
   milestone?: string | null;
   /** Ids this item waits for (v3 field per ADR 0004); empty = no dependencies. */
   dependsOn: string[];
+  /**
+   * Soft lease: ISO date-time set when a claimable item is claimed
+   * (in_progress + assignee) and cleared when the claim is released.
+   * Reporting only — never gates a transition (see docs/convention.md).
+   */
+  claimedAt?: string | null;
   extras: Frontmatter;
   filePath: string;
   containerDir: string;
@@ -54,7 +60,7 @@ const OFFICIAL_KEYS = new Set([
  * convention v3 (ADR 0004). Both parse unconditionally: parsing is additive,
  * so v0-v2 trees keep loading (and validating) unchanged.
  */
-const PROTOTYPE_KEYS = new Set(["milestone", "depends_on"]);
+const PROTOTYPE_KEYS = new Set(["milestone", "depends_on", "claimed_at"]);
 
 /** One soft-load finding (path added by caller). */
 export type SoftIssue = {
@@ -201,6 +207,7 @@ export function softTryLoadItem(filePath: string): SoftLoadResult {
     blockedReason: stringField(data, "blocked_reason"),
     milestone: stringField(data, "milestone") ?? null,
     dependsOn,
+    claimedAt: stringField(data, "claimed_at") ?? null,
     extras,
     filePath,
     containerDir: dirname(filePath),

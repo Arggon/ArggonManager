@@ -169,6 +169,15 @@ program
     "--view <name>",
     'saved view name from tasks/.convention.yml x-views; ANDed with the flags and --filter',
   )
+  .option(
+    "--stale",
+    "list claimed items whose claimed_at lease is older than --older-than (claims from before claimed_at count as stale)",
+    false,
+  )
+  .option(
+    "--older-than <duration>",
+    'stale threshold for --stale: <number><d|h|m> (e.g. 7d, 12h, 30m)',
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (opts: {
@@ -177,6 +186,8 @@ program
       assignee?: string;
       filter?: string;
       view?: string;
+      stale?: boolean;
+      olderThan?: string;
       json?: boolean;
     }) => {
       const json = jsonEnabled(opts);
@@ -188,6 +199,8 @@ program
           assignee: opts.assignee,
           filter: opts.filter,
           view: opts.view,
+          stale: opts.stale,
+          olderThan: opts.olderThan,
         });
         if (json) {
           successJson(
@@ -342,6 +355,12 @@ program
   .option("--blocked-reason <text>", "required when status becomes blocked")
   .option("--force", "allow reassignment of an already-claimed item", false)
   .option(
+    "--steal",
+    "human-only supervised takeover of a claimed item (requires --reason and --assignee; agents are refused)",
+    false,
+  )
+  .option("--reason <text>", "non-empty rationale for --steal, recorded in the item body")
+  .option(
     "--no-cascade",
     "skip automatic container completion when this update closes the last open descendant",
   )
@@ -360,6 +379,8 @@ program
         addDependsOn?: string;
         blockedReason?: string;
         force?: boolean;
+        steal?: boolean;
+        reason?: string;
         cascade?: boolean;
         json?: boolean;
       },
@@ -379,6 +400,8 @@ program
           addDependsOn: opts.addDependsOn,
           blockedReason: opts.blockedReason,
           force: Boolean(opts.force),
+          steal: Boolean(opts.steal),
+          reason: opts.reason,
           cascade: opts.cascade !== false,
         });
         if (json) {

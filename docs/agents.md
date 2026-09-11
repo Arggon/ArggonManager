@@ -37,7 +37,7 @@ Pick a **claimable** item: `story`, `task`, or `bug` in `todo` (or return to `in
 
 - `npm run arggon -- update <id> --status in_progress --assignee <github-login>`
 
-If another assignee already holds the claim, `update` refuses the reassignment (claim conflict) unless `--force` — do not force; see [`docs/claim.md`](./claim.md). Prefer a different item or coordinate in the issue/PR.
+If another assignee already holds the claim, `update` refuses the reassignment (claim conflict) unless `--force` — do not force; see [`docs/claim.md`](./claim.md). Prefer a different item or coordinate in the issue/PR. Claims carry a soft lease (`claimed_at`): `arggon list --stale --older-than 7d` reports stale claims, and reclaiming one is a **human-only** `update <id> --steal --reason "..." --assignee <you>` — agents are never allowed to steal.
 
 Rules:
 

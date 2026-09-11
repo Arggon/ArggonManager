@@ -4,10 +4,11 @@ import {
   assertStatus,
   assertAssignee,
   assertClaimAndBlocked,
+  isClaimed,
   type Status,
 } from "./status.js";
 import { assertUpdateRules } from "./rules.js";
-import { formatDate } from "./dates.js";
+import { formatDate, formatDateTime } from "./dates.js";
 import { assertBranchName, assertLabels } from "./ids.js";
 import { itemsById, loadItems, tryLoadItem, type WorkItem } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
@@ -34,6 +35,15 @@ export type UpdateOptions = {
   blockedReason?: string;
   /** Allow reassignment of an already-claimed item (claim steal). */
   force?: boolean;
+  /**
+   * Supervised takeover of a claimed item (human-only; agents are refused by
+   * the playbook rules). Requires a non-empty `reason`, sets the assignee
+   * (explicit `assignee` or fail), refreshes `claimed_at`, and appends a
+   * dated note line with the reason to the item body.
+   */
+  steal?: boolean;
+  /** Non-empty rationale for `steal`, recorded in the item body. */
+  reason?: string;
   /**
    * Agent-flagged caller (the MCP layer always sets this): playbook
    * restrictions apply — no reopening done/cancelled, no claim steal.
@@ -71,8 +81,9 @@ function parseCsvList(raw: string): string[] {
 /**
  * Update frontmatter fields of one work item. Only requested fields change,
  * plus convention side-effects (unclaim clears assignee, unblocking clears
- * blocked_reason). Returns data; the CLI prints. Throws on unknown id,
- * invalid enums, illegal transitions, claim-rule violations, or claim steal (unless --force).
+ * blocked_reason, claim state drives the claimed_at lease). Returns data; the
+ * CLI prints. Throws on unknown id, invalid enums, illegal transitions,
+ * claim-rule violations, or claim steal (unless --force / supervised --steal).
  */
 export function runUpdate(opts: UpdateOptions): UpdateResult {
   const id = opts.id.trim();
@@ -82,6 +93,9 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   if (opts.assignee !== undefined) assertAssignee(opts.assignee);
   if (opts.unassign && opts.assignee !== undefined) {
     throw new Error("pass either --assignee or --unassign, not both");
+  }
+  if (opts.steal && opts.force) {
+    throw new Error("--steal and --force are mutually exclusive (--steal already authorizes the takeover)");
   }
   let title: string | undefined;
   if (opts.title !== undefined) {
@@ -113,6 +127,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     opts.assignee !== undefined ||
     branchRequest !== undefined ||
     opts.unassign === true ||
+    opts.steal === true ||
     labels !== undefined ||
     depsReplace !== undefined ||
     opts.addDependsOn !== undefined ||
@@ -152,9 +167,30 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
       requestedStatus: opts.status as Status | undefined,
       requestedAssignee: opts.assignee,
       force: opts.force,
+      steal: opts.steal,
     },
     opts.agent ? "agent" : "human",
   );
+
+  // Supervised steal (human-only; agent refusal happened in assertUpdateRules):
+  // requires a non-empty reason (recorded in the body) and an existing claim
+  // to take over, and the caller becomes the assignee.
+  const stealReason = opts.steal ? (opts.reason?.trim() ?? null) : null;
+  if (opts.steal) {
+    if (!stealReason) {
+      throw new Error(
+        "--steal requires a non-empty --reason (the takeover is recorded in the item body)",
+      );
+    }
+    if (!isClaimed(item.type, item.status, item.assignee ?? null)) {
+      throw new Error(
+        `'${id}' is not currently claimed -- --steal takes over an existing claim (in_progress with an assignee); check \`arggon list --stale\``,
+      );
+    }
+    if (opts.assignee === undefined) {
+      throw new Error(`--steal requires --assignee <your-login> (you become the assignee of '${id}')`);
+    }
+  }
 
   // Assignee: explicit > unassign > unclaim default (in_progress -> todo) > keep.
   const currentAssignee = item.assignee ?? null;
@@ -195,6 +231,22 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     newReason = null;
   }
 
+  // claimed_at lease (reporting only — never gates a transition): set when a
+  // claim starts or the claimant changes, kept while the same claim continues
+  // (pre-lease claims stay without it), cleared when the item leaves the
+  // claimed state.
+  const now = opts.now ?? new Date();
+  const wasClaimed = isClaimed(item.type, item.status, currentAssignee);
+  const willBeClaimed = isClaimed(item.type, newStatus, newAssignee);
+  let newClaimedAt: string | null;
+  if (!willBeClaimed) {
+    newClaimedAt = null;
+  } else if (!opts.steal && wasClaimed && newAssignee === currentAssignee) {
+    newClaimedAt = item.claimedAt ?? null;
+  } else {
+    newClaimedAt = formatDateTime(now);
+  }
+
   assertClaimAndBlocked({
     type: item.type,
     status: newStatus,
@@ -233,9 +285,25 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     data.blocked_reason = newReason;
     changed.push("blocked_reason");
   }
+  const currentClaimedAt = item.claimedAt ?? null;
+  if (newClaimedAt !== currentClaimedAt) {
+    if (newClaimedAt === null) {
+      delete data.claimed_at;
+    } else {
+      data.claimed_at = newClaimedAt;
+    }
+    changed.push("claimed_at");
+  }
 
-  data.updated = formatDate(opts.now ?? new Date());
-  writeFileSync(item.filePath, stringifyFrontmatter(data, item.body), "utf8");
+  data.updated = formatDate(now);
+
+  // Supervised steal records the takeover in the item body as a dated note.
+  let newBody = item.body;
+  if (opts.steal && stealReason) {
+    const note = `> stolen ${formatDate(now)} by ${newAssignee}: ${stealReason}`;
+    newBody = `${item.body.endsWith("\n") || item.body.length === 0 ? item.body : `${item.body}\n`}${note}\n`;
+  }
+  writeFileSync(item.filePath, stringifyFrontmatter(data, newBody), "utf8");
 
   const updated = tryLoadItem(item.filePath);
   if (!updated) {
