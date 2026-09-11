@@ -4,10 +4,9 @@ import {
   assertStatus,
   assertAssignee,
   assertClaimAndBlocked,
-  canTransition,
-  isClaimed,
-  TRANSITIONS,
+  type Status,
 } from "./status.js";
+import { assertUpdateRules } from "./rules.js";
 import { formatDate } from "./dates.js";
 import { assertBranchName, assertLabels } from "./ids.js";
 import { itemsById, loadItems, tryLoadItem, type WorkItem } from "./items.js";
@@ -28,6 +27,11 @@ export type UpdateOptions = {
   blockedReason?: string;
   /** Allow reassignment of an already-claimed item (claim steal). */
   force?: boolean;
+  /**
+   * Agent-flagged caller (the MCP layer always sets this): playbook
+   * restrictions apply — no reopening done/cancelled, no claim steal.
+   */
+  agent?: boolean;
   now?: Date;
 };
 
@@ -101,30 +105,21 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   }
 
   const newStatus = opts.status ?? item.status;
-  if (opts.status !== undefined && opts.status !== item.status) {
-    const allowed = TRANSITIONS[item.status];
-    if (!canTransition(item.status, newStatus)) {
-      throw new Error(
-        `cannot transition status ${item.status} -> ${newStatus} (allowed: ${allowed.join(", ")})`,
-      );
-    }
-  }
-
-  // Claim steal guard: refuse reassignment unless --force (docs/claim.md).
-  const currentAssignee = item.assignee ?? null;
-  if (
-    isClaimed(item.type, item.status, currentAssignee) &&
-    opts.assignee !== undefined &&
-    opts.assignee !== currentAssignee &&
-    !opts.force
-  ) {
-    throw new Error(
-      `claim conflict: '${id}' is claimed by '${currentAssignee}' (status in_progress). ` +
-        `Unclaim first (\`arggon update ${id} --status todo\`), coordinate, or pass --force.`,
-    );
-  }
+  assertUpdateRules(
+    {
+      id,
+      type: item.type,
+      currentStatus: item.status,
+      currentAssignee: item.assignee ?? null,
+      requestedStatus: opts.status as Status | undefined,
+      requestedAssignee: opts.assignee,
+      force: opts.force,
+    },
+    opts.agent ? "agent" : "human",
+  );
 
   // Assignee: explicit > unassign > unclaim default (in_progress -> todo) > keep.
+  const currentAssignee = item.assignee ?? null;
   let newAssignee: string | null;
   if (opts.assignee !== undefined) {
     newAssignee = opts.assignee;

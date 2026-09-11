@@ -11,6 +11,8 @@ arggon <command> --json
 
 Example: `arggon --json hello`.
 
+The MCP server (`arggon mcp`) returns these same envelope objects as tool-result text content for its `arggon_list`, `arggon_create`, and `arggon_update` tools; kernel failures become tool errors carrying the same `ok: false` shape (see [`docs/agents.md`](./agents.md) §MCP server).
+
 This flag is a formatter only. It does not walk `tasks/` or parse frontmatter. Commands that load domain objects pass those objects to the formatter. Human vs JSON printing lives in the CLI entrypoint.
 
 ---

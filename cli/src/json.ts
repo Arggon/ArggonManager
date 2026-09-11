@@ -46,20 +46,40 @@ export type FailJsonOptions = {
   conventionVersion?: number;
 };
 
-/** Emit `ok: false` envelope and set `process.exitCode = 1`. */
-export function failJson(opts: FailJsonOptions): void {
+/** Build the `ok: false` envelope object (does not print; shared with MCP). */
+export function failEnvelope(opts: FailJsonOptions): Record<string, unknown> {
   const error: JsonError = { message: opts.message };
   if (opts.code !== undefined) {
     error.code = opts.code;
   }
-  emitJson({
+  return {
     ok: false,
     schemaVersion: JSON_SCHEMA_VERSION,
     conventionVersion: opts.conventionVersion ?? CONVENTION_VERSION_DEFAULT,
     command: opts.command,
     error,
-  });
+  };
+}
+
+/** Emit `ok: false` envelope and set `process.exitCode = 1`. */
+export function failJson(opts: FailJsonOptions): void {
+  emitJson(failEnvelope(opts));
   process.exitCode = 1;
+}
+
+/** Build the `ok: true` envelope object with command payload fields (shared with MCP). */
+export function successEnvelope(
+  command: string,
+  payload: Record<string, unknown> = {},
+  conventionVersion = CONVENTION_VERSION_DEFAULT,
+): Record<string, unknown> {
+  return {
+    ok: true,
+    schemaVersion: JSON_SCHEMA_VERSION,
+    conventionVersion,
+    command,
+    ...payload,
+  };
 }
 
 /** Emit `ok: true` envelope with command-specific payload fields. */
@@ -68,11 +88,5 @@ export function successJson(
   payload: Record<string, unknown> = {},
   conventionVersion = CONVENTION_VERSION_DEFAULT,
 ): void {
-  emitJson({
-    ok: true,
-    schemaVersion: JSON_SCHEMA_VERSION,
-    conventionVersion,
-    command,
-    ...payload,
-  });
+  emitJson(successEnvelope(command, payload, conventionVersion));
 }

@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-mcp-playbook-rules
 title: Encode agent playbook rules in the MCP layer
+assignee: Arggon
 parent: story-mcp-server
 labels: []
 created: "2026-09-11"
@@ -16,6 +17,6 @@ Agents must not reopen done/cancelled, must not steal claims, and unclaim clears
 
 ## Acceptance
 
-- [ ] Rules live in one module imported by both CLI and MCP
-- [ ] Agent-flagged callers cannot reopen or force-steal
-- [ ] Rule tests cover the forbidden paths
+- [x] Rules live in one module imported by both CLI and MCP
+- [x] Agent-flagged callers cannot reopen or force-steal
+- [x] Rule tests cover the forbidden paths

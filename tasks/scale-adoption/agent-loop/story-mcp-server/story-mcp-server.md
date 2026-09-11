@@ -1,8 +1,10 @@
 ---
 type: story
-status: todo
+status: done
 id: story-mcp-server
 title: Expose the CLI as an MCP server
+assignee: Arggon
+branch: feat/story-mcp-server
 parent: agent-loop
 labels: [integration]
 created: "2026-09-11"
@@ -16,6 +18,6 @@ Expose the shared kernel (`items.ts`, `status.ts`, `update.ts`) as MCP tools so 
 
 ## Acceptance
 
-- [ ] MCP tools for list, create, update mirror CLI semantics exactly
-- [ ] Playbook rules (claims, transitions, no agent reopen) enforced in one shared place
-- [ ] Contract tests run against both CLI and MCP entry points
+- [x] MCP tools for list, create, update mirror CLI semantics exactly
+- [x] Playbook rules (claims, transitions, no agent reopen) enforced in one shared place
+- [x] Contract tests run against both CLI and MCP entry points
