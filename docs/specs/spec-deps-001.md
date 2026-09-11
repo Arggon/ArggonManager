@@ -1,7 +1,7 @@
 ---
 spec_id: deps-001
 title: Dependency graph — depends_on, blocked_by y next --ready (convención v3)
-status: proposed
+status: implemented
 created: 2026-09-11
 adr: docs/adr/0004-milestone-deps-v3.md
 ---
@@ -51,8 +51,8 @@ arggon board [--group-by milestone]     # edges de dependencias abiertas en tarj
 
 ## 6. Aceptación
 
-- [ ] Un ítem con `depends_on` abiertos no es sugerido por `next` (o queda último con `--all`); `--ready` lo excluye
-- [ ] Ciclos y refs rotas fallan `validate` con los códigos de la sección 4
-- [ ] `update --depends-on` reemplaza la lista; vacío limpia; ids desconocidos fallan en update también
-- [ ] Árboles v0-v2 sin el campo siguen validando limpio
-- [ ] Board estático y `--serve` muestran las dependencias abiertas
+- [x] Un ítem con `depends_on` abiertos no es sugerido por `next` (o queda último con `--all`); `--ready` lo excluye
+- [x] Ciclos y refs rotas fallan `validate` con los códigos de la sección 4
+- [x] `update --depends-on` reemplaza la lista; vacío limpia; ids desconocidos fallan en update también
+- [x] Árboles v0-v2 sin el campo siguen validando limpio
+- [x] Board estático y `--serve` muestran las dependencias abiertas

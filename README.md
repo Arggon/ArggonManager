@@ -150,7 +150,7 @@ arggon list --view my-open-bugs
 - --status <status>: exact v0 status (`todo`, `in_progress`, `blocked`, `done`, `cancelled`)
 - --type <type>: exact v0 type (`initiative`, `epic`, `story`, `task`, `bug`)
 - --assignee <login>: exact assignee. Special @me resolves via `GITHUB_USER`, then `GITHUB_ACTOR`, then `gh api user -q .login`
-- --filter <expr>: compact filter ANDed with the flags (fields `status`, `type`, `assignee`, `label`, `parent`; `!` negates; quotes allow spaces, e.g. `assignee:"Jane Doe"`); unknown fields are usage errors
+- --filter <expr>: compact filter ANDed with the flags (fields `status`, `type`, `assignee`, `label`, `parent`, `depends-on`, `blocked-by`; `!` negates; quotes allow spaces, e.g. `assignee:"Jane Doe"`); unknown fields are usage errors. `depends-on:<id>` matches items whose `depends_on` contains `<id>`; `blocked-by:<id>` matches the computed inverse — items that `<id>` depends on
 - --view <name>: named saved view from the `x-views` map in `tasks/.convention.yml`, ANDed with the flags and `--filter` (e.g. `x-views:\n  my-open-bugs: "type:bug status:todo !assignee:someone"`); unknown names fail listing the known views
 - --json: one compact JSON object on stdout (envelope v1: `ok`, `schemaVersion: 1`, `conventionVersion`, `command: "list"`, `items: WorkItem[]`); failures emit `ok: false` with `code: "LIST_FAILED"`
 
@@ -164,7 +164,7 @@ Empty results exit `0` (`items: []` with `--json`). Missing `tasks/`, invalid en
 
 `arggon start <id>` claims (`in_progress` + `--assignee`, never `--force`), checks out the branch, commits the claim, pushes, and with `--open-pr` opens a draft PR with the item id in the body. Refuses dirty trees and taken claims. Flags: `--assignee` (default `GITHUB_USER`/`GITHUB_ACTOR`), `--open-pr`, `--json` (envelope `{ item, branch, created, pushed, prUrl }`, failures `START_FAILED`).
 
-`arggon next` suggests the next claimable item: unclaimed `todo` of claimable type (story/task/bug), lexicographic by id, with parent chain and reason. Empty pool exits `0` with a friendly message. Flags: `--json` (envelope `{ suggestion: { item, parentChain, reason } | null }`, failures `NEXT_FAILED`).
+`arggon next` suggests the next claimable item: unclaimed `todo` of claimable type (story/task/bug), lexicographic by id, with parent chain and reason. Dependency-aware (v3): ready items — those whose `depends_on` are all `done`/`cancelled` — rank first, and when the suggestion still has open dependencies the `reason` lists them and the JSON suggestion carries the additive `blockedBy: string[]` (open dependency ids). Dependencies are advisory: they shape suggestions only, never updates. Empty pool exits `0` with a friendly message. Flags: `--ready` (limit the pool to ready items only), `--json` (envelope `{ suggestion: { item, parentChain, reason, blockedBy } | null }`, failures `NEXT_FAILED`).
 
 Shared kernel: `cli/src/paths.ts`, `frontmatter.ts`, `ids.ts`, `status.ts`, `items.ts`, `relations.ts`, `dates.ts`.
 
@@ -184,7 +184,7 @@ Validate: `arggon validate` / `arggon validate --json` (CI gate; docs/json-outpu
 
 ### `arggon board`
 
-Writes a self-contained HTML board (columns = v0 statuses; cards show type, id, title, assignee, labels, parent, `blocked_reason`, `milestone`) from the same kernel read path as `list`. No writes to `tasks/` — the output is a generated snapshot; git files remain the source of truth. Stack decision: [docs/adr/0002-board-viewer-v0.md](docs/adr/0002-board-viewer-v0.md). Drag-and-drop is a client-side pre-check: the embedded script applies exactly the CLI drop rules, and every edit routes through the kernel update path — never raw file writes from the browser.
+Writes a self-contained HTML board (columns = v0 statuses; cards show type, id, title, assignee, labels, parent, `blocked_reason`, `milestone`, plus a `↳ blocked by <id>` line per open dependency — v3; deps that are `done`/`cancelled` render nothing) from the same kernel read path as `list`. No writes to `tasks/` — the output is a generated snapshot; git files remain the source of truth. Stack decision: [docs/adr/0002-board-viewer-v0.md](docs/adr/0002-board-viewer-v0.md). Drag-and-drop is a client-side pre-check: the embedded script applies exactly the CLI drop rules, and every edit routes through the kernel update path — never raw file writes from the browser.
 
 ```bash
 arggon board                  # writes board.html at the repo root (where tasks/ lives)

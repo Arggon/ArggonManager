@@ -2,7 +2,7 @@
 plan_id: deps-001
 title: Plan de implementación del grafo de dependencias
 spec: docs/specs/spec-deps-001.md
-status: proposed
+status: implemented
 created: 2026-09-11
 ---
 

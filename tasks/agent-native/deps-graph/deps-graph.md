@@ -1,6 +1,6 @@
 ---
 type: epic
-status: todo
+status: done
 id: deps-graph
 title: deps-graph
 parent: agent-native

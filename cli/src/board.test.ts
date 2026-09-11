@@ -457,3 +457,34 @@ describe("runBoard github overlay", () => {
     expect(() => runBoard({ cwd: dir, github: true, gh })).toThrow(/plain `arggon board`/);
   });
 });
+
+describe("renderBoardHtml dependency edges (spec-deps-001)", () => {
+  it("shows a blocked-by line per open dependency and none for terminal deps", () => {
+    const html = renderBoardHtml(
+      [
+        item({ id: "task-a", type: "task", status: "todo", depends_on: ["task-x", "done-y"] }),
+        item({ id: "bug-b", type: "bug", status: "todo", depends_on: ["done-y"] }),
+        item({ id: "task-c", type: "task", status: "todo", depends_on: ["done-y", "gone-z"] }),
+        item({ id: "task-x", type: "task", status: "in_progress" }),
+        item({ id: "done-y", type: "task", status: "done" }),
+      ],
+      { generatedAt: GENERATED_AT },
+    );
+    // Open deps render; done/cancelled deps do not.
+    expect(html).toContain("↳ blocked by task-x");
+    expect(html).not.toContain("↳ blocked by done-y");
+    // Unknown dep ids count as open (validate reports UNKNOWN_DEPENDENCY).
+    expect(html).toContain("↳ blocked by gone-z");
+    // Cards without open deps carry no blocked-by line at all.
+    expect(html.match(/↳ blocked by/g)).toHaveLength(2);
+  });
+
+  it("escapes dependency ids like every other card field", () => {
+    const html = renderBoardHtml(
+      [item({ id: "task-a", type: "task", status: "todo", depends_on: ['<b>&"x'] })],
+      { generatedAt: GENERATED_AT },
+    );
+    expect(html).toContain("↳ blocked by &lt;b&gt;&amp;&quot;x");
+    expect(html).not.toContain("<b>&");
+  });
+});

@@ -1,6 +1,11 @@
 import { execFileSync } from "node:child_process";
 import { readConventionConfig } from "./convention.js";
-import { parseFilter, matchesPredicate, type FilterPredicate } from "./filter.js";
+import {
+  buildBlockedByIndex,
+  parseFilter,
+  matchesPredicate,
+  type FilterPredicate,
+} from "./filter.js";
 import { isItemType, ITEM_TYPES } from "./ids.js";
 import { loadItems, type WorkItem } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
@@ -117,13 +122,17 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
     predicates.push(...validatePredicates(parseFilter(opts.filter)));
   }
 
-  const items = loadItems(tasksDir)
+  // The blocked-by: predicate is a computed inverse view over the whole
+  // tree, so it needs the full (unfiltered) item set as its index.
+  const allItems = loadItems(tasksDir);
+  const blockedByIndex = buildBlockedByIndex(allItems);
+  const items = allItems
     .filter((item) => {
       if (opts.type !== undefined && item.type !== opts.type) return false;
       if (opts.status !== undefined && item.status !== opts.status) return false;
       if (assigneeFilter !== undefined && (item.assignee ?? null) !== assigneeFilter) return false;
       for (const pred of predicates) {
-        if (!matchesPredicate(item, pred)) return false;
+        if (!matchesPredicate(item, pred, blockedByIndex)) return false;
       }
       return true;
     })

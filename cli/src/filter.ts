@@ -1,6 +1,14 @@
 /** Compact filter expressions for `list --filter` (story-filter-language). */
 
-export const FILTER_FIELDS = ["status", "type", "assignee", "label", "parent"] as const;
+export const FILTER_FIELDS = [
+  "status",
+  "type",
+  "assignee",
+  "label",
+  "parent",
+  "depends-on",
+  "blocked-by",
+] as const;
 
 export type FilterField = (typeof FILTER_FIELDS)[number];
 
@@ -87,15 +95,49 @@ export function parseFilter(expr: string): FilterPredicate[] {
 }
 
 export type FilterableItem = {
+  id?: string;
   status: string;
   type: string;
   assignee?: string | null;
   labels: string[];
   parent?: string | null;
+  /** Ids this item waits for (convention v3). Optional for call sites that don't carry deps. */
+  dependsOn?: string[];
 };
 
-/** Test one predicate against an item. Pure; no I/O, no @me resolution. */
-export function matchesPredicate(item: FilterableItem, pred: FilterPredicate): boolean {
+/**
+ * Computed inverse dependency view (never stored): dep id -> ids that list
+ * it in `depends_on`. Required by the `blocked-by:` predicate; build once
+ * per query with `buildBlockedByIndex` and pass it to `matchesPredicate`.
+ */
+export type BlockedByIndex = ReadonlyMap<string, readonly string[]>;
+
+/** Build the inverse depends_on view for a set of items. Pure. */
+export function buildBlockedByIndex(
+  items: readonly { id: string; dependsOn?: string[] }[],
+): BlockedByIndex {
+  const index = new Map<string, string[]>();
+  for (const item of items) {
+    for (const depId of item.dependsOn ?? []) {
+      const bucket = index.get(depId);
+      if (bucket) bucket.push(item.id);
+      else index.set(depId, [item.id]);
+    }
+  }
+  return index;
+}
+
+/**
+ * Test one predicate against an item. Pure; no I/O, no @me resolution.
+ * The `blocked-by:` predicate is computed against the whole tree, so it
+ * needs the inverse index (build with `buildBlockedByIndex`); without one
+ * it never matches. All other predicates are self-contained.
+ */
+export function matchesPredicate(
+  item: FilterableItem,
+  pred: FilterPredicate,
+  blockedByIndex?: BlockedByIndex,
+): boolean {
   let hit: boolean;
   switch (pred.field) {
     case "status":
@@ -112,6 +154,12 @@ export function matchesPredicate(item: FilterableItem, pred: FilterPredicate): b
       break;
     case "parent":
       hit = (item.parent ?? null) === pred.value;
+      break;
+    case "depends-on":
+      hit = (item.dependsOn ?? []).includes(pred.value);
+      break;
+    case "blocked-by":
+      hit = (blockedByIndex?.get(pred.value) ?? []).includes(item.id ?? "");
       break;
   }
   return pred.negated ? !hit : hit;

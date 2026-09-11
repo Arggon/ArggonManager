@@ -292,6 +292,8 @@ export function evaluateDrop(
  * grouped under milestone headers sorted ascending; items without a
  * milestone group last under a "no milestone" header - only when the column
  * also has milestone items, so milestone-less columns render as before.
+ * Cards with open dependencies (ADR 0004: deps not done/cancelled) show a
+ * `blocked by <id>` line per open dep; terminal deps render nothing.
  */
 export function renderBoardHtml(
   items: WorkItem[],
@@ -311,6 +313,16 @@ export function renderBoardHtml(
   // Offline snapshot stays byte-identical: the PR line only renders with the live overlay on.
   const showPr = opts.live === true;
   const groupByMilestone = opts.groupBy === "milestone";
+
+  // Dependency edges (ADR 0004): a dep is open when it is not done/cancelled;
+  // unknown ids count as open (validate flags them as UNKNOWN_DEPENDENCY).
+  const TERMINAL_DEP = new Set(["done", "cancelled"]);
+  const statusById = new Map(sorted.map((item) => [item.id, item.status] as const));
+  const openDeps = (item: WorkItem): string[] =>
+    item.depends_on.filter((depId) => {
+      const status = statusById.get(depId);
+      return !status || !TERMINAL_DEP.has(status);
+    });
 
   const NO_MILESTONE = null;
   const milestoneOf = (item: WorkItem): string | null =>
@@ -332,6 +344,9 @@ export function renderBoardHtml(
       const milestone = milestoneOf(item)
         ? `<div class="milestone">⚑ ${esc(milestoneOf(item)!)}</div>`
         : "";
+      const blockedBy = openDeps(item)
+        .map((depId) => `<div class="blocked-by">↳ blocked by ${esc(depId)}</div>`)
+        .join("\n  ");
       const labels =
         item.labels.length > 0
           ? `<div class="labels">${item.labels
@@ -347,6 +362,7 @@ export function renderBoardHtml(
   ${pr}
   ${labels}
   ${milestone}
+  ${blockedBy}
   ${reason}
 </div>`;
     };
@@ -439,6 +455,7 @@ header .meta { color: #59636e; font-size: 13px; }
 .labels { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
 .label { background: #e7ebef; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
 .blocked-reason { margin-top: 6px; color: #9a3412; background: #fff1e7; border-radius: 4px; padding: 4px 6px; font-size: 12px; }
+.blocked-by { color: #9a3412; font-size: 11px; margin-top: 2px; overflow-wrap: anywhere; }
 .milestone { color: #0550ae; font-size: 12px; margin-top: 2px; }
 .mgroup-head { margin: 10px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #0550ae; }
 .mgroup-head:first-child { margin-top: 0; }

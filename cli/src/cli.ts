@@ -163,7 +163,7 @@ program
   )
   .option(
     "--filter <expr>",
-    'compact filter (e.g. "status:todo !label:security"); fields status, type, assignee, label, parent; ! negates; quotes allow spaces',
+    'compact filter (e.g. "status:todo !label:security"); fields status, type, assignee, label, parent, depends-on, blocked-by; ! negates; quotes allow spaces',
   )
   .option(
     "--view <name>",
@@ -217,17 +217,25 @@ program
 
 program
   .command("next")
-  .description("Suggest the next claimable item (unclaimed todo, lexicographic by id)")
+  .description(
+    "Suggest the next claimable item (unclaimed todo, lexicographic by id; ready items rank first)",
+  )
+  .option(
+    "--ready",
+    "limit the pool to ready items (unclaimed todos whose depends_on are all done/cancelled)",
+    false,
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { json?: boolean }) => {
+  .action((opts: { ready?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
-      const result = runNext({ cwd: process.cwd() });
+      const result = runNext({ cwd: process.cwd(), ready: Boolean(opts.ready) });
       const suggestion = result.suggestion
         ? {
             item: toContractWorkItem(result.suggestion.item, result.root),
             parentChain: result.suggestion.parentChain,
             reason: result.suggestion.reason,
+            blockedBy: result.suggestion.blockedBy,
           }
         : null;
       if (json) {
@@ -235,7 +243,11 @@ program
         return;
       }
       if (!result.suggestion) {
-        console.log("arggon next: todo pool is empty — nothing claimable.");
+        console.log(
+          opts.ready
+            ? "arggon next: ready pool is empty — nothing unblocked to claim."
+            : "arggon next: todo pool is empty — nothing claimable.",
+        );
         console.log('  Create work with `arggon create task "<title>" --parent <story-id>`.');
         return;
       }
