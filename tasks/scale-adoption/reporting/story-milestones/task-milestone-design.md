@@ -1,9 +1,10 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-milestone-design
 title: Design milestone field for convention v3
 assignee: arggonarchitect
+branch: feat/task-milestone-design
 parent: story-milestones
 labels: []
 created: "2026-09-11"
@@ -17,6 +18,6 @@ Write the ADR: field semantics (dates on initiatives/epics), interaction with `x
 
 ## Acceptance
 
-- [ ] ADR covers schema, validation, and v0→v3 migration
-- [ ] Reviewed against the reserved-names list in the convention
-- [ ] Decision recorded in docs/adr/
+- [x] ADR covers schema, validation, and v0→v3 migration
+- [x] Reviewed against the reserved-names list in the convention
+- [x] Decision recorded in docs/adr/
