@@ -86,7 +86,7 @@ describe("status", () => {
 describe("frontmatter", () => {
   it("round-trips a sample task file", () => {
     const raw = readFileSync(
-      join(process.cwd(), "tasks/launch-mvp/auth/story-login/task-rate-limit.md"),
+      join(process.cwd(), "fixtures/tasks-valid/tasks/launch-mvp/auth/story-login/task-rate-limit.md"),
       "utf8",
     );
     const { data, body } = parseFrontmatter(raw);
@@ -138,7 +138,7 @@ x-agent: grok
 
 describe("items (shared tree scan)", () => {
   it("walks the sample tasks/ fixture once", () => {
-    const items = loadItems(join(process.cwd(), "tasks"));
+    const items = loadItems(join(process.cwd(), "fixtures/tasks-valid/tasks"));
     const byId = itemsById(items);
     expect(byId.get("launch-mvp")?.type).toBe("initiative");
     expect(byId.get("auth")?.type).toBe("epic");
