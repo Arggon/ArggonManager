@@ -126,6 +126,8 @@ Wire it up with any MCP client config:
 
 Copy-paste wiring so agents follow ArggonManager rules **by default** — same CLI, same rules, no private dialect (Phase 3, [#20](https://github.com/Arggon/ArggonManager/issues/20)).
 
+Or print it on demand: `arggon instructions` extracts these snippets from this file at runtime (`--json` emits them as structured fields), so doc and command cannot drift.
+
 ### Pre-commit gate
 
 `.git/hooks/pre-commit` (make executable) — rejects commits with invalid frontmatter or tree:

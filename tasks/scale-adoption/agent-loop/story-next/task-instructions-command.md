@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-instructions-command
 title: Add instructions command for agent wiring
+assignee: Arggon
 parent: story-next
 labels: []
 created: "2026-09-11"
@@ -16,6 +17,6 @@ Backlog.md's `instructions` command prints agent wiring on demand. Do the same f
 
 ## Acceptance
 
-- [ ] Prints install, pre-commit hook, and CI gate snippets
-- [ ] Snippets are generated from the playbook source, not duplicated by hand
-- [ ] `--json` emits the snippets as structured fields
+- [x] Prints install, pre-commit hook, and CI gate snippets (plus the AGENTS.md wiring snippet)
+- [x] Snippets are generated from the playbook source, not duplicated by hand (extracted from docs/agents.md at runtime; tests parse the real doc so they fail if the doc drifts)
+- [x] `--json` emits the snippets as structured fields (snippets.{install,precommit,ci,agent} with language+body)

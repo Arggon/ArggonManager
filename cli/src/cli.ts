@@ -16,6 +16,7 @@ import {
   successJson,
 } from "./json.js";
 import { formatListTable, runList } from "./list.js";
+import { runInstructions } from "./instructions.js";
 import { runMcpServer } from "./mcp-server.js";
 import { runNext } from "./next.js";
 import { formatReportTable, runReport } from "./report.js";
@@ -666,6 +667,54 @@ program
         return;
       }
       console.error(`arggon sync: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("instructions")
+  .description("Print the agent wiring (install, pre-commit, CI) extracted from docs/agents.md")
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runInstructions({ cwd: process.cwd() });
+      if (json) {
+        successJson(
+          "instructions",
+          {
+            source: result.source,
+            snippets: result.snippets,
+          },
+          readConventionVersion(result.root),
+        );
+        return;
+      }
+      console.log(`arggon instructions: agent wiring from ${result.source}\n`);
+      const sections: Array<[string, { language: string; body: string }]> = [
+        ["install", result.snippets.install],
+        ["pre-commit gate (.git/hooks/pre-commit)", result.snippets.precommit],
+        ["CI gate", result.snippets.ci],
+        ["agent instructions snippet (AGENTS.md)", result.snippets.agent],
+      ];
+      for (const [label, snippet] of sections) {
+        console.log(`## ${label}`);
+        console.log("```" + snippet.language);
+        console.log(snippet.body);
+        console.log("```\n");
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "instructions",
+          message,
+          code: "INSTRUCTIONS_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon instructions: ${message}`);
       process.exitCode = 1;
     }
   });
