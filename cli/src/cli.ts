@@ -16,6 +16,7 @@ import {
   successJson,
 } from "./json.js";
 import { formatListTable, runList } from "./list.js";
+import { runNext } from "./next.js";
 import { runSync } from "./sync-command.js";
 import { runUpdate } from "./update.js";
 import { formatValidateHuman, runValidate } from "./validate.js";
@@ -203,6 +204,53 @@ program
       }
     },
   );
+
+program
+  .command("next")
+  .description("Suggest the next claimable item (unclaimed todo, lexicographic by id)")
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runNext({ cwd: process.cwd() });
+      const suggestion = result.suggestion
+        ? {
+            item: toContractWorkItem(result.suggestion.item, result.root),
+            parentChain: result.suggestion.parentChain,
+            reason: result.suggestion.reason,
+          }
+        : null;
+      if (json) {
+        successJson("next", { suggestion }, readConventionVersion(result.root));
+        return;
+      }
+      if (!result.suggestion) {
+        console.log("arggon next: todo pool is empty — nothing claimable.");
+        console.log('  Create work with `arggon create task "<title>" --parent <story-id>`.');
+        return;
+      }
+      const item = result.suggestion.item;
+      console.log(`arggon next: ${item.id} — ${item.title ?? item.id}`);
+      console.log(
+        `  type: ${item.type} · parent: ${result.suggestion.parentChainDisplay.join(" > ") || "(none)"}`,
+      );
+      console.log(`  why: ${result.suggestion.reason}`);
+      console.log(`  next: arggon start ${item.id} --assignee <login>`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "next",
+          message,
+          code: "NEXT_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon next: ${message}`);
+      process.exitCode = 1;
+    }
+  });
 
 program
   .command("update")

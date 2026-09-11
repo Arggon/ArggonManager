@@ -1,9 +1,10 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-next-command
 title: Add next command for claimable suggestions
 assignee: arggondev
+branch: feat/task-next-command
 parent: story-next
 labels: []
 created: "2026-09-11"

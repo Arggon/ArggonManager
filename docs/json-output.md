@@ -148,6 +148,17 @@ Failures use `error.code: "BRANCH_FAILED"` (unknown id, bad `branch_patterns`, n
 
 Failures use `error.code: "START_FAILED"` (unknown id, taken claim — never forced, dirty tree, existing branch, non-git tree, or gh failure).
 
+### `next`
+
+| Field                    | Type             | Notes                                                          |
+| ------------------------ | ---------------- | -------------------------------------------------------------- |
+| `suggestion`             | `object \| null` | One suggestion object, or `null` when the todo pool is empty   |
+| `suggestion.item`        | `WorkItem`       | Suggested unclaimed todo (claimable type, lexicographic by id) |
+| `suggestion.parentChain` | `string[]`       | Parent ids root-first                                          |
+| `suggestion.reason`      | `string`         | Why this item was chosen                                       |
+
+Empty pool is success (`ok: true`, `suggestion: null`). Failures use `error.code: "NEXT_FAILED"` (missing tasks/, unreadable items).
+
 ### `board`
 
 | Field       | Type      | Notes                                                      |
