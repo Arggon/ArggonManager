@@ -1,7 +1,7 @@
 ---
 spec_id: sync-001
 title: arggon sync — sincronizar items con PRs abiertos rellenando branch vacío
-status: proposed
+status: implemented
 created: 2026-09-10
 depends_on:
   - branch field (tasks/convention.md y update.js ya lo implementan)
