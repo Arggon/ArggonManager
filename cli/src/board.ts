@@ -190,15 +190,20 @@ function prBadge(pr: PrInfo | undefined): string {
 
 /**
  * Client-side drop rule, 1:1 with the CLI update path (cli/src/status.ts
- * TRANSITIONS plus the claim and blocked-reason rules). The board renderer
- * embeds this function's compiled source into the page script, so it must
- * stay self-contained: no module-scope references, no template literals
- * (they would break the surrounding HTML template). Blocked moves pass the
- * rule here; the --blocked-reason prompt is drop-flow UI, not a rule.
+ * TRANSITIONS plus the claim, claim-conflict and blocked-reason rules from
+ * cli/src/update.ts). The board renderer embeds this function's compiled
+ * source into the page script, so it must stay self-contained: no
+ * module-scope references, no template literals (they would break the
+ * surrounding HTML template). Blocked moves pass the rule here; the
+ * --blocked-reason and --assignee prompts are drop-flow UI, not rules.
+ * `edit.force` is always refused: the board route never honors force
+ * (claim steals stay CLI-only), so a smuggled force flag cannot relax the
+ * claim-conflict rule below.
  */
 export function evaluateDrop(
   card: { id: string; type: string; status: string; assignee?: string | null },
   to: string,
+  edit: { assignee?: string | null; force?: boolean } = {},
 ): { ok: boolean; reason: string } {
   const transitions: Record<string, string[]> = {
     todo: ["in_progress", "cancelled"],
@@ -208,6 +213,12 @@ export function evaluateDrop(
     cancelled: ["todo"],
   };
   const claimable = ["story", "task", "bug"];
+  if (edit.force) {
+    return {
+      ok: false,
+      reason: "--force is CLI-only: board edits route through the update path without force",
+    };
+  }
   const allowed = transitions[card.status];
   if (!allowed) {
     return { ok: false, reason: "unknown status '" + card.status + "'" };
@@ -222,7 +233,29 @@ export function evaluateDrop(
         "cannot transition " + card.status + " -> " + to + " (allowed: " + allowed.join(", ") + ")",
     };
   }
-  if (to === "in_progress" && claimable.indexOf(card.type) !== -1 && !card.assignee) {
+  // Claim steal guard, 1:1 with runUpdate: refuse reassignment of a claimed
+  // item. Force is not honored here (checked above), ever.
+  if (
+    card.assignee &&
+    claimable.indexOf(card.type) !== -1 &&
+    card.status === "in_progress" &&
+    edit.assignee !== undefined &&
+    edit.assignee !== card.assignee
+  ) {
+    return {
+      ok: false,
+      reason:
+        "claim conflict: '" +
+        card.id +
+        "' is claimed by '" +
+        card.assignee +
+        "' (status in_progress). Unclaim first (arggon update " +
+        card.id +
+        " --status todo) or coordinate.",
+    };
+  }
+  const effectiveAssignee = edit.assignee !== undefined ? edit.assignee : card.assignee;
+  if (to === "in_progress" && claimable.indexOf(card.type) !== -1 && !effectiveAssignee) {
     return {
       ok: false,
       reason:
@@ -434,10 +467,24 @@ ${evaluateDrop.toString()}
   function attemptMove(card, to) {
     var from = card.getAttribute("data-status");
     var id = card.getAttribute("data-id");
-    var verdict = evaluateDrop(
-      { id: id, type: card.getAttribute("data-type"), status: from, assignee: card.getAttribute("data-assignee") },
-      to
-    );
+    var cardData = {
+      id: id,
+      type: card.getAttribute("data-type"),
+      status: from,
+      assignee: card.getAttribute("data-assignee")
+    };
+    var edit = {};
+    var verdict = evaluateDrop(cardData, to, edit);
+    if (!verdict.ok && verdict.reason.indexOf("requires --assignee") !== -1) {
+      // Claim via board: prompt for the login, then re-run the rule with it.
+      var login = window.prompt("--assignee required to claim " + id + " (GitHub login or agent id):");
+      if (!login || !login.trim()) {
+        toast("✗ " + verdict.reason + " (drop cancelled)", "refused");
+        return;
+      }
+      edit.assignee = login.trim();
+      verdict = evaluateDrop(cardData, to, edit);
+    }
     if (!verdict.ok) {
       toast("✗ " + verdict.reason, "refused");
       return;
@@ -452,8 +499,10 @@ ${evaluateDrop.toString()}
       reason = reason.trim();
     }
     var anchor = card.nextSibling;
+    // Never includes force: the update path must reject claim steals itself.
     var body = { id: id, status: to };
     if (reason) body.blocked_reason = reason;
+    if (edit.assignee) body.assignee = edit.assignee;
     // Optimistic move; the catch below reverts it when the update call fails.
     card.setAttribute("data-status", to);
     columnFor(to).appendChild(card);
