@@ -24,6 +24,13 @@ export type UpdateOptions = {
   unassign?: boolean;
   /** Replace the full labels list (comma-separated). */
   labels?: string;
+  /**
+   * Replace the full depends_on list (comma-separated ids; v3 field).
+   * Empty string clears. Unknown ids fail.
+   */
+  dependsOn?: string;
+  /** Append one depends_on id (v3 field); no-op when already present. Unknown ids fail. */
+  addDependsOn?: string;
   blockedReason?: string;
   /** Allow reassignment of an already-claimed item (claim steal). */
   force?: boolean;
@@ -54,7 +61,7 @@ export type UpdateResult = {
   autoCompleted: string[];
 };
 
-function parseLabels(raw: string): string[] {
+function parseCsvList(raw: string): string[] {
   return raw
     .split(",")
     .map((part) => part.trim())
@@ -81,8 +88,14 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     title = opts.title.trim();
     if (!title) throw new Error("title must not be empty");
   }
-  const labels = opts.labels !== undefined ? parseLabels(opts.labels) : undefined;
+  const labels = opts.labels !== undefined ? parseCsvList(opts.labels) : undefined;
   if (labels !== undefined) assertLabels(labels);
+  const depsReplace = opts.dependsOn !== undefined ? parseCsvList(opts.dependsOn) : undefined;
+  let depsAdd: string | undefined;
+  if (opts.addDependsOn !== undefined) {
+    depsAdd = opts.addDependsOn.trim();
+    if (!depsAdd) throw new Error("--add-depends-on requires a non-empty item id");
+  }
   let branchRequest: string | null | undefined;
   if (opts.branch !== undefined) {
     const trimmed = opts.branch.trim();
@@ -101,15 +114,32 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     branchRequest !== undefined ||
     opts.unassign === true ||
     labels !== undefined ||
+    depsReplace !== undefined ||
+    opts.addDependsOn !== undefined ||
     opts.blockedReason !== undefined;
   if (!requested) {
     throw new Error("nothing to update (pass --title, --status, --assignee, --branch, ...)");
   }
 
   const tasksDir = findTasksDir(opts.cwd);
-  const item = itemsById(loadItems(tasksDir)).get(id);
+  const byId = itemsById(loadItems(tasksDir));
+  const item = byId.get(id);
   if (!item) {
     throw new Error(`id '${id}' not found under tasks/`);
+  }
+
+  // depends_on (v3, ADR 0004): replace the list / append one id. Unknown ids
+  // fail here so the error is actionable at edit time; validate re-checks the
+  // whole graph (unknown, self, cycles) on every run.
+  let newDeps: string[] | undefined;
+  if (depsReplace !== undefined || depsAdd !== undefined) {
+    const base = depsReplace !== undefined ? depsReplace : item.dependsOn;
+    newDeps = depsAdd !== undefined && !base.includes(depsAdd) ? [...base, depsAdd] : [...base];
+    for (const dep of newDeps) {
+      if (!byId.has(dep)) {
+        throw new Error(`depends_on id '${dep}' does not resolve to an existing item`);
+      }
+    }
   }
 
   const newStatus = opts.status ?? item.status;
@@ -193,6 +223,10 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   if (labels !== undefined && labels.join("\u0000") !== item.labels.join("\u0000")) {
     data.labels = labels;
     changed.push("labels");
+  }
+  if (newDeps !== undefined && newDeps.join("\u0000") !== item.dependsOn.join("\u0000")) {
+    data.depends_on = newDeps;
+    changed.push("depends_on");
   }
   const currentReason = item.blockedReason ?? null;
   if (newReason !== currentReason) {

@@ -322,6 +322,11 @@ program
   .option("--branch <name>", "set working branch (empty string clears; unclaim clears by default)")
   .option("--unassign", "clear assignee (in_progress -> todo does this by default)", false)
   .option("--labels <csv>", "replace the full labels list (comma-separated)")
+  .option(
+    "--depends-on <csv>",
+    "replace the full depends_on list of item ids (comma-separated; empty clears)",
+  )
+  .option("--add-depends-on <id>", "append one depends_on id (no-op when already present)")
   .option("--blocked-reason <text>", "required when status becomes blocked")
   .option("--force", "allow reassignment of an already-claimed item", false)
   .option(
@@ -339,6 +344,8 @@ program
         branch?: string;
         unassign?: boolean;
         labels?: string;
+        dependsOn?: string;
+        addDependsOn?: string;
         blockedReason?: string;
         force?: boolean;
         cascade?: boolean;
@@ -356,6 +363,8 @@ program
           branch: opts.branch,
           unassign: opts.unassign,
           labels: opts.labels,
+          dependsOn: opts.dependsOn,
+          addDependsOn: opts.addDependsOn,
           blockedReason: opts.blockedReason,
           force: Boolean(opts.force),
           cascade: opts.cascade !== false,

@@ -22,5 +22,6 @@ export function toContractWorkItem(item: KernelWorkItem, rootDir: string): Contr
     path: relative(rootDir, item.filePath).split(sep).join("/"),
     blocked_reason: item.blockedReason ?? null,
     milestone: item.milestone ?? null,
+    depends_on: [...item.dependsOn],
   };
 }

@@ -14,6 +14,7 @@ const KERNEL_ITEM: KernelWorkItem = {
   created: "2026-09-03",
   updated: "2026-09-03",
   blockedReason: undefined,
+  dependsOn: [],
   extras: {},
   filePath: join("/tmp/repo", "tasks/launch-mvp/auth/story-login/task-rate-limit.md"),
   containerDir: join("/tmp/repo", "tasks/launch-mvp/auth/story-login"),
@@ -37,6 +38,7 @@ describe("toContractWorkItem", () => {
       path: "tasks/launch-mvp/auth/story-login/task-rate-limit.md",
       blocked_reason: null,
       milestone: null,
+      depends_on: [],
     });
   });
 

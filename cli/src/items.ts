@@ -24,6 +24,8 @@ export type WorkItem = {
   blockedReason?: string;
   /** Milestone target date, quoted YYYY-MM-DD (prototype per ADR 0003; official in v3). */
   milestone?: string | null;
+  /** Ids this item waits for (v3 field per ADR 0004); empty = no dependencies. */
+  dependsOn: string[];
   extras: Frontmatter;
   filePath: string;
   containerDir: string;
@@ -46,11 +48,13 @@ const OFFICIAL_KEYS = new Set([
 ]);
 
 /**
- * Forward-declared keys: not official in v0 (so they live in extras and
- * round-trip), but known to the tooling - no UNKNOWN_KEY warning. milestone
- * is the ADR 0003 prototype field, proposed as official in convention v3.
+ * Forward-declared keys: not in the v0 OFFICIAL_KEYS block (so they live in
+ * extras and round-trip), but known to the tooling - no UNKNOWN_KEY warning.
+ * milestone is the ADR 0003 prototype field; depends_on is official in
+ * convention v3 (ADR 0004). Both parse unconditionally: parsing is additive,
+ * so v0-v2 trees keep loading (and validating) unchanged.
  */
-const PROTOTYPE_KEYS = new Set(["milestone"]);
+const PROTOTYPE_KEYS = new Set(["milestone", "depends_on"]);
 
 /** One soft-load finding (path added by caller). */
 export type SoftIssue = {
@@ -162,6 +166,16 @@ export function softTryLoadItem(filePath: string): SoftLoadResult {
     });
   }
 
+  let dependsOn: string[] = [];
+  try {
+    dependsOn = stringArrayField(data, "depends_on");
+  } catch (err) {
+    issues.push({
+      code: "INVALID_DEPENDS_ON",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+
   const extras: Frontmatter = {};
   const unknownKeys: string[] = [];
   for (const [k, v] of Object.entries(data)) {
@@ -186,6 +200,7 @@ export function softTryLoadItem(filePath: string): SoftLoadResult {
     updated: stringField(data, "updated"),
     blockedReason: stringField(data, "blocked_reason"),
     milestone: stringField(data, "milestone") ?? null,
+    dependsOn,
     extras,
     filePath,
     containerDir: dirname(filePath),
@@ -226,9 +241,11 @@ export function tryLoadItem(filePath: string): WorkItem | null {
     throw new Error(`${filePath}: ${result.issues[0]?.message ?? "invalid work item"}`);
   }
   if (result.issues.length > 0) {
-    // Strict loader used by list/create: labels errors still throw
-    const labelsErr = result.issues.find((i) => i.code === "INVALID_LABELS");
-    if (labelsErr) throw new Error(`${filePath}: ${labelsErr.message}`);
+    // Strict loader used by list/create: labels/depends_on type errors still throw
+    const strictErr = result.issues.find(
+      (i) => i.code === "INVALID_LABELS" || i.code === "INVALID_DEPENDS_ON",
+    );
+    if (strictErr) throw new Error(`${filePath}: ${strictErr.message}`);
   }
   return result.item;
 }

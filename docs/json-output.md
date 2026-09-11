@@ -36,7 +36,7 @@ Command-specific fields sit next to this envelope (not nested under a generic `d
 - **Breaking** changes bump `schemaVersion`.
 - Clients **MUST ignore** unknown fields.
 - This CLI emits **`schemaVersion: 1` only**.
-- Distinct from the convention **tree** version in [`docs/convention.md`](./convention.md). A v0 tree with JSON schema 1 is `{ schemaVersion: 1, conventionVersion: 0 }`; a v1 tree (with `branch`) reports `conventionVersion: 1`; a v2 tree (with `branch_patterns`) reports `conventionVersion: 2`.
+- Distinct from the convention **tree** version in [`docs/convention.md`](./convention.md). A v0 tree with JSON schema 1 is `{ schemaVersion: 1, conventionVersion: 0 }`; a v1 tree (with `branch`) reports `conventionVersion: 1`; a v2 tree (with `branch_patterns`) reports `conventionVersion: 2`; a v3 tree (with `milestone` + `depends_on` official) reports `conventionVersion: 3`.
 
 ### Failures (`ok: false`)
 
@@ -58,7 +58,7 @@ Empty success stays `ok: true` (e.g. future `list` with no items → `items: []`
 
 ### `WorkItem`
 
-Stable fields aligned with convention v0 plus the additive v1 `branch`. **Always present** so agents need not special-case missing keys:
+Stable fields aligned with convention v0 plus the additive `branch` (v1) and `milestone` / `depends_on` (v3) fields. **Always present** so agents need not special-case missing keys:
 
 | Field            | Type                                                          | Notes                                                                       |
 | ---------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -75,6 +75,7 @@ Stable fields aligned with convention v0 plus the additive v1 `branch`. **Always
 | `path`           | `string`                                                      | Posix path relative to repo/tree root, e.g. `tasks/launch-mvp/auth/auth.md` |
 | `blocked_reason` | `string` \| `null`                                            |                                                                             |
 | `milestone`      | `string` \| `null`                                            | Prototype per ADR 0003 (official in v3); additive within `schemaVersion: 1` |
+| `depends_on`     | `string[]`                                                    | Ids this item waits for (v3, ADR 0004); empty = none. Additive within `schemaVersion: 1`; `blocked_by` is the computed inverse and is never stored |
 
 Enums match [`docs/convention.md`](./convention.md) v0.
 

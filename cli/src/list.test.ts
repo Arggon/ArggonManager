@@ -217,6 +217,7 @@ describe("runList", () => {
       path: "tasks/launch-mvp/auth/story-login/task-rate-limit.md",
       blocked_reason: null,
       milestone: null,
+      depends_on: [],
     });
   });
 

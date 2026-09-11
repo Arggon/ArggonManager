@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-deps-schema-docs
 title: Convention v3 docs for dependency fields
+assignee: Arggon
 parent: story-deps-schema
 labels: []
 created: "2026-09-11"
@@ -23,5 +24,10 @@ Docs for the schema wave, per the maintenance rules in `docs/agents.md`.
 
 ## Acceptance
 
-- [ ] `docs/convention.md`: v3 section (fields, validation, migration from v0-v2)
-- [ ] `docs/json-output.md`: `depends_on: string[]` on `WorkItem`, `command` enum unchanged
+- [x] `docs/convention.md`: v3 section (fields, validation, migration from v0-v2)
+- [x] `docs/json-output.md`: `depends_on: string[]` on `WorkItem`, `command` enum unchanged
+
+## Notes
+
+- `docs/convention.md`: new "Dependency graph (v3)" section (fields, DAG validation codes, advisory semantics, CLI flags), `depends_on` added to the field table, removed from the reserved list, tree-version example bumped to 3, and the v0→v1 ladder gained the **v3** bullet with the additive migration note.
+- `README.md` (update flags) and `skills/arggon-cli/SKILL.md` (pitfall) kept in sync per docs/agents.md maintenance rules.

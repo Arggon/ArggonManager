@@ -30,6 +30,12 @@ export type WorkItem = {
    * convention v3). Additive within schemaVersion 1, like `branch` in v1.
    */
   milestone: string | null;
+  /**
+   * Ids this item waits for (convention v3 per ADR 0004). Additive within
+   * schemaVersion 1; empty list = no dependencies. `blocked_by` is the
+   * computed inverse and is never stored.
+   */
+  depends_on: string[];
 };
 
 /** One validate finding. `path` is posix, repo-relative (file or directory). */
