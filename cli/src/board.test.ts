@@ -27,6 +27,7 @@ function item(overrides: Partial<WorkItem> & Pick<WorkItem, "id" | "type" | "sta
     path: `tasks/x/${overrides.id}.md`,
     blocked_reason: null,
     milestone: null,
+    depends_on: [],
     ...overrides,
   };
 }

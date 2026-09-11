@@ -121,6 +121,15 @@ const TOOLS: ToolDefinition[] = [
         branch: { type: "string", description: "set working branch (empty string clears)" },
         unassign: { type: "boolean", description: "clear assignee", default: false },
         labels: { type: "string", description: "replace the full labels list (comma-separated)" },
+        depends_on: {
+          type: "string",
+          description:
+            "replace the full depends_on list of item ids (comma-separated; empty clears)",
+        },
+        add_depends_on: {
+          type: "string",
+          description: "append one depends_on id (no-op when already present)",
+        },
         blocked_reason: {
           type: "string",
           description: "required when status is blocked; forbidden otherwise",
@@ -241,6 +250,8 @@ export function runMcpServer(opts: McpServerOptions): void {
           branch: str(args.branch),
           unassign: args.unassign === true,
           labels: str(args.labels),
+          dependsOn: str(args.depends_on),
+          addDependsOn: str(args.add_depends_on),
           blockedReason: str(args.blocked_reason),
           agent: true,
         });

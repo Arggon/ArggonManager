@@ -116,6 +116,31 @@ describe("CLI <-> MCP parity", () => {
     expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
   });
 
+  it("update --add-depends-on emits identical depends_on through both entry points", async () => {
+    const { cliDir, mcpDir } = twinTrees();
+    cliJson(["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"], cliDir);
+    await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
+    cliJson(["create", "task", "Second", "--parent", "story-login", "--id", "second"], cliDir);
+    await mcpCall(mcpDir, "arggon_create", {
+      type: "task",
+      title: "Second",
+      parent: "story-login",
+      id: "second",
+    });
+    const cliResult = cliJson(
+      ["update", "task-rate-limit", "--add-depends-on", "task-second"],
+      cliDir,
+    );
+    const mcpResult = await mcpCall(mcpDir, "arggon_update", {
+      id: "task-rate-limit",
+      add_depends_on: "task-second",
+    });
+    expect(mcpResult.isError).toBe(false);
+    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+    const item = cliResult.item as { depends_on?: string[] };
+    expect(item.depends_on).toEqual(["task-second"]);
+  });
+
   it("list returns the same items through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
     cliJson(["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"], cliDir);

@@ -121,6 +121,7 @@ Every work item file begins with YAML frontmatter between `---` fences.
 | `created`        | no          | string          | Quoted `YYYY-MM-DD` only in v0 (e.g. `created: "2026-09-03"`)                                                                       |
 | `updated`        | no          | string          | Quoted `YYYY-MM-DD` only in v0                                                                                                      |
 | `blocked_reason` | conditional | string          | **Required non-empty** when `status: blocked`; must be **absent or empty** otherwise                                                |
+| `depends_on`     | no          | list of strings | Dependency graph (v3 field, ADR 0004): ids this item waits for; empty/omitted = none. See [Dependency graph (v3)](#dependency-graph-v3) |
 
 ### Defaults when creating
 
@@ -297,7 +298,7 @@ status: cancelled
 Add `tasks/.convention.yml`:
 
 ```yaml
-version: 2
+version: 3
 branch_patterns:
   initiative: "feat/{id}"
   epic: "feat/{id}"
@@ -311,6 +312,32 @@ Omit = `0`. Layout is a tree concern. Per-file schema is optional and defaults t
 ### Branch patterns (v2)
 
 `branch_patterns` maps each work-item type to a branch-name template with `{id}` (required) and `{type}` (optional) placeholders. Missing keys fall back to the defaults above (`feat/{id}` everywhere, `fix/{id}` for bugs); unknown top-level keys are ignored. `arggon branch <id>` resolves the item's pattern (or its recorded `branch` field) and runs `git checkout -b`. Malformed patterns (missing `{id}`, unknown type, non-mapping section) fail `validate` with `INVALID_BRANCH_PATTERN`.
+
+### Dependency graph (v3)
+
+Per [ADR 0004](adr/0004-milestone-deps-v3.md), v3 = v2 + the official `milestone` field ([ADR 0003](adr/0003-milestone-field.md), quoted `YYYY-MM-DD`) + the dependency fields.
+
+`depends_on` is a list of work-item ids this item waits for:
+
+- Permitted on **all** types; empty or omitted = no dependencies.
+- Entries are **ids** (globally unique under `tasks/`), not paths; edges between any types and across initiatives are allowed.
+- `blocked_by` is a **computed inverse view, never stored** — one source of truth, no sync bugs (the key stays reserved).
+
+`validate` enforces that the dependency graph is a consistent DAG:
+
+| Code                 | Meaning                                          |
+| -------------------- | ------------------------------------------------ |
+| `UNKNOWN_DEPENDENCY` | a `depends_on` id does not resolve to an item    |
+| `SELF_DEPENDENCY`    | an item depends on itself                        |
+| `DEPENDENCY_CYCLE`   | the graph has a cycle (it must be a DAG)         |
+
+Semantics are deliberately **advisory-only** (ADR 0004):
+
+- Dependencies **never block an update**: `arggon update <id> --status done` still works with open dependencies (humans may close out of order; the trail is in git).
+- They gate **suggestions and queries** (`arggon next` readiness, board edges) — shipped separately from the schema wave.
+- They do **not** interact with the container auto-completion cascade: containment and dependency are two different graphs with two different rules.
+
+CLI surface: `arggon update <id> --depends-on "a,b"` **replaces** the full list (empty string clears; mirrors `--labels`) and `arggon update <id> --add-depends-on c` appends one edge (no-op when already present). Unknown ids fail `update` with an actionable error; the full graph is re-checked by `validate`.
 
 ### Saved views (`x-views`)
 
@@ -339,7 +366,9 @@ x-views:
 
 These names are reserved for a future version — do not invent them as unknown keys with meaning:
 
-`order` / `rank`, `depends_on` / `blocked_by`, `priority`, `estimate`
+`order` / `rank`, `blocked_by`, `priority`, `estimate`
+
+(`depends_on` was reserved through v2 and became official in v3; `blocked_by` stays reserved permanently — it is a computed inverse view, never stored.)
 
 ### v0 → v1
 
@@ -348,6 +377,7 @@ These names are reserved for a future version — do not invent them as unknown 
 - `validate` **rejects** trees with a higher convention version than it supports.
 - **v1** = v0 + official `branch` field. New trees are scaffolded at v1; v0 trees (explicit `version: 0` or omitted) remain fully supported.
 - **v2** = v1 + `branch_patterns` config in `tasks/.convention.yml`. New trees are scaffolded at v2 with explicit per-type patterns; older trees keep working (missing patterns fall back to defaults).
+- **v3** = v2 + official `milestone` ([ADR 0003](adr/0003-milestone-field.md)) + `depends_on` ([ADR 0004](adr/0004-milestone-deps-v3.md)). New trees are scaffolded at v3. Purely additive migration: **v0–v2 trees stay valid unchanged, nothing to migrate** — the CLI parses `depends_on` (and `milestone`) unconditionally, so older trees that adopt the field early keep validating, and trees without it are unaffected (see [Dependency graph (v3)](#dependency-graph-v3)).
 
 ### Listing order (v0)
 

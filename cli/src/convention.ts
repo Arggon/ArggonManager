@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { isItemType, type ItemType } from "./ids.js";
 
 /** Latest task-tree convention version written by `arggon init` (docs/convention.md). */
-export const CONVENTION_VERSION = 2;
+export const CONVENTION_VERSION = 3;
 
 /** Version assumed when `tasks/.convention.yml` is missing or unparseable (omit file = 0). */
 export const CONVENTION_VERSION_DEFAULT = 0;

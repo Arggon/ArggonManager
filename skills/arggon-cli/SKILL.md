@@ -67,6 +67,7 @@ node dist/cli.js mcp                                                 # stdio MCP
 ## Pitfalls
 
 - `update --labels a,b` REPLACES the full labels list; labels must be kebab-case, unique (validated server-side).
+- `update --depends-on a,b` REPLACES the dependency list (empty clears); `--add-depends-on <id>` appends one; unknown ids fail. Dependencies are advisory — they gate suggestions, never updates (`WorkItem.depends_on` in JSON).
 - `in_progress` on a claimable type without `assignee` is rejected; initiatives/epics may be `in_progress` unassigned.
 - `update --status blocked` without `--blocked-reason` is rejected; `blocked_reason` must be absent otherwise.
 - `WorkItem.path` in JSON is posix, relative to the repo root (not cwd).

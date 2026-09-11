@@ -97,6 +97,7 @@ const BARE = (id: string) => ({
   path: `tasks/x/${id}.md`,
   blocked_reason: null,
   milestone: null,
+  depends_on: [],
 });
 
 describe("board milestone grouping", () => {

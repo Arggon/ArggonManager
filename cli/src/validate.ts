@@ -117,6 +117,77 @@ function checkItemShape(item: SoftItem, errors: Issue[]): void {
   }
 }
 
+/**
+ * Dependency graph pass (convention v3, ADR 0004): referential integrity and
+ * acyclicity over `depends_on`. Advisory-only semantics — these are validate
+ * errors, but dependencies never block updates (see docs/convention.md).
+ */
+function checkDependencies(items: SoftItem[], byId: Map<string, SoftItem>, errors: Issue[]): void {
+  const graph = new Map<string, string[]>();
+  for (const item of items) {
+    const edges: string[] = [];
+    for (const dep of item.dependsOn) {
+      if (dep === item.id) {
+        push(errors, item.relPath, `item '${item.id}' depends on itself`, "SELF_DEPENDENCY");
+        continue; // self-loops are reported once here, not as cycles
+      }
+      if (!byId.has(dep)) {
+        push(
+          errors,
+          item.relPath,
+          `depends_on id '${dep}' does not resolve to an existing item`,
+          "UNKNOWN_DEPENDENCY",
+        );
+        continue;
+      }
+      edges.push(dep);
+    }
+    graph.set(item.id, edges);
+  }
+
+  // Cycle detection (the graph must be a DAG): DFS with gray/black marking.
+  // Each distinct cycle is reported once, anchored at its lexicographically
+  // smallest member so the issue path is deterministic.
+  const color = new Map<string, "gray" | "black">();
+  const stack: string[] = [];
+  const reported = new Set<string>();
+  const visit = (id: string): void => {
+    color.set(id, "gray");
+    stack.push(id);
+    for (const dep of graph.get(id) ?? []) {
+      const state = color.get(dep);
+      if (state === "gray") {
+        const cycle = [...stack.slice(stack.indexOf(dep)), dep];
+        const key = [...cycle].sort().join("\u0000");
+        if (!reported.has(key)) {
+          reported.add(key);
+          // Rotate the chain so it starts at the smallest id: the message and
+          // anchor path stay deterministic regardless of traversal order.
+          const anchorId = cycle.reduce((a, b) => (a < b ? a : b));
+          const at = cycle.indexOf(anchorId);
+          const chain = [...cycle.slice(at), ...cycle.slice(0, at)];
+          const anchor = byId.get(anchorId);
+          if (anchor) {
+            push(
+              errors,
+              anchor.relPath,
+              `dependency cycle: ${chain.join(" -> ")}`,
+              "DEPENDENCY_CYCLE",
+            );
+          }
+        }
+      } else if (state === undefined) {
+        visit(dep);
+      }
+    }
+    stack.pop();
+    color.set(id, "black");
+  };
+  for (const item of items) {
+    if (!color.has(item.id)) visit(item.id);
+  }
+}
+
 export function runValidate(opts: ValidateOptions): ValidateResult {
   const tasksDir = findTasksDir(opts.cwd);
   const root = repoRootFromTasks(tasksDir);
@@ -162,7 +233,7 @@ export function runValidate(opts: ValidateOptions): ValidateResult {
     for (const issue of loaded.issues) {
       push(errors, rel, issue.message, issue.code);
     }
-    const reserved = new Set(["order", "rank", "depends_on", "blocked_by", "priority", "estimate"]);
+    const reserved = new Set(["order", "rank", "blocked_by", "priority", "estimate"]);
     for (const key of loaded.unknownKeys) {
       if (reserved.has(key)) {
         push(errors, rel, `reserved frontmatter key '${key}' is invalid in v0`, "RESERVED_KEY");
@@ -261,6 +332,8 @@ export function runValidate(opts: ValidateOptions): ValidateResult {
       push(errors, posixRel(root, dir), `missing required index ${name}.md`, "MISSING_INDEX");
     }
   }
+
+  checkDependencies(items, byId, errors);
 
   for (const item of items) {
     if (item.type !== "story") continue;

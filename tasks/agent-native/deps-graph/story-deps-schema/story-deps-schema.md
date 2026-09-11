@@ -1,8 +1,10 @@
 ---
 type: story
-status: todo
+status: in_progress
 id: story-deps-schema
 title: Dependency graph schema (v3)
+assignee: Arggon
+branch: feat/story-deps-schema
 parent: deps-graph
 labels: []
 created: "2026-09-11"
@@ -21,5 +23,12 @@ Dependency storage and validation is the kernel half of the graph. Fields stay s
 
 ## Acceptance
 
-- [ ] `depends_on` accepted on all types, `validate` rejects unknown ids, self-references and cycles
-- [ ] Convention v3 + JSON contract documented (task-deps-schema-docs)
+- [x] `depends_on` accepted on all types, `validate` rejects unknown ids, self-references and cycles
+- [x] Convention v3 + JSON contract documented (task-deps-schema-docs)
+
+## Notes
+
+- Implemented in feat/story-deps-schema (task-deps-schema-kernel + task-deps-schema-docs).
+- **Parsing is unconditional, not version-gated** (deviation from spec-deps-001 §2 wording "the field is ignored in v0-v2 trees"): `depends_on` parses on every tree regardless of the `tasks/.convention.yml` version, mirroring how `branch` (v1) and the `milestone` prototype shipped. Parsing is additive, so v0-v2 trees without the field load and validate exactly as before (covered by tests); trees that adopt the field early are legal too. What v3 changes: the field becomes official (no `UNKNOWN_KEY`/`RESERVED_KEY` findings), `init` scaffolds `version: 3`, and `validate` gains the graph rules.
+- `blocked_by` stays a computed inverse view; the key remains reserved (never stored).
+- Semantics stay advisory-only per ADR 0004: dependencies never block updates; they gate suggestions/queries later (story-deps-queries).
