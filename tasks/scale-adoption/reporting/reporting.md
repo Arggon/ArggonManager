@@ -1,6 +1,6 @@
 ---
 type: epic
-status: todo
+status: done
 id: reporting
 title: Progress reporting
 parent: scale-adoption
