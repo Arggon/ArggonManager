@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-board-drag-drop
 title: Drag-and-drop status moves on the web board
 assignee: Arggon
