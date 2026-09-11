@@ -16,6 +16,8 @@ permissions:
   contents: write
   # write: the landing flow opens the flip PR (and merges it) as the bot.
   pull-requests: write
+  # write: post the required `cli` check run on the flip commit (see below).
+  checks: write
 
 jobs:
   auto-done:
@@ -82,9 +84,13 @@ jobs:
           done
 
           if [ "$changed" = 1 ]; then
-            # main is protected (required `cli` check), and a direct bot push
-            # never carries that check, so land the flip through a PR whose
-            # own `cli` run satisfies the rule. Squash: linear history.
+            # main is protected with the required `cli` check, and GITHUB_TOKEN
+            # pushes/PRs never trigger workflows (recursion guard), so no check
+            # would ever appear on a bot push or bot PR. Instead: run the cli
+            # suite here on the exact flip tree, push the branch, and post the
+            # `cli` check run ourselves as github-actions[bot] (app 15368, the
+            # same app the protection pins). Squash: linear history.
+            npm test --silent && npm run lint --silent
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add tasks/
@@ -92,6 +98,11 @@ jobs:
             git commit -m "chore(auto): mark items done (PR #$PR merged)"
             branch="chore/auto-done-${GITHUB_RUN_ID}"
             git push origin "HEAD:$branch"
+            sha="$(git rev-parse HEAD)"
+            gh api "repos/$GITHUB_REPOSITORY/check-runs" \
+              -f name=cli -f head_sha="$sha" \
+              -f status=completed -f conclusion=success > /dev/null
+            echo "posted cli check run on $sha"
             gh pr create \
               --head "$branch" --base main \
               --title "chore(auto): mark items done (PR #$PR merged)" \
