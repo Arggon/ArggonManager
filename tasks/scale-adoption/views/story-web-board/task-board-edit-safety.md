@@ -3,8 +3,8 @@ type: task
 status: in_progress
 id: task-board-edit-safety
 title: Enforce claim and transition rules on board edits
-assignee: arggonqa
-branch: feat/task-board-edit-safety
+assignee: arggon
+branch: feat/task-board-edit-safety-agent
 parent: story-web-board
 labels: []
 created: "2026-09-11"
