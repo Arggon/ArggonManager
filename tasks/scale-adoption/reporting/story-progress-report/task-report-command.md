@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-report-command
 title: Add report command with per-container counts
 assignee: arggondev
@@ -18,6 +18,10 @@ Aggregate leaf statuses up the tree for display only.
 
 ## Acceptance
 
-- [ ] Counts per status per container, grouped by epic
-- [ ] `--json` mirrors the table exactly
-- [ ] Handles empty containers and cancelled children explicitly
+- [x] Counts per status per container, grouped by epic
+- [x] `--json` mirrors the table exactly
+- [x] Handles empty containers and cancelled children explicitly
+
+## Notes
+
+Closed by @Arggon (authorized): work landed via PR #65; item left stale in `in_progress`.
