@@ -36,6 +36,7 @@ describe("toContractWorkItem", () => {
       updated: "2026-09-03",
       path: "tasks/launch-mvp/auth/story-login/task-rate-limit.md",
       blocked_reason: null,
+      milestone: null,
     });
   });
 

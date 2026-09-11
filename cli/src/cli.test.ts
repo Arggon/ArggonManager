@@ -232,6 +232,7 @@ describe("CLI --json", () => {
       updated: expect.any(String),
       path: "tasks/launch-mvp/auth/auth.md",
       blocked_reason: null,
+      milestone: null,
     });
   });
 

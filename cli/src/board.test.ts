@@ -26,6 +26,7 @@ function item(overrides: Partial<WorkItem> & Pick<WorkItem, "id" | "type" | "sta
     updated: "2026-09-07",
     path: `tasks/x/${overrides.id}.md`,
     blocked_reason: null,
+    milestone: null,
     ...overrides,
   };
 }

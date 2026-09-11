@@ -512,17 +512,27 @@ program
     "output HTML file (default: board.html at the repo root; relative --out resolves from cwd)",
   )
   .option("--github", "overlay live GitHub PR state on cards with a branch (read-only)", false)
+  .option(
+    "--group-by <field>",
+    "prototype (ADR 0003): group cards within each column by milestone",
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { out?: string; github?: boolean; json?: boolean }) => {
+  .action((opts: { out?: string; github?: boolean; groupBy?: string; json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
-      const result = runBoard({ cwd: process.cwd(), out: opts.out, github: opts.github });
+      const result = runBoard({
+        cwd: process.cwd(),
+        out: opts.out,
+        github: opts.github,
+        groupBy: opts.groupBy,
+      });
       if (json) {
         successJson(
           "board",
           {
             path: displayPath(result.outPath, process.cwd()),
             itemCount: result.itemCount,
+            ...(result.groupBy ? { groupBy: result.groupBy } : {}),
             ...(opts.github ? { github: true, prCount: result.prCount } : {}),
           },
           readConventionVersion(result.root),
@@ -530,7 +540,7 @@ program
         return;
       }
       console.log(
-        `arggon board: wrote ${displayPath(result.outPath, process.cwd())} (${result.itemCount} item(s)${opts.github ? `, ${result.prCount} PR(s) linked` : ""})`,
+        `arggon board: wrote ${displayPath(result.outPath, process.cwd())} (${result.itemCount} item(s)${result.groupBy ? `, grouped by ${result.groupBy}` : ""}${opts.github ? `, ${result.prCount} PR(s) linked` : ""})`,
       );
       console.log(
         "  Open it in a browser. Re-run after tree changes — tasks/ remains the source of truth.",
