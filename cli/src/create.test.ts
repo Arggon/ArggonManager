@@ -178,7 +178,7 @@ describe("create", () => {
   it("rejects duplicate ids against an existing tree", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-create-sample-"));
     runInit({ dir, force: false });
-    cpSync(join(process.cwd(), "tasks/launch-mvp"), join(dir, "tasks/launch-mvp"), {
+    cpSync(join(process.cwd(), "fixtures/tasks-valid/tasks/launch-mvp"), join(dir, "tasks/launch-mvp"), {
       recursive: true,
     });
     expect(() => runCreate({ cwd: dir, type: "initiative", title: "Launch MVP" })).toThrow(
