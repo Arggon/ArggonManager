@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-docs-promise-node-20-but-tests-need-node-22
 title: Docs promise Node 20+ but tests need Node 22
 assignee: arggon
