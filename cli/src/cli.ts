@@ -156,40 +156,53 @@ program
     "--assignee <login>",
     "exact assignee login; @me resolves via GITHUB_USER, then GITHUB_ACTOR, then `gh api user`",
   )
+  .option(
+    "--filter <expr>",
+    'compact filter (e.g. "status:todo !label:security"); fields status, type, assignee, label, parent; ! negates; quotes allow spaces',
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { status?: string; type?: string; assignee?: string; json?: boolean }) => {
-    const json = jsonEnabled(opts);
-    try {
-      const result = runList({
-        cwd: process.cwd(),
-        status: opts.status,
-        type: opts.type,
-        assignee: opts.assignee,
-      });
-      if (json) {
-        successJson(
-          "list",
-          { items: result.items.map((item) => toContractWorkItem(item, result.root)) },
-          readConventionVersion(result.root),
-        );
-        return;
-      }
-      process.stdout.write(formatListTable(result.items));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (json) {
-        failJson({
-          command: "list",
-          message,
-          code: "LIST_FAILED",
-          conventionVersion: readConventionVersion(process.cwd()),
+  .action(
+    (opts: {
+      status?: string;
+      type?: string;
+      assignee?: string;
+      filter?: string;
+      json?: boolean;
+    }) => {
+      const json = jsonEnabled(opts);
+      try {
+        const result = runList({
+          cwd: process.cwd(),
+          status: opts.status,
+          type: opts.type,
+          assignee: opts.assignee,
+          filter: opts.filter,
         });
-        return;
+        if (json) {
+          successJson(
+            "list",
+            { items: result.items.map((item) => toContractWorkItem(item, result.root)) },
+            readConventionVersion(result.root),
+          );
+          return;
+        }
+        process.stdout.write(formatListTable(result.items));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (json) {
+          failJson({
+            command: "list",
+            message,
+            code: "LIST_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
+        console.error(`arggon list: ${message}`);
+        process.exitCode = 1;
       }
-      console.error(`arggon list: ${message}`);
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 program
   .command("update")
@@ -513,7 +526,7 @@ program
         }
       } else {
         console.log(
-          `arggon sync (${result.mode}): ${result.exit_code === 0 ? "in sync" : "sync needed"}`
+          `arggon sync (${result.mode}): ${result.exit_code === 0 ? "in sync" : "sync needed"}`,
         );
         for (const id of result.matched) {
           console.log(`  matched:   ${id}`);
@@ -536,7 +549,9 @@ program
           console.log(`  filled:    ${id} -> ${branch}`);
         }
         if (result.suggestions.length > 0 && result.mode === "check") {
-          console.log(`next: arggon sync --write fills ${result.suggestions.length} empty branch field(s)`);
+          console.log(
+            `next: arggon sync --write fills ${result.suggestions.length} empty branch field(s)`,
+          );
         }
         if (result.errors.length > 0) {
           console.error(`  errors: ${result.errors.join("; ")}`);

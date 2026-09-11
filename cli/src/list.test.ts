@@ -314,6 +314,40 @@ branch: feat/a
     expect(formatListTable(todos)).toMatch(/task-rate-limit\s+task\s+todo\s+-\s+/);
   });
 
+  it("applies --filter expressions with AND, negation, label, and parent", () => {
+    const dir = makeTree();
+    const { items: todos } = runList({ cwd: dir, filter: "status:todo type:task" });
+    expect(todos.map((i) => i.id)).toEqual(["task-h1-only", "task-rate-limit"]);
+
+    const { items: notDone } = runList({ cwd: dir, filter: "type:task !status:done" });
+    expect(notDone.map((i) => i.id)).toEqual(["task-h1-only", "task-mine", "task-rate-limit"]);
+
+    const { items: labeled } = runList({ cwd: dir, filter: "label:phase-1" });
+    expect(labeled.map((i) => i.id)).toEqual(["launch-mvp"]);
+
+    const { items: children } = runList({ cwd: dir, filter: "parent:story-login" });
+    expect(children.map((i) => i.id).sort()).toEqual([
+      "bug-empty-password-500",
+      "task-h1-only",
+      "task-mine",
+      "task-no-title",
+      "task-rate-limit",
+    ]);
+
+    const { items: mine } = runList(
+      { cwd: dir, filter: "assignee:@me" },
+      { env: { ...process.env, GITHUB_USER: "me-user" } },
+    );
+    expect(mine.map((i) => i.id)).toEqual(["task-mine"]);
+  });
+
+  it("rejects bad filter expressions with usage errors", () => {
+    const dir = makeTree();
+    expect(() => runList({ cwd: dir, filter: "title:foo" })).toThrow(/unknown filter field/);
+    expect(() => runList({ cwd: dir, filter: "status:bogus" })).toThrow(/unknown status/);
+    expect(() => runList({ cwd: dir, filter: "type:bogus" })).toThrow(/unknown type/);
+  });
+
   it("fails on invalid items with file context", () => {
     const dir = makeTree();
     write(

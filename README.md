@@ -143,11 +143,13 @@ arggon list --status todo
 arggon list --type bug --assignee @me
 arggon list --json
 arggon --json list --type task --status in_progress
+arggon list --filter "status:todo !label:security"
 ```
 
 - --status <status>: exact v0 status (`todo`, `in_progress`, `blocked`, `done`, `cancelled`)
 - --type <type>: exact v0 type (`initiative`, `epic`, `story`, `task`, `bug`)
 - --assignee <login>: exact assignee. Special @me resolves via `GITHUB_USER`, then `GITHUB_ACTOR`, then `gh api user -q .login`
+- --filter <expr>: compact filter ANDed with the flags (fields `status`, `type`, `assignee`, `label`, `parent`; `!` negates; quotes allow spaces, e.g. `assignee:"Jane Doe"`); unknown fields are usage errors
 - --json: one compact JSON object on stdout (envelope v1: `ok`, `schemaVersion: 1`, `conventionVersion`, `command: "list"`, `items: WorkItem[]`); failures emit `ok: false` with `code: "LIST_FAILED"`
 
 Empty results exit `0` (`items: []` with `--json`). Missing `tasks/`, invalid enums, unresolvable @me, or unreadable work-item files exit non-zero.

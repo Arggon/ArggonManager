@@ -1,9 +1,10 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-filter-parser
 title: Parse filter expressions
 assignee: arggondev
+branch: feat/task-filter-parser
 parent: story-filter-language
 labels: []
 created: "2026-09-11"

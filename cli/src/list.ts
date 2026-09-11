@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { parseFilter, matchesPredicate, type FilterPredicate } from "./filter.js";
 import { isItemType, ITEM_TYPES } from "./ids.js";
 import { loadItems, type WorkItem } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
@@ -10,6 +11,8 @@ export type ListOptions = {
   status?: string;
   type?: string;
   assignee?: string;
+  /** Compact expression (`status:todo !label:security`); ANDs with the flags above. */
+  filter?: string;
 };
 
 export type ListDeps = {
@@ -56,9 +59,10 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
   }
 
   const env = deps.env ?? process.env;
+  const resolveMe = deps.resolveMe ?? (() => resolveCurrentLogin(env));
   let assigneeFilter = opts.assignee;
   if (assigneeFilter === "@me") {
-    const login = (deps.resolveMe ?? (() => resolveCurrentLogin(env)))();
+    const login = resolveMe();
     if (!login) {
       throw new Error(
         "could not resolve @me (set GITHUB_USER or GITHUB_ACTOR, or authenticate gh: gh api user)",
@@ -67,12 +71,38 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
     assigneeFilter = login;
   }
 
+  // Expression filters use the same predicates (and the same errors) as the flags.
+  let predicates: FilterPredicate[] = [];
+  if (opts.filter !== undefined) {
+    predicates = parseFilter(opts.filter);
+    for (const pred of predicates) {
+      if (pred.field === "type" && !isItemType(pred.value)) {
+        throw new Error(`unknown type "${pred.value}". Allowed: ${ITEM_TYPES.join(", ")}`);
+      }
+      if (pred.field === "status" && !isStatus(pred.value)) {
+        throw new Error(`unknown status "${pred.value}". Allowed: ${STATUSES.join(", ")}`);
+      }
+      if (pred.field === "assignee" && pred.value === "@me") {
+        const login = resolveMe();
+        if (!login) {
+          throw new Error(
+            "could not resolve @me (set GITHUB_USER or GITHUB_ACTOR, or authenticate gh: gh api user)",
+          );
+        }
+        pred.value = login;
+      }
+    }
+  }
+
   const tasksDir = findTasksDir(opts.cwd);
   const items = loadItems(tasksDir)
     .filter((item) => {
       if (opts.type !== undefined && item.type !== opts.type) return false;
       if (opts.status !== undefined && item.status !== opts.status) return false;
       if (assigneeFilter !== undefined && (item.assignee ?? null) !== assigneeFilter) return false;
+      for (const pred of predicates) {
+        if (!matchesPredicate(item, pred)) return false;
+      }
       return true;
     })
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
