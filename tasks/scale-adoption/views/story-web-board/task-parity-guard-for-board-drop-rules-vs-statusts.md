@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-parity-guard-for-board-drop-rules-vs-statusts
 title: Parity guard for board drop rules vs status.ts
+assignee: Arggon
 parent: story-web-board
 labels: []
 created: "2026-09-11"
@@ -30,9 +31,9 @@ add a parity test that fails on drift.
 
 ## Acceptance
 
-- [ ] The board's drop rules are provably 1:1 with `status.ts` + `update.ts` (generated from source, or a parity test that fails on drift)
-- [ ] A deliberate divergence in either copy makes the suite fail
-- [ ] `npm test` passes and the board still refuses illegal drops with the CLI rule message
+- [x] The board's drop rules are provably 1:1 with `status.ts` + `update.ts` (board-parity.test.ts: embedded page script executed in a vm sandbox gives identical verdicts to the TS function over the full transition matrix, and the TS function's accept/refuse matches runUpdate on real trees)
+- [x] A deliberate divergence in either copy makes the suite fail (source-equality check catches edits to the embedded function; the verdict matrix catches rule edits in either copy)
+- [x] `npm test` passes and the board still refuses illegal drops with the CLI rule message (341 tests green; serve test asserts the exact claim-conflict message from the CLI)
 
 ## Notes
 

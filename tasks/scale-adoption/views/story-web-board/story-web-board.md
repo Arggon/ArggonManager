@@ -1,8 +1,10 @@
 ---
 type: story
-status: todo
+status: done
 id: story-web-board
 title: Local web board
+assignee: Arggon
+branch: feat/story-web-board
 parent: views
 labels: [viewer]
 created: "2026-09-11"
@@ -16,6 +18,6 @@ updated: "2026-09-11"
 
 ## Acceptance
 
-- [ ] `arggon board --serve` reflects tree changes without manual refresh
-- [ ] Drag-and-drop performs only legal v0 transitions
-- [ ] Static export (`arggon board`) keeps working unchanged
+- [x] `arggon board --serve` reflects tree changes without manual refresh (fs watcher on tasks/ + SSE reload channel; covered by board-serve.test.ts)
+- [x] Drag-and-drop performs only legal v0 transitions (parity guard proves embedded rules == TS evaluateDrop == kernel runUpdate; server route runs runUpdate)
+- [x] Static export (`arggon board`) keeps working unchanged (the SSE client is injected only in serve mode; existing board tests untouched)
