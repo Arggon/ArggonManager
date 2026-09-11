@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-auto-done-on-merge
 title: Auto-done on merge
 assignee: Arggon
