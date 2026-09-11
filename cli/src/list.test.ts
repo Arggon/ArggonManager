@@ -218,6 +218,7 @@ describe("runList", () => {
       blocked_reason: null,
       milestone: null,
       depends_on: [],
+      claimed_at: null,
     });
   });
 

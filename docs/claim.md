@@ -27,9 +27,24 @@ arggon update <id> --status todo
 arggon update <id> --status in_progress --assignee <you>
 ```
 
-## Stale claims
+## Stale claims (claim leases)
 
-Optional later: warn when `updated` is older than N days. **Deferred** — not enforced in v0.
+Every claim now carries a soft lease: the CLI maintains `claimed_at` (ISO date-time) — set when a claimable item is claimed, cleared when the claim is released. Staleness is **advisory reporting**, never enforcement:
+
+```bash
+arggon list --stale --older-than 7d   # claimed items whose lease is older than 7d
+```
+
+Items claimed before `claimed_at` existed count as stale (no lease recorded).
+
+Reclaiming a stale claim is a **human-only supervised takeover**:
+
+```bash
+arggon update <id> --steal --reason "owner left; taking over" --assignee <you>
+```
+
+- Requires a non-empty `--reason` (recorded in the item body as a dated note) and `--assignee <you>`.
+- Agents are refused (same playbook rule as `--force`) — they unclaim-and-reclaim through coordination instead, or pick another item.
 
 ## Claiming (playbook)
 

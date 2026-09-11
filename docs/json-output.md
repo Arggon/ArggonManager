@@ -76,6 +76,7 @@ Stable fields aligned with convention v0 plus the additive `branch` (v1) and `mi
 | `blocked_reason` | `string` \| `null`                                            |                                                                             |
 | `milestone`      | `string` \| `null`                                            | Prototype per ADR 0003 (official in v3); additive within `schemaVersion: 1` |
 | `depends_on`     | `string[]`                                                    | Ids this item waits for (v3, ADR 0004); empty = none. Additive within `schemaVersion: 1`; `blocked_by` is the computed inverse and is never stored |
+| `claimed_at`     | `string` \| `null`                                          | Soft lease: ISO date-time set when a claimable item is claimed (`in_progress` + assignee, via `update`/`start`) and cleared when the claim is released. Reporting only — never gates a transition. Additive within `schemaVersion: 1`; `null` for items claimed before the field existed |
 
 Enums match [`docs/convention.md`](./convention.md) v0.
 
@@ -128,6 +129,8 @@ Snippets are extracted from the playbook at runtime; failures use `error.code: "
 | `items` | `WorkItem[]` | Lexicographic by `id`, per convention |
 
 Filters compose with the same engine as the flags. The v3 dependency predicates are `depends-on:<id>` (items whose `depends_on` contains `<id>`) and `blocked-by:<id>` (computed inverse — items that `<id>` waits for); both AND and negate (`!`) like the rest.
+
+Stale-claim report: `arggon list --stale --older-than <duration>` (`<number><d|h|m>`, e.g. `7d`, `12h`, `30m`) limits the result to claimed items (in_progress + assignee) whose `claimed_at` is older than the threshold relative to now. It composes with the other filters; `--stale` requires `--older-than` (and vice versa) and invalid durations fail with `LIST_FAILED`. Claims from before `claimed_at` existed count as stale (advisory reporting only — staleness never blocks an update).
 
 ### `validate`
 

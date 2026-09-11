@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-stale-detect
 title: Stale-claim detection and supervised steal
+assignee: Arggon
 parent: story-claim-leases
 labels: []
 created: "2026-09-11"
@@ -23,5 +24,5 @@ Staleness reporting and the supervised escape hatch.
 
 ## Acceptance
 
-- [ ] `arggon list --stale --older-than <duration>` filters claimed items past the threshold
-- [ ] `arggon update <id> --steal --reason "..."` is human-only (agent callers refused, like `--force`) and writes the reason into the item body Notes
+- [x] `arggon list --stale --older-than <duration>` filters claimed items past the threshold
+- [x] `arggon update <id> --steal --reason "..."` is human-only (agent callers refused, like `--force`) and writes the reason into the item body Notes

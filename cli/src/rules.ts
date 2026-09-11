@@ -18,17 +18,25 @@ export type UpdateIntent = {
   requestedAssignee?: string;
   /** Request to steal an existing claim (CLI --force). */
   force?: boolean;
+  /** Request a supervised takeover of the current claim (CLI --steal; human-only). */
+  steal?: boolean;
 };
 
 /**
  * Validate one update against the transition table and the playbook rules.
- * Human callers keep the full CLI semantics (--force steal, manual reopen);
- * agent callers (the MCP layer) can do neither.
+ * Human callers keep the full CLI semantics (--force steal, --steal takeover,
+ * manual reopen); agent callers (the MCP layer) can do neither.
  */
 export function assertUpdateRules(intent: UpdateIntent, caller: CallerKind): void {
   if (caller === "agent" && intent.force) {
     throw new Error(
       "agents must not steal a claim; --force is a human-only escape hatch (docs/agents.md)",
+    );
+  }
+
+  if (caller === "agent" && intent.steal) {
+    throw new Error(
+      "agents must not steal a claim; --steal is a human-only supervised escape hatch (docs/agents.md)",
     );
   }
 
@@ -53,12 +61,14 @@ export function assertUpdateRules(intent: UpdateIntent, caller: CallerKind): voi
     );
   }
 
-  // Claim steal guard: refuse reassignment unless --force (docs/claim.md).
+  // Claim steal guard: refuse reassignment unless --force or the supervised
+  // human-only --steal takeover (docs/claim.md).
   if (
     isClaimed(intent.type, intent.currentStatus, intent.currentAssignee) &&
     intent.requestedAssignee !== undefined &&
     intent.requestedAssignee !== intent.currentAssignee &&
-    !intent.force
+    !intent.force &&
+    !intent.steal
   ) {
     throw new Error(
       `claim conflict: '${intent.id}' is claimed by '${intent.currentAssignee}' (status in_progress). ` +

@@ -62,7 +62,13 @@ async function mcpCall(
 }
 
 function normalize(envelope: Envelope, dir: string): Envelope {
-  return JSON.parse(JSON.stringify(envelope).replaceAll(dir, "<root>")) as Envelope;
+  // claimed_at leases are stamped per invocation (ms precision), so parity
+  // compares their presence/shape rather than the exact instant.
+  return JSON.parse(
+    JSON.stringify(envelope)
+      .replaceAll(dir, "<root>")
+      .replace(/"claimed_at":"[^"]*"/g, '"claimed_at":"<lease>"'),
+  ) as Envelope;
 }
 
 function seedTree(dir: string): void {

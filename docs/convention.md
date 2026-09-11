@@ -122,6 +122,7 @@ Every work item file begins with YAML frontmatter between `---` fences.
 | `updated`        | no          | string          | Quoted `YYYY-MM-DD` only in v0                                                                                                      |
 | `blocked_reason` | conditional | string          | **Required non-empty** when `status: blocked`; must be **absent or empty** otherwise                                                |
 | `depends_on`     | no          | list of strings | Dependency graph (v3 field, ADR 0004): ids this item waits for; empty/omitted = none. See [Dependency graph (v3)](#dependency-graph-v3) |
+| `claimed_at`     | no          | string          | Soft claim lease (ISO date-time), written/cleared by the CLI on claim state changes; reporting only. See [Claim lease](#claim-lease-claimed_at) |
 
 ### Defaults when creating
 
@@ -237,7 +238,17 @@ Claim applies **only** to claimable types: **`story` | `task` | `bug`**.
 
 **Claim** = (`type` ∈ {story, task, bug}) ∧ `assignee` set ∧ `status: in_progress`.
 
-Concurrency / conflict handling (refuse steal unless `--force`, unclaim recovery, stale deferred): see [`claim.md`](claim.md).
+### Claim lease (`claimed_at`)
+
+Claims carry a **soft lease**: an ISO date-time `claimed_at` maintained by the CLI (additive field; treated like the `milestone`/`depends_on` prototype keys — parsed unconditionally, never rejected, ignored by older tools).
+
+- **Set** automatically whenever a claimable item is claimed — transitions to `in_progress` with an assignee via `arggon update` or `arggon start` — and refreshed when the claimant changes.
+- **Cleared** automatically when the item leaves the claimed state: unclaim (`in_progress` → `todo`), terminal states, or `blocked` (a new lease starts on re-claim).
+- **Reporting only**: `claimed_at` never gates a transition and `validate` imposes no constraint on it. Items claimed before the field existed simply have no `claimed_at`.
+- **Staleness is advisory**: `arggon list --stale --older-than <duration>` (`<number><d|h|m>`, e.g. `7d`) surfaces claimed items whose lease started before the threshold. It filters reporting only — it never blocks work.
+- **Only humans may steal**: `arggon update <id> --steal --reason "<why>" --assignee <you>` is a supervised takeover of a claimed item. It requires a non-empty reason, refreshes `claimed_at`, and appends a dated note (`> stolen <date> by <you>: <reason>`) to the item body. Agent callers are refused (`docs/agents.md`), exactly like `--force`.
+
+Concurrency / conflict handling (refuse steal unless `--force`, unclaim recovery, stale reporting): see [`claim.md`](claim.md).
 
 ### Unclaim (v0 CLI `update` default)
 

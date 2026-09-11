@@ -9,7 +9,7 @@ import {
 import { isItemType, ITEM_TYPES } from "./ids.js";
 import { loadItems, type WorkItem } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
-import { isStatus, STATUSES } from "./status.js";
+import { isStatus, isClaimed, STATUSES } from "./status.js";
 
 export type ListOptions = {
   /** Start dir; tasks/ is located with walk-up (same as create). */
@@ -21,6 +21,12 @@ export type ListOptions = {
   filter?: string;
   /** Saved view name (`x-views` in tasks/.convention.yml); ANDs with the flags and --filter. */
   view?: string;
+  /** Limit to claimed items whose claimed_at is older than `olderThan` (or missing). */
+  stale?: boolean;
+  /** Stale threshold: `<number><d|h|m>` (e.g. 7d, 12h, 30m); required with --stale. */
+  olderThan?: string;
+  /** Clock override for deterministic reporting/tests; defaults to now. */
+  now?: Date;
 };
 
 export type ListDeps = {
@@ -53,6 +59,21 @@ export function resolveCurrentLogin(env: NodeJS.ProcessEnv = process.env): strin
   }
 }
 
+/** Stale-threshold durations: number + unit (d/h/m), e.g. 7d, 12h, 30m. */
+const OLDER_THAN_PATTERN = /^(\d+)([dhm])$/;
+const UNIT_MS: Record<string, number> = { d: 86_400_000, h: 3_600_000, m: 60_000 };
+
+/** Parse an `--older-than` duration into milliseconds; invalid input fails with an actionable error. */
+export function parseOlderThan(raw: string): number {
+  const match = OLDER_THAN_PATTERN.exec(raw.trim());
+  if (!match) {
+    throw new Error(
+      `invalid --older-than duration "${raw}" (expected <number><d|h|m>, e.g. 7d, 12h, 30m)`,
+    );
+  }
+  return Number(match[1]) * UNIT_MS[match[2]];
+}
+
 /**
  * Load work items from the shared kernel and apply AND filters.
  * Pure data: no console output (the CLI prints). Throws on bad
@@ -64,6 +85,16 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
   }
   if (opts.status !== undefined && !isStatus(opts.status)) {
     throw new Error(`unknown status "${opts.status}". Allowed: ${STATUSES.join(", ")}`);
+  }
+  let staleMs: number | undefined;
+  if (opts.stale === true || opts.olderThan !== undefined) {
+    if (opts.stale !== true) {
+      throw new Error("--older-than requires --stale (list stale claims)");
+    }
+    if (opts.olderThan === undefined) {
+      throw new Error('--stale requires --older-than <duration> (e.g. "7d", "12h", "30m")');
+    }
+    staleMs = parseOlderThan(opts.olderThan);
   }
 
   const env = deps.env ?? process.env;
@@ -126,11 +157,20 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
   // tree, so it needs the full (unfiltered) item set as its index.
   const allItems = loadItems(tasksDir);
   const blockedByIndex = buildBlockedByIndex(allItems);
+  const nowMs = (opts.now ?? new Date()).getTime();
   const items = allItems
     .filter((item) => {
       if (opts.type !== undefined && item.type !== opts.type) return false;
       if (opts.status !== undefined && item.status !== opts.status) return false;
       if (assigneeFilter !== undefined && (item.assignee ?? null) !== assigneeFilter) return false;
+      // Stale claims: claimed items whose soft lease started before the
+      // threshold. Items claimed before claimed_at existed count as stale.
+      if (staleMs !== undefined) {
+        if (!isClaimed(item.type, item.status, item.assignee)) return false;
+        const claimedMs = item.claimedAt ? Date.parse(item.claimedAt) : Number.NaN;
+        const isStale = Number.isNaN(claimedMs) || nowMs - claimedMs > staleMs;
+        if (!isStale) return false;
+      }
       for (const pred of predicates) {
         if (!matchesPredicate(item, pred, blockedByIndex)) return false;
       }
