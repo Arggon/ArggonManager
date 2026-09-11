@@ -18,6 +18,6 @@ Moving a card between columns maps to `arggon update <id> --status <s>`.
 
 ## Acceptance
 
-- [ ] Drops map 1:1 to CLI status transitions; refusal shows the rule that failed
-- [ ] Optimistic UI reverts when the update call fails
-- [ ] Works with claimable and container types
+- [x] Drops map 1:1 to CLI status transitions; refusal shows the rule that failed
+- [x] Optimistic UI reverts when the update call fails
+- [x] Works with claimable and container types
