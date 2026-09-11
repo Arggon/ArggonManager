@@ -25,7 +25,7 @@ Thanks for helping with ArggonManager. Work is **convention-first**: the repo (`
 
 ## Run the CLI locally
 
-Requires **Node.js 20+**. From the repo root:
+Requires **Node.js 22.12+** (needed by vitest 5 in the dev toolchain; `engines` enforces it). From the repo root:
 
 - `npm install`
 - `npm run arggon -- hello`
