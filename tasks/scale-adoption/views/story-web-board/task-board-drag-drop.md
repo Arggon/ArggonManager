@@ -1,8 +1,10 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-board-drag-drop
 title: Drag-and-drop status moves on the web board
+assignee: Arggon
+branch: feat/task-board-drag-drop
 parent: story-web-board
 labels: []
 created: "2026-09-11"
