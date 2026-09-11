@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-board-edit-safety
 title: Enforce claim and transition rules on board edits
 assignee: arggon
