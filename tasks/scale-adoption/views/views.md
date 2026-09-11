@@ -1,6 +1,6 @@
 ---
 type: epic
-status: todo
+status: done
 id: views
 title: Views and filtering
 parent: scale-adoption

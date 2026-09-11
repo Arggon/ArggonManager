@@ -1,6 +1,6 @@
 ---
 type: initiative
-status: todo
+status: done
 id: scale-adoption
 title: "Scale adoption: views, agent loop, reporting"
 labels: [growth]

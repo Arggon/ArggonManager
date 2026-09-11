@@ -1,6 +1,6 @@
 ---
 type: epic
-status: todo
+status: done
 id: agent-loop
 title: Agent-first workflow
 parent: scale-adoption
