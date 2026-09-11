@@ -162,6 +162,10 @@ program
     "--filter <expr>",
     'compact filter (e.g. "status:todo !label:security"); fields status, type, assignee, label, parent; ! negates; quotes allow spaces',
   )
+  .option(
+    "--view <name>",
+    'saved view name from tasks/.convention.yml x-views; ANDed with the flags and --filter',
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (opts: {
@@ -169,6 +173,7 @@ program
       type?: string;
       assignee?: string;
       filter?: string;
+      view?: string;
       json?: boolean;
     }) => {
       const json = jsonEnabled(opts);
@@ -179,6 +184,7 @@ program
           type: opts.type,
           assignee: opts.assignee,
           filter: opts.filter,
+          view: opts.view,
         });
         if (json) {
           successJson(

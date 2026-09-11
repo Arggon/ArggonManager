@@ -310,6 +310,21 @@ Omit = `0`. Layout is a tree concern. Per-file schema is optional and defaults t
 
 `branch_patterns` maps each work-item type to a branch-name template with `{id}` (required) and `{type}` (optional) placeholders. Missing keys fall back to the defaults above (`feat/{id}` everywhere, `fix/{id}` for bugs); unknown top-level keys are ignored. `arggon branch <id>` resolves the item's pattern (or its recorded `branch` field) and runs `git checkout -b`. Malformed patterns (missing `{id}`, unknown type, non-mapping section) fail `validate` with `INVALID_BRANCH_PATTERN`.
 
+### Saved views (`x-views`)
+
+`x-views` is the official namespaced extension for named list filters (Linear-style saved views). It is a mapping of view name → filter expression using the same compact syntax as `arggon list --filter`:
+
+```yaml
+version: 0
+x-views:
+  my-open-bugs: "type:bug status:todo !assignee:someone"
+  this-epic: "parent:cli"
+```
+
+- `arggon list --view <name>` resolves the expression and applies it ANDed with the explicit flags and `--filter`; `@me` inside a view resolves exactly like `list --assignee @me`.
+- Unknown view names fail with the list of known views; an empty `x-views` map fails for any name.
+- The key is namespaced (`x-*`), so older tools ignore it per the extension policy above; a scalar `x-views` value, an empty expression, or a duplicate view name is a parse error.
+
 ### Extension namespace
 
 - Official keys = the field table above.

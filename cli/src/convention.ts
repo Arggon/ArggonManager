@@ -40,6 +40,8 @@ export type ConventionConfig = {
   version: number;
   /** Per-type branch patterns; always complete (missing keys fall back to defaults). */
   branchPatterns: Record<ItemType, string>;
+  /** Named saved views (`x-views` extension key): view name -> filter expression. */
+  views: Record<string, string>;
 };
 
 function stripQuotes(value: string): string {
@@ -54,14 +56,16 @@ function stripQuotes(value: string): string {
 
 /**
  * Parse `tasks/.convention.yml` (line-oriented, no YAML dependency).
- * Unknown top-level keys are ignored for forward compatibility.
- * Throws with file context on malformed `branch_patterns`.
+ * Unknown top-level keys are ignored for forward compatibility;
+ * `x-views` is the official namespaced extension for saved views.
+ * Throws with file context on malformed `branch_patterns` or `x-views`.
  */
 export function parseConventionConfig(
   raw: string,
   sourcePath = "tasks/.convention.yml",
 ): ConventionConfig {
   const branchPatterns: Record<ItemType, string> = { ...DEFAULT_BRANCH_PATTERNS };
+  const views: Record<string, string> = {};
   let version = CONVENTION_VERSION_DEFAULT;
   let section: string | null = null;
 
@@ -84,7 +88,26 @@ export function parseConventionConfig(
           throw new Error(`${sourcePath}: 'branch_patterns' must be a mapping, one type per line`);
         }
         section = "branch_patterns";
+      } else if (key === "x-views") {
+        if (value !== "") {
+          throw new Error(`${sourcePath}: 'x-views' must be a mapping, one view per line`);
+        }
+        section = "x-views";
       }
+      continue;
+    }
+    if (section === "x-views") {
+      if (!key) {
+        throw new Error(`${sourcePath}: invalid x-views entry ${JSON.stringify(line)}`);
+      }
+      if (key in views) {
+        throw new Error(`${sourcePath}: duplicate view '${key}' in x-views`);
+      }
+      const expr = stripQuotes(value);
+      if (!expr) {
+        throw new Error(`${sourcePath}: empty expression for view '${key}'`);
+      }
+      views[key] = expr;
       continue;
     }
     if (section !== "branch_patterns") continue;
@@ -105,14 +128,18 @@ export function parseConventionConfig(
     branchPatterns[key] = pattern;
   }
 
-  return { version, branchPatterns };
+  return { version, branchPatterns, views };
 }
 
 /** Read and parse `<dir>/tasks/.convention.yml`. Missing file yields version 0 + defaults. */
 export function readConventionConfig(dir: string): ConventionConfig {
   const path = join(dir, "tasks/.convention.yml");
   if (!existsSync(path)) {
-    return { version: CONVENTION_VERSION_DEFAULT, branchPatterns: { ...DEFAULT_BRANCH_PATTERNS } };
+    return {
+      version: CONVENTION_VERSION_DEFAULT,
+      branchPatterns: { ...DEFAULT_BRANCH_PATTERNS },
+      views: {},
+    };
   }
   return parseConventionConfig(readFileSync(path, "utf8"), path);
 }

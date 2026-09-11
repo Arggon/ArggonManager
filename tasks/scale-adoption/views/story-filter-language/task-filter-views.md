@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-filter-views
 title: Named saved views for list
+assignee: Arggon
 parent: story-filter-language
 labels: []
 created: "2026-09-11"
@@ -16,6 +17,6 @@ Linear's saved views: name a filter once, reuse it forever. Store views under a 
 
 ## Acceptance
 
-- [ ] `list --view <name>` resolves from `tasks/.convention.yml` `x-views`
-- [ ] Explicit flags combine with the view filter (AND)
-- [ ] Unknown view name fails with the list of known views
+- [x] `list --view <name>` resolves from `tasks/.convention.yml` `x-views`
+- [x] Explicit flags combine with the view filter (AND)
+- [x] Unknown view name fails with the list of known views
