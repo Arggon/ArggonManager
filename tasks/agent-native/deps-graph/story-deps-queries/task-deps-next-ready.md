@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-deps-next-ready
 title: next --ready and dependency filters
+assignee: Arggon
 parent: story-deps-queries
 labels: []
 created: "2026-09-11"
@@ -23,6 +24,6 @@ Extend `next` ranking and the filter parser with dependency predicates.
 
 ## Acceptance
 
-- [ ] `next` skips items with open `depends_on` (they are not ready) and says so in `reason`
-- [ ] `next --ready` limits the pool to unblocked items; empty pool stays `suggestion: null`
-- [ ] Filter predicates `depends-on:`/`blocked-by:` compose with AND/! like the existing ones
+- [x] `next` skips items with open `depends_on` (they are not ready) and says so in `reason`
+- [x] `next --ready` limits the pool to unblocked items; empty pool stays `suggestion: null`
+- [x] Filter predicates `depends-on:`/`blocked-by:` compose with AND/! like the existing ones

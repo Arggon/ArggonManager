@@ -127,6 +127,8 @@ Snippets are extracted from the playbook at runtime; failures use `error.code: "
 | ------- | ------------ | ------------------------------------- |
 | `items` | `WorkItem[]` | Lexicographic by `id`, per convention |
 
+Filters compose with the same engine as the flags. The v3 dependency predicates are `depends-on:<id>` (items whose `depends_on` contains `<id>`) and `blocked-by:<id>` (computed inverse — items that `<id>` waits for); both AND and negate (`!`) like the rest.
+
 ### `validate`
 
 | Field      | Type      | Notes |
@@ -173,6 +175,9 @@ Failures use `error.code: "START_FAILED"` (unknown id, taken claim — never for
 | `suggestion.item`        | `WorkItem`       | Suggested unclaimed todo (claimable type, lexicographic by id) |
 | `suggestion.parentChain` | `string[]`       | Parent ids root-first                                          |
 | `suggestion.reason`      | `string`         | Why this item was chosen                                       |
+| `suggestion.blockedBy`   | `string[]`       | Additive (v3): open (non-terminal) dependency ids of the suggestion; empty when ready |
+
+Dependency-aware ranking (v3, [ADR 0004](adr/0004-milestone-deps-v3.md)): ready items — `depends_on` all `done`/`cancelled` — rank first (lexicographic within each group); `--ready` limits the pool to ready items only, in which case `blockedBy` is always empty. When the suggestion has open dependencies, `reason` names them. Dependencies are advisory: they gate suggestions and queries only, never `update`.
 
 Empty pool is success (`ok: true`, `suggestion: null`). Failures use `error.code: "NEXT_FAILED"` (missing tasks/, unreadable items).
 

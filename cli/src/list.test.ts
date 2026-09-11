@@ -437,3 +437,60 @@ id: task-broken
     expect(toContractWorkItem(initiatives[0]!, root).assignee).toBeNull();
   });
 });
+
+describe("runList dependency predicates (spec-deps-001)", () => {
+  function depTree(): string {
+    const root = mkdtempSync(join(tmpdir(), "arggon-list-deps-"));
+    mkdirSync(join(root, "tasks"), { recursive: true });
+    write(root, "tasks/.convention.yml", "version: 3\n");
+    const md = (frontmatter: string) =>
+      `---\n${frontmatter}---\n\n# item\n`;
+    write(
+      root,
+      "tasks/x/task-aaa.md",
+      md('type: task\nstatus: todo\nid: task-aaa\ndepends_on: ["task-x", "done-y"]\nlabels: []\ncreated: "2026-09-11"\n'),
+    );
+    write(
+      root,
+      "tasks/x/bug-bbb.md",
+      md('type: bug\nstatus: todo\nid: bug-bbb\ndepends_on: ["task-aaa"]\nlabels: []\ncreated: "2026-09-11"\n'),
+    );
+    write(
+      root,
+      "tasks/x/task-ccc.md",
+      md('type: task\nstatus: todo\nid: task-ccc\nlabels: []\ncreated: "2026-09-11"\n'),
+    );
+    write(
+      root,
+      "tasks/x/task-x.md",
+      md('type: task\nstatus: in_progress\nid: task-x\nassignee: alice\nlabels: []\ncreated: "2026-09-11"\n'),
+    );
+    write(
+      root,
+      "tasks/x/done-y.md",
+      md('type: task\nstatus: done\nid: done-y\nlabels: []\ncreated: "2026-09-11"\n'),
+    );
+    return root;
+  }
+
+  it("depends-on:<id> matches items listing id in depends_on", () => {
+    const { items } = runList({ cwd: depTree(), filter: "depends-on:task-x" });
+    expect(items.map((i) => i.id)).toEqual(["task-aaa"]);
+  });
+
+  it("blocked-by:<id> matches the computed inverse (items depended on by id)", () => {
+    const { items } = runList({ cwd: depTree(), filter: "blocked-by:task-aaa" });
+    expect(items.map((i) => i.id)).toEqual(["bug-bbb"]);
+  });
+
+  it("composes with other predicates and negation", () => {
+    const { items } = runList({ cwd: depTree(), filter: "type:task !depends-on:done-y" });
+    // task-aaa depends on done-y (negated out); the other tasks have no deps.
+    expect(items.map((i) => i.id)).toEqual(["done-y", "task-ccc", "task-x"]);
+  });
+
+  it("blocked-by with no dependents returns empty, not an error", () => {
+    const { items } = runList({ cwd: depTree(), filter: "blocked-by:task-ccc" });
+    expect(items).toEqual([]);
+  });
+});

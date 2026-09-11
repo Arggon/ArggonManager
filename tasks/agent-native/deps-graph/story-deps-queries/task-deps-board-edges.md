@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-deps-board-edges
 title: Dependency edges on the board
+assignee: Arggon
 parent: story-deps-queries
 labels: []
 created: "2026-09-11"
@@ -23,5 +24,5 @@ Render the graph on the static and served boards without breaking self-containme
 
 ## Acceptance
 
-- [ ] Cards show a `↳ blocked by <id>` line per open dependency; edges render between columns
-- [ ] Static export stays a single self-contained HTML file; `--serve` identical
+- [x] Cards show a `↳ blocked by <id>` line per open dependency; edges render between columns
+- [x] Static export stays a single self-contained HTML file; `--serve` identical

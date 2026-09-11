@@ -439,6 +439,79 @@ describe("CLI --json", () => {
     expect(suggestion.item as Record<string, unknown>).toMatchObject({ id: "login" });
   });
 
+  it("arggon next --json carries blockedBy and --ready skips blocked items", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-next-deps-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+    // Claim the story so only the tasks are candidates.
+    expect(
+      runCli(["update", "login", "--status", "in_progress", "--assignee", "bob"], dir).status,
+    ).toBe(0);
+    expect(runCli(["create", "task", "Aaa blocked", "--parent", "login"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Bbb ready", "--parent", "login"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Zzz blocker", "--parent", "login"], dir).status).toBe(0);
+    expect(
+      runCli(["update", "task-aaa-blocked", "--add-depends-on", "task-zzz-blocker"], dir).status,
+    ).toBe(0);
+    expect(
+      runCli(["update", "task-zzz-blocker", "--status", "in_progress", "--assignee", "bob"], dir)
+        .status,
+    ).toBe(0);
+
+    // Default: ready item ranks first despite the blocked item sorting earlier.
+    const ready = runCli(["next", "--json"], dir);
+    expect(ready.status).toBe(0);
+    const readyBody = parseStdout(ready.stdout) as { suggestion: Record<string, unknown> };
+    expect(readyBody.suggestion.item).toMatchObject({ id: "task-bbb-ready" });
+    expect(readyBody.suggestion.blockedBy).toEqual([]);
+
+    // --ready: pool limited to unblocked items.
+    const readyOnly = runCli(["next", "--ready", "--json"], dir);
+    expect(readyOnly.status).toBe(0);
+    expect((parseStdout(readyOnly.stdout) as { suggestion: Record<string, unknown> }).suggestion.item).toMatchObject({ id: "task-bbb-ready" });
+
+    // Claim the ready item: the blocked one is suggested with its open dep in
+    // reason and blockedBy; --ready empties the pool (suggestion stays null).
+    expect(
+      runCli(["update", "task-bbb-ready", "--status", "in_progress", "--assignee", "carol"], dir)
+        .status,
+    ).toBe(0);
+    const blocked = runCli(["next", "--json"], dir);
+    expect(blocked.status).toBe(0);
+    const blockedBody = parseStdout(blocked.stdout) as { suggestion: Record<string, unknown> };
+    expect(blockedBody.suggestion.item).toMatchObject({ id: "task-aaa-blocked" });
+    expect(blockedBody.suggestion.blockedBy).toEqual(["task-zzz-blocker"]);
+    expect(String(blockedBody.suggestion.reason)).toContain("task-zzz-blocker");
+    const none = runCli(["next", "--ready", "--json"], dir);
+    expect(none.status).toBe(0);
+    expect(parseStdout(none.stdout)).toMatchObject({ ok: true, suggestion: null });
+  });
+
+  it("arggon list --json applies dependency filters", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-list-deps-cli-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Aaa", "--parent", "login"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Bbb", "--parent", "login"], dir).status).toBe(0);
+    expect(runCli(["update", "task-aaa", "--add-depends-on", "task-bbb"], dir).status).toBe(0);
+    const dependsOn = runCli(["list", "--json", "--filter", "depends-on:task-bbb"], dir);
+    expect(dependsOn.status).toBe(0);
+    const dependsOnBody = parseStdout(dependsOn.stdout);
+    expect((dependsOnBody.items as Array<Record<string, unknown>>).map((i) => i.id)).toEqual([
+      "task-aaa",
+    ]);
+    const blockedBy = runCli(["list", "--json", "--filter", "blocked-by:task-bbb"], dir);
+    expect(blockedBy.status).toBe(0);
+    const blockedByBody = parseStdout(blockedBy.stdout);
+    expect((blockedByBody.items as Array<Record<string, unknown>>).map((i) => i.id)).toEqual([
+      "task-aaa",
+    ]);
+  });
+
   it("arggon next exits 0 with a friendly message on an empty pool", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-next-empty-"));
     expect(runCli(["init", dir]).status).toBe(0);

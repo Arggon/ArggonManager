@@ -1,8 +1,10 @@
 ---
 type: story
-status: todo
+status: done
 id: story-deps-queries
 title: Dependency-aware queries and board
+assignee: Arggon
+branch: feat/story-deps-queries
 parent: deps-graph
 labels: []
 created: "2026-09-11"
@@ -21,6 +23,6 @@ The payoff of the graph: `arggon next` becomes dependency-aware — an item is *
 
 ## Acceptance
 
-- [ ] `arggon next` (and `--ready`) ranks unblocked items first, with the blocking chain in `reason`
-- [ ] `list --filter depends-on:<id>` / `blocked-by:<id>` predicates
-- [ ] Static and served boards render dependency edges
+- [x] `arggon next` (and `--ready`) ranks unblocked items first, with the blocking chain in `reason`
+- [x] `list --filter depends-on:<id>` / `blocked-by:<id>` predicates
+- [x] Static and served boards render dependency edges

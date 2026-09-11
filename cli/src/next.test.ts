@@ -125,3 +125,97 @@ describe("runNext", () => {
     expect(() => runNext({ cwd: root })).toThrow(/No tasks\/ convention/);
   });
 });
+
+describe("runNext dependency awareness (spec-deps-001)", () => {
+  function depTree(): string {
+    const root = mkdtempSync(join(tmpdir(), "arggon-next-deps-"));
+    write(root, "tasks/.convention.yml", "version: 3\n");
+    write(
+      root,
+      "tasks/launch/epic-a/story-a/task-aaa.md",
+      md(
+        'type: task\nstatus: todo\nid: task-aaa\nparent: story-a\ndepends_on: ["task-zzz"]\nlabels: []\ncreated: "2026-09-11"\n',
+        "Blocked task",
+      ),
+    );
+    write(
+      root,
+      "tasks/launch/epic-a/story-a/task-bbb.md",
+      md(
+        'type: task\nstatus: todo\nid: task-bbb\nparent: story-a\nlabels: []\ncreated: "2026-09-11"\n',
+        "Ready task",
+      ),
+    );
+    write(
+      root,
+      "tasks/launch/epic-a/story-a/task-zzz.md",
+      md(
+        'type: task\nstatus: in_progress\nid: task-zzz\nparent: story-a\nassignee: alice\nlabels: []\ncreated: "2026-09-11"\n',
+        "Open blocker",
+      ),
+    );
+    return root;
+  }
+
+  it("ranks ready items first even when a blocked item sorts earlier", () => {
+    const { suggestion } = runNext({ cwd: depTree() });
+    expect(suggestion!.item.id).toBe("task-bbb");
+    expect(suggestion!.blockedBy).toEqual([]);
+    expect(suggestion!.poolSize).toBe(2);
+  });
+
+  it("--ready limits the pool to items whose depends_on are all terminal", () => {
+    const { suggestion } = runNext({ cwd: depTree(), ready: true });
+    expect(suggestion!.item.id).toBe("task-bbb");
+    expect(suggestion!.poolSize).toBe(1);
+    expect(suggestion!.reason).toContain("--ready");
+  });
+
+  it("suggests the blocked item when nothing is ready, with the blockers in reason and blockedBy", () => {
+    const root = depTree();
+    // Claim the only ready candidate so the pool is blocked-only.
+    const readyMd = join(root, "tasks/launch/epic-a/story-a/task-bbb.md");
+    writeFileSync(
+      readyMd,
+      readFileSync(readyMd, "utf8")
+        .replace("status: todo", "status: in_progress")
+        .replace('created: "2026-09-11"', 'assignee: bob\ncreated: "2026-09-11"'),
+      "utf8",
+    );
+    const { suggestion } = runNext({ cwd: root });
+    expect(suggestion!.item.id).toBe("task-aaa");
+    expect(suggestion!.blockedBy).toEqual(["task-zzz"]);
+    expect(suggestion!.reason).toContain("task-zzz");
+    expect(suggestion!.reason).toContain("open dependencies");
+  });
+
+  it("--ready returns null when every candidate has open dependencies", () => {
+    const root = depTree();
+    const readyMd = join(root, "tasks/launch/epic-a/story-a/task-bbb.md");
+    writeFileSync(
+      readyMd,
+      readFileSync(readyMd, "utf8")
+        .replace("status: todo", "status: in_progress")
+        .replace('created: "2026-09-11"', 'assignee: bob\ncreated: "2026-09-11"'),
+      "utf8",
+    );
+    const { suggestion } = runNext({ cwd: root, ready: true });
+    expect(suggestion).toBeNull();
+  });
+
+  it("treats done and cancelled dependencies as terminal (item becomes ready)", () => {
+    const root = depTree();
+    const blockerMd = join(root, "tasks/launch/epic-a/story-a/task-zzz.md");
+    writeFileSync(
+      blockerMd,
+      readFileSync(blockerMd, "utf8")
+        .replace("status: in_progress", "status: done")
+        .replace("assignee: alice", "assignee: null"),
+      "utf8",
+    );
+    const { suggestion } = runNext({ cwd: root });
+    expect(suggestion!.item.id).toBe("task-aaa");
+    expect(suggestion!.blockedBy).toEqual([]);
+    expect(suggestion!.poolSize).toBe(2);
+  });
+});
