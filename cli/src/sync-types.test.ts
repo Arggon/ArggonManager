@@ -18,7 +18,10 @@ function pr(number: number, headRefName: string): PRInfo {
 }
 
 describe("sync-types matchItem", () => {
-  const withBranch = (id: string, branch: string): Pick<WorkItem, "id" | "branch"> => ({ id, branch });
+  const withBranch = (id: string, branch: string): Pick<WorkItem, "id" | "branch"> => ({
+    id,
+    branch,
+  });
   const withoutBranch = (id: string): Pick<WorkItem, "id" | "branch"> => ({ id, branch: null });
 
   it("returns matched when item branch matches exactly one PR headRefName", () => {
@@ -45,7 +48,12 @@ describe("sync-types matchItem", () => {
     const item = withBranch("task-1", "feat/shared");
     const prs = [pr(10, "feat/shared"), pr(11, "feat/shared")];
     const result = matchItem(item, prs);
-    const r = result as { status: "ambiguous"; itemId: string; branch: string; prNumbers: number[] };
+    const r = result as {
+      status: "ambiguous";
+      itemId: string;
+      branch: string;
+      prNumbers: number[];
+    };
     expect(r.status).toBe("ambiguous");
     expect(r.itemId).toBe("task-1");
     expect(r.branch).toBe("feat/shared");
@@ -87,7 +95,12 @@ describe("sync-types matchItem", () => {
     const item = withoutBranch("task-4");
     const prs = [pr(20, "feat/task-4"), pr(21, "feat/task-4")];
     const result = matchItem(item, prs);
-    const r = result as { status: "ambiguous"; itemId: string; branch: string; prNumbers: number[] };
+    const r = result as {
+      status: "ambiguous";
+      itemId: string;
+      branch: string;
+      prNumbers: number[];
+    };
     expect(r.status).toBe("ambiguous");
     expect(r.itemId).toBe("task-4");
     expect(r.branch).toBe("feat/task-4");
@@ -119,6 +132,10 @@ describe("sync-types branchReferencesItem", () => {
 
   it("matches custom patterns that append a suffix after the id", () => {
     expect(branchReferencesItem("feat/task-1-work", "task-1")).toBe(true);
+  });
+
+  it("does not match a longer id against its hyphen prefix", () => {
+    expect(branchReferencesItem("feat/task-1", "task-1-work")).toBe(false);
   });
 
   it("escapes regex metacharacters in the id", () => {

@@ -12,8 +12,8 @@ Shared kernel (import these; do not fork schema logic):
 - `relations.ts` — parent-type edges (epic→initiative, story→epic, task/bug→story)
 - `dates.ts` — v0 `YYYY-MM-DD` helpers (`formatDate`)
 - `board.ts` — static read-only HTML board renderer (`renderBoardHtml` pure; `runBoard` writes the file)
-- `detect-repo.ts` — GitHub owner/repo from the `origin` remote (board/sync)
-- `get-open-prs.ts` — open PR list via `gh pr list` (with `gh api` fallback)
+- `detect-repo.ts` — GitHub owner/repo from the `origin` remote (sync)
+- `get-open-prs.ts` — shared open-PR reader for board/sync: one `gh pr list` invocation contract (`--limit 100` + `--json`), with `gh api` fallback on the sync path
 - `sync-types.ts` — PR↔item matching + result aggregation (`matchItem`, `toSyncResult`)
 
 Commands: `hello`, `init`, `create`, `list`, `update`, `validate`, `branch`, `start`, `board`, `sync`.
