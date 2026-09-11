@@ -1,8 +1,10 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-auto-done-on-merge
 title: Auto-done on merge
+assignee: Arggon
+branch: feat/task-auto-done-on-merge
 parent: story-github
 labels: []
 created: "2026-09-11"
