@@ -17,6 +17,7 @@ import {
 } from "./json.js";
 import { formatListTable, runList } from "./list.js";
 import { runNext } from "./next.js";
+import { formatReportTable, runReport } from "./report.js";
 import { runSync } from "./sync-command.js";
 import { runUpdate } from "./update.js";
 import { formatValidateHuman, runValidate } from "./validate.js";
@@ -248,6 +249,35 @@ program
         return;
       }
       console.error(`arggon next: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("report")
+  .description("Aggregate leaf statuses per container, grouped by epic (display only)")
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runReport({ cwd: process.cwd() });
+      if (json) {
+        successJson("report", { groups: result.groups }, readConventionVersion(result.root));
+        return;
+      }
+      process.stdout.write(formatReportTable(result.groups));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "report",
+          message,
+          code: "REPORT_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon report: ${message}`);
       process.exitCode = 1;
     }
   });

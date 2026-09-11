@@ -49,6 +49,7 @@ node dist/cli.js validate --json                                     # ok:false 
 node dist/cli.js board --json                                        # {path, itemCount}; HTML defaults to repo root
 node dist/cli.js board --github --json                             # + live PR overlay {github, prCount}; needs gh auth
 node dist/cli.js next --json                                         # {suggestion: {item, parentChain, reason} | null}
+node dist/cli.js report --json                                       # {groups} per-epic leaf counts; display only
 ```
 
 ## Procedure

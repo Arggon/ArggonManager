@@ -459,6 +459,49 @@ describe("CLI --json", () => {
     expect(parseStdout(boxed.stdout)).toMatchObject({ ok: true, suggestion: null });
   });
 
+  it("arggon report aggregates leaf statuses grouped by epic", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-report-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Work", "--parent", "login"], dir).status).toBe(0);
+    expect(
+      runCli(["update", "task-work", "--status", "in_progress", "--assignee", "bob"], dir).status,
+    ).toBe(0);
+    expect(runCli(["update", "task-work", "--status", "done"], dir).status).toBe(0);
+    const human = runCli(["report"], dir);
+    expect(human.status).toBe(0);
+    expect(human.stdout).toContain("epic: auth — Auth [launch-mvp]");
+    expect(human.stdout).toContain(
+      "login: todo=0 in_progress=0 blocked=0 done=1 cancelled=0 (total 1)",
+    );
+    const boxed = runCli(["report", "--json"], dir);
+    expect(boxed.status).toBe(0);
+    const body = parseStdout(boxed.stdout);
+    expect(body).toMatchObject({ ok: true, command: "report" });
+    const groups = body.groups as Array<Record<string, unknown>>;
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ epic: { id: "auth" }, empty: false });
+    const containers = groups[0]!.containers as Array<Record<string, unknown>>;
+    expect(containers).toHaveLength(1);
+    expect(containers[0]).toMatchObject({
+      id: "login",
+      empty: false,
+      counts: { todo: 0, in_progress: 0, blocked: 0, done: 1, cancelled: 0, total: 1 },
+    });
+  });
+
+  it("arggon report --json errors with REPORT_FAILED without tasks/", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-report-err-"));
+    const result = runCli(["report", "--json"], dir);
+    expect(result.status).toBe(1);
+    const body = parseStdout(result.stdout);
+    expect(body.ok).toBe(false);
+    expect(body.command).toBe("report");
+    expect(body.error).toMatchObject({ code: "REPORT_FAILED" });
+  });
+
   it("arggon branch creates, checks out, and records the branch", () => {
     const dir = initGitTree();
     const result = runCli(["branch", "launch-mvp"], dir);
