@@ -16,6 +16,7 @@ import {
   successJson,
 } from "./json.js";
 import { formatListTable, runList } from "./list.js";
+import { runMcpServer } from "./mcp-server.js";
 import { runNext } from "./next.js";
 import { formatReportTable, runReport } from "./report.js";
 import { runSync } from "./sync-command.js";
@@ -657,6 +658,13 @@ program
       console.error(`arggon sync: ${message}`);
       process.exitCode = 1;
     }
+  });
+
+program
+  .command("mcp")
+  .description("Start the stdio MCP server exposing list/create/update with agent rules (JSON-RPC on stdin/stdout)")
+  .action(() => {
+    runMcpServer({ cwd: process.cwd(), input: process.stdin, output: process.stdout });
   });
 
 program.parse();

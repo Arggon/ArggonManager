@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-mcp-scaffold
 title: Scaffold stdio MCP server
+assignee: Arggon
 parent: story-mcp-server
 labels: []
 created: "2026-09-11"
@@ -16,6 +17,6 @@ Stdio MCP server entry point wired to the existing shared kernel modules.
 
 ## Acceptance
 
-- [ ] `arggon-mcp` bin or `arggon mcp` starts a stdio server
-- [ ] Handshake works with at least two MCP clients
-- [ ] Zero new schema logic — kernel imports only
+- [x] `arggon mcp` starts a stdio server
+- [x] Handshake works with at least two MCP clients
+- [x] Zero new schema logic — kernel imports only

@@ -107,6 +107,21 @@ Agents **MUST NOT** reopen `done` / `cancelled` (the schema allows `→ todo`; t
 
 Pass `--json` on supported commands for a stable object on stdout (see [`docs/json-output.md`](./json-output.md)). On failure, expect non-zero exit and a JSON error object when `--json` was set.
 
+## MCP server
+
+`arggon mcp` starts a stdio MCP (JSON-RPC 2.0, newline-delimited) server that exposes the same kernel as three tools: `arggon_list`, `arggon_create`, and `arggon_update`. Tool results are the documented `--json` envelope objects (see [`docs/json-output.md`](./json-output.md)) serialized as text content; kernel failures surface as tool errors with the CLI's message text.
+
+The MCP layer always calls the kernel with the agent playbook rules applied: an MCP caller cannot reopen `done`/`cancelled` items and cannot steal a claim (there is no `force` parameter). These rules live in one module (`cli/src/rules.ts`) shared by the CLI and the MCP server, so both entry points enforce identical semantics.
+
+Wire it up with any MCP client config:
+
+```json
+{
+  "command": "arggon",
+  "args": ["mcp"]
+}
+```
+
 ## Reference integrations
 
 Copy-paste wiring so agents follow ArggonManager rules **by default** — same CLI, same rules, no private dialect (Phase 3, [#20](https://github.com/Arggon/ArggonManager/issues/20)).
