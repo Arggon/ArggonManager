@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-deps-schema-kernel
 title: Kernel and validate for depends_on/blocked_by
 assignee: Arggon
