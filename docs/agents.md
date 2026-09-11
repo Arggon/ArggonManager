@@ -15,6 +15,7 @@ Humans and agents follow the **same** rules. Work lives in git under `tasks/` �
 All work — features, tasks, bugs, review follow-ups — is tracked as work items under **`tasks/`** via `arggon create`, **not** as GitHub issues. GitHub is for **PRs only**.
 
 - File findings where they are found: `npm run arggon -- create bug "<title>" --parent <story-id>` (bugs/tasks live only under a story; create the story/epic/initiative chain if the area has none yet).
+- **Consolidate review findings into follow-ups.** Every actionable finding from a code review, audit, or incident (PR review comments, review summaries, post-merge observations) MUST be filed as a `task`/`bug` under the story that owns the affected area, with context (links to the PR/comment) and an acceptance checklist in the body. Do this **before the reviewed PR merges, or immediately after** — a PR comment alone is not tracking and gets lost. If no story covers the area, create one under the matching epic first.
 - Reference the item id in the PR description; move the item to `done` only when the PR fully finishes it.
 - Do **not** open new GitHub issues. Pre-existing GitHub issues are migrated into `tasks/` the next time they are touched, then closed with a pointer to the item.
 
