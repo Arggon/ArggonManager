@@ -82,3 +82,41 @@ describe("convention config", () => {
     expect(resolveBranchName("fix/{type}-{id}", { id: "b", type: "bug" })).toBe("fix/bug-b");
   });
 });
+
+describe("x-views (saved views)", () => {
+  it("defaults to no views when the file is missing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-xviews-missing-"));
+    expect(readConventionConfig(dir).views).toEqual({});
+  });
+
+  it("parses quoted and unquoted view expressions", () => {
+    const config = parseConventionConfig(
+      [
+        "version: 0",
+        "x-views:",
+        '  my-open: "status:todo !status:done"',
+        "  bugs: type:bug",
+        "",
+      ].join("\n"),
+    );
+    expect(config.views).toEqual({
+      "my-open": "status:todo !status:done",
+      bugs: "type:bug",
+    });
+  });
+
+  it("still ignores unknown x-* keys (only x-views is official)", () => {
+    const config = parseConventionConfig("version: 0\nx-widgets: yes\nx-views:\n  open: status:todo\n");
+    expect(config.views).toEqual({ open: "status:todo" });
+  });
+
+  it("rejects scalar x-views, empty expressions, and duplicate names", () => {
+    expect(() => parseConventionConfig("x-views: open\n")).toThrow(/must be a mapping/);
+    expect(() => parseConventionConfig("x-views:\n  open: ''\n")).toThrow(
+      /empty expression for view 'open'/,
+    );
+    expect(() =>
+      parseConventionConfig("x-views:\n  open: status:todo\n  open: type:bug\n"),
+    ).toThrow(/duplicate view 'open'/);
+  });
+});

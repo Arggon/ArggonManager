@@ -348,6 +348,68 @@ branch: feat/a
     expect(() => runList({ cwd: dir, filter: "type:bogus" })).toThrow(/unknown type/);
   });
 
+  describe("--view (saved views from x-views)", () => {
+    function makeViewTree(): string {
+      const dir = makeTree();
+      write(
+        dir,
+        "tasks/.convention.yml",
+        [
+          "version: 0",
+          "x-views:",
+          '  open-tasks: "type:task status:todo"',
+          "  mine: assignee:@me",
+          "",
+        ].join("\n"),
+      );
+      return dir;
+    }
+
+    it("resolves a saved view as a filter expression", () => {
+      const dir = makeViewTree();
+      const { items } = runList({ cwd: dir, view: "open-tasks" });
+      expect(items.map((i) => i.id)).toEqual(["task-h1-only", "task-rate-limit"]);
+    });
+
+    it("combines explicit flags with the view filter (AND)", () => {
+      const dir = makeViewTree();
+      const { items } = runList({ cwd: dir, view: "open-tasks", status: "done" });
+      expect(items).toEqual([]);
+
+      const { items: negated } = runList({ cwd: dir, view: "open-tasks", type: "story" });
+      expect(negated).toEqual([]);
+    });
+
+    it("ANDs --view with --filter and resolves @me inside views like the flags", () => {
+      const dir = makeViewTree();
+      const { items } = runList(
+        { cwd: dir, view: "mine", filter: "status:in_progress" },
+        { env: { ...process.env, GITHUB_USER: "me-user" } },
+      );
+      expect(items.map((i) => i.id)).toEqual(["task-mine"]);
+    });
+
+    it("fails on unknown view names listing the known views", () => {
+      const dir = makeViewTree();
+      expect(() => runList({ cwd: dir, view: "nope" })).toThrow(
+        /unknown view "nope"\. Known views: open-tasks, mine/,
+      );
+    });
+
+    it("fails on any view name when no views are defined", () => {
+      const dir = makeTree();
+      expect(() => runList({ cwd: dir, view: "nope" })).toThrow(
+        /no saved views defined in tasks\/\.convention\.yml x-views/,
+      );
+    });
+
+    it("validates view expressions with the same usage errors as --filter", () => {
+      const dir = makeTree();
+      write(dir, "tasks/.convention.yml", "x-views:\n  bad: status:bogus\n");
+      expect(() => runList({ cwd: dir, view: "bad" })).toThrow(/unknown status/);
+    });
+  });
+
   it("fails on invalid items with file context", () => {
     const dir = makeTree();
     write(

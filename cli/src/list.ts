@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { readConventionConfig } from "./convention.js";
 import { parseFilter, matchesPredicate, type FilterPredicate } from "./filter.js";
 import { isItemType, ITEM_TYPES } from "./ids.js";
 import { loadItems, type WorkItem } from "./items.js";
@@ -13,6 +14,8 @@ export type ListOptions = {
   assignee?: string;
   /** Compact expression (`status:todo !label:security`); ANDs with the flags above. */
   filter?: string;
+  /** Saved view name (`x-views` in tasks/.convention.yml); ANDs with the flags and --filter. */
+  view?: string;
 };
 
 export type ListDeps = {
@@ -72,10 +75,9 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
   }
 
   // Expression filters use the same predicates (and the same errors) as the flags.
-  let predicates: FilterPredicate[] = [];
-  if (opts.filter !== undefined) {
-    predicates = parseFilter(opts.filter);
-    for (const pred of predicates) {
+  // Saved views (`x-views`) are named expressions resolved here, ANDed with --filter.
+  const validatePredicates = (preds: FilterPredicate[]): FilterPredicate[] => {
+    for (const pred of preds) {
       if (pred.field === "type" && !isItemType(pred.value)) {
         throw new Error(`unknown type "${pred.value}". Allowed: ${ITEM_TYPES.join(", ")}`);
       }
@@ -92,9 +94,29 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
         pred.value = login;
       }
     }
-  }
+    return preds;
+  };
 
   const tasksDir = findTasksDir(opts.cwd);
+  const repoRoot = repoRootFromTasks(tasksDir);
+  const predicates: FilterPredicate[] = [];
+  if (opts.view !== undefined) {
+    const { views } = readConventionConfig(repoRoot);
+    const expr = views[opts.view];
+    if (expr === undefined) {
+      const known = Object.keys(views);
+      throw new Error(
+        known.length === 0
+          ? `unknown view "${opts.view}" (no saved views defined in tasks/.convention.yml x-views)`
+          : `unknown view "${opts.view}". Known views: ${known.join(", ")}`,
+      );
+    }
+    predicates.push(...validatePredicates(parseFilter(expr)));
+  }
+  if (opts.filter !== undefined) {
+    predicates.push(...validatePredicates(parseFilter(opts.filter)));
+  }
+
   const items = loadItems(tasksDir)
     .filter((item) => {
       if (opts.type !== undefined && item.type !== opts.type) return false;
@@ -107,7 +129,7 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
     })
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
-  return { root: repoRootFromTasks(tasksDir), items };
+  return { root: repoRoot, items };
 }
 
 /** Human-readable table for CLI stdout. Missing titles fall back to id. */
