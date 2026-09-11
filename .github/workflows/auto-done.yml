@@ -19,6 +19,7 @@ permissions:
 jobs:
   auto-done:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     if: github.event.pull_request.merged == true
     steps:
       - uses: actions/checkout@v4
@@ -46,9 +47,10 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           echo "referenced ids: ${ids:-none}"
 
-      - name: Flip claimable leaves to done and commit
+      - name: Flip claimable leaves to done and land via PR
         env:
           PR: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
           # Multiline via env, never ${{ }} interpolation: a raw multiline
           # output inside `for id in ...` breaks bash parsing (the newline
           # closes the word list before `; do`).
@@ -78,22 +80,26 @@ jobs:
             esac
           done
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add tasks/
           if [ "$changed" = 1 ] && ! git diff --cached --quiet; then
+            # main is protected (required `cli` check), and a direct bot push
+            # never carries that check, so land the flip through a PR whose
+            # own `cli` run satisfies the rule. Squash: linear history.
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add tasks/
             git commit -m "chore(auto): mark items done (PR #$PR merged)"
-            pushed=0
-            for attempt in 1 2 3; do
-              if git push; then
-                pushed=1
-                break
-              fi
-              git pull --rebase origin main || git rebase --abort
-            done
-            if [ "$pushed" != 1 ]; then
-              echo "::error::could not push the done flip to main after 3 attempts"
-              exit 1
+            branch="chore/auto-done-${GITHUB_RUN_ID}"
+            git push origin "HEAD:$branch"
+            gh pr create \
+              --head "$branch" --base main \
+              --title "chore(auto): mark items done (PR #$PR merged)" \
+              --body "Automated in_progress -> done flip for: $IDS (source PR #$PR)."
+            if gh pr merge "$branch" --auto --squash > /dev/null 2>&1; then
+              echo "auto-merge armed for $branch (lands when cli passes)"
+            else
+              echo "auto-merge not enabled on this repo; watching checks"
+              gh pr checks "$branch" --watch --interval 15
+              gh pr merge "$branch" --squash || { sleep 20; gh pr merge "$branch" --squash; }
             fi
           else
             echo "no status flips to commit"
