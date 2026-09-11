@@ -10,6 +10,14 @@ Humans and agents follow the **same** rules. Work lives in git under `tasks/` �
 - `npm install`
 - `npm run arggon -- <command>`
 
+## 0. Issue tracking: `tasks/`, not GitHub issues
+
+All work — features, tasks, bugs, review follow-ups — is tracked as work items under **`tasks/`** via `arggon create`, **not** as GitHub issues. GitHub is for **PRs only**.
+
+- File findings where they are found: `npm run arggon -- create bug "<title>" --parent <story-id>` (bugs/tasks live only under a story; create the story/epic/initiative chain if the area has none yet).
+- Reference the item id in the PR description; move the item to `done` only when the PR fully finishes it.
+- Do **not** open new GitHub issues. Pre-existing GitHub issues are migrated into `tasks/` the next time they are touched, then closed with a pointer to the item.
+
 ## 1. Find open work
 
 Prefer machine-readable list output:
@@ -37,7 +45,7 @@ Rules:
 
 ## 3. Create bugs/tasks from findings
 
-When work reveals new work, create items under the correct parent story:
+When work reveals new work, create items under the correct parent story — this is the issue tracker (see §0); do not file GitHub issues:
 
 - `npm run arggon -- create task "Add rate limiting" --parent story-login`
 - `npm run arggon -- create bug "Login 500 on empty password" --parent story-login`
@@ -62,7 +70,7 @@ An item is **done** when:
 1. Acceptance checklist in the Markdown body is complete (or explicitly waived in Notes with rationale).
 2. Frontmatter `status` is `done` via `arggon update <id> --status done`.
 3. `updated` date is refreshed (`arggon update` does this automatically).
-4. PR linked to the relevant GitHub issue(s) is merged (or the completing change is on the default branch).
+4. The PR referencing the work item id is merged (or the completing change is on the default branch).
 
 Do **not** jump `todo` → `done` — claim first (`in_progress`), then complete.
 
