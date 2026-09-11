@@ -3,6 +3,7 @@ type: task
 status: todo
 id: task-report-command
 title: Add report command with per-container counts
+assignee: arggondev
 parent: story-progress-report
 labels: []
 created: "2026-09-11"

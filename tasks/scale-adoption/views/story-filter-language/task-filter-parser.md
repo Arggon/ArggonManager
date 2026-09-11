@@ -3,6 +3,7 @@ type: task
 status: todo
 id: task-filter-parser
 title: Parse filter expressions
+assignee: arggondev
 parent: story-filter-language
 labels: []
 created: "2026-09-11"

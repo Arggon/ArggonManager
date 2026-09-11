@@ -3,6 +3,7 @@ type: task
 status: todo
 id: task-milestone-design
 title: Design milestone field for convention v3
+assignee: arggonarchitect
 parent: story-milestones
 labels: []
 created: "2026-09-11"

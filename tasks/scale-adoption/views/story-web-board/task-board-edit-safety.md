@@ -3,6 +3,7 @@ type: task
 status: todo
 id: task-board-edit-safety
 title: Enforce claim and transition rules on board edits
+assignee: arggonqa
 parent: story-web-board
 labels: []
 created: "2026-09-11"

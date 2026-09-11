@@ -3,6 +3,7 @@ type: task
 status: todo
 id: task-next-command
 title: Add next command for claimable suggestions
+assignee: arggondev
 parent: story-next
 labels: []
 created: "2026-09-11"
