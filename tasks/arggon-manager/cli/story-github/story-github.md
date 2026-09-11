@@ -1,6 +1,6 @@
 ---
 type: story
-status: in_progress
+status: done
 id: story-github
 title: GitHub integration
 assignee: Arggon
