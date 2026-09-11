@@ -174,6 +174,8 @@ Empty pool is success (`ok: true`, `suggestion: null`). Failures use `error.code
 
 `counts` always carries all five statuses (`todo`, `in_progress`, `blocked`, `done`, `cancelled` — cancelled explicit, never lumped) plus `total`. Leafless stories report zeros with `empty: true`. Display-only: never writes. Failures use `error.code: "REPORT_FAILED"` (missing tasks/, unreadable items).
 
+Human output supports `--format table` (default) and `--format markdown` (standup summary: per-epic progress lines with `(done + cancelled)/total` completion, plus a Blocked section listing each leaf's `blocked_reason`). Markdown is stdout-only (not part of the JSON contract); both formats are pure tree reads — no network, no GitHub calls.
+
 ### `board`
 
 | Field       | Type      | Notes                                                      |
