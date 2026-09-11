@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-sync-gh-reader
 title: "sync gh reader polish: PR list limit, --repo validation, board reader duplication"
 assignee: arggondev
@@ -25,11 +25,13 @@ Non-blocking review findings from PR #58 (merge fa18c5e), originally filed as Gi
 
 ## Acceptance
 
-- [ ] `getOpenPRsForRepo` passes `--limit 100` (or paginates) on the `gh pr list` path — today the gh default cap of 30 open PRs can misreport matched items as `unmatched` while the `gh api` fallback fetches 100 and `board` uses `--limit 100`.
-- [ ] `--repo` is validated as `owner/name` up front (`cli/src/get-open-prs.ts` splits and non-null-asserts both parts today; `arggon sync --repo foo` currently produces a confusing `foo/undefined` gh error) with an actionable error message.
-- [ ] `board.ts`'s inline `gh pr list` wrapper is consolidated onto the shared reader in `get-open-prs.ts` (or `cli/README.md`'s "(board/sync)" wording is corrected) so the gh invocation contract lives in one place.
-- [ ] `docs/json-output.md` "whole path segment" phrasing matches the actual `branchReferencesItem` rule (hyphen suffixes like `feat/task-1-work` deliberately match `task-1` for `chore/{id}-{type}` patterns), including the hyphen-prefix-of-another-id edge case.
+- [x] `getOpenPRsForRepo` passes `--limit 100` (or paginates) on the `gh pr list` path — today the gh default cap of 30 open PRs can misreport matched items as `unmatched` while the `gh api` fallback fetches 100 and `board` uses `--limit 100`.
+- [x] `--repo` is validated as `owner/name` up front (`cli/src/get-open-prs.ts` splits and non-null-asserts both parts today; `arggon sync --repo foo` currently produces a confusing `foo/undefined` gh error) with an actionable error message.
+- [x] `board.ts`'s inline `gh pr list` wrapper is consolidated onto the shared reader in `get-open-prs.ts` (or `cli/README.md`'s "(board/sync)" wording is corrected) so the gh invocation contract lives in one place.
+- [x] `docs/json-output.md` "whole path segment" phrasing matches the actual `branchReferencesItem` rule (hyphen suffixes like `feat/task-1-work` deliberately match `task-1` for `chore/{id}-{type}` patterns), including the hyphen-prefix-of-another-id edge case.
 
 ## Notes
 
 Supersedes GitHub issue #59. Fix should keep `arggon sync --check` exit semantics unchanged.
+
+Closed by @Arggon (authorized): work landed via PR #62; item left stale in `in_progress`.
