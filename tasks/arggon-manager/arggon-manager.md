@@ -1,6 +1,6 @@
 ---
 type: initiative
-status: todo
+status: done
 id: arggon-manager
 title: ArggonManager development
 labels: []

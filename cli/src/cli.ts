@@ -324,6 +324,10 @@ program
   .option("--labels <csv>", "replace the full labels list (comma-separated)")
   .option("--blocked-reason <text>", "required when status becomes blocked")
   .option("--force", "allow reassignment of an already-claimed item", false)
+  .option(
+    "--no-cascade",
+    "skip automatic container completion when this update closes the last open descendant",
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (
@@ -337,6 +341,7 @@ program
         labels?: string;
         blockedReason?: string;
         force?: boolean;
+        cascade?: boolean;
         json?: boolean;
       },
     ) => {
@@ -353,11 +358,12 @@ program
           labels: opts.labels,
           blockedReason: opts.blockedReason,
           force: Boolean(opts.force),
+          cascade: opts.cascade !== false,
         });
         if (json) {
           successJson(
             "update",
-            { item: toContractWorkItem(result.item, result.root) },
+            { item: toContractWorkItem(result.item, result.root), autoCompleted: result.autoCompleted },
             readConventionVersion(result.root),
           );
           return;
@@ -365,6 +371,9 @@ program
         const what = result.changed.length > 0 ? ` (${result.changed.join(", ")})` : "";
         console.log(`arggon update: ${result.item.type} ${result.id}${what}`);
         console.log(`  ${result.path}`);
+        if (result.autoCompleted.length > 0) {
+          console.log(`  auto-completed: ${result.autoCompleted.join(", ")}`);
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (json) {

@@ -122,11 +122,12 @@ Enums match [`docs/convention.md`](./convention.md) v0.
 
 `ok` is `false` **iff** `errors.length > 0` (warnings alone keep `ok: true`). When `ok` is false, the envelope still includes `error` so generic clients can branch on one field.
 
-### `create` / `update` (contract; commands may land later)
+### `create` / `update`
 
-| Field  | Type       |
-| ------ | ---------- |
-| `item` | `WorkItem` |
+| Field          | Type       | Notes                                                                                             |
+| -------------- | ---------- | ------------------------------------------------------------------------------------------------- |
+| `item`         | `WorkItem` | Item as persisted                                                                                 |
+| `autoCompleted` | `string[]` | `update` only: ancestors auto-completed to `done` by the container-completion cascade (see convention.md); empty when `--no-cascade` or a non-terminal status. Additive within `schemaVersion: 1`. |
 
 ### `branch`
 
