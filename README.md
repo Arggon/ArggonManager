@@ -116,7 +116,7 @@ Copy a stub into `tasks/` per [`docs/convention.md`](docs/convention.md), or use
 
 ## CLI (Phase 1)
 
-Requires **Node.js 20+**. Stack: [docs/adr/0001-cli-stack.md](docs/adr/0001-cli-stack.md) (ADR 0001 Accepted with this scaffold).
+Requires **Node.js 22.12+** (needed by vitest 5 in the dev toolchain; `engines` enforces it). Stack: [docs/adr/0001-cli-stack.md](docs/adr/0001-cli-stack.md) (ADR 0001 Accepted with this scaffold).
 
 Root install; TypeScript in cli/:
 

@@ -4,7 +4,7 @@ Humans and agents follow the **same** rules. Work lives in git under `tasks/` â€
 
 ## Prerequisites
 
-- Node.js 20+ and a checkout of the target repo (with `tasks/` already initialized, or run `arggon init`).
+- Node.js 22.12+ and a checkout of the target repo (with `tasks/` already initialized, or run `arggon init`).
 - From the ArggonManager package root (or a linked `arggon` binary):
 
 - `npm install`
@@ -123,7 +123,7 @@ tasks-validate:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
       with:
-        node-version: 20
+        node-version: 22
         cache: npm
     - run: npm ci
     - run: npm run arggon -- validate
