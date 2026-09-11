@@ -19,7 +19,7 @@ import { formatListTable, runList } from "./list.js";
 import { runInstructions } from "./instructions.js";
 import { runMcpServer } from "./mcp-server.js";
 import { runNext } from "./next.js";
-import { formatReportTable, runReport } from "./report.js";
+import { formatReportMarkdown, formatReportTable, runReport } from "./report.js";
 import { runSync } from "./sync-command.js";
 import { runUpdate } from "./update.js";
 import { formatValidateHuman, runValidate } from "./validate.js";
@@ -264,13 +264,34 @@ program
 program
   .command("report")
   .description("Aggregate leaf statuses per container, grouped by epic (display only)")
+  .option("--format <format>", "output format: table (default) or markdown (standup summary)", "table")
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { json?: boolean }) => {
+  .action((opts: { format?: string; json?: boolean }) => {
     const json = jsonEnabled(opts);
+    const format = opts.format ?? "table";
+    if (format !== "table" && format !== "markdown") {
+      const message = `unknown --format '${format}' (supported: table, markdown)`;
+      if (json) {
+        failJson({
+          command: "report",
+          message,
+          code: "REPORT_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon report: ${message}`);
+      process.exitCode = 1;
+      return;
+    }
     try {
       const result = runReport({ cwd: process.cwd() });
       if (json) {
         successJson("report", { groups: result.groups }, readConventionVersion(result.root));
+        return;
+      }
+      if (format === "markdown") {
+        process.stdout.write(formatReportMarkdown(result));
         return;
       }
       process.stdout.write(formatReportTable(result.groups));

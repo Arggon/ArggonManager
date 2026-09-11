@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-report-markdown
 title: Export standup markdown summary
+assignee: Arggon
 parent: story-progress-report
 labels: []
 created: "2026-09-11"
@@ -16,6 +17,6 @@ One copy-paste block for standups: per-epic progress lines plus blocked items wi
 
 ## Acceptance
 
-- [ ] `--format markdown` writes to stdout
-- [ ] Blocked section lists `blocked_reason` per item
-- [ ] No network or GitHub calls — pure tree read
+- [x] `--format markdown` writes to stdout (unknown formats fail with REPORT_FAILED; default table unchanged)
+- [x] Blocked section lists `blocked_reason` per item (with the item's story ← epic chain)
+- [x] No network or GitHub calls — pure tree read (kernel loadItems only)
