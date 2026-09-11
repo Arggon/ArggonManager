@@ -36,6 +36,8 @@ In **v0**, tasks and bugs live **only** under a story. They must not sit directl
 
 Parent `status` is **independent** of children — **no rollup** in v0. Container status is authored, not derived.
 
+**Exception — automatic container completion** (`task-container-auto-done`): when an update drives an item to a terminal state (`done`/`cancelled`) and an ancestor container's entire subtree is terminal, that ancestor completes as `done` automatically, cascading up to the initiative. Containers in `todo`/`blocked` complete directly to `done` (a documented exception to the transition table, since the intermediate `in_progress` is meaningless for unattended automation and would violate the claim rule on claimable types); already-terminal containers keep their status (an explicit `cancelled` is never overwritten). Callers that must not touch ancestors opt out with `--no-cascade` (`cascade: false` in the kernel). The rollup is write-on-close only — no derived status is ever computed for display.
+
 ### Vocabulary: `id`, inner slug, filename
 
 | Term       | Meaning                                                                                  |

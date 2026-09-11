@@ -1,6 +1,6 @@
 ---
 type: epic
-status: todo
+status: done
 id: cli
 title: CLI
 parent: arggon-manager
