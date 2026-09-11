@@ -49,9 +49,13 @@ jobs:
       - name: Flip claimable leaves to done and commit
         env:
           PR: ${{ github.event.pull_request.number }}
+          # Multiline via env, never ${{ }} interpolation: a raw multiline
+          # output inside `for id in ...` breaks bash parsing (the newline
+          # closes the word list before `; do`).
+          IDS: ${{ steps.ids.outputs.ids }}
         run: |
           changed=0
-          for id in ${{ steps.ids.outputs.ids }}; do
+          for id in $IDS; do
             status="$(node dist/cli.js list --json | jq -r --arg id "$id" '.items[] | select(.id == $id) | .status')"
             case "$status" in
               in_progress)
