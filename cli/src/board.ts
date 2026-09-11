@@ -189,6 +189,55 @@ function prBadge(pr: PrInfo | undefined): string {
 }
 
 /**
+ * Client-side drop rule, 1:1 with the CLI update path (cli/src/status.ts
+ * TRANSITIONS plus the claim and blocked-reason rules). The board renderer
+ * embeds this function's compiled source into the page script, so it must
+ * stay self-contained: no module-scope references, no template literals
+ * (they would break the surrounding HTML template). Blocked moves pass the
+ * rule here; the --blocked-reason prompt is drop-flow UI, not a rule.
+ */
+export function evaluateDrop(
+  card: { id: string; type: string; status: string; assignee?: string | null },
+  to: string,
+): { ok: boolean; reason: string } {
+  const transitions: Record<string, string[]> = {
+    todo: ["in_progress", "cancelled"],
+    in_progress: ["blocked", "done", "cancelled", "todo"],
+    blocked: ["in_progress", "cancelled"],
+    done: ["todo"],
+    cancelled: ["todo"],
+  };
+  const claimable = ["story", "task", "bug"];
+  const allowed = transitions[card.status];
+  if (!allowed) {
+    return { ok: false, reason: "unknown status '" + card.status + "'" };
+  }
+  if (to === card.status) {
+    return { ok: false, reason: card.id + " is already in that column" };
+  }
+  if (allowed.indexOf(to) === -1) {
+    return {
+      ok: false,
+      reason:
+        "cannot transition " + card.status + " -> " + to + " (allowed: " + allowed.join(", ") + ")",
+    };
+  }
+  if (to === "in_progress" && claimable.indexOf(card.type) !== -1 && !card.assignee) {
+    return {
+      ok: false,
+      reason:
+        card.type +
+        " '" +
+        card.id +
+        "' with status in_progress requires --assignee (claim first: arggon update " +
+        card.id +
+        " --assignee <login>)",
+    };
+  }
+  return { ok: true, reason: "" };
+}
+
+/**
  * Pure renderer for the static board. Columns are the v0 statuses in enum
  * order; every card shows its own status (no rollup). All dynamic text is
  * HTML-escaped. Sorted lexicographically by id within each column.
@@ -225,7 +274,7 @@ export function renderBoardHtml(
                 .map((label) => `<span class="label">${esc(label)}</span>`)
                 .join("")}</div>`
             : "";
-        return `<div class="card">
+        return `<div class="card" draggable="true" data-id="${esc(item.id)}" data-type="${esc(item.type)}" data-status="${esc(item.status)}"${item.assignee ? ` data-assignee="${esc(item.assignee)}"` : ""}>
   <div class="card-head"><span class="type" data-type="${esc(item.type)}" style="--type-color: ${TYPE_COLORS[item.type]}">${esc(item.type)}</span><code>${esc(item.id)}</code></div>
   <div class="title">${title}</div>
   ${breadcrumb}
@@ -290,16 +339,160 @@ header .meta { color: #59636e; font-size: 13px; }
 .labels { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
 .label { background: #e7ebef; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
 .blocked-reason { margin-top: 6px; color: #9a3412; background: #fff1e7; border-radius: 4px; padding: 4px 6px; font-size: 12px; }
+.card[draggable="true"] { cursor: grab; }
+.card.dragging { opacity: 0.5; }
+.column.over { outline: 2px dashed #8c919a; outline-offset: -4px; }
+#board-toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); max-width: 80%; background: #424a53; color: #fff; border-radius: 6px; padding: 8px 14px; font-size: 13px; display: none; z-index: 10; box-shadow: 0 2px 8px rgb(0 0 0 / 0.3); }
+#board-toast.show { display: block; }
+#board-toast.refused { background: #cf222e; }
+#board-toast.ok { background: #1a7f37; }
 </style>
 </head>
 <body>
 <header>
   <h1>arggon board${repo}</h1>
-  <div class="meta">generated ${esc(opts.generatedAt)} · ${sorted.length} item(s) · ${counts} · read-only snapshot; git files under tasks/ remain the source of truth${live}</div>
+  <div class="meta">generated ${esc(opts.generatedAt)} · ${sorted.length} item(s) · <span id="status-counts">${counts}</span> · git files under tasks/ remain the source of truth; drops persist only against a live server (arggon board --serve)${live}</div>
 </header>
 <main class="board">
 ${columns}
 </main>
+<div id="board-toast" role="status" aria-live="polite"></div>
+<script>
+'use strict';
+${evaluateDrop.toString()}
+(function () {
+  var ENDPOINT = document.body.getAttribute("data-update-endpoint") || "/api/update";
+  var toastTimer = null;
+  function toast(message, kind) {
+    var el = document.getElementById("board-toast");
+    el.textContent = message;
+    el.className = "show " + (kind || "");
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.className = ""; }, 6000);
+  }
+  function columnFor(status) {
+    return document.querySelector('.column[data-status="' + status + '"]');
+  }
+  function refreshCounts() {
+    var parts = [];
+    document.querySelectorAll(".column").forEach(function (col) {
+      var n = col.querySelectorAll(".card").length;
+      col.querySelector(".count").textContent = String(n);
+      parts.push(col.getAttribute("data-status") + ": " + n);
+    });
+    var metaCounts = document.getElementById("status-counts");
+    if (metaCounts) metaCounts.textContent = parts.join(" · ");
+  }
+  function normalizeEmpties() {
+    document.querySelectorAll(".column").forEach(function (col) {
+      var empty = col.querySelector(".empty");
+      if (col.querySelectorAll(".card").length === 0) {
+        if (!empty) {
+          var d = document.createElement("div");
+          d.className = "empty";
+          d.textContent = "—";
+          col.appendChild(d);
+        }
+      } else if (empty) {
+        empty.remove();
+      }
+    });
+  }
+  var dragged = null;
+  document.addEventListener("dragstart", function (e) {
+    var card = e.target && e.target.closest ? e.target.closest(".card") : null;
+    if (!card) return;
+    dragged = card;
+    card.classList.add("dragging");
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", card.getAttribute("data-id"));
+    }
+  });
+  document.addEventListener("dragend", function () {
+    document.querySelectorAll(".card.dragging").forEach(function (c) { c.classList.remove("dragging"); });
+    document.querySelectorAll(".column.over").forEach(function (c) { c.classList.remove("over"); });
+    dragged = null;
+  });
+  document.querySelectorAll(".column").forEach(function (col) {
+    col.addEventListener("dragover", function (e) {
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = "move";
+      col.classList.add("over");
+    });
+    col.addEventListener("dragleave", function (e) {
+      if (!col.contains(e.relatedTarget)) col.classList.remove("over");
+    });
+    col.addEventListener("drop", function (e) {
+      e.preventDefault();
+      col.classList.remove("over");
+      var card = dragged;
+      dragged = null;
+      if (card) attemptMove(card, col.getAttribute("data-status"));
+    });
+  });
+  function attemptMove(card, to) {
+    var from = card.getAttribute("data-status");
+    var id = card.getAttribute("data-id");
+    var verdict = evaluateDrop(
+      { id: id, type: card.getAttribute("data-type"), status: from, assignee: card.getAttribute("data-assignee") },
+      to
+    );
+    if (!verdict.ok) {
+      toast("✗ " + verdict.reason, "refused");
+      return;
+    }
+    var reason = null;
+    if (to === "blocked") {
+      reason = window.prompt("--blocked-reason required to block " + id + ":");
+      if (!reason || !reason.trim()) {
+        toast("✗ status blocked requires --blocked-reason (drop cancelled)", "refused");
+        return;
+      }
+      reason = reason.trim();
+    }
+    var anchor = card.nextSibling;
+    var body = { id: id, status: to };
+    if (reason) body.blocked_reason = reason;
+    // Optimistic move; the catch below reverts it when the update call fails.
+    card.setAttribute("data-status", to);
+    columnFor(to).appendChild(card);
+    normalizeEmpties();
+    refreshCounts();
+    toast("… arggon update " + id + " --status " + to, "pending");
+    fetch(ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    })
+      .then(function (res) {
+        return res.json().catch(function () {
+          return { ok: false, error: { message: "HTTP " + res.status } };
+        });
+      })
+      .then(function (data) {
+        if (data && data.ok) {
+          toast("✓ " + id + " -> " + to, "ok");
+          return;
+        }
+        throw new Error(data && data.error && data.error.message ? data.error.message : "update failed");
+      })
+      .catch(function (err) {
+        card.setAttribute("data-status", from);
+        var col = columnFor(from);
+        if (anchor && anchor.parentNode === col) col.insertBefore(card, anchor);
+        else col.appendChild(card);
+        normalizeEmpties();
+        refreshCounts();
+        var message = err && err.message ? err.message : "update failed";
+        if (message === "Failed to fetch") {
+          message = "static snapshot: no update endpoint (serve with arggon board --serve)";
+        }
+        toast("✗ " + id + " not moved — " + message + " (run: arggon update " + id + " --status " + to + ")", "refused");
+      });
+  }
+})();
+</script>
 </body>
 </html>
 `;
