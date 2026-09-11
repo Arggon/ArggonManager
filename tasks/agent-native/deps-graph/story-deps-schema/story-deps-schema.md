@@ -1,6 +1,6 @@
 ---
 type: story
-status: in_progress
+status: done
 id: story-deps-schema
 title: Dependency graph schema (v3)
 assignee: Arggon

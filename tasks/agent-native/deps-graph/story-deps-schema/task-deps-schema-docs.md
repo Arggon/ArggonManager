@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-deps-schema-docs
 title: Convention v3 docs for dependency fields
 assignee: Arggon
