@@ -197,6 +197,8 @@ arggon board --github         # overlay live GitHub PR state on cards with a bra
 
 The board is a snapshot: re-run after tree changes to refresh. The generated file is a build artifact — safe to gitignore; deleting it loses nothing.
 
+`arggon report` aggregates leaf (task/bug) statuses per story, grouped by epic, for display only (never writes). Every story gets a row — leafless stories show zeros with `(empty — no leaves)`, storiless epics `(empty — no stories)` — and `cancelled` has its own explicit column. Flags: `--json` (envelope `{ groups }` mirroring the table rows exactly, failures `REPORT_FAILED`).
+
 Fixtures: [fixtures/](fixtures/).
 
 ## Contributing

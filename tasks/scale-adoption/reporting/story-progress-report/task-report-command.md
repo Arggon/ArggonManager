@@ -1,9 +1,10 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-report-command
 title: Add report command with per-container counts
 assignee: arggondev
+branch: feat/task-report-command
 parent: story-progress-report
 labels: []
 created: "2026-09-11"

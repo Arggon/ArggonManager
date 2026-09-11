@@ -159,6 +159,19 @@ Failures use `error.code: "START_FAILED"` (unknown id, taken claim — never for
 
 Empty pool is success (`ok: true`, `suggestion: null`). Failures use `error.code: "NEXT_FAILED"` (missing tasks/, unreadable items).
 
+### `report`
+
+| Field                 | Type                  | Notes                                                            |
+| --------------------- | --------------------- | ---------------------------------------------------------------- |
+| `groups`              | `object[]`            | One entry per epic, lexicographic by id (same rows as the table) |
+| `groups[].epic`       | `{id, title}`         | The epic                                                         |
+| `groups[].initiative` | `{id, title} \| null` | Parent initiative (null when absent)                             |
+| `groups[].containers` | `object[]`            | One entry per story: `{id, title, type, counts, empty}`          |
+| `groups[].totals`     | `counts`              | Sums over the epic's stories                                     |
+| `groups[].empty`      | `boolean`             | True when the epic has no stories                                |
+
+`counts` always carries all five statuses (`todo`, `in_progress`, `blocked`, `done`, `cancelled` — cancelled explicit, never lumped) plus `total`. Leafless stories report zeros with `empty: true`. Display-only: never writes. Failures use `error.code: "REPORT_FAILED"` (missing tasks/, unreadable items).
+
 ### `board`
 
 | Field       | Type      | Notes                                                      |
