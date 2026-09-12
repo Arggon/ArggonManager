@@ -447,3 +447,38 @@ describe("arggon board --tui (CLI)", () => {
     expect(payload.error.message).toContain("--serve");
   });
 });
+
+describe("renderTui column alignment (bug-tui-column-shift)", () => {
+  const mk = (id: string, status: string, type: WorkItem["type"] = "task"): WorkItem => ({
+    id,
+    type,
+    status: status as WorkItem["status"],
+    title: id,
+    assignee: null,
+    branch: null,
+    parent: null,
+    labels: [],
+    created: null,
+    updated: null,
+    path: `tasks/x/${id}.md`,
+    blocked_reason: null,
+    milestone: null,
+    depends_on: [],
+    claimed_at: null,
+    worktree_path: null,
+  });
+
+  it("keeps right-hand columns at their own x-offset when the selected column runs out of cards (color on)", () => {
+    const items = [mk("task-b1", "blocked"), mk("task-d1", "done"), mk("task-d2", "done"), mk("task-d3", "done")];
+    const state = { ...initialTuiState(80, 12), column: 2 }; // blocked selected
+    const lines = renderTui(items, state).split("\n"); // color ON (default)
+    const colWidth = Math.floor(80 / 5);
+    const visibleX = (line: string, needle: string): number =>
+      line.replace(/\x1b\[[0-9;]*m/g, "").indexOf(needle) - 4; // minus "M B " prefix
+    // Rows where blocked has no cell must not shift done's cards left.
+    for (const id of ["task-d1", "task-d2", "task-d3"]) {
+      const line = lines.find((l) => l.replace(/\x1b\[[0-9;]*m/g, "").includes(id))!;
+      expect(visibleX(line, id), `${id} x-offset`).toBe(3 * colWidth);
+    }
+  });
+});

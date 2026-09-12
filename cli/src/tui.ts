@@ -255,7 +255,11 @@ export function renderTui(
     let line = "";
     for (let c = 0; c < STATUSES.length; c++) {
       const cell = columnCards[c][row] ?? "";
-      line += color && c === state.column ? cell : padEndTo(cell, colWidth);
+      // Pad EVERY cell to the column width, selected column included: an
+      // unpadded empty cell shifts all right-hand columns one colWidth left
+      // (bug-tui-column-shift). padEndTo on an SGR-wrapped cell is a no-op
+      // by string length; the visible width was pre-padded at construction.
+      line += padEndTo(cell, colWidth);
     }
     lines.push(padEndTo(line, width));
   }
