@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-stack-explore
 title: arggon stack explore — exploration records
+assignee: Arggon
 parent: story-tech-playbooks
 labels: []
 created: "2026-09-12"
@@ -23,4 +24,4 @@ updated: "2026-09-12"
 
 ## Acceptance
 
-- [ ] Exploration template + scaffold command; never overwrites; --json
+- [x] Exploration template + scaffold command; never overwrites; --json

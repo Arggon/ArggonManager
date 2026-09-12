@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-playbooks-docs
 title: Playbooks docs + AGENTS.md wiring
+assignee: Arggon
 parent: story-tech-playbooks
 labels: []
 created: "2026-09-12"
@@ -23,5 +24,5 @@ Docs + wiring: the init-generated AGENTS.md must reference docs/playbooks/ so ag
 
 ## Acceptance
 
-- [ ] README + agents.md (maintenance section) document the pipeline: explore -> ADR -> playbook -> status/--file-task
-- [ ] init-generated AGENTS.md includes the playbooks pointer (template updated + test)
+- [x] README + agents.md (maintenance section) document the pipeline: explore -> ADR -> playbook -> status/--file-task
+- [x] init-generated AGENTS.md includes the playbooks pointer (template updated + test)

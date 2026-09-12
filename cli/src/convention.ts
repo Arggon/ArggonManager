@@ -36,12 +36,24 @@ export const DEFAULT_BRANCH_PATTERNS: Record<ItemType, string> = {
   bug: "fix/{id}",
 };
 
+/** `x-playbooks` namespaced extension options (story-tech-playbooks). */
+export type PlaybooksConfig = {
+  /**
+   * Stale threshold for `arggon playbook status`, in days, from
+   * `x-playbooks.max-age-days`. `null` when unset (the command applies its
+   * own default of 90).
+   */
+  maxAgeDays: number | null;
+};
+
 export type ConventionConfig = {
   version: number;
   /** Per-type branch patterns; always complete (missing keys fall back to defaults). */
   branchPatterns: Record<ItemType, string>;
   /** Named saved views (`x-views` extension key): view name -> filter expression. */
   views: Record<string, string>;
+  /** Technology-playbook options (`x-playbooks` extension key). */
+  playbooks: PlaybooksConfig;
 };
 
 function stripQuotes(value: string): string {
@@ -57,8 +69,10 @@ function stripQuotes(value: string): string {
 /**
  * Parse `tasks/.convention.yml` (line-oriented, no YAML dependency).
  * Unknown top-level keys are ignored for forward compatibility;
- * `x-views` is the official namespaced extension for saved views.
- * Throws with file context on malformed `branch_patterns` or `x-views`.
+ * `x-views` (saved views) and `x-playbooks` (playbook staleness options)
+ * are the official namespaced extensions.
+ * Throws with file context on malformed `branch_patterns`, `x-views`,
+ * or `x-playbooks`.
  */
 export function parseConventionConfig(
   raw: string,
@@ -66,6 +80,7 @@ export function parseConventionConfig(
 ): ConventionConfig {
   const branchPatterns: Record<ItemType, string> = { ...DEFAULT_BRANCH_PATTERNS };
   const views: Record<string, string> = {};
+  const playbooks: PlaybooksConfig = { maxAgeDays: null };
   let version = CONVENTION_VERSION_DEFAULT;
   let section: string | null = null;
 
@@ -93,7 +108,24 @@ export function parseConventionConfig(
           throw new Error(`${sourcePath}: 'x-views' must be a mapping, one view per line`);
         }
         section = "x-views";
+      } else if (key === "x-playbooks") {
+        if (value !== "") {
+          throw new Error(`${sourcePath}: 'x-playbooks' must be a mapping, one option per line`);
+        }
+        section = "x-playbooks";
       }
+      continue;
+    }
+    if (section === "x-playbooks") {
+      // Namespaced extension: unknown nested keys are ignored (ignore-unknown),
+      // only the official `max-age-days` option is read.
+      if (key !== "max-age-days") continue;
+      if (!/^\d+$/.test(value) || Number.parseInt(value, 10) <= 0) {
+        throw new Error(
+          `${sourcePath}: 'max-age-days' must be a positive integer (got ${JSON.stringify(value)})`,
+        );
+      }
+      playbooks.maxAgeDays = Number.parseInt(value, 10);
       continue;
     }
     if (section === "x-views") {
@@ -128,7 +160,7 @@ export function parseConventionConfig(
     branchPatterns[key] = pattern;
   }
 
-  return { version, branchPatterns, views };
+  return { version, branchPatterns, views, playbooks };
 }
 
 /** Read and parse `<dir>/tasks/.convention.yml`. Missing file yields version 0 + defaults. */
@@ -139,6 +171,7 @@ export function readConventionConfig(dir: string): ConventionConfig {
       version: CONVENTION_VERSION_DEFAULT,
       branchPatterns: { ...DEFAULT_BRANCH_PATTERNS },
       views: {},
+      playbooks: { maxAgeDays: null },
     };
   }
   return parseConventionConfig(readFileSync(path, "utf8"), path);

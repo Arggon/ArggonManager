@@ -252,6 +252,37 @@ arggon spec new my-feature --json     # v1 envelope { files: string[] }
 
 `spec new` numbers globally (max existing NNN across `docs/specs` + `docs/plans`, plus 1) and **never overwrites** an existing file. Templates live in [`templates/spec.md`](templates/spec.md) / [`templates/plan.md`](templates/plan.md) (`{{SLUG}}`, `{{NNN}}`, `{{ID}}`, `{{TITLE}}`, `{{DATE}}` placeholders; an embedded copy in the CLI is the fallback). See the pipeline spec: [docs/specs/spec-spec-pipeline-002.md](docs/specs/spec-spec-pipeline-002.md).
 
+### `arggon stack explore`
+
+Scaffolds an exploration record — the spike note that precedes a stack ADR — at `docs/explorations/exploration-<slug>-NNN.md` with sections **Candidates**, **Criteria**, **Findings** (dated source links), **Recommendation**, and a **Decision** ADR placeholder. The research itself (comparing candidates, collecting dated sources) is the caller's job; the command records it. `NNN` is the max existing number across `docs/explorations` plus 1 (zero-padded to 3), and the command **never overwrites** an existing file.
+
+```bash
+arggon stack explore "vector database"          # docs/explorations/exploration-vector-database-001.md
+arggon stack explore "vector database" --title "Vector DB options"
+arggon stack explore "cache layer" --json       # v1 envelope { command: "explore", files: string[] }
+```
+
+Template: [`templates/exploration.md`](templates/exploration.md) (`{{SLUG}}`, `{{NNN}}`, `{{ID}}`, `{{TITLE}}`, `{{DATE}}` placeholders; an embedded copy in the CLI is the fallback). Fails outside a `tasks/` tree with an actionable error; failures exit non-zero (`EXPLORE_FAILED` under `--json`).
+
+### `arggon playbook`
+
+Technology playbooks with version-freshness tracking (story-tech-playbooks): one playbook per tech at `docs/playbooks/<tech>.md` pinning the chosen version and the current best practices, generated after a documented exploration (`arggon stack explore` → ADR → `playbook new`). The version/best-practices research is the **caller's** job at creation time; the CLI records it and tracks freshness — a stale playbook files a re-research task, like the container cascade drives completion.
+
+```bash
+arggon playbook new postgres --version 16.3   # docs/playbooks/postgres.md (status: current, researched: today)
+arggon playbook new vector-db                 # version defaults to "unpinned"
+arggon playbook status                        # table: tech, version, researched, age-days, current/STALE
+arggon playbook status --max-age-days 30      # flag wins over x-playbooks.max-age-days and the 90-day default
+arggon playbook status --file-task story-x    # one re-research task per stale playbook (idempotent)
+arggon playbook refresh postgres --version 16.4   # after re-research: version + researched: today + status: current
+```
+
+- `playbook new <tech>`: kebab-case tech slug; refuses to overwrite an existing playbook (one per tech — re-research instead). Frontmatter: `playbook_id`, `version` (`--version` or `unpinned`), `researched` (today), `status: current`. Sections Setup / Conventions / Testing / Security / Upgrade policy, each a `<!-- fill me -->` stub reminding the caller to research current best practices with dated sources
+- `playbook status`: stale when `today − researched > max-age-days` (default **90**; override via `tasks/.convention.yml` `x-playbooks.max-age-days:`, the namespaced extension parsed like `x-views`; `--max-age-days` wins over both). Unknown/missing research dates count as stale
+- `playbook status --file-task <story-id>`: creates one `todo` task per stale playbook via the same kernel as `create` — id `task-re-research-<tech>`, title `Re-research <tech> playbook (v<version>, N days old)`, body linking the playbook path; skips ids that already exist; errors when the story does not exist
+- `playbook refresh <tech> --version <v>`: frontmatter-only write (body byte-identical) — sets `version`, `researched: today`, `status: current`
+- `--json`: v1 envelope `command: "playbook"` — `new`/`refresh` return `{ files }` / `{ path, version, researched }`; `status` returns `{ playbooks: [{ id, version, researched, ageDays, stale, path }], staleCount, maxAgeDays, created, skipped }`. Failures exit non-zero (`PLAYBOOK_FAILED` under `--json`; `EXPLORE_FAILED` for `stack explore`)
+
 ### `arggon import-issues`
 
 One-shot migration of an existing GitHub issue backlog into `tasks/` (the docs/agents.md §0 promise). Reads issues via `gh issue list --state all --limit 200 --json number,title,state,body,labels` and writes one task per issue through the same kernel as `create`/`update`. **Idempotent**: target ids are `task-issue-<number>`, so a re-run imports nothing (`created: 0`, everything skipped).

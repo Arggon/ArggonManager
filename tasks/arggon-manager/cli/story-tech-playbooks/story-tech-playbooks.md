@@ -1,12 +1,15 @@
 ---
 type: story
-status: todo
+status: done
 id: story-tech-playbooks
 title: Technology playbooks with version-freshness tracking
+assignee: Arggon
+branch: feat/story-tech-playbooks-impl
 parent: cli
 labels: []
 created: "2026-09-12"
 updated: "2026-09-12"
+claimed_at: "2026-09-12T19:40:21.923Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tech-playbooks/story-tech-playbooks.md (story index; required).
@@ -21,5 +24,5 @@ Technology playbooks: per-tech docs (docs/playbooks/<tech>.md) with the chosen v
 
 ## Acceptance
 
-- [ ] `arggon stack explore` + `arggon playbook new/status` landed with docs
-- [ ] Stale playbooks (>90d, configurable) are flagged and can file a re-research task into the tracker
+- [x] `arggon stack explore` + `arggon playbook new/status` landed with docs
+- [x] Stale playbooks (>90d, configurable) are flagged and can file a re-research task into the tracker

@@ -26,7 +26,7 @@ Every success or failure payload includes:
 | `ok`                | boolean | `true` on success; `false` on failure                                                                                                 |
 | `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.                                            |
 | `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                                                        |
-| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `comment` \| `branch` \| `start` \| `cleanup` \| `board` \| `sync` \| `import-issues` \| `instructions` \| `spec` \| `mcp` |
+| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `comment` \| `branch` \| `start` \| `cleanup` \| `board` \| `sync` \| `import-issues` \| `instructions` \| `spec` \| `explore` \| `playbook` \| `mcp` |
 
 Command-specific fields sit next to this envelope (not nested under a generic `data` key).
 
@@ -163,6 +163,52 @@ Covers both subcommands; the envelope `command` is always `"spec"`.
 | `files` | `string[]` | Created paths, posix, relative to the repo root |
 
 Failures use `error.code: "SPEC_FAILED"` (invalid slug, refusing to overwrite, missing `tasks/`).
+
+### `explore`
+
+`stack explore <topic> [--title <t>]` scaffolds `docs/explorations/exploration-<slug>-NNN.md` (candidates, criteria, findings with dated sources, recommendation, Decision/ADR placeholder); never overwrites. The envelope `command` is `"explore"`.
+
+| Field   | Type       | Notes                                        |
+| ------- | ---------- | -------------------------------------------- |
+| `files` | `string[]` | Created paths, posix, relative to the repo root |
+
+Failures use `error.code: "EXPLORE_FAILED"` (unslugifiable topic, refusing to overwrite, missing `tasks/`).
+
+### `playbook`
+
+Covers all `playbook` subcommands; the envelope `command` is always `"playbook"`.
+
+`playbook new <tech> [--version <v>] [--title <t>]` scaffolds `docs/playbooks/<tech>.md` (frontmatter `playbook_id` / `version` / `researched` / `status: current`; one playbook per tech); never overwrites.
+
+| Field   | Type       | Notes                                        |
+| ------- | ---------- | -------------------------------------------- |
+| `files` | `string[]` | Created paths, posix, relative to the repo root |
+
+`playbook status [--max-age-days <n>] [--file-task <story-id>]` (pure read unless `--file-task` files tasks):
+
+| Field         | Type       | Notes                                                                                            |
+| ------------- | ---------- | ------------------------------------------------------------------------------------------------ |
+| `playbooks`   | `object[]` | One entry per playbook in `docs/playbooks/`, sorted by id                                        |
+| `playbooks[].id`         | `string`        | Frontmatter `playbook_id`, else the filename stem                          |
+| `playbooks[].version`    | `string`        | Frontmatter `version`; `"unknown"` when missing                            |
+| `playbooks[].researched` | `string\|null`  | `YYYY-MM-DD` as recorded; `null` when missing/unparseable                  |
+| `playbooks[].ageDays`    | `number\|null`  | Whole days from `researched` to today (UTC); `null` when unknown           |
+| `playbooks[].stale`      | `boolean`       | `ageDays > maxAgeDays`; unknown age counts as stale                        |
+| `playbooks[].path`       | `string`        | Posix path relative to the repo root                                       |
+| `staleCount`  | `number`   | Entries with `stale: true`                                                                       |
+| `maxAgeDays`  | `number`   | Effective threshold: `--max-age-days`, else `x-playbooks.max-age-days`, else 90                  |
+| `created`     | `string[]` | With `--file-task`: ids of re-research tasks created this run (`task-re-research-<tech>`, status `todo`) |
+| `skipped`     | `string[]` | With `--file-task`: ids whose re-research task already existed (idempotent skip)                 |
+
+`playbook refresh <tech> --version <v>` (frontmatter-only write, body untouched):
+
+| Field        | Type     | Notes                                       |
+| ------------ | -------- | ------------------------------------------- |
+| `path`       | `string` | Updated playbook path, posix, relative to the repo root |
+| `version`    | `string` | The re-researched version                   |
+| `researched` | `string` | Today, `YYYY-MM-DD`                         |
+
+Failures use `error.code: "PLAYBOOK_FAILED"` (bad slug, refusing to overwrite, missing `tasks/`, unknown playbook, missing story for `--file-task`, invalid `--max-age-days`).
 
 ### `create` / `update`
 
