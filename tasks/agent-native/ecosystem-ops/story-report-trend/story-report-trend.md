@@ -1,6 +1,6 @@
 ---
 type: story
-status: in_progress
+status: done
 id: story-report-trend
 title: Git-history trend reporting
 assignee: Arggon
