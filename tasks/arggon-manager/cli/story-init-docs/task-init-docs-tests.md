@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-init-docs-tests
 title: "Init docs: tests and documentation"
+assignee: Arggon
 parent: story-init-docs
 labels: []
 created: "2026-09-12"
@@ -23,5 +24,5 @@ Tests and docs for the generator.
 
 ## Acceptance
 
-- [ ] Tests: fresh init creates the full set; second init skips (idempotent); --full tier-2; existing files never overwritten; placeholders rendered
-- [ ] README/agents.md document the generated set
+- [x] Tests: fresh init creates the full set; second init skips (idempotent); --full tier-2; existing files never overwritten; placeholders rendered
+- [x] README/agents.md document the generated set

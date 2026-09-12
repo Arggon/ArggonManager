@@ -121,6 +121,7 @@ Snippets are extracted from the playbook at runtime; failures use `error.code: "
 | `alreadyInitialized` | `boolean`  | Whether `tasks/.convention.yml` existed before this run                         |
 | `force`              | `boolean`  | Whether `--force` was set                                                       |
 | `created`            | `string[]` | Paths created/overwritten this run (posix, relative to `root`)                  |
+| `skipped`            | `string[]` | Doc files that already existed and were left untouched (posix, relative to `root`). Additive in v1: older clients ignore it |
 | `restored`           | `string[]` | Missing templates restored when already initialized (posix, relative to `root`) |
 
 ### `list`
@@ -340,6 +341,15 @@ Failures use `error.code: "IMPORT_FAILED"` (gh missing/unauthenticated or unpars
   "alreadyInitialized": false,
   "force": false,
   "created": [
+    ".editorconfig",
+    ".github/CODEOWNERS",
+    ".github/PULL_REQUEST_TEMPLATE.md",
+    ".github/copilot-instructions.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "CONTRIBUTING.md",
+    "SECURITY.md",
+    "docs/tracking.md",
     "tasks/.convention.yml",
     "templates/bug.md",
     "templates/epic.md",
@@ -347,11 +357,12 @@ Failures use `error.code: "IMPORT_FAILED"` (gh missing/unauthenticated or unpars
     "templates/story.md",
     "templates/task.md"
   ],
+  "skipped": [],
   "restored": []
 }
 ```
 
-Init still **writes** `tasks/.convention.yml` and `templates/`; `--json` only changes how the result is printed.
+Init still **writes** `tasks/.convention.yml`, `templates/`, and the governing docs (tier-1 by default; tier-2 with `--full`); `--json` only changes how the result is printed. Doc templates render `{{PROJECT_NAME}}` (target dir name) and `{{YEAR}}` at write time; docs are never overwritten — pre-existing files are reported in `skipped[]`, so a second run on an initialized repo is `created: []`.
 
 ### `list` sample (drawn from `tasks/launch-mvp`)
 

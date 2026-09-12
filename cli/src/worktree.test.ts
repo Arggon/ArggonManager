@@ -46,7 +46,9 @@ function initRepo(): string {
   for (const id of ["task-alpha", "task-bravo", "task-charlie"]) {
     runCreate({ cwd: dir, type: "task", title: id, parent: "login", id, now: NOW });
   }
-  git(["add", "tasks", "templates"], dir);
+  // init now also generates governing docs (AGENTS.md, .github/, docs/, ...);
+  // commit the whole scaffold so the tree is clean for start --worktree.
+  git(["add", "-A"], dir);
   git(["commit", "--quiet", "-m", "init tasks"], dir);
   return dir;
 }

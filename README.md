@@ -132,7 +132,14 @@ npm test
 npm run lint
 ```
 
-`arggon init` creates `tasks/.convention.yml` and copies `templates/` (no overwrite unless --force; already-initialized repos are a no-op).
+`arggon init` creates `tasks/.convention.yml`, copies `templates/`, and generates the governing document set from master templates in `templates/docs/` (no overwrite unless --force — docs are **never** overwritten, even with --force; already-initialized repos are a no-op except for missing templates/docs).
+
+Generated docs (placeholders `{{PROJECT_NAME}}` from the target dir name and `{{YEAR}}` are rendered at write time):
+
+- **Default (tier-1):** `AGENTS.md` (spec-compliant agent workflow), `CLAUDE.md` (one-line `@AGENTS.md` shim), `.github/copilot-instructions.md` (pointer), `CONTRIBUTING.md`, `SECURITY.md`, `.editorconfig`, `.github/CODEOWNERS` (placeholder), `.github/PULL_REQUEST_TEMPLATE.md`, `docs/tracking.md` (work tracking in `tasks/`, not GitHub issues).
+- **`--full` adds (tier-2):** `ARCHITECTURE.md`, `docs/convention.md` + `docs/engineering.md` (adopter-owned project templates), `CHANGELOG.md`, `SUPPORT.md`, `docs/runbooks/README.md`.
+
+Everything created is listed in `created[]`; pre-existing files land in `skipped[]` (see [`docs/json-output.md`](docs/json-output.md)).
 
 ### `arggon list`
 

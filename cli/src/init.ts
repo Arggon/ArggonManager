@@ -2,6 +2,7 @@ import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from 
 import { join, resolve } from "node:path";
 import { bundledTemplatesDir } from "./paths.js";
 import { CONVENTION_VERSION, DEFAULT_BRANCH_PATTERNS } from "./convention.js";
+import { generateDocs } from "./docs.js";
 import type { ItemType } from "./ids.js";
 
 const CONVENTION_YML =
@@ -14,6 +15,8 @@ const CONVENTION_YML =
 export type InitOptions = {
   dir: string;
   force: boolean;
+  /** Also generate the tier-2 doc set (ARCHITECTURE.md, docs/convention.md, ...). */
+  full?: boolean;
 };
 
 export type InitResult = {
@@ -21,6 +24,8 @@ export type InitResult = {
   alreadyInitialized: boolean;
   force: boolean;
   created: string[];
+  /** Doc files that already existed and were left untouched (never overwritten). */
+  skipped: string[];
   restored: string[];
   conventionPath: string;
 };
@@ -53,11 +58,13 @@ export function runInit(opts: InitOptions): InitResult {
     const restored = ensureTemplates(root, false)
       .map((name) => `templates/${name}`)
       .sort();
+    const docs = generateDocs({ root, full: Boolean(opts.full) });
     return {
       root,
       alreadyInitialized: true,
       force: false,
-      created: [],
+      created: docs.created,
+      skipped: docs.skipped,
       restored,
       conventionPath,
     };
@@ -72,13 +79,15 @@ export function runInit(opts: InitOptions): InitResult {
   mkdirSync(tasksDir, { recursive: true });
   writeFileSync(conventionPath, CONVENTION_YML, "utf8");
   const copiedTemplates = ensureTemplates(root, opts.force).map((name) => `templates/${name}`);
-  const created = ["tasks/.convention.yml", ...copiedTemplates].sort();
+  const docs = generateDocs({ root, full: Boolean(opts.full) });
+  const created = ["tasks/.convention.yml", ...copiedTemplates, ...docs.created].sort();
 
   return {
     root,
     alreadyInitialized,
     force: opts.force,
     created,
+    skipped: docs.skipped,
     restored: [],
     conventionPath,
   };

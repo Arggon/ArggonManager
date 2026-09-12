@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-init-docs-generator
 title: "Init document generator (AGENTS.md, shims, tier-1/tier-2 set)"
+assignee: Arggon
 parent: story-init-docs
 labels: []
 created: "2026-09-12"
@@ -23,6 +24,6 @@ Master templates live in templates/docs/ (ArggonManager-owned, improved by PR); 
 
 ## Acceptance
 
-- [ ] Tier-1 default set + `--full` tier-2 set, generated in one `arggon init` run (existing init semantics preserved: no overwrite, idempotent)
-- [ ] AGENTS.md spec-compliant + CLAUDE.md shim + copilot pointer generated
-- [ ] Templates render placeholders (project name/year); all files listed in init --json created[]
+- [x] Tier-1 default set + `--full` tier-2 set, generated in one `arggon init` run (existing init semantics preserved: no overwrite, idempotent)
+- [x] AGENTS.md spec-compliant + CLAUDE.md shim + copilot pointer generated
+- [x] Templates render placeholders (project name/year); all files listed in init --json created[]
