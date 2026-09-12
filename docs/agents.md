@@ -166,6 +166,20 @@ Agents follow `docs/playbooks/` by default (the init-generated `AGENTS.md` point
 - `arggon validate` passes.
 - If the change made any doc statement false, that doc edit belongs in this PR.
 
+## Adoption sweep (existing repos)
+
+`arggon adopt` turns "start using ArggonManager here" into a tracked, agent-executable migration. It requires an initialized tree (`arggon init` first — the command pre-flights through the same logic as `arggon doctor`), inventories the repo's governing docs (present/absent, arggon-managed via `x-generated` provenance vs adopter-owned, plus cheap stack-manifest hints), and files one task — `task-adopt-arggon`, "Adopt ArggonManager in this repo" — whose body is the checklist below. `--dry-run` prints the inventory and planned actions and writes nothing; the same JSON is how the executing agent re-derives the inventory mid-flight. The task is created under `--story <story-id>` when given, else under `story-arggon-adoption` (auto-created under the first epic). Idempotent: an already-open `task-adopt-arggon` is reported, not duplicated.
+
+Any agent executing the adoption task follows this procedure (the task body carries the same steps as an acceptance checklist):
+
+1. **Read the arggon-generated docs first**: `AGENTS.md`, `docs/convention.md`, `docs/engineering.md`, `docs/playbooks/` (if present) — they govern the rest of the migration.
+2. **Sweep the existing repo docs** (list them from the inventory): extract the project description, conventions, workflows, and stack info. **Extract, don't wholesale-copy** — rewrite into the target doc's structure and drop duplicated or outdated material.
+3. **Complete the arggon-generated docs** with the extracted content — fill the TODO placeholders: project description in `AGENTS.md`; `CONTRIBUTING.md` specifics (environment setup, build/test commands); `ARCHITECTURE.md` problem statement. The `SECURITY.md` contact is human input — leave it flagged for a human, never invent it.
+4. **Archive replaced originals** to `backup/<YYYY-MM-DD>/` preserving their relative paths (today's date). Only docs you **replaced** get archived; **never archive README.md — merge into it instead**.
+5. **Detect the stack from the manifests** (package.json / requirements.txt / go.mod / Cargo.toml / pom.xml — filenames only); for each technology create a playbook (`arggon playbook new <tech>`), research current versions and best practices with dated sources, then record them with `arggon playbook refresh <tech> --version <v>`.
+6. **Verify**: `arggon validate` + `arggon spec validate` (if specs exist) + `arggon playbook status`.
+7. **Report**: comment on the adoption task (`arggon comment task-adopt-arggon`) listing the extracted content, archived files, and created playbooks; flip the task done when the human reviews.
+
 ## Reference integrations
 
 Copy-paste wiring so agents follow ArggonManager rules **by default** — same CLI, same rules, no private dialect (Phase 3, [#20](https://github.com/Arggon/ArggonManager/issues/20)).

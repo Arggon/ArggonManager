@@ -1,8 +1,10 @@
 ---
 type: task
-status: todo
+status: done
 id: task-adopt-command
 title: arggon adopt — adoption task generator
+assignee: Arggon
+branch: feat/story-adopt-impl
 parent: story-adopt
 labels: []
 created: "2026-09-12"
@@ -23,5 +25,5 @@ updated: "2026-09-12"
 
 ## Acceptance
 
-- [ ] adopt creates the tracked adoption task with the checklist body (idempotent: skips when an un-done adopt task already exists); requires initialized tree
-- [ ] --dry-run reports the plan (existing docs inventory + planned archives) without writing anything
+- [x] adopt creates the tracked adoption task with the checklist body (idempotent: skips when an un-done adopt task already exists); requires initialized tree
+- [x] --dry-run reports the plan (existing docs inventory + planned archives) without writing anything

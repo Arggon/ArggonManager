@@ -26,7 +26,7 @@ Every success or failure payload includes:
 | `ok`                | boolean | `true` on success; `false` on failure                                                                                                 |
 | `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.                                            |
 | `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                                                        |
-| `command`           | string  | Commander command name: `hello` \| `init` \| `doctor` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `comment` \| `branch` \| `start` \| `cleanup` \| `board` \| `sync` \| `import-issues` \| `instructions` \| `spec` \| `explore` \| `playbook` \| `mcp` |
+| `command`           | string  | Commander command name: `hello` \| `init` \| `doctor` \| `adopt` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `comment` \| `branch` \| `start` \| `cleanup` \| `board` \| `sync` \| `import-issues` \| `instructions` \| `spec` \| `explore` \| `playbook` \| `mcp` |
 
 Command-specific fields sit next to this envelope (not nested under a generic `data` key).
 
@@ -461,6 +461,29 @@ Init still **writes** `tasks/.convention.yml` (including the `x-generated` prove
 ```
 
 Non-initialized repos return the same shape with `root: null`, `initialized: false`, zeroed `docs`/`tracker`, and `conventionVersion: 0`.
+
+### `adopt`
+
+Agent-assisted adoption for existing repos (see [docs/agents.md](./agents.md) §Adoption sweep): inventories the governing docs and files the agent-executable migration task `task-adopt-arggon` under a parent story (`--story <story-id>`, else `story-arggon-adoption`, auto-created under the first epic). `--dry-run` computes the full payload and writes nothing — including the default story.
+
+| Field            | Type        | Notes                                                                                                                            |
+| ---------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `taskId`         | `string`    | `task-adopt-arggon` — the created, planned (dry-run), or already-open task id                                                    |
+| `storyId`        | `string`    | Parent story id (`--story` override, `story-arggon-adoption`, or the existing task's parent on an idempotent skip)                |
+| `storyCreated`   | `boolean`   | `true` when this run created `story-arggon-adoption` (always `false` in dry-run and on skip)                                     |
+| `taskCreated`    | `boolean`   | `true` when this run created the task (always `false` in dry-run and on skip)                                                    |
+| `skipped`        | `boolean`   | `true` when an open (`todo`/`in_progress`) `task-adopt-arggon` already existed and creation was skipped (idempotent re-run)       |
+| `taskPath`       | `string`    | Absolute path of the created or existing task file; `"(dry run — not created)"` in dry-run when nothing exists yet               |
+| `inventory`      | `object`    | Read-only doc inventory (below)                                                                                                  |
+| `inventory.docs` | `object[]`  | One entry per scanned governing-doc path (standard destinations + common alternates), sorted by path                             |
+| `inventory.docs[].path`    | `string`  | Posix path relative to the repo root (e.g. `AGENTS.md`, `docs/convention.md`)                                            |
+| `inventory.docs[].exists`  | `boolean` | Whether the file exists on disk                                                                                          |
+| `inventory.docs[].bytes`   | `number`  | File size on disk (`0` when absent)                                                                                      |
+| `inventory.docs[].managed` | `boolean` | `true` when an `x-generated` provenance entry exists for the path — arggon-generated doc set (possibly edited since); an existing file without an entry is adopter-owned (content to extract) |
+| `inventory.stackHints`     | `string[]`| Stack manifests found at the repo root, filename only (`package.json`, `requirements.txt`, `go.mod`, `Cargo.toml`, `pom.xml`) |
+| `dryRun`         | `boolean`   | `true` with `--dry-run` (plan only, no writes)                                                                                   |
+
+Failures use `error.code: "ADOPT_FAILED"` (not an arggon-managed tree — run `arggon init` first; no epic for the default story; `--story` that does not resolve to a story; or a terminal `task-adopt-arggon`, i.e. adoption already completed).
 
 ### `list` sample (drawn from `tasks/launch-mvp`)
 
