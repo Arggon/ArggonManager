@@ -24,5 +24,5 @@ Backlog.md ships a TUI kanban; our contributors live in terminals too. Reuse the
 
 ## Acceptance
 
-- [ ] `arggon board --tui` renders columns with keyboard navigation (arrows, enter = open item path)
-- [ ] Read-only in v1; no writes outside the update path
+- [x] `arggon board --tui` renders columns with keyboard navigation (arrows, enter = open item path)
+- [x] Read-only in v1; no writes outside the update path

@@ -24,5 +24,5 @@ Terminal UI over `list --json` data; dependency-light implementation (raw ANSI, 
 
 ## Acceptance
 
-- [ ] Interactive columns/statuses with keyboard nav and search (`/`); exits cleanly
-- [ ] Renders the same tree state as `arggon board` (golden comparison test on the data layer)
+- [x] Interactive columns/statuses with keyboard nav and search (`/`); exits cleanly
+- [x] Renders the same tree state as `arggon board` (golden comparison test on the data layer)
