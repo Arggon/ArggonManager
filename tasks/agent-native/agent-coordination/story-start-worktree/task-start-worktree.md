@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-start-worktree
 title: start --worktree isolation
+assignee: Arggon
 parent: story-start-worktree
 labels: []
 created: "2026-09-11"
-updated: "2026-09-11"
+updated: "2026-09-12"
+claimed_at: "2026-09-12T00:02:44.311Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-coordination/story-start-worktree/task-start-worktree.md

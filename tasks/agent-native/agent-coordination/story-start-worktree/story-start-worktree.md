@@ -1,12 +1,15 @@
 ---
 type: story
-status: todo
+status: in_progress
 id: story-start-worktree
 title: Worktree-integrated claims
+assignee: Arggon
+branch: feat/story-start-worktree
 parent: agent-coordination
 labels: []
 created: "2026-09-11"
-updated: "2026-09-11"
+updated: "2026-09-12"
+claimed_at: "2026-09-12T00:02:44.152Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-coordination/story-start-worktree/story-start-worktree.md (story index; required).
