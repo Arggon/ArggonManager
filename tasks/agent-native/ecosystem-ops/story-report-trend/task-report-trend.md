@@ -1,12 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-report-trend
 title: report --trend from git history
+assignee: Arggon
+branch: feat/story-report-trend
 parent: story-report-trend
 labels: []
 created: "2026-09-11"
-updated: "2026-09-11"
+updated: "2026-09-12"
+claimed_at: "2026-09-12T01:19:07.186Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-report-trend/task-report-trend.md
@@ -23,5 +26,5 @@ Parse status transitions from commit history of item files; bucket by ISO week.
 
 ## Acceptance
 
-- [ ] Cycle time per leaf (first claim → terminal), weekly completions series, `--since` filter
-- [ ] Deterministic on a fixed repo snapshot (golden test)
+- [x] Cycle time per leaf (first claim → terminal), weekly completions series, `--since` filter
+- [x] Deterministic on a fixed repo snapshot (golden test)

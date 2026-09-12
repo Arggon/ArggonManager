@@ -25,6 +25,12 @@ import { runMcpServer } from "./mcp-server.js";
 import { runNext } from "./next.js";
 import { formatReportMarkdown, formatReportTable, runReport } from "./report.js";
 import {
+  formatTrendMarkdown,
+  formatTrendTable,
+  runTrend,
+  type TrendResult,
+} from "./trend.js";
+import {
   formatSpecValidateHuman,
   runSpecNew,
   runSpecValidate,
@@ -300,7 +306,9 @@ program
   .description("Aggregate leaf statuses per container, grouped by epic (display only)")
   .option("--format <format>", "output format: table (default) or markdown (standup summary)", "table")
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { format?: string; json?: boolean }) => {
+  .option("--trend", "mine git history: weekly completions and cycle time (pure read)", false)
+  .option("--since <date>", "trend window start, YYYY-MM-DD (requires --trend)")
+  .action((opts: { format?: string; json?: boolean; trend?: boolean; since?: string }) => {
     const json = jsonEnabled(opts);
     const format = opts.format ?? "table";
     if (format !== "table" && format !== "markdown") {
@@ -318,17 +326,60 @@ program
       process.exitCode = 1;
       return;
     }
+    if (opts.since !== undefined && !opts.trend) {
+      const message = "--since requires --trend";
+      if (json) {
+        failJson({
+          command: "report",
+          message,
+          code: "REPORT_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon report: ${message}`);
+      process.exitCode = 1;
+      return;
+    }
+    const fail = (message: string, code: "REPORT_FAILED" | "TREND_FAILED"): void => {
+      if (json) {
+        failJson({
+          command: "report",
+          message,
+          code,
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon report: ${message}`);
+      process.exitCode = 1;
+    };
+    let trend: TrendResult | null = null;
+    if (opts.trend) {
+      try {
+        trend = runTrend({ cwd: process.cwd(), since: opts.since });
+      } catch (err) {
+        fail(err instanceof Error ? err.message : String(err), "TREND_FAILED");
+        return;
+      }
+    }
     try {
       const result = runReport({ cwd: process.cwd() });
       if (json) {
-        successJson("report", { groups: result.groups }, readConventionVersion(result.root));
+        const payload: Record<string, unknown> = { groups: result.groups };
+        if (trend) payload.trend = trend;
+        successJson("report", payload, readConventionVersion(result.root));
         return;
       }
       if (format === "markdown") {
-        process.stdout.write(formatReportMarkdown(result));
+        const md = trend
+          ? `${formatReportMarkdown(result)}${formatTrendMarkdown(trend)}`
+          : formatReportMarkdown(result);
+        process.stdout.write(md);
         return;
       }
       process.stdout.write(formatReportTable(result.groups));
+      if (trend) process.stdout.write(formatTrendTable(trend));
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (json) {
