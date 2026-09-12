@@ -1,8 +1,10 @@
 ---
 type: task
-status: todo
+status: done
 id: task-adopt-agent-playbook
 title: Adoption agent playbook
+assignee: Arggon
+branch: feat/story-adopt-impl
 parent: story-adopt
 labels: []
 created: "2026-09-12"
@@ -23,4 +25,4 @@ The agent-side procedure so the adoption task is executable by any agent: sweep 
 
 ## Acceptance
 
-- [ ] docs/agents.md gains the adoption sweep procedure (§Adoption); README documents `arggon adopt`
+- [x] docs/agents.md gains the adoption sweep procedure (§Adoption); README documents `arggon adopt`

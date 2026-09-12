@@ -166,6 +166,24 @@ arggon doctor --json
 
 Non-initialized repos report `initialized: false` with zeroed counts (no crash, still exit 0); failures use `error.code: "DOCTOR_FAILED"` only for unexpected errors.
 
+### `arggon adopt`
+
+Agent-assisted adoption for existing repos (run **after** `arggon init`): turns "start using ArggonManager here" into a tracked, agent-executable migration task instead of a half-finished doc sweep.
+
+```bash
+arggon adopt                      # files task-adopt-arggon with the migration checklist
+arggon adopt --dry-run            # print the inventory + planned actions, write nothing
+arggon adopt --story story-onboarding
+arggon adopt --json               # v1 envelope: { taskId, storyId, storyCreated, taskCreated, skipped, taskPath, inventory, dryRun }
+```
+
+- Pre-flight: requires an initialized tree (same detection as `arggon doctor`); otherwise fails with `ADOPT_FAILED` ("not an arggon-managed tree — run `arggon init` first").
+- Inventory (read-only): every governing doc at the standard destinations — `AGENTS.md`, `CLAUDE.md`, `CONTRIBUTING.md`, `SECURITY.md`, `.editorconfig`, `ARCHITECTURE.md`, the `.github` files, `docs/convention.md`, `docs/engineering.md`, `docs/runbooks/`, `README.md` — plus common alternates (`.cursorrules`, `docs/index.md`, CONTRIBUTING variants). Each entry records `exists`, `bytes`, and `managed` (true when an `x-generated` provenance entry exists — arggon-generated; an existing file without one is adopter-owned, i.e. content to extract). Cheap stack hints: presence of `package.json` / `requirements.txt` / `go.mod` / `Cargo.toml` / `pom.xml` (filenames only).
+- Task: `task-adopt-arggon` — "Adopt ArggonManager in this repo", status `todo`, under `--story <story-id>` when given, else under `story-arggon-adoption` (auto-created under the first epic; actionable error when the tree has no epic). The body is the full agent checklist: read the generated docs, sweep the adopter docs, fill the TODO placeholders, archive replaced originals to `backup/<YYYY-MM-DD>/` (never archive README.md — merge into it), create one playbook per detected technology, verify, and report via `arggon comment`.
+- Idempotent: an already-open (`todo`/`in_progress`) `task-adopt-arggon` is reported (`skipped: true`), not duplicated; a terminal one means adoption already completed and re-running errors.
+
+`--dry-run` prints the same inventory (managed vs adopter-owned vs absent, per-doc sizes, stack hints) and the planned story/task creation without writing anything — including the default story. Executing agents follow the checklist in the task body; the full procedure is documented in [docs/agents.md](docs/agents.md) §Adoption sweep.
+
 ### `arggon list`
 
 Finds `tasks/` with walk-up from cwd (same as `create`), loads work items with the shared kernel, and prints a table (or `--json`). Listing order is lexicographic by `id`. Filters compose with AND.

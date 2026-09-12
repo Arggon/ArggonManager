@@ -1,12 +1,15 @@
 ---
 type: story
-status: todo
+status: done
 id: story-adopt
 title: Agent-assisted adoption for existing repos
+assignee: Arggon
+branch: feat/story-adopt-impl
 parent: cli
 labels: []
 created: "2026-09-12"
 updated: "2026-09-12"
+claimed_at: "2026-09-12T23:04:33.287Z"
 depends_on: [story-adoption-state]
 ---
 <!--
@@ -22,4 +25,4 @@ Adoption flow for existing repos (the user-visible half): `arggon adopt` turns "
 
 ## Acceptance
 
-- [ ] `arggon adopt` landed (task generator + dry-run report); agent playbook documented so any agent can execute the migration task end-to-end
+- [x] `arggon adopt` landed (task generator + dry-run report); agent playbook documented so any agent can execute the migration task end-to-end

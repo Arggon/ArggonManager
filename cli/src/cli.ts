@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import { formatAdoptReport, runAdopt } from "./adopt.js";
 import { displayPath, runBoard } from "./board.js";
 import { startBoardServer } from "./board-serve.js";
 import { runBranch } from "./branch.js";
@@ -167,6 +168,59 @@ program
         return;
       }
       console.error(`arggon doctor: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("adopt")
+  .description(
+    "Inventory the repo's governing docs and create the tracked, agent-executable adoption task (requires init)",
+  )
+  .option("--dry-run", "print the inventory and planned actions, create nothing", false)
+  .option(
+    "--story <story-id>",
+    "parent story for the adoption task (default: auto-create story-arggon-adoption under the first epic)",
+  )
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { dryRun?: boolean; story?: string; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runAdopt({
+        cwd: process.cwd(),
+        story: opts.story,
+        dryRun: Boolean(opts.dryRun),
+      });
+      if (json) {
+        successJson(
+          "adopt",
+          {
+            taskId: result.taskId,
+            storyId: result.storyId,
+            storyCreated: result.storyCreated,
+            taskCreated: result.taskCreated,
+            skipped: result.skipped,
+            taskPath: result.taskPath,
+            inventory: result.inventory,
+            dryRun: result.dryRun,
+          },
+          readConventionVersion(result.root),
+        );
+        return;
+      }
+      process.stdout.write(formatAdoptReport(result));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "adopt",
+          message,
+          code: "ADOPT_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon adopt: ${message}`);
       process.exitCode = 1;
     }
   });
