@@ -1,7 +1,12 @@
 import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { bundledTemplatesDir } from "./paths.js";
-import { CONVENTION_VERSION, DEFAULT_BRANCH_PATTERNS } from "./convention.js";
+import {
+  CONVENTION_VERSION,
+  DEFAULT_BRANCH_PATTERNS,
+  readGeneratedState,
+  updateGeneratedSection,
+} from "./convention.js";
 import { generateDocs } from "./docs.js";
 import type { ItemType } from "./ids.js";
 
@@ -17,6 +22,10 @@ export type InitOptions = {
   force: boolean;
   /** Also generate the tier-2 doc set (ARCHITECTURE.md, docs/convention.md, ...). */
   full?: boolean;
+  /** Archive adopter-modified docs to backup/<date>/<dest> before regenerating. */
+  backup?: boolean;
+  /** Injection point for tests: generation timestamp (defaults to now). */
+  now?: Date;
 };
 
 export type InitResult = {
@@ -24,7 +33,13 @@ export type InitResult = {
   alreadyInitialized: boolean;
   force: boolean;
   created: string[];
-  /** Doc files that already existed and were left untouched (never overwritten). */
+  /** Untouched docs regenerated from the current template (state refreshed). */
+  updated: string[];
+  /** Adopter-modified docs (skipped, or regenerated after --backup). */
+  modified: string[];
+  /** Modified docs archived to backup/<date>/<dest> before regeneration. */
+  backedUp: string[];
+  /** Doc files left untouched (never overwritten). */
   skipped: string[];
   restored: string[];
   conventionPath: string;
@@ -58,12 +73,15 @@ export function runInit(opts: InitOptions): InitResult {
     const restored = ensureTemplates(root, false)
       .map((name) => `templates/${name}`)
       .sort();
-    const docs = generateDocs({ root, full: Boolean(opts.full) });
+    const docs = generateDocs({ root, full: Boolean(opts.full), backup: opts.backup, now: opts.now });
     return {
       root,
       alreadyInitialized: true,
       force: false,
       created: docs.created,
+      updated: docs.updated,
+      modified: docs.modified,
+      backedUp: docs.backedUp,
       skipped: docs.skipped,
       restored,
       conventionPath,
@@ -77,9 +95,12 @@ export function runInit(opts: InitOptions): InitResult {
   }
 
   mkdirSync(tasksDir, { recursive: true });
-  writeFileSync(conventionPath, CONVENTION_YML, "utf8");
+  // A forced re-scaffold carries the x-generated provenance section over so
+  // untouched docs keep regenerating instead of degrading to adopter-modified.
+  const carried = opts.force && alreadyInitialized ? readGeneratedState(root) : {};
+  writeFileSync(conventionPath, updateGeneratedSection(CONVENTION_YML, carried), "utf8");
   const copiedTemplates = ensureTemplates(root, opts.force).map((name) => `templates/${name}`);
-  const docs = generateDocs({ root, full: Boolean(opts.full) });
+  const docs = generateDocs({ root, full: Boolean(opts.full), backup: opts.backup, now: opts.now });
   const created = ["tasks/.convention.yml", ...copiedTemplates, ...docs.created].sort();
 
   return {
@@ -87,6 +108,9 @@ export function runInit(opts: InitOptions): InitResult {
     alreadyInitialized,
     force: opts.force,
     created,
+    updated: docs.updated,
+    modified: docs.modified,
+    backedUp: docs.backedUp,
     skipped: docs.skipped,
     restored: [],
     conventionPath,

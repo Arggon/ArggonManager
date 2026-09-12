@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-generated-provenance
 title: "x-generated provenance: checksums, markers, safe regenerate"
+assignee: Arggon
 parent: story-adoption-state
 labels: []
 created: "2026-09-12"
@@ -23,6 +24,6 @@ Provenance: generateDocs stamps every generated doc with a visible marker commen
 
 ## Acceptance
 
-- [ ] Markers + x-generated state written by generateDocs (including the skill bundle); validate accepts v3 trees with x-generated (namespaced, ignore-unknown)
-- [ ] Re-run: untouched docs regenerate silently (state refreshed); modified docs skipped + `modified[]`; `--backup` archives to backup/<date>/ then regenerates
-- [ ] Tests: untouched/modified/backup/first-run flows with fixed checksums; doctor counts
+- [x] Markers + x-generated state written by generateDocs (including the skill bundle); validate accepts v3 trees with x-generated (namespaced, ignore-unknown)
+- [x] Re-run: untouched docs regenerate silently (state refreshed); modified docs skipped + `modified[]`; `--backup` archives to backup/<date>/ then regenerates
+- [x] Tests: untouched/modified/backup/first-run flows with fixed checksums; doctor counts

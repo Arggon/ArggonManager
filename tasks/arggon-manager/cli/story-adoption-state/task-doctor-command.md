@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-doctor-command
 title: arggon doctor — installation state report
+assignee: Arggon
 parent: story-adoption-state
 labels: []
 created: "2026-09-12"
@@ -23,5 +24,5 @@ updated: "2026-09-12"
 
 ## Acceptance
 
-- [ ] doctor reports initialized + conventionVersion + docs state (managed/modified/stale counts) from x-generated
-- [ ] Works on non-initialized repos (reports initialized: false, no crash); --json envelope; report-only (never writes)
+- [x] doctor reports initialized + conventionVersion + docs state (managed/modified/stale counts) from x-generated
+- [x] Works on non-initialized repos (reports initialized: false, no crash); --json envelope; report-only (never writes)

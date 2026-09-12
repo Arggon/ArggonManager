@@ -8,7 +8,9 @@ import {
   parseConventionConfig,
   readConventionConfig,
   readConventionVersion,
+  readGeneratedState,
   resolveBranchName,
+  updateGeneratedSection,
 } from "./convention.js";
 
 describe("readConventionVersion", () => {
@@ -152,5 +154,115 @@ describe("x-views (saved views)", () => {
     expect(() =>
       parseConventionConfig("x-views:\n  open: status:todo\n  open: type:bug\n"),
     ).toThrow(/duplicate view 'open'/);
+  });
+});
+
+describe("x-generated (generated-doc provenance, story-adoption-state)", () => {
+  const SECTION = [
+    "version: 3",
+    "branch_patterns:",
+    '  bug: "fix/{id}"',
+    "# a comment arggon wrote",
+    "x-generated:",
+    "  AGENTS.md:",
+    '    template: "docs/AGENTS.md"',
+    '    checksum: "sha256:abc123"',
+    '    arggonVersion: "0.0.0"',
+    '    generatedAt: "2026-09-12T10:00:00.000Z"',
+    "  .agents/skills/arggon-cli/SKILL.md:",
+    '    template: "skills/arggon-cli/SKILL.md"',
+    '    checksum: "sha256:def456"',
+    '    arggonVersion: "0.0.0"',
+    '    generatedAt: "2026-09-12T10:00:00.000Z"',
+    "",
+  ].join("\n");
+
+  it("parses destination entries with their fields (tolerant of unknown fields)", () => {
+    const config = parseConventionConfig(`${SECTION}    futureField: whatever\n`);
+    expect(Object.keys(config.generated).sort()).toEqual([
+      ".agents/skills/arggon-cli/SKILL.md",
+      "AGENTS.md",
+    ]);
+    expect(config.generated["AGENTS.md"]).toEqual({
+      template: "docs/AGENTS.md",
+      checksum: "sha256:abc123",
+      arggonVersion: "0.0.0",
+      generatedAt: "2026-09-12T10:00:00.000Z",
+    });
+    expect(config.generated[".agents/skills/arggon-cli/SKILL.md"]!.template).toBe(
+      "skills/arggon-cli/SKILL.md",
+    );
+  });
+
+  it("keeps incomplete entries instead of throwing (machine-written state)", () => {
+    const config = parseConventionConfig("x-generated:\n  AGENTS.md:\n    checksum: sha256:x\n");
+    expect(config.generated["AGENTS.md"]).toEqual({
+      template: "",
+      checksum: "sha256:x",
+      arggonVersion: "",
+      generatedAt: "",
+    });
+  });
+
+  it("rejects a scalar x-generated section (mapping required)", () => {
+    expect(() => parseConventionConfig("x-generated: AGENTS.md\n")).toThrow(/must be a mapping/);
+  });
+
+  it("readGeneratedState never throws (missing or malformed file -> empty state)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-conv-gen-"));
+    expect(readGeneratedState(dir)).toEqual({});
+    mkdirSync(join(dir, "tasks"), { recursive: true });
+    writeFileSync(join(dir, "tasks/.convention.yml"), "branch_patterns:\n  oops\n", "utf8");
+    expect(readGeneratedState(dir)).toEqual({});
+  });
+
+  it("updateGeneratedSection preserves surrounding content and replaces the section", () => {
+    const updated = updateGeneratedSection(SECTION, {
+      "AGENTS.md": {
+        template: "docs/AGENTS.md",
+        checksum: "sha256:new",
+        arggonVersion: "0.0.0",
+        generatedAt: "2026-09-13T00:00:00.000Z",
+      },
+    });
+    expect(updated).toContain("version: 3");
+    expect(updated).toContain('bug: "fix/{id}"');
+    expect(updated).toContain("# a comment arggon wrote");
+    expect(updated).toContain('checksum: "sha256:new"');
+    expect(updated).not.toContain("def456");
+    expect(updated).not.toContain("SKILL.md");
+    expect(parseConventionConfig(updated).generated["AGENTS.md"]!.checksum).toBe("sha256:new");
+  });
+
+  it("updateGeneratedSection appends the section when missing and removes it when empty", () => {
+    const appended = updateGeneratedSection(
+      "version: 3\nbranch_patterns:\n  bug: \"fix/{id}\"\n",
+      {},
+    );
+    expect(appended).toBe("version: 3\nbranch_patterns:\n  bug: \"fix/{id}\"\n");
+    const withEntry = updateGeneratedSection("version: 3\n# keep me\n", {
+      "AGENTS.md": {
+        template: "docs/AGENTS.md",
+        checksum: "sha256:x",
+        arggonVersion: "0.0.0",
+        generatedAt: "2026-09-12T00:00:00.000Z",
+      },
+    });
+    expect(withEntry).toBe(
+      [
+        "version: 3",
+        "# keep me",
+        "",
+        "x-generated:",
+        "  AGENTS.md:",
+        '    template: "docs/AGENTS.md"',
+        '    checksum: "sha256:x"',
+        '    arggonVersion: "0.0.0"',
+        '    generatedAt: "2026-09-12T00:00:00.000Z"',
+        "",
+      ].join("\n"),
+    );
+    // Round-trip: parsing the serialized section yields the same entry.
+    expect(parseConventionConfig(withEntry).generated["AGENTS.md"]!.checksum).toBe("sha256:x");
   });
 });
