@@ -111,8 +111,9 @@ v0 stubs (YAML frontmatter + Context / Acceptance / Notes) live in [`templates/`
 - [`templates/story.md`](templates/story.md)
 - [`templates/task.md`](templates/task.md)
 - [`templates/bug.md`](templates/bug.md)
+- [`templates/spec.md`](templates/spec.md) / [`templates/plan.md`](templates/plan.md) (rendered by `arggon spec new`)
 
-Copy a stub into `tasks/` per [`docs/convention.md`](docs/convention.md), or use `arggon create` (copies from these templates).
+Copy a stub into `tasks/` per [`docs/convention.md`](docs/convention.md), or use `arggon create` (copies from these templates). Spec/plan stubs are rendered into `docs/specs/` / `docs/plans/` by `arggon spec new` (see below).
 
 ## CLI (Phase 1)
 
@@ -215,6 +216,21 @@ Closing work is easy on containers too: when an update reaches a terminal state 
 ### `arggon sync`
 
 Reconciles `tasks/` with the repo's open GitHub PRs: `--check` (default, CI-safe) reports matched/unmatched items and exits non-zero when sync is pending; `--write` fills **only empty** `branch` fields — never overwrites a set branch, never guesses an ambiguous match, never touches status. Flags: `--repo <owner/repo>`, `--json`. Failures: `SYNC_FAILED`.
+
+### `arggon spec`
+
+Validates and scaffolds feature specs (`docs/specs/spec-<slug>-NNN.md`) and implementation plans (`docs/plans/plan-<slug>-NNN.md`) so agents can trust and check them. `spec validate` is a **pure read**: it checks frontmatter (`spec_id`/`plan_id` kebab-case, `title`, `status` (`proposed` | `implemented` | `superseded`), `created` as `YYYY-MM-DD`), required sections (Purpose or a non-empty intro, a Synopsis/Design/Model-of-data equivalent, Acceptance criteria — lenient about naming, including the Spanish sections of the existing specs, strict about acceptance), plans pointing at an existing spec file, and `spec_id` uniqueness across `docs/specs/`. Exits non-zero on errors.
+
+```bash
+arggon spec validate                  # check docs/specs/ + docs/plans/ (pure read, CI-safe)
+arggon spec validate --file docs/specs/spec-deps-001.md   # single file, also outside docs/specs|plans
+arggon spec validate --json           # v1 envelope { errors, warnings }; failures SPEC_FAILED
+arggon spec new my-feature            # scaffold docs/specs/spec-my-feature-NNN.md
+arggon spec new my-feature --title "My feature" --plan   # also scaffold docs/plans/plan-my-feature-NNN.md
+arggon spec new my-feature --json     # v1 envelope { files: string[] }
+```
+
+`spec new` numbers globally (max existing NNN across `docs/specs` + `docs/plans`, plus 1) and **never overwrites** an existing file. Templates live in [`templates/spec.md`](templates/spec.md) / [`templates/plan.md`](templates/plan.md) (`{{SLUG}}`, `{{NNN}}`, `{{ID}}`, `{{TITLE}}`, `{{DATE}}` placeholders; an embedded copy in the CLI is the fallback). See the pipeline spec: [docs/specs/spec-spec-pipeline-002.md](docs/specs/spec-spec-pipeline-002.md).
 
 ### `arggon import-issues`
 

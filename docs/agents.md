@@ -147,6 +147,7 @@ Agents and humans keep the docs alive **in the same PR as the change** — never
 - **Spec** (`docs/specs/spec-<slug>-NNN.md`): the reviewable contract — purpose, synopsis, flags, JSON shapes, invariants ("never overwrites", "pure read"), and acceptance criteria. Write it **before** implementing; frontmatter carries `spec_id`, `title`, `status` (`proposed` → `implemented`), `created`.
 - **Plan** (`docs/plans/plan-<slug>-NNN.md`): the implementation breakdown derived from the spec — ordered tasks, each with verifiable acceptance criteria and a link back to the spec. Frontmatter: `plan_id`, `spec`, `status`.
 - When the feature lands, flip both statuses in the same PR as the implementation (never leave a shipped feature `proposed`).
+- Tooling: `arggon spec validate [--file <path>]` checks spec/plan structure read-only (CI-safe, non-zero on errors) and `arggon spec new <slug> [--title <t>] [--plan]` scaffolds the next numbered spec/plan from `templates/spec.md` / `templates/plan.md` — never overwrites. See [docs/specs/spec-spec-pipeline-002.md](specs/spec-spec-pipeline-002.md).
 
 ### Verification before opening the PR
 
