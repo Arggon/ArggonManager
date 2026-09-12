@@ -4,15 +4,16 @@ import { readConventionVersion } from "./convention.js";
 import { failEnvelope, successEnvelope } from "./json.js";
 import { ITEM_TYPES } from "./ids.js";
 import { runCreate } from "./create.js";
+import { runComment } from "./comment.js";
 import { runList } from "./list.js";
 import { runUpdate } from "./update.js";
 import { STATUSES } from "./status.js";
 import { toContractWorkItem } from "./contract.js";
 
 /**
- * Stdio MCP server exposing the shared kernel (list/create/update) as MCP
- * tools. No new schema logic: tool handlers call the same run* functions as
- * the CLI and return the documented `--json` envelope objects as tool text.
+ * Stdio MCP server exposing the shared kernel (list/create/update/comment) as
+ * MCP tools. No new schema logic: tool handlers call the same run* functions
+ * as the CLI and return the documented `--json` envelope objects as tool text.
  * Agent playbook rules are enforced by passing `agent: true` to runUpdate —
  * the MCP layer cannot reopen done/cancelled items or steal claims.
  */
@@ -25,6 +26,7 @@ const SERVER_INFO = { name: "arggon", version: "0.0.0" } as const;
 const LIST_FAILED = "LIST_FAILED";
 const CREATE_FAILED = "CREATE_FAILED";
 const UPDATE_FAILED = "UPDATE_FAILED";
+const COMMENT_FAILED = "COMMENT_FAILED";
 
 type JsonRpcRequest = {
   jsonrpc: "2.0";
@@ -139,6 +141,25 @@ const TOOLS: ToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "arggon_comment",
+    description:
+      "Append a timestamped, author-attributed comment section to a work item's body (agent handoff context: why blocked, what the next agent should know). Body-only write: frontmatter is never touched (no `updated` bump; works on done/cancelled items — this is not a reopen). Returns the arggon `comment --json` envelope: {ok, schemaVersion, conventionVersion, command, id, path, comment: {author, date, lines}}.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "work item id" },
+        text: { type: "string", description: "comment text (multiline supported; non-empty)" },
+        author: {
+          type: "string",
+          description:
+            "author login (optional; default: @me resolution — GITHUB_USER, then GITHUB_ACTOR, then `gh api user`)",
+        },
+      },
+      required: ["id", "text"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 /** One MCP server session bound to fixed streams and a fixed repo root. */
@@ -191,7 +212,13 @@ export function runMcpServer(opts: McpServerOptions): void {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const code =
-        command === "list" ? LIST_FAILED : command === "create" ? CREATE_FAILED : UPDATE_FAILED;
+        command === "list"
+          ? LIST_FAILED
+          : command === "create"
+            ? CREATE_FAILED
+            : command === "comment"
+              ? COMMENT_FAILED
+              : UPDATE_FAILED;
       envelope = failEnvelope({ command, message, code, conventionVersion: conventionVersion() });
       return { content: [{ type: "text", text: JSON.stringify(envelope) }], isError: true };
     }
@@ -258,6 +285,21 @@ export function runMcpServer(opts: McpServerOptions): void {
         return successEnvelope(
           "update",
           { item: toContractWorkItem(result.item, result.root), autoCompleted: result.autoCompleted },
+          conventionVersion(),
+        );
+      });
+    }
+    if (name === "arggon_comment") {
+      return toolEnvelope("arggon_comment", () => {
+        const result = runComment({
+          cwd: opts.cwd,
+          id: str(args.id) ?? "",
+          text: str(args.text) ?? "",
+          author: str(args.author),
+        });
+        return successEnvelope(
+          "comment",
+          { id: result.id, path: result.path, comment: result.comment },
           conventionVersion(),
         );
       });

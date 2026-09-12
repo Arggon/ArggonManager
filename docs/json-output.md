@@ -11,7 +11,7 @@ arggon <command> --json
 
 Example: `arggon --json hello`.
 
-The MCP server (`arggon mcp`) returns these same envelope objects as tool-result text content for its `arggon_list`, `arggon_create`, and `arggon_update` tools; kernel failures become tool errors carrying the same `ok: false` shape (see [`docs/agents.md`](./agents.md) §MCP server).
+The MCP server (`arggon mcp`) returns these same envelope objects as tool-result text content for its `arggon_list`, `arggon_create`, `arggon_update`, and `arggon_comment` tools; kernel failures become tool errors carrying the same `ok: false` shape (see [`docs/agents.md`](./agents.md) §MCP server).
 
 This flag is a formatter only. It does not walk `tasks/` or parse frontmatter. Commands that load domain objects pass those objects to the formatter. Human vs JSON printing lives in the CLI entrypoint.
 
@@ -26,7 +26,7 @@ Every success or failure payload includes:
 | `ok`                | boolean | `true` on success; `false` on failure                                                                                                 |
 | `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.                                            |
 | `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                                                        |
-| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `branch` \| `start` \| `cleanup` \| `board` \| `sync` \| `instructions` \| `mcp` |
+| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `comment` \| `branch` \| `start` \| `cleanup` \| `board` \| `sync` \| `instructions` \| `mcp` |
 
 Command-specific fields sit next to this envelope (not nested under a generic `data` key).
 
@@ -148,6 +148,20 @@ Stale-claim report: `arggon list --stale --older-than <duration>` (`<number><d|h
 | -------------- | ---------- | ------------------------------------------------------------------------------------------------- |
 | `item`         | `WorkItem` | Item as persisted                                                                                 |
 | `autoCompleted` | `string[]` | `update` only: ancestors auto-completed to `done` by the container-completion cascade (see convention.md); empty when `--no-cascade` or a non-terminal status. Additive within `schemaVersion: 1`. |
+
+### `comment`
+
+Appends a timestamped, author-attributed comment section (`### <date> @<author>` + text lines) to the item **body**. Body-only write: the frontmatter is re-serialized unchanged — `updated` is NOT touched (a comment is history, not a status change), and commenting on `done`/`cancelled` items is allowed (this is not a reopen).
+
+| Field             | Type       | Notes                                          |
+| ----------------- | ---------- | ---------------------------------------------- |
+| `id`              | `string`   | Commented item id                              |
+| `path`            | `string`   | Absolute path of the item file                 |
+| `comment.author`  | `string`   | Resolved author login (rendered `@<author>`)   |
+| `comment.date`    | `string`   | `YYYY-MM-DD` (UTC) rendered in the heading     |
+| `comment.lines`   | `string[]` | Comment text lines appended under the heading  |
+
+Failures use `error.code: "COMMENT_FAILED"` (unknown id, empty text, unresolvable author — pass `--author <login>` or set `GITHUB_USER`/`GITHUB_ACTOR`).
 
 ### `branch`
 

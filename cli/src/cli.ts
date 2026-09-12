@@ -3,6 +3,7 @@ import { Command } from "commander";
 import { displayPath, runBoard } from "./board.js";
 import { startBoardServer } from "./board-serve.js";
 import { runBranch } from "./branch.js";
+import { runComment } from "./comment.js";
 import { runStart } from "./start.js";
 import { runCleanup } from "./cleanup.js";
 import { readConventionVersion } from "./convention.js";
@@ -431,6 +432,55 @@ program
           return;
         }
         console.error(`arggon update: ${message}`);
+        process.exitCode = 1;
+      }
+    },
+  );
+
+program
+  .command("comment")
+  .description("Append a timestamped, author-attributed comment section to an item's body")
+  .argument("<id>", "work item id")
+  .argument("<text>", "comment text (multiline supported)")
+  .option(
+    "--author <login>",
+    "comment author (default: @me resolution — GITHUB_USER, then GITHUB_ACTOR, then `gh api user`)",
+  )
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action(
+    (id: string, text: string, opts: { author?: string; json?: boolean }) => {
+      const json = jsonEnabled(opts);
+      try {
+        const result = runComment({
+          cwd: process.cwd(),
+          id,
+          text,
+          author: opts.author,
+        });
+        if (json) {
+          successJson(
+            "comment",
+            { id: result.id, path: result.path, comment: result.comment },
+            readConventionVersion(result.root),
+          );
+          return;
+        }
+        console.log(
+          `arggon comment: ${result.id} (${result.comment.date} @${result.comment.author})`,
+        );
+        console.log(`  ${result.path}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (json) {
+          failJson({
+            command: "comment",
+            message,
+            code: "COMMENT_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
+        console.error(`arggon comment: ${message}`);
         process.exitCode = 1;
       }
     },

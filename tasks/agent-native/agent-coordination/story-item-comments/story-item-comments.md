@@ -1,12 +1,15 @@
 ---
 type: story
-status: todo
+status: done
 id: story-item-comments
 title: Comments on work items
+assignee: Arggon
+branch: feat/story-item-comments
 parent: agent-coordination
 labels: []
 created: "2026-09-11"
-updated: "2026-09-11"
+updated: "2026-09-12"
+claimed_at: "2026-09-12T00:31:28.399Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-coordination/story-item-comments/story-item-comments.md (story index; required).
@@ -21,5 +24,5 @@ Agent handoff needs a home: why an item is blocked, what the next agent should k
 
 ## Acceptance
 
-- [ ] `arggon comment <id> "text"` appends a timestamped, author-attributed section; `--json` confirms
-- [ ] Comments never touch frontmatter (body-only write path, tested)
+- [x] `arggon comment <id> "text"` appends a timestamped, author-attributed section; `--json` confirms
+- [x] Comments never touch frontmatter (body-only write path, tested)
