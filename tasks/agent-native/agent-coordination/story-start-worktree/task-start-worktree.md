@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-start-worktree
 title: start --worktree isolation
 assignee: Arggon
@@ -8,7 +8,6 @@ parent: story-start-worktree
 labels: []
 created: "2026-09-11"
 updated: "2026-09-12"
-claimed_at: "2026-09-12T00:02:44.311Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-coordination/story-start-worktree/task-start-worktree.md
@@ -25,5 +24,5 @@ Worktree creation wired into `start`, reusing the existing claim/branch/push pip
 
 ## Acceptance
 
-- [ ] `start --worktree` creates the worktree, records `worktree_path`, and runs all follow-up commands from it
-- [ ] Idempotent: existing worktree path attaches; non-git trees fail with `START_FAILED`
+- [x] `start --worktree` creates the worktree, records `worktree_path`, and runs all follow-up commands from it
+- [x] Idempotent: existing worktree path attaches; non-git trees fail with `START_FAILED`

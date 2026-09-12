@@ -29,6 +29,7 @@ function item(overrides: Partial<WorkItem> & Pick<WorkItem, "id" | "type" | "sta
     milestone: null,
     depends_on: [],
     claimed_at: null,
+    worktree_path: null,
     ...overrides,
   };
 }

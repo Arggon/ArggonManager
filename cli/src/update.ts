@@ -1,4 +1,5 @@
 import { writeFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { stringifyFrontmatter } from "./frontmatter.js";
 import {
   assertStatus,
@@ -33,6 +34,12 @@ export type UpdateOptions = {
   /** Append one depends_on id (v3 field); no-op when already present. Unknown ids fail. */
   addDependsOn?: string;
   blockedReason?: string;
+  /**
+   * Set the additive `worktree_path` field (absolute path of the git worktree
+   * created by `start --worktree`). Empty string clears it. Kernel-level only:
+   * there is no CLI flag.
+   */
+  worktreePath?: string;
   /** Allow reassignment of an already-claimed item (claim steal). */
   force?: boolean;
   /**
@@ -120,6 +127,11 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
       branchRequest = null;
     }
   }
+  let worktreeRequest: string | null | undefined;
+  if (opts.worktreePath !== undefined) {
+    const trimmed = opts.worktreePath.trim();
+    worktreeRequest = trimmed ? resolve(trimmed) : null;
+  }
 
   const requested =
     title !== undefined ||
@@ -128,6 +140,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     branchRequest !== undefined ||
     opts.unassign === true ||
     opts.steal === true ||
+    worktreeRequest !== undefined ||
     labels !== undefined ||
     depsReplace !== undefined ||
     opts.addDependsOn !== undefined ||
@@ -271,6 +284,15 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   if (newBranch !== currentBranch) {
     data.branch = newBranch;
     changed.push("branch");
+  }
+  const currentWorktreePath = item.worktreePath ?? null;
+  if (worktreeRequest !== undefined && worktreeRequest !== currentWorktreePath) {
+    if (worktreeRequest === null) {
+      delete data.worktree_path;
+    } else {
+      data.worktree_path = worktreeRequest;
+    }
+    changed.push("worktree_path");
   }
   if (labels !== undefined && labels.join("\u0000") !== item.labels.join("\u0000")) {
     data.labels = labels;

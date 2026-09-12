@@ -59,6 +59,13 @@ function fakeGit(overrides: Partial<StartGit> = {}): StartGit & { calls: Call[] 
       calls.push({ op: "pr", arg: input.title });
       return "https://github.com/o/r/pull/1";
     },
+    worktreeList: () => {
+      calls.push({ op: "worktreeList" });
+      return [];
+    },
+    worktreeAdd: (_cwd, path, opts) => {
+      calls.push({ op: "worktreeAdd", arg: `${path} ${opts.branch}` });
+    },
     ...overrides,
   };
 }

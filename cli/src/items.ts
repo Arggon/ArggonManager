@@ -32,6 +32,11 @@ export type WorkItem = {
    * Reporting only — never gates a transition (see docs/convention.md).
    */
   claimedAt?: string | null;
+  /**
+   * Absolute path of the git worktree created by `start --worktree`
+   * (story-start-worktree); omit/null = none.
+   */
+  worktreePath?: string | null;
   extras: Frontmatter;
   filePath: string;
   containerDir: string;
@@ -60,7 +65,7 @@ const OFFICIAL_KEYS = new Set([
  * convention v3 (ADR 0004). Both parse unconditionally: parsing is additive,
  * so v0-v2 trees keep loading (and validating) unchanged.
  */
-const PROTOTYPE_KEYS = new Set(["milestone", "depends_on", "claimed_at"]);
+const PROTOTYPE_KEYS = new Set(["milestone", "depends_on", "claimed_at", "worktree_path"]);
 
 /** One soft-load finding (path added by caller). */
 export type SoftIssue = {
@@ -208,6 +213,7 @@ export function softTryLoadItem(filePath: string): SoftLoadResult {
     milestone: stringField(data, "milestone") ?? null,
     dependsOn,
     claimedAt: stringField(data, "claimed_at") ?? null,
+    worktreePath: stringField(data, "worktree_path") ?? null,
     extras,
     filePath,
     containerDir: dirname(filePath),

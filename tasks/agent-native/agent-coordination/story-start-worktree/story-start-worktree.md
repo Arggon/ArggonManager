@@ -1,6 +1,6 @@
 ---
 type: story
-status: in_progress
+status: done
 id: story-start-worktree
 title: Worktree-integrated claims
 assignee: Arggon
@@ -24,5 +24,5 @@ The playbook mandates worktrees; the CLI can enforce it. `start --worktree` crea
 
 ## Acceptance
 
-- [ ] `start --worktree` yields an isolated worktree recorded on the item; re-running attaches
-- [ ] `arggon cleanup` lists (default) and removes (`--prune`) stale worktrees safely
+- [x] `start --worktree` yields an isolated worktree recorded on the item; re-running attaches
+- [x] `arggon cleanup` lists (default) and removes (`--prune`) stale worktrees safely

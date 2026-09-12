@@ -24,5 +24,6 @@ export function toContractWorkItem(item: KernelWorkItem, rootDir: string): Contr
     milestone: item.milestone ?? null,
     depends_on: [...item.dependsOn],
     claimed_at: item.claimedAt ?? null,
+    worktree_path: item.worktreePath ?? null,
   };
 }
