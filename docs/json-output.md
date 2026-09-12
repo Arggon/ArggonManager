@@ -26,7 +26,7 @@ Every success or failure payload includes:
 | `ok`                | boolean | `true` on success; `false` on failure                                                                                                 |
 | `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.                                            |
 | `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                                                        |
-| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `comment` \| `branch` \| `start` \| `cleanup` \| `board` \| `sync` \| `import-issues` \| `instructions` \| `mcp` |
+| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `comment` \| `branch` \| `start` \| `cleanup` \| `board` \| `sync` \| `import-issues` \| `instructions` \| `spec` \| `mcp` |
 
 Command-specific fields sit next to this envelope (not nested under a generic `data` key).
 
@@ -141,6 +141,27 @@ Stale-claim report: `arggon list --stale --older-than <duration>` (`<number><d|h
 | `warnings` | `Issue[]` |       |
 
 `ok` is `false` **iff** `errors.length > 0` (warnings alone keep `ok: true`). When `ok` is false, the envelope still includes `error` so generic clients can branch on one field.
+
+### `spec`
+
+Covers both subcommands; the envelope `command` is always `"spec"`.
+
+`spec validate [--file <path>]` (pure read over `docs/specs/*.md` / `docs/plans/*.md`, or one file with `--file`):
+
+| Field      | Type      | Notes |
+| ---------- | --------- | ----- |
+| `errors`   | `Issue[]` | Same shape as `validate`; codes include `SPEC_MISSING_FRONTMATTER`, `SPEC_MISSING_FIELD`, `SPEC_BAD_STATUS`, `SPEC_BAD_DATE`, `SPEC_BAD_ID`, `SPEC_MISSING_SECTION`, `SPEC_DUPLICATE_ID`, `SPEC_READ_FAILED`, `PLAN_MISSING_FRONTMATTER`, `PLAN_MISSING_FIELD`, `PLAN_BAD_STATUS`, `PLAN_BAD_DATE`, `PLAN_SPEC_NOT_FOUND`, `PLAN_DUPLICATE_ID` |
+| `warnings` | `Issue[]` | Currently always empty |
+
+`ok` is `false` **iff** `errors.length > 0`; failed runs carry `error.code: "SPEC_FAILED"`.
+
+`spec new <slug> [--title <t>] [--plan]` scaffolds `docs/specs/spec-<slug>-NNN.md` (plus `docs/plans/plan-<slug>-NNN.md` with `--plan`) from the bundled templates; never overwrites.
+
+| Field   | Type       | Notes                                        |
+| ------- | ---------- | -------------------------------------------- |
+| `files` | `string[]` | Created paths, posix, relative to the repo root |
+
+Failures use `error.code: "SPEC_FAILED"` (invalid slug, refusing to overwrite, missing `tasks/`).
 
 ### `create` / `update`
 

@@ -1,12 +1,13 @@
 ---
 type: task
-status: todo
+status: done
 id: task-spec-validate
 title: arggon spec validate + templates
+assignee: Arggon
 parent: story-spec-pipeline
 labels: []
 created: "2026-09-11"
-updated: "2026-09-11"
+updated: "2026-09-12"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-spec-pipeline/task-spec-validate.md
@@ -23,5 +24,5 @@ Read-only validator for `docs/specs/*.md` and `docs/plans/*.md` frontmatter and 
 
 ## Acceptance
 
-- [ ] Required frontmatter (`spec_id`/`plan_id`, `title`, `status`, `created`) and section checks; `--json` issues
-- [ ] `arggon spec new <slug>` scaffolds from the template
+- [x] Required frontmatter (`spec_id`/`plan_id`, `title`, `status`, `created`) and section checks; `--json` issues
+- [x] `arggon spec new <slug>` scaffolds from the template

@@ -24,6 +24,11 @@ import { runInstructions } from "./instructions.js";
 import { runMcpServer } from "./mcp-server.js";
 import { runNext } from "./next.js";
 import { formatReportMarkdown, formatReportTable, runReport } from "./report.js";
+import {
+  formatSpecValidateHuman,
+  runSpecNew,
+  runSpecValidate,
+} from "./spec.js";
 import { runSync } from "./sync-command.js";
 import { runUpdate } from "./update.js";
 import { formatValidateHuman, runValidate } from "./validate.js";
@@ -596,6 +601,102 @@ program
         return;
       }
       console.error(`arggon validate: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+const spec = program
+  .command("spec")
+  .description("Validate and scaffold feature specs and plans (docs/specs, docs/plans)");
+
+spec
+  .command("validate")
+  .description("Validate spec/plan frontmatter and section structure (pure read)")
+  .option("--file <path>", "validate a single file (also outside docs/specs / docs/plans)")
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { file?: string; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runSpecValidate({ cwd: process.cwd(), file: opts.file });
+      if (json) {
+        const payload = {
+          ok: result.errors.length === 0,
+          schemaVersion: JSON_SCHEMA_VERSION,
+          conventionVersion: result.conventionVersion,
+          command: "spec",
+          errors: result.errors,
+          warnings: result.warnings,
+        };
+        if (result.errors.length > 0) {
+          emitJson({
+            ...payload,
+            error: {
+              message: `spec validate failed with ${result.errors.length} error(s)`,
+              code: "SPEC_FAILED",
+            },
+          });
+          process.exitCode = 1;
+          return;
+        }
+        emitJson(payload);
+        return;
+      }
+      process.stdout.write(formatSpecValidateHuman(result));
+      if (result.errors.length > 0) process.exitCode = 1;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "spec",
+          message,
+          code: "SPEC_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon spec: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+spec
+  .command("new")
+  .description(
+    "Scaffold docs/specs/spec-<slug>-NNN.md (and docs/plans/plan-<slug>-NNN.md with --plan); never overwrites",
+  )
+  .argument("<slug>", "kebab-case slug (^[a-z0-9]+(-[a-z0-9]+)*$)")
+  .option("--title <title>", "spec title (defaults to the slug, hyphens as spaces)")
+  .option("--plan", "also scaffold the matching implementation plan", false)
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((slug: string, opts: { title?: string; plan?: boolean; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runSpecNew({
+        cwd: process.cwd(),
+        slug,
+        title: opts.title,
+        plan: Boolean(opts.plan),
+      });
+      if (json) {
+        successJson("spec", { files: result.files }, readConventionVersion(result.root));
+        return;
+      }
+      console.log(`arggon spec new: created ${result.files.length} file(s)`);
+      for (const file of result.files) {
+        console.log(`  ${file}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "spec",
+          message,
+          code: "SPEC_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon spec new: ${message}`);
       process.exitCode = 1;
     }
   });
