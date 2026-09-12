@@ -1,12 +1,15 @@
 ---
 type: story
-status: todo
+status: done
 id: story-tui-board
 title: Terminal UI kanban
+assignee: Arggon
+branch: feat/story-tui-board
 parent: ecosystem-ops
 labels: []
 created: "2026-09-11"
-updated: "2026-09-11"
+updated: "2026-09-12"
+claimed_at: "2026-09-12T01:39:23.116Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-tui-board/story-tui-board.md (story index; required).

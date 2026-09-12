@@ -1,12 +1,12 @@
 ---
 type: epic
-status: todo
+status: done
 id: ecosystem-ops
 title: ecosystem-ops
 parent: agent-native
 labels: []
 created: "2026-09-11"
-updated: "2026-09-11"
+updated: "2026-09-12"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/ecosystem-ops.md (epic index; required).
