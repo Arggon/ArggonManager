@@ -12,6 +12,7 @@ import { describe, expect, it } from "vitest";
 import { runInit } from "./init.js";
 
 const TIER1_DOCS = [
+  ".agents/skills/arggon-cli/SKILL.md",
   ".editorconfig",
   ".github/CODEOWNERS",
   ".github/PULL_REQUEST_TEMPLATE.md",
