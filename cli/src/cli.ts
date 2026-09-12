@@ -31,6 +31,13 @@ import {
   type TrendResult,
 } from "./trend.js";
 import {
+  formatPlaybookStatusTable,
+  runPlaybookNew,
+  runPlaybookRefresh,
+  runPlaybookStatus,
+  runStackExplore,
+} from "./playbooks.js";
+import {
   formatSpecValidateHuman,
   runSpecNew,
   runSpecValidate,
@@ -45,6 +52,10 @@ program
   .name("arggon")
   .description("Git-native task CLI for ArggonManager")
   .version("0.0.0")
+  // Positional options: the root --version flag must not swallow a subcommand's
+  // own --version (playbook new/refresh), so options after the subcommand name
+  // are parsed by that subcommand only.
+  .enablePositionalOptions()
   .option("--json", "emit one JSON object on stdout (agent contract)", false);
 
 bindJsonProgram(program);
@@ -751,6 +762,215 @@ spec
         return;
       }
       console.error(`arggon spec new: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+const stack = program
+  .command("stack")
+  .description("Exploration records preceding stack decisions (docs/explorations)");
+
+stack
+  .command("explore")
+  .description(
+    "Scaffold docs/explorations/exploration-<slug>-NNN.md (candidates, criteria, findings, recommendation); never overwrites",
+  )
+  .argument("<topic>", "topic to explore (slugified for the filename)")
+  .option("--title <title>", "exploration title (defaults to the topic as given)")
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((topic: string, opts: { title?: string; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runStackExplore({
+        cwd: process.cwd(),
+        topic,
+        title: opts.title,
+      });
+      if (json) {
+        successJson("explore", { files: result.files }, readConventionVersion(result.root));
+        return;
+      }
+      console.log(`arggon stack explore: created ${result.files.length} file(s)`);
+      for (const file of result.files) {
+        console.log(`  ${file}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "explore",
+          message,
+          code: "EXPLORE_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon stack explore: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+const playbook = program
+  .command("playbook")
+  .description("Per-tech playbooks with version-freshness tracking (docs/playbooks)");
+
+playbook
+  .command("new")
+  .description(
+    "Scaffold docs/playbooks/<tech>.md pinning the chosen version; never overwrites (research is the caller's job)",
+  )
+  .argument("<tech>", "technology slug (kebab-case)")
+  .option("--version <version>", "chosen version to pin (default: unpinned)")
+  .option("--title <title>", "playbook title (defaults to the tech slug, hyphens as spaces)")
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((tech: string, opts: { version?: string; title?: string; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runPlaybookNew({
+        cwd: process.cwd(),
+        tech,
+        version: opts.version,
+        title: opts.title,
+      });
+      if (json) {
+        successJson("playbook", { files: result.files }, readConventionVersion(result.root));
+        return;
+      }
+      console.log(`arggon playbook new: created ${result.files.length} file(s)`);
+      for (const file of result.files) {
+        console.log(`  ${file}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "playbook",
+          message,
+          code: "PLAYBOOK_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon playbook new: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+playbook
+  .command("status")
+  .description(
+    "Report playbook freshness: age since `researched` vs the stale threshold (default 90, x-playbooks.max-age-days)",
+  )
+  .option("--max-age-days <days>", "stale threshold override in days (wins over x-playbooks)")
+  .option(
+    "--file-task <story-id>",
+    "file one re-research task per stale playbook into the tracker (errors when the story does not exist)",
+  )
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { maxAgeDays?: string; fileTask?: string; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    let maxAgeDays: number | undefined;
+    if (opts.maxAgeDays !== undefined) {
+      const parsed = Number.parseInt(opts.maxAgeDays, 10);
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        const message = `invalid --max-age-days '${opts.maxAgeDays}' (expected a positive integer)`;
+        if (json) {
+          failJson({
+            command: "playbook",
+            message,
+            code: "PLAYBOOK_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
+        console.error(`arggon playbook status: ${message}`);
+        process.exitCode = 1;
+        return;
+      }
+      maxAgeDays = parsed;
+    }
+    try {
+      const result = runPlaybookStatus({
+        cwd: process.cwd(),
+        maxAgeDays,
+        fileTask: opts.fileTask,
+      });
+      if (json) {
+        successJson(
+          "playbook",
+          {
+            playbooks: result.playbooks,
+            staleCount: result.staleCount,
+            maxAgeDays: result.maxAgeDays,
+            created: result.created,
+            skipped: result.skipped,
+          },
+          result.conventionVersion,
+        );
+        return;
+      }
+      process.stdout.write(formatPlaybookStatusTable(result));
+      for (const id of result.created) {
+        console.log(`filed:   ${id}`);
+      }
+      for (const id of result.skipped) {
+        console.log(`skipped: ${id} (re-research task already exists)`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "playbook",
+          message,
+          code: "PLAYBOOK_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon playbook status: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+playbook
+  .command("refresh")
+  .description(
+    "After re-research: set version + researched: today + status: current (frontmatter-only, body untouched)",
+  )
+  .argument("<tech>", "technology slug (kebab-case)")
+  .option("--version <version>", "the re-researched version (required)", "")
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((tech: string, opts: { version: string; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runPlaybookRefresh({
+        cwd: process.cwd(),
+        tech,
+        version: opts.version,
+      });
+      if (json) {
+        successJson(
+          "playbook",
+          { path: result.path, version: result.version, researched: result.researched },
+          readConventionVersion(result.root),
+        );
+        return;
+      }
+      console.log(
+        `arggon playbook refresh: ${result.path} → version ${result.version}, researched ${result.researched}`,
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "playbook",
+          message,
+          code: "PLAYBOOK_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon playbook refresh: ${message}`);
       process.exitCode = 1;
     }
   });

@@ -1,12 +1,14 @@
 ---
 type: story
-status: todo
+status: in_progress
 id: story-tech-playbooks
 title: Technology playbooks with version-freshness tracking
+assignee: Arggon
 parent: cli
 labels: []
 created: "2026-09-12"
 updated: "2026-09-12"
+claimed_at: "2026-09-12T19:40:21.923Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tech-playbooks/story-tech-playbooks.md (story index; required).

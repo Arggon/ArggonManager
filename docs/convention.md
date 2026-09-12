@@ -365,6 +365,20 @@ x-views:
 - Unknown view names fail with the list of known views; an empty `x-views` map fails for any name.
 - The key is namespaced (`x-*`), so older tools ignore it per the extension policy above; a scalar `x-views` value, an empty expression, or a duplicate view name is a parse error.
 
+### Technology playbooks (`x-playbooks`)
+
+`x-playbooks` is the official namespaced extension for playbook staleness options (`arggon playbook status`, story-tech-playbooks). It is a mapping of option names to values; the only official option today is `max-age-days`:
+
+```yaml
+version: 3
+x-playbooks:
+  max-age-days: 60
+```
+
+- `arggon playbook status` flags `docs/playbooks/<tech>.md` whose `researched` date is older than `max-age-days` days. Precedence: `--max-age-days <n>` wins over `x-playbooks.max-age-days`, which wins over the built-in default of **90**.
+- Unknown nested keys inside `x-playbooks` are ignored (ignore-unknown, forward compat); a scalar `x-playbooks` value or a `max-age-days` that is not a positive integer is a parse error.
+- The key is namespaced (`x-*`), so older tools ignore it per the extension policy above.
+
 ### Extension namespace
 
 - Official keys = the field table above.

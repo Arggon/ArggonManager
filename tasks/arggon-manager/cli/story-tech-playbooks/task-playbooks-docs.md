@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-playbooks-docs
 title: Playbooks docs + AGENTS.md wiring
+assignee: Arggon
 parent: story-tech-playbooks
 labels: []
 created: "2026-09-12"
 updated: "2026-09-12"
+claimed_at: "2026-09-12T19:40:22.395Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tech-playbooks/task-playbooks-docs.md

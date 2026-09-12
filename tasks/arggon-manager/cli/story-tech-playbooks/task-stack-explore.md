@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-stack-explore
 title: arggon stack explore — exploration records
+assignee: Arggon
 parent: story-tech-playbooks
 labels: []
 created: "2026-09-12"
 updated: "2026-09-12"
+claimed_at: "2026-09-12T19:40:22.081Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tech-playbooks/task-stack-explore.md

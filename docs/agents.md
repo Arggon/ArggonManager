@@ -149,6 +149,17 @@ Agents and humans keep the docs alive **in the same PR as the change** — never
 - When the feature lands, flip both statuses in the same PR as the implementation (never leave a shipped feature `proposed`).
 - Tooling: `arggon spec validate [--file <path>]` checks spec/plan structure read-only (CI-safe, non-zero on errors) and `arggon spec new <slug> [--title <t>] [--plan]` scaffolds the next numbered spec/plan from `templates/spec.md` / `templates/plan.md` — never overwrites. See [docs/specs/spec-spec-pipeline-002.md](specs/spec-spec-pipeline-002.md).
 
+### Technology playbooks (stack decisions and doc freshness)
+
+Stack/technology decisions follow the pipeline: **explore → ADR → playbook → status/--file-task**.
+
+1. `arggon stack explore <topic>` records the spike (`docs/explorations/exploration-<slug>-NNN.md`): candidates, criteria, findings with dated sources, recommendation.
+2. The decision lands as an ADR under `docs/adr/` (link it in the exploration's Decision section).
+3. `arggon playbook new <tech> --version <v>` generates `docs/playbooks/<tech>.md` — the chosen version plus Setup / Conventions / Testing / Security / Upgrade policy. The research is the caller's job (with dated sources); the CLI records it.
+4. `arggon playbook status` flags playbooks older than the threshold (default 90 days, `x-playbooks.max-age-days` in `tasks/.convention.yml`); `--file-task <story-id>` files one re-research task per stale playbook into the tracker. After re-researching, `arggon playbook refresh <tech> --version <v>` updates the frontmatter.
+
+Agents follow `docs/playbooks/` by default (the init-generated `AGENTS.md` points there) and refresh playbooks when `playbook status` flags them stale.
+
 ### Verification before opening the PR
 
 - `grep` the new command/flag/field across `README.md`, `docs/json-output.md`, `docs/convention.md`, `docs/agents.md` — every hit must match the implemented behavior.

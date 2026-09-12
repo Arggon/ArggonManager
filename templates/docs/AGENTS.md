@@ -25,7 +25,7 @@ Read these before non-trivial changes (if present in this repo):
 
 - [`docs/convention.md`](docs/convention.md) — tasks/ tree layout and frontmatter schema.
 - [`docs/engineering.md`](docs/engineering.md) — review bar, testing, definition of done.
-- `docs/playbooks/` — step-by-step operational guides.
+- `docs/playbooks/` — technology playbooks: follow them for the current pinned versions and best practices; check `arggon playbook status` and refresh playbooks when they go stale.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — branch, commit, and PR rules.
 
 ## Gates

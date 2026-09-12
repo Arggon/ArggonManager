@@ -56,6 +56,7 @@ describe("init docs: tier-1 content", () => {
     expect(agents).toContain("docs/convention.md");
     expect(agents).toContain("docs/engineering.md");
     expect(agents).toContain("docs/playbooks/");
+    expect(agents).toContain("arggon playbook status");
     expect(agents).toContain("arggon validate");
   });
 

@@ -83,6 +83,40 @@ describe("convention config", () => {
   });
 });
 
+describe("x-playbooks (playbook staleness)", () => {
+  it("defaults to maxAgeDays null when the file or the key is missing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-xpb-missing-"));
+    expect(readConventionConfig(dir).playbooks).toEqual({ maxAgeDays: null });
+    expect(parseConventionConfig("version: 3\n").playbooks).toEqual({ maxAgeDays: null });
+  });
+
+  it("parses max-age-days in a v3 tree (unknown nested keys ignored)", () => {
+    const config = parseConventionConfig(
+      ["version: 3", "x-playbooks:", "  max-age-days: 30", "  future-option: 7", ""].join("\n"),
+    );
+    expect(config.playbooks).toEqual({ maxAgeDays: 30 });
+    expect(config.version).toBe(3);
+  });
+
+  it("parses x-playbooks regardless of the declared tree version (v0 too)", () => {
+    const config = parseConventionConfig("version: 0\nx-playbooks:\n  max-age-days: 14\n");
+    expect(config.playbooks).toEqual({ maxAgeDays: 14 });
+  });
+
+  it("rejects scalar x-playbooks and non-positive / non-numeric max-age-days", () => {
+    expect(() => parseConventionConfig("x-playbooks: 30\n")).toThrow(/must be a mapping/);
+    expect(() => parseConventionConfig("x-playbooks:\n  max-age-days: soon\n")).toThrow(
+      /'max-age-days' must be a positive integer/,
+    );
+    expect(() => parseConventionConfig("x-playbooks:\n  max-age-days: 0\n")).toThrow(
+      /must be a positive integer/,
+    );
+    expect(() => parseConventionConfig("x-playbooks:\n  max-age-days: -5\n")).toThrow(
+      /must be a positive integer/,
+    );
+  });
+});
+
 describe("x-views (saved views)", () => {
   it("defaults to no views when the file is missing", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-xviews-missing-"));
