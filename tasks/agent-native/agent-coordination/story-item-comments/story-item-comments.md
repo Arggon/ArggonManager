@@ -1,12 +1,15 @@
 ---
 type: story
-status: todo
+status: in_progress
 id: story-item-comments
 title: Comments on work items
+assignee: Arggon
+branch: feat/story-item-comments
 parent: agent-coordination
 labels: []
 created: "2026-09-11"
-updated: "2026-09-11"
+updated: "2026-09-12"
+claimed_at: "2026-09-12T00:31:28.399Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-coordination/story-item-comments/story-item-comments.md (story index; required).
