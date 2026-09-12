@@ -248,10 +248,15 @@ Empty pool is success (`ok: true`, `suggestion: null`). Failures use `error.code
 | `groups[].containers` | `object[]`            | One entry per story: `{id, title, type, counts, empty}`          |
 | `groups[].totals`     | `counts`              | Sums over the epic's stories                                     |
 | `groups[].empty`      | `boolean`             | True when the epic has no stories                                |
+| `trend`               | `object`              | Additive, present only with `--trend` (git-history mining)       |
+| `trend.weeks`         | `object[]`            | `{ week, completions }`, ascending ISO week ("2026-W37"), only weeks with >= 1 completion |
+| `trend.cycleTime`     | `object[]`            | `{ type, avgDays, count }` per leaf type (task/bug), alphabetical; `avgDays` rounded to 1 decimal |
 
 `counts` always carries all five statuses (`todo`, `in_progress`, `blocked`, `done`, `cancelled` — cancelled explicit, never lumped) plus `total`. Leafless stories report zeros with `empty: true`. Display-only: never writes. Failures use `error.code: "REPORT_FAILED"` (missing tasks/, unreadable items).
 
-Human output supports `--format table` (default) and `--format markdown` (standup summary: per-epic progress lines with `(done + cancelled)/total` completion, plus a Blocked section listing each leaf's `blocked_reason`). Markdown is stdout-only (not part of the JSON contract); both formats are pure tree reads — no network, no GitHub calls.
+`--trend` mines git history (story-report-trend): a single `git log -p` pass over `tasks/` collects `+status:` frontmatter transitions per item file. Completions are leaf (`task`/`bug`) first terminal transitions (`done`/`cancelled`) bucketed by the ISO week of the commit's committer date; cycle time is first `in_progress` claim → terminal in days. Open items count as not-completed. `--since <YYYY-MM-DD>` (UTC) filters the considered window — transitions before it are ignored, so items completed before the window drop out entirely; an item whose claim predates the window completes without a measurable cycle time. `--since` requires `--trend`. Trend failures (non-git tree, `git log` errors) use `error.code: "TREND_FAILED"`; a tasks/ tree with no commits yet is not a failure and yields empty series.
+
+Human output supports `--format table` (default) and `--format markdown` (standup summary: per-epic progress lines with `(done + cancelled)/total` completion, plus a Blocked section listing each leaf's `blocked_reason`). With `--trend` the trend block is appended to both (markdown gains a `## Trend` section). Markdown is stdout-only (not part of the JSON contract); both formats are pure tree reads — no network, no GitHub calls.
 
 ### `board`
 
