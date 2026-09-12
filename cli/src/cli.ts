@@ -9,6 +9,7 @@ import { runCleanup } from "./cleanup.js";
 import { readConventionVersion } from "./convention.js";
 import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
+import { runDoctor, formatDoctorReport } from "./doctor.js";
 import { runInit, type InitResult } from "./init.js";
 import {
   bindJsonProgram,
@@ -79,11 +80,21 @@ program
   .argument("[dir]", "target directory", ".")
   .option("-f, --force", "overwrite existing convention/templates (docs are never overwritten)", false)
   .option("--full", "also generate the tier-2 doc set (ARCHITECTURE.md, docs/convention.md, ...)", false)
+  .option(
+    "--backup",
+    "archive adopter-modified docs to backup/<date>/<dest> before regenerating them (default: skip modified docs)",
+    false,
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((dir: string, opts: { force: boolean; full?: boolean; json?: boolean }) => {
+  .action((dir: string, opts: { force: boolean; full?: boolean; backup?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
-      const result = runInit({ dir, force: Boolean(opts.force), full: Boolean(opts.full) });
+      const result = runInit({
+        dir,
+        force: Boolean(opts.force),
+        full: Boolean(opts.full),
+        backup: Boolean(opts.backup),
+      });
       if (json) {
         successJson(
           "init",
@@ -92,6 +103,9 @@ program
             alreadyInitialized: result.alreadyInitialized,
             force: result.force,
             created: result.created,
+            updated: result.updated,
+            modified: result.modified,
+            backedUp: result.backedUp,
             skipped: result.skipped,
             restored: result.restored,
             conventionPath: result.conventionPath,
@@ -113,6 +127,46 @@ program
         return;
       }
       console.error(`arggon init: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("doctor")
+  .description(
+    "Report installation state: convention version, generated-doc provenance, tracker counts (pure read)",
+  )
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runDoctor({ cwd: process.cwd() });
+      if (json) {
+        successJson(
+          "doctor",
+          {
+            root: result.root,
+            initialized: result.initialized,
+            docs: result.docs,
+            tracker: result.tracker,
+          },
+          result.conventionVersion,
+        );
+        return;
+      }
+      process.stdout.write(formatDoctorReport(result));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "doctor",
+          message,
+          code: "DOCTOR_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon doctor: ${message}`);
       process.exitCode = 1;
     }
   });
@@ -1295,8 +1349,18 @@ function printInitHuman(result: InitResult): void {
     if (result.created.length > 0) {
       console.log(`arggon init: generated missing docs: ${result.created.join(", ")}`);
     }
+    if (result.updated.length > 0) {
+      console.log(
+        `arggon init: regenerated untouched docs: ${result.updated.length} file(s)`,
+      );
+    }
+    if (result.backedUp.length > 0) {
+      console.log(`arggon init: archived modified docs: ${result.backedUp.join(", ")}`);
+    }
     if (result.skipped.length > 0) {
-      console.log(`arggon init: kept existing docs: ${result.skipped.length} file(s) (never overwritten)`);
+      console.log(
+        `arggon init: kept adopter-modified docs: ${result.skipped.length} file(s) (--backup archives and regenerates)`,
+      );
     }
     console.log("Next: create work with `arggon create` (coming soon), or copy from templates/.");
     return;
@@ -1309,9 +1373,15 @@ function printInitHuman(result: InitResult): void {
     const docs = result.created.filter((p) => p !== "tasks/.convention.yml" && !p.startsWith("templates/"));
     console.log(`  - governing docs (${docs.length}): ${docs.join(", ")}`);
   }
+  if (result.updated.length > 0) {
+    console.log(`  - regenerated untouched docs: ${result.updated.length} file(s)`);
+  }
+  if (result.backedUp.length > 0) {
+    console.log(`  - archived modified docs: ${result.backedUp.join(", ")}`);
+  }
   if (result.skipped.length > 0) {
     console.log(
-      `  - kept existing docs (never overwritten): ${result.skipped.join(", ")}`,
+      `  - kept adopter-modified docs (never overwritten): ${result.skipped.join(", ")}`,
     );
   }
   console.log("Next:");

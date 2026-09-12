@@ -379,6 +379,32 @@ x-playbooks:
 - Unknown nested keys inside `x-playbooks` are ignored (ignore-unknown, forward compat); a scalar `x-playbooks` value or a `max-age-days` that is not a positive integer is a parse error.
 - The key is namespaced (`x-*`), so older tools ignore it per the extension policy above.
 
+### Generated-doc provenance (`x-generated`)
+
+`x-generated` is the official namespaced extension for generated-file provenance (`arggon init` / `generateDocs`, story-adoption-state; Copier/Helm precedent). It maps each generated destination (posix, relative to the repo root) to its provenance record:
+
+```yaml
+version: 3
+x-generated:
+  AGENTS.md:
+    template: "docs/AGENTS.md"
+    checksum: "sha256:0f3a…"
+    arggonVersion: "0.0.0"
+    generatedAt: "2026-09-12T10:30:00.000Z"
+  .agents/skills/arggon-cli/SKILL.md:
+    template: "skills/arggon-cli/SKILL.md"
+    checksum: "sha256:91bc…"
+    arggonVersion: "0.0.0"
+    generatedAt: "2026-09-12T10:30:00.000Z"
+```
+
+- Every generated doc carries a visible marker as its **first line** — `<!-- arggon:generated template="<template-relative-path>" -->` — so authorship is visible in any diff or editor; the `template` inside the marker is relative to the template root (`AGENTS.md`), while the state entry records the package-root-relative source (`docs/AGENTS.md`).
+- `checksum` is the sha256 of the exact written bytes (marker included). It distinguishes "arggon-generated and untouched" from "edited by the adopter": a hand edit may keep the marker (harmless) but never the checksum.
+- Re-running `arggon init`: destination absent → generate (`created[]`); file checksum matches the recorded one → untouched → silently regenerate from the current template and refresh the entry (`updated[]`); checksum differs, or the file exists with no entry (pre-provenance files) → adopter-modified → skip by default (`modified[]` + `skipped[]`, never overwritten, even with `--force`); `arggon init --backup` first moves the modified file to `backup/<YYYY-MM-DD>/<dest>` and then regenerates (`backedUp[]`).
+- State is machine-written: unknown nested fields are ignored, and incomplete entries never fail a command — they simply never match, so the file reports as adopter-modified (the conservative default). `arggon doctor` reports `managed`/`untouched`/`modified`/`stale`/`missing` counts from this section.
+- The section is spliced into `tasks/.convention.yml` without disturbing sibling content (comments, `branch_patterns`, `x-views`, `x-playbooks`); `arggon init --force` carries the section across a re-scaffold.
+- The key is namespaced (`x-*`), so older tools ignore it per the extension policy above.
+
 ### Extension namespace
 
 - Official keys = the field table above.

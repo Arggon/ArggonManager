@@ -77,12 +77,14 @@ describe("init", () => {
     expect(existsSync(join(dir, "tasks/.convention.yml"))).toBe(true);
   });
 
-  it("second run creates nothing and skips every doc (idempotent)", () => {
+  it("second run regenerates every untouched doc (updated[]) and creates nothing", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-"));
     runInit({ dir, force: false, full: true });
     const second = runInit({ dir, force: false, full: true });
     expect(second.created).toEqual([]);
-    expect(second.skipped).toEqual([...TIER1_DOCS, ...TIER2_DOCS].sort());
+    expect(second.modified).toEqual([]);
+    expect(second.skipped).toEqual([]);
+    expect(second.updated).toEqual([...TIER1_DOCS, ...TIER2_DOCS].sort());
   });
 
   it("restores missing templates when already initialized", () => {

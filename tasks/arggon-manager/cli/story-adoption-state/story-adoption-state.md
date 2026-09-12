@@ -1,12 +1,15 @@
 ---
 type: story
-status: todo
+status: done
 id: story-adoption-state
 title: Installation state and generated-file provenance
+assignee: Arggon
+branch: feat/story-adoption-state-impl
 parent: cli
 labels: []
 created: "2026-09-12"
 updated: "2026-09-12"
+claimed_at: "2026-09-12T22:35:50.508Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-adoption-state/story-adoption-state.md (story index; required).
@@ -21,4 +24,4 @@ Existing repos cannot safely adopt (or upgrade) ArggonManager's generated docume
 
 ## Acceptance
 
-- [ ] `arggon doctor` reports installation state; `x-generated` state + markers landed; init re-runs update untouched docs without backup and report modified ones
+- [x] `arggon doctor` reports installation state; `x-generated` state + markers landed; init re-runs update untouched docs without backup and report modified ones

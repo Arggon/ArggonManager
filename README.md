@@ -132,14 +132,39 @@ npm test
 npm run lint
 ```
 
-`arggon init` creates `tasks/.convention.yml`, copies `templates/`, and generates the governing document set from master templates in `templates/docs/` (no overwrite unless --force — docs are **never** overwritten, even with --force; already-initialized repos are a no-op except for missing templates/docs).
+`arggon init` creates `tasks/.convention.yml`, copies `templates/`, and generates the governing document set from master templates in `templates/docs/`. Adopter-owned content is never overwritten (not even with `--force`); on already-initialized repos init is an idempotent upgrade — see [Re-running init](#re-running-init-provenance-and-safe-regeneration) below.
 
 Generated docs (placeholders `{{PROJECT_NAME}}` from the target dir name and `{{YEAR}}` are rendered at write time):
 
 - **Default (tier-1):** `AGENTS.md` (spec-compliant agent workflow; mandates the bundled **arggon-cli skill** by default), `CLAUDE.md` (one-line `@AGENTS.md` shim), `.github/copilot-instructions.md` (pointer), `CONTRIBUTING.md`, `SECURITY.md`, `.editorconfig`, `.github/CODEOWNERS` (placeholder), `.github/PULL_REQUEST_TEMPLATE.md`, `docs/tracking.md` (work tracking in `tasks/`, not GitHub issues), and the **arggon-cli skill** itself at `.agents/skills/arggon-cli/SKILL.md (copied from this repo's `skills/arggon-cli/SKILL.md` — single source, never a duplicate).
 - **`--full` adds (tier-2):** `ARCHITECTURE.md`, `docs/convention.md` + `docs/engineering.md` (adopter-owned project templates), `CHANGELOG.md`, `SUPPORT.md`, `docs/runbooks/README.md`.
 
-Everything created is listed in `created[]`; pre-existing files land in `skipped[]` (see [`docs/json-output.md`](docs/json-output.md)).
+Everything created is listed in `created[]`; files left untouched land in `skipped[]` (see [`docs/json-output.md`](docs/json-output.md)).
+
+#### Re-running init: provenance and safe regeneration
+
+Every generated doc carries a visible provenance marker as its **first line** (`<!-- arggon:generated template="..." -->`), and the generation state is recorded in `tasks/.convention.yml` under the namespaced `x-generated:` section (destination path → `{ template, checksum, arggonVersion, generatedAt }`; the checksum is the sha256 of the file as written, marker included). Re-running `arggon init` upgrades templates safely, Copier/Helm-style, per destination:
+
+- **Not on disk** → generated as today (`created[]`).
+- **On disk, checksum matches the recorded one** → generated-and-untouched: silently regenerated from the current template and the state refreshed (`updated[]`). This is how template improvements reach an adopted repo.
+- **On disk, checksum differs (or no state entry — pre-provenance files)** → adopter-modified: **skipped** by default (`modified[]` + `skipped[]`; never overwritten, not even with `--force`). With `--backup`, the modified file is first moved to `backup/<YYYY-MM-DD>/<dest>` and then regenerated with fresh state (`backedUp[]`).
+
+The arggon-cli skill bundle (`.agents/skills/arggon-cli/SKILL.md`) follows exactly the same rules. Hand edits keep the marker (harmless) but the checksum betrays the edit. `arggon validate` accepts the `x-generated` section (namespaced extension, ignore-unknown).
+
+### `arggon doctor`
+
+Report-only installation check (exit 0, pure read): is ArggonManager installed here, and in what shape?
+
+```bash
+arggon doctor
+arggon doctor --json
+```
+
+- `initialized`: whether `tasks/.convention.yml` was found, plus the convention version (0-3).
+- `docs`: generated-doc provenance counts from `x-generated` — `managed` (tracked destinations), `untouched` (checksum matches), `modified` (checksum differs), `stale` (template no longer generated), `missing` (tracked but absent).
+- `tracker`: cheap tracker sanity — total work items and `todo` count.
+
+Non-initialized repos report `initialized: false` with zeroed counts (no crash, still exit 0); failures use `error.code: "DOCTOR_FAILED"` only for unexpected errors.
 
 ### `arggon list`
 

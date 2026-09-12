@@ -26,7 +26,7 @@ Every success or failure payload includes:
 | `ok`                | boolean | `true` on success; `false` on failure                                                                                                 |
 | `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.                                            |
 | `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                                                        |
-| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `comment` \| `branch` \| `start` \| `cleanup` \| `board` \| `sync` \| `import-issues` \| `instructions` \| `spec` \| `explore` \| `playbook` \| `mcp` |
+| `command`           | string  | Commander command name: `hello` \| `init` \| `doctor` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `comment` \| `branch` \| `start` \| `cleanup` \| `board` \| `sync` \| `import-issues` \| `instructions` \| `spec` \| `explore` \| `playbook` \| `mcp` |
 
 Command-specific fields sit next to this envelope (not nested under a generic `data` key).
 
@@ -120,9 +120,32 @@ Snippets are extracted from the playbook at runtime; failures use `error.code: "
 | `root`               | `string`   | Absolute path initialized                                                       |
 | `alreadyInitialized` | `boolean`  | Whether `tasks/.convention.yml` existed before this run                         |
 | `force`              | `boolean`  | Whether `--force` was set                                                       |
-| `created`            | `string[]` | Paths created/overwritten this run (posix, relative to `root`)                  |
-| `skipped`            | `string[]` | Doc files that already existed and were left untouched (posix, relative to `root`). Additive in v1: older clients ignore it |
+| `created`            | `string[]` | Paths created this run (posix, relative to `root`)                              |
+| `updated`            | `string[]` | Untouched docs regenerated from the current template with refreshed `x-generated` state (posix, relative to `root`). Additive in v1: older clients ignore it |
+| `modified`           | `string[]` | Adopter-modified docs (checksum differs, or no state entry): skipped by default, regenerated after `--backup`. Additive in v1: older clients ignore it |
+| `backedUp`           | `string[]` | Subset of `modified[]` archived to `backup/<YYYY-MM-DD>/<dest>` before regeneration (`--backup` only). Additive in v1: older clients ignore it |
+| `skipped`            | `string[]` | Doc files left untouched this run (posix, relative to `root`). Additive in v1: older clients ignore it |
 | `restored`           | `string[]` | Missing templates restored when already initialized (posix, relative to `root`) |
+
+Failures use `error.code: "INIT_FAILED"`.
+
+### `doctor`
+
+Pure-read installation report (exit 0 on every well-formed input, including non-initialized repos):
+
+| Field               | Type      | Notes                                                                        |
+| ------------------- | --------- | ---------------------------------------------------------------------------- |
+| `root`              | `string\|null` | Repo root; `null` when no `tasks/.convention.yml` was found             |
+| `initialized`       | `boolean` | Whether `tasks/.convention.yml` exists (walk-up from cwd, like `create`)      |
+| `docs`              | `object`  | Generated-doc provenance counts from `x-generated` (see below)                |
+| `docs.managed`      | `number`  | Total `x-generated` entries                                                   |
+| `docs.untouched`    | `number`  | Files whose sha256 still matches the recorded checksum                        |
+| `docs.modified`     | `number`  | Files on disk whose checksum differs (or whose checksum is unparseable)       |
+| `docs.stale`        | `number`  | Entries whose `template` no longer exists in the current template bundle      |
+| `docs.missing`      | `number`  | Entries whose destination file is absent                                      |
+| `tracker`           | `object`  | `{ items, todo }` — total work items under `tasks/` and their `todo` count    |
+
+Each `docs` entry falls in exactly one bucket (`missing`, else `stale`, else `untouched`/`modified`), so `untouched + modified + stale + missing = managed`. Failures use `error.code: "DOCTOR_FAILED"` (unexpected errors only — a missing tree is a normal report).
 
 ### `list`
 
@@ -403,12 +426,41 @@ Failures use `error.code: "IMPORT_FAILED"` (gh missing/unauthenticated or unpars
     "templates/story.md",
     "templates/task.md"
   ],
+  "updated": [],
+  "modified": [],
+  "backedUp": [],
   "skipped": [],
   "restored": []
 }
 ```
 
-Init still **writes** `tasks/.convention.yml`, `templates/`, and the governing docs (tier-1 by default; tier-2 with `--full`); `--json` only changes how the result is printed. Doc templates render `{{PROJECT_NAME}}` (target dir name) and `{{YEAR}}` at write time; docs are never overwritten — pre-existing files are reported in `skipped[]`, so a second run on an initialized repo is `created: []`.
+Init still **writes** `tasks/.convention.yml` (including the `x-generated` provenance section), `templates/`, and the governing docs (tier-1 by default; tier-2 with `--full`); `--json` only changes how the result is printed. Doc templates render `{{PROJECT_NAME}}` (target dir name) and `{{YEAR}}` at write time, and every generated file carries a `<!-- arggon:generated template="..." -->` marker as its first line. Re-run semantics are checksum-based (see [docs/convention.md](./convention.md) §Generated-doc provenance): untouched docs regenerate into `updated[]`, adopter-modified docs are skipped into `modified[]` + `skipped[]` (regenerated after `--backup`, with the old file archived to `backup/<YYYY-MM-DD>/<dest>` and listed in `backedUp[]`), so a second init on an untouched repo is `created: [], skipped: []` with every doc in `updated[]`.
+
+### `doctor` sample (initialized repo)
+
+```json
+{
+  "ok": true,
+  "schemaVersion": 1,
+  "conventionVersion": 3,
+  "command": "doctor",
+  "root": "/tmp/example-repo",
+  "initialized": true,
+  "docs": {
+    "managed": 16,
+    "untouched": 15,
+    "modified": 1,
+    "stale": 0,
+    "missing": 0
+  },
+  "tracker": {
+    "items": 12,
+    "todo": 3
+  }
+}
+```
+
+Non-initialized repos return the same shape with `root: null`, `initialized: false`, zeroed `docs`/`tracker`, and `conventionVersion: 0`.
 
 ### `list` sample (drawn from `tasks/launch-mvp`)
 
