@@ -1,12 +1,13 @@
 ---
 type: task
-status: todo
+status: done
 id: task-tui-board
 title: Terminal kanban board
+assignee: Arggon
 parent: story-tui-board
 labels: []
 created: "2026-09-11"
-updated: "2026-09-11"
+updated: "2026-09-12"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-tui-board/task-tui-board.md

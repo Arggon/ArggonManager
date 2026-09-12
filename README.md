@@ -199,6 +199,7 @@ arggon board --github         # overlay live GitHub PR state on cards with a bra
 arggon board --group-by milestone      # prototype (ADR 0003): group cards within each column
 arggon board --serve          # local live-reload server on 127.0.0.1 (edits via the update path)
 arggon board --serve --port 4173       # pick the port
+arggon board --tui            # interactive read-only terminal kanban (raw ANSI, no deps)
 ```
 
 - `--out <file>`: output path (default `board.html` at the repo root regardless of cwd); parent directories must exist
@@ -206,6 +207,16 @@ arggon board --serve --port 4173       # pick the port
 - `--github`: one `gh pr list` read matched by head ref name → per-card badge (`#N · draft/open/merged/closed` + checks `✓/✗/…`, neutral `○ no PR` without branch or PR); without gh auth fails clearly suggesting plain `board`; never writes to `tasks/`
 - `--group-by milestone`: prototype per [ADR 0003](docs/adr/0003-milestone-field.md); items without a milestone group last
 - `--serve`: serves the board locally, **bound to 127.0.0.1 only**, and reloads the page whenever any file under `tasks/` changes; drag-and-drop posts to the update endpoint, which runs the same kernel update rules as the CLI. `--serve --json` emits the standard envelope once (`{ serving, url, port }`)
+- `--tui`: interactive, read-only terminal kanban over the same kernel read path — five v0 status columns, dependency-light (raw ANSI escapes, no TUI framework, zero new dependencies). Re-reads the tree after every keypress, so it always shows the current tree. Requires an interactive terminal (piped stdout fails with `BOARD_FAILED`); **not combinable with `--json`** (it is a view, not a data format) or `--serve`. Keybindings:
+
+| Key | Action |
+| --- | --- |
+| `←` / `→` | move the selected column (v0 status order) |
+| `↑` / `↓` | move the selected card within the column |
+| `/` | open the search prompt (substring on id/title); `enter` applies, `esc` cancels |
+| `esc` | clear the active filter |
+| `enter` | print the selected item's file path (does not open an editor) |
+| `q` / `Ctrl-C` | quit, restoring the screen |
 
 The static export is a snapshot: re-run after tree changes to refresh (or use `--serve`). The generated file is a build artifact — safe to gitignore; deleting it loses nothing.
 

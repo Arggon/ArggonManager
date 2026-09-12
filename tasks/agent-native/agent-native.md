@@ -1,11 +1,11 @@
 ---
 type: initiative
-status: todo
+status: done
 id: agent-native
 title: "Agent-native tooling: dependencies, leases, worktrees, ecosystem"
 labels: []
 created: "2026-09-11"
-updated: "2026-09-11"
+updated: "2026-09-12"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-native.md (initiative index; required).

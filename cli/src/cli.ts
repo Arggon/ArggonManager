@@ -36,6 +36,7 @@ import {
   runSpecValidate,
 } from "./spec.js";
 import { runSync } from "./sync-command.js";
+import { runTuiBoard } from "./tui.js";
 import { runUpdate } from "./update.js";
 import { formatValidateHuman, runValidate } from "./validate.js";
 const program = new Command();
@@ -952,23 +953,40 @@ program
   )
   .option("--serve", "serve the board locally (127.0.0.1) with live reload; edits go through the update path", false)
   .option("--port <port>", "port for --serve (default: a free ephemeral port)")
+  .option("--tui", "interactive read-only terminal kanban (raw ANSI, q quits; not combinable with --json)", false)
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { out?: string; github?: boolean; groupBy?: string; serve?: boolean; port?: string; json?: boolean }) => {
+  .action((opts: { out?: string; github?: boolean; groupBy?: string; serve?: boolean; port?: string; tui?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
+    const jsonFailed = (message: string) => {
+      if (json) {
+        failJson({
+          command: "board",
+          message,
+          code: "BOARD_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon board: ${message}`);
+      process.exitCode = 1;
+    };
+    if (opts.tui) {
+      if (opts.serve) {
+        jsonFailed("cannot combine --tui with --serve (both are interactive modes)");
+        return;
+      }
+      if (json) {
+        jsonFailed(
+          "--tui is an interactive view and cannot be combined with --json (use plain `arggon list --json` for data)",
+        );
+        return;
+      }
+      runTuiBoard({ cwd: process.cwd() }).catch((err: unknown) => {
+        jsonFailed(err instanceof Error ? err.message : String(err));
+      });
+      return;
+    }
     if (opts.serve) {
-      const jsonFailed = (message: string) => {
-        if (json) {
-          failJson({
-            command: "board",
-            message,
-            code: "BOARD_FAILED",
-            conventionVersion: readConventionVersion(process.cwd()),
-          });
-          return;
-        }
-        console.error(`arggon board: ${message}`);
-        process.exitCode = 1;
-      };
       if (opts.github) {
         jsonFailed("cannot combine --serve with --github (the served board renders fresh per request)");
         return;
