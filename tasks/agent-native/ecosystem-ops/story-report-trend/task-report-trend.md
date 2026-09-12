@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-report-trend
 title: report --trend from git history
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-report-trend
 labels: []
 created: "2026-09-11"
 updated: "2026-09-12"
-claimed_at: "2026-09-12T01:19:07.186Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-report-trend/task-report-trend.md
