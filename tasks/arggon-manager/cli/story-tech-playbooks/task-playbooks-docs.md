@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-playbooks-docs
 title: Playbooks docs + AGENTS.md wiring
 assignee: Arggon
@@ -8,7 +8,6 @@ parent: story-tech-playbooks
 labels: []
 created: "2026-09-12"
 updated: "2026-09-12"
-claimed_at: "2026-09-12T19:40:22.395Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tech-playbooks/task-playbooks-docs.md
@@ -25,5 +24,5 @@ Docs + wiring: the init-generated AGENTS.md must reference docs/playbooks/ so ag
 
 ## Acceptance
 
-- [ ] README + agents.md (maintenance section) document the pipeline: explore -> ADR -> playbook -> status/--file-task
-- [ ] init-generated AGENTS.md includes the playbooks pointer (template updated + test)
+- [x] README + agents.md (maintenance section) document the pipeline: explore -> ADR -> playbook -> status/--file-task
+- [x] init-generated AGENTS.md includes the playbooks pointer (template updated + test)

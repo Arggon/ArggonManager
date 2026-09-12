@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-playbook-commands
 title: arggon playbook new/status — versioned playbooks
 assignee: Arggon
@@ -8,7 +8,6 @@ parent: story-tech-playbooks
 labels: []
 created: "2026-09-12"
 updated: "2026-09-12"
-claimed_at: "2026-09-12T19:40:22.238Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tech-playbooks/task-playbook-commands.md
@@ -25,5 +24,5 @@ claimed_at: "2026-09-12T19:40:22.238Z"
 
 ## Acceptance
 
-- [ ] playbook new/status landed with tests (stale math fixed-clock, --file-task integration via runCreate)
-- [ ] Stale threshold configurable via .convention.yml x-playbooks (namespaced extension)
+- [x] playbook new/status landed with tests (stale math fixed-clock, --file-task integration via runCreate)
+- [x] Stale threshold configurable via .convention.yml x-playbooks (namespaced extension)
