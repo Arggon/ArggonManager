@@ -62,6 +62,8 @@ Generate the branch from the work item `id` following the configured patterns (`
 
 This checks out the branch and records it in the item's `branch` field. If the right branch already exists and matches, it attaches to it. Defaults follow `feat/<id>` / `fix/<id>` / `docs/<id>` (e.g. `feat/task-rate-limit`, `fix/bug-empty-password-500`).
 
+The manual worktree step (`git worktree add ../<repo>-<id> -b <branch>`) can be folded into the claim: `arggon start <id> --worktree --assignee <login>` claims, creates (or attaches to) the worktree at `../<repo-name>-<id>`, and runs the claim commit / push / optional `--open-pr` inside it, recording the path on the item's `worktree_path` field. When the work is done and merged, `arggon cleanup` lists (and with `--prune` removes) the stale worktrees.
+
 One primary claimable id per branch when possible. Open a PR early; keep it small.
 
 ## 5. Done criteria

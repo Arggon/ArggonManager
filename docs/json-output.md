@@ -26,7 +26,7 @@ Every success or failure payload includes:
 | `ok`                | boolean | `true` on success; `false` on failure                                                                                                 |
 | `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.                                            |
 | `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                                                        |
-| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `branch` \| `start` \| `board` \| `sync` \| `instructions` \| `mcp` |
+| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `branch` \| `start` \| `cleanup` \| `board` \| `sync` \| `instructions` \| `mcp` |
 
 Command-specific fields sit next to this envelope (not nested under a generic `data` key).
 
@@ -77,6 +77,7 @@ Stable fields aligned with convention v0 plus the additive `branch` (v1) and `mi
 | `milestone`      | `string` \| `null`                                            | Prototype per ADR 0003 (official in v3); additive within `schemaVersion: 1` |
 | `depends_on`     | `string[]`                                                    | Ids this item waits for (v3, ADR 0004); empty = none. Additive within `schemaVersion: 1`; `blocked_by` is the computed inverse and is never stored |
 | `claimed_at`     | `string` \| `null`                                          | Soft lease: ISO date-time set when a claimable item is claimed (`in_progress` + assignee, via `update`/`start`) and cleared when the claim is released. Reporting only — never gates a transition. Additive within `schemaVersion: 1`; `null` for items claimed before the field existed |
+| `worktree_path`  | `string` \| `null`                                          | Absolute path of the git worktree created by `start --worktree` (`../<repo-name>-<id>`). Additive within `schemaVersion: 1`; `null` when the item was started without worktree isolation |
 
 Enums match [`docs/convention.md`](./convention.md) v0.
 
@@ -167,8 +168,26 @@ Failures use `error.code: "BRANCH_FAILED"` (unknown id, bad `branch_patterns`, n
 | `created` | `boolean`      | `true` when `git checkout -b` ran; `false` on attach |
 | `pushed`  | `boolean`      | `true` when the branch was pushed this run           |
 | `prUrl`   | `string\|null` | Draft PR URL with `--open-pr`; `null` otherwise      |
+| `worktreePath` | `string\|null` | Absolute worktree path with `--worktree`; `null` otherwise. Additive within `schemaVersion: 1` |
 
-Failures use `error.code: "START_FAILED"` (unknown id, taken claim — never forced, dirty tree, existing branch, non-git tree, or gh failure).
+With `--worktree` the claim commit, push, and draft PR run inside the worktree and the item's `worktree_path` is persisted (re-runs attach to the recorded path). Failures use `error.code: "START_FAILED"` (unknown id, taken claim — never forced, dirty tree, existing branch, non-git tree, worktree path occupied by a non-worktree, or gh failure).
+
+### `cleanup`
+
+| Field        | Type         | Notes                                                                                     |
+| ------------ | ------------ | ----------------------------------------------------------------------------------------- |
+| `base`       | `string`     | Ref the merge check runs against (`origin/HEAD`, else local `main`/`master`)              |
+| `candidates` | `object[]`   | One entry per item with a `worktree_path` record, lexicographic by id                      |
+| `candidates[].id`        | `string`         | Item id                                                       |
+| `candidates[].status`    | `string`         | Item status at classification time                            |
+| `candidates[].branch`    | `string\|null`   | Recorded branch                                               |
+| `candidates[].path`      | `string`         | Recorded absolute worktree path                               |
+| `candidates[].removable` | `boolean`        | True when `--prune` would remove it (terminal item + merged branch) |
+| `candidates[].reason`    | `string\|null`   | Why it is skipped (null when removable)                       |
+| `candidates[].action`    | `string\|null`   | What `--prune` does for it (null when skipped)                |
+| `pruned`     | `object[]`   | `{ id, action }` entries performed (empty without `--prune`)                               |
+
+Default mode only lists. `--prune` removes removable worktrees (`git worktree remove` — git refuses dirty worktrees), deletes their merged branches (`git branch -d`), and clears the `worktree_path` records; skipped entries (non-terminal item, unmerged/missing branch) are never touched. Failures use `error.code: "CLEANUP_FAILED"` (non-git tree, undetectable default branch, or per-item prune failures — already-completed actions are reported in the error message).
 
 ### `next`
 

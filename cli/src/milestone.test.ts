@@ -99,6 +99,7 @@ const BARE = (id: string) => ({
   milestone: null,
   depends_on: [],
   claimed_at: null,
+  worktree_path: null,
 });
 
 describe("board milestone grouping", () => {

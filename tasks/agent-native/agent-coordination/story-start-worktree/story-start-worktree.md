@@ -1,12 +1,15 @@
 ---
 type: story
-status: todo
+status: done
 id: story-start-worktree
 title: Worktree-integrated claims
+assignee: Arggon
+branch: feat/story-start-worktree
 parent: agent-coordination
 labels: []
 created: "2026-09-11"
-updated: "2026-09-11"
+updated: "2026-09-12"
+claimed_at: "2026-09-12T00:02:44.152Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-coordination/story-start-worktree/story-start-worktree.md (story index; required).
@@ -21,5 +24,5 @@ The playbook mandates worktrees; the CLI can enforce it. `start --worktree` crea
 
 ## Acceptance
 
-- [ ] `start --worktree` yields an isolated worktree recorded on the item; re-running attaches
-- [ ] `arggon cleanup` lists (default) and removes (`--prune`) stale worktrees safely
+- [x] `start --worktree` yields an isolated worktree recorded on the item; re-running attaches
+- [x] `arggon cleanup` lists (default) and removes (`--prune`) stale worktrees safely

@@ -4,6 +4,7 @@ import { displayPath, runBoard } from "./board.js";
 import { startBoardServer } from "./board-serve.js";
 import { runBranch } from "./branch.js";
 import { runStart } from "./start.js";
+import { runCleanup } from "./cleanup.js";
 import { readConventionVersion } from "./convention.js";
 import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
@@ -530,50 +531,140 @@ program
   .argument("<id>", "work item id")
   .option("--assignee <login>", "claim as this login (default: GITHUB_USER / GITHUB_ACTOR)")
   .option("--open-pr", "open a draft PR after pushing", false)
+  .option(
+    "--worktree",
+    "run the flow inside a linked git worktree at ../<repo-name>-<id> (recorded on the item as worktree_path)",
+    false,
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((id: string, opts: { assignee?: string; openPr?: boolean; json?: boolean }) => {
+  .action(
+    (
+      id: string,
+      opts: { assignee?: string; openPr?: boolean; worktree?: boolean; json?: boolean },
+    ) => {
+      const json = jsonEnabled(opts);
+      try {
+        const result = runStart({
+          cwd: process.cwd(),
+          id,
+          assignee: opts.assignee,
+          openPr: Boolean(opts.openPr),
+          worktree: Boolean(opts.worktree),
+        });
+        if (json) {
+          successJson(
+            "start",
+            {
+              item: toContractWorkItem(result.item, result.root),
+              branch: result.branch,
+              created: result.created,
+              pushed: result.pushed,
+              prUrl: result.prUrl,
+              worktreePath: result.worktreePath,
+            },
+            readConventionVersion(result.root),
+          );
+          return;
+        }
+        console.log(`arggon start: ${result.item.type} ${result.id} → ${result.branch}`);
+        if (result.worktreePath) {
+          console.log(
+            `  worktree: ${result.worktreePath} (${result.worktreeCreated ? "created" : "attached"})`,
+          );
+        }
+        if (result.prUrl) {
+          console.log(`  draft PR: ${result.prUrl}`);
+        } else if (result.pushed) {
+          console.log(`  pushed (no PR; pass --open-pr)`);
+        } else {
+          console.log(`  already started; nothing to publish`);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (json) {
+          failJson({
+            command: "start",
+            message,
+            code: "START_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
+        console.error(`arggon start: ${message}`);
+        process.exitCode = 1;
+      }
+    },
+  );
+
+program
+  .command("cleanup")
+  .description(
+    "List worktrees of done/cancelled items whose branches are merged (--prune removes them)",
+  )
+  .option(
+    "--prune",
+    "remove removable worktrees (git worktree remove), delete their merged branches, and clear the worktree_path records",
+    false,
+  )
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { prune?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
-      const result = runStart({
-        cwd: process.cwd(),
-        id,
-        assignee: opts.assignee,
-        openPr: Boolean(opts.openPr),
-      });
+      const result = runCleanup({ cwd: process.cwd(), prune: Boolean(opts.prune) });
       if (json) {
+        if (result.failures.length > 0) {
+          failJson({
+            command: "cleanup",
+            message: result.failures.join("; "),
+            code: "CLEANUP_FAILED",
+            conventionVersion: readConventionVersion(result.root),
+          });
+          return;
+        }
         successJson(
-          "start",
+          "cleanup",
           {
-            item: toContractWorkItem(result.item, result.root),
-            branch: result.branch,
-            created: result.created,
-            pushed: result.pushed,
-            prUrl: result.prUrl,
+            base: result.base,
+            candidates: result.entries,
+            pruned: result.pruned,
           },
           readConventionVersion(result.root),
         );
         return;
       }
-      console.log(`arggon start: ${result.item.type} ${result.id} → ${result.branch}`);
-      if (result.prUrl) {
-        console.log(`  draft PR: ${result.prUrl}`);
-      } else if (result.pushed) {
-        console.log(`  pushed (no PR; pass --open-pr)`);
-      } else {
-        console.log(`  already started; nothing to publish`);
+      const removable = result.entries.filter((e) => e.removable);
+      console.log(
+        `arggon cleanup: ${result.entries.length} tracked worktree(s), base ${result.base}`,
+      );
+      for (const entry of result.entries) {
+        if (entry.removable) {
+          console.log(`  removable: ${entry.id} -> ${entry.path} (${entry.action})`);
+        } else {
+          console.log(`  skipped:   ${entry.id} (${entry.reason})`);
+        }
       }
+      for (const action of result.pruned) {
+        console.log(`  pruned:    ${action.id}: ${action.action}`);
+      }
+      for (const failure of result.failures) {
+        console.error(`  failed:    ${failure}`);
+      }
+      if (!opts.prune && removable.length > 0) {
+        console.log(`next: arggon cleanup --prune removes ${removable.length} worktree(s)`);
+      }
+      if (result.failures.length > 0) process.exitCode = 1;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (json) {
         failJson({
-          command: "start",
+          command: "cleanup",
           message,
-          code: "START_FAILED",
+          code: "CLEANUP_FAILED",
           conventionVersion: readConventionVersion(process.cwd()),
         });
         return;
       }
-      console.error(`arggon start: ${message}`);
+      console.error(`arggon cleanup: ${message}`);
       process.exitCode = 1;
     }
   });

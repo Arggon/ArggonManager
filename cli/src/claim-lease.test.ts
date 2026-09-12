@@ -57,6 +57,8 @@ function fakeGit(): StartGit {
     commitFile: () => undefined,
     pushBranch: () => undefined,
     createDraftPr: () => "https://github.com/o/r/pull/1",
+    worktreeList: () => [],
+    worktreeAdd: () => undefined,
   };
 }
 

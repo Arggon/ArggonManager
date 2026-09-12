@@ -53,13 +53,15 @@ node dist/cli.js board --github --json                             # + live PR o
 node dist/cli.js next --json                                         # {suggestion: {item, parentChain, reason} | null}
 node dist/cli.js report --json                                       # {groups} per-epic leaf counts; --format markdown for standups
 node dist/cli.js instructions --json                                 # agent wiring snippets extracted from docs/agents.md
+node dist/cli.js cleanup --json                                      # worktrees of done/cancelled items with merged branches: {base, candidates, pruned}
+node dist/cli.js cleanup --prune                                     # remove removable worktrees + delete merged branches (skips are reported, never touched)
 node dist/cli.js mcp                                                 # stdio MCP server exposing list/create/update (agent rules)
 ```
 
 ## Procedure
 
 1. **Locate work:** `list --status todo --json`. Completion: `ok:true` and an `items` array (possibly empty — empty is success, not an error).
-2. **Start:** `start <id> --assignee <login> [--open-pr]` — claims (`in_progress` + assignee), checks out the working branch (pattern or recorded field), commits the claim, pushes, and with `--open-pr` opens a draft PR with the item id in the body. Completion: `ok:true` with `branch` + `pushed:true` (`prUrl` with `--open-pr`). If the claim is taken (`START_FAILED`), pick another item — never `--force`. Manual fallback: `update <id> --status in_progress --assignee <login>` + `branch <id>`.
+2. **Start:** `start <id> --assignee <login> [--open-pr] [--worktree]` — claims (`in_progress` + assignee), checks out the working branch (pattern or recorded field), commits the claim, pushes, and with `--open-pr` opens a draft PR with the item id in the body. With `--worktree` the flow runs inside a linked git worktree at `../<repo-name>-<id>` (recorded on the item as additive `worktree_path`; re-runs attach). Completion: `ok:true` with `branch` + `pushed:true` (`prUrl` with `--open-pr`, `worktreePath` with `--worktree`). If the claim is taken (`START_FAILED`), pick another item — never `--force`. Manual fallback: `update <id> --status in_progress --assignee <login>` + `branch <id>`.
 3. **Record findings:** `create task|bug "<title>" --parent <story-id>`. Completion: returned `item.id` + `path` under the parent story. Leaves get the `task-`/`bug-` prefix automatically (even with `--id`).
 4. **Finish:** complete the acceptance checklist in the Markdown body, then `update <id> --status done`. Never jump `todo` → `done`, never reopen `done`/`cancelled`.
 5. **Verify:** `validate --json` must show `ok:true` before committing.

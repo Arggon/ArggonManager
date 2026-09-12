@@ -42,6 +42,12 @@ export type WorkItem = {
    * Additive within schemaVersion 1; reporting only, never gates transitions.
    */
   claimed_at: string | null;
+  /**
+   * Absolute path of the git worktree created by `arggon start --worktree`
+   * (`../<repo-name>-<id>`). Additive within schemaVersion 1; `null` when the
+   * item was started without worktree isolation.
+   */
+  worktree_path: string | null;
 };
 
 /** One validate finding. `path` is posix, repo-relative (file or directory). */
