@@ -357,7 +357,7 @@ describe("CLI --json", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-subdir-board-"));
     expect(runCli(["init", dir]).status).toBe(0);
     const sub = join(dir, "docs");
-    mkdirSync(sub);
+    mkdirSync(sub, { recursive: true });
     const result = runCli(["board", "--json"], sub);
     expect(result.status).toBe(0);
     const body = parseStdout(result.stdout);

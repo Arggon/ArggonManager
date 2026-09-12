@@ -189,7 +189,7 @@ tasks-validate:
 
 ### Agent instructions snippet
 
-Paste into the target repo's `AGENTS.md` (or equivalent) so coding agents loop through the CLI:
+Adopters get this wiring for free: `arggon init` generates a spec-compliant `AGENTS.md` (plus a one-line `CLAUDE.md` shim with `@AGENTS.md` and a `.github/copilot-instructions.md` pointer) from master templates — it never overwrites an existing file. Repos that do not use `init` can still paste the snippet below into their `AGENTS.md` (or equivalent) so coding agents loop through the CLI:
 
 ```markdown
 ## Task workflow (ArggonManager)

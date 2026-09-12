@@ -1,12 +1,15 @@
 ---
 type: story
-status: todo
+status: done
 id: story-init-docs
 title: Init scaffolds the governing document set
+assignee: Arggon
+branch: feat/story-init-docs-impl
 parent: cli
 labels: []
 created: "2026-09-12"
 updated: "2026-09-12"
+claimed_at: "2026-09-12T19:19:04.049Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-init-docs/story-init-docs.md (story index; required).
@@ -21,5 +24,5 @@ updated: "2026-09-12"
 
 ## Acceptance
 
-- [ ] `arggon init` generates the tier-1 set by default (AGENTS.md, CLAUDE.md shim, .github/copilot-instructions.md pointer, CONTRIBUTING.md, SECURITY.md, .editorconfig, CODEOWNERS placeholder, PR/issue templates); `--full` adds ARCHITECTURE.md, project-local docs/convention.md + docs/engineering.md templates, CHANGELOG.md, SUPPORT.md, docs/runbooks/
-- [ ] Never overwrites existing files; generated-from-source templates with placeholders; --json reports created/skipped
+- [x] `arggon init` generates the tier-1 set by default (AGENTS.md, CLAUDE.md shim, .github/copilot-instructions.md pointer, CONTRIBUTING.md, SECURITY.md, .editorconfig, CODEOWNERS placeholder, PR/issue templates); `--full` adds ARCHITECTURE.md, project-local docs/convention.md + docs/engineering.md templates, CHANGELOG.md, SUPPORT.md, docs/runbooks/
+- [x] Never overwrites existing files; generated-from-source templates with placeholders; --json reports created/skipped

@@ -64,14 +64,15 @@ program
 
 program
   .command("init")
-  .description("Scaffold tasks/ convention (+ templates) in a repo")
+  .description("Scaffold tasks/ convention (+ templates + governing docs) in a repo")
   .argument("[dir]", "target directory", ".")
-  .option("-f, --force", "overwrite existing convention/templates", false)
+  .option("-f, --force", "overwrite existing convention/templates (docs are never overwritten)", false)
+  .option("--full", "also generate the tier-2 doc set (ARCHITECTURE.md, docs/convention.md, ...)", false)
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((dir: string, opts: { force: boolean; json?: boolean }) => {
+  .action((dir: string, opts: { force: boolean; full?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
-      const result = runInit({ dir, force: Boolean(opts.force) });
+      const result = runInit({ dir, force: Boolean(opts.force), full: Boolean(opts.full) });
       if (json) {
         successJson(
           "init",
@@ -80,6 +81,7 @@ program
             alreadyInitialized: result.alreadyInitialized,
             force: result.force,
             created: result.created,
+            skipped: result.skipped,
             restored: result.restored,
             conventionPath: result.conventionPath,
           },
@@ -1070,6 +1072,12 @@ function printInitHuman(result: InitResult): void {
     } else {
       console.log("arggon init: templates/ already complete");
     }
+    if (result.created.length > 0) {
+      console.log(`arggon init: generated missing docs: ${result.created.join(", ")}`);
+    }
+    if (result.skipped.length > 0) {
+      console.log(`arggon init: kept existing docs: ${result.skipped.length} file(s) (never overwritten)`);
+    }
     console.log("Next: create work with `arggon create` (coming soon), or copy from templates/.");
     return;
   }
@@ -1077,6 +1085,15 @@ function printInitHuman(result: InitResult): void {
   console.log(`arggon init: ready in ${result.root}`);
   console.log("  - tasks/.convention.yml (version: 0)");
   console.log("  - templates/ (initiative, epic, story, task, bug)");
+  if (result.created.some((p) => !p.startsWith("templates/"))) {
+    const docs = result.created.filter((p) => p !== "tasks/.convention.yml" && !p.startsWith("templates/"));
+    console.log(`  - governing docs (${docs.length}): ${docs.join(", ")}`);
+  }
+  if (result.skipped.length > 0) {
+    console.log(
+      `  - kept existing docs (never overwritten): ${result.skipped.join(", ")}`,
+    );
+  }
   console.log("Next:");
   console.log("  1. Add an initiative under tasks/<slug>/<slug>.md (see docs/convention.md)");
   console.log("  2. Or use templates/ as stubs until `arggon create` lands");
