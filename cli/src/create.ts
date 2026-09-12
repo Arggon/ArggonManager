@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { stringifyFrontmatter, type Frontmatter } from "./frontmatter.js";
-import { innerSlug, isItemType, itemId, slugify, type ItemType } from "./ids.js";
+import { assertLabels, innerSlug, isItemType, itemId, slugify, type ItemType } from "./ids.js";
 import { itemsById, loadItems, tryLoadItem, type WorkItem } from "./items.js";
 import { bundledTemplatesDir, findTasksDir, newItemPath, repoRootFromTasks } from "./paths.js";
 import { assertParentEdge, expectedParentType } from "./relations.js";
@@ -23,6 +23,14 @@ export type CreateOptions = {
   assignee?: string;
   status?: string;
   blockedReason?: string;
+  /** Replace the default empty labels list (must satisfy the kebab-case rules). */
+  labels?: string[];
+  /**
+   * Override the template-derived body with verbatim content (e.g.
+   * import-issues writes the original issue body plus a provenance line).
+   * Omit to fill the type's template body as usual.
+   */
+  body?: string;
   now?: Date;
 };
 
@@ -48,6 +56,7 @@ export function runCreate(opts: CreateOptions): CreateResult {
   const status: Status = statusRaw;
   assertCreatableStatus(status);
   if (opts.assignee !== undefined) assertAssignee(opts.assignee);
+  if (opts.labels !== undefined) assertLabels(opts.labels);
   assertClaimAndBlocked({
     type,
     status,
@@ -96,20 +105,23 @@ export function runCreate(opts: CreateOptions): CreateResult {
   const today = formatDate(opts.now ?? new Date());
   const templatePath = resolveTemplate(tasksDir, type);
   const template = readFileSync(templatePath, "utf8");
-  const body = fillTemplateBody(stripFrontmatterBody(template), {
-    type,
-    id,
-    title,
-    parent: parentItem,
-    byId,
-  });
+  const body =
+    opts.body !== undefined
+      ? opts.body
+      : fillTemplateBody(stripFrontmatterBody(template), {
+          type,
+          id,
+          title,
+          parent: parentItem,
+          byId,
+        });
 
   const data: Frontmatter = {
     type,
     status,
     id,
     title,
-    labels: [],
+    labels: opts.labels ?? [],
     created: today,
     updated: today,
   };

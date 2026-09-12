@@ -26,7 +26,7 @@ Every success or failure payload includes:
 | `ok`                | boolean | `true` on success; `false` on failure                                                                                                 |
 | `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.                                            |
 | `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                                                        |
-| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `comment` \| `branch` \| `start` \| `cleanup` \| `board` \| `sync` \| `instructions` \| `mcp` |
+| `command`           | string  | Commander command name: `hello` \| `init` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `comment` \| `branch` \| `start` \| `cleanup` \| `board` \| `sync` \| `import-issues` \| `instructions` \| `mcp` |
 
 Command-specific fields sit next to this envelope (not nested under a generic `data` key).
 
@@ -263,6 +263,26 @@ With `--github` the board overlays live PR state (number, draft/ready, checks) o
 Matching: items with a `branch` reconcile by exact head-ref equality (any type); empty `branch` fields are fill candidates only for leaves (`task`/`bug`) whose id starts a branch path segment and is not immediately followed by a letter or digit. Trailing hyphen suffixes deliberately still match — `feat/task-1-work` references `task-1` (this is what makes `chore/{id}-{type}` patterns fillable) — while `feat/task-12` does not reference `task-1`, and a longer id is never matched by its hyphen prefix (`feat/task-1` does not reference `task-1-work`). `--write` fills only empty fields — it never overwrites a set branch, never touches `status`, and never resolves ambiguity.
 
 **Exit-code semantics (differs from `ok`):** the process exits non-zero when check mode finds sync needed (`pending`/`ambiguous`) or the run errored, so `arggon sync --check` works as a CI gate after `arggon sync --write`. `ok` stays `true` for those — it is `false` only when the sync itself failed. Failures use `error.code: "SYNC_FAILED"` (missing tasks/, conflicting flags, or gh unavailable).
+
+### `import-issues`
+
+One-shot GitHub issue import (idempotent): every issue becomes a task under a parent story — open → `todo`, closed → `done`; `--dry-run` computes the plan and writes nothing (including the default story). Target ids are `task-issue-<number>`, so re-running imports nothing (`created: 0`, every entry `skipped`).
+
+| Field                   | Type                                                              | Notes                                                                                          |
+| ----------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `dryRun`                | `boolean`                                                         | `true` with `--dry-run` (plan only, no writes)                                                 |
+| `story`                 | `{ id: string, created: boolean }`                                | Target story; `created` is true when this run created `story-imported-issues` (always `false` in dry-run) |
+| `entries`               | `object[]`                                                        | One entry per issue, in gh order                                                               |
+| `entries[].issue`       | `number`                                                          | GitHub issue number                                                                            |
+| `entries[].id`          | `string`                                                          | Target/imported task id (`task-issue-<number>`)                                                |
+| `entries[].title`       | `string`                                                          | `issue #<n>: <issue title>`                                                                    |
+| `entries[].status`      | `"todo" \| "done"`                                                | Mapped from the issue state                                                                    |
+| `entries[].action`      | `"created" \| "skipped" \| "would-create" \| "would-skip"`        | `would-*` only with `--dry-run`                                                                |
+| `created`               | `number`                                                          | Items written this run                                                                         |
+| `skipped`               | `number`                                                          | Issues whose id already existed (idempotent re-run: all of them)                               |
+| `labels`                | `{ mapped: number, skipped: number }`                             | Issue labels mapped into item labels (kebab-case, deduped); `skipped` counts invalid ones dropped silently |
+
+Failures use `error.code: "IMPORT_FAILED"` (gh missing/unauthenticated or unparseable output, missing `tasks/`, no epic for the default story, malformed `--repo`, or `--parent` that does not resolve to a story).
 
 ---
 

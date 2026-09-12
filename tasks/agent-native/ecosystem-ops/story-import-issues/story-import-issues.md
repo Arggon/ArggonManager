@@ -1,12 +1,15 @@
 ---
 type: story
-status: todo
+status: done
 id: story-import-issues
 title: Import GitHub issues one-shot
+assignee: Arggon
+branch: feat/story-import-issues
 parent: ecosystem-ops
 labels: []
 created: "2026-09-11"
-updated: "2026-09-11"
+updated: "2026-09-12"
+claimed_at: "2026-09-12T00:45:33.818Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-import-issues/story-import-issues.md (story index; required).
@@ -21,5 +24,5 @@ updated: "2026-09-11"
 
 ## Acceptance
 
-- [ ] `arggon import-issues` maps open issues to `todo` tasks, closed to `done`, idempotently (re-run imports nothing)
-- [ ] Cross-references preserved (issue number in body/Notes); `--dry-run` previews
+- [x] `arggon import-issues` maps open issues to `todo` tasks, closed to `done`, idempotently (re-run imports nothing)
+- [x] Cross-references preserved (issue number in body/Notes); `--dry-run` previews

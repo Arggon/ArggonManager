@@ -216,6 +216,25 @@ Closing work is easy on containers too: when an update reaches a terminal state 
 
 Reconciles `tasks/` with the repo's open GitHub PRs: `--check` (default, CI-safe) reports matched/unmatched items and exits non-zero when sync is pending; `--write` fills **only empty** `branch` fields — never overwrites a set branch, never guesses an ambiguous match, never touches status. Flags: `--repo <owner/repo>`, `--json`. Failures: `SYNC_FAILED`.
 
+### `arggon import-issues`
+
+One-shot migration of an existing GitHub issue backlog into `tasks/` (the docs/agents.md §0 promise). Reads issues via `gh issue list --state all --limit 200 --json number,title,state,body,labels` and writes one task per issue through the same kernel as `create`/`update`. **Idempotent**: target ids are `task-issue-<number>`, so a re-run imports nothing (`created: 0`, everything skipped).
+
+- status mapping: open → `todo`, closed → `done` (closed items are created `todo` and closed through the legal kernel path in the same run; the container auto-completion cascade may fire)
+- title `issue #N: <issue title>`; body: the original issue body plus a `> imported from issue #N` provenance line
+- labels: issue labels slugified to kebab-case and deduped; invalid ones are skipped silently but counted in the report
+- target story: `story-imported-issues`, created under the first epic when missing (actionable error when the tree has no epic); override with `--parent <story-id>`
+
+```bash
+arggon import-issues                      # gh resolves the repo from cwd
+arggon import-issues --repo owner/name    # explicit repository
+arggon import-issues --dry-run            # print the would-create / would-skip plan, write nothing
+arggon import-issues --parent story-backlog
+arggon import-issues --json               # v1 envelope: { dryRun, story, entries, created, skipped, labels }
+```
+
+Failures exit non-zero (`IMPORT_FAILED` under `--json`): gh missing/unauthenticated (`gh auth login`), missing `tasks/`, a tree without an epic for the default story, or a malformed `--repo` / unresolvable `--parent`.
+
 ### `arggon comment`
 
 Appends a timestamped, author-attributed comment section to an item's body — the handoff channel for agent context ("why blocked", "what the next agent should know"). Comments are history, not status changes: the write is **body-only** (frontmatter is re-serialized unchanged, `updated` is NOT bumped), it works on any item in any status including `done`/`cancelled` (this is NOT a reopen), and agents may comment on closed items. Section format:

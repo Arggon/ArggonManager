@@ -19,6 +19,7 @@ import {
   successJson,
 } from "./json.js";
 import { formatListTable, runList } from "./list.js";
+import { runImportIssues } from "./import-issues.js";
 import { runInstructions } from "./instructions.js";
 import { runMcpServer } from "./mcp-server.js";
 import { runNext } from "./next.js";
@@ -481,6 +482,70 @@ program
           return;
         }
         console.error(`arggon comment: ${message}`);
+        process.exitCode = 1;
+      }
+    },
+  );
+
+program
+  .command("import-issues")
+  .description("One-shot import of GitHub issues into tasks/ as tasks (idempotent)")
+  .option("--repo <owner/repo>", "GitHub repository (default: gh's own resolution from cwd)")
+  .option(
+    "--parent <story-id>",
+    "target story for imported tasks (default: story-imported-issues, created under the first epic when missing)",
+  )
+  .option("--dry-run", "print the mapping plan (would-create / would-skip) without writing", false)
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action(
+    (opts: { repo?: string; parent?: string; dryRun?: boolean; json?: boolean }) => {
+      const json = jsonEnabled(opts);
+      try {
+        const result = runImportIssues({
+          cwd: process.cwd(),
+          repo: opts.repo,
+          parent: opts.parent,
+          dryRun: Boolean(opts.dryRun),
+        });
+        if (json) {
+          successJson(
+            "import-issues",
+            {
+              dryRun: result.dryRun,
+              story: result.story,
+              entries: result.entries,
+              created: result.created,
+              skipped: result.skipped,
+              labels: { mapped: result.labelsMapped, skipped: result.labelsSkipped },
+            },
+            readConventionVersion(result.root),
+          );
+          return;
+        }
+        console.log(
+          `arggon import-issues${result.dryRun ? " (dry run)" : ""}: ${result.entries.length} issue(s), ${result.created} created, ${result.skipped} skipped`,
+        );
+        console.log(
+          `  target story: ${result.story.id}${result.story.created ? " (created)" : result.dryRun ? " (would create when missing)" : ""}`,
+        );
+        for (const entry of result.entries) {
+          console.log(`  ${entry.action.padEnd(13)} ${entry.id}  ${entry.title} [${entry.status}]`);
+        }
+        console.log(
+          `  labels: ${result.labelsMapped} mapped, ${result.labelsSkipped} skipped (invalid)`,
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (json) {
+          failJson({
+            command: "import-issues",
+            message,
+            code: "IMPORT_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
+        console.error(`arggon import-issues: ${message}`);
         process.exitCode = 1;
       }
     },
