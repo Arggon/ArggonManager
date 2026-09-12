@@ -31,6 +31,10 @@ export type DocsResult = {
   skipped: string[];
 };
 
+/** Source (package-root relative) and destination of the bundled agent skill. */
+const SKILL_SOURCE = "skills/arggon-cli/SKILL.md";
+const SKILL_DEST = ".agents/skills/arggon-cli/SKILL.md";
+
 /** Template-relative path → destination-relative path. Unlisted paths map 1:1. */
 const DOC_PATH_MAP: Record<string, string> = {
   editorconfig: ".editorconfig",
@@ -80,6 +84,8 @@ export function renderDocPlaceholders(
 }
 
 export function generateDocs(opts: GenerateDocsOptions): DocsResult {
+  const packageRoot = resolve(bundledTemplatesDir(), "..");
+  const skillSrc = resolve(packageRoot, ...SKILL_SOURCE.split("/"));
   const docsSrc = resolve(bundledTemplatesDir(), "docs");
   if (!existsSync(docsSrc)) {
     throw new Error(`Bundled doc templates not found at ${docsSrc}`);
@@ -101,6 +107,21 @@ export function generateDocs(opts: GenerateDocsOptions): DocsResult {
     writeFileSync(destAbs, renderDocPlaceholders(template, vars), "utf8");
     created.push(dest);
   }
+
+  // Bundle the arggon-cli skill from its single source (skills/ in this repo —
+  // NOT a template duplicate) so agents in the adopter repo use it by default.
+  if (existsSync(skillSrc)) {
+    const destAbs = join(opts.root, ...SKILL_DEST.split("/"));
+    if (existsSync(destAbs)) {
+      skipped.push(SKILL_DEST);
+    } else {
+      mkdirSync(dirname(destAbs), { recursive: true });
+      writeFileSync(destAbs, readFileSync(skillSrc, "utf8"), "utf8");
+      created.push(SKILL_DEST);
+    }
+  }
+  // Missing skill source (e.g. stripped packaging): skip silently — docs
+  // generation must never fail because an optional bundle is absent.
 
   return { created: created.sort(), skipped: skipped.sort() };
 }

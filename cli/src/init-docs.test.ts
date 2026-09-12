@@ -153,11 +153,12 @@ describe("init docs: no-overwrite guarantee", () => {
   it("generateDocs never overwrites and reports skips", () => {
     const dir = tempDir();
     const first = generateDocs({ root: dir, full: true });
-    expect(first.created.length).toBe(15);
+    expect(first.created.length).toBe(16); // 15 docs + bundled arggon-cli skill
+    expect(first.created).toContain(".agents/skills/arggon-cli/SKILL.md");
     expect(first.skipped).toEqual([]);
     const second = generateDocs({ root: dir, full: true });
     expect(second.created).toEqual([]);
-    expect(second.skipped.length).toBe(15);
+    expect(second.skipped.length).toBe(16);
   });
 });
 
@@ -188,7 +189,8 @@ describe("init docs: --json payload", () => {
     expect(body.created).toEqual([]);
     expect(body.skipped).toContain("AGENTS.md");
     expect(body.skipped).toContain("ARCHITECTURE.md");
-    expect(body.skipped.length).toBe(15);
+    expect(body.skipped).toContain(".agents/skills/arggon-cli/SKILL.md");
+    expect(body.skipped.length).toBe(16);
   });
 
   it("a later --full run adds only the tier-2 docs (tier-1 kept)", () => {
@@ -200,8 +202,9 @@ describe("init docs: --json payload", () => {
     expect(body.created).toEqual(
       ["ARCHITECTURE.md", "CHANGELOG.md", "SUPPORT.md", "docs/convention.md", "docs/engineering.md", "docs/runbooks/README.md"].sort(),
     );
-    expect(body.skipped.length).toBe(9);
+    expect(body.skipped.length).toBe(10); // 9 tier-1 docs + bundled skill
     expect(body.skipped).toContain("AGENTS.md");
+    expect(body.skipped).toContain(".agents/skills/arggon-cli/SKILL.md");
   });
 
   it("--full creates the tier-2 files", () => {
@@ -213,5 +216,33 @@ describe("init docs: --json payload", () => {
     expect(body.created).toContain("docs/convention.md");
     expect(body.created).toContain("docs/runbooks/README.md");
     expect(existsSync(join(dir, "docs/engineering.md"))).toBe(true);
+  });
+});
+
+describe("init bundles the arggon-cli skill (task-init-skill-bundle)", () => {
+  it("copies the skill from the single source into .agents/skills/", () => {
+    const dir = tempDir();
+    const result = runInit({ dir, force: false, full: true });
+    const skillDest = join(dir, ".agents/skills/arggon-cli/SKILL.md");
+    expect(result.created).toContain(".agents/skills/arggon-cli/SKILL.md");
+    const skill = readFileSync(skillDest, "utf8");
+    expect(skill).toContain("arggon-cli");
+    expect(skill).toContain("Pitfalls");
+  });
+
+  it("skips the skill on a second run (idempotent)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const second = runInit({ dir, force: false, full: true });
+    expect(second.created).not.toContain(".agents/skills/arggon-cli/SKILL.md");
+    expect(second.skipped).toContain(".agents/skills/arggon-cli/SKILL.md");
+  });
+
+  it("generated AGENTS.md mandates the arggon-cli skill by default", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
+    expect(agents).toContain(".agents/skills/arggon-cli/SKILL.md");
+    expect(agents).toMatch(/skill by default/i);
   });
 });

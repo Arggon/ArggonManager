@@ -12,6 +12,8 @@ Instructions for humans and AI agents working on **{{PROJECT_NAME}}**. Read this
 
 Work items live in-tree under `tasks/` (Markdown + YAML frontmatter), managed by `arggon`. GitHub is for PRs only — do not open GitHub issues.
 
+> **Use the `arggon-cli` skill by default.** This repo bundles it at `.agents/skills/arggon-cli/SKILL.md`. Load it before any `arggon` invocation: it defines the JSON contract (`--json`), the claim rules, and the command pitfalls. Do not guess flags from memory.
+
 1. **Find work:** `arggon list --status todo --json`
 2. **Claim before starting:** `arggon update <id> --status in_progress --assignee <your-login>` (or `arggon start <id> --worktree --assignee <your-login>` to claim + create a worktree). Never set `in_progress` without an assignee; never steal a claim.
 3. **One branch per item:** `arggon branch <id>` → `feat/<id>` / `fix/<id>`. Work in a git worktree, not the primary checkout.
