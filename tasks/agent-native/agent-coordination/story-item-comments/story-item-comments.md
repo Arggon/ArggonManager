@@ -1,6 +1,6 @@
 ---
 type: story
-status: in_progress
+status: done
 id: story-item-comments
 title: Comments on work items
 assignee: Arggon
@@ -24,5 +24,5 @@ Agent handoff needs a home: why an item is blocked, what the next agent should k
 
 ## Acceptance
 
-- [ ] `arggon comment <id> "text"` appends a timestamped, author-attributed section; `--json` confirms
-- [ ] Comments never touch frontmatter (body-only write path, tested)
+- [x] `arggon comment <id> "text"` appends a timestamped, author-attributed section; `--json` confirms
+- [x] Comments never touch frontmatter (body-only write path, tested)

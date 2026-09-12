@@ -216,13 +216,35 @@ Closing work is easy on containers too: when an update reaches a terminal state 
 
 Reconciles `tasks/` with the repo's open GitHub PRs: `--check` (default, CI-safe) reports matched/unmatched items and exits non-zero when sync is pending; `--write` fills **only empty** `branch` fields — never overwrites a set branch, never guesses an ambiguous match, never touches status. Flags: `--repo <owner/repo>`, `--json`. Failures: `SYNC_FAILED`.
 
+### `arggon comment`
+
+Appends a timestamped, author-attributed comment section to an item's body — the handoff channel for agent context ("why blocked", "what the next agent should know"). Comments are history, not status changes: the write is **body-only** (frontmatter is re-serialized unchanged, `updated` is NOT bumped), it works on any item in any status including `done`/`cancelled` (this is NOT a reopen), and agents may comment on closed items. Section format:
+
+```markdown
+### 2026-09-11 @<author>
+<text>
+```
+
+```bash
+arggon comment story-login "Blocked on OAuth credentials; next agent: ping #ops"
+arggon comment task-rate-limit "why blocked:
+- waiting on repro from QA" --author octocat
+arggon comment story-login "handoff note" --json
+```
+
+- `<text>`: comment text; multiline supported (each line lands under the heading; a blank line separates the section from the body). Multiple comments append in order
+- `--author <login>`: attribution (rendered as `@<author>`); defaults to `@me` resolution — `GITHUB_USER`, then `GITHUB_ACTOR`, then `gh api user -q .login`. Unresolvable author fails with an actionable error
+- `--json`: one compact JSON object on stdout (envelope v1: `ok`, `schemaVersion: 1`, `conventionVersion`, `command: "comment"`, `id`, `path`, `comment: { author, date, lines }`); failures emit `ok: false` with `code: "COMMENT_FAILED"` (unknown id, empty text, unresolvable author)
+
+`arggon validate` keeps passing on a commented tree — comment sections are plain freeform Markdown in the body.
+
 ### `arggon instructions`
 
 Prints the agent wiring (install commands, pre-commit hook, CI gate, `AGENTS.md` snippet) extracted at runtime from `docs/agents.md` — the CLI never duplicates the playbook text, so doc and command cannot drift. Flags: `--json` (`{ source, snippets: { install, precommit, ci, agent } }`, failures `INSTRUCTIONS_FAILED`).
 
 ### `arggon mcp`
 
-Starts a stdio MCP server (JSON-RPC 2.0) exposing `arggon_list`, `arggon_create`, and `arggon_update` with the same rules and JSON envelopes as the CLI. The MCP layer always runs with agent playbook rules: no reopening `done`/`cancelled`, no claim stealing. See [docs/agents.md](docs/agents.md) §MCP server.
+Starts a stdio MCP server (JSON-RPC 2.0) exposing `arggon_list`, `arggon_create`, `arggon_update`, and `arggon_comment` with the same rules and JSON envelopes as the CLI. The MCP layer always runs with agent playbook rules: no reopening `done`/`cancelled`, no claim stealing. See [docs/agents.md](docs/agents.md) §MCP server.
 
 Fixtures: [fixtures/](fixtures/).
 

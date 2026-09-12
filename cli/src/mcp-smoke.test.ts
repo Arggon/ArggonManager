@@ -93,6 +93,7 @@ describe("arggon mcp smoke (child process client)", () => {
         "arggon_list",
         "arggon_create",
         "arggon_update",
+        "arggon_comment",
       ]);
 
       await server.request(3, "tools/call", {

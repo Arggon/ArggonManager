@@ -15,6 +15,7 @@ Humans and agents follow the **same** rules. Work lives in git under `tasks/` �
 All work — features, tasks, bugs, review follow-ups — is tracked as work items under **`tasks/`** via `arggon create`, **not** as GitHub issues. GitHub is for **PRs only**.
 
 - File findings where they are found: `npm run arggon -- create bug "<title>" --parent <story-id>` (bugs/tasks live only under a story; create the story/epic/initiative chain if the area has none yet).
+- **Comments are the agent handoff channel.** When you stop work (blocked, done, or handing off), leave context on the item itself: `arggon comment <id> "why blocked / what the next agent should know"` appends a timestamped, author-attributed section to the item body. Body-only write (frontmatter, including `updated`, is never touched); allowed on `done`/`cancelled` items — a comment is history, not a reopen.
 - **Consolidate review findings into follow-ups.** Every actionable finding from a code review, audit, or incident (PR review comments, review summaries, post-merge observations) MUST be filed as a `task`/`bug` under the story that owns the affected area, with context (links to the PR/comment) and an acceptance checklist in the body. Do this **before the reviewed PR merges, or immediately after** — a PR comment alone is not tracking and gets lost. If no story covers the area, create one under the matching epic first.
 - Reference the item id in the PR description; move the item to `done` only when the PR fully finishes it.
 - Do **not** open new GitHub issues. Pre-existing GitHub issues are migrated into `tasks/` the next time they are touched, then closed with a pointer to the item.
@@ -113,7 +114,7 @@ Pass `--json` on supported commands for a stable object on stdout (see [`docs/js
 
 ## MCP server
 
-`arggon mcp` starts a stdio MCP (JSON-RPC 2.0, newline-delimited) server that exposes the same kernel as three tools: `arggon_list`, `arggon_create`, and `arggon_update`. Tool results are the documented `--json` envelope objects (see [`docs/json-output.md`](./json-output.md)) serialized as text content; kernel failures surface as tool errors with the CLI's message text.
+`arggon mcp` starts a stdio MCP (JSON-RPC 2.0, newline-delimited) server that exposes the same kernel as four tools: `arggon_list`, `arggon_create`, `arggon_update`, and `arggon_comment`. Tool results are the documented `--json` envelope objects (see [`docs/json-output.md`](./json-output.md)) serialized as text content; kernel failures surface as tool errors with the CLI's message text.
 
 The MCP layer always calls the kernel with the agent playbook rules applied: an MCP caller cannot reopen `done`/`cancelled` items and cannot steal a claim (there is no `force` parameter). These rules live in one module (`cli/src/rules.ts`) shared by the CLI and the MCP server, so both entry points enforce identical semantics.
 
