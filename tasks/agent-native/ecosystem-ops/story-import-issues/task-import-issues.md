@@ -1,12 +1,13 @@
 ---
 type: task
-status: todo
+status: done
 id: task-import-issues
 title: arggon import-issues via gh
+assignee: Arggon
 parent: story-import-issues
 labels: []
 created: "2026-09-11"
-updated: "2026-09-11"
+updated: "2026-09-12"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-import-issues/task-import-issues.md
@@ -23,5 +24,5 @@ Import via `gh issue list`, mapping labels to labels and milestone dates to `x-m
 
 ## Acceptance
 
-- [ ] `--dry-run` prints the mapping plan; real run writes items through the kernel (validate clean)
-- [ ] Idempotent by issue number recorded in the item body; closed issues import as `done`
+- [x] `--dry-run` prints the mapping plan; real run writes items through the kernel (validate clean)
+- [x] Idempotent by issue number recorded in the item body; closed issues import as `done`

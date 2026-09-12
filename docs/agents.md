@@ -18,7 +18,7 @@ All work — features, tasks, bugs, review follow-ups — is tracked as work ite
 - **Comments are the agent handoff channel.** When you stop work (blocked, done, or handing off), leave context on the item itself: `arggon comment <id> "why blocked / what the next agent should know"` appends a timestamped, author-attributed section to the item body. Body-only write (frontmatter, including `updated`, is never touched); allowed on `done`/`cancelled` items — a comment is history, not a reopen.
 - **Consolidate review findings into follow-ups.** Every actionable finding from a code review, audit, or incident (PR review comments, review summaries, post-merge observations) MUST be filed as a `task`/`bug` under the story that owns the affected area, with context (links to the PR/comment) and an acceptance checklist in the body. Do this **before the reviewed PR merges, or immediately after** — a PR comment alone is not tracking and gets lost. If no story covers the area, create one under the matching epic first.
 - Reference the item id in the PR description; move the item to `done` only when the PR fully finishes it.
-- Do **not** open new GitHub issues. Pre-existing GitHub issues are migrated into `tasks/` the next time they are touched, then closed with a pointer to the item.
+- Do **not** open new GitHub issues. Pre-existing GitHub issues migrate into `tasks/` with `arggon import-issues` (one-shot and idempotent; `--dry-run` previews the mapping), then close on GitHub with a pointer to the item.
 
 ## 1. Find open work
 
