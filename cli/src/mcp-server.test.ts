@@ -148,6 +148,15 @@ describe("mcp server", () => {
     }
   });
 
+  it("hides steal from the arggon_update schema (agents cannot even ask)", async () => {
+    const result = await client.request("tools/list");
+    const tools = result.tools as Array<{ name: string; inputSchema: Record<string, unknown> }>;
+    const update = tools.find((tool) => tool.name === "arggon_update");
+    const properties = update!.inputSchema.properties as Record<string, unknown>;
+    expect(properties).not.toHaveProperty("steal");
+    expect(properties).not.toHaveProperty("force");
+  });
+
   it("create -> list -> update round trip returns the documented envelopes", async () => {
     const created = await client.request("tools/call", {
       name: "arggon_create",

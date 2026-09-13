@@ -1,8 +1,9 @@
 ---
 type: bug
-status: todo
+status: done
 id: bug-cli-steal-not-gated
 title: "CLI --steal is not agent-gated: the human-only guarantee is false in the main interface"
+assignee: Arggon
 parent: story-claim-leases
 labels: []
 created: "2026-09-13"
@@ -25,5 +26,5 @@ Impact: the multi-agent governance guarantee (dead-agent claims can only be take
 
 ## Acceptance
 
-- [ ] A design decision lands for CLI caller identity — candidates: (a) interactive TTY confirmation for --steal (agents are non-interactive; humans confirm with y/N), (b) opt-in config `x-tracker.allow-steal: true` required to arm the flag, (c) env/flag-based agent marking with docs. Whatever lands, the guard must be test-enforced in BOTH entry points.
-- [ ] Tests: steal via CLI blocked/confirmed per the landed design; steal via MCP still refused; docs updated (skill, claim.md, agents.md)
+- [x] A design decision lands for CLI caller identity — candidates: (a) interactive TTY confirmation for --steal (agents are non-interactive; humans confirm with y/N), (b) opt-in config `x-tracker.allow-steal: true` required to arm the flag, (c) env/flag-based agent marking with docs. Whatever lands, the guard must be test-enforced in BOTH entry points.
+- [x] Tests: steal via CLI blocked/confirmed per the landed design; steal via MCP still refused; docs updated (skill, claim.md, agents.md)
