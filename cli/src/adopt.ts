@@ -443,6 +443,12 @@ export type AdoptAckResult = {
  *    untracked);
  *  - standalone: no tracker access, works even when task-adopt-arggon is
  *    already done.
+ *
+ * Each acked entry is additionally flagged `acknowledged: true`
+ * (bug-ack-baseline-regen-loss): later `init` re-runs must never regenerate
+ * acknowledged docs — their recorded checksum equals the adopter's sanctioned
+ * content, not the template render, so the old "untouched -> regenerate" path
+ * would silently destroy the sanctioned edits.
  */
 export function runAdoptAck(opts: AdoptAckOptions): AdoptAckResult {
   // Pre-flight: same sources as `arggon doctor` (story-adoption-state).
@@ -463,7 +469,17 @@ export function runAdoptAck(opts: AdoptAckOptions): AdoptAckResult {
     // Missing on disk: nothing to acknowledge, and nothing may be created.
     if (!existsSync(abs)) continue;
     const checksum = checksumOf(readFileSync(abs, "utf8"));
-    nextState[path] = { ...prevState[path]!, checksum, arggonVersion: version, generatedAt };
+    // acknowledged: true (bug-ack-baseline-regen-loss) — the acked baseline is
+    // the adopter's sanctioned content, so later init re-runs must never
+    // regenerate these files (they would otherwise classify as "untouched"
+    // and silently overwrite the sanctioned edits from the template).
+    nextState[path] = {
+      ...prevState[path]!,
+      checksum,
+      arggonVersion: version,
+      generatedAt,
+      acknowledged: true,
+    };
     acked.push({ path, checksum });
   }
 

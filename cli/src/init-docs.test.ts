@@ -398,3 +398,61 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
     expect(config.views).toEqual({});
   });
 });
+
+describe("init docs: acknowledged baselines are never regenerated (bug-ack-baseline-regen-loss)", () => {
+  it("round-trips the acknowledged flag through the x-generated section", () => {
+    const raw = 'version: 3\n\nx-generated:\n  AGENTS.md:\n    template: "docs/AGENTS.md"\n    checksum: "sha256:x"\n    arggonVersion: "0.0.0"\n    generatedAt: "2026-09-13T00:00:00.000Z"\n    acknowledged: true\n';
+    const config = parseConventionConfig(raw);
+    expect(config.generated["AGENTS.md"]!.acknowledged).toBe(true);
+    // Entries without the flag parse as undefined (old sections stay valid).
+    expect(parseConventionConfig(raw.replace("    acknowledged: true\n", "")).generated["AGENTS.md"]!.acknowledged).toBeUndefined();
+    // Serializing only emits the flag when set (byte-stable for old state).
+    const reserialized = updateGeneratedSection("version: 3\n", config.generated);
+    expect(reserialized).toContain("    acknowledged: true");
+  });
+
+  it("a re-run after acking skips the acked doc and keeps its bytes; unacked untouched docs still update", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    // Sanctioned sweep edit + ack on one doc (simulating adopt --ack's flag;
+    // the runAdoptAck tests in adopt.test.ts cover the command wiring).
+    const yml = join(dir, "tasks/.convention.yml");
+    const state = readConventionConfig(dir).generated;
+    writeFileSync(join(dir, "AGENTS.md"), "SWEEP: sanctioned content\n", "utf8");
+    const acked = updateGeneratedSection(readFileSync(yml, "utf8"), {
+      ...state,
+      "AGENTS.md": { ...state["AGENTS.md"]!, acknowledged: true },
+    });
+    writeFileSync(yml, acked, "utf8");
+
+    // A "template bump" would normally regenerate untouched docs; the acked
+    // doc must survive byte-for-byte instead.
+    const result = generateDocs({ root: dir, full: true });
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe("SWEEP: sanctioned content\n");
+    expect(result.updated).not.toContain("AGENTS.md");
+    expect(result.modified).not.toContain("AGENTS.md");
+    expect(result.skipped).toContain("AGENTS.md");
+    // The unacked untouched docs still follow the silent-update promise.
+    expect(result.updated).toContain("CONTRIBUTING.md");
+    expect(result.updated).toContain("ARCHITECTURE.md");
+    // The entry stays acknowledged after the skip.
+    expect(readConventionConfig(dir).generated["AGENTS.md"]!.acknowledged).toBe(true);
+  });
+
+  it("a hand edit to an acked doc is still skipped (acknowledged wins over any hash)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const yml = join(dir, "tasks/.convention.yml");
+    const state = readConventionConfig(dir).generated;
+    writeFileSync(yml, updateGeneratedSection(readFileSync(yml, "utf8"), {
+      ...state,
+      "AGENTS.md": { ...state["AGENTS.md"]!, acknowledged: true },
+    }), "utf8");
+    writeFileSync(join(dir, "AGENTS.md"), "LATE HAND EDIT\n", "utf8");
+    const result = generateDocs({ root: dir, full: true });
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe("LATE HAND EDIT\n");
+    expect(result.updated).not.toContain("AGENTS.md");
+    expect(result.modified).not.toContain("AGENTS.md");
+    expect(result.skipped).toContain("AGENTS.md");
+  });
+});

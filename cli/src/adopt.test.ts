@@ -323,32 +323,52 @@ describe("runAdoptAck: x-generated baseline refresh (task-adopt-checksum-refresh
     expect(agents.generatedAt).toBe("2026-09-13T10:00:00.000Z");
     expect(agents.template).toBe("docs/AGENTS.md");
     expect(agents.arggonVersion).toBe("0.0.0");
-    // The sanctioned edits stop reporting as modified.
-    expect(runDoctor({ cwd: dir }).docs).toMatchObject({ managed: 16, modified: 0, untouched: 16 });
+    // The sanctioned edits stop reporting as modified: they are acknowledged
+    // (sanctioned-diverged baselines), the healthy acked bucket.
+    expect(runDoctor({ cwd: dir }).docs).toMatchObject({
+      managed: 16,
+      modified: 0,
+      untouched: 0,
+      acknowledged: 16,
+    });
   });
 
-  it("next init reports acked docs as untouched (updated[], not modified[])", () => {
+  it("next init never regenerates acked docs (skipped[], sanctioned content intact)", () => {
     const dir = seedTree();
     writeFileSync(join(dir, "AGENTS.md"), "SWEEP: project description\n", "utf8");
     runAdoptAck({ cwd: dir });
     const result = runInit({ dir, force: false, full: true });
     expect(result.modified).toEqual([]);
-    expect(result.skipped).toEqual([]);
-    expect(result.updated).toContain("AGENTS.md");
+    // Acknowledged baselines are never regenerated (bug-ack-baseline-regen-loss):
+    // the sanctioned sweep content must survive every re-run.
+    expect(result.updated).not.toContain("AGENTS.md");
+    expect(result.skipped).toContain("AGENTS.md");
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(
+      "SWEEP: project description\n",
+    );
+    // The entry keeps its acknowledged flag after the skip.
+    expect(readConventionConfig(dir).generated["AGENTS.md"]!.acknowledged).toBe(true);
   });
 
-  it("hand edits after acking report modified again (protection intact)", () => {
+  it("hand edits after acking stay protected: acknowledged bucket, still skipped by init", () => {
     const dir = seedTree();
     runAdoptAck({ cwd: dir });
     writeFileSync(join(dir, "AGENTS.md"), "LATE HAND EDIT\n", "utf8");
-    expect(runDoctor({ cwd: dir }).docs).toMatchObject({ modified: 1, untouched: 15 });
+    // An acked doc is sanctioned-diverged, not modified (doctor honesty).
+    expect(runDoctor({ cwd: dir }).docs).toMatchObject({
+      modified: 0,
+      untouched: 0,
+      acknowledged: 16,
+    });
     // The state keeps the acked baseline, not the hand edit.
     expect(readConventionConfig(dir).generated["AGENTS.md"]!.checksum).not.toBe(
       checksumOf("LATE HAND EDIT\n"),
     );
-    // And a later init keeps the hand edit (modified + skipped, never overwritten).
+    // And a later init keeps the hand edit (skipped, never overwritten —
+    // acknowledged entries are never regenerated regardless of hash).
     const result = runInit({ dir, force: false, full: true });
-    expect(result.modified).toContain("AGENTS.md");
+    expect(result.modified).not.toContain("AGENTS.md");
+    expect(result.updated).not.toContain("AGENTS.md");
     expect(result.skipped).toContain("AGENTS.md");
     expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe("LATE HAND EDIT\n");
   });
