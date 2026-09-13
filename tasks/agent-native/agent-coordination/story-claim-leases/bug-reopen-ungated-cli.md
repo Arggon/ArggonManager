@@ -19,10 +19,10 @@ updated: "2026-09-13"
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+Found by the suizo experiment (2026-09-13, verified with a clean repro): `arggon update <done-epic-id> --status todo` returned ok:true with zero resistance. The playbook forbids agents from reopening done/cancelled ("never reopen done/cancelled — agents are refused"), and the MCP layer enforces it via `agent: true` in rules.ts — but the CLI has no caller identity, so the guard is unreachable in the main interface. Same class as bug-cli-steal-not-gated (fixed in PR #128 via TTY confirmation): an agent suizo-needed the reopen for an authorized experiment and the CLI let it through without any marker. Side effect observed: reopening a story left its parent initiative done while the subtree had todo items (asymmetric intermediate states are representable).
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] Same gating treatment as steal (PR #128): reopening done/cancelled via CLI requires interactive TTY confirmation (agents non-interactive → refused), independent of any config; humans keep the ability by confirming
+- [ ] Tests: CLI reopen by non-TTY → refused with actionable message; TTY confirm → allowed; MCP agent refusal unchanged; kernel contract unchanged
+- [ ] Docs: skill/claim/agents updated — the reopen rule is now enforced, not documented

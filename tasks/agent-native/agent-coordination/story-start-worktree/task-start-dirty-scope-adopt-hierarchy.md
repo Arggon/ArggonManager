@@ -19,10 +19,10 @@ updated: "2026-09-13"
 
 ## Context
 
-<!-- Why this task exists. -->
+Two frictions found by the suizo experiment: (1) `start` refuses on ANY untracked file — including agent-environment dirs unrelated to the project (.v2c/, .video_agent/) — forcing gitignore edits before work; (2) on a fresh `init --full` tree, `adopt` fails with ADOPT_FAILED "no epic found" (init scaffolds no hierarchy; the agent had to guess-create initiative+epic first — the guardian and cuentas-claras agents hit the same flow).
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] start's clean-tree check is scoped: untracked files outside the flow's blast radius (tasks/, the working branch paths) don't block, or an explicit --allow-dirty-untracked escape hatch exists with docs
+- [ ] adopt on a fresh init tree works out of the box: auto-creates the minimal hierarchy (initiative+epic+adoption story, like it auto-creates the story today) or init --full scaffolds an empty initiative/epic pair; documented
+- [ ] Tests for both; guardian/cuentas-claras/suizo-style first-run adoption requires zero guesswork

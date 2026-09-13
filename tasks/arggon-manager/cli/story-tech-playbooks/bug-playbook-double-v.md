@@ -19,10 +19,8 @@ updated: "2026-09-13"
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+Found by the suizo experiment (2026-09-13): `arggon playbook status --file-task <story>` created a task titled "Re-research go playbook (vv1.27.1, 100 days old)" — double v. playbooks.ts:386 hardcodes `v${playbook.version}`; when the recorded version already carries the prefix, it doubles.
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] The title normalizes the prefix (v once, e.g. v1.27.1 whether version is stored as "1.27.1" or "v1.27.1"); test both stored forms

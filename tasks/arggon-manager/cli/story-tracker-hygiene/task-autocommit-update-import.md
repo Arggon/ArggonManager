@@ -19,10 +19,10 @@ updated: "2026-09-13"
 
 ## Context
 
-<!-- Why this task exists. -->
+Found by the suizo experiment (2026-09-13): auto-commit (PR #116) covers create/comment/adopt/cleanup, but two high-frequency mutations still leave tasks/ dirty: `update --status done` (which via cascade can touch up to 4 files) and `import-issues` (story + 6 items at once). The suizo agent hit the dirty tree repeatedly right after done-flips, and report --trend depends on those done commits existing.
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] `update` (including cascade multi-file flips) auto-commits its mutated item files with the same surgical staging + message convention (e.g. `chore(tasks): done task-x (cascade: story-a, epic-b)`)
+- [ ] `import-issues` auto-commits its created items as one commit (`chore(tasks): imported N issues`)
+- [ ] --no-commit / x-tracker.auto-commit respected everywhere; tests per surface
