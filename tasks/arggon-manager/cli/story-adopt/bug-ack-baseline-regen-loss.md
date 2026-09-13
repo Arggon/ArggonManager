@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-ack-baseline-regen-loss
 title: adopt --ack baseline is destroyed by the next init re-run (content loss)
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-adopt
 labels: []
 created: "2026-09-13"
 updated: "2026-09-13"
-claimed_at: "2026-09-13T20:47:15.327Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-adopt/bug-ack-baseline-regen-loss.md
