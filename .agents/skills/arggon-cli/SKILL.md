@@ -186,7 +186,11 @@ lean. A 40-line spec beats a 4-page one nobody reads.
   be `in_progress` unassigned. Claims carry a soft lease (`claimed_at`, ISO date-time):
   reporting only. `list --stale --older-than 7d` reports stale claims (pre-feature claims
   count as stale). `update --steal --reason "<why>" --assignee <you>` is HUMAN-only
-  (agents are refused, like `--force`) and appends a dated note to the body.
+  (agents are refused, like `--force`) and appends a dated note to the body. It is
+  also double-gated: the repo must arm `x-tracker.allow-steal: true` in
+  `tasks/.convention.yml`, and it must run at an interactive terminal with a y/N
+  confirmation — a non-TTY (agent/script/CI) invocation is always refused. Agents
+  can never steal; coordinate instead.
 - `update --status blocked` requires `--blocked-reason`; `blocked_reason` is forbidden otherwise.
 - **Cascade**: a terminal status (done/cancelled) auto-completes ancestor containers whose
   whole subtree is terminal — up to the initiative. Opt out with `--no-cascade`; flipped

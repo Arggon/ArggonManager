@@ -54,6 +54,13 @@ export type TrackerConfig = {
    * the built-in default of true; a `--no-commit` CLI flag still wins).
    */
   autoCommit: boolean | null;
+  /**
+   * Claim-steal arming from `x-tracker.allow-steal` (bug-cli-steal-not-gated).
+   * `null` (unset) and `false` both leave `update --steal` refused with an
+   * actionable message; only an explicit `true` arms the interactive,
+   * human-only steal flow.
+   */
+  allowSteal: boolean | null;
 };
 
 /** `x-import` namespaced extension options (task-import-type-mapping). */
@@ -151,7 +158,7 @@ export function parseConventionConfig(
   const branchPatterns: Record<ItemType, string> = { ...DEFAULT_BRANCH_PATTERNS };
   const views: Record<string, string> = {};
   const playbooks: PlaybooksConfig = { maxAgeDays: null };
-  const tracker: TrackerConfig = { autoCommit: null };
+  const tracker: TrackerConfig = { autoCommit: null, allowSteal: null };
   const generated: Record<string, GeneratedEntry> = {};
   const importLabelTypes: Record<string, ItemType> = {};
   let importHasLabelTypes = false;
@@ -260,7 +267,17 @@ export function parseConventionConfig(
     }
     if (section === "x-tracker") {
       // Namespaced extension: unknown nested keys are ignored (ignore-unknown),
-      // only the official `auto-commit` option is read.
+      // the official options are `auto-commit` (tracker hygiene) and
+      // `allow-steal` (claim-steal arming, bug-cli-steal-not-gated).
+      if (key === "allow-steal") {
+        if (value !== "true" && value !== "false") {
+          throw new Error(
+            `${sourcePath}: 'allow-steal' must be a boolean (got ${JSON.stringify(value)})`,
+          );
+        }
+        tracker.allowSteal = value === "true";
+        continue;
+      }
       if (key !== "auto-commit") continue;
       if (value !== "true" && value !== "false") {
         throw new Error(
@@ -372,7 +389,7 @@ export function readConventionConfig(dir: string): ConventionConfig {
       branchPatterns: { ...DEFAULT_BRANCH_PATTERNS },
       views: {},
       playbooks: { maxAgeDays: null },
-      tracker: { autoCommit: null },
+      tracker: { autoCommit: null, allowSteal: null },
       import: { labelTypes: null },
       worktree: { postStart: null },
       generated: {},

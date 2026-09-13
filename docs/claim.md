@@ -37,13 +37,17 @@ arggon list --stale --older-than 7d   # claimed items whose lease is older than 
 
 Items claimed before `claimed_at` existed count as stale (no lease recorded).
 
-Reclaiming a stale claim is a **human-only supervised takeover**:
+Reclaiming a stale claim is a **human-only supervised takeover** (BREAKING hardening, bug-cli-steal-not-gated: steal is now opt-in per repo and interactive — the unconditional flow before this change is gone):
 
 ```bash
 arggon update <id> --steal --reason "owner left; taking over" --assignee <you>
 ```
 
-- Requires a non-empty `--reason` (recorded in the item body as a dated note) and `--assignee <you>`.
+The flow (both gates are required):
+
+1. **Arm the repo once**: `x-tracker.allow-steal: true` in `tasks/.convention.yml` (default when absent: steal is refused with `steal is disabled in this repo (x-tracker.allow-steal: true in tasks/.convention.yml arms it)`).
+2. **A human runs it in their terminal**: `--steal` requires an interactive stdin — scripts, CI, and agents (non-TTY) are refused with `--steal requires an interactive terminal (agents must not steal claims — docs/agents.md)`, even with the repo armed and even with `y` piped in. In a TTY, the CLI asks `Steal '<id>' from '<current-assignee>'? [y/N]` and aborts on anything but y/yes. There is no `--yes` override — the prompt is the point.
+3. As before: a non-empty `--reason` (recorded in the item body as a dated note) and `--assignee <you>` are required.
 - Agents are refused (same playbook rule as `--force`) — they unclaim-and-reclaim through coordination instead, or pick another item.
 
 ## Claiming (playbook)

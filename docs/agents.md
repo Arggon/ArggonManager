@@ -39,7 +39,7 @@ Pick a **claimable** item: `story`, `task`, or `bug` in `todo` (or return to `in
 
 - `npm run arggon -- update <id> --status in_progress --assignee <github-login>`
 
-If another assignee already holds the claim, `update` refuses the reassignment (claim conflict) unless `--force` — do not force; see [`docs/claim.md`](./claim.md). Prefer a different item or coordinate in the issue/PR. Claims carry a soft lease (`claimed_at`): `arggon list --stale --older-than 7d` reports stale claims, and reclaiming one is a **human-only** `update <id> --steal --reason "..." --assignee <you>` — agents are never allowed to steal.
+If another assignee already holds the claim, `update` refuses the reassignment (claim conflict) unless `--force` — do not force; see [`docs/claim.md`](./claim.md). Prefer a different item or coordinate in the issue/PR. Claims carry a soft lease (`claimed_at`): `arggon list --stale --older-than 7d` reports stale claims, and reclaiming one is a **human-only** `update <id> --steal --reason "..." --assignee <you>` — agents are never allowed to steal. The CLI enforces this structurally (bug-cli-steal-not-gated): the repo must arm `x-tracker.allow-steal: true` in `tasks/.convention.yml` and the takeover must be confirmed at an interactive terminal; non-interactive (agent/script/CI) invocations are refused.
 
 Rules:
 

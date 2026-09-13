@@ -18,6 +18,9 @@ import { parseFrontmatter } from "./frontmatter.js";
 import { runInit } from "./init.js";
 import { runStart, defaultStartGit } from "./start.js";
 import {
+  readConventionConfig,
+} from "./convention.js";
+import {
   commitPayload,
   commitTrackerMutation,
   formatCommitLine,
@@ -86,6 +89,14 @@ describe("tracker-commit helpers", () => {
     // Malformed config never fails a mutation — falls back to the default.
     writeFileSync(join(dir, "tasks/.convention.yml"), "x-tracker:\n  auto-commit: maybe\n");
     expect(readAutoCommitConfig(dir)).toBeNull();
+    // allow-steal (bug-cli-steal-not-gated) shares the x-tracker namespace.
+    writeFileSync(
+      join(dir, "tasks/.convention.yml"),
+      "x-tracker:\n  allow-steal: true\n",
+      "utf8",
+    );
+    expect(readConventionConfig(dir).tracker.allowSteal).toBe(true);
+    expect(readConventionConfig(dir).tracker.autoCommit).toBeNull();
   });
 
   it("formats the message convention and the human/payload views", () => {

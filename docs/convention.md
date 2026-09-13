@@ -248,7 +248,7 @@ Claims carry a **soft lease**: an ISO date-time `claimed_at` maintained by the C
 - **Cleared** automatically when the item leaves the claimed state: unclaim (`in_progress` → `todo`), terminal states, or `blocked` (a new lease starts on re-claim).
 - **Reporting only**: `claimed_at` never gates a transition and `validate` imposes no constraint on it. Items claimed before the field existed simply have no `claimed_at`.
 - **Staleness is advisory**: `arggon list --stale --older-than <duration>` (`<number><d|h|m>`, e.g. `7d`) surfaces claimed items whose lease started before the threshold. It filters reporting only — it never blocks work.
-- **Only humans may steal**: `arggon update <id> --steal --reason "<why>" --assignee <you>` is a supervised takeover of a claimed item. It requires a non-empty reason, refreshes `claimed_at`, and appends a dated note (`> stolen <date> by <you>: <reason>`) to the item body. Agent callers are refused (`docs/agents.md`), exactly like `--force`.
+- **Only humans may steal**: `arggon update <id> --steal --reason "<why>" --assignee <you>` is a supervised takeover of a claimed item. It requires a non-empty reason, refreshes `claimed_at`, and appends a dated note (`> stolen <date> by <you>: <reason>`) to the item body. It is double-gated at the CLI (bug-cli-steal-not-gated): the repo must arm `x-tracker.allow-steal: true` in `tasks/.convention.yml` (default: refused), and the invocation must run on an interactive terminal with a y/N confirmation — non-TTY callers are refused even when armed. Agent callers are refused by the playbook rules (`docs/agents.md`), exactly like `--force`.
 
 Concurrency / conflict handling (refuse steal unless `--force`, unclaim recovery, stale reporting): see [`claim.md`](claim.md).
 

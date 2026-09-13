@@ -49,6 +49,7 @@ import { runTuiBoard } from "./tui.js";
 import { runUpdate } from "./update.js";
 import { formatValidateHuman, runValidate } from "./validate.js";
 import { commitPayload, formatCommitLine } from "./tracker-commit.js";
+import { gateSteal } from "./steal-gate.js";
 const program = new Command();
 
 program
@@ -599,7 +600,16 @@ program
       },
     ) => {
       const json = jsonEnabled(opts);
-      try {
+      const main = async (): Promise<void> => {
+        try {
+        // Claim-steal gate (bug-cli-steal-not-gated): human-only, enforced at
+        // the CLI entry point BEFORE the kernel — repo opt-in via
+        // x-tracker.allow-steal, then an interactive TTY confirmation.
+        // runUpdate keeps its kernel steal semantics (agents refused via the
+        // rules layer, shared with MCP).
+        if (opts.steal) {
+          await gateSteal({ cwd: process.cwd(), id });
+        }
         const result = runUpdate({
           cwd: process.cwd(),
           id,
@@ -661,6 +671,8 @@ program
         console.error(`arggon update: ${message}`);
         process.exitCode = 1;
       }
+      };
+      void main();
     },
   );
 
