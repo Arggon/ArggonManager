@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-self-host-init-docs
 title: "Run init --full on this repo: bundle skill, generate missing docs"
 assignee: Arggon
@@ -8,7 +8,6 @@ parent: story-dogfood-self-host
 labels: []
 created: "2026-09-13"
 updated: "2026-09-13"
-claimed_at: "2026-09-13T15:45:33.187Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-dogfood-self-host/task-self-host-init-docs.md
@@ -25,6 +24,6 @@ Run `arggon init --full` on this repo: bundles the skill at .agents/skills/arggo
 
 ## Acceptance
 
-- [ ] .agents/skills/arggon-cli/SKILL.md exists; missing docs generated; existing ones untouched (skipped[])
-- [ ] Generated ARCHITECTURE.md/AGENTS-description filled from the repo's real content; SECURITY contact left flagged for human
-- [ ] committed; validate ok; doctor reports the state
+- [x] .agents/skills/arggon-cli/SKILL.md exists; missing docs generated; existing ones untouched (skipped[])
+- [x] Generated ARCHITECTURE.md/AGENTS-description filled from the repo's real content; SECURITY contact left flagged for human
+- [x] committed; validate ok; doctor reports the state
