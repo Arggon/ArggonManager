@@ -1,8 +1,10 @@
 ---
 type: bug
-status: todo
+status: done
 id: bug-cleanup-partial-failure
 title: cleanup --prune leaves partial state when git branch -d fails
+assignee: Arggon
+branch: fix/bug-cleanup-partial-failure
 parent: story-start-worktree
 labels: []
 created: "2026-09-13"
@@ -23,5 +25,5 @@ Found by the guardian adoption agent (2026-09-13): `cleanup --prune` removed the
 
 ## Acceptance
 
-- [ ] Cleanup is transactional per candidate: verify BOTH conditions (item terminal + branch fully merged locally AND on the tracked remote) before removing anything; on any failure, either complete or roll back without orphaning state
-- [ ] Tests: divergent-upstream scenario -> worktree kept, item state consistent, actionable error
+- [x] Cleanup is transactional per candidate: verify BOTH conditions (item terminal + branch fully merged locally AND on the tracked remote) before removing anything; on any failure, either complete or roll back without orphaning state
+- [x] Tests: divergent-upstream scenario -> worktree kept, item state consistent, actionable error

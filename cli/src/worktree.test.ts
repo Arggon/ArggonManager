@@ -9,7 +9,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { runCleanup } from "./cleanup.js";
+import { defaultCleanupGit, runCleanup } from "./cleanup.js";
 import { runCreate } from "./create.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { runInit } from "./init.js";
@@ -385,5 +385,119 @@ describe("arggon cleanup", () => {
     const bare = mkdtempSync(join(tmpdir(), "arggon-worktree-nogit-"));
     runInit({ dir: bare, force: false });
     expect(() => runCleanup({ cwd: bare })).toThrow(/not a git repository/);
+  });
+
+  /**
+   * Repo with a bare remote and a task-alpha worktree whose pushed tip is C1.
+   * With `amend: true` the local tip is rewritten past C1 (simulated lost
+   * push): origin/feat/task-alpha then holds a commit that never reaches main
+   * even after the branch is merged locally.
+   */
+  function initRemoteCleanupRepo(amend: boolean): { dir: string; paths: Record<string, string> } {
+    const dir = initRepo();
+    const remote = mkdtempSync(join(tmpdir(), "arggon-remote-"));
+    git(["-c", "init.defaultBranch=main", "init", "--bare", "--quiet"], remote);
+    git(["remote", "add", "origin", remote], dir);
+
+    const alpha = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    const wt = alpha.worktreePath!;
+    spawnSync("touch", [join(wt, "alpha.txt")]);
+    git(["add", "alpha.txt"], wt);
+    git(["commit", "--quiet", "-m", "work"], wt);
+    git(["push", "--quiet", "origin", "feat/task-alpha"], dir);
+    if (amend) {
+      // The final push is lost: the local tip is rewritten past the pushed one.
+      spawnSync("touch", [join(wt, "lost.txt")]);
+      git(["add", "lost.txt"], wt);
+      git(["commit", "--quiet", "--amend", "--no-edit"], wt);
+    }
+    runUpdate({ cwd: wt, id: "task-alpha", status: "done", now: NOW });
+    git(["add", "tasks"], wt);
+    git(["commit", "--quiet", "-m", "close task-alpha"], wt);
+    // Fast-forward main so the closed record and the branch commits land.
+    git(["merge", "--quiet", "--ff-only", "feat/task-alpha"], dir);
+    return { dir, paths: { "task-alpha": wt } };
+  }
+
+  it("skips candidates whose remote branch is not merged into base (lost push)", () => {
+    const { dir, paths } = initRemoteCleanupRepo(true);
+
+    const result = runCleanup({ cwd: dir, prune: true });
+
+    const entry = result.entries.find((e) => e.id === "task-alpha")!;
+    expect(entry.removable).toBe(false);
+    expect(entry.reason).toBe(
+      "remote branch divergent or behind (origin/feat/task-alpha) — push or delete the remote branch first",
+    );
+    expect(result.pruned).toEqual([]);
+    expect(result.failures).toEqual([]);
+    // Nothing was touched: worktree and branch survive, the record stays.
+    expect(existsSync(paths["task-alpha"])).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(true);
+    const raw = readFileSync(join(dir, "tasks/launch/auth/login/task-alpha.md"), "utf8");
+    expect(parseFrontmatter(raw).data.worktree_path).toBe(paths["task-alpha"]);
+  });
+
+  it("prunes normally when the remote branch is merged into base", () => {
+    const { dir, paths } = initRemoteCleanupRepo(false);
+
+    const result = runCleanup({ cwd: dir, prune: true });
+
+    expect(result.failures).toEqual([]);
+    const entry = result.entries.find((e) => e.id === "task-alpha")!;
+    expect(entry.removable).toBe(true);
+    expect(result.pruned.map((a) => a.action)).toEqual([
+      `removed worktree ${paths["task-alpha"]}`,
+      "deleted branch feat/task-alpha",
+      "cleared worktree_path",
+    ]);
+    expect(existsSync(paths["task-alpha"])).toBe(false);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
+  });
+
+  it("clears the record and reports leftoverBranch when branch -d fails after removal", () => {
+    const { dir, paths } = initCleanupRepo();
+    const fakeGit = {
+      ...defaultCleanupGit(),
+      deleteBranch: () => {
+        throw new Error("refusing to delete branch");
+      },
+    };
+
+    const result = runCleanup({ cwd: dir, prune: true }, { git: fakeGit });
+
+    // Per-candidate failure: the run stays green and continues.
+    expect(result.failures).toEqual([]);
+    expect(existsSync(paths["task-alpha"])).toBe(false);
+    const raw = readFileSync(join(dir, "tasks/launch/auth/login/task-alpha.md"), "utf8");
+    expect(parseFrontmatter(raw).data.worktree_path).toBeUndefined();
+    const failed = result.pruned.find((a) => a.action === "failed")!;
+    expect(failed).toMatchObject({ id: "task-alpha", leftoverBranch: "feat/task-alpha" });
+    expect(failed.error).toContain("refusing to delete branch");
+  });
+
+  it("reports the remote-safety skip in the --json payload", () => {
+    const { dir } = initRemoteCleanupRepo(true);
+
+    const r = spawnSync(process.execPath, [tsx, cli, "cleanup", "--json", "--prune"], {
+      encoding: "utf8",
+      cwd: dir,
+    });
+    expect(r.status).toBe(0);
+    const envelope = JSON.parse(r.stdout) as {
+      ok: boolean;
+      candidates: Array<{ id: string; removable: boolean; reason: string | null }>;
+      pruned: Array<{ id: string; action: string }>;
+      failures: string[];
+    };
+    expect(envelope.ok).toBe(true);
+    const alpha = envelope.candidates.find((c) => c.id === "task-alpha")!;
+    expect(alpha.removable).toBe(false);
+    expect(alpha.reason).toContain("remote branch divergent or behind (origin/feat/task-alpha)");
+    expect(envelope.pruned).toEqual([]);
+    expect(envelope.failures).toEqual([]);
   });
 });
