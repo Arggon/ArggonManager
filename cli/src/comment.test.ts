@@ -1,7 +1,9 @@
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { PassThrough } from "node:stream";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { runComment } from "./comment.js";
 import { runCreate } from "./create.js";
@@ -9,6 +11,10 @@ import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
 import { runUpdate } from "./update.js";
 import { runValidate } from "./validate.js";
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const cli = join(repoRoot, "cli/src/cli.ts");
+const tsx = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
 const NOW = new Date("2026-09-11T12:00:00Z");
 const LATER = new Date("2026-09-12T12:00:00Z");
@@ -194,6 +200,101 @@ describe("comment", () => {
     runComment({ cwd: dir, id, text: "note two\nmore detail", author: "octocat", now: LATER });
     const result = runValidate({ cwd: dir });
     expect(result.errors).toEqual([]);
+  });
+});
+
+describe("comment --file/stdin (task-comment-stdin-file)", () => {
+  // Backticks, double quotes, $ and newlines: exactly the characters shell
+  // quoting used to mangle before the text could travel outside the shell.
+  const SHELLY = 'deploy `npm test` — "quoted" and $HOME and\nsecond line\n';
+
+  it("reads comment text from a file, byte-identical (backticks, quotes, $, newlines)", () => {
+    const { dir, id, path } = primedTask();
+    const file = join(dir, "note.md");
+    writeFileSync(file, SHELLY, "utf8");
+    const before = raw(path);
+    const result = runComment({ cwd: dir, id, text: "", file, author: "arggon", now: NOW });
+    // Trailing file newline is trimmed by the same normalization as positional text.
+    expect(result.comment.lines).toEqual([
+      'deploy `npm test` — "quoted" and $HOME and',
+      "second line",
+    ]);
+    expect(raw(path)).toBe(
+      `${before}\n### 2026-09-11 @arggon\ndeploy \`npm test\` — "quoted" and $HOME and\nsecond line\n`,
+    );
+  });
+
+  it("reads comment text from stdin with --file - (spawn with piped input)", () => {
+    const { dir } = primedTask();
+    const piped = 'run `npm run lint` — output was $?, "exit 1"';
+    const proc = spawnSync(
+      process.execPath,
+      [tsx, cli, "--json", "comment", "task-rate-limit", "--file", "-", "--author", "arggon"],
+      { encoding: "utf8", cwd: dir, input: piped },
+    );
+    expect(proc.status, proc.stderr).toBe(0);
+    const envelope = JSON.parse(proc.stdout) as { ok: boolean; command: string; id: string };
+    expect(envelope).toMatchObject({ ok: true, command: "comment", id: "task-rate-limit" });
+    expect(
+      raw(join(dir, "tasks/launch-mvp/auth/story-login/task-rate-limit.md")),
+    ).toContain(`@arggon\n${piped}\n`);
+  });
+
+  it("rejects passing both positional text and --file", () => {
+    const { dir, id } = primedTask();
+    const file = join(dir, "note.md");
+    writeFileSync(file, SHELLY, "utf8");
+    expect(() =>
+      runComment({ cwd: dir, id, text: "positional", file, author: "a", now: NOW }),
+    ).toThrow(/pass either the comment text or --file/);
+  });
+
+  it("fails with an actionable error when --file does not exist", () => {
+    const { dir, id } = primedTask();
+    expect(() =>
+      runComment({ cwd: dir, id, text: "", file: join(dir, "missing.md"), author: "a", now: NOW }),
+    ).toThrow(/--file '.*missing\.md': file not found/);
+  });
+
+  it("rejects an empty file like empty positional text", () => {
+    const { dir, id } = primedTask();
+    const empty = join(dir, "empty.md");
+    writeFileSync(empty, "", "utf8");
+    expect(() =>
+      runComment({ cwd: dir, id, text: "", file: empty, author: "a", now: NOW }),
+    ).toThrow(/comment text must not be empty/);
+    const blank = join(dir, "blank.md");
+    writeFileSync(blank, "  \n \n", "utf8");
+    expect(() =>
+      runComment({ cwd: dir, id, text: "", file: blank, author: "a", now: NOW }),
+    ).toThrow(/comment text must not be empty/);
+  });
+
+  it("surfaces --file errors as COMMENT_FAILED through the CLI envelope", () => {
+    const { dir } = primedTask();
+    const both = spawnSync(
+      process.execPath,
+      [tsx, cli, "--json", "comment", "task-rate-limit", "positional", "--file", "-", "--author", "a"],
+      { encoding: "utf8", cwd: dir },
+    );
+    expect(both.status).not.toBe(0);
+    expect(JSON.parse(both.stdout)).toMatchObject({
+      ok: false,
+      command: "comment",
+      error: { code: "COMMENT_FAILED", message: expect.stringMatching(/pass either the comment text or --file/) },
+    });
+
+    const missing = spawnSync(
+      process.execPath,
+      [tsx, cli, "--json", "comment", "task-rate-limit", "--file", "no-such-file.md", "--author", "a"],
+      { encoding: "utf8", cwd: dir },
+    );
+    expect(missing.status).not.toBe(0);
+    expect(JSON.parse(missing.stdout)).toMatchObject({
+      ok: false,
+      command: "comment",
+      error: { code: "COMMENT_FAILED", message: expect.stringMatching(/no-such-file\.md.*file not found/) },
+    });
   });
 });
 

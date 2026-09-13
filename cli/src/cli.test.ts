@@ -10,8 +10,13 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { JSON_SCHEMA_VERSION } from "./json.js";
+
+// Every test here spawns the CLI through tsx (fresh process each); the heaviest
+// loops run it 10-15 times and sit right at vitest's 5s default under CI runner
+// load (bug-next-json-test-flakily-exceeds-vitest-5s-timeout). File-scoped bump.
+vi.setConfig({ testTimeout: 30_000 });
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const cli = resolve(root, "cli/src/cli.ts");
