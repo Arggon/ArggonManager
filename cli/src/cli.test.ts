@@ -10,13 +10,12 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
+import { runCreate } from "./create.js";
+import { runInit } from "./init.js";
 import { JSON_SCHEMA_VERSION } from "./json.js";
-
-// Every test here spawns the CLI through tsx (fresh process each); the heaviest
-// loops run it 10-15 times and sit right at vitest's 5s default under CI runner
-// load (bug-next-json-test-flakily-exceeds-vitest-5s-timeout). File-scoped bump.
-vi.setConfig({ testTimeout: 30_000 });
+import { runNext } from "./next.js";
+import { runUpdate } from "./update.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const cli = resolve(root, "cli/src/cli.ts");
@@ -448,25 +447,28 @@ describe("CLI --json", () => {
   });
 
   it("arggon next --json carries blockedBy and --ready skips blocked items", () => {
+    // Tree built in-process (same runInit/runCreate/runUpdate the CLI calls);
+    // only the --json envelope assertions spawn the real CLI. The ranking and
+    // blockedBy logic itself is covered in-process by next.test.ts — spawning
+    // the full 14-command setup loop here flakily exceeded vitest's 5s default
+    // under CI runner load (bug-next-json-test-flakily-exceeds-vitest-5s-timeout).
     const dir = mkdtempSync(join(tmpdir(), "arggon-next-deps-"));
-    expect(runCli(["init", dir]).status).toBe(0);
-    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
-    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
-    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+    runInit({ dir, force: false });
+    runCreate({ cwd: dir, type: "initiative", title: "Launch MVP" });
+    runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp" });
+    runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth" });
     // Claim the story so only the tasks are candidates.
-    expect(
-      runCli(["update", "login", "--status", "in_progress", "--assignee", "bob"], dir).status,
-    ).toBe(0);
-    expect(runCli(["create", "task", "Aaa blocked", "--parent", "login"], dir).status).toBe(0);
-    expect(runCli(["create", "task", "Bbb ready", "--parent", "login"], dir).status).toBe(0);
-    expect(runCli(["create", "task", "Zzz blocker", "--parent", "login"], dir).status).toBe(0);
-    expect(
-      runCli(["update", "task-aaa-blocked", "--add-depends-on", "task-zzz-blocker"], dir).status,
-    ).toBe(0);
-    expect(
-      runCli(["update", "task-zzz-blocker", "--status", "in_progress", "--assignee", "bob"], dir)
-        .status,
-    ).toBe(0);
+    runUpdate({ cwd: dir, id: "login", status: "in_progress", assignee: "bob" });
+    runCreate({ cwd: dir, type: "task", title: "Aaa blocked", parent: "login" });
+    runCreate({ cwd: dir, type: "task", title: "Bbb ready", parent: "login" });
+    runCreate({ cwd: dir, type: "task", title: "Zzz blocker", parent: "login" });
+    runUpdate({ cwd: dir, id: "task-aaa-blocked", addDependsOn: "task-zzz-blocker" });
+    runUpdate({ cwd: dir, id: "task-zzz-blocker", status: "in_progress", assignee: "bob" });
+
+    // --ready limits the pool to unblocked items (in-process, same runNext).
+    const readyOnly = runNext({ cwd: dir, ready: true });
+    expect(readyOnly.suggestion).not.toBeNull();
+    expect(readyOnly.suggestion!.item.id).toBe("task-bbb-ready");
 
     // Default: ready item ranks first despite the blocked item sorting earlier.
     const ready = runCli(["next", "--json"], dir);
@@ -475,17 +477,9 @@ describe("CLI --json", () => {
     expect(readyBody.suggestion.item).toMatchObject({ id: "task-bbb-ready" });
     expect(readyBody.suggestion.blockedBy).toEqual([]);
 
-    // --ready: pool limited to unblocked items.
-    const readyOnly = runCli(["next", "--ready", "--json"], dir);
-    expect(readyOnly.status).toBe(0);
-    expect((parseStdout(readyOnly.stdout) as { suggestion: Record<string, unknown> }).suggestion.item).toMatchObject({ id: "task-bbb-ready" });
-
     // Claim the ready item: the blocked one is suggested with its open dep in
     // reason and blockedBy; --ready empties the pool (suggestion stays null).
-    expect(
-      runCli(["update", "task-bbb-ready", "--status", "in_progress", "--assignee", "carol"], dir)
-        .status,
-    ).toBe(0);
+    runUpdate({ cwd: dir, id: "task-bbb-ready", status: "in_progress", assignee: "carol" });
     const blocked = runCli(["next", "--json"], dir);
     expect(blocked.status).toBe(0);
     const blockedBody = parseStdout(blocked.stdout) as { suggestion: Record<string, unknown> };
@@ -498,14 +492,15 @@ describe("CLI --json", () => {
   });
 
   it("arggon list --json applies dependency filters", () => {
+    // In-process tree; the spawn is only for the --filter CLI passthrough.
     const dir = mkdtempSync(join(tmpdir(), "arggon-list-deps-cli-"));
-    expect(runCli(["init", dir]).status).toBe(0);
-    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
-    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
-    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
-    expect(runCli(["create", "task", "Aaa", "--parent", "login"], dir).status).toBe(0);
-    expect(runCli(["create", "task", "Bbb", "--parent", "login"], dir).status).toBe(0);
-    expect(runCli(["update", "task-aaa", "--add-depends-on", "task-bbb"], dir).status).toBe(0);
+    runInit({ dir, force: false });
+    runCreate({ cwd: dir, type: "initiative", title: "Launch MVP" });
+    runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp" });
+    runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth" });
+    runCreate({ cwd: dir, type: "task", title: "Aaa", parent: "login" });
+    runCreate({ cwd: dir, type: "task", title: "Bbb", parent: "login" });
+    runUpdate({ cwd: dir, id: "task-aaa", addDependsOn: "task-bbb" });
     const dependsOn = runCli(["list", "--json", "--filter", "depends-on:task-bbb"], dir);
     expect(dependsOn.status).toBe(0);
     const dependsOnBody = parseStdout(dependsOn.stdout);
