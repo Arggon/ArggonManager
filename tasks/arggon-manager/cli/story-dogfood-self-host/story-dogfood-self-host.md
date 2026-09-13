@@ -1,6 +1,6 @@
 ---
 type: story
-status: in_progress
+status: done
 id: story-dogfood-self-host
 title: "Eat your own dogfood: self-host the full arggon stack in this repo"
 assignee: Arggon
@@ -24,4 +24,4 @@ claimed_at: "2026-09-13T15:45:32.858Z"
 
 ## Acceptance
 
-- [ ] Convention v3 declared, x-tracker.auto-commit active, pre-commit hook installed, skill bundled at .agents/, missing init docs generated, 3 base playbooks created with researched versions, doctor reports a healthy self-hosted state
+- [x] Convention v3 declared, x-tracker.auto-commit active, pre-commit hook installed, skill bundled at .agents/, missing init docs generated, 3 base playbooks created with researched versions, doctor reports a healthy self-hosted state
