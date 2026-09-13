@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,9 +10,14 @@ import {
   ADOPT_TASK_ID,
   ADOPT_TASK_TITLE,
   buildInventory,
+  formatAdoptAckReport,
   formatAdoptReport,
   runAdopt,
+  runAdoptAck,
 } from "./adopt.js";
+import { readConventionConfig, updateGeneratedSection } from "./convention.js";
+import { checksumOf } from "./docs.js";
+import { runDoctor } from "./doctor.js";
 import { runCreate } from "./create.js";
 import { runInit } from "./init.js";
 import { loadItems } from "./items.js";
@@ -70,8 +75,8 @@ describe("runAdopt: task creation", () => {
     const task = loadItems(join(dir, "tasks")).find((item) => item.id === ADOPT_TASK_ID)!;
     const body = readFileSync(task.filePath, "utf8");
     expect(body).toContain(ADOPT_TASK_BODY);
-    // Seven ordered checklist steps (1-7).
-    expect(body.match(/^- \[ \] /gm)).toHaveLength(7);
+    // Eight ordered checklist steps (1-8).
+    expect(body.match(/^- \[ \] /gm)).toHaveLength(8);
     // Step 1: read the generated governing docs.
     expect(body).toContain("AGENTS.md");
     expect(body).toContain("docs/convention.md");
@@ -89,11 +94,14 @@ describe("runAdopt: task creation", () => {
     expect(body).toContain("package.json / requirements.txt / go.mod / Cargo.toml / pom.xml");
     expect(body).toContain("arggon playbook new <tech>");
     expect(body).toContain("arggon playbook refresh <tech> --version <v>");
-    // Step 6: verification commands.
+    // Step 6: baseline the sanctioned sweep edits (task-adopt-checksum-refresh).
+    expect(body).toContain("arggon adopt --ack");
+    expect(body).toContain("Hand edits made AFTER this ack still report modified");
+    // Step 7: verification commands.
     expect(body).toContain("arggon validate");
     expect(body).toContain("arggon spec validate");
     expect(body).toContain("arggon playbook status");
-    // Step 7: report + handoff to the human.
+    // Step 8: report + handoff to the human.
     expect(body).toContain("arggon comment task-adopt-arggon");
   });
 
@@ -278,6 +286,167 @@ describe("adopt via the CLI (--json)", () => {
   it("fails with ADOPT_FAILED on a non-initialized tree", () => {
     const dir = tempDir("arggon-adopt-cli-naked-");
     const proc = runCli(["adopt", "--json"], dir);
+    expect(proc.status).toBe(1);
+    const body = JSON.parse(proc.stdout) as {
+      ok: boolean;
+      command: string;
+      error: { code: string; message: string };
+    };
+    expect(body.ok).toBe(false);
+    expect(body.command).toBe("adopt");
+    expect(body.error.code).toBe("ADOPT_FAILED");
+    expect(body.error.message).toContain("arggon init");
+  });
+});
+
+describe("runAdoptAck: x-generated baseline refresh (task-adopt-checksum-refresh)", () => {
+  it("acks the current content: state checksums refresh and doctor reports untouched", () => {
+    const dir = seedTree();
+    // The sanctioned sweep edits (step 3 of the checklist).
+    writeFileSync(join(dir, "AGENTS.md"), "SWEEP: project description\n", "utf8");
+    writeFileSync(join(dir, "CONTRIBUTING.md"), "SWEEP: setup + build commands\n", "utf8");
+    expect(runDoctor({ cwd: dir }).docs).toMatchObject({ managed: 16, modified: 2, untouched: 14 });
+
+    const now = new Date("2026-09-13T10:00:00Z");
+    const result = runAdoptAck({ cwd: dir, now });
+    expect(result.count).toBe(result.acked.length);
+    expect(result.count).toBe(16);
+    expect(result.acked.map((doc) => doc.path)).toEqual(
+      [...result.acked.map((doc) => doc.path)].sort(),
+    );
+    const byPath = new Map(result.acked.map((doc) => [doc.path, doc.checksum]));
+    expect(byPath.get("AGENTS.md")).toBe(checksumOf("SWEEP: project description\n"));
+
+    const config = readConventionConfig(dir);
+    const agents = config.generated["AGENTS.md"]!;
+    expect(agents.checksum).toBe(checksumOf(readFileSync(join(dir, "AGENTS.md"), "utf8")));
+    expect(agents.generatedAt).toBe("2026-09-13T10:00:00.000Z");
+    expect(agents.template).toBe("docs/AGENTS.md");
+    expect(agents.arggonVersion).toBe("0.0.0");
+    // The sanctioned edits stop reporting as modified.
+    expect(runDoctor({ cwd: dir }).docs).toMatchObject({ managed: 16, modified: 0, untouched: 16 });
+  });
+
+  it("next init reports acked docs as untouched (updated[], not modified[])", () => {
+    const dir = seedTree();
+    writeFileSync(join(dir, "AGENTS.md"), "SWEEP: project description\n", "utf8");
+    runAdoptAck({ cwd: dir });
+    const result = runInit({ dir, force: false, full: true });
+    expect(result.modified).toEqual([]);
+    expect(result.skipped).toEqual([]);
+    expect(result.updated).toContain("AGENTS.md");
+  });
+
+  it("hand edits after acking report modified again (protection intact)", () => {
+    const dir = seedTree();
+    runAdoptAck({ cwd: dir });
+    writeFileSync(join(dir, "AGENTS.md"), "LATE HAND EDIT\n", "utf8");
+    expect(runDoctor({ cwd: dir }).docs).toMatchObject({ modified: 1, untouched: 15 });
+    // The state keeps the acked baseline, not the hand edit.
+    expect(readConventionConfig(dir).generated["AGENTS.md"]!.checksum).not.toBe(
+      checksumOf("LATE HAND EDIT\n"),
+    );
+    // And a later init keeps the hand edit (modified + skipped, never overwritten).
+    const result = runInit({ dir, force: false, full: true });
+    expect(result.modified).toContain("AGENTS.md");
+    expect(result.skipped).toContain("AGENTS.md");
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe("LATE HAND EDIT\n");
+  });
+
+  it("creates nothing: untracked docs stay untracked, missing files are skipped", () => {
+    const dir = seedTree();
+    // Adopter-owned doc with no x-generated entry.
+    writeFileSync(join(dir, "docs/index.md"), "ADOPTER OWNED\n", "utf8");
+    // A tracked doc missing on disk.
+    rmSync(join(dir, "SUPPORT.md"));
+    const baseline = readConventionConfig(dir).generated["SUPPORT.md"]!.checksum;
+
+    const result = runAdoptAck({ cwd: dir });
+    const paths = result.acked.map((doc) => doc.path);
+    expect(paths).not.toContain("docs/index.md");
+    expect(paths).not.toContain("SUPPORT.md");
+    expect(readFileSync(join(dir, "docs/index.md"), "utf8")).toBe("ADOPTER OWNED\n");
+    const config = readConventionConfig(dir);
+    expect(config.generated["docs/index.md"]).toBeUndefined();
+    // The missing file's entry keeps its old checksum (still missing, not acked).
+    expect(config.generated["SUPPORT.md"]!.checksum).toBe(baseline);
+    // The other tracked docs are still acked and present.
+    expect(config.generated["AGENTS.md"]).toBeDefined();
+    expect(result.count).toBe(15);
+  });
+
+  it("is standalone: works when the adoption task is already done", () => {
+    const dir = seedTree();
+    runAdopt({ cwd: dir });
+    runUpdate({ cwd: dir, id: ADOPT_TASK_ID, status: "in_progress", assignee: "adopt-bot" });
+    runUpdate({ cwd: dir, id: ADOPT_TASK_ID, status: "done", unassign: true });
+    const result = runAdoptAck({ cwd: dir });
+    expect(result.count).toBe(16);
+  });
+
+  it("with no x-generated entries the ack is a no-op (state file byte-identical)", () => {
+    const dir = tempDir("arggon-adopt-ack-nostate-");
+    runInit({ dir, force: false, full: true });
+    const yml = join(dir, "tasks/.convention.yml");
+    writeFileSync(yml, updateGeneratedSection(readFileSync(yml, "utf8"), {}), "utf8");
+    const before = readFileSync(yml, "utf8");
+    const result = runAdoptAck({ cwd: dir });
+    expect(result.acked).toEqual([]);
+    expect(result.count).toBe(0);
+    expect(readFileSync(yml, "utf8")).toBe(before);
+  });
+
+  it("requires an initialized tree", () => {
+    const dir = tempDir("arggon-adopt-ack-naked-");
+    expect(() => runAdoptAck({ cwd: dir })).toThrow(/not an arggon-managed tree.*arggon init/s);
+  });
+});
+
+describe("formatAdoptAckReport", () => {
+  it("lists the acked docs with their new checksums plus the count", () => {
+    const dir = seedTree();
+    const report = formatAdoptAckReport(runAdoptAck({ cwd: dir }));
+    expect(report).toContain("16 generated doc(s) acknowledged as the new baseline");
+    expect(report).toContain("AGENTS.md — sha256:");
+    expect(report).toContain(".agents/skills/arggon-cli/SKILL.md — sha256:");
+  });
+});
+
+describe("adopt --ack via the CLI (--json)", () => {
+  it("acks the generated docs and reports the v1 payload", () => {
+    const dir = seedTree();
+    writeFileSync(join(dir, "AGENTS.md"), "SWEEP: project description\n", "utf8");
+    const proc = runCli(["adopt", "--ack", "--json"], dir);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      ok: boolean;
+      schemaVersion: number;
+      conventionVersion: number;
+      command: string;
+      acked: { path: string; checksum: string }[];
+      count: number;
+    };
+    expect(body.ok).toBe(true);
+    expect(body.schemaVersion).toBe(1);
+    expect(body.conventionVersion).toBe(3);
+    expect(body.command).toBe("adopt");
+    const agents = body.acked.find((doc) => doc.path === "AGENTS.md")!;
+    expect(agents.checksum).toBe(checksumOf("SWEEP: project description\n"));
+    expect(body.count).toBe(body.acked.length);
+    expect(runDoctor({ cwd: dir }).docs.modified).toBe(0);
+  });
+
+  it("prints the acked list + count in human output", () => {
+    const dir = seedTree();
+    const proc = runCli(["adopt", "--ack"], dir);
+    expect(proc.status).toBe(0);
+    expect(proc.stdout).toContain("acknowledged as the new baseline");
+    expect(proc.stdout).toContain("AGENTS.md — sha256:");
+  });
+
+  it("fails with ADOPT_FAILED on a non-initialized tree", () => {
+    const dir = tempDir("arggon-adopt-ack-cli-naked-");
+    const proc = runCli(["adopt", "--ack", "--json"], dir);
     expect(proc.status).toBe(1);
     const body = JSON.parse(proc.stdout) as {
       ok: boolean;

@@ -1,6 +1,11 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { readGeneratedState } from "./convention.js";
+import {
+  readGeneratedState,
+  updateGeneratedSection,
+  type GeneratedEntry,
+} from "./convention.js";
+import { arggonVersion, checksumOf } from "./docs.js";
 import { runCreate } from "./create.js";
 import { runDoctor } from "./doctor.js";
 import { itemId } from "./ids.js";
@@ -28,6 +33,11 @@ import {
  *    exists for the path) or adopter-owned, plus cheap stack-manifest hints.
  *  - `runAdopt(opts)`: command wiring — pre-flight, story resolution,
  *    idempotent task creation, dry-run.
+ *
+ * Plus `runAdoptAck(opts)` (`--ack`, task-adopt-checksum-refresh): a
+ * standalone acknowledgment that makes the CURRENT on-disk content of every
+ * generated doc the new `x-generated` baseline, so the sanctioned sweep edits
+ * stop reporting as adopter-modified while later hand edits stay protected.
  */
 
 /** Id of the auto-created parent story (kernel adds no prefix for stories). */
@@ -150,8 +160,9 @@ arggon adopt --dry-run --json
 - [ ] 3. Complete the arggon-generated docs with the extracted content — fill the TODO placeholders: project description in AGENTS.md; CONTRIBUTING.md specifics (environment setup, build/test commands); ARCHITECTURE.md problem statement. The SECURITY.md contact is human input — leave it flagged for a human, never invent it.
 - [ ] 4. Archive replaced originals to backup/<YYYY-MM-DD>/ preserving their relative paths (use today's date). Only docs you REPLACED get archived; never archive README.md — merge into it instead.
 - [ ] 5. Detect the stack from the manifests (package.json / requirements.txt / go.mod / Cargo.toml / pom.xml); for each technology create a playbook (\`arggon playbook new <tech>\`), research current versions and best practices with dated sources, then record them with \`arggon playbook refresh <tech> --version <v>\`.
-- [ ] 6. Verify: \`arggon validate\` + \`arggon spec validate\` (if specs exist) + \`arggon playbook status\`.
-- [ ] 7. Report: comment on this task (\`arggon comment task-adopt-arggon\`) listing the extracted content, archived files, and created playbooks; flip this task done when the human reviews.
+- [ ] 6. Baseline the sanctioned edits: run \`arggon adopt --ack\` so the generated docs you completed in step 3 become the new x-generated baseline (their checksums are refreshed and they stop reporting as modified). Hand edits made AFTER this ack still report modified — the protection stays intact.
+- [ ] 7. Verify: \`arggon validate\` + \`arggon spec validate\` (if specs exist) + \`arggon playbook status\`.
+- [ ] 8. Report: comment on this task (\`arggon comment task-adopt-arggon\`) listing the extracted content, archived files, and created playbooks; flip this task done when the human reviews.
 `;
 
 export type AdoptOptions = {
@@ -386,6 +397,98 @@ export function formatAdoptReport(result: AdoptResult): string {
   }
   if (result.inventory.stackHints.length > 0) {
     lines.push(`  stack hints: ${result.inventory.stackHints.join(", ")}`);
+  }
+  return `${lines.join("\n")}\n`;
+}
+
+/**
+ * One acknowledged generated doc (task-adopt-checksum-refresh): the on-disk
+ * content became the new `x-generated` baseline.
+ */
+export type AckedDoc = {
+  /** Posix path relative to the repo root. */
+  path: string;
+  /** The new baseline checksum ("sha256:<hex>"), computed from disk. */
+  checksum: string;
+};
+
+export type AdoptAckOptions = {
+  cwd: string;
+  /** Injection point for tests: the recorded generatedAt timestamp. */
+  now?: Date;
+};
+
+export type AdoptAckResult = {
+  /** Repo root (parent of tasks/). */
+  root: string;
+  /** Acknowledged docs, sorted by path. */
+  acked: AckedDoc[];
+  /** Number of acknowledged docs (acked.length). */
+  count: number;
+};
+
+/**
+ * `arggon adopt --ack` (task-adopt-checksum-refresh): acknowledge the CURRENT
+ * on-disk content of every arggon-generated doc (each path present in the
+ * `x-generated` state) as the new baseline. The adoption sweep legitimately
+ * fills the generated docs, which would otherwise stay permanently
+ * "adopter-modified" and shadow every future template upgrade; the explicit
+ * ack recomputes the checksums from disk and refreshes the state entries
+ * (checksum + arggonVersion + generatedAt).
+ *
+ * Guarantees:
+ *  - state entries whose file is missing on disk are left untouched (nothing
+ *    is created);
+ *  - files absent from the state are never touched (adopter-owned docs stay
+ *    untracked);
+ *  - standalone: no tracker access, works even when task-adopt-arggon is
+ *    already done.
+ */
+export function runAdoptAck(opts: AdoptAckOptions): AdoptAckResult {
+  // Pre-flight: same sources as `arggon doctor` (story-adoption-state).
+  const doctor = runDoctor({ cwd: opts.cwd });
+  if (!doctor.initialized || doctor.root === null) {
+    throw new Error("not an arggon-managed tree — run `arggon init` first");
+  }
+  const root = doctor.root;
+  const statePath = join(root, "tasks", ".convention.yml");
+  const prevState = readGeneratedState(root);
+  const generatedAt = (opts.now ?? new Date()).toISOString();
+  const version = arggonVersion();
+
+  const nextState: Record<string, GeneratedEntry> = { ...prevState };
+  const acked: AckedDoc[] = [];
+  for (const path of Object.keys(prevState).sort()) {
+    const abs = join(root, ...path.split("/"));
+    // Missing on disk: nothing to acknowledge, and nothing may be created.
+    if (!existsSync(abs)) continue;
+    const checksum = checksumOf(readFileSync(abs, "utf8"));
+    nextState[path] = { ...prevState[path]!, checksum, arggonVersion: version, generatedAt };
+    acked.push({ path, checksum });
+  }
+
+  // Nothing acknowledged (no state entries, or none of the tracked files on
+  // disk): leave the state file byte-identical — never degrade it to an empty
+  // section.
+  if (acked.length === 0) {
+    return { root, acked, count: 0 };
+  }
+
+  writeFileSync(
+    statePath,
+    updateGeneratedSection(readFileSync(statePath, "utf8"), nextState),
+    "utf8",
+  );
+  return { root, acked, count: acked.length };
+}
+
+/** Human-readable ack report (pairs with the adopt --ack --json payload). */
+export function formatAdoptAckReport(result: AdoptAckResult): string {
+  const lines = [
+    `arggon adopt --ack: ${result.count} generated doc(s) acknowledged as the new baseline`,
+  ];
+  for (const doc of result.acked) {
+    lines.push(`  ${doc.path} — ${doc.checksum}`);
   }
   return `${lines.join("\n")}\n`;
 }

@@ -494,6 +494,15 @@ Agent-assisted adoption for existing repos (see [docs/agents.md](./agents.md) §
 
 Failures use `error.code: "ADOPT_FAILED"` (not an arggon-managed tree — run `arggon init` first; no epic for the default story; `--story` that does not resolve to a story; or a terminal `task-adopt-arggon`, i.e. adoption already completed).
 
+With `--ack`, the command takes a different, standalone payload (task-adopt-checksum-refresh): it acknowledges the CURRENT on-disk content of every generated doc (each path present in `x-generated`) as the new baseline — checksums are recomputed from disk and the state entries refreshed (`arggonVersion` + current timestamp) — so the sanctioned adoption-sweep edits stop reporting as modified. It writes only `tasks/.convention.yml`, creates nothing, ignores files absent from the state, and works even when `task-adopt-arggon` is already done. Hand edits made AFTER an ack still report modified — the protection stays intact.
+
+| Field   | Type       | Notes                                                                                              |
+| ------- | ---------- | -------------------------------------------------------------------------------------------------- |
+| `acked` | `object[]` | One entry per acknowledged doc, sorted by path: `{ path, checksum }` (the new `sha256:…` baseline)  |
+| `count` | `number`   | `acked.length`                                                                                     |
+
+Failures with `--ack` also use `error.code: "ADOPT_FAILED"` (only the non-initialized-tree case — the ack needs the `x-generated` state init writes).
+
 ### `list` sample (drawn from `tasks/launch-mvp`)
 
 ```json
