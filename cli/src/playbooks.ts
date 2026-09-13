@@ -403,6 +403,9 @@ export function runPlaybookStatus(opts: PlaybookStatusOptions): PlaybookStatusRe
           `- [ ] Playbook refreshed via \`arggon playbook refresh ${playbook.id} --version <v>\``,
           "",
         ].join("\n"),
+        // Keeps its historic no-commit behavior (out of the tracker
+        // auto-commit surface, task-auto-commit-tracker).
+        commit: false,
         now: opts.now,
       });
       result.created.push(`task-${stem}`);

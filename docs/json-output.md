@@ -78,6 +78,7 @@ Stable fields aligned with convention v0 plus the additive `branch` (v1) and `mi
 | `depends_on`     | `string[]`                                                    | Ids this item waits for (v3, ADR 0004); empty = none. Additive within `schemaVersion: 1`; `blocked_by` is the computed inverse and is never stored |
 | `claimed_at`     | `string` \| `null`                                          | Soft lease: ISO date-time set when a claimable item is claimed (`in_progress` + assignee, via `update`/`start`) and cleared when the claim is released. Reporting only — never gates a transition. Additive within `schemaVersion: 1`; `null` for items claimed before the field existed |
 | `worktree_path`  | `string` \| `null`                                          | Absolute path of the git worktree created by `start --worktree` (`../<repo-name>-<id>`). Additive within `schemaVersion: 1`; `null` when the item was started without worktree isolation |
+| `issue`          | `number` \| `null`                                          | GitHub issue number recorded by `import-issues` (frontmatter `issue`). Additive within `schemaVersion: 1`; `null` when the item was not imported from an issue. `start --open-pr` appends `Closes #N` to the PR body for items carrying it |
 
 Enums match [`docs/convention.md`](./convention.md) v0.
 
@@ -239,6 +240,9 @@ Failures use `error.code: "PLAYBOOK_FAILED"` (bad slug, refusing to overwrite, m
 | -------------- | ---------- | ------------------------------------------------------------------------------------------------- |
 | `item`         | `WorkItem` | Item as persisted                                                                                 |
 | `autoCompleted` | `string[]` | `update` only: ancestors auto-completed to `done` by the container-completion cascade (see convention.md); empty when `--no-cascade` or a non-terminal status. Additive within `schemaVersion: 1`. |
+| `commit`       | `object`   | `create` only: tracker auto-commit outcome (task-auto-commit-tracker). `{ hash, message }` when the created file was committed, `{ skipped: <reason> }` otherwise (`--no-commit`, non-git tree, nothing to commit). Additive within `schemaVersion: 1`. |
+
+Tracker auto-commit (story-tracker-hygiene): `create`, `comment`, `adopt`, and `cleanup --prune` commit ONLY their own mutated paths (`chore(tasks): <verb> <id>`); the user's pre-existing dirty files are never staged. `--no-commit` opts out per invocation; `tasks/.convention.yml` `x-tracker.auto-commit: false` opts out tree-wide (flag wins over config, config wins over the default `true`). Skips are reported, never failures — the CLI works without git.
 
 ### `comment`
 
@@ -251,6 +255,7 @@ Appends a timestamped, author-attributed comment section (`### <date> @<author>`
 | `comment.author`  | `string`   | Resolved author login (rendered `@<author>`)   |
 | `comment.date`    | `string`   | `YYYY-MM-DD` (UTC) rendered in the heading     |
 | `comment.lines`   | `string[]` | Comment text lines appended under the heading  |
+| `commit`          | `object`   | Tracker auto-commit outcome: `{ hash, message }` when the commented file was committed, `{ skipped: <reason> }` otherwise. Additive within `schemaVersion: 1`. |
 
 Failures use `error.code: "COMMENT_FAILED"` (unknown id, empty text, unresolvable author — pass `--author <login>` or set `GITHUB_USER`/`GITHUB_ACTOR`).
 
@@ -275,7 +280,7 @@ Failures use `error.code: "BRANCH_FAILED"` (unknown id, bad `branch_patterns`, n
 | `prUrl`   | `string\|null` | Draft PR URL with `--open-pr`; `null` otherwise      |
 | `worktreePath` | `string\|null` | Absolute worktree path with `--worktree`; `null` otherwise. Additive within `schemaVersion: 1` |
 
-With `--worktree` the claim commit, push, and draft PR run inside the worktree and the item's `worktree_path` is persisted (re-runs attach to the recorded path). Failures use `error.code: "START_FAILED"` (unknown id, taken claim — never forced, dirty tree, existing branch, non-git tree, worktree path occupied by a non-worktree, or gh failure).
+With `--worktree` the claim commit, push, and draft PR run inside the worktree and the item's `worktree_path` is persisted (re-runs attach to the recorded path). When the item carries an imported GitHub issue number (`WorkItem.issue`), the PR body ends with `Closes #N` so GitHub closes the issue when the PR merges; items without it are unchanged. Failures use `error.code: "START_FAILED"` (unknown id, taken claim — never forced, dirty tree, existing branch, non-git tree, worktree path occupied by a non-worktree, or gh failure).
 
 ### `cleanup`
 
@@ -291,6 +296,7 @@ With `--worktree` the claim commit, push, and draft PR run inside the worktree a
 | `candidates[].reason`    | `string\|null`   | Why it is skipped (null when removable)                       |
 | `candidates[].action`    | `string\|null`   | What `--prune` does for it (null when skipped)                |
 | `pruned`     | `object[]`   | `{ id, action }` entries performed (empty without `--prune`)                               |
+| `commit`     | `object`     | With `--prune`: tracker auto-commit outcome for the cleared `worktree_path` records — `{ hash, message }` or `{ skipped: <reason> }`. Additive within `schemaVersion: 1`; absent when nothing was pruned |
 
 Default mode only lists. `--prune` removes removable worktrees (`git worktree remove` — git refuses dirty worktrees), deletes their merged branches (`git branch -d`), and clears the `worktree_path` records; skipped entries (non-terminal item, unmerged/missing branch) are never touched. Failures use `error.code: "CLEANUP_FAILED"` (non-git tree, undetectable default branch, or per-item prune failures — already-completed actions are reported in the error message).
 
@@ -379,6 +385,8 @@ One-shot GitHub issue import (idempotent): every issue becomes a task under a pa
 | `created`               | `number`                                                          | Items written this run                                                                         |
 | `skipped`               | `number`                                                          | Issues whose id already existed (idempotent re-run: all of them)                               |
 | `labels`                | `{ mapped: number, skipped: number }`                             | Issue labels mapped into item labels (kebab-case, deduped); `skipped` counts invalid ones dropped silently |
+
+Each created item records the GitHub issue number in its frontmatter (`issue: <number>`, exposed as `WorkItem.issue`), so `arggon start <id> --open-pr` can close the issue on merge with `Closes #N`.
 
 Failures use `error.code: "IMPORT_FAILED"` (gh missing/unauthenticated or unparseable output, missing `tasks/`, no epic for the default story, malformed `--repo`, or `--parent` that does not resolve to a story).
 
@@ -482,6 +490,7 @@ Agent-assisted adoption for existing repos (see [docs/agents.md](./agents.md) §
 | `inventory.docs[].managed` | `boolean` | `true` when an `x-generated` provenance entry exists for the path — arggon-generated doc set (possibly edited since); an existing file without an entry is adopter-owned (content to extract) |
 | `inventory.stackHints`     | `string[]`| Stack manifests found at the repo root, filename only (`package.json`, `requirements.txt`, `go.mod`, `Cargo.toml`, `pom.xml`) |
 | `dryRun`         | `boolean`   | `true` with `--dry-run` (plan only, no writes)                                                                                   |
+| `commit`         | `object`    | Tracker auto-commit outcome for the files written this run — ONE `{ hash, message }` commit covering the task and (when created) its story, or `{ skipped: <reason> }`. Additive within `schemaVersion: 1`; absent in dry-run / when nothing was written |
 
 Failures use `error.code: "ADOPT_FAILED"` (not an arggon-managed tree — run `arggon init` first; no epic for the default story; `--story` that does not resolve to a story; or a terminal `task-adopt-arggon`, i.e. adoption already completed).
 

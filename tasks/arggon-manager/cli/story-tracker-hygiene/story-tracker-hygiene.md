@@ -1,12 +1,15 @@
 ---
 type: story
-status: todo
+status: done
 id: story-tracker-hygiene
 title: Tracker hygiene and GitHub linking
+assignee: Arggon
+branch: feat/story-tracker-hygiene-impl
 parent: cli
 labels: []
 created: "2026-09-13"
 updated: "2026-09-13"
+claimed_at: "2026-09-13T13:13:17.770Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tracker-hygiene/story-tracker-hygiene.md (story index; required).
@@ -21,5 +24,5 @@ Top-priority improvements from the cuentas-claras adoption agent's feedback (202
 
 ## Acceptance
 
-- [ ] Tracker mutations auto-commit their own changes (opt-out); `start`'s clean-tree precondition never blocks tool-generated state
-- [ ] Issue->PR closure loop is automatic for imported tasks
+- [x] Tracker mutations auto-commit their own changes (opt-out); `start`'s clean-tree precondition never blocks tool-generated state
+- [x] Issue->PR closure loop is automatic for imported tasks

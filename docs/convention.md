@@ -379,6 +379,22 @@ x-playbooks:
 - Unknown nested keys inside `x-playbooks` are ignored (ignore-unknown, forward compat); a scalar `x-playbooks` value or a `max-age-days` that is not a positive integer is a parse error.
 - The key is namespaced (`x-*`), so older tools ignore it per the extension policy above.
 
+### Tracker hygiene (`x-tracker`)
+
+`x-tracker` is the official namespaced extension for tracker-hygiene options (story-tracker-hygiene). It is a mapping of option names to values; the only official option today is `auto-commit`:
+
+```yaml
+version: 3
+x-tracker:
+  auto-commit: false
+```
+
+- Tracker mutations — `create`, `comment`, `adopt` (task + story files), `cleanup --prune` (cleared `worktree_path` records) — commit their own mutated files by default as `chore(tasks): <verb> <id>` (verbs: `created`/`commented`/`adopted`/`pruned`). Staging is surgical (`git add -- <path>` only): the user's pre-existing dirty files are never swept into the tool's commit.
+- `x-tracker.auto-commit: false` opts out tree-wide. Precedence: the per-invocation `--no-commit` flag wins over `x-tracker.auto-commit`, which wins over the built-in default of **true**.
+- Skipping is never a failure: non-git trees, a missing `git` binary, or a no-op commit (nothing staged) are reported (`--json` additive `commit: { skipped: <reason> }`) and the command succeeds — the CLI works without git.
+- Unknown nested keys inside `x-tracker` are ignored (ignore-unknown, forward compat); a scalar `x-tracker` value or an `auto-commit` that is not `true`/`false` is a parse error.
+- The key is namespaced (`x-*`), so older tools ignore it per the extension policy above.
+
 ### Generated-doc provenance (`x-generated`)
 
 `x-generated` is the official namespaced extension for generated-file provenance (`arggon init` / `generateDocs`, story-adoption-state; Copier/Helm precedent). It maps each generated destination (posix, relative to the repo root) to its provenance record:

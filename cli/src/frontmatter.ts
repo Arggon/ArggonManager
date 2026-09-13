@@ -115,6 +115,14 @@ export function stringField(data: Frontmatter, key: string): string | undefined 
   return String(v);
 }
 
+/** Tolerant numeric field: undefined when absent/null/unparseable (never throws). */
+export function numberField(data: Frontmatter, key: string): number | undefined {
+  const v = data[key];
+  if (v === undefined || v === null) return undefined;
+  const n = typeof v === "number" ? v : Number(String(v).trim());
+  return Number.isFinite(n) ? n : undefined;
+}
+
 export function stringArrayField(data: Frontmatter, key: string): string[] {
   const v = data[key];
   if (v === undefined || v === null) return [];

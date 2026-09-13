@@ -4,6 +4,13 @@ import { formatDate } from "./dates.js";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 import { resolveCurrentLogin } from "./list.js";
+import {
+  commitTrackerMutation,
+  readAutoCommitConfig,
+  resolveAutoCommit,
+  trackerCommitMessage,
+  type TrackerCommitResult,
+} from "./tracker-commit.js";
 
 export type CommentOptions = {
   cwd: string;
@@ -13,6 +20,11 @@ export type CommentOptions = {
   text: string;
   /** Explicit author login; when omitted, resolved like `list --assignee @me`. */
   author?: string;
+  /**
+   * Auto-commit the commented item file (tracker hygiene). `undefined`
+   * resolves via `x-tracker.auto-commit` config, default ON.
+   */
+  commit?: boolean;
   /** Clock override for deterministic output/tests; defaults to now. */
   now?: Date;
   /** Author-resolution environment (tests inject one; defaults to process.env). */
@@ -35,6 +47,8 @@ export type CommentResult = {
     /** Comment text lines as appended under the heading. */
     lines: string[];
   };
+  /** Tracker auto-commit outcome (task-auto-commit-tracker). */
+  commit?: TrackerCommitResult;
 };
 
 /**
@@ -83,11 +97,18 @@ export function runComment(opts: CommentOptions): CommentResult {
   // Body-only write: frontmatter data round-trips unchanged (no `updated` bump).
   writeFileSync(item.filePath, stringifyFrontmatter(item.data, newBody), "utf8");
 
+  const root = repoRootFromTasks(tasksDir);
+  const commit = commitTrackerMutation(root, [item.filePath], {
+    message: trackerCommitMessage("commented", [id]),
+    commit: resolveAutoCommit(opts.commit, readAutoCommitConfig(root)),
+  });
+
   return {
     id,
     path: item.filePath,
-    root: repoRootFromTasks(tasksDir),
+    root,
     comment: { author, date, lines },
+    commit,
   };
 }
 

@@ -30,6 +30,7 @@ function item(overrides: Partial<WorkItem> & Pick<WorkItem, "id" | "type" | "sta
     depends_on: [],
     claimed_at: null,
     worktree_path: null,
+    issue: null,
     ...overrides,
   };
 }

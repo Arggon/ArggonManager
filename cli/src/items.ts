@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import {
   parseFrontmatter,
+  numberField,
   stringArrayField,
   stringField,
   type Frontmatter,
@@ -37,6 +38,12 @@ export type WorkItem = {
    * (story-start-worktree); omit/null = none.
    */
   worktreePath?: string | null;
+  /**
+   * GitHub issue number recorded by `import-issues` (story-tracker-hygiene);
+   * omit/null = not linked. `start --open-pr` turns it into `Closes #N` in
+   * the PR body.
+   */
+  issue?: number | null;
   extras: Frontmatter;
   filePath: string;
   containerDir: string;
@@ -62,10 +69,17 @@ const OFFICIAL_KEYS = new Set([
  * Forward-declared keys: not in the v0 OFFICIAL_KEYS block (so they live in
  * extras and round-trip), but known to the tooling - no UNKNOWN_KEY warning.
  * milestone is the ADR 0003 prototype field; depends_on is official in
- * convention v3 (ADR 0004). Both parse unconditionally: parsing is additive,
- * so v0-v2 trees keep loading (and validating) unchanged.
+ * convention v3 (ADR 0004). issue records the GitHub issue number written by
+ * `import-issues` (story-tracker-hygiene). All parse unconditionally:
+ * parsing is additive, so v0-v2 trees keep loading (and validating) unchanged.
  */
-const PROTOTYPE_KEYS = new Set(["milestone", "depends_on", "claimed_at", "worktree_path"]);
+const PROTOTYPE_KEYS = new Set([
+  "milestone",
+  "depends_on",
+  "claimed_at",
+  "worktree_path",
+  "issue",
+]);
 
 /** One soft-load finding (path added by caller). */
 export type SoftIssue = {
@@ -214,6 +228,7 @@ export function softTryLoadItem(filePath: string): SoftLoadResult {
     dependsOn,
     claimedAt: stringField(data, "claimed_at") ?? null,
     worktreePath: stringField(data, "worktree_path") ?? null,
+    issue: numberField(data, "issue") ?? null,
     extras,
     filePath,
     containerDir: dirname(filePath),

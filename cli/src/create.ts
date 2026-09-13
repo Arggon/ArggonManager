@@ -13,6 +13,13 @@ import {
   type Status,
 } from "./status.js";
 import { formatDate } from "./dates.js";
+import {
+  commitTrackerMutation,
+  readAutoCommitConfig,
+  resolveAutoCommit,
+  trackerCommitMessage,
+  type TrackerCommitResult,
+} from "./tracker-commit.js";
 
 export type CreateOptions = {
   cwd: string;
@@ -26,11 +33,23 @@ export type CreateOptions = {
   /** Replace the default empty labels list (must satisfy the kebab-case rules). */
   labels?: string[];
   /**
-   * Override the template-derived body with verbatim content (e.g.
+   * GitHub issue number recorded in the additive `issue` frontmatter field
+   * (import-issues provenance; `start --open-pr` turns it into `Closes #N`).
+   */
+  issue?: number;
+  /**
+   * Replace the template-derived body with verbatim content (e.g.
    * import-issues writes the original issue body plus a provenance line).
    * Omit to fill the type's template body as usual.
    */
   body?: string;
+  /**
+   * Auto-commit the created item file (tracker hygiene,
+   * task-auto-commit-tracker). `undefined` resolves via `x-tracker.auto-commit`
+   * config, default ON. Internal callers that commit themselves (adopt) or
+   * stay uncommitted (import-issues) pass `false` explicitly.
+   */
+  commit?: boolean;
   now?: Date;
 };
 
@@ -41,6 +60,8 @@ export type CreateResult = {
   root: string;
   /** The created item, reloaded from disk. */
   item: WorkItem;
+  /** Tracker auto-commit outcome (task-auto-commit-tracker). */
+  commit?: TrackerCommitResult;
 };
 
 export function runCreate(opts: CreateOptions): CreateResult {
@@ -127,6 +148,12 @@ export function runCreate(opts: CreateOptions): CreateResult {
   };
   if (opts.assignee) data.assignee = opts.assignee;
   if (parentItem) data.parent = parentItem.id;
+  if (opts.issue !== undefined) {
+    if (!Number.isInteger(opts.issue) || opts.issue <= 0) {
+      throw new Error("issue must be a positive integer (the GitHub issue number)");
+    }
+    data.issue = opts.issue;
+  }
   if (status === "blocked" && opts.blockedReason) {
     data.blocked_reason = opts.blockedReason.trim();
   }
@@ -138,7 +165,12 @@ export function runCreate(opts: CreateOptions): CreateResult {
   if (!created) {
     throw new Error(`Created item is unreadable: ${filePath}`);
   }
-  return { id, path: filePath, root: repoRootFromTasks(tasksDir), item: created };
+  const root = repoRootFromTasks(tasksDir);
+  const commit = commitTrackerMutation(root, [filePath], {
+    message: trackerCommitMessage("created", [id]),
+    commit: resolveAutoCommit(opts.commit, readAutoCommitConfig(root)),
+  });
+  return { id, path: filePath, root, item: created, commit };
 }
 
 function resolveTemplate(tasksDir: string, type: ItemType): string {

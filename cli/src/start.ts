@@ -84,8 +84,7 @@ function git(args: string[], cwd: string): string {
   }
 }
 
-function gh(args: string[], cwd: string): string {
-  try {
+function gh(args: string[], cwd: string): string {  try {
     return execFileSync("gh", args, {
       encoding: "utf8",
       cwd,
@@ -191,6 +190,24 @@ export function defaultStartGit(): StartGit {
 }
 
 /**
+ * Draft PR body for a started item (task-closes-issue-linking): when the item
+ * carries an imported GitHub issue number (`issue` frontmatter), the body
+ * ends with `Closes #N` so GitHub closes the issue when the PR merges.
+ * Items without a linked issue are unchanged.
+ */
+export function draftPrBody(
+  id: string,
+  relPath: string,
+  item: Pick<WorkItem, "issue">,
+  worktree: boolean,
+): string {
+  const base =
+    `Work item: ${id}\n\nPath: ${relPath}\n\n` +
+    `Draft opened by \`arggon start${worktree ? " --worktree" : ""}\`.`;
+  return item.issue != null ? `${base}\n\nCloses #${item.issue}` : base;
+}
+
+/**
  * Start work on an item in one flow: claim (in_progress + assignee) →
  * working branch (pattern or recorded field) → commit the claim →
  * push → optional draft PR with the item id in the body.
@@ -260,7 +277,7 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
     const rel = relative(root, branch.path).split(sep).join("/");
     prUrl = gitRunner.createDraftPr(root, {
       title: branch.item.title ?? id,
-      body: `Work item: ${id}\n\nPath: ${rel}\n\nDraft opened by \`arggon start\`.`,
+      body: draftPrBody(id, rel, branch.item, false),
     });
   }
 
@@ -374,7 +391,7 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       const rel = relative(worktreePath, itemInWorktree.filePath).split(sep).join("/");
       prUrl = gitRunner.createDraftPr(worktreePath, {
         title: itemInWorktree.title ?? id,
-        body: `Work item: ${id}\n\nPath: ${rel}\n\nDraft opened by \`arggon start --worktree\`.`,
+        body: draftPrBody(id, rel, itemInWorktree, true),
       });
     }
 
