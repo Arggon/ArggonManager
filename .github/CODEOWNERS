@@ -1,0 +1,6 @@
+<!-- arggon:generated template="github/CODEOWNERS" -->
+# CODEOWNERS — https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+# Reviewers requested automatically when a PR touches matching paths.
+
+# Global default owner — every file not matched below.
+*       @Arggon

@@ -8,3 +8,65 @@ branch_patterns:
 
 x-tracker:
   auto-commit: true
+
+x-generated:
+  .agents/skills/arggon-cli/SKILL.md:
+    template: "skills/arggon-cli/SKILL.md"
+    checksum: "sha256:441972439323ca262dd2b6defa176499a391003e70a31e6001494e59e6e79397"
+    arggonVersion: "0.0.0"
+    generatedAt: "2026-09-13T15:54:50.433Z"
+  .editorconfig:
+    template: "docs/editorconfig"
+    checksum: "sha256:e6dc051b98ca6c21f7d858afd4ae6fa334cb9c234c69e7c3153561614c4fdaa5"
+    arggonVersion: "0.0.0"
+    generatedAt: "2026-09-13T15:54:50.433Z"
+  .github/CODEOWNERS:
+    template: "docs/github/CODEOWNERS"
+    checksum: "sha256:ab2d1552589d2eb6abe99ff11b4e466862f2f512b3db1f21a5dccc54b49cb5d1"
+    arggonVersion: "0.0.0"
+    generatedAt: "2026-09-13T15:54:50.433Z"
+  .github/PULL_REQUEST_TEMPLATE.md:
+    template: "docs/github/PULL_REQUEST_TEMPLATE.md"
+    checksum: "sha256:53cc012f88ce25d2eadd727a9834363795ccc09033018fc8646dedea5fabaefc"
+    arggonVersion: "0.0.0"
+    generatedAt: "2026-09-13T15:54:50.433Z"
+  .github/copilot-instructions.md:
+    template: "docs/github/copilot-instructions.md"
+    checksum: "sha256:983981db0f4bdf81d65e19bc31347c333381bfa231db49dad6e57e568ebb04f8"
+    arggonVersion: "0.0.0"
+    generatedAt: "2026-09-13T15:54:50.433Z"
+  ARCHITECTURE.md:
+    template: "docs/ARCHITECTURE.md"
+    checksum: "sha256:84acd218090586e1ae921bcedae5c3234f7a4a9094a736597362cfa56e95beb7"
+    arggonVersion: "0.0.0"
+    generatedAt: "2026-09-13T15:54:50.433Z"
+  CHANGELOG.md:
+    template: "docs/CHANGELOG.md"
+    checksum: "sha256:6068b49da9df8ca18cfe9ee5a54658b61364570c9542ea6113d27cad98dabfda"
+    arggonVersion: "0.0.0"
+    generatedAt: "2026-09-13T15:54:50.433Z"
+  CLAUDE.md:
+    template: "docs/CLAUDE.md"
+    checksum: "sha256:63e50bfeda0d64c0c4b921f8be72bf10c0418603c6fe41b6e12de08f84765558"
+    arggonVersion: "0.0.0"
+    generatedAt: "2026-09-13T15:54:50.433Z"
+  SECURITY.md:
+    template: "docs/SECURITY.md"
+    checksum: "sha256:690bae6b59c49c98ebbdd9eddad3ba864410456f3f5005a1c15361ecae3851b0"
+    arggonVersion: "0.0.0"
+    generatedAt: "2026-09-13T15:54:50.433Z"
+  SUPPORT.md:
+    template: "docs/SUPPORT.md"
+    checksum: "sha256:92741af40949fcd480dc2402c33cf2c07c3db9f2e325cb97932b52e51dfaf196"
+    arggonVersion: "0.0.0"
+    generatedAt: "2026-09-13T15:54:50.433Z"
+  docs/runbooks/README.md:
+    template: "docs/docs/runbooks/README.md"
+    checksum: "sha256:b0b2035070347e0f8d65d7e0cb4f25b05c9b107fdd3f1228e4f100d793bfbf35"
+    arggonVersion: "0.0.0"
+    generatedAt: "2026-09-13T15:54:50.433Z"
+  docs/tracking.md:
+    template: "docs/tracking.md"
+    checksum: "sha256:98d2547e856c2c4d5e88426a7fd1854b3defb4f92c105358a213170f8b9a15a6"
+    arggonVersion: "0.0.0"
+    generatedAt: "2026-09-13T15:54:50.433Z"
