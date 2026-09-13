@@ -1,8 +1,10 @@
 ---
 type: task
-status: todo
+status: done
 id: task-comment-stdin-file
 title: comment --file/stdin to end shell-quoting bugs
+assignee: Arggon
+branch: feat/task-comment-stdin-file
 parent: story-item-comments
 labels: []
 created: "2026-09-13"
@@ -23,5 +25,8 @@ cuentas-claras feedback: a comment containing backticks was mangled by shell com
 
 ## Acceptance
 
-- [ ] `arggon comment <id> --file <path>` and `--file -` (stdin) read the comment text; positional text stays supported
-- [ ] Test: backticks/quotes/$ in file content land byte-identical in the body
+- [x] `arggon comment <id> --file <path>` and `--file -` (stdin) read the comment text; positional text stays supported
+- [x] Test: backticks/quotes/$ in file content land byte-identical in the body
+
+### 2026-09-13 @Arggon
+Done on `feat/task-comment-stdin-file`: `comment <id> --file <path>` (and `--file -` for stdin) reads the text verbatim outside the shell; both-text-and-file, missing-file and empty-file all fail actionable. 6 kernel/CLI tests added (639 green).
