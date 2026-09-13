@@ -26,3 +26,13 @@ updated: "2026-09-13"
 - [ ] 
 
 ## Notes
+
+## Context
+
+Observed on the first CI run of PR #118: `cli/src/cli.test.ts > CLI --json > arggon next --json carries blockedBy and --ready skips blocked items` failed with `Error: Test timed out in 5000ms` (~6008ms); the rerun passed. The test spawns the CLI ~14 times via tsx (fresh process each), so it sits right at vitest's 5s default and tips over under runner load. See https://github.com/Arggon/ArggonManager/pull/118
+
+## Acceptance
+
+- [ ] Raise the per-test timeout (vitest `it(..., timeout)`) for the spawn-loop tests in cli/src/cli.test.ts, or trim the invocation count so they stay well under the limit
+- [ ] Sweep cli/src for other spawn-loop tests sitting near the 5s default
+- [ ] Green CI on a few consecutive runs
