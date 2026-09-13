@@ -157,6 +157,55 @@ describe("x-views (saved views)", () => {
   });
 });
 
+describe("x-import (issue-import options, task-import-type-mapping)", () => {
+  it("defaults to labelTypes null when the file or the key is missing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-ximport-missing-"));
+    expect(readConventionConfig(dir).import).toEqual({ labelTypes: null });
+    expect(parseConventionConfig("version: 3\n").import).toEqual({ labelTypes: null });
+  });
+
+  it("parses quoted and unquoted label-types (unknown option keys ignored)", () => {
+    const config = parseConventionConfig(
+      [
+        "version: 0",
+        "x-import:",
+        "  label-types:",
+        "    bug: bug",
+        '    "help wanted": task',
+        "  future-option: 7",
+        "",
+      ].join("\n"),
+    );
+    expect(config.import).toEqual({ labelTypes: { bug: "bug", "help wanted": "task" } });
+  });
+
+  it("parses any valid work-item type as a value (the import narrows to leaves)", () => {
+    const config = parseConventionConfig("x-import:\n  label-types:\n    feature: story\n");
+    expect(config.import.labelTypes).toEqual({ feature: "story" });
+  });
+
+  it("treats an explicit empty label-types mapping as set (not the built-in default)", () => {
+    const config = parseConventionConfig("x-import:\n  label-types:\n");
+    expect(config.import).toEqual({ labelTypes: {} });
+  });
+
+  it("rejects scalar sections, invalid values, and duplicate labels", () => {
+    expect(() => parseConventionConfig("x-import: true\n")).toThrow(/'x-import' must be a mapping/);
+    expect(() => parseConventionConfig("x-import:\n  label-types: bug\n")).toThrow(
+      /'label-types' must be a mapping/,
+    );
+    expect(() => parseConventionConfig("x-import:\n  label-types:\n    bug: canoe\n")).toThrow(
+      /'label-types' values must be work-item types/,
+    );
+    expect(() => parseConventionConfig("x-import:\n  label-types:\n    bug: ''\n")).toThrow(
+      /'label-types' values must be work-item types/,
+    );
+    expect(() =>
+      parseConventionConfig("x-import:\n  label-types:\n    bug: bug\n    bug: task\n"),
+    ).toThrow(/duplicate label 'bug' in x-import\.label-types/);
+  });
+});
+
 describe("x-generated (generated-doc provenance, story-adoption-state)", () => {
   const SECTION = [
     "version: 3",

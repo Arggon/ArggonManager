@@ -727,7 +727,7 @@ program
 
 program
   .command("import-issues")
-  .description("One-shot import of GitHub issues into tasks/ as tasks (idempotent)")
+  .description("One-shot import of GitHub issues into tasks/ as tasks/bugs (idempotent; x-import maps labels to types)")
   .option("--repo <owner/repo>", "GitHub repository (default: gh's own resolution from cwd)")
   .option(
     "--parent <story-id>",

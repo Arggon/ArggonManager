@@ -333,7 +333,7 @@ One-shot migration of an existing GitHub issue backlog into `tasks/` (the docs/a
 - status mapping: open → `todo`, closed → `done` (closed items are created `todo` and closed through the legal kernel path in the same run; the container auto-completion cascade may fire)
 - title `issue #N: <issue title>`; body: the original issue body plus a `> imported from issue #N` provenance line
 - issue linking: the GitHub issue number is recorded in the item's additive `issue` frontmatter field (contract-visible as `WorkItem.issue`); `arggon start <id> --open-pr` then appends `Closes #N` to the PR body, closing the issue when the PR merges. Items without it are unaffected
-- labels: issue labels slugified to kebab-case and deduped; invalid ones are skipped silently but counted in the report
+- labels: issue labels slugified to kebab-case and deduped; invalid ones are skipped silently but counted in the report; type mapping — the `bug` label imports as a bug (everything else as a task), customizable via `x-import.label-types` in `tasks/.convention.yml` (see [docs/convention.md](docs/convention.md))
 - target story: `story-imported-issues`, created under the first epic when missing (actionable error when the tree has no epic); override with `--parent <story-id>`
 
 ```bash
