@@ -1,8 +1,10 @@
 ---
 type: task
-status: todo
+status: done
 id: task-cascade-predictability
 title: "Cascade predictability: dry-run/warning for high-level containers"
+assignee: Arggon
+branch: feat/task-cascade-predictability
 parent: story-container-rollup
 labels: []
 created: "2026-09-13"
@@ -23,5 +25,5 @@ cuentas-claras feedback: closing the adoption task (sole child of its story) aut
 
 ## Acceptance
 
-- [ ] Cascade affecting containers at epic level or above (not just the immediate story) prints a visible notice in human output and surfaces in --json (already via autoCompleted — add container levels)
-- [ ] `update --status done --no-cascade` documented as THE way to close administrative tasks whose containers must stay open; docs/agents.md guidance: administrative stories should not live as sole children of product containers
+- [x] Cascade affecting containers at epic level or above (not just the immediate story) prints a visible notice in human output and surfaces in --json (already via autoCompleted — add container levels)
+- [x] `update --status done --no-cascade` documented as THE way to close administrative tasks whose containers must stay open; docs/agents.md guidance: administrative stories should not live as sole children of product containers

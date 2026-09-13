@@ -290,7 +290,11 @@ export function runMcpServer(opts: McpServerOptions): void {
         });
         return successEnvelope(
           "update",
-          { item: toContractWorkItem(result.item, result.root), autoCompleted: result.autoCompleted },
+          {
+            item: toContractWorkItem(result.item, result.root),
+            autoCompleted: result.autoCompleted,
+            cascadeLevels: result.cascadeLevels,
+          },
           conventionVersion(),
         );
       });
