@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { formatAdoptReport, runAdopt } from "./adopt.js";
+import { formatAdoptAckReport, formatAdoptReport, runAdopt, runAdoptAck } from "./adopt.js";
 import { displayPath, runBoard } from "./board.js";
 import { startBoardServer } from "./board-serve.js";
 import { runBranch } from "./branch.js";
@@ -187,10 +187,24 @@ program
     "--no-commit",
     "keep tasks/ dirty: skip the tracker auto-commit of the adoption task + story (default: on; x-tracker.auto-commit: false opts out tree-wide)",
   )
+  .option(
+    "--ack",
+    "standalone: acknowledge the current on-disk content of every generated doc as the new x-generated baseline (refresh checksums; sanctioned sweep edits stop reporting as modified)",
+    false,
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { dryRun?: boolean; story?: string; commit?: boolean; json?: boolean }) => {
+  .action((opts: { dryRun?: boolean; story?: string; commit?: boolean; ack?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
+      if (opts.ack) {
+        const result = runAdoptAck({ cwd: process.cwd() });
+        if (json) {
+          successJson("adopt", { acked: result.acked, count: result.count }, readConventionVersion(result.root));
+          return;
+        }
+        process.stdout.write(formatAdoptAckReport(result));
+        return;
+      }
       const result = runAdopt({
         cwd: process.cwd(),
         story: opts.story,
