@@ -19,10 +19,9 @@ updated: "2026-09-13"
 
 ## Context
 
-<!-- Why this task exists. -->
+Found by the guardian adoption agent (2026-09-13): in a story-driven project, `report --trend` returns empty weeks because `trend.ts` only counts task/bug completions (stories are excluded by design of "cycle time per leaf type"). Story-driven repos (like guardian and ArggonManager itself) get an empty trend — the feature under-delivers for the repo's own methodology.
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] Trend includes story completions in the weekly series (and either a per-type cycle time row for stories or an explicit `--include-stories` opt-in); documented in json-output.md
+- [ ] Tests: story-driven tree produces non-empty weeks; existing leaf semantics unchanged
