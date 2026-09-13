@@ -50,6 +50,10 @@ export type CleanupEntry = {
 export type CleanupAction = {
   id: string;
   action: string;
+  /** Present on `failed` actions: why the action failed. */
+  error?: string;
+  /** Present when the branch could not be deleted (worktree already removed). */
+  leftoverBranch?: string;
 };
 
 export type CleanupResult = {
@@ -79,6 +83,8 @@ export type CleanupGit = {
   defaultBranch(cwd: string): string;
   /** True when `branch` is an ancestor of `base` (fully merged). */
   isAncestor(cwd: string, branch: string, base: string): boolean;
+  /** True when a remote-tracking branch `origin/<branch>` exists. */
+  remoteBranchExists(cwd: string, branch: string): boolean;
   /** `git worktree remove <path>` (refuses dirty worktrees). */
   removeWorktree(cwd: string, path: string): void;
   /** Safe `git branch -d <branch>` (only succeeds for merged branches). */
@@ -155,6 +161,14 @@ export function defaultCleanupGit(): CleanupGit {
         return false;
       }
     },
+    remoteBranchExists(cwd: string, branch: string): boolean {
+      try {
+        git(["show-ref", "--verify", "--quiet", `refs/remotes/origin/${branch}`], cwd);
+        return true;
+      } catch {
+        return false;
+      }
+    },
     removeWorktree(cwd: string, path: string): void {
       git(["worktree", "remove", path], cwd);
     },
@@ -195,6 +209,15 @@ function classify(item: WorkItem, root: string, base: string, gitRunner: Cleanup
     entry.reason = `branch '${item.branch}' is not fully merged into '${base}'`;
     return entry;
   }
+  // Remote safety (bug-cleanup-partial-failure): a lost final push leaves
+  // origin/<branch> behind local. Deleting the local branch would strand the
+  // remote tip, so require the remote tip merged too before touching anything.
+  if (gitRunner.remoteBranchExists(root, item.branch) && !gitRunner.isAncestor(root, `origin/${item.branch}`, base)) {
+    entry.reason =
+      `remote branch divergent or behind (origin/${item.branch}) — ` +
+      `push or delete the remote branch first`;
+    return entry;
+  }
   if (!existsSync(path)) {
     entry.action = "clear stale worktree_path record (path missing on disk)";
   } else if (!gitRunner.worktreeList(root).map((p) => resolve(p)).includes(path)) {
@@ -213,8 +236,12 @@ function classify(item: WorkItem, root: string, base: string, gitRunner: Cleanup
  * mode only lists; `prune: true` removes removable worktrees (git worktree
  * remove), deletes their merged branches (git branch -d), and clears the
  * record. Items that are not done/cancelled and branches that are not fully
- * merged are reported as skipped and never touched. Throws on non-git trees
- * or undetectable default branch (CLI maps to CLEANUP_FAILED).
+ * merged are reported as skipped and never touched. Before anything is
+ * removed, both the local branch AND its remote counterpart (when
+ * `origin/<branch>` exists) must be merged into the base, so a lost push can
+ * never leave a stranded remote tip (bug-cleanup-partial-failure). Per-item
+ * prune failures are reported and never abort the run. Throws on non-git
+ * trees or undetectable default branch (CLI maps to CLEANUP_FAILED).
  */
 export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): CleanupResult {
   const gitRunner = deps.git ?? defaultCleanupGit();
@@ -244,18 +271,37 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
           pruned.push({ id: entry.id, action: `removed worktree ${entry.path}` });
         }
         if (entry.branch && gitRunner.branchExists(root, entry.branch)) {
-          gitRunner.deleteBranch(root, entry.branch);
-          pruned.push({ id: entry.id, action: `deleted branch ${entry.branch}` });
+          try {
+            gitRunner.deleteBranch(root, entry.branch);
+            pruned.push({ id: entry.id, action: `deleted branch ${entry.branch}` });
+          } catch (err) {
+            // Race: pre-flight passed but the delete failed. The worktree is
+            // already gone, so its record is obsolete either way; report the
+            // leftover branch explicitly and keep the run going.
+            const message = err instanceof Error ? err.message : String(err);
+            pruned.push({
+              id: entry.id,
+              action: "failed",
+              error: message,
+              leftoverBranch: entry.branch,
+            });
+          }
         }
+        // Clear the record whenever the worktree is gone (including entries
+        // whose stale record pointed at a missing path); a failed branch
+        // delete does not make the record useful again.
         runUpdate({ cwd: root, id: entry.id, worktreePath: "" });
         pruned.push({ id: entry.id, action: "cleared worktree_path" });
         // Entries are built from byId values, so the item always resolves.
         clearedPaths.push(byId.get(entry.id)!.filePath);
         clearedIds.push(entry.id);
       } catch (err) {
-        failures.push(
-          `${entry.id}: ${err instanceof Error ? err.message : String(err)}`,
-        );
+        // Per-candidate failure: nothing is orphaned (the worktree_path
+        // record stays only while the worktree still exists); the run
+        // continues and CLEANUP_FAILED is not raised.
+        const message = err instanceof Error ? err.message : String(err);
+        failures.push(`${entry.id}: ${message}`);
+        pruned.push({ id: entry.id, action: "failed", error: message });
       }
     }
   }

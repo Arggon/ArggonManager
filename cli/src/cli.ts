@@ -1341,21 +1341,17 @@ program
         commit: opts.commit === false ? false : undefined,
       });
       if (json) {
-        if (result.failures.length > 0) {
-          failJson({
-            command: "cleanup",
-            message: result.failures.join("; "),
-            code: "CLEANUP_FAILED",
-            conventionVersion: readConventionVersion(result.root),
-          });
-          return;
-        }
+        // Per-candidate prune failures are reported in the payload (each
+        // pruned entry may carry action "failed" + error/leftoverBranch);
+        // CLEANUP_FAILED is reserved for top-level errors (non-git tree,
+        // undetectable default branch).
         successJson(
           "cleanup",
           {
             base: result.base,
             candidates: result.entries,
             pruned: result.pruned,
+            failures: result.failures,
             ...(result.commit ? { commit: commitPayload(result.commit) } : {}),
           },
           readConventionVersion(result.root),
@@ -1374,7 +1370,12 @@ program
         }
       }
       for (const action of result.pruned) {
-        console.log(`  pruned:    ${action.id}: ${action.action}`);
+        if (action.action === "failed") {
+          const leftover = action.leftoverBranch ? ` (leftover branch: ${action.leftoverBranch})` : "";
+          console.error(`  failed:    ${action.id}: ${action.error}${leftover}`);
+        } else {
+          console.log(`  pruned:    ${action.id}: ${action.action}`);
+        }
       }
       const commitLine = formatCommitLine(result.commit);
       if (commitLine) console.log(`  ${commitLine}`);
