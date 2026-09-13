@@ -19,10 +19,9 @@ updated: "2026-09-13"
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+Found by the guardian adoption agent (2026-09-13): after `arggon adopt --ack` records sanctioned sweep edits as the checksum baseline, the NEXT `arggon init --full` re-run classified those docs as "untouched" (hash matches the recorded baseline) and REGENERATED them from template — destroying the sanctioned content (5 docs lost, restored from git). The "untouched -> silently regenerate" path assumes the baseline equals the TEMPLATE output, but ack baselines equal the adopter's edited content. The agent lost content 5 times during experiments; git was the net.
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] Regenerate-on-untouched only happens when the file content actually equals the current template render (or ack marks entries as diverged and re-runs skip diverged files); acked+edited docs must never be silently overwritten
+- [ ] Tests: ack -> template bump -> re-run leaves acked content intact (or applies the merge strategy that lands); content-loss scenario impossible
