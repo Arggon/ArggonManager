@@ -1,4 +1,4 @@
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import { stringifyFrontmatter } from "./frontmatter.js";
 import { formatDate } from "./dates.js";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
@@ -18,6 +18,13 @@ export type CommentOptions = {
   id: string;
   /** Comment text; may span multiple lines (each line lands under the heading). */
   text: string;
+  /**
+   * Read the comment text from this path instead of `text`; `-` reads stdin.
+   * CLI-only ergonomics (task-comment-stdin-file): the text is taken verbatim
+   * from the file, outside the shell, so backticks, quotes and `$` land in the
+   * body unmangled. The MCP `arggon_comment` tool keeps taking `text` directly.
+   */
+  file?: string;
   /** Explicit author login; when omitted, resolved like `list --assignee @me`. */
   author?: string;
   /**
@@ -66,7 +73,11 @@ export type CommentResult = {
 export function runComment(opts: CommentOptions): CommentResult {
   const id = opts.id.trim();
   if (!id) throw new Error("id is required");
-  const text = opts.text.replace(/\r\n/g, "\n").replace(/\s+$/g, "").replace(/^\n+/, "");
+  if (opts.file !== undefined && opts.text.trim() !== "") {
+    throw new Error("pass either the comment text or --file <path>, not both");
+  }
+  const source = opts.file !== undefined ? readCommentSource(opts.file) : opts.text;
+  const text = source.replace(/\r\n/g, "\n").replace(/\s+$/g, "").replace(/^\n+/, "");
   if (!text.trim()) {
     throw new Error("comment text must not be empty");
   }
@@ -116,4 +127,32 @@ export function runComment(opts: CommentOptions): CommentResult {
 function resolveAuthor(opts: CommentOptions): string | undefined {
   if (opts.resolveMe) return opts.resolveMe();
   return resolveCurrentLogin(opts.env ?? process.env);
+}
+
+/**
+ * Read the `--file <path>` comment source as verbatim UTF-8 (`-` = stdin).
+ * This path exists to bypass the shell (task-comment-stdin-file): backticks,
+ * double quotes and `$` must reach the body exactly as written.
+ */
+function readCommentSource(file: string): string {
+  if (file === "-") {
+    try {
+      return readFileSync(0, "utf8");
+    } catch {
+      throw new Error("--file -: could not read stdin (pipe the comment text in)");
+    }
+  }
+  try {
+    return readFileSync(file, "utf8");
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException | null)?.code;
+    const codeText = typeof code === "string" ? code : "unknown";
+    if (codeText === "ENOENT") {
+      throw new Error(`--file '${file}': file not found (pass a readable UTF-8 file, or - for stdin)`);
+    }
+    if (codeText === "EISDIR") {
+      throw new Error(`--file '${file}': is a directory (pass a UTF-8 file, or - for stdin)`);
+    }
+    throw new Error(`--file '${file}': could not read file (${codeText})`);
+  }
 }

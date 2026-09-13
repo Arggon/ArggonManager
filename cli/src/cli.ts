@@ -654,7 +654,11 @@ program
   .command("comment")
   .description("Append a timestamped, author-attributed comment section to an item's body")
   .argument("<id>", "work item id")
-  .argument("<text>", "comment text (multiline supported)")
+  .argument("[text]", "comment text (multiline supported); omit when --file is given")
+  .option(
+    "--file <path>",
+    "read the comment text from a file (`-` = stdin); verbatim UTF-8, outside the shell — backticks/quotes/$ land unmangled",
+  )
   .option(
     "--author <login>",
     "comment author (default: @me resolution — GITHUB_USER, then GITHUB_ACTOR, then `gh api user`)",
@@ -665,13 +669,23 @@ program
   )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
-    (id: string, text: string, opts: { author?: string; commit?: boolean; json?: boolean }) => {
+    (
+      id: string,
+      text: string | undefined,
+      opts: { file?: string; author?: string; commit?: boolean; json?: boolean },
+    ) => {
       const json = jsonEnabled(opts);
       try {
+        if (opts.file === "-" && process.stdin.isTTY) {
+          throw new Error(
+            "--file -: stdin is a terminal (pipe the comment text in, or pass a --file <path>)",
+          );
+        }
         const result = runComment({
           cwd: process.cwd(),
           id,
-          text,
+          text: text ?? "",
+          file: opts.file,
           author: opts.author,
           commit: opts.commit === false ? false : undefined,
         });

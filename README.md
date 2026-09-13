@@ -360,14 +360,19 @@ arggon comment story-login "Blocked on OAuth credentials; next agent: ping #ops"
 arggon comment task-rate-limit "why blocked:
 - waiting on repro from QA" --author octocat
 arggon comment story-login "handoff note" --json
+# text from stdin — no shell quoting to get wrong (backticks, $ and quotes survive verbatim):
+arggon comment task-rate-limit --file - <<'EOF'
+rerun `npm test` — the failure was $?, not the fixture
+EOF
 ```
 
 - `<text>`: comment text; multiline supported (each line lands under the heading; a blank line separates the section from the body). Multiple comments append in order
+- `--file <path>`: read the comment text from a file instead; `--file -` reads stdin. UTF-8, verbatim — the text bypasses the shell entirely, so backticks, double quotes and `$` land in the body unmangled (pass either the text or `--file`, not both; an empty file/stdin fails like empty text)
 - `--author <login>`: attribution (rendered as `@<author>`); defaults to `@me` resolution — `GITHUB_USER`, then `GITHUB_ACTOR`, then `gh api user -q .login`. Unresolvable author fails with an actionable error
 - tracker hygiene: the commented item file is auto-committed (`chore(tasks): commented <id>`; `--no-commit` keeps it dirty, `x-tracker.auto-commit: false` opts out tree-wide, non-git trees skip silently)
-- `--json`: one compact JSON object on stdout (envelope v1: `ok`, `schemaVersion: 1`, `conventionVersion`, `command: "comment"`, `id`, `path`, `comment: { author, date, lines }` + additive `commit`); failures emit `ok: false` with `code: "COMMENT_FAILED"` (unknown id, empty text, unresolvable author)
+- `--json`: one compact JSON object on stdout (envelope v1: `ok`, `schemaVersion: 1`, `conventionVersion`, `command: "comment"`, `id`, `path`, `comment: { author, date, lines }` + additive `commit`); failures emit `ok: false` with `code: "COMMENT_FAILED"` (unknown id, empty text, unresolvable author, text and `--file` together, unreadable `--file`)
 
-`arggon validate` keeps passing on a commented tree — comment sections are plain freeform Markdown in the body.
+`arggon validate` keeps passing on a commented tree — comment sections are plain freeform Markdown in the body. `--file` is CLI-only ergonomics; the MCP `arggon_comment` tool takes the comment text directly as its `text` argument (no file/stdin indirection).
 
 ### `arggon instructions`
 
