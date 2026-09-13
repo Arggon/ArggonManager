@@ -134,11 +134,76 @@ function initGoldenRepo(): string {
   return dir;
 }
 
+/**
+ * Story-driven fixture (the guardian failure case): stories claimed and
+ * completed, no task/bug items at all.
+ * 2026-09-01 falls in ISO week 36; 2026-09-07/09 in week 37.
+ */
+function initStoryRepo(): string {
+  const dir = mkdtempSync(join(tmpdir(), "arggon-trend-story-"));
+  gitInit(dir);
+  write("tasks/.convention.yml", "version: 0\n")(dir);
+  write("tasks/launch/launch.md", LAUNCH)(dir);
+  write("tasks/launch/epic-a/epic-a.md", EPIC)(dir);
+  write("tasks/launch/epic-a/story-a/story-a.md", STORY("todo"))(dir);
+  write("tasks/launch/epic-a/story-b/story-b.md", STORY("todo").replace("story-a", "story-b"))(dir);
+  commit(dir, "c1: create story-driven tree", "2026-08-31T10:00:00+00:00");
+
+  write("tasks/launch/epic-a/story-a/story-a.md", STORY("in_progress"))(dir);
+  commit(dir, "c2: claim story-a", "2026-09-01T10:00:00+00:00");
+
+  write("tasks/launch/epic-a/story-a/story-a.md", STORY("done"))(dir);
+  write(
+    "tasks/launch/epic-a/story-b/story-b.md",
+    STORY("cancelled").replace("story-a", "story-b"),
+  )(dir);
+  write("tasks/launch/epic-a/epic-a.md", EPIC.replace('status: todo', 'status: done'))(dir);
+  commit(dir, "c3: stories terminal, epic done", "2026-09-07T12:00:00+00:00");
+  return dir;
+}
+
+describe("runTrend story-driven tree", () => {
+  it("produces non-empty weeks with no task/bug items (guardian failure case)", () => {
+    const dir = initStoryRepo();
+    const result = runTrend({ cwd: dir });
+    expect(result.weeks).toEqual([{ week: "2026-W37", completions: 3 }]);
+  });
+
+  it("computes a story cycle-time row from first in_progress to terminal", () => {
+    const dir = initStoryRepo();
+    // story-a: claim 09-01T10:00 -> done 09-07T12:00 = 6d2h (6.0833) -> 6.1.
+    // story-b goes todo -> cancelled without a claim — not measurable.
+    expect(runTrend({ cwd: dir }).cycleTime).toEqual([
+      { type: "story", avgDays: 6.1, count: 1 },
+    ]);
+  });
+
+  it("still excludes container completions from cycleTime", () => {
+    const dir = initStoryRepo();
+    // epic-a completes in the weeks series (all types count) but gains no
+    // cycle-time row — containers are excluded from cycle time.
+    const result = runTrend({ cwd: dir });
+    expect(result.weeks).toEqual([{ week: "2026-W37", completions: 3 }]); // 2 stories + epic
+    expect(result.cycleTime.map((c) => c.type)).toEqual(["story"]);
+  });
+
+  it("applies --since to stories and containers alike", () => {
+    const dir = initStoryRepo();
+    // Everything terminal happens at 2026-09-07; a window after it is empty.
+    expect(runTrend({ cwd: dir, since: "2026-09-08" })).toEqual({ weeks: [], cycleTime: [] });
+    // Window from 2026-09-07 keeps the completions.
+    expect(runTrend({ cwd: dir, since: "2026-09-07" }).weeks).toEqual([
+      { week: "2026-W37", completions: 3 },
+    ]);
+  });
+});
+
 describe("runTrend (golden temp repo)", () => {
-  it("buckets leaf completions by ISO week and averages cycle time per type", () => {
+  it("buckets completions of all types by ISO week and averages cycle time per leaf type", () => {
     const dir = initGoldenRepo();
     expect(runTrend({ cwd: dir })).toEqual({
-      weeks: [{ week: "2026-W37", completions: 4 }],
+      // 4 leaves + story-a (done at c5) — completions count every type.
+      weeks: [{ week: "2026-W37", completions: 5 }],
       cycleTime: [
         // bug-one: claim 12:00 -> cancel 18:00 same day = 0.25d -> 0.3
         { type: "bug", avgDays: 0.3, count: 1 },
@@ -148,12 +213,11 @@ describe("runTrend (golden temp repo)", () => {
     });
   });
 
-  it("counts open items as not-completed (task-stuck, story-a excluded)", () => {
+  it("counts open items as not-completed (task-stuck excluded)", () => {
     const dir = initGoldenRepo();
     const result = runTrend({ cwd: dir });
-    // 4 leaves completed, not 5 (task-stuck is open) and not 6 (story done
-    // does not count — completions are leaves only).
-    expect(result.weeks).toEqual([{ week: "2026-W37", completions: 4 }]);
+    // 5 completions (4 leaves + story-a), not 6 (task-stuck is open).
+    expect(result.weeks).toEqual([{ week: "2026-W37", completions: 5 }]);
     expect(result.cycleTime.every((c) => c.count <= 2)).toBe(true);
   });
 
@@ -161,9 +225,10 @@ describe("runTrend (golden temp repo)", () => {
     const dir = initGoldenRepo();
     // Window from 2026-09-08: c4/c5 only; task-two's claim (c3) is outside,
     // so it completes without a measurable cycle time. task-quoted completes
-    // at c5 (never claimed — quoted todo -> quoted done).
+    // at c5 (never claimed — quoted todo -> quoted done); story-a completes
+    // at c5 too (weeks count stories).
     expect(runTrend({ cwd: dir, since: "2026-09-08" })).toEqual({
-      weeks: [{ week: "2026-W37", completions: 3 }],
+      weeks: [{ week: "2026-W37", completions: 4 }],
       cycleTime: [{ type: "bug", avgDays: 0.3, count: 1 }],
     });
     // Window after everything: nothing left.
@@ -342,7 +407,7 @@ describe("report --trend CLI wiring", () => {
     expect(body.command).toBe("report");
     expect(body.groups).toHaveLength(1);
     expect(body.trend).toEqual({
-      weeks: [{ week: "2026-W37", completions: 4 }],
+      weeks: [{ week: "2026-W37", completions: 5 }],
       cycleTime: [
         { type: "bug", avgDays: 0.3, count: 1 },
         { type: "task", avgDays: 4, count: 2 },
@@ -356,7 +421,7 @@ describe("report --trend CLI wiring", () => {
     expect(r.status).toBe(0);
     expect(r.stdout).toContain("epic: epic-a");
     expect(r.stdout).toContain("trend (from git history):");
-    expect(r.stdout).toContain("2026-W37: 4");
+    expect(r.stdout).toContain("2026-W37: 5");
   });
 
   it("fails with TREND_FAILED on a non-git tree", () => {
