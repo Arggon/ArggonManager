@@ -974,8 +974,9 @@ playbook
     "--file-task <story-id>",
     "file one re-research task per stale playbook into the tracker (errors when the story does not exist)",
   )
+  .option("--now <iso-date>", "determinism hook: evaluate ages as of this date instead of now (test/determinism hook)")
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { maxAgeDays?: string; fileTask?: string; json?: boolean }) => {
+  .action((opts: { maxAgeDays?: string; fileTask?: string; now?: string; json?: boolean }) => {
     const json = jsonEnabled(opts);
     let maxAgeDays: number | undefined;
     if (opts.maxAgeDays !== undefined) {
@@ -997,11 +998,31 @@ playbook
       }
       maxAgeDays = parsed;
     }
+    let now: Date | undefined;
+    if (opts.now !== undefined) {
+      now = new Date(opts.now);
+      if (Number.isNaN(now.getTime())) {
+        const message = `invalid --now '${opts.now}' (expected a parseable date)`;
+        if (json) {
+          failJson({
+            command: "playbook",
+            message,
+            code: "PLAYBOOK_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
+        console.error(`arggon playbook status: ${message}`);
+        process.exitCode = 1;
+        return;
+      }
+    }
     try {
       const result = runPlaybookStatus({
         cwd: process.cwd(),
         maxAgeDays,
         fileTask: opts.fileTask,
+        now,
       });
       if (json) {
         successJson(

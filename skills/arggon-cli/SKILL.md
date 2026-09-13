@@ -1,7 +1,7 @@
 ---
 name: arggon-cli
-description: Operate the ArggonManager git-native task CLI end to end — install/update the tool, adopt or init projects, and run the full work loop with JSON output.
-version: 0.2.0
+description: Work like a senior engineer with ArggonManager — install/update the tool, adopt or init projects, run the work loop, and follow the full engineering methodology (explorations, specs, ADRs, playbooks, runbooks) with JSON-output tooling.
+version: 0.3.0
 author: Arggon (Arggon), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -13,11 +13,15 @@ metadata:
 
 # Arggon CLI Skill
 
-Drive the `arggon` task CLI. Work lives as Markdown under `tasks/` (the repo is the
-source of truth); GitHub is for PRs only. This skill covers the whole agent
-lifecycle: installing/updating ArggonManager, starting or adopting a project, and
-running the find → claim → work → PR loop. The full playbook lives in
-`docs/agents.md`; this file is the operational reference.
+Drive the `arggon` task CLI **and** follow the engineering methodology it encodes.
+Work lives as Markdown under `tasks/` (the repo is the source of truth); GitHub is
+for PRs only. This skill covers the whole agent lifecycle: installing/updating
+ArggonManager, starting or adopting a project, running the find → claim → work → PR
+loop, and — critically — **deciding what the work needs before writing code**:
+explorations, specs, ADRs, playbooks, runbooks. Sections 5 (methodology) and 6
+(quality bar) are not optional reading; they are how senior work differs from
+task-shoveling. The full playbook lives in `docs/agents.md` and
+`docs/engineering.md`; this file is the operational reference.
 
 ## When to Use
 
@@ -112,6 +116,49 @@ arggon playbook refresh <tech> --version v  # re-record after re-research
 
 Pipeline: explore → ADR → playbook → status. The generated AGENTS.md points agents
 at `docs/playbooks/`; stale playbooks file their own re-research tasks.
+
+## 5. Engineering methodology — what does this work need?
+
+Before implementing, classify the work. The size and risk decide the paperwork;
+the paperwork is created in the same PR as the change, never as a follow-up TODO.
+
+| Work is... | Required process |
+| --- | --- |
+| **Trivial** (typo, one-line fix, copy tweak) | Just the task. No spec, no ADR. |
+| **A non-trivial feature** (new behavior, new endpoint/scene/module) | **Spec first** (`arggon spec new <slug>` → docs/specs/): purpose, synopsis, invariants ("never overwrites", "pure read"), acceptance criteria. Then a **plan** (`--plan`) breaking it into ordered tasks with verifiable criteria. Then implement. Flip spec/plan status to `implemented` in the same PR as the landing feature. |
+| **A cross-cutting or hard-to-reverse decision** (stack choice, schema/convention change, new top-level package, identity model) | **Exploration spike** (`arggon stack explore <topic>`): candidates, criteria, findings with dated sources. Then an **ADR** in `docs/adr/` (NNNN-title, Proposed → Accepted on merge; supersede, never rewrite). Only then implement. |
+| **Introducing or upgrading a technology** (new dependency, framework, major version) | **Playbook** (`arggon playbook new <tech> --version <v>`): researched current version + best practices with dated sources; the project's AGENTS.md points agents at it. `arggon playbook status` flags stale ones (>90d) — refresh via re-research + `playbook refresh`, and file the re-research task in the tracker (`--file-task`). |
+| **Operational/infra behavior someone will have to run or debug** (deploy, alerting, data migration, recovery) | **Runbook** in `docs/runbooks/`: trigger → diagnosis → mitigation → escalation → rollback. Write steps individually automatable. |
+| **A finding from review/audit/incident** | A tracked follow-up (`arggon create task|bug ... --parent <story-id>`) with context and acceptance — never only a PR comment. |
+
+When in doubt between two levels, take the heavier one — but keep the artifacts
+lean. A 40-line spec beats a 4-page one nobody reads.
+
+**Scope and ordering:**
+- Check `arggon next --ready` before picking work; declare `--depends-on` when your
+  task orders after another (the graph is the plan — keep it true).
+- One claimable item per branch/PR; keep PRs small; reference the item id.
+- If the work reveals more work, file it (`arggon create task|bug`) — don't grow the
+  PR's scope, and don't leave it only in code comments.
+
+## 6. Quality bar (every PR, no exceptions)
+
+- **Conventions first:** read the project's `docs/convention.md`,
+  `docs/engineering.md`, and the relevant `docs/playbooks/<tech>.md` before
+  writing code. If project docs disagree with what you're about to do, fix the
+  docs in the same PR or file a blocking follow-up — never fork silently.
+- **Tests are part of the change** when behavior changes; run the full suite plus
+  lint/typecheck gates the project defines, and keep every acceptance checkbox
+  in the item body honest.
+- **Docs travel with code:** any change that makes a doc statement false updates
+  that doc in the same PR (see the change-type → doc mapping in `docs/agents.md`
+  §Documentation maintenance).
+- **Handoffs are written:** blocked, out-of-scope discoveries, and decisions go in
+  `arggon comment` on the item — the next agent (or human) should never need to
+  re-derive your context.
+- **Leave it cleaner:** expired claims get released (`--status todo`), merged
+  worktrees get `arggon cleanup --prune`, stale playbooks get flagged, and the
+  tree validates before every commit.
 
 ## Procedure
 

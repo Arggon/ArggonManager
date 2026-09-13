@@ -323,7 +323,11 @@ describe("playbook CLI --json parity", () => {
     const createdBody = JSON.parse(created.stdout) as { ok: boolean; command: string; files: string[] };
     expect(createdBody).toMatchObject({ ok: true, command: "playbook", files: ["docs/playbooks/redis.md"] });
 
-    const status = runCli(["playbook", "status", "--json"], dir);
+    // Pin the clock to the recorded `researched` date: otherwise a UTC-midnight
+    // rollover between `new` and `status` flips ageDays 0 -> 1 (bug-playbook-age-rollover).
+    const playbookFile = readFileSync(join(dir, "docs", "playbooks", "redis.md"), "utf8");
+    const researched = /researched:\s*"?(\d{4}-\d{2}-\d{2})"?/.exec(playbookFile)![1]!;
+    const status = runCli(["playbook", "status", "--json", "--now", `${researched}T12:00:00Z`], dir);
     expect(status.status).toBe(0);
     const statusBody = JSON.parse(status.stdout) as {
       ok: boolean;
@@ -335,7 +339,7 @@ describe("playbook CLI --json parity", () => {
     expect(statusBody.ok).toBe(true);
     expect(statusBody.command).toBe("playbook");
     expect(statusBody.playbooks).toEqual([
-      { id: "redis", version: "7.2", researched: TODAY, ageDays: 0, stale: false, path: "docs/playbooks/redis.md" },
+      { id: "redis", version: "7.2", researched, ageDays: 0, stale: false, path: "docs/playbooks/redis.md" },
     ]);
     expect(statusBody.staleCount).toBe(0);
     expect(statusBody.maxAgeDays).toBe(90);
@@ -360,16 +364,16 @@ describe("playbook CLI --json parity", () => {
     const dir = makeRepo();
     const story = makeStory(dir);
     writePlaybook(dir, "stale-tech", { playbook_id: "stale-tech", version: "2.1", researched: "2026-06-01" });
-    const table = runCli(["playbook", "status"], dir);
+    const table = runCli(["playbook", "status", "--now", "2026-09-13T12:00:00Z"], dir);
     expect(table.status).toBe(0);
     expect(table.stdout).toContain("tech        version  researched  age-days  status");
-    expect(table.stdout).toContain("stale-tech  2.1      2026-06-01  103       STALE");
+    expect(table.stdout).toContain("stale-tech  2.1      2026-06-01  104       STALE");
     expect(table.stdout).toContain("--file-task <story-id>");
 
-    const filed = runCli(["playbook", "status", "--file-task", story], dir);
+    const filed = runCli(["playbook", "status", "--file-task", story, "--now", "2026-09-13T12:00:00Z"], dir);
     expect(filed.status).toBe(0);
     expect(filed.stdout).toContain("filed:   task-re-research-stale-tech");
-    const again = runCli(["playbook", "status", "--file-task", story], dir);
+    const again = runCli(["playbook", "status", "--file-task", story, "--now", "2026-09-13T12:00:00Z"], dir);
     expect(again.stdout).toContain("skipped: task-re-research-stale-tech (re-research task already exists)");
   });
 
