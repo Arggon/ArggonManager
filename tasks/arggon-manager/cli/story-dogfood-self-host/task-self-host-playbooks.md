@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-self-host-playbooks
 title: Create base tech playbooks (node/typescript/vitest) with researched versions
+assignee: Arggon
 parent: story-dogfood-self-host
 labels: []
 created: "2026-09-13"
 updated: "2026-09-13"
+claimed_at: "2026-09-13T15:45:33.347Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-dogfood-self-host/task-self-host-playbooks.md

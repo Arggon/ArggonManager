@@ -1,1 +1,10 @@
-version: 0
+version: 3
+branch_patterns:
+  initiative: "feat/{id}"
+  epic: "feat/{id}"
+  story: "feat/{id}"
+  task: "feat/{id}"
+  bug: "fix/{id}"
+
+x-tracker:
+  auto-commit: true

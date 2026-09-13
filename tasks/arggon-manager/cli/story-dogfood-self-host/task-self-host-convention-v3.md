@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-self-host-convention-v3
 title: Convention v3 upgrade + x-tracker auto-commit + pre-commit hook
+assignee: Arggon
 parent: story-dogfood-self-host
 labels: []
 created: "2026-09-13"
 updated: "2026-09-13"
+claimed_at: "2026-09-13T15:45:33.027Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-dogfood-self-host/task-self-host-convention-v3.md
