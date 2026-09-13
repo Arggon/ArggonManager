@@ -68,6 +68,17 @@ export type ImportConfig = {
   labelTypes: Record<string, ItemType> | null;
 };
 
+/** `x-worktree` namespaced extension options (task-start-post-hook). */
+export type WorktreeConfig = {
+  /**
+   * Shell command from `x-worktree.post-start`, run inside a freshly created
+   * worktree after a successful `arggon start --worktree` (cwd = the worktree
+   * root). `null` when unset (the start is a no-op for the hook; `--no-hook`
+   * skips it per invocation).
+   */
+  postStart: string | null;
+};
+
 /**
  * One generated-doc provenance record (`x-generated` namespaced extension,
  * story-adoption-state): destination path -> entry, written by
@@ -96,6 +107,8 @@ export type ConventionConfig = {
   tracker: TrackerConfig;
   /** Issue-import options (`x-import` extension key). */
   import: ImportConfig;
+  /** Worktree-bootstrap options (`x-worktree` extension key). */
+  worktree: WorktreeConfig;
   /**
    * Generated-doc provenance (`x-generated` extension key): destination path
    * (posix, relative to the repo root) -> provenance entry.
@@ -118,11 +131,11 @@ function stripQuotes(value: string): string {
  * Unknown top-level keys are ignored for forward compatibility;
  * `x-views` (saved views), `x-playbooks` (playbook staleness options),
  * `x-tracker` (tracker-hygiene options), `x-import` (issue-import options),
- * and `x-generated` (generated-doc provenance) are the official namespaced
- * extensions.
+ * `x-worktree` (worktree-bootstrap options), and `x-generated` (generated-doc
+ * provenance) are the official namespaced extensions.
  * Throws with file context on malformed `branch_patterns`, `x-views`,
- * `x-playbooks`, `x-tracker`, or `x-import`; `x-generated` parses tolerantly
- * (machine-written state).
+ * `x-playbooks`, `x-tracker`, `x-import`, or `x-worktree`; `x-generated`
+ * parses tolerantly (machine-written state).
  */
 export function parseConventionConfig(
   raw: string,
@@ -135,6 +148,7 @@ export function parseConventionConfig(
   const generated: Record<string, GeneratedEntry> = {};
   const importLabelTypes: Record<string, ItemType> = {};
   let importHasLabelTypes = false;
+  const worktree: WorktreeConfig = { postStart: null };
   let version = CONVENTION_VERSION_DEFAULT;
   let section: string | null = null;
   let generatedDest: string | null = null;
@@ -181,6 +195,11 @@ export function parseConventionConfig(
           throw new Error(`${sourcePath}: 'x-import' must be a mapping, one option per line`);
         }
         section = "x-import";
+      } else if (key === "x-worktree") {
+        if (value !== "") {
+          throw new Error(`${sourcePath}: 'x-worktree' must be a mapping, one option per line`);
+        }
+        section = "x-worktree";
       } else if (key === "x-generated") {
         if (value !== "") {
           throw new Error(
@@ -278,6 +297,20 @@ export function parseConventionConfig(
       importHasLabelTypes = true;
       continue;
     }
+    if (section === "x-worktree") {
+      // Namespaced extension (task-start-post-hook): unknown nested keys are
+      // ignored (ignore-unknown); the official `post-start` option is a shell
+      // command run inside a freshly created worktree.
+      if (key !== "post-start") continue;
+      const command = stripQuotes(value);
+      if (!command) {
+        throw new Error(
+          `${sourcePath}: 'post-start' must be a non-empty string (got ${JSON.stringify(value)})`,
+        );
+      }
+      worktree.postStart = command;
+      continue;
+    }
     if (section === "x-views") {
       if (!key) {
         throw new Error(`${sourcePath}: invalid x-views entry ${JSON.stringify(line)}`);
@@ -317,6 +350,7 @@ export function parseConventionConfig(
     playbooks,
     tracker,
     import: { labelTypes: importHasLabelTypes ? importLabelTypes : null },
+    worktree,
     generated,
   };
 }
@@ -332,6 +366,7 @@ export function readConventionConfig(dir: string): ConventionConfig {
       playbooks: { maxAgeDays: null },
       tracker: { autoCommit: null },
       import: { labelTypes: null },
+      worktree: { postStart: null },
       generated: {},
     };
   }

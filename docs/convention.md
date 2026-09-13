@@ -417,6 +417,23 @@ x-import:
 - Unknown option keys inside `x-import` are ignored (ignore-unknown, forward compat); a scalar `x-import` or `label-types` value, a value that is not a work-item type, or a duplicate label is a parse error.
 - The key is namespaced (`x-*`), so older tools ignore it per the extension policy above.
 
+### Worktree bootstrap (`x-worktree`)
+
+`x-worktree` is the official namespaced extension for worktree-bootstrap options (`arggon start --worktree`, task-start-post-hook). It is a mapping of option names to values; the only official option today is `post-start`, a shell command run after a new worktree is created:
+
+```yaml
+version: 3
+x-worktree:
+  post-start: "npm ci"
+```
+
+- The hook runs **only when `arggon start --worktree` creates a new worktree** — the sanctioned spot for per-checkout bootstrap like `npm ci` (linked worktrees do not share `node_modules`). Attach re-runs (idempotent re-starts of the same item) never re-run it.
+- Execution: `sh -c <command>` with cwd = the worktree root, after the claim commit / push / PR steps have succeeded.
+- Failure is reported, never fatal — the worktree exists and the claim stands. Human output prints `post-start failed: <command> → <stderr tail>` (last 3 stderr lines); the command still exits 0. `--json` reports the additive `postStart: { command, ok: false, error }` field (success: `postStart: { command, ok: true }`; no config: the field is absent).
+- The per-invocation `--no-hook` flag skips the hook for that start, regardless of config.
+- Unknown nested keys inside `x-worktree` are ignored (ignore-unknown, forward compat); a scalar `x-worktree` value or an empty `post-start` value is a parse error.
+- The key is namespaced (`x-*`), so older tools ignore it per the extension policy above.
+
 ### Generated-doc provenance (`x-generated`)
 
 `x-generated` is the official namespaced extension for generated-file provenance (`arggon init` / `generateDocs`, story-adoption-state; Copier/Helm precedent). It maps each generated destination (posix, relative to the repo root) to its provenance record:

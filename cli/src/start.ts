@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { basename, relative, resolve, sep } from "node:path";
 import { readConventionConfig, resolveBranchName } from "./convention.js";
@@ -20,6 +20,11 @@ export type StartOptions = {
    * inside the worktree. The main checkout never leaves its current branch.
    */
   worktree?: boolean;
+  /**
+   * Skip the `x-worktree.post-start` hook for this invocation
+   * (task-start-post-hook). The hook only ever runs on new-worktree creation.
+   */
+  noHook?: boolean;
   now?: Date;
 };
 
@@ -41,8 +46,27 @@ export type StartResult = {
   worktreePath: string | null;
   /** True when the worktree was created this run; false on attach or without --worktree. */
   worktreeCreated: boolean;
+  /**
+   * `x-worktree.post-start` outcome (task-start-post-hook): set only when a
+   * new worktree was created, a hook is configured, and `--no-hook` was not
+   * passed. Absent otherwise (no config = no-op).
+   */
+  postStart?: PostStartResult;
   /** The item, reloaded from disk. */
   item: WorkItem;
+};
+
+/** Outcome of the `x-worktree.post-start` bootstrap hook (task-start-post-hook). */
+export type PostStartResult = {
+  /** The configured shell command. */
+  command: string;
+  /** False when the command exited non-zero or could not be spawned. */
+  ok: boolean;
+  /**
+   * Human-readable failure report (`post-start failed: <cmd> → <stderr tail>`);
+   * absent on success. Failure is never fatal to the start itself.
+   */
+  error?: string;
 };
 
 /** Git + gh operations, injectable for tests. Extends the branch runner. */
@@ -205,6 +229,45 @@ export function draftPrBody(
     `Work item: ${id}\n\nPath: ${relPath}\n\n` +
     `Draft opened by \`arggon start${worktree ? " --worktree" : ""}\`.`;
   return item.issue != null ? `${base}\n\nCloses #${item.issue}` : base;
+}
+
+/** Last non-empty lines of a stream, for the failure report tail. */
+function outputTail(output: string): string {
+  const lines = output
+    .trimEnd()
+    .split(/\r?\n/)
+    .filter((line) => line.trim().length > 0);
+  return lines.slice(-3).join("\n");
+}
+
+/**
+ * Run the `x-worktree.post-start` bootstrap hook (task-start-post-hook):
+ * `sh -c <command>` with cwd = the freshly created worktree root. Never
+ * throws — a failure (non-zero exit, spawn error) is reported in the result
+ * so the start itself still succeeds (the worktree exists and is claimed;
+ * the hook is convenience, e.g. `npm ci`).
+ */
+export function runPostStart(command: string, cwd: string): PostStartResult {
+  let result: ReturnType<typeof spawnSync>;
+  try {
+    result = spawnSync("sh", ["-c", command], { cwd, encoding: "utf8" });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { command, ok: false, error: `post-start failed: ${command} → ${message}` };
+  }
+  if (result.error) {
+    return {
+      command,
+      ok: false,
+      error: `post-start failed: ${command} → ${result.error.message}`,
+    };
+  }
+  if (result.status !== 0) {
+    const tail = outputTail(String(result.stderr ?? "") || String(result.stdout ?? ""));
+    const detail = tail || `exit code ${result.status ?? "unknown"}`;
+    return { command, ok: false, error: `post-start failed: ${command} → ${detail}` };
+  }
+  return { command, ok: true };
 }
 
 /**
@@ -398,6 +461,15 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     const finalItem = itemsById(loadItems(wtTasksDir)).get(id);
     if (!finalItem) throw new Error(`id '${id}' not found under tasks/`);
 
+    // Post-start bootstrap hook (task-start-post-hook): only on new-worktree
+    // creation, never on attach re-runs. Failure is reported, not fatal — the
+    // worktree exists and the claim stands — so it must not trigger rollback.
+    let postStart: PostStartResult | undefined;
+    if (worktreeCreated && !opts.noHook) {
+      const hookCommand = config.worktree.postStart;
+      if (hookCommand) postStart = runPostStart(hookCommand, worktreePath);
+    }
+
     return {
       id,
       path: itemInWorktree.filePath,
@@ -409,6 +481,7 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       prUrl,
       worktreePath,
       worktreeCreated,
+      postStart,
       item: finalItem,
     };
   } catch (err) {

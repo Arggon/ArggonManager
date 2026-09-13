@@ -4,7 +4,7 @@
  * (sync-smoke pattern); only push/PR are stubbed so no remote is needed.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -62,6 +62,17 @@ function worktreeCount(dir: string): number {
 /** Tolerates exit 1: show-ref --quiet fails when the ref does not exist. */
 function refExists(dir: string, ref: string): boolean {
   return spawnSync("git", ["show-ref", "--verify", "--quiet", ref], { cwd: dir }).status === 0;
+}
+
+/**
+ * Configure `x-worktree.post-start` (task-start-post-hook) and commit it —
+ * `start` refuses dirty trees, so the config edit must land before starting.
+ */
+function setPostStart(dir: string, command: string | null): void {
+  if (command === null) return;
+  appendFileSync(join(dir, "tasks/.convention.yml"), `x-worktree:\n  post-start: "${command}"\n`);
+  git(["add", "tasks/.convention.yml"], dir);
+  git(["commit", "--quiet", "-m", "config: x-worktree.post-start"], dir);
 }
 
 describe("start --worktree", () => {
@@ -172,6 +183,86 @@ describe("start --worktree", () => {
     expect(worktreeCount(dir)).toBe(1);
     expect(existsSync(resolve(dirname(dir), `${basename(dir)}-task-alpha`))).toBe(false);
     expect(git(["status", "--porcelain"], dir)).toBe("");
+  });
+});
+
+describe("start --worktree post-start hook (x-worktree)", () => {
+  it("runs the configured command inside the new worktree cwd", () => {
+    const dir = initRepo();
+    setPostStart(dir, "pwd > .post-start-cwd");
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
+    expect(result.postStart).toEqual({ command: "pwd > .post-start-cwd", ok: true });
+    // The marker proves the hook ran with cwd = the worktree root.
+    expect(readFileSync(join(expectedPath, ".post-start-cwd"), "utf8").trim()).toBe(expectedPath);
+  });
+
+  it("reports a failing hook but keeps the start successful", () => {
+    const dir = initRepo();
+    setPostStart(dir, "echo boom >&2; exit 3");
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    // The worktree exists and the claim stands; only the hook failed.
+    expect(existsSync(result.worktreePath!)).toBe(true);
+    expect(result.item.status).toBe("in_progress");
+    expect(result.postStart).toMatchObject({
+      command: "echo boom >&2; exit 3",
+      ok: false,
+    });
+    expect(result.postStart?.error).toContain("post-start failed: echo boom >&2; exit 3");
+    expect(result.postStart?.error).toContain("boom");
+  });
+
+  it("--no-hook skips the hook for that invocation", () => {
+    const dir = initRepo();
+    setPostStart(dir, "pwd > .post-start-cwd");
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, noHook: true, now: NOW },
+      { git: localGit() },
+    );
+
+    expect(result.postStart).toBeUndefined();
+    expect(existsSync(join(result.worktreePath!, ".post-start-cwd"))).toBe(false);
+  });
+
+  it("is a no-op without x-worktree.post-start config", () => {
+    const dir = initRepo();
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    expect(result.postStart).toBeUndefined();
+  });
+
+  it("does not re-run the hook when a re-run attaches to the worktree", () => {
+    const dir = initRepo();
+    setPostStart(dir, "echo run >> .post-start-count");
+
+    const first = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    const second = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    expect(first.postStart).toEqual({ command: "echo run >> .post-start-count", ok: true });
+    expect(second.worktreeCreated).toBe(false);
+    expect(second.postStart).toBeUndefined();
+    expect(readFileSync(join(first.worktreePath!, ".post-start-count"), "utf8").trim()).toBe("run");
   });
 });
 

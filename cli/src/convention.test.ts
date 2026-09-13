@@ -206,6 +206,40 @@ describe("x-import (issue-import options, task-import-type-mapping)", () => {
   });
 });
 
+describe("x-worktree (worktree bootstrap, task-start-post-hook)", () => {
+  it("defaults to postStart null when the file or the key is missing", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-xwt-missing-"));
+    expect(readConventionConfig(dir).worktree).toEqual({ postStart: null });
+    expect(parseConventionConfig("version: 3\n").worktree).toEqual({ postStart: null });
+  });
+
+  it("parses quoted and unquoted post-start commands (unknown nested keys ignored)", () => {
+    const config = parseConventionConfig(
+      ["version: 3", "x-worktree:", '  post-start: "npm ci"', "  future-option: 7", ""].join("\n"),
+    );
+    expect(config.worktree).toEqual({ postStart: "npm ci" });
+    expect(parseConventionConfig("x-worktree:\n  post-start: npm ci\n").worktree).toEqual({
+      postStart: "npm ci",
+    });
+  });
+
+  it("parses x-worktree regardless of the declared tree version (v0 too)", () => {
+    const config = parseConventionConfig('version: 0\nx-worktree:\n  post-start: "make setup"\n');
+    expect(config.worktree).toEqual({ postStart: "make setup" });
+  });
+
+  it("rejects scalar x-worktree and empty / mapping post-start values", () => {
+    expect(() => parseConventionConfig("x-worktree: npm ci\n")).toThrow(/must be a mapping/);
+    expect(() => parseConventionConfig("x-worktree:\n  post-start: ''\n")).toThrow(
+      /'post-start' must be a non-empty string/,
+    );
+    // A nested mapping under post-start surfaces as an empty scalar value.
+    expect(() => parseConventionConfig("x-worktree:\n  post-start:\n    npm: ci\n")).toThrow(
+      /'post-start' must be a non-empty string/,
+    );
+  });
+});
+
 describe("x-generated (generated-doc provenance, story-adoption-state)", () => {
   const SECTION = [
     "version: 3",
