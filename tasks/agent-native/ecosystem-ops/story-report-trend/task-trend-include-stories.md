@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-trend-include-stories
 title: report --trend should include story completions (or an opt-in flag)
+assignee: Arggon
 parent: story-report-trend
 labels: []
 created: "2026-09-13"
@@ -23,5 +24,5 @@ Found by the guardian adoption agent (2026-09-13): in a story-driven project, `r
 
 ## Acceptance
 
-- [ ] Trend includes story completions in the weekly series (and either a per-type cycle time row for stories or an explicit `--include-stories` opt-in); documented in json-output.md
-- [ ] Tests: story-driven tree produces non-empty weeks; existing leaf semantics unchanged
+- [x] Trend includes story completions in the weekly series (and either a per-type cycle time row for stories or an explicit `--include-stories` opt-in); documented in json-output.md
+- [x] Tests: story-driven tree produces non-empty weeks; existing leaf semantics unchanged

@@ -22,10 +22,10 @@ const defaultExecGit: GitExecutor = (file, args, options) =>
 export type TrendWeek = { week: string; completions: number };
 
 /** Average cycle time (claim → terminal) for one leaf type, in days. */
-export type TrendCycleTime = { type: "task" | "bug"; avgDays: number; count: number };
+export type TrendCycleTime = { type: "bug" | "story" | "task"; avgDays: number; count: number };
 
 export type TrendResult = {
-  /** ISO weeks with at least one leaf completion, ascending. */
+  /** ISO weeks with at least one completion (any item type), ascending. */
   weeks: TrendWeek[];
   /** One entry per leaf type with at least one measurable item, alphabetical. */
   cycleTime: TrendCycleTime[];
@@ -52,9 +52,11 @@ export type RunTrendOptions = {
 
 /**
  * Mine `git log -p` over `tasks/` for status transitions and aggregate:
- * weekly leaf completions (ISO week of the first terminal transition) and
- * average cycle time per leaf type (first claim → terminal, in days).
- * Leaves are task/bug items; open items count as not-completed.
+ * weekly completions of ALL item types (ISO week of the first terminal
+ * transition — story-driven projects get non-empty trends) and average cycle
+ * time per leaf type (first claim → terminal, in days; leaves are
+ * task/bug/story — containers stay out of cycle time).
+ * Open items count as not-completed.
  */
 export function runTrend(opts: RunTrendOptions): TrendResult {
   const sinceMs = parseSince(opts.since);
@@ -119,7 +121,7 @@ export function runTrend(opts: RunTrendOptions): TrendResult {
   }
 
   const weekCounts = new Map<string, number>();
-  const cycleByType = new Map<"task" | "bug", number[]>();
+  const cycleByType = new Map<"bug" | "story" | "task", number[]>();
 
   for (const [path, events] of histories) {
     // Chronological order: git log emits the newest commit first, so the
@@ -141,18 +143,20 @@ export function runTrend(opts: RunTrendOptions): TrendResult {
     }
     if (terminalMs === null) continue; // still open (or terminal before the window)
 
-    const isLeaf = type === "task" || type === "bug";
-    if (!isLeaf) continue;
-    const leafType = type as "task" | "bug";
-
+    // Weekly completions count every item type reaching a terminal status.
     const week = isoWeekKey(new Date(terminalMs));
     weekCounts.set(week, (weekCounts.get(week) ?? 0) + 1);
 
-    if (claimedMs !== null) {
-      const days = (terminalMs - claimedMs) / 86_400_000;
-      const list = cycleByType.get(leafType) ?? [];
-      list.push(days);
-      cycleByType.set(leafType, list);
+    // Cycle time keeps leaf semantics: task/bug/story only (containers are
+    // status roll-ups; their in_progress events are container transitions).
+    if (type === "task" || type === "bug" || type === "story") {
+      const leafType = type as "bug" | "story" | "task";
+      if (claimedMs !== null) {
+        const days = (terminalMs - claimedMs) / 86_400_000;
+        const list = cycleByType.get(leafType) ?? [];
+        list.push(days);
+        cycleByType.set(leafType, list);
+      }
     }
   }
 
