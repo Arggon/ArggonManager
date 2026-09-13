@@ -17,10 +17,8 @@ updated: "2026-09-13"
 
 ## Context
 
-<!-- Why this story exists. -->
+2026-09-13 audit: the repo distributes init --full (document set + skill bundle), convention v3 and playbooks to adopters — but doctor reports docs.managed: 0, tasks/.convention.yml is version 0 with no x-* extensions, .agents/ doesn't exist, playbooks are absent, and there is no pre-commit hook. The repo self-hosts the tracker but not the configuration and governance layer it sells. This story applies the full stack to ArggonManager itself.
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] Convention v3 declared, x-tracker.auto-commit active, pre-commit hook installed, skill bundled at .agents/, missing init docs generated, 3 base playbooks created with researched versions, doctor reports a healthy self-hosted state

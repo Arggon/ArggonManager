@@ -19,10 +19,10 @@ updated: "2026-09-13"
 
 ## Context
 
-<!-- Why this task exists. -->
+Run `arggon init --full` on this repo: bundles the skill at .agents/skills/arggon-cli/SKILL.md and generates the missing governing docs. Existing docs (AGENTS.md, CONTRIBUTING.md, docs/convention.md, docs/engineering.md, README) will land in skipped[] — they stay adopter-owned; only the MISSING ones generate (SECURITY.md, .editorconfig, .github/CODEOWNERS, PR template, ARCHITECTURE.md, CHANGELOG.md, SUPPORT.md, docs/runbooks/, docs/tracking.md). Generated docs get their fill-me placeholders completed where the repo's real content answers them (project description, architecture) and stay flagged where human input is required (SECURITY contact).
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] .agents/skills/arggon-cli/SKILL.md exists; missing docs generated; existing ones untouched (skipped[])
+- [ ] Generated ARCHITECTURE.md/AGENTS-description filled from the repo's real content; SECURITY contact left flagged for human
+- [ ] committed; validate ok; doctor reports the state

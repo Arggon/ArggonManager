@@ -19,10 +19,9 @@ updated: "2026-09-13"
 
 ## Context
 
-<!-- Why this task exists. -->
+Create docs/playbooks/ for the three core technologies of this repo (node, typescript, vitest), researched with current versions and dated sources (npm view / official docs), recorded via arggon playbook new + refresh. The skill's methodology section mandates playbooks for any tech the project uses; this repo uses three and had zero.
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] docs/playbooks/{node,typescript,vitest}.md with researched version pins and dated sources
+- [ ] arggon playbook status reports 0 stale; docs referenced from AGENTS.md if natural

@@ -19,10 +19,10 @@ updated: "2026-09-13"
 
 ## Context
 
-<!-- Why this task exists. -->
+tasks/.convention.yml upgrades 0 -> 3 (additive, backward-compatible by design) and enables the extensions this repo now ships: x-tracker.auto-commit: true (kills the dirty-tree dance after every create/comment in this repo), branch_patterns declared explicitly (v2 feature, documents the defaults). Plus the pre-commit hook from docs/agents.md Reference integrations (.git/hooks/pre-commit running arggon validate — local-only, not committed, but installed and verified).
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] .convention.yml: version 3 + branch_patterns + x-tracker.auto-commit: true; envelopes report conventionVersion: 3
+- [ ] create/comment here self-commit (verified live); pre-commit hook installed and rejects an invalid tree (verified by attempt)
+- [ ] Full suite green on the upgraded tree
