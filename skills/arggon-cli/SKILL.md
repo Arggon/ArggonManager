@@ -1,7 +1,7 @@
 ---
 name: arggon-cli
 description: Work like a senior engineer with ArggonManager — install/update the tool, adopt or init projects, run the work loop, and follow the full engineering methodology (explorations, specs, ADRs, playbooks, runbooks) with JSON-output tooling.
-version: 0.3.0
+version: 0.3.1
 author: Arggon (Arggon), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -204,6 +204,18 @@ lean. A 40-line spec beats a 4-page one nobody reads.
 - Conventions evolve: check `conventionVersion` in any envelope (v3 current; v0-v2 rules
   in `docs/convention.md`).
 - Stale `dist` after a pull → `unknown option` errors: rebuild (`npm run build`).
+- **Stage explicit paths — never `git add -A` / `git add .`.** The rule exists
+  because ignore files have a scope gap, not as dogma: directory patterns like
+  `node_modules/` in `.gitignore` match directories only, so in worktrees where
+  `node_modules` is a SYMLINK to a shared install (the ArggonManager convention)
+  it is untracked-but-not-ignored and `-A` commits it. This actually happened in
+  an init worktree here and needed an amend before push. In repos where no such
+  symlinks/infrastructure exist and everything really is gitignored, `-A` is
+  lower-risk — but explicit paths remain the universal habit: they also protect
+  against unrelated dirty files being swept into your commit. Match the tool
+  itself: tracker mutations (`create`/`comment`/`adopt`/`cleanup --prune`)
+  auto-commit with surgical staging (`git add -- <path>` only), and your own
+  commits should do the same.
 
 ## Verification
 
