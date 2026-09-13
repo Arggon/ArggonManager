@@ -397,6 +397,26 @@ x-tracker:
 - Unknown nested keys inside `x-tracker` are ignored (ignore-unknown, forward compat); a scalar `x-tracker` value or an `auto-commit` that is not `true`/`false` is a parse error.
 - The key is namespaced (`x-*`), so older tools ignore it per the extension policy above.
 
+### Import type mapping (`x-import`)
+
+`x-import` is the official namespaced extension for GitHub issue-import options (`arggon import-issues`, task-import-type-mapping). It is a mapping of option names to values; the only official option today is `label-types`, which maps GitHub labels (exact keys, matched against the slugified issue labels) to work-item types:
+
+```yaml
+version: 3
+x-import:
+  label-types:
+    bug: bug
+    enhancement: task
+```
+
+- Label-based type mapping: an issue whose labels contain a configured label imports as that type; the **first of the issue's labels with a mapping wins** (issue label order). Labels without a mapping keep the `task` default.
+- Without `x-import.label-types`, the built-in default applies: the `bug` label imports as a **bug**, everything else (including `enhancement`/`feature`) as a **task**. An explicit `label-types` mapping **replaces** the built-in default entirely (set `bug: task` there to opt out; an explicitly empty mapping disables all mapping).
+- Mapped types must be **leaves**: only `task` or `bug` are accepted at import time. A mapping to a container (`story`, `epic`, `initiative`) fails the import with an actionable `IMPORT_FAILED` error — stories are containers, and imported leaves all live under the same target story. Values must still be valid work-item types; anything else is a `.convention.yml` parse error.
+- Mapped bugs go under the **same parent story** as tasks (bugs live only under stories in v0/v3 — never under epics). The target id follows the mapped type — `task-issue-<n>` or `bug-issue-<n>` — so idempotency is per (issue, mapped type): changing the mapping can re-import an issue under the new id.
+- The GitHub issue number is recorded on every imported item regardless of type (`issue: <n>`, so `start --open-pr` still emits `Closes #N`).
+- Unknown option keys inside `x-import` are ignored (ignore-unknown, forward compat); a scalar `x-import` or `label-types` value, a value that is not a work-item type, or a duplicate label is a parse error.
+- The key is namespaced (`x-*`), so older tools ignore it per the extension policy above.
+
 ### Generated-doc provenance (`x-generated`)
 
 `x-generated` is the official namespaced extension for generated-file provenance (`arggon init` / `generateDocs`, story-adoption-state; Copier/Helm precedent). It maps each generated destination (posix, relative to the repo root) to its provenance record:

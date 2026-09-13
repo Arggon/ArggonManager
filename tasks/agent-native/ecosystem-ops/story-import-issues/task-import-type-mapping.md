@@ -1,8 +1,10 @@
 ---
 type: task
-status: todo
+status: done
 id: task-import-type-mapping
 title: "Import: label-based type mapping and issue number in frontmatter"
+assignee: Arggon
+branch: feat/task-import-type-mapping
 parent: story-import-issues
 labels: []
 created: "2026-09-13"
@@ -23,5 +25,5 @@ cuentas-claras feedback: at 6 issues importing everything as tasks was fine, but
 
 ## Acceptance
 
-- [ ] Label-based mapping: `bug` label -> bug type, `enhancement`/`feature` -> task, unrecognized labels still map to item labels; default type task; configurable via x-import in .convention.yml
-- [ ] Tests: mapping per label combination; items without recognized labels default to task
+- [x] Label-based mapping: `bug` label -> bug type, `enhancement`/`feature` -> task, unrecognized labels still map to item labels; default type task; configurable via x-import in .convention.yml
+- [x] Tests: mapping per label combination; items without recognized labels default to task

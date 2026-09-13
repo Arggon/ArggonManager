@@ -1,4 +1,5 @@
 import { execFileSync, type ExecFileSyncOptions } from "node:child_process";
+import { readConventionConfig } from "./convention.js";
 import { runCreate } from "./create.js";
 import { parseRepoSlug } from "./get-open-prs.js";
 import { itemId, slugify } from "./ids.js";
@@ -26,6 +27,35 @@ const TITLE_PREFIX = "issue";
  */
 const IMPORT_CLAIMANT = "github-import";
 
+/**
+ * Built-in label -> import type mapping used when `x-import.label-types` is
+ * unset (task-import-type-mapping): GitHub's `bug` label imports as a bug;
+ * everything else — including `enhancement`/`feature` — imports as a task.
+ * An explicit `x-import` `label-types` mapping replaces this default
+ * entirely (set `bug: task` there to opt out of bug mapping).
+ */
+export const BUILTIN_IMPORT_LABEL_TYPES: Record<string, "task" | "bug"> = {
+  bug: "bug",
+};
+
+/**
+ * Resolve the import type for one issue: the first of the issue's
+ * normalized labels with an entry in the mapping wins (issue label order);
+ * labels without a mapping keep the `task` default. Mapped leaves are still
+ * created under the same parent story — bugs only live under stories in
+ * v0/v3, never under epics.
+ */
+export function resolveImportType(
+  labels: string[],
+  labelTypes: Record<string, "task" | "bug">,
+): "task" | "bug" {
+  for (const label of labels) {
+    const mapped = labelTypes[label];
+    if (mapped === "bug" || mapped === "task") return mapped;
+  }
+  return "task";
+}
+
 export type GhIssueLabel = string | { name?: string };
 
 /** Shape of one `gh issue list --json number,title,state,body,labels` entry. */
@@ -42,7 +72,7 @@ export type ImportEntryAction = "created" | "skipped" | "would-create" | "would-
 export type ImportEntry = {
   /** GitHub issue number. */
   issue: number;
-  /** Target/imported work-item id (e.g. task-issue-12). */
+  /** Target/imported work-item id (e.g. task-issue-12; bug-issue-12 with a bug mapping). */
   id: string;
   title: string;
   /** Mapped status: open -> todo, closed -> done. */
@@ -175,9 +205,15 @@ export function importedBody(issue: GhIssue): string {
 
 /**
  * One-shot GitHub issue import (docs/agents.md §0 promise): every issue
- * becomes a task under a parent story.
+ * becomes a leaf item under a parent story.
  *
- * - Idempotency is the core requirement: target ids are `task-issue-<number>`;
+ * - Type mapping (task-import-type-mapping): the issue's labels are matched
+ *   against `x-import.label-types` from `tasks/.convention.yml` (built-in
+ *   default: `bug` -> bug, everything else -> task). Mapped types must be
+ *   leaves (`task`/`bug`); the target id follows the mapped type
+ *   (`task-issue-<n>` / `bug-issue-<n>`) and the item is created under the
+ *   same parent story either way.
+ * - Idempotency is the core requirement: target ids are `<type>-issue-<number>`;
  *   existing ids are skipped, so re-running imports nothing.
  * - open -> `todo`, closed -> `done` (create cannot make `done` — closed
  *   issues are created `todo` and updated through the kernel in the same
@@ -188,6 +224,25 @@ export function importedBody(issue: GhIssue): string {
 export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
   // Fail fast with an actionable error before any gh call.
   if (opts.repo !== undefined) parseRepoSlug(opts.repo);
+  // Resolve the label -> type mapping up front. A mapping to a container type
+  // (`story`/`epic`/`initiative`) is a config error, not a fallback: stories
+  // are containers, and imported leaves all land under the same target story.
+  const config = readConventionConfig(opts.cwd);
+  let labelTypes: Record<string, "task" | "bug"> = BUILTIN_IMPORT_LABEL_TYPES;
+  if (config.import.labelTypes !== null) {
+    // An explicit label-types mapping replaces the built-in default entirely.
+    labelTypes = {};
+    for (const [label, mapped] of Object.entries(config.import.labelTypes)) {
+      if (mapped !== "task" && mapped !== "bug") {
+        throw new Error(
+          `x-import.label-types maps '${label}' to '${mapped}' — imported issues are leaves ` +
+            "under the target story, so mapped types may only be 'task' or 'bug' " +
+            "(stories are containers); fix tasks/.convention.yml",
+        );
+      }
+      labelTypes[label] = mapped;
+    }
+  }
   const tasksDir = findTasksDir(opts.cwd);
   const issues = ghIssueListJson({ repo: opts.repo, execGh: opts.execGh });
   const dryRun = Boolean(opts.dryRun);
@@ -257,7 +312,11 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
       throw new Error("gh issue list returned an entry without a valid issue number");
     }
     const number = issue.number;
-    const id = itemId("task", `issue-${number}`);
+    const { labels, skipped: badLabels } = normalizeGhLabels(issue.labels);
+    // Label-based type mapping (task-import-type-mapping): the first label
+    // with a mapping wins; the id prefix follows the mapped type.
+    const type = resolveImportType(labels, labelTypes);
+    const id = itemId(type, `issue-${number}`);
     const status = mapIssueState(issue.state ?? "");
     const title = `${TITLE_PREFIX} #${number}: ${(issue.title ?? "").trim()}`;
     if (byId.has(id)) {
@@ -265,13 +324,12 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
       entries.push({ issue: number, id, title, status, action: dryRun ? "would-skip" : "skipped" });
       continue;
     }
-    const { labels, skipped: badLabels } = normalizeGhLabels(issue.labels);
     labelsMapped += labels.length;
     labelsSkipped += badLabels;
     if (!dryRun) {
       runCreate({
         cwd: opts.cwd,
-        type: "task",
+        type,
         title,
         parent: storyId,
         id: `issue-${number}`,

@@ -370,7 +370,7 @@ Matching: items with a `branch` reconcile by exact head-ref equality (any type);
 
 ### `import-issues`
 
-One-shot GitHub issue import (idempotent): every issue becomes a task under a parent story — open → `todo`, closed → `done`; `--dry-run` computes the plan and writes nothing (including the default story). Target ids are `task-issue-<number>`, so re-running imports nothing (`created: 0`, every entry `skipped`).
+One-shot GitHub issue import (idempotent): every issue becomes a leaf item under a parent story — open → `todo`, closed → `done`; `--dry-run` computes the plan and writes nothing (including the default story). The imported type follows the label mapping (`x-import.label-types`; default: `bug`-labeled issues import as bugs, everything else as tasks), so target ids are `task-issue-<number>` or `bug-issue-<number>` — re-running imports nothing (`created: 0`, every entry `skipped`).
 
 | Field                   | Type                                                              | Notes                                                                                          |
 | ----------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
@@ -378,7 +378,7 @@ One-shot GitHub issue import (idempotent): every issue becomes a task under a pa
 | `story`                 | `{ id: string, created: boolean }`                                | Target story; `created` is true when this run created `story-imported-issues` (always `false` in dry-run) |
 | `entries`               | `object[]`                                                        | One entry per issue, in gh order                                                               |
 | `entries[].issue`       | `number`                                                          | GitHub issue number                                                                            |
-| `entries[].id`          | `string`                                                          | Target/imported task id (`task-issue-<number>`)                                                |
+| `entries[].id`          | `string`                                                          | Target/imported item id (`<type>-issue-<number>`, type per the label mapping)                  |
 | `entries[].title`       | `string`                                                          | `issue #<n>: <issue title>`                                                                    |
 | `entries[].status`      | `"todo" \| "done"`                                                | Mapped from the issue state                                                                    |
 | `entries[].action`      | `"created" \| "skipped" \| "would-create" \| "would-skip"`        | `would-*` only with `--dry-run`                                                                |
@@ -388,7 +388,7 @@ One-shot GitHub issue import (idempotent): every issue becomes a task under a pa
 
 Each created item records the GitHub issue number in its frontmatter (`issue: <number>`, exposed as `WorkItem.issue`), so `arggon start <id> --open-pr` can close the issue on merge with `Closes #N`.
 
-Failures use `error.code: "IMPORT_FAILED"` (gh missing/unauthenticated or unparseable output, missing `tasks/`, no epic for the default story, malformed `--repo`, or `--parent` that does not resolve to a story).
+Failures use `error.code: "IMPORT_FAILED"` (gh missing/unauthenticated or unparseable output, missing `tasks/`, no epic for the default story, malformed `--repo`, `--parent` that does not resolve to a story, a malformed `x-import` section, or an `x-import.label-types` mapping to a non-leaf type — imported issues are leaves under the target story).
 
 ---
 
