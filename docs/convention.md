@@ -38,6 +38,8 @@ Parent `status` is **independent** of children — **no rollup** in v0. Containe
 
 **Exception — automatic container completion** (`task-container-auto-done`): when an update drives an item to a terminal state (`done`/`cancelled`) and an ancestor container's entire subtree is terminal, that ancestor completes as `done` automatically, cascading up to the initiative. Containers in `todo`/`blocked` complete directly to `done` (a documented exception to the transition table, since the intermediate `in_progress` is meaningless for unattended automation and would violate the claim rule on claimable types); already-terminal containers keep their status (an explicit `cancelled` is never overwritten). Callers that must not touch ancestors opt out with `--no-cascade` (`cascade: false` in the kernel). The rollup is write-on-close only — no derived status is ever computed for display.
 
+**Cascade predictability** (`task-cascade-predictability`): when the cascade auto-completes containers at **epic level or above**, human `arggon update` output prints a visible warning naming them (e.g. `⚠ cascade: auto-completed epic 'cli' (and 1 more ancestor) — use --no-cascade to keep containers open`), and the `--json` envelope carries `cascadeLevels` (container types affected, parallel to `autoCompleted`). Modeling guidance: administrative leaves (e.g. adoption or migration tasks) must not live as the **sole children** of product containers that must stay open — closing the last child completes the whole chain. When closing such a leaf is unavoidable, pass `--no-cascade` so its containers stay open.
+
 ### Vocabulary: `id`, inner slug, filename
 
 | Term       | Meaning                                                                                  |

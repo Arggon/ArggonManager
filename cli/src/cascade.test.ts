@@ -4,11 +4,14 @@
  * When an update reaches a terminal state (done/cancelled) and every
  * sibling under a parent is terminal too, ancestor containers complete as
  * `done`, cascading up to the initiative. `--no-cascade` / cascade:false
- * opts out.
+ * opts out. The result names the affected container TYPES (`cascadeLevels`)
+ * so callers can tell when the cascade reached epic level or above.
  */
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { loadItems } from "./items.js";
 import { runCreate } from "./create.js";
@@ -17,6 +20,13 @@ import { runInit } from "./init.js";
 import { runUpdate } from "./update.js";
 
 const NOW = new Date("2026-09-11T12:00:00Z");
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const cli = resolve(root, "cli/src/cli.ts");
+const tsx = resolve(root, "node_modules/tsx/dist/cli.mjs");
+
+function runCli(args: string[], cwd: string) {
+  return spawnSync(process.execPath, [tsx, cli, ...args], { encoding: "utf8", cwd });
+}
 
 function chainTree(): { dir: string; tasks: string[]; bug: string } {
   const dir = mkdtempSync(join(tmpdir(), "arggon-cascade-"));
@@ -76,6 +86,7 @@ describe("automatic container completion", () => {
     runUpdate({ cwd: dir, id: bug, status: "in_progress", assignee: "worker", now: NOW });
     const result = runUpdate({ cwd: dir, id: bug, status: "done", now: NOW });
     expect(result.autoCompleted).toEqual(["story-a", "epic-a", "launch"]);
+    expect(result.cascadeLevels).toEqual(["story", "epic", "initiative"]);
     expect(statusOf(dir, "story-a")).toBe("done");
     expect(statusOf(dir, "epic-a")).toBe("done");
     expect(statusOf(dir, "launch")).toBe("done");
@@ -122,8 +133,54 @@ describe("automatic container completion", () => {
     runUpdate({ cwd: dir, id: bug, status: "in_progress", assignee: "worker", now: NOW });
     const result = runUpdate({ cwd: dir, id: bug, status: "done", cascade: false, now: NOW });
     expect(result.autoCompleted).toEqual([]);
+    expect(result.cascadeLevels).toEqual([]);
     expect(statusOf(dir, "story-a")).toBe("todo");
     expect(statusOf(dir, "launch")).toBe("todo");
+  });
+
+  it("reports only the story level when a sibling story keeps the epic open", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-cascade-"));
+    runInit({ dir, force: false });
+    runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
+    runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch", id: "epic-a", now: NOW });
+    runCreate({
+      cwd: dir,
+      type: "story",
+      title: "Login",
+      parent: "epic-a",
+      id: "story-a",
+      now: NOW,
+    });
+    runCreate({
+      cwd: dir,
+      type: "story",
+      title: "Signup",
+      parent: "epic-a",
+      id: "story-b",
+      now: NOW,
+    });
+    runCreate({
+      cwd: dir,
+      type: "task",
+      title: "One",
+      parent: "story-a",
+      id: "task-one",
+      now: NOW,
+    });
+    runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Two",
+      parent: "story-a",
+      id: "task-two",
+      now: NOW,
+    });
+    claimAndDone(dir, "task-one");
+    runUpdate({ cwd: dir, id: "task-two", status: "in_progress", assignee: "worker", now: NOW });
+    const result = runUpdate({ cwd: dir, id: "task-two", status: "done", now: NOW });
+    expect(result.autoCompleted).toEqual(["story-a"]);
+    expect(result.cascadeLevels).toEqual(["story"]);
+    expect(statusOf(dir, "epic-a")).toBe("todo");
   });
 
   it("skips already-terminal containers but keeps completing their ancestors", () => {
@@ -154,5 +211,93 @@ describe("automatic container completion", () => {
     );
     expect(fm.data.status).toBe("done");
     expect(fm.data.updated).toBe("2026-09-11");
+  });
+});
+
+/**
+ * Cascade predictability (task-cascade-predictability): the human output of
+ * `arggon update` carries a visible warning when the cascade auto-completes
+ * containers at epic level or above. Cascades that stop at a story stay
+ * quiet (the plain auto-completed line is enough). The `--json` envelope
+ * gains `cascadeLevels` additively (ids were already in `autoCompleted`).
+ */
+describe("cascade notice in human output", () => {
+  /** Kernel-built tree; only the final `update` goes through the real CLI. */
+  function cliTree(): { dir: string; last: string } {
+    const { dir, tasks, bug } = chainTree();
+    claimAndDone(dir, tasks[0]);
+    claimAndDone(dir, tasks[1]);
+    runUpdate({ cwd: dir, id: bug, status: "in_progress", assignee: "worker", now: NOW });
+    return { dir, last: bug };
+  }
+
+  it("warns on human output when the cascade reaches epic level", () => {
+    const { dir, last } = cliTree();
+    const res = runCli(["update", last, "--status", "done"], dir);
+    expect(res.status).toBe(0);
+    expect(res.stdout).toContain("auto-completed: story-a, epic-a, launch");
+    expect(res.stdout).toContain(
+      "⚠ cascade: auto-completed epic 'epic-a' (and 1 more ancestor)" +
+        " — use --no-cascade to keep containers open",
+    );
+  });
+
+  it("stays quiet when only a story auto-completes", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-cascade-"));
+    runInit({ dir, force: false });
+    runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
+    runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch", id: "epic-a", now: NOW });
+    runCreate({
+      cwd: dir,
+      type: "story",
+      title: "Login",
+      parent: "epic-a",
+      id: "story-a",
+      now: NOW,
+    });
+    runCreate({
+      cwd: dir,
+      type: "story",
+      title: "Signup",
+      parent: "epic-a",
+      id: "story-b",
+      now: NOW,
+    });
+    runCreate({
+      cwd: dir,
+      type: "task",
+      title: "One",
+      parent: "story-a",
+      id: "task-one",
+      now: NOW,
+    });
+    runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Two",
+      parent: "story-a",
+      id: "task-two",
+      now: NOW,
+    });
+    claimAndDone(dir, "task-one");
+    runUpdate({ cwd: dir, id: "task-two", status: "in_progress", assignee: "worker", now: NOW });
+    const res = runCli(["update", "task-two", "--status", "done"], dir);
+    expect(res.status).toBe(0);
+    expect(res.stdout).toContain("auto-completed: story-a");
+    expect(res.stdout).not.toContain("cascade: auto-completed");
+  });
+
+  it("keeps the --json envelope additive with cascadeLevels", () => {
+    const { dir, last } = cliTree();
+    const res = runCli(["update", last, "--status", "done", "--json"], dir);
+    expect(res.status).toBe(0);
+    const envelope = JSON.parse(res.stdout) as {
+      ok: boolean;
+      autoCompleted: string[];
+      cascadeLevels: string[];
+    };
+    expect(envelope.ok).toBe(true);
+    expect(envelope.autoCompleted).toEqual(["story-a", "epic-a", "launch"]);
+    expect(envelope.cascadeLevels).toEqual(["story", "epic", "initiative"]);
   });
 });

@@ -76,6 +76,12 @@ export type UpdateResult = {
   changed: string[];
   /** Ancestor containers auto-completed by the cascade (empty unless terminal). */
   autoCompleted: string[];
+  /**
+   * Container TYPES auto-completed by the cascade, parallel to `autoCompleted`
+   * (e.g. ["story", "epic", "initiative"]). Empty unless terminal. Lets callers
+   * tell when the cascade reached epic level or above without a second lookup.
+   */
+  cascadeLevels: string[];
 };
 
 function parseCsvList(raw: string): string[] {
@@ -335,7 +341,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   // Automatic container completion (task-container-auto-done): when an item
   // reaches a terminal state and every sibling under a parent is terminal
   // too, that parent completes, cascading up the chain. Off with cascade:false.
-  const autoCompleted: string[] =
+  const completedContainers: WorkItem[] =
     opts.cascade === false || (newStatus !== "done" && newStatus !== "cancelled")
       ? []
       : autoCompleteAncestors(tasksDir, item, opts.now ?? new Date());
@@ -346,7 +352,8 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     root: repoRootFromTasks(tasksDir),
     item: updated,
     changed,
-    autoCompleted,
+    autoCompleted: completedContainers.map((container) => container.id),
+    cascadeLevels: completedContainers.map((container) => container.type),
   };
 }
 
@@ -366,8 +373,8 @@ function autoCompleteAncestors(
   tasksDir: string,
   from: WorkItem,
   now: Date,
-): string[] {
-  const completed: string[] = [];
+): WorkItem[] {
+  const completed: WorkItem[] = [];
   const byId = itemsById(loadItems(tasksDir));
   let parentId = from.parent;
   const seen = new Set<string>([from.id]);
@@ -389,7 +396,7 @@ function autoCompleteAncestors(
       // Keep the in-memory copy fresh: the next ancestor's children check
       // must see this container as terminal.
       container.status = "done";
-      completed.push(container.id);
+      completed.push(container);
     }
     parentId = container.parent;
   }

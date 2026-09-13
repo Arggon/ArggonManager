@@ -606,7 +606,11 @@ program
         if (json) {
           successJson(
             "update",
-            { item: toContractWorkItem(result.item, result.root), autoCompleted: result.autoCompleted },
+            {
+              item: toContractWorkItem(result.item, result.root),
+              autoCompleted: result.autoCompleted,
+              cascadeLevels: result.cascadeLevels,
+            },
             readConventionVersion(result.root),
           );
           return;
@@ -616,6 +620,18 @@ program
         console.log(`  ${result.path}`);
         if (result.autoCompleted.length > 0) {
           console.log(`  auto-completed: ${result.autoCompleted.join(", ")}`);
+          const high = result.autoCompleted
+            .map((cid, index) => ({ id: cid, level: result.cascadeLevels[index] }))
+            .filter((c) => c.level === "epic" || c.level === "initiative");
+          if (high.length > 0) {
+            const more = high.length - 1;
+            const suffix =
+              more > 0 ? ` (and ${more} more ancestor${more === 1 ? "" : "s"})` : "";
+            console.log(
+              `⚠ cascade: auto-completed ${high[0].level} '${high[0].id}'${suffix}` +
+                ` — use --no-cascade to keep containers open`,
+            );
+          }
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
