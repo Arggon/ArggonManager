@@ -146,6 +146,7 @@ Everything created is listed in `created[]`; files left untouched land in `skipp
 Every generated doc carries a visible provenance marker as its **first line** (`<!-- arggon:generated template="..." -->`), and the generation state is recorded in `tasks/.convention.yml` under the namespaced `x-generated:` section (destination path → `{ template, checksum, arggonVersion, generatedAt }`; the checksum is the sha256 of the file as written, marker included). Re-running `arggon init` upgrades templates safely, Copier/Helm-style, per destination:
 
 - **Not on disk** → generated as today (`created[]`).
+- **Acknowledged via `arggon adopt --ack`** (`acknowledged: true` in the state) → skip, never regenerated: the acked content is the adopter's sanctioned baseline — **it is yours**.
 - **On disk, checksum matches the recorded one** → generated-and-untouched: silently regenerated from the current template and the state refreshed (`updated[]`). This is how template improvements reach an adopted repo.
 - **On disk, checksum differs (or no state entry — pre-provenance files)** → adopter-modified: **skipped** by default (`modified[]` + `skipped[]`; never overwritten, not even with `--force`). With `--backup`, the modified file is first moved to `backup/<YYYY-MM-DD>/<dest>` and then regenerated with fresh state (`backedUp[]`).
 
@@ -161,7 +162,7 @@ arggon doctor --json
 ```
 
 - `initialized`: whether `tasks/.convention.yml` was found, plus the convention version (0-3).
-- `docs`: generated-doc provenance counts from `x-generated` — `managed` (tracked destinations), `untouched` (checksum matches), `modified` (checksum differs), `stale` (template no longer generated), `missing` (tracked but absent).
+- `docs`: generated-doc provenance counts from `x-generated` — `managed` (tracked destinations), `untouched` (checksum matches), `modified` (checksum differs), `acknowledged` (sanctioned-diverged baselines from `adopt --ack`), `stale` (template no longer generated), `missing` (tracked but absent).
 - `tracker`: cheap tracker sanity — total work items and `todo` count.
 
 Non-initialized repos report `initialized: false` with zeroed counts (no crash, still exit 0); failures use `error.code: "DOCTOR_FAILED"` only for unexpected errors.
