@@ -13,6 +13,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { runCreate } from "./create.js";
+import { readConventionVersion } from "./convention.js";
 import { runInit } from "./init.js";
 import { JSON_SCHEMA_VERSION } from "./json.js";
 import { runNext } from "./next.js";
@@ -113,7 +114,10 @@ describe("CLI --json", () => {
     expect(body).toEqual({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 0,
+      // The envelope echoes the convention version of the tree the CLI runs in
+      // (repo root by default). This repo now self-hosts convention v3
+      // (story-dogfood-self-host), so read it instead of hardcoding a default.
+      conventionVersion: readConventionVersion(root),
       command: "hello",
       message: "arggon: hello from Phase 1 scaffold",
     });

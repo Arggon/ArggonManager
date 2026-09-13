@@ -1,12 +1,15 @@
 ---
 type: story
-status: todo
+status: done
 id: story-dogfood-self-host
 title: "Eat your own dogfood: self-host the full arggon stack in this repo"
+assignee: Arggon
+branch: feat/story-dogfood-self-host-impl
 parent: cli
 labels: []
 created: "2026-09-13"
 updated: "2026-09-13"
+claimed_at: "2026-09-13T15:45:32.858Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-dogfood-self-host/story-dogfood-self-host.md (story index; required).
@@ -21,4 +24,4 @@ updated: "2026-09-13"
 
 ## Acceptance
 
-- [ ] Convention v3 declared, x-tracker.auto-commit active, pre-commit hook installed, skill bundled at .agents/, missing init docs generated, 3 base playbooks created with researched versions, doctor reports a healthy self-hosted state
+- [x] Convention v3 declared, x-tracker.auto-commit active, pre-commit hook installed, skill bundled at .agents/, missing init docs generated, 3 base playbooks created with researched versions, doctor reports a healthy self-hosted state

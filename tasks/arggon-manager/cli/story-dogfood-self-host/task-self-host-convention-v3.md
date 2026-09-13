@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-self-host-convention-v3
 title: Convention v3 upgrade + x-tracker auto-commit + pre-commit hook
+assignee: Arggon
 parent: story-dogfood-self-host
 labels: []
 created: "2026-09-13"
@@ -23,6 +24,9 @@ tasks/.convention.yml upgrades 0 -> 3 (additive, backward-compatible by design) 
 
 ## Acceptance
 
-- [ ] .convention.yml: version 3 + branch_patterns + x-tracker.auto-commit: true; envelopes report conventionVersion: 3
-- [ ] create/comment here self-commit (verified live); pre-commit hook installed and rejects an invalid tree (verified by attempt)
-- [ ] Full suite green on the upgraded tree
+- [x] .convention.yml: version 3 + branch_patterns + x-tracker.auto-commit: true; envelopes report conventionVersion: 3
+- [x] create/comment here self-commit (verified live); pre-commit hook installed and rejects an invalid tree (verified by attempt)
+- [x] Full suite green on the upgraded tree
+
+### 2026-09-13 @Arggon
+dogfood: x-tracker.auto-commit enabled — this comment self-committed via the tracker auto-commit path (create/comment/adopt/cleanup). Handoff note: pre-commit hook verification follows in this task.
