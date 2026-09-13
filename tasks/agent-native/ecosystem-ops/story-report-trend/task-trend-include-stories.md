@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-trend-include-stories
 title: report --trend should include story completions (or an opt-in flag)
 assignee: Arggon
@@ -8,7 +8,6 @@ parent: story-report-trend
 labels: []
 created: "2026-09-13"
 updated: "2026-09-13"
-claimed_at: "2026-09-13T21:01:13.486Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-report-trend/task-trend-include-stories.md
