@@ -29,6 +29,9 @@ import {
  * generatedAt }). Re-run semantics per destination:
  *
  *   - not on disk                                   → generate (`created[]`)
+ *   - acknowledged (`arggon adopt --ack`, entry flag)  → adopter-owned
+ *     sanctioned-diverged content: skip, never touch regardless of hash
+ *     (`skipped[]`) — regenerating would destroy the sanctioned content
  *   - on disk, state checksum matches               → untouched: regenerate
  *     silently from the current template and refresh state (`updated[]`)
  *   - on disk, checksum differs or no state entry
@@ -219,6 +222,16 @@ export function generateDocs(opts: GenerateDocsOptions): DocsResult {
       return { write: content, entry };
     }
     const prev = prevState[dest];
+    if (prev?.acknowledged) {
+      // Acknowledged baseline (`arggon adopt --ack`,
+      // bug-ack-baseline-regen-loss): the recorded checksum equals the
+      // adopter's sanctioned content, NOT the template render — regenerating
+      // here destroyed adopter content. Acknowledged entries are never
+      // touched; the skip reason is implicit (sanctioned-diverged baseline).
+      skipped.push(dest);
+      nextState[dest] = prev;
+      return null;
+    }
     const onDisk = checksumOf(readFileSync(destAbs, "utf8"));
     if (prev?.checksum && prev.checksum === onDisk) {
       // Untouched: silently regenerate from the current template.

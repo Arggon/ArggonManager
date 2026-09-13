@@ -10,6 +10,7 @@ import {
   type GeneratedEntry,
 } from "./convention.js";
 import { runDoctor, formatDoctorReport } from "./doctor.js";
+import { runAdoptAck } from "./adopt.js";
 import { runCreate } from "./create.js";
 import { runInit } from "./init.js";
 
@@ -32,7 +33,7 @@ describe("doctor: non-initialized repos", () => {
     expect(result.initialized).toBe(false);
     expect(result.root).toBeNull();
     expect(result.conventionVersion).toBe(0);
-    expect(result.docs).toEqual({ managed: 0, untouched: 0, modified: 0, stale: 0, missing: 0 });
+    expect(result.docs).toEqual({ managed: 0, untouched: 0, modified: 0, acknowledged: 0, stale: 0, missing: 0 });
     expect(result.tracker).toEqual({ items: 0, todo: 0 });
     expect(formatDoctorReport(result)).toContain("not initialized");
   });
@@ -64,7 +65,7 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     expect(result.initialized).toBe(true);
     expect(result.root).toBe(dir);
     expect(result.conventionVersion).toBe(3);
-    expect(result.docs).toEqual({ managed: 16, untouched: 16, modified: 0, stale: 0, missing: 0 });
+    expect(result.docs).toEqual({ managed: 16, untouched: 16, modified: 0, acknowledged: 0, stale: 0, missing: 0 });
     expect(result.tracker).toEqual({ items: 0, todo: 0 });
   });
 
@@ -87,7 +88,7 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     runInit({ dir, force: false, full: true, backup: true });
     expect(existsSync(join(dir, "backup"))).toBe(true);
     const result = runDoctor({ cwd: dir });
-    expect(result.docs).toEqual({ managed: 16, untouched: 16, modified: 0, stale: 0, missing: 0 });
+    expect(result.docs).toEqual({ managed: 16, untouched: 16, modified: 0, acknowledged: 0, stale: 0, missing: 0 });
   });
 
   it("counts a deleted managed doc as missing", () => {
@@ -125,6 +126,27 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     expect(result.docs.untouched).toBe(16);
   });
 
+  it("counts acked docs in the acknowledged bucket (sanctioned-diverged, not modified)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    writeFileSync(join(dir, "AGENTS.md"), "SWEEP: sanctioned content\n", "utf8");
+    writeFileSync(join(dir, "CONTRIBUTING.md"), "SWEEP: setup\n", "utf8");
+    expect(runDoctor({ cwd: dir }).docs.modified).toBe(2);
+    runAdoptAck({ cwd: dir });
+    const result = runDoctor({ cwd: dir });
+    expect(result.docs).toEqual({
+      managed: 16,
+      untouched: 0,
+      modified: 0,
+      acknowledged: 16,
+      stale: 0,
+      missing: 0,
+    });
+    const report = formatDoctorReport(result);
+    expect(report).toContain("16 acknowledged");
+    expect(report).toContain("0 modified");
+  });
+
   it("reports tracker counts via loadItems", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
@@ -156,7 +178,7 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     expect(body.command).toBe("doctor");
     expect(body.initialized).toBe(true);
     expect(body.root).toBe(dir);
-    expect(body.docs).toEqual({ managed: 16, untouched: 15, modified: 1, stale: 0, missing: 0 });
+    expect(body.docs).toEqual({ managed: 16, untouched: 15, modified: 1, acknowledged: 0, stale: 0, missing: 0 });
     expect(body.tracker).toEqual({ items: 0, todo: 0 });
   });
 

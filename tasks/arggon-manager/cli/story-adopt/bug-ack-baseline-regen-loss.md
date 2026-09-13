@@ -1,8 +1,10 @@
 ---
 type: bug
-status: todo
+status: done
 id: bug-ack-baseline-regen-loss
 title: adopt --ack baseline is destroyed by the next init re-run (content loss)
+assignee: Arggon
+branch: fix/bug-ack-baseline-regen-loss
 parent: story-adopt
 labels: []
 created: "2026-09-13"
@@ -23,5 +25,5 @@ Found by the guardian adoption agent (2026-09-13): after `arggon adopt --ack` re
 
 ## Acceptance
 
-- [ ] Regenerate-on-untouched only happens when the file content actually equals the current template render (or ack marks entries as diverged and re-runs skip diverged files); acked+edited docs must never be silently overwritten
-- [ ] Tests: ack -> template bump -> re-run leaves acked content intact (or applies the merge strategy that lands); content-loss scenario impossible
+- [x] Regenerate-on-untouched only happens when the file content actually equals the current template render (or ack marks entries as diverged and re-runs skip diverged files); acked+edited docs must never be silently overwritten
+- [x] Tests: ack -> template bump -> re-run leaves acked content intact (or applies the merge strategy that lands); content-loss scenario impossible
