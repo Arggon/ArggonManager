@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
 import {
+  appendFileSync,
   chmodSync,
   existsSync,
   mkdirSync,
@@ -678,5 +679,31 @@ describe("CLI --json", () => {
     const body = parseStdout(result.stdout);
     expect(body.error).toMatchObject({ code: "START_FAILED" });
     expect(String((body.error as { message: string }).message)).toMatch(/claim conflict/);
+  });
+
+  it("arggon start --worktree runs the post-start hook and reports it in --json", () => {
+    const { dir, env } = initStartTree(true);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Hooked", "--parent", "login"], dir).status).toBe(0);
+    // Configure x-worktree.post-start (task-start-post-hook), then commit
+    // items + config in one go: start refuses dirty trees.
+    appendFileSync(join(dir, "tasks/.convention.yml"), 'x-worktree:\n  post-start: "echo hooked > .hook-ran"\n');
+    expect(runGit(["add", "-A"], dir).status).toBe(0);
+    expect(
+      runGit(["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "config"], dir).status,
+    ).toBe(0);
+
+    const result = runCli(
+      ["start", "task-hooked", "--worktree", "--assignee", "arggon", "--json"],
+      dir,
+      env,
+    );
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body.ok).toBe(true);
+    expect(body.command).toBe("start");
+    expect(body.postStart).toEqual({ command: "echo hooked > .hook-ran", ok: true });
+    expect(existsSync(join(dirname(dir), "work-task-hooked", ".hook-ran"))).toBe(true);
   });
 });

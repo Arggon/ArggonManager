@@ -1,8 +1,10 @@
 ---
 type: task
-status: todo
+status: done
 id: task-start-post-hook
 title: Configurable post-start hook for worktree bootstrap
+assignee: Arggon
+branch: feat/task-start-post-hook
 parent: story-start-worktree
 labels: []
 created: "2026-09-13"
@@ -23,5 +25,5 @@ cuentas-claras feedback: worktrees do not share node_modules — the agent ran n
 
 ## Acceptance
 
-- [ ] `x-worktree.post-start` (shell command) in tasks/.convention.yml runs inside the worktree after a successful start (e.g. `npm ci`); failure is reported, not fatal; flag --no-hook to skip
-- [ ] Test: hook executed in the worktree cwd; failure reported; absent config = no-op
+- [x] `x-worktree.post-start` (shell command) in tasks/.convention.yml runs inside the worktree after a successful start (e.g. `npm ci`); failure is reported, not fatal; flag --no-hook to skip
+- [x] Test: hook executed in the worktree cwd; failure reported; absent config = no-op

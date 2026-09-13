@@ -1229,11 +1229,21 @@ program
     "run the flow inside a linked git worktree at ../<repo-name>-<id> (recorded on the item as worktree_path)",
     false,
   )
+  .option(
+    "--no-hook",
+    "skip the x-worktree.post-start hook (it only runs when a new worktree is created)",
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (
       id: string,
-      opts: { assignee?: string; openPr?: boolean; worktree?: boolean; json?: boolean },
+      opts: {
+        assignee?: string;
+        openPr?: boolean;
+        worktree?: boolean;
+        hook?: boolean;
+        json?: boolean;
+      },
     ) => {
       const json = jsonEnabled(opts);
       try {
@@ -1243,6 +1253,7 @@ program
           assignee: opts.assignee,
           openPr: Boolean(opts.openPr),
           worktree: Boolean(opts.worktree),
+          noHook: opts.hook === false,
         });
         if (json) {
           successJson(
@@ -1254,6 +1265,7 @@ program
               pushed: result.pushed,
               prUrl: result.prUrl,
               worktreePath: result.worktreePath,
+              postStart: result.postStart,
             },
             readConventionVersion(result.root),
           );
@@ -1264,6 +1276,10 @@ program
           console.log(
             `  worktree: ${result.worktreePath} (${result.worktreeCreated ? "created" : "attached"})`,
           );
+        }
+        if (result.postStart) {
+          if (result.postStart.ok) console.log(`  post-start: ${result.postStart.command}`);
+          else console.log(`  ${result.postStart.error}`);
         }
         if (result.prUrl) {
           console.log(`  draft PR: ${result.prUrl}`);
