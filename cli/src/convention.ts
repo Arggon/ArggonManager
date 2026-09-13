@@ -46,6 +46,16 @@ export type PlaybooksConfig = {
   maxAgeDays: number | null;
 };
 
+/** `x-tracker` namespaced extension options (story-tracker-hygiene). */
+export type TrackerConfig = {
+  /**
+   * Auto-commit of tracker mutations from `x-tracker.auto-commit`
+   * (create/comment/adopt/cleanup --prune). `null` when unset (callers apply
+   * the built-in default of true; a `--no-commit` CLI flag still wins).
+   */
+  autoCommit: boolean | null;
+};
+
 /**
  * One generated-doc provenance record (`x-generated` namespaced extension,
  * story-adoption-state): destination path -> entry, written by
@@ -70,6 +80,8 @@ export type ConventionConfig = {
   views: Record<string, string>;
   /** Technology-playbook options (`x-playbooks` extension key). */
   playbooks: PlaybooksConfig;
+  /** Tracker-hygiene options (`x-tracker` extension key). */
+  tracker: TrackerConfig;
   /**
    * Generated-doc provenance (`x-generated` extension key): destination path
    * (posix, relative to the repo root) -> provenance entry.
@@ -90,11 +102,12 @@ function stripQuotes(value: string): string {
 /**
  * Parse `tasks/.convention.yml` (line-oriented, no YAML dependency).
  * Unknown top-level keys are ignored for forward compatibility;
- * `x-views` (saved views), `x-playbooks` (playbook staleness options), and
- * `x-generated` (generated-doc provenance) are the official namespaced
- * extensions.
+ * `x-views` (saved views), `x-playbooks` (playbook staleness options),
+ * `x-tracker` (tracker-hygiene options), and `x-generated` (generated-doc
+ * provenance) are the official namespaced extensions.
  * Throws with file context on malformed `branch_patterns`, `x-views`,
- * or `x-playbooks`; `x-generated` parses tolerantly (machine-written state).
+ * `x-playbooks`, or `x-tracker`; `x-generated` parses tolerantly
+ * (machine-written state).
  */
 export function parseConventionConfig(
   raw: string,
@@ -103,6 +116,7 @@ export function parseConventionConfig(
   const branchPatterns: Record<ItemType, string> = { ...DEFAULT_BRANCH_PATTERNS };
   const views: Record<string, string> = {};
   const playbooks: PlaybooksConfig = { maxAgeDays: null };
+  const tracker: TrackerConfig = { autoCommit: null };
   const generated: Record<string, GeneratedEntry> = {};
   let version = CONVENTION_VERSION_DEFAULT;
   let section: string | null = null;
@@ -138,6 +152,11 @@ export function parseConventionConfig(
           throw new Error(`${sourcePath}: 'x-playbooks' must be a mapping, one option per line`);
         }
         section = "x-playbooks";
+      } else if (key === "x-tracker") {
+        if (value !== "") {
+          throw new Error(`${sourcePath}: 'x-tracker' must be a mapping, one option per line`);
+        }
+        section = "x-tracker";
       } else if (key === "x-generated") {
         if (value !== "") {
           throw new Error(
@@ -188,6 +207,18 @@ export function parseConventionConfig(
       playbooks.maxAgeDays = Number.parseInt(value, 10);
       continue;
     }
+    if (section === "x-tracker") {
+      // Namespaced extension: unknown nested keys are ignored (ignore-unknown),
+      // only the official `auto-commit` option is read.
+      if (key !== "auto-commit") continue;
+      if (value !== "true" && value !== "false") {
+        throw new Error(
+          `${sourcePath}: 'auto-commit' must be a boolean (got ${JSON.stringify(value)})`,
+        );
+      }
+      tracker.autoCommit = value === "true";
+      continue;
+    }
     if (section === "x-views") {
       if (!key) {
         throw new Error(`${sourcePath}: invalid x-views entry ${JSON.stringify(line)}`);
@@ -220,7 +251,7 @@ export function parseConventionConfig(
     branchPatterns[key] = pattern;
   }
 
-  return { version, branchPatterns, views, playbooks, generated };
+  return { version, branchPatterns, views, playbooks, tracker, generated };
 }
 
 /** Read and parse `<dir>/tasks/.convention.yml`. Missing file yields version 0 + defaults. */
@@ -232,6 +263,7 @@ export function readConventionConfig(dir: string): ConventionConfig {
       branchPatterns: { ...DEFAULT_BRANCH_PATTERNS },
       views: {},
       playbooks: { maxAgeDays: null },
+      tracker: { autoCommit: null },
       generated: {},
     };
   }

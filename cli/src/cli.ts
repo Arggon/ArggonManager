@@ -48,6 +48,7 @@ import { runSync } from "./sync-command.js";
 import { runTuiBoard } from "./tui.js";
 import { runUpdate } from "./update.js";
 import { formatValidateHuman, runValidate } from "./validate.js";
+import { commitPayload, formatCommitLine } from "./tracker-commit.js";
 const program = new Command();
 
 program
@@ -182,14 +183,19 @@ program
     "--story <story-id>",
     "parent story for the adoption task (default: auto-create story-arggon-adoption under the first epic)",
   )
+  .option(
+    "--no-commit",
+    "keep tasks/ dirty: skip the tracker auto-commit of the adoption task + story (default: on; x-tracker.auto-commit: false opts out tree-wide)",
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { dryRun?: boolean; story?: string; json?: boolean }) => {
+  .action((opts: { dryRun?: boolean; story?: string; commit?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
       const result = runAdopt({
         cwd: process.cwd(),
         story: opts.story,
         dryRun: Boolean(opts.dryRun),
+        commit: opts.commit === false ? false : undefined,
       });
       if (json) {
         successJson(
@@ -203,6 +209,7 @@ program
             taskPath: result.taskPath,
             inventory: result.inventory,
             dryRun: result.dryRun,
+            commit: commitPayload(result.commit),
           },
           readConventionVersion(result.root),
         );
@@ -235,6 +242,10 @@ program
   .option("--assignee <login>", "assignee (omit when unassigned)")
   .option("--status <status>", "status (default: todo)", "todo")
   .option("--blocked-reason <text>", "required when --status blocked")
+  .option(
+    "--no-commit",
+    "keep tasks/ dirty: skip the tracker auto-commit of the created item (default: on; x-tracker.auto-commit: false opts out tree-wide)",
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (
@@ -246,6 +257,7 @@ program
         assignee?: string;
         status?: string;
         blockedReason?: string;
+        commit?: boolean;
         json?: boolean;
       },
     ) => {
@@ -260,17 +272,23 @@ program
           assignee: opts.assignee,
           status: opts.status,
           blockedReason: opts.blockedReason,
+          commit: opts.commit === false ? false : undefined,
         });
         if (json) {
           successJson(
             "create",
-            { item: toContractWorkItem(result.item, result.root) },
+            {
+              item: toContractWorkItem(result.item, result.root),
+              commit: commitPayload(result.commit),
+            },
             readConventionVersion(result.root),
           );
           return;
         }
         console.log(`arggon create: ${result.item.type} ${result.id}`);
         console.log(`  ${result.path}`);
+        const commitLine = formatCommitLine(result.commit);
+        if (commitLine) console.log(`  ${commitLine}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (json) {
@@ -625,9 +643,13 @@ program
     "--author <login>",
     "comment author (default: @me resolution — GITHUB_USER, then GITHUB_ACTOR, then `gh api user`)",
   )
+  .option(
+    "--no-commit",
+    "keep tasks/ dirty: skip the tracker auto-commit of the commented item (default: on; x-tracker.auto-commit: false opts out tree-wide)",
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
-    (id: string, text: string, opts: { author?: string; json?: boolean }) => {
+    (id: string, text: string, opts: { author?: string; commit?: boolean; json?: boolean }) => {
       const json = jsonEnabled(opts);
       try {
         const result = runComment({
@@ -635,11 +657,17 @@ program
           id,
           text,
           author: opts.author,
+          commit: opts.commit === false ? false : undefined,
         });
         if (json) {
           successJson(
             "comment",
-            { id: result.id, path: result.path, comment: result.comment },
+            {
+              id: result.id,
+              path: result.path,
+              comment: result.comment,
+              commit: commitPayload(result.commit),
+            },
             readConventionVersion(result.root),
           );
           return;
@@ -648,6 +676,8 @@ program
           `arggon comment: ${result.id} (${result.comment.date} @${result.comment.author})`,
         );
         console.log(`  ${result.path}`);
+        const commitLine = formatCommitLine(result.commit);
+        if (commitLine) console.log(`  ${commitLine}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (json) {
@@ -1225,11 +1255,19 @@ program
     "remove removable worktrees (git worktree remove), delete their merged branches, and clear the worktree_path records",
     false,
   )
+  .option(
+    "--no-commit",
+    "keep tasks/ dirty: skip the tracker auto-commit of the cleared worktree_path records (default: on with --prune; x-tracker.auto-commit: false opts out tree-wide)",
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { prune?: boolean; json?: boolean }) => {
+  .action((opts: { prune?: boolean; commit?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
-      const result = runCleanup({ cwd: process.cwd(), prune: Boolean(opts.prune) });
+      const result = runCleanup({
+        cwd: process.cwd(),
+        prune: Boolean(opts.prune),
+        commit: opts.commit === false ? false : undefined,
+      });
       if (json) {
         if (result.failures.length > 0) {
           failJson({
@@ -1246,6 +1284,7 @@ program
             base: result.base,
             candidates: result.entries,
             pruned: result.pruned,
+            ...(result.commit ? { commit: commitPayload(result.commit) } : {}),
           },
           readConventionVersion(result.root),
         );
@@ -1265,6 +1304,8 @@ program
       for (const action of result.pruned) {
         console.log(`  pruned:    ${action.id}: ${action.action}`);
       }
+      const commitLine = formatCommitLine(result.commit);
+      if (commitLine) console.log(`  ${commitLine}`);
       for (const failure of result.failures) {
         console.error(`  failed:    ${failure}`);
       }

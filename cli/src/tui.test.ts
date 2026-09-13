@@ -38,6 +38,7 @@ function item(overrides: Partial<WorkItem> & Pick<WorkItem, "id" | "type" | "sta
     depends_on: [],
     claimed_at: null,
     worktree_path: null,
+    issue: null,
     ...overrides,
   };
 }
@@ -466,6 +467,7 @@ describe("renderTui column alignment (bug-tui-column-shift)", () => {
     depends_on: [],
     claimed_at: null,
     worktree_path: null,
+    issue: null,
   });
 
   it("keeps right-hand columns at their own x-offset when the selected column runs out of cards (color on)", () => {

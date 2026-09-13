@@ -6,6 +6,14 @@ import { runDoctor } from "./doctor.js";
 import { itemId } from "./ids.js";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
 import { findTasksDir } from "./paths.js";
+import {
+  commitTrackerMutation,
+  formatCommitLine,
+  readAutoCommitConfig,
+  resolveAutoCommit,
+  trackerCommitMessage,
+  type TrackerCommitResult,
+} from "./tracker-commit.js";
 
 /**
  * `arggon adopt` (story-adopt, task-adopt-command): agent-assisted adoption
@@ -152,6 +160,12 @@ export type AdoptOptions = {
   story?: string;
   /** Plan only: print/report the inventory and planned actions, write nothing. */
   dryRun?: boolean;
+  /**
+   * Auto-commit the files written this run (tracker hygiene): ONE commit
+   * covering the adoption task and (when created) its story. `undefined`
+   * resolves via `x-tracker.auto-commit` config, default ON.
+   */
+  commit?: boolean;
   /** Injection point for tests. */
   now?: Date;
 };
@@ -173,6 +187,8 @@ export type AdoptResult = {
   skipped: boolean;
   /** Absolute path of the created or existing task file. */
   taskPath: string;
+  /** Tracker auto-commit outcome for the files written this run. */
+  commit?: TrackerCommitResult;
 };
 
 function firstEpicId(byId: Map<string, WorkItem>): string | null {
@@ -201,6 +217,21 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
   const inventory = buildInventory(root);
 
   const byId = itemsById(loadItems(tasksDir));
+
+  // Tracker hygiene (task-auto-commit-tracker): one commit covering the files
+  // written this run (the adoption task plus, when created, its story). The
+  // internal runCreate calls suppress their own auto-commit. The message
+  // references the primary item id (the adoption task; its story on the
+  // story-only path).
+  const autoCommit = resolveAutoCommit(opts.commit, readAutoCommitConfig(root));
+  const writtenPaths: string[] = [];
+  const commitWritten = (primaryId: string): TrackerCommitResult | undefined => {
+    if (writtenPaths.length === 0) return undefined;
+    return commitTrackerMutation(root, writtenPaths, {
+      message: trackerCommitMessage("adopted", [primaryId]),
+      commit: autoCommit,
+    });
+  };
 
   // Resolve the parent story: explicit --story, else the shared auto story
   // (created under the first epic, lexicographic — same pattern as import-issues).
@@ -234,15 +265,17 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
       );
     }
     if (!dryRun) {
-      runCreate({
+      const story = runCreate({
         cwd: opts.cwd,
         type: "story",
         title: ADOPT_STORY_TITLE,
         // Container ids keep their full stem (only leaves get a kernel prefix).
         id: ADOPT_STORY_ID,
         parent: epicId,
+        commit: false,
         now: opts.now,
       });
+      writtenPaths.push(story.path);
       storyCreated = true;
     }
     storyId = ADOPT_STORY_ID;
@@ -259,11 +292,12 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
         dryRun,
         inventory,
         storyId: existingTask.parent ?? storyId,
-        storyCreated: false,
+        storyCreated,
         taskId: existingTask.id,
         taskCreated: false,
         skipped: true,
         taskPath: existingTask.filePath,
+        commit: commitWritten(ADOPT_STORY_ID),
       };
     }
     throw new Error(
@@ -280,8 +314,10 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
       parent: storyId,
       id: ADOPT_TASK_STEM,
       body: ADOPT_TASK_BODY,
+      commit: false,
       now: opts.now,
     });
+    writtenPaths.push(created.path);
     return {
       root,
       dryRun,
@@ -292,6 +328,7 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
       taskCreated: true,
       skipped: false,
       taskPath: created.path,
+      commit: commitWritten(created.id),
     };
   }
   return {
@@ -332,6 +369,10 @@ export function formatAdoptReport(result: AdoptResult): string {
         ? "(would create when missing)"
         : "(existing)";
   lines.push(`  story: ${result.storyId} ${storyState}`);
+  const commitLine = formatCommitLine(result.commit);
+  if (commitLine) {
+    lines.push(`  ${commitLine}`);
+  }
   lines.push(
     `  docs: ${result.inventory.docs.length} scanned — ` +
       `${present.length} present (${managed.length} arggon-managed, ${adopterOwned.length} adopter-owned), ${absent} absent`,

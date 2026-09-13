@@ -6,6 +6,8 @@ import { parseFrontmatter } from "./frontmatter.js";
 import { type GhExecutor, ghIssueListJson, importedBody, mapIssueState, normalizeGhLabels, runImportIssues } from "./import-issues.js";
 import { runCreate } from "./create.js";
 import { runInit } from "./init.js";
+import { runList } from "./list.js";
+import { toContractWorkItem } from "./contract.js";
 import { runValidate } from "./validate.js";
 
 const NOW = new Date("2026-09-11T12:00:00Z");
@@ -122,6 +124,28 @@ describe("runImportIssues", () => {
     // The imported tree must be convention-clean.
     const validation = runValidate({ cwd: dir });
     expect(validation.errors).toEqual([]);
+  });
+
+  it("records the GitHub issue number on the imported items (frontmatter + contract)", () => {
+    const dir = primed();
+    const execGh = ghIssueListMock(JSON.stringify(FIXTURE_ISSUES));
+
+    runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW });
+
+    // The number lands in the additive `issue` frontmatter field, open and
+    // closed issues alike, so `start --open-pr` can emit `Closes #N`.
+    const openPath = join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-1.md");
+    expect(fm(openPath).issue).toBe(1);
+    const closedPath = join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-2.md");
+    expect(fm(closedPath).issue).toBe(2);
+
+    // The field is contract-visible and convention-clean (no UNKNOWN_KEY warning).
+    const { items } = runList({ cwd: dir });
+    const imported = items.find((i) => i.id === "task-issue-1");
+    expect(toContractWorkItem(imported!, dir).issue).toBe(1);
+    const validation = runValidate({ cwd: dir });
+    expect(validation.errors).toEqual([]);
+    expect(validation.warnings).toEqual([]);
   });
 
   it("writes the original issue body plus the provenance line", () => {

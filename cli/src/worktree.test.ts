@@ -105,8 +105,35 @@ describe("start --worktree", () => {
     expect(validation.warnings).toEqual([]);
   });
 
-  it("attaches on re-run instead of failing or duplicating the worktree", () => {
+  it("appends Closes #N to the worktree PR body for items with a linked issue", () => {
     const dir = initRepo();
+    // runCreate auto-commits its own file now (task-auto-commit-tracker),
+    // so the tree stays clean for start --worktree.
+    runCreate({ cwd: dir, type: "task", title: "Linked", parent: "login", id: "linked", issue: 9, now: NOW });
+    expect(git(["status", "--porcelain"], dir)).toBe("");
+
+    const prBodies: string[] = [];
+    const result = runStart(
+      { cwd: dir, id: "task-linked", assignee: "arggon", worktree: true, openPr: true, now: NOW },
+      {
+        git: {
+          ...localGit(),
+          createDraftPr: (_cwd, input) => {
+            prBodies.push(input.body);
+            return "https://github.com/o/r/pull/2";
+          },
+        },
+      },
+    );
+
+    expect(result.prUrl).toBe("https://github.com/o/r/pull/2");
+    expect(prBodies).toEqual([
+      "Work item: task-linked\n\nPath: tasks/launch/auth/login/task-linked.md\n\n" +
+        "Draft opened by `arggon start --worktree`.\n\nCloses #9",
+    ]);
+  });
+
+  it("attaches on re-run instead of failing or duplicating the worktree", () => {    const dir = initRepo();
     const first = runStart(
       { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
       { git: localGit() },

@@ -3,6 +3,13 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
+import {
+  commitTrackerMutation,
+  readAutoCommitConfig,
+  resolveAutoCommit,
+  trackerCommitMessage,
+  type TrackerCommitResult,
+} from "./tracker-commit.js";
 import { runUpdate } from "./update.js";
 
 const TERMINAL: ReadonlySet<string> = new Set(["done", "cancelled"]);
@@ -16,6 +23,12 @@ export type CleanupOptions = {
    * Never touches items that are not terminal or branches that are unmerged.
    */
   prune?: boolean;
+  /**
+   * Auto-commit the item files whose worktree_path record `--prune` cleared
+   * (tracker hygiene): ONE commit covering all cleared records. `undefined`
+   * resolves via `x-tracker.auto-commit` config, default ON.
+   */
+  commit?: boolean;
 };
 
 /** One tracked worktree (an item with a worktree_path record) and its classification. */
@@ -50,6 +63,8 @@ export type CleanupResult = {
   pruned: CleanupAction[];
   /** Per-item failures during prune (removal/branch-delete errors). */
   failures: string[];
+  /** Tracker auto-commit outcome for the cleared worktree_path records (prune only). */
+  commit?: TrackerCommitResult;
 };
 
 /** Git operations for cleanup, injectable for tests. */
@@ -219,6 +234,8 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
 
   const pruned: CleanupAction[] = [];
   const failures: string[] = [];
+  const clearedPaths: string[] = [];
+  const clearedIds: string[] = [];
   if (opts.prune) {
     for (const entry of entries.filter((e) => e.removable)) {
       try {
@@ -232,6 +249,9 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
         }
         runUpdate({ cwd: root, id: entry.id, worktreePath: "" });
         pruned.push({ id: entry.id, action: "cleared worktree_path" });
+        // Entries are built from byId values, so the item always resolves.
+        clearedPaths.push(byId.get(entry.id)!.filePath);
+        clearedIds.push(entry.id);
       } catch (err) {
         failures.push(
           `${entry.id}: ${err instanceof Error ? err.message : String(err)}`,
@@ -240,5 +260,17 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
     }
   }
 
-  return { root, base, entries, pruned, failures };
+  // Tracker hygiene (task-auto-commit-tracker): one commit covering every
+  // item file whose worktree_path record was cleared this run — staged
+  // surgically by path, so unrelated dirty state stays untouched. Skipped
+  // when nothing was cleared; never fails the command.
+  const commit: TrackerCommitResult | undefined =
+    opts.prune && clearedPaths.length > 0
+      ? commitTrackerMutation(root, clearedPaths, {
+          message: trackerCommitMessage("pruned", clearedIds),
+          commit: resolveAutoCommit(opts.commit, readAutoCommitConfig(root)),
+        })
+      : undefined;
+
+  return { root, base, entries, pruned, failures, commit };
 }

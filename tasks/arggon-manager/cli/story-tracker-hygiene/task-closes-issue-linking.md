@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-closes-issue-linking
 title: "Issue-to-PR linking: Closes #N with issue number in frontmatter"
+assignee: Arggon
 parent: story-tracker-hygiene
 labels: []
 created: "2026-09-13"
@@ -23,6 +24,6 @@ updated: "2026-09-13"
 
 ## Acceptance
 
-- [ ] import-issues records the issue number on the item (contract-visible); migrate: items without it are unaffected
-- [ ] start --open-pr appends "Closes #N" to the PR body when the claimed item carries an issue number
-- [ ] Tests: import -> item.issue set; start --open-pr body contains Closes #N; items without issue unaffected
+- [x] import-issues records the issue number on the item (contract-visible); migrate: items without it are unaffected
+- [x] start --open-pr appends "Closes #N" to the PR body when the claimed item carries an issue number
+- [x] Tests: import -> item.issue set; start --open-pr body contains Closes #N; items without issue unaffected

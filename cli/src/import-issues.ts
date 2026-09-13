@@ -236,6 +236,9 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
         title: "Imported GitHub issues",
         id: IMPORTED_STORY_ID,
         parent: epics[0].id,
+        // Bulk import keeps its historic no-commit behavior (out of the
+        // tracker auto-commit surface; callers commit the sweep themselves).
+        commit: false,
         now,
       });
       storyCreated = true;
@@ -274,6 +277,11 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
         id: `issue-${number}`,
         labels,
         body: importedBody(issue),
+        // Provenance (task-closes-issue-linking): the GitHub issue number rides
+        // on the item so `start --open-pr` can close it on merge (Closes #N).
+        issue: number,
+        // Bulk import keeps its historic no-commit behavior.
+        commit: false,
         now,
       });
       if (status === "done") {

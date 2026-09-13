@@ -9,6 +9,7 @@ import { runList } from "./list.js";
 import { runUpdate } from "./update.js";
 import { STATUSES } from "./status.js";
 import { toContractWorkItem } from "./contract.js";
+import { commitPayload } from "./tracker-commit.js";
 
 /**
  * Stdio MCP server exposing the shared kernel (list/create/update/comment) as
@@ -258,10 +259,15 @@ export function runMcpServer(opts: McpServerOptions): void {
           assignee: str(args.assignee),
           status: str(args.status),
           blockedReason: str(args.blocked_reason),
+          // Tracker auto-commit resolves like the CLI (`x-tracker.auto-commit`,
+          // default ON) so both entry points stay envelope-identical.
         });
         return successEnvelope(
           "create",
-          { item: toContractWorkItem(result.item, result.root) },
+          {
+            item: toContractWorkItem(result.item, result.root),
+            commit: commitPayload(result.commit),
+          },
           conventionVersion(),
         );
       });
@@ -296,10 +302,16 @@ export function runMcpServer(opts: McpServerOptions): void {
           id: str(args.id) ?? "",
           text: str(args.text) ?? "",
           author: str(args.author),
+          // Tracker auto-commit resolves like the CLI.
         });
         return successEnvelope(
           "comment",
-          { id: result.id, path: result.path, comment: result.comment },
+          {
+            id: result.id,
+            path: result.path,
+            comment: result.comment,
+            commit: commitPayload(result.commit),
+          },
           conventionVersion(),
         );
       });

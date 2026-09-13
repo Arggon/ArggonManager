@@ -9,7 +9,7 @@ import { runUpdate } from "./update.js";
 
 const NOW = new Date("2026-09-03T12:00:00Z");
 
-type Call = { op: string; arg?: string };
+type Call = { op: string; arg?: string; body?: string };
 
 function primedTask(): { dir: string; id: string } {
   const dir = mkdtempSync(join(tmpdir(), "arggon-start-"));
@@ -56,7 +56,7 @@ function fakeGit(overrides: Partial<StartGit> = {}): StartGit & { calls: Call[] 
       calls.push({ op: "push", arg: branch });
     },
     createDraftPr: (_cwd, input) => {
-      calls.push({ op: "pr", arg: input.title });
+      calls.push({ op: "pr", arg: input.title, body: input.body });
       return "https://github.com/o/r/pull/1";
     },
     worktreeList: () => {
@@ -153,5 +153,40 @@ describe("start", () => {
     expect(() =>
       runStart({ cwd: dir, id, now: NOW }, { git: fakeGit({ resolveMe: () => undefined }) }),
     ).toThrow(/could not resolve assignee/);
+  });
+});
+
+describe("start --open-pr closes the linked GitHub issue (task-closes-issue-linking)", () => {
+  it("appends Closes #N when the item carries an issue number", () => {
+    const { dir } = primedTask();
+    const item = runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Imported fix",
+      parent: "story-login",
+      id: "imported-fix",
+      issue: 12,
+      now: NOW,
+    });
+    const git = fakeGit();
+    const result = runStart({ cwd: dir, id: item.id, assignee: "arggon", openPr: true, now: NOW }, { git });
+    expect(result.prUrl).not.toBeNull();
+    const pr = git.calls.find((c) => c.op === "pr");
+    expect(pr?.body).toBe(
+      `Work item: ${item.id}\n\nPath: tasks/launch-mvp/auth/story-login/${item.id}.md\n\n` +
+        "Draft opened by `arggon start`.\n\nCloses #12",
+    );
+  });
+
+  it("leaves the body unchanged for items without a linked issue", () => {
+    const { dir, id } = primedTask();
+    const git = fakeGit();
+    runStart({ cwd: dir, id, assignee: "arggon", openPr: true, now: NOW }, { git });
+    const pr = git.calls.find((c) => c.op === "pr");
+    expect(pr?.body).toBe(
+      `Work item: ${id}\n\nPath: tasks/launch-mvp/auth/story-login/${id}.md\n\n` +
+        "Draft opened by `arggon start`.",
+    );
+    expect(pr?.body).not.toContain("Closes");
   });
 });

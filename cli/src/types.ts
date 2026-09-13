@@ -48,6 +48,13 @@ export type WorkItem = {
    * item was started without worktree isolation.
    */
   worktree_path: string | null;
+  /**
+   * GitHub issue number recorded by `arggon import-issues` (frontmatter
+   * `issue`). Additive within schemaVersion 1; `null` when the item was not
+   * imported from an issue. `start --open-pr` appends `Closes #N` to the PR
+   * body for items carrying it.
+   */
+  issue: number | null;
 };
 
 /** One validate finding. `path` is posix, repo-relative (file or directory). */

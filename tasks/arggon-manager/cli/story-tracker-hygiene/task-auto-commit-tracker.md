@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-auto-commit-tracker
 title: Auto-commit tracker mutations (--commit/--no-commit)
+assignee: Arggon
 parent: story-tracker-hygiene
 labels: []
 created: "2026-09-13"
@@ -23,6 +24,6 @@ updated: "2026-09-13"
 
 ## Acceptance
 
-- [ ] create/comment/adopt/cleanup --prune commit their mutated files by default (--no-commit opts out); message references the item id
-- [ ] Staging is surgical (only the mutated path); non-git trees skip silently; config override via x-tracker
-- [ ] Tests: mutation + assert commit exists with only that path staged/changed; --no-commit leaves dirty
+- [x] create/comment/adopt/cleanup --prune commit their mutated files by default (--no-commit opts out); message references the item id
+- [x] Staging is surgical (only the mutated path); non-git trees skip silently; config override via x-tracker
+- [x] Tests: mutation + assert commit exists with only that path staged/changed; --no-commit leaves dirty
