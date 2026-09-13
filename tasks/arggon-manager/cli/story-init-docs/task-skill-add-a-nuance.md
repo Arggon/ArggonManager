@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-skill-add-a-nuance
 title: "Skill: qualify the git add -A pitfall (gitignore-scope nuance)"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-init-docs
 labels: []
 created: "2026-09-13"
 updated: "2026-09-13"
-claimed_at: "2026-09-13T15:12:07.291Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-init-docs/task-skill-add-a-nuance.md
