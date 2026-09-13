@@ -56,6 +56,18 @@ export type TrackerConfig = {
   autoCommit: boolean | null;
 };
 
+/** `x-import` namespaced extension options (task-import-type-mapping). */
+export type ImportConfig = {
+  /**
+   * GitHub label -> work-item type mapping from `x-import.label-types`
+   * (keys matched exactly against the slugified issue labels). `null` when
+   * unset (the import applies its built-in default: `bug` -> bug, everything
+   * else -> task). Values are validated as work-item types at parse time;
+   * the import itself only accepts leaf types (`task`/`bug`).
+   */
+  labelTypes: Record<string, ItemType> | null;
+};
+
 /**
  * One generated-doc provenance record (`x-generated` namespaced extension,
  * story-adoption-state): destination path -> entry, written by
@@ -82,6 +94,8 @@ export type ConventionConfig = {
   playbooks: PlaybooksConfig;
   /** Tracker-hygiene options (`x-tracker` extension key). */
   tracker: TrackerConfig;
+  /** Issue-import options (`x-import` extension key). */
+  import: ImportConfig;
   /**
    * Generated-doc provenance (`x-generated` extension key): destination path
    * (posix, relative to the repo root) -> provenance entry.
@@ -103,10 +117,11 @@ function stripQuotes(value: string): string {
  * Parse `tasks/.convention.yml` (line-oriented, no YAML dependency).
  * Unknown top-level keys are ignored for forward compatibility;
  * `x-views` (saved views), `x-playbooks` (playbook staleness options),
- * `x-tracker` (tracker-hygiene options), and `x-generated` (generated-doc
- * provenance) are the official namespaced extensions.
+ * `x-tracker` (tracker-hygiene options), `x-import` (issue-import options),
+ * and `x-generated` (generated-doc provenance) are the official namespaced
+ * extensions.
  * Throws with file context on malformed `branch_patterns`, `x-views`,
- * `x-playbooks`, or `x-tracker`; `x-generated` parses tolerantly
+ * `x-playbooks`, `x-tracker`, or `x-import`; `x-generated` parses tolerantly
  * (machine-written state).
  */
 export function parseConventionConfig(
@@ -118,9 +133,12 @@ export function parseConventionConfig(
   const playbooks: PlaybooksConfig = { maxAgeDays: null };
   const tracker: TrackerConfig = { autoCommit: null };
   const generated: Record<string, GeneratedEntry> = {};
+  const importLabelTypes: Record<string, ItemType> = {};
+  let importHasLabelTypes = false;
   let version = CONVENTION_VERSION_DEFAULT;
   let section: string | null = null;
   let generatedDest: string | null = null;
+  let importOption: string | null = null;
 
   for (const line of raw.split(/\r?\n/)) {
     if (!line.trim() || line.trimStart().startsWith("#")) continue;
@@ -134,6 +152,7 @@ export function parseConventionConfig(
     if (indent === 0) {
       section = null;
       generatedDest = null;
+      importOption = null;
       if (key === "version") {
         const parsed = Number.parseInt(value, 10);
         if (Number.isFinite(parsed)) version = parsed;
@@ -157,6 +176,11 @@ export function parseConventionConfig(
           throw new Error(`${sourcePath}: 'x-tracker' must be a mapping, one option per line`);
         }
         section = "x-tracker";
+      } else if (key === "x-import") {
+        if (value !== "") {
+          throw new Error(`${sourcePath}: 'x-import' must be a mapping, one option per line`);
+        }
+        section = "x-import";
       } else if (key === "x-generated") {
         if (value !== "") {
           throw new Error(
@@ -219,6 +243,41 @@ export function parseConventionConfig(
       tracker.autoCommit = value === "true";
       continue;
     }
+    if (section === "x-import") {
+      // Namespaced extension (task-import-type-mapping): unknown option keys
+      // are ignored (ignore-unknown); the official `label-types` option is a
+      // nested mapping of GitHub label -> work-item type.
+      if (indent <= 2) {
+        importOption = key === "label-types" ? "label-types" : null;
+        if (importOption !== null) {
+          // An explicitly declared label-types option is "set" even with zero
+          // entries (empty mapping = no label mapping, replacing the default).
+          importHasLabelTypes = true;
+          if (value !== "") {
+            throw new Error(`${sourcePath}: 'label-types' must be a mapping, one label per line`);
+          }
+        }
+        continue;
+      }
+      if (importOption !== "label-types") continue;
+      const label = stripQuotes(key);
+      if (!label) {
+        throw new Error(`${sourcePath}: invalid x-import entry ${JSON.stringify(line)}`);
+      }
+      if (label in importLabelTypes) {
+        throw new Error(`${sourcePath}: duplicate label '${label}' in x-import.label-types`);
+      }
+      const mapped = stripQuotes(value);
+      if (!isItemType(mapped)) {
+        throw new Error(
+          `${sourcePath}: 'label-types' values must be work-item types ` +
+            `(initiative | epic | story | task | bug), got ${JSON.stringify(value)} for label '${label}'`,
+        );
+      }
+      importLabelTypes[label] = mapped;
+      importHasLabelTypes = true;
+      continue;
+    }
     if (section === "x-views") {
       if (!key) {
         throw new Error(`${sourcePath}: invalid x-views entry ${JSON.stringify(line)}`);
@@ -251,7 +310,15 @@ export function parseConventionConfig(
     branchPatterns[key] = pattern;
   }
 
-  return { version, branchPatterns, views, playbooks, tracker, generated };
+  return {
+    version,
+    branchPatterns,
+    views,
+    playbooks,
+    tracker,
+    import: { labelTypes: importHasLabelTypes ? importLabelTypes : null },
+    generated,
+  };
 }
 
 /** Read and parse `<dir>/tasks/.convention.yml`. Missing file yields version 0 + defaults. */
@@ -264,6 +331,7 @@ export function readConventionConfig(dir: string): ConventionConfig {
       views: {},
       playbooks: { maxAgeDays: null },
       tracker: { autoCommit: null },
+      import: { labelTypes: null },
       generated: {},
     };
   }

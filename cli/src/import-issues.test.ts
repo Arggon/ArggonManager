@@ -1,9 +1,9 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { parseFrontmatter } from "./frontmatter.js";
-import { type GhExecutor, ghIssueListJson, importedBody, mapIssueState, normalizeGhLabels, runImportIssues } from "./import-issues.js";
+import { type GhExecutor, ghIssueListJson, importedBody, mapIssueState, normalizeGhLabels, resolveImportType, runImportIssues } from "./import-issues.js";
 import { runCreate } from "./create.js";
 import { runInit } from "./init.js";
 import { runList } from "./list.js";
@@ -90,7 +90,7 @@ describe("runImportIssues", () => {
     expect(result.entries).toEqual([
       {
         issue: 1,
-        id: "task-issue-1",
+        id: "bug-issue-1",
         title: "issue #1: Fix login",
         status: "todo",
         action: "created",
@@ -107,10 +107,12 @@ describe("runImportIssues", () => {
     const storyPath = join(dir, "tasks/launch-mvp/backlog/story-imported-issues/story-imported-issues.md");
     expect(fm(storyPath)).toMatchObject({ type: "story", id: "story-imported-issues", parent: "backlog" });
 
-    const openPath = join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-1.md");
+    // Issue 1 carries the `bug` label: built-in default mapping imports it
+    // as a bug leaf, still under the same parent story.
+    const openPath = join(dir, "tasks/launch-mvp/backlog/story-imported-issues/bug-issue-1.md");
     expect(fm(openPath)).toMatchObject({
-      type: "task",
-      id: "task-issue-1",
+      type: "bug",
+      id: "bug-issue-1",
       status: "todo",
       parent: "story-imported-issues",
       title: "issue #1: Fix login",
@@ -134,14 +136,14 @@ describe("runImportIssues", () => {
 
     // The number lands in the additive `issue` frontmatter field, open and
     // closed issues alike, so `start --open-pr` can emit `Closes #N`.
-    const openPath = join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-1.md");
+    const openPath = join(dir, "tasks/launch-mvp/backlog/story-imported-issues/bug-issue-1.md");
     expect(fm(openPath).issue).toBe(1);
     const closedPath = join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-2.md");
     expect(fm(closedPath).issue).toBe(2);
 
     // The field is contract-visible and convention-clean (no UNKNOWN_KEY warning).
     const { items } = runList({ cwd: dir });
-    const imported = items.find((i) => i.id === "task-issue-1");
+    const imported = items.find((i) => i.id === "bug-issue-1");
     expect(toContractWorkItem(imported!, dir).issue).toBe(1);
     const validation = runValidate({ cwd: dir });
     expect(validation.errors).toEqual([]);
@@ -154,7 +156,7 @@ describe("runImportIssues", () => {
     runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW });
 
     const raw = readFileSync(
-      join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-1.md"),
+      join(dir, "tasks/launch-mvp/backlog/story-imported-issues/bug-issue-1.md"),
       "utf8",
     );
     expect(raw).toContain("Login fails on empty password.");
@@ -207,8 +209,8 @@ describe("runImportIssues", () => {
 
     expect(result.story).toEqual({ id: "story-import", created: false });
     expect(existsSync(join(dir, "tasks/launch-mvp/backlog/story-imported-issues"))).toBe(false);
-    const taskPath = join(dir, "tasks/launch-mvp/backlog/story-import/task-issue-1.md");
-    expect(fm(taskPath)).toMatchObject({ id: "task-issue-1", parent: "story-import" });
+    const taskPath = join(dir, "tasks/launch-mvp/backlog/story-import/bug-issue-1.md");
+    expect(fm(taskPath)).toMatchObject({ id: "bug-issue-1", parent: "story-import" });
   });
 
   it("maps labels kebab-case, dedupes, and counts invalid ones", () => {
@@ -271,6 +273,133 @@ describe("runImportIssues", () => {
     expect(() => runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW })).toThrow(
       /gh issue list failed \(gh auth expired; check `gh auth status`\)/,
     );
+  });
+});
+
+describe("import type mapping (task-import-type-mapping)", () => {
+  function issueWithLabels(number: number, labels: string[]) {
+    return { number, title: `Issue ${number}`, state: "OPEN", body: null, labels };
+  }
+
+  function writeConvention(dir: string, content: string): void {
+    writeFileSync(join(dir, "tasks/.convention.yml"), content, "utf8");
+  }
+
+  it("imports the bug label as a bug under the same story (built-in default)", () => {
+    const dir = primed();
+    const execGh = ghIssueListMock(JSON.stringify([issueWithLabels(5, ["bug"])]));
+
+    const result = runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW });
+
+    expect(result.entries[0]!.id).toBe("bug-issue-5");
+    const path = join(dir, "tasks/launch-mvp/backlog/story-imported-issues/bug-issue-5.md");
+    expect(fm(path)).toMatchObject({
+      type: "bug",
+      id: "bug-issue-5",
+      parent: "story-imported-issues",
+      status: "todo",
+      issue: 5,
+    });
+    const validation = runValidate({ cwd: dir });
+    expect(validation.errors).toEqual([]);
+  });
+
+  it("imports enhancement and feature labels as tasks by default", () => {
+    const dir = primed();
+    const execGh = ghIssueListMock(
+      JSON.stringify([issueWithLabels(6, ["enhancement"]), issueWithLabels(7, ["feature"])]),
+    );
+
+    const result = runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW });
+
+    expect(result.entries.map((e) => e.id)).toEqual(["task-issue-6", "task-issue-7"]);
+    expect(
+      fm(join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-6.md")).type,
+    ).toBe("task");
+    expect(
+      fm(join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-7.md")).type,
+    ).toBe("task");
+  });
+
+  it("first mapped label in issue order wins (bug + documentation -> bug)", () => {
+    const dir = primed();
+    const execGh = ghIssueListMock(
+      JSON.stringify([issueWithLabels(8, ["documentation", "bug"]), issueWithLabels(9, ["bug", "enhancement"])]),
+    );
+
+    const result = runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW });
+
+    expect(result.entries.map((e) => e.id)).toEqual(["bug-issue-8", "bug-issue-9"]);
+    expect(
+      fm(join(dir, "tasks/launch-mvp/backlog/story-imported-issues/bug-issue-8.md")).type,
+    ).toBe("bug");
+  });
+
+  it("unmapped labels import as tasks", () => {
+    const dir = primed();
+    const execGh = ghIssueListMock(JSON.stringify([issueWithLabels(10, ["documentation"])]));
+
+    const result = runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW });
+
+    expect(result.entries[0]!.id).toBe("task-issue-10");
+    expect(
+      fm(join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-10.md")).type,
+    ).toBe("task");
+  });
+
+  it("an explicit x-import.label-types mapping replaces the built-in default", () => {
+    const dir = primed();
+    writeConvention(dir, "version: 3\nx-import:\n  label-types:\n    bug: task\n");
+    const execGh = ghIssueListMock(JSON.stringify([issueWithLabels(11, ["bug"])]));
+
+    const result = runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW });
+
+    expect(result.entries[0]!.id).toBe("task-issue-11");
+    expect(
+      fm(join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-11.md")).type,
+    ).toBe("task");
+  });
+
+  it("fails with an actionable error when label-types maps to a container type", () => {
+    const dir = primed();
+    writeConvention(dir, "version: 3\nx-import:\n  label-types:\n    feature: story\n");
+    const execGh = ghIssueListMock(JSON.stringify([issueWithLabels(12, ["feature"])]));
+
+    // Config errors precede any gh call (IMPORT_FAILED with the explanation
+    // that stories are containers and imports are leaves under one story).
+    expect(() => runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW })).toThrow(
+      /x-import\.label-types maps 'feature' to 'story'.*'task' or 'bug'/s,
+    );
+    expect(execGh).not.toHaveBeenCalled();
+  });
+
+  it("surfaces a malformed x-import section as a parse error", () => {
+    const dir = primed();
+    writeConvention(dir, "x-import: 42\n");
+    const execGh = ghIssueListMock(JSON.stringify([issueWithLabels(13, [])]));
+
+    expect(() => runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW })).toThrow(
+      /'x-import' must be a mapping/,
+    );
+  });
+
+  it("rejects label-types values that are not work-item types", () => {
+    const dir = primed();
+    writeConvention(dir, "x-import:\n  label-types:\n    bug: canoe\n");
+    const execGh = ghIssueListMock(JSON.stringify([issueWithLabels(14, ["bug"])]));
+
+    expect(() => runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW })).toThrow(
+      /'label-types' values must be work-item types/,
+    );
+  });
+});
+
+describe("resolveImportType", () => {
+  it("first mapping hit in label order wins; unmapped labels default to task", () => {
+    expect(resolveImportType(["documentation", "bug"], { bug: "bug" })).toBe("bug");
+    expect(resolveImportType(["bug", "enhancement"], { bug: "bug", enhancement: "task" })).toBe("bug");
+    expect(resolveImportType(["enhancement"], { bug: "bug" })).toBe("task");
+    expect(resolveImportType([], {})).toBe("task");
   });
 });
 
