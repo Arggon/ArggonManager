@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-update-reparent
 title: "update --parent: reparent items without moving files by hand"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-cli-ergonomics
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
-claimed_at: "2026-09-14T15:49:34.400Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-cli-ergonomics/task-update-reparent.md
