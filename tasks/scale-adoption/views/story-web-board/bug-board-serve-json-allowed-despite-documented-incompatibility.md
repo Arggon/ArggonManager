@@ -4,6 +4,7 @@ status: in_progress
 id: bug-board-serve-json-allowed-despite-documented-incompatibility
 title: board --serve --json allowed despite documented incompatibility
 assignee: Arggon
+branch: fix/bug-board-serve-json-allowed-despite-documented-incompatibility
 parent: story-web-board
 labels: []
 created: "2026-09-14"
