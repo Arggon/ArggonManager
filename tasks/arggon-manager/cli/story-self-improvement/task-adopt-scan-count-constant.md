@@ -29,7 +29,7 @@ Two housekeeping findings from the wave-1 reviews (PRs #198/#199):
 
 ## Acceptance
 
-- [ ] `ADOPT_SCAN_PATHS` includes docs/deploy.md (adopt inventory reports it)
-- [ ] A single derived constant replaces the hardcoded generated-doc counts in tests; adding the next template touches only templates/ + docs.ts
+- [x] `ADOPT_SCAN_PATHS` includes docs/deploy.md (adopt inventory reports it)
+- [x] A single derived constant replaces the hardcoded generated-doc counts in tests; adding the next template touches only templates/ + docs.ts
 
 ## Notes
