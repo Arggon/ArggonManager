@@ -17,10 +17,10 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this story exists. -->
+Third ergonomics batch, from the estanteria MCP-first experiment (2026-09-14): (1) the `parent:` filter predicate is direct-parent only, so saved views cannot express "everything under this initiative" — the agent's per-initiative views stopped at epic level; (2) `update` has no --parent, so imported items (import-issues pins them under an adoption story) cannot be reparented to their real home without hand-moving files; (3) package.json version is never bumped — `arggon --version` prints 0.0.0, making it impossible to audit which build ran.
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] Filters/views can target whole initiatives or subtrees (ancestor predicate or initiative field); documented + tested
+- [ ] `arggon update <id> --parent <new-parent>` reparents with the same rules as create's parent validation; documented + tested
+- [ ] A version policy exists (bump on release or changelog-driven) and --version reflects it; documented

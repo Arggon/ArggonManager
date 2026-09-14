@@ -19,10 +19,9 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this task exists. -->
+filter.ts:155 — `parent:` matches the DIRECT parent only; no OR, no ancestor predicate. Saved views cannot express "everything under this initiative" (the estanteria agent's per-frente views stopped at epic level).
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] `ancestor:<id>` predicate (true when id appears anywhere in the item's parent chain) works in filters and x-views; or an equivalent `initiative:<id>` resolution — document which landed
+- [ ] Table-driven tests: nested chains, negation, composition

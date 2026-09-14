@@ -19,10 +19,9 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this task exists. -->
+Found by the estanteria MCP-first experiment (2026-09-13): the SKILL says docs/convention.md is the source of truth for schema, and the adopter's generated docs/convention.md is where an agent looks first — but the generated (adopter-local) template documents none of the x-* namespaced extensions (x-views value syntax, x-import.label-types, x-worktree.post-start[-shell], x-tracker, x-generated). The agent's first x-views attempt failed with a misleading error and had to read convention.ts to discover views are name: "<predicate expression>" mappings.
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] templates/docs/convention.md gains a "Namespaced extensions" section: the x-* list with one-line what/where, pointing to ArggonManager docs/convention.md as the full reference
+- [ ] init-docs test asserts the section exists in the generated file

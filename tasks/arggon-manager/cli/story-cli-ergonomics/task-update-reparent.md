@@ -19,10 +19,9 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this task exists. -->
+convention.md documents reparenting as move-dir + update parent references, but the CLI has no --parent on update: imported items (import-issues pins them under the adoption story) cannot be moved to their real home without hand-editing files and paths.
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] `arggon update <id> --parent <new-parent>` validates the edge (expected parent type), rewrites frontmatter, MOVES the file/directory per the folder layout rules (leaves move file; containers move their whole directory), and refuses invalid edges
+- [ ] Tests: leaf reparent, container reparent with children (paths updated), invalid edge refusal, cascade/report consistency after move
