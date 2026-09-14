@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-architecture-first-principle
 title: "Architecture-first principle: good practices and sound architecture always matter"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: operating-principles
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
-claimed_at: "2026-09-14T20:34:21.725Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/operating-principles/task-architecture-first-principle.md
