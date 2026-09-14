@@ -4,6 +4,7 @@ status: in_progress
 id: task-adr0006-compact-next
 title: "ADR 0006 quick wins: compact JSON envelopes + next-first agent guidance"
 assignee: Arggon
+branch: feat/task-adr0006-compact-next
 parent: operating-principles
 labels: []
 created: "2026-09-14"
