@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-init-mcp-config
 title: Init registers the arggon MCP server (.mcp.json)
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-init-docs
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
-claimed_at: "2026-09-14T12:37:29.366Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-init-docs/task-init-mcp-config.md
@@ -28,6 +27,6 @@ Design notes: the file must remain VALID JSON — the arggon:generated provenanc
 
 ## Acceptance
 
-- [ ] arggon init generates .mcp.json (tier-1, valid JSON, mcpServers.arggon = {command: "arggon", args: ["mcp"]}, NO HTML marker inside), enters x-generated state, never overwrites, skipped[]/created[] reported
-- [ ] Generated AGENTS.md mentions the registered MCP server (.mcp.json)
-- [ ] Tests (valid JSON parse, no-overwrite, idempotent, x-generated entry) + README/docs/agents.md + SKILL.md sync
+- [x] arggon init generates .mcp.json (tier-1, valid JSON, mcpServers.arggon = {command: "arggon", args: ["mcp"]}, NO HTML marker inside), enters x-generated state, never overwrites, skipped[]/created[] reported
+- [x] Generated AGENTS.md mentions the registered MCP server (.mcp.json)
+- [x] Tests (valid JSON parse, no-overwrite, idempotent, x-generated entry) + README/docs/agents.md + SKILL.md sync
