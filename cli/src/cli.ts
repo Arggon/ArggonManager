@@ -276,6 +276,7 @@ program
     "--no-commit",
     "keep tasks/ dirty: skip the tracker auto-commit of the created item (default: on; x-tracker.auto-commit: false opts out tree-wide)",
   )
+  .option("--full", "emit complete WorkItem shapes (default: compact per ADR 0006 — null/empty optional fields omitted)", false)
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (
@@ -288,6 +289,7 @@ program
         status?: string;
         blockedReason?: string;
         commit?: boolean;
+        full?: boolean;
         json?: boolean;
       },
     ) => {
@@ -308,7 +310,7 @@ program
           successJson(
             "create",
             {
-              item: toContractWorkItem(result.item, result.root),
+              item: toContractWorkItem(result.item, result.root, { full: opts.full === true }),
               commit: commitPayload(result.commit),
             },
             readConventionVersion(result.root),
@@ -366,10 +368,12 @@ program
     "--older-than <duration>",
     'stale threshold for --stale: <number><d|h|m> (e.g. 7d, 12h, 30m)',
   )
+  .option("--full", "emit complete WorkItem shapes (default: compact per ADR 0006 — null/empty optional fields omitted)", false)
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (opts: {
       status?: string;
+      full?: boolean;
       type?: string;
       parent?: string;
       assignee?: string;
@@ -395,7 +399,8 @@ program
         if (json) {
           successJson(
             "list",
-            { items: result.items.map((item) => toContractWorkItem(item, result.root)) },
+            { items: result.items.map((item) => toContractWorkItem(item, result.root, { full: opts.full === true })) },
+          
             readConventionVersion(result.root),
           );
           return;
@@ -666,11 +671,13 @@ program
     "--no-commit",
     "keep tasks/ dirty: skip the tracker auto-commit of the mutated item files, cascade included (default: on; x-tracker.auto-commit: false opts out tree-wide)",
   )
+  .option("--full", "emit complete WorkItem shapes (default: compact per ADR 0006 — null/empty optional fields omitted)", false)
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (
       id: string,
       opts: {
+        full?: boolean;
         title?: string;
         status?: string;
         assignee?: string;
@@ -741,7 +748,7 @@ program
           successJson(
             "update",
             {
-              item: toContractWorkItem(result.item, result.root),
+              item: toContractWorkItem(result.item, result.root, { full: opts.full === true }),
               autoCompleted: result.autoCompleted,
               cascadeLevels: result.cascadeLevels,
               ...(result.movedFrom ? { movedFrom: result.movedFrom } : {}),

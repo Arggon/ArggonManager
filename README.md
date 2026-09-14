@@ -198,6 +198,7 @@ arggon list --status todo
 arggon list --type bug --assignee @me
 arggon list --parent story-login
 arggon list --json
+arggon list --json --full       # complete WorkItem shapes (default: compact per ADR 0006 — null/empty optional fields omitted)
 arggon --json list --type task --status in_progress
 arggon list --filter "status:todo !label:security"
 arggon list --view my-open-bugs

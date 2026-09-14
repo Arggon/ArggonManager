@@ -58,7 +58,11 @@ Empty success stays `ok: true` (e.g. future `list` with no items → `items: []`
 
 ### `WorkItem`
 
-Stable fields aligned with convention v0 plus the additive `branch` (v1) and `milestone` / `depends_on` (v3) fields. **Always present** so agents need not special-case missing keys:
+Stable fields aligned with convention v0 plus the additive `branch` (v1) and `milestone` / `depends_on` (v3) fields.
+
+**Compact default (ADR 0006).** In `list` / `create` / `update` `--json` payloads, the optional fields below are **omitted when null/empty unless `--full`** is passed: `blocked_reason`, `milestone`, `worktree_path`, `issue` (when null), and `depends_on`, `labels` (when the array is empty). `schemaVersion` is unchanged — omission is a documented default, not a shape break: read optional fields as `item.field ?? null` and either shape works. `--full` restores the complete always-present shape shown in the table. Human output and the other commands are unaffected.
+
+| Field            | Type                                                          | Notes                                                                       |
 
 | Field            | Type                                                          | Notes                                                                       |
 | ---------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------- |

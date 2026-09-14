@@ -231,6 +231,8 @@ describe("CLI --json", () => {
     });
     expect(Array.isArray(body.items)).toBe(true);
     expect((body.items as Array<{ id: string }>).map((i) => i.id)).toEqual(["auth", "launch-mvp"]);
+    // Compact ADR 0006 default: null/empty optional fields are omitted;
+    // `--full` restores the complete shape (asserted in the --full case below).
     expect((body.items as Array<Record<string, unknown>>)[0]).toEqual({
       id: "auth",
       type: "epic",
@@ -239,14 +241,27 @@ describe("CLI --json", () => {
       assignee: null,
       branch: null,
       parent: "launch-mvp",
-      labels: [],
       created: expect.any(String),
       updated: expect.any(String),
       path: "tasks/launch-mvp/auth/auth.md",
+      claimed_at: null,
+    });
+  });
+
+  it("arggon list --json --full restores the complete WorkItem shape", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-json-list-full-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    const result = runCli(["list", "--json", "--full"], dir);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body).toMatchObject({ ok: true, command: "list" });
+    const item = (body.items as Array<Record<string, unknown>>)[0]!;
+    expect(item).toMatchObject({
       blocked_reason: null,
       milestone: null,
       depends_on: [],
-      claimed_at: null,
+      labels: [],
       worktree_path: null,
       issue: null,
     });

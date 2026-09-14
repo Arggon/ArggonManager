@@ -56,6 +56,38 @@ describe("toContractWorkItem", () => {
     expect(item.branch).toBeNull();
   });
 
+  it("compact default omits null/empty optional fields (ADR 0006)", () => {
+    const item = toContractWorkItem(KERNEL_ITEM, "/tmp/repo", { full: false });
+    expect(item).not.toHaveProperty("blocked_reason");
+    expect(item).not.toHaveProperty("milestone");
+    expect(item).not.toHaveProperty("worktree_path");
+    expect(item).not.toHaveProperty("issue");
+    expect(item).not.toHaveProperty("depends_on");
+    // KERNEL_ITEM.labels is non-empty, so labels survives compaction.
+    expect(item.labels).toEqual(["security"]);
+    // Present, non-null fields survive untouched.
+    expect(item.assignee).toBeNull();
+    expect(item.claimed_at).toBeNull();
+  });
+
+  it("compact default keeps set optional fields", () => {
+    const item = toContractWorkItem(
+      {
+        ...KERNEL_ITEM,
+        labels: ["security"],
+        dependsOn: ["task-other"],
+        issue: 42,
+        blockedReason: "waiting on review",
+      },
+      "/tmp/repo",
+      { full: false },
+    );
+    expect(item.labels).toEqual(["security"]);
+    expect(item.depends_on).toEqual(["task-other"]);
+    expect(item.issue).toBe(42);
+    expect(item.blocked_reason).toBe("waiting on review");
+  });
+
   it("maps a set branch through", () => {
     const item = toContractWorkItem(
       { ...KERNEL_ITEM, branch: "feat/task-rate-limit" },

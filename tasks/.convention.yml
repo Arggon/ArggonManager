@@ -12,7 +12,7 @@ x-tracker:
 x-generated:
   .agents/skills/arggon-cli/SKILL.md:
     template: "skills/arggon-cli/SKILL.md"
-    checksum: "sha256:29926a1ca0a52e3b4d3fb61e271085bb48ece31abdb833bf28057622bef18431"
+    checksum: "sha256:75094e813cdb04a7fe232241f4379ca94351ef5dca9168a8a75c58ba1e0514ac"
     arggonVersion: "0.0.0"
     generatedAt: "2026-09-13T21:12:48.651Z"
     acknowledged: true

@@ -26,7 +26,14 @@ Implements the two quick wins of accepted [ADR 0006](../../../docs/adr/0006-toke
 
 ## Acceptance
 
-- [ ] Compact envelopes by default: `list`/`create`/`update`/`comment` `--json` payloads omit null/empty optional fields (blocked_reason, milestone, worktree_path, issue, depends_on when empty, labels when empty); `--full` restores the complete shape; schemaVersion unchanged (omission documented as the default in docs/json-output.md); contract/parity tests updated
-- [ ] next-first guidance: SKILL.md + generated AGENTS.md steer agents to `arggon next --json` for "what should I work on" instead of `list --json`; copy synced to .agents + re-acked
+- [x] Compact envelopes by default: `list`/`create`/`update`/`comment` `--json` payloads omit null/empty optional fields (blocked_reason, milestone, worktree_path, issue, depends_on when empty, labels when empty); `--full` restores the complete shape; schemaVersion unchanged (omission documented as the default in docs/json-output.md); contract/parity tests updated
+- [x] next-first guidance: SKILL.md + generated AGENTS.md steer agents to `arggon next --json` for "what should I work on" instead of `list --json`; copy synced to .agents + re-acked
 
 ## Notes
+
+## Implementation notes (2026-09-14)
+
+- Shared omission helper `compactWorkItem` in cli/src/json.ts; `toContractWorkItem` gains `{ full?: boolean }` (default full; list/create/update pass `full: !--full` in CLI + MCP).
+- `comment` envelope carries no WorkItem and already omits `commit` when skipped, so no compact change / no `--full` needed there.
+- Payload measured on this tree (same code, before/after): `list --json` 62,735 -> 48,683 bytes (-22.4%); `next --json` 909 bytes (~69x smaller than full list, matching the item's 67x estimate).
+- SKILL.md source edited; .agents copy regenerated; checksum re-acked in tasks/.convention.yml (doctor: 0 modified / 0 drifted). templates/docs/AGENTS.md got the one-line next-first steer.
