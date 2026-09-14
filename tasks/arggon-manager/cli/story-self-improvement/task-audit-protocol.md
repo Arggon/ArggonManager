@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-audit-protocol
 title: Adversarial audit protocol + first recurring audit
+assignee: Arggon
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T14:45:15.893Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/task-audit-protocol.md
