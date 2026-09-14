@@ -19,10 +19,13 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this task exists. -->
+From the task-version-policy review (PR #157): bumping package.json required
+editing version literals in 3 test files (adopt.test.ts, init-docs.test.ts,
+mcp-server.test.ts). Every future release-wave bump repeats that churn and a
+missed file fails CI unrelated to the release.
 
 ## Acceptance
 
-- [ ] 
+- [ ] Version assertions derive the expected value from `arggonVersion()` (or a shared fixture) instead of hardcoded literals; a bump touches only package.json + CHANGELOG
 
 ## Notes

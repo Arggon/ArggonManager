@@ -19,10 +19,14 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this task exists. -->
+From the bug-board-serve-json review (PR #153): the board command's envelope
+is documented in BOTH README.md and docs/json-output.md; the two copies
+already diverged once (README:263 described the one-shot --serve envelope
+correctly while docs/json-output.md did not). Duplication is a standing drift
+risk for the next board change.
 
 ## Acceptance
 
-- [ ] 
+- [ ] Decide and land: single source (one doc references the other) or a docs-parity test that fails when the two envelope descriptions diverge
 
 ## Notes
