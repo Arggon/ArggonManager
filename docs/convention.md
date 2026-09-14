@@ -419,17 +419,22 @@ x-import:
 
 ### Worktree bootstrap (`x-worktree`)
 
-`x-worktree` is the official namespaced extension for worktree-bootstrap options (`arggon start --worktree`, task-start-post-hook). It is a mapping of option names to values; the only official option today is `post-start`, a shell command run after a new worktree is created:
+`x-worktree` is the official namespaced extension for worktree-bootstrap options (`arggon start --worktree`, task-start-post-hook). It is a mapping of option names to values; the official options are `post-start`, a shell command run after a new worktree is created, and `post-start-shell`, the shell that command runs through:
 
 ```yaml
 version: 3
 x-worktree:
   post-start: "npm ci"
+  post-start-shell: "login"
 ```
 
 - The hook runs **only when `arggon start --worktree` creates a new worktree** — the sanctioned spot for per-checkout bootstrap like `npm ci` (linked worktrees do not share `node_modules`). Attach re-runs (idempotent re-starts of the same item) never re-run it.
 - Execution: `sh -c <command>` with cwd = the worktree root, after the claim commit / push / PR steps have succeeded.
-- Failure is reported, never fatal — the worktree exists and the claim stands. Human output prints `post-start failed: <command> → <stderr tail>` (last 3 stderr lines); the command still exits 0. `--json` reports the additive `postStart: { command, ok: false, error }` field (success: `postStart: { command, ok: true }`; no config: the field is absent).
+- **Environment footgun (task-post-start-env):** the hook inherits the environment of the process that ran `arggon` — not your interactive shell. Toolchains installed outside that PATH fail with "command not found" even though they work in a terminal (rustup installs to `~/.cargo/bin`; mise/asdf shims are similar). Workarounds, in order of preference:
+  1. Use absolute paths in the hook: `~/.cargo/bin/cargo check`.
+  2. Source the toolchain env inside the hook: `source ~/.cargo/env && cargo check`.
+  3. Set `x-worktree.post-start-shell: "login"` to run the hook via your login shell (`$SHELL -lc`), which sources your profile files (`~/.profile`, `~/.cargo/env`, ...) so the toolchain lands on PATH. The per-invocation flag `arggon start --worktree --post-start-shell login` overrides the config value; anything other than `inherit` (the default, current behavior) or `login` is a parse error.
+- Failure is reported, never fatal — the worktree exists and the claim stands. Human output prints `post-start failed: <command> → <stderr tail> (hint: hooks inherit the environment of the process that ran arggon — use absolute paths, or set x-worktree.post-start-shell: "login")` (last 3 stderr lines + hint); the command still exits 0. `--json` reports the additive `postStart: { command, ok: false, error }` field (success: `postStart: { command, ok: true }`; no config: the field is absent).
 - The per-invocation `--no-hook` flag skips the hook for that start, regardless of config.
 - Unknown nested keys inside `x-worktree` are ignored (ignore-unknown, forward compat); a scalar `x-worktree` value or an empty `post-start` value is a parse error.
 - The key is namespaced (`x-*`), so older tools ignore it per the extension policy above.
