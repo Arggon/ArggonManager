@@ -4,6 +4,10 @@ coverage/
 .DS_Store
 *.log
 
+# task-adr0006-docs-budget: generated copy of skills/arggon-cli/SKILL.md
+# (single committed source). Recreate with `npm run skills:sync`.
+.agents/skills/arggon-cli/SKILL.md
+
 # Tooling artifacts (video2code / video-agent sessions)
 .v2c/
 .video_agent/

@@ -123,6 +123,7 @@ Root install; TypeScript in cli/:
 
 ```bash
 npm install
+npm run skills:sync   # regenerate the gitignored .agents/skills/arggon-cli/SKILL.md copy
 npm run arggon -- hello
 npm run arggon -- init /path/to/repo
 npm run arggon -- list
@@ -131,6 +132,8 @@ npm run build
 npm test
 npm run lint
 ```
+
+After a fresh clone, `.agents/skills/arggon-cli/SKILL.md` is absent (it is generated from the single source `skills/arggon-cli/SKILL.md`, not committed): run `npm run skills:sync` so agent clients that read skills from disk can see it (`npm test` regenerates it too).
 
 `arggon init` creates `tasks/.convention.yml`, copies `templates/`, and generates the governing document set from master templates in `templates/docs/`. Adopter-owned content is never overwritten (not even with `--force`); on already-initialized repos init is an idempotent upgrade — see [Re-running init](#re-running-init-provenance-and-safe-regeneration) below. In a git tree init auto-commits exactly the files it wrote (one `chore(tasks): generated init docs (N files)` commit, surgical staging — `--no-commit` opts out), so a fresh init leaves a clean tree and `arggon start` is never blocked by untracked tool-generated state.
 

@@ -10,12 +10,6 @@ x-tracker:
   auto-commit: true
 
 x-generated:
-  .agents/skills/arggon-cli/SKILL.md:
-    template: "skills/arggon-cli/SKILL.md"
-    checksum: "sha256:75094e813cdb04a7fe232241f4379ca94351ef5dca9168a8a75c58ba1e0514ac"
-    arggonVersion: "0.0.0"
-    generatedAt: "2026-09-13T21:12:48.651Z"
-    acknowledged: true
   .editorconfig:
     template: "docs/editorconfig"
     checksum: "sha256:13683ae1820c1cf4ef46cc076940c7b43c7e895890ea93dfb885029163793698"
