@@ -26,5 +26,5 @@ convention.md documents reparenting as move-dir + update parent references, but 
 
 ## Acceptance
 
-- [ ] `arggon update <id> --parent <new-parent>` validates the edge (expected parent type), rewrites frontmatter, MOVES the file/directory per the folder layout rules (leaves move file; containers move their whole directory), and refuses invalid edges
-- [ ] Tests: leaf reparent, container reparent with children (paths updated), invalid edge refusal, cascade/report consistency after move
+- [x] `arggon update <id> --parent <new-parent>` validates the edge (expected parent type), rewrites frontmatter, MOVES the file/directory per the folder layout rules (leaves move file; containers move their whole directory), and refuses invalid edges
+- [x] Tests: leaf reparent, container reparent with children (paths updated), invalid edge refusal, cascade/report consistency after move
