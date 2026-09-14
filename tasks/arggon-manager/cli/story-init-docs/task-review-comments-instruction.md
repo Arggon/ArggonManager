@@ -41,3 +41,6 @@ running under a generated AGENTS.md follows it without being told.
 - [ ] init-docs test asserts the generated AGENTS.md carries the review-channel instruction
 
 ## Notes
+
+### 2026-09-14 @Arggon
+Implementation landed (commit f7a1d91): review channel institutionalized in templates/docs/AGENTS.md, docs/agents.md lead-architect bullet, skills/arggon-cli/SKILL.md (+skills:sync), and init-docs test assertion. Generated AGENTS.md at 2018 B (<=2048 budget). Full suite 817/817, lint, build green. Acceptance ticks applied; PR to follow.
