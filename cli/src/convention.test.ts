@@ -1,8 +1,10 @@
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync as _mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import {
+
+
   CONVENTION_VERSION,
   CONVENTION_VERSION_DEFAULT,
   parseConventionConfig,
@@ -12,6 +14,17 @@ import {
   resolveBranchName,
   updateGeneratedSection,
 } from "./convention.js";
+
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+const tmpDirs: string[] = [];
+afterEach(() => {
+  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
+  const dir = _mkdtempSync(prefix, options);
+  tmpDirs.push(dir);
+  return dir;
+}
 
 describe("readConventionVersion", () => {
   it("returns the default (0) when tasks/.convention.yml is missing", () => {

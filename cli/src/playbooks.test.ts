@@ -1,11 +1,13 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { runCreate } from "./create.js";
 import { itemsById, loadItems } from "./items.js";
 import {
+
+
   normalizeVersionPrefix,
   PLAYBOOK_MAX_AGE_DAYS_DEFAULT,
   runPlaybookNew,
@@ -13,6 +15,17 @@ import {
   runPlaybookStatus,
   runStackExplore,
 } from "./playbooks.js";
+
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+const tmpDirs: string[] = [];
+afterEach(() => {
+  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
+  const dir = _mkdtempSync(prefix, options);
+  tmpDirs.push(dir);
+  return dir;
+}
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const cli = resolve(repoRoot, "cli/src/cli.ts");

@@ -1,12 +1,23 @@
 import { PassThrough } from "node:stream";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync as _mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runCreate } from "./create.js";
 import { arggonVersion } from "./docs.js";
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
+
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+const tmpDirs: string[] = [];
+afterEach(() => {
+  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
+  const dir = _mkdtempSync(prefix, options);
+  tmpDirs.push(dir);
+  return dir;
+}
 
 /**
  * In-process MCP client #1: drives runMcpServer over connected streams,
