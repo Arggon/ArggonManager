@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -108,15 +108,34 @@ describe("start", () => {
     expect(git.calls).toEqual([]);
   });
 
-  it("refuses a dirty tree without touching anything", () => {
+  it("refuses untracked files inside tasks/ without touching anything", () => {
     const { dir, id } = primedTask();
     writeFileSync(join(dir, "tasks/scratch.txt"), "x");
     const git = fakeGit({ fileStatus: () => "?? tasks/scratch.txt\n" });
     expect(() => runStart({ cwd: dir, id, assignee: "arggon", now: NOW }, { git })).toThrow(
-      /working tree is dirty/,
+      /working tree has changes that block start[\s\S]*tasks\/scratch\.txt/,
     );
     expect(git.calls).toEqual([]);
     expect(readFileSync(join(dir, "tasks/scratch.txt"), "utf8")).toBe("x");
+  });
+
+  it("refuses modified tracked files", () => {
+    const { dir, id } = primedTask();
+    const git = fakeGit({ fileStatus: (_c, f) => (f === "." ? " M src/app.ts\n" : ` M ${f}`) });
+    expect(() => runStart({ cwd: dir, id, assignee: "arggon", now: NOW }, { git })).toThrow(
+      /working tree has changes that block start[\s\S]*src\/app\.ts/,
+    );
+    expect(git.calls).toEqual([]);
+  });
+
+  it("ignores untracked files outside tasks/ (scoped clean-tree check)", () => {
+    const { dir, id } = primedTask();
+    mkdirSync(join(dir, ".v2c"), { recursive: true });
+    writeFileSync(join(dir, ".v2c", "state.json"), "{}");
+    const git = fakeGit({ fileStatus: (_c, f) => (f === "." ? "?? .v2c/\n?? notes.txt\n" : ` M ${f}`) });
+    const result = runStart({ cwd: dir, id, assignee: "arggon", now: NOW }, { git });
+    expect(result.committed).toBe(true);
+    expect(git.calls.map((c) => c.op)).toContain("commit");
   });
 
   it("fails clearly on existing-branch mismatch and unknown id", () => {

@@ -44,6 +44,17 @@ import {
 export const ADOPT_STORY_ID = "story-arggon-adoption";
 /** Title of the auto-created parent story. */
 export const ADOPT_STORY_TITLE = "ArggonManager adoption";
+/** Title of the auto-created initiative and epic containers (same title both). */
+export const ADOPT_CONTAINER_TITLE = "ArggonManager adoption";
+/**
+ * Id of the auto-created initiative container (task-start-dirty-scope-adopt-hierarchy):
+ * created only when the tree has NO epic at all (e.g. a fresh `init --full`
+ * tree scaffolds no hierarchy). Ids are globally unique, so the epic uses a
+ * distinct id (`epic-arggon-adoption`).
+ */
+export const ADOPT_INITIATIVE_ID = "arggon-adoption";
+/** Id of the auto-created epic container (see ADOPT_INITIATIVE_ID). */
+export const ADOPT_EPIC_ID = "epic-arggon-adoption";
 /** Id stem of the adoption task (the kernel adds the task- prefix). */
 export const ADOPT_TASK_STEM = "adopt-arggon";
 /** Canonical adoption task id. */
@@ -190,6 +201,14 @@ export type AdoptResult = {
   storyId: string;
   /** True when this run created the story (always false in dry-run). */
   storyCreated: boolean;
+  /**
+   * Container ids auto-created this run (task-start-dirty-scope-adopt-hierarchy):
+   * the initiative and epic chain when the tree had no epic (fresh `init
+   * --full`). Empty when an epic already existed, `--story` was passed, or on
+   * the idempotent-skip path. In dry-run the planned ids are listed (nothing
+   * is written).
+   */
+  createdContainers: string[];
   /** The adoption task id (task-adopt-arggon). */
   taskId: string;
   /** True when this run created the task (always false in dry-run). */
@@ -246,8 +265,15 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
 
   // Resolve the parent story: explicit --story, else the shared auto story
   // (created under the first epic, lexicographic — same pattern as import-issues).
+  // When the tree has NO epic at all (e.g. a fresh `init --full` tree scaffolds
+  // no hierarchy), the minimal container chain is auto-created
+  // (task-start-dirty-scope-adopt-hierarchy): initiative `arggon-adoption` →
+  // epic `epic-arggon-adoption` → the adoption story. Adopting an EXISTING repo
+  // that already has its own structure should pass --story to place the task
+  // under the right story instead of relying on the containers.
   let storyId: string;
   let storyCreated = false;
+  const createdContainers: string[] = [];
   if (opts.story !== undefined) {
     const parent = byId.get(opts.story);
     if (!parent) {
@@ -268,12 +294,40 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
     }
     storyId = ADOPT_STORY_ID;
   } else {
-    const epicId = firstEpicId(byId);
+    let epicId = firstEpicId(byId);
     if (epicId === null) {
-      throw new Error(
-        "no epic found under tasks/ — the adoption story needs a parent epic. " +
-          "Create one with `arggon create epic <title> --parent <initiative-id>` or pass --story <story-id>",
-      );
+      // No epic anywhere: build the minimal chain. Existing items with the
+      // container ids are reused as-is (never duplicated).
+      if (!dryRun) {
+        const existingInitiative = byId.get(ADOPT_INITIATIVE_ID);
+        if (!existingInitiative) {
+          const initiative = runCreate({
+            cwd: opts.cwd,
+            type: "initiative",
+            title: ADOPT_CONTAINER_TITLE,
+            id: ADOPT_INITIATIVE_ID,
+            commit: false,
+            now: opts.now,
+          });
+          writtenPaths.push(initiative.path);
+          createdContainers.push(initiative.id);
+        }
+        const epic = runCreate({
+          cwd: opts.cwd,
+          type: "epic",
+          title: ADOPT_CONTAINER_TITLE,
+          id: ADOPT_EPIC_ID,
+          parent: existingInitiative ? existingInitiative.id : ADOPT_INITIATIVE_ID,
+          commit: false,
+          now: opts.now,
+        });
+        writtenPaths.push(epic.path);
+        createdContainers.push(epic.id);
+      } else {
+        // Dry-run plans the containers without writing them.
+        createdContainers.push(ADOPT_INITIATIVE_ID, ADOPT_EPIC_ID);
+      }
+      epicId = ADOPT_EPIC_ID;
     }
     if (!dryRun) {
       const story = runCreate({
@@ -304,6 +358,7 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
         inventory,
         storyId: existingTask.parent ?? storyId,
         storyCreated,
+        createdContainers,
         taskId: existingTask.id,
         taskCreated: false,
         skipped: true,
@@ -335,6 +390,7 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
       inventory,
       storyId,
       storyCreated,
+      createdContainers,
       taskId: created.id,
       taskCreated: true,
       skipped: false,
@@ -348,6 +404,7 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
     inventory,
     storyId,
     storyCreated: false,
+    createdContainers,
     taskId: itemId("task", ADOPT_TASK_STEM),
     taskCreated: false,
     skipped: false,
@@ -380,6 +437,10 @@ export function formatAdoptReport(result: AdoptResult): string {
         ? "(would create when missing)"
         : "(existing)";
   lines.push(`  story: ${result.storyId} ${storyState}`);
+  if (result.createdContainers.length > 0) {
+    const state = result.dryRun ? "(planned)" : "(created)";
+    lines.push(`  containers: ${result.createdContainers.join(` ${state}, `)} ${state}`);
+  }
   const commitLine = formatCommitLine(result.commit);
   if (commitLine) {
     lines.push(`  ${commitLine}`);

@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: done
 id: task-start-dirty-scope-adopt-hierarchy
 title: Scope start clean-tree check; adopt needs pre-existing hierarchy after fresh init
+assignee: Arggon
+branch: feat/task-start-dirty-scope-adopt-hierarchy
 parent: story-start-worktree
 labels: []
 created: "2026-09-13"
-updated: "2026-09-13"
+updated: "2026-09-14"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-coordination/story-start-worktree/task-start-dirty-scope-adopt-hierarchy.md
@@ -23,6 +25,6 @@ Two frictions found by the suizo experiment: (1) `start` refuses on ANY untracke
 
 ## Acceptance
 
-- [ ] start's clean-tree check is scoped: untracked files outside the flow's blast radius (tasks/, the working branch paths) don't block, or an explicit --allow-dirty-untracked escape hatch exists with docs
-- [ ] adopt on a fresh init tree works out of the box: auto-creates the minimal hierarchy (initiative+epic+adoption story, like it auto-creates the story today) or init --full scaffolds an empty initiative/epic pair; documented
-- [ ] Tests for both; guardian/cuentas-claras/suizo-style first-run adoption requires zero guesswork
+- [x] start's clean-tree check is scoped: untracked files outside the flow's blast radius (tasks/, the working branch paths) don't block, or an explicit --allow-dirty-untracked escape hatch exists with docs
+- [x] adopt on a fresh init tree works out of the box: auto-creates the minimal hierarchy (initiative+epic+adoption story, like it auto-creates the story today) or init --full scaffolds an empty initiative/epic pair; documented
+- [x] Tests for both; guardian/cuentas-claras/suizo-style first-run adoption requires zero guesswork

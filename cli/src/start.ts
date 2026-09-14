@@ -272,11 +272,74 @@ export function runPostStart(command: string, cwd: string): PostStartResult {
 }
 
 /**
+ * Clean-tree precondition, scoped (task-start-dirty-scope-adopt-hierarchy):
+ * the start flow's claim commit stages ONLY the item file (tracker-commit
+ * surgical staging), so unrelated untracked files can never land in it — git
+ * does not commit untracked files unless they are added. Therefore:
+ *  - untracked paths (`?? `) OUTSIDE `tasks/` do NOT block start (agent
+ *    environment dirs like `.v2c/` are harmless);
+ *  - untracked paths INSIDE `tasks/` still block (they would pollute the
+ *    tracker and `arggon validate`);
+ *  - modified or staged TRACKED paths always block (they could be swept into
+ *    the claim commit's index state and branch checks).
+ */
+export type DirtyBlockers = {
+  /** Modified/staged tracked porcelain lines (excluding the status code). */
+  tracked: string[];
+  /** Untracked paths under tasks/ (or the tasks/ tree itself). */
+  untrackedInTasks: string[];
+};
+
+/** Classify `git status --porcelain` output into the two blocker groups. */
+export function dirtyBlockers(porcelain: string): DirtyBlockers {
+  const tracked: string[] = [];
+  const untrackedInTasks: string[] = [];
+  for (const line of porcelain.split("\n")) {
+    if (line.trim().length === 0) continue;
+    const code = line.slice(0, 2);
+    const path = line.slice(3).trim().replace(/^"|"$/g, "");
+    if (code === "??") {
+      const normalized = path.replace(/\/+$/, "");
+      if (normalized === "tasks" || normalized.startsWith("tasks/")) {
+        untrackedInTasks.push(path);
+      }
+    } else if (code.trim().length > 0) {
+      tracked.push(path);
+    }
+  }
+  return { tracked, untrackedInTasks };
+}
+
+/**
+ * Assert the tree is startable under the scoped clean-tree rule; throws an
+ * actionable error listing exactly what blocks when it is not.
+ */
+export function assertStartableTree(porcelain: string): void {
+  const { tracked, untrackedInTasks } = dirtyBlockers(porcelain);
+  if (tracked.length === 0 && untrackedInTasks.length === 0) return;
+  const parts: string[] = [];
+  if (untrackedInTasks.length > 0) {
+    parts.push(
+      `untracked files under tasks/ (they would pollute the tracker):\n  ` +
+        untrackedInTasks.slice(0, 10).join("\n  "),
+    );
+  }
+  if (tracked.length > 0) {
+    parts.push(
+      `modified/staged tracked files (they could collide with the claim commit):\n  ` +
+        tracked.slice(0, 10).join("\n  "),
+    );
+  }
+  throw new Error(`working tree has changes that block start (commit or stash first):\n${parts.join("\n")}`);
+}
+
+/**
  * Start work on an item in one flow: claim (in_progress + assignee) →
  * working branch (pattern or recorded field) → commit the claim →
  * push → optional draft PR with the item id in the body.
  * Never --force: a taken claim fails clearly. Library returns data;
- * the CLI prints. Throws on dirty tree, unknown id, or git/gh errors.
+ * the CLI prints. Throws on a blocking dirty tree (scoped — see
+ * `assertStartableTree`), unknown id, or git/gh errors.
  * With `worktree: true` the whole flow runs inside a linked git worktree
  * (`../<repo-name>-<id>`, recorded on the item as `worktree_path`).
  */
@@ -291,11 +354,10 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
     throw new Error(`not a git repository (${root}); arggon start needs git`);
   }
 
-  const dirty = gitRunner.fileStatus(root, ".").trim();
-  if (dirty) {
-    const preview = dirty.split("\n").slice(0, 10).join("\n");
-    throw new Error(`working tree is dirty (commit or stash first):\n${preview}`);
-  }
+  // Scoped clean-tree check (task-start-dirty-scope-adopt-hierarchy): only
+  // tracked modifications and untracked files under tasks/ block. Raw output
+  // (not trimmed): the leading X status column matters to the parser.
+  assertStartableTree(gitRunner.fileStatus(root, "."));
 
   const item = itemsById(loadItems(tasksDir)).get(id);
   if (!item) {

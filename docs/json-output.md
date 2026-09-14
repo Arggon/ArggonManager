@@ -486,6 +486,7 @@ Agent-assisted adoption for existing repos (see [docs/agents.md](./agents.md) §
 | `taskId`         | `string`    | `task-adopt-arggon` — the created, planned (dry-run), or already-open task id                                                    |
 | `storyId`        | `string`    | Parent story id (`--story` override, `story-arggon-adoption`, or the existing task's parent on an idempotent skip)                |
 | `storyCreated`   | `boolean`   | `true` when this run created `story-arggon-adoption` (always `false` in dry-run and on skip)                                     |
+| `createdContainers` | `string[]` | Container ids auto-created this run when the tree had no epic (fresh `init --full`): `["arggon-adoption", "epic-arggon-adoption"]`; planned ids in dry-run; `[]` when an epic existed, `--story` was passed, or on skip (additive) |
 | `taskCreated`    | `boolean`   | `true` when this run created the task (always `false` in dry-run and on skip)                                                    |
 | `skipped`        | `boolean`   | `true` when an open (`todo`/`in_progress`) `task-adopt-arggon` already existed and creation was skipped (idempotent re-run)       |
 | `taskPath`       | `string`    | Absolute path of the created or existing task file; `"(dry run — not created)"` in dry-run when nothing exists yet               |
