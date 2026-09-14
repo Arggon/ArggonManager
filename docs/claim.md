@@ -57,6 +57,6 @@ Agents and humans follow the same rules:
 1. Claim before starting (`--status in_progress --assignee <you>`).
 2. Do not steal; unclaim or use `--force` only when coordinated.
 3. Unclaim when releasing work (`--status todo`).
-4. Do not reopen `done`/`cancelled` as an agent (schema may allow; see convention reopen policy).
+4. Do not reopen `done`/`cancelled` as an agent — enforced: the MCP layer refuses agent callers, and the CLI requires an interactive-terminal y/N confirmation for `--status todo` on a `done`/`cancelled` item (see convention reopen policy).
 
 Longer loop (find → claim → work → PR): [`agents.md`](agents.md). Prefer that playbook for the full agent workflow; keep claim/concurrency rules here.

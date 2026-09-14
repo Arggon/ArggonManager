@@ -269,7 +269,7 @@ Concurrency / conflict handling (refuse steal unless `--force`, unclaim recovery
 ### Reopen / status policy
 
 - **`validate` ALLOWS** `done|cancelled` → `todo` (schema permits).
-- **Playbook:** agents **MUST NOT** reopen; humans may via documented escape hatch (`arggon reopen` / `--force`).
+- **Enforced (bug-reopen-ungated-cli):** agents are refused — the MCP layer via rules.ts, and the CLI via an interactive-terminal gate (`--status todo` on a `done`/`cancelled` item needs a y/N confirmation over TTY stdin; non-TTY callers are refused, no `--yes`, no config opt-in). Humans reopen by confirming at their terminal.
 - No status rollup — parent status is independent of children.
 
 ### `blocked_reason`
