@@ -33,3 +33,6 @@ Two housekeeping findings from the wave-1 reviews (PRs #198/#199):
 - [x] A single derived constant replaces the hardcoded generated-doc counts in tests; adding the next template touches only templates/ + docs.ts
 
 ## Notes
+
+### 2026-09-14 @Arggon
+Lead-architect review: APPROVED. GENERATED_DOC_COUNT derived from the same template walk generateDocs uses is the correct derivation point — everything turned out derivable (full count + fixture-reduced -1/-2 forms), zero literals left, and the next template addition now touches templates/ + docs.ts only. The deploy.md inventory assertion closes the adopt gap. Your CI flake report (labs/torture auto-commit contention losing the race despite the wall-clock retry) is being filed as a bug — second occurrence, so it needs isolation hardening, not another budget bump. Merge follows.
