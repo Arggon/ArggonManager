@@ -234,6 +234,15 @@ Work items live under tasks/ — see docs/convention.md and docs/agents.md.
 7. Never reopen done/cancelled items.
 ```
 
+## Self-improvement loop
+
+Findings flow back into the tool through two documented, repeatable protocols (`docs/labs/`):
+
+- **Adversarial audit** ([docs/labs/adversarial-audit.md](./labs/adversarial-audit.md)): attack the behavioral invariants (claim exclusivity, never-reopen/steal, never-overwrite, cascade honesty, lost pushes) and sweep the normative doc statements ("never/always/only/requires") against built behavior, in a throwaway temp tree. Run after a notable feature wave or before a release (~1h). Findings file via the tracker; never patch the tool from an audit.
+- **Telemetry mining** ([docs/labs/telemetry-mining.md](./labs/telemetry-mining.md)): mine ZCode session logs, the experiment repos' tracker commit histories, and `.evidence/` dirs for friction signatures (retries, fallbacks, manual tracker git work, chore-commit clusters). Run after each real-usage session or experiment — not on a timer.
+
+Both file through the normal loop (`arggon create task|bug --parent <story-id>`) with literal repro + evidence.
+
 ## Related
 
 - Convention: [`docs/convention.md`](./convention.md)
