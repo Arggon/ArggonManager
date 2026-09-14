@@ -4,6 +4,7 @@ status: in_progress
 id: task-orchestration-default-refile
 title: "Init ships the orchestration playbook: agents delegate by default (refile)"
 assignee: Arggon
+branch: feat/task-orchestration-default-refile
 parent: story-init-docs
 labels: []
 created: "2026-09-14"
