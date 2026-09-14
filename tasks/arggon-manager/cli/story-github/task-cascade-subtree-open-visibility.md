@@ -4,6 +4,7 @@ status: in_progress
 id: task-cascade-subtree-open-visibility
 title: "cascade: record subtree-open skip reason; auto-done re-checkout before flip loop"
 assignee: Arggon
+branch: feat/task-cascade-subtree-open-visibility
 parent: story-github
 labels: []
 created: "2026-09-14"
