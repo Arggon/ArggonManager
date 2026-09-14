@@ -11,7 +11,7 @@ arggon <command> --json
 
 Example: `arggon --json hello`.
 
-The MCP server (`arggon mcp`) returns these same envelope objects as tool-result text content for its `arggon_list`, `arggon_create`, `arggon_update`, and `arggon_comment` tools; kernel failures become tool errors carrying the same `ok: false` shape (see [`docs/agents.md`](./agents.md) §MCP server). The tool input schemas are parity-tested against the CLI option surface (`cli/src/mcp-parity.test.ts`): the two surfaces stay in sync by test, not by convention — schema changes are **additive only**; a breaking change bumps `schemaVersion`.
+The MCP server (`arggon mcp`) returns these same envelope objects as tool-result text content for its `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`, and `arggon_show` tools; kernel failures become tool errors carrying the same `ok: false` shape (see [`docs/agents.md`](./agents.md) §MCP server). The tool input schemas are parity-tested against the CLI option surface (`cli/src/mcp-parity.test.ts`): the two surfaces stay in sync by test, not by convention — schema changes are **additive only**; a breaking change bumps `schemaVersion`.
 
 This flag is a formatter only. It does not walk `tasks/` or parse frontmatter. Commands that load domain objects pass those objects to the formatter. Human vs JSON printing lives in the CLI entrypoint.
 
@@ -58,7 +58,11 @@ Empty success stays `ok: true` (e.g. future `list` with no items → `items: []`
 
 ### `WorkItem`
 
-Stable fields aligned with convention v0 plus the additive `branch` (v1) and `milestone` / `depends_on` (v3) fields. **Always present** so agents need not special-case missing keys:
+Stable fields aligned with convention v0 plus the additive `branch` (v1) and `milestone` / `depends_on` (v3) fields.
+
+**Compact default (ADR 0006).** In `list` / `create` / `update` `--json` payloads, the optional fields below are **omitted when null/empty unless `--full`** is passed: `blocked_reason`, `milestone`, `worktree_path`, `issue` (when null), and `depends_on`, `labels` (when the array is empty). `schemaVersion` is unchanged — omission is a documented default, not a shape break: read optional fields as `item.field ?? null` and either shape works. `--full` restores the complete always-present shape shown in the table. Human output and the other commands are unaffected.
+
+| Field            | Type                                                          | Notes                                                                       |
 
 | Field            | Type                                                          | Notes                                                                       |
 | ---------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------- |
@@ -326,6 +330,21 @@ Default mode only lists. `--prune` removes removable worktrees (`git worktree re
 Dependency-aware ranking (v3, [ADR 0004](adr/0004-milestone-deps-v3.md)): ready items — `depends_on` all `done`/`cancelled` — rank first (lexicographic within each group); `--ready` limits the pool to ready items only, in which case `blockedBy` is always empty. When the suggestion has open dependencies, `reason` names them. Dependencies are advisory: they gate suggestions and queries only, never `update`.
 
 Empty pool is success (`ok: true`, `suggestion: null`). Failures use `error.code: "NEXT_FAILED"` (missing tasks/, unreadable items).
+
+### `show`
+
+Reads one item with bounded output ([ADR 0006](adr/0006-token-context-efficiency.md), spec `show-item-003`): progressive disclosure so agents never pay for an unbounded comment tail on every read. Pure read — never writes, exit 0 on success.
+
+| Field             | Type        | Notes                                                                                                |
+| ----------------- | ----------- | ---------------------------------------------------------------------------------------------------- |
+| `item`            | `WorkItem`  | The item's frontmatter fields (contract shape)                                                       |
+| `path`            | `string`    | Absolute path of the item file                                                                       |
+| `comments`        | `object[]`  | The comments INCLUDED by this view, in document order: `{ date, author, lines }` (heading excluded)  |
+| `body`            | `string`    | Only under `--body`: the item's verbatim markdown body; `comments` then carries ALL comments          |
+
+View selection: default is compact — frontmatter + the body's last 3 comments; `--tail-comments <n>` overrides the tail size; `--meta` drops `comments` entirely (frontmatter only); `--body` is the explicit unbounded opt-in (verbatim `body` + all `comments`). The MCP `arggon_show` tool (`id`, `meta`, `body`, `tail_comments`) returns the identical payload.
+
+Failures use `error.code: "SHOW_FAILED"` (unknown id, missing tasks/, unreadable items).
 
 ### `report`
 

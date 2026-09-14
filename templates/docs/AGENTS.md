@@ -16,7 +16,7 @@ Work items live in-tree under `tasks/` (Markdown + YAML frontmatter), managed by
 
 The repo registers the arggon MCP server via `.mcp.json` — agents whose clients support project-scoped MCP config get `arggon_list`/`arggon_create`/`arggon_update`/`arggon_comment` as native tools.
 
-1. **Find work:** `arggon list --status todo --json`
+1. **Find work:** `arggon next --json` for "what should I work on" (67x smaller than `list --json`); `arggon list --status todo --json` only for a full scan.
 2. **Claim before starting:** `arggon update <id> --status in_progress --assignee <your-login>` (or `arggon start <id> --worktree --assignee <your-login>` to claim + create a worktree). Never set `in_progress` without an assignee; never steal a claim.
 3. **One branch per item:** `arggon branch <id>` → `feat/<id>` / `fix/<id>`. Work in a git worktree, not the primary checkout.
 4. **Open a PR** referencing the work item id in the title or body. Keep PRs small.
@@ -40,6 +40,7 @@ Read these before non-trivial changes (if present in this repo):
 
 - [`docs/convention.md`](docs/convention.md) — tasks/ tree layout and frontmatter schema.
 - [`docs/engineering.md`](docs/engineering.md) — review bar, testing, definition of done.
+- [`docs/deploy.md`](docs/deploy.md) — per-shape deployment defaults (target, dated cost, config-in-repo sketch, exit note); re-verify pricing annually or before each release wave.
 - `docs/playbooks/` — technology playbooks: follow them for the current pinned versions and best practices; check `arggon playbook status` and refresh playbooks when they go stale.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md) — branch, commit, and PR rules.
 

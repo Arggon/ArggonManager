@@ -1,8 +1,10 @@
 ---
 type: task
-status: todo
+status: done
 id: task-adr0006-show-command
 title: "ADR 0006: arggon show <id> progressive-disclosure read path (CLI + MCP)"
+assignee: Arggon
+branch: feat/task-adr0006-show-command
 parent: operating-principles
 labels: []
 created: "2026-09-14"
@@ -23,7 +25,7 @@ Implements the structural quick win of accepted [ADR 0006](../../../docs/adr/000
 
 ## Acceptance
 
-- [ ] Spec (docs/specs/, arggon spec new) then implementation: `arggon show <id> [--meta] [--body] [--tail-comments N]` — default compact (frontmatter + last N comments), bounded reads; MCP `arggon_show` tool parity-tested (task-mcp-cli-parity harness)
-- [ ] Tests: bounded output, comment tailing, unknown id error; docs in README + docs/json-output.md (additive)
+- [x] Spec (docs/specs/, arggon spec new) then implementation: `arggon show <id> [--meta] [--body] [--tail-comments N]` — default compact (frontmatter + last N comments), bounded reads; MCP `arggon_show` tool parity-tested (task-mcp-cli-parity harness)
+- [x] Tests: bounded output, comment tailing, unknown id error; docs in README + docs/json-output.md (additive)
 
 ## Notes

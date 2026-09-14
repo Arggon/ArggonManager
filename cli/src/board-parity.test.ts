@@ -14,12 +14,23 @@
  *
  * A deliberate edit to either copy makes part of this suite fail.
  */
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync as _mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { evaluateDrop, renderBoardHtml } from "./board.js";
 import { runUpdate } from "./update.js";
+
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+const tmpDirs: string[] = [];
+afterEach(() => {
+  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
+  const dir = _mkdtempSync(prefix, options);
+  tmpDirs.push(dir);
+  return dir;
+}
 
 type Card = { id: string; type: string; status: string; assignee?: string | null };
 type Verdict = { ok: boolean; reason: string };

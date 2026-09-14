@@ -50,6 +50,7 @@ import { maybeCommitUpdate, runUpdate } from "./update.js";
 import { formatValidateHuman, runValidate } from "./validate.js";
 import { commitPayload, formatCommitLine } from "./tracker-commit.js";
 import { arggonVersion } from "./docs.js";
+import { DEFAULT_TAIL_COMMENTS, renderShowText, runShow } from "./show.js";
 import { gateSteal, findItemStatus, gateReopen } from "./steal-gate.js";
 const program = new Command();
 
@@ -275,6 +276,7 @@ program
     "--no-commit",
     "keep tasks/ dirty: skip the tracker auto-commit of the created item (default: on; x-tracker.auto-commit: false opts out tree-wide)",
   )
+  .option("--full", "emit complete WorkItem shapes (default: compact per ADR 0006 — null/empty optional fields omitted)", false)
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (
@@ -287,6 +289,7 @@ program
         status?: string;
         blockedReason?: string;
         commit?: boolean;
+        full?: boolean;
         json?: boolean;
       },
     ) => {
@@ -307,7 +310,7 @@ program
           successJson(
             "create",
             {
-              item: toContractWorkItem(result.item, result.root),
+              item: toContractWorkItem(result.item, result.root, { full: opts.full === true }),
               commit: commitPayload(result.commit),
             },
             readConventionVersion(result.root),
@@ -365,10 +368,12 @@ program
     "--older-than <duration>",
     'stale threshold for --stale: <number><d|h|m> (e.g. 7d, 12h, 30m)',
   )
+  .option("--full", "emit complete WorkItem shapes (default: compact per ADR 0006 — null/empty optional fields omitted)", false)
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (opts: {
       status?: string;
+      full?: boolean;
       type?: string;
       parent?: string;
       assignee?: string;
@@ -394,7 +399,8 @@ program
         if (json) {
           successJson(
             "list",
-            { items: result.items.map((item) => toContractWorkItem(item, result.root)) },
+            { items: result.items.map((item) => toContractWorkItem(item, result.root, { full: opts.full === true })) },
+          
             readConventionVersion(result.root),
           );
           return;
@@ -472,6 +478,65 @@ program
         return;
       }
       console.error(`arggon next: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("show")
+  .description(
+    "Read one item with bounded output (ADR 0006): frontmatter + last comments; full body is an explicit opt-in",
+  )
+  .argument("<id>", "work item id")
+  .option("--meta", "frontmatter only — no body, no comments", false)
+  .option("--body", "full body including ALL comments (unbounded; explicit opt-in)", false)
+  .option(
+    "--tail-comments <n>",
+    `compact view: include the last N comments instead of the default ${DEFAULT_TAIL_COMMENTS}`,
+    Number.parseInt,
+  )
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((id: string, opts: { meta?: boolean; body?: boolean; tailComments?: number; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      if (opts.tailComments !== undefined && (!Number.isInteger(opts.tailComments) || opts.tailComments < 0)) {
+        throw new Error(`--tail-comments must be a non-negative integer (got '${opts.tailComments}')`);
+      }
+      const result = runShow({
+        cwd: process.cwd(),
+        id,
+        meta: opts.meta,
+        body: opts.body,
+        tailComments: opts.tailComments,
+      });
+      const comments = result.comments.map((comment) => ({ ...comment }));
+      if (json) {
+        successJson(
+          "show",
+          {
+            item: toContractWorkItem(result.item, result.root),
+            path: result.path,
+            ...(opts.body === true
+              ? { body: result.item.body, comments: result.allComments.map((c) => ({ ...c })) }
+              : { comments }),
+          },
+          readConventionVersion(result.root),
+        );
+        return;
+      }
+      console.log(renderShowText(result).join("\n"));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "show",
+          message,
+          code: "SHOW_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon show: ${message}`);
       process.exitCode = 1;
     }
   });
@@ -606,11 +671,13 @@ program
     "--no-commit",
     "keep tasks/ dirty: skip the tracker auto-commit of the mutated item files, cascade included (default: on; x-tracker.auto-commit: false opts out tree-wide)",
   )
+  .option("--full", "emit complete WorkItem shapes (default: compact per ADR 0006 — null/empty optional fields omitted)", false)
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (
       id: string,
       opts: {
+        full?: boolean;
         title?: string;
         status?: string;
         assignee?: string;
@@ -681,7 +748,7 @@ program
           successJson(
             "update",
             {
-              item: toContractWorkItem(result.item, result.root),
+              item: toContractWorkItem(result.item, result.root, { full: opts.full === true }),
               autoCompleted: result.autoCompleted,
               cascadeLevels: result.cascadeLevels,
               ...(result.movedFrom ? { movedFrom: result.movedFrom } : {}),

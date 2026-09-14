@@ -8,7 +8,7 @@
  * 127.0.0.1-only binding.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync as _mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,6 +16,14 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startBoardServer, type BoardServeHandle } from "./board-serve.js";
 import { runInit } from "./init.js";
 import { runCreate } from "./create.js";
+
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+const tmpDirs: string[] = [];
+function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
+  const dir = _mkdtempSync(prefix, options);
+  tmpDirs.push(dir);
+  return dir;
+}
 
 let handle: BoardServeHandle;
 let dir: string;
@@ -33,6 +41,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await handle.close();
+  for (const d of tmpDirs.splice(0)) rmSync(d, { recursive: true, force: true });
 });
 
 describe("board --serve", () => {

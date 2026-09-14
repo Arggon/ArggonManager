@@ -1,23 +1,26 @@
 import { spawnSync } from "node:child_process";
-import {
-  appendFileSync,
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { runCreate } from "./create.js";
 import { readConventionVersion } from "./convention.js";
 import { runInit } from "./init.js";
 import { JSON_SCHEMA_VERSION } from "./json.js";
 import { runNext } from "./next.js";
 import { runUpdate } from "./update.js";
+
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+const tmpDirs: string[] = [];
+afterEach(() => {
+  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
+  const dir = _mkdtempSync(prefix, options);
+  tmpDirs.push(dir);
+  return dir;
+}
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const cli = resolve(root, "cli/src/cli.ts");
@@ -228,6 +231,8 @@ describe("CLI --json", () => {
     });
     expect(Array.isArray(body.items)).toBe(true);
     expect((body.items as Array<{ id: string }>).map((i) => i.id)).toEqual(["auth", "launch-mvp"]);
+    // Compact ADR 0006 default: null/empty optional fields are omitted;
+    // `--full` restores the complete shape (asserted in the --full case below).
     expect((body.items as Array<Record<string, unknown>>)[0]).toEqual({
       id: "auth",
       type: "epic",
@@ -236,14 +241,27 @@ describe("CLI --json", () => {
       assignee: null,
       branch: null,
       parent: "launch-mvp",
-      labels: [],
       created: expect.any(String),
       updated: expect.any(String),
       path: "tasks/launch-mvp/auth/auth.md",
+      claimed_at: null,
+    });
+  });
+
+  it("arggon list --json --full restores the complete WorkItem shape", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-json-list-full-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    const result = runCli(["list", "--json", "--full"], dir);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body).toMatchObject({ ok: true, command: "list" });
+    const item = (body.items as Array<Record<string, unknown>>)[0]!;
+    expect(item).toMatchObject({
       blocked_reason: null,
       milestone: null,
       depends_on: [],
-      claimed_at: null,
+      labels: [],
       worktree_path: null,
       issue: null,
     });
