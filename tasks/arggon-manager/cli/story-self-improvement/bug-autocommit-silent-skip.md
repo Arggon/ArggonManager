@@ -1,12 +1,14 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-autocommit-silent-skip
 title: autocommit-silent-skip
+assignee: Arggon
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T15:49:18.508Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/bug-autocommit-silent-skip.md
