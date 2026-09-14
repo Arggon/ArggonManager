@@ -19,10 +19,9 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this task exists. -->
+Found by the racha experiment (2026-09-14): x-worktree.post-start: "cargo check" always failed with postStart.ok:false — the hook inherits the invoking arggon process environment, and rustup installs toolchains in ~/.cargo/bin which was not in the PATH of the shell that launched arggon (installed mid-session; mise/rustup users hit this constantly).
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] Documented in docs/convention.md x-worktree section: hooks inherit the invoking shell environment — use absolute paths (e.g. ~/.cargo/bin/cargo) or run via the user's login shell
+- [ ] Optional enhancement landed (decide during implementation): a `sh -lc` variant or explicit env passthrough note; failing either way, the documented workaround must be verified live
