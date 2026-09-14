@@ -14,7 +14,7 @@ For humans and AI agents working on **{{PROJECT_NAME}}**. Work items live in-tre
 
 ### Orchestration
 
-Delegated by default: a coordinator assigns each item to a subagent (one per worktree), planning waves by file-disjointness. The coordinator (lead architect) **code-reviews every subagent PR before merge** — green CI is necessary, not sufficient — then verifies merges and owns tracker state. Subagents follow the same rules (claim, never steal a claim, never reopen, validate before every commit, PR references the item id) and report findings to the coordinator instead of filing tracker items.
+Delegated by default: a coordinator assigns each item to a subagent (one per worktree), planning waves by file-disjointness, and the coordinator (lead architect) **code-reviews every subagent PR before merge** — green CI is necessary, not sufficient. Review verdicts and change requests are recorded on the item with `arggon comment <item-id>` — never as GitHub PR comments; the PR carries CI and merge mechanics only. Subagents follow the same rules and report findings to the coordinator instead of filing tracker items.
 
 ## Docs & gates
 

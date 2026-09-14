@@ -1,12 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-review-comments-instruction
 title: "init instruction: review feedback lands in ArggonManager comments, not GitHub PR comments"
+assignee: Arggon
+branch: feat/task-review-comments-instruction
 parent: story-init-docs
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T22:27:24.973Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-init-docs/task-review-comments-instruction.md
@@ -32,9 +35,12 @@ running under a generated AGENTS.md follows it without being told.
 
 ## Acceptance
 
-- [ ] templates/docs/AGENTS.md orchestration/review guidance states the channel: review verdicts and change requests are recorded with `arggon comment <item-id>` on the item; PR comments are not the review channel
-- [ ] docs/agents.md lead-architect review duty names `arggon comment` as the feedback channel (amend the existing bullet)
-- [ ] skills/arggon-cli/SKILL.md syncs (one line in the handoff/comments guidance); .agents copy regenerated via `npm run skills:sync` (parity test covers it)
-- [ ] init-docs test asserts the generated AGENTS.md carries the review-channel instruction
+- [x] templates/docs/AGENTS.md orchestration/review guidance states the channel: review verdicts and change requests are recorded with `arggon comment <item-id>` on the item; PR comments are not the review channel
+- [x] docs/agents.md lead-architect review duty names `arggon comment` as the feedback channel (amend the existing bullet)
+- [x] skills/arggon-cli/SKILL.md syncs (one line in the handoff/comments guidance); .agents copy regenerated via `npm run skills:sync` (parity test covers it)
+- [x] init-docs test asserts the generated AGENTS.md carries the review-channel instruction
 
 ## Notes
+
+### 2026-09-14 @Arggon
+Implementation landed (commit f7a1d91): review channel institutionalized in templates/docs/AGENTS.md, docs/agents.md lead-architect bullet, skills/arggon-cli/SKILL.md (+skills:sync), and init-docs test assertion. Generated AGENTS.md at 2018 B (<=2048 budget). Full suite 817/817, lint, build green. Acceptance ticks applied; PR to follow.
