@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-telemetry-mining
 title: "Telemetry mining protocol: session logs + tracker history"
+assignee: Arggon
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T14:45:16.474Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/task-telemetry-mining.md
