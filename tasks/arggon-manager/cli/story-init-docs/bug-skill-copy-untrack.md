@@ -28,3 +28,6 @@ Found 2026-09-14 by the coordinator review of task-review-comments-instruction (
 - [ ] After a skills:sync + a source edit, `git status` shows ONLY the source as modified — the copy no longer appears
 
 ## Notes
+
+### 2026-09-14 @Arggon
+CANCELLED as invalid on filing verification: the coordinator's check used 'git ls-files <path> && echo TRACKED', but git ls-files exits 0 with no output when nothing matches — the check was defective. Proper verification: 'git ls-files | grep .agents' has no matches (untracked), and PR #205's diff shows the file was removed from tracking. The demanded end-state (untracked copy + gitignore + skills:sync + self-healing parity test) already holds since #205. Keeping the trail honest: this bug documents a defective verification pattern as its own lesson — always grep the full ls-files output, never gate on its exit code.
