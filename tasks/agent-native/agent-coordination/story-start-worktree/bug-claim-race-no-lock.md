@@ -1,12 +1,13 @@
 ---
 type: bug
-status: todo
+status: done
 id: bug-claim-race-no-lock
 title: "start claim is not atomic: concurrent starts both succeed (no lock on check-and-set)"
+assignee: Arggon
 parent: story-start-worktree
 labels: []
 created: "2026-09-13"
-updated: "2026-09-13"
+updated: "2026-09-14"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-coordination/story-start-worktree/bug-claim-race-no-lock.md
@@ -23,7 +24,7 @@ Found by the suizo experiment (2026-09-13, session sess_29e61c5a): two subagents
 
 ## Acceptance
 
-- [ ] Claim check-and-set is atomic (file lock — flock on a lock file under tasks/ or the item file — around read/verify/write in start and update status transitions)
-- [ ] Concurrent same-assignee starts: exactly one wins (created), the other attaches OR fails deterministically — no interleaved double-ok with shared worktree (decide and document the semantics)
-- [ ] Concurrent different-assignee starts: exactly one wins, the other gets the claim-conflict START_FAILED (never last-write-wins)
-- [ ] Tests: real concurrent processes (like the suizo repro) asserting single-winner semantics
+- [x] Claim check-and-set is atomic (file lock — flock on a lock file under tasks/ or the item file — around read/verify/write in start and update status transitions)
+- [x] Concurrent same-assignee starts: exactly one wins (created), the other attaches OR fails deterministically — no interleaved double-ok with shared worktree (decide and document the semantics)
+- [x] Concurrent different-assignee starts: exactly one wins, the other gets the claim-conflict START_FAILED (never last-write-wins)
+- [x] Tests: real concurrent processes (like the suizo repro) asserting single-winner semantics
