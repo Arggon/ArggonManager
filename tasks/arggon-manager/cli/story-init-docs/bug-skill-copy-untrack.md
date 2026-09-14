@@ -19,10 +19,12 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+Found 2026-09-14 by the coordinator review of task-review-comments-instruction (PR #209): PR #205 gitignored `.agents/skills/arggon-cli/SKILL.md` but never ran `git rm --cached` on it, so the file stayed TRACKED — the ignore rule is a no-op for already-tracked files and the "single committed source" goal is only half-landed: every `skills:sync` regen shows the copy as a tracked modification, and PR #209 (correctly not staging it) leaves main's tracked copy stale vs the source after merge.
 
 ## Acceptance
 
-- [ ] 
+- [ ] Copy untracked (`git rm --cached .agents/skills/arggon-cli/SKILL.md`; local file kept for skill-reading clients), committed with the removal
+- [ ] Parity test still green (it regenerates when absent/mismatched); validate + doctor unchanged (0 modified / 0 drifted / 11 managed)
+- [ ] After a skills:sync + a source edit, `git status` shows ONLY the source as modified — the copy no longer appears
 
 ## Notes
