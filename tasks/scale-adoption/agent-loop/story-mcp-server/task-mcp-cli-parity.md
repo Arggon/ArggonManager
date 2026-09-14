@@ -36,9 +36,9 @@ the standing invariant.
 
 ## Acceptance
 
-- [ ] mcp-parity.test.ts derives the CLI option surface for the four wrapped commands (list, create, update, comment — from the commander definitions or the kernel option types) and fails when a CLI option has no counterpart in the MCP tool input schema (or vice versa), with a maintained explicit exception list where the CLI surface is intentionally interactive-only (e.g. --no-commit defaults, TTY-only gates)
-- [ ] Current drift fixed so the parity test is green WITHOUT exceptions beyond the documented list — known candidate: `arggon_list` schema lacks `parent` (and any other flag parity flags)
-- [ ] The invariant is documented: docs/agents.md §MCP server and docs/json-output.md state that MCP tool schemas are parity-tested against the CLI (additive changes only; breaking changes bump schemaVersion)
+- [x] mcp-parity.test.ts derives the CLI option surface for the four wrapped commands (list, create, update, comment — from the commander definitions or the kernel option types) and fails when a CLI option has no counterpart in the MCP tool input schema (or vice versa), with a maintained explicit exception list where the CLI surface is intentionally interactive-only (e.g. --no-commit defaults, TTY-only gates)
+- [x] Current drift fixed so the parity test is green WITHOUT exceptions beyond the documented list — known candidate: `arggon_list` schema lacks `parent` (and any other flag parity flags)
+- [x] The invariant is documented: docs/agents.md §MCP server and docs/json-output.md state that MCP tool schemas are parity-tested against the CLI (additive changes only; breaking changes bump schemaVersion)
 
 ## Notes
 
@@ -46,3 +46,6 @@ the standing invariant.
 - Related: task-list-parent-flag (#179) fixed one instance of the drift; this item makes the class impossible to reintroduce silently.
 
 ## Notes
+
+### 2026-09-14 @Arggon
+Implemented on feat/task-mcp-cli-parity (commit 1bfdf8f). Harness derives the CLI option surface by parsing the commander .option() definitions in cli.ts and compares both ways against the live MCP tools/list schemas. Drift fixed: arggon_list lacked parent, stale, older_than; arggon_update lacked no_cascade. Exceptions documented in-test: --json (all), --no-commit (create/update/comment), --force/--steal/--reason (update), --file (comment).
