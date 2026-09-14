@@ -4,6 +4,7 @@ status: in_progress
 id: task-orchestrator-lead-architect-review
 title: "Orchestrator is lead architect: code-reviews every subagent PR before merge"
 assignee: Arggon
+branch: feat/task-orchestrator-lead-architect-review
 parent: story-init-docs
 labels: []
 created: "2026-09-14"
