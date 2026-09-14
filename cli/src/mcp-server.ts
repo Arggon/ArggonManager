@@ -66,6 +66,11 @@ const TOOLS: ToolDefinition[] = [
           description:
             "exact assignee login; @me resolves via GITHUB_USER, then GITHUB_ACTOR, then `gh api user`",
         },
+        parent: {
+          type: "string",
+          description:
+            'exact parent item id (sugar for the "parent:" filter predicate); ANDed with the other filters',
+        },
         filter: {
           type: "string",
           description: 'compact filter expression, e.g. "status:todo !label:security"',
@@ -73,6 +78,16 @@ const TOOLS: ToolDefinition[] = [
         view: {
           type: "string",
           description: "saved view name from tasks/.convention.yml x-views",
+        },
+        stale: {
+          type: "boolean",
+          description:
+            "list claimed items whose claimed_at lease is older than older_than (claims from before claimed_at count as stale)",
+          default: false,
+        },
+        older_than: {
+          type: "string",
+          description: "stale threshold for stale: <number><d|h|m> (e.g. 7d, 12h, 30m)",
         },
       },
       additionalProperties: false,
@@ -142,6 +157,12 @@ const TOOLS: ToolDefinition[] = [
         blocked_reason: {
           type: "string",
           description: "required when status is blocked; forbidden otherwise",
+        },
+        no_cascade: {
+          type: "boolean",
+          description:
+            "skip automatic container completion when this update closes the last open descendant",
+          default: false,
         },
       },
       required: ["id"],
@@ -243,9 +264,12 @@ export function runMcpServer(opts: McpServerOptions): void {
           cwd: opts.cwd,
           status: str(args.status),
           type: str(args.type),
+          parent: str(args.parent),
           assignee: str(args.assignee),
           filter: str(args.filter),
           view: str(args.view),
+          stale: args.stale === true,
+          olderThan: str(args.older_than),
         });
         return successEnvelope(
           "list",
@@ -293,6 +317,7 @@ export function runMcpServer(opts: McpServerOptions): void {
           dependsOn: str(args.depends_on),
           addDependsOn: str(args.add_depends_on),
           blockedReason: str(args.blocked_reason),
+          cascade: args.no_cascade !== true,
           agent: true,
         });
         // Tracker auto-commit resolves like the CLI (`--no-commit` has no MCP
