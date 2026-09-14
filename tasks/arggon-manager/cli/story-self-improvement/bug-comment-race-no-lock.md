@@ -4,6 +4,7 @@ status: in_progress
 id: bug-comment-race-no-lock
 title: "comment race: unlocked read-modify-write loses concurrent comments"
 assignee: Arggon
+branch: fix/bug-comment-race-no-lock
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
