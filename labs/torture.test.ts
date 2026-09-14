@@ -39,13 +39,10 @@
  *    origin: suizo observation "necesité reintentos por lock transitorio".
  *    asserts: all comments land in their item files; git's index.lock races
  *    resolve as success or a clean, reported failure — never a corrupted
- *    state, no index.lock left behind, validate ok. Two EXPOSED bugs are
- *    tracked instead of baked into green assertions:
- *    - bug-comment-race-no-lock: concurrent comments on the SAME item lose
- *      one (runComment is unlocked) — it.todo below scenario 2.
- *    - bug-autocommit-silent-skip: a lost index.lock race silently skips the
- *      commit (file left dirty, ok:true) — `git status` asserted as
- *      modifications-only instead of clean.
+ *    state, no index.lock left behind, validate ok. bug-comment-race-no-lock
+ *    (same-item comment loss) is still tracked as the it.todo below;
+ *    bug-autocommit-silent-skip is FIXED (commitTrackerMutation retries the
+ *    index.lock race), so scenario 2 asserts the tree `git status`-clean.
  *
  * 3. Synthetic legacy tree, full adoption flow (end-to-end CLI)
  *    origin: guardian/cuentas-claras/suizo/racha — adopt auto-hierarchy + ack
@@ -311,20 +308,12 @@ describe("lab: concurrent tracker auto-commit contention (suizo lock-transitorio
         expect(body).toContain(`note on ${id}`);
       }
 
-      // No git index.lock left behind and no corruption: the tree converged.
-      // NOTE: we do NOT assert `git status` fully clean here — the lab
-      // exposed bug-autocommit-silent-skip: under index.lock contention
-      // commitTrackerMutation can silently skip the commit, leaving the
-      // mutated item file dirty with ok:true. Assert the dirty set is only
-      // in-place modifications under tasks/ (never deletions/renames), and
-      // every comment is on disk.
+      // No git index.lock left behind and the tree is fully clean: with the
+      // commitTrackerMutation retry (bug-autocommit-silent-skip fix) every
+      // index.lock race resolves as a landed commit — a silent skip would
+      // leave the mutated item file dirty here.
       expect(existsSync(join(dir, ".git/index.lock"))).toBe(false);
-      const dirty = git(["status", "--porcelain"], dir)
-        .split("\n")
-        .filter((line) => line.length > 0);
-      for (const line of dirty) {
-        expect(line).toMatch(/^ ?M tasks\/launch\/auth\/story-login\/task-[a-f]\.md$/);
-      }
+      expect(git(["status", "--porcelain"], dir)).toBe("");
 
       expect(runCli(["validate", "--json"], dir).body).toMatchObject({ ok: true });
 
