@@ -4,6 +4,7 @@ status: in_progress
 id: task-list-parent-flag
 title: first-class list --parent flag; MCP arggon_update lacks parent
 assignee: Arggon
+branch: feat/task-list-parent-flag
 parent: story-cli-ergonomics
 labels: []
 created: "2026-09-14"
