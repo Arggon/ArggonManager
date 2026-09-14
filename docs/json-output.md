@@ -357,6 +357,8 @@ Human output supports `--format table` (default) and `--format markdown` (standu
 
 With `--github` the board overlays live PR state (number, draft/ready, checks) on cards with a `branch`, matched by head ref name; cards without a branch or PR get a neutral badge. Without the flag the board is a fully offline snapshot. Failures use `error.code: "BOARD_FAILED"` (missing tasks/, or without gh auth — run plain `board` for the offline snapshot).
 
+`--serve` is combinable with `--json` (unlike `--github`/`--tui`, which fail with `BOARD_FAILED` under `--serve`): it is a one-shot programmatic server-start signal — the standard `board` envelope is emitted exactly once, with `serving: true`, the loopback `url` and the bound `port`, and then the process keeps serving; nothing further is written to stdout by the CLI itself.
+
 `--tui` is an interactive read-only terminal kanban (story-tui-board), **not a data format**: it is not combinable with `--json` (fails with `error.code: "BOARD_FAILED"`) and emits no envelope — it renders ANSI frames until you press `q`. It also fails with `BOARD_FAILED` when stdout is not a TTY (piped output). It performs no writes: it re-reads the tree over the same kernel read path as `list`/`board` after every keypress.
 
 ### `sync`

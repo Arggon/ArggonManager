@@ -48,7 +48,7 @@ x-generated:
     acknowledged: true
   CHANGELOG.md:
     template: "docs/CHANGELOG.md"
-    checksum: "sha256:2a9840bafc6e3920ef4e29611e258c22a06a4b5d5f012264f0a99c3c5d1e7da3"
+    checksum: "sha256:f112c79f72ef2a981afd9a898df4c569dc351c9d4f623917fce802651fcd640c"
     arggonVersion: "0.0.0"
     generatedAt: "2026-09-13T21:12:48.651Z"
     acknowledged: true

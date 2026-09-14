@@ -355,7 +355,7 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
     expect(agentsEntry.template).toBe("docs/AGENTS.md");
     expect(agentsEntry.checksum).toBe(checksumOf(agents));
     expect(agentsEntry.checksum.startsWith("sha256:")).toBe(true);
-    expect(agentsEntry.arggonVersion).toBe("0.0.0");
+    expect(agentsEntry.arggonVersion).toBe("0.1.0");
     expect(agentsEntry.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(result.created).toContain("AGENTS.md");
 
