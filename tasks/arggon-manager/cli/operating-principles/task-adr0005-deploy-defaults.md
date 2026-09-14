@@ -4,6 +4,7 @@ status: in_progress
 id: task-adr0005-deploy-defaults
 title: "ADR 0005 into product: init/playbooks carry per-shape deploy defaults"
 assignee: Arggon
+branch: feat/task-adr0005-deploy-defaults
 parent: operating-principles
 labels: []
 created: "2026-09-14"
