@@ -1,7 +1,7 @@
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
 import { parseFrontmatter } from "./frontmatter.js";
@@ -9,6 +9,17 @@ import { runInit } from "./init.js";
 import { parseOlderThan, runList } from "./list.js";
 import { runStart, type StartGit } from "./start.js";
 import { runUpdate } from "./update.js";
+
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+const tmpDirs: string[] = [];
+afterEach(() => {
+  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
+  const dir = _mkdtempSync(prefix, options);
+  tmpDirs.push(dir);
+  return dir;
+}
 
 const NOW = new Date("2026-09-03T12:00:00Z");
 const NOW_ISO = "2026-09-03T12:00:00.000Z";

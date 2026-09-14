@@ -1,9 +1,9 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import {
   arggonVersion,
   checksumOf,
@@ -18,6 +18,17 @@ import {
   type GeneratedEntry,
 } from "./convention.js";
 import { runInit } from "./init.js";
+
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+const tmpDirs: string[] = [];
+afterAll(() => {
+  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
+  const dir = _mkdtempSync(prefix, options);
+  tmpDirs.push(dir);
+  return dir;
+}
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const cli = resolve(repoRoot, "cli/src/cli.ts");
@@ -111,6 +122,7 @@ describe("init docs: tier-1 content", () => {
     expect(existsSync(join(dir, "CHANGELOG.md"))).toBe(false);
     expect(existsSync(join(dir, "SUPPORT.md"))).toBe(false);
     expect(existsSync(join(dir, "docs/runbooks/README.md"))).toBe(false);
+    expect(existsSync(join(dir, "docs/deploy.md"))).toBe(false);
   });
 });
 
@@ -170,7 +182,7 @@ describe("init docs: no-overwrite guarantee", () => {
   it("generateDocs creates on the first run and treats stateless files as modified on the second", () => {
     const dir = tempDir();
     const first = generateDocs({ root: dir, full: true });
-    expect(first.created.length).toBe(17); // 16 docs (incl. .mcp.json) + bundled arggon-cli skill
+    expect(first.created.length).toBe(18); // 17 docs (incl. .mcp.json) + bundled arggon-cli skill
     expect(first.created).toContain(".agents/skills/arggon-cli/SKILL.md");
     expect(first.skipped).toEqual([]);
     expect(first.updated).toEqual([]);
@@ -181,8 +193,8 @@ describe("init docs: no-overwrite guarantee", () => {
     // provenance state every on-disk file counts as adopter-modified and is
     // skipped (never overwritten).
     expect(second.updated).toEqual([]);
-    expect(second.modified.length).toBe(17);
-    expect(second.skipped.length).toBe(17);
+    expect(second.modified.length).toBe(18);
+    expect(second.skipped.length).toBe(18);
   });
 });
 
@@ -225,7 +237,7 @@ describe("init docs: --json payload", () => {
     expect(body.updated).toContain("AGENTS.md");
     expect(body.updated).toContain("ARCHITECTURE.md");
     expect(body.updated).toContain(".agents/skills/arggon-cli/SKILL.md");
-    expect(body.updated.length).toBe(17);
+    expect(body.updated.length).toBe(18);
     expect(body.modified).toEqual([]);
     expect(body.skipped).toEqual([]);
   });
@@ -237,7 +249,7 @@ describe("init docs: --json payload", () => {
     expect(proc.status).toBe(0);
     const body = JSON.parse(proc.stdout) as { created: string[]; updated: string[]; skipped: string[] };
     expect(body.created).toEqual(
-      ["ARCHITECTURE.md", "CHANGELOG.md", "SUPPORT.md", "docs/convention.md", "docs/engineering.md", "docs/runbooks/README.md"].sort(),
+      ["ARCHITECTURE.md", "CHANGELOG.md", "SUPPORT.md", "docs/convention.md", "docs/deploy.md", "docs/engineering.md", "docs/runbooks/README.md"].sort(),
     );
     expect(body.updated.length).toBe(11); // 10 tier-1 docs (incl. .mcp.json) + bundled skill
     expect(body.updated).toContain("AGENTS.md");
@@ -351,7 +363,7 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
     expect(skill.startsWith(`${generatedMarker("skills/arggon-cli/SKILL.md")}\n`)).toBe(true);
 
     const config = readConventionConfig(dir);
-    expect(Object.keys(config.generated).length).toBe(17);
+    expect(Object.keys(config.generated).length).toBe(18);
     const agentsEntry = config.generated["AGENTS.md"]!;
     expect(agentsEntry.template).toBe("docs/AGENTS.md");
     expect(agentsEntry.checksum).toBe(checksumOf(agents));
@@ -370,7 +382,7 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
     runInit({ dir, force: false, full: true });
     const before = readFileSync(join(dir, "AGENTS.md"), "utf8");
     const result = runInit({ dir, force: false, full: true });
-    expect(result.updated.length).toBe(17);
+    expect(result.updated.length).toBe(18);
     expect(result.created).toEqual([]);
     expect(result.skipped).toEqual([]);
     // Content is byte-identical (same template, same placeholders).
@@ -428,7 +440,7 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
     const result = runInit({ dir, force: true, full: true });
     // State survived the forced convention.yml rewrite, so untouched docs
     // update instead of degrading to adopter-modified.
-    expect(result.updated.length).toBe(17);
+    expect(result.updated.length).toBe(18);
     expect(result.modified).toEqual([]);
     expect(readConventionConfig(dir).generated["AGENTS.md"]!.template).toBe("docs/AGENTS.md");
   });
@@ -537,5 +549,47 @@ describe("init docs: generated convention.md documents the x-* namespaced extens
     for (const ext of ["x-views", "x-playbooks", "x-tracker", "x-import", "x-worktree", "x-generated"]) {
       expect(generated).toContain(ext);
     }
+  });
+});
+
+describe("init docs: deploy defaults (task-adr0005-deploy-defaults)", () => {
+  it("--full generates docs/deploy.md with the per-shape ADR 0005 defaults, dated pricing, and exit notes", () => {
+    const dir = tempDir();
+    const result = runInit({ dir, force: false, full: true });
+    expect(result.created).toContain("docs/deploy.md");
+    const deploy = readFileSync(join(dir, "docs/deploy.md"), "utf8");
+    // All four project shapes (ADR 0005 defaults) are keyed in the table.
+    expect(deploy).toContain("Static site");
+    expect(deploy).toContain("SPA + small API");
+    expect(deploy).toContain("Long-running server");
+    expect(deploy).toContain("Jobs / cron");
+    // Pricing-verification date and re-verify cadence are named.
+    expect(deploy).toContain("2026-09-14");
+    expect(deploy).toMatch(/re-verify/i);
+    expect(deploy).toMatch(/annually|release wave/);
+    // Each default is agent-executable (config-in-repo) with an exit note.
+    expect(deploy).toContain("wrangler");
+    expect(deploy).toContain("Exit note");
+  });
+
+  it("tier-1 (no --full) does not generate docs/deploy.md, and generated AGENTS.md carries one pointer line", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    expect(existsSync(join(dir, "docs/deploy.md"))).toBe(false);
+    const full = tempDir();
+    runInit({ dir: full, force: false, full: true });
+    const agents = readFileSync(join(full, "AGENTS.md"), "utf8");
+    expect(agents).toContain("docs/deploy.md");
+  });
+
+  it("a second --full run regenerates the untouched deploy.md and refreshes its x-generated state", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const first = readFileSync(join(dir, "docs/deploy.md"), "utf8");
+    expect(first.startsWith(generatedMarker("docs/deploy.md"))).toBe(true);
+    const second = runInit({ dir, force: false, full: true });
+    expect(second.updated).toContain("docs/deploy.md");
+    expect(readFileSync(join(dir, "docs/deploy.md"), "utf8")).toBe(first);
+    expect(readConventionConfig(dir).generated["docs/deploy.md"]!.template).toBe("docs/docs/deploy.md");
   });
 });

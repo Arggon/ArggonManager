@@ -417,7 +417,7 @@ describe("lab: synthetic legacy tree, full adoption flow (guardian/cuentas/suizo
 
     // adopt --ack re-baselines every generated doc to its current bytes.
     const ack = runCli(["adopt", "--ack", "--json"], dir);
-    expect(ack.body).toMatchObject({ ok: true, command: "adopt", count: 17 });
+    expect(ack.body).toMatchObject({ ok: true, command: "adopt", count: 18 });
     const agentsAcked = (ack.body!.acked as Array<Json>).find((doc) => doc.path === "AGENTS.md");
     expect(agentsAcked).toBeDefined();
 

@@ -6,6 +6,7 @@ import { ITEM_TYPES } from "./ids.js";
 import { runCreate } from "./create.js";
 import { runComment } from "./comment.js";
 import { runList } from "./list.js";
+import { runShow } from "./show.js";
 import { maybeCommitUpdate, runUpdate } from "./update.js";
 import { STATUSES } from "./status.js";
 import { toContractWorkItem } from "./contract.js";
@@ -29,6 +30,7 @@ const LIST_FAILED = "LIST_FAILED";
 const CREATE_FAILED = "CREATE_FAILED";
 const UPDATE_FAILED = "UPDATE_FAILED";
 const COMMENT_FAILED = "COMMENT_FAILED";
+const SHOW_FAILED = "SHOW_FAILED";
 
 type JsonRpcRequest = {
   jsonrpc: "2.0";
@@ -188,6 +190,33 @@ const TOOLS: ToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "arggon_show",
+    description:
+      "Read one work item with bounded output (ADR 0006): frontmatter fields plus the body's last comments by default; the full body is an explicit opt-in. Pure read — never writes. Returns the arggon `show --json` envelope: {ok, schemaVersion, conventionVersion, command, item, path, comments[, body]}.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "work item id" },
+        meta: {
+          type: "boolean",
+          description: "frontmatter only — no body, no comments (highest precedence)",
+          default: false,
+        },
+        body: {
+          type: "boolean",
+          description: "full body including ALL comments (the unbounded explicit opt-in)",
+          default: false,
+        },
+        tail_comments: {
+          type: "number",
+          description: "compact view: include the last N comments instead of the default 3",
+        },
+      },
+      required: ["id"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 /** One MCP server session bound to fixed streams and a fixed repo root. */
@@ -246,7 +275,9 @@ export function runMcpServer(opts: McpServerOptions): void {
             ? CREATE_FAILED
             : command === "comment"
               ? COMMENT_FAILED
-              : UPDATE_FAILED;
+              : command === "show"
+                ? SHOW_FAILED
+                : UPDATE_FAILED;
       envelope = failEnvelope({ command, message, code, conventionVersion: conventionVersion() });
       return { content: [{ type: "text", text: JSON.stringify(envelope) }], isError: true };
     }
@@ -355,6 +386,28 @@ export function runMcpServer(opts: McpServerOptions): void {
             path: result.path,
             comment: result.comment,
             commit: commitPayload(result.commit),
+          },
+          conventionVersion(),
+        );
+      });
+    }
+    if (name === "arggon_show") {
+      return toolEnvelope("arggon_show", () => {
+        const result = runShow({
+          cwd: opts.cwd,
+          id: str(args.id) ?? "",
+          meta: args.meta === true,
+          body: args.body === true,
+          tailComments: typeof args.tail_comments === "number" ? args.tail_comments : undefined,
+        });
+        return successEnvelope(
+          "show",
+          {
+            item: toContractWorkItem(result.item, result.root),
+            path: result.path,
+            ...(args.body === true
+              ? { body: result.item.body, comments: result.allComments }
+              : { comments: result.comments }),
           },
           conventionVersion(),
         );

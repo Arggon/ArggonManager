@@ -1,8 +1,10 @@
 ---
 type: task
-status: todo
+status: done
 id: task-adr0005-deploy-defaults
 title: "ADR 0005 into product: init/playbooks carry per-shape deploy defaults"
+assignee: Arggon
+branch: feat/task-adr0005-deploy-defaults
 parent: operating-principles
 labels: []
 created: "2026-09-14"
@@ -25,8 +27,8 @@ Also carries the recurring review consequence: infra pricing guidance ages (Orac
 
 ## Acceptance
 
-- [ ] init (or the generated docs/playbooks) emits the per-shape deploy defaults table from ADR 0005, each default config-in-repo (agent-executable) with an exit note
-- [ ] The guidance names its pricing-verification date and the re-verify cadence (annual, or before each release wave)
-- [ ] init-docs test asserts the deploy guidance is present in the generated tree
+- [x] init (or the generated docs/playbooks) emits the per-shape deploy defaults table from ADR 0005, each default config-in-repo (agent-executable) with an exit note
+- [x] The guidance names its pricing-verification date and the re-verify cadence (annual, or before each release wave)
+- [x] init-docs test asserts the deploy guidance is present in the generated tree
 
 ## Notes

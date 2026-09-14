@@ -1,12 +1,23 @@
 import { PassThrough } from "node:stream";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync as _mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runCreate } from "./create.js";
 import { arggonVersion } from "./docs.js";
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
+
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+const tmpDirs: string[] = [];
+afterEach(() => {
+  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
+  const dir = _mkdtempSync(prefix, options);
+  tmpDirs.push(dir);
+  return dir;
+}
 
 /**
  * In-process MCP client #1: drives runMcpServer over connected streams,
@@ -135,7 +146,7 @@ describe("mcp server", () => {
     expect(fallback.protocolVersion).toBe("2025-06-18");
   });
 
-  it("lists the four tools with JSON-schema inputs", async () => {
+  it("lists the five tools with JSON-schema inputs", async () => {
     const result = await client.request("tools/list");
     const tools = result.tools as Array<{ name: string; inputSchema: Record<string, unknown> }>;
     expect(tools.map((tool) => tool.name)).toEqual([
@@ -143,6 +154,7 @@ describe("mcp server", () => {
       "arggon_create",
       "arggon_update",
       "arggon_comment",
+      "arggon_show",
     ]);
     for (const tool of tools) {
       expect(tool.inputSchema.type).toBe("object");

@@ -8,12 +8,23 @@
  * tools/call round trip returns the documented `--json` envelope.
  */
 import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync } from "node:fs";
+import { mkdirSync, mkdtempSync as _mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { runInit } from "./init.js";
+
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+const tmpDirs: string[] = [];
+afterEach(() => {
+  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
+  const dir = _mkdtempSync(prefix, options);
+  tmpDirs.push(dir);
+  return dir;
+}
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const cli = join(root, "cli/src/cli.ts");
@@ -94,6 +105,7 @@ describe("arggon mcp smoke (child process client)", () => {
         "arggon_create",
         "arggon_update",
         "arggon_comment",
+        "arggon_show",
       ]);
 
       await server.request(3, "tools/call", {
