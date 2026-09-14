@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-token-context-research
 title: "Token/context principle: investigate optimizing agent tokens and context windows in ArggonManager"
+assignee: Arggon
 parent: operating-principles
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T20:34:28.261Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/operating-principles/task-token-context-research.md
