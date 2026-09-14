@@ -43,3 +43,5 @@ running under a generated AGENTS.md follows it without being told.
 
 ### 2026-09-14 @Arggon
 Implementation landed (commit f7a1d91): review channel institutionalized in templates/docs/AGENTS.md, docs/agents.md lead-architect bullet, skills/arggon-cli/SKILL.md (+skills:sync), and init-docs test assertion. Generated AGENTS.md at 2018 B (<=2048 budget). Full suite 817/817, lint, build green. Acceptance ticks applied; PR to follow.
+
+Lead-architect review: APPROVED. The channel is institutionalized at all three layers (generated AGENTS.md orchestration guidance, docs/agents.md lead-architect bullet, SKILL handoff line + skills:sync) with the init-docs assertion locking it in. Budget held: 2018/2048 B — headroom is now ~30 B, so the NEXT init-docs addition will need prose compression or an ADR-level budget decision; flagged for the next cycle. Merge follows.
