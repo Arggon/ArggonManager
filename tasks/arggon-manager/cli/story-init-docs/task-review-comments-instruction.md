@@ -4,6 +4,7 @@ status: in_progress
 id: task-review-comments-instruction
 title: "init instruction: review feedback lands in ArggonManager comments, not GitHub PR comments"
 assignee: Arggon
+branch: feat/task-review-comments-instruction
 parent: story-init-docs
 labels: []
 created: "2026-09-14"
