@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-ancestor-filter
 title: Ancestor/initiative filter predicate for filters and saved views
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-cli-ergonomics
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
-claimed_at: "2026-09-14T15:49:31.189Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-cli-ergonomics/task-ancestor-filter.md
