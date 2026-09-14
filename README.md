@@ -196,6 +196,7 @@ Finds `tasks/` with walk-up from cwd (same as `create`), loads work items with t
 arggon list
 arggon list --status todo
 arggon list --type bug --assignee @me
+arggon list --parent story-login
 arggon list --json
 arggon --json list --type task --status in_progress
 arggon list --filter "status:todo !label:security"
@@ -205,6 +206,7 @@ arggon list --stale --older-than 7d
 
 - --status <status>: exact v0 status (`todo`, `in_progress`, `blocked`, `done`, `cancelled`)
 - --type <type>: exact v0 type (`initiative`, `epic`, `story`, `task`, `bug`)
+- --parent <id>: exact parent item id — sugar for the `parent:` filter predicate; ANDed with the other flags. Unlike the raw predicate, an unknown parent id fails with `LIST_FAILED` instead of returning an empty list
 - --assignee <login>: exact assignee. Special @me resolves via `GITHUB_USER`, then `GITHUB_ACTOR`, then `gh api user -q .login`
 - --filter <expr>: compact filter ANDed with the flags (fields `status`, `type`, `assignee`, `label`, `parent`, `depends-on`, `blocked-by`, `ancestor`; `!` negates; quotes allow spaces, e.g. `assignee:"Jane Doe"`); unknown fields are usage errors. `depends-on:<id>` matches items whose `depends_on` contains `<id>`; `blocked-by:<id>` matches the computed inverse — items that `<id>` depends on; `ancestor:<id>` matches items with `<id>` anywhere in their parent chain (e.g. `arggon list --filter "status:todo ancestor:launch-mvp"` — everything still open under the initiative)
 - --view <name>: named saved view from the `x-views` map in `tasks/.convention.yml`, ANDed with the flags and `--filter` (e.g. `x-views:\n  my-open-bugs: "type:bug status:todo !assignee:someone"`); unknown names fail listing the known views
@@ -257,10 +259,10 @@ arggon board --tui            # interactive read-only terminal kanban (raw ANSI,
 ```
 
 - `--out <file>`: output path (default `board.html` at the repo root regardless of cwd); parent directories must exist
-- `--json`: one JSON object on stdout; failures emit `code: "BOARD_FAILED"`
+- `--json`: one JSON object on stdout; failures emit `code: "BOARD_FAILED"`. The payload contract for every mode (which fields appear with `--serve`, `--github`, `--group-by`) is documented once in [docs/json-output.md](docs/json-output.md) — the `board` section there is the normative source
 - `--github`: one `gh pr list` read matched by head ref name → per-card badge (`#N · draft/open/merged/closed` + checks `✓/✗/…`, neutral `○ no PR` without branch or PR); without gh auth fails clearly suggesting plain `board`; never writes to `tasks/`
 - `--group-by milestone`: prototype per [ADR 0003](docs/adr/0003-milestone-field.md); items without a milestone group last
-- `--serve`: serves the board locally, **bound to 127.0.0.1 only**, and reloads the page whenever any file under `tasks/` changes; drag-and-drop posts to the update endpoint, which runs the same kernel update rules as the CLI. `--serve --json` emits the standard envelope once (`{ serving, url, port }`)
+- `--serve`: serves the board locally, **bound to 127.0.0.1 only**, and reloads the page whenever any file under `tasks/` changes; drag-and-drop posts to the update endpoint, which runs the same kernel update rules as the CLI. `--serve` is combinable with `--json` (the envelope is emitted once, then the server keeps running); see docs/json-output.md for the payload fields
 - `--tui`: interactive, read-only terminal kanban over the same kernel read path — five v0 status columns, dependency-light (raw ANSI escapes, no TUI framework, zero new dependencies). Re-reads the tree after every keypress, so it always shows the current tree. Requires an interactive terminal (piped stdout fails with `BOARD_FAILED`); **not combinable with `--json`** (it is a view, not a data format) or `--serve`. Keybindings:
 
 | Key | Action |

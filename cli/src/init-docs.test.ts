@@ -5,6 +5,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
+  arggonVersion,
   checksumOf,
   generateDocs,
   generatedMarker,
@@ -355,7 +356,7 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
     expect(agentsEntry.template).toBe("docs/AGENTS.md");
     expect(agentsEntry.checksum).toBe(checksumOf(agents));
     expect(agentsEntry.checksum.startsWith("sha256:")).toBe(true);
-    expect(agentsEntry.arggonVersion).toBe("0.1.0");
+    expect(agentsEntry.arggonVersion).toBe(arggonVersion());
     expect(agentsEntry.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(result.created).toContain("AGENTS.md");
 

@@ -1,12 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-version-literal-churn
 title: "version literal churn: tests assert hardcoded 0.1.0 instead of arggonVersion()"
+assignee: Arggon
+branch: feat/task-version-literal-churn
 parent: story-cli-ergonomics
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T19:17:09.056Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-cli-ergonomics/task-version-literal-churn.md
@@ -26,6 +29,6 @@ missed file fails CI unrelated to the release.
 
 ## Acceptance
 
-- [ ] Version assertions derive the expected value from `arggonVersion()` (or a shared fixture) instead of hardcoded literals; a bump touches only package.json + CHANGELOG
+- [x] Version assertions derive the expected value from `arggonVersion()` (or a shared fixture) instead of hardcoded literals; a bump touches only package.json + CHANGELOG
 
 ## Notes

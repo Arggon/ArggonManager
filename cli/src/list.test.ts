@@ -533,3 +533,26 @@ describe("runList dependency predicates (spec-deps-001)", () => {
     expect(items).toEqual([]);
   });
 });
+
+describe("runList --parent flag", () => {
+  it("filters to direct children of the given parent id", () => {
+    const { items } = runList({ cwd: makeTree(), parent: "launch-mvp" });
+    expect(items.map((i) => i.id)).toEqual(["auth", "z-later"]);
+  });
+
+  it("composes with --status (AND)", () => {
+    const { items } = runList({ cwd: makeTree(), parent: "launch-mvp", status: "in_progress" });
+    expect(items.map((i) => i.id)).toEqual(["auth"]);
+  });
+
+  it("composes with --filter (AND)", () => {
+    const { items } = runList({ cwd: makeTree(), parent: "launch-mvp", filter: "type:epic" });
+    expect(items.map((i) => i.id)).toEqual(["auth", "z-later"]);
+  });
+
+  it("unknown parent id fails with an actionable error", () => {
+    expect(() => runList({ cwd: makeTree(), parent: "nope" })).toThrowError(
+      'unknown parent "nope" (no work item with that id under tasks/)',
+    );
+  });
+});

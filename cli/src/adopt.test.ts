@@ -16,7 +16,7 @@ import {
   runAdoptAck,
 } from "./adopt.js";
 import { readConventionConfig, updateGeneratedSection } from "./convention.js";
-import { checksumOf } from "./docs.js";
+import { arggonVersion, checksumOf } from "./docs.js";
 import { runDoctor } from "./doctor.js";
 import { runCreate } from "./create.js";
 import { runInit } from "./init.js";
@@ -367,7 +367,7 @@ describe("runAdoptAck: x-generated baseline refresh (task-adopt-checksum-refresh
     expect(agents.checksum).toBe(checksumOf(readFileSync(join(dir, "AGENTS.md"), "utf8")));
     expect(agents.generatedAt).toBe("2026-09-13T10:00:00.000Z");
     expect(agents.template).toBe("docs/AGENTS.md");
-    expect(agents.arggonVersion).toBe("0.1.0");
+    expect(agents.arggonVersion).toBe(arggonVersion());
     // The sanctioned edits stop reporting as modified: they are acknowledged
     // (sanctioned-diverged baselines), the healthy acked bucket.
     expect(runDoctor({ cwd: dir }).docs).toMatchObject({
