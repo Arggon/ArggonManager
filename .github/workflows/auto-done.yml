@@ -64,11 +64,20 @@ jobs:
             status="$(node dist/cli.js list --json | jq -r --arg id "$id" '.items[] | select(.id == $id) | .status')"
             case "$status" in
               in_progress)
-                if node dist/cli.js update "$id" --status done --json > /dev/null; then
-                  echo "$id (PR #$PR): in_progress -> done"
+                # Capture the update JSON (task-auto-done-cascade-visibility):
+                # autoCompleted/cascadeSkipped must land in the run log so a
+                # missed cascade is diagnosable after the fact. Note: a
+                # sibling that is still non-terminal on THIS tree (e.g. its
+                # own flip PR had not merged when this run checked out main)
+                # stops the cascade silently — visible here only as an empty
+                # cascade list, not as a cascadeSkipped entry.
+                if out="$(node dist/cli.js update "$id" --status done --json)"; then
+                  cascade="$(printf '%s' "$out" | jq -r '(.autoCompleted // []) | join(",")' 2>/dev/null || true)"
+                  skipped="$(printf '%s' "$out" | jq -r '(.cascadeSkipped // []) | map("\(.id):\(.reason)") | join(",")' 2>/dev/null || true)"
+                  echo "$id (PR #$PR): in_progress -> done (cascade: ${cascade:-none}${skipped:+; skipped: $skipped})"
                   changed=1
                 else
-                  echo "::warning::$id: update failed unexpectedly"
+                  echo "::warning::$id: update failed unexpectedly (output: ${out:-empty})"
                 fi
                 ;;
               done|cancelled)
