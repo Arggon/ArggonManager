@@ -81,6 +81,9 @@ arggon create task|bug "Title" --parent <story-id>    # file follow-ups (leaves 
 arggon validate --json                                # gate before every commit
 ```
 
+- Non-trivial items are **orchestrated**: coordinators delegate them to subagents
+  in file-disjoint waves (one subagent per worktree) per the generated AGENTS.md.
+
 - Full `--json` envelope: `{ok, schemaVersion: 1, conventionVersion, command, ...payload}`;
   failures `{ok: false, error: {message, code}}` + non-zero exit. Error codes:
   `INIT_FAILED, CREATE_FAILED, LIST_FAILED, UPDATE_FAILED, VALIDATE_FAILED, BRANCH_FAILED,
