@@ -4,6 +4,7 @@ status: in_progress
 id: task-token-context-research
 title: "Token/context principle: investigate optimizing agent tokens and context windows in ArggonManager"
 assignee: Arggon
+branch: feat/task-token-context-research
 parent: operating-principles
 labels: []
 created: "2026-09-14"
