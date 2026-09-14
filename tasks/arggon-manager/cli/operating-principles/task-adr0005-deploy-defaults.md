@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adr0005-deploy-defaults
 title: "ADR 0005 into product: init/playbooks carry per-shape deploy defaults"
+assignee: Arggon
 parent: operating-principles
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T21:15:19.652Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/operating-principles/task-adr0005-deploy-defaults.md
