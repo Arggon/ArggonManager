@@ -1,12 +1,15 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-tmp-fixture-leak
 title: vitest fixtures leak mkdtemp dirs under /tmp (inode exhaustion breaks runs)
+assignee: Arggon
+branch: feat/bug-tmp-fixture-leak
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T21:15:15.785Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/bug-tmp-fixture-leak.md
@@ -23,7 +26,7 @@ Found 2026-09-14 during the task-cascade-subtree-open-visibility cycle (lead-arc
 
 ## Acceptance
 
-- [ ] Audit fixture helpers across cli/src/*.test.ts for mkdtemp usage without rmSync on exit; fix the leakers (try/finally or afterEach cleanup)
-- [ ] One full suite run leaves zero new `arggon-*` dirs in /tmp (assert manually before/after; note the count in the PR body)
+- [x] Audit fixture helpers across cli/src/*.test.ts for mkdtemp usage without rmSync on exit; fix the leakers (try/finally or afterEach cleanup)
+- [x] One full suite run leaves zero new `arggon-*` dirs in /tmp (assert manually before/after; note the count in the PR body)
 
 ## Notes

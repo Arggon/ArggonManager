@@ -6,10 +6,10 @@
  * board groups by it behind the opt-in `--group-by milestone` flag;
  * ungrouped rendering stays byte-identical to the pre-prototype output.
  */
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { runBoard, renderBoardHtml } from "./board.js";
 import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
@@ -17,6 +17,17 @@ import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { runInit } from "./init.js";
 import { softTryLoadItem } from "./items.js";
 import { runValidate } from "./validate.js";
+
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+const tmpDirs: string[] = [];
+afterEach(() => {
+  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
+  const dir = _mkdtempSync(prefix, options);
+  tmpDirs.push(dir);
+  return dir;
+}
 
 const GENERATED_AT = "2026-09-11T00:00:00.000Z";
 

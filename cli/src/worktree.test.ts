@@ -4,19 +4,11 @@
  * (sync-smoke pattern); only push/PR are stubbed so no remote is needed.
  */
 import { spawnSync } from "node:child_process";
-import {
-  appendFileSync,
-  chmodSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
+import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { defaultCleanupGit, runCleanup } from "./cleanup.js";
 import { runCreate } from "./create.js";
 import { parseFrontmatter } from "./frontmatter.js";
@@ -24,6 +16,29 @@ import { runInit } from "./init.js";
 import { defaultStartGit, runStart } from "./start.js";
 import { runUpdate } from "./update.js";
 import { runValidate } from "./validate.js";
+
+// bug-tmp-fixture-leak: track mkdtemp dirs (plus any `arggon start --worktree`
+// sibling worktrees named `<basename>-task-*`) and remove them after each test.
+const tmpDirs: string[] = [];
+function removeFixtureTree(dir: string): void {
+  rmSync(dir, { recursive: true, force: true });
+  try {
+    const base = basename(dir);
+    for (const entry of readdirSync(dirname(dir))) {
+      if (entry.startsWith(`${base}-task`)) rmSync(join(dirname(dir), entry), { recursive: true, force: true });
+    }
+  } catch {
+    // parent already gone
+  }
+}
+afterEach(() => {
+  for (const dir of tmpDirs.splice(0)) removeFixtureTree(dir);
+});
+function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
+  const dir = _mkdtempSync(prefix, options);
+  tmpDirs.push(dir);
+  return dir;
+}
 
 const NOW = new Date("2026-09-11T12:00:00Z");
 

@@ -10,11 +10,11 @@
  * --open-pr). The CLI runs from source via tsx, like cli.test.ts.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { runCreate } from "./create.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { runInit } from "./init.js";
@@ -25,6 +25,30 @@ const TIMEOUT_MS = 120_000;
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const cliEntry = resolve(repoRoot, "cli/src/cli.ts");
 const tsxLoader = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
+
+// bug-tmp-fixture-leak: track mkdtemp dirs (plus `arggon start --worktree`
+// sibling worktrees named `<basename>-task-*`) and remove them once the
+// spawned CLI children have finished (afterEach runs after the test's awaits).
+const tmpDirs: string[] = [];
+function removeFixtureTree(dir: string): void {
+  rmSync(dir, { recursive: true, force: true });
+  try {
+    const base = basename(dir);
+    for (const entry of readdirSync(dirname(dir))) {
+      if (entry.startsWith(`${base}-task`)) rmSync(join(dirname(dir), entry), { recursive: true, force: true });
+    }
+  } catch {
+    // parent already gone
+  }
+}
+afterEach(() => {
+  for (const dir of tmpDirs.splice(0)) removeFixtureTree(dir);
+});
+function trackedMkdtemp(prefix: string): string {
+  const dir = mkdtempSync(join(tmpdir(), prefix));
+  tmpDirs.push(dir);
+  return dir;
+}
 
 function git(args: string[], cwd: string): string {
   const r = spawnSync("git", args, { encoding: "utf8", cwd });
@@ -43,7 +67,7 @@ function commitAllIfDirty(dir: string, message: string): void {
 }
 
 function initRepoWithRemote(prefix: string): string {
-  const dir = mkdtempSync(join(tmpdir(), `arggon-race-${prefix}-`));
+  const dir = trackedMkdtemp(`arggon-race-${prefix}-`);
   git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
   git(["config", "user.email", "test@example.com"], dir);
   git(["config", "user.name", "Test"], dir);
@@ -54,7 +78,7 @@ function initRepoWithRemote(prefix: string): string {
   runCreate({ cwd: dir, type: "task", title: "Race target", parent: "login", id: "task-race", now: NOW });
   commitAllIfDirty(dir, "init tasks");
   // Bare remote so the real pushBranch step works without gh.
-  const remote = mkdtempSync(join(tmpdir(), `arggon-race-${prefix}-remote-`));
+  const remote = trackedMkdtemp(`arggon-race-${prefix}-remote-`);
   git(["init", "--bare", "--quiet"], remote);
   git(["remote", "add", "origin", remote], dir);
   git(["push", "--quiet", "-u", "origin", "main"], dir);
