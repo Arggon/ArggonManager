@@ -29,6 +29,7 @@ Non-trivial items are **delegated by default**: a coordinator agent assigns each
 
 - **One subagent per worktree**, working strictly inside `../<project>-<item-id>`.
 - **Plan waves by file-disjointness**: items in the same wave touch disjoint files/modules; conflicting items wait for the next wave.
+- **The coordinator code-reviews every subagent PR before merge**, acting as lead architect: conventions, tests, docs-in-the-same-PR, scope staying on the item, and honest acceptance ticks. Change requests go back to the subagent; only a review that passes merges — green CI is necessary, not sufficient.
 - **The coordinator verifies each merge**, resolves cross-item conflicts, and owns the tracker state (claims, statuses, follow-ups).
 - **Subagents follow the same rules**: claim your item before starting, never steal a claim, never reopen `done`/`cancelled`, validate before every commit, and open a PR referencing the item id.
 - Subagents report findings back to the coordinator instead of filing tracker items themselves.

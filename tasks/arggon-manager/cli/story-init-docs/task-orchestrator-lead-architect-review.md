@@ -1,12 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-orchestrator-lead-architect-review
 title: "Orchestrator is lead architect: code-reviews every subagent PR before merge"
+assignee: Arggon
+branch: feat/task-orchestrator-lead-architect-review
 parent: story-init-docs
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T19:16:09.067Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-init-docs/task-orchestrator-lead-architect-review.md
@@ -34,9 +37,9 @@ institutionalizes it for adopters.
 
 ## Acceptance
 
-- [ ] templates/docs/AGENTS.md Orchestration subsection states the review duty (coordinator = lead architect: reviews every subagent PR against the review bar before merge, requests changes, approves, then merges)
-- [ ] docs/agents.md orchestration section documents the review duties formally (what the review checks, request-changes loop, merge authority)
-- [ ] skills/arggon-cli/SKILL.md + generated .agents copy sync the one-liner; checksums re-acked (doctor: 0 modified)
-- [ ] init-docs test asserts the generated AGENTS.md mentions the review duty
+- [x] templates/docs/AGENTS.md Orchestration subsection states the review duty (coordinator = lead architect: reviews every subagent PR against the review bar before merge, requests changes, approves, then merges)
+- [x] docs/agents.md orchestration section documents the review duties formally (what the review checks, request-changes loop, merge authority)
+- [x] skills/arggon-cli/SKILL.md + generated .agents copy sync the one-liner; checksums re-acked (doctor: 0 modified)
+- [x] init-docs test asserts the generated AGENTS.md mentions the review duty
 
 ## Notes

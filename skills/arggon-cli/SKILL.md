@@ -82,7 +82,8 @@ arggon validate --json                                # gate before every commit
 ```
 
 - Non-trivial items are **orchestrated**: coordinators delegate them to subagents
-  in file-disjoint waves (one subagent per worktree) per the generated AGENTS.md.
+  in file-disjoint waves (one subagent per worktree), then code-review every
+  subagent PR as lead architect before merge — per the generated AGENTS.md.
 
 - Full `--json` envelope: `{ok, schemaVersion: 1, conventionVersion, command, ...payload}`;
   failures `{ok: false, error: {message, code}}` + non-zero exit. Error codes:
