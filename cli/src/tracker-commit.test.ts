@@ -583,7 +583,7 @@ describe("commitTrackerMutation index.lock contention (bug-autocommit-silent-ski
     expect(status(dir)).toBe("");
   }, 15_000);
 
-  it("reports the skip (payload + stderr warning) when the lock is held past all retries", () => {
+  it("reports the skip (payload + stderr warning) when the lock is held past the retry budget", () => {
     const dir = initRepo();
     const itemPath = dirtyItem(dir);
     writeFileSync(join(dir, ".git/index.lock"), "", "utf8");
@@ -591,6 +591,9 @@ describe("commitTrackerMutation index.lock contention (bug-autocommit-silent-ski
     try {
       const result = commitTrackerMutation(dir, [itemPath], {
         message: trackerCommitMessage("commented", ["task-rate-limit"]),
+        // Small injected budget: exercises the exhausted-skip path in
+        // milliseconds instead of the full 10s default.
+        commitRetryTimeoutMs: 300,
       });
 
       expect(result).toEqual({ committed: false, skipReason: "git index locked" });
