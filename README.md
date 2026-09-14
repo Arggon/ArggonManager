@@ -257,10 +257,10 @@ arggon board --tui            # interactive read-only terminal kanban (raw ANSI,
 ```
 
 - `--out <file>`: output path (default `board.html` at the repo root regardless of cwd); parent directories must exist
-- `--json`: one JSON object on stdout; failures emit `code: "BOARD_FAILED"`
+- `--json`: one JSON object on stdout; failures emit `code: "BOARD_FAILED"`. The payload contract for every mode (which fields appear with `--serve`, `--github`, `--group-by`) is documented once in [docs/json-output.md](docs/json-output.md) — the `board` section there is the normative source
 - `--github`: one `gh pr list` read matched by head ref name → per-card badge (`#N · draft/open/merged/closed` + checks `✓/✗/…`, neutral `○ no PR` without branch or PR); without gh auth fails clearly suggesting plain `board`; never writes to `tasks/`
 - `--group-by milestone`: prototype per [ADR 0003](docs/adr/0003-milestone-field.md); items without a milestone group last
-- `--serve`: serves the board locally, **bound to 127.0.0.1 only**, and reloads the page whenever any file under `tasks/` changes; drag-and-drop posts to the update endpoint, which runs the same kernel update rules as the CLI. `--serve --json` emits the standard envelope once (`{ serving, url, port }`)
+- `--serve`: serves the board locally, **bound to 127.0.0.1 only**, and reloads the page whenever any file under `tasks/` changes; drag-and-drop posts to the update endpoint, which runs the same kernel update rules as the CLI. `--serve` is combinable with `--json` (the envelope is emitted once, then the server keeps running); see docs/json-output.md for the payload fields
 - `--tui`: interactive, read-only terminal kanban over the same kernel read path — five v0 status columns, dependency-light (raw ANSI escapes, no TUI framework, zero new dependencies). Re-reads the tree after every keypress, so it always shows the current tree. Requires an interactive terminal (piped stdout fails with `BOARD_FAILED`); **not combinable with `--json`** (it is a view, not a data format) or `--serve`. Keybindings:
 
 | Key | Action |
