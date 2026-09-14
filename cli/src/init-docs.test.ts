@@ -511,3 +511,15 @@ describe("init docs: acknowledged baselines are never regenerated (bug-ack-basel
     expect(result.skipped).toContain("AGENTS.md");
   });
 });
+
+describe("init docs: generated convention.md documents the x-* namespaced extensions (task-init-convention-extensions)", () => {
+  it("init --full generates a convention.md with a Namespaced extensions section listing each x-* key", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const generated = readFileSync(join(dir, "docs/convention.md"), "utf8");
+    expect(generated).toMatch(/Namespaced extensions/);
+    for (const ext of ["x-views", "x-playbooks", "x-tracker", "x-import", "x-worktree", "x-generated"]) {
+      expect(generated).toContain(ext);
+    }
+  });
+});
