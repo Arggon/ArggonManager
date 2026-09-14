@@ -4,6 +4,7 @@ status: in_progress
 id: bug-init-leaves-docs-untracked-start-blocks-on-clean-tree
 title: "init leaves docs untracked, start blocks on clean-tree"
 assignee: Arggon
+branch: fix/bug-init-leaves-docs-untracked-start-blocks-on-clean-tree
 parent: story-start-worktree
 labels: []
 created: "2026-09-14"
