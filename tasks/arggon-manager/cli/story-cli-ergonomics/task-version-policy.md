@@ -26,5 +26,5 @@ claimed_at: "2026-09-14T15:49:37.537Z"
 
 ## Acceptance
 
-- [ ] A version policy lands (decision + docs): either bump package.json per release wave (changelog-driven) or derive --version from git describe at build time
-- [ ] `arggon --version` reports the landed scheme; documented in README
+- [x] A version policy lands (decision + docs): either bump package.json per release wave (changelog-driven) or derive --version from git describe at build time
+- [x] `arggon --version` reports the landed scheme; documented in README

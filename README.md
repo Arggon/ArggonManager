@@ -389,6 +389,10 @@ Starts a stdio MCP server (JSON-RPC 2.0) exposing `arggon_list`, `arggon_create`
 
 Fixtures: [fixtures/](fixtures/).
 
+## Versioning
+
+The package version in `package.json` is bumped manually, once per release wave — not per commit or per PR. `CHANGELOG.md` documents what lands in each wave, so `arggon --version` (which reads the package version) plus the changelog answer "which build is this and what's in it?". No semver guarantees are made beyond that.
+
 ## Contributing
 
 Ideas on folder layout, frontmatter schema, and CLI UX are especially useful right now. Open an issue. Please follow the [task convention](docs/convention.md) when proposing sample trees or templates.
