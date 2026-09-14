@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adr0006-compact-next
 title: "ADR 0006 quick wins: compact JSON envelopes + next-first agent guidance"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: operating-principles
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
-claimed_at: "2026-09-14T21:15:27.015Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/operating-principles/task-adr0006-compact-next.md
