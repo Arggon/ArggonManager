@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-ack-drift-promise
 title: "adopt --ack: the 'hand edits still report modified' promise is false — acked drift is invisible"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-adopt
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
-claimed_at: "2026-09-14T15:49:12.162Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-adopt/bug-ack-drift-promise.md
