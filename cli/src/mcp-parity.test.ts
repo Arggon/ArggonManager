@@ -10,15 +10,26 @@
  * must match BOTH ways, minus the documented exception list below.
  */
 import { spawnSync } from "node:child_process";
-import { cpSync, mkdtempSync, readFileSync } from "node:fs";
+import { cpSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PassThrough } from "node:stream";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { runCreate } from "./create.js";
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
+
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+const tmpDirs: string[] = [];
+afterEach(() => {
+  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
+function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
+  const dir = _mkdtempSync(prefix, options);
+  tmpDirs.push(dir);
+  return dir;
+}
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const cli = join(root, "cli/src/cli.ts");
 const tsx = join(root, "node_modules/tsx/dist/cli.mjs");
