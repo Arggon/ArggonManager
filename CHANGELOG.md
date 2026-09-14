@@ -14,3 +14,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed
 
 - `cli/src/cli.test.ts`: the `hello` envelope test now reads the tree's convention version instead of hardcoding the default 0.
+
+## [0.1.0] - 2026-09-14
+
+### Added
+
+- `doctor` now surfaces x-generated drift: modified/untouched generated docs are reported so agents can see ack drift.
+- Comment lock: concurrent `arggon comment` runs on one item serialize instead of clobbering each other.
+- Tracker autocommit retry + explicit reporting when the post-command commit fails.
+- `ancestor:<id>` filter predicate for `arggon list`.
+- `arggon update --parent <id>` reparenting.
+- Version policy: package.json is bumped manually per release wave; `arggon --version` reads the package version; this changelog documents each wave.
+- Init docs: `x-*` extensions section and an orchestration subsection in generated guidance.
+
+### Fixed
+
+- `board --serve --json` docs aligned with actual behavior.
+- `arggon init` auto-commit fix.

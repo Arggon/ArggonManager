@@ -49,13 +49,15 @@ import { runTuiBoard } from "./tui.js";
 import { maybeCommitUpdate, runUpdate } from "./update.js";
 import { formatValidateHuman, runValidate } from "./validate.js";
 import { commitPayload, formatCommitLine } from "./tracker-commit.js";
+import { arggonVersion } from "./docs.js";
 import { gateSteal, findItemStatus, gateReopen } from "./steal-gate.js";
 const program = new Command();
 
 program
   .name("arggon")
   .description("Git-native task CLI for ArggonManager")
-  .version("0.0.0")
+  // Package version (manual bump per release wave; see README "Versioning").
+  .version(arggonVersion())
   // Positional options: the root --version flag must not swallow a subcommand's
   // own --version (playbook new/refresh), so options after the subcommand name
   // are parsed by that subcommand only.
