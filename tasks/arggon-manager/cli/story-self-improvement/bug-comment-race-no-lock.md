@@ -28,9 +28,9 @@ Repro: two concurrent `arggon comment <id> ...` processes on the SAME item — o
 
 ## Acceptance
 
-- [ ] `runComment` wraps its read-modify-write in `withItemLock` (same lock family as update/start)
-- [ ] Concurrent same-item comments both land (lab test `labs/torture.test.ts` scenario 2 follow-up un-.todo'd and green)
-- [ ] No regression in tracker-commit tests / comment tests
+- [x] `runComment` wraps its read-modify-write in `withItemLock` (same lock family as update/start)
+- [x] Concurrent same-item comments both land (lab test `labs/torture.test.ts` scenario 2 follow-up un-.todo'd and green)
+- [x] No regression in tracker-commit tests / comment tests
 
 ## Notes
 
