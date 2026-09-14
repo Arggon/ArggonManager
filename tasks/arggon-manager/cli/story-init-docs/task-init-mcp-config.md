@@ -4,6 +4,7 @@ status: in_progress
 id: task-init-mcp-config
 title: Init registers the arggon MCP server (.mcp.json)
 assignee: Arggon
+branch: feat/task-init-mcp-config-impl
 parent: story-init-docs
 labels: []
 created: "2026-09-14"
