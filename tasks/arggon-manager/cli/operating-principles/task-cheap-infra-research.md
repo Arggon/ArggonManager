@@ -4,6 +4,7 @@ status: in_progress
 id: task-cheap-infra-research
 title: "Cheap-infra principle: investigate the most economical path to prod for generated projects"
 assignee: Arggon
+branch: feat/task-cheap-infra-research
 parent: operating-principles
 labels: []
 created: "2026-09-14"
