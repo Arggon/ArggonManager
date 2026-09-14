@@ -65,6 +65,18 @@ describe("init docs: placeholders", () => {
   });
 });
 
+describe("init docs: generated-docs context budget (task-adr0006-docs-budget)", () => {
+  it("generated AGENTS.md stays within the 2 KB context budget", () => {
+    // ADR 0006: the generated AGENTS.md is a fixed per-session read; its byte
+    // size is budgeted (<=2048 incl. the generated marker) so it cannot
+    // regress silently. Pointers over inline rules keep it small.
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
+    expect(Buffer.byteLength(agents, "utf8")).toBeLessThanOrEqual(2048);
+  });
+});
+
 describe("init docs: tier-1 content", () => {
   const dir = tempDir();
   runInit({ dir, force: false });
