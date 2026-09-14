@@ -4,6 +4,7 @@ status: in_progress
 id: task-update-reparent
 title: "update --parent: reparent items without moving files by hand"
 assignee: Arggon
+branch: feat/task-update-reparent
 parent: story-cli-ergonomics
 labels: []
 created: "2026-09-14"
