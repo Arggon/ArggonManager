@@ -1,8 +1,9 @@
 ---
 type: task
-status: todo
+status: done
 id: task-audit-protocol
 title: Adversarial audit protocol + first recurring audit
+assignee: Arggon
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
@@ -23,5 +24,5 @@ The two best bugs of the series (claim race, reopen gate, ack drift promise) wer
 
 ## Acceptance
 
-- [ ] docs/labs/adversarial-audit.md: the protocol (invariant checklist, conformance sweep, angle rotation, filing rules)
-- [ ] First audit executed: task created + findings filed in the tracker (or zero-findings report)
+- [x] docs/labs/adversarial-audit.md: the protocol (invariant checklist, conformance sweep, angle rotation, filing rules)
+- [x] First audit executed: task created + findings filed in the tracker (or zero-findings report)
