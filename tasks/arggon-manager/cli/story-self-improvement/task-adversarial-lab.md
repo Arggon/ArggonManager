@@ -4,6 +4,7 @@ status: in_progress
 id: task-adversarial-lab
 title: "Adversarial lab: experiment scenarios as a permanent suite"
 assignee: Arggon
+branch: feat/task-adversarial-lab
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
