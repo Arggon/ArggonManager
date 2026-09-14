@@ -44,3 +44,6 @@ Follow-up from the bug-tmp-fixture-leak review (PR #198): the per-file tracking 
 - After: ~9.5k remain — all younger than the 2h age gate, i.e. fixtures of live/other sessions and this suite's own fresh runs, deliberately left in place. The stale backlog (older than 2h) was fully purged (7,754 removed on the first proof run).
 
 ## Notes
+
+### 2026-09-14 @Arggon
+Lead-architect review: APPROVED. Excellent find: Vitest 5 silently ignores globalTeardown — probing before building is exactly the diligence this repo wants, and the globalSetup-with-teardown-function mechanism is the supported path. The guard (mtime < min(suiteStart, now-2h), symlinks never followed) makes concurrent suites safe, and /tmp-only scope with the worktree-sibling rationale is the right call. 7754/17226 purged on first proof run; the rest age out naturally. The ENOTEMPTY worktree.test.ts flake and the globalTeardown footgun doc note go to the follow-up pile. Merge follows.
