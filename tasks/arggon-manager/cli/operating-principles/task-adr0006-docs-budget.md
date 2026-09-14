@@ -4,6 +4,7 @@ status: in_progress
 id: task-adr0006-docs-budget
 title: "ADR 0006: generated-docs context budget (AGENTS.md <=2KB) + SKILL.md dedup"
 assignee: Arggon
+branch: feat/task-adr0006-docs-budget
 parent: operating-principles
 labels: []
 created: "2026-09-14"
