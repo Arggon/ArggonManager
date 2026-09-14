@@ -94,6 +94,7 @@ arggon validate --json                                # gate before every commit
 ```bash
 arggon board                       # self-contained HTML (columns, deps edges, drag-drop pre-checks)
 arggon board --serve               # local live-reload server, 127.0.0.1 only (edits via update path)
+arggon board --serve --json        # same, plus one envelope ({serving, url, port}) then keeps serving
 arggon board --tui                 # interactive terminal kanban (not combinable with --json/--serve)
 arggon board --github              # overlay live PR state (needs gh auth)
 arggon report --trend --json       # weekly completions + cycle time mined from git history
@@ -204,7 +205,9 @@ lean. A 40-line spec beats a 4-page one nobody reads.
   `status:`, `type:`, `assignee:`, `label:`, `parent:`, `depends-on:`, `blocked-by:`, `!` negates.
 - `board` without `--out` writes `board.html` at the repo root (where `tasks/` lives).
   `--tui` requires an interactive terminal. `--serve` binds 127.0.0.1 only and is
-  incompatible with `--github`/`--tui`/`--json`.
+  incompatible with `--github`/`--tui`. `--serve --json` is allowed and useful for
+  tooling: it emits the standard `board` envelope once (`serving: true` plus `url`
+  and `port`) and then keeps serving.
 - `init`/docs are never overwritten — even with `--force`. Re-runs regenerate untouched
   generated docs silently, skip modified ones, `--backup` archives them.
 - `adopt` requires an initialized tree; it creates the migration task — executing it is an

@@ -36,7 +36,7 @@ Either the doc should drop `--json` from the incompatible list (the envelope is 
 
 ## Acceptance
 
-- [ ] SKILL.md `--serve` sentence matches implemented flag-combination behavior (all three names checked)
-- [ ] If --serve --json stays allowed: behavior documented where --serve is described; if refused: error path covered by a test
+- [x] SKILL.md `--serve` sentence matches implemented flag-combination behavior (all three names checked)
+- [x] If --serve --json stays allowed: behavior documented where --serve is described; if refused: error path covered by a test
 
 ## Notes
