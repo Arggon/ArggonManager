@@ -34,6 +34,27 @@ export function jsonEnabled(cmdOpts?: { json?: unknown }): boolean {
   return Boolean(boundProgram?.opts<{ json?: boolean }>().json);
 }
 
+/**
+ * Compact WorkItem envelope default (ADR 0006, task-adr0006-compact-next):
+ * optional WorkItem fields that are null and list fields that are empty are
+ * OMITTED from `--json` payloads unless `--full` restores them. schemaVersion
+ * is unchanged: omission is a documented default (docs/json-output.md), not a
+ * shape break — consumers read `item.blocked_reason ?? null` either way.
+ */
+const COMPACT_OMIT_WHEN_NULL = ["blocked_reason", "milestone", "worktree_path", "issue"] as const;
+const COMPACT_OMIT_WHEN_EMPTY = ["depends_on", "labels"] as const;
+
+export function compactWorkItem<T extends Record<string, unknown>>(item: T): T {
+  const out: Record<string, unknown> = { ...item };
+  for (const key of COMPACT_OMIT_WHEN_NULL) {
+    if (out[key] === null) delete out[key];
+  }
+  for (const key of COMPACT_OMIT_WHEN_EMPTY) {
+    if (Array.isArray(out[key]) && (out[key] as unknown[]).length === 0) delete out[key];
+  }
+  return out as T;
+}
+
 /** Write one JSON object + newline to stdout (stable; no pretty-print). */
 export function emitJson(obj: Record<string, unknown>): void {
   process.stdout.write(`${JSON.stringify(obj)}\n`);

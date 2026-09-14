@@ -197,7 +197,8 @@ describe("mcp server", () => {
     expect(listEnvelope).toMatchObject({ ok: true, command: "list" });
     const items = listEnvelope.items as Array<Record<string, unknown>>;
     expect(items.map((item) => item.id)).toContain("task-rate-limit");
-    expect(items[0]).toHaveProperty("blocked_reason");
+    // Compact ADR 0006 default: blocked_reason is null here, so it is omitted.
+    expect(items[0]).not.toHaveProperty("blocked_reason");
 
     const claimed = await client.request("tools/call", {
       name: "arggon_update",

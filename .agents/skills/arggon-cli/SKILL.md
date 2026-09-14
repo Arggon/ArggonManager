@@ -74,6 +74,8 @@ arggon doctor             # installation state: initialized? conventionVersion? 
 ```bash
 arggon list --status todo --json                       # find work (empty items[] = no work, not an error)
 arggon next --json                                    # suggested claimable item + reason (+ blockedBy)
+                                                      # "what should I work on" = next --json, NOT list --json
+                                                      # (67x smaller envelope; list --json only for full scans)
 arggon start <id> --assignee <login> --worktree       # claim + branch + worktree + commit + push
                                                       # (--open-pr adds a draft PR; re-runs attach)
 arggon update <id> --status done                      # complete (see pitfalls: cascade, claim rules)

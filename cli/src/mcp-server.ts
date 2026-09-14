@@ -91,6 +91,12 @@ const TOOLS: ToolDefinition[] = [
           type: "string",
           description: "stale threshold for stale: <number><d|h|m> (e.g. 7d, 12h, 30m)",
         },
+        full: {
+          type: "boolean",
+          description:
+            "emit complete WorkItem shapes (default: compact per ADR 0006 — null/empty optional fields omitted)",
+          default: false,
+        },
       },
       additionalProperties: false,
     },
@@ -115,6 +121,12 @@ const TOOLS: ToolDefinition[] = [
         blocked_reason: {
           type: "string",
           description: "required when status is blocked",
+        },
+        full: {
+          type: "boolean",
+          description:
+            "emit complete WorkItem shapes (default: compact per ADR 0006 — null/empty optional fields omitted)",
+          default: false,
         },
       },
       required: ["type", "title"],
@@ -164,6 +176,12 @@ const TOOLS: ToolDefinition[] = [
           type: "boolean",
           description:
             "skip automatic container completion when this update closes the last open descendant",
+          default: false,
+        },
+        full: {
+          type: "boolean",
+          description:
+            "emit complete WorkItem shapes (default: compact per ADR 0006 — null/empty optional fields omitted)",
           default: false,
         },
       },
@@ -304,7 +322,11 @@ export function runMcpServer(opts: McpServerOptions): void {
         });
         return successEnvelope(
           "list",
-          { items: result.items.map((item) => toContractWorkItem(item, result.root)) },
+          {
+            items: result.items.map((item) =>
+              toContractWorkItem(item, result.root, { full: args.full === true }),
+            ),
+          },
           conventionVersion(),
         );
       });
@@ -326,7 +348,7 @@ export function runMcpServer(opts: McpServerOptions): void {
         return successEnvelope(
           "create",
           {
-            item: toContractWorkItem(result.item, result.root),
+            item: toContractWorkItem(result.item, result.root, { full: args.full === true }),
             commit: commitPayload(result.commit),
           },
           conventionVersion(),
@@ -358,7 +380,7 @@ export function runMcpServer(opts: McpServerOptions): void {
         return successEnvelope(
           "update",
           {
-            item: toContractWorkItem(result.item, result.root),
+            item: toContractWorkItem(result.item, result.root, { full: args.full === true }),
             autoCompleted: result.autoCompleted,
             cascadeLevels: result.cascadeLevels,
             ...(result.cascadeSkipped.length > 0
