@@ -4,6 +4,7 @@ status: in_progress
 id: task-board-docs-dedup
 title: board envelope docs duplicated between README and docs/json-output.md (drift risk)
 assignee: Arggon
+branch: feat/task-board-docs-dedup
 parent: story-web-board
 labels: []
 created: "2026-09-14"
