@@ -4,6 +4,7 @@ status: in_progress
 id: bug-autocommit-silent-skip
 title: autocommit-silent-skip
 assignee: Arggon
+branch: fix/bug-autocommit-silent-skip
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
