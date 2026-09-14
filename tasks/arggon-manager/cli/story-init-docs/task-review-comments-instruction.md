@@ -35,10 +35,10 @@ running under a generated AGENTS.md follows it without being told.
 
 ## Acceptance
 
-- [ ] templates/docs/AGENTS.md orchestration/review guidance states the channel: review verdicts and change requests are recorded with `arggon comment <item-id>` on the item; PR comments are not the review channel
-- [ ] docs/agents.md lead-architect review duty names `arggon comment` as the feedback channel (amend the existing bullet)
-- [ ] skills/arggon-cli/SKILL.md syncs (one line in the handoff/comments guidance); .agents copy regenerated via `npm run skills:sync` (parity test covers it)
-- [ ] init-docs test asserts the generated AGENTS.md carries the review-channel instruction
+- [x] templates/docs/AGENTS.md orchestration/review guidance states the channel: review verdicts and change requests are recorded with `arggon comment <item-id>` on the item; PR comments are not the review channel
+- [x] docs/agents.md lead-architect review duty names `arggon comment` as the feedback channel (amend the existing bullet)
+- [x] skills/arggon-cli/SKILL.md syncs (one line in the handoff/comments guidance); .agents copy regenerated via `npm run skills:sync` (parity test covers it)
+- [x] init-docs test asserts the generated AGENTS.md carries the review-channel instruction
 
 ## Notes
 
