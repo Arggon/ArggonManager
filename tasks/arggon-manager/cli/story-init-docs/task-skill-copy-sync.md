@@ -4,6 +4,7 @@ status: in_progress
 id: task-skill-copy-sync
 title: generated .agents skill copy drifts from skills/ source; add sync mechanism or drift test
 assignee: Arggon
+branch: feat/task-skill-copy-sync
 parent: story-init-docs
 labels: []
 created: "2026-09-14"
