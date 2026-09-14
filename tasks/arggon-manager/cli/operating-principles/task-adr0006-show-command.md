@@ -26,7 +26,7 @@ Implements the structural quick win of accepted [ADR 0006](../../../docs/adr/000
 
 ## Acceptance
 
-- [ ] Spec (docs/specs/, arggon spec new) then implementation: `arggon show <id> [--meta] [--body] [--tail-comments N]` — default compact (frontmatter + last N comments), bounded reads; MCP `arggon_show` tool parity-tested (task-mcp-cli-parity harness)
-- [ ] Tests: bounded output, comment tailing, unknown id error; docs in README + docs/json-output.md (additive)
+- [x] Spec (docs/specs/, arggon spec new) then implementation: `arggon show <id> [--meta] [--body] [--tail-comments N]` — default compact (frontmatter + last N comments), bounded reads; MCP `arggon_show` tool parity-tested (task-mcp-cli-parity harness)
+- [x] Tests: bounded output, comment tailing, unknown id error; docs in README + docs/json-output.md (additive)
 
 ## Notes
