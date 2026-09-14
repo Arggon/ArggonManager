@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-auto-done-cascade-visibility
 title: "auto-done bot: cascade result invisible; cascade skipped story-cli-ergonomics though conditions were met"
+assignee: Arggon
 parent: story-github
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T19:16:55.703Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-github/task-auto-done-cascade-visibility.md
