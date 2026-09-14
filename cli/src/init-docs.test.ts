@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import {
   arggonVersion,
   checksumOf,
+  GENERATED_DOC_COUNT,
   generateDocs,
   generatedMarker,
   renderDocPlaceholders,
@@ -194,7 +195,7 @@ describe("init docs: no-overwrite guarantee", () => {
   it("generateDocs creates on the first run and treats stateless files as modified on the second", () => {
     const dir = tempDir();
     const first = generateDocs({ root: dir, full: true });
-    expect(first.created.length).toBe(18); // 17 docs (incl. .mcp.json) + bundled arggon-cli skill
+    expect(first.created.length).toBe(GENERATED_DOC_COUNT); // generated docs (incl. .mcp.json) + bundled arggon-cli skill
     expect(first.created).toContain(".agents/skills/arggon-cli/SKILL.md");
     expect(first.skipped).toEqual([]);
     expect(first.updated).toEqual([]);
@@ -205,8 +206,8 @@ describe("init docs: no-overwrite guarantee", () => {
     // provenance state every on-disk file counts as adopter-modified and is
     // skipped (never overwritten).
     expect(second.updated).toEqual([]);
-    expect(second.modified.length).toBe(18);
-    expect(second.skipped.length).toBe(18);
+    expect(second.modified.length).toBe(GENERATED_DOC_COUNT);
+    expect(second.skipped.length).toBe(GENERATED_DOC_COUNT);
   });
 });
 
@@ -249,7 +250,7 @@ describe("init docs: --json payload", () => {
     expect(body.updated).toContain("AGENTS.md");
     expect(body.updated).toContain("ARCHITECTURE.md");
     expect(body.updated).toContain(".agents/skills/arggon-cli/SKILL.md");
-    expect(body.updated.length).toBe(18);
+    expect(body.updated.length).toBe(GENERATED_DOC_COUNT);
     expect(body.modified).toEqual([]);
     expect(body.skipped).toEqual([]);
   });
@@ -375,7 +376,7 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
     expect(skill.startsWith(`${generatedMarker("skills/arggon-cli/SKILL.md")}\n`)).toBe(true);
 
     const config = readConventionConfig(dir);
-    expect(Object.keys(config.generated).length).toBe(18);
+    expect(Object.keys(config.generated).length).toBe(GENERATED_DOC_COUNT);
     const agentsEntry = config.generated["AGENTS.md"]!;
     expect(agentsEntry.template).toBe("docs/AGENTS.md");
     expect(agentsEntry.checksum).toBe(checksumOf(agents));
@@ -394,7 +395,7 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
     runInit({ dir, force: false, full: true });
     const before = readFileSync(join(dir, "AGENTS.md"), "utf8");
     const result = runInit({ dir, force: false, full: true });
-    expect(result.updated.length).toBe(18);
+    expect(result.updated.length).toBe(GENERATED_DOC_COUNT);
     expect(result.created).toEqual([]);
     expect(result.skipped).toEqual([]);
     // Content is byte-identical (same template, same placeholders).
@@ -452,7 +453,7 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
     const result = runInit({ dir, force: true, full: true });
     // State survived the forced convention.yml rewrite, so untouched docs
     // update instead of degrading to adopter-modified.
-    expect(result.updated.length).toBe(18);
+    expect(result.updated.length).toBe(GENERATED_DOC_COUNT);
     expect(result.modified).toEqual([]);
     expect(readConventionConfig(dir).generated["AGENTS.md"]!.template).toBe("docs/AGENTS.md");
   });

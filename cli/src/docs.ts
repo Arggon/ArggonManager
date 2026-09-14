@@ -162,6 +162,15 @@ export function currentGeneratedTemplates(): { dest: string; template: string }[
   return found.sort((a, b) => a.dest.localeCompare(b.dest));
 }
 
+/**
+ * How many files arggon currently generates with a full init (tier-1 + tier-2
+ * docs, .mcp.json, and the bundled skill). Derived from the same template walk
+ * generateDocs uses, so adding the next template touches only `templates/` and
+ * this module — tests import this constant instead of hardcoding the count
+ * (task-adopt-scan-count-constant).
+ */
+export const GENERATED_DOC_COUNT: number = currentGeneratedTemplates().length;
+
 function utcDate(now: Date): string {
   return now.toISOString().slice(0, 10);
 }
