@@ -182,7 +182,7 @@ program
   .option("--dry-run", "print the inventory and planned actions, create nothing", false)
   .option(
     "--story <story-id>",
-    "parent story for the adoption task (default: auto-create story-arggon-adoption under the first epic)",
+    "parent story for the adoption task (default: auto-create story-arggon-adoption under the first epic; with no epic at all, an initiative+epic chain is auto-created). Prefer --story when adopting an existing repo with its own structure",
   )
   .option(
     "--no-commit",
@@ -219,6 +219,7 @@ program
             taskId: result.taskId,
             storyId: result.storyId,
             storyCreated: result.storyCreated,
+            createdContainers: result.createdContainers,
             taskCreated: result.taskCreated,
             skipped: result.skipped,
             taskPath: result.taskPath,

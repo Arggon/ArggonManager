@@ -148,15 +148,59 @@ describe("runAdopt: task creation", () => {
     expect(() => runAdopt({ cwd: dir })).toThrow(/not an arggon-managed tree.*arggon init/s);
   });
 
-  it("errors when the tree has no epic for the auto story", () => {
-    const dir = tempDir("arggon-adopt-noepic-");
+  it("auto-creates the container chain on a fresh init tree (no epic)", () => {
+    const dir = tempDir("arggon-adopt-fresh-");
+    runInit({ dir, force: false, full: true });
+    const result = runAdopt({ cwd: dir });
+    expect(result.createdContainers).toEqual(["arggon-adoption", "epic-arggon-adoption"]);
+    expect(result.storyCreated).toBe(true);
+    const items = loadItems(join(dir, "tasks"));
+    const initiative = items.find((item) => item.id === "arggon-adoption");
+    expect(initiative?.type).toBe("initiative");
+    expect(initiative?.title).toBe("ArggonManager adoption");
+    expect(initiative?.parent).toBeNull();
+    const epic = items.find((item) => item.id === "epic-arggon-adoption");
+    expect(epic?.type).toBe("epic");
+    expect(epic?.parent).toBe("arggon-adoption");
+    const story = items.find((item) => item.id === ADOPT_STORY_ID);
+    expect(story?.parent).toBe("epic-arggon-adoption");
+    expect(items.find((item) => item.id === ADOPT_TASK_ID)?.parent).toBe(ADOPT_STORY_ID);
+  });
+
+  it("auto-creates the containers even when an unrelated initiative exists (no epic)", () => {
+    const dir = tempDir("arggon-adopt-initonly-");
     runInit({ dir, force: false });
     runCreate({ cwd: dir, type: "initiative", title: "Main" });
-    expect(() => runAdopt({ cwd: dir })).toThrow(/no epic found under tasks\//);
+    const result = runAdopt({ cwd: dir });
+    expect(result.createdContainers).toEqual(["arggon-adoption", "epic-arggon-adoption"]);
+    const items = loadItems(join(dir, "tasks"));
+    expect(items.find((item) => item.id === ADOPT_STORY_ID)?.parent).toBe("epic-arggon-adoption");
+  });
+
+  it("reuses an existing epic and creates no containers", () => {
+    const dir = seedTree();
+    const result = runAdopt({ cwd: dir });
+    expect(result.createdContainers).toEqual([]);
+    expect(result.storyCreated).toBe(true);
+    const items = loadItems(join(dir, "tasks"));
+    expect(items.find((item) => item.id === "arggon-adoption")).toBeUndefined();
+    expect(items.find((item) => item.id === "epic-arggon-adoption")).toBeUndefined();
+    expect(items.find((item) => item.id === ADOPT_STORY_ID)?.parent).toBe("cli");
   });
 });
 
 describe("runAdopt: --dry-run", () => {
+  it("plans the container chain on a fresh tree without writing it", () => {
+    const dir = tempDir("arggon-adopt-dryfresh-");
+    runInit({ dir, force: false, full: true });
+    const before = loadItems(join(dir, "tasks")).map((item) => item.id).sort();
+    const result = runAdopt({ cwd: dir, dryRun: true });
+    expect(result.createdContainers).toEqual(["arggon-adoption", "epic-arggon-adoption"]);
+    const after = loadItems(join(dir, "tasks")).map((item) => item.id).sort();
+    expect(after).toEqual(before);
+  });
+
+
   it("reports the plan but creates nothing", () => {
     const dir = seedTree();
     const before = loadItems(join(dir, "tasks")).map((item) => item.id).sort();
