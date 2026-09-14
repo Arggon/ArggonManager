@@ -6,7 +6,7 @@ import { ITEM_TYPES } from "./ids.js";
 import { runCreate } from "./create.js";
 import { runComment } from "./comment.js";
 import { runList } from "./list.js";
-import { runUpdate } from "./update.js";
+import { maybeCommitUpdate, runUpdate } from "./update.js";
 import { STATUSES } from "./status.js";
 import { toContractWorkItem } from "./contract.js";
 import { commitPayload } from "./tracker-commit.js";
@@ -288,12 +288,20 @@ export function runMcpServer(opts: McpServerOptions): void {
           blockedReason: str(args.blocked_reason),
           agent: true,
         });
+        // Tracker auto-commit resolves like the CLI (`--no-commit` has no MCP
+        // equivalent; `x-tracker.auto-commit` governs) so both entry points
+        // stay envelope-identical (task-autocommit-update-import).
+        const commit = maybeCommitUpdate(result, undefined);
         return successEnvelope(
           "update",
           {
             item: toContractWorkItem(result.item, result.root),
             autoCompleted: result.autoCompleted,
             cascadeLevels: result.cascadeLevels,
+            ...(result.cascadeSkipped.length > 0
+              ? { cascadeSkipped: result.cascadeSkipped }
+              : {}),
+            ...(commit ? { commit: commitPayload(commit) } : {}),
           },
           conventionVersion(),
         );

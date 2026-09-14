@@ -674,10 +674,9 @@ describe("CLI --json", () => {
     expect(
       runCli(["update", "task-work", "--status", "in_progress", "--assignee", "alice"], dir).status,
     ).toBe(0);
-    expect(runGit(["add", "-A"], dir).status).toBe(0);
-    expect(
-      runGit(["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "claim"], dir).status,
-    ).toBe(0);
+    // Tracker auto-commit (task-autocommit-update-import): the claim commit
+    // is already made — the tree stays clean without a manual commit dance.
+    expect(runGit(["status", "--porcelain"], dir).stdout.trim()).toBe("");
     const result = runCli(["start", "task-work", "--assignee", "bob", "--json"], dir, env);
     expect(result.status).toBe(1);
     const body = parseStdout(result.stdout);

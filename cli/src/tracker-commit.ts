@@ -44,11 +44,30 @@ export type TrackerCommitOptions = {
 };
 
 /** Verbs of the `chore(tasks): <verb> <id>` message convention. */
-export type TrackerCommitVerb = "created" | "commented" | "adopted" | "pruned";
+export type TrackerCommitVerb =
+  | "created"
+  | "commented"
+  | "adopted"
+  | "pruned"
+  | "done"
+  | "updated"
+  | "claimed"
+  | "imported";
 
 /** `chore(tasks): <verb> <item-id>` (comma-joined ids when a commit covers several). */
 export function trackerCommitMessage(verb: TrackerCommitVerb, ids: string[]): string {
   return `chore(tasks): ${verb} ${ids.join(", ")}`;
+}
+
+/**
+ * Message for an `update`-driven commit: `chore(tasks): <verb> <id>`, with a
+ * ` (cascade: <ids>)` suffix when the container auto-completion fired in the
+ * same run (task-autocommit-update-import) — the cascade-mutated ancestors
+ * ride in the same commit, so the message names them.
+ */
+export function updateCommitMessage(verb: TrackerCommitVerb, id: string, cascadeIds: string[]): string {
+  const base = trackerCommitMessage(verb, [id]);
+  return cascadeIds.length > 0 ? `${base} (cascade: ${cascadeIds.join(", ")})` : base;
 }
 
 /**

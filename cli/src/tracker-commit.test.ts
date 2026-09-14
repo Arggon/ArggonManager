@@ -20,6 +20,7 @@ import { runStart, defaultStartGit } from "./start.js";
 import {
   readConventionConfig,
 } from "./convention.js";
+import { runImportIssues } from "./import-issues.js";
 import {
   commitPayload,
   commitTrackerMutation,
@@ -27,8 +28,9 @@ import {
   readAutoCommitConfig,
   resolveAutoCommit,
   trackerCommitMessage,
+  updateCommitMessage,
 } from "./tracker-commit.js";
-import { runUpdate } from "./update.js";
+import { maybeCommitUpdate, runUpdate } from "./update.js";
 
 const NOW = new Date("2026-09-13T12:00:00Z");
 
@@ -369,6 +371,164 @@ describe("tracker auto-commit on cleanup --prune", () => {
     expect(result.pruned).toEqual([]);
     expect(result.commit).toBeUndefined();
     expect(commitPayload(result.commit)).toBeUndefined();
+  });
+});
+
+describe("tracker auto-commit on update", () => {
+  /** Tick every acceptance checkbox so the done-flip cascade can complete the whole chain. */
+  function acceptanceOpen(dir: string): void {
+    for (const rel of [
+      "tasks/launch/launch.md",
+      "tasks/launch/auth/auth.md",
+      "tasks/launch/auth/login/login.md",
+    ]) {
+      const full = join(dir, rel);
+      writeFileSync(full, readFileSync(full, "utf8").replaceAll("- [ ] ", "- [x] ticked\n"), "utf8");
+    }
+    // Legal kernel path to done: claim first (todo -> done is illegal).
+    runUpdate({ cwd: dir, id: "task-rate-limit", status: "in_progress", assignee: "arggon", now: NOW });
+    git(["add", "tasks"], dir);
+    git(["commit", "--quiet", "-m", "tick acceptance"], dir);
+  }
+
+  it("commits ONE commit touching exactly the mutated paths, cascade ids in the message", () => {
+    const dir = initRepo();
+    acceptanceOpen(dir);
+
+    const result = runUpdate({ cwd: dir, id: "task-rate-limit", status: "done", now: NOW });
+    expect(result.autoCompleted).toEqual(["login", "auth", "launch"]);
+    const commit = maybeCommitUpdate(result, undefined);
+
+    expect(commit).toMatchObject({
+      committed: true,
+      message: "chore(tasks): done task-rate-limit (cascade: login, auth, launch)",
+    });
+    expect(committedPaths(dir)).toEqual([
+      "tasks/launch/auth/auth.md",
+      "tasks/launch/auth/login/login.md",
+      "tasks/launch/auth/login/task-rate-limit.md",
+      "tasks/launch/launch.md",
+    ]);
+    expect(status(dir)).toBe("");
+  });
+
+  it("--no-commit keeps every mutated file dirty (cascade included)", () => {
+    const dir = initRepo();
+    acceptanceOpen(dir);
+
+    const result = runUpdate({ cwd: dir, id: "task-rate-limit", status: "done", now: NOW });
+    const commit = maybeCommitUpdate(result, false);
+
+    expect(commit).toEqual({ committed: false, skipReason: "auto-commit disabled" });
+    expect(status(dir)).toContain("tasks/launch/launch.md");
+    expect(status(dir)).toContain("tasks/launch/auth/login/task-rate-limit.md");
+    expect(git(["log", "--format=%s", "-1"], dir)).toBe("tick acceptance");
+  });
+
+  it("honors x-tracker.auto-commit: false from the config", () => {
+    const dir = initRepo();
+    acceptanceOpen(dir);
+    writeFileSync(join(dir, "tasks/.convention.yml"), "version: 3\nx-tracker:\n  auto-commit: false\n", "utf8");
+
+    const result = runUpdate({ cwd: dir, id: "task-rate-limit", status: "done", now: NOW });
+    const commit = maybeCommitUpdate(result, undefined);
+
+    expect(commit).toEqual({ committed: false, skipReason: "auto-commit disabled" });
+    expect(status(dir)).toContain("tasks/launch/launch.md");
+  });
+
+  it("skips the commit on a no-op update (nothing requested changed)", () => {
+    const dir = initRepo();
+
+    const result = runUpdate({ cwd: dir, id: "task-rate-limit", title: "Rate limit", now: NOW });
+    expect(result.changed).toEqual([]);
+    expect(maybeCommitUpdate(result, undefined)).toBeUndefined();
+    expect(git(["log", "--format=%s", "-1"], dir)).toBe("init tasks");
+  });
+
+  it("builds the cascade message suffix only when the cascade fired", () => {
+    expect(updateCommitMessage("done", "task-x", [])).toBe("chore(tasks): done task-x");
+    expect(updateCommitMessage("done", "task-x", ["story-a", "epic-b"])).toBe(
+      "chore(tasks): done task-x (cascade: story-a, epic-b)",
+    );
+    expect(updateCommitMessage("claimed", "task-y", [])).toBe("chore(tasks): claimed task-y");
+    expect(updateCommitMessage("updated", "task-z", [])).toBe("chore(tasks): updated task-z");
+  });
+});
+
+const IMPORT_PAYLOAD = JSON.stringify([
+  { number: 1, title: "Fix login", state: "OPEN", body: "broken", labels: [] },
+  { number: 2, title: "Dark mode", state: "CLOSED", body: "shipped", labels: [] },
+]);
+
+/** Git-committed variant of primed(): init + initiative + epic, all committed. */
+function initImportRepo(): string {
+  const dir = mkdtempSync(join(tmpdir(), "arggon-tracker-import-"));
+  git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
+  git(["config", "user.email", "test@example.com"], dir);
+  git(["config", "user.name", "Test"], dir);
+  runInit({ dir, force: false });
+  runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
+  runCreate({ cwd: dir, type: "epic", title: "Backlog", parent: "launch", id: "backlog", now: NOW });
+  git(["add", "-A"], dir);
+  git(["commit", "--quiet", "-m", "init tasks"], dir);
+  return dir;
+}
+
+function execGh(payload: string) {
+  return ((_file: string, args: string[]) => {
+    if (args[0] === "issue") return payload;
+    throw new Error(`Unexpected: ${args.join(" ")}`);
+  }) as unknown as import("./import-issues.js").GhExecutor;
+}
+
+describe("tracker auto-commit on import-issues", () => {
+  it("commits ONE commit covering the story and every created item", () => {
+    const dir = initImportRepo();
+
+    const result = runImportIssues({ cwd: dir, execGh: execGh(IMPORT_PAYLOAD), now: NOW });
+
+    expect(result.created).toBe(2);
+    expect(result.commit).toMatchObject({
+      committed: true,
+      message: "chore(tasks): imported 2 issues",
+    });
+    expect(committedPaths(dir)).toEqual([
+      "tasks/launch/backlog/story-imported-issues/story-imported-issues.md",
+      "tasks/launch/backlog/story-imported-issues/task-issue-1.md",
+      "tasks/launch/backlog/story-imported-issues/task-issue-2.md",
+    ]);
+    expect(status(dir)).toBe("");
+  });
+
+  it("--no-commit keeps the imported files dirty", () => {
+    const dir = initImportRepo();
+
+    const result = runImportIssues({
+      cwd: dir,
+      execGh: execGh(IMPORT_PAYLOAD),
+      commit: false,
+      now: NOW,
+    });
+
+    expect(result.commit).toEqual({ committed: false, skipReason: "auto-commit disabled" });
+    expect(status(dir)).toContain("tasks/launch/backlog/story-imported-issues/");
+    expect(git(["log", "--format=%s", "-1"], dir)).toBe("init tasks");
+  });
+
+  it("a mid-run failure keeps the historic no-commit behavior (dirty + error, no commit)", () => {
+    const dir = initImportRepo();
+    const bad = JSON.stringify([
+      { number: 1, title: "Fix login", state: "OPEN", body: "broken", labels: [] },
+      { number: 0, title: "Broken", state: "OPEN", body: "", labels: [] },
+    ]);
+
+    expect(() => runImportIssues({ cwd: dir, execGh: execGh(bad), now: NOW })).toThrow(
+      "valid issue number",
+    );
+    // The first issue and its story were written but never committed.
+    expect(status(dir)).toContain("tasks/launch/backlog/story-imported-issues/");
+    expect(git(["log", "--format=%s", "-1"], dir)).toBe("init tasks");
   });
 });
 
