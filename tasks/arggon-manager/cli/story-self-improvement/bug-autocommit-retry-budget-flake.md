@@ -1,12 +1,14 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-autocommit-retry-budget-flake
 title: "labs/torture scenario 2 flakes under loaded CI: autocommit retry budget too short"
+assignee: Arggon
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T17:55:16.988Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/bug-autocommit-retry-budget-flake.md
