@@ -1,6 +1,6 @@
 ---
 type: story
-status: in_progress
+status: done
 id: story-cli-ergonomics
 title: Query and reparent ergonomics
 assignee: Arggon
@@ -8,7 +8,6 @@ parent: cli
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
-claimed_at: "2026-09-14T18:34:52.408Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-cli-ergonomics/story-cli-ergonomics.md (story index; required).
