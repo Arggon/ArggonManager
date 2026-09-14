@@ -46,7 +46,7 @@ import {
 } from "./spec.js";
 import { runSync } from "./sync-command.js";
 import { runTuiBoard } from "./tui.js";
-import { runUpdate } from "./update.js";
+import { maybeCommitUpdate, runUpdate } from "./update.js";
 import { formatValidateHuman, runValidate } from "./validate.js";
 import { commitPayload, formatCommitLine } from "./tracker-commit.js";
 import { gateSteal, findItemStatus, gateReopen } from "./steal-gate.js";
@@ -579,6 +579,10 @@ program
     "--no-cascade",
     "skip automatic container completion when this update closes the last open descendant",
   )
+  .option(
+    "--no-commit",
+    "keep tasks/ dirty: skip the tracker auto-commit of the mutated item files, cascade included (default: on; x-tracker.auto-commit: false opts out tree-wide)",
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (
@@ -597,6 +601,7 @@ program
         steal?: boolean;
         reason?: string;
         cascade?: boolean;
+        commit?: boolean;
         json?: boolean;
       },
     ) => {
@@ -640,6 +645,13 @@ program
           reason: opts.reason,
           cascade: opts.cascade !== false,
         });
+        // Tracker hygiene (task-autocommit-update-import): auto-commit ALL
+        // item files written this run (the updated item + cascade-completed
+        // ancestors) AFTER the mutation — a refused update (reopen/steal
+        // gates above) never commits. Only a run that actually changed
+        // fields commits; a no-op write (nothing requested changed) keeps
+        // the previous no-commit behavior.
+        const commit = maybeCommitUpdate(result, opts.commit);
         if (json) {
           successJson(
             "update",
@@ -650,6 +662,7 @@ program
               ...(result.cascadeSkipped.length > 0
                 ? { cascadeSkipped: result.cascadeSkipped }
                 : {}),
+              ...(commit ? { commit: commitPayload(commit) } : {}),
             },
             readConventionVersion(result.root),
           );
@@ -679,6 +692,8 @@ program
             );
           }
         }
+        const commitLine = formatCommitLine(commit);
+        if (commitLine) console.log(`  ${commitLine}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (json) {
@@ -782,9 +797,13 @@ program
     "target story for imported tasks (default: story-imported-issues, created under the first epic when missing)",
   )
   .option("--dry-run", "print the mapping plan (would-create / would-skip) without writing", false)
+  .option(
+    "--no-commit",
+    "keep tasks/ dirty: skip the tracker auto-commit of the imported items (default: on; x-tracker.auto-commit: false opts out tree-wide)",
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
-    (opts: { repo?: string; parent?: string; dryRun?: boolean; json?: boolean }) => {
+    (opts: { repo?: string; parent?: string; dryRun?: boolean; commit?: boolean; json?: boolean }) => {
       const json = jsonEnabled(opts);
       try {
         const result = runImportIssues({
@@ -792,6 +811,7 @@ program
           repo: opts.repo,
           parent: opts.parent,
           dryRun: Boolean(opts.dryRun),
+          commit: opts.commit === false ? false : undefined,
         });
         if (json) {
           successJson(
@@ -803,6 +823,7 @@ program
               created: result.created,
               skipped: result.skipped,
               labels: { mapped: result.labelsMapped, skipped: result.labelsSkipped },
+              ...(result.commit ? { commit: commitPayload(result.commit) } : {}),
             },
             readConventionVersion(result.root),
           );
@@ -820,6 +841,8 @@ program
         console.log(
           `  labels: ${result.labelsMapped} mapped, ${result.labelsSkipped} skipped (invalid)`,
         );
+        const commitLine = formatCommitLine(result.commit);
+        if (commitLine) console.log(`  ${commitLine}`);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (json) {

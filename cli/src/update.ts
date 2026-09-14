@@ -20,6 +20,13 @@ import {
   type WorkItem,
 } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
+import {
+  commitTrackerMutation,
+  readAutoCommitConfig,
+  resolveAutoCommit,
+  updateCommitMessage,
+  type TrackerCommitResult,
+} from "./tracker-commit.js";
 
 export type UpdateOptions = {
   cwd: string;
@@ -96,6 +103,13 @@ export type UpdateResult = {
    * stopped before the initiative.
    */
   cascadeSkipped: Array<{ id: string; type: string; reason: "acceptance-incomplete" }>;
+  /**
+   * Absolute paths of EVERY item file written this run: the updated item plus
+   * any cascade-completed ancestors (task-autocommit-update-import). Callers
+   * use it for the tracker auto-commit — surgical staging of exactly these
+   * paths. Empty only when nothing was written (never, on a successful run).
+   */
+  changedPaths: string[];
 };
 
 function parseCsvList(raw: string): string[] {
@@ -382,11 +396,41 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     autoCompleted: completedContainers.map((container) => container.id),
     cascadeLevels: completedContainers.map((container) => container.type),
     cascadeSkipped,
+    changedPaths: [item.filePath, ...completedContainers.map((container) => container.filePath)],
   };
   };
 
   // Hold the item lock across read → verify → write (bug-claim-race-no-lock).
   return withItemLock(peekItem.filePath, apply);
+}
+
+/**
+ * Tracker auto-commit for `update` (task-autocommit-update-import): commit
+ * exactly the item files written this run — the updated item plus any
+ * cascade-completed ancestors, staged surgically. Message verb follows the
+ * change (`done` for a terminal flip, `claimed` for a claim, `updated`
+ * otherwise) with a ` (cascade: <ids>)` suffix when the cascade fired.
+ * Gated on the run actually changing something (a requested field or a
+ * cascade completion): a no-op write (nothing changed) skips like before.
+ * `flag` is the `--no-commit` request; `undefined` defers to the
+ * `x-tracker.auto-commit` config. Never throws — commit failures degrade to
+ * a skip reason, never fail the update.
+ */
+export function maybeCommitUpdate(
+  result: UpdateResult,
+  flag: boolean | undefined,
+): TrackerCommitResult | undefined {
+  if (result.changed.length === 0 && result.autoCompleted.length === 0) return undefined;
+  const statusChanged = result.changed.includes("status");
+  const verb = statusChanged && (result.item.status === "done" || result.item.status === "cancelled")
+    ? "done"
+    : statusChanged && result.item.status === "in_progress"
+      ? "claimed"
+      : "updated";
+  return commitTrackerMutation(result.root, result.changedPaths, {
+    message: updateCommitMessage(verb, result.id, result.autoCompleted),
+    commit: resolveAutoCommit(flag, readAutoCommitConfig(result.root)),
+  });
 }
 
 const TERMINAL: ReadonlySet<string> = new Set(["done", "cancelled"]);

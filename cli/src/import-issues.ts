@@ -5,6 +5,7 @@ import { parseRepoSlug } from "./get-open-prs.js";
 import { itemId, slugify } from "./ids.js";
 import { itemsById, loadItems } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
+import { commitTrackerMutation, readAutoCommitConfig, resolveAutoCommit, type TrackerCommitResult } from "./tracker-commit.js";
 import { runUpdate } from "./update.js";
 
 /**
@@ -94,6 +95,13 @@ export type ImportIssuesResult = {
   labelsMapped: number;
   /** Labels dropped silently (un-slugifiable / invalid), counted in the report. */
   labelsSkipped: number;
+  /**
+   * Tracker auto-commit outcome for the files written this run
+   * (task-autocommit-update-import): ONE commit covering the created story
+   * and every created/updated item. Undefined in dry-run and when nothing
+   * was written.
+   */
+  commit?: TrackerCommitResult;
 };
 
 export type ImportIssuesOptions = {
@@ -103,6 +111,14 @@ export type ImportIssuesOptions = {
   /** Target story id; default `story-imported-issues`, created under the first epic. */
   parent?: string;
   dryRun?: boolean;
+  /**
+   * Auto-commit the files written this run as ONE commit
+   * (`chore(tasks): imported N issues`; task-autocommit-update-import).
+   * `undefined` resolves via `x-tracker.auto-commit` config, default ON.
+   * A mid-run failure keeps the historic no-commit behavior: the thrown
+   * error skips the commit and the partial run leaves tasks/ dirty.
+   */
+  commit?: boolean;
   execGh?: GhExecutor;
   now?: Date;
 };
@@ -249,6 +265,9 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
   const now = opts.now ?? new Date();
 
   const byId = itemsById(loadItems(tasksDir));
+  // Every item file written this run (story + items + any cascade ancestors),
+  // committed as ONE commit after a fully successful run.
+  const writtenPaths: string[] = [];
 
   // Resolve (or plan) the parent story: leaves may only live under a story.
   let storyId: string;
@@ -285,18 +304,19 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
       );
     }
     if (!dryRun) {
-      runCreate({
+      const story = runCreate({
         cwd: opts.cwd,
         type: "story",
         title: "Imported GitHub issues",
         id: IMPORTED_STORY_ID,
         parent: epics[0].id,
-        // Bulk import keeps its historic no-commit behavior (out of the
-        // tracker auto-commit surface; callers commit the sweep themselves).
+        // Internal suppression (task-autocommit-update-import): the
+        // run-level commit below covers this file in ONE commit.
         commit: false,
         now,
       });
       storyCreated = true;
+      writtenPaths.push(story.path);
     }
     storyId = IMPORTED_STORY_ID;
   }
@@ -327,7 +347,7 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
     labelsMapped += labels.length;
     labelsSkipped += badLabels;
     if (!dryRun) {
-      runCreate({
+      const createdItem = runCreate({
         cwd: opts.cwd,
         type,
         title,
@@ -338,10 +358,12 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
         // Provenance (task-closes-issue-linking): the GitHub issue number rides
         // on the item so `start --open-pr` can close it on merge (Closes #N).
         issue: number,
-        // Bulk import keeps its historic no-commit behavior.
+        // Internal suppression (task-autocommit-update-import): the
+        // run-level commit below covers this file in ONE commit.
         commit: false,
         now,
       });
+      writtenPaths.push(createdItem.path);
       if (status === "done") {
         // `create` cannot make `done` (todo ↛ done) and the claim rule needs
         // an assignee for in_progress, so close through the legal kernel
@@ -355,7 +377,10 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
           assignee: IMPORT_CLAIMANT,
           now,
         });
-        runUpdate({ cwd: opts.cwd, id, status: "done", unassign: true, now });
+        const closed = runUpdate({ cwd: opts.cwd, id, status: "done", unassign: true, now });
+        // The container cascade may write ancestors in the same run — their
+        // paths ride in the run-level commit too.
+        writtenPaths.push(...closed.changedPaths);
       }
     }
     created += 1;
@@ -368,8 +393,22 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
     });
   }
 
+  const root = repoRootFromTasks(tasksDir);
+  // Tracker hygiene (task-autocommit-update-import): ONE commit covering
+  // every file written this run (story + items + any cascade ancestors).
+  // Only after the whole run succeeded — a mid-run failure keeps the
+  // historic no-commit behavior (partial runs leave tasks/ dirty, reported
+  // by the CLI error).
+  const commit =
+    !dryRun && writtenPaths.length > 0
+      ? commitTrackerMutation(root, writtenPaths, {
+          message: `chore(tasks): imported ${created} issues`,
+          commit: resolveAutoCommit(opts.commit, readAutoCommitConfig(root)),
+        })
+      : undefined;
+
   return {
-    root: repoRootFromTasks(tasksDir),
+    root,
     dryRun,
     story: { id: storyId, created: storyCreated },
     entries,
@@ -377,5 +416,6 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
     skipped,
     labelsMapped,
     labelsSkipped,
+    commit,
   };
 }
