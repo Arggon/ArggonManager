@@ -162,7 +162,7 @@ arggon doctor --json
 ```
 
 - `initialized`: whether `tasks/.convention.yml` was found, plus the convention version (0-3).
-- `docs`: generated-doc provenance counts from `x-generated` — `managed` (tracked destinations), `untouched` (checksum matches), `modified` (checksum differs), `acknowledged` (sanctioned-diverged baselines from `adopt --ack`), `stale` (template no longer generated), `missing` (tracked but absent).
+- `docs`: generated-doc provenance counts from `x-generated` — `managed` (tracked destinations), `untouched` (checksum matches), `modified` (checksum differs), `acknowledged` (sanctioned-diverged baselines from `adopt --ack`), `acknowledgedDrifted` (acknowledged docs whose current checksum differs from the acked baseline — a hand edit after the ack; informational, still adopter-owned), `stale` (template no longer generated), `missing` (tracked but absent).
 - `tracker`: cheap tracker sanity — total work items and `todo` count.
 
 Non-initialized repos report `initialized: false` with zeroed counts (no crash, still exit 0); failures use `error.code: "DOCTOR_FAILED"` only for unexpected errors.
