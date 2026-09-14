@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-cheap-infra-research
 title: "Cheap-infra principle: investigate the most economical path to prod for generated projects"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: operating-principles
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
-claimed_at: "2026-09-14T20:34:25.016Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/operating-principles/task-cheap-infra-research.md
