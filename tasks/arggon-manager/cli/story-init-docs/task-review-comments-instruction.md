@@ -19,10 +19,22 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this task exists. -->
+Coordinator decision (2026-09-14): review feedback (verdicts, change requests)
+must live in **ArggonManager's own comments** (`arggon comment <item-id>`),
+which auto-commit to the tracker and are the agent handoff channel — NOT in
+GitHub PR comments. GitHub is for PRs only (CI/merge mechanics); a review that
+lives only on the PR is untracked by the tool the repo exists to prove out.
+Observed in practice: the lead-architect reviews of the 2026-09-14 waves were
+posted as PR comments; from now on they go through the tracker.
+
+Init must deliver this instruction to adopters by default, so every agent
+running under a generated AGENTS.md follows it without being told.
 
 ## Acceptance
 
-- [ ] 
+- [ ] templates/docs/AGENTS.md orchestration/review guidance states the channel: review verdicts and change requests are recorded with `arggon comment <item-id>` on the item; PR comments are not the review channel
+- [ ] docs/agents.md lead-architect review duty names `arggon comment` as the feedback channel (amend the existing bullet)
+- [ ] skills/arggon-cli/SKILL.md syncs (one line in the handoff/comments guidance); .agents copy regenerated via `npm run skills:sync` (parity test covers it)
+- [ ] init-docs test asserts the generated AGENTS.md carries the review-channel instruction
 
 ## Notes
