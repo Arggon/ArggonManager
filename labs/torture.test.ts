@@ -85,6 +85,7 @@ import { describe, expect, it } from "vitest";
 import { runCreate } from "../cli/src/create.js";
 import { runInit } from "../cli/src/init.js";
 import { runUpdate } from "../cli/src/update.js";
+import { GENERATED_DOC_COUNT } from "../cli/src/docs.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(root, "cli/src/cli.ts");
@@ -417,7 +418,7 @@ describe("lab: synthetic legacy tree, full adoption flow (guardian/cuentas/suizo
 
     // adopt --ack re-baselines every generated doc to its current bytes.
     const ack = runCli(["adopt", "--ack", "--json"], dir);
-    expect(ack.body).toMatchObject({ ok: true, command: "adopt", count: 18 });
+    expect(ack.body).toMatchObject({ ok: true, command: "adopt", count: GENERATED_DOC_COUNT });
     const agentsAcked = (ack.body!.acked as Array<Json>).find((doc) => doc.path === "AGENTS.md");
     expect(agentsAcked).toBeDefined();
 
