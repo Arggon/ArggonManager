@@ -51,9 +51,10 @@ git -C ../ArggonManager pull --ff-only && npm -C ../ArggonManager run build
 
 ```bash
 arggon init --full        # NEW repo: tasks/ tree + governing docs (AGENTS.md + CLAUDE.md
-                          # shim + .github/ files + CONTRIBUTING/SECURITY/.editorconfig;
-                          # --full adds ARCHITECTURE.md, docs/convention.md + engineering.md,
-                          # CHANGELOG, SUPPORT, runbooks) + bundles this skill at
+                          # shim + .github/ files + CONTRIBUTING/SECURITY/.editorconfig +
+                          # .mcp.json MCP registration; --full adds ARCHITECTURE.md,
+                          # docs/convention.md + engineering.md, CHANGELOG, SUPPORT,
+                          # runbooks) + bundles this skill at
                           # .agents/skills/arggon-cli/SKILL.md
 arggon adopt              # EXISTING repo: creates a tracked migration task with an agent
                           # checklist (sweep docs → extract content → complete generated docs
@@ -177,7 +178,7 @@ lean. A 40-line spec beats a 4-page one nobody reads.
 3. **Record findings:** `create task|bug "<title>" --parent <story-id>` — leaves get the
    `task-`/`bug-` prefix automatically (even with `--id`).
 4. **Finish:** tick the acceptance checklist in the item body, then
-   `update <id> --status done`. Never jump `todo → done`, never reopen `done`/`cancelled`.
+   `update <id> --status done`. Never jump `todo → done`, never reopen `done`/`cancelled` — reopen is gated like steal (bug-reopen-ungated-cli): `--status todo` on a `done`/`cancelled` item requires a y/N confirmation in an interactive terminal; non-TTY callers (agents, scripts, CI) are refused, no `--yes` override.
    Completing an item may auto-complete ancestor containers (cascade) — expected.
 5. **Verify:** `validate --json` must be `ok:true` before committing.
 
@@ -199,6 +200,9 @@ lean. A 40-line spec beats a 4-page one nobody reads.
 - **Cascade**: a terminal status (done/cancelled) auto-completes ancestor containers whose
   whole subtree is terminal — up to the initiative. Opt out with `--no-cascade`; flipped
   ids come back as `autoCompleted`. Comments (`arggon comment`) never touch frontmatter.
+- **Cascade is acceptance-aware**: a container whose own body still has unchecked
+  acceptance checkboxes is never auto-completed (reported as `cascadeSkipped`) — tick the
+  checklist or use `--no-cascade`; a container with no checklist completes as before.
 - `WorkItem.path` is posix relative to the repo root. Run inside the repo tree — outside,
   every command fails fast (`LIST_FAILED` etc.).
 - `list` filters compose with AND; unknown `--status`/`--type` values fail. Predicates:

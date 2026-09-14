@@ -207,7 +207,7 @@ Copy-paste wiring so agents follow ArggonManager rules **by default** — same C
 
 Or print it on demand: `arggon instructions` extracts these snippets from this file at runtime (`--json` emits them as structured fields), so doc and command cannot drift.
 
-The generated AGENTS.md also mandates the bundled **arggon-cli skill** (`.agents/skills/arggon-cli/SKILL.md`, copied by `arggon init` from this repo's `skills/arggon-cli/SKILL.md` — single source, no duplicate): agents load it before any arggon invocation for the JSON contract, claim rules and pitfalls.
+The generated AGENTS.md also mandates the bundled **arggon-cli skill** (`.agents/skills/arggon-cli/SKILL.md`, copied by `arggon init` from this repo's `skills/arggon-cli/SKILL.md` — single source, no duplicate): agents load it before any arggon invocation for the JSON contract, claim rules and pitfalls. A parity test (`cli/src/skill-copy.test.ts`) keeps that copy byte-equal to the source, modulo the generated marker.
 
 ### Pre-commit gate
 
