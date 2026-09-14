@@ -4,6 +4,7 @@ status: in_progress
 id: bug-tmp-fixture-leak
 title: vitest fixtures leak mkdtemp dirs under /tmp (inode exhaustion breaks runs)
 assignee: Arggon
+branch: feat/bug-tmp-fixture-leak
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
