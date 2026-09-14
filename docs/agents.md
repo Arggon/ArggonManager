@@ -136,7 +136,7 @@ Pass `--json` on supported commands for a stable object on stdout (see [`docs/js
 
 ## MCP server
 
-`arggon mcp` starts a stdio MCP (JSON-RPC 2.0, newline-delimited) server that exposes the same kernel as four tools: `arggon_list`, `arggon_create`, `arggon_update`, and `arggon_comment`. Tool results are the documented `--json` envelope objects (see [`docs/json-output.md`](./json-output.md)) serialized as text content; kernel failures surface as tool errors with the CLI's message text. `arggon init` generates a `.mcp.json` that registers the server project-scoped; if your repo already has a `.mcp.json`, the arggon entry is never overwritten — add `{"command": "arggon", "args": ["mcp"]}` under `mcpServers` manually.
+`arggon mcp` starts a stdio MCP (JSON-RPC 2.0, newline-delimited) server that exposes the same kernel as five tools: `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`, and `arggon_show`. Tool results are the documented `--json` envelope objects (see [`docs/json-output.md`](./json-output.md)) serialized as text content; kernel failures surface as tool errors with the CLI's message text. `arggon init` generates a `.mcp.json` that registers the server project-scoped; if your repo already has a `.mcp.json`, the arggon entry is never overwritten — add `{"command": "arggon", "args": ["mcp"]}` under `mcpServers` manually.
 
 The MCP layer always calls the kernel with the agent playbook rules applied: an MCP caller cannot reopen `done`/`cancelled` items and cannot steal a claim (there is no `force` parameter). These rules live in one module (`cli/src/rules.ts`) shared by the CLI and the MCP server, so both entry points enforce identical semantics.
 

@@ -219,6 +219,9 @@ const PARITY_EXCEPTIONS: Record<string, Record<string, string>> = {
     "--file":
       "shell/TTY stdin helper for humans; MCP callers pass the text inline as the `text` property",
   },
+  show: {
+    "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
+  },
 };
 
 /** Positional CLI arguments and the MCP schema property each maps to. */
@@ -227,10 +230,11 @@ const POSITIONAL_MAP: Record<string, string[]> = {
   create: ["type", "title"],
   update: ["id"],
   comment: ["id", "text"],
+  show: ["id"],
 };
 
 /** `.command("name")` blocks whose CLI surface must be mirrored by MCP. */
-const PARITY_COMMANDS = ["list", "create", "update", "comment"] as const;
+const PARITY_COMMANDS = ["list", "create", "update", "comment", "show"] as const;
 
 /** Extract the long flags of every `.option(...)` call in a command block. */
 function deriveCliOptions(command: string): string[] {

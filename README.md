@@ -227,6 +227,17 @@ Empty results exit `0` (`items: []` with `--json`). Missing `tasks/`, invalid en
 
 `arggon next` suggests the next claimable item: unclaimed `todo` of claimable type (story/task/bug), lexicographic by id, with parent chain and reason. Dependency-aware (v3): ready items — those whose `depends_on` are all `done`/`cancelled` — rank first, and when the suggestion still has open dependencies the `reason` lists them and the JSON suggestion carries the additive `blockedBy: string[]` (open dependency ids). Dependencies are advisory: they shape suggestions only, never updates. Empty pool exits `0` with a friendly message. Flags: `--ready` (limit the pool to ready items only), `--json` (envelope `{ suggestion: { item, parentChain, reason, blockedBy } | null }`, failures `NEXT_FAILED`).
 
+### `arggon show`
+
+Reads ONE item with bounded output ([ADR 0006](docs/adr/0006-token-context-efficiency.md)): comment tails grow every whole-file read, so `show` returns the frontmatter fields plus only the LAST 3 comments by default. Pure read — never writes, no lock, no tracker commit. Flags: `--meta` (frontmatter only), `--body` (full body including ALL comments — the unbounded explicit opt-in), `--tail-comments <n>` (compact-view tail size), `--json` (envelope `{ item, path, comments }` + `body` under `--body`; failures `SHOW_FAILED`).
+
+```bash
+arggon show task-rate-limit
+arggon show task-rate-limit --meta
+arggon show task-rate-limit --tail-comments 10
+arggon show task-rate-limit --body
+```
+
 Shared kernel: `cli/src/paths.ts`, `frontmatter.ts`, `ids.ts`, `status.ts`, `items.ts`, `relations.ts`, `dates.ts`.
 
 ### `arggon validate`
