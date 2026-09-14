@@ -1,12 +1,14 @@
 ---
 type: bug
-status: todo
+status: done
 id: bug-reopen-ungated-cli
 title: reopen done->todo is ungated in the CLI (playbook forbids agents; nothing enforces it)
+assignee: Arggon
+branch: fix/bug-reopen-ungated-cli
 parent: story-claim-leases
 labels: []
 created: "2026-09-13"
-updated: "2026-09-13"
+updated: "2026-09-14"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-coordination/story-claim-leases/bug-reopen-ungated-cli.md
@@ -23,6 +25,6 @@ Found by the suizo experiment (2026-09-13, verified with a clean repro): `arggon
 
 ## Acceptance
 
-- [ ] Same gating treatment as steal (PR #128): reopening done/cancelled via CLI requires interactive TTY confirmation (agents non-interactive → refused), independent of any config; humans keep the ability by confirming
-- [ ] Tests: CLI reopen by non-TTY → refused with actionable message; TTY confirm → allowed; MCP agent refusal unchanged; kernel contract unchanged
-- [ ] Docs: skill/claim/agents updated — the reopen rule is now enforced, not documented
+- [x] Same gating treatment as steal (PR #128): reopening done/cancelled via CLI requires interactive TTY confirmation (agents non-interactive → refused), independent of any config; humans keep the ability by confirming
+- [x] Tests: CLI reopen by non-TTY → refused with actionable message; TTY confirm → allowed; MCP agent refusal unchanged; kernel contract unchanged
+- [x] Docs: skill/claim/agents updated — the reopen rule is now enforced, not documented
