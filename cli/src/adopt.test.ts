@@ -96,7 +96,8 @@ describe("runAdopt: task creation", () => {
     expect(body).toContain("arggon playbook refresh <tech> --version <v>");
     // Step 6: baseline the sanctioned sweep edits (task-adopt-checksum-refresh).
     expect(body).toContain("arggon adopt --ack");
-    expect(body).toContain("Hand edits made AFTER this ack still report modified");
+    expect(body).toContain("Hand edits made AFTER this ack leave the file adopter-owned");
+    expect(body).toContain("acknowledgedDrifted");
     // Step 7: verification commands.
     expect(body).toContain("arggon validate");
     expect(body).toContain("arggon spec validate");
@@ -398,11 +399,14 @@ describe("runAdoptAck: x-generated baseline refresh (task-adopt-checksum-refresh
     const dir = seedTree();
     runAdoptAck({ cwd: dir });
     writeFileSync(join(dir, "AGENTS.md"), "LATE HAND EDIT\n", "utf8");
-    // An acked doc is sanctioned-diverged, not modified (doctor honesty).
+    // An acked doc is sanctioned-diverged, not modified (doctor honesty) —
+    // but the hand edit after the ack IS visible in the informational
+    // acknowledgedDrifted bucket (bug-ack-drift-promise).
     expect(runDoctor({ cwd: dir }).docs).toMatchObject({
       modified: 0,
       untouched: 0,
-      acknowledged: 17,
+      acknowledged: 16,
+      acknowledgedDrifted: 1,
     });
     // The state keeps the acked baseline, not the hand edit.
     expect(readConventionConfig(dir).generated["AGENTS.md"]!.checksum).not.toBe(

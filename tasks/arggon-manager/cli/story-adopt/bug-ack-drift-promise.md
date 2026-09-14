@@ -30,5 +30,5 @@ Two possible resolutions (decide as design, then land):
 
 ## Acceptance
 
-- [ ] The promise text in ADOPT_TASK_BODY matches the landed behavior (reworded per the chosen design)
-- [ ] Per the chosen design: either drift is reported (doctor bucket + tests) or the docs explicitly state drift is not tracked for acknowledged entries
+- [x] The promise text in ADOPT_TASK_BODY matches the landed behavior (reworded per the chosen design)
+- [x] Per the chosen design: either drift is reported (doctor bucket + tests) or the docs explicitly state drift is not tracked for acknowledged entries
