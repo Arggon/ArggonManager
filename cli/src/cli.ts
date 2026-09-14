@@ -341,6 +341,10 @@ program
   .option("--status <status>", "exact v0 status (todo | in_progress | blocked | done | cancelled)")
   .option("--type <type>", "exact v0 type (initiative | epic | story | task | bug)")
   .option(
+    "--parent <id>",
+    'exact parent item id (sugar for the "parent:" filter predicate); ANDed with the other flags',
+  )
+  .option(
     "--assignee <login>",
     "exact assignee login; @me resolves via GITHUB_USER, then GITHUB_ACTOR, then `gh api user`",
   )
@@ -366,6 +370,7 @@ program
     (opts: {
       status?: string;
       type?: string;
+      parent?: string;
       assignee?: string;
       filter?: string;
       view?: string;
@@ -379,6 +384,7 @@ program
           cwd: process.cwd(),
           status: opts.status,
           type: opts.type,
+          parent: opts.parent,
           assignee: opts.assignee,
           filter: opts.filter,
           view: opts.view,

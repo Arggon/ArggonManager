@@ -259,3 +259,64 @@ describe("mcp server", () => {
     });
   });
 });
+
+describe("mcp server arggon_update parent (task-list-parent-flag)", () => {
+  let client: McpTestClient;
+  let repoDir: string;
+
+  beforeEach(() => {
+    repoDir = primedRepo();
+    client = new McpTestClient();
+    client.cwd = repoDir;
+    client.start();
+  });
+
+  it("exposes parent in the arggon_update input schema", async () => {
+    await client.request("initialize", {
+      protocolVersion: "2025-03-26",
+      capabilities: {},
+      clientInfo: { name: "client-a", version: "1.0" },
+    });
+    const tools = await client.request("tools/list");
+    const toolsList = tools.tools as Array<{ name: string; inputSchema: { properties: Record<string, unknown> } }>;
+    const update = toolsList.find((tool) => tool.name === "arggon_update");
+    expect(update).toBeDefined();
+    expect(update!.inputSchema.properties).toHaveProperty("parent");
+  });
+
+  it("reparents an item via arggon_update parent", async () => {
+    await client.request("initialize", {
+      protocolVersion: "2025-03-26",
+      capabilities: {},
+      clientInfo: { name: "client-a", version: "1.0" },
+    });
+    // Valid edge: story-login (story) reparents under billing (epic).
+    runCreate({ cwd: repoDir, type: "epic", title: "Billing", parent: "launch-mvp", id: "billing" });
+    const result = await client.request("tools/call", {
+      name: "arggon_update",
+      arguments: { id: "story-login", parent: "billing" },
+    });
+    expect(result.isError).toBeUndefined();
+    const envelope = textContent(result) as Record<string, unknown>;
+    expect(envelope).toMatchObject({ ok: true, command: "update" });
+    expect((envelope.item as Record<string, unknown>).parent).toBe("billing");
+  });
+
+  it("rejects an unknown parent id with the CLI edge validation error", async () => {
+    await client.request("initialize", {
+      protocolVersion: "2025-03-26",
+      capabilities: {},
+      clientInfo: { name: "client-a", version: "1.0" },
+    });
+    const result = await client.request("tools/call", {
+      name: "arggon_update",
+      arguments: { id: "story-login", parent: "nope" },
+    });
+    expect(result.isError).toBe(true);
+    expect(textContent(result)).toMatchObject({
+      ok: false,
+      command: "update",
+      error: { code: "UPDATE_FAILED" },
+    });
+  });
+});

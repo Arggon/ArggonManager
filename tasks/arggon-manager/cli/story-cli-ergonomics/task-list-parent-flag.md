@@ -31,7 +31,7 @@ mechanical).
 
 ## Acceptance
 
-- [ ] Decide: add `--parent <id>` to `arggon list` (sugar over the predicate) or document predicates as the only path — either way documented
-- [ ] MCP `arggon_update` exposes `parent` with the same edge validation as the CLI (or the exclusion is documented deliberately)
+- [x] Decide: add `--parent <id>` to `arggon list` (sugar over the predicate) or document predicates as the only path — either way documented
+- [x] MCP `arggon_update` exposes `parent` with the same edge validation as the CLI (or the exclusion is documented deliberately)
 
 ## Notes

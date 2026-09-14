@@ -18,6 +18,8 @@ export type ListOptions = {
   status?: string;
   type?: string;
   assignee?: string;
+  /** Exact parent item id (sugar over the `parent:` filter predicate). */
+  parent?: string;
   /** Compact expression (`status:todo !label:security`); ANDs with the flags above. */
   filter?: string;
   /** Saved view name (`x-views` in tasks/.convention.yml); ANDs with the flags and --filter. */
@@ -157,6 +159,12 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
   // The blocked-by: and ancestor: predicates are computed views over the
   // whole tree, so they need the full (unfiltered) item set as their index.
   const allItems = loadItems(tasksDir);
+  // --parent is sugar over the `parent:` predicate, but unlike the raw
+  // predicate it validates that the referenced item exists so typos fail
+  // loudly instead of returning an empty list.
+  if (opts.parent !== undefined && !allItems.some((item) => item.id === opts.parent)) {
+    throw new Error(`unknown parent "${opts.parent}" (no work item with that id under tasks/)`);
+  }
   const blockedByIndex = buildBlockedByIndex(allItems);
   const ancestorIndex = buildAncestorIndex(allItems);
   const nowMs = (opts.now ?? new Date()).getTime();
@@ -165,6 +173,7 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
       if (opts.type !== undefined && item.type !== opts.type) return false;
       if (opts.status !== undefined && item.status !== opts.status) return false;
       if (assigneeFilter !== undefined && (item.assignee ?? null) !== assigneeFilter) return false;
+      if (opts.parent !== undefined && (item.parent ?? null) !== opts.parent) return false;
       // Stale claims: claimed items whose soft lease started before the
       // threshold. Items claimed before claimed_at existed count as stale.
       if (staleMs !== undefined) {
