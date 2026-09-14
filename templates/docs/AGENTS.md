@@ -23,6 +23,16 @@ The repo registers the arggon MCP server via `.mcp.json` — agents whose client
 5. **Done** = acceptance checklist in the item body complete + `arggon update <id> --status done` + PR merged.
 6. **Never reopen** `done`/`cancelled` items. File follow-ups instead: `arggon create task|bug "<title>" --parent <story-id>`.
 
+### Orchestration
+
+Non-trivial items are **delegated by default**: a coordinator agent assigns each item to a subagent rather than working it inline.
+
+- **One subagent per worktree**, working strictly inside `../<project>-<item-id>`.
+- **Plan waves by file-disjointness**: items in the same wave touch disjoint files/modules; conflicting items wait for the next wave.
+- **The coordinator verifies each merge**, resolves cross-item conflicts, and owns the tracker state (claims, statuses, follow-ups).
+- **Subagents follow the same rules**: claim your item before starting, never steal a claim, never reopen `done`/`cancelled`, validate before every commit, and open a PR referencing the item id.
+- Subagents report findings back to the coordinator instead of filing tracker items themselves.
+
 ## Project docs
 
 Read these before non-trivial changes (if present in this repo):

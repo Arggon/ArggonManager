@@ -1,12 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-orchestration-default-refile
 title: "Init ships the orchestration playbook: agents delegate by default (refile)"
+assignee: Arggon
+branch: feat/task-orchestration-default-refile
 parent: story-init-docs
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T16:59:56.946Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-init-docs/task-orchestration-default-refile.md
@@ -37,9 +40,9 @@ guidance-only (no new config).
 
 ## Acceptance
 
-- [ ] templates/docs/AGENTS.md gains the Orchestration subsection (delegate-by-default for non-trivial items: subagents per worktree, file-disjoint waves, coordinator duties, claim/PR rules apply to subagents)
-- [ ] docs/agents.md documents the orchestration modality formally (waves, conflict resolution as coordinator, subagent rules)
-- [ ] skills/arggon-cli/SKILL.md syncs (one line)
-- [ ] init-docs test asserts the generated AGENTS.md contains the orchestration section
+- [x] templates/docs/AGENTS.md gains the Orchestration subsection (delegate-by-default for non-trivial items: subagents per worktree, file-disjoint waves, coordinator duties, claim/PR rules apply to subagents)
+- [x] docs/agents.md documents the orchestration modality formally (waves, conflict resolution as coordinator, subagent rules)
+- [x] skills/arggon-cli/SKILL.md syncs (one line)
+- [x] init-docs test asserts the generated AGENTS.md contains the orchestration section
 
 ## Notes
