@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-board-docs-dedup
 title: board envelope docs duplicated between README and docs/json-output.md (drift risk)
+assignee: Arggon
 parent: story-web-board
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T19:17:13.972Z"
 ---
 <!--
   Placement (v0): tasks/scale-adoption/views/story-web-board/task-board-docs-dedup.md
