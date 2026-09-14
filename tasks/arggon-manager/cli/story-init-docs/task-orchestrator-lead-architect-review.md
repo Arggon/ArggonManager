@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-orchestrator-lead-architect-review
 title: "Orchestrator is lead architect: code-reviews every subagent PR before merge"
+assignee: Arggon
 parent: story-init-docs
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T19:16:09.067Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-init-docs/task-orchestrator-lead-architect-review.md
