@@ -1,5 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { withItemLock } from "./lock.js";
 import { stringifyFrontmatter } from "./frontmatter.js";
 import {
   assertStatus,
@@ -155,6 +156,17 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     throw new Error("nothing to update (pass --title, --status, --assignee, --branch, ...)");
   }
 
+  // Peek only to LOCATE the item file (bug-claim-race-no-lock): the claim is
+  // a read-modify-write, so the real read → verify → write below runs under
+  // the item lock — concurrent claim updates serialize instead of racing to
+  // a last-write-wins on the item file.
+  const peekTasksDir = findTasksDir(opts.cwd);
+  const peekItem = itemsById(loadItems(peekTasksDir)).get(id);
+  if (!peekItem) {
+    throw new Error(`id '${id}' not found under tasks/`);
+  }
+
+  const apply = (): UpdateResult => {
   const tasksDir = findTasksDir(opts.cwd);
   const byId = itemsById(loadItems(tasksDir));
   const item = byId.get(id);
@@ -176,7 +188,9 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     }
   }
 
-  const newStatus = opts.status ?? item.status;
+  // (assertStatus above verified the enum; the cast survives the closure —
+  // property narrowing from the assertion does not cross the function boundary.)
+  const newStatus = (opts.status as Status | undefined) ?? item.status;
   assertUpdateRules(
     {
       id,
@@ -355,6 +369,10 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     autoCompleted: completedContainers.map((container) => container.id),
     cascadeLevels: completedContainers.map((container) => container.type),
   };
+  };
+
+  // Hold the item lock across read → verify → write (bug-claim-race-no-lock).
+  return withItemLock(peekItem.filePath, apply);
 }
 
 const TERMINAL: ReadonlySet<string> = new Set(["done", "cancelled"]);

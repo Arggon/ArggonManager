@@ -6,6 +6,7 @@ import { runBranch, type GitRunner } from "./branch.js";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
 import { resolveCurrentLogin } from "./list.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
+import { withItemLock } from "./lock.js";
 import { runUpdate } from "./update.js";
 
 export type StartOptions = {
@@ -311,17 +312,30 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
   }
 
   if (opts.worktree) {
-    return startInWorktree({ id, item, assignee, root, gitRunner, opts });
+    // Hold the ROOT item's lock across the whole worktree flow (claim checks,
+    // worktree add, item writes in the worktree copy): concurrent starts on
+    // the same item serialize here, so exactly one creates the worktree and
+    // the rest either attach (same assignee) or fail with the claim conflict
+    // (different assignee) — never interleaved double-ok (bug-claim-race-no-lock).
+    return withItemLock(item.filePath, () => {
+      // Re-read under the lock: the claim state may have changed while we waited.
+      const fresh = itemsById(loadItems(tasksDir)).get(id);
+      if (!fresh) throw new Error(`id '${id}' not found under tasks/`);
+      return startInWorktree({ id, item: fresh, assignee, root, gitRunner, opts });
+    });
   }
 
-  runUpdate({
-    cwd: opts.cwd,
-    id,
-    status: "in_progress",
-    assignee,
-    now: opts.now,
-  });
-  const branch = runBranch({ cwd: opts.cwd, id, now: opts.now }, { git: gitRunner });
+  // Same lock for the plain flow: claim update → branch → commit → push must
+  // not interleave with another process's claim on the same item.
+  return withItemLock(item.filePath, () => {
+    runUpdate({
+      cwd: opts.cwd,
+      id,
+      status: "in_progress",
+      assignee,
+      now: opts.now,
+    });
+    const branch = runBranch({ cwd: opts.cwd, id, now: opts.now }, { git: gitRunner });
 
   let committed = false;
   if (gitRunner.fileStatus(root, branch.path).trim()) {
@@ -344,19 +358,20 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
     });
   }
 
-  return {
-    id,
-    path: branch.path,
-    root,
-    branch: branch.branch,
-    created: branch.created,
-    committed,
-    pushed,
-    prUrl,
-    worktreePath: null,
-    worktreeCreated: false,
-    item: branch.item,
-  };
+    return {
+      id,
+      path: branch.path,
+      root,
+      branch: branch.branch,
+      created: branch.created,
+      committed,
+      pushed,
+      prUrl,
+      worktreePath: null,
+      worktreeCreated: false,
+      item: branch.item,
+    };
+  });
 }
 
 type WorktreeStartInput = {
