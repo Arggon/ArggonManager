@@ -59,6 +59,8 @@ A PR merges only when **all** applicable bars pass:
 
 ### Architecture / boundaries (Software Architect)
 
+**Operating principle 1: code is cheap; good practices and sound software architecture are always important.** Architecture quality is always in scope, on every PR: clear module boundaries, small surfaces, tests that travel with behavior, and docs that travel with code are part of "done" — never deferred as "refactor later". The speed of writing code never justifies structural debt.
+
 - Changes match documented boundaries (convention vs eng vs CLI).
 - No silent schema forks: if CLI behavior disagrees with `docs/convention.md`, update the doc **in the same PR** or open a follow-up that blocks release.
 - No shortcuts that break Phase 2/3 extensibility without an ADR (e.g. hard-coding non-unique ids, inventing frontmatter keys outside reserved extension rules).

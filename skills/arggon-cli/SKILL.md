@@ -149,6 +149,9 @@ lean. A 40-line spec beats a 4-page one nobody reads.
 
 ## 6. Quality bar (every PR, no exceptions)
 
+- **Architecture is part of done:** code being cheap to WRITE never excuses
+  structural debt — boundaries, small surfaces, and tests are the deliverable,
+  never deferred as "refactor later".
 - **Conventions first:** read the project's `docs/convention.md`,
   `docs/engineering.md`, and the relevant `docs/playbooks/<tech>.md` before
   writing code. If project docs disagree with what you're about to do, fix the

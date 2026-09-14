@@ -34,9 +34,9 @@ into EXISTING sections rather than duplicating them.
 
 ## Acceptance
 
-- [ ] docs/engineering.md integrates the principle into its review bar / methodology sections (architecture quality named explicitly as always-in-scope, not optional refactor-later work)
-- [ ] templates/docs/engineering.md carries the same principle for adopter projects (adopter-appropriate wording)
-- [ ] skills/arggon-cli/SKILL.md §Quality bar names architecture-first (one or two lines); generated .agents copy synced (parity formula) and checksum re-acked — doctor reports 0 modified / 0 drifted
-- [ ] No duplication: the principle is stated once per document, in the section where a reader already looks for quality rules
+- [x] docs/engineering.md integrates the principle into its review bar / methodology sections (architecture quality named explicitly as always-in-scope, not optional refactor-later work)
+- [x] templates/docs/engineering.md carries the same principle for adopter projects (adopter-appropriate wording)
+- [x] skills/arggon-cli/SKILL.md §Quality bar names architecture-first (one or two lines); generated .agents copy synced (parity formula) and checksum re-acked — doctor reports 0 modified / 0 drifted
+- [x] No duplication: the principle is stated once per document, in the section where a reader already looks for quality rules
 
 ## Notes
