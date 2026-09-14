@@ -19,10 +19,11 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this task exists. -->
+Implements the structural quick win of accepted [ADR 0006](../../../docs/adr/0006-token-context-efficiency.md): today there is NO `arggon show <id>` — agents read whole item files via the filesystem, and comment tails grow the read unbounded (~226 B per comment, paid on every read). SPEC FIRST per the methodology.
 
 ## Acceptance
 
-- [ ] 
+- [ ] Spec (docs/specs/, arggon spec new) then implementation: `arggon show <id> [--meta] [--body] [--tail-comments N]` — default compact (frontmatter + last N comments), bounded reads; MCP `arggon_show` tool parity-tested (task-mcp-cli-parity harness)
+- [ ] Tests: bounded output, comment tailing, unknown id error; docs in README + docs/json-output.md (additive)
 
 ## Notes

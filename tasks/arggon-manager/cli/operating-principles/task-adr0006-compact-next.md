@@ -19,10 +19,11 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this task exists. -->
+Implements the two quick wins of accepted [ADR 0006](../../../docs/adr/0006-token-context-efficiency.md) (token/context efficiency). Measured 2026-09-14: `list --json` costs ~15.2k tokens over 136 items and always-emitted null/empty fields are ~15-20% of the payload; `next --json` is 67x smaller than `list` but agent guidance does not steer there.
 
 ## Acceptance
 
-- [ ] 
+- [ ] Compact envelopes by default: `list`/`create`/`update`/`comment` `--json` payloads omit null/empty optional fields (blocked_reason, milestone, worktree_path, issue, depends_on when empty, labels when empty); `--full` restores the complete shape; schemaVersion unchanged (omission documented as the default in docs/json-output.md); contract/parity tests updated
+- [ ] next-first guidance: SKILL.md + generated AGENTS.md steer agents to `arggon next --json` for "what should I work on" instead of `list --json`; copy synced to .agents + re-acked
 
 ## Notes

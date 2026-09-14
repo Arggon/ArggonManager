@@ -19,10 +19,14 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this task exists. -->
+Implements the accepted [ADR 0005](../../../docs/adr/0005-cheap-path-to-prod.md) (cheap-path-to-prod): init/playbooks must carry the per-shape deploy defaults so every generated project ships with a credible, low-cost answer to "how does this reach production?" — agent-executable from files in the repo, near-zero cost at small scale, with a documented exit path.
+
+Also carries the recurring review consequence: infra pricing guidance ages (Oracle halving, Hetzner hikes, Netlify credits — see exploration cheap-path-to-prod-001), so the deploy defaults must name their verification date and get re-verified periodically.
 
 ## Acceptance
 
-- [ ] 
+- [ ] init (or the generated docs/playbooks) emits the per-shape deploy defaults table from ADR 0005, each default config-in-repo (agent-executable) with an exit note
+- [ ] The guidance names its pricing-verification date and the re-verify cadence (annual, or before each release wave)
+- [ ] init-docs test asserts the deploy guidance is present in the generated tree
 
 ## Notes
