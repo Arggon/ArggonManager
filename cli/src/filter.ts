@@ -8,6 +8,7 @@ export const FILTER_FIELDS = [
   "parent",
   "depends-on",
   "blocked-by",
+  "ancestor",
 ] as const;
 
 export type FilterField = (typeof FILTER_FIELDS)[number];
@@ -128,15 +129,53 @@ export function buildBlockedByIndex(
 }
 
 /**
+ * Computed ancestor view (never stored): item id -> ids on its parent
+ * chain, nearest parent first, up to the root. The item itself is NOT
+ * included (`ancestor:<own-id>` is false). Required by the `ancestor:`
+ * predicate; build once per query with `buildAncestorIndex` and pass it
+ * to `matchesPredicate`.
+ */
+export type AncestorIndex = ReadonlyMap<string, readonly string[]>;
+
+/** Walk `parent` links up to the root for a set of items. Pure; cycle-safe. */
+export function buildAncestorIndex(
+  items: readonly { id?: string; parent?: string | null }[],
+): AncestorIndex {
+  const parentOf = new Map<string, string>();
+  for (const item of items) {
+    if (item.id !== undefined && item.parent) parentOf.set(item.id, item.parent);
+  }
+  const index = new Map<string, string[]>();
+  for (const item of items) {
+    if (item.id === undefined) continue;
+    const chain: string[] = [];
+    const visited = new Set<string>([item.id]);
+    let cur = parentOf.get(item.id);
+    while (cur !== undefined && !visited.has(cur)) {
+      chain.push(cur);
+      visited.add(cur);
+      cur = parentOf.get(cur);
+    }
+    index.set(item.id, chain);
+  }
+  return index;
+}
+
+/**
  * Test one predicate against an item. Pure; no I/O, no @me resolution.
- * The `blocked-by:` predicate is computed against the whole tree, so it
- * needs the inverse index (build with `buildBlockedByIndex`); without one
- * it never matches. All other predicates are self-contained.
+ * `blocked-by:` needs the inverse dependency index and `ancestor:` needs
+ * the ancestor index (both computed against the whole tree; build with
+ * `buildBlockedByIndex` / `buildAncestorIndex`); without the relevant
+ * index the corresponding predicate never matches. All other predicates
+ * are self-contained. `ancestor:<id>` is true when `<id>` appears anywhere
+ * in the item's parent chain (the chain only — the item itself does not
+ * count, and an unknown id simply never matches).
  */
 export function matchesPredicate(
   item: FilterableItem,
   pred: FilterPredicate,
   blockedByIndex?: BlockedByIndex,
+  ancestorIndex?: AncestorIndex,
 ): boolean {
   let hit: boolean;
   switch (pred.field) {
@@ -160,6 +199,9 @@ export function matchesPredicate(
       break;
     case "blocked-by":
       hit = (blockedByIndex?.get(pred.value) ?? []).includes(item.id ?? "");
+      break;
+    case "ancestor":
+      hit = (ancestorIndex?.get(item.id ?? "") ?? []).includes(pred.value);
       break;
   }
   return pred.negated ? !hit : hit;
