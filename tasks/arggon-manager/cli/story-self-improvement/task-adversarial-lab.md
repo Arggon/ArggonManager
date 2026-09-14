@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adversarial-lab
 title: "Adversarial lab: experiment scenarios as a permanent suite"
+assignee: Arggon
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T14:45:15.211Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/task-adversarial-lab.md
