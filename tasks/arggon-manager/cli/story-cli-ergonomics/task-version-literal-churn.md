@@ -4,6 +4,7 @@ status: in_progress
 id: task-version-literal-churn
 title: "version literal churn: tests assert hardcoded 0.1.0 instead of arggonVersion()"
 assignee: Arggon
+branch: feat/task-version-literal-churn
 parent: story-cli-ergonomics
 labels: []
 created: "2026-09-14"
