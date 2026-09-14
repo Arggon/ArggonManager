@@ -4,6 +4,7 @@ status: in_progress
 id: bug-autocommit-retry-budget-flake
 title: "labs/torture scenario 2 flakes under loaded CI: autocommit retry budget too short"
 assignee: Arggon
+branch: fix/bug-autocommit-retry-budget-flake
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
