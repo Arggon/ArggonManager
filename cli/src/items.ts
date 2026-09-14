@@ -291,3 +291,18 @@ export function itemsById(items: WorkItem[]): Map<string, WorkItem> {
   }
   return map;
 }
+
+/**
+ * Acceptance-aware cascade helper (task-cascade-acceptance-aware): does the
+ * item body carry an acceptance contract, and is it fully satisfied?
+ *
+ * Markdown task-list items only (`- [ ]` / `- [x]` / `- [X]`, leading
+ * whitespace tolerated). A body with NO task-list items has no acceptance
+ * checklist — treated as complete so the cascade may finish it as before.
+ * A body WITH any checklist item is complete only when every one is checked.
+ */
+export function acceptanceComplete(body: string): boolean {
+  const boxes = [...body.matchAll(/^[ \t]*[-*] \[( |x|X)\]/gm)];
+  if (boxes.length === 0) return true;
+  return boxes.every((match) => match[1] !== " ");
+}

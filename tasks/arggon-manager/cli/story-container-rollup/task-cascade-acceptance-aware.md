@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: done
 id: task-cascade-acceptance-aware
 title: Cascade should respect container acceptance checkboxes
+assignee: Arggon
+branch: feat/task-cascade-acceptance-aware
 parent: story-container-rollup
 labels: []
 created: "2026-09-13"
-updated: "2026-09-13"
+updated: "2026-09-14"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-container-rollup/task-cascade-acceptance-aware.md
@@ -23,5 +25,5 @@ Found by the suizo experiment (2026-09-13): a story created as the container for
 
 ## Acceptance
 
-- [ ] Design lands (ADR or documented decision): either the cascade skips containers whose OWN acceptance checklist has unchecked boxes (requires checkbox parsing at cascade time), or the semantic is explicitly ratified and documented ("cascade is purely status-mirroring; containers with pending acceptance must use --no-cascade") with skill/docs guidance
-- [ ] Tests covering the chosen semantics; the tie-breakers scenario (unimplemented story + completed child) produces the documented outcome
+- [x] Design lands (ADR or documented decision): either the cascade skips containers whose OWN acceptance checklist has unchecked boxes (requires checkbox parsing at cascade time), or the semantic is explicitly ratified and documented ("cascade is purely status-mirroring; containers with pending acceptance must use --no-cascade") with skill/docs guidance
+- [x] Tests covering the chosen semantics; the tie-breakers scenario (unimplemented story + completed child) produces the documented outcome

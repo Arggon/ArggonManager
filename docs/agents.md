@@ -79,7 +79,7 @@ An item is **done** when:
 
 Do **not** jump `todo` → `done` — claim first (`in_progress`), then complete.
 
-**Automatic container completion:** updates that reach a terminal state (`done`/`cancelled`) auto-complete any ancestor container whose entire subtree is terminal (up to the initiative; see the exception in `docs/convention.md`). Use `--no-cascade` when ancestors must not be touched. The cascade is predictable, but closing an **administrative** task (adoption/migration bookkeeping) should consciously pass `--no-cascade` when its product containers must stay open — and never model administrative leaves as sole children of product containers.
+**Automatic container completion:** updates that reach a terminal state (`done`/`cancelled`) auto-complete any ancestor container whose entire subtree is terminal (up to the initiative; see the exception in `docs/convention.md`). Use `--no-cascade` when ancestors must not be touched. The cascade is predictable, but closing an **administrative** task (adoption/migration bookkeeping) should consciously pass `--no-cascade` when its product containers must stay open — and never model administrative leaves as sole children of product containers. The cascade is acceptance-aware: a container whose own body still has unchecked acceptance checkboxes is never auto-completed — tick the checklist (or use `--no-cascade`) when a container must stay open.
 
 ### Auto-done on merge
 

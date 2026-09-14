@@ -194,6 +194,9 @@ lean. A 40-line spec beats a 4-page one nobody reads.
 - **Cascade**: a terminal status (done/cancelled) auto-completes ancestor containers whose
   whole subtree is terminal — up to the initiative. Opt out with `--no-cascade`; flipped
   ids come back as `autoCompleted`. Comments (`arggon comment`) never touch frontmatter.
+- **Cascade is acceptance-aware**: a container whose own body still has unchecked
+  acceptance checkboxes is never auto-completed (reported as `cascadeSkipped`) — tick the
+  checklist or use `--no-cascade`; a container with no checklist completes as before.
 - `WorkItem.path` is posix relative to the repo root. Run inside the repo tree — outside,
   every command fails fast (`LIST_FAILED` etc.).
 - `list` filters compose with AND; unknown `--status`/`--type` values fail. Predicates:
