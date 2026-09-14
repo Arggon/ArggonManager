@@ -4,6 +4,7 @@ status: in_progress
 id: task-init-orchestration-default
 title: "Init ships the orchestration playbook: agents delegate by default"
 assignee: Arggon
+branch: feat/task-orchestration-default
 parent: story-init-docs
 labels: []
 created: "2026-09-14"
