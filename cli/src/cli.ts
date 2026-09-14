@@ -335,7 +335,7 @@ program
   )
   .option(
     "--filter <expr>",
-    'compact filter (e.g. "status:todo !label:security"); fields status, type, assignee, label, parent, depends-on, blocked-by; ! negates; quotes allow spaces',
+    'compact filter (e.g. "status:todo !label:security"); fields status, type, assignee, label, parent, depends-on, blocked-by, ancestor; ! negates; quotes allow spaces',
   )
   .option(
     "--view <name>",

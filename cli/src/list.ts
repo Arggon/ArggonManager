@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readConventionConfig } from "./convention.js";
 import {
+  buildAncestorIndex,
   buildBlockedByIndex,
   parseFilter,
   matchesPredicate,
@@ -153,10 +154,11 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
     predicates.push(...validatePredicates(parseFilter(opts.filter)));
   }
 
-  // The blocked-by: predicate is a computed inverse view over the whole
-  // tree, so it needs the full (unfiltered) item set as its index.
+  // The blocked-by: and ancestor: predicates are computed views over the
+  // whole tree, so they need the full (unfiltered) item set as their index.
   const allItems = loadItems(tasksDir);
   const blockedByIndex = buildBlockedByIndex(allItems);
+  const ancestorIndex = buildAncestorIndex(allItems);
   const nowMs = (opts.now ?? new Date()).getTime();
   const items = allItems
     .filter((item) => {
@@ -172,7 +174,7 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
         if (!isStale) return false;
       }
       for (const pred of predicates) {
-        if (!matchesPredicate(item, pred, blockedByIndex)) return false;
+        if (!matchesPredicate(item, pred, blockedByIndex, ancestorIndex)) return false;
       }
       return true;
     })

@@ -26,5 +26,5 @@ filter.ts:155 — `parent:` matches the DIRECT parent only; no OR, no ancestor p
 
 ## Acceptance
 
-- [ ] `ancestor:<id>` predicate (true when id appears anywhere in the item's parent chain) works in filters and x-views; or an equivalent `initiative:<id>` resolution — document which landed
-- [ ] Table-driven tests: nested chains, negation, composition
+- [x] `ancestor:<id>` predicate (true when id appears anywhere in the item's parent chain) works in filters and x-views; or an equivalent `initiative:<id>` resolution — document which landed — **`ancestor:<id>` landed** (chain only: the item itself never matches; unknown ids match silently)
+- [x] Table-driven tests: nested chains, negation, composition
