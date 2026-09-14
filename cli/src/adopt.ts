@@ -79,6 +79,7 @@ export const ADOPT_SCAN_PATHS: string[] = [
   ".github/PULL_REQUEST_TEMPLATE.md",
   "docs/convention.md",
   "docs/engineering.md",
+  "docs/deploy.md",
   "docs/runbooks/README.md",
   "README.md",
   // Common alternates (adopter-owned conventions arggon does not generate).
