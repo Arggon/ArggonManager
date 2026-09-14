@@ -107,7 +107,7 @@ arggon update <id> --status todo
 
 ### Reopen
 
-Agents **MUST NOT** reopen `done` / `cancelled` (the schema allows `→ todo`; the playbook forbids it for agents). Humans may reopen with `arggon update <id> --status todo`.
+Agents **MUST NOT** reopen `done` / `cancelled`. This is enforced, not just documented (bug-reopen-ungated-cli): the MCP layer refuses agent callers via the shared rules module cli/src/rules.ts, and the CLI — which has no caller identity — gates the transition behind an interactive terminal: `arggon update <id> --status todo` on a `done`/`cancelled` item requires a `y/N` confirmation over a TTY stdin. Piped stdin (agents, scripts, CI) is refused even with `y` piped in; there is no `--yes` override and no config opt-in. Humans keep the ability by confirming at their terminal.
 
 ## JSON for agents
 

@@ -172,7 +172,7 @@ lean. A 40-line spec beats a 4-page one nobody reads.
 3. **Record findings:** `create task|bug "<title>" --parent <story-id>` — leaves get the
    `task-`/`bug-` prefix automatically (even with `--id`).
 4. **Finish:** tick the acceptance checklist in the item body, then
-   `update <id> --status done`. Never jump `todo → done`, never reopen `done`/`cancelled`.
+   `update <id> --status done`. Never jump `todo → done`, never reopen `done`/`cancelled` — reopen is gated like steal (bug-reopen-ungated-cli): `--status todo` on a `done`/`cancelled` item requires a y/N confirmation in an interactive terminal; non-TTY callers (agents, scripts, CI) are refused, no `--yes` override.
    Completing an item may auto-complete ancestor containers (cascade) — expected.
 5. **Verify:** `validate --json` must be `ok:true` before committing.
 

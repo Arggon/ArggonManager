@@ -49,7 +49,7 @@ import { runTuiBoard } from "./tui.js";
 import { runUpdate } from "./update.js";
 import { formatValidateHuman, runValidate } from "./validate.js";
 import { commitPayload, formatCommitLine } from "./tracker-commit.js";
-import { gateSteal } from "./steal-gate.js";
+import { gateSteal, findItemStatus, gateReopen } from "./steal-gate.js";
 const program = new Command();
 
 program
@@ -609,6 +609,18 @@ program
         // rules layer, shared with MCP).
         if (opts.steal) {
           await gateSteal({ cwd: process.cwd(), id });
+        }
+        // Reopen gate (bug-reopen-ungated-cli): done/cancelled -> todo is a
+        // legal transition (humans reopen legitimately), but the playbook
+        // forbids agents from reopening and the CLI has no caller identity —
+        // so, like the steal gate, it requires an interactive terminal with a
+        // y/N confirmation. Never config-armed; the kernel (rules.ts) keeps
+        // refusing agents via the MCP path unchanged.
+        if (opts.status === "todo") {
+          const current = findItemStatus(process.cwd(), id);
+          if (current === "done" || current === "cancelled") {
+            await gateReopen({ id, from: current, to: "todo" });
+          }
         }
         const result = runUpdate({
           cwd: process.cwd(),
