@@ -59,6 +59,14 @@ jobs:
           # closes the word list before `; do`).
           IDS: ${{ steps.ids.outputs.ids }}
         run: |
+          # Re-fetch and re-checkout main immediately before the flip loop
+          # (task-cascade-subtree-open-visibility): the checkout above pinned
+          # main at run START, so a sibling's flip PR merging minutes later was
+          # invisible to the loop (the race behind task-auto-done-cascade-
+          # visibility). Fast-forward to origin/main here to shrink the window.
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
           changed=0
           for id in $IDS; do
             status="$(node dist/cli.js list --json | jq -r --arg id "$id" '.items[] | select(.id == $id) | .status')"

@@ -40,8 +40,8 @@ story-cli-ergonomics cascade:
 
 ## Acceptance
 
-- [ ] `autoCompleteAncestors` records a `subtree-open` skip (with the blocking sibling id) in `cascadeSkipped`; additive payload change, test in cascade.test.ts
-- [ ] The auto-done workflow re-fetches/re-checks out main immediately before the flip loop
-- [ ] docs/json-output.md documents the new cascadeSkipped reason additively
+- [x] `autoCompleteAncestors` records a `subtree-open` skip (with the blocking sibling id) in `cascadeSkipped`; additive payload change, test in cascade.test.ts
+- [x] The auto-done workflow re-fetches/re-checks out main immediately before the flip loop
+- [x] docs/json-output.md documents the new cascadeSkipped reason additively
 
 ## Notes
