@@ -112,7 +112,17 @@ export type UpdateResult = {
    * Empty unless a skip happened. Additive — lets agents see why the cascade
    * stopped before the initiative.
    */
-  cascadeSkipped: Array<{ id: string; type: string; reason: "acceptance-incomplete" }>;
+  cascadeSkipped: Array<{
+    id: string;
+    type: string;
+    reason: "acceptance-incomplete" | "subtree-open";
+    /**
+     * For reason "subtree-open" (task-cascade-subtree-open-visibility): the id
+     * of the direct child of the skipped container whose subtree still contains
+     * a non-terminal item — the sibling that blocked the cascade.
+     */
+    sibling?: string;
+  }>;
   /**
    * Absolute paths of EVERY item file written this run: the updated item plus
    * any cascade-completed ancestors (task-autocommit-update-import). Callers
@@ -574,10 +584,20 @@ function autoCompleteAncestors(
   now: Date,
 ): {
   completed: WorkItem[];
-  skipped: Array<{ id: string; type: string; reason: "acceptance-incomplete" }>;
+  skipped: Array<{
+    id: string;
+    type: string;
+    reason: "acceptance-incomplete" | "subtree-open";
+    sibling?: string;
+  }>;
 } {
   const completed: WorkItem[] = [];
-  const skipped: Array<{ id: string; type: string; reason: "acceptance-incomplete" }> = [];
+  const skipped: Array<{
+    id: string;
+    type: string;
+    reason: "acceptance-incomplete" | "subtree-open";
+    sibling?: string;
+  }> = [];
   const byId = itemsById(loadItems(tasksDir));
   let parentId = from.parent;
   const seen = new Set<string>([from.id]);
@@ -586,7 +606,21 @@ function autoCompleteAncestors(
     const container = byId.get(parentId);
     if (!container) break;
     const children = [...byId.values()].filter((candidate) => candidate.parent === container.id);
-    if (children.length === 0 || !children.every((child) => subtreeClosed(child, byId))) break;
+    const openSibling = children.find((child) => !subtreeClosed(child, byId));
+    if (children.length === 0 || openSibling) {
+      // Subtree-open visibility (task-cascade-subtree-open-visibility): when
+      // the walk stops because a sibling subtree still holds a non-terminal
+      // item, record WHICH sibling blocked it instead of stopping silently.
+      if (openSibling) {
+        skipped.push({
+          id: container.id,
+          type: container.type,
+          reason: "subtree-open",
+          sibling: openSibling.id,
+        });
+      }
+      break;
+    }
     if (!TERMINAL.has(container.status)) {
       // Acceptance contract check happens BEFORE the write: an unchecked box
       // in the container's own body vetoes auto-completion.

@@ -59,6 +59,14 @@ jobs:
           # closes the word list before `; do`).
           IDS: ${{ steps.ids.outputs.ids }}
         run: |
+          # Re-fetch and re-checkout main immediately before the flip loop
+          # (task-cascade-subtree-open-visibility): the checkout above pinned
+          # main at run START, so a sibling's flip PR merging minutes later was
+          # invisible to the loop (the race behind task-auto-done-cascade-
+          # visibility). Fast-forward to origin/main here to shrink the window.
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
           changed=0
           for id in $IDS; do
             status="$(node dist/cli.js list --json | jq -r --arg id "$id" '.items[] | select(.id == $id) | .status')"
@@ -66,11 +74,11 @@ jobs:
               in_progress)
                 # Capture the update JSON (task-auto-done-cascade-visibility):
                 # autoCompleted/cascadeSkipped must land in the run log so a
-                # missed cascade is diagnosable after the fact. Note: a
-                # sibling that is still non-terminal on THIS tree (e.g. its
-                # own flip PR had not merged when this run checked out main)
-                # stops the cascade silently — visible here only as an empty
-                # cascade list, not as a cascadeSkipped entry.
+                # missed cascade is diagnosable after the fact. A sibling that
+                # is still non-terminal on THIS tree (e.g. its own flip PR had
+                # not merged when this run checked out main) stops the cascade
+                # — recorded as a cascadeSkipped entry with reason
+                # subtree-open naming the blocking sibling.
                 if out="$(node dist/cli.js update "$id" --status done --json)"; then
                   cascade="$(printf '%s' "$out" | jq -r '(.autoCompleted // []) | join(",")' 2>/dev/null || true)"
                   skipped="$(printf '%s' "$out" | jq -r '(.cascadeSkipped // []) | map("\(.id):\(.reason)") | join(",")' 2>/dev/null || true)"

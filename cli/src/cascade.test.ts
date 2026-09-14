@@ -131,6 +131,34 @@ describe("automatic container completion", () => {
     expect(statusOf(dir, "launch")).toBe("todo");
   });
 
+  it("records a subtree-open skip naming the blocking sibling (task-cascade-subtree-open-visibility)", () => {
+    const { dir, tasks } = chainTree();
+    // Flip two leaves done, leaving bug-x open: the ancestor walk stops at
+    // story-a because a sibling subtree (bug-x) is still open.
+    runUpdate({ cwd: dir, id: tasks[0], status: "in_progress", assignee: "worker", now: NOW });
+    runUpdate({ cwd: dir, id: tasks[0], status: "done", now: NOW });
+    runUpdate({ cwd: dir, id: tasks[1], status: "in_progress", assignee: "worker", now: NOW });
+    const result = runUpdate({ cwd: dir, id: tasks[1], status: "done", now: NOW });
+    expect(result.autoCompleted).toEqual([]);
+    expect(result.cascadeSkipped).toEqual([
+      { id: "story-a", type: "story", reason: "subtree-open", sibling: "bug-x" },
+    ]);
+    expect(statusOf(dir, "story-a")).toBe("todo");
+    // No silent stop above the skip either: nothing completed, nothing else skipped.
+    expect(result.cascadeLevels).toEqual([]);
+  });
+
+  it("records no subtree-open skip when the walk completes or stops for acceptance", () => {
+    const { dir, tasks, bug } = chainTree();
+    // Full close: cascade completes, no skips.
+    claimAndDone(dir, tasks[0]);
+    claimAndDone(dir, tasks[1]);
+    runUpdate({ cwd: dir, id: bug, status: "in_progress", assignee: "worker", now: NOW });
+    const done = runUpdate({ cwd: dir, id: bug, status: "done", now: NOW });
+    expect(done.cascadeSkipped).toEqual([]);
+    expect(done.autoCompleted).toEqual(["story-a", "epic-a", "launch"]);
+  });
+
   it("counts cancelled as closed and completes the parent as done", () => {
     const { dir, tasks, bug } = chainTree();
     runUpdate({ cwd: dir, id: tasks[0], status: "cancelled", now: NOW });

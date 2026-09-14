@@ -1,12 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-cascade-subtree-open-visibility
 title: "cascade: record subtree-open skip reason; auto-done re-checkout before flip loop"
+assignee: Arggon
+branch: feat/task-cascade-subtree-open-visibility
 parent: story-github
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T19:58:29.343Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-github/task-cascade-subtree-open-visibility.md
@@ -37,8 +40,8 @@ story-cli-ergonomics cascade:
 
 ## Acceptance
 
-- [ ] `autoCompleteAncestors` records a `subtree-open` skip (with the blocking sibling id) in `cascadeSkipped`; additive payload change, test in cascade.test.ts
-- [ ] The auto-done workflow re-fetches/re-checks out main immediately before the flip loop
-- [ ] docs/json-output.md documents the new cascadeSkipped reason additively
+- [x] `autoCompleteAncestors` records a `subtree-open` skip (with the blocking sibling id) in `cascadeSkipped`; additive payload change, test in cascade.test.ts
+- [x] The auto-done workflow re-fetches/re-checks out main immediately before the flip loop
+- [x] docs/json-output.md documents the new cascadeSkipped reason additively
 
 ## Notes
