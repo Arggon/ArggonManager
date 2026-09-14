@@ -4,6 +4,8 @@ Project-owned review bar and definition of done. Keep this short, enforceable, a
 
 ## Review bar
 
+Operating principle: **code is cheap; good practices and sound software architecture are always important.** Architecture quality is part of "done" on every change — clear module boundaries, small surfaces, tests that travel with behavior, docs that travel with code. Code that is quick to write is never an excuse for structural debt deferred to "refactor later".
+
 A PR is reviewable when:
 
 - [ ] It does one thing (small, focused diff).
