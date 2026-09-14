@@ -315,7 +315,7 @@ describe("arggon cleanup", () => {
   it("lists only terminal items with merged branches (default mode removes nothing)", () => {
     const { dir, paths } = initCleanupRepo();
 
-    const result = runCleanup({ cwd: dir });
+    const result = runCleanup({ cwd: dir, noGh: true });
 
     expect(result.base).toBe("main");
     expect(result.entries.map((e) => e.id)).toEqual(["task-alpha", "task-bravo", "task-charlie"]);
@@ -336,7 +336,7 @@ describe("arggon cleanup", () => {
   it("--prune removes merged worktrees and deletes their branches, skipping the rest", () => {
     const { dir, paths } = initCleanupRepo();
 
-    const result = runCleanup({ cwd: dir, prune: true });
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true });
 
     expect(result.failures).toEqual([]);
     expect(result.pruned.map((a) => a.action)).toEqual([
@@ -357,7 +357,7 @@ describe("arggon cleanup", () => {
 
   it("emits the standard --json envelope via the CLI", () => {
     const { dir } = initCleanupRepo();
-    const r = spawnSync(process.execPath, [tsx, cli, "cleanup", "--json"], {
+    const r = spawnSync(process.execPath, [tsx, cli, "cleanup", "--json", "--no-gh"], {
       encoding: "utf8",
       cwd: dir,
     });
@@ -467,7 +467,7 @@ describe("arggon cleanup", () => {
       },
     };
 
-    const result = runCleanup({ cwd: dir, prune: true }, { git: fakeGit });
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true }, { git: fakeGit });
 
     // Per-candidate failure: the run stays green and continues.
     expect(result.failures).toEqual([]);
@@ -499,5 +499,86 @@ describe("arggon cleanup", () => {
     expect(alpha.reason).toContain("remote branch divergent or behind (origin/feat/task-alpha)");
     expect(envelope.pruned).toEqual([]);
     expect(envelope.failures).toEqual([]);
+  });
+
+  /** Fake gh executor returning a merged PR list (task-cleanup-squash-merge). */
+  function fakeGh(result: unknown, calls: string[][] = []): (file: string, args: string[]) => string {
+    return (file, args) => {
+      calls.push([file, ...args]);
+      if (result === undefined) throw new Error("gh exploded");
+      return JSON.stringify(result);
+    };
+  }
+
+  // task-charlie is done with an UNMERGED branch — exactly the squash-merge
+  // shape: git ancestry can never prove it was integrated.
+
+  it("prunes a squash-merged branch via the gh fallback, annotated with the PR", () => {
+    const { dir, paths } = initCleanupRepo();
+    const calls: string[][] = [];
+
+    const result = runCleanup({ cwd: dir, prune: true }, { gh: fakeGh([{ number: 12, url: "https://github.com/o/r/pull/12", mergedAt: "2026-09-13T00:00:00Z" }], calls) });
+
+    const entry = result.entries.find((e) => e.id === "task-charlie")!;
+    expect(entry.removable).toBe(true);
+    expect(entry.via).toBe("squash-merged PR #12");
+    expect(result.failures).toEqual([]);
+    expect(result.pruned.filter((a) => a.id === "task-charlie")).toEqual([
+      { id: "task-charlie", action: `removed worktree ${paths["task-charlie"]}`, via: "squash-merged PR #12" },
+      { id: "task-charlie", action: "deleted branch feat/task-charlie", via: "squash-merged PR #12" },
+      { id: "task-charlie", action: "cleared worktree_path" },
+    ]);
+    expect(existsSync(paths["task-charlie"])).toBe(false);
+    expect(refExists(dir, "refs/heads/feat/task-charlie")).toBe(false);
+    const raw = readFileSync(join(dir, "tasks/launch/auth/login/task-charlie.md"), "utf8");
+    expect(parseFrontmatter(raw).data.worktree_path).toBeUndefined();
+    // The gh query targets the branch with the merged-PR contract.
+    expect(calls).toHaveLength(1);
+    expect(calls[0].slice(0, 2)).toEqual(["gh", "pr"]);
+    expect(calls[0]).toContain("--state");
+    expect(calls[0][calls[0].indexOf("--state") + 1]).toBe("merged");
+    expect(calls[0][calls[0].indexOf("--head") + 1]).toBe("feat/task-charlie");
+  });
+
+  it("skips when ancestry fails and gh finds no merged PR", () => {
+    const { dir, paths } = initCleanupRepo();
+
+    const result = runCleanup({ cwd: dir, prune: true }, { gh: fakeGh([]) });
+
+    const entry = result.entries.find((e) => e.id === "task-charlie")!;
+    expect(entry.removable).toBe(false);
+    expect(entry.reason).toBe("branch not merged and no merged PR found");
+    expect(result.pruned.filter((a) => a.id === "task-charlie")).toEqual([]);
+    expect(result.failures).toEqual([]);
+    expect(existsSync(paths["task-charlie"])).toBe(true);
+    expect(refExists(dir, "refs/heads/feat/task-charlie")).toBe(true);
+  });
+
+  it("skips (never crashes) when gh is unavailable", () => {
+    const { dir, paths } = initCleanupRepo();
+
+    const result = runCleanup({ cwd: dir, prune: true }, { gh: fakeGh(undefined) });
+
+    const entry = result.entries.find((e) => e.id === "task-charlie")!;
+    expect(entry.removable).toBe(false);
+    expect(entry.reason).toBe(
+      "ancestry check failed and gh is unavailable to check for squash-merged PRs",
+    );
+    expect(result.pruned.filter((a) => a.id === "task-charlie")).toEqual([]);
+    expect(result.failures).toEqual([]);
+    expect(existsSync(paths["task-charlie"])).toBe(true);
+  });
+
+  it("--no-gh skips the gh fallback entirely (ancestry-only)", () => {
+    const { dir } = initCleanupRepo();
+    const calls: string[][] = [];
+
+    const result = runCleanup({ cwd: dir, noGh: true }, { gh: fakeGh([{ number: 12, url: "u", mergedAt: null }], calls) });
+
+    const entry = result.entries.find((e) => e.id === "task-charlie")!;
+    expect(entry.removable).toBe(false);
+    expect(entry.reason).toBe("branch 'feat/task-charlie' is not fully merged into 'main'");
+    expect(calls).toEqual([]);
+    expect(result.pruned).toEqual([]);
   });
 });
