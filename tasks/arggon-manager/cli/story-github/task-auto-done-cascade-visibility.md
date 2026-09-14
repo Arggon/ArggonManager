@@ -4,6 +4,7 @@ status: in_progress
 id: task-auto-done-cascade-visibility
 title: "auto-done bot: cascade result invisible; cascade skipped story-cli-ergonomics though conditions were met"
 assignee: Arggon
+branch: feat/task-auto-done-cascade-visibility
 parent: story-github
 labels: []
 created: "2026-09-14"
