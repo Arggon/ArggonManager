@@ -30,6 +30,10 @@ risk for the next board change.
 
 ## Acceptance
 
-- [ ] Decide and land: single source (one doc references the other) or a docs-parity test that fails when the two envelope descriptions diverge
+- [x] Decide and land: single source (one doc references the other) or a docs-parity test that fails when the two envelope descriptions diverge
 
 ## Notes
+
+Decision: **Option A — single normative source.** docs/json-output.md is the JSON contract doc, so its `board` section stays the complete, normative envelope reference. README's board section keeps user-facing prose (--serve/--json/--tui behavior, combinability, failure codes) but no longer lists envelope payload keys; it points to docs/json-output.md for the payload contract. Option B (docs-parity test) was rejected: no precedent for docs-parity tests in the repo and the test would be brittle.
+
+Before landing, every board-envelope claim in docs/json-output.md was verified against cli/src/cli.ts (board action) / board.ts / board-serve.ts: `path` absent with `--serve`; `serving/url/port` only with `--serve`; `github/prCount` only with `--github` (not combinable with `--serve`); `groupBy` with `--group-by milestone`; one-shot `--serve --json` envelope while the process keeps serving; `--tui` fails with `BOARD_FAILED` under `--json` or non-TTY stdout. All claims match; no doc corrections needed beyond the dedup pointer.
