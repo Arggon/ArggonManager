@@ -1,8 +1,10 @@
 ---
 type: bug
-status: todo
+status: done
 id: bug-playbook-double-v
 title: playbook --file-task title doubles the v prefix (vv1.27.1)
+assignee: Arggon
+branch: fix/bug-playbook-double-v
 parent: story-tech-playbooks
 labels: []
 created: "2026-09-13"
@@ -23,4 +25,4 @@ Found by the suizo experiment (2026-09-13): `arggon playbook status --file-task 
 
 ## Acceptance
 
-- [ ] The title normalizes the prefix (v once, e.g. v1.27.1 whether version is stored as "1.27.1" or "v1.27.1"); test both stored forms
+- [x] The title normalizes the prefix (v once, e.g. v1.27.1 whether version is stored as "1.27.1" or "v1.27.1"); test both stored forms

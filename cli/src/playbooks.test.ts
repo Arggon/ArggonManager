@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { runCreate } from "./create.js";
 import { itemsById, loadItems } from "./items.js";
 import {
+  normalizeVersionPrefix,
   PLAYBOOK_MAX_AGE_DAYS_DEFAULT,
   runPlaybookNew,
   runPlaybookRefresh,
@@ -227,6 +228,24 @@ describe("playbook status", () => {
     expect(filed?.body).toContain("docs/playbooks/stale-tech.md");
     expect(filed?.body).toContain("arggon playbook refresh stale-tech --version <v>");
     expect(byId.has("task-re-research-fresh-tech")).toBe(false);
+  });
+
+  it("--file-task does not double the v prefix when the stored version carries one", () => {
+    const dir = makeRepo();
+    const story = makeStory(dir);
+    writePlaybook(dir, "stale-tech", { playbook_id: "stale-tech", version: "v1.27.1", researched: "2026-06-01" });
+
+    runPlaybookStatus({ cwd: dir, fileTask: story, now: NOW });
+    const byId = itemsById(loadItems(join(dir, "tasks")));
+    const filed = byId.get("task-re-research-stale-tech");
+    expect(filed?.title).toBe("Re-research stale-tech playbook (v1.27.1, 103 days old)");
+  });
+
+  it("normalizeVersionPrefix yields exactly one leading v", () => {
+    expect(normalizeVersionPrefix("1.27.1")).toBe("v1.27.1");
+    expect(normalizeVersionPrefix("v1.27.1")).toBe("v1.27.1");
+    expect(normalizeVersionPrefix("V2")).toBe("v2");
+    expect(normalizeVersionPrefix("")).toBe("v");
   });
 
   it("--file-task is idempotent: an existing re-research task is skipped", () => {
