@@ -1,6 +1,6 @@
 ---
 type: bug
-status: todo
+status: cancelled
 id: bug-skill-copy-untrack
 title: ".agents skill copy still tracked — #205 dedup left gitignore as no-op"
 parent: story-init-docs
