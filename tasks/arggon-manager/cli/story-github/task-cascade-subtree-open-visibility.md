@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-cascade-subtree-open-visibility
 title: "cascade: record subtree-open skip reason; auto-done re-checkout before flip loop"
+assignee: Arggon
 parent: story-github
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T19:58:29.343Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-github/task-cascade-subtree-open-visibility.md
