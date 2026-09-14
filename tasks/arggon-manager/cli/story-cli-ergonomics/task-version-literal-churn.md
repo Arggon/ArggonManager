@@ -29,6 +29,6 @@ missed file fails CI unrelated to the release.
 
 ## Acceptance
 
-- [ ] Version assertions derive the expected value from `arggonVersion()` (or a shared fixture) instead of hardcoded literals; a bump touches only package.json + CHANGELOG
+- [x] Version assertions derive the expected value from `arggonVersion()` (or a shared fixture) instead of hardcoded literals; a bump touches only package.json + CHANGELOG
 
 ## Notes
