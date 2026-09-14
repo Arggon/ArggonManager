@@ -19,10 +19,11 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+Found 2026-09-14 during the task-cascade-subtree-open-visibility cycle (lead-architect review round): `/tmp`'s inode table hit 100% from ~20k stale `arggon-*` mkdtemp dirs left behind by prior vitest runs, making the suite fail spuriously until the dirs were manually cleaned. Cascade test fixtures (cli/src/cascade.test.ts `chainTree()`, and possibly other fixture helpers) create mkdtemp dirs without removing them on exit.
 
 ## Acceptance
 
-- [ ] 
+- [ ] Audit fixture helpers across cli/src/*.test.ts for mkdtemp usage without rmSync on exit; fix the leakers (try/finally or afterEach cleanup)
+- [ ] One full suite run leaves zero new `arggon-*` dirs in /tmp (assert manually before/after; note the count in the PR body)
 
 ## Notes
