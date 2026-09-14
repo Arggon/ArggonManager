@@ -162,7 +162,7 @@ arggon doctor --json
 ```
 
 - `initialized`: whether `tasks/.convention.yml` was found, plus the convention version (0-3).
-- `docs`: generated-doc provenance counts from `x-generated` — `managed` (tracked destinations), `untouched` (checksum matches), `modified` (checksum differs), `acknowledged` (sanctioned-diverged baselines from `adopt --ack`), `stale` (template no longer generated), `missing` (tracked but absent).
+- `docs`: generated-doc provenance counts from `x-generated` — `managed` (tracked destinations), `untouched` (checksum matches), `modified` (checksum differs), `acknowledged` (sanctioned-diverged baselines from `adopt --ack`), `acknowledgedDrifted` (acknowledged docs whose current checksum differs from the acked baseline — a hand edit after the ack; informational, still adopter-owned), `stale` (template no longer generated), `missing` (tracked but absent).
 - `tracker`: cheap tracker sanity — total work items and `todo` count.
 
 Non-initialized repos report `initialized: false` with zeroed counts (no crash, still exit 0); failures use `error.code: "DOCTOR_FAILED"` only for unexpected errors.
@@ -388,6 +388,10 @@ Prints the agent wiring (install commands, pre-commit hook, CI gate, `AGENTS.md`
 Starts a stdio MCP server (JSON-RPC 2.0) exposing `arggon_list`, `arggon_create`, `arggon_update`, and `arggon_comment` with the same rules and JSON envelopes as the CLI. The MCP layer always runs with agent playbook rules: no reopening `done`/`cancelled`, no claim stealing. See [docs/agents.md](docs/agents.md) §MCP server.
 
 Fixtures: [fixtures/](fixtures/).
+
+## Versioning
+
+The package version in `package.json` is bumped manually, once per release wave — not per commit or per PR. `CHANGELOG.md` documents what lands in each wave, so `arggon --version` (which reads the package version) plus the changelog answer "which build is this and what's in it?". No semver guarantees are made beyond that.
 
 ## Contributing
 
