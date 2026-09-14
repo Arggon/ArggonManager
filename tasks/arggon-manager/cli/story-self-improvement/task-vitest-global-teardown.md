@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-vitest-global-teardown
 title: "vitest globalTeardown: shared /tmp purge for stale arggon-* fixture dirs"
+assignee: Arggon
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T22:27:28.458Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/task-vitest-global-teardown.md
