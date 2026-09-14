@@ -4,6 +4,7 @@ status: in_progress
 id: task-post-start-env
 title: "post-start hook environment: document PATH inheritance (or login-shell option)"
 assignee: Arggon
+branch: feat/task-post-start-env
 parent: story-start-worktree
 labels: []
 created: "2026-09-14"
