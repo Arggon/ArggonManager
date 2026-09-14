@@ -93,6 +93,7 @@ describe("init docs: tier-1 content", () => {
     expect(agents).toContain("docs/playbooks/");
     expect(agents).toContain("arggon playbook status");
     expect(agents).toContain("arggon validate");
+    expect(agents).toMatch(/arggon comment <item-id>[^\n]*never as GitHub PR comments/);
   });
 
   it("CLAUDE.md is the @AGENTS.md shim under the provenance marker", () => {

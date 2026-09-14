@@ -166,7 +166,8 @@ lean. A 40-line spec beats a 4-page one nobody reads.
   §Documentation maintenance).
 - **Handoffs are written:** blocked, out-of-scope discoveries, and decisions go in
   `arggon comment` on the item — the next agent (or human) should never need to
-  re-derive your context.
+  re-derive your context. Review feedback (verdicts, change requests) also lands
+  on the item via `arggon comment <id>`, never as GitHub PR comments.
 - **Leave it cleaner:** expired claims get released (`--status todo`), merged
   worktrees get `arggon cleanup --prune`, stale playbooks get flagged, and the
   tree validates before every commit.
