@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-list-parent-flag
 title: first-class list --parent flag; MCP arggon_update lacks parent
+assignee: Arggon
 parent: story-cli-ergonomics
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T19:17:04.553Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-cli-ergonomics/task-list-parent-flag.md
