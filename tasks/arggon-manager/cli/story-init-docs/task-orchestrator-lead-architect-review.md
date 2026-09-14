@@ -37,9 +37,9 @@ institutionalizes it for adopters.
 
 ## Acceptance
 
-- [ ] templates/docs/AGENTS.md Orchestration subsection states the review duty (coordinator = lead architect: reviews every subagent PR against the review bar before merge, requests changes, approves, then merges)
-- [ ] docs/agents.md orchestration section documents the review duties formally (what the review checks, request-changes loop, merge authority)
-- [ ] skills/arggon-cli/SKILL.md + generated .agents copy sync the one-liner; checksums re-acked (doctor: 0 modified)
-- [ ] init-docs test asserts the generated AGENTS.md mentions the review duty
+- [x] templates/docs/AGENTS.md Orchestration subsection states the review duty (coordinator = lead architect: reviews every subagent PR against the review bar before merge, requests changes, approves, then merges)
+- [x] docs/agents.md orchestration section documents the review duties formally (what the review checks, request-changes loop, merge authority)
+- [x] skills/arggon-cli/SKILL.md + generated .agents copy sync the one-liner; checksums re-acked (doctor: 0 modified)
+- [x] init-docs test asserts the generated AGENTS.md mentions the review duty
 
 ## Notes

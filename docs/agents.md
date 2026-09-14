@@ -117,6 +117,7 @@ Non-trivial items are **orchestrated by default**: a coordinator agent delegates
 
 - **Wave planning by file-disjointness:** group claimable items into waves whose members touch disjoint files/modules. Items that would collide go in different waves.
 - **Per-item worktrees:** one subagent per item, each working in its own worktree (`../<repo>-<item-id>`); no two subagents share a working tree.
+- **Code review (lead architect):** the coordinator reviews **every** subagent PR before merge — against the review bar in docs/engineering.md (conventions first, tests travel with behavior, docs travel with code, scope stays on the item) plus the coordination specifics: surgical staging, no cross-item files, no unrelated reformatting, acceptance ticks honest. Change requests go back to the subagent (PR comment or tracker comment) and are addressed before merge; only a review that passes merges. Green CI is necessary, not sufficient.
 - **Merge verification:** after each subagent's PR, the coordinator verifies the merge; when waves overlap, the coordinator resolves cross-item conflicts.
 - **Tracker ownership:** the coordinator owns tracker state — claim conflicts, blocked items, follow-up filing, and final wave verification (0 open items, `arggon validate` ok, `arggon doctor` clean).
 
@@ -124,6 +125,7 @@ Non-trivial items are **orchestrated by default**: a coordinator agent delegates
 
 - Claim **your** item (`in_progress` + assignee) and stay inside **your** worktree.
 - Never flip your item `done` — completion is the coordinator's call after merge verification — and never reopen `done`/`cancelled` or steal a claim.
+- Expect the coordinator's code review on your PR and address change requests before it merges.
 - Report findings back to the coordinator instead of filing tracker items — the coordinator consolidates and files.
 
 The claim, branch, PR, and validate rules above apply to subagents **unchanged**: same commands, same gates, same "never" list.

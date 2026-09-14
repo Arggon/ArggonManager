@@ -523,6 +523,8 @@ describe("init docs: orchestration by default (task-orchestration-default-refile
     expect(agents).toContain("file-disjoint");
     expect(agents).toContain("coordinator");
     expect(agents).toMatch(/never steal a claim/i);
+    expect(agents).toMatch(/code-review/i);
+    expect(agents).toMatch(/lead architect/i);
   });
 });
 
