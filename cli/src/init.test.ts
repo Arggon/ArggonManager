@@ -24,6 +24,7 @@ const TIER2_DOCS = [
   "CHANGELOG.md",
   "SUPPORT.md",
   "docs/convention.md",
+  "docs/deploy.md",
   "docs/engineering.md",
   "docs/runbooks/README.md",
 ];

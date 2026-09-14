@@ -28,8 +28,8 @@ Also carries the recurring review consequence: infra pricing guidance ages (Orac
 
 ## Acceptance
 
-- [ ] init (or the generated docs/playbooks) emits the per-shape deploy defaults table from ADR 0005, each default config-in-repo (agent-executable) with an exit note
-- [ ] The guidance names its pricing-verification date and the re-verify cadence (annual, or before each release wave)
-- [ ] init-docs test asserts the deploy guidance is present in the generated tree
+- [x] init (or the generated docs/playbooks) emits the per-shape deploy defaults table from ADR 0005, each default config-in-repo (agent-executable) with an exit note
+- [x] The guidance names its pricing-verification date and the re-verify cadence (annual, or before each release wave)
+- [x] init-docs test asserts the deploy guidance is present in the generated tree
 
 ## Notes
