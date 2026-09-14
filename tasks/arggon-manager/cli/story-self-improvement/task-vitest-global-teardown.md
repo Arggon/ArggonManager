@@ -4,6 +4,7 @@ status: in_progress
 id: task-vitest-global-teardown
 title: "vitest globalTeardown: shared /tmp purge for stale arggon-* fixture dirs"
 assignee: Arggon
+branch: feat/task-vitest-global-teardown
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
