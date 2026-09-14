@@ -84,6 +84,15 @@ export type WorktreeConfig = {
    * skips it per invocation).
    */
   postStart: string | null;
+  /**
+   * Shell variant from `x-worktree.post-start-shell` (task-post-start-env):
+   * `"inherit"` (default) runs the hook via `sh -c` with the invoking arggon
+   * process environment; `"login"` runs it via the user's login shell
+   * (`$SHELL -lc`) so toolchains installed through profile files (rustup's
+   * ~/.cargo/env, mise, asdf) land on PATH. `null` when unset (= inherit).
+   * The `--post-start-shell` start flag overrides per invocation.
+   */
+  postStartShell: "inherit" | "login" | null;
 };
 
 /**
@@ -162,7 +171,7 @@ export function parseConventionConfig(
   const generated: Record<string, GeneratedEntry> = {};
   const importLabelTypes: Record<string, ItemType> = {};
   let importHasLabelTypes = false;
-  const worktree: WorktreeConfig = { postStart: null };
+  const worktree: WorktreeConfig = { postStart: null, postStartShell: null };
   let version = CONVENTION_VERSION_DEFAULT;
   let section: string | null = null;
   let generatedDest: string | null = null;
@@ -326,6 +335,19 @@ export function parseConventionConfig(
       // Namespaced extension (task-start-post-hook): unknown nested keys are
       // ignored (ignore-unknown); the official `post-start` option is a shell
       // command run inside a freshly created worktree.
+      if (key === "post-start-shell") {
+        // Shell variant (task-post-start-env): "inherit" (default) or "login"
+        // ($SHELL -lc, sources profile files so rustup/mise/asdf toolchains
+        // are on PATH). Anything else is a parse error.
+        const shell = stripQuotes(value);
+        if (shell !== "inherit" && shell !== "login") {
+          throw new Error(
+            `${sourcePath}: 'post-start-shell' must be "inherit" or "login" (got ${JSON.stringify(value)})`,
+          );
+        }
+        worktree.postStartShell = shell;
+        continue;
+      }
       if (key !== "post-start") continue;
       const command = stripQuotes(value);
       if (!command) {
@@ -391,7 +413,7 @@ export function readConventionConfig(dir: string): ConventionConfig {
       playbooks: { maxAgeDays: null },
       tracker: { autoCommit: null, allowSteal: null },
       import: { labelTypes: null },
-      worktree: { postStart: null },
+      worktree: { postStart: null, postStartShell: null },
       generated: {},
     };
   }

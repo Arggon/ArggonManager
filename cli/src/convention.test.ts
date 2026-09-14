@@ -209,23 +209,27 @@ describe("x-import (issue-import options, task-import-type-mapping)", () => {
 describe("x-worktree (worktree bootstrap, task-start-post-hook)", () => {
   it("defaults to postStart null when the file or the key is missing", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-xwt-missing-"));
-    expect(readConventionConfig(dir).worktree).toEqual({ postStart: null });
-    expect(parseConventionConfig("version: 3\n").worktree).toEqual({ postStart: null });
+    expect(readConventionConfig(dir).worktree).toEqual({ postStart: null, postStartShell: null });
+    expect(parseConventionConfig("version: 3\n").worktree).toEqual({
+      postStart: null,
+      postStartShell: null,
+    });
   });
 
   it("parses quoted and unquoted post-start commands (unknown nested keys ignored)", () => {
     const config = parseConventionConfig(
       ["version: 3", "x-worktree:", '  post-start: "npm ci"', "  future-option: 7", ""].join("\n"),
     );
-    expect(config.worktree).toEqual({ postStart: "npm ci" });
+    expect(config.worktree).toEqual({ postStart: "npm ci", postStartShell: null });
     expect(parseConventionConfig("x-worktree:\n  post-start: npm ci\n").worktree).toEqual({
       postStart: "npm ci",
+      postStartShell: null,
     });
   });
 
   it("parses x-worktree regardless of the declared tree version (v0 too)", () => {
     const config = parseConventionConfig('version: 0\nx-worktree:\n  post-start: "make setup"\n');
-    expect(config.worktree).toEqual({ postStart: "make setup" });
+    expect(config.worktree).toEqual({ postStart: "make setup", postStartShell: null });
   });
 
   it("rejects scalar x-worktree and empty / mapping post-start values", () => {
@@ -237,6 +241,21 @@ describe("x-worktree (worktree bootstrap, task-start-post-hook)", () => {
     expect(() => parseConventionConfig("x-worktree:\n  post-start:\n    npm: ci\n")).toThrow(
       /'post-start' must be a non-empty string/,
     );
+  });
+
+  it("parses post-start-shell inherit/login and rejects anything else (task-post-start-env)", () => {
+    expect(
+      parseConventionConfig('x-worktree:\n  post-start-shell: "login"\n').worktree.postStartShell,
+    ).toBe("login");
+    expect(
+      parseConventionConfig("x-worktree:\n  post-start-shell: inherit\n").worktree.postStartShell,
+    ).toBe("inherit");
+    expect(() =>
+      parseConventionConfig("x-worktree:\n  post-start-shell: bash\n"),
+    ).toThrow(/'post-start-shell' must be "inherit" or "login"/);
+    expect(() =>
+      parseConventionConfig("x-worktree:\n  post-start-shell: ''\n"),
+    ).toThrow(/'post-start-shell' must be "inherit" or "login"/);
   });
 });
 
