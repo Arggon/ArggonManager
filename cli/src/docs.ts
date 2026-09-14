@@ -89,6 +89,7 @@ const TIER2_DESTS = new Set([
   "docs/convention.md",
   "docs/engineering.md",
   "docs/runbooks/README.md",
+  "docs/deploy.md",
 ]);
 
 /** Visible provenance marker written as the first line of every generated file. */
