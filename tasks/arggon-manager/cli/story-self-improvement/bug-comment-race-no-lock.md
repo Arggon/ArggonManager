@@ -1,12 +1,15 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-comment-race-no-lock
 title: "comment race: unlocked read-modify-write loses concurrent comments"
+assignee: Arggon
+branch: fix/bug-comment-race-no-lock
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T15:49:15.419Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/bug-comment-race-no-lock.md
@@ -25,9 +28,9 @@ Repro: two concurrent `arggon comment <id> ...` processes on the SAME item — o
 
 ## Acceptance
 
-- [ ] `runComment` wraps its read-modify-write in `withItemLock` (same lock family as update/start)
-- [ ] Concurrent same-item comments both land (lab test `labs/torture.test.ts` scenario 2 follow-up un-.todo'd and green)
-- [ ] No regression in tracker-commit tests / comment tests
+- [x] `runComment` wraps its read-modify-write in `withItemLock` (same lock family as update/start)
+- [x] Concurrent same-item comments both land (lab test `labs/torture.test.ts` scenario 2 follow-up un-.todo'd and green)
+- [x] No regression in tracker-commit tests / comment tests
 
 ## Notes
 
