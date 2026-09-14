@@ -1,15 +1,13 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adversarial-lab
 title: "Adversarial lab: experiment scenarios as a permanent suite"
-assignee: Arggon
 branch: feat/task-adversarial-lab
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
-claimed_at: "2026-09-14T14:45:15.211Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/task-adversarial-lab.md
@@ -26,8 +24,8 @@ The five experiments produced ~20 findings; the highest-value ones came from cro
 
 ## Acceptance
 
-- [ ] labs/torture.test.ts with the scenario catalog: concurrent claim races (N processes, same/different assignee, mixed ops), gate probes (steal/reopen via CLI non-TTY + MCP), upgrade flows over acked state, synthetic legacy adoption, long MCP session; each test tagged with its origin (experiment/finding)
-- [ ] Registered in CI (vitest run includes it); suite green
+- [x] labs/torture.test.ts with the scenario catalog: concurrent claim races (N processes, same/different assignee, mixed ops), gate probes (steal/reopen via CLI non-TTY + MCP), upgrade flows over acked state, synthetic legacy adoption, long MCP session; each test tagged with its origin (experiment/finding)
+- [x] Registered in CI (vitest run includes it); suite green
 
 ### 2026-09-14 @Arggon
 Lab implemented: labs/torture.test.ts (6 scenarios, 7 passing + 1 todo), labs/README.md catalog, vitest include + labs/tsconfig.json. Exposed 2 real bugs, filed as bug-comment-race-no-lock and bug-autocommit-silent-skip.
