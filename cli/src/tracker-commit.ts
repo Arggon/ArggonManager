@@ -41,6 +41,12 @@ export type TrackerCommitOptions = {
    * `false` skips without touching git.
    */
   commit?: boolean;
+  /**
+   * Wall-clock retry budget under index.lock contention. Default 10s
+   * (lock.ts's LOCK_TIMEOUT_MS); tests inject a small value to exercise the
+   * skip path quickly.
+   */
+  commitRetryTimeoutMs?: number;
 };
 
 /** Verbs of the `chore(tasks): <verb> <id>` message convention. */
@@ -96,14 +102,17 @@ export function readAutoCommitConfig(root: string): boolean | null {
 
 /**
  * index.lock contention (bug-autocommit-silent-skip): concurrent tracker
- * mutations race git's `index.lock`, so `add`/`commit` are retried with a
- * short bounded backoff (lock.ts retry cadence) instead of skipping silently.
- * A skip that survives every attempt is still reported — in the JSON payload
- * (`{ skipped: "git index locked" }`) AND as a stderr warning — never silent.
+ * mutations race git's `index.lock`, so `add`/`commit` are retried within a
+ * wall-clock budget (lock.ts retry cadence) instead of skipping silently.
+ * A skip that survives the whole budget is still reported — in the JSON
+ * payload (`{ skipped: "git index locked" }`) AND as a stderr warning —
+ * never silent.
  */
-export const COMMIT_RETRY_ATTEMPTS = 4;
-/** Sleep before retry N (N starts at 1): 75ms, 150ms, 225ms — ~450ms total. */
+/** Contending waits up to this long before giving up (actionable skip). */
+export const COMMIT_RETRY_TIMEOUT_MS = 10_000;
+/** Sleep before retry N (N starts at 1), capped so the budget is time-bounded. */
 export const COMMIT_RETRY_MS = 75;
+const COMMIT_RETRY_MAX_SLEEP_MS = 1_000;
 
 /** Synchronous sleep (the commit path is a single-threaded sequence of git runs). */
 function sleepSync(ms: number): void {
@@ -183,19 +192,23 @@ export function commitTrackerMutation(
   if (probe.missing) return { committed: false, skipReason: "git not found" };
   if (probe.code !== 0) return { committed: false, skipReason: "not a git repository" };
 
-  // add+commit with bounded retry on index.lock contention. Each attempt
-  // re-runs `add` then `commit`; only a lock race retries (never a real git
-  // error). When every attempt loses the race, the mutation stays written on
-  // disk but uncommitted — reported as `git index locked`, never silently.
+  // add+commit with a wall-clock-bounded retry on index.lock contention. Each
+  // attempt re-runs `add` then `commit`; only a lock race retries (never a
+  // real git error). When the budget is exhausted, the mutation stays written
+  // on disk but uncommitted — reported as `git index locked`, never silently.
+  // Budget is wall-clock (like lock.ts's timeout): git holds index.lock for
+  // milliseconds, so 10s absorbs even heavily loaded CI runners.
+  const deadline = Date.now() + (opts.commitRetryTimeoutMs ?? COMMIT_RETRY_TIMEOUT_MS);
   let locked: string | null = null;
   let add: GitRun | undefined;
   let commit: GitRun | undefined;
-  for (let attempt = 1; attempt <= COMMIT_RETRY_ATTEMPTS; attempt++) {
-    if (attempt > 1) sleepSync(COMMIT_RETRY_MS * (attempt - 1));
+  for (let attempt = 1; ; attempt++) {
+    if (attempt > 1) sleepSync(Math.min(COMMIT_RETRY_MS * (attempt - 1), COMMIT_RETRY_MAX_SLEEP_MS));
     add = runGit(["add", "--", ...paths], root);
     if (add.code !== 0) {
       if (isIndexLockContention(add)) {
         locked = "git index locked";
+        if (Date.now() >= deadline) break;
         continue;
       }
       warnGitSkip(`git add failed: ${firstLine(add.err || add.out)}`);
@@ -209,6 +222,7 @@ export function commitTrackerMutation(
       }
       if (isIndexLockContention(commit)) {
         locked = "git index locked";
+        if (Date.now() >= deadline) break;
         continue;
       }
       warnGitSkip(`git commit failed: ${firstLine(commit.err || commit.out)}`);
