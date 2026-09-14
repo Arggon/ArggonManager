@@ -4,6 +4,7 @@ status: in_progress
 id: task-adopt-scan-count-constant
 title: "housekeeping: adopt scans docs/deploy.md; shared generated-docs count constant"
 assignee: Arggon
+branch: feat/task-adopt-scan-count-constant
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
