@@ -1,6 +1,6 @@
 ---
 type: story
-status: todo
+status: done
 id: story-self-improvement
 title: "Self-improvement loop: adversarial lab, audit protocol, telemetry mining"
 parent: cli
