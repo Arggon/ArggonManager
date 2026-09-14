@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-autocommit-update-import
 title: Extend auto-commit to update-cascade and import-issues
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-tracker-hygiene
 labels: []
 created: "2026-09-13"
 updated: "2026-09-14"
-claimed_at: "2026-09-14T00:53:54.477Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tracker-hygiene/task-autocommit-update-import.md
