@@ -14,6 +14,8 @@ Work items live in-tree under `tasks/` (Markdown + YAML frontmatter), managed by
 
 > **Use the `arggon-cli` skill by default.** This repo bundles it at `.agents/skills/arggon-cli/SKILL.md`. Load it before any `arggon` invocation: it defines the JSON contract (`--json`), the claim rules, and the command pitfalls. Do not guess flags from memory.
 
+The repo registers the arggon MCP server via `.mcp.json` — agents whose clients support project-scoped MCP config get `arggon_list`/`arggon_create`/`arggon_update`/`arggon_comment` as native tools.
+
 1. **Find work:** `arggon list --status todo --json`
 2. **Claim before starting:** `arggon update <id> --status in_progress --assignee <your-login>` (or `arggon start <id> --worktree --assignee <your-login>` to claim + create a worktree). Never set `in_progress` without an assignee; never steal a claim.
 3. **One branch per item:** `arggon branch <id>` → `feat/<id>` / `fix/<id>`. Work in a git worktree, not the primary checkout.

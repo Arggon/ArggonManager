@@ -17,6 +17,7 @@ const TIER1_DOCS = [
   ".github/CODEOWNERS",
   ".github/PULL_REQUEST_TEMPLATE.md",
   ".github/copilot-instructions.md",
+  ".mcp.json",
   "AGENTS.md",
   "CLAUDE.md",
   "CONTRIBUTING.md",

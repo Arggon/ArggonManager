@@ -349,12 +349,12 @@ describe("runAdoptAck: x-generated baseline refresh (task-adopt-checksum-refresh
     // The sanctioned sweep edits (step 3 of the checklist).
     writeFileSync(join(dir, "AGENTS.md"), "SWEEP: project description\n", "utf8");
     writeFileSync(join(dir, "CONTRIBUTING.md"), "SWEEP: setup + build commands\n", "utf8");
-    expect(runDoctor({ cwd: dir }).docs).toMatchObject({ managed: 16, modified: 2, untouched: 14 });
+    expect(runDoctor({ cwd: dir }).docs).toMatchObject({ managed: 17, modified: 2, untouched: 15 });
 
     const now = new Date("2026-09-13T10:00:00Z");
     const result = runAdoptAck({ cwd: dir, now });
     expect(result.count).toBe(result.acked.length);
-    expect(result.count).toBe(16);
+    expect(result.count).toBe(17);
     expect(result.acked.map((doc) => doc.path)).toEqual(
       [...result.acked.map((doc) => doc.path)].sort(),
     );
@@ -370,10 +370,10 @@ describe("runAdoptAck: x-generated baseline refresh (task-adopt-checksum-refresh
     // The sanctioned edits stop reporting as modified: they are acknowledged
     // (sanctioned-diverged baselines), the healthy acked bucket.
     expect(runDoctor({ cwd: dir }).docs).toMatchObject({
-      managed: 16,
+      managed: 17,
       modified: 0,
       untouched: 0,
-      acknowledged: 16,
+      acknowledged: 17,
     });
   });
 
@@ -402,7 +402,7 @@ describe("runAdoptAck: x-generated baseline refresh (task-adopt-checksum-refresh
     expect(runDoctor({ cwd: dir }).docs).toMatchObject({
       modified: 0,
       untouched: 0,
-      acknowledged: 16,
+      acknowledged: 17,
     });
     // The state keeps the acked baseline, not the hand edit.
     expect(readConventionConfig(dir).generated["AGENTS.md"]!.checksum).not.toBe(
@@ -436,7 +436,7 @@ describe("runAdoptAck: x-generated baseline refresh (task-adopt-checksum-refresh
     expect(config.generated["SUPPORT.md"]!.checksum).toBe(baseline);
     // The other tracked docs are still acked and present.
     expect(config.generated["AGENTS.md"]).toBeDefined();
-    expect(result.count).toBe(15);
+    expect(result.count).toBe(16);
   });
 
   it("is standalone: works when the adoption task is already done", () => {
@@ -445,7 +445,7 @@ describe("runAdoptAck: x-generated baseline refresh (task-adopt-checksum-refresh
     runUpdate({ cwd: dir, id: ADOPT_TASK_ID, status: "in_progress", assignee: "adopt-bot" });
     runUpdate({ cwd: dir, id: ADOPT_TASK_ID, status: "done", unassign: true });
     const result = runAdoptAck({ cwd: dir });
-    expect(result.count).toBe(16);
+    expect(result.count).toBe(17);
   });
 
   it("with no x-generated entries the ack is a no-op (state file byte-identical)", () => {
@@ -470,7 +470,7 @@ describe("formatAdoptAckReport", () => {
   it("lists the acked docs with their new checksums plus the count", () => {
     const dir = seedTree();
     const report = formatAdoptAckReport(runAdoptAck({ cwd: dir }));
-    expect(report).toContain("16 generated doc(s) acknowledged as the new baseline");
+    expect(report).toContain("17 generated doc(s) acknowledged as the new baseline");
     expect(report).toContain("AGENTS.md — sha256:");
     expect(report).toContain(".agents/skills/arggon-cli/SKILL.md — sha256:");
   });

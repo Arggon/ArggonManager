@@ -78,6 +78,7 @@ const DOC_PATH_MAP: Record<string, string> = {
   "github/CODEOWNERS": ".github/CODEOWNERS",
   "github/PULL_REQUEST_TEMPLATE.md": ".github/PULL_REQUEST_TEMPLATE.md",
   "tracking.md": "docs/tracking.md",
+  "mcp-json": ".mcp.json",
 };
 
 /** Destination-relative paths of the tier-2 set (generated only with `full`). */
@@ -190,8 +191,15 @@ export function generateDocs(opts: GenerateDocsOptions): DocsResult {
     markerTemplate: string,
     stateTemplate: string,
     content: string,
+    dest: string,
   ): { content: string; entry: GeneratedEntry } => {
-    const withMarker = `${generatedMarker(markerTemplate)}\n${content}`;
+    // JSON destinations (e.g. .mcp.json) must stay valid JSON: MCP clients
+    // parse the file directly, and an HTML comment as the first line would
+    // break them. Skip the marker there; x-generated checksum provenance
+    // still applies (checksum covers the exact bytes written).
+    const withMarker = dest.endsWith(".json")
+      ? content
+      : `${generatedMarker(markerTemplate)}\n${content}`;
     return {
       content: withMarker,
       entry: {
@@ -215,7 +223,7 @@ export function generateDocs(opts: GenerateDocsOptions): DocsResult {
     render: () => string,
   ): { write: string; entry: GeneratedEntry } | null => {
     const destAbs = join(opts.root, ...dest.split("/"));
-    const { content, entry } = stamp(markerTemplate, stateTemplate, render());
+    const { content, entry } = stamp(markerTemplate, stateTemplate, render(), dest);
     if (!existsSync(destAbs)) {
       created.push(dest);
       nextState[dest] = entry;

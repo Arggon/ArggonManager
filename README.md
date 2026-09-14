@@ -136,10 +136,10 @@ npm run lint
 
 Generated docs (placeholders `{{PROJECT_NAME}}` from the target dir name and `{{YEAR}}` are rendered at write time):
 
-- **Default (tier-1):** `AGENTS.md` (spec-compliant agent workflow; mandates the bundled **arggon-cli skill** by default), `CLAUDE.md` (one-line `@AGENTS.md` shim), `.github/copilot-instructions.md` (pointer), `CONTRIBUTING.md`, `SECURITY.md`, `.editorconfig`, `.github/CODEOWNERS` (placeholder), `.github/PULL_REQUEST_TEMPLATE.md`, `docs/tracking.md` (work tracking in `tasks/`, not GitHub issues), and the **arggon-cli skill** itself at `.agents/skills/arggon-cli/SKILL.md (copied from this repo's `skills/arggon-cli/SKILL.md` — single source, never a duplicate).
+- **Default (tier-1):** `AGENTS.md` (spec-compliant agent workflow; mandates the bundled **arggon-cli skill** by default), `CLAUDE.md` (one-line `@AGENTS.md` shim), `.github/copilot-instructions.md` (pointer), `CONTRIBUTING.md`, `SECURITY.md`, `.editorconfig`, `.mcp.json` (registers the arggon MCP server so MCP clients pick it up), `.github/CODEOWNERS` (placeholder), `.github/PULL_REQUEST_TEMPLATE.md`, `docs/tracking.md` (work tracking in `tasks/`, not GitHub issues), and the **arggon-cli skill** itself at `.agents/skills/arggon-cli/SKILL.md (copied from this repo's `skills/arggon-cli/SKILL.md` — single source, never a duplicate).
 - **`--full` adds (tier-2):** `ARCHITECTURE.md`, `docs/convention.md` + `docs/engineering.md` (adopter-owned project templates), `CHANGELOG.md`, `SUPPORT.md`, `docs/runbooks/README.md`.
 
-Everything created is listed in `created[]`; files left untouched land in `skipped[]` (see [`docs/json-output.md`](docs/json-output.md)).
+Everything created is listed in `created[]`; files left untouched land in `skipped[]` (see [`docs/json-output.md`](docs/json-output.md)). `.mcp.json` is the one exception to the provenance marker: it ships as pure JSON (no `arggon:generated` HTML comment) because MCP clients parse it directly — provenance is still tracked via its `x-generated` checksum.
 
 #### Re-running init: provenance and safe regeneration
 
