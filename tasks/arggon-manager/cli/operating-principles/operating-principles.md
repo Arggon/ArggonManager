@@ -1,6 +1,6 @@
 ---
 type: story
-status: in_progress
+status: done
 id: operating-principles
 title: "Operating principles: architecture-first, cheap infra, token/context efficiency"
 assignee: Arggon
@@ -8,7 +8,6 @@ parent: cli
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
-claimed_at: "2026-09-14T21:04:27.510Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/operating-principles/operating-principles.md (story index; required).
