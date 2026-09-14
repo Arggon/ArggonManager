@@ -4,6 +4,7 @@ status: in_progress
 id: task-init-convention-extensions
 title: "Generated docs/convention.md should document or point to the x-* extensions"
 assignee: Arggon
+branch: feat/task-init-convention-extensions
 parent: story-init-docs
 labels: []
 created: "2026-09-14"
