@@ -26,5 +26,5 @@ Found by the estanteria MCP-first experiment (2026-09-13): the SKILL says docs/c
 
 ## Acceptance
 
-- [ ] templates/docs/convention.md gains a "Namespaced extensions" section: the x-* list with one-line what/where, pointing to ArggonManager docs/convention.md as the full reference
-- [ ] init-docs test asserts the section exists in the generated file
+- [x] templates/docs/convention.md gains a "Namespaced extensions" section: the x-* list with one-line what/where, pointing to ArggonManager docs/convention.md as the full reference
+- [x] init-docs test asserts the section exists in the generated file
