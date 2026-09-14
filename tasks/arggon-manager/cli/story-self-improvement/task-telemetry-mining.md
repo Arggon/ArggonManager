@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-telemetry-mining
 title: "Telemetry mining protocol: session logs + tracker history"
 assignee: Arggon
@@ -8,7 +8,6 @@ parent: story-self-improvement
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
-claimed_at: "2026-09-14T14:45:16.474Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/task-telemetry-mining.md
@@ -25,5 +24,5 @@ Two audit findings (dirty-tree dance, lost-push cleanup failure) came from readi
 
 ## Acceptance
 
-- [ ] docs/labs/telemetry-mining.md: the mining procedure (sources, patterns, friction signatures, filing rules)
-- [ ] First mining pass over the five experiment repos + available session logs executed; friction candidates filed or reported as zero-findings
+- [x] docs/labs/telemetry-mining.md: the mining procedure (sources, patterns, friction signatures, filing rules)
+- [x] First mining pass over the five experiment repos + available session logs executed; friction candidates filed or reported as zero-findings
