@@ -4,6 +4,7 @@ status: in_progress
 id: task-adr0006-show-command
 title: "ADR 0006: arggon show <id> progressive-disclosure read path (CLI + MCP)"
 assignee: Arggon
+branch: feat/task-adr0006-show-command
 parent: operating-principles
 labels: []
 created: "2026-09-14"
