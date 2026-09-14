@@ -140,6 +140,8 @@ Pass `--json` on supported commands for a stable object on stdout (see [`docs/js
 
 The MCP layer always calls the kernel with the agent playbook rules applied: an MCP caller cannot reopen `done`/`cancelled` items and cannot steal a claim (there is no `force` parameter). These rules live in one module (`cli/src/rules.ts`) shared by the CLI and the MCP server, so both entry points enforce identical semantics.
 
+The MCP tool input schemas are **parity-tested against the CLI** (`cli/src/mcp-parity.test.ts` derives the commander option surface for `list`/`create`/`update`/`comment` and asserts it matches the tool schemas both ways, minus a documented exception list). Keep MCP schema changes **additive only**; a breaking change to a tool input schema must bump the `schemaVersion` of the JSON output contract.
+
 Wire it up with any MCP client config:
 
 ```json
