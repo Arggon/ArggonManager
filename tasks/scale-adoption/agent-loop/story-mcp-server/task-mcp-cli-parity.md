@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-mcp-cli-parity
 title: "MCP and CLI stay in sync: parity-tested tool surface"
+assignee: Arggon
 parent: story-mcp-server
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T19:58:35.012Z"
 ---
 <!--
   Placement (v0): tasks/scale-adoption/agent-loop/story-mcp-server/task-mcp-cli-parity.md
