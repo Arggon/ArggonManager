@@ -562,6 +562,10 @@ program
   .option("--status <status>", "new status (must follow v0 transitions)")
   .option("--assignee <login>", "new assignee (claimable types need one when in_progress)")
   .option("--branch <name>", "set working branch (empty string clears; unclaim clears by default)")
+  .option(
+    "--parent <id>",
+    "reparent the item: rewrite parent and move the file/directory per the layout rules (leaves move as a file; containers move their whole directory)",
+  )
   .option("--unassign", "clear assignee (in_progress -> todo does this by default)", false)
   .option("--labels <csv>", "replace the full labels list (comma-separated)")
   .option(
@@ -594,6 +598,7 @@ program
         status?: string;
         assignee?: string;
         branch?: string;
+        parent?: string;
         unassign?: boolean;
         labels?: string;
         dependsOn?: string;
@@ -637,6 +642,7 @@ program
           status: opts.status,
           assignee: opts.assignee,
           branch: opts.branch,
+          parent: opts.parent,
           unassign: opts.unassign,
           labels: opts.labels,
           dependsOn: opts.dependsOn,
@@ -661,6 +667,7 @@ program
               item: toContractWorkItem(result.item, result.root),
               autoCompleted: result.autoCompleted,
               cascadeLevels: result.cascadeLevels,
+              ...(result.movedFrom ? { movedFrom: result.movedFrom } : {}),
               ...(result.cascadeSkipped.length > 0
                 ? { cascadeSkipped: result.cascadeSkipped }
                 : {}),
@@ -673,6 +680,7 @@ program
         const what = result.changed.length > 0 ? ` (${result.changed.join(", ")})` : "";
         console.log(`arggon update: ${result.item.type} ${result.id}${what}`);
         console.log(`  ${result.path}`);
+        if (result.movedFrom) console.log(`  moved from: ${result.movedFrom}`);
         for (const skipped of result.cascadeSkipped) {
           console.log(
             `  cascade skipped: ${skipped.type} '${skipped.id}'` +

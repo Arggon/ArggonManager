@@ -1,5 +1,5 @@
-import { writeFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, mkdirSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { withItemLock } from "./lock.js";
 import { stringifyFrontmatter } from "./frontmatter.js";
 import {
@@ -19,7 +19,8 @@ import {
   tryLoadItem,
   type WorkItem,
 } from "./items.js";
-import { findTasksDir, repoRootFromTasks } from "./paths.js";
+import { findTasksDir, newItemPath, repoRootFromTasks } from "./paths.js";
+import { assertParentEdge, expectedParentType } from "./relations.js";
 import {
   commitTrackerMutation,
   readAutoCommitConfig,
@@ -36,6 +37,15 @@ export type UpdateOptions = {
   assignee?: string;
   /** Set working branch (v1); empty string clears it. */
   branch?: string;
+  /**
+   * Reparent the item (task-update-reparent): rewrites the `parent` frontmatter
+   * field and MOVES the file/directory per the convention layout rules (a leaf
+   * moves as a file into the new story's directory; a container moves its whole
+   * directory, children riding along). Same value = documented no-op. Invalid
+   * edges (unknown parent, wrong parent type, parent == own descendant) fail
+   * before anything moves.
+   */
+  parent?: string;
   /** Clear assignee (subject to the claim rule for the resulting status). */
   unassign?: boolean;
   /** Replace the full labels list (comma-separated). */
@@ -110,6 +120,12 @@ export type UpdateResult = {
    * paths. Empty only when nothing was written (never, on a successful run).
    */
   changedPaths: string[];
+  /**
+   * Reparent move (task-update-reparent): the absolute path of what moved —
+   * the item FILE for a leaf (task/bug), the item DIRECTORY for a container
+   * (story/epic/initiative). Undefined when no move happened.
+   */
+  movedFrom?: string;
 };
 
 function parseCsvList(raw: string): string[] {
@@ -161,6 +177,11 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
       branchRequest = null;
     }
   }
+  let parentRequest: string | undefined;
+  if (opts.parent !== undefined) {
+    parentRequest = opts.parent.trim();
+    if (!parentRequest) throw new Error("--parent requires a non-empty item id");
+  }
   let worktreeRequest: string | null | undefined;
   if (opts.worktreePath !== undefined) {
     const trimmed = opts.worktreePath.trim();
@@ -172,6 +193,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     opts.status !== undefined ||
     opts.assignee !== undefined ||
     branchRequest !== undefined ||
+    parentRequest !== undefined ||
     opts.unassign === true ||
     opts.steal === true ||
     worktreeRequest !== undefined ||
@@ -199,6 +221,45 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   const item = byId.get(id);
   if (!item) {
     throw new Error(`id '${id}' not found under tasks/`);
+  }
+
+  // Reparent validation (task-update-reparent): every refusal happens BEFORE
+  // any filesystem mutation, so an invalid edge leaves the tree untouched.
+  // Same parent is a documented no-op: no move, no `parent` change entry.
+  let reparentTo: WorkItem | undefined;
+  if (parentRequest !== undefined && parentRequest !== item.parent) {
+    if (expectedParentType(item.type) === null) {
+      throw new Error("initiative cannot have a parent");
+    }
+    const parentItem = byId.get(parentRequest);
+    if (!parentItem) {
+      throw new Error(`parent '${parentRequest}' not found under tasks/`);
+    }
+    // Cycle guard BEFORE the edge-type check so reparenting under one's own
+    // descendant always reports the cycle, never a confusing type mismatch.
+    // The new parent must not be the item itself or one of its descendants
+    // (validate re-checks the whole tree on every run, but the mutation must
+    // never be able to CREATE a cycle).
+    const descendants = new Set<string>([id]);
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const candidate of byId.values()) {
+        if (
+          candidate.parent &&
+          descendants.has(candidate.parent) &&
+          !descendants.has(candidate.id)
+        ) {
+          descendants.add(candidate.id);
+          grew = true;
+        }
+      }
+    }
+    if (descendants.has(parentRequest)) {
+      throw new Error(`cannot reparent '${id}' under '${parentRequest}' (own descendant — cycle)`);
+    }
+    assertParentEdge(item.type, parentItem.type);
+    reparentTo = parentItem;
   }
 
   // depends_on (v3, ADR 0004): replace the list / append one id. Unknown ids
@@ -372,11 +433,60 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     const note = `> stolen ${formatDate(now)} by ${newAssignee}: ${stealReason}`;
     newBody = `${item.body.endsWith("\n") || item.body.length === 0 ? item.body : `${item.body}\n`}${note}\n`;
   }
-  writeFileSync(item.filePath, stringifyFrontmatter(data, newBody), "utf8");
+  // Reparent move (task-update-reparent): performed LAST, right before the
+  // frontmatter write, so every other validation (status transitions, claim
+  // rules, steal gates) has already passed — a refused update never moves
+  // anything. Leaves (task/bug) move as a FILE into the new story's
+  // directory; containers move their WHOLE directory (children's frontmatter
+  // is untouched — they reference the id, not a path). The old and new paths
+  // all ride into the tracker auto-commit so git history follows the move and
+  // the tree never ends dirty.
+  let targetPath = item.filePath;
+  let movedFrom: string | undefined;
+  const movedOldPaths: string[] = [];
+  const movedNewPaths: string[] = [];
+  if (reparentTo) {
+    const newPath = newItemPath({
+      tasksDir,
+      type: item.type,
+      id,
+      parentContainerDir: reparentTo.containerDir,
+    });
+    if (newPath !== item.filePath) {
+      if (existsSync(newPath)) {
+        throw new Error(`reparent target already exists: ${newPath}`);
+      }
+      const isLeaf = item.type === "task" || item.type === "bug";
+      if (isLeaf) {
+        movedOldPaths.push(item.filePath);
+        movedNewPaths.push(newPath);
+        mkdirSync(dirname(newPath), { recursive: true });
+        renameSync(item.filePath, newPath);
+      } else {
+        const oldDir = item.containerDir;
+        const newDir = dirname(newPath);
+        for (const old of listFiles(oldDir)) {
+          if (old === item.filePath) continue;
+          movedOldPaths.push(old);
+          movedNewPaths.push(join(newDir, old.slice(oldDir.length + 1)));
+        }
+        movedOldPaths.push(item.filePath);
+        movedNewPaths.push(newPath);
+        mkdirSync(dirname(newDir), { recursive: true });
+        renameSync(oldDir, newDir);
+      }
+      movedFrom = isLeaf ? item.filePath : item.containerDir;
+    }
+    data.parent = reparentTo.id;
+    if (!changed.includes("parent")) changed.push("parent");
+    targetPath = newPath;
+  }
 
-  const updated = tryLoadItem(item.filePath);
+  writeFileSync(targetPath, stringifyFrontmatter(data, newBody), "utf8");
+
+  const updated = tryLoadItem(targetPath);
   if (!updated) {
-    throw new Error(`Updated item is unreadable: ${item.filePath}`);
+    throw new Error(`Updated item is unreadable: ${targetPath}`);
   }
 
   // Automatic container completion (task-container-auto-done): when an item
@@ -389,14 +499,20 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
 
   return {
     id,
-    path: item.filePath,
+    path: targetPath,
     root: repoRootFromTasks(tasksDir),
     item: updated,
     changed,
     autoCompleted: completedContainers.map((container) => container.id),
     cascadeLevels: completedContainers.map((container) => container.type),
     cascadeSkipped,
-    changedPaths: [item.filePath, ...completedContainers.map((container) => container.filePath)],
+    changedPaths: [
+      targetPath,
+      ...movedNewPaths,
+      ...movedOldPaths,
+      ...completedContainers.map((container) => container.filePath),
+    ],
+    movedFrom,
   };
   };
 
@@ -502,4 +618,24 @@ function subtreeClosed(item: WorkItem, byId: Map<string, WorkItem>): boolean {
   if (item.type === "task" || item.type === "bug") return true;
   const children = [...byId.values()].filter((candidate) => candidate.parent === item.id);
   return children.every((child) => subtreeClosed(child, byId));
+}
+
+/**
+ * Every file under `dir`, recursively, dotfiles skipped (mirror of the loader
+ * walk in items.ts). Used to plan the container reparent move: the auto-commit
+ * stages each old path (deletion) next to its new path so history follows.
+ */
+function listFiles(dir: string): string[] {
+  const files: string[] = [];
+  if (!existsSync(dir)) return files;
+  for (const name of readdirSync(dir)) {
+    if (name.startsWith(".")) continue;
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) {
+      files.push(...listFiles(full));
+    } else {
+      files.push(full);
+    }
+  }
+  return files;
 }
