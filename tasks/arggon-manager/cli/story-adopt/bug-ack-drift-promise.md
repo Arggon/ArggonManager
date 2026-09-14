@@ -4,6 +4,7 @@ status: in_progress
 id: bug-ack-drift-promise
 title: "adopt --ack: the 'hand edits still report modified' promise is false — acked drift is invisible"
 assignee: Arggon
+branch: fix/bug-ack-drift-promise
 parent: story-adopt
 labels: []
 created: "2026-09-14"
