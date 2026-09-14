@@ -132,7 +132,7 @@ npm test
 npm run lint
 ```
 
-`arggon init` creates `tasks/.convention.yml`, copies `templates/`, and generates the governing document set from master templates in `templates/docs/`. Adopter-owned content is never overwritten (not even with `--force`); on already-initialized repos init is an idempotent upgrade — see [Re-running init](#re-running-init-provenance-and-safe-regeneration) below.
+`arggon init` creates `tasks/.convention.yml`, copies `templates/`, and generates the governing document set from master templates in `templates/docs/`. Adopter-owned content is never overwritten (not even with `--force`); on already-initialized repos init is an idempotent upgrade — see [Re-running init](#re-running-init-provenance-and-safe-regeneration) below. In a git tree init auto-commits exactly the files it wrote (one `chore(tasks): generated init docs (N files)` commit, surgical staging — `--no-commit` opts out), so a fresh init leaves a clean tree and `arggon start` is never blocked by untracked tool-generated state.
 
 Generated docs (placeholders `{{PROJECT_NAME}}` from the target dir name and `{{YEAR}}` are rendered at write time):
 

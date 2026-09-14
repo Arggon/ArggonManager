@@ -49,10 +49,10 @@ function primeGitWorkTree(dir: string): void {
   expect(runGit(["config", "user.name", "t"], dir).status).toBe(0);
   expect(runCli(["init", dir]).status).toBe(0);
   expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
-  expect(runGit(["add", "-A"], dir).status).toBe(0);
-  expect(
-    runGit(["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "init"], dir).status,
-  ).toBe(0);
+  runGit(["add", "-A"], dir);
+  // init/creates auto-commit now; the manual commit may be a no-op.
+  const c = runGit(["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "init"], dir);
+  expect(c.status === 0 || /nothing to commit/.test(c.stderr + c.stdout)).toBe(true);
 }
 
 /** Git tree with a pushable origin and a mocked `gh` on PATH (both outside the work tree). */
@@ -692,7 +692,7 @@ describe("CLI --json", () => {
     // Configure x-worktree.post-start (task-start-post-hook), then commit
     // items + config in one go: start refuses dirty trees.
     appendFileSync(join(dir, "tasks/.convention.yml"), 'x-worktree:\n  post-start: "echo hooked > .hook-ran"\n');
-    expect(runGit(["add", "-A"], dir).status).toBe(0);
+    runGit(["add", "-A"], dir); // init/creates auto-commit; staging is a harmless no-op
     expect(
       runGit(["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "config"], dir).status,
     ).toBe(0);

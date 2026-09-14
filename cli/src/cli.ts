@@ -90,51 +90,62 @@ program
     "archive adopter-modified docs to backup/<date>/<dest> before regenerating them (default: skip modified docs)",
     false,
   )
+  .option(
+    "--no-commit",
+    "keep the generated docs untracked: skip the auto-commit of what init wrote (default: on; x-tracker.auto-commit: false opts out tree-wide)",
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((dir: string, opts: { force: boolean; full?: boolean; backup?: boolean; json?: boolean }) => {
-    const json = jsonEnabled(opts);
-    try {
-      const result = runInit({
-        dir,
-        force: Boolean(opts.force),
-        full: Boolean(opts.full),
-        backup: Boolean(opts.backup),
-      });
-      if (json) {
-        successJson(
-          "init",
-          {
-            root: result.root,
-            alreadyInitialized: result.alreadyInitialized,
-            force: result.force,
-            created: result.created,
-            updated: result.updated,
-            modified: result.modified,
-            backedUp: result.backedUp,
-            skipped: result.skipped,
-            restored: result.restored,
-            conventionPath: result.conventionPath,
-          },
-          readConventionVersion(result.root),
-        );
-        return;
-      }
-      printInitHuman(result);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (json) {
-        failJson({
-          command: "init",
-          message,
-          code: "INIT_FAILED",
-          conventionVersion: readConventionVersion(dir),
+  .action(
+    (
+      dir: string,
+      opts: { force: boolean; full?: boolean; backup?: boolean; commit?: boolean; json?: boolean },
+    ) => {
+      const json = jsonEnabled(opts);
+      try {
+        const result = runInit({
+          dir,
+          force: Boolean(opts.force),
+          full: Boolean(opts.full),
+          backup: Boolean(opts.backup),
+          commit: opts.commit === false ? false : undefined,
         });
-        return;
+        if (json) {
+          successJson(
+            "init",
+            {
+              root: result.root,
+              alreadyInitialized: result.alreadyInitialized,
+              force: result.force,
+              created: result.created,
+              updated: result.updated,
+              modified: result.modified,
+              backedUp: result.backedUp,
+              skipped: result.skipped,
+              restored: result.restored,
+              conventionPath: result.conventionPath,
+              commit: commitPayload(result.commit),
+            },
+            readConventionVersion(result.root),
+          );
+          return;
+        }
+        printInitHuman(result);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (json) {
+          failJson({
+            command: "init",
+            message,
+            code: "INIT_FAILED",
+            conventionVersion: readConventionVersion(dir),
+          });
+          return;
+        }
+        console.error(`arggon init: ${message}`);
+        process.exitCode = 1;
       }
-      console.error(`arggon init: ${message}`);
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 program
   .command("doctor")
@@ -1628,10 +1639,14 @@ function printInitHuman(result: InitResult): void {
         `arggon init: kept adopter-modified docs: ${result.skipped.length} file(s) (--backup archives and regenerates)`,
       );
     }
+    const commitLine = formatCommitLine(result.commit);
+    if (commitLine && result.commit?.committed) console.log(`arggon init: ${commitLine}`);
     console.log("Next: create work with `arggon create` (coming soon), or copy from templates/.");
     return;
   }
 
+  const commitLine = formatCommitLine(result.commit);
+  if (commitLine) console.log(`arggon init: ${commitLine}`);
   console.log(`arggon init: ready in ${result.root}`);
   console.log("  - tasks/.convention.yml (version: 0)");
   console.log("  - templates/ (initiative, epic, story, task, bug)");
