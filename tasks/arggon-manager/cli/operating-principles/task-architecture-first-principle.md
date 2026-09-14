@@ -4,6 +4,7 @@ status: in_progress
 id: task-architecture-first-principle
 title: "Architecture-first principle: good practices and sound architecture always matter"
 assignee: Arggon
+branch: feat/task-architecture-first-principle
 parent: operating-principles
 labels: []
 created: "2026-09-14"
