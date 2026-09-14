@@ -169,7 +169,7 @@ describe("init docs: no-overwrite guarantee", () => {
   it("generateDocs creates on the first run and treats stateless files as modified on the second", () => {
     const dir = tempDir();
     const first = generateDocs({ root: dir, full: true });
-    expect(first.created.length).toBe(16); // 15 docs + bundled arggon-cli skill
+    expect(first.created.length).toBe(17); // 16 docs (incl. .mcp.json) + bundled arggon-cli skill
     expect(first.created).toContain(".agents/skills/arggon-cli/SKILL.md");
     expect(first.skipped).toEqual([]);
     expect(first.updated).toEqual([]);
@@ -180,8 +180,8 @@ describe("init docs: no-overwrite guarantee", () => {
     // provenance state every on-disk file counts as adopter-modified and is
     // skipped (never overwritten).
     expect(second.updated).toEqual([]);
-    expect(second.modified.length).toBe(16);
-    expect(second.skipped.length).toBe(16);
+    expect(second.modified.length).toBe(17);
+    expect(second.skipped.length).toBe(17);
   });
 });
 
@@ -224,7 +224,7 @@ describe("init docs: --json payload", () => {
     expect(body.updated).toContain("AGENTS.md");
     expect(body.updated).toContain("ARCHITECTURE.md");
     expect(body.updated).toContain(".agents/skills/arggon-cli/SKILL.md");
-    expect(body.updated.length).toBe(16);
+    expect(body.updated.length).toBe(17);
     expect(body.modified).toEqual([]);
     expect(body.skipped).toEqual([]);
   });
@@ -238,7 +238,7 @@ describe("init docs: --json payload", () => {
     expect(body.created).toEqual(
       ["ARCHITECTURE.md", "CHANGELOG.md", "SUPPORT.md", "docs/convention.md", "docs/engineering.md", "docs/runbooks/README.md"].sort(),
     );
-    expect(body.updated.length).toBe(10); // 9 tier-1 docs + bundled skill
+    expect(body.updated.length).toBe(11); // 10 tier-1 docs (incl. .mcp.json) + bundled skill
     expect(body.updated).toContain("AGENTS.md");
     expect(body.updated).toContain(".agents/skills/arggon-cli/SKILL.md");
     expect(body.skipped).toEqual([]);
@@ -285,6 +285,61 @@ describe("init bundles the arggon-cli skill (task-init-skill-bundle)", () => {
   });
 });
 
+describe("init generates .mcp.json (task-init-mcp-config)", () => {
+  it("creates a valid tier-1 .mcp.json with the arggon MCP server and no HTML marker", () => {
+    const dir = tempDir();
+    const result = runInit({ dir, force: false });
+    expect(result.created).toContain(".mcp.json");
+    const raw = readFileSync(join(dir, ".mcp.json"), "utf8");
+    const parsed = JSON.parse(raw) as { mcpServers: Record<string, { command: string; args: string[] }> };
+    expect(parsed.mcpServers.arggon).toEqual({ command: "arggon", args: ["mcp"] });
+    // MCP clients parse the file as JSON: the arggon:generated HTML comment
+    // must never be prepended (it would break their parsers).
+    expect(raw).not.toContain("arggon:generated");
+    // Tier-1: present even without --full.
+    const full = tempDir();
+    runInit({ dir: full, force: false, full: true });
+    expect(JSON.parse(readFileSync(join(full, ".mcp.json"), "utf8")).mcpServers).toBeDefined();
+  });
+
+  it("records the x-generated entry and skips the untouched file on a second init", () => {
+    const dir = tempDir();
+    const first = runInit({ dir, force: false });
+    expect(first.created).toContain(".mcp.json");
+    const entry = readConventionConfig(dir).generated[".mcp.json"]!;
+    expect(entry.template).toBe("docs/mcp-json");
+    expect(entry.checksum).toBe(checksumOf(readFileSync(join(dir, ".mcp.json"), "utf8")));
+    const second = runInit({ dir, force: false });
+    expect(second.created).not.toContain(".mcp.json");
+    expect(second.updated).toContain(".mcp.json");
+    expect(second.skipped).not.toContain(".mcp.json");
+  });
+
+  it("never overwrites a pre-existing adopter .mcp.json (reported in skipped[] + modified[])", () => {
+    const dir = tempDir();
+    const theirs = JSON.stringify(
+      { mcpServers: { other: { command: "other-server", args: ["serve"] } } },
+      null,
+      2,
+    );
+    writeFileSync(join(dir, ".mcp.json"), `${theirs}\n`, "utf8");
+    const result = runInit({ dir, force: false });
+    expect(readFileSync(join(dir, ".mcp.json"), "utf8")).toBe(`${theirs}\n`);
+    expect(result.created).not.toContain(".mcp.json");
+    expect(result.skipped).toContain(".mcp.json");
+    expect(result.modified).toContain(".mcp.json");
+    expect(readConventionConfig(dir).generated[".mcp.json"]).toBeUndefined();
+  });
+
+  it("generated AGENTS.md mentions the registered MCP server", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
+    expect(agents).toContain(".mcp.json");
+    expect(agents).toContain("MCP");
+  });
+});
+
 describe("init docs: x-generated provenance (story-adoption-state)", () => {
   it("first init stamps markers and records the x-generated state (checksum matches file)", () => {
     const dir = tempDir();
@@ -295,7 +350,7 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
     expect(skill.startsWith(`${generatedMarker("skills/arggon-cli/SKILL.md")}\n`)).toBe(true);
 
     const config = readConventionConfig(dir);
-    expect(Object.keys(config.generated).length).toBe(16);
+    expect(Object.keys(config.generated).length).toBe(17);
     const agentsEntry = config.generated["AGENTS.md"]!;
     expect(agentsEntry.template).toBe("docs/AGENTS.md");
     expect(agentsEntry.checksum).toBe(checksumOf(agents));
@@ -314,7 +369,7 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
     runInit({ dir, force: false, full: true });
     const before = readFileSync(join(dir, "AGENTS.md"), "utf8");
     const result = runInit({ dir, force: false, full: true });
-    expect(result.updated.length).toBe(16);
+    expect(result.updated.length).toBe(17);
     expect(result.created).toEqual([]);
     expect(result.skipped).toEqual([]);
     // Content is byte-identical (same template, same placeholders).
@@ -372,7 +427,7 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
     const result = runInit({ dir, force: true, full: true });
     // State survived the forced convention.yml rewrite, so untouched docs
     // update instead of degrading to adopter-modified.
-    expect(result.updated.length).toBe(16);
+    expect(result.updated.length).toBe(17);
     expect(result.modified).toEqual([]);
     expect(readConventionConfig(dir).generated["AGENTS.md"]!.template).toBe("docs/AGENTS.md");
   });

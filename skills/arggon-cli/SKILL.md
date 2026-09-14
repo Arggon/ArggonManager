@@ -50,9 +50,10 @@ git -C ../ArggonManager pull --ff-only && npm -C ../ArggonManager run build
 
 ```bash
 arggon init --full        # NEW repo: tasks/ tree + governing docs (AGENTS.md + CLAUDE.md
-                          # shim + .github/ files + CONTRIBUTING/SECURITY/.editorconfig;
-                          # --full adds ARCHITECTURE.md, docs/convention.md + engineering.md,
-                          # CHANGELOG, SUPPORT, runbooks) + bundles this skill at
+                          # shim + .github/ files + CONTRIBUTING/SECURITY/.editorconfig +
+                          # .mcp.json MCP registration; --full adds ARCHITECTURE.md,
+                          # docs/convention.md + engineering.md, CHANGELOG, SUPPORT,
+                          # runbooks) + bundles this skill at
                           # .agents/skills/arggon-cli/SKILL.md
 arggon adopt              # EXISTING repo: creates a tracked migration task with an agent
                           # checklist (sweep docs → extract content → complete generated docs
