@@ -12,7 +12,13 @@ import {
 import { assertUpdateRules } from "./rules.js";
 import { formatDate, formatDateTime } from "./dates.js";
 import { assertBranchName, assertLabels } from "./ids.js";
-import { itemsById, loadItems, tryLoadItem, type WorkItem } from "./items.js";
+import {
+  acceptanceComplete,
+  itemsById,
+  loadItems,
+  tryLoadItem,
+  type WorkItem,
+} from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 
 export type UpdateOptions = {
@@ -83,6 +89,13 @@ export type UpdateResult = {
    * tell when the cascade reached epic level or above without a second lookup.
    */
   cascadeLevels: string[];
+  /**
+   * Ancestor containers the cascade did NOT complete because their own body
+   * still has unchecked acceptance checkboxes (task-cascade-acceptance-aware).
+   * Empty unless a skip happened. Additive — lets agents see why the cascade
+   * stopped before the initiative.
+   */
+  cascadeSkipped: Array<{ id: string; type: string; reason: "acceptance-incomplete" }>;
 };
 
 function parseCsvList(raw: string): string[] {
@@ -355,9 +368,9 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   // Automatic container completion (task-container-auto-done): when an item
   // reaches a terminal state and every sibling under a parent is terminal
   // too, that parent completes, cascading up the chain. Off with cascade:false.
-  const completedContainers: WorkItem[] =
+  const { completed: completedContainers, skipped: cascadeSkipped } =
     opts.cascade === false || (newStatus !== "done" && newStatus !== "cancelled")
-      ? []
+      ? { completed: [], skipped: [] }
       : autoCompleteAncestors(tasksDir, item, opts.now ?? new Date());
 
   return {
@@ -368,6 +381,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     changed,
     autoCompleted: completedContainers.map((container) => container.id),
     cascadeLevels: completedContainers.map((container) => container.type),
+    cascadeSkipped,
   };
   };
 
@@ -386,13 +400,24 @@ const TERMINAL: ReadonlySet<string> = new Set(["done", "cancelled"]);
  * Already-terminal containers keep their status (an explicit `cancelled`
  * is never overwritten) but do not stop the walk: their ancestors may
  * still complete.
+ *
+ * Acceptance-aware (task-cascade-acceptance-aware): a container whose OWN
+ * body still has unchecked acceptance checkboxes is never auto-completed
+ * ("done = acceptance checklist complete"). The walk simply stops there:
+ * the skipped container stays non-terminal, so its parent's subtree is not
+ * closed either and nothing above it completes — the conservative outcome
+ * (no ancestor flips while a contract below is unfinished).
  */
 function autoCompleteAncestors(
   tasksDir: string,
   from: WorkItem,
   now: Date,
-): WorkItem[] {
+): {
+  completed: WorkItem[];
+  skipped: Array<{ id: string; type: string; reason: "acceptance-incomplete" }>;
+} {
   const completed: WorkItem[] = [];
+  const skipped: Array<{ id: string; type: string; reason: "acceptance-incomplete" }> = [];
   const byId = itemsById(loadItems(tasksDir));
   let parentId = from.parent;
   const seen = new Set<string>([from.id]);
@@ -403,6 +428,12 @@ function autoCompleteAncestors(
     const children = [...byId.values()].filter((candidate) => candidate.parent === container.id);
     if (children.length === 0 || !children.every((child) => subtreeClosed(child, byId))) break;
     if (!TERMINAL.has(container.status)) {
+      // Acceptance contract check happens BEFORE the write: an unchecked box
+      // in the container's own body vetoes auto-completion.
+      if (!acceptanceComplete(container.body)) {
+        skipped.push({ id: container.id, type: container.type, reason: "acceptance-incomplete" });
+        break;
+      }
       writeFileSync(
         container.filePath,
         stringifyFrontmatter(
@@ -418,7 +449,7 @@ function autoCompleteAncestors(
     }
     parentId = container.parent;
   }
-  return completed;
+  return { completed, skipped };
 }
 
 /** A subtree is closed when every child is terminal and, for containers, its own subtree is closed too. */

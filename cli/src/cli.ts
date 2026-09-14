@@ -646,6 +646,9 @@ program
               item: toContractWorkItem(result.item, result.root),
               autoCompleted: result.autoCompleted,
               cascadeLevels: result.cascadeLevels,
+              ...(result.cascadeSkipped.length > 0
+                ? { cascadeSkipped: result.cascadeSkipped }
+                : {}),
             },
             readConventionVersion(result.root),
           );
@@ -654,6 +657,12 @@ program
         const what = result.changed.length > 0 ? ` (${result.changed.join(", ")})` : "";
         console.log(`arggon update: ${result.item.type} ${result.id}${what}`);
         console.log(`  ${result.path}`);
+        for (const skipped of result.cascadeSkipped) {
+          console.log(
+            `  cascade skipped: ${skipped.type} '${skipped.id}'` +
+              ` — acceptance checklist incomplete`,
+          );
+        }
         if (result.autoCompleted.length > 0) {
           console.log(`  auto-completed: ${result.autoCompleted.join(", ")}`);
           const high = result.autoCompleted

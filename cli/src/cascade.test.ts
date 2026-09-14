@@ -8,7 +8,7 @@
  * so callers can tell when the cascade reached epic level or above.
  */
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -65,7 +65,31 @@ function chainTree(): { dir: string; tasks: string[]; bug: string } {
     id: "bug-x",
     now: NOW,
   });
+  for (const container of ["launch", "epic-a", "story-a"]) stripChecklist(dir, container);
   return { dir, tasks: [t1.id, t2.id], bug: bug.id };
+}
+
+/**
+ * Remove the template's acceptance checklist (`- [ ]` lines) from an item
+ * body, simulating a container WITHOUT an acceptance contract. The new
+ * acceptance-aware rule (task-cascade-acceptance-aware) never auto-completes
+ * containers with unchecked boxes; the pre-existing cascade fixtures exercise
+ * the no-checklist behavior, so their bodies must be checklist-free.
+ */
+function stripChecklist(dir: string, id: string): void {
+  const tasksDir = join(dir, "tasks");
+  const walk = (current: string): string[] =>
+    readdirSync(current, { withFileTypes: true }).flatMap((entry) => {
+      const full = join(current, entry.name);
+      return entry.isDirectory() ? walk(full) : full;
+    });
+  const file = walk(tasksDir).find((f) => f.endsWith(`/${id}.md`));
+  if (!file) throw new Error(`stripChecklist: '${id}' not found under ${tasksDir}`);
+  const stripped = readFileSync(file, "utf8")
+    .split("\n")
+    .filter((line) => !/^[ \t]*[-*] \[( |x|X)\]/.test(line))
+    .join("\n");
+  writeFileSync(file, stripped, "utf8");
 }
 
 function claimAndDone(dir: string, id: string): void {
@@ -175,6 +199,7 @@ describe("automatic container completion", () => {
       id: "task-two",
       now: NOW,
     });
+    for (const container of ["launch", "epic-a", "story-a"]) stripChecklist(dir, container);
     claimAndDone(dir, "task-one");
     runUpdate({ cwd: dir, id: "task-two", status: "in_progress", assignee: "worker", now: NOW });
     const result = runUpdate({ cwd: dir, id: "task-two", status: "done", now: NOW });
@@ -279,6 +304,7 @@ describe("cascade notice in human output", () => {
       id: "task-two",
       now: NOW,
     });
+    for (const container of ["launch", "epic-a", "story-a"]) stripChecklist(dir, container);
     claimAndDone(dir, "task-one");
     runUpdate({ cwd: dir, id: "task-two", status: "in_progress", assignee: "worker", now: NOW });
     const res = runCli(["update", "task-two", "--status", "done"], dir);
@@ -299,5 +325,105 @@ describe("cascade notice in human output", () => {
     expect(envelope.ok).toBe(true);
     expect(envelope.autoCompleted).toEqual(["story-a", "epic-a", "launch"]);
     expect(envelope.cascadeLevels).toEqual(["story", "epic", "initiative"]);
+  });
+});
+
+/**
+ * Acceptance-aware cascade (task-cascade-acceptance-aware): the tie-breakers
+ * scenario. A container whose OWN body still has unchecked acceptance
+ * checkboxes is never auto-completed — "done = acceptance checklist
+ * complete" wins over status mirroring. Nothing above the skipped container
+ * completes either (its subtree is not closed). Containers without any
+ * checklist keep completing as before.
+ */
+describe("acceptance-aware cascade", () => {
+  /** story-a gets an acceptance contract (its body gains a checklist). */
+  function storyWithChecklist(dir: string, box: "[ ]" | "[x]"): void {
+    const path = join(dir, "tasks/launch/epic-a/story-a/story-a.md");
+    const raw = readFileSync(path, "utf8");
+    const section = `## Acceptance\n\n- ${box} tie-breakers resolved\n`;
+    const withSection = raw.includes("## Acceptance")
+      ? raw.replace(/## Acceptance[\s\S]*$/, section)
+      : `${raw}\n${section}`;
+    writeFileSync(path, withSection, "utf8");
+  }
+
+  it("does not auto-complete a story with an unchecked acceptance box (nor its ancestors)", () => {
+    const { dir, tasks, bug } = chainTree();
+    storyWithChecklist(dir, "[ ]");
+    claimAndDone(dir, tasks[0]);
+    claimAndDone(dir, tasks[1]);
+    runUpdate({ cwd: dir, id: bug, status: "in_progress", assignee: "worker", now: NOW });
+    const result = runUpdate({ cwd: dir, id: bug, status: "done", now: NOW });
+    expect(result.autoCompleted).toEqual([]);
+    expect(result.cascadeSkipped).toEqual([
+      { id: "story-a", type: "story", reason: "acceptance-incomplete" },
+    ]);
+    expect(statusOf(dir, "story-a")).toBe("todo");
+    expect(statusOf(dir, "epic-a")).toBe("todo");
+    expect(statusOf(dir, "launch")).toBe("todo");
+  });
+
+  it("completes the chain once the acceptance box is ticked", () => {
+    const { dir, tasks, bug } = chainTree();
+    storyWithChecklist(dir, "[ ]");
+    claimAndDone(dir, tasks[0]);
+    claimAndDone(dir, tasks[1]);
+    runUpdate({ cwd: dir, id: bug, status: "in_progress", assignee: "worker", now: NOW });
+    const blocked = runUpdate({ cwd: dir, id: bug, status: "done", now: NOW });
+    expect(blocked.cascadeSkipped).toHaveLength(1);
+    // Tick the box (the honest path to done) and re-run any terminal update.
+    storyWithChecklist(dir, "[x]");
+    const result = runUpdate({ cwd: dir, id: bug, status: "done", now: NOW });
+    expect(result.cascadeSkipped).toEqual([]);
+    expect(result.autoCompleted).toEqual(["story-a", "epic-a", "launch"]);
+    expect(statusOf(dir, "story-a")).toBe("done");
+    expect(statusOf(dir, "launch")).toBe("done");
+  });
+
+  it("treats a fully-ticked checklist as acceptance-complete", () => {
+    const { dir, tasks, bug } = chainTree();
+    storyWithChecklist(dir, "[x]");
+    claimAndDone(dir, tasks[0]);
+    claimAndDone(dir, tasks[1]);
+    runUpdate({ cwd: dir, id: bug, status: "in_progress", assignee: "worker", now: NOW });
+    const result = runUpdate({ cwd: dir, id: bug, status: "done", now: NOW });
+    expect(result.autoCompleted).toEqual(["story-a", "epic-a", "launch"]);
+    expect(result.cascadeSkipped).toEqual([]);
+  });
+
+  it("surfaces the skip in human output and the --json envelope", () => {
+    const { dir, tasks, bug } = chainTree();
+    storyWithChecklist(dir, "[ ]");
+    claimAndDone(dir, tasks[0]);
+    claimAndDone(dir, tasks[1]);
+    runUpdate({ cwd: dir, id: bug, status: "in_progress", assignee: "worker", now: NOW });
+    const human = runCli(["update", bug, "--status", "done"], dir);
+    expect(human.status).toBe(0);
+    expect(human.stdout).toContain(
+      "cascade skipped: story 'story-a' — acceptance checklist incomplete",
+    );
+    // Second tree for the JSON run (the first run already consumed the state).
+    const { dir: dir2, tasks: tasks2, bug: bug2 } = chainTree();
+    storyWithChecklist(dir2, "[ ]");
+    claimAndDone(dir2, tasks2[0]);
+    claimAndDone(dir2, tasks2[1]);
+    runUpdate({ cwd: dir2, id: bug2, status: "in_progress", assignee: "worker", now: NOW });
+    const res = runCli(["update", bug2, "--status", "done", "--json"], dir2);
+    expect(res.status).toBe(0);
+    const envelope = JSON.parse(res.stdout) as {
+      cascadeSkipped: Array<{ id: string; reason: string }>;
+    };
+    expect(envelope.cascadeSkipped).toEqual([
+      { id: "story-a", type: "story", reason: "acceptance-incomplete" },
+    ]);
+  });
+
+  it("acceptanceComplete: no checklist, all-checked, and unchecked cases", async () => {
+    const { acceptanceComplete } = await import("./items.js");
+    expect(acceptanceComplete("no checkboxes here")).toBe(true);
+    expect(acceptanceComplete("- [x] done\n- [X] also done")).toBe(true);
+    expect(acceptanceComplete("  - [ ] indented pending")).toBe(false);
+    expect(acceptanceComplete("- [x] done\n- [ ] pending")).toBe(false);
   });
 });
