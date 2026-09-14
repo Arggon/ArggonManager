@@ -38,8 +38,8 @@ Proposed), their recommendations shape the product afterwards.
 
 ## Acceptance
 
-- [ ] Principle 1 institutionalized in governing docs and templates (task-architecture-first-principle)
-- [ ] Principle 2 researched: cheapest path-to-prod exploration + ADR (task-cheap-infra-research)
-- [ ] Principle 3 researched: token/context optimization exploration + proposal (task-token-context-research)
+- [x] Principle 1 institutionalized in governing docs and templates (task-architecture-first-principle)
+- [x] Principle 2 researched: cheapest path-to-prod exploration + ADR (task-cheap-infra-research)
+- [x] Principle 3 researched: token/context optimization exploration + proposal (task-token-context-research)
 
 ## Notes

@@ -1,6 +1,6 @@
 # 0006 Token/context efficiency: compact envelopes, `show` read path, `next`-first guidance, generated-docs budget
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-14
 - Deciders: Software Architect (author), Project Manager (aware)
 - Research: [exploration-token-context-efficiency-001](../explorations/exploration-token-context-efficiency-001.md) (task-token-context-research)

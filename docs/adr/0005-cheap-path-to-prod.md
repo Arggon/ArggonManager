@@ -1,6 +1,6 @@
 # 0005 Default cheap-path-to-prod guidance for generated projects
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-14
 - Deciders: Software Architect (author); coordinator accepts on merge
 
