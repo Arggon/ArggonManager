@@ -4,6 +4,7 @@ status: in_progress
 id: task-version-policy
 title: "Version policy: package.json version is never bumped (--version prints 0.0.0)"
 assignee: Arggon
+branch: feat/task-version-policy
 parent: story-cli-ergonomics
 labels: []
 created: "2026-09-14"
