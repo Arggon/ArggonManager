@@ -511,3 +511,28 @@ describe("init docs: acknowledged baselines are never regenerated (bug-ack-basel
     expect(result.skipped).toContain("AGENTS.md");
   });
 });
+
+describe("init docs: orchestration by default (task-orchestration-default-refile)", () => {
+  it("generated AGENTS.md ships an Orchestration subsection in the task workflow", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
+    expect(agents).toMatch(/### orchestration/i);
+    expect(agents).toMatch(/delegated by default/i);
+    expect(agents).toContain("file-disjoint");
+    expect(agents).toContain("coordinator");
+    expect(agents).toMatch(/never steal a claim/i);
+  });
+});
+
+describe("init docs: generated convention.md documents the x-* namespaced extensions (task-init-convention-extensions)", () => {
+  it("init --full generates a convention.md with a Namespaced extensions section listing each x-* key", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const generated = readFileSync(join(dir, "docs/convention.md"), "utf8");
+    expect(generated).toMatch(/Namespaced extensions/);
+    for (const ext of ["x-views", "x-playbooks", "x-tracker", "x-import", "x-worktree", "x-generated"]) {
+      expect(generated).toContain(ext);
+    }
+  });
+});

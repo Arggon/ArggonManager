@@ -5,11 +5,10 @@
  * paths, honor --no-commit and x-tracker.auto-commit, and skip silently on
  * non-git trees.
  */
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { spawn, spawnSync } from "node:child_process";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { runAdopt } from "./adopt.js";
 import { runCleanup } from "./cleanup.js";
 import { runComment } from "./comment.js";
@@ -544,4 +543,70 @@ describe("commitTrackerMutation edge cases", () => {
     expect(result).toEqual({ committed: false, skipReason: "nothing to commit" });
     expect(status(dir)).toBe("");
   });
+});
+
+describe("commitTrackerMutation index.lock contention (bug-autocommit-silent-skip)", () => {
+  /** Mutate the item on disk so the next commit has something to stage. */
+  function dirtyItem(dir: string): string {
+    const itemPath = join(dir, "tasks/launch/auth/login/task-rate-limit.md");
+    const raw = readFileSync(itemPath, "utf8");
+    writeFileSync(itemPath, `${raw}\n- contention note\n`, "utf8");
+    return itemPath;
+  }
+
+  /**
+   * Hold git's index.lock from a detached node child that removes it after
+   * `ms` (the mutation runs synchronously, so the release must come from
+   * another process — the same real-contention pattern as the torture lab).
+   */
+  function releaseLockAfter(dir: string, ms: number): void {
+    const lock = join(dir, ".git/index.lock");
+    writeFileSync(lock, "", "utf8");
+    const child = spawn(
+      process.execPath,
+      ["-e", `setTimeout(() => require("node:fs").rmSync(${JSON.stringify(lock)}), ${ms})`],
+      { stdio: "ignore" },
+    );
+    child.unref();
+  }
+
+  it("retries and commits once the lock is released mid-backoff", () => {
+    const dir = initRepo();
+    const itemPath = dirtyItem(dir);
+    releaseLockAfter(dir, 200); // gone by retry 2 (75ms) / 3 (225ms)
+
+    const result = commitTrackerMutation(dir, [itemPath], {
+      message: trackerCommitMessage("commented", ["task-rate-limit"]),
+    });
+
+    expect(result).toMatchObject({ committed: true });
+    expect(status(dir)).toBe("");
+  }, 15_000);
+
+  it("reports the skip (payload + stderr warning) when the lock is held past the retry budget", () => {
+    const dir = initRepo();
+    const itemPath = dirtyItem(dir);
+    writeFileSync(join(dir, ".git/index.lock"), "", "utf8");
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const result = commitTrackerMutation(dir, [itemPath], {
+        message: trackerCommitMessage("commented", ["task-rate-limit"]),
+        // Small injected budget: exercises the exhausted-skip path in
+        // milliseconds instead of the full 10s default.
+        commitRetryTimeoutMs: 300,
+      });
+
+      expect(result).toEqual({ committed: false, skipReason: "git index locked" });
+      expect(commitPayload(result)).toEqual({ skipped: "git index locked" });
+      // Human output is never silent: the skip warns on stderr...
+      expect(stderr).toHaveBeenCalledWith(
+        expect.stringContaining("commit skipped: git index locked"),
+      );
+      // ...and the file state is consistent: mutation written, still dirty.
+      expect(readFileSync(itemPath, "utf8")).toContain("contention note");
+      expect(status(dir)).toContain("tasks/launch/auth/login/task-rate-limit.md");
+    } finally {
+      stderr.mockRestore();
+    }
+  }, 15_000);
 });
