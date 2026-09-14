@@ -33,7 +33,7 @@ re-ack.
 
 ## Acceptance
 
-- [ ] A sync mechanism lands: either init-docs regenerates the copy on validate/doctor with a drift error, or a test fails when the two files diverge (modulo nothing — byte-equal)
-- [ ] Current drift (if any) resolved; doctor reports the copy as acknowledged and matching
+- [x] A sync mechanism lands: either init-docs regenerates the copy on validate/doctor with a drift error, or a test fails when the two files diverge (modulo nothing — byte-equal)
+- [x] Current drift (if any) resolved; doctor reports the copy as acknowledged and matching
 
 ## Notes
