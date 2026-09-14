@@ -1,0 +1,10 @@
+{
+  "mcp": {
+    "servers": {
+      "arggon": {
+        "command": "arggon",
+        "args": ["mcp"]
+      }
+    }
+  }
+}
