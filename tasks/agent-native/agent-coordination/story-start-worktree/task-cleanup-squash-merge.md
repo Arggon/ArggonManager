@@ -1,8 +1,10 @@
 ---
 type: task
-status: todo
+status: done
 id: task-cleanup-squash-merge
 title: "cleanup --prune: support squash-merged branches"
+assignee: Arggon
+branch: feat/task-cleanup-squash-merge
 parent: story-start-worktree
 labels: []
 created: "2026-09-14"
@@ -23,5 +25,5 @@ Second experiment hitting the same limitation (arggon-cv noted it, racha confirm
 
 ## Acceptance
 
-- [ ] When the ancestry check fails, cleanup queries gh for a MERGED PR whose head branch matches (gh pr list --state merged --head <branch>), and treats "PR merged" as prunable (optional --require-pr flag to make gh optional)
-- [ ] Tests: squash-merged branch (remote merge commit, no ancestry) gets pruned with --require-pr + fake gh; no matching PR → still skipped
+- [x] When the ancestry check fails, cleanup queries gh for a MERGED PR whose head branch matches (gh pr list --state merged --head <branch>), and treats "PR merged" as prunable — landed as the inverse flag `--no-gh` (gh on by default, ancestry-only opt-out), per the landed design
+- [x] Tests: squash-merged branch (unmerged tip, no ancestry) gets pruned via injected fake gh (with `via: "squash-merged PR #N"` annotations and forced branch delete); no matching PR → skipped; gh failing → skipped with unavailable reason; `--no-gh` never calls gh

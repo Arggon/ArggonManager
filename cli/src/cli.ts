@@ -1392,14 +1392,20 @@ program
     "--no-commit",
     "keep tasks/ dirty: skip the tracker auto-commit of the cleared worktree_path records (default: on with --prune; x-tracker.auto-commit: false opts out tree-wide)",
   )
+  .option(
+    "--no-gh",
+    "ancestry-only classification: skip the gh fallback that detects squash-merged PRs when the branch fails the ancestry check (offline/CI use)",
+    true,
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { prune?: boolean; commit?: boolean; json?: boolean }) => {
+  .action((opts: { prune?: boolean; commit?: boolean; noGh?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
       const result = runCleanup({
         cwd: process.cwd(),
         prune: Boolean(opts.prune),
         commit: opts.commit === false ? false : undefined,
+        noGh: opts.noGh === false,
       });
       if (json) {
         // Per-candidate prune failures are reported in the payload (each
