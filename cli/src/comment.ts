@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { stringifyFrontmatter } from "./frontmatter.js";
 import { formatDate } from "./dates.js";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
+import { withItemLock } from "./lock.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 import { resolveCurrentLogin } from "./list.js";
 import {
@@ -102,11 +103,24 @@ export function runComment(opts: CommentOptions): CommentResult {
   const heading = `### ${date} @${author}`;
 
   // Blank line before the section; section itself ends with a newline.
-  const base = item.body.endsWith("\n") || item.body.length === 0 ? item.body : `${item.body}\n`;
-  const newBody = `${base}\n${heading}\n${lines.join("\n")}\n`;
+  // The read-modify-write is serialized with withItemLock (bug-comment-race-no-lock):
+  // without it, two concurrent `arggon comment` processes on the SAME item both
+  // read the original body and full-file-write — last-write-wins silently drops
+  // one comment. The body is re-read INSIDE the lock so each process appends to
+  // the other's result, not to a stale snapshot. Same lock family as the claim
+  // path (bug-claim-race-no-lock, PR #134) and runUpdate.
+  withItemLock(item.filePath, () => {
+    const fresh: WorkItem | undefined = itemsById(loadItems(tasksDir)).get(id);
+    if (!fresh) {
+      throw new Error(`id '${id}' not found under tasks/`);
+    }
+    const base =
+      fresh.body.endsWith("\n") || fresh.body.length === 0 ? fresh.body : `${fresh.body}\n`;
+    const newBody = `${base}\n${heading}\n${lines.join("\n")}\n`;
 
-  // Body-only write: frontmatter data round-trips unchanged (no `updated` bump).
-  writeFileSync(item.filePath, stringifyFrontmatter(item.data, newBody), "utf8");
+    // Body-only write: frontmatter data round-trips unchanged (no `updated` bump).
+    writeFileSync(fresh.filePath, stringifyFrontmatter(fresh.data, newBody), "utf8");
+  });
 
   const root = repoRootFromTasks(tasksDir);
   const commit = commitTrackerMutation(root, [item.filePath], {
