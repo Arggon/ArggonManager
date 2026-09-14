@@ -4,6 +4,7 @@ status: in_progress
 id: task-mcp-cli-parity
 title: "MCP and CLI stay in sync: parity-tested tool surface"
 assignee: Arggon
+branch: feat/task-mcp-cli-parity
 parent: story-mcp-server
 labels: []
 created: "2026-09-14"
