@@ -1,12 +1,14 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-board-serve-json-allowed-despite-documented-incompatibility
 title: board --serve --json allowed despite documented incompatibility
+assignee: Arggon
 parent: story-web-board
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T15:49:21.629Z"
 ---
 <!--
   Placement (v0): tasks/scale-adoption/views/story-web-board/bug-board-serve-json-allowed-despite-documented-incompatibility.md
