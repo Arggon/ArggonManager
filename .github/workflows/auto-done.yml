@@ -74,11 +74,11 @@ jobs:
               in_progress)
                 # Capture the update JSON (task-auto-done-cascade-visibility):
                 # autoCompleted/cascadeSkipped must land in the run log so a
-                # missed cascade is diagnosable after the fact. Note: a
-                # sibling that is still non-terminal on THIS tree (e.g. its
-                # own flip PR had not merged when this run checked out main)
-                # stops the cascade silently — visible here only as an empty
-                # cascade list, not as a cascadeSkipped entry.
+                # missed cascade is diagnosable after the fact. A sibling that
+                # is still non-terminal on THIS tree (e.g. its own flip PR had
+                # not merged when this run checked out main) stops the cascade
+                # — recorded as a cascadeSkipped entry with reason
+                # subtree-open naming the blocking sibling.
                 if out="$(node dist/cli.js update "$id" --status done --json)"; then
                   cascade="$(printf '%s' "$out" | jq -r '(.autoCompleted // []) | join(",")' 2>/dev/null || true)"
                   skipped="$(printf '%s' "$out" | jq -r '(.cascadeSkipped // []) | map("\(.id):\(.reason)") | join(",")' 2>/dev/null || true)"
