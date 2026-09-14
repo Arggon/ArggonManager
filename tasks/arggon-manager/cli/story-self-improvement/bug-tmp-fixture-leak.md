@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-tmp-fixture-leak
 title: vitest fixtures leak mkdtemp dirs under /tmp (inode exhaustion breaks runs)
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-self-improvement
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
-claimed_at: "2026-09-14T21:15:15.785Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/bug-tmp-fixture-leak.md
