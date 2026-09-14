@@ -4,6 +4,7 @@ status: in_progress
 id: task-ancestor-filter
 title: Ancestor/initiative filter predicate for filters and saved views
 assignee: Arggon
+branch: feat/task-ancestor-filter
 parent: story-cli-ergonomics
 labels: []
 created: "2026-09-14"
