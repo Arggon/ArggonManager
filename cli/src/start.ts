@@ -26,6 +26,12 @@ export type StartOptions = {
    * (task-start-post-hook). The hook only ever runs on new-worktree creation.
    */
   noHook?: boolean;
+  /**
+   * Shell for the `x-worktree.post-start` hook (task-post-start-env):
+   * "inherit" (default) or "login" ($SHELL -lc). Per-invocation override —
+   * wins over the `x-worktree.post-start-shell` config value.
+   */
+  postStartShell?: "inherit" | "login";
   now?: Date;
 };
 
@@ -242,31 +248,52 @@ function outputTail(output: string): string {
 }
 
 /**
- * Run the `x-worktree.post-start` bootstrap hook (task-start-post-hook):
- * `sh -c <command>` with cwd = the freshly created worktree root. Never
- * throws — a failure (non-zero exit, spawn error) is reported in the result
- * so the start itself still succeeds (the worktree exists and is claimed;
- * the hook is convenience, e.g. `npm ci`).
+ * Actionable hint appended to every post-start failure report
+ * (task-post-start-env): the hook inherits the invoking arggon process
+ * environment, so tools installed outside that PATH (rustup's ~/.cargo/bin,
+ * mise/asdf shims) fail with "command not found" even though they work in an
+ * interactive shell.
  */
-export function runPostStart(command: string, cwd: string): PostStartResult {
+const POST_START_FAILURE_HINT =
+  '(hint: hooks inherit the environment of the process that ran arggon — ' +
+  'use absolute paths, or set x-worktree.post-start-shell: "login")';
+
+/**
+ * Run the `x-worktree.post-start` bootstrap hook (task-start-post-hook) with
+ * cwd = the freshly created worktree root. `shell` selects the invocation
+ * (task-post-start-env): "inherit" (default) is `sh -c` with the invoking
+ * environment; "login" runs `"$SHELL" -lc` so login profile files are sourced
+ * and toolchains installed via rustup/mise/asdf land on PATH. Never throws —
+ * a failure (non-zero exit, spawn error) is reported in the result so the
+ * start itself still succeeds (the worktree exists and is claimed; the hook
+ * is convenience, e.g. `npm ci`). Failure reports carry an actionable hint.
+ */
+export function runPostStart(
+  command: string,
+  cwd: string,
+  shell: "inherit" | "login" = "inherit",
+): PostStartResult {
+  const failure = (detail: string): PostStartResult => ({
+    command,
+    ok: false,
+    error: `post-start failed: ${command} → ${detail} ${POST_START_FAILURE_HINT}`,
+  });
   let result: ReturnType<typeof spawnSync>;
   try {
-    result = spawnSync("sh", ["-c", command], { cwd, encoding: "utf8" });
+    result =
+      shell === "login"
+        ? spawnSync(process.env.SHELL || "/bin/sh", ["-lc", command], { cwd, encoding: "utf8" })
+        : spawnSync("sh", ["-c", command], { cwd, encoding: "utf8" });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return { command, ok: false, error: `post-start failed: ${command} → ${message}` };
+    return failure(message);
   }
   if (result.error) {
-    return {
-      command,
-      ok: false,
-      error: `post-start failed: ${command} → ${result.error.message}`,
-    };
+    return failure(result.error.message);
   }
   if (result.status !== 0) {
     const tail = outputTail(String(result.stderr ?? "") || String(result.stdout ?? ""));
-    const detail = tail || `exit code ${result.status ?? "unknown"}`;
-    return { command, ok: false, error: `post-start failed: ${command} → ${detail}` };
+    return failure(tail || `exit code ${result.status ?? "unknown"}`);
   }
   return { command, ok: true };
 }
@@ -544,7 +571,11 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     let postStart: PostStartResult | undefined;
     if (worktreeCreated && !opts.noHook) {
       const hookCommand = config.worktree.postStart;
-      if (hookCommand) postStart = runPostStart(hookCommand, worktreePath);
+      if (hookCommand) {
+        // Flag wins over config (task-post-start-env); config unset = inherit.
+        const shell = opts.postStartShell ?? config.worktree.postStartShell ?? "inherit";
+        postStart = runPostStart(hookCommand, worktreePath, shell);
+      }
     }
 
     return {

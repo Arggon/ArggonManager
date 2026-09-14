@@ -1,8 +1,10 @@
 ---
 type: task
-status: todo
+status: done
 id: task-post-start-env
 title: "post-start hook environment: document PATH inheritance (or login-shell option)"
+assignee: Arggon
+branch: feat/task-post-start-env
 parent: story-start-worktree
 labels: []
 created: "2026-09-14"
@@ -23,5 +25,5 @@ Found by the racha experiment (2026-09-14): x-worktree.post-start: "cargo check"
 
 ## Acceptance
 
-- [ ] Documented in docs/convention.md x-worktree section: hooks inherit the invoking shell environment — use absolute paths (e.g. ~/.cargo/bin/cargo) or run via the user's login shell
-- [ ] Optional enhancement landed (decide during implementation): a `sh -lc` variant or explicit env passthrough note; failing either way, the documented workaround must be verified live
+- [x] Documented in docs/convention.md x-worktree section: hooks inherit the invoking shell environment — use absolute paths (e.g. ~/.cargo/bin/cargo) or run via the user's login shell
+- [x] Optional enhancement landed (decide during implementation): a `sh -lc` variant or explicit env passthrough note; failing either way, the documented workaround must be verified live

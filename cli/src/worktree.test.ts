@@ -4,7 +4,15 @@
  * (sync-smoke pattern); only push/PR are stubbed so no remote is needed.
  */
 import { spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync } from "node:fs";
+import {
+  appendFileSync,
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -263,6 +271,130 @@ describe("start --worktree post-start hook (x-worktree)", () => {
     expect(second.worktreeCreated).toBe(false);
     expect(second.postStart).toBeUndefined();
     expect(readFileSync(join(first.worktreePath!, ".post-start-count"), "utf8").trim()).toBe("run");
+  });
+});
+
+describe("post-start shell variant (task-post-start-env)", () => {
+  /**
+   * A stand-in "$SHELL" that records its argv tail into `log` (no dependence
+   * on the test machine's real shell or profile files) and then execs
+   * /bin/sh, so `-lc` still behaves like a login shell invocation.
+   */
+  function fakeLoginShell(dir: string, log: string): string {
+    const path = join(dir, "fakeshell");
+    writeFileSync(
+      path,
+      `#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\nexec /bin/sh "$@"\n`,
+    );
+    chmodSync(path, 0o755);
+    return path;
+  }
+
+  /** withShell: run fn with SHELL pointed at `shell`, restoring afterwards. */
+  function withShell<T>(shell: string | undefined, fn: () => T): T {
+    const prev = process.env.SHELL;
+    if (shell === undefined) delete process.env.SHELL;
+    else process.env.SHELL = shell;
+    try {
+      return fn();
+    } finally {
+      if (prev === undefined) delete process.env.SHELL;
+      else process.env.SHELL = prev;
+    }
+  }
+
+  /** Configure post-start + post-start-shell and commit (tree must be clean). */
+  function setPostStartWithShell(dir: string, command: string, shell: string | null): void {
+    const shellLine = shell ? `\n  post-start-shell: "${shell}"` : "";
+    appendFileSync(
+      join(dir, "tasks/.convention.yml"),
+      `x-worktree:\n  post-start: "${command}"${shellLine}\n`,
+    );
+    git(["add", "tasks/.convention.yml"], dir);
+    git(["commit", "--quiet", "-m", "config: x-worktree.post-start-shell"], dir);
+  }
+
+  it("x-worktree.post-start-shell: login runs the hook via the login shell", () => {
+    const dir = initRepo();
+    const log = join(dir, "fakeshell.log");
+    setPostStartWithShell(dir, "pwd > .post-start-cwd", "login");
+    const fake = fakeLoginShell(dir, log);
+
+    const result = withShell(fake, () =>
+      runStart({ cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW }, { git: localGit() }),
+    );
+
+    expect(result.postStart).toEqual({ command: "pwd > .post-start-cwd", ok: true });
+    // The fake shell saw the -lc login invocation...
+    expect(readFileSync(log, "utf8")).toContain("-lc");
+    // ...and the hook still ran with cwd = the freshly created worktree root.
+    expect(readFileSync(join(result.worktreePath!, ".post-start-cwd"), "utf8").trim()).toBe(
+      result.worktreePath,
+    );
+  });
+
+  it("defaults to the inheriting shell (no $SHELL -lc) when unset", () => {
+    const dir = initRepo();
+    const log = join(dir, "fakeshell.log");
+    setPostStartWithShell(dir, "pwd > .post-start-cwd", null);
+
+    const result = withShell(undefined, () =>
+      runStart({ cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW }, { git: localGit() }),
+    );
+
+    expect(result.postStart).toEqual({ command: "pwd > .post-start-cwd", ok: true });
+    expect(existsSync(log)).toBe(false);
+    expect(readFileSync(join(result.worktreePath!, ".post-start-cwd"), "utf8").trim()).toBe(
+      result.worktreePath,
+    );
+  });
+
+  it("the --post-start-shell start flag wins over the config value", () => {
+    const dir = initRepo();
+    const log = join(dir, "fakeshell.log");
+    setPostStartWithShell(dir, "pwd > .post-start-cwd", null);
+    const fake = fakeLoginShell(dir, log);
+
+    // Flag "login" over inherit config: hook goes through the login shell.
+    withShell(fake, () =>
+      runStart(
+        { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, postStartShell: "login", now: NOW },
+        { git: localGit() },
+      ),
+    );
+    expect(readFileSync(log, "utf8")).toContain("-lc");
+
+    // Flag "inherit" over login config: hook bypasses $SHELL.
+    const dir2 = initRepo();
+    const log2 = join(dir2, "fakeshell.log");
+    setPostStartWithShell(dir2, "pwd > .post-start-cwd", "login");
+    const fake2 = fakeLoginShell(dir2, log2);
+    const inherit = withShell(fake2, () =>
+      runStart(
+        { cwd: dir2, id: "task-alpha", assignee: "arggon", worktree: true, postStartShell: "inherit", now: NOW },
+        { git: localGit() },
+      ),
+    );
+    expect(existsSync(log2)).toBe(false);
+    expect(inherit.postStart).toEqual({ command: "pwd > .post-start-cwd", ok: true });
+  });
+
+  it("failure reports carry the PATH-inheritance hint", () => {
+    const dir = initRepo();
+    setPostStartWithShell(dir, "echo boom >&2; exit 3", null);
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    expect(result.postStart?.ok).toBe(false);
+    expect(result.postStart?.error).toContain("post-start failed: echo boom >&2; exit 3");
+    expect(result.postStart?.error).toContain("boom");
+    expect(result.postStart?.error).toContain("hooks inherit the environment of the process");
+    expect(result.postStart?.error).toContain('x-worktree.post-start-shell: "login"');
+    // Failure is still non-fatal: the start itself succeeded.
+    expect(result.worktreeCreated).toBe(true);
   });
 });
 

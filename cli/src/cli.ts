@@ -1290,6 +1290,10 @@ program
     "--no-hook",
     "skip the x-worktree.post-start hook (it only runs when a new worktree is created)",
   )
+  .option(
+    "--post-start-shell <shell>",
+    'shell for the x-worktree.post-start hook: "inherit" (default) or "login" ($SHELL -lc; overrides x-worktree.post-start-shell)',
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (
@@ -1299,10 +1303,21 @@ program
         openPr?: boolean;
         worktree?: boolean;
         hook?: boolean;
+        postStartShell?: string;
         json?: boolean;
       },
     ) => {
       const json = jsonEnabled(opts);
+      if (opts.postStartShell !== undefined && opts.postStartShell !== "inherit" && opts.postStartShell !== "login") {
+        const message = `--post-start-shell must be "inherit" or "login" (got ${JSON.stringify(opts.postStartShell)})`;
+        if (json) {
+          failJson({ command: "start", message, code: "START_FAILED", conventionVersion: readConventionVersion(process.cwd()) });
+          return;
+        }
+        console.error(`arggon start: ${message}`);
+        process.exitCode = 1;
+        return;
+      }
       try {
         const result = runStart({
           cwd: process.cwd(),
@@ -1311,6 +1326,7 @@ program
           openPr: Boolean(opts.openPr),
           worktree: Boolean(opts.worktree),
           noHook: opts.hook === false,
+          postStartShell: opts.postStartShell as "inherit" | "login" | undefined,
         });
         if (json) {
           successJson(
