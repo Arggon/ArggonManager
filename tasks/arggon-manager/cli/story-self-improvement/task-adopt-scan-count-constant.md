@@ -19,10 +19,14 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this task exists. -->
+Two housekeeping findings from the wave-1 reviews (PRs #198/#199):
+
+1. `cli/src/adopt.ts` `ADOPT_SCAN_PATHS` does not include the new generated `docs/deploy.md` (PR #199), so adopt's inventory does not report it as arggon-managed.
+2. The generated-docs count (17 → 18 in #199) is hardcoded in ~6 places across test files; every template addition forces the same churn. A shared constant (exported from docs.ts/init.ts, e.g. `GENERATED_DOC_COUNT` or derived from the template list) removes it.
 
 ## Acceptance
 
-- [ ] 
+- [ ] `ADOPT_SCAN_PATHS` includes docs/deploy.md (adopt inventory reports it)
+- [ ] A single derived constant replaces the hardcoded generated-doc counts in tests; adding the next template touches only templates/ + docs.ts
 
 ## Notes
