@@ -19,10 +19,9 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this task exists. -->
+The two best bugs of the series (claim race, reopen gate, ack drift promise) were found by adversarial agents attacking invariants and checking doc promises against behavior. Formalize that as a documented protocol so ANY agent can run an audit: (1) invariant-violation checklist (claim exclusivity, never-reopen/steal for agents, never-overwrite, cascade honesty, lost pushes), (2) doc-promise conformance sweep (extract "never/always/requires/only" statements from skill+docs and test each against the built CLI), (3) rotation: every audit picks fresh attack angles. Findings file via the tracker as always.
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] docs/labs/adversarial-audit.md: the protocol (invariant checklist, conformance sweep, angle rotation, filing rules)
+- [ ] First audit executed: task created + findings filed in the tracker (or zero-findings report)

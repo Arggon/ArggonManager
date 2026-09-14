@@ -19,10 +19,9 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this task exists. -->
+Two audit findings (dirty-tree dance, lost-push cleanup failure) came from reading session logs and tracker commit history — organic signal from REAL usage that synthetic experiments miss. Protocolize the mining: (a) ZCode session logs (~/.zcode/cli/log/*.jsonl: tool.call sequences, error patterns, retry loops per session id), (b) tracker commit history of the five live experiment repos (reverted operations, fix-of-fix commits, dirty-tree dance patterns), (c) .evidence/ dirs. Output: friction candidates filed as tracker items with evidence links.
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] docs/labs/telemetry-mining.md: the mining procedure (sources, patterns, friction signatures, filing rules)
+- [ ] First mining pass over the five experiment repos + available session logs executed; friction candidates filed or reported as zero-findings

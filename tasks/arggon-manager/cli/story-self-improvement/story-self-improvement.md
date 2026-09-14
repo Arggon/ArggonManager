@@ -17,10 +17,8 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this story exists. -->
+Five adoption experiments (cv, cuentas-claras, guardian, suizo, racha) + estanteria (MCP-first) proved the finding-source is NOT the side-project app (contributed zero findings) but the adversarial scenarios, adoption/upgrade flows, and doc-vs-behavior conformance. Building throwaway apps is the slow part. Research (2026-09-14: Anthropic evals loop, Arize closing-the-loop, agentic-patterns dogfooding, continuous red-teaming) converges on a standing loop: adversarial evals suite + audit agent protocol + telemetry mining of real usage. This story institutionalizes that loop inside ArggonManager.
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] The experiment scenarios live as a permanent lab suite (CI-runnable); the audit protocol and telemetry mining are documented with first runs executed; findings flow through the tracker as always

@@ -19,10 +19,9 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this task exists. -->
+The five experiments produced ~20 findings; the highest-value ones came from cross-cutting scenarios (concurrent claim races, gate probes from every entry point, upgrade flows over acked docs, adoption of legacy trees, long MCP sessions). Those scenarios exist only as one-off scripts in experiment repos. Convert them into a permanent lab suite: labs/torture.test.ts (vitest picks it up) — each scenario documented with which experiment/finding it guards. NOT a duplicate of unit tests: the lab covers cross-module flows and real-process concurrency that unit tests don't.
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] labs/torture.test.ts with the scenario catalog: concurrent claim races (N processes, same/different assignee, mixed ops), gate probes (steal/reopen via CLI non-TTY + MCP), upgrade flows over acked state, synthetic legacy adoption, long MCP session; each test tagged with its origin (experiment/finding)
+- [ ] Registered in CI (vitest run includes it); suite green
