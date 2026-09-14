@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adr0006-show-command
 title: "ADR 0006: arggon show <id> progressive-disclosure read path (CLI + MCP)"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: operating-principles
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
-claimed_at: "2026-09-14T21:15:23.155Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/operating-principles/task-adr0006-show-command.md
