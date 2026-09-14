@@ -17,10 +17,29 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this story exists. -->
+Three operating principles for ArggonManager's modus operandi, set 2026-09-14.
+They bind the tool itself AND every project that adopts it:
+
+1. **Architecture-first (code is cheap):** writing code is cheap, so following
+   good practices and keeping a sound software architecture is ALWAYS
+   important — in ArggonManager and in the projects that adopt it. Speed never
+   justifies structural debt.
+2. **Cheap infra (infrastructure is expensive):** infrastructure costs real
+   money, so there is always an investigation into the most accessible way to
+   get an ArggonManager-generated project to production, minimizing ongoing
+   maintenance cost.
+3. **Token/context efficiency:** agent tokens and context windows are a
+   priority; ArggonManager must investigate and optimize how it manages agent
+   work so agents spend the least tokens and context possible.
+
+Landing plan: principle 1 institutionalizes now (governing docs + templates);
+principles 2 and 3 are research-first (exploration with dated sources + ADR
+Proposed), their recommendations shape the product afterwards.
 
 ## Acceptance
 
-- [ ] 
+- [ ] Principle 1 institutionalized in governing docs and templates (task-architecture-first-principle)
+- [ ] Principle 2 researched: cheapest path-to-prod exploration + ADR (task-cheap-infra-research)
+- [ ] Principle 3 researched: token/context optimization exploration + proposal (task-token-context-research)
 
 ## Notes

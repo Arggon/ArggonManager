@@ -19,10 +19,17 @@ updated: "2026-09-14"
 
 ## Context
 
-<!-- Why this task exists. -->
+Operating principle 2 (2026-09-14): **infrastructure is expensive.** There is
+always an investigation into the most accessible way to take an
+ArggonManager-generated project to production with the lowest possible setup
+and maintenance cost. This is a research-first task: explore with dated
+sources, decide via ADR, let the product (init, playbooks, templates) carry
+the decision afterwards.
 
 ## Acceptance
 
-- [ ] 
+- [ ] Exploration recorded via `arggon stack explore` (docs/explorations/): candidates for cheapest credible path-to-prod per common project shape (static site, SPA + API, full-stack server, worker/cron), criteria (setup effort, monthly cost at small scale, maintenance burden, exit cost), findings with DATED sources (pricing pages with dates), recommendation
+- [ ] ADR under docs/adr/ (next number, status Proposed in the PR) capturing the default guidance init/playbooks will recommend for generated projects, linked from the exploration's Decision section
+- [ ] No product code changes in this item — the decision lands in the product through follow-up items
 
 ## Notes
