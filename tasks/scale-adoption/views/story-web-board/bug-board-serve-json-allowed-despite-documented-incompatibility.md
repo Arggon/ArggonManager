@@ -1,12 +1,15 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-board-serve-json-allowed-despite-documented-incompatibility
 title: board --serve --json allowed despite documented incompatibility
+assignee: Arggon
+branch: fix/bug-board-serve-json-allowed-despite-documented-incompatibility
 parent: story-web-board
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T15:49:21.629Z"
 ---
 <!--
   Placement (v0): tasks/scale-adoption/views/story-web-board/bug-board-serve-json-allowed-despite-documented-incompatibility.md
@@ -33,7 +36,7 @@ Either the doc should drop `--json` from the incompatible list (the envelope is 
 
 ## Acceptance
 
-- [ ] SKILL.md `--serve` sentence matches implemented flag-combination behavior (all three names checked)
-- [ ] If --serve --json stays allowed: behavior documented where --serve is described; if refused: error path covered by a test
+- [x] SKILL.md `--serve` sentence matches implemented flag-combination behavior (all three names checked)
+- [x] If --serve --json stays allowed: behavior documented where --serve is described; if refused: error path covered by a test
 
 ## Notes
