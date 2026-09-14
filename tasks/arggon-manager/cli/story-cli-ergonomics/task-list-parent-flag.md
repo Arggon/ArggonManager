@@ -1,12 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-list-parent-flag
 title: first-class list --parent flag; MCP arggon_update lacks parent
+assignee: Arggon
+branch: feat/task-list-parent-flag
 parent: story-cli-ergonomics
 labels: []
 created: "2026-09-14"
 updated: "2026-09-14"
+claimed_at: "2026-09-14T19:17:04.553Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-cli-ergonomics/task-list-parent-flag.md
@@ -28,7 +31,7 @@ mechanical).
 
 ## Acceptance
 
-- [ ] Decide: add `--parent <id>` to `arggon list` (sugar over the predicate) or document predicates as the only path — either way documented
-- [ ] MCP `arggon_update` exposes `parent` with the same edge validation as the CLI (or the exclusion is documented deliberately)
+- [x] Decide: add `--parent <id>` to `arggon list` (sugar over the predicate) or document predicates as the only path — either way documented
+- [x] MCP `arggon_update` exposes `parent` with the same edge validation as the CLI (or the exclusion is documented deliberately)
 
 ## Notes

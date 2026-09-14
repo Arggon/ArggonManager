@@ -123,6 +123,11 @@ const TOOLS: ToolDefinition[] = [
           description: "new assignee (claimable types need one when in_progress)",
         },
         branch: { type: "string", description: "set working branch (empty string clears)" },
+        parent: {
+          type: "string",
+          description:
+            "reparent the item under this container id (same edge validation as the CLI: unknown parent, wrong parent type, cycles fail)",
+        },
         unassign: { type: "boolean", description: "clear assignee", default: false },
         labels: { type: "string", description: "replace the full labels list (comma-separated)" },
         depends_on: {
@@ -282,6 +287,7 @@ export function runMcpServer(opts: McpServerOptions): void {
           status: str(args.status),
           assignee: str(args.assignee),
           branch: str(args.branch),
+          parent: str(args.parent),
           unassign: args.unassign === true,
           labels: str(args.labels),
           dependsOn: str(args.depends_on),
