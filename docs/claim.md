@@ -17,6 +17,27 @@ If an item is already claimed, `arggon update` **refuses** reassignment to a dif
 
 Coordinate first when possible. Prefer unclaim + reclaim over force.
 
+## Concurrent claims (atomic check-and-set)
+
+The claim is a read-modify-write of the item file, so it is guarded by a file
+lock (`cli/src/lock.ts`, bug-claim-race-no-lock): `start` and claim-changing
+`update` runs take an exclusive-create lock (in `os.tmpdir()`, keyed by the
+item's absolute path) around read → verify → write. Locks older than 60s are
+broken automatically (a crashed process cannot wedge the tracker); a contender
+that cannot acquire the lock within 10s fails with an actionable error instead
+of racing.
+
+Resulting semantics for simultaneous `arggon start` processes on one item:
+
+- **Same assignee**: serialized by the lock — exactly one run creates the
+  branch/worktree (`created: true`), the others see the claimed state and
+  attach (`created: false`). Deterministic; two processes never write the same
+  worktree simultaneously.
+- **Different assignees**: exactly one wins; the others read the claimed state
+  and fail with the claim-conflict `START_FAILED`. The claim is never silently
+  replaced (no last-write-wins).
+
+
 ## Unclaim recovery
 
 v0 unclaim: `in_progress` → `todo` clears `assignee` (CLI `update` default).

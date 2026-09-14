@@ -76,6 +76,16 @@ function assertKebabCase(value: string, what: string): void {
   }
 }
 
+/**
+ * Normalizes a stored version string to carry exactly one leading "v":
+ * strips an existing leading "v"/"V" (if any) and prefixes once with "v".
+ * An empty/whitespace-only input yields "v" (the prefix alone); callers that
+ * need a fallback (e.g. "unknown") should handle that before calling.
+ */
+export function normalizeVersionPrefix(version: string): string {
+  return `v${version.trim().replace(/^[vV]/, "")}`;
+}
+
 // ---------------------------------------------------------------------------
 // stack explore — exploration records
 // ---------------------------------------------------------------------------
@@ -383,7 +393,7 @@ export function runPlaybookStatus(opts: PlaybookStatusOptions): PlaybookStatusRe
         cwd: opts.cwd,
         type: "task",
         id: stem,
-        title: `Re-research ${playbook.id} playbook (v${playbook.version}, ${age})`,
+        title: `Re-research ${playbook.id} playbook (${normalizeVersionPrefix(playbook.version)}, ${age})`,
         parent: story,
         status: "todo",
         body: [
