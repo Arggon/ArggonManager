@@ -33,6 +33,15 @@ function git(args: string[], cwd: string): string {
 }
 
 /** Fresh repo with the standard scaffold, a clean tree, and a bare remote. */
+function commitAllIfDirty(dir: string, message: string): void {
+  spawnSync("git", ["add", "-A"], { cwd: dir, stdio: "pipe" });
+  const r = spawnSync("git", ["commit", "--quiet", "-m", message], { cwd: dir, stdio: "pipe" });
+  // init/creates auto-commit now (tracker hygiene); "nothing to commit" is fine.
+  if (r.status !== 0 && !/nothing to commit/.test(String(r.stderr) + String(r.stdout))) {
+    throw new Error(`git commit failed: ${r.stderr}`);
+  }
+}
+
 function initRepoWithRemote(prefix: string): string {
   const dir = mkdtempSync(join(tmpdir(), `arggon-race-${prefix}-`));
   git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
@@ -43,8 +52,7 @@ function initRepoWithRemote(prefix: string): string {
   runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch", id: "auth", now: NOW });
   runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "login", now: NOW });
   runCreate({ cwd: dir, type: "task", title: "Race target", parent: "login", id: "task-race", now: NOW });
-  git(["add", "-A"], dir);
-  git(["commit", "--quiet", "-m", "init tasks"], dir);
+  commitAllIfDirty(dir, "init tasks");
   // Bare remote so the real pushBranch step works without gh.
   const remote = mkdtempSync(join(tmpdir(), `arggon-race-${prefix}-remote-`));
   git(["init", "--bare", "--quiet"], remote);

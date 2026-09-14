@@ -9,6 +9,13 @@ import {
 } from "./convention.js";
 import { generateDocs } from "./docs.js";
 import type { ItemType } from "./ids.js";
+import {
+  commitTrackerMutation,
+  readAutoCommitConfig,
+  resolveAutoCommit,
+  trackerCommitMessage,
+  type TrackerCommitResult,
+} from "./tracker-commit.js";
 
 const CONVENTION_YML =
   `version: ${CONVENTION_VERSION}\n` +
@@ -26,6 +33,16 @@ export type InitOptions = {
   backup?: boolean;
   /** Injection point for tests: generation timestamp (defaults to now). */
   now?: Date;
+  /**
+   * Auto-commit the files this run wrote (tracker hygiene,
+   * bug-init-leaves-docs-untracked-start-blocks-on-clean-tree): a fresh init
+   * must not leave ~20 untracked docs behind, or `start`'s clean-tree
+   * precondition blocks the very next step. Surgical staging — exactly the
+   * written paths, never `git add -A`. `undefined` resolves via
+   * `x-tracker.auto-commit` config, default ON; best effort (non-git trees
+   * and git-absent machines skip with a reason, command stays ok).
+   */
+  commit?: boolean;
 };
 
 export type InitResult = {
@@ -43,10 +60,11 @@ export type InitResult = {
   skipped: string[];
   restored: string[];
   conventionPath: string;
+  /** Tracker auto-commit outcome for the files written this run. */
+  commit?: TrackerCommitResult;
 };
 
-function ensureTemplates(root: string, force: boolean): string[] {
-  const templatesDest = join(root, "templates");
+function ensureTemplates(root: string, force: boolean): string[] {  const templatesDest = join(root, "templates");
   const templatesSrc = bundledTemplatesDir();
   if (!existsSync(templatesSrc)) {
     throw new Error(`Bundled templates not found at ${templatesSrc}`);
@@ -63,6 +81,27 @@ function ensureTemplates(root: string, force: boolean): string[] {
   return copied;
 }
 
+/**
+ * Tracker hygiene (bug-init-leaves-docs-untracked-start-blocks-on-clean-tree):
+ * commit exactly the files this run wrote — docs, templates, tasks/ tree and
+ * tasks/.convention.yml (its x-generated state must ride along so the first
+ * commit is self-consistent). Surgical staging (`git add -- <path>`), never
+ * `git add -A`; best effort — non-git trees and git-absent machines skip with
+ * a reason and the command stays ok. A re-run that rewrote nothing (identical
+ * bytes) hits the quiet "nothing to commit" skip, keeping HEAD untouched.
+ */
+function commitGeneratedDocs(
+  root: string,
+  writtenPaths: string[],
+  commitFlag: boolean | undefined,
+): TrackerCommitResult {
+  const paths = [...new Set(writtenPaths)].sort();
+  return commitTrackerMutation(root, paths, {
+    message: trackerCommitMessage("generated", [`init docs (${paths.length} files)`]),
+    commit: resolveAutoCommit(commitFlag, readAutoCommitConfig(root)),
+  });
+}
+
 export function runInit(opts: InitOptions): InitResult {
   const root = resolve(opts.dir);
   const tasksDir = join(root, "tasks");
@@ -74,6 +113,7 @@ export function runInit(opts: InitOptions): InitResult {
       .map((name) => `templates/${name}`)
       .sort();
     const docs = generateDocs({ root, full: Boolean(opts.full), backup: opts.backup, now: opts.now });
+    const written = [...restored, ...docs.created, ...docs.updated, "tasks/.convention.yml"];
     return {
       root,
       alreadyInitialized: true,
@@ -85,6 +125,7 @@ export function runInit(opts: InitOptions): InitResult {
       skipped: docs.skipped,
       restored,
       conventionPath,
+      commit: commitGeneratedDocs(root, written, opts.commit),
     };
   }
 
@@ -102,6 +143,7 @@ export function runInit(opts: InitOptions): InitResult {
   const copiedTemplates = ensureTemplates(root, opts.force).map((name) => `templates/${name}`);
   const docs = generateDocs({ root, full: Boolean(opts.full), backup: opts.backup, now: opts.now });
   const created = ["tasks/.convention.yml", ...copiedTemplates, ...docs.created].sort();
+  const written = [...created, ...docs.updated];
 
   return {
     root,
@@ -114,5 +156,6 @@ export function runInit(opts: InitOptions): InitResult {
     skipped: docs.skipped,
     restored: [],
     conventionPath,
+    commit: commitGeneratedDocs(root, written, opts.commit),
   };
 }

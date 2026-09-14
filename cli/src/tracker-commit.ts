@@ -58,7 +58,9 @@ export type TrackerCommitVerb =
   | "done"
   | "updated"
   | "claimed"
-  | "imported";
+  | "imported"
+  /** init bootstrap (bug-init-leaves-docs-untracked): the generated doc set. */
+  | "generated";
 
 /** `chore(tasks): <verb> <item-id>` (comma-joined ids when a commit covers several). */
 export function trackerCommitMessage(verb: TrackerCommitVerb, ids: string[]): string {

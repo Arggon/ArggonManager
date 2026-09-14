@@ -33,6 +33,15 @@ import { maybeCommitUpdate, runUpdate } from "./update.js";
 
 const NOW = new Date("2026-09-13T12:00:00Z");
 
+function commitAllIfDirty(dir: string, message: string): void {
+  spawnSync("git", ["add", "-A"], { cwd: dir, stdio: "pipe" });
+  const r = spawnSync("git", ["commit", "--quiet", "-m", message], { cwd: dir, stdio: "pipe" });
+  // init/creates auto-commit now (tracker hygiene); "nothing to commit" is fine.
+  if (r.status !== 0 && !/nothing to commit/.test(String(r.stderr) + String(r.stdout))) {
+    throw new Error(`git commit failed: ${r.stderr}`);
+  }
+}
+
 function git(args: string[], cwd: string): string {
   const r = spawnSync("git", args, { encoding: "utf8", cwd });
   expect(r.status, `git ${args.join(" ")}: ${r.stderr}`).toBe(0);
@@ -63,8 +72,7 @@ function initRepo(): string {
   // init also generates governing docs; commit the whole scaffold (fixture
   // setup in a throwaway temp repo — same as the worktree.test.ts pattern)
   // so per-test diffs only show the mutation under test.
-  git(["add", "-A"], dir);
-  git(["commit", "--quiet", "-m", "init tasks"], dir);
+  commitAllIfDirty(dir, "init tasks");
   return dir;
 }
 
@@ -158,7 +166,8 @@ describe("tracker auto-commit on create", () => {
 
     expect(result.commit).toEqual({ committed: false, skipReason: "auto-commit disabled" });
     expect(status(dir)).toContain("tasks/launch/auth/login/task-dirty.md");
-    expect(git(["log", "--format=%s", "-1"], dir)).toBe("init tasks");
+    // Scaffold commits are auto-created now (init + creates, tracker hygiene).
+    expect(git(["log", "--format=%s", "-1"], dir)).toBe("chore(tasks): created task-rate-limit");
   });
 
   it("honors x-tracker.auto-commit: false from the config", () => {
@@ -442,7 +451,8 @@ describe("tracker auto-commit on update", () => {
     const result = runUpdate({ cwd: dir, id: "task-rate-limit", title: "Rate limit", now: NOW });
     expect(result.changed).toEqual([]);
     expect(maybeCommitUpdate(result, undefined)).toBeUndefined();
-    expect(git(["log", "--format=%s", "-1"], dir)).toBe("init tasks");
+    // Scaffold commits are auto-created now (init + creates, tracker hygiene).
+    expect(git(["log", "--format=%s", "-1"], dir)).toBe("chore(tasks): created task-rate-limit");
   });
 
   it("builds the cascade message suffix only when the cascade fired", () => {
@@ -469,8 +479,7 @@ function initImportRepo(): string {
   runInit({ dir, force: false });
   runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
   runCreate({ cwd: dir, type: "epic", title: "Backlog", parent: "launch", id: "backlog", now: NOW });
-  git(["add", "-A"], dir);
-  git(["commit", "--quiet", "-m", "init tasks"], dir);
+  commitAllIfDirty(dir, "init tasks");
   return dir;
 }
 
@@ -512,7 +521,8 @@ describe("tracker auto-commit on import-issues", () => {
 
     expect(result.commit).toEqual({ committed: false, skipReason: "auto-commit disabled" });
     expect(status(dir)).toContain("tasks/launch/backlog/story-imported-issues/");
-    expect(git(["log", "--format=%s", "-1"], dir)).toBe("init tasks");
+    // Scaffold commits are auto-created now (init + creates, tracker hygiene).
+    expect(git(["log", "--format=%s", "-1"], dir)).toBe("chore(tasks): created backlog");
   });
 
   it("a mid-run failure keeps the historic no-commit behavior (dirty + error, no commit)", () => {
@@ -527,7 +537,8 @@ describe("tracker auto-commit on import-issues", () => {
     );
     // The first issue and its story were written but never committed.
     expect(status(dir)).toContain("tasks/launch/backlog/story-imported-issues/");
-    expect(git(["log", "--format=%s", "-1"], dir)).toBe("init tasks");
+    // Scaffold commits are auto-created now (init + creates, tracker hygiene).
+    expect(git(["log", "--format=%s", "-1"], dir)).toBe("chore(tasks): created backlog");
   });
 });
 

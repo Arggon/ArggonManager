@@ -47,7 +47,7 @@ The tracker-commit history of every live experiment repo shows a **manual first 
 
 ## Acceptance
 
-- [ ] The chosen design landed: fresh `init` → `start` succeeds without a manual commit, or the promise text is scoped so it no longer covers init output
-- [ ] Regression test covering the fresh init → start sequence (or doc-only change noted in the item)
+- [x] The chosen design landed: fresh `init` → `start` succeeds without a manual commit, or the promise text is scoped so it no longer covers init output (option (a): init auto-commits exactly the files it wrote via commitTrackerMutation, new `generated` verb, `--no-commit`/`x-tracker.auto-commit` honored; test proves `git status --porcelain` is empty after fresh init)
+- [x] Regression test covering the fresh init → start sequence (or doc-only change noted in the item) (cli/src/init.test.ts: clean tree + HEAD contents after fresh init; ok in non-git dir; HEAD untouched on no-op re-run)
 
 ## Notes

@@ -1,11 +1,5 @@
-import {
-  mkdtempSync,
-  readFileSync,
-  existsSync,
-  mkdirSync,
-  writeFileSync,
-  unlinkSync,
-} from "node:fs";
+import { mkdtempSync, readFileSync, existsSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -123,4 +117,57 @@ describe("init", () => {
     writeFileSync(join(dir, "tasks/note.txt"), "x");
     expect(() => runInit({ dir, force: false })).toThrow(/--force/);
   });
+
+  // bug-init-leaves-docs-untracked-start-blocks-on-clean-tree: init must
+  // auto-commit the docs it generates so `start`'s clean-tree precondition
+  // never blocks tool-generated state.
+  it("auto-commits generated docs: fresh init leaves a clean git tree", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-"));
+    gitInit(dir);
+    const result = runInit({ dir, force: false });
+    expect(result.commit?.committed).toBe(true);
+    expect(result.commit?.message).toMatch(/^chore\(tasks\): generated init docs \(\d+ files\)$/);
+    // start's clean-tree gate: nothing untracked, nothing modified.
+    const status = git(dir, ["status", "--porcelain"]);
+    expect(status).toBe("");
+    // HEAD carries the generated docs, the tasks/ tree AND the provenance state.
+    const tracked = git(dir, ["ls-files"]);
+    for (const doc of [...TIER1_DOCS, "tasks/.convention.yml", "templates/task.md"]) {
+      expect(tracked).toContain(doc);
+    }
+  });
+
+  it("stays ok in a non-git directory (commit skipped, not a failure)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-"));
+    const result = runInit({ dir, force: false });
+    expect(existsSync(join(dir, "AGENTS.md"))).toBe(true);
+    expect(result.commit?.committed).toBe(false);
+    expect(result.commit?.skipReason).toMatch(/not a git repository|git not found/);
+  });
+
+  it("re-run with nothing regenerated leaves HEAD untouched (quiet no-op)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-"));
+    gitInit(dir);
+    const now = new Date("2026-09-14T12:00:00Z");
+    runInit({ dir, force: false, now });
+    const headBefore = git(dir, ["rev-parse", "HEAD"]);
+    const second = runInit({ dir, force: false, now });
+    // Same generation timestamp → identical bytes → "nothing to commit" skip,
+    // never a noisy empty commit nor a dirty tree.
+    expect(second.commit?.committed).toBe(false);
+    expect(second.commit?.skipReason).toBe("nothing to commit");
+    expect(git(dir, ["rev-parse", "HEAD"])).toBe(headBefore);
+    expect(git(dir, ["status", "--porcelain"])).toBe("");
+  });
 });
+
+/** Minimal git repo with a committer identity so auto-commits can land. */
+function gitInit(dir: string): void {
+  execFileSync("git", ["init", "-q"], { cwd: dir, stdio: "pipe" });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: dir, stdio: "pipe" });
+  execFileSync("git", ["config", "user.name", "Test"], { cwd: dir, stdio: "pipe" });
+}
+
+function git(dir: string, args: string[]): string {
+  return execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: "pipe" });
+}

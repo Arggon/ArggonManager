@@ -42,6 +42,15 @@ function localGit() {
   return { ...defaultStartGit(), pushBranch: () => {}, createDraftPr: () => "https://github.com/o/r/pull/1" };
 }
 
+function commitAllIfDirty(dir: string, message: string): void {
+  spawnSync("git", ["add", "-A"], { cwd: dir, stdio: "pipe" });
+  const r = spawnSync("git", ["commit", "--quiet", "-m", message], { cwd: dir, stdio: "pipe" });
+  // init/creates auto-commit now (tracker hygiene); "nothing to commit" is fine.
+  if (r.status !== 0 && !/nothing to commit/.test(String(r.stderr) + String(r.stdout))) {
+    throw new Error(`git commit failed: ${r.stderr}`);
+  }
+}
+
 function initRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), "arggon-worktree-"));
   git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
@@ -54,10 +63,9 @@ function initRepo(): string {
   for (const id of ["task-alpha", "task-bravo", "task-charlie"]) {
     runCreate({ cwd: dir, type: "task", title: id, parent: "login", id, now: NOW });
   }
-  // init now also generates governing docs (AGENTS.md, .github/, docs/, ...);
-  // commit the whole scaffold so the tree is clean for start --worktree.
-  git(["add", "-A"], dir);
-  git(["commit", "--quiet", "-m", "init tasks"], dir);
+  // init now also generates AND auto-commits the governing docs; this is a
+  // tolerant no-op when everything is already committed (tracker hygiene).
+  commitAllIfDirty(dir, "init tasks");
   return dir;
 }
 
