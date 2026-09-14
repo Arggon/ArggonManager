@@ -1,12 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-autocommit-update-import
 title: Extend auto-commit to update-cascade and import-issues
+assignee: Arggon
+branch: feat/task-autocommit-update-import
 parent: story-tracker-hygiene
 labels: []
 created: "2026-09-13"
-updated: "2026-09-13"
+updated: "2026-09-14"
+claimed_at: "2026-09-14T00:53:54.477Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tracker-hygiene/task-autocommit-update-import.md
@@ -23,6 +26,6 @@ Found by the suizo experiment (2026-09-13): auto-commit (PR #116) covers create/
 
 ## Acceptance
 
-- [ ] `update` (including cascade multi-file flips) auto-commits its mutated item files with the same surgical staging + message convention (e.g. `chore(tasks): done task-x (cascade: story-a, epic-b)`)
-- [ ] `import-issues` auto-commits its created items as one commit (`chore(tasks): imported N issues`)
-- [ ] --no-commit / x-tracker.auto-commit respected everywhere; tests per surface
+- [x] `update` (including cascade multi-file flips) auto-commits its mutated item files with the same surgical staging + message convention (e.g. `chore(tasks): done task-x (cascade: story-a, epic-b)`)
+- [x] `import-issues` auto-commits its created items as one commit (`chore(tasks): imported N issues`)
+- [x] --no-commit / x-tracker.auto-commit respected everywhere; tests per surface
