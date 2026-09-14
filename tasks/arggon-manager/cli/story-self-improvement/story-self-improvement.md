@@ -1,6 +1,6 @@
 ---
 type: story
-status: todo
+status: done
 id: story-self-improvement
 title: "Self-improvement loop: adversarial lab, audit protocol, telemetry mining"
 parent: cli
@@ -21,4 +21,4 @@ Five adoption experiments (cv, cuentas-claras, guardian, suizo, racha) + estante
 
 ## Acceptance
 
-- [ ] The experiment scenarios live as a permanent lab suite (CI-runnable); the audit protocol and telemetry mining are documented with first runs executed; findings flow through the tracker as always
+- [x] The experiment scenarios live as a permanent lab suite (CI-runnable); the audit protocol and telemetry mining are documented with first runs executed; findings flow through the tracker as always

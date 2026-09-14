@@ -10,6 +10,7 @@ import { maybeCommitUpdate, runUpdate } from "./update.js";
 import { STATUSES } from "./status.js";
 import { toContractWorkItem } from "./contract.js";
 import { commitPayload } from "./tracker-commit.js";
+import { arggonVersion } from "./docs.js";
 
 /**
  * Stdio MCP server exposing the shared kernel (list/create/update/comment) as
@@ -22,7 +23,7 @@ import { commitPayload } from "./tracker-commit.js";
 const SUPPORTED_PROTOCOL_VERSIONS = ["2024-11-05", "2025-03-26", "2025-06-18"] as const;
 const DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 
-const SERVER_INFO = { name: "arggon", version: "0.0.0" } as const;
+const SERVER_INFO = { name: "arggon", version: arggonVersion() };
 
 const LIST_FAILED = "LIST_FAILED";
 const CREATE_FAILED = "CREATE_FAILED";

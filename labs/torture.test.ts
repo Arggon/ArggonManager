@@ -39,14 +39,13 @@
  *    origin: suizo observation "necesité reintentos por lock transitorio".
  *    asserts: all comments land in their item files; git's index.lock races
  *    resolve as success or a clean, reported failure — never a corrupted
- *    state, no index.lock left behind, validate ok. Two EXPOSED bugs are
- *    tracked instead of baked into green assertions:
- *    - bug-comment-race-no-lock: concurrent comments on the SAME item lose
- *      one (runComment is unlocked) — it.todo below scenario 2.
- *    - bug-autocommit-silent-skip: a lost index.lock race silently skips the
- *      commit (file left dirty, ok:true) — `git status` asserted as
- *      modifications-only instead of clean.
- *
+ *    state, no index.lock left behind, validate ok. Both exposed bugs are
+ *    FIXED and asserted below:
+ *    - bug-comment-race-no-lock: runComment holds withItemLock, so
+ *      same-item concurrent comments both land (the test after scenario 2).
+ *    - bug-autocommit-silent-skip: commitTrackerMutation retries the
+ *      index.lock race and reports unavoidable skips, so scenario 2 asserts
+ *      the tree `git status`-clean. *
  * 3. Synthetic legacy tree, full adoption flow (end-to-end CLI)
  *    origin: guardian/cuentas-claras/suizo/racha — adopt auto-hierarchy + ack
  *    sweep. asserts: init --full preserves the adopter's old-school files;
@@ -217,9 +216,8 @@ describe("lab: mixed concurrent operations on one item family (suizo / bug-claim
         { args: ["update", "task-sibling", "--status", "done", "--json"] },
         { args: ["update", "task-sibling", "--title", "Sibling v2", "--json"] },
         // Comments racing the claims. NOTE: they target DIFFERENT items —
-        // concurrent comments on the SAME item currently lose one (runComment
-        // is an unlocked read-modify-write); see bug-comment-race-no-lock,
-        // probed by the it.todo below.
+        // same-item concurrent comments are covered by the test below
+        // (bug-comment-race-no-lock, now fixed with withItemLock).
         { args: ["comment", "task-target", "observer one", "--author", "alice", "--json"] },
         { args: ["comment", "task-sibling", "observer two", "--author", "bob", "--json"] },
       ]);
@@ -287,8 +285,8 @@ describe("lab: concurrent tracker auto-commit contention (suizo lock-transitorio
 
       // Six processes comment on six different items simultaneously — every
       // mutation ends in its own git commit, so git's index.lock is contended.
-      // (The same-item variant is the it.todo below: runComment is currently
-      // unlocked, so we do not bake its known loss into a green assertion.)
+      // (The same-item variant is asserted by the test below — see
+      // bug-comment-race-no-lock.)
       const commands = ids.map((id) => ({
         args: ["comment", id, `note on ${id}`, "--author", "agent", "--json"],
       }));
@@ -311,20 +309,12 @@ describe("lab: concurrent tracker auto-commit contention (suizo lock-transitorio
         expect(body).toContain(`note on ${id}`);
       }
 
-      // No git index.lock left behind and no corruption: the tree converged.
-      // NOTE: we do NOT assert `git status` fully clean here — the lab
-      // exposed bug-autocommit-silent-skip: under index.lock contention
-      // commitTrackerMutation can silently skip the commit, leaving the
-      // mutated item file dirty with ok:true. Assert the dirty set is only
-      // in-place modifications under tasks/ (never deletions/renames), and
-      // every comment is on disk.
+      // No git index.lock left behind and the tree is fully clean: with the
+      // commitTrackerMutation retry (bug-autocommit-silent-skip fix) every
+      // index.lock race resolves as a landed commit — a silent skip would
+      // leave the mutated item file dirty here.
       expect(existsSync(join(dir, ".git/index.lock"))).toBe(false);
-      const dirty = git(["status", "--porcelain"], dir)
-        .split("\n")
-        .filter((line) => line.length > 0);
-      for (const line of dirty) {
-        expect(line).toMatch(/^ ?M tasks\/launch\/auth\/story-login\/task-[a-f]\.md$/);
-      }
+      expect(git(["status", "--porcelain"], dir)).toBe("");
 
       expect(runCli(["validate", "--json"], dir).body).toMatchObject({ ok: true });
 
@@ -334,11 +324,46 @@ describe("lab: concurrent tracker auto-commit contention (suizo lock-transitorio
   );
 
   // Exposed by this lab while building scenario 2: two concurrent comments on
-  // the SAME item lose one silently (runComment in cli/src/comment.ts does an
-  // unlocked read-modify-write, unlike the locked claim/update path from
-  // bug-claim-race-no-lock / PR #134). Filed as bug-comment-race-no-lock —
-  // convert this to a real assertion (both comments land) once fixed.
-  it.todo("two concurrent comments on the same item both land (bug-comment-race-no-lock)");
+  // the SAME item used to lose one silently (runComment did an unlocked
+  // read-modify-write). Fixed in bug-comment-race-no-lock: runComment now
+  // serializes its read-modify-write with withItemLock, so both comments land.
+  it(
+    "two concurrent comments on the same item both land (bug-comment-race-no-lock)",
+    async () => {
+      const dir = freshGitTree("comment-race", "x-tracker:\n  auto-commit: true\n");
+      try {
+        runCreate({ cwd: dir, type: "task", title: "Race target", parent: "story-login", id: "task-a" });
+        gitCommitIfDirty(dir, "seed race target");
+
+        // Two processes comment on the SAME item simultaneously.
+        const results = await spawnAll(dir, [
+          { args: ["comment", "task-a", "first concurrent comment", "--author", "agent", "--json"] },
+          { args: ["comment", "task-a", "second concurrent comment", "--author", "agent", "--json"] },
+        ]);
+
+        // Both processes succeed (or report a clean contention failure — the
+        // item lock timeout, or git's index.lock, the known separate
+        // bug-autocommit-silent-skip family). With the fix both should be ok.
+        for (const r of results) {
+          expect(r.body).not.toBeNull();
+          if (r.body!.ok !== true) {
+            const message = (r.body!.error as Json).message as string;
+            expect(/failed to acquire lock|index/i.test(message)).toBe(true);
+          }
+        }
+
+        // The invariant this bug was filed for: NEITHER comment is lost.
+        const body = readFileSync(join(dir, "tasks/launch/auth/story-login/task-a.md"), "utf8");
+        expect(body).toContain("first concurrent comment");
+        expect(body).toContain("second concurrent comment");
+
+        expect(runCli(["validate", "--json"], dir).body).toMatchObject({ ok: true });
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    },
+    90_000,
+  );
 });
 
 // ---------------------------------------------------------------------------

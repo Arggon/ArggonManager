@@ -1,8 +1,9 @@
 ---
 type: story
-status: todo
+status: done
 id: story-cli-ergonomics
 title: Query and reparent ergonomics
+assignee: Arggon
 parent: cli
 labels: []
 created: "2026-09-14"
@@ -21,6 +22,6 @@ Third ergonomics batch, from the estanteria MCP-first experiment (2026-09-14): (
 
 ## Acceptance
 
-- [ ] Filters/views can target whole initiatives or subtrees (ancestor predicate or initiative field); documented + tested
-- [ ] `arggon update <id> --parent <new-parent>` reparents with the same rules as create's parent validation; documented + tested
-- [ ] A version policy exists (bump on release or changelog-driven) and --version reflects it; documented
+- [x] Filters/views can target whole initiatives or subtrees (ancestor predicate or initiative field); documented + tested
+- [x] `arggon update <id> --parent <new-parent>` reparents with the same rules as create's parent validation; documented + tested
+- [x] A version policy exists (bump on release or changelog-driven) and --version reflects it; documented

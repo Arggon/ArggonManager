@@ -49,13 +49,15 @@ import { runTuiBoard } from "./tui.js";
 import { maybeCommitUpdate, runUpdate } from "./update.js";
 import { formatValidateHuman, runValidate } from "./validate.js";
 import { commitPayload, formatCommitLine } from "./tracker-commit.js";
+import { arggonVersion } from "./docs.js";
 import { gateSteal, findItemStatus, gateReopen } from "./steal-gate.js";
 const program = new Command();
 
 program
   .name("arggon")
   .description("Git-native task CLI for ArggonManager")
-  .version("0.0.0")
+  // Package version (manual bump per release wave; see README "Versioning").
+  .version(arggonVersion())
   // Positional options: the root --version flag must not swallow a subcommand's
   // own --version (playbook new/refresh), so options after the subcommand name
   // are parsed by that subcommand only.
@@ -333,7 +335,7 @@ program
   )
   .option(
     "--filter <expr>",
-    'compact filter (e.g. "status:todo !label:security"); fields status, type, assignee, label, parent, depends-on, blocked-by; ! negates; quotes allow spaces',
+    'compact filter (e.g. "status:todo !label:security"); fields status, type, assignee, label, parent, depends-on, blocked-by, ancestor; ! negates; quotes allow spaces',
   )
   .option(
     "--view <name>",
@@ -560,6 +562,10 @@ program
   .option("--status <status>", "new status (must follow v0 transitions)")
   .option("--assignee <login>", "new assignee (claimable types need one when in_progress)")
   .option("--branch <name>", "set working branch (empty string clears; unclaim clears by default)")
+  .option(
+    "--parent <id>",
+    "reparent the item: rewrite parent and move the file/directory per the layout rules (leaves move as a file; containers move their whole directory)",
+  )
   .option("--unassign", "clear assignee (in_progress -> todo does this by default)", false)
   .option("--labels <csv>", "replace the full labels list (comma-separated)")
   .option(
@@ -592,6 +598,7 @@ program
         status?: string;
         assignee?: string;
         branch?: string;
+        parent?: string;
         unassign?: boolean;
         labels?: string;
         dependsOn?: string;
@@ -635,6 +642,7 @@ program
           status: opts.status,
           assignee: opts.assignee,
           branch: opts.branch,
+          parent: opts.parent,
           unassign: opts.unassign,
           labels: opts.labels,
           dependsOn: opts.dependsOn,
@@ -659,6 +667,7 @@ program
               item: toContractWorkItem(result.item, result.root),
               autoCompleted: result.autoCompleted,
               cascadeLevels: result.cascadeLevels,
+              ...(result.movedFrom ? { movedFrom: result.movedFrom } : {}),
               ...(result.cascadeSkipped.length > 0
                 ? { cascadeSkipped: result.cascadeSkipped }
                 : {}),
@@ -671,6 +680,7 @@ program
         const what = result.changed.length > 0 ? ` (${result.changed.join(", ")})` : "";
         console.log(`arggon update: ${result.item.type} ${result.id}${what}`);
         console.log(`  ${result.path}`);
+        if (result.movedFrom) console.log(`  moved from: ${result.movedFrom}`);
         for (const skipped of result.cascadeSkipped) {
           console.log(
             `  cascade skipped: ${skipped.type} '${skipped.id}'` +

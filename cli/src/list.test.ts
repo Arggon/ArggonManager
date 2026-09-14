@@ -413,6 +413,42 @@ branch: feat/a
       write(dir, "tasks/.convention.yml", "x-views:\n  bad: status:bogus\n");
       expect(() => runList({ cwd: dir, view: "bad" })).toThrow(/unknown status/);
     });
+
+    it("resolves ancestor:<id> inside saved views over the whole chain", () => {
+      const dir = makeViewTree();
+      write(
+        dir,
+        "tasks/.convention.yml",
+        [
+          "version: 0",
+          "x-views:",
+          '  launch: "ancestor:launch-mvp status:todo"',
+          "",
+        ].join("\n"),
+      );
+      const { items } = runList({ cwd: dir, view: "launch" });
+      // Under the initiative at any depth and still todo; launch-mvp itself
+      // is in_progress and never matches its own ancestor chain.
+      expect(items.map((i) => i.id)).toEqual(["story-login", "task-h1-only", "task-rate-limit", "z-later"]);
+    });
+  });
+
+  describe("ancestor: filter (task-ancestor-filter)", () => {
+    it("matches items at any depth under an id and composes with flags", () => {
+      const dir = makeTree();
+      const { items } = runList({ cwd: dir, filter: "ancestor:launch-mvp", type: "task" });
+      expect(items.map((i) => i.id)).toEqual(["task-h1-only", "task-mine", "task-no-title", "task-rate-limit"]);
+      const { items: negated } = runList({ cwd: dir, filter: "!ancestor:launch-mvp" });
+      expect(negated.map((i) => i.id)).toEqual(["launch-mvp"]);
+    });
+
+    it("returns empty (not an error) for unknown ancestor ids, and excludes the item itself", () => {
+      const dir = makeTree();
+      const { items } = runList({ cwd: dir, filter: "ancestor:nope" });
+      expect(items).toEqual([]);
+      const { items: self } = runList({ cwd: dir, filter: "ancestor:launch-mvp", status: "in_progress", type: "initiative" });
+      expect(self.map((i) => i.id)).toEqual([]);
+    });
   });
 
   it("fails on invalid items with file context", () => {

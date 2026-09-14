@@ -81,6 +81,8 @@ CLI create examples:
 
 `parent` is an **id**, not a path. Moving `story-login/` from under `auth/` to under `onboarding/` updates only that story’s `parent` (`auth` → `onboarding`). Nested tasks keep `parent: story-login`.
 
+`arggon update <id> --parent <new-parent>` performs this reparent mechanically: it validates the edge (task/bug under a story, story under an epic, epic under an initiative; no cycles — a parent that is the item's own descendant is refused), rewrites `parent`, and moves the file (leaves) or the whole directory (containers) per the layout rules. Same parent = no-op.
+
 ### Invalid layouts (reject / fail validate)
 
 | Problem                                                     | Why invalid                                                                         |
@@ -361,9 +363,11 @@ version: 0
 x-views:
   my-open-bugs: "type:bug status:todo !assignee:someone"
   this-epic: "parent:cli"
+  this-initiative: "ancestor:launch-mvp"
 ```
 
 - `arggon list --view <name>` resolves the expression and applies it ANDed with the explicit flags and `--filter`; `@me` inside a view resolves exactly like `list --assignee @me`.
+- `ancestor:<id>` matches items with `<id>` anywhere in their parent chain (task → story → epic → initiative), composing with the other predicates and `!` negation. It checks the chain only: an item is never its own ancestor (`ancestor:<own-id>` is false), and an unknown id simply matches nothing (no error). `parent:<id>` remains the direct-parent-only predicate.
 - Unknown view names fail with the list of known views; an empty `x-views` map fails for any name.
 - The key is namespaced (`x-*`), so older tools ignore it per the extension policy above; a scalar `x-views` value, an empty expression, or a duplicate view name is a parse error.
 

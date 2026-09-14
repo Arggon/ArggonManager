@@ -109,6 +109,25 @@ arggon update <id> --status todo
 
 Agents **MUST NOT** reopen `done` / `cancelled`. This is enforced, not just documented (bug-reopen-ungated-cli): the MCP layer refuses agent callers via the shared rules module cli/src/rules.ts, and the CLI — which has no caller identity — gates the transition behind an interactive terminal: `arggon update <id> --status todo` on a `done`/`cancelled` item requires a `y/N` confirmation over a TTY stdin. Piped stdin (agents, scripts, CI) is refused even with `y` piped in; there is no `--yes` override and no config opt-in. Humans keep the ability by confirming at their terminal.
 
+## Orchestration (multi-agent work)
+
+Non-trivial items are **orchestrated by default**: a coordinator agent delegates them to subagents instead of working them inline. Trivial items (one-line fixes, doc tweaks) stay inline.
+
+**Coordinator duties:**
+
+- **Wave planning by file-disjointness:** group claimable items into waves whose members touch disjoint files/modules. Items that would collide go in different waves.
+- **Per-item worktrees:** one subagent per item, each working in its own worktree (`../<repo>-<item-id>`); no two subagents share a working tree.
+- **Merge verification:** after each subagent's PR, the coordinator verifies the merge; when waves overlap, the coordinator resolves cross-item conflicts.
+- **Tracker ownership:** the coordinator owns tracker state — claim conflicts, blocked items, follow-up filing, and final wave verification (0 open items, `arggon validate` ok, `arggon doctor` clean).
+
+**Subagent rules:**
+
+- Claim **your** item (`in_progress` + assignee) and stay inside **your** worktree.
+- Never flip your item `done` — completion is the coordinator's call after merge verification — and never reopen `done`/`cancelled` or steal a claim.
+- Report findings back to the coordinator instead of filing tracker items — the coordinator consolidates and files.
+
+The claim, branch, PR, and validate rules above apply to subagents **unchanged**: same commands, same gates, same "never" list.
+
 ## JSON for agents
 
 Pass `--json` on supported commands for a stable object on stdout (see [`docs/json-output.md`](./json-output.md)). On failure, expect non-zero exit and a JSON error object when `--json` was set.

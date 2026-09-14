@@ -33,7 +33,7 @@ describe("doctor: non-initialized repos", () => {
     expect(result.initialized).toBe(false);
     expect(result.root).toBeNull();
     expect(result.conventionVersion).toBe(0);
-    expect(result.docs).toEqual({ managed: 0, untouched: 0, modified: 0, acknowledged: 0, stale: 0, missing: 0 });
+    expect(result.docs).toEqual({ managed: 0, untouched: 0, modified: 0, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0 });
     expect(result.tracker).toEqual({ items: 0, todo: 0 });
     expect(formatDoctorReport(result)).toContain("not initialized");
   });
@@ -65,7 +65,7 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     expect(result.initialized).toBe(true);
     expect(result.root).toBe(dir);
     expect(result.conventionVersion).toBe(3);
-    expect(result.docs).toEqual({ managed: 17, untouched: 17, modified: 0, acknowledged: 0, stale: 0, missing: 0 });
+    expect(result.docs).toEqual({ managed: 17, untouched: 17, modified: 0, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0 });
     expect(result.tracker).toEqual({ items: 0, todo: 0 });
   });
 
@@ -88,7 +88,7 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     runInit({ dir, force: false, full: true, backup: true });
     expect(existsSync(join(dir, "backup"))).toBe(true);
     const result = runDoctor({ cwd: dir });
-    expect(result.docs).toEqual({ managed: 17, untouched: 17, modified: 0, acknowledged: 0, stale: 0, missing: 0 });
+    expect(result.docs).toEqual({ managed: 17, untouched: 17, modified: 0, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0 });
   });
 
   it("counts a deleted managed doc as missing", () => {
@@ -139,12 +139,33 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
       untouched: 0,
       modified: 0,
       acknowledged: 17,
+      acknowledgedDrifted: 0,
       stale: 0,
       missing: 0,
     });
     const report = formatDoctorReport(result);
     expect(report).toContain("17 acknowledged");
     expect(report).toContain("0 modified");
+  });
+
+  it("reports hand edits after ack in the informational acknowledgedDrifted bucket (bug-ack-drift-promise)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    runAdoptAck({ cwd: dir });
+    writeFileSync(join(dir, "AGENTS.md"), "LATE HAND EDIT\n", "utf8");
+    const result = runDoctor({ cwd: dir });
+    expect(result.docs).toEqual({
+      managed: 17,
+      untouched: 0,
+      modified: 0,
+      acknowledged: 16,
+      acknowledgedDrifted: 1,
+      stale: 0,
+      missing: 0,
+    });
+    const report = formatDoctorReport(result);
+    expect(report).toContain("1 acknowledgedDrifted");
+    expect(report).toContain("drifted from the acked baseline");
   });
 
   it("reports tracker counts via loadItems", () => {
@@ -178,7 +199,7 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     expect(body.command).toBe("doctor");
     expect(body.initialized).toBe(true);
     expect(body.root).toBe(dir);
-    expect(body.docs).toEqual({ managed: 17, untouched: 16, modified: 1, acknowledged: 0, stale: 0, missing: 0 });
+    expect(body.docs).toEqual({ managed: 17, untouched: 16, modified: 1, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0 });
     expect(body.tracker).toEqual({ items: 0, todo: 0 });
   });
 

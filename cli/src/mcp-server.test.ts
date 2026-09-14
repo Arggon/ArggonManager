@@ -111,7 +111,7 @@ describe("mcp server", () => {
     expect(result).toMatchObject({
       protocolVersion: "2025-03-26",
       capabilities: { tools: { listChanged: false } },
-      serverInfo: { name: "arggon", version: "0.0.0" },
+      serverInfo: { name: "arggon", version: "0.1.0" },
     });
   });
 

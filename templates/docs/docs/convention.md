@@ -46,6 +46,19 @@ Every work item is a Markdown file with YAML frontmatter:
 - `todo` → `done` directly is not allowed: claim first, then complete.
 - Agents never reopen `done`/`cancelled`; file a follow-up with `arggon create`.
 
+## Namespaced extensions
+
+`tasks/.convention.yml` supports `x-*` namespaced extension keys (older tools ignore them). The generated file documents each one-line; the full normative reference is [`docs/convention.md`](https://github.com/Arggon/ArggonManager) in the ArggonManager repository:
+
+| Extension      | What it does | Where |
+| -------------- | ------------ | ----- |
+| `x-views`      | Saved list/board views: a mapping of `name: "<predicate expression>"` using the filter predicate language (`arggon list --filter`) | ArggonManager `docs/convention.md` § Saved views |
+| `x-playbooks`  | Playbook staleness options for `arggon playbook status` (`max-age-days`) | ArggonManager `docs/convention.md` § Technology playbooks |
+| `x-tracker`    | Tracker hygiene options: `auto-commit`, `allow-steal` | ArggonManager `docs/convention.md` § Tracker hygiene |
+| `x-import`     | `arggon import-issues` options, e.g. `label-types` (GitHub label → work-item type mapping) | ArggonManager `docs/convention.md` § Import type mapping |
+| `x-worktree`   | Worktree bootstrap for `arggon start --worktree`: `post-start` / `post-start-shell` commands | ArggonManager `docs/convention.md` § Worktree bootstrap |
+| `x-generated`  | Checksum/provenance state for arggon-generated docs (drives `arggon doctor` modified/stale reporting) | ArggonManager `docs/convention.md` § Generated-doc provenance |
+
 ## Validation
 
 `arggon validate` checks the tree (run in pre-commit and CI — see [`AGENTS.md`](../AGENTS.md)).

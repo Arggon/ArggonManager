@@ -1,8 +1,10 @@
 ---
 type: bug
-status: todo
+status: done
 id: bug-autocommit-silent-skip
 title: autocommit-silent-skip
+assignee: Arggon
+branch: fix/bug-autocommit-silent-skip
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
@@ -25,9 +27,9 @@ Repro: labs/torture.test.ts scenario 2 (6 concurrent `arggon comment` processes 
 
 ## Acceptance
 
-- [ ] `commitTrackerMutation` retries the commit on `index.lock` contention (bounded, e.g. reuse the lock.ts retry/backoff approach) instead of skipping silently
-- [ ] If a skip is still unavoidable, it is reported (JSON `commit` payload / stderr warning), never silent
-- [ ] labs/torture.test.ts scenario 2's `git status --porcelain`-clean assertion is re-enabled and green
+- [x] `commitTrackerMutation` retries the commit on `index.lock` contention (bounded, e.g. reuse the lock.ts retry/backoff approach) instead of skipping silently
+- [x] If a skip is still unavoidable, it is reported (JSON `commit` payload / stderr warning), never silent
+- [x] labs/torture.test.ts scenario 2's `git status --porcelain`-clean assertion is re-enabled and green
 
 ## Notes
 
