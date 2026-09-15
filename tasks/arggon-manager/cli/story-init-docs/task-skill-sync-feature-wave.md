@@ -32,10 +32,15 @@ Gaps (code-verified against skills/arggon-cli/SKILL.md):
 
 ## Acceptance
 
-- [ ] SKILL.md MCP line lists the 9 tools (or drift-proof phrasing pointing at docs/agents.md §MCP for the live list)
-- [ ] SKILL.md gains: `arggon show <id> --json` (bounded single-item read — prefer it over raw file reads) and `arggon handoff <id> --next "..."` (structured resume at session end) in the command/guidance sections
-- [ ] SKILL.md one-liners: `arggon spec analyze` (report-only quality pass) in §4; issue round-trip (x-github, opt-in) in the import/GitHub guidance; --include-stories note in the next guidance
-- [ ] .agents copy regenerated via `npm run skills:sync` (gitignored, parity test covers); doctor 0 modified / 0 drifted; generated AGENTS.md untouched (budget)
-- [ ] Standing rule noted in the item: agent-facing features MUST sync SKILL.md in the same PR — reviewers reject otherwise
+- [x] SKILL.md MCP line lists the 9 tools (or drift-proof phrasing pointing at docs/agents.md §MCP for the live list)
+- [x] SKILL.md gains: `arggon show <id> --json` (bounded single-item read — prefer it over raw file reads) and `arggon handoff <id> --next "..."` (structured resume at session end) in the command/guidance sections
+- [x] SKILL.md one-liners: `arggon spec analyze` (report-only quality pass) in §4; issue round-trip (x-github, opt-in) in the import/GitHub guidance; --include-stories note in the next guidance
+- [x] .agents copy regenerated via `npm run skills:sync` (gitignored, parity test covers); doctor 0 modified / 0 drifted; generated AGENTS.md untouched (budget)
+- [x] Standing rule noted in the item: agent-facing features MUST sync SKILL.md in the same PR — reviewers reject otherwise
 
 ## Notes
+
+Standing rule (coordinator, 2026-09-15): agent-facing features MUST sync
+skills/arggon-cli/SKILL.md in the same PR as the feature — reviewers reject
+feature PRs that leave the SKILL stale (docs-travel-with-code applies to the
+SKILL with priority, since it is what agents read by default).
