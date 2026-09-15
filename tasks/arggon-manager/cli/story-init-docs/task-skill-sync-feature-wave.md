@@ -4,6 +4,7 @@ status: in_progress
 id: task-skill-sync-feature-wave
 title: "SKILL sync: surface show, handoff, 9-tool MCP list and recent features in the bundled skill"
 assignee: Arggon
+branch: feat/task-skill-sync-feature-wave
 parent: story-init-docs
 labels: [p2]
 created: "2026-09-15"
