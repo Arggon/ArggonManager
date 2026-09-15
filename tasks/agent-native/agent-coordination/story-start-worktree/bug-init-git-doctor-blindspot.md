@@ -33,3 +33,6 @@ Doctor is exactly the report-only surface where this belongs: it already reports
 - [x] Tests: doctor on a non-git tree reports the git state; init-in-non-git emits the warning
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. Doctor now answers the question it was asked in vencimientos (is this tree actually usable for the full loop?) without breaking its report-only charter; the init warning rides stderr + additive JSON field following existing conventions; no auto-git-init scope creep. Tests cover both trees. Merge follows.
