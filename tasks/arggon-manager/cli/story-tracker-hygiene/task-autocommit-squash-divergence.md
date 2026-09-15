@@ -4,6 +4,7 @@ status: in_progress
 id: task-autocommit-squash-divergence
 title: "tracker auto-commits + squash merges diverge history: document workflow or decide"
 assignee: Arggon
+branch: feat/task-autocommit-squash-divergence
 parent: story-tracker-hygiene
 labels: [p2]
 created: "2026-09-15"
