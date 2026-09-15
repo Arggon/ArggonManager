@@ -442,18 +442,27 @@ program
 program
   .command("next")
   .description(
-    "Suggest the next claimable item (ready items rank first, by downstream weight — unblocks count; lexicographic id on ties)",
+    "Suggest the next claimable leaf item (tasks/bugs; ready items rank first, by downstream weight — unblocks count; lexicographic id on ties; --include-stories opts stories back in)",
   )
   .option(
     "--ready",
     "limit the pool to ready items (unclaimed todos whose depends_on are all done/cancelled)",
     false,
   )
+  .option(
+    "--include-stories",
+    "include unclaimed stories in the suggestion pool (default: leaf work only)",
+    false,
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { ready?: boolean; json?: boolean }) => {
+  .action((opts: { ready?: boolean; includeStories?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
-      const result = runNext({ cwd: process.cwd(), ready: Boolean(opts.ready) });
+      const result = runNext({
+        cwd: process.cwd(),
+        ready: Boolean(opts.ready),
+        includeStories: Boolean(opts.includeStories),
+      });
       const suggestion = result.suggestion
         ? {
             item: toContractWorkItem(result.suggestion.item, result.root),
@@ -468,10 +477,17 @@ program
         return;
       }
       if (!result.suggestion) {
+        // Default pool excludes stories; distinguish "only stories remain"
+        // from a fully empty pool so the message points at the right flag.
+        const onlyStories =
+          !opts.includeStories &&
+          runNext({ cwd: process.cwd(), includeStories: true }).suggestion !== null;
         console.log(
           opts.ready
             ? "arggon next: ready pool is empty — nothing unblocked to claim."
-            : "arggon next: todo pool is empty — nothing claimable.",
+            : onlyStories
+              ? "arggon next: no unclaimed leaf work remains — only stories are left (plan explicitly, or retry with --include-stories)."
+              : "arggon next: todo pool is empty — nothing claimable.",
         );
         console.log('  Create work with `arggon create task "<title>" --parent <story-id>`.');
         return;

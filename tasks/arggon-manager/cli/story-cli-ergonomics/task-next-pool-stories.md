@@ -26,7 +26,7 @@ Follow-up from the task-mcp-parity-full review (PR #237): `arggon next`'s ready 
 
 ## Acceptance
 
-- [ ] Decision + landing: either stories leave the default pool (flag/`--include-stories` to opt in) or the ranking demotes them explicitly below leaf tasks — decided and documented
-- [ ] Tests for both pools; reason line reflects the chosen semantics
+- [x] Decision + landing: either stories leave the default pool (flag/`--include-stories` to opt in) or the ranking demotes them explicitly below leaf tasks — decided and documented
+- [x] Tests for both pools; reason line reflects the chosen semantics
 
 ## Notes

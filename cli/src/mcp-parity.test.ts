@@ -199,9 +199,9 @@ describe("CLI <-> MCP parity", () => {
     expect(mcpResult.isError).toBe(false);
     expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
     const suggestion = cliResult.suggestion as { item: { id: string }; unblocks: number };
-    // The seeded unclaimed story is also a claimable todo and wins the
-    // lexicographic tie (equal downstream weight).
-    expect(suggestion.item.id).toBe("story-login");
+    // task-next-pool-stories: the default pool excludes stories, so the
+    // seeded unclaimed story is NOT suggested — the leaf task is.
+    expect(suggestion.item.id).toBe("task-rate-limit");
   });
 
   it("report returns the same groups through both entry points", async () => {
@@ -316,6 +316,8 @@ const PARITY_EXCEPTIONS: Record<string, Record<string, string>> = {
   },
   next: {
     "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
+    "--include-stories":
+      "task-next-pool-stories: stories are excluded from the default suggestion pool (leaf work first); the arggon_next MCP tool keeps the default-only surface — claiming a story is a planning act done explicitly via arggon_update/arggon_start, and the flag only changes the candidate set, not the payload shape",
   },
   report: {
     "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
