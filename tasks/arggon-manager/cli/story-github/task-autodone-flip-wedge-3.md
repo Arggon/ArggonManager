@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-autodone-flip-wedge-3
 title: "auto-done flip wedge 3: comment on flipped item conflicts rebase"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-github
 labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
-claimed_at: "2026-09-15T23:34:29.033Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-github/task-autodone-flip-wedge-3.md
