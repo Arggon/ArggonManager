@@ -4,7 +4,7 @@ status: todo
 id: task-autodone-flip-wedge-3
 title: "auto-done flip wedge 3: comment on flipped item conflicts rebase"
 parent: story-github
-labels: []
+labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
