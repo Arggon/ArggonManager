@@ -47,3 +47,6 @@ Research component: document how established tools keep docs synced from source 
 - skills:sync verified idempotent (two runs = zero diff); full suite 900/900, lint, build green; doctor 0 modified / 0 drifted.
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. This is the forever fix done right: the command reference is now COMPILED from the same .description() strings that power --help — improving a description improves the CLI, the SKILL and the docs net from one place. The introspection resolves nested subcommand groups via owner-token with loud failures on unresolvable parents (never silent), regions are per-section filtered, exclusions carry reasons, and the three invariants (region==fresh render, documented-everywhere net, generator sanity) plus verified idempotency make drift structurally impossible. Research confirms the marker-region pattern is the industry standard (oclif readme, terraform-docs) and strengthens it with source introspection instead of help-text scraping. Narrative stays hand-written under the standing review rule. Merge follows.
