@@ -31,3 +31,6 @@ Feedback from the vencimientos adoption experiment (2026-09-15): `arggon create 
 - [x] The error message stays as-is (it already names the expected type)
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. The help text now answers the question at the exact point of failure (expected parent per type, whitespace-normalized assertion included), the SKILL placement line sits in the work-loop area away from the parallel Pitfalls edit, and the convention.md sentence documents the placeholder-cascade interaction that surprised the vencimientos agent. Scope kept to create as agreed. Merge follows.
