@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-skill-generated-command-reference
 title: "Forever fix: SKILL command reference generated from the CLI"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-init-docs
 labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
-claimed_at: "2026-09-15T21:24:07.739Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-init-docs/task-skill-generated-command-reference.md
