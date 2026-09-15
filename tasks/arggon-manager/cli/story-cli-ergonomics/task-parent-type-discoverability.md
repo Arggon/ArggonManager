@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-parent-type-discoverability
 title: "create --parent: document expected parent type per item type (discoverability)"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-cli-ergonomics
 labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
-claimed_at: "2026-09-15T13:00:33.179Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-cli-ergonomics/task-parent-type-discoverability.md
