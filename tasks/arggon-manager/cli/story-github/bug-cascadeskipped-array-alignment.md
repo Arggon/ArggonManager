@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-cascadeskipped-array-alignment
 title: "update --json: cascadeSkipped absent when empty while autoCompleted is always []"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-github
 labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
-claimed_at: "2026-09-15T13:00:22.483Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-github/bug-cascadeskipped-array-alignment.md
