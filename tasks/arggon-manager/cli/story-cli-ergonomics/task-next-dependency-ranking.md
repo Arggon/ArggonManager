@@ -4,6 +4,7 @@ status: in_progress
 id: task-next-dependency-ranking
 title: next --json ranks ready work by dependency weight (downstream unblocking)
 assignee: Arggon
+branch: feat/task-next-dependency-ranking
 parent: story-cli-ergonomics
 labels: [p2]
 created: "2026-09-15"
