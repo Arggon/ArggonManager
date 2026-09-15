@@ -4,6 +4,7 @@ status: in_progress
 id: task-adr0006-remeasure
 title: "ADR 0006 re-measure: repeatable context-budget measurement vs live surfaces"
 assignee: Arggon
+branch: feat/task-adr0006-remeasure
 parent: operating-principles
 labels: [p2]
 created: "2026-09-15"
