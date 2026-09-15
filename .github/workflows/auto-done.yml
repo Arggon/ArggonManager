@@ -123,14 +123,108 @@ jobs:
             # (the rebased head would lack the required `cli` check; bot
             # pushes never trigger CI) — only an admin bypass cleared it.
             # So: bounded loop that, before each merge attempt, refreshes
-            # main, rebases the flip branch if behind (conflicts should be
-            # impossible — the flip only touches tasks/), RE-POSTS the `cli`
-            # check on the new head sha, and retries the merge.
+            # main, rebases the flip branch if behind, RE-POSTS the `cli`
+            # check on the new head sha, and retries the merge. A rebase can
+            # CONFLICT (task-autodone-flip-wedge-3): when the coordinator
+            # posts a review via `arggon comment` on an item being flipped
+            # mid-flight, the comment auto-commits that same item file to
+            # main while the flip branch carries its own version (claim
+            # frontmatter + ticks). That case no longer wedges: the rebase
+            # failure path REDOs the flip on a fresh main checkout (see
+            # redo_flip below) instead of abandoning to an admin.
             post_cli_check() {
               gh api "repos/$GITHUB_REPOSITORY/check-runs" \
                 -f name=cli -f head_sha="$1" \
                 -f status=completed -f conclusion=success > /dev/null
               echo "posted cli check run on $1"
+            }
+            # (task-autodone-flip-wedge-3) Recovery for same-file conflicts:
+            # re-run the whole flip from a FRESH origin/main checkout in a
+            # temp worktree, push a NEW flip branch (unique suffix so it can
+            # never collide with the wedged one), post the `cli` check on the
+            # new head, and squash-merge it. The flip update is idempotent
+            # from a clean tree — already-done ids skip cleanly — and per-id
+            # outcomes are still logged. The temp worktree is removed ALWAYS
+            # (success or failure) and the old wedged branch is deleted after
+            # the redo merge lands. Returns 0 when main no longer needs the
+            # original flip (redo merged, or items already done on main).
+            redo_flip() {
+              local suffix="$1" tmp newbranch rc=1
+              tmp="$(mktemp -d /tmp/auto-done-redo.XXXXXX)"
+              newbranch="chore/auto-done-${GITHUB_RUN_ID}-${suffix}"
+              if git worktree add --detach "$tmp" origin/main; then
+                if (
+                  cd "$tmp" &&
+                  git config user.name "github-actions[bot]" &&
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com" &&
+                  npm ci --silent && npm run build --silent &&
+                  changed2=0
+                  for rid in $IDS; do
+                    rstatus="$(node dist/cli.js list --json | jq -r --arg id "$rid" '.items[] | select(.id == $id) | .status')"
+                    case "$rstatus" in
+                      in_progress)
+                        if out2="$(node dist/cli.js update "$rid" --status done --json)"; then
+                          cascade2="$(printf '%s' "$out2" | jq -r '(.autoCompleted // []) | join(",")' 2>/dev/null || true)"
+                          skipped2="$(printf '%s' "$out2" | jq -r '(.cascadeSkipped // []) | map("\(.id):\(.reason)") | join(",")' 2>/dev/null || true)"
+                          echo "$rid (redo, PR #$PR): in_progress -> done (cascade: ${cascade2:-none}${skipped2:+; skipped: $skipped2})"
+                          changed2=1
+                        else
+                          echo "::warning::$rid: redo update failed unexpectedly (output: ${out2:-empty})"
+                        fi
+                        ;;
+                      done|cancelled)
+                        echo "skip $rid (redo): already $rstatus"
+                        ;;
+                      *)
+                        echo "::warning::$rid (redo): status '${rstatus:-missing}' — not flipped"
+                        ;;
+                    esac
+                  done
+                  if [ "$changed2" != 1 ]; then
+                    echo "redo: no status flips to commit (items already done on main?)"
+                    exit 2
+                  fi
+                  git add tasks/
+                  # The CLI may auto-commit the flip itself (it did in the
+                  # wedge-3 repro), so an empty staged tree is NOT a failure.
+                  if ! git diff --cached --quiet; then
+                    git commit -m "chore(auto): mark items done (PR #$PR merged, redo ${suffix})"
+                  fi
+                  git rev-parse HEAD >/dev/null && git push origin "HEAD:$newbranch"
+                ); then
+                  redo_inner=$?
+                else
+                  redo_inner=$?
+                fi
+                if [ "$redo_inner" = 2 ]; then
+                  # Nothing to flip: main already has the items done (e.g. the
+                  # comment race itself closed them out). The wedge is moot.
+                  git push origin --delete "$branch" 2>/dev/null || true
+                  rc=0
+                elif [ "$redo_inner" = 0 ]; then
+                  git fetch origin "$newbranch"
+                  newsha="$(git rev-parse FETCH_HEAD)"
+                  post_cli_check "$newsha"
+                  gh pr create \
+                    --head "$newbranch" --base main \
+                    --title "chore(auto): mark items done (PR #$PR merged, ${suffix})" \
+                    --body "Automated redo of the in_progress -> done flip for: $IDS (source PR #$PR) after a rebase conflict on the original flip branch."
+                  sleep 10
+                  if gh pr merge "$newbranch" --squash; then
+                    echo "redo merge landed on $newbranch; deleting wedged branch $branch"
+                    git push origin --delete "$branch" 2>/dev/null || true
+                    rc=0
+                  else
+                    echo "redo: merge of $newbranch failed (likely out-of-date race)"
+                  fi
+                fi
+              else
+                echo "::warning::redo: could not create temp worktree at $tmp"
+              fi
+              git worktree remove --force "$tmp" 2>/dev/null || true
+              git worktree prune
+              rm -rf "$tmp"
+              return "$rc"
             }
             sha="$(git rev-parse HEAD)"
             post_cli_check "$sha"
@@ -148,7 +242,19 @@ jobs:
                 echo "attempt $attempt: $branch is behind main; rebasing onto origin/main"
                 if ! git rebase origin/main; then
                   git rebase --abort
-                  echo "::warning::rebase of $branch onto origin/main failed (unexpected: the flip only touches tasks/); recovery: admin-merge the flip PR"
+                  echo "rebase of $branch onto origin/main conflicted (expected when main touched the same item files mid-flight); attempting redo on fresh main"
+                  redo_ok=0
+                  for redo in 1 2; do
+                    if redo_flip "redo${redo}"; then
+                      redo_ok=1
+                      echo "redo attempt $redo recovered the flip"
+                      break
+                    fi
+                    echo "redo attempt $redo failed; retrying with a fresh worktree"
+                  done
+                  if [ "$redo_ok" != 1 ]; then
+                    echo "::warning::rebase of $branch onto origin/main failed AND the redo-on-fresh-main recovery failed after 2 attempts; recovery: admin-merge the flip PR"
+                  fi
                   break
                 fi
                 git push --force-with-lease origin "HEAD:$branch"
