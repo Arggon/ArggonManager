@@ -19,10 +19,12 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- Why this task exists. -->
+Candidate #4 of the product-discovery research round (2026-09-15): MCP specification 2026-07-28 is the biggest protocol overhaul — stateless core, Extensions framework, Tasks for long-running operations, MCP Apps, multi round-trip requests, cacheable list endpoints, updated SDKs (modelcontextprotocol.io, 2026-09-15). ArggonManager's stdio server (9 tools, sync JSON-RPC) predates it. RESEARCH + EVALUATION task: decide what adoption means for us, via exploration + ADR. Spec/code changes are follow-ups.
 
 ## Acceptance
 
-- [ ] 
+- [ ] Exploration recorded via `arggon stack explore` (docs/explorations/, dated sources from modelcontextprotocol.io + blog + Cloudflare): map each new capability to our server (stateless: already?; Tasks: our tools are fast — would long-running candidates be init/adopt/report --trend?; Extensions: declare ArggonManager?; cacheable list endpoints: our list is cheap)
+- [ ] ADR (next number, Proposed in PR): adopt / partial-adopt / defer per capability, with the SDK story (stdio JSON-RPC vs new transports) and consequences
+- [ ] No product code changes — implementation lands via follow-up items if the ADR adopts anything
 
 ## Notes

@@ -19,10 +19,12 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- Why this task exists. -->
+Candidate #2 of the product-discovery research round (2026-09-15): OpenSpec's main differentiator is the CLEANEST UPGRADE PATH — it separates user content from tool files — while Spec Kit "has known upgrade issues that overwrite customization files" (ranthebuilder.cloud, 2026-09-15). ArggonManager already implements a stronger version (init/adopt never overwrite; adopter-owned the moment they exist; x-generated checksums; re-run refreshes untouched docs silently; --backup archives) — but the differentiator is undocumented, so adopters evaluating tools never see it. Docs-only, effort S.
 
 ## Acceptance
 
-- [ ] 
+- [ ] README (Why ArggonManager section): a short upgrade-path paragraph — never overwrites, adopter-owned docs, re-run refreshes untouched docs, --backup archives — the Spec Kit/OpenSpec comparison implicit, no vendor bashing
+- [ ] docs/agents.md or docs/convention.md: the same guarantee stated where adopters look for upgrade behavior (one place, no duplication)
+- [ ] doctor/init tests unchanged and green (docs-only)
 
 ## Notes
