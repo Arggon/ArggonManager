@@ -23,9 +23,9 @@ Candidate #3 of [product discovery](docs/explorations/exploration-product-discov
 
 ## Acceptance
 
-- [ ] Spec for `arggon spec analyze` filed (arggon spec new) and flipped to implemented in the same PR
-- [ ] Ambiguity scan: checklist-driven pass over docs/specs/*.md (unspecified error paths, missing invariants, vague quantifiers) — report, never auto-edit
-- [ ] Consistency check: spec ↔ tasks/plans cross-reference (tasks cite specs; specs marked implemented have landed items)
-- [ ] Tests + docs (README + json-output if --json)
+- [x] Spec for `arggon spec analyze` filed (arggon spec new) and flipped to implemented in the same PR
+- [x] Ambiguity scan: checklist-driven pass over docs/specs/*.md (unspecified error paths, missing invariants, vague quantifiers) — report, never auto-edit
+- [x] Consistency check: spec ↔ tasks/plans cross-reference (tasks cite specs; specs marked implemented have landed items)
+- [x] Tests + docs (README + json-output if --json)
 
 ## Notes

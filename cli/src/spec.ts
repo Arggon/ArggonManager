@@ -343,6 +343,286 @@ export function formatSpecValidateHuman(result: SpecValidateResult): string {
   return `${lines.join("\n")}\n`;
 }
 
+/**
+ * `arggon spec analyze` — checklist-driven ambiguity scan + spec/plan/task
+ * consistency report. Pure read: it NEVER edits the documents it scans, and
+ * findings never fail the run (exit 0 with findings; non-zero only on a
+ * structural failure such as an unreadable file, reusing SPEC_FAILED).
+ */
+
+export type SpecFindingSeverity = "info" | "warn";
+
+export type SpecFinding = {
+  /** Posix path, relative to the repo root. */
+  file: string;
+  /** Checklist kind, e.g. "vague-quantifier", "spec-orphaned". */
+  kind: string;
+  /** 1-based line number, when the finding is tied to one. */
+  line?: number;
+  severity: SpecFindingSeverity;
+  message: string;
+};
+
+export type SpecAnalyzeOptions = {
+  cwd: string;
+  /** Scan a single spec file (also outside docs/specs) instead of the corpus. */
+  spec?: string;
+};
+
+export type SpecAnalyzeResult = {
+  root: string;
+  conventionVersion: number;
+  /** Number of spec documents scanned. */
+  scanned: number;
+  ambiguity: SpecFinding[];
+  consistency: SpecFinding[];
+};
+
+/** Deliberately small, documented checklist; deterministic, no AI. */
+const VAGUE_TERMS = [
+  "fast",
+  "scalable",
+  "several",
+  "quickly",
+  "efficient",
+  "robust",
+  "flexible",
+  "user-friendly",
+] as const;
+
+const VAGUE_PATTERN = new RegExp(`\\b(${VAGUE_TERMS.join("|")})\\b`, "i");
+const TODO_PATTERN = /\b(TODO|TBD|FIXME)\b/;
+const ERROR_PATH_PATTERN = /\b(error|errors|failure|fail|fails|failing)\b/i;
+const CHECKBOX_PATTERN = /^\s*[-*]\s+\[[ xX]\]/;
+const SPEC_ID_CITATION_PATTERN = /\bspec-[a-z0-9]+(?:-[a-z0-9]+)*-\d{3}\b/g;
+
+function finding(
+  file: string,
+  kind: string,
+  severity: SpecFindingSeverity,
+  message: string,
+  line?: number,
+): SpecFinding {
+  return line === undefined ? { file, kind, severity, message } : { file, kind, line, severity, message };
+}
+
+function bodyWithoutFrontmatter(raw: string): string {
+  return raw.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+}
+
+function isTruthyFrontmatter(value: string | undefined): string | undefined {
+  if (value === undefined) return undefined;
+  const stripped = stripScalar(value.trim());
+  return stripped === "" || stripped === "null" ? undefined : stripped;
+}
+
+/** Ambiguity checklist over one spec document's body. */
+function ambiguityFindings(rel: string, raw: string): SpecFinding[] {
+  const findings: SpecFinding[] = [];
+  const body = bodyWithoutFrontmatter(raw);
+  // Line numbers are reported against the full file: offset by the removed
+  // frontmatter block ("---\\nk: v\\n---\\n" = 3 lines before the body).
+  const fmBlock = raw.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
+  const offset = fmBlock ? fmBlock[0].split(/\r?\n/).length - 1 : 0;
+  const lines = body.split(/\r?\n/);
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const at = offset + i + 1;
+    const vague = line.match(VAGUE_PATTERN);
+    if (vague) {
+      findings.push(
+        finding(
+          rel,
+          "vague-quantifier",
+          "warn",
+          `vague term '${vague[1]}' — quantify or replace with a measurable term`,
+          at,
+        ),
+      );
+    }
+    const todo = line.match(TODO_PATTERN);
+    if (todo) {
+      findings.push(finding(rel, "todo-marker", "warn", `unresolved ${todo[1]} marker`, at));
+    }
+  }
+
+  const mentionsErrorPath = lines.some((l) => ERROR_PATH_PATTERN.test(l));
+  if (!mentionsErrorPath) {
+    findings.push(
+      finding(rel, "no-error-path", "warn", "no error/failure path mentioned anywhere in the spec"),
+    );
+  }
+
+  const headings = [...body.matchAll(/^##\s+(.+?)\s*$/gm)];
+  const acceptanceIdx = headings.findIndex((m) => isAcceptanceHeading(normalizeHeading(m[1]!)));
+  if (acceptanceIdx === -1) {
+    findings.push(finding(rel, "no-acceptance", "warn", "missing an Acceptance criteria section"));
+  } else {
+    const start = (headings[acceptanceIdx]!.index ?? 0) + headings[acceptanceIdx]![0].length;
+    const next = headings[acceptanceIdx + 1]?.index ?? body.length;
+    const section = body.slice(start, next);
+    const hasChecklist = section.split(/\r?\n/).some((l) => CHECKBOX_PATTERN.test(l));
+    if (!hasChecklist) {
+      findings.push(
+        finding(rel, "untestable-acceptance", "warn", "Acceptance section has no checklist items to verify"),
+      );
+    }
+  }
+
+  return findings;
+}
+
+function walkMarkdownFiles(dir: string): string[] {
+  if (!existsSync(dir)) return [];
+  const out: string[] = [];
+  const visit = (current: string): void => {
+    for (const entry of readdirSync(current, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      const full = join(current, entry.name);
+      if (entry.isDirectory()) visit(full);
+      else if (entry.isFile() && entry.name.endsWith(".md")) out.push(full);
+    }
+  };
+  visit(dir);
+  return out;
+}
+
+/**
+ * Consistency across the corpus: implemented specs nobody cites (no task
+ * body, no plan) and plans pointing at missing spec files.
+ */
+function consistencyFindings(root: string): SpecFinding[] {
+  const findings: SpecFinding[] = [];
+
+  type SpecEntry = { rel: string; specId?: string; status?: string };
+  const specs: SpecEntry[] = [];
+  for (const abs of listMarkdownDocs(join(root, "docs", "specs"))) {
+    const rel = posixRel(root, abs);
+    let raw: string;
+    try {
+      raw = readFileSync(abs, "utf8");
+    } catch {
+      continue; // structural read failures surface via the ambiguity pass
+    }
+    const data = parseDocFrontmatter(raw) ?? {};
+    specs.push({ rel, specId: isTruthyFrontmatter(data.spec_id), status: isTruthyFrontmatter(data.status) });
+  }
+
+  const citedIds = new Set<string>();
+  for (const abs of walkMarkdownFiles(join(root, "tasks"))) {
+    let raw: string;
+    try {
+      raw = readFileSync(abs, "utf8");
+    } catch {
+      continue;
+    }
+    for (const match of raw.matchAll(SPEC_ID_CITATION_PATTERN)) citedIds.add(match[0]);
+  }
+
+  const planReferencedSpecIds = new Set<string>();
+  for (const abs of listMarkdownDocs(join(root, "docs", "plans"))) {
+    const rel = posixRel(root, abs);
+    let raw: string;
+    try {
+      raw = readFileSync(abs, "utf8");
+    } catch {
+      continue;
+    }
+    const data = parseDocFrontmatter(raw) ?? {};
+    const specPath = isTruthyFrontmatter(data.spec);
+    if (specPath === undefined) continue;
+    if (!existsSync(resolve(root, specPath))) {
+      findings.push(
+        finding(rel, "plan-spec-missing", "warn", `spec file '${specPath}' does not exist (relative to the repo root)`),
+      );
+      continue;
+    }
+    // docs/specs/spec-<spec_id>.md -> <spec_id>
+    const base = basename(specPath).replace(/\.md$/, "");
+    if (base.startsWith("spec-")) planReferencedSpecIds.add(base.slice("spec-".length));
+  }
+
+  for (const spec of specs) {
+    if (spec.specId === undefined || spec.status !== "implemented") continue;
+    // Items cite either the bare spec_id ("sync-001") or the filename stem
+    // ("spec-sync-001"); accept both forms.
+    if (citedIds.has(spec.specId) || citedIds.has(`spec-${spec.specId}`)) continue;
+    if (planReferencedSpecIds.has(spec.specId)) continue;
+    findings.push(
+      finding(
+        spec.rel,
+        "spec-orphaned",
+        "warn",
+        `spec '${spec.specId}' is marked implemented but no item under tasks/ and no plan cites it`,
+      ),
+    );
+  }
+
+  return findings;
+}
+
+export function runSpecAnalyze(opts: SpecAnalyzeOptions): SpecAnalyzeResult {
+  const tasksDir = findTasksDir(opts.cwd);
+  const root = repoRootFromTasks(tasksDir);
+  const conventionVersion = readConventionVersion(root);
+  const ambiguity: SpecFinding[] = [];
+  let scanned = 0;
+
+  if (opts.spec) {
+    const abs = isAbsolute(opts.spec) ? opts.spec : resolve(opts.cwd, opts.spec);
+    const rel = posixRel(root, abs);
+    let raw: string;
+    try {
+      raw = readFileSync(abs, "utf8");
+    } catch (err) {
+      throw new Error(`cannot read ${rel}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    scanned = 1;
+    ambiguity.push(...ambiguityFindings(rel, raw));
+  } else {
+    for (const abs of listMarkdownDocs(join(root, "docs", "specs"))) {
+      let raw: string;
+      try {
+        raw = readFileSync(abs, "utf8");
+      } catch (err) {
+        throw new Error(
+          `cannot read ${posixRel(root, abs)}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+      scanned++;
+      ambiguity.push(...ambiguityFindings(posixRel(root, abs), raw));
+    }
+  }
+
+  const consistency = opts.spec ? [] : consistencyFindings(root);
+
+  const byFile = (a: SpecFinding, b: SpecFinding): number =>
+    a.file.localeCompare(b.file) || a.kind.localeCompare(b.kind) || (a.line ?? 0) - (b.line ?? 0);
+  ambiguity.sort(byFile);
+  consistency.sort(byFile);
+  return { root, conventionVersion, scanned, ambiguity, consistency };
+}
+
+export function formatSpecAnalyzeHuman(result: SpecAnalyzeResult): string {
+  const lines: string[] = [];
+  for (const f of result.consistency) {
+    lines.push(`${f.severity} ${f.file}: ${f.message} [${f.kind}]`);
+  }
+  for (const f of result.ambiguity) {
+    const at = f.line === undefined ? "" : `${f.line}:`;
+    lines.push(`${f.severity} ${f.file}:${at} ${f.message} [${f.kind}]`);
+  }
+  const total = result.ambiguity.length + result.consistency.length;
+  if (total === 0) {
+    lines.push(`arggon spec analyze: clean (${result.scanned} spec(s) scanned)`);
+  } else {
+    lines.push(
+      `arggon spec analyze: ${total} finding(s) across ${result.scanned} spec(s) — report only, nothing was edited`,
+    );
+  }
+  return `${lines.join("\n")}\n`;
+}
+
 const SPEC_TEMPLATE_FALLBACK = `---
 spec_id: {{ID}}
 title: {{TITLE}}
