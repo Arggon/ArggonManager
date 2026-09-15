@@ -146,7 +146,7 @@ describe("mcp server", () => {
     expect(fallback.protocolVersion).toBe("2025-06-18");
   });
 
-  it("lists the six tools with JSON-schema inputs", async () => {
+  it("lists the nine tools with JSON-schema inputs", async () => {
     const result = await client.request("tools/list");
     const tools = result.tools as Array<{ name: string; inputSchema: Record<string, unknown> }>;
     expect(tools.map((tool) => tool.name)).toEqual([
@@ -156,6 +156,9 @@ describe("mcp server", () => {
       "arggon_comment",
       "arggon_handoff",
       "arggon_show",
+      "arggon_next",
+      "arggon_report",
+      "arggon_validate",
     ]);
     for (const tool of tools) {
       expect(tool.inputSchema.type).toBe("object");
@@ -263,8 +266,7 @@ describe("mcp server", () => {
     });
   });
 
-  it("answers ping, rejects unknown methods, and reports parse errors", async () => {
-    expect(await client.request("ping")).toEqual({});
+  it("answers ping, rejects unknown methods, and reports parse errors", async () => {    expect(await client.request("ping")).toEqual({});
 
     const unknown = await client.request("resources/list");
     expect(unknown).toMatchObject({ error: { code: -32601 } });
@@ -336,6 +338,109 @@ describe("mcp server arggon_update parent (task-list-parent-flag)", () => {
       ok: false,
       command: "update",
       error: { code: "UPDATE_FAILED" },
+    });
+  });
+});
+
+describe("mcp server next/report/validate (task-mcp-parity-full)", () => {
+  let client: McpTestClient;
+  let repoDir: string;
+
+  beforeEach(() => {
+    repoDir = primedRepo();
+    client = new McpTestClient();
+    client.cwd = repoDir;
+    client.start();
+  });
+
+  it("arggon_next suggests the created task with reason, blockedBy and unblocks", async () => {
+    const created = await client.request("tools/call", {
+      name: "arggon_create",
+      arguments: { type: "task", title: "Add rate limiting", parent: "story-login", id: "rate-limit" },
+    });
+    expect(created.isError).toBeUndefined();
+
+    const next = await client.request("tools/call", { name: "arggon_next", arguments: {} });
+    expect(next.isError).toBeUndefined();
+    const envelope = textContent(next) as Record<string, unknown>;
+    expect(envelope).toMatchObject({ ok: true, schemaVersion: 1, command: "next" });
+    const suggestion = envelope.suggestion as Record<string, unknown>;
+    // The seeded unclaimed story is claimable too and wins the lexicographic
+    // tie (equal downstream weight).
+    expect((suggestion.item as Record<string, unknown>).id).toBe("story-login");
+    expect(suggestion.parentChain).toEqual(["launch-mvp", "auth"]);
+    expect(suggestion.blockedBy).toEqual([]);
+    expect(suggestion.unblocks).toBe(0);
+    expect(typeof suggestion.reason).toBe("string");
+
+    // Once the story is claimed, the created task is the suggestion; once
+    // every todo is claimed the ready-only pool is empty -> suggestion null,
+    // like `next --ready` on the CLI.
+    await client.request("tools/call", {
+      name: "arggon_update",
+      arguments: { id: "story-login", status: "in_progress", assignee: "agent-x" },
+    });
+    const nextTask = await client.request("tools/call", { name: "arggon_next", arguments: {} });
+    const nextEnvelope = textContent(nextTask) as Record<string, unknown>;
+    expect((nextEnvelope.suggestion as Record<string, unknown>).item).toMatchObject({
+      id: "task-rate-limit",
+    });
+    await client.request("tools/call", {
+      name: "arggon_update",
+      arguments: { id: "task-rate-limit", status: "in_progress", assignee: "agent-x" },
+    });
+    const empty = await client.request("tools/call", { name: "arggon_next", arguments: { ready: true } });
+    expect(empty.isError).toBeUndefined();
+    expect((textContent(empty) as Record<string, unknown>).suggestion).toBeNull();
+  });
+
+  it("arggon_report returns the per-epic groups envelope", async () => {
+    const report = await client.request("tools/call", { name: "arggon_report", arguments: {} });
+    expect(report.isError).toBeUndefined();
+    const envelope = textContent(report) as Record<string, unknown>;
+    expect(envelope).toMatchObject({ ok: true, schemaVersion: 1, command: "report" });
+    const groups = envelope.groups as Array<Record<string, unknown>>;
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ epic: { id: "auth" } });
+    expect(envelope.trend).toBeUndefined();
+  });
+
+  it("arggon_report rejects since without trend with the CLI message", async () => {
+    const report = await client.request("tools/call", {
+      name: "arggon_report",
+      arguments: { since: "2026-01-01" },
+    });
+    expect(report.isError).toBe(true);
+    expect(textContent(report)).toMatchObject({
+      ok: false,
+      command: "report",
+      error: { message: "--since requires --trend", code: "REPORT_FAILED" },
+    });
+  });
+
+  it("arggon_validate returns the ok envelope on a clean tree and fails like the CLI on a broken one", async () => {
+    const clean = await client.request("tools/call", { name: "arggon_validate", arguments: {} });
+    expect(clean.isError).toBeUndefined();
+    const cleanEnvelope = textContent(clean) as Record<string, unknown>;
+    expect(cleanEnvelope).toMatchObject({ ok: true, schemaVersion: 1, command: "validate" });
+    expect(cleanEnvelope.errors).toEqual([]);
+
+    // status: blocked without blocked_reason is a validate error.
+    const created = await client.request("tools/call", {
+      name: "arggon_create",
+      arguments: { type: "task", title: "Broken", parent: "story-login", id: "rate-limit" },
+    });
+    expect(created.isError).toBeUndefined();
+    const { readFileSync, writeFileSync } = await import("node:fs");
+    const file = join(repoDir, "tasks", "launch-mvp", "auth", "story-login", "task-rate-limit.md");
+    writeFileSync(file, readFileSync(file, "utf8").replace("status: todo", "status: blocked"));
+
+    const broken = await client.request("tools/call", { name: "arggon_validate", arguments: {} });
+    expect(broken.isError).toBe(true);
+    expect(textContent(broken)).toMatchObject({
+      ok: false,
+      command: "validate",
+      error: { code: "VALIDATE_FAILED" },
     });
   });
 });

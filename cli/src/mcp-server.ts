@@ -7,8 +7,12 @@ import { runCreate } from "./create.js";
 import { runComment } from "./comment.js";
 import { runHandoff } from "./handoff.js";
 import { runList } from "./list.js";
+import { runNext } from "./next.js";
+import { runReport } from "./report.js";
 import { runShow } from "./show.js";
+import { runTrend, type TrendResult } from "./trend.js";
 import { maybeCommitUpdate, runUpdate } from "./update.js";
+import { runValidate } from "./validate.js";
 import { STATUSES } from "./status.js";
 import { toContractWorkItem } from "./contract.js";
 import { commitPayload } from "./tracker-commit.js";
@@ -32,6 +36,9 @@ const CREATE_FAILED = "CREATE_FAILED";
 const UPDATE_FAILED = "UPDATE_FAILED";
 const COMMENT_FAILED = "COMMENT_FAILED";
 const SHOW_FAILED = "SHOW_FAILED";
+const NEXT_FAILED = "NEXT_FAILED";
+const REPORT_FAILED = "REPORT_FAILED";
+const VALIDATE_FAILED = "VALIDATE_FAILED";
 
 type JsonRpcRequest = {
   jsonrpc: "2.0";
@@ -266,6 +273,53 @@ const TOOLS: ToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "arggon_next",
+    description:
+      "Suggest the next claimable item (ADR 0006 next-first): ready items (depends_on all done/cancelled) rank first by downstream weight — the unblocks count — with lexicographic id on ties; blocked items are suggested only when nothing is ready. Pure read — never writes. Returns the arggon `next --json` envelope: {ok, schemaVersion, conventionVersion, command, suggestion} where suggestion is {item, parentChain, reason, blockedBy, unblocks} or null when the pool is empty.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ready: {
+          type: "boolean",
+          description:
+            "limit the pool to ready items (unclaimed todos whose depends_on are all done/cancelled)",
+          default: false,
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "arggon_report",
+    description:
+      "Aggregate leaf (task/bug) statuses per story, grouped by epic — display only, never writes. Returns the arggon `report --json` envelope: {ok, schemaVersion, conventionVersion, command, groups[, trend]}.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        trend: {
+          type: "boolean",
+          description: "mine git history: weekly completions and cycle time (pure read)",
+          default: false,
+        },
+        since: {
+          type: "string",
+          description: "trend window start, YYYY-MM-DD (requires trend)",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "arggon_validate",
+    description:
+      "Validate tasks/ frontmatter and tree integrity (parent edges, statuses, claim/blocked invariants, depends_on). Pure read — never writes. Returns the arggon `validate --json` envelope: {ok, schemaVersion, conventionVersion, command, errors, warnings}; ok is false and the result is a tool error when there is at least one error.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false,
+    },
+  },
 ];
 
 /** One MCP server session bound to fixed streams and a fixed repo root. */
@@ -317,7 +371,11 @@ export function runMcpServer(opts: McpServerOptions): void {
       envelope = body();
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      const code =
+      // Bodies may pin a specific failure code (e.g. report trend mining
+      // throws TREND_FAILED while the command stays "report"); otherwise the
+      // code falls back to the per-command default.
+      const thrown = err as { code?: unknown };
+      const fallback =
         command === "list"
           ? LIST_FAILED
           : command === "create"
@@ -326,11 +384,23 @@ export function runMcpServer(opts: McpServerOptions): void {
               ? COMMENT_FAILED
               : command === "show"
                 ? SHOW_FAILED
-                : UPDATE_FAILED;
+                : command === "next"
+                  ? NEXT_FAILED
+                  : command === "report"
+                    ? REPORT_FAILED
+                    : command === "validate"
+                      ? VALIDATE_FAILED
+                      : UPDATE_FAILED;
+      const code = typeof thrown.code === "string" ? thrown.code : fallback;
       envelope = failEnvelope({ command, message, code, conventionVersion: conventionVersion() });
       return { content: [{ type: "text", text: JSON.stringify(envelope) }], isError: true };
     }
-    return { content: [{ type: "text", text: JSON.stringify(envelope) }] };
+    // Pure reads like validate succeed with ok:false in the envelope when
+    // errors were found (the CLI exits 1) — surface that as a tool error.
+    return {
+      content: [{ type: "text", text: JSON.stringify(envelope) }],
+      ...(envelope.ok === false ? { isError: true } : {}),
+    };
   };
 
   const conventionVersion = (): number => readConventionVersion(opts.cwd);
@@ -485,6 +555,68 @@ export function runMcpServer(opts: McpServerOptions): void {
               : { comments: result.comments }),
           },
           conventionVersion(),
+        );
+      });
+    }
+    if (name === "arggon_next") {
+      return toolEnvelope("arggon_next", () => {
+        const result = runNext({ cwd: opts.cwd, ready: args.ready === true });
+        const suggestion = result.suggestion
+          ? {
+              item: toContractWorkItem(result.suggestion.item, result.root),
+              parentChain: result.suggestion.parentChain,
+              reason: result.suggestion.reason,
+              blockedBy: result.suggestion.blockedBy,
+              unblocks: result.suggestion.unblocks,
+            }
+          : null;
+        return successEnvelope("next", { suggestion }, conventionVersion());
+      });
+    }
+    if (name === "arggon_report") {
+      return toolEnvelope("arggon_report", () => {
+        if (args.since !== undefined && args.trend !== true) {
+          // Same guard and message text as the CLI.
+          throw new Error("--since requires --trend");
+        }
+        let trend: TrendResult | null = null;
+        if (args.trend === true) {
+          try {
+            trend = runTrend({ cwd: opts.cwd, since: str(args.since) });
+          } catch (err) {
+            throw Object.assign(err instanceof Error ? err : new Error(String(err)), {
+              code: "TREND_FAILED",
+            });
+          }
+        }
+        const result = runReport({ cwd: opts.cwd });
+        const payload: Record<string, unknown> = { groups: result.groups };
+        if (trend) payload.trend = trend;
+        return successEnvelope("report", payload, conventionVersion());
+      });
+    }
+    if (name === "arggon_validate") {
+      return toolEnvelope("arggon_validate", () => {
+        const result = runValidate({ cwd: opts.cwd });
+        // Same envelope shape as the CLI: the payload carries ok, errors and
+        // warnings; with errors present the envelope flips to ok:false and
+        // carries the VALIDATE_FAILED error (tool-level isError above).
+        return successEnvelope(
+          "validate",
+          {
+            ok: result.errors.length === 0,
+            errors: result.errors,
+            warnings: result.warnings,
+            ...(result.errors.length > 0
+              ? {
+                  error: {
+                    message: `validate failed with ${result.errors.length} error(s)`,
+                    code: VALIDATE_FAILED,
+                  },
+                }
+              : {}),
+          },
+          result.conventionVersion,
         );
       });
     }

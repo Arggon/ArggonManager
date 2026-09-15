@@ -11,7 +11,7 @@ arggon <command> --json
 
 Example: `arggon --json hello`.
 
-The MCP server (`arggon mcp`) returns these same envelope objects as tool-result text content for its `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`, `arggon_handoff`, and `arggon_show` tools; kernel failures become tool errors carrying the same `ok: false` shape (see [`docs/agents.md`](./agents.md) §MCP server). The tool input schemas are parity-tested against the CLI option surface (`cli/src/mcp-parity.test.ts`): the two surfaces stay in sync by test, not by convention — schema changes are **additive only**; a breaking change bumps `schemaVersion`.
+The MCP server (`arggon mcp`) returns these same envelope objects as tool-result text content for its `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`, `arggon_handoff`, `arggon_show`, `arggon_next`, `arggon_report`, and `arggon_validate` tools; kernel failures become tool errors carrying the same `ok: false` shape (see [`docs/agents.md`](./agents.md) §MCP server). The tool input schemas are parity-tested against the CLI option surface (`cli/src/mcp-parity.test.ts`): the two surfaces stay in sync by test, not by convention — schema changes are **additive only**; a breaking change bumps `schemaVersion`.
 
 This flag is a formatter only. It does not walk `tasks/` or parse frontmatter. Commands that load domain objects pass those objects to the formatter. Human vs JSON printing lives in the CLI entrypoint.
 
