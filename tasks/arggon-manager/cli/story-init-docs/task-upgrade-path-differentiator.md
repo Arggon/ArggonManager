@@ -4,6 +4,7 @@ status: in_progress
 id: task-upgrade-path-differentiator
 title: document the upgrade-path differentiator (never-overwrite + adopter-owned + re-run refresh)
 assignee: Arggon
+branch: feat/task-upgrade-path-differentiator
 parent: story-init-docs
 labels: [p3]
 created: "2026-09-15"
