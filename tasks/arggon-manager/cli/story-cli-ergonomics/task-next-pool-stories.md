@@ -4,6 +4,7 @@ status: in_progress
 id: task-next-pool-stories
 title: next suggestion pool includes unclaimed stories (surprising for implement-next)
 assignee: Arggon
+branch: feat/task-next-pool-stories
 parent: story-cli-ergonomics
 labels: []
 created: "2026-09-15"
