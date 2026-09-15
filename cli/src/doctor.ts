@@ -6,6 +6,7 @@
  * work-item tree (tracker counts). Never writes anything.
  */
 
+import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { readConventionConfig, readConventionVersion } from "./convention.js";
@@ -38,6 +39,20 @@ export type DoctorDocs = {
   missing: number;
 };
 
+/**
+ * Git state of the target tree (bug-init-git-doctor-blindspot): report-only —
+ * branch/worktree/push/PR flows and the pre-commit validate hook all depend on
+ * git, so doctor surfaces whether they are even possible here. `dirty` and
+ * `remote` are null when the tree is not a git repository.
+ */
+export type DoctorGit = {
+  isRepo: boolean;
+  /** Working tree has uncommitted changes (status --porcelain non-empty); null when not a repo. */
+  dirty: boolean | null;
+  /** URL of the `origin` remote (else the first remote); null when not a repo or no remote. */
+  remote: string | null;
+};
+
 export type DoctorResult = {
   /** Repo root, or null when no tasks/.convention.yml was found. */
   root: string | null;
@@ -51,6 +66,8 @@ export type DoctorResult = {
     /** Items with status todo. */
     todo: number;
   };
+  /** Git state of the tree (additive; bug-init-git-doctor-blindspot). */
+  git: DoctorGit;
 };
 
 const ZERO_DOCS: DoctorDocs = {
@@ -62,6 +79,33 @@ const ZERO_DOCS: DoctorDocs = {
   stale: 0,
   missing: 0,
 };
+
+const NOT_A_REPO: DoctorGit = { isRepo: false, dirty: null, remote: null };
+
+function gitProbe(args: string[], cwd: string): { ok: boolean; out: string } {
+  try {
+    return {
+      ok: true,
+      out: String(execFileSync("git", args, { cwd, stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" }) ?? ""),
+    };
+  } catch {
+    return { ok: false, out: "" };
+  }
+}
+
+/** Best-effort git state report (bug-init-git-doctor-blindspot); never throws. */
+export function gitState(cwd: string): DoctorGit {
+  if (!gitProbe(["rev-parse", "--git-dir"], cwd).ok) return { ...NOT_A_REPO };
+  const dirty = gitProbe(["status", "--porcelain"], cwd).out.trim().length > 0;
+  let remote: string | null = null;
+  const remotes = gitProbe(["remote"], cwd).out.split("\n").map((l) => l.trim()).filter(Boolean);
+  const pick = remotes.includes("origin") ? "origin" : remotes[0];
+  if (pick) {
+    const url = gitProbe(["remote", "get-url", pick], cwd).out.trim();
+    if (url) remote = url;
+  }
+  return { isRepo: true, dirty, remote };
+}
 
 export function runDoctor(opts: { cwd: string }): DoctorResult {
   let tasksDir: string;
@@ -77,6 +121,7 @@ export function runDoctor(opts: { cwd: string }): DoctorResult {
       conventionVersion: 0,
       docs: { ...ZERO_DOCS },
       tracker: { items: 0, todo: 0 },
+      git: gitState(opts.cwd),
     };
   }
 
@@ -154,7 +199,17 @@ export function runDoctor(opts: { cwd: string }): DoctorResult {
       items: items.length,
       todo: items.filter((item) => item.status === "todo").length,
     },
+    git: gitState(root),
   };
+}
+
+/** One-line human summary of the git state: repo ✓/✗ + dirty + remote. */
+function formatGitLine(git: DoctorGit): string {
+  if (!git.isRepo) return "not a git repository (branch/worktree/push/PR flows unavailable)";
+  const parts = ["repo", git.dirty ? "dirty" : "clean"];
+  if (git.remote) parts.push(`remote ${git.remote}`);
+  else parts.push("no remote");
+  return parts.join(", ");
 }
 
 /** Human-readable report (never writes; pairs with the doctor --json payload). */
@@ -169,6 +224,7 @@ export function formatDoctorReport(result: DoctorResult): string {
       `${result.docs.acknowledgedDrifted} acknowledgedDrifted, ` +
       `${result.docs.stale} stale, ${result.docs.missing} missing`,
     `  tracker: ${result.tracker.items} item(s), ${result.tracker.todo} todo`,
+    `  git: ${formatGitLine(result.git)}`,
   ];
   if (result.docs.acknowledgedDrifted > 0) {
     lines.push(

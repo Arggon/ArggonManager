@@ -383,9 +383,7 @@ export function runMcpServer(opts: McpServerOptions): void {
             item: toContractWorkItem(result.item, result.root, { full: args.full === true }),
             autoCompleted: result.autoCompleted,
             cascadeLevels: result.cascadeLevels,
-            ...(result.cascadeSkipped.length > 0
-              ? { cascadeSkipped: result.cascadeSkipped }
-              : {}),
+            cascadeSkipped: result.cascadeSkipped,
             ...(commit ? { commit: commitPayload(commit) } : {}),
           },
           conventionVersion(),
