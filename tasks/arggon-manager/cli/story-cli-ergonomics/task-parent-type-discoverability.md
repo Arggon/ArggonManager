@@ -4,7 +4,7 @@ status: todo
 id: task-parent-type-discoverability
 title: "create --parent: document expected parent type per item type (discoverability)"
 parent: story-cli-ergonomics
-labels: []
+labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
