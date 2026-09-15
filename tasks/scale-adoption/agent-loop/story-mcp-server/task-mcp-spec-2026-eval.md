@@ -26,8 +26,8 @@ Candidate #4 of the product-discovery research round (2026-09-15): MCP specifica
 
 ## Acceptance
 
-- [ ] Exploration recorded via `arggon stack explore` (docs/explorations/, dated sources from modelcontextprotocol.io + blog + Cloudflare): map each new capability to our server (stateless: already?; Tasks: our tools are fast — would long-running candidates be init/adopt/report --trend?; Extensions: declare ArggonManager?; cacheable list endpoints: our list is cheap)
-- [ ] ADR (next number, Proposed in PR): adopt / partial-adopt / defer per capability, with the SDK story (stdio JSON-RPC vs new transports) and consequences
-- [ ] No product code changes — implementation lands via follow-up items if the ADR adopts anything
+- [x] Exploration recorded via `arggon stack explore` (docs/explorations/, dated sources from modelcontextprotocol.io + blog + Cloudflare): map each new capability to our server (stateless: already?; Tasks: our tools are fast — would long-running candidates be init/adopt/report --trend?; Extensions: declare ArggonManager?; cacheable list endpoints: our list is cheap) — docs/explorations/exploration-mcp-2026-07-28-004.md
+- [x] ADR (next number, Proposed in PR): adopt / partial-adopt / defer per capability, with the SDK story (stdio JSON-RPC vs new transports) and consequences — docs/adr/0007-mcp-2026-07-28-adoption.md (Proposed)
+- [x] No product code changes — implementation lands via follow-up items if the ADR adopts anything
 
 ## Notes
