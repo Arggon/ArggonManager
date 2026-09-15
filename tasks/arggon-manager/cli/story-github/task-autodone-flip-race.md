@@ -1,12 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-autodone-flip-race
 title: "auto-done: flip PRs lose the up-to-date race and wedge (no retry; bot check not re-posted)"
+assignee: Arggon
+branch: feat/task-autodone-flip-race
 parent: story-github
 labels: []
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T16:28:52.290Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-github/task-autodone-flip-race.md
@@ -23,8 +26,8 @@ Observed 2026-09-15 during the 8-item product-discovery cycle: merging several P
 
 ## Acceptance
 
-- [ ] The workflow becomes race-tolerant: before merging, if out-of-date, rebase the flip branch onto fresh main AND re-post the `cli` check on the new head via the checks API (it already has checks:write), then retry the merge (bounded retries)
-- [ ] The cascade/flip logging (task-auto-done-cascade-visibility) still reports per-id outcomes after the retry path
-- [ ] Documented in docs/agents.md (or the workflow comments): why flip PRs can wedge and what the recovery is without admin
+- [x] The workflow becomes race-tolerant: before merging, if out-of-date, rebase the flip branch onto fresh main AND re-post the `cli` check on the new head via the checks API (it already has checks:write), then retry the merge (bounded retries)
+- [x] The cascade/flip logging (task-auto-done-cascade-visibility) still reports per-id outcomes after the retry path
+- [x] Documented in docs/agents.md (or the workflow comments): why flip PRs can wedge and what the recovery is without admin
 
 ## Notes
