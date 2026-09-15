@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-board-dependency-visuals
 title: board/TUI dependency visuals + --group-by story
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-web-board
 labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
-claimed_at: "2026-09-15T15:04:08.052Z"
 ---
 <!--
   Placement (v0): tasks/scale-adoption/views/story-web-board/task-board-dependency-visuals.md
