@@ -28,8 +28,8 @@ Candidate mitigation (from the review): after a "nothing to commit" result, re-c
 
 ## Acceptance
 
-- [ ] "nothing to commit" followed by residual changes in the mutated paths is reported as a skip (warning + payload), not silent; genuinely clean trees stay quiet
-- [ ] Tracker-commit tests cover both branches (residue vs clean); labs/torture contention scenario stays green
-- [ ] docs/json-output.md skip-reason documentation updated if the reason string changes
+- [x] "nothing to commit" followed by residual changes in the mutated paths is reported as a skip (warning + payload), not silent; genuinely clean trees stay quiet
+- [x] Tracker-commit tests cover both branches (residue vs clean); labs/torture contention scenario stays green
+- [x] docs/json-output.md skip-reason documentation updated if the reason string changes
 
 ## Notes

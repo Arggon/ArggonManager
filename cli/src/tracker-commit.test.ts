@@ -558,12 +558,80 @@ describe("commitTrackerMutation edge cases", () => {
     const dir = initRepo();
     const itemPath = resolve(dir, "tasks/launch/auth/login/task-rate-limit.md");
 
-    const result = commitTrackerMutation(dir, [itemPath], {
-      message: trackerCommitMessage("commented", ["task-rate-limit"]),
-    });
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const result = commitTrackerMutation(dir, [itemPath], {
+        message: trackerCommitMessage("commented", ["task-rate-limit"]),
+      });
 
-    expect(result).toEqual({ committed: false, skipReason: "nothing to commit" });
-    expect(status(dir)).toBe("");
+      expect(result).toEqual({ committed: false, skipReason: "nothing to commit" });
+      expect(status(dir)).toBe("");
+      // Benign case (someone else already committed the content): stays quiet.
+      expect(stderr).not.toHaveBeenCalled();
+    } finally {
+      stderr.mockRestore();
+    }
+  });
+
+  // task-nothing-to-commit-masking: deterministic replay of the index-clobber
+  // race (bug-torture-contention-flake2 root cause) — another process rewrites
+  // the index between our `add` and `commit`, so `commit` reports "nothing to
+  // commit" while our staged entry is gone and the mutated file is still
+  // dirty. Simulated by faking git's commit failure (real git would commit the
+  // staged entry; the interleaving is not reproducible synchronously) while
+  // every other git call (status probe included) runs for real.
+  it("reports a lost staged entry as a warned skip, not a quiet one", async () => {
+    const dir = initRepo();
+    const itemPath = join(dir, "tasks/launch/auth/login/task-rate-limit.md");
+    writeFileSync(
+      itemPath,
+      `${readFileSync(itemPath, "utf8")}\n- uncommitted mutation\n`,
+      "utf8",
+    );
+    const realExecFileSync = (await import("node:child_process")).execFileSync;
+    vi.doMock("node:child_process", () => ({
+      execFileSync: (file: string, args: string[], opts: unknown) => {
+        if (args?.[0] === "commit") {
+          const err = Object.assign(new Error("git failed"), {
+            status: 1,
+            stdout: "On branch main\nnothing to commit, working tree clean\n",
+            stderr: "",
+          });
+          throw err;
+        }
+        return realExecFileSync(file, args, opts as never);
+      },
+    }));
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    // Drop the statically-imported module from the registry so the dynamic
+    // import below re-evaluates tracker-commit.js against the mock.
+    vi.resetModules();
+    try {
+      const { commitTrackerMutation: mockedMutation } = await import("./tracker-commit.js");
+      const result = mockedMutation(dir, [itemPath], {
+        message: trackerCommitMessage("commented", ["task-rate-limit"]),
+      });
+
+      // Distinct, reported skip reason (additive payload) + stderr warning.
+      expect(result).toEqual({
+        committed: false,
+        skipReason: "nothing to commit (staged entry lost under contention)",
+      });
+      expect(commitPayload(result)).toEqual({
+        skipped: "nothing to commit (staged entry lost under contention)",
+      });
+      expect(stderr).toHaveBeenCalledWith(
+        expect.stringContaining(
+          "commit skipped: nothing to commit (staged entry lost under contention)",
+        ),
+      );
+      // The mutation sits written-but-uncommitted, exactly as in the race.
+      expect(readFileSync(itemPath, "utf8")).toContain("uncommitted mutation");
+      expect(status(dir)).toContain("tasks/launch/auth/login/task-rate-limit.md");
+    } finally {
+      vi.doUnmock("node:child_process");
+      stderr.mockRestore();
+    }
   });
 });
 
