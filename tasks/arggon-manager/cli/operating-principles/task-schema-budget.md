@@ -26,8 +26,8 @@ Candidate #1 of the product-discovery research round (2026-09-15): tool-schema b
 
 ## Acceptance
 
-- [ ] `doctor --budget` reports the MCP tools/list payload: total bytes + tokens (~chars/4, same method as the baseline) + the largest tools, against an advisory budget threshold (constant in measure.ts, baseline recorded, e.g. total <=6 KB)
-- [ ] The doctor --budget command description updated to mention the MCP schema dimension; skills:sync run so the generated SKILL region reflects it (FOREVER-FIX LIVE TEST: the region regeneration must pick this up mechanically)
-- [ ] Tests (fixture tool definitions, deterministic bytes) + docs/json-output.md additive
+- [x] `doctor --budget` reports the MCP tools/list payload: total bytes + tokens (~chars/4, same method as the baseline) + the largest tools, against an advisory budget threshold (constant in measure.ts, baseline recorded, e.g. total <=6 KB)
+- [x] The doctor --budget command description updated to mention the MCP schema dimension; skills:sync run so the generated SKILL region reflects it (FOREVER-FIX LIVE TEST: the region regeneration must pick this up mechanically)
+- [x] Tests (fixture tool definitions, deterministic bytes) + docs/json-output.md additive
 
 ## Notes
