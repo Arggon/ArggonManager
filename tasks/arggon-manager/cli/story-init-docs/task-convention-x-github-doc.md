@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-convention-x-github-doc
 title: "generated convention.md extensions table: document the new x-github namespace"
+assignee: Arggon
 parent: story-init-docs
 labels: []
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T16:29:09.247Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-init-docs/task-convention-x-github-doc.md
