@@ -26,8 +26,14 @@ Follow-up from the task-schema-budget review (PR #256): the forever-fix (task-sk
 
 ## Acceptance
 
-- [ ] Coverage invariant: every non-excluded command appears in a generated region (a cross-check test fails when a command is documented only in hand-written prose)
-- [ ] The remaining hand-written command lines (init, adopt, branch, start, import-issues, etc.) migrate into generated regions (or join the exclusion list with reasons if genuinely internal)
-- [ ] The forever-fix net is then closed end-to-end: description changes propagate mechanically for ALL user-facing commands
+- [x] Coverage invariant: every non-excluded command appears in a generated region (a cross-check test fails when a command is documented only in hand-written prose)
+- [x] The remaining hand-written command lines (init, adopt, branch, start, import-issues, etc.) migrate into generated regions (or join the exclusion list with reasons if genuinely internal)
+- [x] The forever-fix net is then closed end-to-end: description changes propagate mechanically for ALL user-facing commands
+
+## Notes
+
+- Coverage audit (pre-fix): hand-written-only commands were `init`, `adopt`, `branch`, `import-issues` (start/list/next/etc. and doctor were already in regions). No new exclusions needed — existing list (hello, mcp, spec/stack/playbook groupings) kept with reasons.
+- Migration: §1 init/adopt block became a generated region (filter `init,adopt`); curated nuance kept as hand-written bullets outside the region. `branch` joined the §2 work-loop filter; `import-issues` joined the §3 tooling filter. No generator rendering changes needed (init's `[dir]` argument renders fine).
+- Coverage invariant lives in cli/src/skill-generated-commands.test.ts (4th test).
 
 ## Notes

@@ -63,6 +63,32 @@ describe("generated SKILL command reference (task-skill-generated-command-refere
     ).toEqual([]);
   });
 
+  it("keeps every user-facing command INSIDE a generated region (task-generated-regions-coverage: coverage is not opt-in — description edits must feed a region mechanically)", () => {
+    const source = readFileSync(skillPath, "utf8");
+    const infos = loadCliCommands();
+    // Render from the current source (not the file body) so the check reads the
+    // same regions the sync writes — a stale-but-present region still counts.
+    const regionBodies = [...spliceGeneratedCommands(source, infos).matchAll(REGION_RE)].map(
+      (m) => m[2]!,
+    );
+    const outside: string[] = [];
+    for (const info of infos) {
+      const name = info.path.join(" ");
+      if (COMMAND_EXCLUSIONS[name]) continue;
+      const inRegion = regionBodies.some((body) =>
+        new RegExp(`^arggon ${name.replaceAll("-", "\\-")}(?:\\s|$)`, "m").test(body),
+      );
+      if (!inRegion) outside.push(name);
+    }
+    expect(
+      outside,
+      "commands documented only in hand-written prose (their description edits never " +
+        "regenerate anything): add them to a generated-commands filter in " +
+        "skills/arggon-cli/SKILL.md and run `npm run skills:sync`, or exclude them in " +
+        "COMMAND_EXCLUSIONS with a reason",
+    ).toEqual([]);
+  });
+
   it("renders region lines from the live .description() strings (sanity on the generator itself)", () => {
     const rendered = renderRegion(loadCliCommands(), "list,next");
     expect(rendered).toContain("arggon list  # List work items under tasks/");
