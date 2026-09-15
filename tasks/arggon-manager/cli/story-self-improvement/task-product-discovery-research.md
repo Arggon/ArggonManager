@@ -33,3 +33,6 @@ Research-first: no product code changes. Outcomes feed the backlog (the coordina
 - [x] No product code changes in this item
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. The ranking formula (evidence x alignment / effort) makes the list auditable instead of vibes, the landscape spans all four quadrants with ~30 dated sources, and the rejected section is the deliverable I most cared about — SaaS tracker, execution engines, SQL store and llms.txt-as-primary all rejected with reasons that respect tracker-in-tree and the operating principles. The shortlist is coherent: MCP parity completes ADR 0006 where it hurts most (MCP-only agents on the worst read path), dependency-weighted next and spec analyze are high-leverage S/M items, issue round-trip rides existing frontmatter. Candidates go to the user for picking; filing happens next cycle. Merge follows.
