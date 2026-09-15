@@ -97,6 +97,21 @@ export function tuiColumnItems(items: WorkItem[], filter: string, status: string
   return visibleTuiItems(items, filter).filter((item) => item.status === status);
 }
 
+const TUI_TERMINAL_DEP = new Set(["done", "cancelled"]);
+
+/**
+ * True when the item has open dependencies (dep not done/cancelled; unknown
+ * dep ids count as open — same rule as the HTML board, ADR 0004).
+ */
+export function tuiDepBlocked(items: WorkItem[], item: WorkItem): boolean {
+  if (item.depends_on.length === 0) return false;
+  const statusById = new Map(items.map((it) => [it.id, it.status] as const));
+  return item.depends_on.some((depId) => {
+    const status = statusById.get(depId);
+    return !status || !TUI_TERMINAL_DEP.has(status);
+  });
+}
+
 /** Visible card count per status, aligned with STATUSES (for key clamping). */
 export function tuiColumnCounts(items: WorkItem[], filter: string): number[] {
   return STATUSES.map((status) => tuiColumnItems(items, filter, status).length);
@@ -197,11 +212,14 @@ function padEndTo(text: string, n: number): string {
   return text.length >= n ? text : text + " ".repeat(n - text.length);
 }
 
-function cardLine(item: WorkItem, selected: boolean): string {
+function cardLine(item: WorkItem, selected: boolean, depBlocked: boolean): string {
   const marker = selected ? ">" : " ";
   const badge = TYPE_BADGES[item.type];
   const title = item.title ?? item.id;
-  return `${marker} ${badge} ${item.id} ${title}`;
+  // task-board-dependency-visuals: dependency-blocked items carry a `⌫` tag
+  // (open deps = deps not done/cancelled; same rule as the HTML board).
+  const blockedTag = depBlocked ? " ⌫" : "";
+  return `${marker} ${badge} ${item.id}${blockedTag} ${title}`;
 }
 
 /**
@@ -244,7 +262,7 @@ export function renderTui(
   const columnCards = STATUSES.map((status, i) =>
     tuiColumnItems(items, state.filter, status).map((item, j) => {
       const line = padEndTo(
-        clipLine(cardLine(item, i === state.column && j === state.card), colWidth),
+        clipLine(cardLine(item, i === state.column && j === state.card, tuiDepBlocked(items, item)), colWidth),
         colWidth,
       );
       if (!color) return line;

@@ -270,6 +270,7 @@ arggon board --out report/board.html   # explicit path, relative to cwd
 arggon board --json           # v1 envelope: { path, itemCount }
 arggon board --github         # overlay live GitHub PR state on cards with a branch (read-only)
 arggon board --group-by milestone      # prototype (ADR 0003): group cards within each column
+arggon board --group-by story          # group cards within each column by parent story
 arggon board --serve          # local live-reload server on 127.0.0.1 (edits via the update path)
 arggon board --serve --port 4173       # pick the port
 arggon board --tui            # interactive read-only terminal kanban (raw ANSI, no deps)
@@ -279,6 +280,8 @@ arggon board --tui            # interactive read-only terminal kanban (raw ANSI,
 - `--json`: one JSON object on stdout; failures emit `code: "BOARD_FAILED"`. The payload contract for every mode (which fields appear with `--serve`, `--github`, `--group-by`) is documented once in [docs/json-output.md](docs/json-output.md) — the `board` section there is the normative source
 - `--github`: one `gh pr list` read matched by head ref name → per-card badge (`#N · draft/open/merged/closed` + checks `✓/✗/…`, neutral `○ no PR` without branch or PR); without gh auth fails clearly suggesting plain `board`; never writes to `tasks/`
 - `--group-by milestone`: prototype per [ADR 0003](docs/adr/0003-milestone-field.md); items without a milestone group last
+- `--group-by story`: group cards within each column under parent-story headers (sorted ascending); parent-less cards render last under a `no story` header only when the column also has parent groups; stories without cards never render. Not combinable with `--tui` (the TUI groups by status column only) — combining them fails with `BOARD_FAILED`; combinable with `--serve` and `--json`
+- blocked cards: cards with open dependencies (deps not `done`/`cancelled`) render dimmed with a `blocked by N` badge in the card head plus the per-dep `↳ blocked by <id>` lines; in `--tui` such items carry a `⌫` tag
 - `--serve`: serves the board locally, **bound to 127.0.0.1 only**, and reloads the page whenever any file under `tasks/` changes; drag-and-drop posts to the update endpoint, which runs the same kernel update rules as the CLI. `--serve` is combinable with `--json` (the envelope is emitted once, then the server keeps running); see docs/json-output.md for the payload fields
 - `--tui`: interactive, read-only terminal kanban over the same kernel read path — five v0 status columns, dependency-light (raw ANSI escapes, no TUI framework, zero new dependencies). Re-reads the tree after every keypress, so it always shows the current tree. Requires an interactive terminal (piped stdout fails with `BOARD_FAILED`); **not combinable with `--json`** (it is a view, not a data format) or `--serve`. Keybindings:
 

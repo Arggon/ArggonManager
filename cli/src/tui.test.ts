@@ -19,6 +19,7 @@ import {
   runTuiBoard,
   selectedTuiItem,
   tuiColumnCounts,
+  tuiDepBlocked,
   visibleTuiItems,
 } from "./tui.js";
 import type { TuiState } from "./tui.js";
@@ -493,5 +494,42 @@ describe("renderTui column alignment (bug-tui-column-shift)", () => {
       const line = lines.find((l) => l.replace(/\x1b\[[0-9;]*m/g, "").includes(id))!;
       expect(visibleX(line, id), `${id} x-offset`).toBe(3 * colWidth);
     }
+  });
+});
+
+describe("tui dependency visuals (task-board-dependency-visuals)", () => {
+  it("marks dependency-blocked cards with a ⌫ tag; terminal-only deps and clean cards stay unmarked", () => {
+    const items = [
+      item({ id: "task-a", type: "task", status: "todo", depends_on: ["task-x"] }),
+      item({ id: "task-b", type: "task", status: "todo", depends_on: ["done-y"] }),
+      item({ id: "task-c", type: "task", status: "todo" }),
+      item({ id: "task-x", type: "task", status: "in_progress" }),
+      item({ id: "done-y", type: "task", status: "done" }),
+    ];
+    const frame = renderTui(items, initialTuiState(120, 24), { color: false });
+    expect(frame).toContain("T task-a ⌫ ");
+    expect(frame).not.toContain("T task-b ⌫");
+    expect(frame).not.toContain("T task-c ⌫");
+    // Unknown dep ids count as open (same rule as the HTML board).
+    const frameUnknown = renderTui(
+      [item({ id: "task-d", type: "task", status: "todo", depends_on: ["gone-z"] })],
+      initialTuiState(120, 24),
+      { color: false },
+    );
+    expect(frameUnknown).toContain("T task-d ⌫ ");
+  });
+
+  it("tuiDepBlocked matches the HTML board open-dep rule", () => {
+    const items = [
+      item({ id: "task-x", type: "task", status: "in_progress" }),
+      item({ id: "done-y", type: "task", status: "done" }),
+      item({ id: "cancel-z", type: "task", status: "cancelled" }),
+      item({ id: "task-a", type: "task", status: "todo", depends_on: ["task-x"] }),
+      item({ id: "task-b", type: "task", status: "todo", depends_on: ["done-y", "cancel-z"] }),
+    ];
+    expect(tuiDepBlocked(items, items[3])).toBe(true);
+    expect(tuiDepBlocked(items, items[4])).toBe(false);
+    expect(tuiDepBlocked(items, { ...items[3], depends_on: [] })).toBe(false);
+    expect(tuiDepBlocked(items, { ...items[3], depends_on: ["missing"] })).toBe(true);
   });
 });
