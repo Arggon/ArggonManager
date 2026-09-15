@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-autodone-flip-race
 title: "auto-done: flip PRs lose the up-to-date race and wedge (no retry; bot check not re-posted)"
+assignee: Arggon
 parent: story-github
 labels: []
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T16:28:52.290Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-github/task-autodone-flip-race.md
