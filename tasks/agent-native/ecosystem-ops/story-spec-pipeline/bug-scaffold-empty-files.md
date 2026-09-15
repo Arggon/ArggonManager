@@ -4,7 +4,7 @@ status: todo
 id: bug-scaffold-empty-files
 title: scaffolded docs reported truncated to 0 lines (spec new / playbook new / stack explore)
 parent: story-spec-pipeline
-labels: []
+labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
