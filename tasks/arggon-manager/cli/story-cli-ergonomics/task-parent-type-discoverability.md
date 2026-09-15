@@ -4,6 +4,7 @@ status: in_progress
 id: task-parent-type-discoverability
 title: "create --parent: document expected parent type per item type (discoverability)"
 assignee: Arggon
+branch: feat/task-parent-type-discoverability
 parent: story-cli-ergonomics
 labels: [p3]
 created: "2026-09-15"
