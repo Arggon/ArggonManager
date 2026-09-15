@@ -321,6 +321,8 @@ arggon spec new my-feature --json     # v1 envelope { files: string[] }
 
 `spec new` numbers globally (max existing NNN across `docs/specs` + `docs/plans`, plus 1) and **never overwrites** an existing file. Templates live in [`templates/spec.md`](templates/spec.md) / [`templates/plan.md`](templates/plan.md) (`{{SLUG}}`, `{{NNN}}`, `{{ID}}`, `{{TITLE}}`, `{{DATE}}` placeholders; an embedded copy in the CLI is the fallback). See the pipeline spec: [docs/specs/spec-spec-pipeline-002.md](docs/specs/spec-spec-pipeline-002.md).
 
+`spec analyze [--spec <path>]` is a **report-only** quality pass over the specs (default: every `docs/specs/*.md`): a checklist-driven ambiguity scan (vague quantifiers like "fast"/"several", TODO/TBD markers, no error path, missing or untestable acceptance criteria) plus a spec ↔ tasks/plans consistency check (specs marked `implemented` that no item or plan cites; plans whose `spec:` points at a missing file). Findings never fail the run — exit `0` with findings; only an unreadable file exits `1` with `SPEC_FAILED`. Run it before implementation starts to catch what structural validation cannot. See [docs/specs/spec-spec-analyze-004.md](docs/specs/spec-spec-analyze-004.md).
+
 ### `arggon stack explore`
 
 Scaffolds an exploration record — the spike note that precedes a stack ADR — at `docs/explorations/exploration-<slug>-NNN.md` with sections **Candidates**, **Criteria**, **Findings** (dated source links), **Recommendation**, and a **Decision** ADR placeholder. The research itself (comparing candidates, collecting dated sources) is the caller's job; the command records it. `NNN` is the max existing number across `docs/explorations` plus 1 (zero-padded to 3), and the command **never overwrites** an existing file.

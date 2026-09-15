@@ -41,10 +41,13 @@ import {
   runStackExplore,
 } from "./playbooks.js";
 import {
+  formatSpecAnalyzeHuman,
   formatSpecValidateHuman,
+  runSpecAnalyze,
   runSpecNew,
   runSpecValidate,
 } from "./spec.js";
+
 import { runSync } from "./sync-command.js";
 import { runTuiBoard } from "./tui.js";
 import { maybeCommitUpdate, runUpdate } from "./update.js";
@@ -1165,6 +1168,45 @@ spec
         return;
       }
       console.error(`arggon spec: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+spec
+  .command("analyze")
+  .description(
+    "Checklist-driven ambiguity scan + spec/task consistency report (report-only, never edits; exit 0 with findings)",
+  )
+  .option("--spec <path>", "scan a single spec file (also outside docs/specs)")
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { spec?: string; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runSpecAnalyze({ cwd: process.cwd(), spec: opts.spec });
+      if (json) {
+        emitJson({
+          ok: true,
+          schemaVersion: JSON_SCHEMA_VERSION,
+          conventionVersion: result.conventionVersion,
+          command: "spec",
+          scanned: result.scanned,
+          findings: { ambiguity: result.ambiguity, consistency: result.consistency },
+        });
+        return;
+      }
+      process.stdout.write(formatSpecAnalyzeHuman(result));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "spec",
+          message,
+          code: "SPEC_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon spec analyze: ${message}`);
       process.exitCode = 1;
     }
   });

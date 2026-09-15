@@ -179,7 +179,7 @@ Stale-claim report: `arggon list --stale --older-than <duration>` (`<number><d|h
 
 ### `spec`
 
-Covers both subcommands; the envelope `command` is always `"spec"`.
+Covers `spec validate`, `spec new`, and `spec analyze`; the envelope `command` is always `"spec"`.
 
 `spec validate [--file <path>]` (pure read over `docs/specs/*.md` / `docs/plans/*.md`, or one file with `--file`):
 
@@ -197,6 +197,15 @@ Covers both subcommands; the envelope `command` is always `"spec"`.
 | `files` | `string[]` | Created paths, posix, relative to the repo root |
 
 Failures use `error.code: "SPEC_FAILED"` (invalid slug, refusing to overwrite, missing `tasks/`).
+
+`spec analyze [--spec <path>]` (report-only ambiguity scan + spec ↔ tasks/plans consistency; default scope `docs/specs/*.md`, one file with `--spec`) — **findings never fail the run**: `ok` is always `true` on a completed scan, even with findings. Structural failures (unreadable file) use `error.code: "SPEC_FAILED"` and exit code 1.
+
+| Field      | Type                  | Notes |
+| ---------- | --------------------- | ----- |
+| `scanned`  | `number`              | Spec documents scanned |
+| `findings` | `FindingsByArea`      | `{ ambiguity: Finding[], consistency: Finding[] }` |
+
+`Finding` is `{ file, kind, line?, severity, message }` — `file` posix, repo-relative; `severity` is `"info"` or `"warn"`; `line` (1-based, present when the finding is tied to a line) is reported against the full file including frontmatter. Kinds: `vague-quantifier`, `todo-marker`, `no-error-path`, `no-acceptance`, `untestable-acceptance` (ambiguity); `spec-orphaned`, `plan-spec-missing` (consistency).
 
 ### `explore`
 
