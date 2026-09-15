@@ -4,6 +4,7 @@ status: in_progress
 id: task-agents-md-budget-headroom
 title: AGENTS.md budget headroom exhausted (5 B); init --full tree grew 18% un-budgeted
 assignee: Arggon
+branch: feat/task-agents-md-budget-headroom
 parent: operating-principles
 labels: []
 created: "2026-09-15"
