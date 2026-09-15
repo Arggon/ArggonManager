@@ -19,10 +19,11 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- Why this task exists. -->
+Follow-up from the task-mcp-parity-full review (PR #237): `arggon next`'s ready pool includes unclaimed STORIES, so on a fresh tree the suggestion is the story itself rather than a leaf task — deterministic, but surprising for the dominant "what do I implement next" use case. With dependency-weighted ranking landed, the pool semantics are the remaining rough edge.
 
 ## Acceptance
 
-- [ ] 
+- [ ] Decision + landing: either stories leave the default pool (flag/`--include-stories` to opt in) or the ranking demotes them explicitly below leaf tasks — decided and documented
+- [ ] Tests for both pools; reason line reflects the chosen semantics
 
 ## Notes

@@ -19,10 +19,11 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+Follow-up from the task-mcp-parity-full review (PR #237): `create --json` no longer emits a top-level `path` field (only `item.path`), while `show`/`comment` still carry top-level `path` — envelope-shape inconsistency across commands introduced with the compact-envelope default (PR #203) or before. Consumers reading `path` from create must now know it moved inside `item`.
 
 ## Acceptance
 
-- [ ] 
+- [ ] Decide + align: either create restores the additive top-level `path` or show/comment drop theirs — one convention, documented in docs/json-output.md (schemaVersion unchanged)
+- [ ] Tests assert the aligned shape in all three commands
 
 ## Notes
