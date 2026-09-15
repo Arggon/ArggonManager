@@ -29,3 +29,6 @@ Follow-up from the task-mcp-parity-full review (PR #237): `create --json` no lon
 - [x] Tests assert the aligned shape in all three commands
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. Top-level path restored on create and aligned additively in arggon_create — whose own tool description already promised {id, path, item}, so this fixes an MCP contract lie too, not just the CLI. The convention sentence (top-level path where a command created/wrote an item file; item.path mirrors) is precise, and the show/comment absolute-vs-create repo-relative wrinkle is honestly documented rather than silently harmonized. Merge follows.
