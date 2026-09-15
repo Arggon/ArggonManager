@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-next-pool-stories
 title: next suggestion pool includes unclaimed stories (surprising for implement-next)
+assignee: Arggon
 parent: story-cli-ergonomics
 labels: []
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T16:28:59.112Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-cli-ergonomics/task-next-pool-stories.md
