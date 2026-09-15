@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-generated-regions-coverage
 title: "forever-fix coverage: generated SKILL regions for every command"
+assignee: Arggon
 parent: story-init-docs
 labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T23:14:45.378Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-init-docs/task-generated-regions-coverage.md
