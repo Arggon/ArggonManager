@@ -28,9 +28,9 @@ Research-first: no product code changes. Outcomes feed the backlog (the coordina
 
 ## Acceptance
 
-- [ ] Exploration recorded via `arggon stack explore` (docs/explorations/): landscape survey of adjacent tools — agent-native task/issue trackers, spec-driven development kits, worktree/orchestration managers, context-engineering practices — each with a dated source and a one-line "what it does that ArggonManager doesn't"
-- [ ] Ranked list of 8-12 candidate improvements/features: problem it solves, evidence (dated source), effort (S/M/L), which operating principle/ADR it aligns with, and surface (docs-only / CLI / MCP / board)
-- [ ] An explicit "evaluated and rejected" section with reasons — scope discipline is part of the deliverable
-- [ ] No product code changes in this item
+- [x] Exploration recorded via `arggon stack explore` (docs/explorations/): landscape survey of adjacent tools — agent-native task/issue trackers, spec-driven development kits, worktree/orchestration managers, context-engineering practices — each with a dated source and a one-line "what it does that ArggonManager doesn't" — docs/explorations/exploration-product-discovery-002.md (17-entry landscape table, all sources accessed 2026-09-15)
+- [x] Ranked list of 8-12 candidate improvements/features: problem it solves, evidence (dated source), effort (S/M/L), which operating principle/ADR it aligns with, and surface (docs-only / CLI / MCP / board) — 12 ranked candidates in the same exploration
+- [x] An explicit "evaluated and rejected" section with reasons — scope discipline is part of the deliverable — 8 rejected notables with reasons
+- [x] No product code changes in this item
 
 ## Notes
