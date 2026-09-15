@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-next-dependency-ranking
 title: next --json ranks ready work by dependency weight (downstream unblocking)
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-cli-ergonomics
 labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
-claimed_at: "2026-09-15T15:04:01.069Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-cli-ergonomics/task-next-dependency-ranking.md
