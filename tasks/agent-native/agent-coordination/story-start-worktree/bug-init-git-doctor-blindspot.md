@@ -4,7 +4,7 @@ status: todo
 id: bug-init-git-doctor-blindspot
 title: init in a non-git dir yields a half-functional tracker; doctor reports all-healthy
 parent: story-start-worktree
-labels: []
+labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
