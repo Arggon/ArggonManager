@@ -155,10 +155,15 @@ program
     "Report installation state: convention version, generated-doc provenance, tracker counts (pure read)",
   )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { json?: boolean }) => {
+  .option(
+    "--budget",
+    "also measure the ADR 0006 context-budget surfaces (fresh init --full in a deleted temp tree; report-only)",
+    false,
+  )
+  .action((opts: { json?: boolean; budget?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
-      const result = runDoctor({ cwd: process.cwd() });
+      const result = runDoctor({ cwd: process.cwd(), budget: opts.budget });
       if (json) {
         successJson(
           "doctor",
@@ -168,6 +173,8 @@ program
             docs: result.docs,
             tracker: result.tracker,
             git: result.git,
+            ...(result.budget ? { budget: result.budget } : {}),
+            ...(result.budgetError !== undefined ? { budgetError: result.budgetError } : {}),
           },
           result.conventionVersion,
         );

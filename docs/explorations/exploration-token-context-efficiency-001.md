@@ -192,3 +192,42 @@ this PR; Accepted on merge). Chosen direction: compact envelopes by default
 read path with comment tailing (C2+C6), and a generated-docs context budget
 (C4). MCP trimming deferred (C5). Implementation lands via follow-up items,
 not in this research item.
+
+## Re-measurement (2026-09-15, task-adr0006-remeasure)
+
+Directions 1-4 of [ADR 0006](../adr/0006-token-context-efficiency.md) have
+landed (compact envelopes, `next`-first guidance, `show`, generated-docs
+budget). As promised, the surfaces were re-measured — now via a repeatable
+surface, `arggon doctor --json --budget` (report-only; measures a fresh
+`init --full` in a throwaway temp tree that is always deleted, plus a
+deterministic 8-item fixture for the `list`/`show` payloads, CLI run from
+source so bytes are what an agent receives). Measured 2026-09-15 in this
+repo, worktree `feat/task-adr0006-remeasure`:
+
+| Surface | 2026-09-14 baseline | 2026-09-15 re-measure | Verdict |
+|---|---|---|---|
+| `list --json`, compact default (8-item fixture) | n/a (compact did not exist) | 2,539 B | compact vs `--full`: 3,347 B — 808 B (~24%) saved by envelope compaction |
+| `list --json --full` (8-item fixture) | n/a (same baseline shape) | 3,347 B | per-item ≈ 418 B full / 317 B compact — consistent with the 15-20% null-field estimate |
+| `show <id> --json` (1 comment) | unbounded file read (~330 B fresh, +226 B/comment, no command) | 730 B | bounded read exists; ~0.7 KB replaces list+fs-read round-trip |
+| generated AGENTS.md | 3,696 B (over budget) | 2,043 B | within the 2,048 B budget (direction 4) — pass, with only 5 B of headroom |
+| fresh `init --full` tree total | 43,694 B | 51,813 B | grew ~18% (generated SKILL.md copy + newer docs); generated AGENTS.md itself shrank per direction 4 |
+
+Token estimates (~4 chars/token): fixture `list --json` ≈ 635 tokens compact
+vs ≈ 837 full; `show` ≈ 183 tokens; generated AGENTS.md ≈ 511 tokens
+(baseline ≈ 925).
+
+Notes:
+
+- The fixture (8 items) is deliberately small and deterministic, so absolute
+  numbers are NOT directly comparable to the 136-item 60.7 KB baseline list;
+  the `--full` vs compact pair and per-item bytes are the comparability
+  anchors, and both confirm the direction-1 saving (~24% on the fixture vs
+  the 15-20% baseline estimate — compact also drops keys, not just nulls).
+- The generated AGENTS.md passes its budget by 5 B. Any copy growth regresses
+  it; `cli/src/init-docs.test.ts` keeps the hard assert.
+- The init-tree growth is dominated by the generated SKILL.md copy and
+  tracked docs, not the AGENTS.md — consistent with direction 4 trading
+  AGENTS.md bytes for pointer reads.
+- Repeatable measurement surface: `arggon doctor --json --budget` (additive
+  `budget` section; human output via `arggon doctor --budget`). Method and
+  budget checks documented in docs/json-output.md §`doctor`.

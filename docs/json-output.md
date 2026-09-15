@@ -154,6 +154,7 @@ Pure-read installation report (exit 0 on every well-formed input, including non-
 | `docs.missing`      | `number`  | Entries whose destination file is absent                                      |
 | `tracker`           | `object`  | `{ items, todo }` — total work items under `tasks/` and their `todo` count    |
 | `git`               | `object`  | Git state of the tree (bug-init-git-doctor-blindspot, additive): `{ isRepo, dirty, remote }` — `isRepo` from `git rev-parse --git-dir`; `dirty` is whether `git status --porcelain` is non-empty and `remote` the URL of `origin` (else the first remote), both `null` when the tree is not a git repository. Report-only; doctor's exit-0 charter is unchanged. |
+| `budget`            | `object`  | Present only with `--budget` (task-adr0006-remeasure, additive): context-budget measurement of the ADR 0006 agent-facing surfaces — `{ initTreeBytes, generatedAgentsMdBytes, listCompactBytes, listFullBytes, showBytes, fixtureItems }`. Method mirrors the 2026-09-14 baseline ([exploration-token-context-efficiency-001](explorations/exploration-token-context-efficiency-001.md)): a fresh `init --full` in a throwaway temp tree (ALWAYS deleted afterwards), a deterministic 8-item fixture (1 initiative + 1 epic + 1 story + 5 tasks, 1 comment) for the `list`/`show` payload sizes, CLI run from source so bytes are what an agent actually receives. Budget checks: `generatedAgentsMdBytes` <= 2048 B (ADR 0006 direction 4); `listCompactBytes < listFullBytes` shows the compact-envelope saving. Report-only; never touches the tree being examined; on measurement failure `budgetError` carries the message and doctor still exits 0. |
 
 Each `docs` entry falls in exactly one bucket (`missing`, else `stale`, else `acknowledged`/`acknowledgedDrifted`, else `untouched`/`modified`), so `untouched + modified + acknowledged + acknowledgedDrifted + stale + missing = managed`. Failures use `error.code: "DOCTOR_FAILED"` (unexpected errors only — a missing tree is a normal report).
 
@@ -511,6 +512,21 @@ Init still **writes** `tasks/.convention.yml` (including the `x-generated` prove
 ```
 
 Non-initialized repos return the same shape with `root: null`, `initialized: false`, zeroed `docs`/`tracker`, `conventionVersion: 0`, and the `git` section probed from the cwd (a non-git tree reports `{ isRepo: false, dirty: null, remote: null }`).
+
+With `--budget`, an additive `budget` section appears (values illustrative; re-measure with `arggon doctor --json --budget`):
+
+```json
+{
+  "budget": {
+    "initTreeBytes": 51813,
+    "generatedAgentsMdBytes": 2043,
+    "listCompactBytes": 2539,
+    "listFullBytes": 3347,
+    "showBytes": 730,
+    "fixtureItems": 8
+  }
+}
+```
 
 ### `adopt`
 
