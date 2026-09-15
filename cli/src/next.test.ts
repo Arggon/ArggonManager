@@ -230,3 +230,118 @@ describe("runNext dependency awareness (spec-deps-001)", () => {
     expect(suggestion!.poolSize).toBe(2);
   });
 });
+
+describe("runNext downstream-weight ranking (task-next-dependency-ranking)", () => {
+  /** Write one unclaimed todo item; `deps` is its depends_on list. */
+  function todo(
+    root: string,
+    id: string,
+    deps: string[] = [],
+    status: "todo" | "in_progress" = "todo",
+    assignee?: string,
+  ): void {
+    const assigneeLine = assignee ? `assignee: ${assignee}\n` : "";
+    write(
+      root,
+      `tasks/s/s/${id}.md`,
+      md(
+        `type: task\nstatus: ${status}\nid: ${id}\nparent: s\n` +
+          (deps.length > 0 ? `depends_on: [${deps.map((d) => `"${d}"`).join(", ")}]\n` : "") +
+          assigneeLine +
+          `labels: []\ncreated: "2026-09-11"\n`,
+        id,
+      ),
+    );
+  }
+
+  function scaffold(): string {
+    const root = mkdtempSync(join(tmpdir(), "arggon-next-rank-"));
+    write(root, "tasks/.convention.yml", "version: 3\n");
+    write(
+      root,
+      "tasks/s/s.md",
+      md(
+        'type: story\nstatus: done\nid: s\ntitle: S\nlabels: []\ncreated: "2026-09-11"\n',
+        "S",
+      ),
+    );
+    return root;
+  }
+
+  const cases: {
+    name: string;
+    items: [string, string[]][];
+    expectPick: string;
+    expectUnblocks?: number;
+    expectReason?: string;
+  }[] = [
+    {
+      name: "blocked chain A <- B <- C (C blocks B blocks A): next picks C with reason unblocks 2",
+      items: [
+        ["task-aaa", ["task-bbb"]],
+        ["task-bbb", ["task-ccc"]],
+        ["task-ccc", []],
+      ],
+      expectPick: "task-ccc",
+      expectUnblocks: 2,
+      expectReason: "unblocks 2 items downstream",
+    },
+    {
+      name: "parallel ready items with different weights: heavier subtree first",
+      items: [
+        ["task-aaa", []],
+        ["task-bbb", []],
+        ["task-ccc", ["task-bbb"]],
+      ],
+      expectPick: "task-bbb",
+      expectUnblocks: 1,
+      expectReason: "unblocks 1 item downstream",
+    },
+    {
+      name: "no-deps tree: stable lexicographic tie-break",
+      items: [
+        ["task-aaa", []],
+        ["task-bbb", []],
+        ["task-ccc", []],
+      ],
+      expectPick: "task-aaa",
+      expectUnblocks: 0,
+    },
+  ];
+
+  for (const tc of cases) {
+    it(tc.name, () => {
+      const root = scaffold();
+      for (const [id, deps] of tc.items) todo(root, id, deps);
+      const { suggestion } = runNext({ cwd: root });
+      expect(suggestion!.item.id).toBe(tc.expectPick);
+      if (tc.expectUnblocks !== undefined) {
+        expect(suggestion!.unblocks).toBe(tc.expectUnblocks);
+      }
+      if (tc.expectReason) {
+        expect(suggestion!.reason).toContain(tc.expectReason);
+      }
+      expect(suggestion!.reason.split("\n").length).toBe(1);
+    });
+  }
+
+  it("cycle in depends_on does not hang or overcount", () => {
+    const root = scaffold();
+    todo(root, "task-aaa", ["task-bbb"]);
+    todo(root, "task-bbb", ["task-aaa"]);
+    const { suggestion } = runNext({ cwd: root });
+    expect(suggestion!.item.id).toBe("task-aaa");
+    expect(suggestion!.unblocks).toBe(1);
+  });
+
+  it("transitive weight counts through in_progress items too", () => {
+    const root = scaffold();
+    // Completing task-aaa unblocks claimed task-bbb, which unblocks task-ccc.
+    todo(root, "task-aaa", []);
+    todo(root, "task-bbb", ["task-aaa"], "in_progress", "alice");
+    todo(root, "task-ccc", ["task-bbb"]);
+    const { suggestion } = runNext({ cwd: root });
+    expect(suggestion!.item.id).toBe("task-aaa");
+    expect(suggestion!.unblocks).toBe(2);
+  });
+});
