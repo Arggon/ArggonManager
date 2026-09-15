@@ -29,3 +29,6 @@ Candidate #3 of [product discovery](docs/explorations/exploration-product-discov
 - [x] Tests + docs (README + json-output if --json)
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. Dogfooding the pipeline on the spec tooling itself (spec-analyze-004 proposed->implemented in-PR) is exactly how this item should have been built. Report-only invariant proven byte-identical, the ambiguity checklist catches what structural validation cannot (your own corpus flagged two real cases), and the consistency check already paid for itself by finding the orphaned show-item spec. Exit-0-with-findings respects the report charter. The two corpus findings are being handled. Merge follows.
