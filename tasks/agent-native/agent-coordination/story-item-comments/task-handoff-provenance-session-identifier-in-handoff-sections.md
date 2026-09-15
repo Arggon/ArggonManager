@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-handoff-provenance-session-identifier-in-handoff-sections
 title: "handoff provenance: session identifier in handoff sections"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-item-comments
 labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
-claimed_at: "2026-09-15T22:23:16.786Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-coordination/story-item-comments/task-handoff-provenance-session-identifier-in-handoff-sections.md
