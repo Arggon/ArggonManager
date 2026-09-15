@@ -54,3 +54,6 @@ baseline, `arggon doctor --json --budget`):
 
 Full comparison table in docs/explorations/exploration-token-context-efficiency-001.md
 §Re-measurement (linked from ADR 0006 Consequences).
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. doctor --budget keeps the report-only charter while making ADR 0006 falsifiable — the baseline method is replicated exactly (temp tree always deleted, deterministic fixture, both compact and --full measured). The numbers themselves are the review finding: AGENTS.md at 2043/2048 (5 B headroom — fragile) and the init tree +18% (SKILL.md-dominated, un-budgeted). Both going to the backlog. Merge follows.
