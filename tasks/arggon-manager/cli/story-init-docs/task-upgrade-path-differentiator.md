@@ -31,3 +31,6 @@ Candidate #2 of the product-discovery research round (2026-09-15): OpenSpec's ma
 - [x] doctor/init tests unchanged and green (docs-only)
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. The guarantee stated as our own (no vendor bashing), every claim verified against decide()/docs.ts before writing, and the agent-audience phrasing in docs/agents.md differing from README's human phrasing without duplication. This was the cheapest candidate and the one adopters evaluating tools will actually read. Merge follows.
