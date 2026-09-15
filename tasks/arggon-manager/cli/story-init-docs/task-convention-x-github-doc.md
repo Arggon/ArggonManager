@@ -4,6 +4,7 @@ status: in_progress
 id: task-convention-x-github-doc
 title: "generated convention.md extensions table: document the new x-github namespace"
 assignee: Arggon
+branch: feat/task-convention-x-github-doc
 parent: story-init-docs
 labels: []
 created: "2026-09-15"
