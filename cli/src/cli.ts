@@ -269,7 +269,10 @@ program
   .description("Create a work item under tasks/")
   .argument("<type>", "initiative | epic | story | task | bug")
   .argument("<title>", "title (id is slugified; override with --id)")
-  .option("-p, --parent <id>", "parent item id (required except initiative)")
+  .option(
+    "-p, --parent <id>",
+    "parent item id (required except initiative; expected parent per type — initiative: none; epic: initiative; story: epic; task/bug: story)",
+  )
   .option("--id <id>", "override id stem (CLI still adds task-/bug- for leaves)")
   .option("--assignee <login>", "assignee (omit when unassigned)")
   .option("--status <status>", "status (default: todo)", "todo")
