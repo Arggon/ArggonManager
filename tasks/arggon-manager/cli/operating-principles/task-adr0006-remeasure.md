@@ -4,7 +4,7 @@ status: todo
 id: task-adr0006-remeasure
 title: "ADR 0006 re-measure: repeatable context-budget measurement vs live surfaces"
 parent: operating-principles
-labels: []
+labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
