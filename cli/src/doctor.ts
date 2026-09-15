@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { readConventionConfig, readConventionVersion } from "./convention.js";
 import { checksumOf, currentGeneratedTemplates } from "./docs.js";
 import { loadItems } from "./items.js";
+import { measureBudget, formatBudgetLines, type BudgetResult } from "./measure.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 
 export type DoctorDocs = {
@@ -68,6 +69,15 @@ export type DoctorResult = {
   };
   /** Git state of the tree (additive; bug-init-git-doctor-blindspot). */
   git: DoctorGit;
+  /**
+   * Context-budget measurement (additive, task-adr0006-remeasure): present
+   * only when `doctor --budget` is passed. Measures the ADR 0006 agent-facing
+   * surfaces with the 2026-09-14 baseline method (fresh `init --full` in a
+   * temp tree that is always deleted) — report-only, never touches this tree.
+   */
+  budget?: BudgetResult;
+  /** Set when the budget measurement itself failed (doctor still exits 0). */
+  budgetError?: string;
 };
 
 const ZERO_DOCS: DoctorDocs = {
@@ -107,7 +117,20 @@ export function gitState(cwd: string): DoctorGit {
   return { isRepo: true, dirty, remote };
 }
 
-export function runDoctor(opts: { cwd: string }): DoctorResult {
+/** Best-effort budget measurement: doctor stays exit-0 even if it fails. */
+function tryMeasureBudget(): { budget?: BudgetResult; budgetError?: string } {
+  try {
+    return { budget: measureBudget() };
+  } catch (err) {
+    return { budgetError: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+export function runDoctor(opts: { cwd: string; budget?: boolean }): DoctorResult {
+  // Measured up front (both the initialized and not-initialized report paths
+  // include it): the budget surfaces come from a throwaway temp tree, not
+  // from the tree being examined.
+  const budgetPart = opts.budget === true ? tryMeasureBudget() : {};
   let tasksDir: string;
   let root: string;
   try {
@@ -122,6 +145,7 @@ export function runDoctor(opts: { cwd: string }): DoctorResult {
       docs: { ...ZERO_DOCS },
       tracker: { items: 0, todo: 0 },
       git: gitState(opts.cwd),
+      ...budgetPart,
     };
   }
 
@@ -200,6 +224,7 @@ export function runDoctor(opts: { cwd: string }): DoctorResult {
       todo: items.filter((item) => item.status === "todo").length,
     },
     git: gitState(root),
+    ...budgetPart,
   };
 }
 
@@ -215,7 +240,9 @@ function formatGitLine(git: DoctorGit): string {
 /** Human-readable report (never writes; pairs with the doctor --json payload). */
 export function formatDoctorReport(result: DoctorResult): string {
   if (!result.initialized) {
-    return "arggon doctor: not initialized (no tasks/.convention.yml found) — run `arggon init`\n";
+    const head = "arggon doctor: not initialized (no tasks/.convention.yml found) — run `arggon init`\n";
+    if (result.budget) return head + `${formatBudgetLines(result.budget).join("\n")}\n`;
+    return head;
   }
   const lines = [
     `arggon doctor: initialized (convention v${result.conventionVersion}) at ${result.root}`,
@@ -226,6 +253,11 @@ export function formatDoctorReport(result: DoctorResult): string {
     `  tracker: ${result.tracker.items} item(s), ${result.tracker.todo} todo`,
     `  git: ${formatGitLine(result.git)}`,
   ];
+  if (result.budget) {
+    lines.push(...formatBudgetLines(result.budget));
+  } else if (result.budgetError !== undefined) {
+    lines.push(`  budget: measurement failed: ${result.budgetError}`);
+  }
   if (result.docs.acknowledgedDrifted > 0) {
     lines.push(
       "  note: " +

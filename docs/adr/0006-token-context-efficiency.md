@@ -59,3 +59,8 @@ Explicitly **rejected/deferred**:
   docs, like lint rules are for code.
 - Follow-up: each direction needs its own item (spec first for 3 and 4);
   re-measure all surfaces after 1–4 land to verify savings.
+- Re-measured 2026-09-15 (task-adr0006-remeasure) via the repeatable
+  `arggon doctor --json --budget` surface: numbers and comparison vs the
+  baseline in the linked exploration, §Re-measurement. Generated AGENTS.md
+  2,043 B (budget pass); compact `list --json` saves ~24% vs `--full` on the
+  measurement fixture.

@@ -162,11 +162,13 @@ Report-only installation check (exit 0, pure read): is ArggonManager installed h
 ```bash
 arggon doctor
 arggon doctor --json
+arggon doctor --json --budget
 ```
 
 - `initialized`: whether `tasks/.convention.yml` was found, plus the convention version (0-3).
 - `docs`: generated-doc provenance counts from `x-generated` — `managed` (tracked destinations), `untouched` (checksum matches), `modified` (checksum differs), `acknowledged` (sanctioned-diverged baselines from `adopt --ack`), `acknowledgedDrifted` (acknowledged docs whose current checksum differs from the acked baseline — a hand edit after the ack; informational, still adopter-owned), `stale` (template no longer generated), `missing` (tracked but absent).
 - `tracker`: cheap tracker sanity — total work items and `todo` count.
+- `budget` (only with `--budget`, task-adr0006-remeasure): re-measures the ADR 0006 agent-facing context budgets with the 2026-09-14 baseline method — a fresh `init --full` in a throwaway temp tree (always deleted), a deterministic 8-item fixture for `list --json` (compact AND `--full`) and `show --json` payload bytes, and the generated AGENTS.md bytes against its <=2048 B budget. Report-only; see docs/json-output.md §`doctor`.
 
 Non-initialized repos report `initialized: false` with zeroed counts (no crash, still exit 0); failures use `error.code: "DOCTOR_FAILED"` only for unexpected errors.
 
