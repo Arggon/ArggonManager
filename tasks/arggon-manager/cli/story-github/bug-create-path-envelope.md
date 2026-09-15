@@ -1,0 +1,28 @@
+---
+type: bug
+status: todo
+id: bug-create-path-envelope
+title: create --json dropped top-level path field while show/comment keep it (envelope inconsistency)
+parent: story-github
+labels: []
+created: "2026-09-15"
+updated: "2026-09-15"
+---
+<!--
+  Placement (v0): tasks/arggon-manager/cli/story-github/bug-create-path-envelope.md
+  Leaves live only under a story. id is the filename stem: bug-create-path-envelope.
+  CLI `arggon create bug create-path-envelope` adds the bug- prefix (do not pass it twice).
+  parent MUST be the story id. Omit assignee when unassigned. Omit blocked_reason unless status is blocked.
+-->
+
+# create --json dropped top-level path field while show/comment keep it (envelope inconsistency)
+
+## Context
+
+<!-- What went wrong / how to reproduce. -->
+
+## Acceptance
+
+- [ ] 
+
+## Notes
