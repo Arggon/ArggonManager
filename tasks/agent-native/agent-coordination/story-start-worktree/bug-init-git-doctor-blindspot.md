@@ -1,12 +1,14 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-init-git-doctor-blindspot
 title: init in a non-git dir yields a half-functional tracker; doctor reports all-healthy
+assignee: Arggon
 parent: story-start-worktree
 labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T13:00:19.106Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-coordination/story-start-worktree/bug-init-git-doctor-blindspot.md
