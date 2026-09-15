@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-product-discovery-research
 title: "Product discovery: online research into improvements and new feature possibilities"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-self-improvement
 labels: []
 created: "2026-09-15"
 updated: "2026-09-15"
-claimed_at: "2026-09-15T13:57:41.783Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/task-product-discovery-research.md
