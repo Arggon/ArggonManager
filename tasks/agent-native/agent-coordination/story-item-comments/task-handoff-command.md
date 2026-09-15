@@ -1,12 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-handoff-command
 title: "arggon handoff <id>: structured bounded resume note (CLI + MCP)"
+assignee: Arggon
+branch: feat/task-handoff-command
 parent: story-item-comments
 labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T15:31:13.341Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-coordination/story-item-comments/task-handoff-command.md
@@ -23,8 +26,8 @@ Candidate #8 of [product discovery](docs/explorations/exploration-product-discov
 
 ## Acceptance
 
-- [ ] `arggon handoff <id> --next "..." [--open-questions "..."]` (flag set per spec judgment) appends a STRUCTURED, bounded handoff section to the item (branch, current state, next step, open questions)
-- [ ] MCP `arggon_handoff` tool + parity harness entry
-- [ ] Tests (structure + bounded output), README + json-output additive docs
+- [x] `arggon handoff <id> --next "..." [--open-questions "..."]` (flag set per spec judgment) appends a STRUCTURED, bounded handoff section to the item (branch, current state, next step, open questions)
+- [x] MCP `arggon_handoff` tool + parity harness entry
+- [x] Tests (structure + bounded output), README + json-output additive docs
 
 ## Notes

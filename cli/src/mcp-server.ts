@@ -5,6 +5,7 @@ import { failEnvelope, successEnvelope } from "./json.js";
 import { ITEM_TYPES } from "./ids.js";
 import { runCreate } from "./create.js";
 import { runComment } from "./comment.js";
+import { runHandoff } from "./handoff.js";
 import { runList } from "./list.js";
 import { runShow } from "./show.js";
 import { maybeCommitUpdate, runUpdate } from "./update.js";
@@ -209,6 +210,36 @@ const TOOLS: ToolDefinition[] = [
     },
   },
   {
+    name: "arggon_handoff",
+    description:
+      "Append a structured, bounded session-end handoff section to a work item's body: `### handoff <date> @<author> — next: <step>` + bounded lines for branch (auto-detected from git when omitted) and optional open questions. Appends through the same body-only path as arggon_comment (frontmatter never touched, works on done/cancelled items). Each field is capped at 200 characters (longer input truncates). Returns the arggon `handoff --json` envelope: {ok, schemaVersion, conventionVersion, command, id, path, comment: {author, date, lines}, handoff: {branch, next, openQuestions?}}.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "work item id" },
+        next: {
+          type: "string",
+          description: "the first thing the resuming agent should do (required; capped at 200 chars)",
+        },
+        branch: {
+          type: "string",
+          description: "working branch (optional; auto-detected from git when omitted)",
+        },
+        open_questions: {
+          type: "string",
+          description: "open questions, semicolon-separated by convention (optional; capped at 200 chars)",
+        },
+        author: {
+          type: "string",
+          description:
+            "author login (optional; default: @me resolution — GITHUB_USER, then GITHUB_ACTOR, then `gh api user`)",
+        },
+      },
+      required: ["id", "next"],
+      additionalProperties: false,
+    },
+  },
+  {
     name: "arggon_show",
     description:
       "Read one work item with bounded output (ADR 0006): frontmatter fields plus the body's last comments by default; the full body is an explicit opt-in. Pure read — never writes. Returns the arggon `show --json` envelope: {ok, schemaVersion, conventionVersion, command, item, path, comments[, body]}.",
@@ -291,7 +322,7 @@ export function runMcpServer(opts: McpServerOptions): void {
           ? LIST_FAILED
           : command === "create"
             ? CREATE_FAILED
-            : command === "comment"
+            : command === "comment" || command === "handoff"
               ? COMMENT_FAILED
               : command === "show"
                 ? SHOW_FAILED
@@ -405,6 +436,30 @@ export function runMcpServer(opts: McpServerOptions): void {
             id: result.id,
             path: result.path,
             comment: result.comment,
+            commit: commitPayload(result.commit),
+          },
+          conventionVersion(),
+        );
+      });
+    }
+    if (name === "arggon_handoff") {
+      return toolEnvelope("arggon_handoff", () => {
+        const result = runHandoff({
+          cwd: opts.cwd,
+          id: str(args.id) ?? "",
+          next: str(args.next) ?? "",
+          branch: str(args.branch),
+          openQuestions: str(args.open_questions),
+          author: str(args.author),
+          // Tracker auto-commit resolves like the CLI.
+        });
+        return successEnvelope(
+          "handoff",
+          {
+            id: result.id,
+            path: result.path,
+            comment: result.comment,
+            handoff: result.handoff,
             commit: commitPayload(result.commit),
           },
           conventionVersion(),

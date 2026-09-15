@@ -172,6 +172,24 @@ describe("CLI <-> MCP parity", () => {
     expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
   });
 
+  it("handoff appends the same structured section through both entry points", async () => {
+    const { cliDir, mcpDir } = twinTrees();
+    cliJson(["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"], cliDir);
+    await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
+    const cliResult = cliJson(
+      ["handoff", "task-rate-limit", "--next", "write the tests", "--branch", "feat/x", "--author", "same-user"],
+      cliDir,
+    );
+    const mcpResult = await mcpCall(mcpDir, "arggon_handoff", {
+      id: "task-rate-limit",
+      next: "write the tests",
+      branch: "feat/x",
+      author: "same-user",
+    });
+    expect(mcpResult.isError).toBe(false);
+    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+  });
+
   it("errors match: same message text and ok:false shape through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
     const cliProc = runCli(["update", "nope", "--status", "todo"], cliDir);
@@ -222,6 +240,11 @@ const PARITY_EXCEPTIONS: Record<string, Record<string, string>> = {
   show: {
     "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
   },
+  handoff: {
+    "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
+    "--no-commit":
+      "default-on flip semantics governed tree-wide by x-tracker.auto-commit; MCP resolves commit identically without a flag",
+  },
 };
 
 /** Positional CLI arguments and the MCP schema property each maps to. */
@@ -231,10 +254,11 @@ const POSITIONAL_MAP: Record<string, string[]> = {
   update: ["id"],
   comment: ["id", "text"],
   show: ["id"],
+  handoff: ["id"],
 };
 
 /** `.command("name")` blocks whose CLI surface must be mirrored by MCP. */
-const PARITY_COMMANDS = ["list", "create", "update", "comment", "show"] as const;
+const PARITY_COMMANDS = ["list", "create", "update", "comment", "show", "handoff"] as const;
 
 /** Extract the long flags of every `.option(...)` call in a command block. */
 function deriveCliOptions(command: string): string[] {
