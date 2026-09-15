@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-skill-sync-feature-wave
 title: "SKILL sync: surface show, handoff, 9-tool MCP list and recent features in the bundled skill"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-init-docs
 labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
-claimed_at: "2026-09-15T20:54:17.093Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-init-docs/task-skill-sync-feature-wave.md
