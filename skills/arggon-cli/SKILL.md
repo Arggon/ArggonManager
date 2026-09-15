@@ -67,18 +67,28 @@ arggon doctor             # installation state: initialized? conventionVersion? 
   docs are adopter-owned the moment they exist. Re-running init regenerates
   **untouched** generated docs silently (checksum in `x-generated` state), skips and
   reports **modified** ones, and archives with `--backup` to `backup/<date>/`.
+- Issue management stays in-tree: GitHub is for PRs only. With the opt-in
+  `x-github.issue-roundtrip` config (`tasks/.convention.yml`), imported issues
+  close automatically when their item reaches done — still never open GitHub issues.
 
 ## 2. Run the work loop
 
 ```bash
 arggon list --status todo --json                       # find work (empty items[] = no work, not an error)
 arggon next --json                                    # suggested claimable item + reason (+ blockedBy)
+                                                      # leaf work only by default; --include-stories
+                                                      # opts unclaimed stories back into the pool
                                                       # "what should I work on" = next --json, NOT list --json
                                                       # (67x smaller envelope; list --json only for full scans)
 arggon start <id> --assignee <login> --worktree       # claim + branch + worktree + commit + push
                                                       # (--open-pr adds a draft PR; re-runs attach)
 arggon update <id> --status done                      # complete (see pitfalls: cascade, claim rules)
 arggon comment <id> "handoff note"                    # timestamped agent-handoff sections (body-only)
+arggon show <id> --json                               # bounded single-item read (ADR 0006):
+                                                      # frontmatter + last 3 comments; --body for full —
+                                                      # prefer this over reading whole item files
+arggon handoff <id> --next "<step>"                   # structured session-end handoff (bounded fields);
+                                                      # optional --branch, --open-questions "q1; q2"
 arggon create task|bug "Title" --parent <story-id>    # file follow-ups (leaves get task-/bug- prefix)
 arggon validate --json                                # gate before every commit
 ```
@@ -107,13 +117,15 @@ arggon report --trend --json       # weekly completions + cycle time mined from 
 arggon sync --check                # reconcile open GitHub PRs into tasks/ (non-zero when pending)
 arggon instructions                # agent wiring snippets extracted from docs/agents.md
 arggon cleanup --prune             # reap worktrees of done/cancelled items with merged branches
-arggon mcp                         # stdio MCP server: arggon_list/_create/_update/_comment tools
+arggon mcp                         # stdio MCP server: arggon_list/_create/_update/_comment/
+                                   # _show/_handoff/_next/_report/_validate tools
 ```
 
 ## 4. Planning documents (specs, playbooks, explorations)
 
 ```bash
 arggon spec validate               # validate docs/specs/*.md + docs/plans/*.md structure
+arggon spec analyze                # ambiguity scan + spec/task consistency (report-only)
 arggon spec new <slug> --title     # scaffold spec (+ --plan for the implementation plan)
 arggon stack explore <topic>       # scaffold a comparison/spike record in docs/explorations/
 arggon playbook new <tech> --version v   # version-pinned per-tech best-practices doc
@@ -166,8 +178,11 @@ lean. A 40-line spec beats a 4-page one nobody reads.
   §Documentation maintenance).
 - **Handoffs are written:** blocked, out-of-scope discoveries, and decisions go in
   `arggon comment` on the item — the next agent (or human) should never need to
-  re-derive your context. Review feedback (verdicts, change requests) also lands
-  on the item via `arggon comment <id>`, never as GitHub PR comments.
+  re-derive your context. Close a session with a structured handoff
+  (`arggon handoff <id> --next "<step>"`; bounded fields). Review feedback (verdicts,
+  change requests) also lands on the item via `arggon comment <id>`, never as GitHub
+  PR comments. Prefer `arggon show <id> --json` (bounded, ADR 0006) over reading
+  whole item files.
 - **Leave it cleaner:** expired claims get released (`--status todo`), merged
   worktrees get `arggon cleanup --prune`, stale playbooks get flagged, and the
   tree validates before every commit.
