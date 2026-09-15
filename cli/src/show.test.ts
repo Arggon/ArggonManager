@@ -111,13 +111,15 @@ describe("show (ADR 0006 progressive disclosure)", () => {
   });
 
   it("--json envelope follows the standard shape with a bounded comments array", () => {
-    const { dir, id } = primedTask(5);
+    const { dir, id, path } = primedTask(5);
     const proc = runCli(["show", id, "--json"], dir);
     expect(proc.status).toBe(0);
     const envelope = JSON.parse(proc.stdout) as Record<string, unknown>;
     expect(envelope.ok).toBe(true);
     expect(envelope.schemaVersion).toBe(1);
     expect(envelope.command).toBe("show");
+    // Top-level path: the absolute path of the item file (bug-create-path-envelope).
+    expect(envelope.path).toBe(path);
     const item = envelope.item as Record<string, unknown>;
     expect(item.id).toBe(id);
     expect(envelope.body).toBeUndefined();

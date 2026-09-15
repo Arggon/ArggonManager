@@ -236,7 +236,7 @@ describe("comment --file/stdin (task-comment-stdin-file)", () => {
   });
 
   it("reads comment text from stdin with --file - (spawn with piped input)", () => {
-    const { dir } = primedTask();
+    const { dir, path } = primedTask();
     const piped = 'run `npm run lint` — output was $?, "exit 1"';
     const proc = spawnSync(
       process.execPath,
@@ -244,8 +244,15 @@ describe("comment --file/stdin (task-comment-stdin-file)", () => {
       { encoding: "utf8", cwd: dir, input: piped },
     );
     expect(proc.status, proc.stderr).toBe(0);
-    const envelope = JSON.parse(proc.stdout) as { ok: boolean; command: string; id: string };
+    const envelope = JSON.parse(proc.stdout) as {
+      ok: boolean;
+      command: string;
+      id: string;
+      path: string;
+    };
     expect(envelope).toMatchObject({ ok: true, command: "comment", id: "task-rate-limit" });
+    // Top-level path: the absolute path of the commented item file (bug-create-path-envelope).
+    expect(envelope.path).toBe(path);
     expect(
       raw(join(dir, "tasks/launch-mvp/auth/story-login/task-rate-limit.md")),
     ).toContain(`@arggon\n${piped}\n`);

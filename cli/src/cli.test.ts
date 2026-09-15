@@ -182,6 +182,7 @@ describe("CLI --json", () => {
       schemaVersion: JSON_SCHEMA_VERSION,
       conventionVersion: 3,
       command: "create",
+      path: "tasks/launch-mvp/launch-mvp.md",
     });
     expect(body.item).toMatchObject({
       id: "launch-mvp",
@@ -191,6 +192,8 @@ describe("CLI --json", () => {
       parent: null,
       path: "tasks/launch-mvp/launch-mvp.md",
     });
+    const item = body.item as Record<string, unknown>;
+    expect(body.path).toBe(item.path);
     expect(existsSync(join(dir, "tasks/launch-mvp/launch-mvp.md"))).toBe(true);
   });
 

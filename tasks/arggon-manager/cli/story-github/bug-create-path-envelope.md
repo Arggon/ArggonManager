@@ -1,12 +1,15 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-create-path-envelope
 title: create --json dropped top-level path field while show/comment keep it (envelope inconsistency)
+assignee: Arggon
+branch: fix/bug-create-path-envelope
 parent: story-github
 labels: []
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T16:29:05.810Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-github/bug-create-path-envelope.md
@@ -23,7 +26,7 @@ Follow-up from the task-mcp-parity-full review (PR #237): `create --json` no lon
 
 ## Acceptance
 
-- [ ] Decide + align: either create restores the additive top-level `path` or show/comment drop theirs — one convention, documented in docs/json-output.md (schemaVersion unchanged)
-- [ ] Tests assert the aligned shape in all three commands
+- [x] Decide + align: either create restores the additive top-level `path` or show/comment drop theirs — one convention, documented in docs/json-output.md (schemaVersion unchanged)
+- [x] Tests assert the aligned shape in all three commands
 
 ## Notes

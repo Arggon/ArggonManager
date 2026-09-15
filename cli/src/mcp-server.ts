@@ -1,4 +1,5 @@
 import { createInterface } from "node:readline";
+import { relative, sep } from "node:path";
 import type { Readable, Writable } from "node:stream";
 import { readConventionVersion } from "./convention.js";
 import { failEnvelope, successEnvelope } from "./json.js";
@@ -449,6 +450,7 @@ export function runMcpServer(opts: McpServerOptions): void {
         return successEnvelope(
           "create",
           {
+            path: relative(result.root, result.path).split(sep).join("/"),
             item: toContractWorkItem(result.item, result.root, { full: args.full === true }),
             commit: commitPayload(result.commit),
           },

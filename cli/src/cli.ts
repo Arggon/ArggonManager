@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { Command } from "commander";
+import { relative, sep } from "node:path";
 import { formatAdoptAckReport, formatAdoptReport, runAdopt, runAdoptAck } from "./adopt.js";
 import { displayPath, runBoard } from "./board.js";
 import { startBoardServer } from "./board-serve.js";
@@ -326,6 +327,7 @@ program
           successJson(
             "create",
             {
+              path: relative(result.root, result.path).split(sep).join("/"),
               item: toContractWorkItem(result.item, result.root, { full: opts.full === true }),
               commit: commitPayload(result.commit),
             },
