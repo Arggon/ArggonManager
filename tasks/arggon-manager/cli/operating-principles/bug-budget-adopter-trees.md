@@ -4,7 +4,7 @@ status: todo
 id: bug-budget-adopter-trees
 title: doctor --budget measures nothing in adopter trees (resolves cli/src from cwd)
 parent: operating-principles
-labels: []
+labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
