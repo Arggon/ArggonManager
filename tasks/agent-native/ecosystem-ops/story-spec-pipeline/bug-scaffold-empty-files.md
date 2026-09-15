@@ -19,10 +19,14 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+Reported by the casa-pendiente experiment (2026-09-15, session sess_fefa3aec): after running `arggon stack explore`, `spec new` and `playbook new` (5 files under docs/), the scaffolded files were repeatedly found TRUNCATED TO 0 LINES between the agent's read and write passes ("file modified since read" errors). The agent rewrote all content by hand (no loss) and could not identify the cause or reproduce it deterministically.
+
+Code analysis at filing time: the scaffold write paths (cli/src/spec.ts:727/737, cli/src/playbooks.ts:193/287) are single full-content `writeFileSync` calls — they never write empty output. So the truncation is most likely environmental (interrupted process, concurrent interference in that workspace) rather than the CLI writing empty content — but a single non-atomic write can truncate on crash, and generated docs are data.
 
 ## Acceptance
 
-- [ ] 
+- [ ] Scaffold writes hardened: temp-file + rename (atomic) across spec new / playbook new / stack explore write paths
+- [ ] Shrink guard: a post-write check that the written byte length matches the rendered content, failing loudly instead of leaving a truncated doc
+- [ ] If the environment cause is identified during investigation, document it in this item
 
 ## Notes

@@ -19,10 +19,11 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- Why this task exists. -->
+Follow-up from the casa-pendiente experiment (2026-09-15), extending the landed task-autocommit-squash-divergence pitfall (PR #219): the agent hit the local-main divergence TWICE and empirically found the preventive discipline that avoids it entirely: **push main immediately after every tracker mutation made from the primary checkout** (arggon comment/update/create auto-commits land on local main; if the PR merge reaches origin first, the pull diverges). Also folded: the cleanup --prune auto-commit (worktree_path clearing) traveled as contraband on a branch cut before pushing main — same root.
 
 ## Acceptance
 
-- [ ] 
+- [ ] The squash-divergence SKILL pitfall gains the preventive line: push main right after primary-checkout tracker mutations (before opening/merging any PR)
+- [ ] docs/agents.md §0 tracker-hygiene paragraph mentions the same discipline
 
 ## Notes

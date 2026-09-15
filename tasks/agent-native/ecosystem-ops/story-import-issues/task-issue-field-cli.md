@@ -19,10 +19,12 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- Why this task exists. -->
+Reported by the casa-pendiente experiment (2026-09-15): the GitHub round-trip (x-github.issue-roundtrip) is UNREACHABLE for hand-built hierarchies. Code-verified: the create kernel supports `opts.issue` (cli/src/create.ts:36-153, validated) but the CLI never wires a `--issue` flag, and `update` only USES the issue field for the round-trip close (cli/src/update.ts) — it cannot SET it. Consequence: items not born from `import-issues` (e.g. the hand-built story hierarchy casa-pendiente needed) can never gain an `issue:` field, so their linked GitHub issues must be closed manually with gh (the agent closed 4 by hand).
 
 ## Acceptance
 
-- [ ] 
+- [ ] `arggon create --issue <n>` wires the existing kernel option
+- [ ] `arggon update --issue <n>` (and a way to clear it) writes the `issue:` field — same validation, additive payload
+- [ ] Parity harness covers --issue for create/update; tests for set, clear, invalid value; docs (README + json-output + convention.md x-github cross-reference)
 
 ## Notes

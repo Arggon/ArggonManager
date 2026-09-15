@@ -19,10 +19,12 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- Why this task exists. -->
+Reported by the casa-pendiente experiment (2026-09-15): `import-issues` flattens every imported idea as a leaf (task/bug) under one container story. For the greenfield flow (ideas as GitHub issues → import → build hierarchy) the agent needed FEATURE-LEVEL stories with children and had to hand-build the whole hierarchy with `arggon create`, discarding the import structure. Related gap: there is no way to PROMOTE an existing task to a story (type conversion keeping body/issue/labels), which is the natural repair move after import.
 
 ## Acceptance
 
-- [ ] 
+- [ ] Decide + land a promotion path: either `arggon update <task-id> --type story` (converts in place: moves file to story layout, validates children edge rules) or a documented import option that imports top-level ideas as stories — whichever is smaller, documented in the item
+- [ ] Tests: promotion with no children, with children (file moves), invalid conversions refused
+- [ ] Docs (README + convention.md if placement rules change)
 
 ## Notes
