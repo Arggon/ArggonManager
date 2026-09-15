@@ -19,10 +19,11 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- Why this task exists. -->
+Observed 2026-09-15 (coordinator local run): after merging PRs that changed the SKILL source, the local `.agents/skills/arggon-cli/SKILL.md` copy (gitignored, generated) is stale and the parity test fails spuriously until `npm run skills:sync` runs — the test failing on a build artifact adds friction without detection value (the source is the committed truth; the copy is derived).
 
 ## Acceptance
 
-- [ ] 
+- [ ] The parity test (or a vitest globalSetup/pretest step) REGENERATES the copy from source before asserting equality — stale local copies can never fail the suite
+- [ ] CI equivalence unchanged (fresh checkouts generate-then-assert as today)
 
 ## Notes
