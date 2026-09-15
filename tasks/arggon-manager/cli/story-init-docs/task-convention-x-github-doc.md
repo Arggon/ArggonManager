@@ -26,8 +26,8 @@ Follow-up from the task-issue-roundtrip review (PR #228): the round-trip landed 
 
 ## Acceptance
 
-- [ ] templates/docs/convention.md extensions table gains the `x-github` row (one line: issue round-trip on done, default OFF)
-- [ ] ArggonManager's own docs/convention.md matches (it is the normative reference the template points to)
-- [ ] init-docs extensions assertion covers x-github
+- [x] templates/docs/convention.md extensions table gains the `x-github` row (one line: issue round-trip on done, default OFF)
+- [x] ArggonManager's own docs/convention.md matches (it is the normative reference the template points to)
+- [x] init-docs extensions assertion covers x-github
 
 ## Notes
