@@ -19,10 +19,12 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- Why this task exists. -->
+Third wedge flavor, observed 2026-09-15 (flip PR #262 for task-handoff-provenance...): the coordinator posted the lead-architect review via `arggon comment` on the SAME item whose flip was in flight. The comment auto-commits to main; the flip branch carries that same item file (claim frontmatter + ticks) — so the #240 retry loop's rebase onto fresh main CONFLICTS on the item file, violating its load-bearing assumption ("the flip only touches tasks/, conflicts should be impossible"). The loop warns and abandons; only admin clears it. Extends task-autodone-flip-race (done): that fix handles staleness, not same-file conflicts.
 
 ## Acceptance
 
-- [ ] 
+- [ ] The workflow handles the same-file conflict: on rebase conflict during the retry, REDO the flip on a fresh main checkout instead (delete flip branch, re-run `arggon update <id> --status done` on fresh main — the flip is idempotent from a clean tree — re-post the check, push, merge). Bounded retries as in #240.
+- [ ] The retry loop's "conflicts should be impossible" comment corrected: they are possible when the coordinator comments the flipped item mid-flight.
+- [ ] Evidence: a simulated same-file main commit during a flip run ends merged (not wedged) — documented repro in the item.
 
 ## Notes
