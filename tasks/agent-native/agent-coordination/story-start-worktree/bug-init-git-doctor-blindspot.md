@@ -28,8 +28,8 @@ Doctor is exactly the report-only surface where this belongs: it already reports
 
 ## Acceptance
 
-- [ ] `doctor --json` reports git state: is-repo, dirty/clean, remote present (report-only, exit 0 as always)
-- [ ] `init` warns on stderr when generating in a non-git tree (branch/worktree/push/PR flows unavailable; auto-commit skipping is expected) — do NOT auto-`git init` (design decision explicitly out of scope for this bug)
-- [ ] Tests: doctor on a non-git tree reports the git state; init-in-non-git emits the warning
+- [x] `doctor --json` reports git state: is-repo, dirty/clean, remote present (report-only, exit 0 as always)
+- [x] `init` warns on stderr when generating in a non-git tree (branch/worktree/push/PR flows unavailable; auto-commit skipping is expected) — do NOT auto-`git init` (design decision explicitly out of scope for this bug)
+- [x] Tests: doctor on a non-git tree reports the git state; init-in-non-git emits the warning
 
 ## Notes

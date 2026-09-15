@@ -125,6 +125,7 @@ program
               restored: result.restored,
               conventionPath: result.conventionPath,
               commit: commitPayload(result.commit),
+              ...(result.warning ? { warning: result.warning } : {}),
             },
             readConventionVersion(result.root),
           );
@@ -166,6 +167,7 @@ program
             initialized: result.initialized,
             docs: result.docs,
             tracker: result.tracker,
+            git: result.git,
           },
           result.conventionVersion,
         );
@@ -1688,6 +1690,11 @@ program
   });
 
 function printInitHuman(result: InitResult): void {
+  // bug-init-git-doctor-blindspot: human path warns on stderr; the --json
+  // envelope carries the same text as the additive `warning` field instead.
+  if (result.warning) {
+    console.error(`arggon: warning: ${result.warning}`);
+  }
   if (result.alreadyInitialized && !result.force) {
     console.log(`arggon init: already initialized at ${result.conventionPath}`);
     if (result.restored.length > 0) {

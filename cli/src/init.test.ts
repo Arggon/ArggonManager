@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runInit } from "./init.js";
 
@@ -15,6 +16,10 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
   tmpDirs.push(dir);
   return dir;
 }
+
+const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const cli = resolve(repoRoot, "cli/src/cli.ts");
+const tsx = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
 const TIER1_DOCS = [
   ".agents/skills/arggon-cli/SKILL.md",
@@ -171,10 +176,42 @@ describe("init", () => {
     expect(git(dir, ["rev-parse", "HEAD"])).toBe(headBefore);
     expect(git(dir, ["status", "--porcelain"])).toBe("");
   });
+
+  // bug-init-git-doctor-blindspot: a non-git tree yields a half-functional
+  // tracker (no branch/worktree/push/PR, no pre-commit validate hook) — init
+  // must say so instead of reporting all-healthy.
+  it("warns when the target tree is not a git repository", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-"));
+    const result = runInit({ dir, force: false });
+    expect(result.warning).toMatch(
+      /not a git repository — branch\/worktree\/push\/PR flows and the pre-commit validate hook will be unavailable/,
+    );
+  });
+
+  it("carries the warning in the --json envelope and on stderr (human output only there)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-"));
+    const proc = spawnSync(process.execPath, [tsx, cli, "init", "--json", dir], {
+      encoding: "utf8",
+      cwd: dir,
+    });
+    expect(proc.status).toBe(0);
+    // Human-facing warning rides stderr even in --json mode? No: the JSON
+    // envelope carries the additive `warning` field; stderr stays quiet there.
+    expect(proc.stderr).not.toMatch(/warning/);
+    const body = JSON.parse(proc.stdout) as { ok: boolean; warning?: string };
+    expect(body.ok).toBe(true);
+    expect(body.warning).toMatch(/not a git repository/);
+  });
+
+  it("does not warn on a git tree", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-"));
+    gitInit(dir);
+    const result = runInit({ dir, force: false });
+    expect(result.warning).toBeUndefined();
+  });
 });
 
-/** Minimal git repo with a committer identity so auto-commits can land. */
-function gitInit(dir: string): void {
+/** Minimal git repo with a committer identity so auto-commits can land. */function gitInit(dir: string): void {
   execFileSync("git", ["init", "-q"], { cwd: dir, stdio: "pipe" });
   execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: dir, stdio: "pipe" });
   execFileSync("git", ["config", "user.name", "Test"], { cwd: dir, stdio: "pipe" });

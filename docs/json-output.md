@@ -132,6 +132,7 @@ Snippets are extracted from the playbook at runtime; failures use `error.code: "
 | `skipped`            | `string[]` | Doc files left untouched this run (posix, relative to `root`). Additive in v1: older clients ignore it |
 | `restored`           | `string[]` | Missing templates restored when already initialized (posix, relative to `root`) |
 | `commit`             | `object`   | Tracker auto-commit outcome for the files this run wrote (bug-init-leaves-docs-untracked-start-blocks-on-clean-tree): ONE `{ hash, message }` commit (`chore(tasks): generated init docs (N files)`) covering the generated/updated docs, templates, the tasks/ tree and `tasks/.convention.yml` — or `{ skipped: <reason> }` (`--no-commit`, non-git tree, git absent, nothing to commit). Additive within `schemaVersion: 1`. |
+| `warning`            | `string`   | Present only when the target tree is NOT a git repository (bug-init-git-doctor-blindspot): `not a git repository — branch/worktree/push/PR flows and the pre-commit validate hook will be unavailable until you run \`git init\``. Human output warns on stderr with the same text; init never auto-`git init`s. Additive within `schemaVersion: 1`. |
 
 Failures use `error.code: "INIT_FAILED"`.
 
@@ -152,6 +153,7 @@ Pure-read installation report (exit 0 on every well-formed input, including non-
 | `docs.stale`        | `number`  | Entries whose `template` no longer exists in the current template bundle      |
 | `docs.missing`      | `number`  | Entries whose destination file is absent                                      |
 | `tracker`           | `object`  | `{ items, todo }` — total work items under `tasks/` and their `todo` count    |
+| `git`               | `object`  | Git state of the tree (bug-init-git-doctor-blindspot, additive): `{ isRepo, dirty, remote }` — `isRepo` from `git rev-parse --git-dir`; `dirty` is whether `git status --porcelain` is non-empty and `remote` the URL of `origin` (else the first remote), both `null` when the tree is not a git repository. Report-only; doctor's exit-0 charter is unchanged. |
 
 Each `docs` entry falls in exactly one bucket (`missing`, else `stale`, else `acknowledged`/`acknowledgedDrifted`, else `untouched`/`modified`), so `untouched + modified + acknowledged + acknowledgedDrifted + stale + missing = managed`. Failures use `error.code: "DOCTOR_FAILED"` (unexpected errors only — a missing tree is a normal report).
 
@@ -499,11 +501,16 @@ Init still **writes** `tasks/.convention.yml` (including the `x-generated` prove
   "tracker": {
     "items": 12,
     "todo": 3
+  },
+  "git": {
+    "isRepo": true,
+    "dirty": false,
+    "remote": "git@github.com:example/example-repo.git"
   }
 }
 ```
 
-Non-initialized repos return the same shape with `root: null`, `initialized: false`, zeroed `docs`/`tracker`, and `conventionVersion: 0`.
+Non-initialized repos return the same shape with `root: null`, `initialized: false`, zeroed `docs`/`tracker`, `conventionVersion: 0`, and the `git` section probed from the cwd (a non-git tree reports `{ isRepo: false, dirty: null, remote: null }`).
 
 ### `adopt`
 
