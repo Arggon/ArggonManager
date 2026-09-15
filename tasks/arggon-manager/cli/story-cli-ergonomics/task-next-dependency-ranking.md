@@ -31,3 +31,6 @@ Candidate #2 of [product discovery](docs/explorations/exploration-product-discov
 - [x] Table-driven tests (blocked chains, parallel ready items, no-deps trees); docs/agents.md or README one line; --json payload unchanged or additively extended
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. Reusing buildBlockedByIndex instead of forking a second graph walk is the architecture-first call, the closure is cycle-safe, the tie-break is documented in three places (docstring, README, reason line), and unblocks:N is additive to the payload. Known simplification (transitive dependents regardless of claimability) is documented — right trade for Effort S. Merge follows.
