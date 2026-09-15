@@ -4,7 +4,7 @@ status: todo
 id: task-skill-generated-command-reference
 title: "Forever fix: SKILL command reference generated from the CLI"
 parent: story-init-docs
-labels: []
+labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
