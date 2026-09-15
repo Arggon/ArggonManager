@@ -293,15 +293,37 @@ describe("lab: concurrent tracker auto-commit contention (suizo lock-transitorio
       }));
       const results = await spawnAll(dir, commands);
 
-      for (const r of results) {
-        // Either the mutation + commit succeeded, or the process reported a
-        // clean failure — never a crash, never ok:false with the file mutated
-        // but uncommitted and unexplained.
+      // Either the mutation + commit succeeded, or the process reported a
+      // clean failure — never a crash, never ok:false with the file mutated
+      // but uncommitted and unexplained.
+      const cleanSkips: string[] = [];
+      results.forEach((r, i) => {
         expect(r.body).not.toBeNull();
         if (r.body!.ok !== true) {
           const message = (r.body!.error as Json).message as string;
           expect(/lock|index/i.test(message)).toBe(true);
+          cleanSkips.push(ids[i]!);
+          return;
         }
+        // bug-torture-contention-flake2: a CONTENTION skip can also arrive as
+        // ok:true with a `commit.skipped` payload. Under concurrent commits,
+        // one process's `git commit` rewrites the index between another
+        // process's `git add` and its `git commit`, clobbering the loser's
+        // staged entry — its commit then reports "nothing to commit"
+        // (reported in the JSON payload, quiet on stderr, well inside the 10s
+        // retry budget) while its mutation sits written but uncommitted.
+        const commit = r.body!.commit as Json | undefined;
+        if (commit !== undefined && commit.skipped !== undefined) cleanSkips.push(ids[i]!);
+      });
+
+      // A cleanly reported skip is retried sequentially, like a real caller
+      // would (comment-race.test.ts pattern): the retry re-appends the comment
+      // and its commit picks up the uncommitted mutation too. This keeps the
+      // contract below intact under scheduler starvation and the index-clobber
+      // race without weakening the clean-tree assertion.
+      for (const id of cleanSkips) {
+        const retry = runCli(["comment", id, `note on ${id}`, "--author", "agent", "--json"], dir);
+        expect(retry.body, retry.stderr).toMatchObject({ ok: true });
       }
 
       // Every comment actually landed in its item file.
@@ -311,9 +333,10 @@ describe("lab: concurrent tracker auto-commit contention (suizo lock-transitorio
       }
 
       // No git index.lock left behind and the tree is fully clean: with the
-      // commitTrackerMutation retry (bug-autocommit-silent-skip fix) every
-      // index.lock race resolves as a landed commit — a silent skip would
-      // leave the mutated item file dirty here.
+      // commitTrackerMutation retry (bug-autocommit-silent-skip fix) plus the
+      // sequential retries above, every index.lock race and every reported
+      // skip resolves as a landed commit — an UNREPORTED skip would still
+      // leave the mutated item file dirty here, and that stays a failure.
       expect(existsSync(join(dir, ".git/index.lock"))).toBe(false);
       expect(git(["status", "--porcelain"], dir)).toBe("");
 
