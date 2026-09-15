@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-handoff-command
 title: "arggon handoff <id>: structured bounded resume note (CLI + MCP)"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-item-comments
 labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
-claimed_at: "2026-09-15T15:31:13.341Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/agent-coordination/story-item-comments/task-handoff-command.md
