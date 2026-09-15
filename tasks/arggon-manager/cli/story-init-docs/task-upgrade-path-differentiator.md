@@ -4,7 +4,7 @@ status: todo
 id: task-upgrade-path-differentiator
 title: document the upgrade-path differentiator (never-overwrite + adopter-owned + re-run refresh)
 parent: story-init-docs
-labels: []
+labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
