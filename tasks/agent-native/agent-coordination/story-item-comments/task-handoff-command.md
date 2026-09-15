@@ -19,10 +19,12 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- Why this task exists. -->
+Candidate #8 of [product discovery](docs/explorations/exploration-product-discovery-002.md): session end loses working state — Beads sells "resume exactly where you left off" (beads.gascity.com, 2026-09-15) while ArggonManager's `comment` is freeform only. A structured, bounded handoff note turns that into a tracker feature. Effort S; principle: token-context (structured + bounded beats prose).
 
 ## Acceptance
 
-- [ ] 
+- [ ] `arggon handoff <id> --next "..." [--open-questions "..."]` (flag set per spec judgment) appends a STRUCTURED, bounded handoff section to the item (branch, current state, next step, open questions)
+- [ ] MCP `arggon_handoff` tool + parity harness entry
+- [ ] Tests (structure + bounded output), README + json-output additive docs
 
 ## Notes

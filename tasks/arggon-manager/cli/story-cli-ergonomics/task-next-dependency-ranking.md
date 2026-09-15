@@ -19,10 +19,12 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- Why this task exists. -->
+Candidate #2 of [product discovery](docs/explorations/exploration-product-discovery-002.md): `next` ignores graph shape — lexicographic-first suggestions make agents pick arbitrary ready work instead of unblocking the most downstream items. Beads' core differentiator is enforced ready-work computation (steve-yegge.medium.com, 2026-09-15). Effort S; principles: architecture-first, token-context (one right answer saves round-trips).
 
 ## Acceptance
 
-- [ ] 
+- [ ] `next` ranks ready items by dependency weight (how many downstream items this unblocks; deeper/loaded subtrees first), deterministic tie-break documented
+- [ ] Ranking rationale surfaces in the suggestion reason (bounded — one line)
+- [ ] Table-driven tests (blocked chains, parallel ready items, no-deps trees); docs/agents.md or README one line; --json payload unchanged or additively extended
 
 ## Notes

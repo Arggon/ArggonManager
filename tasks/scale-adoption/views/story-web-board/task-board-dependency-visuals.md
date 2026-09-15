@@ -19,10 +19,12 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- Why this task exists. -->
+Candidate #9 of [product discovery](docs/explorations/exploration-product-discovery-002.md): board cards render deps as text lines with no visual blocking, and the TUI has no dependency awareness at all — agents/humans scan the board instead of reading edges (agent-kanban.dev, 2026-09-15). Effort S; principle: cheap-infra (same read path, presentation only).
 
 ## Acceptance
 
-- [ ] 
+- [ ] Board HTML: blocked cards visually distinct (greyed/badged), dependency edges or badges per card
+- [ ] TUI: blocked items marked and `--group-by story` grouping available in board and/or TUI (decide exact surface, document)
+- [ ] Tests (board-parity/render assertions); no new dependencies
 
 ## Notes

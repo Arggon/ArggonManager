@@ -19,10 +19,12 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- Why this task exists. -->
+Candidate #7 of [product discovery](docs/explorations/exploration-product-discovery-002.md): `import-issues` is one-shot — items carry the linked GitHub issue in the additive `issue` frontmatter field but never push status back, so dual-tracker teams drift. Linear×Copilot issue→PR→status flows are now the norm (github.blog, 2026-07-23). Effort S; principle: same-rules, repo-is-truth (the issue id is already in frontmatter).
 
 ## Acceptance
 
-- [ ] 
+- [ ] Opt-in round-trip lands: on `update --status done`, items with `issue:` frontmatter close/annotate the linked issue via gh (config-gated, e.g. x-github round-trip flag, or explicit `--close-issue` — decide and document)
+- [ ] gh absent/unauthenticated → clean skip, never blocks the done flip
+- [ ] Tests with a mocked gh path; docs (README + json-output additive note)
 
 ## Notes
