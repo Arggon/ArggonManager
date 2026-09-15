@@ -943,6 +943,10 @@ program
     "open questions, semicolon-separated by convention (optional)",
   )
   .option(
+    "--session <id>",
+    "session identifier for provenance, rendered in the heading (optional; capped at 64 chars)",
+  )
+  .option(
     "--author <login>",
     "handoff author (default: @me resolution — GITHUB_USER, then GITHUB_ACTOR, then `gh api user`)",
   )
@@ -958,6 +962,7 @@ program
         next?: string;
         branch?: string;
         openQuestions?: string;
+        session?: string;
         author?: string;
         commit?: boolean;
         json?: boolean;
@@ -979,6 +984,7 @@ program
           next: opts.next,
           branch: opts.branch,
           openQuestions: opts.openQuestions,
+          session: opts.session,
           author: opts.author,
           commit: opts.commit === false ? false : undefined,
         });

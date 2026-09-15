@@ -22,6 +22,13 @@ import { runComment, type CommentResult } from "./comment.js";
 /** Per-field character cap (branch, next, open questions); longer input truncates. */
 export const HANDOFF_FIELD_CAP = 200;
 
+/**
+ * Session identifier cap (task-handoff-provenance-session-identifier-in-handoff-sections):
+ * a handoff may carry the caller's session id for provenance — bounded tighter
+ * than the prose fields (ids like `sess_xxx` are short).
+ */
+export const HANDOFF_SESSION_CAP = 64;
+
 export type HandoffOptions = {
   cwd: string;
   /** Work item id (filename stem). */
@@ -32,6 +39,12 @@ export type HandoffOptions = {
   branch?: string;
   /** Optional open questions, semicolon-separated by convention. */
   openQuestions?: string;
+  /**
+   * Optional session identifier for provenance (explicit flag only: the CLI
+   * cannot reliably know the caller's session id — callers pass what they
+   * have). Rendered in the heading; omitted cleanly when absent.
+   */
+  session?: string;
   author?: string;
   commit?: boolean;
   /** Clock override for deterministic output/tests; defaults to now. */
@@ -46,6 +59,7 @@ export type HandoffResult = CommentResult & {
     branch: string;
     next: string;
     openQuestions?: string;
+    session?: string;
   };
 };
 
@@ -58,6 +72,17 @@ function capField(value: string | undefined): string | undefined {
     // The marker counts against the cap: the rendered field is never longer
     // than HANDOFF_FIELD_CAP characters.
     return trimmed.slice(0, HANDOFF_FIELD_CAP - marker.length) + marker;
+  }
+  return trimmed;
+}
+
+/** Cap the session identifier at HANDOFF_SESSION_CAP; undefined when empty. */
+function capSession(value: string | undefined): string | undefined {
+  const trimmed = capField(value);
+  if (!trimmed) return undefined;
+  if (trimmed.length > HANDOFF_SESSION_CAP) {
+    const marker = "…";
+    return trimmed.slice(0, HANDOFF_SESSION_CAP - marker.length) + marker;
   }
   return trimmed;
 }
@@ -86,6 +111,7 @@ export function runHandoff(opts: HandoffOptions): HandoffResult {
   }
   const branch = capField(opts.branch) ?? detectBranch(opts.cwd);
   const openQuestions = capField(opts.openQuestions);
+  const session = capSession(opts.session);
 
   const lines = [`- branch: ${branch}`];
   if (openQuestions) lines.push(`- open questions: ${openQuestions}`);
@@ -99,11 +125,17 @@ export function runHandoff(opts: HandoffOptions): HandoffResult {
     now: opts.now,
     env: opts.env,
     resolveMe: opts.resolveMe,
-    heading: (date, author) => `### handoff ${date} @${author} — next: ${next}`,
+    heading: (date, author) =>
+      `### handoff ${date} @${author}${session ? ` (session: ${session})` : ""} — next: ${next}`,
   });
 
   return {
     ...result,
-    handoff: openQuestions ? { branch, next, openQuestions } : { branch, next },
+    handoff: {
+      branch,
+      next,
+      ...(openQuestions ? { openQuestions } : {}),
+      ...(session ? { session } : {}),
+    },
   };
 }

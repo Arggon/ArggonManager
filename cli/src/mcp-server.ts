@@ -220,7 +220,7 @@ const TOOLS: ToolDefinition[] = [
   {
     name: "arggon_handoff",
     description:
-      "Append a structured, bounded session-end handoff section to a work item's body: `### handoff <date> @<author> — next: <step>` + bounded lines for branch (auto-detected from git when omitted) and optional open questions. Appends through the same body-only path as arggon_comment (frontmatter never touched, works on done/cancelled items). Each field is capped at 200 characters (longer input truncates). Returns the arggon `handoff --json` envelope: {ok, schemaVersion, conventionVersion, command, id, path, comment: {author, date, lines}, handoff: {branch, next, openQuestions?}}.",
+      "Append a structured, bounded session-end handoff section to a work item's body: `### handoff <date> @<author>[ (session: <id>)] — next: <step>` + bounded lines for branch (auto-detected from git when omitted) and optional open questions. Appends through the same body-only path as arggon_comment (frontmatter never touched, works on done/cancelled items). Each field is capped at 200 characters (the session identifier at 64; longer input truncates). Returns the arggon `handoff --json` envelope: {ok, schemaVersion, conventionVersion, command, id, path, comment: {author, date, lines}, handoff: {branch, next, openQuestions?, session?}}.",
     inputSchema: {
       type: "object",
       properties: {
@@ -236,6 +236,11 @@ const TOOLS: ToolDefinition[] = [
         open_questions: {
           type: "string",
           description: "open questions, semicolon-separated by convention (optional; capped at 200 chars)",
+        },
+        session: {
+          type: "string",
+          description:
+            "session identifier for provenance, rendered in the heading (optional; capped at 64 chars)",
         },
         author: {
           type: "string",
@@ -522,6 +527,7 @@ export function runMcpServer(opts: McpServerOptions): void {
           next: str(args.next) ?? "",
           branch: str(args.branch),
           openQuestions: str(args.open_questions),
+          session: str(args.session),
           author: str(args.author),
           // Tracker auto-commit resolves like the CLI.
         });

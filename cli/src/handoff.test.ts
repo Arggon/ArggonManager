@@ -6,7 +6,7 @@ import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCreate } from "./create.js";
-import { HANDOFF_FIELD_CAP, runHandoff } from "./handoff.js";
+import { HANDOFF_FIELD_CAP, HANDOFF_SESSION_CAP, runHandoff } from "./handoff.js";
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
 import { runValidate } from "./validate.js";
@@ -128,6 +128,61 @@ describe("handoff", () => {
     expect(body).not.toContain("x".repeat(HANDOFF_FIELD_CAP + 1));
   });
 
+  it("renders the session identifier in the heading when provided (provenance)", () => {
+    const { dir, id, path } = primedTask();
+    const before = raw(path);
+    const result = runHandoff({
+      cwd: dir,
+      id,
+      next: "resume the review",
+      branch: "feat/x",
+      session: "sess_abc123",
+      author: "arggon",
+      now: NOW,
+    });
+    expect(result.handoff).toEqual({
+      branch: "feat/x",
+      next: "resume the review",
+      session: "sess_abc123",
+    });
+    expect(raw(path)).toBe(
+      `${before}\n### handoff 2026-09-15 @arggon (session: sess_abc123) — next: resume the review\n- branch: feat/x\n`,
+    );
+  });
+
+  it("caps the session identifier at HANDOFF_SESSION_CAP characters", () => {
+    const { dir, id, path } = primedTask();
+    const long = "s".repeat(HANDOFF_SESSION_CAP + 100);
+    const result = runHandoff({
+      cwd: dir,
+      id,
+      next: "step",
+      session: long,
+      author: "a",
+      now: NOW,
+    });
+    expect(result.handoff.session!.length).toBe(HANDOFF_SESSION_CAP);
+    expect(result.handoff.session!.endsWith("…")).toBe(true);
+    expect(raw(path)).toContain(`(session: ${"s".repeat(HANDOFF_SESSION_CAP - 1)}…)`);
+  });
+
+  it("omits the session cleanly when absent (no empty placeholder)", () => {
+    const { dir, id, path } = primedTask();
+    const before = raw(path);
+    const result = runHandoff({
+      cwd: dir,
+      id,
+      next: "ship it",
+      branch: "main",
+      session: "   ",
+      author: "arggon",
+      now: NOW,
+    });
+    expect(result.handoff).toEqual({ branch: "main", next: "ship it" });
+    expect("session" in result.handoff).toBe(false);
+    expect(raw(path)).toBe(`${before}\n### handoff 2026-09-15 @arggon — next: ship it\n- branch: main\n`);
+  });
+
   it("fails cleanly without --next (kernel: the documented error text)", () => {
     const { dir, id } = primedTask();
     expect(() => runHandoff({ cwd: dir, id, next: "  ", author: "a", now: NOW })).toThrow(
@@ -221,6 +276,35 @@ describe("handoff CLI", () => {
     ]);
   });
 
+  it("passes --session through the CLI flag into the heading (provenance)", () => {
+    const { dir } = primedTask();
+    const proc = spawnSync(
+      process.execPath,
+      [
+        tsx,
+        cli,
+        "--json",
+        "handoff",
+        "task-rate-limit",
+        "--next",
+        "resume here",
+        "--branch",
+        "feat/x",
+        "--session",
+        "sess_cli_42",
+        "--author",
+        "arggon",
+        "--no-commit",
+      ],
+      { encoding: "utf8", cwd: dir },
+    );
+    expect(proc.status, proc.stderr).toBe(0);
+    const envelope = JSON.parse(proc.stdout) as {
+      handoff: { session?: string };
+    };
+    expect(envelope.handoff.session).toBe("sess_cli_42");
+  });
+
   it("surfaces a missing --next as ok:false with COMMENT_FAILED (reused comment code, by design)", () => {
     const { dir } = primedTask();
     const proc = spawnSync(
@@ -296,6 +380,25 @@ describe("mcp arggon_handoff tool", () => {
     });
     expect(raw(path)).toContain(
       "### handoff 2026-09-15 @agent-x — next: resume with the cascade tests\n- branch: feat/x\n",
+    );
+  });
+
+  it("renders the session identifier through the arggon_handoff tool", async () => {
+    const { dir, path } = primedTask();
+    const client = new Client(dir);
+    const result = await client.call("arggon_handoff", {
+      id: "task-rate-limit",
+      next: "resume with the cascade tests",
+      session: "sess_mcp_7",
+      author: "agent-x",
+    });
+    expect(result.isError).toBeUndefined();
+    expect(envelopeOf(result)).toMatchObject({
+      ok: true,
+      handoff: { next: "resume with the cascade tests", session: "sess_mcp_7" },
+    });
+    expect(raw(path)).toContain(
+      "### handoff 2026-09-15 @agent-x (session: sess_mcp_7) — next: resume with the cascade tests\n",
     );
   });
 
