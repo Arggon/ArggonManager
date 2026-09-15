@@ -31,3 +31,6 @@ Candidate #8 of [product discovery](docs/explorations/exploration-product-discov
 - [x] Tests (structure + bounded output), README + json-output additive docs
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. Reusing the comment kernel via a heading override is the architecture-first move — lock, author resolution, body-only write, auto-commit and done/cancelled legality all inherited for free. Caps enforced including the truncation marker, and validating --next inside the action so --json still gets the envelope instead of commander's stderr abort is a detail most would miss. COMMENT_FAILED reuse documented as 'the handoff kernel IS the comment kernel'. Merge follows.
