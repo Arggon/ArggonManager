@@ -6,7 +6,7 @@ import {
   type ServerResponse,
 } from "node:http";
 import type { AddressInfo } from "node:net";
-import { renderBoardHtml } from "./board.js";
+import { renderBoardHtml, defaultBoardGithub, type BoardGithub, type PrInfo } from "./board.js";
 import { toContractWorkItem } from "./contract.js";
 import { loadItems } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
@@ -19,6 +19,13 @@ import { runUpdate } from "./update.js";
  * tab whenever any file under tasks/ changes. Edits posted by drag-and-drop
  * go through the kernel update path (runUpdate) — never raw file writes from
  * the browser, keeping "git files under tasks/ are the source of truth".
+ *
+ * Review surface (task-board-review-surface): the served board overlays live
+ * PR state (open/draft/merged + checks) and per-PR diff links on cards with a
+ * `branch`, polling the shared gh read path (get-open-prs via BoardGithub) on
+ * a fixed interval. Rate-limit/gh failures are swallowed: the last good PR
+ * snapshot (or none) keeps rendering and cards degrade to the neutral badge —
+ * the same clean degradation as the offline board.
  */
 
 const RELOAD_SCRIPT =
@@ -30,6 +37,10 @@ export type BoardServeOptions = {
   port?: number;
   /** Group cards within each column: `milestone` (ADR 0003) or `story`. */
   groupBy?: string;
+  /** Injectable GitHub reader (tests pass a fake; default shells out to `gh`). */
+  gh?: BoardGithub;
+  /** PR poll interval in ms (default 60_000). */
+  pollMs?: number;
 };
 
 export type BoardServeHandle = {
@@ -59,11 +70,48 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
   const clients = new Set<ServerResponse>();
   let debounce: NodeJS.Timeout | undefined;
 
+  // Live PR overlay (task-board-review-surface): cached snapshot polled from
+  // the shared gh read path. Missing gh/auth or a failed poll never breaks
+  // the server — the last good snapshot keeps rendering.
+  const gh: BoardGithub = opts.gh ?? defaultBoardGithub();
+  const pollMs = opts.pollMs ?? 60_000;
+  let prs = new Map<string, PrInfo>();
+
+  const prsEqual = (a: Map<string, PrInfo>, b: Map<string, PrInfo>): boolean => {
+    if (a.size !== b.size) return false;
+    for (const [branch, info] of a) {
+      const other = b.get(branch);
+      if (!other) return false;
+      if (
+        info.number !== other.number ||
+        info.state !== other.state ||
+        info.isDraft !== other.isDraft ||
+        info.checks !== other.checks ||
+        info.url !== other.url
+      ) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  /** Refresh the PR cache; returns true when the snapshot changed. */
+  const refreshPrs = (): boolean => {
+    try {
+      const next = new Map(gh.listPrs(root).map((pr) => [pr.branch, pr]));
+      const changed = !prsEqual(prs, next);
+      prs = next;
+      return changed;
+    } catch {
+      return false; // keep last good snapshot; degrade quietly
+    }
+  };
+
   const render = (): string => {
     const items = loadItems(tasksDir).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     const html = renderBoardHtml(
       items.map((item) => toContractWorkItem(item, root)),
-      { generatedAt: new Date().toISOString(), groupBy },
+      { generatedAt: new Date().toISOString(), groupBy, prs, live: true, diffLinks: true },
     );
     // Live-reload client, injected only in serve mode; the static export
     // stays byte-identical to the plain `arggon board` output.
@@ -77,6 +125,16 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
   const watcher: FSWatcher = watch(tasksDir, { recursive: true }, () => {
     clearTimeout(debounce);
     debounce = setTimeout(broadcastReload, 100);
+  });
+
+  // Poll gh off the accept path: the first render may precede the first
+  // successful snapshot (cards show the neutral badge until data lands).
+  const prPoll = setInterval(() => {
+    if (refreshPrs()) broadcastReload();
+  }, pollMs);
+  prPoll.unref?.();
+  queueMicrotask(() => {
+    if (refreshPrs()) broadcastReload();
   });
 
   const server: Server = createServer((req, res) => {
@@ -160,6 +218,7 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
     close: () => {
       watcher.close();
       clearTimeout(debounce);
+      if (prPoll) clearInterval(prPoll);
       for (const res of clients) res.end();
       clients.clear();
       return new Promise((resolve) => server.close(() => resolve()));

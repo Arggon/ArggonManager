@@ -27,8 +27,12 @@ Candidate #6 of [product discovery](docs/explorations/exploration-product-discov
 
 ## Acceptance
 
-- [ ] --serve board renders per-item PR state (open/draft/merged + checks) and a diff link for items with a branch/PR
-- [ ] Reuses the existing gh read path (get-open-prs); no new dependencies; rate-limit-safe (cached/poll)
-- [ ] Tests for the render path; docs updated
+- [x] --serve board renders per-item PR state (open/draft/merged + checks) and a diff link for items with a branch/PR
+- [x] Reuses the existing gh read path (get-open-prs); no new dependencies; rate-limit-safe (cached/poll)
+- [x] Tests for the render path; docs updated
 
 ## Notes
+
+- Scope guard decision: the review surface (live PR strip + diff links) lands on the `--serve` HTML board ONLY. The static export (`arggon board`, incl. `--github`) and `--tui` are untouched: the static file stays byte-identical (no `diffLinks` in its render options), and `--tui` is deliberately out of scope. Rationale: the standing serve board is where review happens (fresh renders, SSE reload, update endpoint); the static export remains a portable offline snapshot.
+- Implementation: board-serve.ts now polls the existing gh read path (defaultBoardGithub → ghPrListJson in get-open-prs.ts — no changes to that file) on a 60s interval against a cached snapshot; a changed snapshot broadcasts an SSE reload. gh missing/unauthenticated or a failed poll degrades cleanly: last good snapshot (or none) keeps rendering, cards show the neutral `○ no PR` badge, server never fails. renderBoardHtml gains a serve-only `diffLinks` option appending a `/files` diff link next to the PR badge.
+- No board envelope fields added, so docs/json-output.md is unchanged.
