@@ -29,3 +29,6 @@ Implements the structural quick win of accepted [ADR 0006](../../../docs/adr/000
 - [x] Tests: bounded output, comment tailing, unknown id error; docs in README + docs/json-output.md (additive)
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Spec linkage for the consistency checker: this item is the landing implementation of docs/specs/spec-show-item-003.md (spec-show-item-003, proposed->implemented in PR #197).
