@@ -33,3 +33,6 @@ Candidate mitigation (from the review): after a "nothing to commit" result, re-c
 - [x] docs/json-output.md skip-reason documentation updated if the reason string changes
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. The residue probe draws the exact line the bug demanded: 'nothing to commit' with residue = lost staged entry = warned, distinct, additive skip reason; genuinely-clean trees keep the quiet benign path. Report-over-retry matches the coordinator preference and the torture lab's existing collection logic needed zero changes. The mocked-commit caveat is honestly noted — the lab covers the real interleaving. Merge follows.
