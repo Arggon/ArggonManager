@@ -4,7 +4,7 @@ status: todo
 id: task-next-dependency-ranking
 title: next --json ranks ready work by dependency weight (downstream unblocking)
 parent: story-cli-ergonomics
-labels: []
+labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
