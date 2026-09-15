@@ -31,3 +31,6 @@ Candidate #7 of [product discovery](docs/explorations/exploration-product-discov
 - [x] Tests with a mocked gh path (cli/src/issue-roundtrip.test.ts, 6 cases, no live gh); docs updated (README import-issues bullet, docs/json-output.md `issueRoundtrip`, docs/agents.md §0)
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. Config-gate over per-call flag is correct (flips come through bots and MCP), the kernel-level hook means arggon_update flips are covered with zero special-casing, and every failure degrades to a reported skip that never blocks the done flip — the import-issues story stays one-shot while the round-trip is strictly opt-in. Mocked-gh tests follow the established pattern. Merge follows.
