@@ -192,6 +192,8 @@ describe("mcp server", () => {
       command: "create",
     });
     expect((createEnvelope.item as Record<string, unknown>).id).toBe("task-rate-limit");
+    // Top-level path mirrors item.path (bug-create-path-envelope).
+    expect(createEnvelope.path).toBe((createEnvelope.item as Record<string, unknown>).path);
 
     const listed = await client.request("tools/call", {
       name: "arggon_list",

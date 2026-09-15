@@ -257,6 +257,7 @@ Failures use `error.code: "PLAYBOOK_FAILED"` (bad slug, refusing to overwrite, m
 
 | Field          | Type       | Notes                                                                                             |
 | -------------- | ---------- | ------------------------------------------------------------------------------------------------- |
+| `path`         | `string`   | `create` only (bug-create-path-envelope): repo-relative posix path of the created item file; mirrors `item.path` |
 | `item`         | `WorkItem` | Item as persisted                                                                                 |
 | `autoCompleted` | `string[]` | `update` only: ancestors auto-completed to `done` by the container-completion cascade (see convention.md); empty when `--no-cascade` or a non-terminal status. Additive within `schemaVersion: 1`. |
 | `cascadeLevels` | `string[]` | `update` only: container TYPES auto-completed, parallel to `autoCompleted`. Additive. |
@@ -264,6 +265,8 @@ Failures use `error.code: "PLAYBOOK_FAILED"` (bad slug, refusing to overwrite, m
 | `movedFrom` | `string` | `update` only, present when `--parent` moved the item (task-update-reparent): absolute path of what moved — the item file for a leaf (task/bug), the item directory for a container (story/epic). Additive within `schemaVersion: 1`. |
 | `issueRoundtrip` | `object` | `update` only, present when the flip to `done` closed the linked GitHub issue (task-issue-roundtrip): `{ closed: true, issue: <number>, repo: "owner/name" }`, or `{ closed: false, issue: <number>, skipped: <reason> }` when the close degraded (gh missing/unauthenticated, non-GitHub origin, gh failure) — the flip itself always succeeds; skips are also warned on stderr. Fires only for items carrying the `issue` frontmatter field and only when `tasks/.convention.yml` enables `x-github.issue-roundtrip: true` (default OFF); applies to every caller of the update kernel (CLI and `arggon_update` MCP tool alike). Additive within `schemaVersion: 1`. |
 | `commit`       | `object`   | Tracker auto-commit outcome (task-auto-commit-tracker). `create`: `{ hash, message }` when the created file was committed, `{ skipped: <reason> }` otherwise (`--no-commit`, non-git tree, nothing to commit). `update`: present when the run actually changed something — ONE commit covering the updated item plus any cascade-completed ancestors, `{ hash, message }` or `{ skipped: <reason> }` (`--no-commit`, non-git tree). Additive within `schemaVersion: 1`. |
+
+Envelope convention (bug-create-path-envelope): command payloads carry a top-level `path` where the command created or wrote an item file; `item.path` always mirrors it. (`create` emits the repo-relative posix path for both; `show`/`comment` emit the absolute path.)
 
 MCP parity (`task-list-parent-flag`): the `arggon_update` tool exposes `parent` (`{"parent": "<id>"}`) with exactly the kernel-level edge validation the CLI runs — unknown parent, wrong parent type, and reparent-under-own-descendant all fail as `UPDATE_FAILED` tool errors with the CLI message text.
 
