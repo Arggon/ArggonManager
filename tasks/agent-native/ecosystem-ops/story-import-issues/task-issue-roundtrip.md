@@ -4,6 +4,7 @@ status: in_progress
 id: task-issue-roundtrip
 title: "issue round-trip: done flips close/annotate the linked GitHub issue"
 assignee: Arggon
+branch: feat/task-issue-roundtrip
 parent: story-import-issues
 labels: [p3]
 created: "2026-09-15"
