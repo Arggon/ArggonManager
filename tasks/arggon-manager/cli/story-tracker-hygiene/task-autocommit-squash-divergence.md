@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-autocommit-squash-divergence
 title: "tracker auto-commits + squash merges diverge history: document workflow or decide"
+assignee: Arggon
 parent: story-tracker-hygiene
 labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T13:00:29.359Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tracker-hygiene/task-autocommit-squash-divergence.md
