@@ -4,7 +4,7 @@ status: todo
 id: task-autocommit-squash-divergence
 title: "tracker auto-commits + squash merges diverge history: document workflow or decide"
 parent: story-tracker-hygiene
-labels: []
+labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
