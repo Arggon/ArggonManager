@@ -4,7 +4,7 @@ status: todo
 id: task-spec-analyze
 title: "spec analyze: ambiguity scan + spec-tasks consistency check"
 parent: story-spec-pipeline
-labels: []
+labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
