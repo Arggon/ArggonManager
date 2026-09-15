@@ -30,3 +30,6 @@ Follow-up from the task-mcp-parity-full review (PR #237): `arggon next`'s ready 
 - [x] Tests for both pools; reason line reflects the chosen semantics
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. Leaves-first default answers 'what do I implement next' correctly, --include-stories keeps story-claiming discoverable, and the empty-pool message distinguishing 'only stories left' from truly empty is a nice touch. The parity exception (arggon_next stays default-only over MCP) is documented — and good catch on the stale brief: arggon_next landed with task-mcp-parity-full; noted for the record. Merge follows.
