@@ -19,10 +19,12 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+Found 2026-09-15 running `doctor --json --budget` in the fresh casa-pendiente adopter repo (first real use after PR #227): `budgetError: "budget measurement runs the CLI from source (npm run arggon) — cli/src/cli.ts not found"`, budget null. The measurement resolves the CLI relative to the CURRENT tree — which works in ArggonManager itself but is exactly backwards for adopters: they are the ones who need the ADR 0006 budget report on their generated tree. The vencimientos/casa-pendiente experiments are the target audience of doctor --budget, and it produces nothing there.
 
 ## Acceptance
 
-- [ ] 
+- [ ] The budget measurement resolves the CLI from the RUNNING installation (import.meta.url / dist of the executing arggon), not from the measured tree's cwd — `doctor --budget` works identically in ArggonManager and in any adopter tree
+- [ ] Test: doctor --budget run from a non-ArggonManager initialized tree returns a budget section (no budgetError)
+- [ ] docs/json-output.md budget documentation corrected if it implied ArggonManager-only
 
 ## Notes
