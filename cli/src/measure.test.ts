@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { evaluateBudget, formatBudgetLines, measureBudget, AGENTS_MD_BUDGET_BYTES } from "./measure.js";
+import { evaluateBudget, formatBudgetLines, measureBudget, measureMcpSchema, buildMcpSchemaBudget, AGENTS_MD_BUDGET_BYTES, MCP_TOOLS_BUDGET_BYTES, MCP_TOOLS_BASELINE_BYTES } from "./measure.js";
 import { runDoctor } from "./doctor.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
@@ -27,8 +27,8 @@ function runCli(args: string[], cwd: string) {
 }
 
 describe("budget measurement (task-adr0006-remeasure, ADR 0006)", () => {
-  it("measures all ADR 0006 surfaces with the baseline method, deterministically bounded", () => {
-    const m = measureBudget();
+  it("measures all ADR 0006 surfaces with the baseline method, deterministically bounded", async () => {
+    const m = await measureBudget();
     // Present + numeric, under stated bounds where stable (loose asserts).
     expect(m.initTreeBytes).toBeGreaterThan(30_000); // baseline was 43,694 B
     expect(m.generatedAgentsMdBytes).toBeGreaterThan(500);
@@ -40,16 +40,16 @@ describe("budget measurement (task-adr0006-remeasure, ADR 0006)", () => {
     expect(m.showBytes).toBeLessThan(2_048); // bounded read (ADR 0006 dir 3)
   }, 60_000);
 
-  it("always deletes the measurement temp tree (/tmp hygiene)", () => {
-    measureBudget();
+  it("always deletes the measurement temp tree (/tmp hygiene)", async () => {
+    await measureBudget();
     const leftovers = spawnSync("bash", ["-c", "ls -d ${TMPDIR:-/tmp}/arggon-budget-* 2>/dev/null || true"], {
       encoding: "utf8",
     });
     expect(leftovers.stdout.trim()).toBe("");
   }, 60_000);
 
-  it("reports the init --full tree as an advisory line with numeric growth vs the baseline", () => {
-    const m = measureBudget();
+  it("reports the init --full tree as an advisory line with numeric growth vs the baseline", async () => {
+    const m = await measureBudget();
     const lines = formatBudgetLines(m);
     const treeLine = lines.find((l) => l.includes("init --full tree"));
     expect(treeLine).toBeDefined();
@@ -59,8 +59,8 @@ describe("budget measurement (task-adr0006-remeasure, ADR 0006)", () => {
     expect(treeLine).not.toContain("FAIL"); // advisory: no hard budget
   }, 60_000);
 
-  it("evaluateBudget checks the generated AGENTS.md against the 2048 B budget", () => {
-    const m = measureBudget();
+  it("evaluateBudget checks the generated AGENTS.md against the 2048 B budget", async () => {
+    const m = await measureBudget();
     const checks = evaluateBudget(m);
     const byName = Object.fromEntries(checks.map((c) => [c.name, c]));
     expect(byName["generated AGENTS.md"].budget).toBe(2048);
@@ -83,7 +83,13 @@ describe("budget measurement (task-adr0006-remeasure, ADR 0006)", () => {
     const body = JSON.parse(withBudget.stdout) as {
       ok: boolean;
       command: string;
-      budget?: { generatedAgentsMdBytes: number; listCompactBytes: number; listFullBytes: number; showBytes: number };
+      budget?: {
+        generatedAgentsMdBytes: number;
+        listCompactBytes: number;
+        listFullBytes: number;
+        showBytes: number;
+        mcp?: { toolCount: number; totalBytes: number; tokenEstimate: number; largestTools: unknown[] };
+      };
       budgetError?: string;
     };
     expect(body.ok).toBe(true);
@@ -92,13 +98,66 @@ describe("budget measurement (task-adr0006-remeasure, ADR 0006)", () => {
     expect(body.budget!.generatedAgentsMdBytes).toBeLessThanOrEqual(AGENTS_MD_BUDGET_BYTES);
     expect(body.budget!.listFullBytes).toBeGreaterThan(body.budget!.listCompactBytes);
     expect(body.budget!.showBytes).toBeGreaterThan(0);
+    // task-schema-budget: the MCP schema dimension rides in the same payload.
+    expect(body.budget!.mcp).toBeDefined();
+    expect(body.budget!.mcp!.toolCount).toBeGreaterThan(0);
+    expect(body.budget!.mcp!.totalBytes).toBeGreaterThan(0);
+    expect(body.budget!.mcp!.largestTools.length).toBeGreaterThan(0);
   }, 60_000);
 
-  it("runDoctor supports the budget flag directly (best-effort, still exit-0 charter)", () => {
+  it("runDoctor itself stays synchronous and budget-free; the CLI action attaches the budget", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-measure-"));
-    const result = runDoctor({ cwd: dir, budget: true });
-    expect(result.initialized).toBe(false); // temp dir is not initialized...
-    expect(result.budget).toBeDefined(); // ...but the measurement uses its own temp tree
-    expect(result.budget!.generatedAgentsMdBytes).toBeGreaterThan(0);
+    const result = runDoctor({ cwd: dir });
+    expect(result.initialized).toBe(false);
+    expect(result.budget).toBeUndefined(); // attached by the CLI action when --budget is passed
+  });
+});
+
+describe("MCP tool-schema budget (task-schema-budget)", () => {
+  it("buildMcpSchemaBudget sizes deterministic fixture tools exactly", () => {
+    const toolA = { name: "arggon_alpha", inputSchema: { type: "object", properties: { x: { type: "string" } } } };
+    const toolB = { name: "arggon_beta", inputSchema: { type: "object" } };
+    const budget = buildMcpSchemaBudget([toolA, toolB]);
+    expect(budget.toolCount).toBe(2);
+    expect(budget.totalBytes).toBe(
+      Buffer.byteLength(JSON.stringify(toolA), "utf8") + Buffer.byteLength(JSON.stringify(toolB), "utf8"),
+    );
+    expect(budget.tokenEstimate).toBe(Math.round(budget.totalBytes / 4));
+    expect(budget.largestTools[0]).toEqual({ name: "arggon_alpha", bytes: Buffer.byteLength(JSON.stringify(toolA), "utf8") });
+    expect(budget.largestTools).toHaveLength(2);
+  });
+
+  it("buildMcpSchemaBudget caps the largest-tools list at 3, descending", () => {
+    const tools = [1, 2, 3, 4].map((n) => ({
+      name: `arggon_tool_${n}`,
+      inputSchema: { description: "x".repeat(n * 10) },
+    }));
+    const budget = buildMcpSchemaBudget(tools);
+    expect(budget.largestTools).toHaveLength(3);
+    const bytes = budget.largestTools.map((t) => t.bytes);
+    expect([...bytes].sort((a, b) => b - a)).toEqual(bytes); // descending
+    expect(budget.largestTools[0]!.name).toBe("arggon_tool_4"); // biggest fixture schema
+  });
+
+  it("evaluateBudget checks the live tools/list against the advisory 12 KiB budget", async () => {
+    const m = await measureBudget();
+    expect(m.mcp.toolCount).toBe(9); // the live surface (mcp-parity.test.ts wraps the same 9 commands)
+    expect(m.mcp.totalBytes).toBeGreaterThan(MCP_TOOLS_BASELINE_BYTES - 2_000); // near the recorded baseline
+    const checks = evaluateBudget(m);
+    const mcpCheck = checks.find((c) => c.name === "mcp tools/list")!;
+    expect(mcpCheck.budget).toBe(MCP_TOOLS_BUDGET_BYTES);
+    expect(mcpCheck.withinBudget).toBe(true); // live surface is within the advisory cap
+    const lines = formatBudgetLines(m);
+    const mcpLine = lines.find((l) => l.includes("mcp tools/list:"))!;
+    expect(mcpLine).toContain(`(budget ${MCP_TOOLS_BUDGET_BYTES} B: pass)`);
+    expect(mcpLine).toContain("tok (~chars/4)");
+    expect(lines.join("\n")).toContain("mcp tools/list (largest): arggon_");
+  }, 60_000);
+
+  it("measureMcpSchema reads the LIVE server surface (never a copied schema list)", async () => {
+    const budget = await measureMcpSchema();
+    expect(budget.toolCount).toBe(9);
+    expect(budget.totalBytes).toBeGreaterThan(0);
+    expect(budget.largestTools[0]!.name).toMatch(/^arggon_/);
   }, 60_000);
 });

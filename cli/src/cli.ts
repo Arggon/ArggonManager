@@ -12,7 +12,7 @@ import { runCleanup } from "./cleanup.js";
 import { readConventionVersion } from "./convention.js";
 import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
-import { runDoctor, formatDoctorReport } from "./doctor.js";
+import { runDoctor, formatDoctorReport, measureBudgetForDoctor } from "./doctor.js";
 import { runInit, type InitResult } from "./init.js";
 import {
   bindJsonProgram,
@@ -157,18 +157,24 @@ program
 program
   .command("doctor")
   .description(
-    "Report installation state: convention version, generated-doc provenance, tracker counts (pure read)",
+    "Report installation state: convention version, generated-doc provenance, tracker counts (pure read); with --budget, also the ADR 0006 context-budget surfaces incl. the live MCP tool-schema size (report-only)",
   )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .option(
     "--budget",
-    "also measure the ADR 0006 context-budget surfaces (fresh init --full in a deleted temp tree; report-only)",
+    "also measure the ADR 0006 context-budget surfaces (fresh init --full in a deleted temp tree; live MCP tools/list; report-only)",
     false,
   )
-  .action((opts: { json?: boolean; budget?: boolean }) => {
+  .action(async (opts: { json?: boolean; budget?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
-      const result = runDoctor({ cwd: process.cwd(), budget: opts.budget });
+      const result = runDoctor({ cwd: process.cwd() });
+      if (opts.budget === true) {
+        // Measured after the tree report (both initialized and not): the
+        // budget surfaces come from a throwaway temp tree + the live MCP
+        // server, not from the tree being examined (task-schema-budget).
+        Object.assign(result, await measureBudgetForDoctor());
+      }
       if (json) {
         successJson(
           "doctor",

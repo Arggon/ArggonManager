@@ -117,20 +117,22 @@ export function gitState(cwd: string): DoctorGit {
   return { isRepo: true, dirty, remote };
 }
 
-/** Best-effort budget measurement: doctor stays exit-0 even if it fails. */
-function tryMeasureBudget(): { budget?: BudgetResult; budgetError?: string } {
+/**
+ * Best-effort budget measurement for `doctor --budget`: doctor stays exit-0
+ * even if the measurement fails. Async because the MCP schema dimension
+ * (task-schema-budget) fetches the live tools/list in-process. The caller
+ * (cli.ts doctor action) attaches the result to the DoctorResult before
+ * formatting, so runDoctor itself stays synchronous for its other callers.
+ */
+export async function measureBudgetForDoctor(): Promise<{ budget?: BudgetResult; budgetError?: string }> {
   try {
-    return { budget: measureBudget() };
+    return { budget: await measureBudget() };
   } catch (err) {
     return { budgetError: err instanceof Error ? err.message : String(err) };
   }
 }
 
-export function runDoctor(opts: { cwd: string; budget?: boolean }): DoctorResult {
-  // Measured up front (both the initialized and not-initialized report paths
-  // include it): the budget surfaces come from a throwaway temp tree, not
-  // from the tree being examined.
-  const budgetPart = opts.budget === true ? tryMeasureBudget() : {};
+export function runDoctor(opts: { cwd: string }): DoctorResult {
   let tasksDir: string;
   let root: string;
   try {
@@ -138,6 +140,7 @@ export function runDoctor(opts: { cwd: string; budget?: boolean }): DoctorResult
     root = repoRootFromTasks(tasksDir);
   } catch {
     // Missing tree: a normal report, not a failure (task-doctor-command).
+    // Budget, when requested, is attached by the caller (measureBudgetForDoctor).
     return {
       root: null,
       initialized: false,
@@ -145,7 +148,6 @@ export function runDoctor(opts: { cwd: string; budget?: boolean }): DoctorResult
       docs: { ...ZERO_DOCS },
       tracker: { items: 0, todo: 0 },
       git: gitState(opts.cwd),
-      ...budgetPart,
     };
   }
 
@@ -224,7 +226,6 @@ export function runDoctor(opts: { cwd: string; budget?: boolean }): DoctorResult
       todo: items.filter((item) => item.status === "todo").length,
     },
     git: gitState(root),
-    ...budgetPart,
   };
 }
 

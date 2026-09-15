@@ -10,7 +10,10 @@
  * - the generated AGENTS.md bytes (budget: <=2048 B, task-adr0006-docs-budget);
  * - a fixture `list --json` payload, BOTH compact default and `--full`, so
  *   the compact-envelope saving stays visible (baseline: 60.7 KB un-compact);
- * - a `show <id> --json` output (baseline method had no show; measured now).
+ * - a `show <id> --json` output (baseline method had no show; measured now);
+ * - the live MCP tools/list payload (task-schema-budget), fetched in-process
+ *   against runMcpServer the same way mcp-parity.test.ts does — the LIVE
+ *   surface, never a copy-pasted schema list.
  *
  * Pure report: everything is created under a temp dir that is always removed.
  * Runs the real CLI from source (npm run arggon charter) so bytes are what an
@@ -22,9 +25,42 @@ import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs"
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { PassThrough } from "node:stream";
 
 /** Generated-docs context budget (ADR 0006 direction 4; init-docs.test.ts). */
 export const AGENTS_MD_BUDGET_BYTES = 2048;
+
+/**
+ * MCP tool-schema budget (task-schema-budget). Live baseline measured
+ * 2026-09-15 against the in-process tools/list: 9 tools, 9,050 B of tool
+ * definitions (~2,263 tok at ~chars/4) — the item brief's "~4.7 KB" was an
+ * early estimate; the LIVE surface is the baseline of record. Advisory cap at
+ * 12 KiB: ~35% headroom over the baseline, enough for several new tools or
+ * schema growth without letting the 50K-token bloat spiral (Towards AI 2026)
+ * start unnoticed. Advisory (no hard cap): report-only budget section.
+ */
+export const MCP_TOOLS_BUDGET_BYTES = 12_288;
+
+/** Live tools/list bytes at the 2026-09-15 baseline measurement. */
+export const MCP_TOOLS_BASELINE_BYTES = 9_050;
+
+export type McpToolBytes = {
+  /** MCP tool name (e.g. arggon_update). */
+  name: string;
+  /** Serialized tool-definition bytes as an agent receives them. */
+  bytes: number;
+};
+
+export type McpSchemaBudget = {
+  /** Number of tools the MCP server exposes. */
+  toolCount: number;
+  /** Total tools/list payload bytes (the tool definitions themselves). */
+  totalBytes: number;
+  /** Token estimate (~chars/4 — the same method as the baseline tables). */
+  tokenEstimate: number;
+  /** Largest tools by definition bytes, descending, top 3. */
+  largestTools: McpToolBytes[];
+};
 
 /**
  * Fresh `init --full` tree at the 2026-09-14 baseline (ADR 0006 re-measure).
@@ -49,6 +85,8 @@ export type BudgetResult = {
   showBytes: number;
   /** Fixture item count the list payloads cover. */
   fixtureItems: number;
+  /** Live MCP tools/list measurement (task-schema-budget). */
+  mcp: McpSchemaBudget;
 };
 
 export type BudgetCheck = {
@@ -97,11 +135,52 @@ export function treeGrowthPct(bytes: number): string {
 }
 
 /**
+ * Pure budget math over fetched tool definitions (task-schema-budget): total
+ * bytes, ~chars/4 token estimate, and the largest tools. Exported separately
+ * so tests can drive it with deterministic fixtures.
+ */
+export function buildMcpSchemaBudget(
+  tools: Array<{ name: string; inputSchema?: Record<string, unknown> }>,
+): McpSchemaBudget {
+  const sized = tools.map((tool) => ({
+    name: tool.name,
+    bytes: Buffer.byteLength(JSON.stringify(tool), "utf8"),
+  }));
+  const totalBytes = sized.reduce((sum, t) => sum + t.bytes, 0);
+  return {
+    toolCount: tools.length,
+    totalBytes,
+    tokenEstimate: Math.round(totalBytes / 4),
+    largestTools: [...sized].sort((a, b) => b.bytes - a.bytes).slice(0, 3),
+  };
+}
+
+/**
+ * Fetch the LIVE tool definitions from an in-process MCP server and size them
+ * (task-schema-budget). Same pattern as mcp-parity.test.ts: raw JSON-RPC
+ * tools/list over PassThrough streams against runMcpServer — the live public
+ * surface, never a copied schema list.
+ */
+export async function measureMcpSchema(): Promise<McpSchemaBudget> {
+  const { runMcpServer } = await import("./mcp-server.js");
+  const input = new PassThrough();
+  const output = new PassThrough();
+  runMcpServer({ cwd: process.cwd(), input, output });
+  const responsePromise = new Promise<Record<string, unknown>>((resolveResponse) => {
+    output.on("data", (chunk: Buffer) => resolveResponse(JSON.parse(chunk.toString("utf8"))));
+  });
+  input.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })}\n`);
+  const response = await responsePromise;
+  const tools = (response.result as { tools: Array<{ name: string; inputSchema: Record<string, unknown> }> }).tools;
+  return buildMcpSchemaBudget(tools);
+}
+
+/**
  * Measure all agent-facing surfaces. Creates a throwaway `init --full` tree
  * under os.tmpdir(), creates the deterministic fixture inside it, measures,
  * and ALWAYS removes the temp tree (the repo's /tmp hygiene history).
  */
-export function measureBudget(): BudgetResult {
+export async function measureBudget(): Promise<BudgetResult> {
   if (!existsSync(cliEntry) || !existsSync(tsxEntry)) {
     throw new Error("budget measurement runs the CLI from source (npm run arggon) — cli/src/cli.ts not found");
   }
@@ -137,6 +216,7 @@ export function measureBudget(): BudgetResult {
     const listCompactBytes = Buffer.byteLength(runCli(["list", "--json"], dir), "utf8");
     const listFullBytes = Buffer.byteLength(runCli(["list", "--json", "--full"], dir), "utf8");
     const showBytes = Buffer.byteLength(runCli(["show", firstTask, "--json"], dir), "utf8");
+    const mcp = await measureMcpSchema();
 
     return {
       initTreeBytes: treeBytes(dir),
@@ -145,6 +225,7 @@ export function measureBudget(): BudgetResult {
       listFullBytes,
       showBytes,
       fixtureItems: FIXTURE_TASK_COUNT + 3,
+      mcp,
     };
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -183,6 +264,15 @@ export function evaluateBudget(m: BudgetResult): BudgetCheck[] {
       bytes: m.showBytes,
       note: "bounded single-item read (ADR 0006 direction 3); unbounded before show existed",
     },
+    {
+      name: "mcp tools/list",
+      bytes: m.mcp.totalBytes,
+      budget: MCP_TOOLS_BUDGET_BYTES,
+      withinBudget: m.mcp.totalBytes <= MCP_TOOLS_BUDGET_BYTES,
+      note:
+        `${m.mcp.toolCount} tools, ~${m.mcp.tokenEstimate.toLocaleString("en-US")} tok (~chars/4); ` +
+        `advisory (task-schema-budget) — live baseline ${MCP_TOOLS_BASELINE_BYTES.toLocaleString("en-US")} B (2026-09-15)`,
+    },
   ];
 }
 
@@ -193,6 +283,10 @@ export function formatBudgetLines(m: BudgetResult): string[] {
     let line = `    ${check.name}: ${check.bytes.toLocaleString("en-US")} B`;
     if (check.budget !== undefined) {
       line += ` (budget ${check.budget} B: ${check.withinBudget ? "pass" : "FAIL"})`;
+      // The MCP schema budget carries its live-baseline reference inline even
+      // when budgeted (task-schema-budget) so growth is comparable, not just
+      // pass/fail.
+      if (check.note) line += ` — ${check.note}`;
     } else if (check.note) {
       // Advisory surfaces (no hard budget) carry their reference inline —
       // e.g. the init tree's growth vs the baseline (task-agents-md-budget-headroom).
@@ -204,5 +298,9 @@ export function formatBudgetLines(m: BudgetResult): string[] {
     `    compact-envelope saving: ${(m.listFullBytes - m.listCompactBytes).toLocaleString("en-US")} B ` +
       "per fixture list (null/empty fields omitted)",
   );
+  const largest = m.mcp.largestTools
+    .map((t) => `${t.name} ${t.bytes.toLocaleString("en-US")} B`)
+    .join(", ");
+  lines.push(`    mcp tools/list (largest): ${largest}`);
   return lines;
 }

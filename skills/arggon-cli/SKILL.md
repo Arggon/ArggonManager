@@ -118,9 +118,10 @@ Nuances (hand-written, review-covered):
 ## 3. Views, reporting, tooling
 
 ```bash
-<!-- arggon:generated-commands start: board,report,sync,instructions,cleanup -->
+<!-- arggon:generated-commands start: board,report,doctor,sync,instructions,cleanup -->
 arggon board  # Write a static read-only HTML board from tasks/ (git files stay the source of truth)
 arggon report  # Aggregate leaf statuses per container, grouped by epic (display only)
+arggon doctor  # Report installation state: convention version, generated-doc provenance, tracker counts (pure read); with --budget, also the ADR 0006 context-budget surfaces incl. the live MCP tool-schema size (report-only)
 arggon sync  # Reconcile task branch fields with open GitHub PRs
 arggon instructions  # Print the agent wiring (install, pre-commit, CI) extracted from docs/agents.md
 arggon cleanup  # List worktrees of done/cancelled items whose branches are merged (--prune removes them)
