@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-issue-roundtrip
 title: "issue round-trip: done flips close/annotate the linked GitHub issue"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-import-issues
 labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
-claimed_at: "2026-09-15T15:04:04.651Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-import-issues/task-issue-roundtrip.md
