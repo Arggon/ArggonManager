@@ -30,3 +30,6 @@ Follow-up from the task-issue-roundtrip review (PR #228): the round-trip landed 
 - [x] init-docs extensions assertion covers x-github
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. The generated extensions table now lists x-github, and — the part I care most about — docs/convention.md gained the missing NORMATIVE x-github section (default OFF, degraded-close semantics, ignore-unknown rules), so the template's 'full reference' pointer actually holds. Extensions assertion extended by one key. Correct template-path correction (templates/docs/docs/). Merge follows.
