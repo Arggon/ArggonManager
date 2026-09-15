@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-mcp-parity-full
 title: "MCP tool parity: next, show, report, validate as MCP tools"
+assignee: Arggon
 parent: story-mcp-server
 labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T15:53:18.164Z"
 depends_on: [task-handoff-command]
 ---
 <!--
