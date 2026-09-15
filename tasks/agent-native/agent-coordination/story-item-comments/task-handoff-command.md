@@ -4,7 +4,7 @@ status: todo
 id: task-handoff-command
 title: "arggon handoff <id>: structured bounded resume note (CLI + MCP)"
 parent: story-item-comments
-labels: []
+labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
