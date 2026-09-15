@@ -4,7 +4,7 @@ status: todo
 id: task-mcp-spec-2026-eval
 title: "MCP spec 2026-07-28 adoption evaluation (Tasks, Extensions, stateless)"
 parent: story-mcp-server
-labels: []
+labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
