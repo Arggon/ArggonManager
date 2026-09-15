@@ -132,6 +132,7 @@ Snippets are extracted from the playbook at runtime; failures use `error.code: "
 | `skipped`            | `string[]` | Doc files left untouched this run (posix, relative to `root`). Additive in v1: older clients ignore it |
 | `restored`           | `string[]` | Missing templates restored when already initialized (posix, relative to `root`) |
 | `commit`             | `object`   | Tracker auto-commit outcome for the files this run wrote (bug-init-leaves-docs-untracked-start-blocks-on-clean-tree): ONE `{ hash, message }` commit (`chore(tasks): generated init docs (N files)`) covering the generated/updated docs, templates, the tasks/ tree and `tasks/.convention.yml` — or `{ skipped: <reason> }` (`--no-commit`, non-git tree, git absent, nothing to commit). Additive within `schemaVersion: 1`. |
+| `warning`            | `string`   | Present only when the target tree is NOT a git repository (bug-init-git-doctor-blindspot): `not a git repository — branch/worktree/push/PR flows and the pre-commit validate hook will be unavailable until you run \`git init\``. Human output warns on stderr with the same text; init never auto-`git init`s. Additive within `schemaVersion: 1`. |
 
 Failures use `error.code: "INIT_FAILED"`.
 
@@ -152,6 +153,7 @@ Pure-read installation report (exit 0 on every well-formed input, including non-
 | `docs.stale`        | `number`  | Entries whose `template` no longer exists in the current template bundle      |
 | `docs.missing`      | `number`  | Entries whose destination file is absent                                      |
 | `tracker`           | `object`  | `{ items, todo }` — total work items under `tasks/` and their `todo` count    |
+| `git`               | `object`  | Git state of the tree (bug-init-git-doctor-blindspot, additive): `{ isRepo, dirty, remote }` — `isRepo` from `git rev-parse --git-dir`; `dirty` is whether `git status --porcelain` is non-empty and `remote` the URL of `origin` (else the first remote), both `null` when the tree is not a git repository. Report-only; doctor's exit-0 charter is unchanged. |
 
 Each `docs` entry falls in exactly one bucket (`missing`, else `stale`, else `acknowledged`/`acknowledgedDrifted`, else `untouched`/`modified`), so `untouched + modified + acknowledged + acknowledgedDrifted + stale + missing = managed`. Failures use `error.code: "DOCTOR_FAILED"` (unexpected errors only — a missing tree is a normal report).
 
@@ -248,7 +250,7 @@ Failures use `error.code: "PLAYBOOK_FAILED"` (bad slug, refusing to overwrite, m
 | `item`         | `WorkItem` | Item as persisted                                                                                 |
 | `autoCompleted` | `string[]` | `update` only: ancestors auto-completed to `done` by the container-completion cascade (see convention.md); empty when `--no-cascade` or a non-terminal status. Additive within `schemaVersion: 1`. |
 | `cascadeLevels` | `string[]` | `update` only: container TYPES auto-completed, parallel to `autoCompleted`. Additive. |
-| `cascadeSkipped` | `Array<{ id, type, reason: "acceptance-incomplete" \| "subtree-open", sibling? }>` | `update` only, present when non-empty: ancestor containers the cascade did NOT complete, with the reason. `acceptance-incomplete` (task-cascade-acceptance-aware): the container's own body still has unchecked acceptance checkboxes. `subtree-open` (task-cascade-subtree-open-visibility): the walk stopped because a sibling subtree still holds a non-terminal item — `sibling` carries that blocking sibling's id (direct child of the skipped container). Additive. |
+| `cascadeSkipped` | `Array<{ id, type, reason: "acceptance-incomplete" \| "subtree-open", sibling? }>` | `update` only: ancestor containers the cascade did NOT complete, with the reason — always present as an array, `[]` when nothing was skipped (bug-cascadeskipped-array-alignment; same always-arrays convention as `autoCompleted`/`cascadeLevels`). `acceptance-incomplete` (task-cascade-acceptance-aware): the container's own body still has unchecked acceptance checkboxes. `subtree-open` (task-cascade-subtree-open-visibility): the walk stopped because a sibling subtree still holds a non-terminal item — `sibling` carries that blocking sibling's id (direct child of the skipped container). Additive. |
 | `movedFrom` | `string` | `update` only, present when `--parent` moved the item (task-update-reparent): absolute path of what moved — the item file for a leaf (task/bug), the item directory for a container (story/epic). Additive within `schemaVersion: 1`. |
 | `commit`       | `object`   | Tracker auto-commit outcome (task-auto-commit-tracker). `create`: `{ hash, message }` when the created file was committed, `{ skipped: <reason> }` otherwise (`--no-commit`, non-git tree, nothing to commit). `update`: present when the run actually changed something — ONE commit covering the updated item plus any cascade-completed ancestors, `{ hash, message }` or `{ skipped: <reason> }` (`--no-commit`, non-git tree). Additive within `schemaVersion: 1`. |
 
@@ -499,11 +501,16 @@ Init still **writes** `tasks/.convention.yml` (including the `x-generated` prove
   "tracker": {
     "items": 12,
     "todo": 3
+  },
+  "git": {
+    "isRepo": true,
+    "dirty": false,
+    "remote": "git@github.com:example/example-repo.git"
   }
 }
 ```
 
-Non-initialized repos return the same shape with `root: null`, `initialized: false`, zeroed `docs`/`tracker`, and `conventionVersion: 0`.
+Non-initialized repos return the same shape with `root: null`, `initialized: false`, zeroed `docs`/`tracker`, `conventionVersion: 0`, and the `git` section probed from the cwd (a non-git tree reports `{ isRepo: false, dirty: null, remote: null }`).
 
 ### `adopt`
 

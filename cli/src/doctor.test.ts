@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawnSync, execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -221,5 +221,58 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     const before = readFileSync(join(dir, "tasks/.convention.yml"), "utf8");
     runDoctor({ cwd: dir });
     expect(readFileSync(join(dir, "tasks/.convention.yml"), "utf8")).toBe(before);
+  });
+});
+
+describe("doctor: git section (bug-init-git-doctor-blindspot)", () => {
+  it("reports { isRepo: false, dirty: null, remote: null } on a non-git tree", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const result = runDoctor({ cwd: dir });
+    expect(result.git).toEqual({ isRepo: false, dirty: null, remote: null });
+    expect(formatDoctorReport(result)).toContain("not a git repository");
+  });
+
+  it("reports isRepo: true with dirty/remote fields on a git tree", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    // No remote configured, generated docs untracked → dirty, remote null.
+    const result = runDoctor({ cwd: dir });
+    expect(result.git.isRepo).toBe(true);
+    expect(result.git.dirty).toBe(true);
+    expect(result.git.remote).toBeNull();
+    expect(formatDoctorReport(result)).toContain("repo, dirty, no remote");
+  });
+
+  it("reports the origin remote url when one is configured", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["remote", "add", "origin", "git@github.com:example/example.git"], { cwd: dir });
+    const result = runDoctor({ cwd: dir });
+    expect(result.git.remote).toBe("git@github.com:example/example.git");
+  });
+
+  it("reports a clean tree as dirty: false after committing everything", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync("git", ["add", "--", "."], { cwd: dir });
+    execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init"], { cwd: dir });
+    const result = runDoctor({ cwd: dir });
+    expect(result.git).toEqual({ isRepo: true, dirty: false, remote: null });
+  });
+
+  it("exposes the git section via the CLI --json on a non-git dir (exit 0)", () => {
+    const dir = tempDir();
+    const proc = runCli(["doctor", "--json"], dir);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      ok: boolean;
+      git: { isRepo: boolean; dirty: boolean | null; remote: string | null };
+    };
+    expect(body.ok).toBe(true);
+    expect(body.git).toEqual({ isRepo: false, dirty: null, remote: null });
   });
 });

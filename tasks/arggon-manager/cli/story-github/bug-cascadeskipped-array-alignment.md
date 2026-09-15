@@ -1,12 +1,15 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-cascadeskipped-array-alignment
 title: "update --json: cascadeSkipped absent when empty while autoCompleted is always []"
+assignee: Arggon
+branch: fix/bug-cascadeskipped-array-alignment
 parent: story-github
 labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T13:00:22.483Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-github/bug-cascadeskipped-array-alignment.md
@@ -23,7 +26,10 @@ Feedback from the vencimientos adoption experiment (2026-09-15): in `update --js
 
 ## Acceptance
 
-- [ ] `autoCompleted` and `cascadeSkipped` are emitted consistently (both always arrays, or both omitted-when-empty) across CLI and MCP `update` envelopes — pick one, document in docs/json-output.md (additive, schemaVersion unchanged)
-- [ ] Tests: empty-cascade envelope asserts the aligned shape (cli + mcp); parity harness unaffected or updated
+- [x] `autoCompleted` and `cascadeSkipped` are emitted consistently (both always arrays, or both omitted-when-empty) across CLI and MCP `update` envelopes — pick one, document in docs/json-output.md (additive, schemaVersion unchanged)
+- [x] Tests: empty-cascade envelope asserts the aligned shape (cli + mcp); parity harness unaffected or updated
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. Always-arrays is the right convention (matches autoCompleted, present-and-empty beats absent-then-appearing for parsers) and correctly stays outside the ADR 0006 compact-WorkItem scope. Asserted through CLI and MCP both, and the grep confirmed no other conditional-spread sites. Merge follows.
