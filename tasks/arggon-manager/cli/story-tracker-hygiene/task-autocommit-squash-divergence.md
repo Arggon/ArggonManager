@@ -46,3 +46,7 @@ Adopted **(a) as the primary rule**: a PR whose branch carries tracker auto-comm
 - `skills/arggon-cli/SKILL.md` — Pitfalls entry: pattern, why, rule, recovery (carrier for adopters).
 - `docs/agents.md` — §0 tracker-hygiene paragraph: merge-don't-squash rule + recovery recipe (ArggonManager's own playbook; adopter AGENTS.md stays lean per its 2KB budget).
 - `docs/convention.md` — intentionally unchanged: the rule is workflow guidance, not a schema-level `x-tracker` option.
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. The Pitfalls entry is dense and complete — pattern, why, the merge-don't-squash rule, recovery (rebase/rerere or restart from fresh main), and the --no-commit alternative for stacked branches. Trade-offs (a)/(b)/(c) documented in the item with (c) rejected for good reason: the detection is complex and the guidance covers the case. This was the highest-friction finding of the vencimientos experiment; now every adopter inherits the rule. Merge follows.
+
