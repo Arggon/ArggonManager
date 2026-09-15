@@ -36,3 +36,6 @@ Follow-up from the task-schema-budget review (PR #256): the forever-fix (task-sk
 - Coverage invariant lives in cli/src/skill-generated-commands.test.ts (4th test).
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED (deep-validated). I personally probed the invariant: removed 'init' from the region filter -> TWO tests failed (region-stale + the new coverage invariant, with an actionable message naming the fix); restored -> 4/4 green and skills:sync idempotent. The coverage test renders from current source (not the file body), so a stale-but-present region still counts as covered — the right semantics. The spec/stack/playbook subtree staying hand-documented is a conscious exclusion worth revisiting if those surfaces grow. Merge follows.
