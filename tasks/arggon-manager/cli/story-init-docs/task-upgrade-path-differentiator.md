@@ -26,8 +26,8 @@ Candidate #2 of the product-discovery research round (2026-09-15): OpenSpec's ma
 
 ## Acceptance
 
-- [ ] README (Why ArggonManager section): a short upgrade-path paragraph — never overwrites, adopter-owned docs, re-run refreshes untouched docs, --backup archives — the Spec Kit/OpenSpec comparison implicit, no vendor bashing
-- [ ] docs/agents.md or docs/convention.md: the same guarantee stated where adopters look for upgrade behavior (one place, no duplication)
-- [ ] doctor/init tests unchanged and green (docs-only)
+- [x] README (Why ArggonManager section): a short upgrade-path paragraph — never overwrites, adopter-owned docs, re-run refreshes untouched docs, --backup archives — the Spec Kit/OpenSpec comparison implicit, no vendor bashing
+- [x] docs/agents.md or docs/convention.md: the same guarantee stated where adopters look for upgrade behavior (one place, no duplication)
+- [x] doctor/init tests unchanged and green (docs-only)
 
 ## Notes

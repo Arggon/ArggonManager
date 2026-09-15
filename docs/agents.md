@@ -10,6 +10,8 @@ Humans and agents follow the **same** rules. Work lives in git under `tasks/` �
 - `npm install`
 - `npm run arggon -- <command>`
 
+Upgrading is non-destructive for agents too: an agent's edits to a generated doc are respected on every re-run — `arggon init` refreshes untouched docs quietly, skips modified ones (listed in the command's JSON output) rather than clobbering them, and archives the originals under `backup/<date>/` first when run with `--backup`.
+
 ## 0. Issue tracking: `tasks/`, not GitHub issues
 
 All work — features, tasks, bugs, review follow-ups — is tracked as work items under **`tasks/`** via `arggon create`, **not** as GitHub issues. GitHub is for **PRs only**.
