@@ -4,6 +4,7 @@ status: in_progress
 id: bug-torture-contention-flake2
 title: labs/torture auto-commit contention still flakes in CI despite wall-clock retry
 assignee: Arggon
+branch: fix/bug-torture-contention-flake2
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
