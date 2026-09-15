@@ -73,25 +73,35 @@ arggon doctor             # installation state: initialized? conventionVersion? 
 
 ## 2. Run the work loop
 
+The command lines below are GENERATED from the live CLI between the
+`arggon:generated-commands` markers (run `npm run skills:sync` after any
+command/flag/description change; cli/src/skill-generated-commands.test.ts
+fails on drift). Curated nuances live outside the region.
+
 ```bash
-arggon list --status todo --json                       # find work (empty items[] = no work, not an error)
-arggon next --json                                    # suggested claimable item + reason (+ blockedBy)
-                                                      # leaf work only by default; --include-stories
-                                                      # opts unclaimed stories back into the pool
-                                                      # "what should I work on" = next --json, NOT list --json
-                                                      # (67x smaller envelope; list --json only for full scans)
-arggon start <id> --assignee <login> --worktree       # claim + branch + worktree + commit + push
-                                                      # (--open-pr adds a draft PR; re-runs attach)
-arggon update <id> --status done                      # complete (see pitfalls: cascade, claim rules)
-arggon comment <id> "handoff note"                    # timestamped agent-handoff sections (body-only)
-arggon show <id> --json                               # bounded single-item read (ADR 0006):
-                                                      # frontmatter + last 3 comments; --body for full —
-                                                      # prefer this over reading whole item files
-arggon handoff <id> --next "<step>"                   # structured session-end handoff (bounded fields);
-                                                      # optional --branch, --open-questions "q1; q2"
-arggon create task|bug "Title" --parent <story-id>    # file follow-ups (leaves get task-/bug- prefix)
-arggon validate --json                                # gate before every commit
+<!-- arggon:generated-commands start: list,next,start,update,comment,show,handoff,create,validate -->
+arggon list  # List work items under tasks/ with optional filters
+arggon next  # Suggest the next claimable leaf item (tasks/bugs; ready items rank first, by downstream weight — unblocks count; lexicographic id on ties; --include-stories opts stories back in)
+arggon start <id>  # Claim an item, check out its branch, commit, push, and optionally open a draft PR
+arggon update <id>  # Update frontmatter fields of a work item
+arggon comment <id> [text]  # Append a timestamped, author-attributed comment section to an item's body
+arggon show <id>  # Read one item with bounded output (ADR 0006): frontmatter + last comments; full body is an explicit opt-in
+arggon handoff <id>  # Append a structured, bounded handoff section (branch, next step, open questions) to an item's body
+arggon create <type> <title>  # Create a work item under tasks/
+arggon validate  # Validate tasks/ frontmatter and tree integrity
+<!-- arggon:generated-commands end -->
 ```
+
+Nuances (hand-written, review-covered):
+- "what should I work on" = `next --json`, NOT `list --json` (67x smaller
+  envelope; `list --json` only for full scans). `next` suggests leaf work only
+  by default; `--include-stories` opts unclaimed stories back into the pool.
+- `start --open-pr` adds a draft PR (re-runs attach); with `--worktree`
+  everything runs inside `../<repo-name>-<id>`.
+- `show` is bounded (ADR 0006): prefer it over reading whole item files;
+  `--body` for full.
+- `comment` sections are body-only (never touch frontmatter); `handoff` fields
+  are bounded (`--branch`, `--open-questions "q1; q2"`).
 
 - Non-trivial items are **orchestrated**: coordinators delegate them to subagents
   in file-disjoint waves (one subagent per worktree), then code-review every
@@ -108,30 +118,34 @@ arggon validate --json                                # gate before every commit
 ## 3. Views, reporting, tooling
 
 ```bash
-arggon board                       # self-contained HTML (columns, deps edges, drag-drop pre-checks)
-arggon board --serve               # local live-reload server, 127.0.0.1 only (edits via update path)
-arggon board --serve --json        # same, plus one envelope ({serving, url, port}) then keeps serving
-arggon board --tui                 # interactive terminal kanban (not combinable with --json/--serve)
-arggon board --github              # overlay live PR state (needs gh auth)
-arggon report --trend --json       # weekly completions + cycle time mined from git history
-arggon sync --check                # reconcile open GitHub PRs into tasks/ (non-zero when pending)
-arggon instructions                # agent wiring snippets extracted from docs/agents.md
-arggon cleanup --prune             # reap worktrees of done/cancelled items with merged branches
-arggon mcp                         # stdio MCP server: arggon_list/_create/_update/_comment/
-                                   # _show/_handoff/_next/_report/_validate tools
+<!-- arggon:generated-commands start: board,report,sync,instructions,cleanup -->
+arggon board  # Write a static read-only HTML board from tasks/ (git files stay the source of truth)
+arggon report  # Aggregate leaf statuses per container, grouped by epic (display only)
+arggon sync  # Reconcile task branch fields with open GitHub PRs
+arggon instructions  # Print the agent wiring (install, pre-commit, CI) extracted from docs/agents.md
+arggon cleanup  # List worktrees of done/cancelled items whose branches are merged (--prune removes them)
+<!-- arggon:generated-commands end -->
+arggon mcp                           # internal stdio MCP server (arggon_list/_create/_update/
+                                     # _comment/_show/_handoff/_next/_report/_validate tools);
+                                     # reached via MCP registration (.mcp.json), not typed
 ```
+
+Board nuances: `--serve` binds 127.0.0.1 only and is incompatible with
+`--github`/`--tui`; `--tui` needs an interactive terminal; `--serve --json`
+emits one envelope (`{serving, url, port}`) then keeps serving.
 
 ## 4. Planning documents (specs, playbooks, explorations)
 
 ```bash
-arggon spec validate               # validate docs/specs/*.md + docs/plans/*.md structure
-arggon spec analyze                # ambiguity scan + spec/task consistency (report-only)
-arggon spec new <slug> --title     # scaffold spec (+ --plan for the implementation plan)
-arggon stack explore <topic>       # scaffold a comparison/spike record in docs/explorations/
-arggon playbook new <tech> --version v   # version-pinned per-tech best-practices doc
-arggon playbook status             # flag stale playbooks (>90d default, x-playbooks.max-age-days);
-                                   # --file-task <story-id> files a re-research task in the tracker
-arggon playbook refresh <tech> --version v  # re-record after re-research
+<!-- arggon:generated-commands start: spec validate,spec analyze,spec new,stack explore,playbook new,playbook status,playbook refresh -->
+arggon spec validate  # Validate spec/plan frontmatter and section structure (pure read)
+arggon spec analyze  # Checklist-driven ambiguity scan + spec/task consistency report (report-only, never edits; exit 0 with findings)
+arggon spec new <slug>  # Scaffold docs/specs/spec-<slug>-NNN.md (and docs/plans/plan-<slug>-NNN.md with --plan); never overwrites
+arggon stack explore <topic>  # Scaffold docs/explorations/exploration-<slug>-NNN.md (candidates, criteria, findings, recommendation); never overwrites
+arggon playbook new <tech>  # Scaffold docs/playbooks/<tech>.md pinning the chosen version; never overwrites (research is the caller's job)
+arggon playbook status  # Report playbook freshness: age since `researched` vs the stale threshold (default 90, x-playbooks.max-age-days)
+arggon playbook refresh <tech>  # After re-research: set version + researched: today + status: current (frontmatter-only, body untouched)
+<!-- arggon:generated-commands end -->
 ```
 
 Pipeline: explore → ADR → playbook → status. The generated AGENTS.md points agents
