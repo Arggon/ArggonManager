@@ -4,7 +4,7 @@ status: todo
 id: task-board-dependency-visuals
 title: board/TUI dependency visuals + --group-by story
 parent: story-web-board
-labels: []
+labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
