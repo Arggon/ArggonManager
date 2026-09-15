@@ -19,10 +19,12 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- Why this task exists. -->
+Follow-up from the task-adr0006-remeasure review (PR #227): the generated AGENTS.md measures 2,043 B against its 2,048 B budget — 5 B of headroom. The very next init-docs addition will regress the assertion (task-review-comments-instruction already forced prose compression once). Also from the same measurement: the full `init --full` tree grew ~18% since the ADR 0006 baseline (43.7 KB → 51.8 KB, dominated by the generated SKILL.md) with no total-tree budget at all.
 
 ## Acceptance
 
-- [ ] 
+- [ ] Decision + landing: either compress the generated AGENTS.md below ~1.9 KB (restoring meaningful headroom) or raise the budget consciously in the docs-budget assertion with rationale — decided as lead-architect, not by accident on the next addition
+- [ ] A total-tree budget (or advisory report line in doctor --budget) covers the init --full output so 18%-style growth is visible
+- [ ] doctor --budget numbers updated and green
 
 ## Notes

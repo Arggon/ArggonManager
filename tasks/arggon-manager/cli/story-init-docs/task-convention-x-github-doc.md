@@ -19,10 +19,12 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- Why this task exists. -->
+Follow-up from the task-issue-roundtrip review (PR #228): the round-trip landed a new `x-github` namespaced extension (`issue-roundtrip`, default OFF), but the generated docs/convention.md extensions table (task-init-convention-extensions) does not list it — an adopter reading the generated convention doc cannot discover the gate.
 
 ## Acceptance
 
-- [ ] 
+- [ ] templates/docs/convention.md extensions table gains the `x-github` row (one line: issue round-trip on done, default OFF)
+- [ ] ArggonManager's own docs/convention.md matches (it is the normative reference the template points to)
+- [ ] init-docs extensions assertion covers x-github
 
 ## Notes
