@@ -4,6 +4,7 @@ status: in_progress
 id: task-product-discovery-research
 title: "Product discovery: online research into improvements and new feature possibilities"
 assignee: Arggon
+branch: feat/task-product-discovery-research
 parent: story-self-improvement
 labels: []
 created: "2026-09-15"
