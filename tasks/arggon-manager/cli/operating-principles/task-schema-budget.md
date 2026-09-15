@@ -4,6 +4,7 @@ status: in_progress
 id: task-schema-budget
 title: "doctor --budget: MCP tool-schema budget (schema bloat guard)"
 assignee: Arggon
+branch: feat/task-schema-budget
 parent: operating-principles
 labels: [p2]
 created: "2026-09-15"
