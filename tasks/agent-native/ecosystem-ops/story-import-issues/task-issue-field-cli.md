@@ -4,7 +4,7 @@ status: todo
 id: task-issue-field-cli
 title: "expose --issue on create/update: round-trip is unreachable for hand-built items"
 parent: story-import-issues
-labels: []
+labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
