@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-spec-analyze
 title: "spec analyze: ambiguity scan + spec-tasks consistency check"
+assignee: Arggon
 parent: story-spec-pipeline
 labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T16:24:18.625Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-spec-pipeline/task-spec-analyze.md
