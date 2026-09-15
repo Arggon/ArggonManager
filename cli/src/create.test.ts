@@ -1,6 +1,8 @@
+import { spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCreate } from "./create.js";
 import { parseFrontmatter } from "./frontmatter.js";
@@ -223,5 +225,19 @@ describe("create", () => {
     } finally {
       log.mockRestore();
     }
+  });
+});
+
+// task-parent-type-discoverability: rendered `create --help` documents the expected parent per type.
+describe("create --help parent-type mapping", () => {
+  it("documents the expected parent type per item type", () => {
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+    const proc = spawnSync(process.execPath, [resolve(root, "node_modules/tsx/dist/cli.mjs"), resolve(root, "cli/src/cli.ts"), "create", "--help"], {
+      encoding: "utf8",
+    });
+    expect(proc.status).toBe(0);
+    // Commander wraps long option descriptions; compare with normalized whitespace.
+    const normalized = proc.stdout.replace(/\s+/g, " ");
+    expect(normalized).toMatch(/initiative: none; epic: initiative; story: epic; task\/bug: story/);
   });
 });
