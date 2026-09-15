@@ -207,6 +207,10 @@ describe("mcp server", () => {
     const updateEnvelope = textContent(claimed) as Record<string, unknown>;
     expect(updateEnvelope).toMatchObject({ ok: true, command: "update" });
     expect((updateEnvelope.item as Record<string, unknown>).status).toBe("in_progress");
+    // bug-cascadeskipped-array-alignment: cascade fields are always arrays,
+    // empty ([] not absent) when the cascade did not run.
+    expect(updateEnvelope.autoCompleted).toEqual([]);
+    expect(updateEnvelope.cascadeSkipped).toEqual([]);
   });
 
   it("surfaces kernel errors as tool errors with the CLI message text", async () => {

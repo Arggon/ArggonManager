@@ -754,9 +754,7 @@ program
               autoCompleted: result.autoCompleted,
               cascadeLevels: result.cascadeLevels,
               ...(result.movedFrom ? { movedFrom: result.movedFrom } : {}),
-              ...(result.cascadeSkipped.length > 0
-                ? { cascadeSkipped: result.cascadeSkipped }
-                : {}),
+              cascadeSkipped: result.cascadeSkipped,
               ...(commit ? { commit: commitPayload(commit) } : {}),
             },
             readConventionVersion(result.root),

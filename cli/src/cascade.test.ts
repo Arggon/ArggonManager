@@ -365,6 +365,21 @@ describe("cascade notice in human output", () => {
     expect(envelope.autoCompleted).toEqual(["story-a", "epic-a", "launch"]);
     expect(envelope.cascadeLevels).toEqual(["story", "epic", "initiative"]);
   });
+
+  it("always emits cascadeSkipped and autoCompleted as arrays, empty when no cascade (bug-cascadeskipped-array-alignment)", () => {
+    const { dir, last } = cliTree();
+    // Non-terminal status: cascade does not run at all.
+    const res = runCli(["update", last, "--title", "renamed", "--json"], dir);
+    expect(res.status).toBe(0);
+    const envelope = JSON.parse(res.stdout) as {
+      ok: boolean;
+      autoCompleted: string[];
+      cascadeSkipped: string[];
+    };
+    expect(envelope.ok).toBe(true);
+    expect(envelope.autoCompleted).toEqual([]);
+    expect(envelope.cascadeSkipped).toEqual([]);
+  });
 });
 
 /**
