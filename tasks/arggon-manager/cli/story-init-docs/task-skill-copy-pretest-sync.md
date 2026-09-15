@@ -4,7 +4,7 @@ status: todo
 id: task-skill-copy-pretest-sync
 title: generate the .agents skill copy in a pretest/globalSetup step
 parent: story-init-docs
-labels: []
+labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
