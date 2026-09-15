@@ -11,9 +11,12 @@ import { readConventionConfig } from "./convention.js";
  *  - Staging is surgical: `git add -- <path>` for the mutated files only —
  *    never `git add -A` / `git add .`. The user's own pre-existing dirty
  *    files stay dirty (untracked by the tool's commit).
- *  - Best effort by design: non-git trees, missing git, or a no-op commit
- *    (nothing staged) skip with a reason instead of failing the command —
- *    the whole CLI already works without git.
+   *  - Best effort by design: non-git trees, missing git, or a no-op commit
+   *    (nothing staged) skip with a reason instead of failing the command —
+   *    the whole CLI already works without git. Exception (task-nothing-to-
+   *    commit-masking): a "nothing to commit" whose mutated paths still carry
+   *    changes means a concurrent index rewrite lost our staged entry — that
+   *    skip is REPORTED (stderr warning + payload), never quiet.
  *  - Default ON, opt-out per invocation (`--no-commit`) and per tree
  *    (`tasks/.convention.yml` `x-tracker.auto-commit: false`, namespaced
  *    like `x-playbooks`); precedence is CLI flag > config > built-in
@@ -135,7 +138,7 @@ function isIndexLockContention(run: GitRun): boolean {
  * quiet — they are the documented default behavior, not a lost mutation.
  */
 function warnGitSkip(skipReason: string): void {
-  if (/^git (add|commit) failed|^git index locked/.test(skipReason)) {
+  if (/^git (add|commit) failed|^git index locked|staged entry lost/.test(skipReason)) {
     process.stderr.write(`arggon: warning: commit skipped: ${skipReason}\n`);
   }
 }
@@ -220,6 +223,19 @@ export function commitTrackerMutation(
     if (commit.code !== 0) {
       const detail = `${commit.out}\n${commit.err}`;
       if (/nothing to commit|nothing added/.test(detail)) {
+        // task-nothing-to-commit-masking: "nothing to commit" is benign only
+        // when someone else already committed the same content (paths clean).
+        // Under concurrent commits it can also mean another process's index
+        // rewrite clobbered our staged entry between `add` and `commit` — the
+        // mutation then sits written-but-uncommitted while git claims there is
+        // nothing to do. Residue in the mutated paths = our entry was lost →
+        // a REPORTED skip (warning + payload), never the quiet benign path.
+        const residue = runGit(["status", "--porcelain", "--", ...paths], root);
+        if (residue.code === 0 && residue.out.trim().length > 0) {
+          const lost = "nothing to commit (staged entry lost under contention)";
+          warnGitSkip(lost);
+          return { committed: false, skipReason: lost };
+        }
         return { committed: false, skipReason: "nothing to commit" };
       }
       if (isIndexLockContention(commit)) {
