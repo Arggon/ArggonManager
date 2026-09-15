@@ -5,6 +5,7 @@ import { displayPath, runBoard } from "./board.js";
 import { startBoardServer } from "./board-serve.js";
 import { runBranch } from "./branch.js";
 import { runComment } from "./comment.js";
+import { runHandoff } from "./handoff.js";
 import { runStart } from "./start.js";
 import { runCleanup } from "./cleanup.js";
 import { readConventionVersion } from "./convention.js";
@@ -897,6 +898,97 @@ program
           return;
         }
         console.error(`arggon comment: ${message}`);
+        process.exitCode = 1;
+      }
+    },
+  );
+
+program
+  .command("handoff")
+  .description(
+    "Append a structured, bounded handoff section (branch, next step, open questions) to an item's body",
+  )
+  .argument("<id>", "work item id")
+  .option("--next <text>", "the first thing the resuming agent should do (required)")
+  .option("--branch <name>", "working branch (default: auto-detected from git; 'unknown' outside git)")
+  .option(
+    "--open-questions <text>",
+    "open questions, semicolon-separated by convention (optional)",
+  )
+  .option(
+    "--author <login>",
+    "handoff author (default: @me resolution — GITHUB_USER, then GITHUB_ACTOR, then `gh api user`)",
+  )
+  .option(
+    "--no-commit",
+    "keep tasks/ dirty: skip the tracker auto-commit of the item (default: on; x-tracker.auto-commit: false opts out tree-wide)",
+  )
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action(
+    (
+      id: string,
+      opts: {
+        next?: string;
+        branch?: string;
+        openQuestions?: string;
+        author?: string;
+        commit?: boolean;
+        json?: boolean;
+      },
+    ) => {
+      const json = jsonEnabled(opts);
+      try {
+        // Validated here (not commander .requiredOption) so the failure still
+        // emits the JSON envelope under --json (COMMENT_FAILED) instead of
+        // commander's pre-action stderr abort.
+        if (!opts.next?.trim()) {
+          throw new Error(
+            'handoff requires --next "<next step>" (the first thing the resuming agent should do)',
+          );
+        }
+        const result = runHandoff({
+          cwd: process.cwd(),
+          id,
+          next: opts.next,
+          branch: opts.branch,
+          openQuestions: opts.openQuestions,
+          author: opts.author,
+          commit: opts.commit === false ? false : undefined,
+        });
+        if (json) {
+          successJson(
+            "handoff",
+            {
+              id: result.id,
+              path: result.path,
+              comment: result.comment,
+              handoff: result.handoff,
+              commit: commitPayload(result.commit),
+            },
+            readConventionVersion(result.root),
+          );
+          return;
+        }
+        console.log(
+          `arggon handoff: ${result.id} (${result.comment.date} @${result.comment.author} — next: ${result.handoff.next})`,
+        );
+        console.log(`  ${result.path}`);
+        const commitLine = formatCommitLine(result.commit);
+        if (commitLine) console.log(`  ${commitLine}`);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (json) {
+          // COMMENT_FAILED by design: the handoff kernel IS the comment kernel
+          // (same body-append path, same failure modes).
+          failJson({
+            command: "handoff",
+            message,
+            code: "COMMENT_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
+        console.error(`arggon handoff: ${message}`);
         process.exitCode = 1;
       }
     },

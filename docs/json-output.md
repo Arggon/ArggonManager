@@ -11,7 +11,7 @@ arggon <command> --json
 
 Example: `arggon --json hello`.
 
-The MCP server (`arggon mcp`) returns these same envelope objects as tool-result text content for its `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`, and `arggon_show` tools; kernel failures become tool errors carrying the same `ok: false` shape (see [`docs/agents.md`](./agents.md) §MCP server). The tool input schemas are parity-tested against the CLI option surface (`cli/src/mcp-parity.test.ts`): the two surfaces stay in sync by test, not by convention — schema changes are **additive only**; a breaking change bumps `schemaVersion`.
+The MCP server (`arggon mcp`) returns these same envelope objects as tool-result text content for its `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`, `arggon_handoff`, and `arggon_show` tools; kernel failures become tool errors carrying the same `ok: false` shape (see [`docs/agents.md`](./agents.md) §MCP server). The tool input schemas are parity-tested against the CLI option surface (`cli/src/mcp-parity.test.ts`): the two surfaces stay in sync by test, not by convention — schema changes are **additive only**; a breaking change bumps `schemaVersion`.
 
 This flag is a formatter only. It does not walk `tasks/` or parse frontmatter. Commands that load domain objects pass those objects to the formatter. Human vs JSON printing lives in the CLI entrypoint.
 
@@ -26,7 +26,7 @@ Every success or failure payload includes:
 | `ok`                | boolean | `true` on success; `false` on failure                                                                                                 |
 | `schemaVersion`     | number  | JSON **output** contract version. Currently **`1`**. Not the task-tree convention version.                                            |
 | `conventionVersion` | number  | From `tasks/.convention.yml` (`version`). Omit file = **`0`**.                                                                        |
-| `command`           | string  | Commander command name: `hello` \| `init` \| `doctor` \| `adopt` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `comment` \| `branch` \| `start` \| `cleanup` \| `board` \| `sync` \| `import-issues` \| `instructions` \| `spec` \| `explore` \| `playbook` \| `mcp` |
+| `command`           | string  | Commander command name: `hello` \| `init` \| `doctor` \| `adopt` \| `list` \| `next` \| `report` \| `validate` \| `create` \| `update` \| `comment` \| `handoff` \| `branch` \| `start` \| `cleanup` \| `board` \| `sync` \| `import-issues` \| `instructions` \| `spec` \| `explore` \| `playbook` \| `mcp` |
 
 Command-specific fields sit next to this envelope (not nested under a generic `data` key).
 
@@ -276,6 +276,24 @@ Appends a timestamped, author-attributed comment section (`### <date> @<author>`
 | `commit`          | `object`   | Tracker auto-commit outcome: `{ hash, message }` when the commented file was committed, `{ skipped: <reason> }` otherwise. Additive within `schemaVersion: 1`. |
 
 Failures use `error.code: "COMMENT_FAILED"` (unknown id, empty text, unresolvable author — pass `--author <login>` or set `GITHUB_USER`/`GITHUB_ACTOR`).
+
+### `handoff`
+
+Appends a structured, bounded session-end handoff section (`### handoff <date> @<author> — next: <step>` + `- branch: …` / `- open questions: …` lines) to the item **body** through the same machinery as `comment`: body-only write (frontmatter unchanged, no `updated` bump), works on `done`/`cancelled` items. Bounded by construction: each field (`--branch`, `--next`, `--open-questions`) is capped at 200 characters — longer input truncates with `…` — so the whole section stays under ~800 characters.
+
+| Field                   | Type       | Notes                                                                        |
+| ----------------------- | ---------- | ---------------------------------------------------------------------------- |
+| `id`                    | `string`   | Handed-off item id                                                           |
+| `path`                  | `string`   | Absolute path of the item file                                               |
+| `comment.author`        | `string`   | Resolved author login (rendered `@<author>` in the heading)                  |
+| `comment.date`          | `string`   | `YYYY-MM-DD` (UTC) rendered in the heading                                   |
+| `comment.lines`         | `string[]` | The `- branch: …` / `- open questions: …` lines appended under the heading   |
+| `handoff.branch`        | `string`   | Working branch as rendered (auto-detected from git when omitted; `unknown` outside git); capped at 200 chars |
+| `handoff.next`          | `string`   | The next step (required); capped at 200 chars                                |
+| `handoff.openQuestions` | `string`   | Present only when `--open-questions` was given; capped at 200 chars          |
+| `commit`                | `object`   | Tracker auto-commit outcome, same shape as `comment`. Additive within `schemaVersion: 1`. |
+
+Failures reuse `error.code: "COMMENT_FAILED"` by design (task-handoff-command): the handoff kernel IS the comment kernel — same body-append path, same failure modes (unknown id, missing `--next`, unresolvable author).
 
 ### `branch`
 

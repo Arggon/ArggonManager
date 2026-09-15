@@ -39,6 +39,13 @@ export type CommentOptions = {
   env?: NodeJS.ProcessEnv;
   /** Author-resolution override (tests); defaults to resolveCurrentLogin(env). */
   resolveMe?: () => string | undefined;
+  /**
+   * Heading override (task-handoff-command): `(date, author) => heading line`.
+   * Default is the plain comment heading ``### <date> @<author>``; `runHandoff`
+   * uses this to render its structured heading while reusing the rest of this
+   * machinery (lock, author resolution, body-only append, tracker commit).
+   */
+  heading?: (date: string, author: string) => string;
 };
 
 export type CommentResult = {
@@ -100,7 +107,7 @@ export function runComment(opts: CommentOptions): CommentResult {
   const now = opts.now ?? new Date();
   const date = formatDate(now);
   const lines = text.split("\n");
-  const heading = `### ${date} @${author}`;
+  const heading = opts.heading ? opts.heading(date, author) : `### ${date} @${author}`;
 
   // Blank line before the section; section itself ends with a newline.
   // The read-modify-write is serialized with withItemLock (bug-comment-race-no-lock):

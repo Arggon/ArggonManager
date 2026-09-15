@@ -146,7 +146,7 @@ describe("mcp server", () => {
     expect(fallback.protocolVersion).toBe("2025-06-18");
   });
 
-  it("lists the five tools with JSON-schema inputs", async () => {
+  it("lists the six tools with JSON-schema inputs", async () => {
     const result = await client.request("tools/list");
     const tools = result.tools as Array<{ name: string; inputSchema: Record<string, unknown> }>;
     expect(tools.map((tool) => tool.name)).toEqual([
@@ -154,6 +154,7 @@ describe("mcp server", () => {
       "arggon_create",
       "arggon_update",
       "arggon_comment",
+      "arggon_handoff",
       "arggon_show",
     ]);
     for (const tool of tools) {
