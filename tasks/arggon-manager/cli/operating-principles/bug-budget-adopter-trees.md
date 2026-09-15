@@ -26,8 +26,26 @@ Found 2026-09-15 running `doctor --json --budget` in the fresh casa-pendiente ad
 
 ## Acceptance
 
-- [ ] The budget measurement resolves the CLI from the RUNNING installation (import.meta.url / dist of the executing arggon), not from the measured tree's cwd — `doctor --budget` works identically in ArggonManager and in any adopter tree
-- [ ] Test: doctor --budget run from a non-ArggonManager initialized tree returns a budget section (no budgetError)
-- [ ] docs/json-output.md budget documentation corrected if it implied ArggonManager-only
+- [x] The budget measurement resolves the CLI from the RUNNING installation (import.meta.url / dist of the executing arggon), not from the measured tree's cwd — `doctor --budget` works identically in ArggonManager and in any adopter tree
+- [x] Test: doctor --budget run from a non-ArggonManager initialized tree returns a budget section (no budgetError)
+- [x] docs/json-output.md budget documentation corrected if it implied ArggonManager-only
 
 ## Notes
+
+Resolution (cli/src/measure.ts): new exported `cliCommand()` resolves the CLI entry from `import.meta.url` of the RUNNING module — `src/measure.ts` means from-source (tsx + `cli/src/cli.ts`, repo charter unchanged); anything else (installed `dist/measure.js`) runs `process.execPath dist/cli.js` directly from the package root of the executing installation. The measured tree is only the SUBJECT (cwd of spawned commands); the fresh temp `init --full` fixture method and /tmp hygiene are unchanged. `measureBudget`'s guard now checks the resolved entry instead of hard-coded `cli/src/cli.ts`.
+
+Adopter end-to-end evidence (real installed-dist path, cwd OUTSIDE ArggonManager, 2026-09-15):
+
+```
+ADOPTER=$(mktemp -d /tmp/arggon-adopter-e2e-XXXXXX); cd "$ADOPTER"
+node /home/arggon/Projects/ArggonManager-bug-budget-adopter-trees/dist/cli.js init --full --json
+# {"ok":true,...,"command":"init",...}
+node /home/arggon/Projects/ArggonManager-bug-budget-adopter-trees/dist/cli.js doctor --json --budget
+# {"ok":true,...,"initialized":true,...,
+#  "budget":{"initTreeBytes":54127,"generatedAgentsMdBytes":1872,"listCompactBytes":2539,
+#            "listFullBytes":3347,"showBytes":730,"fixtureItems":8,
+#            "mcp":{"toolCount":9,"totalBytes":9232,"tokenEstimate":2308,...}}}
+rm -rf "$ADOPTER"
+```
+
+No `budgetError`; budget section fully populated. From-source path re-verified in the worktree: `npm run arggon -- doctor --json --budget` → budget present, no budgetError; `doctor --json` → 0 modified / 0 drifted. Tests: `npx vitest run` 58 files / 911 tests pass, incl. new measure.test.ts case "resolves the CLI from the RUNNING installation: doctor --json --budget works from an adopter tree outside the repo (bug-budget-adopter-trees)" (locates the CLI via the product `cliCommand()` resolution). `npm run lint` clean; `validate --json` ok:true.

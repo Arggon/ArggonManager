@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { evaluateBudget, formatBudgetLines, measureBudget, measureMcpSchema, buildMcpSchemaBudget, AGENTS_MD_BUDGET_BYTES, MCP_TOOLS_BUDGET_BYTES, MCP_TOOLS_BASELINE_BYTES } from "./measure.js";
+import { evaluateBudget, formatBudgetLines, measureBudget, measureMcpSchema, buildMcpSchemaBudget, cliCommand, AGENTS_MD_BUDGET_BYTES, MCP_TOOLS_BUDGET_BYTES, MCP_TOOLS_BASELINE_BYTES } from "./measure.js";
 import { runDoctor } from "./doctor.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
@@ -103,6 +103,30 @@ describe("budget measurement (task-adr0006-remeasure, ADR 0006)", () => {
     expect(body.budget!.mcp!.toolCount).toBeGreaterThan(0);
     expect(body.budget!.mcp!.totalBytes).toBeGreaterThan(0);
     expect(body.budget!.mcp!.largestTools.length).toBeGreaterThan(0);
+  }, 60_000);
+
+  it("resolves the CLI from the RUNNING installation: doctor --json --budget works from an adopter tree outside the repo (bug-budget-adopter-trees)", () => {
+    // Adopter simulation: init a throwaway tree elsewhere, then run doctor
+    // --json --budget with THAT tree as cwd. The CLI binary is located via the
+    // same import.meta.url resolution the product code uses (cliCommand), so
+    // the assertion covers the resolution, not the test's own repo layout.
+    const cmd = cliCommand();
+    const adopter = mkdtempSync(join(tmpdir(), "arggon-budget-adopter-"));
+    try {
+      const init = spawnSync(cmd.file, [...cmd.args, "init", "--full", "--json"], { encoding: "utf8", cwd: adopter });
+      expect(init.status).toBe(0);
+      const doctor = spawnSync(cmd.file, [...cmd.args, "doctor", "--json", "--budget"], {
+        encoding: "utf8",
+        cwd: adopter,
+      });
+      expect(doctor.status).toBe(0);
+      const body = JSON.parse(doctor.stdout) as { ok: boolean; budget?: unknown; budgetError?: string };
+      expect(body.ok).toBe(true);
+      expect(body.budgetError).toBeUndefined(); // the reported casa-pendiente failure
+      expect(body.budget).toBeDefined();
+    } finally {
+      rmSync(adopter, { recursive: true, force: true });
+    }
   }, 60_000);
 
   it("runDoctor itself stays synchronous and budget-free; the CLI action attaches the budget", () => {
