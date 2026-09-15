@@ -34,10 +34,17 @@ Research component: document how established tools keep docs synced from source 
 
 ## Acceptance
 
-- [ ] Exploration recorded (docs/explorations/): docs-from-source patterns with dated sources; marker-region confirmed or a better pattern adopted with rationale
-- [ ] The SKILL command reference is a generated marker region rendered from live CLI introspection; `skills:sync` regenerates it; the parity/copy pipeline unchanged downstream
-- [ ] Cross-check test: every user-facing command documented in SKILL.md + README.md + docs/agents.md (fails loudly on new undocumented commands; maintained exception list for internal commands like mcp/instructions if needed)
-- [ ] Narrative sections (quality bar, pitfalls, orchestration) remain hand-written — the standing review rule covers them (noted in the item)
-- [ ] Full suite + parity + skills:sync pipeline green; doctor 0 modified / 0 drifted
+- [x] Exploration recorded (docs/explorations/): docs-from-source patterns with dated sources; marker-region confirmed or a better pattern adopted with rationale
+- [x] The SKILL command reference is a generated marker region rendered from live CLI introspection; `skills:sync` regenerates it; the parity/copy pipeline unchanged downstream
+- [x] Cross-check test: every user-facing command documented in SKILL.md + README.md + docs/agents.md (fails loudly on new undocumented commands; maintained exception list for internal commands like mcp/instructions if needed)
+- [x] Narrative sections (quality bar, pitfalls, orchestration) remain hand-written — the standing review rule covers them (noted in the item)
+- [x] Full suite + parity + skills:sync pipeline green; doctor 0 modified / 0 drifted
+
+## Notes
+
+- Exploration: docs/explorations/exploration-docs-from-source-003.md (oclif readme markers, terraform-docs BEGIN/END markers, clap_mangen build-time whole-file, agent skill-sync tools solve distribution not drift) — marker-region pattern CONFIRMED.
+- Implementation: cli/src/skill-commands.ts (source introspection of cli.ts `.command()/.description()/.argument()`, exclusion list with reasons: hello, mcp, spec/stack/playbook grouping parents); cli/src/sync-skills.ts splices the three `arggon:generated-commands` regions of skills/arggon-cli/SKILL.md (§2 work loop, §3 tooling, §4 planning) before writing the .agents copy; curated nuances moved to hand-written bullets outside the regions.
+- Invariants: cli/src/skill-generated-commands.test.ts — (1) regenerated regions must equal on-disk regions, (2) every non-excluded command name appears in SKILL.md ∪ README.md ∪ docs/agents.md, (3) generator sanity render.
+- skills:sync verified idempotent (two runs = zero diff); full suite 900/900, lint, build green; doctor 0 modified / 0 drifted.
 
 ## Notes
