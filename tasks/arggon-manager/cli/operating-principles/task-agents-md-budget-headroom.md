@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-agents-md-budget-headroom
 title: AGENTS.md budget headroom exhausted (5 B); init --full tree grew 18% un-budgeted
+assignee: Arggon
 parent: operating-principles
 labels: []
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T16:29:02.435Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/operating-principles/task-agents-md-budget-headroom.md
