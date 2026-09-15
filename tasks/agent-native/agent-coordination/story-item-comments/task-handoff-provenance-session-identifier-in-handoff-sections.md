@@ -4,6 +4,7 @@ status: in_progress
 id: task-handoff-provenance-session-identifier-in-handoff-sections
 title: "handoff provenance: session identifier in handoff sections"
 assignee: Arggon
+branch: feat/task-handoff-provenance-session-identifier-in-handoff-sections
 parent: story-item-comments
 labels: [p2]
 created: "2026-09-15"
