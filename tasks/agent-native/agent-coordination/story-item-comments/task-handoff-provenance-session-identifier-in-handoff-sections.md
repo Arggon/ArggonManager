@@ -4,7 +4,7 @@ status: todo
 id: task-handoff-provenance-session-identifier-in-handoff-sections
 title: "handoff provenance: session identifier in handoff sections"
 parent: story-item-comments
-labels: []
+labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
