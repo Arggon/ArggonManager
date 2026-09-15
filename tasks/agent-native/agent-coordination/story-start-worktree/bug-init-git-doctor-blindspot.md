@@ -4,6 +4,7 @@ status: in_progress
 id: bug-init-git-doctor-blindspot
 title: init in a non-git dir yields a half-functional tracker; doctor reports all-healthy
 assignee: Arggon
+branch: fix/bug-init-git-doctor-blindspot
 parent: story-start-worktree
 labels: [p2]
 created: "2026-09-15"
