@@ -28,7 +28,7 @@ export type BoardServeOptions = {
   cwd: string;
   /** Port to bind on 127.0.0.1; 0 (default) picks a free ephemeral port. */
   port?: number;
-  /** Prototype (ADR 0003): render the served board grouped by `milestone`. */
+  /** Group cards within each column: `milestone` (ADR 0003) or `story`. */
   groupBy?: string;
 };
 
@@ -46,12 +46,14 @@ export type BoardServeHandle = {
 export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
   const tasksDir = findTasksDir(opts.cwd);
   const root = repoRootFromTasks(tasksDir);
-  let groupBy: "milestone" | undefined;
+  let groupBy: "milestone" | "story" | undefined;
   if (opts.groupBy !== undefined) {
-    if (opts.groupBy !== "milestone") {
-      throw new Error(`unknown --group-by field '${opts.groupBy}' (supported: milestone)`);
+    if (opts.groupBy !== "milestone" && opts.groupBy !== "story") {
+      throw new Error(
+        `unknown --group-by field '${opts.groupBy}' (supported: milestone, story)`,
+      );
     }
-    groupBy = "milestone";
+    groupBy = opts.groupBy;
   }
 
   const clients = new Set<ServerResponse>();

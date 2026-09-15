@@ -436,6 +436,34 @@ describe("CLI --json", () => {
     expect(String((body.error as { message: string }).message)).toMatch(/plain `arggon board`/);
   });
 
+  it("arggon board --group-by story writes story headers and reports groupBy in the envelope", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-json-board-story-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    expect(runCli(["create", "initiative", "Launch MVP"], dir).status).toBe(0);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Work", "--parent", "login"], dir).status).toBe(0);
+    const result = runCli(["board", "--group-by", "story", "--json"], dir);
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body).toMatchObject({ ok: true, command: "board", groupBy: "story" });
+    const html = readFileSync(join(dir, "board.html"), "utf8");
+    expect(html).toContain("⚑ login");
+  });
+
+  it("arggon board --tui --group-by fails with BOARD_FAILED (documented incompatibility)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-json-board-tui-group-"));
+    expect(runCli(["init", dir]).status).toBe(0);
+    const result = runCli(["board", "--tui", "--group-by", "story", "--json"], dir);
+    expect(result.status).toBe(1);
+    const body = parseStdout(result.stdout);
+    expect(body.ok).toBe(false);
+    expect(body.error).toMatchObject({ code: "BOARD_FAILED" });
+    expect(String((body.error as { message: string }).message)).toMatch(
+      /cannot combine --tui with --group-by/,
+    );
+  });
+
   it("arggon next suggests the lexicographic unclaimed todo with reason", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-next-"));
     expect(runCli(["init", dir]).status).toBe(0);

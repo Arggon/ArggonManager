@@ -502,3 +502,94 @@ describe("renderBoardHtml dependency edges (spec-deps-001)", () => {
     expect(html).not.toContain("<b>&");
   });
 });
+
+describe("renderBoardHtml blocked-card visuals (task-board-dependency-visuals)", () => {
+  it("marks cards with open deps: dep-blocked class + blocked-by-N badge; clean cards stay plain", () => {
+    const html = renderBoardHtml(
+      [
+        item({ id: "task-a", type: "task", status: "todo", depends_on: ["task-x", "gone-z"] }),
+        item({ id: "task-b", type: "task", status: "todo", depends_on: ["done-y"] }),
+        item({ id: "task-c", type: "task", status: "todo" }),
+        item({ id: "task-x", type: "task", status: "in_progress" }),
+        item({ id: "done-y", type: "task", status: "done" }),
+      ],
+      { generatedAt: GENERATED_AT },
+    );
+    // Blocked card: dimming class + one count badge (two open deps -> "2").
+    expect(html).toContain('<div class="card dep-blocked" draggable="true" data-id="task-a"');
+    expect(html).toContain('<span class="blocked-badge">blocked by 2</span>');
+    // Deps that are only terminal do not block: no class, no badge.
+    expect(html).not.toContain('data-id="task-b" class');
+    expect(html.match(/class="card dep-blocked"/g)).toHaveLength(1);
+    expect(html.match(/<span class="blocked-badge">/g)).toHaveLength(1);
+    expect(html).toContain('<div class="card" draggable="true" data-id="task-b"');
+    expect(html).toContain('<div class="card" draggable="true" data-id="task-c"');
+  });
+});
+
+describe("renderBoardHtml --group-by story (task-board-dependency-visuals)", () => {
+  it("groups cards under parent-story headers sorted ascending; parent-less cards last under 'no story' only when mixed", () => {
+    const html = renderBoardHtml(
+      [
+        item({ id: "task-z", type: "task", status: "todo", parent: "story-b" }),
+        item({ id: "task-a", type: "task", status: "todo", parent: "story-a" }),
+        item({ id: "task-b", type: "task", status: "todo", parent: "story-a" }),
+        item({ id: "task-c", type: "task", status: "todo" }),
+        item({ id: "task-d", type: "task", status: "done", parent: "story-b" }),
+      ],
+      { generatedAt: GENERATED_AT, groupBy: "story" },
+    );
+    expect(html).toContain('<div class="mgroup-head">⚑ story-a</div>');
+    expect(html).toContain('<div class="mgroup-head">⚑ story-b</div>');
+    expect(html.indexOf("⚑ story-a")).toBeLessThan(html.indexOf("⚑ story-b"));
+    expect(html).toContain('<div class="mgroup-head none">no story</div>');
+    // "no story" renders last within its column.
+    expect(html.indexOf("no story")).toBeGreaterThan(html.indexOf("⚑ story-b"));
+    // task-c's card sits under the no-story header; task-d is in done.
+    expect(html).toContain('data-id="task-c"');
+  });
+
+  it("hides group headers entirely when no card has a parent (renders as before)", () => {
+    const html = renderBoardHtml(
+      [item({ id: "task-a", type: "task", status: "todo" })],
+      { generatedAt: GENERATED_AT, groupBy: "story" },
+    );
+    expect(html).not.toContain('<div class="mgroup-head');
+    expect(html).not.toContain("no story");
+    expect(html).toContain('data-id="task-a"');
+  });
+
+  it("escapes hostile parent ids like every other card field", () => {
+    const html = renderBoardHtml(
+      [item({ id: "task-a", type: "task", status: "todo", parent: '"><script>' })],
+      { generatedAt: GENERATED_AT, groupBy: "story" },
+    );
+    expect(html).toContain("⚑ &quot;&gt;&lt;script&gt;");
+    expect(html).not.toContain('"><script>');
+  });
+});
+
+describe("runBoard --group-by story (task-board-dependency-visuals)", () => {
+  it("accepts groupBy story, reports it, and rejects unknown fields naming both options", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-group-story-"));
+    mkdirSync(join(dir, "tasks"));
+    writeFileSync(join(dir, "tasks", ".convention.yml"), "version: 1\n", "utf8");
+    writeFileSync(
+      join(dir, "tasks", "task-a.md"),
+      '---\ntype: task\nid: task-a\ntitle: A\nstatus: todo\nparent: story-x\ncreated: "2026-09-15"\nupdated: "2026-09-15"\n---\n',
+      "utf8",
+    );
+    const result = runBoard({
+      cwd: dir,
+      out: join(dir, "board.html"),
+      generatedAt: GENERATED_AT,
+      groupBy: "story",
+    });
+    expect(result.groupBy).toBe("story");
+    const html = readFileSync(result.outPath, "utf8");
+    expect(html).toContain("⚑ story-x");
+    expect(() => runBoard({ cwd: dir, groupBy: "priority" })).toThrow(
+      /unknown --group-by field 'priority' \(supported: milestone, story\)/,
+    );
+  });
+});

@@ -16,7 +16,7 @@ export type BoardOptions = {
   generatedAt?: string;
   /** When true, overlay live GitHub PR state on cards with a `branch` (read-only). */
   github?: boolean;
-  /** Prototype (ADR 0003): group cards within each column by `milestone`. */
+  /** Prototype (ADR 0003) `milestone`, or `story` (task-board-dependency-visuals): group cards within each column. */
   groupBy?: string;
   /** Injectable GitHub reader (tests pass a fake; default shells out to `gh`). */
   gh?: BoardGithub;
@@ -28,8 +28,8 @@ export type BoardResult = {
   itemCount: number;
   /** PRs matched to card branches (0 unless `github` is on). */
   prCount: number;
-  /** Set when the board was rendered grouped (prototype: "milestone"). */
-  groupBy?: "milestone";
+  /** Set when the board was rendered grouped ("milestone" prototype, or "story"). */
+  groupBy?: "milestone" | "story";
 };
 
 /** Live PR state for one branch, matched by head ref name. */
@@ -125,10 +125,12 @@ export function runBoard(opts: BoardOptions): BoardResult {
   const root = repoRootFromTasks(tasksDir);
   let groupBy: BoardResult["groupBy"];
   if (opts.groupBy !== undefined) {
-    if (opts.groupBy !== "milestone") {
-      throw new Error(`unknown --group-by field '${opts.groupBy}' (supported: milestone)`);
+    if (opts.groupBy !== "milestone" && opts.groupBy !== "story") {
+      throw new Error(
+        `unknown --group-by field '${opts.groupBy}' (supported: milestone, story)`,
+      );
     }
-    groupBy = "milestone";
+    groupBy = opts.groupBy;
   }
   const items = loadItems(tasksDir).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   let overlay = new Map<string, PrInfo>();
@@ -292,8 +294,13 @@ export function evaluateDrop(
  * grouped under milestone headers sorted ascending; items without a
  * milestone group last under a "no milestone" header - only when the column
  * also has milestone items, so milestone-less columns render as before.
- * Cards with open dependencies (ADR 0004: deps not done/cancelled) show a
- * `blocked by <id>` line per open dep; terminal deps render nothing.
+ * With `groupBy: "story"` (task-board-dependency-visuals) cards group under
+ * parent-story headers sorted ascending; parent-less cards render last under
+ * a "no story" header only when the column also has parent groups.
+ * Cards with open dependencies (ADR 0004: deps not done/cancelled) are
+ * visually distinct: a `dep-blocked` class (dimmed card) plus a
+ * `blocked by N` badge, and a `↳ blocked by <id>` line per open dep;
+ * terminal deps render nothing.
  */
 export function renderBoardHtml(
   items: WorkItem[],
@@ -302,7 +309,7 @@ export function renderBoardHtml(
     repoName?: string;
     prs?: Map<string, PrInfo>;
     live?: boolean;
-    groupBy?: "milestone";
+    groupBy?: "milestone" | "story";
   } = {
     generatedAt: "",
   },
@@ -313,6 +320,7 @@ export function renderBoardHtml(
   // Offline snapshot stays byte-identical: the PR line only renders with the live overlay on.
   const showPr = opts.live === true;
   const groupByMilestone = opts.groupBy === "milestone";
+  const groupByStory = opts.groupBy === "story";
 
   // Dependency edges (ADR 0004): a dep is open when it is not done/cancelled;
   // unknown ids count as open (validate flags them as UNKNOWN_DEPENDENCY).
@@ -327,6 +335,16 @@ export function renderBoardHtml(
   const NO_MILESTONE = null;
   const milestoneOf = (item: WorkItem): string | null =>
     typeof item.milestone === "string" && item.milestone !== "" ? item.milestone : NO_MILESTONE;
+
+  // Grouping key per mode: milestone (ADR 0003) or parent story
+  // (task-board-dependency-visuals). Any non-empty parent id is a group key;
+  // stories without cards never render (groups are built from cards).
+  const NO_GROUP = null;
+  const groupKeyOf = groupByStory
+    ? (item: WorkItem): string | null =>
+        typeof item.parent === "string" && item.parent !== "" ? item.parent : NO_GROUP
+    : (item: WorkItem): string | null => milestoneOf(item);
+  const noGroupLabel = groupByStory ? "no story" : "no milestone";
 
   const columns = STATUSES.map((status) => {
     const columnItems = sorted.filter((item) => item.status === status);
@@ -344,17 +362,21 @@ export function renderBoardHtml(
       const milestone = milestoneOf(item)
         ? `<div class="milestone">⚑ ${esc(milestoneOf(item)!)}</div>`
         : "";
-      const blockedBy = openDeps(item)
+      const blocked = openDeps(item);
+      const blockedBy = blocked
         .map((depId) => `<div class="blocked-by">↳ blocked by ${esc(depId)}</div>`)
         .join("\n  ");
+      const blockedBadge = blocked.length
+        ? `<span class="blocked-badge">blocked by ${blocked.length}</span>`
+        : "";
       const labels =
         item.labels.length > 0
           ? `<div class="labels">${item.labels
               .map((label) => `<span class="label">${esc(label)}</span>`)
               .join("")}</div>`
           : "";
-      return `<div class="card" draggable="true" data-id="${esc(item.id)}" data-type="${esc(item.type)}" data-status="${esc(item.status)}"${item.assignee ? ` data-assignee="${esc(item.assignee)}"` : ""}${milestoneOf(item) ? ` data-milestone="${esc(milestoneOf(item)!)}"` : ""}>
-  <div class="card-head"><span class="type" data-type="${esc(item.type)}" style="--type-color: ${TYPE_COLORS[item.type]}">${esc(item.type)}</span><code>${esc(item.id)}</code></div>
+      return `<div class="card${blocked.length ? " dep-blocked" : ""}" draggable="true" data-id="${esc(item.id)}" data-type="${esc(item.type)}" data-status="${esc(item.status)}"${item.assignee ? ` data-assignee="${esc(item.assignee)}"` : ""}${milestoneOf(item) ? ` data-milestone="${esc(milestoneOf(item)!)}"` : ""}>
+  <div class="card-head"><span class="type" data-type="${esc(item.type)}" style="--type-color: ${TYPE_COLORS[item.type]}">${esc(item.type)}</span><code>${esc(item.id)}</code>${blockedBadge}</div>
   <div class="title">${title}</div>
   ${breadcrumb}
   ${assignee}
@@ -367,39 +389,39 @@ export function renderBoardHtml(
 </div>`;
     };
 
-    // Groups render in this order: milestones ascending, then no-milestone.
+    // Groups render in this order: keys ascending, then the key-less group.
     let groups: Array<{ key: string | null; items: WorkItem[] }>;
-    if (groupByMilestone) {
+    if (groupByMilestone || groupByStory) {
       const byKey = new Map<string | null, WorkItem[]>();
       for (const item of columnItems) {
-        const key = milestoneOf(item);
+        const key = groupKeyOf(item);
         const bucket = byKey.get(key);
         if (bucket) bucket.push(item);
         else byKey.set(key, [item]);
       }
-      const withMilestone = [...byKey.keys()]
-        .filter((key): key is string => key !== NO_MILESTONE)
+      const withKey = [...byKey.keys()]
+        .filter((key): key is string => key !== NO_GROUP)
         .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
         .map((key) => ({ key, items: byKey.get(key)! }));
-      const bare = byKey.get(NO_MILESTONE);
+      const bare = byKey.get(NO_GROUP);
       groups =
-        bare && withMilestone.length > 0
-          ? [...withMilestone, { key: NO_MILESTONE, items: bare }]
+        bare && withKey.length > 0
+          ? [...withKey, { key: NO_GROUP, items: bare }]
           : bare
-            ? [{ key: NO_MILESTONE, items: bare }]
-            : withMilestone;
+            ? [{ key: NO_GROUP, items: bare }]
+            : withKey;
     } else {
-      groups = columnItems.length > 0 ? [{ key: NO_MILESTONE, items: columnItems }] : [];
+      groups = columnItems.length > 0 ? [{ key: NO_GROUP, items: columnItems }] : [];
     }
 
     const cards = groups
       .map(({ key, items: groupItems }) => {
         const body = groupItems.map(renderCard).join("\n");
-        // The "no milestone" header only appears when it shares a column
-        // with milestone groups; a milestone-less column renders as before.
-        if (key === NO_MILESTONE && groups.length === 1) return body;
-        const label = key === NO_MILESTONE ? "no milestone" : `⚑ ${esc(key)}`;
-        const cls = key === NO_MILESTONE ? "mgroup-head none" : "mgroup-head";
+        // The key-less header only appears when it shares a column
+        // with keyed groups; a column without any key renders as before.
+        if (key === NO_GROUP && groups.length === 1) return body;
+        const label = key === NO_GROUP ? noGroupLabel : `⚑ ${esc(key)}`;
+        const cls = key === NO_GROUP ? "mgroup-head none" : "mgroup-head";
         return `<div class="${cls}">${label}</div>\n${body}`;
       })
       .join("\n");
@@ -456,6 +478,9 @@ header .meta { color: #59636e; font-size: 13px; }
 .label { background: #e7ebef; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
 .blocked-reason { margin-top: 6px; color: #9a3412; background: #fff1e7; border-radius: 4px; padding: 4px 6px; font-size: 12px; }
 .blocked-by { color: #9a3412; font-size: 11px; margin-top: 2px; overflow-wrap: anywhere; }
+.card.dep-blocked { opacity: 0.55; }
+.card.dep-blocked .title { color: #59636e; }
+.blocked-badge { margin-left: auto; color: #9a3412; background: #fff1e7; border-radius: 10px; padding: 0 8px; font-size: 10px; font-weight: 600; white-space: nowrap; }
 .milestone { color: #0550ae; font-size: 12px; margin-top: 2px; }
 .mgroup-head { margin: 10px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #0550ae; }
 .mgroup-head:first-child { margin-top: 0; }

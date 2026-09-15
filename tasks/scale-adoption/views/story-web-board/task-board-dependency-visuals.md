@@ -26,8 +26,12 @@ Candidate #9 of [product discovery](docs/explorations/exploration-product-discov
 
 ## Acceptance
 
-- [ ] Board HTML: blocked cards visually distinct (greyed/badged), dependency edges or badges per card
-- [ ] TUI: blocked items marked and `--group-by story` grouping available in board and/or TUI (decide exact surface, document)
-- [ ] Tests (board-parity/render assertions); no new dependencies
+- [x] Board HTML: blocked cards visually distinct (greyed/badged), dependency edges or badges per card
+- [x] TUI: blocked items marked and `--group-by story` grouping available in board and/or TUI (decide exact surface, document)
+- [x] Tests (board-parity/render assertions); no new dependencies
+
+## Notes
+
+- Landed surface: `--group-by story` on the HTML board (static export and `--serve`), grouping cards within each column under parent-story headers; parent-less cards last under `no story` only when the column also has parent groups. Not combinable with `--tui` (fails with `BOARD_FAILED`); combinable with `--serve`/`--json`. TUI gets the `⌫` blocked marker only.
 
 ## Notes

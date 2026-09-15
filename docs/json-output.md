@@ -374,7 +374,7 @@ Human output supports `--format table` (default) and `--format markdown` (standu
 | ----------- | --------- | -------------------------------------------------------------------- |
 | `path`      | `string`  | Output HTML path (display form); absent with `--serve`                |
 | `itemCount` | `number`  | Items rendered                                                       |
-| `groupBy`   | `string`  | Present with `--group-by` (prototype: `milestone`)                    |
+| `groupBy`   | `string`  | Present with `--group-by` (`milestone`, or `story`)                   |
 | `serving`   | `boolean` | Present and `true` only with `--serve`                                |
 | `url`       | `string`  | `--serve` only: loopback base URL (`http://127.0.0.1:<port>`)         |
 | `port`      | `number`  | `--serve` only: bound port                                            |

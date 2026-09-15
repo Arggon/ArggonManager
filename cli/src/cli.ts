@@ -1578,7 +1578,7 @@ program
   .option("--github", "overlay live GitHub PR state on cards with a branch (read-only)", false)
   .option(
     "--group-by <field>",
-    "prototype (ADR 0003): group cards within each column by milestone",
+    "group cards within each column by milestone (ADR 0003) or parent story (story)",
   )
   .option("--serve", "serve the board locally (127.0.0.1) with live reload; edits go through the update path", false)
   .option("--port <port>", "port for --serve (default: a free ephemeral port)")
@@ -1602,6 +1602,12 @@ program
     if (opts.tui) {
       if (opts.serve) {
         jsonFailed("cannot combine --tui with --serve (both are interactive modes)");
+        return;
+      }
+      if (opts.groupBy !== undefined) {
+        jsonFailed(
+          "cannot combine --tui with --group-by (the TUI groups by status column only; use the HTML board for --group-by)",
+        );
         return;
       }
       if (json) {
