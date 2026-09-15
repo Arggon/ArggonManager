@@ -4,6 +4,7 @@ status: in_progress
 id: task-board-dependency-visuals
 title: board/TUI dependency visuals + --group-by story
 assignee: Arggon
+branch: feat/task-board-dependency-visuals
 parent: story-web-board
 labels: [p3]
 created: "2026-09-15"
