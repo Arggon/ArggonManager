@@ -1,12 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-issue-roundtrip
 title: "issue round-trip: done flips close/annotate the linked GitHub issue"
+assignee: Arggon
+branch: feat/task-issue-roundtrip
 parent: story-import-issues
 labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T15:04:04.651Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-import-issues/task-issue-roundtrip.md
@@ -23,8 +26,8 @@ Candidate #7 of [product discovery](docs/explorations/exploration-product-discov
 
 ## Acceptance
 
-- [ ] Opt-in round-trip lands: on `update --status done`, items with `issue:` frontmatter close/annotate the linked issue via gh (config-gated, e.g. x-github round-trip flag, or explicit `--close-issue` — decide and document)
-- [ ] gh absent/unauthenticated → clean skip, never blocks the done flip
-- [ ] Tests with a mocked gh path; docs (README + json-output additive note)
+- [x] Opt-in round-trip lands: on `update --status done`, items with `issue:` frontmatter close/annotate the linked issue via gh (config-gated, e.g. x-github round-trip flag, or explicit `--close-issue` — decide and document) — DECIDED: config gate `tasks/.convention.yml` `x-github.issue-roundtrip: true` (default OFF; new namespaced `x-github` section); lives in the update kernel, so CLI + MCP (`arggon_update`) flips are both covered
+- [x] gh absent/unauthenticated → clean skip, never blocks the done flip (skip reported in the additive `issueRoundtrip` payload field + stderr warning)
+- [x] Tests with a mocked gh path (cli/src/issue-roundtrip.test.ts, 6 cases, no live gh); docs updated (README import-issues bullet, docs/json-output.md `issueRoundtrip`, docs/agents.md §0)
 
 ## Notes

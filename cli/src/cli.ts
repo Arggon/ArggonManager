@@ -766,6 +766,7 @@ program
               cascadeLevels: result.cascadeLevels,
               ...(result.movedFrom ? { movedFrom: result.movedFrom } : {}),
               cascadeSkipped: result.cascadeSkipped,
+              ...(result.issueRoundtrip ? { issueRoundtrip: result.issueRoundtrip } : {}),
               ...(commit ? { commit: commitPayload(commit) } : {}),
             },
             readConventionVersion(result.root),
@@ -799,6 +800,14 @@ program
         }
         const commitLine = formatCommitLine(commit);
         if (commitLine) console.log(`  ${commitLine}`);
+        if (result.issueRoundtrip) {
+          const rt = result.issueRoundtrip;
+          if (rt.closed) {
+            console.log(`  issue round-trip: closed #${rt.issue} in ${rt.repo}`);
+          } else {
+            console.log(`  issue round-trip skipped: ${rt.skipped}`);
+          }
+        }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         if (json) {
