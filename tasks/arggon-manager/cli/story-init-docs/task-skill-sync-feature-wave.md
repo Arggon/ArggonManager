@@ -43,3 +43,6 @@ Standing rule (coordinator, 2026-09-15): agent-facing features MUST sync
 skills/arggon-cli/SKILL.md in the same PR as the feature — reviewers reject
 feature PRs that leave the SKILL stale (docs-travel-with-code applies to the
 SKILL with priority, since it is what agents read by default).
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. All four audit gaps closed with wording verified against live --help (no invented flags), the 9-tool MCP line replaces the stale 4-tool list, and the standing rule is now recorded in the item: agent-facing features sync the SKILL in the same PR or the review rejects it. The quality-bar clause folding show/handoff/comment guidance into one place is tight. Merge follows.
