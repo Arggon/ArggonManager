@@ -365,10 +365,10 @@ describe("mcp server next/report/validate (task-mcp-parity-full)", () => {
     const envelope = textContent(next) as Record<string, unknown>;
     expect(envelope).toMatchObject({ ok: true, schemaVersion: 1, command: "next" });
     const suggestion = envelope.suggestion as Record<string, unknown>;
-    // The seeded unclaimed story is claimable too and wins the lexicographic
-    // tie (equal downstream weight).
-    expect((suggestion.item as Record<string, unknown>).id).toBe("story-login");
-    expect(suggestion.parentChain).toEqual(["launch-mvp", "auth"]);
+    // task-next-pool-stories: the default pool excludes stories, so the
+    // created leaf task is suggested, not the seeded unclaimed story.
+    expect((suggestion.item as Record<string, unknown>).id).toBe("task-rate-limit");
+    expect(suggestion.parentChain).toEqual(["launch-mvp", "auth", "story-login"]);
     expect(suggestion.blockedBy).toEqual([]);
     expect(suggestion.unblocks).toBe(0);
     expect(typeof suggestion.reason).toBe("string");

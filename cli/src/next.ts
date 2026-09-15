@@ -7,6 +7,12 @@ export type NextOptions = {
   cwd: string;
   /** Limit the candidate pool to ready items (all depends_on terminal). */
   ready?: boolean;
+  /**
+   * Include unclaimed stories in the suggestion pool. Default `next`
+   * suggests leaf work (tasks/bugs) only — "what do I implement next";
+   * claiming a story is a planning act done explicitly via `update`/`start`.
+   */
+  includeStories?: boolean;
 };
 
 export type NextSuggestion = {
@@ -100,7 +106,9 @@ export function downstreamWeight(
  * completes (deepest/loaded subtrees first) — with the existing
  * lexicographic id order as the deterministic tie-break. Blocked items
  * (suggested only when nothing is ready) keep the lexicographic order.
- * With `--ready` the pool is limited to ready items only. Skips claimed
+ * With `--ready` the pool is limited to ready items only. Stories are
+ * excluded from the default pool (leaf work first); `--include-stories`
+ * restores the full pool. Skips claimed
  * items (in_progress + assignee — including other owners'), non-claimable
  * types, and non-todo statuses. Pure data; the CLI prints.
  */
@@ -115,7 +123,10 @@ export function runNext(opts: NextOptions): NextResult {
   const todos = items
     .filter(
       (item) =>
-        isClaimable(item.type) && item.status === "todo" && (item.assignee ?? null) === null,
+        isClaimable(item.type) &&
+        item.status === "todo" &&
+        (item.assignee ?? null) === null &&
+        (opts.includeStories || item.type !== "story"),
     )
     .sort(lexicographic);
   const ready = todos.filter((item) => openDependencies(item, byId).length === 0);
@@ -157,10 +168,13 @@ export function runNext(opts: NextOptions): NextResult {
   const readyNote = opts.ready
     ? `; --ready limits the pool to items whose depends_on are all terminal`
     : "";
+  const storiesNote = opts.includeStories
+    ? `; stories included via --include-stories`
+    : `; stories excluded by default (--include-stories to include them)`;
   const reason =
     `unclaimed todo ${item.type}${where}; ${weightNote}${blockedNote}` +
     `highest downstream weight first among ${pool.length} candidate(s), lexicographic id on ties ` +
-    `(skipped claimed, non-claimable, and non-todo items${readyNote})`;
+    `(skipped claimed, non-claimable, and non-todo items${storiesNote}${readyNote})`;
 
   return {
     root,

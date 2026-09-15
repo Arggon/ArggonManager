@@ -90,6 +90,8 @@ The `auto-done` workflow (`.github/workflows/auto-done.yml`) mirrors `start` on 
 - It never edits acceptance checklists and never touches containers (story/epic/initiative) — tick the checklist in the item body before the PR merges.
 - Reference the item id in the PR title or body (the id is what the workflow greps for).
 
+**Why flip PRs can wedge:** merging several PRs rapidly triggers concurrent auto-done runs, and sibling main commits (other flips, review comments) make the open flip PRs out-of-date, so the bot's self-merge fails — and it cannot be repaired with `update-branch`, because a rebased bot head would lack the required `cli` check (bot pushes never trigger CI). The workflow is race-tolerant since task-autodone-flip-race: before each merge attempt it rebases the flip branch onto fresh `origin/main`, re-posts the `cli` check on the new head, and retries (3 attempts). If it still fails, the only recovery is an admin merge of the flip PR — the run log names this in a `::warning::`.
+
 ### Blocked
 
 Set `status: blocked`, keep `assignee` on claimable types, and set non-empty `blocked_reason` per convention:

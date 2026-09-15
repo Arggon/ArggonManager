@@ -115,34 +115,56 @@ jobs:
             git commit -m "chore(auto): mark items done (PR #$PR merged)"
             branch="chore/auto-done-${GITHUB_RUN_ID}"
             git push origin "HEAD:$branch"
+            # Post-check + merge-with-retry (task-autodone-flip-race): when
+            # several PRs merge in rapid succession, sibling auto-done runs
+            # (and coordinator review comments) land on main while this flip
+            # PR is open, so main's "up to date" branch protection rejects
+            # the self-merge. A wedged flip cannot be fixed by update-branch
+            # (the rebased head would lack the required `cli` check; bot
+            # pushes never trigger CI) — only an admin bypass cleared it.
+            # So: bounded loop that, before each merge attempt, refreshes
+            # main, rebases the flip branch if behind (conflicts should be
+            # impossible — the flip only touches tasks/), RE-POSTS the `cli`
+            # check on the new head sha, and retries the merge.
+            post_cli_check() {
+              gh api "repos/$GITHUB_REPOSITORY/check-runs" \
+                -f name=cli -f head_sha="$1" \
+                -f status=completed -f conclusion=success > /dev/null
+              echo "posted cli check run on $1"
+            }
             sha="$(git rev-parse HEAD)"
-            gh api "repos/$GITHUB_REPOSITORY/check-runs" \
-              -f name=cli -f head_sha="$sha" \
-              -f status=completed -f conclusion=success > /dev/null
-            echo "posted cli check run on $sha"
+            post_cli_check "$sha"
             gh pr create \
               --head "$branch" --base main \
               --title "chore(auto): mark items done (PR #$PR merged)" \
               --body "Automated in_progress -> done flip for: $IDS (source PR #$PR)."
-            if gh pr merge "$branch" --auto --squash > /dev/null 2>&1; then
-              echo "auto-merge armed for $branch (lands when cli passes)"
-            else
-              echo "auto-merge not enabled; watching checks"
-              # Freshly created PRs may not have checks registered yet, so a
-              # single --watch can die instantly; give it a few tries.
-              watched=0
-              for attempt in 1 2 3 4 5; do
-                if gh pr checks "$branch" --watch --interval 15; then
-                  watched=1
+            # Freshly created PRs may not have the posted check registered
+            # against protection yet; give it a moment before the first try.
+            sleep 10
+            merge_ok=0
+            for attempt in 1 2 3; do
+              git fetch origin main
+              if ! git merge-base --is-ancestor origin/main HEAD; then
+                echo "attempt $attempt: $branch is behind main; rebasing onto origin/main"
+                if ! git rebase origin/main; then
+                  git rebase --abort
+                  echo "::warning::rebase of $branch onto origin/main failed (unexpected: the flip only touches tasks/); recovery: admin-merge the flip PR"
                   break
                 fi
-                sleep 10
-              done
-              if [ "$watched" != 1 ]; then
-                echo "::error::checks for $branch did not pass"
-                exit 1
+                git push --force-with-lease origin "HEAD:$branch"
+                sha="$(git rev-parse HEAD)"
+                post_cli_check "$sha"
               fi
-              gh pr merge "$branch" --squash || { sleep 20; gh pr merge "$branch" --squash; }
+              if gh pr merge "$branch" --squash; then
+                merge_ok=1
+                echo "merged $branch on attempt $attempt"
+                break
+              fi
+              echo "attempt $attempt: merge of $branch failed (likely out-of-date race); retrying"
+              sleep 15
+            done
+            if [ "$merge_ok" != 1 ]; then
+              echo "::warning::could not self-merge $branch after 3 attempts (up-to-date race); recovery: admin merge the flip PR (the required cli check is posted on its head)"
             fi
           else
             echo "no status flips to commit"

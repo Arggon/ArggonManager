@@ -90,16 +90,26 @@ function makeTree(): string {
 }
 
 describe("runNext", () => {
-  it("suggests id, title, parent chain, and reason", () => {
+  it("suggests id, title, parent chain, and reason (leaf work first)", () => {
     const { suggestion } = runNext({ cwd: makeTree() });
     expect(suggestion).not.toBeNull();
-    // story-a sorts before task-bbb and is itself an unclaimed claimable todo.
+    // Default pool excludes stories: task-bbb is suggested, not story-a.
+    expect(suggestion!.item.id).toBe("task-bbb");
+    expect(suggestion!.parentChain).toEqual(["launch", "epic-a", "story-a"]);
+    expect(suggestion!.parentChainDisplay).toEqual([
+      "launch (Launch)",
+      "epic-a (Epic A)",
+      "story-a (Story A)",
+    ]);
+    expect(suggestion!.reason).toContain("unclaimed todo task");
+    expect(suggestion!.reason).toContain("stories excluded by default");
+    expect(suggestion!.poolSize).toBe(1);
+  });
+
+  it("--include-stories restores the full pool (story can be suggested)", () => {
+    const { suggestion } = runNext({ cwd: makeTree(), includeStories: true });
     expect(suggestion!.item.id).toBe("story-a");
-    expect(suggestion!.item.title).toBe("Story A");
-    expect(suggestion!.parentChain).toEqual(["launch", "epic-a"]);
-    expect(suggestion!.parentChainDisplay).toEqual(["launch (Launch)", "epic-a (Epic A)"]);
-    expect(suggestion!.reason).toContain("unclaimed todo story");
-    expect(suggestion!.reason).toContain("epic-a");
+    expect(suggestion!.reason).toContain("stories included via --include-stories");
     expect(suggestion!.poolSize).toBe(2);
   });
 
@@ -134,6 +144,86 @@ describe("runNext", () => {
   it("throws outside a tasks/ tree", () => {
     const root = mkdtempSync(join(tmpdir(), "arggon-next-naked-"));
     expect(() => runNext({ cwd: root })).toThrow(/No tasks\/ convention/);
+  });
+
+  it("returns null when only unclaimed stories are ready (default pool)", () => {
+    const root = mkdtempSync(join(tmpdir(), "arggon-next-stories-only-"));
+    write(root, "tasks/.convention.yml", "version: 0\n");
+    write(
+      root,
+      "tasks/launch/launch.md",
+      md(
+        'type: initiative\nstatus: done\nid: launch\ntitle: Launch\nlabels: []\ncreated: "2026-09-11"\n',
+        "Launch",
+      ),
+    );
+    write(
+      root,
+      "tasks/launch/story-solo/story-solo.md",
+      md(
+        'type: story\nstatus: todo\nid: story-solo\nparent: launch\ntitle: Solo\nlabels: []\ncreated: "2026-09-11"\n',
+        "Solo",
+      ),
+    );
+    expect(runNext({ cwd: root }).suggestion).toBeNull();
+    // Opt-in restores the story.
+    const withStories = runNext({ cwd: root, includeStories: true });
+    expect(withStories.suggestion!.item.id).toBe("story-solo");
+  });
+
+  it("dependency-weight ranking still applies among leaf candidates (default pool)", () => {
+    const root = mkdtempSync(join(tmpdir(), "arggon-next-leaf-rank-"));
+    write(root, "tasks/.convention.yml", "version: 0\n");
+    write(
+      root,
+      "tasks/launch/launch.md",
+      md(
+        'type: initiative\nstatus: done\nid: launch\ntitle: Launch\nlabels: []\ncreated: "2026-09-11"\n',
+        "Launch",
+      ),
+    );
+    write(
+      root,
+      "tasks/launch/story-hub/story-hub.md",
+      md(
+        'type: story\nstatus: in_progress\nid: story-hub\nparent: launch\nassignee: alice\nlabels: []\ncreated: "2026-09-11"\n',
+        "Hub",
+      ),
+    );
+    // Lexicographically first leaf, but nothing depends on it (weight 0).
+    write(
+      root,
+      "tasks/launch/story-hub/task-aaa.md",
+      md(
+        'type: task\nstatus: todo\nid: task-aaa\nparent: story-hub\nlabels: []\ncreated: "2026-09-11"\n',
+        "AAA",
+      ),
+    );
+    // Later leaf that unblocks two downstream leaves (weight 2).
+    write(
+      root,
+      "tasks/launch/story-hub/task-zzz.md",
+      md(
+        'type: task\nstatus: todo\nid: task-zzz\nparent: story-hub\nlabels: []\ncreated: "2026-09-11"\n',
+        "ZZZ",
+      ),
+    );
+    for (const id of ["task-mmm", "task-nnn"]) {
+      write(
+        root,
+        `tasks/launch/story-hub/${id}.md`,
+        md(
+          `type: task\nstatus: todo\nid: ${id}\nparent: story-hub\ndepends_on: [task-zzz]\nlabels: []\ncreated: "2026-09-11"\n`,
+          id,
+        ),
+      );
+    }
+    const { suggestion } = runNext({ cwd: root });
+    expect(suggestion!.item.id).toBe("task-zzz");
+    expect(suggestion!.unblocks).toBe(2);
+    // Default (non-ready) pool includes blocked leaves too: mmm/nnn blocked
+    // on task-zzz stay in the pool behind the ready candidates.
+    expect(suggestion!.poolSize).toBe(4);
   });
 });
 
