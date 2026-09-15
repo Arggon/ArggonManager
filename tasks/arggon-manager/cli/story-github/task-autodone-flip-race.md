@@ -31,3 +31,6 @@ Observed 2026-09-15 during the 8-item product-discovery cycle: merging several P
 - [x] Documented in docs/agents.md (or the workflow comments): why flip PRs can wedge and what the recovery is without admin
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. The 3-attempt loop with fetch/rebase + re-posted check on the new head is exactly the fix — it uses the checks-API trick the workflow already had, the rebase-failure path warns with the admin recovery, and the 'flip touches only tasks/' invariant is now explicitly load-bearing (documented). Logging survived the refactor. The worktree.test.ts ENOTEMPTY flake you hit stays covered by the global-teardown family item. Merge follows.
