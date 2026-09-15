@@ -4,6 +4,7 @@ status: in_progress
 id: task-autodone-flip-wedge-3
 title: "auto-done flip wedge 3: comment on flipped item conflicts rebase"
 assignee: Arggon
+branch: feat/task-autodone-flip-wedge-3
 parent: story-github
 labels: [p2]
 created: "2026-09-15"
