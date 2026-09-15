@@ -4,6 +4,7 @@ status: in_progress
 id: task-generated-regions-coverage
 title: "forever-fix coverage: generated SKILL regions for every command"
 assignee: Arggon
+branch: feat/task-generated-regions-coverage
 parent: story-init-docs
 labels: [p2]
 created: "2026-09-15"
