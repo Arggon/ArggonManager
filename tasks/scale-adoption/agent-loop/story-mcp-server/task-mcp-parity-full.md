@@ -4,9 +4,10 @@ status: todo
 id: task-mcp-parity-full
 title: "MCP tool parity: next, show, report, validate as MCP tools"
 parent: story-mcp-server
-labels: []
+labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
+depends_on: [task-handoff-command]
 ---
 <!--
   Placement (v0): tasks/scale-adoption/agent-loop/story-mcp-server/task-mcp-parity-full.md
