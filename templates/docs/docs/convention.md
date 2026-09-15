@@ -56,6 +56,7 @@ Every work item is a Markdown file with YAML frontmatter:
 | `x-playbooks`  | Playbook staleness options for `arggon playbook status` (`max-age-days`) | ArggonManager `docs/convention.md` § Technology playbooks |
 | `x-tracker`    | Tracker hygiene options: `auto-commit`, `allow-steal` | ArggonManager `docs/convention.md` § Tracker hygiene |
 | `x-import`     | `arggon import-issues` options, e.g. `label-types` (GitHub label → work-item type mapping) | ArggonManager `docs/convention.md` § Import type mapping |
+| `x-github`     | GitHub issue round-trip: with `issue-roundtrip: true` (default OFF), flipping an item with an `issue:` field to done closes the linked GitHub issue | ArggonManager `docs/convention.md` § Issue round-trip |
 | `x-worktree`   | Worktree bootstrap for `arggon start --worktree`: `post-start` / `post-start-shell` commands | ArggonManager `docs/convention.md` § Worktree bootstrap |
 | `x-generated`  | Checksum/provenance state for arggon-generated docs (drives `arggon doctor` modified/stale reporting) | ArggonManager `docs/convention.md` § Generated-doc provenance |
 

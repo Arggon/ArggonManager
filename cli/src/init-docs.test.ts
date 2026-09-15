@@ -560,7 +560,7 @@ describe("init docs: generated convention.md documents the x-* namespaced extens
     runInit({ dir, force: false, full: true });
     const generated = readFileSync(join(dir, "docs/convention.md"), "utf8");
     expect(generated).toMatch(/Namespaced extensions/);
-    for (const ext of ["x-views", "x-playbooks", "x-tracker", "x-import", "x-worktree", "x-generated"]) {
+    for (const ext of ["x-views", "x-playbooks", "x-tracker", "x-import", "x-worktree", "x-github", "x-generated"]) {
       expect(generated).toContain(ext);
     }
   });

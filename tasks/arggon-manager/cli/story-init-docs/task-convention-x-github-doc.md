@@ -1,12 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-convention-x-github-doc
 title: "generated convention.md extensions table: document the new x-github namespace"
+assignee: Arggon
+branch: feat/task-convention-x-github-doc
 parent: story-init-docs
 labels: []
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T16:29:09.247Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-init-docs/task-convention-x-github-doc.md
@@ -23,8 +26,8 @@ Follow-up from the task-issue-roundtrip review (PR #228): the round-trip landed 
 
 ## Acceptance
 
-- [ ] templates/docs/convention.md extensions table gains the `x-github` row (one line: issue round-trip on done, default OFF)
-- [ ] ArggonManager's own docs/convention.md matches (it is the normative reference the template points to)
-- [ ] init-docs extensions assertion covers x-github
+- [x] templates/docs/convention.md extensions table gains the `x-github` row (one line: issue round-trip on done, default OFF)
+- [x] ArggonManager's own docs/convention.md matches (it is the normative reference the template points to)
+- [x] init-docs extensions assertion covers x-github
 
 ## Notes
