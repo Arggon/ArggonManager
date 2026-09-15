@@ -48,6 +48,17 @@ describe("budget measurement (task-adr0006-remeasure, ADR 0006)", () => {
     expect(leftovers.stdout.trim()).toBe("");
   }, 60_000);
 
+  it("reports the init --full tree as an advisory line with numeric growth vs the baseline", () => {
+    const m = measureBudget();
+    const lines = formatBudgetLines(m);
+    const treeLine = lines.find((l) => l.includes("init --full tree"));
+    expect(treeLine).toBeDefined();
+    // Advisory number present, plus a signed numeric delta vs the 43,694 B baseline.
+    expect(treeLine).toMatch(/init --full tree: [\d,]+ B/);
+    expect(treeLine).toMatch(/[+-]\d+\.\d+% vs the 2026-09-14 baseline \(43,694 B\)/);
+    expect(treeLine).not.toContain("FAIL"); // advisory: no hard budget
+  }, 60_000);
+
   it("evaluateBudget checks the generated AGENTS.md against the 2048 B budget", () => {
     const m = measureBudget();
     const checks = evaluateBudget(m);

@@ -2,7 +2,7 @@
 
 For humans and AI agents working on **{{PROJECT_NAME}}**. Work items live in-tree under `tasks/`, managed by `arggon`; GitHub is for PRs only — never open GitHub issues.
 
-> **Use the `arggon-cli` skill by default** (`.agents/skills/arggon-cli/SKILL.md`) before any `arggon` call: it defines the `--json` contract, claim rules, and pitfalls. An `arggon` MCP server is registered in `.mcp.json`.
+> **Use the `arggon-cli` skill by default** (`.agents/skills/arggon-cli/SKILL.md`) before any `arggon` call: `--json` contract, claim rules, pitfalls. MCP server: `.mcp.json`.
 
 ## Task workflow
 
@@ -14,10 +14,8 @@ For humans and AI agents working on **{{PROJECT_NAME}}**. Work items live in-tre
 
 ### Orchestration
 
-Delegated by default: a coordinator assigns each item to a subagent (one per worktree), planning waves by file-disjointness, and the coordinator (lead architect) **code-reviews every subagent PR before merge** — green CI is necessary, not sufficient. Review verdicts and change requests are recorded on the item with `arggon comment <item-id>` — never as GitHub PR comments; the PR carries CI and merge mechanics only. Subagents follow the same rules and report findings to the coordinator instead of filing tracker items.
+Delegated by default: a coordinator assigns each item to a subagent (one per worktree), planning waves by file-disjointness, and the coordinator (lead architect) **code-reviews every subagent PR before merge** — green CI is necessary, not sufficient. Verdicts land on the item via `arggon comment <item-id>` — never as GitHub PR comments (PR: CI and merge mechanics only). Subagents follow the same rules and report findings to the coordinator instead of filing tracker items.
 
 ## Docs & gates
 
-Read before non-trivial changes: [`docs/convention.md`](docs/convention.md), [`docs/engineering.md`](docs/engineering.md), [`docs/deploy.md`](docs/deploy.md), `docs/playbooks/` (check `arggon playbook status`), [`CONTRIBUTING.md`](CONTRIBUTING.md). Keep `arggon validate` green before every commit and in CI.
-
-<!-- Pre-commit gate: .git/hooks/pre-commit runs `arggon validate` -->
+Read before non-trivial changes: [`docs/convention.md`](docs/convention.md), [`docs/engineering.md`](docs/engineering.md), [`docs/deploy.md`](docs/deploy.md), `docs/playbooks/` (`arggon playbook status`), [`CONTRIBUTING.md`](CONTRIBUTING.md). Keep `arggon validate` green before every commit and in CI.

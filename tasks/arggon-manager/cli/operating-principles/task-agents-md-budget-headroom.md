@@ -26,8 +26,8 @@ Follow-up from the task-adr0006-remeasure review (PR #227): the generated AGENTS
 
 ## Acceptance
 
-- [ ] Decision + landing: either compress the generated AGENTS.md below ~1.9 KB (restoring meaningful headroom) or raise the budget consciously in the docs-budget assertion with rationale — decided as lead-architect, not by accident on the next addition
-- [ ] A total-tree budget (or advisory report line in doctor --budget) covers the init --full output so 18%-style growth is visible
-- [ ] doctor --budget numbers updated and green
+- [x] Decision + landing: either compress the generated AGENTS.md below ~1.9 KB (restoring meaningful headroom) or raise the budget consciously in the docs-budget assertion with rationale — decided as lead-architect, not by accident on the next addition (template compressed: rendered 2,043 B → 1,872 B, 176 B headroom; all normative rules and test-asserted phrases kept)
+- [x] A total-tree budget (or advisory report line in doctor --budget) covers the init --full output so 18%-style growth is visible (advisory line now renders numeric growth vs the 43,694 B baseline: "+18.2% vs the 2026-09-14 baseline (43,694 B)"; light test added in measure.test.ts)
+- [x] doctor --budget numbers updated and green (AGENTS.md 1,872 B pass; validate ok:true; doctor 0 modified / 0 drifted)
 
 ## Notes
