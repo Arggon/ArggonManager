@@ -30,3 +30,6 @@ Feedback from the vencimientos adoption experiment (2026-09-15): in `update --js
 - [x] Tests: empty-cascade envelope asserts the aligned shape (cli + mcp); parity harness unaffected or updated
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. Always-arrays is the right convention (matches autoCompleted, present-and-empty beats absent-then-appearing for parsers) and correctly stays outside the ADR 0006 compact-WorkItem scope. Asserted through CLI and MCP both, and the grep confirmed no other conditional-spread sites. Merge follows.
