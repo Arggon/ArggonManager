@@ -42,3 +42,7 @@ Second occurrence (first: bug-autocommit-silent-skip / PR #168, which moved the 
 ### Hardening
 
 Mirrors the post-fix comment-race.test.ts pattern: cleanly reported skips are collected — both `ok:false` lock failures AND `ok:true` with a `commit.skipped` payload — and each is retried sequentially (one extra `comment` invocation; its auto-commit picks up the uncommitted mutation too), after which the strict clean-tree/index.lock assertions stand unchanged. The scenario still runs 6 real concurrent processes against real git; an *unreported* skip still fails the assertion.
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED — and the root-cause analysis is the best part of this cycle. Index-clobber race (add/commit interleaving drops the loser's staged entry) is a DIFFERENT failure than the budget exhaustion we fixed in #168, proven by the 3292ms timing and the silent-on-stderr benign skip path. Hardening mirrors the comment-race pattern without weakening the clean-tree contract, and correctly leaves the product budget alone. Your follow-up candidate (the 'nothing to commit' benign path masking a lost staged entry) is going to the backlog per standing rule. Merge follows.
+
