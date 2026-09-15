@@ -19,10 +19,15 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- Why this task exists. -->
+ArggonManager evolved fast (orchestration defaults, token/context efficiency, parity harness, deploy guidance) but its roadmap has been driven by findings from our own experiments. A product-discovery pass grounds the next roadmap round in what the broader ecosystem is doing: agent-native trackers, spec-driven development kits, worktree/orchestration managers, context-engineering practices. Research online with dated sources, then rank concrete improvement/feature candidates for ArggonManager.
+
+Research-first: no product code changes. Outcomes feed the backlog (the coordinator files candidates after review).
 
 ## Acceptance
 
-- [ ] 
+- [ ] Exploration recorded via `arggon stack explore` (docs/explorations/): landscape survey of adjacent tools — agent-native task/issue trackers, spec-driven development kits, worktree/orchestration managers, context-engineering practices — each with a dated source and a one-line "what it does that ArggonManager doesn't"
+- [ ] Ranked list of 8-12 candidate improvements/features: problem it solves, evidence (dated source), effort (S/M/L), which operating principle/ADR it aligns with, and surface (docs-only / CLI / MCP / board)
+- [ ] An explicit "evaluated and rejected" section with reasons — scope discipline is part of the deliverable
+- [ ] No product code changes in this item
 
 ## Notes
