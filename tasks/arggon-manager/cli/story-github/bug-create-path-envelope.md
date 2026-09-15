@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-create-path-envelope
 title: create --json dropped top-level path field while show/comment keep it (envelope inconsistency)
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-github
 labels: []
 created: "2026-09-15"
 updated: "2026-09-15"
-claimed_at: "2026-09-15T16:29:05.810Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-github/bug-create-path-envelope.md
