@@ -31,3 +31,6 @@ Candidate #1 of the product-discovery research round (2026-09-15): tool-schema b
 - [x] Tests (fixture tool definitions, deterministic bytes) + docs/json-output.md additive
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. Live measurement beats the estimate (9,050 B real vs ~4.7 KB estimado — 9 tools ya crecieron), the 12 KiB advisory with ~35% headroom is documented, measuring via the LIVE tools/list in-process instead of a copied schema list is the right call, and runDoctor staying synchronous via measureBudgetForDoctor shows care for the existing callers. The forever-fix nuance you found is the real takeaway: the mechanism regenerated the region mechanically once doctor joined a region filter — the coverage hole (hand-written-only commands never feed regions) goes to the backlog. Merge follows.
