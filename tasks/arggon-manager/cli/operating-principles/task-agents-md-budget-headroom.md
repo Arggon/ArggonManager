@@ -1,12 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-agents-md-budget-headroom
 title: AGENTS.md budget headroom exhausted (5 B); init --full tree grew 18% un-budgeted
+assignee: Arggon
+branch: feat/task-agents-md-budget-headroom
 parent: operating-principles
 labels: []
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T16:29:02.435Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/operating-principles/task-agents-md-budget-headroom.md
@@ -23,8 +26,8 @@ Follow-up from the task-adr0006-remeasure review (PR #227): the generated AGENTS
 
 ## Acceptance
 
-- [ ] Decision + landing: either compress the generated AGENTS.md below ~1.9 KB (restoring meaningful headroom) or raise the budget consciously in the docs-budget assertion with rationale — decided as lead-architect, not by accident on the next addition
-- [ ] A total-tree budget (or advisory report line in doctor --budget) covers the init --full output so 18%-style growth is visible
-- [ ] doctor --budget numbers updated and green
+- [x] Decision + landing: either compress the generated AGENTS.md below ~1.9 KB (restoring meaningful headroom) or raise the budget consciously in the docs-budget assertion with rationale — decided as lead-architect, not by accident on the next addition (template compressed: rendered 2,043 B → 1,872 B, 176 B headroom; all normative rules and test-asserted phrases kept)
+- [x] A total-tree budget (or advisory report line in doctor --budget) covers the init --full output so 18%-style growth is visible (advisory line now renders numeric growth vs the 43,694 B baseline: "+18.2% vs the 2026-09-14 baseline (43,694 B)"; light test added in measure.test.ts)
+- [x] doctor --budget numbers updated and green (AGENTS.md 1,872 B pass; validate ok:true; doctor 0 modified / 0 drifted)
 
 ## Notes
