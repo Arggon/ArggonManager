@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-upgrade-path-differentiator
 title: document the upgrade-path differentiator (never-overwrite + adopter-owned + re-run refresh)
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-init-docs
 labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
-claimed_at: "2026-09-15T22:23:20.226Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-init-docs/task-upgrade-path-differentiator.md
