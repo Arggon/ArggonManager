@@ -4,7 +4,7 @@ status: todo
 id: task-promote-task-to-story
 title: promote/convert task to story (import flattens ideas under one container)
 parent: story-import-issues
-labels: []
+labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
