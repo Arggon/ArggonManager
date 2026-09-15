@@ -473,9 +473,14 @@ describe("CLI --json", () => {
     expect(runCli(["create", "task", "Work", "--parent", "login"], dir).status).toBe(0);
     const result = runCli(["next"], dir);
     expect(result.status).toBe(0);
-    expect(result.stdout).toContain("arggon next: login — Login");
+    // task-next-pool-stories: the default pool suggests leaf work, not the story.
+    expect(result.stdout).toContain("arggon next: task-work — Work");
     expect(result.stdout).toContain("why:");
-    expect(result.stdout).toContain("arggon start login --assignee <login>");
+    expect(result.stdout).toContain("arggon start task-work --assignee <login>");
+    // --include-stories opts the story back into the pool.
+    const withStories = runCli(["next", "--include-stories"], dir);
+    expect(withStories.status).toBe(0);
+    expect(withStories.stdout).toContain("arggon next: login — Login");
   });
 
   it("arggon next --json emits one suggestion object", () => {
@@ -490,11 +495,12 @@ describe("CLI --json", () => {
     const body = parseStdout(result.stdout);
     expect(body).toMatchObject({ ok: true, command: "next" });
     const suggestion = body.suggestion as Record<string, unknown>;
+    // task-next-pool-stories: default pool suggests the leaf task.
     expect(suggestion).toMatchObject({
-      parentChain: ["launch-mvp", "auth"],
+      parentChain: ["launch-mvp", "auth", "login"],
       reason: expect.any(String),
     });
-    expect(suggestion.item as Record<string, unknown>).toMatchObject({ id: "login" });
+    expect(suggestion.item as Record<string, unknown>).toMatchObject({ id: "task-work" });
   });
 
   it("arggon next --json carries blockedBy and --ready skips blocked items", () => {

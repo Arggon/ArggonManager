@@ -26,6 +26,13 @@ import { fileURLToPath } from "node:url";
 /** Generated-docs context budget (ADR 0006 direction 4; init-docs.test.ts). */
 export const AGENTS_MD_BUDGET_BYTES = 2048;
 
+/**
+ * Fresh `init --full` tree at the 2026-09-14 baseline (ADR 0006 re-measure).
+ * Advisory reference only (no hard cap): the total-tree line reports growth
+ * against it so 18%-style drift stays visible (task-agents-md-budget-headroom).
+ */
+export const INIT_TREE_BASELINE_BYTES = 43_694;
+
 /** Fixture shape: 1 initiative + 1 epic + 1 story + 5 tasks, 1 comment — deterministic. */
 export const FIXTURE_TASK_COUNT = 5;
 
@@ -81,6 +88,12 @@ function treeBytes(dir: string): number {
     else total += statSync(abs).size;
   }
   return total;
+}
+
+/** Signed percent growth of the init tree vs the baseline (advisory; 1 dp). */
+export function treeGrowthPct(bytes: number): string {
+  const pct = ((bytes - INIT_TREE_BASELINE_BYTES) / INIT_TREE_BASELINE_BYTES) * 100;
+  return `${pct >= 0 ? "+" : ""}${pct.toFixed(1)}`;
 }
 
 /**
@@ -144,7 +157,9 @@ export function evaluateBudget(m: BudgetResult): BudgetCheck[] {
     {
       name: "init --full tree",
       bytes: m.initTreeBytes,
-      note: "fresh adopter tree; no hard budget — tracked vs the 2026-09-14 baseline (43,694 B)",
+      note:
+        `fresh adopter tree; advisory (no hard budget) — ` +
+        `${treeGrowthPct(m.initTreeBytes)}% vs the 2026-09-14 baseline (${INIT_TREE_BASELINE_BYTES.toLocaleString("en-US")} B)`,
     },
     {
       name: "generated AGENTS.md",
@@ -178,6 +193,10 @@ export function formatBudgetLines(m: BudgetResult): string[] {
     let line = `    ${check.name}: ${check.bytes.toLocaleString("en-US")} B`;
     if (check.budget !== undefined) {
       line += ` (budget ${check.budget} B: ${check.withinBudget ? "pass" : "FAIL"})`;
+    } else if (check.note) {
+      // Advisory surfaces (no hard budget) carry their reference inline —
+      // e.g. the init tree's growth vs the baseline (task-agents-md-budget-headroom).
+      line += ` — ${check.note}`;
     }
     lines.push(line);
   }
