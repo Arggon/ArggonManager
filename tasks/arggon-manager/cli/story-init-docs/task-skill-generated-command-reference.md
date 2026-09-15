@@ -19,10 +19,22 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- Why this task exists. -->
+The SKILL content audit (task-skill-sync-feature-wave) found 4 gaps and fixed them manually — but the fix is momentary: the SKILL command block is hand-written prose that drifts every time a command/flag changes (show, handoff, next --include-stories all drifted within one cycle). The permanent fix makes drift IMPOSSIBLE BY CONSTRUCTION: the mechanical parts of the SKILL are GENERATED from the live CLI, the narrative parts stay hand-written with the standing review rule.
+
+Design (coordinator decision, mirrors the established generatedMarker/skills:sync/parity machinery):
+1. The SKILL command block (the `arggon <cmd> ...` reference lines in the command sections) becomes a GENERATED marker region: `skills:sync` renders it by introspecting the real commander program (same source-parse approach the parity harness uses — command names, args, .description() strings), and splices it between markers in skills/arggon-cli/SKILL.md. Curated one-liner comments per command move into a maintained description map in the generator (improving a description improves CLI --help AND SKILL from one place).
+2. Test invariant: the rendered region matches the live CLI surface — adding/renaming a command without regenerating fails loudly.
+3. Cross-check invariant: every user-facing CLI command appears somewhere in SKILL.md + README.md + docs/agents.md (the "documented somewhere" net for narrative omissions).
+4. The .agents copy pipeline (marker + source) is unchanged, running after the splice.
+
+Research component: document how established tools keep docs synced from source (oclif `readme` marker-region generation, terraform-docs, clap_generate-style) — dated sources, one line each, cited in the exploration; confirm or challenge the marker-region choice before implementing.
 
 ## Acceptance
 
-- [ ] 
+- [ ] Exploration recorded (docs/explorations/): docs-from-source patterns with dated sources; marker-region confirmed or a better pattern adopted with rationale
+- [ ] The SKILL command reference is a generated marker region rendered from live CLI introspection; `skills:sync` regenerates it; the parity/copy pipeline unchanged downstream
+- [ ] Cross-check test: every user-facing command documented in SKILL.md + README.md + docs/agents.md (fails loudly on new undocumented commands; maintained exception list for internal commands like mcp/instructions if needed)
+- [ ] Narrative sections (quality bar, pitfalls, orchestration) remain hand-written — the standing review rule covers them (noted in the item)
+- [ ] Full suite + parity + skills:sync pipeline green; doctor 0 modified / 0 drifted
 
 ## Notes
