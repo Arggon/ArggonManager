@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adr0006-remeasure
 title: "ADR 0006 re-measure: repeatable context-budget measurement vs live surfaces"
+assignee: Arggon
 parent: operating-principles
 labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T15:03:57.716Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/operating-principles/task-adr0006-remeasure.md
