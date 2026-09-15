@@ -438,7 +438,7 @@ program
 program
   .command("next")
   .description(
-    "Suggest the next claimable item (unclaimed todo, lexicographic by id; ready items rank first)",
+    "Suggest the next claimable item (ready items rank first, by downstream weight — unblocks count; lexicographic id on ties)",
   )
   .option(
     "--ready",
@@ -456,6 +456,7 @@ program
             parentChain: result.suggestion.parentChain,
             reason: result.suggestion.reason,
             blockedBy: result.suggestion.blockedBy,
+            unblocks: result.suggestion.unblocks,
           }
         : null;
       if (json) {

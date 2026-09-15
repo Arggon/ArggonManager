@@ -1,12 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-next-dependency-ranking
 title: next --json ranks ready work by dependency weight (downstream unblocking)
+assignee: Arggon
+branch: feat/task-next-dependency-ranking
 parent: story-cli-ergonomics
 labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T15:04:01.069Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-cli-ergonomics/task-next-dependency-ranking.md
@@ -23,8 +26,8 @@ Candidate #2 of [product discovery](docs/explorations/exploration-product-discov
 
 ## Acceptance
 
-- [ ] `next` ranks ready items by dependency weight (how many downstream items this unblocks; deeper/loaded subtrees first), deterministic tie-break documented
-- [ ] Ranking rationale surfaces in the suggestion reason (bounded — one line)
-- [ ] Table-driven tests (blocked chains, parallel ready items, no-deps trees); docs/agents.md or README one line; --json payload unchanged or additively extended
+- [x] `next` ranks ready items by dependency weight (how many downstream items this unblocks; deeper/loaded subtrees first), deterministic tie-break documented
+- [x] Ranking rationale surfaces in the suggestion reason (bounded — one line)
+- [x] Table-driven tests (blocked chains, parallel ready items, no-deps trees); docs/agents.md or README one line; --json payload unchanged or additively extended
 
 ## Notes
