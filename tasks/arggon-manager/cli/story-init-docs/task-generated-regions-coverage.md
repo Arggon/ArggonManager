@@ -4,7 +4,7 @@ status: todo
 id: task-generated-regions-coverage
 title: "forever-fix coverage: generated SKILL regions for every command"
 parent: story-init-docs
-labels: []
+labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
