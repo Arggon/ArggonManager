@@ -1,12 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-upgrade-path-differentiator
 title: document the upgrade-path differentiator (never-overwrite + adopter-owned + re-run refresh)
+assignee: Arggon
+branch: feat/task-upgrade-path-differentiator
 parent: story-init-docs
 labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T22:23:20.226Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-init-docs/task-upgrade-path-differentiator.md
@@ -23,8 +26,8 @@ Candidate #2 of the product-discovery research round (2026-09-15): OpenSpec's ma
 
 ## Acceptance
 
-- [ ] README (Why ArggonManager section): a short upgrade-path paragraph — never overwrites, adopter-owned docs, re-run refreshes untouched docs, --backup archives — the Spec Kit/OpenSpec comparison implicit, no vendor bashing
-- [ ] docs/agents.md or docs/convention.md: the same guarantee stated where adopters look for upgrade behavior (one place, no duplication)
-- [ ] doctor/init tests unchanged and green (docs-only)
+- [x] README (Why ArggonManager section): a short upgrade-path paragraph — never overwrites, adopter-owned docs, re-run refreshes untouched docs, --backup archives — the Spec Kit/OpenSpec comparison implicit, no vendor bashing
+- [x] docs/agents.md or docs/convention.md: the same guarantee stated where adopters look for upgrade behavior (one place, no duplication)
+- [x] doctor/init tests unchanged and green (docs-only)
 
 ## Notes

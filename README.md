@@ -58,6 +58,10 @@ Each item is a Markdown file with **YAML frontmatter** (status and other fields)
 3. **Same rules for humans and agents**
 4. **Simple & self-hostable** — open, lightweight, no lock-in
 
+## Why ArggonManager
+
+Upgrades are safe by construction. Every doc the tool generates is adopter-owned the moment it exists and is never overwritten: re-running `arggon init` silently refreshes the docs you haven't touched, skips the ones you've modified and reports them, and `--backup` archives a modified doc before regenerating it. Your customization survives every tool upgrade.
+
 ## What’s shipping (phased)
 
 | Phase | Deliverable                                       |
