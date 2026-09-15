@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-mcp-spec-2026-eval
 title: "MCP spec 2026-07-28 adoption evaluation (Tasks, Extensions, stateless)"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-mcp-server
 labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
-claimed_at: "2026-09-15T22:23:23.539Z"
 ---
 <!--
   Placement (v0): tasks/scale-adoption/agent-loop/story-mcp-server/task-mcp-spec-2026-eval.md
