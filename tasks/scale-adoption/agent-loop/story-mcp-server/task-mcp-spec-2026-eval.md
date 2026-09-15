@@ -31,3 +31,6 @@ Candidate #4 of the product-discovery research round (2026-09-15): MCP specifica
 - [x] No product code changes — implementation lands via follow-up items if the ADR adopts anything
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. Honest partial-adopt: stateless compatibility declared (version negotiation only, no wire rewrite), Tasks deferred with an explicit revisit trigger, SDK migration deferred because our zero-dep server has full envelope control — each row carries the reasoning, not a rubber stamp. ADR 0007 flips to Accepted at merge; the two light follow-ups (protocol version + cache hints) go to the backlog. Merge follows.
