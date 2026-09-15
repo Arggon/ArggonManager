@@ -95,6 +95,18 @@ export type WorktreeConfig = {
   postStartShell: "inherit" | "login" | null;
 };
 
+/** `x-github` namespaced extension options (task-issue-roundtrip). */
+export type GitHubConfig = {
+  /**
+   * Issue round-trip from `x-github.issue-roundtrip` (task-issue-roundtrip):
+   * when an item carrying the `issue` frontmatter field flips to `done`, the
+   * linked GitHub issue is closed (annotated) via `gh`. Default OFF — flips
+   * happen through bots too, so a per-call flag would not cover them; the
+   * tree-wide config gate does.
+   */
+  issueRoundtrip: boolean;
+};
+
 /**
  * One generated-doc provenance record (`x-generated` namespaced extension,
  * story-adoption-state): destination path -> entry, written by
@@ -132,6 +144,8 @@ export type ConventionConfig = {
   import: ImportConfig;
   /** Worktree-bootstrap options (`x-worktree` extension key). */
   worktree: WorktreeConfig;
+  /** GitHub round-trip options (`x-github` extension key). */
+  github: GitHubConfig;
   /**
    * Generated-doc provenance (`x-generated` extension key): destination path
    * (posix, relative to the repo root) -> provenance entry.
@@ -153,11 +167,12 @@ function stripQuotes(value: string): string {
  * Parse `tasks/.convention.yml` (line-oriented, no YAML dependency).
  * Unknown top-level keys are ignored for forward compatibility;
  * `x-views` (saved views), `x-playbooks` (playbook staleness options),
- * `x-tracker` (tracker-hygiene options), `x-import` (issue-import options),
- * `x-worktree` (worktree-bootstrap options), and `x-generated` (generated-doc
- * provenance) are the official namespaced extensions.
- * Throws with file context on malformed `branch_patterns`, `x-views`,
- * `x-playbooks`, `x-tracker`, `x-import`, or `x-worktree`; `x-generated`
+   * `x-tracker` (tracker-hygiene options), `x-import` (issue-import options),
+   * `x-worktree` (worktree-bootstrap options), `x-github` (GitHub round-trip
+   * options), and `x-generated` (generated-doc
+   * provenance) are the official namespaced extensions.
+   * Throws with file context on malformed `branch_patterns`, `x-views`,
+   * `x-playbooks`, `x-tracker`, `x-import`, `x-worktree`, or `x-github`; `x-generated`
  * parses tolerantly (machine-written state).
  */
 export function parseConventionConfig(
@@ -172,6 +187,7 @@ export function parseConventionConfig(
   const importLabelTypes: Record<string, ItemType> = {};
   let importHasLabelTypes = false;
   const worktree: WorktreeConfig = { postStart: null, postStartShell: null };
+  const github: GitHubConfig = { issueRoundtrip: false };
   let version = CONVENTION_VERSION_DEFAULT;
   let section: string | null = null;
   let generatedDest: string | null = null;
@@ -223,6 +239,11 @@ export function parseConventionConfig(
           throw new Error(`${sourcePath}: 'x-worktree' must be a mapping, one option per line`);
         }
         section = "x-worktree";
+      } else if (key === "x-github") {
+        if (value !== "") {
+          throw new Error(`${sourcePath}: 'x-github' must be a mapping, one option per line`);
+        }
+        section = "x-github";
       } else if (key === "x-generated") {
         if (value !== "") {
           throw new Error(
@@ -358,6 +379,19 @@ export function parseConventionConfig(
       worktree.postStart = command;
       continue;
     }
+    if (section === "x-github") {
+      // Namespaced extension (task-issue-roundtrip): unknown nested keys are
+      // ignored (ignore-unknown); the official `issue-roundtrip` option is a
+      // boolean gate for closing the linked GitHub issue on a done flip.
+      if (key !== "issue-roundtrip") continue;
+      if (value !== "true" && value !== "false") {
+        throw new Error(
+          `${sourcePath}: 'issue-roundtrip' must be a boolean (got ${JSON.stringify(value)})`,
+        );
+      }
+      github.issueRoundtrip = value === "true";
+      continue;
+    }
     if (section === "x-views") {
       if (!key) {
         throw new Error(`${sourcePath}: invalid x-views entry ${JSON.stringify(line)}`);
@@ -398,6 +432,7 @@ export function parseConventionConfig(
     tracker,
     import: { labelTypes: importHasLabelTypes ? importLabelTypes : null },
     worktree,
+    github,
     generated,
   };
 }
@@ -414,6 +449,7 @@ export function readConventionConfig(dir: string): ConventionConfig {
       tracker: { autoCommit: null, allowSteal: null },
       import: { labelTypes: null },
       worktree: { postStart: null, postStartShell: null },
+      github: { issueRoundtrip: false },
       generated: {},
     };
   }

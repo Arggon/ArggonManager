@@ -28,6 +28,8 @@ import {
   updateCommitMessage,
   type TrackerCommitResult,
 } from "./tracker-commit.js";
+import { closeLinkedIssue, type IssueRoundtripResult } from "./issue-roundtrip.js";
+import { readConventionConfig } from "./convention.js";
 
 export type UpdateOptions = {
   cwd: string;
@@ -86,6 +88,12 @@ export type UpdateOptions = {
    * terminal, ancestors complete as done, recursively.
    */
   cascade?: boolean;
+  /**
+   * Issue round-trip (task-issue-roundtrip) gh executor; tests inject a mock.
+   * Only used when the item flips to done, carries an `issue` frontmatter
+   * number, and `x-github.issue-roundtrip` is enabled.
+   */
+  execGh?: typeof import("node:child_process").execFileSync;
   now?: Date;
 };
 
@@ -136,6 +144,12 @@ export type UpdateResult = {
    * (story/epic/initiative). Undefined when no move happened.
    */
   movedFrom?: string;
+  /**
+   * Issue round-trip outcome (task-issue-roundtrip): present only when the
+   * update flipped the item to done, the item carries an `issue` frontmatter
+   * number, and `x-github.issue-roundtrip` is enabled. Never blocks the flip.
+   */
+  issueRoundtrip?: IssueRoundtripResult;
 };
 
 function parseCsvList(raw: string): string[] {
@@ -507,10 +521,36 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
       ? { completed: [], skipped: [] }
       : autoCompleteAncestors(tasksDir, item, opts.now ?? new Date());
 
+  // Issue round-trip (task-issue-roundtrip): when the update FLIPS the item to
+  // done and it carries the additive `issue` frontmatter number (written by
+  // `import-issues`), close the linked GitHub issue — opt-in, gated tree-wide
+  // by `x-github.issue-roundtrip` (default OFF, flips happen through bots too;
+  // a malformed config must never fail the flip, so the gate reads tolerantly
+  // like the tracker auto-commit). Best effort like the tracker commit: gh
+  // absent, unauthenticated, or failing degrade to a reported skip — reported
+  // in the payload AND as a stderr warning when enabled, never silent, never
+  // fatal. The flip flows through every caller (CLI, MCP) that uses runUpdate.
+  const root = repoRootFromTasks(tasksDir);
+  let issueRoundtrip: IssueRoundtripResult | undefined;
+  const issueNumber = updated.issue ?? null;
+  if (
+    changed.includes("status") &&
+    newStatus === "done" &&
+    issueNumber !== null &&
+    issueRoundtripEnabled(root)
+  ) {
+    issueRoundtrip = closeLinkedIssue(root, id, issueNumber, opts.execGh);
+    if (!issueRoundtrip.closed) {
+      process.stderr.write(
+        `arggon: warning: issue round-trip skipped: ${issueRoundtrip.skipped}\n`,
+      );
+    }
+  }
+
   return {
     id,
     path: targetPath,
-    root: repoRootFromTasks(tasksDir),
+    root,
     item: updated,
     changed,
     autoCompleted: completedContainers.map((container) => container.id),
@@ -523,11 +563,26 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
       ...completedContainers.map((container) => container.filePath),
     ],
     movedFrom,
+    ...(issueRoundtrip ? { issueRoundtrip } : {}),
   };
   };
 
   // Hold the item lock across read → verify → write (bug-claim-race-no-lock).
   return withItemLock(peekItem.filePath, apply);
+}
+
+/**
+ * Tolerant read of the `x-github.issue-roundtrip` gate (task-issue-roundtrip):
+ * true only when explicitly enabled; a missing/malformed config yields the
+ * documented default (OFF). Malformed config must never fail a done flip —
+ * same contract as readAutoCommitConfig.
+ */
+function issueRoundtripEnabled(root: string): boolean {
+  try {
+    return readConventionConfig(root).github.issueRoundtrip === true;
+  } catch {
+    return false;
+  }
 }
 
 /**
