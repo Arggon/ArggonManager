@@ -4,6 +4,7 @@ status: in_progress
 id: task-mcp-spec-2026-eval
 title: "MCP spec 2026-07-28 adoption evaluation (Tasks, Extensions, stateless)"
 assignee: Arggon
+branch: feat/task-mcp-spec-2026-eval
 parent: story-mcp-server
 labels: [p2]
 created: "2026-09-15"
