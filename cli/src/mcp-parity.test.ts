@@ -177,13 +177,25 @@ describe("CLI <-> MCP parity", () => {
     cliJson(["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"], cliDir);
     await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
     const cliResult = cliJson(
-      ["handoff", "task-rate-limit", "--next", "write the tests", "--branch", "feat/x", "--author", "same-user"],
+      [
+        "handoff",
+        "task-rate-limit",
+        "--next",
+        "write the tests",
+        "--branch",
+        "feat/x",
+        "--session",
+        "sess_parity_1",
+        "--author",
+        "same-user",
+      ],
       cliDir,
     );
     const mcpResult = await mcpCall(mcpDir, "arggon_handoff", {
       id: "task-rate-limit",
       next: "write the tests",
       branch: "feat/x",
+      session: "sess_parity_1",
       author: "same-user",
     });
     expect(mcpResult.isError).toBe(false);

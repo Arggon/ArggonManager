@@ -408,27 +408,28 @@ EOF
 
 ### `arggon handoff`
 
-Appends a structured, bounded session-end handoff section to an item's body — `comment` with structure, for the "resume exactly where you left off" moment. Same body-only machinery as `comment`: frontmatter never touched, works on `done`/`cancelled` items, not a reopen. Section format (each field capped at 200 characters; longer input truncates with `…`, so the whole section stays under ~800 characters):
+Appends a structured, bounded session-end handoff section to an item's body — `comment` with structure, for the "resume exactly where you left off" moment. Same body-only machinery as `comment`: frontmatter never touched, works on `done`/`cancelled` items, not a reopen. Section format (each field capped at 200 characters — the optional session identifier at 64; longer input truncates with `…`, so the whole section stays under ~800 characters):
 
 ```markdown
-### handoff 2026-09-15 @<author> — next: <step>
+### handoff 2026-09-15 @<author>[ (session: <id>)] — next: <step>
 - branch: <branch>
 - open questions: <q1; q2>
 ```
 
 ```bash
 arggon handoff task-rate-limit --next "write the cascade tests"
-arggon handoff task-rate-limit --next "fix the lock retry" --open-questions "does the lease survive rebase?" --json
+arggon handoff task-rate-limit --next "fix the lock retry" --open-questions "does the lease survive rebase?" --session "sess_abc123" --json
 ```
 
 - `--next <text>` (required): the first thing the resuming agent should do
 - `--branch <name>`: working branch; auto-detected from git when omitted (`unknown` outside a git repo)
 - `--open-questions <text>`: optional; semicolon-separated by convention
+- `--session <id>`: optional session identifier for provenance (task-handoff-provenance-session-identifier-in-handoff-sections) — rendered in the heading as `(session: <id>)` so the resuming agent knows which session produced the handoff; explicit flag only (the CLI cannot reliably know the caller's session id — callers pass what they have); omitted cleanly when absent; capped at 64 chars
 - `--author <login>`: attribution, same `@me` resolution as `comment`
 - tracker hygiene: auto-commits the item (`chore(tasks): commented <id>`; `--no-commit` and `x-tracker.auto-commit: false` opt out, non-git trees skip silently)
-- `--json`: envelope v1 with `command: "handoff"`, payload `id`, `path`, `comment: { author, date, lines }`, `handoff: { branch, next, openQuestions? }` + additive `commit`; failures emit `ok: false` with `code: "COMMENT_FAILED"` — reused by design, the handoff kernel IS the comment kernel (same body-append path, same failure modes)
+- `--json`: envelope v1 with `command: "handoff"`, payload `id`, `path`, `comment: { author, date, lines }`, `handoff: { branch, next, openQuestions?, session? }` + additive `commit`; failures emit `ok: false` with `code: "COMMENT_FAILED"` — reused by design, the handoff kernel IS the comment kernel (same body-append path, same failure modes)
 
-The MCP `arggon_handoff` tool takes `id`, `next`, `branch`, `open_questions`, `author` and returns the same envelope.
+The MCP `arggon_handoff` tool takes `id`, `next`, `branch`, `open_questions`, `session`, `author` and returns the same envelope.
 
 ### `arggon instructions`
 

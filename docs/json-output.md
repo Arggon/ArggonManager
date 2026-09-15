@@ -291,7 +291,7 @@ Failures use `error.code: "COMMENT_FAILED"` (unknown id, empty text, unresolvabl
 
 ### `handoff`
 
-Appends a structured, bounded session-end handoff section (`### handoff <date> @<author> — next: <step>` + `- branch: …` / `- open questions: …` lines) to the item **body** through the same machinery as `comment`: body-only write (frontmatter unchanged, no `updated` bump), works on `done`/`cancelled` items. Bounded by construction: each field (`--branch`, `--next`, `--open-questions`) is capped at 200 characters — longer input truncates with `…` — so the whole section stays under ~800 characters.
+Appends a structured, bounded session-end handoff section (`### handoff <date> @<author>[ (session: <id>)] — next: <step>` + `- branch: …` / `- open questions: …` lines) to the item **body** through the same machinery as `comment`: body-only write (frontmatter unchanged, no `updated` bump), works on `done`/`cancelled` items. Bounded by construction: each field (`--branch`, `--next`, `--open-questions`) is capped at 200 characters — the optional `--session` provenance identifier at 64 — longer input truncates with `…` — so the whole section stays under ~800 characters.
 
 | Field                   | Type       | Notes                                                                        |
 | ----------------------- | ---------- | ---------------------------------------------------------------------------- |
@@ -303,6 +303,7 @@ Appends a structured, bounded session-end handoff section (`### handoff <date> @
 | `handoff.branch`        | `string`   | Working branch as rendered (auto-detected from git when omitted; `unknown` outside git); capped at 200 chars |
 | `handoff.next`          | `string`   | The next step (required); capped at 200 chars                                |
 | `handoff.openQuestions` | `string`   | Present only when `--open-questions` was given; capped at 200 chars          |
+| `handoff.session`       | `string`   | Present only when `--session` was given; provenance session identifier rendered in the heading; capped at 64 chars |
 | `commit`                | `object`   | Tracker auto-commit outcome, same shape as `comment`. Additive within `schemaVersion: 1`. |
 
 Failures reuse `error.code: "COMMENT_FAILED"` by design (task-handoff-command): the handoff kernel IS the comment kernel — same body-append path, same failure modes (unknown id, missing `--next`, unresolvable author).
