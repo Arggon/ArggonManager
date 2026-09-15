@@ -27,7 +27,7 @@ Second occurrence (first: bug-autocommit-silent-skip / PR #168, which moved the 
 ## Acceptance
 
 - [x] Failure mode identified precisely from the CI log (what held the lock and for how long) and documented in this item
-- [ ] Hardening landed: either isolation (scoped TMPDIR/GIT_DIR per fixture) or an observation-level retry that preserves the clean-tree contract; labs/torture scenario green across repeated CI runs
+- [x] Hardening landed: either isolation (scoped TMPDIR/GIT_DIR per fixture) or an observation-level retry that preserves the clean-tree contract; labs/torture scenario green across repeated CI runs (PR #214 cli check green; 6/6 stable local vitest runs of labs/torture.test.ts; full suite 817 passed)
 
 ## Notes
 
