@@ -26,7 +26,7 @@ Feedback from the vencimientos adoption experiment (2026-09-15): in `update --js
 
 ## Acceptance
 
-- [ ] `autoCompleted` and `cascadeSkipped` are emitted consistently (both always arrays, or both omitted-when-empty) across CLI and MCP `update` envelopes — pick one, document in docs/json-output.md (additive, schemaVersion unchanged)
-- [ ] Tests: empty-cascade envelope asserts the aligned shape (cli + mcp); parity harness unaffected or updated
+- [x] `autoCompleted` and `cascadeSkipped` are emitted consistently (both always arrays, or both omitted-when-empty) across CLI and MCP `update` envelopes — pick one, document in docs/json-output.md (additive, schemaVersion unchanged)
+- [x] Tests: empty-cascade envelope asserts the aligned shape (cli + mcp); parity harness unaffected or updated
 
 ## Notes
