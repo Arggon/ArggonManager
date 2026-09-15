@@ -4,6 +4,7 @@ status: in_progress
 id: task-skill-generated-command-reference
 title: "Forever fix: SKILL command reference generated from the CLI"
 assignee: Arggon
+branch: feat/task-skill-generated-command-reference
 parent: story-init-docs
 labels: [p2]
 created: "2026-09-15"
