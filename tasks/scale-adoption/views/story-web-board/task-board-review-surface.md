@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-board-review-surface
 title: "board review surface: per-item PR status, checks and diff link"
+assignee: Arggon
 parent: story-web-board
 labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
+claimed_at: "2026-09-15T15:31:16.867Z"
 depends_on: [task-board-dependency-visuals]
 ---
 <!--
