@@ -190,6 +190,19 @@ lean. A 40-line spec beats a 4-page one nobody reads.
 
 ## Pitfalls
 
+- **Tracker-carrying PRs must be MERGE-merged, never squashed.** Tracker mutations
+  auto-commit locally on your branch (`chore(tasks): ...`); a squash merge rewrites
+  those changes into one NEW commit on main while the branch's local auto-commits
+  remain in your local history — the next `git pull` on the stale branch diverges on
+  identical content (vencimientos merge #1 blocked and needed a manual
+  `rebase --onto`; #2/#3 only auto-resolved via rerere). Rule: merge tracker-carrying
+  branches with a merge commit so the local auto-commits ARE the upstream history.
+  If your repo policy forces squash: after merge, either
+  `git pull --rebase origin main` from the stale branch and resolve the
+  duplicate-content conflicts (enable rerere first), or just delete the stale local
+  branch and restart tracker work from fresh main. For stacked/multi-item branches,
+  `--no-commit` on mutations is the alternative — let the PR itself carry the tracker
+  change so there are no local auto-commits to diverge.
 - `update --labels a,b` REPLACES the label list (kebab-case, unique). Same for
   `--depends-on a,b` (empty clears; `--add-depends-on <id>` appends; unknown ids fail).
   **Dependencies are advisory**: they gate `next`/`--ready` suggestions, never updates.
