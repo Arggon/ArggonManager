@@ -360,6 +360,8 @@ Default mode only lists. `--prune` removes removable worktrees (`git worktree re
 
 Dependency-aware ranking (v3, [ADR 0004](adr/0004-milestone-deps-v3.md)): ready items — `depends_on` all `done`/`cancelled` — rank first (lexicographic within each group); `--ready` limits the pool to ready items only, in which case `blockedBy` is always empty. When the suggestion has open dependencies, `reason` names them. Dependencies are advisory: they gate suggestions and queries only, never `update`.
 
+Pool semantics (task-next-pool-stories): the default pool suggests leaf work (tasks/bugs) only — unclaimed stories are excluded, since `next` answers "what do I implement next" and claiming a story is a planning act done explicitly via `update`/`start`. The `--include-stories` flag restores the full pool. Payload shape is unchanged; only the candidate set (and the `reason` line, which names the active semantics) differ. The `arggon_next` MCP tool keeps the default-only (leaf-work) surface.
+
 Empty pool is success (`ok: true`, `suggestion: null`). Failures use `error.code: "NEXT_FAILED"` (missing tasks/, unreadable items).
 
 ### `show`
