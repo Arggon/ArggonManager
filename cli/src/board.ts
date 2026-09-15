@@ -171,8 +171,12 @@ export function escapeHtml(value: string): string {
     .replace(/'/g, "&#39;");
 }
 
-/** Badge for the live GitHub overlay. No branch or no matching PR -> neutral badge. */
-function prBadge(pr: PrInfo | undefined): string {
+/**
+ * Badge for the live GitHub overlay. No branch or no matching PR -> neutral
+ * badge. With `diffLinks` (serve-mode review surface only), a second link to
+ * the PR's files view (…/pull/<n>/files) is appended after the badge text.
+ */
+function prBadge(pr: PrInfo | undefined, diffLinks: boolean): string {
   if (!pr) return `<div class="pr nopr">○ no PR</div>`;
   const kind =
     pr.state === "MERGED"
@@ -199,9 +203,13 @@ function prBadge(pr: PrInfo | undefined): string {
           ? " · …"
           : "";
   const text = `#${pr.number} · ${label}${checks}`;
+  const diff =
+    diffLinks && pr.url
+      ? ` · <a class="diff" href="${escapeHtml(pr.url)}/files">diff</a>`
+      : "";
   return pr.url
-    ? `<div class="pr ${kind}"><a href="${escapeHtml(pr.url)}">${escapeHtml(text)}</a></div>`
-    : `<div class="pr ${kind}">${escapeHtml(text)}</div>`;
+    ? `<div class="pr ${kind}"><a href="${escapeHtml(pr.url)}">${escapeHtml(text)}</a>${diff}</div>`
+    : `<div class="pr ${kind}">${escapeHtml(text)}${diff}</div>`;
 }
 
 /**
@@ -297,6 +305,11 @@ export function evaluateDrop(
  * With `groupBy: "story"` (task-board-dependency-visuals) cards group under
  * parent-story headers sorted ascending; parent-less cards render last under
  * a "no story" header only when the column also has parent groups.
+ * With `live: true` (GitHub overlay) cards with a `branch` also render a PR
+ * badge: state (open/draft/merged/closed) + checks summary; with
+ * `diffLinks: true` (task-board-review-surface, --serve only) a second link
+ * to the PR's files view is appended. Without `live` the export stays
+ * badge-free and byte-identical to the plain render.
  * Cards with open dependencies (ADR 0004: deps not done/cancelled) are
  * visually distinct: a `dep-blocked` class (dimmed card) plus a
  * `blocked by N` badge, and a `↳ blocked by <id>` line per open dep;
@@ -309,6 +322,8 @@ export function renderBoardHtml(
     repoName?: string;
     prs?: Map<string, PrInfo>;
     live?: boolean;
+    /** Serve-mode review surface (task-board-review-surface): add per-PR diff links. */
+    diffLinks?: boolean;
     groupBy?: "milestone" | "story";
   } = {
     generatedAt: "",
@@ -319,6 +334,7 @@ export function renderBoardHtml(
   const prs = opts.prs ?? new Map<string, PrInfo>();
   // Offline snapshot stays byte-identical: the PR line only renders with the live overlay on.
   const showPr = opts.live === true;
+  const diffLinks = showPr && opts.diffLinks === true;
   const groupByMilestone = opts.groupBy === "milestone";
   const groupByStory = opts.groupBy === "story";
 
@@ -355,7 +371,7 @@ export function renderBoardHtml(
         ? `<div class="assignee">@${esc(item.assignee)}</div>`
         : `<div class="assignee unassigned">unassigned</div>`;
       const branch = item.branch ? `<div class="branch">⑂ ${esc(item.branch)}</div>` : "";
-      const pr = showPr ? prBadge(item.branch ? prs.get(item.branch) : undefined) : "";
+      const pr = showPr ? prBadge(item.branch ? prs.get(item.branch) : undefined, diffLinks) : "";
       const reason = item.blocked_reason
         ? `<div class="blocked-reason">${esc(item.blocked_reason)}</div>`
         : "";
@@ -469,6 +485,7 @@ header .meta { color: #59636e; font-size: 13px; }
 .pr { font-size: 12px; margin-top: 2px; }
 .pr a { color: inherit; text-decoration: none; }
 .pr a:hover { text-decoration: underline; }
+.pr a.diff { color: #0550ae; font-weight: 400; }
 .pr.nopr { color: #a0a6ad; }
 .pr.draft { color: #8c919a; }
 .pr.open { color: #1a7f37; font-weight: 600; }

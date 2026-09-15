@@ -14,6 +14,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startBoardServer, type BoardServeHandle } from "./board-serve.js";
+import type { BoardGithub, PrInfo } from "./board.js";
 import { runInit } from "./init.js";
 import { runCreate } from "./create.js";
 
@@ -144,6 +145,99 @@ describe("board --serve", () => {
     const body = (await res.json()) as { ok: boolean; error: { message: string } };
     expect(body.ok).toBe(false);
   });
+});
+
+describe("board --serve review surface (task-board-review-surface)", () => {
+  function ghFake(response: PrInfo[] | Error): BoardGithub {
+    return {
+      listPrs: () => {
+        if (response instanceof Error) throw response;
+        return response;
+      },
+    };
+  }
+
+  function writeBranchedTask(dir: string): void {
+    const taskMd = join(dir, "tasks/launch-mvp/auth/story-login/task-br.md");
+    mkdirSync(join(taskMd, ".."), { recursive: true });
+    writeFileSync(
+      taskMd,
+      '---\ntype: task\nstatus: in_progress\nid: task-br\nparent: story-login\nbranch: feat/task-br\nlabels: []\ncreated: "2026-09-15"\nupdated: "2026-09-15"\n---\n\n# task-br\n',
+      "utf8",
+    );
+  }
+
+  it("renders PR state, checks and a diff link from the gh read path, and reloads on PR change", async () => {
+    const ghDir = mkdtempSync(join(tmpdir(), "arggon-serve-gh-"));
+    runInit({ dir: ghDir, force: false });
+    writeBranchedTask(ghDir);
+    let checks: PrInfo["checks"] = "pending";
+    const gh: BoardGithub = {
+      listPrs: () => [
+        {
+          branch: "feat/task-br",
+          number: 9,
+          url: "https://github.com/o/r/pull/9",
+          state: "OPEN",
+          isDraft: false,
+          checks,
+        },
+      ],
+    };
+    const ghHandle = startBoardServer({ cwd: ghDir, gh, pollMs: 50 });
+    await ghHandle.ready;
+    try {
+      const html = await (await fetch(`${ghHandle.url}/`)).text();
+      expect(html).toContain("#9 · open · …");
+      expect(html).toContain('href="https://github.com/o/r/pull/9/files"');
+      expect(html).toContain("live GitHub overlay (1 PR(s))");
+
+      // Poll picks up a checks transition and pushes a reload to SSE clients.
+      const controller = new AbortController();
+      const res = await fetch(`${ghHandle.url}/events`, { signal: controller.signal });
+      const reader = res.body!.getReader();
+      void reader.read(); // hello
+      const reload = (async () => {
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) return "";
+          if (new TextDecoder().decode(value).includes("data: reload")) return "reload";
+        }
+      })();
+      checks = "passing";
+      const seen = await Promise.race([
+        reload,
+        new Promise<string>((resolve) => setTimeout(() => resolve("timeout"), 5000)),
+      ]);
+      controller.abort();
+      expect(seen).toBe("reload");
+      const refreshed = await (await fetch(`${ghHandle.url}/`)).text();
+      expect(refreshed).toContain("#9 · open · ✓");
+    } finally {
+      await ghHandle.close();
+      rmSync(ghDir, { recursive: true, force: true });
+    }
+  }, 15_000);
+
+  it("degrades cleanly without gh (neutral badges, server keeps serving)", async () => {
+    const noGhDir = mkdtempSync(join(tmpdir(), "arggon-serve-nogh-"));
+    runInit({ dir: noGhDir, force: false });
+    writeBranchedTask(noGhDir);
+    const gh = ghFake(new Error("gh not found (install gh and run `gh auth login`)"));
+    const noGhHandle = startBoardServer({ cwd: noGhDir, gh, pollMs: 50 });
+    await noGhHandle.ready;
+    try {
+      const html = await (await fetch(`${noGhHandle.url}/`)).text();
+      expect(html).toContain("○ no PR");
+      expect(html).not.toContain("/files");
+      expect(html).not.toContain('class="diff"');
+      // Degradation never takes the server down.
+      expect((await fetch(`${noGhHandle.url}/`)).status).toBe(200);
+    } finally {
+      await noGhHandle.close();
+      rmSync(noGhDir, { recursive: true, force: true });
+    }
+  }, 15_000);
 });
 
 describe("arggon board --serve (CLI)", () => {

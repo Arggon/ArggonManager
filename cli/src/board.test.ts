@@ -411,6 +411,43 @@ describe("renderBoardHtml github overlay", () => {
   });
 });
 
+describe("renderBoardHtml review surface (task-board-review-surface, serve-only diff links)", () => {
+  it("appends a /files diff link next to the PR badge only with diffLinks", () => {
+    const items = [item({ id: "task-a", type: "task", status: "todo", branch: "feat/a" })];
+    const prs = new Map([["feat/a", pr({ branch: "feat/a", number: 7 })]]);
+    const serveHtml = renderBoardHtml(items, {
+      generatedAt: GENERATED_AT,
+      live: true,
+      diffLinks: true,
+      prs,
+    });
+    expect(serveHtml).toContain('href="https://github.com/o/r/pull/7/files"');
+    expect(serveHtml).toContain(">diff</a>");
+
+    // Static --github export (no diffLinks) stays without the diff link.
+    const staticHtml = renderBoardHtml(items, { generatedAt: GENERATED_AT, live: true, prs });
+    expect(staticHtml).not.toContain("/files");
+    expect(staticHtml).not.toContain(">diff</a>");
+  });
+
+  it("renders no diff link for PRs without a url or cards without a matching PR", () => {
+    const html = renderBoardHtml(
+      [
+        item({ id: "task-a", type: "task", status: "todo", branch: "feat/a" }),
+        item({ id: "task-b", type: "task", status: "todo", branch: "feat/b" }),
+      ],
+      {
+        generatedAt: GENERATED_AT,
+        live: true,
+        diffLinks: true,
+        prs: new Map([["feat/a", pr({ branch: "feat/a", number: 7, url: "" })]]),
+      },
+    );
+    expect(html).not.toContain('class="diff"');
+    expect(html).toContain("○ no PR");
+  });
+});
+
 function writeBranchedTree(dir: string): { taskMd: string; conventionYml: string } {
   mkdirSync(join(dir, "tasks/launch/auth/story-a"), { recursive: true });
   writeFileSync(join(dir, "tasks/.convention.yml"), "version: 1\n");
