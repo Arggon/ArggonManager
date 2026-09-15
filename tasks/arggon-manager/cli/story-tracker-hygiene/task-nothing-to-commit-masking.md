@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-nothing-to-commit-masking
 title: "commitTrackerMutation: nothing-to-commit benign skip can mask a lost staged entry under concurrency"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-tracker-hygiene
 labels: []
 created: "2026-09-15"
 updated: "2026-09-15"
-claimed_at: "2026-09-15T16:28:55.709Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tracker-hygiene/task-nothing-to-commit-masking.md
