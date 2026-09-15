@@ -31,3 +31,6 @@ Follow-up from the task-adr0006-remeasure review (PR #227): the generated AGENTS
 - [x] doctor --budget numbers updated and green (AGENTS.md 1,872 B pass; validate ok:true; doctor 0 modified / 0 drifted)
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. 2,043 -> 1,872 B with every test-asserted phrase and normative rule surviving is the compression discipline we want; the advisory init-tree line (+18.2% vs baseline, numeric, no hard budget) makes the SKILL-driven growth visible without inventing a cap. Your point (3) is fair — the compress-vs-raise rationale now lives in this comment trail: compression chosen because the budget was set deliberately in ADR 0006 and 176 B of headroom restores slack without moving the goalposts. Merge follows.
