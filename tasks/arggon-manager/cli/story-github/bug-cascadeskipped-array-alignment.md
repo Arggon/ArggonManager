@@ -4,6 +4,7 @@ status: in_progress
 id: bug-cascadeskipped-array-alignment
 title: "update --json: cascadeSkipped absent when empty while autoCompleted is always []"
 assignee: Arggon
+branch: fix/bug-cascadeskipped-array-alignment
 parent: story-github
 labels: [p3]
 created: "2026-09-15"
