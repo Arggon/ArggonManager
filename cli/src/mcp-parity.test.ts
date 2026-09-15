@@ -190,6 +190,75 @@ describe("CLI <-> MCP parity", () => {
     expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
   });
 
+  it("next suggests the same item with the same envelope through both entry points", async () => {
+    const { cliDir, mcpDir } = twinTrees();
+    cliJson(["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"], cliDir);
+    await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
+    const cliResult = cliJson(["next"], cliDir);
+    const mcpResult = await mcpCall(mcpDir, "arggon_next", {});
+    expect(mcpResult.isError).toBe(false);
+    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+    const suggestion = cliResult.suggestion as { item: { id: string }; unblocks: number };
+    // The seeded unclaimed story is also a claimable todo and wins the
+    // lexicographic tie (equal downstream weight).
+    expect(suggestion.item.id).toBe("story-login");
+  });
+
+  it("report returns the same groups through both entry points", async () => {
+    const { cliDir, mcpDir } = twinTrees();
+    cliJson(["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"], cliDir);
+    await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
+    const cliResult = cliJson(["report"], cliDir);
+    const mcpResult = await mcpCall(mcpDir, "arggon_report", {});
+    expect(mcpResult.isError).toBe(false);
+    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+  });
+
+  it("validate returns the same ok envelope through both entry points", async () => {
+    const { cliDir, mcpDir } = twinTrees();
+    const cliResult = cliJson(["validate"], cliDir);
+    const mcpResult = await mcpCall(mcpDir, "arggon_validate", {});
+    expect(mcpResult.isError).toBe(false);
+    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+    expect(cliResult.ok).toBe(true);
+  });
+
+  it("validate failure carries the same errors and ok:false shape through both entry points", async () => {
+    const { cliDir, mcpDir } = twinTrees();
+    // Corrupt both trees identically: a blocked leaf with no blocked_reason
+    // (validate flags the missing reason as an error).
+    const fs = await import("node:fs");
+    const breakTree = async (cwd: string): Promise<void> => {
+      const created = cliJson(
+        ["create", "task", "Broken", "--parent", "story-login", "--id", "broken"],
+        cwd,
+      );
+      const path = (created.item as { path: string }).path;
+      const file = resolve(cwd, path);
+      const body = fs.readFileSync(file, "utf8");
+      fs.writeFileSync(file, body.replace("status: todo", "status: blocked"));
+    };
+    await breakTree(cliDir);
+    await breakTree(mcpDir);
+    const cliProc = runCli(["validate"], cliDir);
+    expect(cliProc.status).not.toBe(0);
+    const cliResult = JSON.parse(cliProc.stdout) as Envelope;
+    expect(cliResult.ok).toBe(false);
+    const mcpResult = await mcpCall(mcpDir, "arggon_validate", {});
+    expect(mcpResult.isError).toBe(true);
+    expect(mcpResult.result).toEqual(normalize(cliResult, cliDir));
+  });
+
+  it("report --since without trend fails identically through both entry points", async () => {
+    const { cliDir, mcpDir } = twinTrees();
+    const cliProc = runCli(["report", "--since", "2026-01-01"], cliDir);
+    expect(cliProc.status).not.toBe(0);
+    const cliResult = JSON.parse(cliProc.stdout) as Envelope;
+    const mcpResult = await mcpCall(mcpDir, "arggon_report", { since: "2026-01-01" });
+    expect(mcpResult.isError).toBe(true);
+    expect(mcpResult.result).toEqual(normalize(cliResult, cliDir));
+  });
+
   it("errors match: same message text and ok:false shape through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
     const cliProc = runCli(["update", "nope", "--status", "todo"], cliDir);
@@ -245,6 +314,17 @@ const PARITY_EXCEPTIONS: Record<string, Record<string, string>> = {
     "--no-commit":
       "default-on flip semantics governed tree-wide by x-tracker.auto-commit; MCP resolves commit identically without a flag",
   },
+  next: {
+    "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
+  },
+  report: {
+    "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
+    "--format":
+      "human output layout only (table vs markdown); the MCP tool text is always the JSON envelope",
+  },
+  validate: {
+    "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
+  },
 };
 
 /** Positional CLI arguments and the MCP schema property each maps to. */
@@ -255,10 +335,23 @@ const POSITIONAL_MAP: Record<string, string[]> = {
   comment: ["id", "text"],
   show: ["id"],
   handoff: ["id"],
+  next: [],
+  report: [],
+  validate: [],
 };
 
 /** `.command("name")` blocks whose CLI surface must be mirrored by MCP. */
-const PARITY_COMMANDS = ["list", "create", "update", "comment", "show", "handoff"] as const;
+const PARITY_COMMANDS = [
+  "list",
+  "create",
+  "update",
+  "comment",
+  "show",
+  "handoff",
+  "next",
+  "report",
+  "validate",
+] as const;
 
 /** Extract the long flags of every `.option(...)` call in a command block. */
 function deriveCliOptions(command: string): string[] {

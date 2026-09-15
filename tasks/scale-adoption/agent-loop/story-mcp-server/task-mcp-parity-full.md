@@ -26,8 +26,12 @@ Candidate #1 of [product discovery](docs/explorations/exploration-product-discov
 
 ## Acceptance
 
-- [ ] `arggon_next`, `arggon_show`, `arggon_report`, `arggon_validate` MCP tools land (schemas mirror the CLI surface; bounded outputs)
-- [ ] Parity harness (cli/src/mcp-parity.test.ts) covers all four + existing tools still green
-- [ ] docs/agents.md §MCP server + docs/json-output.md updated (tool list); ADR 0006 completion noted in the item
+- [x] `arggon_next`, `arggon_show`, `arggon_report`, `arggon_validate` MCP tools land (schemas mirror the CLI surface; bounded outputs)
+- [x] Parity harness (cli/src/mcp-parity.test.ts) covers all four + existing tools still green
+- [x] docs/agents.md §MCP server + docs/json-output.md updated (tool list); ADR 0006 completion noted in the item
 
 ## Notes
+
+- arggon_show already landed with task-handoff-command; this item added `arggon_next` (ready flag; suggestion carries item/parentChain/reason/blockedBy/unblocks), `arggon_report` (trend/since; --format has no MCP counterpart — human layout only), `arggon_validate` (pure read; ok:false + VALIDATE_FAILED when errors exist).
+- ADR 0006 MCP surface complete: the next-first suggestion loop (next → start → update) now works entirely over MCP with bounded envelopes.
+- Documented parity exceptions: next/report/validate `--json` (envelope is the tool text); report `--format` (human output layout only).
