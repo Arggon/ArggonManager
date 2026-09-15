@@ -34,3 +34,6 @@ Design decision: **explicit flag only** — the CLI cannot reliably know the cal
 - [x] Docs: README handoff section + docs/json-output.md `handoff` envelope table (additive)
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. Explicit-flag-only is the right provenance design (the CLI cannot know the caller's session id — callers pass what they have), 64-char cap consistent with the other fields, omitted cleanly, and the MCP schema + parity case ride along. The session-annotated heading gives the resuming agent the origin without token cost. Merge follows.
