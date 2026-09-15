@@ -19,10 +19,14 @@ updated: "2026-09-15"
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+Feedback from the vencimientos adoption experiment (2026-09-15 session): the agent ran `arggon init` in a fresh directory with NO git repo. Init generated the full governance set (AGENTS.md, docs, tracker) and auto-commit skipped gracefully ("not a git repository" — by design, the CLI works without git). But `arggon doctor` reported everything healthy while the actual loop was half-broken: branch, worktree, tracker auto-commit, push, PR and the pre-commit `arggon validate` hook all depend on git. The agent had to `git init`, create the hook manually and open the GitHub repo before claiming the first item.
+
+Doctor is exactly the report-only surface where this belongs: it already reports docs/tracker health, just not git state.
 
 ## Acceptance
 
-- [ ] 
+- [ ] `doctor --json` reports git state: is-repo, dirty/clean, remote present (report-only, exit 0 as always)
+- [ ] `init` warns on stderr when generating in a non-git tree (branch/worktree/push/PR flows unavailable; auto-commit skipping is expected) — do NOT auto-`git init` (design decision explicitly out of scope for this bug)
+- [ ] Tests: doctor on a non-git tree reports the git state; init-in-non-git emits the warning
 
 ## Notes
