@@ -1,12 +1,14 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-torture-contention-flake2
 title: labs/torture auto-commit contention still flakes in CI despite wall-clock retry
+assignee: Arggon
 parent: story-self-improvement
 labels: []
 created: "2026-09-14"
-updated: "2026-09-14"
+updated: "2026-09-15"
+claimed_at: "2026-09-15T13:00:26.025Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/bug-torture-contention-flake2.md
