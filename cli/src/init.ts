@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { bundledTemplatesDir } from "./paths.js";
@@ -62,6 +63,15 @@ export type InitResult = {
   conventionPath: string;
   /** Tracker auto-commit outcome for the files written this run. */
   commit?: TrackerCommitResult;
+  /**
+   * Present only when the target tree is NOT a git repository
+   * (bug-init-git-doctor-blindspot): branch/worktree/push/PR flows and the
+   * pre-commit validate hook are unavailable until the adopter runs
+   * `git init`. Surfaced as a stderr warning (human output) and this additive
+   * JSON field; auto-commit skipping stays the expected, quiet default.
+   * Never auto-`git init` — explicitly out of scope.
+   */
+  warning?: string;
 };
 
 function ensureTemplates(root: string, force: boolean): string[] {  const templatesDest = join(root, "templates");
@@ -102,10 +112,32 @@ function commitGeneratedDocs(
   });
 }
 
+const NOT_A_REPO_WARNING =
+  "not a git repository — branch/worktree/push/PR flows and the pre-commit " +
+  "validate hook will be unavailable until you run `git init`";
+
+/**
+ * bug-init-git-doctor-blindspot: is the target tree inside a git repository?
+ * Best-effort probe (`git rev-parse --git-dir`), false when git is absent.
+ */
+function isGitRepo(root: string): boolean {
+  try {
+    execFileSync("git", ["rev-parse", "--git-dir"], {
+      cwd: root,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function runInit(opts: InitOptions): InitResult {
   const root = resolve(opts.dir);
   const tasksDir = join(root, "tasks");
   const conventionPath = join(tasksDir, ".convention.yml");
+  // Compute once up front; attached to every result shape below.
+  const gitWarning = isGitRepo(root) ? undefined : NOT_A_REPO_WARNING;
 
   const alreadyInitialized = existsSync(conventionPath);
   if (alreadyInitialized && !opts.force) {
@@ -126,6 +158,7 @@ export function runInit(opts: InitOptions): InitResult {
       restored,
       conventionPath,
       commit: commitGeneratedDocs(root, written, opts.commit),
+      warning: gitWarning,
     };
   }
 
@@ -157,5 +190,6 @@ export function runInit(opts: InitOptions): InitResult {
     restored: [],
     conventionPath,
     commit: commitGeneratedDocs(root, written, opts.commit),
+    warning: gitWarning,
   };
 }
