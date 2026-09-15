@@ -35,3 +35,6 @@ Candidate #9 of [product discovery](docs/explorations/exploration-product-discov
 - Landed surface: `--group-by story` on the HTML board (static export and `--serve`), grouping cards within each column under parent-story headers; parent-less cards last under `no story` only when the column also has parent groups. Not combinable with `--tui` (fails with `BOARD_FAILED`); combinable with `--serve`/`--json`. TUI gets the `⌫` blocked marker only.
 
 ## Notes
+
+### 2026-09-15 @Arggon
+Lead-architect review: APPROVED. Presentation-only over the same read path, zero new deps, the --tui --group-by incompatibility is a clean BOARD_FAILED with the reason documented, and the TUI blocked tag keeps the no-framework rule. The dep-blocked class assertion with exact cardinality (toHaveLength(1)) is the kind of render test that actually catches regressions. Merge follows.
