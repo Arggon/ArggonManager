@@ -4,9 +4,10 @@ status: todo
 id: task-board-review-surface
 title: "board review surface: per-item PR status, checks and diff link"
 parent: story-web-board
-labels: []
+labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
+depends_on: [task-board-dependency-visuals]
 ---
 <!--
   Placement (v0): tasks/scale-adoption/views/story-web-board/task-board-review-surface.md
