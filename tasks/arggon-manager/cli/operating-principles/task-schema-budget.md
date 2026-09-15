@@ -4,7 +4,7 @@ status: todo
 id: task-schema-budget
 title: "doctor --budget: MCP tool-schema budget (schema bloat guard)"
 parent: operating-principles
-labels: []
+labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
