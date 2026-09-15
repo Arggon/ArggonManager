@@ -4,6 +4,7 @@ status: in_progress
 id: task-board-review-surface
 title: "board review surface: per-item PR status, checks and diff link"
 assignee: Arggon
+branch: feat/task-board-review-surface
 parent: story-web-board
 labels: [p3]
 created: "2026-09-15"
