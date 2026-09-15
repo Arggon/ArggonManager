@@ -4,7 +4,7 @@ status: todo
 id: bug-cascadeskipped-array-alignment
 title: "update --json: cascadeSkipped absent when empty while autoCompleted is always []"
 parent: story-github
-labels: []
+labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
