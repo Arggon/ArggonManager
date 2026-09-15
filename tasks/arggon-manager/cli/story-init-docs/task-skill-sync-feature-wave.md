@@ -4,7 +4,7 @@ status: todo
 id: task-skill-sync-feature-wave
 title: "SKILL sync: surface show, handoff, 9-tool MCP list and recent features in the bundled skill"
 parent: story-init-docs
-labels: []
+labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
