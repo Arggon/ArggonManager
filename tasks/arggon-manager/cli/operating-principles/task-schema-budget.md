@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-schema-budget
 title: "doctor --budget: MCP tool-schema budget (schema bloat guard)"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: operating-principles
 labels: [p2]
 created: "2026-09-15"
 updated: "2026-09-15"
-claimed_at: "2026-09-15T22:03:27.407Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/operating-principles/task-schema-budget.md
