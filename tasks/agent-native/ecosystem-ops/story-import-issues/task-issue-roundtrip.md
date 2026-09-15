@@ -4,7 +4,7 @@ status: todo
 id: task-issue-roundtrip
 title: "issue round-trip: done flips close/annotate the linked GitHub issue"
 parent: story-import-issues
-labels: []
+labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-15"
 ---
