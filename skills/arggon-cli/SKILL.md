@@ -49,20 +49,20 @@ git -C ../ArggonManager pull --ff-only && npm -C ../ArggonManager run build
 ## 1. Start or adopt a project
 
 ```bash
-arggon init --full        # NEW repo: tasks/ tree + governing docs (AGENTS.md + CLAUDE.md
-                          # shim + .github/ files + CONTRIBUTING/SECURITY/.editorconfig +
-                          # .mcp.json MCP registration; --full adds ARCHITECTURE.md,
-                          # docs/convention.md + engineering.md, CHANGELOG, SUPPORT,
-                          # runbooks) + bundles this skill at
-                          # .agents/skills/arggon-cli/SKILL.md
-arggon adopt              # EXISTING repo: creates a tracked migration task with an agent
-                          # checklist (sweep docs → extract content → complete generated docs
-                          # → archive replaced originals to backup/<date>/ → playbooks from
-                          # detected stack → verify → report). --dry-run inventories only.
-arggon doctor             # installation state: initialized? conventionVersion? docs
-                          # managed/untouched/modified/stale? tracker counts? (report-only)
+<!-- arggon:generated-commands start: init,adopt -->
+arggon init [dir]  # Scaffold tasks/ convention (+ templates + governing docs) in a repo
+arggon adopt  # Inventory the repo's governing docs and create the tracked, agent-executable adoption task (requires init)
+<!-- arggon:generated-commands end -->
 ```
 
+- `init --full` adds the tier-2 doc set (ARCHITECTURE.md, docs/convention.md +
+  engineering.md, CHANGELOG, SUPPORT, runbooks) and bundles this skill at
+  `.agents/skills/arggon-cli/SKILL.md`; `--backup` archives adopter-modified docs
+  to `backup/<date>/`.
+- `adopt` creates the tracked migration task with an agent checklist (sweep docs →
+  extract content → complete generated docs → archive replaced originals to
+  `backup/<date>/` → playbooks from detected stack → verify → report);
+  `--dry-run` inventories only. Doctor (§3) reports installation state.
 - Init/adopt never overwrite existing files (not even with `--force`): governing
   docs are adopter-owned the moment they exist. Re-running init regenerates
   **untouched** generated docs silently (checksum in `x-generated` state), skips and
@@ -79,9 +79,10 @@ command/flag/description change; cli/src/skill-generated-commands.test.ts
 fails on drift). Curated nuances live outside the region.
 
 ```bash
-<!-- arggon:generated-commands start: list,next,start,update,comment,show,handoff,create,validate -->
+<!-- arggon:generated-commands start: list,next,branch,start,update,comment,show,handoff,create,validate -->
 arggon list  # List work items under tasks/ with optional filters
 arggon next  # Suggest the next claimable leaf item (tasks/bugs; ready items rank first, by downstream weight — unblocks count; lexicographic id on ties; --include-stories opts stories back in)
+arggon branch <id>  # Check out the working branch for an item (generated from branch_patterns)
 arggon start <id>  # Claim an item, check out its branch, commit, push, and optionally open a draft PR
 arggon update <id>  # Update frontmatter fields of a work item
 arggon comment <id> [text]  # Append a timestamped, author-attributed comment section to an item's body
@@ -118,11 +119,12 @@ Nuances (hand-written, review-covered):
 ## 3. Views, reporting, tooling
 
 ```bash
-<!-- arggon:generated-commands start: board,report,doctor,sync,instructions,cleanup -->
+<!-- arggon:generated-commands start: board,report,doctor,sync,import-issues,instructions,cleanup -->
 arggon board  # Write a static read-only HTML board from tasks/ (git files stay the source of truth)
 arggon report  # Aggregate leaf statuses per container, grouped by epic (display only)
 arggon doctor  # Report installation state: convention version, generated-doc provenance, tracker counts (pure read); with --budget, also the ADR 0006 context-budget surfaces incl. the live MCP tool-schema size (report-only)
 arggon sync  # Reconcile task branch fields with open GitHub PRs
+arggon import-issues  # One-shot import of GitHub issues into tasks/ as tasks/bugs (idempotent; x-import maps labels to types)
 arggon instructions  # Print the agent wiring (install, pre-commit, CI) extracted from docs/agents.md
 arggon cleanup  # List worktrees of done/cancelled items whose branches are merged (--prune removes them)
 <!-- arggon:generated-commands end -->

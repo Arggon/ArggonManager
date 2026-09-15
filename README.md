@@ -137,7 +137,7 @@ npm test
 npm run lint
 ```
 
-The SKILL command reference is generated, not hand-written: the `arggon <cmd> ...` lines inside the `arggon:generated-commands` marker regions of `skills/arggon-cli/SKILL.md` are rendered from the live commander definitions in `cli/src/cli.ts` — run `npm run skills:sync` after any command/flag/description change (`cli/src/skill-generated-commands.test.ts` fails on drift). Curated narrative stays outside the regions.
+The SKILL command reference is generated, not hand-written: the `arggon <cmd> ...` lines inside the `arggon:generated-commands` marker regions of `skills/arggon-cli/SKILL.md` are rendered from the live commander definitions in `cli/src/cli.ts` — run `npm run skills:sync` after any command/flag/description change (`cli/src/skill-generated-commands.test.ts` fails on drift). Curated narrative stays outside the regions; a coverage invariant in the same test file fails when any non-excluded command lacks a generated-region line, so description edits always feed a region mechanically.
 
 After a fresh clone, `.agents/skills/arggon-cli/SKILL.md` is absent (it is generated from the single source `skills/arggon-cli/SKILL.md`, not committed): run `npm run skills:sync` so agent clients that read skills from disk can see it (`npm test` regenerates it too).
 
