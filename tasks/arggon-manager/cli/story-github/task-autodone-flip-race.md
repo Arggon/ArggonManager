@@ -4,6 +4,7 @@ status: in_progress
 id: task-autodone-flip-race
 title: "auto-done: flip PRs lose the up-to-date race and wedge (no retry; bot check not re-posted)"
 assignee: Arggon
+branch: feat/task-autodone-flip-race
 parent: story-github
 labels: []
 created: "2026-09-15"
