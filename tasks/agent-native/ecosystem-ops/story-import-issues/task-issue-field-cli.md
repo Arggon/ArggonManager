@@ -4,6 +4,7 @@ status: in_progress
 id: task-issue-field-cli
 title: "expose --issue on create/update: round-trip is unreachable for hand-built items"
 assignee: Arggon
+branch: feat/task-issue-field-cli
 parent: story-import-issues
 labels: [p2]
 created: "2026-09-15"
