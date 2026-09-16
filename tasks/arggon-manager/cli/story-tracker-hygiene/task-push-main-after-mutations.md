@@ -29,3 +29,6 @@ Follow-up from the casa-pendiente experiment (2026-09-15), extending the landed 
 - [x] docs/agents.md §0 tracker-hygiene paragraph mentions the same discipline
 
 ## Notes
+
+### 2026-09-16 @Arggon
+Lead-architect review: APPROVED. The preventive line lands inside the existing pitfall (no duplication), the contraband clause folds the cleanup --prune auto-commit into the same discipline, and both docs/agents.md spots stay lean. Docs-only, gates green. Merge follows.
