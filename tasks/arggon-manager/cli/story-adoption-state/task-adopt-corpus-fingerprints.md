@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adopt-corpus-fingerprints
 title: "adopt/init inventory: CLI-native spec-corpus detection by fingerprints"
+assignee: Arggon
 parent: story-adoption-state
 labels: [p3]
 created: "2026-09-16"
 updated: "2026-09-16"
+claimed_at: "2026-09-16T19:58:26.221Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-adoption-state/task-adopt-corpus-fingerprints.md
