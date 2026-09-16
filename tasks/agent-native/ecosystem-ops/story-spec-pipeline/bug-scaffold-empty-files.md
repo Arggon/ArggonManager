@@ -1,12 +1,15 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-scaffold-empty-files
 title: scaffolded docs reported truncated to 0 lines (spec new / playbook new / stack explore)
+assignee: Arggon
+branch: fix/bug-scaffold-empty-files
 parent: story-spec-pipeline
 labels: [p3]
 created: "2026-09-15"
-updated: "2026-09-15"
+updated: "2026-09-16"
+claimed_at: "2026-09-16T01:08:16.859Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-spec-pipeline/bug-scaffold-empty-files.md
@@ -25,8 +28,8 @@ Code analysis at filing time: the scaffold write paths (cli/src/spec.ts:727/737,
 
 ## Acceptance
 
-- [ ] Scaffold writes hardened: temp-file + rename (atomic) across spec new / playbook new / stack explore write paths
-- [ ] Shrink guard: a post-write check that the written byte length matches the rendered content, failing loudly instead of leaving a truncated doc
+- [x] Scaffold writes hardened: temp-file + rename (atomic) across spec new / playbook new / stack explore write paths
+- [x] Shrink guard: a post-write check that the written byte length matches the rendered content, failing loudly instead of leaving a truncated doc
 - [ ] If the environment cause is identified during investigation, document it in this item
 
 ## Notes
