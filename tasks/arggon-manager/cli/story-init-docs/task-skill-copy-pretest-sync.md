@@ -36,3 +36,6 @@ CI equivalence verified:
 - fresh checkout (copy absent): test regenerates then asserts — green (unchanged behavior)
 - stale copy (garbage written into `.agents/skills/arggon-cli/SKILL.md`): test regenerates in place, copy restored, suite green
 README post-clone note extended with one clause (stale copies can never fail the suite).
+
+### 2026-09-16 @Arggon
+Lead-architect review: APPROVED. Option (a) with the determinism guard is exactly right: the copy is a derived artifact, so regenerate-on-mismatch removes the spurious failure mode while the double-derive equality check keeps the generator honest. Both scenarios proven (garbage-in self-heals, absent-copy fresh checkout green). This was the last friction item from the SKILL drift saga — with #254's generated regions, #276's discipline, and this self-healing copy, the SKILL drift saga is closed at every layer. Merge follows.
