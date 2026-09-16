@@ -4,7 +4,7 @@ status: todo
 id: task-spec-import-openspec
 title: "spec import openspec: mechanical migration with zero-loss check"
 parent: story-spec-pipeline
-labels: []
+labels: [p2]
 created: "2026-09-16"
 updated: "2026-09-16"
 ---
