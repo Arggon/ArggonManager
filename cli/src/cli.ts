@@ -826,10 +826,13 @@ program
         if (result.movedFrom) console.log(`  moved from: ${result.movedFrom}`);
         if (result.renamedFrom) console.log(`  renamed from id: ${result.renamedFrom}`);
         for (const skipped of result.cascadeSkipped) {
-          console.log(
-            `  cascade skipped: ${skipped.type} '${skipped.id}'` +
-              ` — acceptance checklist incomplete`,
-          );
+          const why =
+            skipped.reason === "subtree-open"
+              ? `subtree still open${"sibling" in skipped && skipped.sibling ? ` (sibling '${skipped.sibling}')` : ""}`
+              : skipped.reason === "lock-timeout"
+                ? "another arggon process holds its lock (re-run any terminal update to retrigger the cascade)"
+                : "acceptance checklist incomplete";
+          console.log(`  cascade skipped: ${skipped.type} '${skipped.id}' — ${why}`);
         }
         if (result.autoCompleted.length > 0) {
           console.log(`  auto-completed: ${result.autoCompleted.join(", ")}`);

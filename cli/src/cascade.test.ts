@@ -7,8 +7,8 @@
  * opts out. The result names the affected container TYPES (`cascadeLevels`)
  * so callers can tell when the cascade reached epic level or above.
  */
-import { spawnSync } from "node:child_process";
-import { mkdtempSync as _mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { mkdtempSync as _mkdtempSync, closeSync, openSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,6 +17,7 @@ import { loadItems } from "./items.js";
 import { runCreate } from "./create.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { runInit } from "./init.js";
+import { lockFilePathFor } from "./lock.js";
 import { runUpdate } from "./update.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
@@ -480,4 +481,146 @@ describe("acceptance-aware cascade", () => {
     expect(acceptanceComplete("  - [ ] indented pending")).toBe(false);
     expect(acceptanceComplete("- [x] done\n- [ ] pending")).toBe(false);
   });
+});
+
+/**
+ * Cascade ancestor-write guard (bug-cascade-lost-update).
+ *
+ * Before the fix, autoCompleteAncestors wrote ancestor files while holding
+ * only the CHILD's item lock. The interleave that loses data:
+ *
+ *   P1 (cascade from a child done-flip)      P2 (direct update of the ancestor)
+ *   ---------------------------------        ----------------------------------
+ *   holds CHILD lock only                    acquires ANCESTOR lock
+ *   reads ancestor snapshot S_old            reads ancestor, edits, writes
+ *   writes ancestor from S_old  ----clobber---->  P2's change is LOST
+ *                                            (or symmetric: P1's done is lost
+ *                                             when P2 writes back its stale read)
+ *
+ * The child lock covers one item, not the ancestor write set, so nothing
+ * serialized the two writers on the ancestor file. The fix holds the
+ * ANCESTOR's item lock across the cascade's fresh re-read + write, with the
+ * documented lock ordering CHILD -> ANCESTORS strictly upward.
+ */
+describe("cascade ancestor-write guard (bug-cascade-lost-update)", () => {
+  type Json = Record<string, unknown>;
+
+  /** Spawn one `arggon ... --json` process; resolve its parsed last-line JSON + stderr. */
+  function spawnJson(args: string[], cwd: string, timeoutMs: number): Promise<Json | null> {
+    return new Promise((resolvePromise) => {
+      const child = spawn(process.execPath, [tsx, cli, ...args], {
+        cwd,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let out = "";
+      let err = "";
+      child.stdout.on("data", (chunk: string) => (out += chunk));
+      child.stderr.on("data", (chunk: string) => (err += chunk));
+      child.on("close", () => {
+        const trimmed = out.trim();
+        resolvePromise(trimmed ? (JSON.parse(trimmed.split("\n").pop() ?? trimmed) as Json) : null);
+      });
+      setTimeout(() => child.kill("SIGKILL"), timeoutMs).unref();
+      void err;
+    });
+  }
+
+  /** Tree where bug-x is the LAST open leaf: flipping it done fires the full cascade. */
+  function primedTree(): { dir: string; bug: string; storyPath: string } {
+    const { dir, bug } = chainTree();
+    claimAndDone(dir, "task-one");
+    claimAndDone(dir, "task-two");
+    runUpdate({ cwd: dir, id: bug, status: "in_progress", assignee: "worker", now: NOW });
+    return { dir, bug, storyPath: join(dir, "tasks/launch/epic-a/story-a/story-a.md") };
+  }
+
+  /** Hold the story's item lock from THIS test process (same lock family/format as lock.ts). */
+  function holdLock(itemPath: string): { release: () => void; lockPath: string } {
+    const lockPath = lockFilePathFor(itemPath);
+    const fd = openSync(lockPath, "wx");
+    writeFileSync(fd, JSON.stringify({ pid: process.pid, acquiredAt: new Date().toISOString() }));
+    return { lockPath, release: () => { try { unlinkSync(lockPath); } finally { closeSync(fd); } } };
+  }
+
+  it(
+    "repro: the cascade never writes an ancestor while the ancestor's item lock is held",
+    async () => {
+      const { dir, bug, storyPath } = primedTree();
+      const { release } = holdLock(storyPath);
+      try {
+        // The done-flip runs in a REAL separate process (its pid differs from
+        // ours, so the lock genuinely contends). Before the fix the cascade
+        // wrote story-a WITHOUT ever trying to take its lock: story-a ended
+        // "done" even though another writer held the lock and was mid
+        // read-modify-write on the same file — the lost-update window, open
+        // deterministically. With the guard, the cascade blocks, times out
+        // per the lock-family convention, and REPORTS the skip instead of
+        // writing unguarded.
+        const body = await spawnJson(["update", bug, "--status", "done", "--json"], dir, 25_000);
+        expect(body).not.toBeNull();
+        expect(body!.ok).toBe(true);
+        // The guard held: nothing was written to the locked ancestor...
+        expect(statusOf(dir, "story-a")).toBe("todo");
+        // ...and the skip is reported, not silent.
+        expect(body!.cascadeSkipped).toEqual([
+          { id: "story-a", type: "story", reason: "lock-timeout" },
+        ]);
+        expect(body!.autoCompleted).toEqual([]);
+      } finally {
+        release();
+      }
+
+      // The child's own flip landed even though the cascade was skipped (the
+      // skip must never fail a succeeded mutation).
+      expect(statusOf(dir, bug)).toBe("done");
+
+      // Retrigger the cascade (any terminal update re-walks the ancestors):
+      // with the lock released, the story completes and the chain closes.
+      const retried = runUpdate({ cwd: dir, id: bug, status: "done", now: NOW });
+      expect(retried.autoCompleted).toEqual(["story-a", "epic-a", "launch"]);
+      expect(retried.cascadeSkipped).toEqual([]);
+      expect(statusOf(dir, "story-a")).toBe("done");
+      expect(statusOf(dir, "launch")).toBe("done");
+    },
+    40_000, // the guarded cascade waits out the 10s lock budget in a real process
+  );
+
+  it("two concurrent sibling done-flips both land and the ancestor ends consistent", async () => {
+    // Three rounds of the exact torture-scenario-1 shape (task two siblings
+    // racing their final done-flips into the same cascade) — each round on a
+    // fresh tree so both siblings are genuinely open.
+    for (let round = 0; round < 3; round++) {
+      // Fresh tree per round: task-one closed up front; task-two and bug-x
+      // both primed to in_progress so TWO siblings can race their final
+      // done-flips — each flip's cascade walks the same story/epic/initiative
+      // files from a separate process.
+      const { dir, bug } = chainTree();
+      claimAndDone(dir, "task-one");
+      runUpdate({ cwd: dir, id: "task-two", status: "in_progress", assignee: "worker", now: NOW });
+      runUpdate({ cwd: dir, id: bug, status: "in_progress", assignee: "worker", now: NOW });
+
+      const [flip, retitle] = await Promise.all([
+        spawnJson(["update", bug, "--status", "done", "--json"], dir, 30_000),
+        spawnJson(["update", "task-two", "--status", "done", "--json"], dir, 30_000),
+      ]);
+
+      // Both flips succeeded — neither status was lost (the child writes were
+      // already lock-serialized; this asserts no regression).
+      expect(flip, `round ${round}: ${JSON.stringify(flip)}`).toMatchObject({ ok: true });
+      expect(retitle, `round ${round}: ${JSON.stringify(retitle)}`).toMatchObject({ ok: true });
+      expect(statusOf(dir, bug)).toBe("done");
+      expect(statusOf(dir, "task-two")).toBe("done");
+
+      // The ancestor ends CONSISTENT: whoever's cascade fired last saw a
+      // closed subtree and completed it — or both reported the walk honestly
+      // (subtree-open) if their snapshots predate the other's write. What is
+      // forbidden is a silent half-state, so retrigger and require closure.
+      const closed = runUpdate({ cwd: dir, id: bug, status: "done", now: NOW });
+      expect(closed.cascadeSkipped).toEqual([]);
+      expect(statusOf(dir, "story-a")).toBe("done");
+      expect(statusOf(dir, "epic-a")).toBe("done");
+      expect(statusOf(dir, "launch")).toBe("done");
+      rmSync(dir, { recursive: true, force: true });
+    }
+  }, 120_000);
 });
