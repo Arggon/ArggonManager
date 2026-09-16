@@ -162,6 +162,37 @@ describe("CLI <-> MCP parity", () => {
     expect(item.depends_on).toEqual(["task-second"]);
   });
 
+  it("create/update --issue emit identical envelopes through both entry points", async () => {
+    const { cliDir, mcpDir } = twinTrees();
+    const cliResult = cliJson(
+      [
+        "create",
+        "task",
+        CREATE_ARGS.title,
+        "--parent",
+        CREATE_ARGS.parent,
+        "--id",
+        "rate-limit",
+        "--issue",
+        "42",
+      ],
+      cliDir,
+    );
+    const mcpResult = await mcpCall(mcpDir, "arggon_create", { ...CREATE_ARGS, issue: 42 });
+    expect(mcpResult.isError).toBe(false);
+    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+    expect((cliResult.item as { issue?: number }).issue).toBe(42);
+
+    const cliClear = cliJson(["update", "task-rate-limit", "--issue", "0"], cliDir);
+    const mcpClear = await mcpCall(mcpDir, "arggon_update", {
+      id: "task-rate-limit",
+      issue: 0,
+    });
+    expect(mcpClear.isError).toBe(false);
+    expect(normalize(mcpClear.result, mcpDir)).toEqual(normalize(cliClear, cliDir));
+    expect((cliClear.item as { issue?: number }).issue).toBeUndefined();
+  });
+
   it("list returns the same items through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
     cliJson(["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"], cliDir);

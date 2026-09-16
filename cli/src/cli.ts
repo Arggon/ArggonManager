@@ -296,6 +296,10 @@ program
   .option("--status <status>", "status (default: todo)", "todo")
   .option("--blocked-reason <text>", "required when --status blocked")
   .option(
+    "--issue <n>",
+    "GitHub issue number recorded in the additive issue frontmatter field (start --open-pr appends Closes #N; positive integer)",
+  )
+  .option(
     "--no-commit",
     "keep tasks/ dirty: skip the tracker auto-commit of the created item (default: on; x-tracker.auto-commit: false opts out tree-wide)",
   )
@@ -311,6 +315,7 @@ program
         assignee?: string;
         status?: string;
         blockedReason?: string;
+        issue?: string;
         commit?: boolean;
         full?: boolean;
         json?: boolean;
@@ -327,6 +332,7 @@ program
           assignee: opts.assignee,
           status: opts.status,
           blockedReason: opts.blockedReason,
+          issue: opts.issue !== undefined ? Number(opts.issue) : undefined,
           commit: opts.commit === false ? false : undefined,
         });
         if (json) {
@@ -696,6 +702,10 @@ program
     "replace the full depends_on list of item ids (comma-separated; empty clears)",
   )
   .option("--add-depends-on <id>", "append one depends_on id (no-op when already present)")
+  .option(
+    "--issue <n>",
+    "set the GitHub issue number in the additive issue frontmatter field (positive integer; 0 clears it)",
+  )
   .option("--blocked-reason <text>", "required when status becomes blocked")
   .option("--force", "allow reassignment of an already-claimed item", false)
   .option(
@@ -728,6 +738,7 @@ program
         labels?: string;
         dependsOn?: string;
         addDependsOn?: string;
+        issue?: string;
         blockedReason?: string;
         force?: boolean;
         steal?: boolean;
@@ -772,6 +783,7 @@ program
           labels: opts.labels,
           dependsOn: opts.dependsOn,
           addDependsOn: opts.addDependsOn,
+          issue: opts.issue !== undefined ? Number(opts.issue) : undefined,
           blockedReason: opts.blockedReason,
           force: Boolean(opts.force),
           steal: Boolean(opts.steal),

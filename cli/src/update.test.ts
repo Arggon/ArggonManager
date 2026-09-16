@@ -236,3 +236,34 @@ describe("update", () => {
     );
   });
 });
+
+// task-issue-field-cli: update can SET and CLEAR the additive `issue` field.
+describe("update --issue", () => {
+  it("sets, keeps, and clears the issue field (0 clears)", () => {
+    const { dir, id } = primedTask();
+    const set = runUpdate({ cwd: dir, id, issue: 42, now: NOW });
+    expect(fm(set.path).data.issue).toBe(42);
+    expect(set.changed).toContain("issue");
+    expect(set.item.issue).toBe(42);
+
+    // Same value is a no-op: no change entry, nothing rewritten.
+    const same = runUpdate({ cwd: dir, id, issue: 42, now: LATER });
+    expect(same.changed).not.toContain("issue");
+
+    const cleared = runUpdate({ cwd: dir, id, issue: 0, now: LATER });
+    expect(fm(cleared.path).data.issue).toBeUndefined();
+    expect(cleared.item.issue).toBeNull();
+    expect(cleared.changed).toContain("issue");
+
+    // --issue alone satisfies the "nothing to update" gate.
+    expect(() => runUpdate({ cwd: dir, id, now: NOW })).toThrow(/nothing to update/);
+  });
+
+  it("rejects invalid issue values with the kernel error", () => {
+    const { dir, id } = primedTask();
+    expect(() => runUpdate({ cwd: dir, id, issue: -1, now: NOW })).toThrow(
+      /positive integer.*or 0 to clear/,
+    );
+    expect(() => runUpdate({ cwd: dir, id, issue: 1.5, now: NOW })).toThrow(/positive integer/);
+  });
+});

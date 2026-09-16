@@ -241,3 +241,51 @@ describe("create --help parent-type mapping", () => {
     expect(normalized).toMatch(/initiative: none; epic: initiative; story: epic; task\/bug: story/);
   });
 });
+
+// task-issue-field-cli: create wires the existing kernel issue option.
+describe("create --issue", () => {
+  it("records the issue number in frontmatter", () => {
+    const dir = primed();
+    runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
+    runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", now: NOW });
+    runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "story-login", now: NOW });
+    const task = runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Add rate limiting",
+      parent: "story-login",
+      id: "rate-limit",
+      issue: 42,
+      now: NOW,
+    });
+    expect(fm(task.path).issue).toBe(42);
+    expect(task.item.issue).toBe(42);
+  });
+
+  it("rejects invalid issue values with the kernel error", () => {
+    const dir = primed();
+    runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
+    runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", now: NOW });
+    runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "story-login", now: NOW });
+    expect(() =>
+      runCreate({
+        cwd: dir,
+        type: "task",
+        title: "Bad",
+        parent: "story-login",
+        issue: 0,
+        now: NOW,
+      }),
+    ).toThrow(/positive integer/);
+    expect(() =>
+      runCreate({
+        cwd: dir,
+        type: "task",
+        title: "Bad",
+        parent: "story-login",
+        issue: 1.5,
+        now: NOW,
+      }),
+    ).toThrow(/positive integer/);
+  });
+});
