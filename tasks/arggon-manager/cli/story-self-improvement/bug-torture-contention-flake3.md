@@ -53,3 +53,6 @@ clean on new. Follow-up (not filed): scenario 1 (N=8 mixed) flaked once
 locally and in CI run 34998411032 (`labs/torture.test.ts:248`, sibling status
 `in_progress` vs `done`) — a cascade lost-update in update.ts's multi-file
 write path, distinct from this item's commit-contention family.
+
+### 2026-09-16 @Arggon
+Lead-architect review: APPROVED (deep-validated, with one residual documented). The root cause is now precise: index.lock serializes COMMANDS, not the logical add->commit SEQUENCE — and the #214 lab retry asserted ok:true, so the retry's own commit could re-enter contention (the occurrence-3 interleave that survived every hardening). The repo-level lock (withItemLock keyed on the common .git dir — worktrees serialize together, 10s budget, reported-skip semantics intact) eliminates the arggon-vs-arggon clobber class: deterministic pre-fix repro now passes, foreign-committer storm keeps the tree clean, torture x10 green locally, 6/6 in my own probe batch. RESIDUAL (documented, not reproduced since): 1 failure in ~17 branch runs before this review — hypothesis: the scenario's foreign (non-arggon) committer can still clobber between the lock-protected add and commit, which git cannot prevent cross-tool; if confirmed, scope the clean-tree assertion to arggon-vs-arggon interleaves and document the foreign-writer limitation. Merge follows.
