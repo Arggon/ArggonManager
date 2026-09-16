@@ -16,14 +16,15 @@
  *   surface, never a copy-pasted schema list.
  *
  * Pure report: everything is created under a temp dir that is always removed.
- * Runs the real CLI from source (npm run arggon charter) so bytes are what an
- * agent actually receives.
+ * Runs the real CLI from the RUNNING installation (tsx from source in the
+ * repo, the installed dist/cli.js in adopter trees — bug-budget-adopter-trees)
+ * so bytes are what an agent actually receives.
  */
 
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PassThrough } from "node:stream";
 
@@ -100,13 +101,31 @@ export type BudgetCheck = {
   note?: string;
 };
 
-/** Repo root resolved from this source file (the CLI runs from source). */
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cliEntry = join(repoRoot, "cli", "src", "cli.ts");
-const tsxEntry = join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs");
+/**
+ * CLI invocation resolved from the RUNNING installation (bug-budget-adopter-
+ * trees), never from the measured tree's cwd: from source (tsx, the repo
+ * charter) when this module is cli/src/measure.ts, or from the installed
+ * dist/cli.js of the executing arggon otherwise (adopter trees have no
+ * cli/src — the measurement must work identically there). The measured tree
+ * is only the SUBJECT (cwd of the spawned commands); the CLI binary always
+ * comes from the running installation.
+ */
+export function cliCommand(): { file: string; args: string[] } {
+  const modulePath = fileURLToPath(import.meta.url);
+  const runningFromSource = modulePath.endsWith(`${sep}src${sep}measure.ts`);
+  if (runningFromSource) {
+    const repoRoot = resolve(dirname(modulePath), "../..");
+    return {
+      file: process.execPath,
+      args: [join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs"), join(repoRoot, "cli", "src", "cli.ts")],
+    };
+  }
+  return { file: process.execPath, args: [resolve(dirname(modulePath), "cli.js")] };
+}
 
 function runCli(args: string[], cwd: string): string {
-  const proc = spawnSync(process.execPath, [tsxEntry, cliEntry, ...args], {
+  const cmd = cliCommand();
+  const proc = spawnSync(cmd.file, [...cmd.args, ...args], {
     encoding: "utf8",
     cwd,
     stdio: ["ignore", "pipe", "pipe"],
@@ -181,8 +200,10 @@ export async function measureMcpSchema(): Promise<McpSchemaBudget> {
  * and ALWAYS removes the temp tree (the repo's /tmp hygiene history).
  */
 export async function measureBudget(): Promise<BudgetResult> {
-  if (!existsSync(cliEntry) || !existsSync(tsxEntry)) {
-    throw new Error("budget measurement runs the CLI from source (npm run arggon) — cli/src/cli.ts not found");
+  const cmd = cliCommand();
+  const cliEntry = cmd.args[cmd.args.length - 1];
+  if (!existsSync(cliEntry)) {
+    throw new Error(`budget measurement runs the CLI from the running installation — entry not found: ${cliEntry}`);
   }
   const dir = mkdtempSync(join(tmpdir(), "arggon-budget-"));
   try {
