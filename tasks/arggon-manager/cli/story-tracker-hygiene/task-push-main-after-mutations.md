@@ -26,7 +26,7 @@ Follow-up from the casa-pendiente experiment (2026-09-15), extending the landed 
 
 ## Acceptance
 
-- [ ] The squash-divergence SKILL pitfall gains the preventive line: push main right after primary-checkout tracker mutations (before opening/merging any PR)
-- [ ] docs/agents.md §0 tracker-hygiene paragraph mentions the same discipline
+- [x] The squash-divergence SKILL pitfall gains the preventive line: push main right after primary-checkout tracker mutations (before opening/merging any PR)
+- [x] docs/agents.md §0 tracker-hygiene paragraph mentions the same discipline
 
 ## Notes
