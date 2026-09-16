@@ -4,6 +4,7 @@ status: in_progress
 id: task-spec-audit
 title: "spec audit: duplication detection command (pairwise Jaccard + shared titles)"
 assignee: Arggon
+branch: feat/task-spec-audit
 parent: story-spec-pipeline
 labels: [p3]
 created: "2026-09-16"
