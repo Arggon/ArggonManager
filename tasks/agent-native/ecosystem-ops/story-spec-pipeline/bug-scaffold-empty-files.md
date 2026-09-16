@@ -4,6 +4,7 @@ status: in_progress
 id: bug-scaffold-empty-files
 title: scaffolded docs reported truncated to 0 lines (spec new / playbook new / stack explore)
 assignee: Arggon
+branch: fix/bug-scaffold-empty-files
 parent: story-spec-pipeline
 labels: [p3]
 created: "2026-09-15"
