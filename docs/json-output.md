@@ -207,6 +207,16 @@ Failures use `error.code: "SPEC_FAILED"` (invalid slug, refusing to overwrite, m
 
 `Finding` is `{ file, kind, line?, severity, message }` — `file` posix, repo-relative; `severity` is `"info"` or `"warn"`; `line` (1-based, present when the finding is tied to a line) is reported against the full file including frontmatter. Kinds: `vague-quantifier`, `todo-marker`, `no-error-path`, `no-acceptance`, `untestable-acceptance` (ambiguity); `spec-orphaned`, `plan-spec-missing` (consistency).
 
+`spec import openspec <path> [--dry-run]` (mechanical OpenSpec migration; never overwrites, all-or-nothing per run). On success (`command: "spec"`):
+
+| Field      | Type                    | Notes |
+| ---------- | ----------------------- | ----- |
+| `created`  | `ImportEntry[]`         | One `{ capability, file, specId, source }` per migrated capability (absent under `--dry-run`) |
+| `dryRun`   | `boolean`               | `true` when `--dry-run` |
+| `inventory`| `ImportEntry[]`         | Planned files under `--dry-run` (absent otherwise) |
+
+Failures use `error.code: "SPEC_IMPORT_FAILED"` and exit code 1, plus an additive `failures` array (`{ capability, source, message, diff? }` — `diff` is the per-file `- source` / `+ output` line diff for zero-loss mismatches). Nothing is written when the run fails.
+
 ### `explore`
 
 `stack explore <topic> [--title <t>]` scaffolds `docs/explorations/exploration-<slug>-NNN.md` (candidates, criteria, findings with dated sources, recommendation, Decision/ADR placeholder); never overwrites. The envelope `command` is `"explore"`.
