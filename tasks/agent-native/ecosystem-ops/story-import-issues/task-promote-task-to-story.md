@@ -37,3 +37,6 @@ DECIDED + LANDED (2026-09-16): in-place conversion via `arggon update <task-id> 
 - Reuses `assertParentEdge` (cli/src/relations.ts) and `newItemPath`; additive payload fields `movedFrom` (shared with reparent) and `renamedFrom`; exposed through the MCP `arggon_update` schema too (parity test enforces it).
 
 ## Notes
+
+### 2026-09-16 @Arggon
+Lead-architect review: APPROVED (deep-validated). The id rename is the standout: validate forbids container ids with task-/bug- prefixes, so keeping the old id would leave the tree permanently invalid — the depends_on tree-wide rewrite + renamedFrom payload is the correct handling of a discovered constraint, not scope creep. Refusals all pre-mutation, the grandparent-epic derivation reuses create's edge logic, issue/labels/body ride along (round-trip preserved), and the convention.md sentence landed. One edge for the record (not blocking): promoting an item whose PR already references the old task- id would break the auto-done id grep — promotion is for pre-PR ideas; worth a line in the docs next time the section is touched. Merge follows.
