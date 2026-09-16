@@ -17,9 +17,11 @@ import { runInit, type InitResult } from "./init.js";
 import {
   bindJsonProgram,
   emitJson,
+  failEnvelope,
   failJson,
   JSON_SCHEMA_VERSION,
   jsonEnabled,
+  successEnvelope,
   successJson,
 } from "./json.js";
 import { formatListTable, runList } from "./list.js";
@@ -48,6 +50,7 @@ import {
   runSpecNew,
   runSpecValidate,
 } from "./spec.js";
+import { runSpecImport, SpecImportError } from "./spec-import.js";
 
 import { runSync } from "./sync-command.js";
 import { runTuiBoard } from "./tui.js";
@@ -1305,6 +1308,58 @@ spec
         return;
       }
       console.error(`arggon spec new: ${message}`);
+      process.exitCode = 1;
+    }
+  });
+
+spec
+  .command("import openspec")
+  .description(
+    "Migrate an OpenSpec corpus (<path>/specs/<capability>/spec.md) into Arggon spec docs with a per-file zero-loss assertion; all-or-nothing per run, never overwrites",
+  )
+  .argument("<path>", "OpenSpec corpus root (contains specs/<capability>/spec.md)")
+  .option("--dry-run", "inventory only: discover files and preview the mapping without writing", false)
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((path: string, opts: { dryRun?: boolean; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runSpecImport({ cwd: process.cwd(), path, dryRun: Boolean(opts.dryRun) });
+      if (json) {
+        if (result.dryRun) {
+          emitJson(successEnvelope("spec", { dryRun: true, inventory: result.inventory }));
+          return;
+        }
+        successJson("spec", { created: result.created }, readConventionVersion(result.root));
+        return;
+      }
+      if (result.dryRun) {
+        console.log("arggon spec import openspec: dry run (nothing written)");
+        for (const entry of result.inventory) {
+          console.log(`  ${entry.file} <- ${entry.source} (${entry.specId})`);
+        }
+        return;
+      }
+      console.log(`arggon spec import openspec: created ${result.created.length} file(s)`);
+      for (const entry of result.created) {
+        console.log(`  ${entry.file} <- ${entry.source} (${entry.specId})`);
+      }
+    } catch (err) {
+      const failures = err instanceof SpecImportError ? err.failures : undefined;
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        emitJson({
+          ...failEnvelope({
+            command: "spec",
+            message,
+            code: "SPEC_IMPORT_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          }),
+          ...(failures ? { failures } : {}),
+        });
+        process.exitCode = 1;
+        return;
+      }
+      console.error(`arggon spec import openspec: ${message}`);
       process.exitCode = 1;
     }
   });

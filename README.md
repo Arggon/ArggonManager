@@ -323,11 +323,15 @@ arggon spec validate --json           # v1 envelope { errors, warnings }; failur
 arggon spec new my-feature            # scaffold docs/specs/spec-my-feature-NNN.md
 arggon spec new my-feature --title "My feature" --plan   # also scaffold docs/plans/plan-my-feature-NNN.md
 arggon spec new my-feature --json     # v1 envelope { files: string[] }
+arggon spec import openspec ./openspec       # migrate an OpenSpec corpus (zero-loss)
+arggon spec import openspec ./openspec --dry-run   # inventory only, writes nothing
 ```
 
 `spec new` numbers globally (max existing NNN across `docs/specs` + `docs/plans`, plus 1) and **never overwrites** an existing file. Templates live in [`templates/spec.md`](templates/spec.md) / [`templates/plan.md`](templates/plan.md) (`{{SLUG}}`, `{{NNN}}`, `{{ID}}`, `{{TITLE}}`, `{{DATE}}` placeholders; an embedded copy in the CLI is the fallback). See the pipeline spec: [docs/specs/spec-spec-pipeline-002.md](docs/specs/spec-spec-pipeline-002.md).
 
 `spec analyze [--spec <path>]` is a **report-only** quality pass over the specs (default: every `docs/specs/*.md`): a checklist-driven ambiguity scan (vague quantifiers like "fast"/"several", TODO/TBD markers, no error path, missing or untestable acceptance criteria) plus a spec ↔ tasks/plans consistency check (specs marked `implemented` that no item or plan cites; plans whose `spec:` points at a missing file). Findings never fail the run — exit `0` with findings; only an unreadable file exits `1` with `SPEC_FAILED`. Run it before implementation starts to catch what structural validation cannot. See [docs/specs/spec-spec-analyze-004.md](docs/specs/spec-spec-analyze-004.md).
+
+`spec import openspec <path> [--dry-run]` mechanically migrates an OpenSpec corpus (`<path>/specs/<capability>/spec.md`) into Arggon spec docs: for each capability (sorted) it scaffolds `docs/specs/spec-<capability>-NNN.md` with consecutive global numbering. Mapping (proven in production): OpenSpec `## Purpose` -> Purpose; `## Requirements` (`### Requirement:` / `#### Scenario:` Given/When/Then) -> Acceptance criteria verbatim, plus a `### Verification checklist` per requirement and an italic provenance line. **Zero-loss**: the re-assembled mapped content must equal the source body after normalization - on mismatch the run fails loudly with a per-file diff. **All-or-nothing per run**: map + assert every file first, then write; any failure (parse, zero-loss, collision, non-kebab-case capability) writes nothing. Never overwrites. The format parsing lives behind a `CorpusAdapter` extension point (`cli/src/spec-import.ts`) so other corpus formats plug in. See [docs/specs/spec-spec-import-openspec-005.md](docs/specs/spec-spec-import-openspec-005.md).
 
 ### `arggon stack explore`
 
