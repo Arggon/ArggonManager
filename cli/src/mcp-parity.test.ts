@@ -193,6 +193,28 @@ describe("CLI <-> MCP parity", () => {
     expect((cliClear.item as { issue?: number }).issue).toBeUndefined();
   });
 
+  it("create --labels emits identical label frontmatter through both entry points", async () => {
+    const { cliDir, mcpDir } = twinTrees();
+    const cliResult = cliJson(
+      [
+        "create",
+        "task",
+        CREATE_ARGS.title,
+        "--parent",
+        CREATE_ARGS.parent,
+        "--id",
+        "rate-limit",
+        "--labels",
+        "p2,perf",
+      ],
+      cliDir,
+    );
+    const mcpResult = await mcpCall(mcpDir, "arggon_create", { ...CREATE_ARGS, labels: "p2,perf" });
+    expect(mcpResult.isError).toBe(false);
+    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+    expect((cliResult.item as { labels?: string[] }).labels).toEqual(["p2", "perf"]);
+  });
+
   it("list returns the same items through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
     cliJson(["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"], cliDir);
