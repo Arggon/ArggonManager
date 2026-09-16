@@ -88,7 +88,7 @@ arggon update <id>  # Update frontmatter fields of a work item
 arggon comment <id> [text]  # Append a timestamped, author-attributed comment section to an item's body
 arggon show <id>  # Read one item with bounded output (ADR 0006): frontmatter + last comments; full body is an explicit opt-in
 arggon handoff <id>  # Append a structured, bounded handoff section (branch, next step, open questions) to an item's body
-arggon create <type> <title>  # Create a work item under tasks/
+arggon create <type> <title>  # Create a work item under tasks/ (label at creation with --labels <csv>)
 arggon validate  # Validate tasks/ frontmatter and tree integrity
 <!-- arggon:generated-commands end -->
 ```
@@ -103,6 +103,8 @@ Nuances (hand-written, review-covered):
   `--body` for full.
 - `comment` sections are body-only (never touch frontmatter); `handoff` fields
   are bounded (`--branch`, `--open-questions "q1; q2"`).
+- Label at creation with `create --labels <csv>` (task-create-labels) — same
+  kebab-case rules as `update --labels`; no follow-up update needed.
 
 - Non-trivial items are **orchestrated**: coordinators delegate them to subagents
   in file-disjoint waves (one subagent per worktree), then code-review every

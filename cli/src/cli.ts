@@ -51,7 +51,7 @@ import {
 
 import { runSync } from "./sync-command.js";
 import { runTuiBoard } from "./tui.js";
-import { maybeCommitUpdate, runUpdate } from "./update.js";
+import { maybeCommitUpdate, parseCsvList, runUpdate } from "./update.js";
 import { formatValidateHuman, runValidate } from "./validate.js";
 import { commitPayload, formatCommitLine } from "./tracker-commit.js";
 import { arggonVersion } from "./docs.js";
@@ -284,7 +284,7 @@ program
 
 program
   .command("create")
-  .description("Create a work item under tasks/")
+  .description("Create a work item under tasks/ (label at creation with --labels <csv>)")
   .argument("<type>", "initiative | epic | story | task | bug")
   .argument("<title>", "title (id is slugified; override with --id)")
   .option(
@@ -293,6 +293,7 @@ program
   )
   .option("--id <id>", "override id stem (CLI still adds task-/bug- for leaves)")
   .option("--assignee <login>", "assignee (omit when unassigned)")
+  .option("--labels <csv>", "label the new item at creation (comma-separated; same kebab-case rules as update --labels)")
   .option("--status <status>", "status (default: todo)", "todo")
   .option("--blocked-reason <text>", "required when --status blocked")
   .option(
@@ -313,6 +314,7 @@ program
         parent?: string;
         id?: string;
         assignee?: string;
+        labels?: string;
         status?: string;
         blockedReason?: string;
         issue?: string;
@@ -330,6 +332,7 @@ program
           parent: opts.parent,
           id: opts.id,
           assignee: opts.assignee,
+          labels: opts.labels !== undefined ? parseCsvList(opts.labels) : undefined,
           status: opts.status,
           blockedReason: opts.blockedReason,
           issue: opts.issue !== undefined ? Number(opts.issue) : undefined,

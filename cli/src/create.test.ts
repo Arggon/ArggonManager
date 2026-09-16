@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCreate } from "./create.js";
+import { toContractWorkItem } from "./contract.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { runInit } from "./init.js";
 
@@ -239,6 +240,63 @@ describe("create --help parent-type mapping", () => {
     // Commander wraps long option descriptions; compare with normalized whitespace.
     const normalized = proc.stdout.replace(/\s+/g, " ");
     expect(normalized).toMatch(/initiative: none; epic: initiative; story: epic; task\/bug: story/);
+  });
+});
+
+// task-create-labels: label a new item at creation (parity with update --labels).
+describe("create --labels", () => {
+  it("writes the labels frontmatter array at creation", () => {
+    const dir = primed();
+    runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
+    runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", now: NOW });
+    runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "story-login", now: NOW });
+    const task = runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Add rate limiting",
+      parent: "story-login",
+      id: "rate-limit",
+      labels: ["p2", "perf"],
+      now: NOW,
+    });
+    expect(fm(task.path).labels).toEqual(["p2", "perf"]);
+    expect(task.item.labels).toEqual(["p2", "perf"]);
+  });
+
+  it("omitted labels keep the empty-array default (field omitted in compact envelopes)", () => {
+    const dir = primed();
+    const result = runCreate({ cwd: dir, type: "initiative", title: "Plain", now: NOW });
+    expect(fm(result.path).labels).toEqual([]);
+    // ADR 0006 compact: empty arrays are omitted from the --json payload.
+    const compact = toContractWorkItem(result.item, dir, { full: false });
+    expect(compact.labels).toBeUndefined();
+  });
+
+  it("refuses invalid labels with the same error text as update --labels", () => {
+    const dir = primed();
+    runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
+    runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", now: NOW });
+    runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "story-login", now: NOW });
+    expect(() =>
+      runCreate({
+        cwd: dir,
+        type: "task",
+        title: "Bad",
+        parent: "story-login",
+        labels: ["P2"],
+        now: NOW,
+      }),
+    ).toThrow(/label 'P2' must be kebab-case ASCII/);
+    expect(() =>
+      runCreate({
+        cwd: dir,
+        type: "task",
+        title: "Dup",
+        parent: "story-login",
+        labels: ["p2", "p2"],
+        now: NOW,
+      }),
+    ).toThrow(/duplicate label 'p2'/);
   });
 });
 

@@ -1,12 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-create-labels
 title: "create --labels: label a new item at creation"
+assignee: Arggon
+branch: feat/task-create-labels
 parent: story-cli-ergonomics
 labels: [p2]
 created: "2026-09-16"
 updated: "2026-09-16"
+claimed_at: "2026-09-16T13:09:59.541Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-cli-ergonomics/task-create-labels.md
@@ -25,9 +28,9 @@ Note: this task is also the LIVE TEST of the forever-fix in its flag dimension �
 
 ## Acceptance
 
-- [ ] `arggon create ... --labels <csv>` lands (kernel: create.ts gains opts.labels — check if it already accepts labels via the frontmatter writer; wire kernel + CLI flag + MCP arggon_create schema + parity harness entry)
-- [ ] Semantics match update --labels exactly: replace-style CSV, kebab-case normalization, invalid values refused with the same error text
-- [ ] SKILL.md syncs in the same PR (the create command guidance mentions --labels); .agents copy via skills:sync; README + json-output additive; agents.md section one-liner if natural
-- [ ] Tests: create with labels writes them; empty/omitted omits the field (compact rules); invalid CSV refused; MCP parity for the flag
+- [x] `arggon create ... --labels <csv>` lands (kernel: create.ts gains opts.labels — check if it already accepts labels via the frontmatter writer; wire kernel + CLI flag + MCP arggon_create schema + parity harness entry)
+- [x] Semantics match update --labels exactly: replace-style CSV, kebab-case normalization, invalid values refused with the same error text
+- [x] SKILL.md syncs in the same PR (the create command guidance mentions --labels); .agents copy via skills:sync; README + json-output additive; agents.md section one-liner if natural
+- [x] Tests: create with labels writes them; empty/omitted omits the field (compact rules); invalid CSV refused; MCP parity for the flag
 
 ## Notes

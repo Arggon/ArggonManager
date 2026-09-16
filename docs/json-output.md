@@ -73,7 +73,7 @@ Stable fields aligned with convention v0 plus the additive `branch` (v1) and `mi
 | `assignee`       | `string` \| `null`                                            |                                                                             |
 | `branch`         | `string` \| `null`                                            | Working branch (v1, additive); `null` when unset                            |
 | `parent`         | `string` \| `null`                                            |                                                                             |
-| `labels`         | `string[]`                                                    |                                                                             |
+| `labels`         | `string[]`                                                    | Kebab-case; set at creation with `create --labels <csv>` (task-create-labels) or replaced with `update --labels <csv>`; omitted from compact envelopes when empty |
 | `created`        | `string` \| `null`                                            | `YYYY-MM-DD`                                                                |
 | `updated`        | `string` \| `null`                                            | `YYYY-MM-DD`                                                                |
 | `path`           | `string`                                                      | Posix path relative to repo/tree root, e.g. `tasks/launch-mvp/auth/auth.md` |

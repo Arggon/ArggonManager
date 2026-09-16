@@ -12,7 +12,7 @@ import { runNext } from "./next.js";
 import { runReport } from "./report.js";
 import { runShow } from "./show.js";
 import { runTrend, type TrendResult } from "./trend.js";
-import { maybeCommitUpdate, runUpdate } from "./update.js";
+import { maybeCommitUpdate, parseCsvList, runUpdate } from "./update.js";
 import { runValidate } from "./validate.js";
 import { STATUSES } from "./status.js";
 import { toContractWorkItem } from "./contract.js";
@@ -122,6 +122,10 @@ const TOOLS: ToolDefinition[] = [
         parent: { type: "string", description: "parent container id (required for non-initiatives)" },
         id: { type: "string", description: "optional explicit id stem (leaves get task-/bug- prefix)" },
         assignee: { type: "string", description: "optional assignee login" },
+        labels: {
+          type: "string",
+          description: "label the new item at creation (comma-separated; same rules as update --labels)",
+        },
         status: {
           type: "string",
           enum: ["todo", "in_progress", "blocked", "cancelled"],
@@ -465,6 +469,7 @@ export function runMcpServer(opts: McpServerOptions): void {
           parent: str(args.parent),
           id: str(args.id),
           assignee: str(args.assignee),
+          labels: str(args.labels) !== undefined ? parseCsvList(str(args.labels)!) : undefined,
           status: str(args.status),
           blockedReason: str(args.blocked_reason),
           issue: typeof args.issue === "number" ? args.issue : undefined,

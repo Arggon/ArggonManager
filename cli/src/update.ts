@@ -177,7 +177,8 @@ export type UpdateResult = {
   issueRoundtrip?: IssueRoundtripResult;
 };
 
-function parseCsvList(raw: string): string[] {
+/** Shared CSV split (trim parts, drop empties) — also used by create --labels. */
+export function parseCsvList(raw: string): string[] {
   return raw
     .split(",")
     .map((part) => part.trim())
