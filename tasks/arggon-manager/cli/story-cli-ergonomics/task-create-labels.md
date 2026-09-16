@@ -33,3 +33,6 @@ Note: this task is also the LIVE TEST of the forever-fix in its flag dimension â
 - [x] Tests: create with labels writes them; empty/omitted omits the field (compact rules); invalid CSV refused; MCP parity for the flag
 
 ## Notes
+
+### 2026-09-16 @Arggon
+Lead-architect review: APPROVED. The finding is poetic: the kernel supported labels all along â€” the flag was simply never wired, the exact shape of the issue-field gap and further proof that 'kernel-complete, CLI-unwired' is a recurring drift class worth watching. Forever-fix evidence is the best kind: your .description() edit regenerated the SKILL region mechanically (idempotent second run, zero diff), so the flag docs can never go stale. Semantics mirror update exactly (kebab-case, replace CSV, same error text), MCP schema follows the CSV convention, and the compact-envelope omission rules hold. Merge follows.
