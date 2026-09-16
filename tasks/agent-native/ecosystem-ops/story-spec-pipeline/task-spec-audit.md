@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-spec-audit
 title: "spec audit: duplication detection command (pairwise Jaccard + shared titles)"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-spec-pipeline
 labels: [p3]
 created: "2026-09-16"
 updated: "2026-09-16"
-claimed_at: "2026-09-16T21:39:36.536Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-spec-pipeline/task-spec-audit.md
