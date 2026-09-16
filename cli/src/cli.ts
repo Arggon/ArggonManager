@@ -695,6 +695,10 @@ program
     "--parent <id>",
     "reparent the item: rewrite parent and move the file/directory per the layout rules (leaves move as a file; containers move their whole directory)",
   )
+  .option(
+    "--type <type>",
+    "convert the item's type in place; v1 supports only 'story' (promote a task: moves the file to the story layout under the grandparent epic, renames task-x to story-x, rewrites depends_on references, keeps issue/labels/body; refuses bugs, stories, and missing epics)",
+  )
   .option("--unassign", "clear assignee (in_progress -> todo does this by default)", false)
   .option("--labels <csv>", "replace the full labels list (comma-separated)")
   .option(
@@ -734,6 +738,7 @@ program
         assignee?: string;
         branch?: string;
         parent?: string;
+        type?: string;
         unassign?: boolean;
         labels?: string;
         dependsOn?: string;
@@ -779,6 +784,7 @@ program
           assignee: opts.assignee,
           branch: opts.branch,
           parent: opts.parent,
+          type: opts.type,
           unassign: opts.unassign,
           labels: opts.labels,
           dependsOn: opts.dependsOn,
@@ -805,6 +811,7 @@ program
               autoCompleted: result.autoCompleted,
               cascadeLevels: result.cascadeLevels,
               ...(result.movedFrom ? { movedFrom: result.movedFrom } : {}),
+              ...(result.renamedFrom ? { renamedFrom: result.renamedFrom } : {}),
               cascadeSkipped: result.cascadeSkipped,
               ...(result.issueRoundtrip ? { issueRoundtrip: result.issueRoundtrip } : {}),
               ...(commit ? { commit: commitPayload(commit) } : {}),
@@ -817,6 +824,7 @@ program
         console.log(`arggon update: ${result.item.type} ${result.id}${what}`);
         console.log(`  ${result.path}`);
         if (result.movedFrom) console.log(`  moved from: ${result.movedFrom}`);
+        if (result.renamedFrom) console.log(`  renamed from id: ${result.renamedFrom}`);
         for (const skipped of result.cascadeSkipped) {
           console.log(
             `  cascade skipped: ${skipped.type} '${skipped.id}'` +

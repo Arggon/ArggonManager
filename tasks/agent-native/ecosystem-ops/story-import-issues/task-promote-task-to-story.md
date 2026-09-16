@@ -26,8 +26,15 @@ Reported by the casa-pendiente experiment (2026-09-15): `import-issues` flattens
 
 ## Acceptance
 
-- [ ] Decide + land a promotion path: either `arggon update <task-id> --type story` (converts in place: moves file to story layout, validates children edge rules) or a documented import option that imports top-level ideas as stories — whichever is smaller, documented in the item
-- [ ] Tests: promotion with no children, with children (file moves), invalid conversions refused
-- [ ] Docs (README + convention.md if placement rules change)
+- [x] Decide + land a promotion path: either `arggon update <task-id> --type story` (converts in place: moves file to story layout, validates children edge rules) or a documented import option that imports top-level ideas as stories — whichever is smaller, documented in the item
+- [x] Tests: promotion with no children, with children (file moves), invalid conversions refused
+- [x] Docs (README + convention.md if placement rules change)
+
+## Notes
+
+DECIDED + LANDED (2026-09-16): in-place conversion via `arggon update <task-id> --type story` (v1: task→story only; demotion refused, bugs refused, already-story refused, missing/invalid grandparent epic refused — all pre-mutation). Design notes:
+- The file moves to the story index layout under the task's grandparent epic (exactly where `create story` places it); the promoted story starts empty of children (it was a leaf, so "promotion with children" is impossible by construction — the file-move is covered by tests).
+- The id renames `task-x` → `story-x`: validate forbids container ids starting with `task-`/`bug-`, so keeping the id would leave the tree permanently invalid. `depends_on` references are rewritten tree-wide; the `issue` field, labels, and body ride along untouched (GitHub round-trip link preserved — covered by a mocked-gh test).
+- Reuses `assertParentEdge` (cli/src/relations.ts) and `newItemPath`; additive payload fields `movedFrom` (shared with reparent) and `renamedFrom`; exposed through the MCP `arggon_update` schema too (parity test enforces it).
 
 ## Notes

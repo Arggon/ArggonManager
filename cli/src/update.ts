@@ -48,6 +48,19 @@ export type UpdateOptions = {
    * before anything moves.
    */
   parent?: string;
+  /**
+   * Convert the item's type in place (task-promote-task-to-story). v1 supports
+   * exactly one direction: `--type story` promotes a TASK to a story. The file
+   * moves to the story layout under the task's grandparent epic, the id gains
+   * the `story-` prefix (a container id must not start with `task-`/`bug-` —
+   * validate would reject the tree otherwise), `depends_on` references to the
+   * old id are rewritten tree-wide, and `issue`/labels/body ride along
+   * untouched (a promoted task keeps its GitHub round-trip link). The promoted
+   * story starts empty of children. Demotion (story → task) is refused; bugs
+   * are refused (tasks only in v1); an already-story item is refused; a
+   * missing/invalid target epic is refused — all before any mutation.
+   */
+  type?: string;
   /** Clear assignee (subject to the claim rule for the resulting status). */
   unassign?: boolean;
   /** Replace the full labels list (comma-separated). */
@@ -151,6 +164,12 @@ export type UpdateResult = {
    */
   movedFrom?: string;
   /**
+   * Promotion id rename (task-promote-task-to-story): the OLD id when the
+   * promotion renamed it (task-x -> story-x, since a container id must not
+   * start with task-/bug-). Undefined when no rename happened.
+   */
+  renamedFrom?: string;
+  /**
    * Issue round-trip outcome (task-issue-roundtrip): present only when the
    * update flipped the item to done, the item carries an `issue` frontmatter
    * number, and `x-github.issue-roundtrip` is enabled. Never blocks the flip.
@@ -212,6 +231,20 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     parentRequest = opts.parent.trim();
     if (!parentRequest) throw new Error("--parent requires a non-empty item id");
   }
+  let typeRequest: string | undefined;
+  if (opts.type !== undefined) {
+    const trimmed = opts.type.trim();
+    if (!trimmed) throw new Error("--type requires a type");
+    if (trimmed !== "story") {
+      throw new Error(
+        "--type only supports 'story' in v1 (task → story promotion); demoting a story to a task is not supported",
+      );
+    }
+    if (parentRequest !== undefined) {
+      throw new Error("pass either --type or --parent, not both (promotion derives the parent from the grandparent epic)");
+    }
+    typeRequest = trimmed;
+  }
   let issueRequest: number | null | undefined;
   if (opts.issue !== undefined) {
     if (!Number.isInteger(opts.issue) || opts.issue < 0) {
@@ -231,6 +264,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     opts.assignee !== undefined ||
     branchRequest !== undefined ||
     parentRequest !== undefined ||
+    typeRequest !== undefined ||
     opts.unassign === true ||
     opts.steal === true ||
     worktreeRequest !== undefined ||
@@ -298,6 +332,59 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     }
     assertParentEdge(item.type, parentItem.type);
     reparentTo = parentItem;
+  }
+
+  // Promotion validation (task-promote-task-to-story): every refusal happens
+  // BEFORE any filesystem mutation. v1 supports exactly one conversion —
+  // task → story (--type story). The parse step already refused every other
+  // requested type; here we refuse the items it cannot apply to.
+  let promoteEpic: WorkItem | undefined;
+  let promoteNewPath: string | undefined;
+  let promoteNewId: string | undefined;
+  if (typeRequest !== undefined) {
+    if (item.type === "story") {
+      throw new Error(`cannot convert '${id}': it is already a story`);
+    }
+    if (item.type !== "task") {
+      throw new Error(
+        `--type story promotes tasks only (v1); '${id}' is a ${item.type} — refusing (create the story and move the work instead)`,
+      );
+    }
+    const parentStory = item.parent ? byId.get(item.parent) : undefined;
+    if (!parentStory || parentStory.type !== "story") {
+      throw new Error(
+        `task '${id}' has no parent story to derive the target epic from — create the epic first (arggon create epic <title> --parent <initiative-id>) and reparent '${id}' under a story below it`,
+      );
+    }
+    const epic = parentStory.parent ? byId.get(parentStory.parent) : undefined;
+    if (!epic) {
+      throw new Error(
+        `parent story '${parentStory.id}' has no parent epic — create the epic first and reparent '${parentStory.id}' under it (a story lives under an epic)`,
+      );
+    }
+    try {
+      assertParentEdge("story", epic.type);
+    } catch {
+      throw new Error(
+        `promoting '${id}' needs an epic target, but its grandparent '${epic.id}' is a ${epic.type} — create the epic first (arggon create epic <title> --parent <initiative-id>)`,
+      );
+    }
+    // A promoted story is a CONTAINER, and container ids must not start with
+    // task- or bug- (validate would reject the tree). Promoting therefore also
+    // renames the id: task-x -> story-x (ids without the task- prefix keep
+    // their id). References ride along: every depends_on entry pointing at the
+    // old id is rewritten tree-wide.
+    promoteNewId = id.startsWith("task-") ? `story-${id.slice("task-".length)}` : id;
+    if (promoteNewId !== id && byId.has(promoteNewId)) {
+      throw new Error(`cannot promote '${id}': target id '${promoteNewId}' is already taken`);
+    }
+    promoteEpic = epic;
+    promoteNewPath = newItemPath({
+      tasksDir,
+      type: "story",
+      id: promoteNewId,
+      parentContainerDir: epic.containerDir,
+    });
   }
 
   // depends_on (v3, ADR 0004): replace the list / append one id. Unknown ids
@@ -491,6 +578,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   // the tree never ends dirty.
   let targetPath = item.filePath;
   let movedFrom: string | undefined;
+  let renamedFrom: string | undefined;
   const movedOldPaths: string[] = [];
   const movedNewPaths: string[] = [];
   if (reparentTo) {
@@ -528,6 +616,52 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     data.parent = reparentTo.id;
     if (!changed.includes("parent")) changed.push("parent");
     targetPath = newPath;
+  }
+
+  // Promotion move (task-promote-task-to-story): performed LAST like the
+  // reparent move, after every other validation has passed. The task file
+  // moves to the story layout under the grandparent epic
+  // (<epic>/<story-id>/<story-id>.md, exactly where `create story` places
+  // it), the type and parent flip, and the promoted story starts EMPTY of
+  // children. issue/labels/body ride along untouched in the same file.
+  if (promoteNewPath && promoteEpic && promoteNewId) {
+    if (existsSync(promoteNewPath)) {
+      throw new Error(`promotion target already exists: ${promoteNewPath}`);
+    }
+    mkdirSync(dirname(promoteNewPath), { recursive: true });
+    renameSync(item.filePath, promoteNewPath);
+    movedOldPaths.push(item.filePath);
+    movedNewPaths.push(promoteNewPath);
+    movedFrom = item.filePath;
+    data.type = "story";
+    changed.push("type");
+    data.parent = promoteEpic.id;
+    if (!changed.includes("parent")) changed.push("parent");
+    if (promoteNewId !== id) {
+      data.id = promoteNewId;
+      changed.push("id");
+      renamedFrom = id;
+      // Rewrite depends_on references to the old id tree-wide so the graph
+      // stays resolvable (validate re-checks on every run). These files ride
+      // into the auto-commit via movedNewPaths staging.
+      for (const other of byId.values()) {
+        if (other.id === id || !other.dependsOn.includes(id)) continue;
+        writeFileSync(
+          other.filePath,
+          stringifyFrontmatter(
+            {
+              ...other.data,
+              depends_on: other.dependsOn.map((dep) => (dep === id ? promoteNewId : dep)),
+              updated: formatDate(now),
+            },
+            other.body,
+          ),
+          "utf8",
+        );
+        movedNewPaths.push(other.filePath);
+      }
+    }
+    targetPath = promoteNewPath;
   }
 
   writeFileSync(targetPath, stringifyFrontmatter(data, newBody), "utf8");
@@ -572,7 +706,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   }
 
   return {
-    id,
+    id: updated.id,
     path: targetPath,
     root,
     item: updated,
@@ -587,6 +721,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
       ...completedContainers.map((container) => container.filePath),
     ],
     movedFrom,
+    ...(renamedFrom ? { renamedFrom } : {}),
     ...(issueRoundtrip ? { issueRoundtrip } : {}),
   };
   };
