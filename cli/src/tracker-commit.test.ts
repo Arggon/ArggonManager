@@ -26,9 +26,12 @@ import {
   formatCommitLine,
   readAutoCommitConfig,
   resolveAutoCommit,
+  resolveCommonGitDir,
   trackerCommitMessage,
+  trackerGitLockKey,
   updateCommitMessage,
 } from "./tracker-commit.js";
+import { lockFilePathFor } from "./lock.js";
 import { maybeCommitUpdate, runUpdate } from "./update.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
@@ -699,4 +702,155 @@ describe("commitTrackerMutation index.lock contention (bug-autocommit-silent-ski
       stderr.mockRestore();
     }
   }, 15_000);
+});
+
+describe("repo-level git-mutation lock (bug-torture-contention-flake3)", () => {
+  /** The tmpdir lock file guarding the repo's add+commit sequence. */
+  function repoLock(dir: string): string {
+    return lockFilePathFor(trackerGitLockKey(resolveCommonGitDir(dir)!));
+  }
+
+  /** Write a repo-lock file as if held by another (live, non-stale) process. */
+  function holdRepoLock(dir: string, holderPid = 999_999): void {
+    writeFileSync(
+      repoLock(dir),
+      JSON.stringify({ pid: holderPid, acquiredAt: new Date().toISOString() }),
+      "utf8",
+    );
+  }
+
+  it("keys the lock on the repo's shared common git dir", () => {
+    const dir = initRepo();
+    expect(resolveCommonGitDir(dir)).toBe(resolve(dir, ".git"));
+    // Deterministic tmpdir lock file derived from the common dir, so every
+    // process (and every linked worktree of the same repo) contends on it.
+    expect(repoLock(dir)).toMatch(/arggon-lock-[0-9a-f]{40}\.lock$/);
+    expect(trackerGitLockKey(resolveCommonGitDir(dir)!)).toBe(
+      join(resolve(dir, ".git"), "arggon-tracker-git.lock"),
+    );
+  });
+
+  it("keeps the surgical staging contract: unstaged dirty files stay out of the commit", () => {
+    const dir = initRepo();
+    const itemPath = join(dir, "tasks/launch/auth/login/task-rate-limit.md");
+    writeFileSync(itemPath, `${readFileSync(itemPath, "utf8")}\n- only note\n`, "utf8");
+    writeFileSync(join(dir, "user-file.txt"), "user content\n", "utf8");
+
+    const result = commitTrackerMutation(dir, [itemPath], {
+      message: trackerCommitMessage("commented", ["task-rate-limit"]),
+    });
+
+    expect(result).toMatchObject({ committed: true });
+    // Our commit contains ONLY the mutated tracker path...
+    expect(committedPaths(dir)).toEqual(["tasks/launch/auth/login/task-rate-limit.md"]);
+    // ...and the user's dirty (unstaged) file stays out of it, still dirty.
+    expect(status(dir)).toBe("?? user-file.txt");
+  });
+  it("waits for another arggon process holding the repo lock and commits after release", () => {
+    const dir = initRepo();
+    const itemPath = join(dir, "tasks/launch/auth/login/task-rate-limit.md");
+    writeFileSync(itemPath, `${readFileSync(itemPath, "utf8")}\n- lock-wait note\n`, "utf8");
+    holdRepoLock(dir);
+    // Release from a detached child (the mutation is synchronous).
+    const lock = repoLock(dir);
+    const child = spawn(
+      process.execPath,
+      ["-e", `setTimeout(() => require("node:fs").rmSync(${JSON.stringify(lock)}), 200)`],
+      { stdio: "ignore" },
+    );
+    child.unref();
+
+    const result = commitTrackerMutation(dir, [itemPath], {
+      message: trackerCommitMessage("commented", ["task-rate-limit"]),
+    });
+
+    expect(result).toMatchObject({ committed: true });
+    expect(status(dir)).toBe("");
+  }, 15_000);
+
+  it("reports a warned skip when another arggon process holds the repo lock past the budget", () => {
+    const dir = initRepo();
+    const itemPath = join(dir, "tasks/launch/auth/login/task-rate-limit.md");
+    writeFileSync(itemPath, `${readFileSync(itemPath, "utf8")}\n- repo-lock note\n`, "utf8");
+    holdRepoLock(dir);
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const result = commitTrackerMutation(dir, [itemPath], {
+        message: trackerCommitMessage("commented", ["task-rate-limit"]),
+        commitRetryTimeoutMs: 300,
+      });
+
+      expect(result).toEqual({ committed: false, skipReason: "git index locked" });
+      expect(commitPayload(result)).toEqual({ skipped: "git index locked" });
+      expect(stderr).toHaveBeenCalledWith(
+        expect.stringContaining("commit skipped: git index locked"),
+      );
+      expect(status(dir)).toContain("task-rate-limit.md");
+    } finally {
+      stderr.mockRestore();
+    }
+  }, 15_000);
+
+  // The previously-flaky interleave, end-to-end at small scale: N concurrent
+  // PROCESSES calling commitTrackerMutation on one repo — each mutation must
+  // land in its own commit and the tree must end clean. Before the repo-level
+  // lock this raced the shared index (clobber between add and commit); now
+  // the mutations serialize.
+  it("N=4 concurrent processes commit distinct mutations with a clean tree", async () => {
+    const dir = initRepo();
+    const itemPath = join(dir, "tasks/launch/auth/login/task-rate-limit.md");
+    // Four extra items to mutate, seeded in one commit.
+    const ids = ["task-c1", "task-c2", "task-c3", "task-c4"];
+    const paths = [itemPath, ...ids.map((id) => join(dir, `tasks/launch/auth/login/${id}.md`))];
+    for (const p of paths.slice(1)) writeFileSync(p, "---\nseed\n---\n", "utf8");
+    commitAllIfDirty(dir, "seed concurrency items");
+
+    // The runner lives OUTSIDE the repo: an untracked file in the fixture
+    // would trip the clean-tree assertion below.
+    const runnerDir = mkdtempSync(join(tmpdir(), "arggon-concurrent-committer-"));
+    const runner = join(runnerDir, "concurrent-committer.mjs");
+    writeFileSync(
+      runner,
+      `import { commitTrackerMutation, trackerCommitMessage } from ${JSON.stringify(
+        resolve(new URL(".", import.meta.url).pathname, "./tracker-commit.js"),
+      )};
+import { appendFileSync } from "node:fs";
+const [root, itemPath, id] = process.argv.slice(2);
+appendFileSync(itemPath, \`- concurrent note \${id}\\n\`);
+const r = commitTrackerMutation(root, [itemPath], {
+  message: trackerCommitMessage("commented", [id]),
+});
+console.log(JSON.stringify(r));
+`,
+      "utf8",
+    );
+    const tsxCli = resolve(new URL("../../node_modules/tsx/dist/cli.mjs", import.meta.url).pathname);
+    const results = await Promise.all(
+      paths.map((p, i) =>
+        new Promise<string>((done, fail) => {
+          const child = spawn(process.execPath, [tsxCli, runner, dir, p, `item-${i}`], {
+            cwd: dir,
+            stdio: ["ignore", "pipe", "pipe"],
+          });
+          let out = "";
+          child.stdout.on("data", (d: Buffer) => (out += d));
+          child.stderr.on("data", (d: Buffer) => (out += d));
+          child.on("close", (code) =>
+            code === 0 ? done(out) : fail(new Error(`child ${i} exited ${code}: ${out}`)),
+          );
+        }),
+      ),
+    );
+
+    // Every process committed its own mutation — none skipped.
+    results.forEach((out, i) => {
+      expect(JSON.parse(out.trim().split("\n").at(-1)!), `process ${i}`).toMatchObject({
+        committed: true,
+      });
+    });
+    // The previously-flaky invariant: tree fully clean, every commit landed.
+    expect(status(dir)).toBe("");
+    const log = git(["log", "--format=%s", "-6"], dir);
+    for (let i = 0; i < paths.length; i++) expect(log).toContain(`chore(tasks): commented item-${i}`);
+  }, 60_000);
 });

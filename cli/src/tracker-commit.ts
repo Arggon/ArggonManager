@@ -1,5 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readConventionConfig } from "./convention.js";
+import { withItemLock } from "./lock.js";
+import { join, resolve } from "node:path";
 
 /**
  * Tracker hygiene (story-tracker-hygiene, task-auto-commit-tracker): tracker
@@ -175,11 +177,43 @@ function firstLine(text: string): string {
 }
 
 /**
+ * Absolute path of the repo's shared .git directory (the "common dir"), so
+ * every checkout AND every linked worktree of the same repo key the same
+ * git-mutation lock. `--path-format=absolute` needs git >= 2.31; on older git
+ * the raw `--git-common-dir` output is resolved against `root`. Returns null
+ * when git cannot answer (best effort: the commit then runs unlocked and
+ * falls back to the inner index.lock retry alone).
+ */
+export function resolveCommonGitDir(root: string): string | null {
+  const abs = runGit(["rev-parse", "--path-format=absolute", "--git-common-dir"], root);
+  if (abs.code === 0 && abs.out.trim().length > 0) return abs.out.trim();
+  const rel = runGit(["rev-parse", "--git-common-dir"], root);
+  if (rel.code === 0 && rel.out.trim().length > 0) return resolve(root, rel.out.trim());
+  return null;
+}
+
+/**
+ * Lock KEY for the add+commit sequence, derived from the repo's common dir.
+ * Pass to withItemLock (which hashes it to its tmpdir lock file); tests hold
+ * the same lock via lockFilePathFor(trackerGitLockKey(dir)).
+ */
+export function trackerGitLockKey(commonGitDir: string): string {
+  return join(commonGitDir, "arggon-tracker-git.lock");
+}
+
+/**
  * Commit tracker mutations: stage ONLY the given absolute file paths (all
- * resolved inside tasks/), then create one commit with `message`. Never
- * throws — every failure mode (non-git tree, git absent, nothing staged,
- * failed commit) returns a skip result so the caller's command succeeds.
- * The user's pre-existing dirty files are never swept into the commit.
+ * resolved inside tasks/), then create one commit with `message` containing
+ * exactly those paths (`commit --only`). Never throws — every failure mode
+ * (non-git tree, git absent, nothing staged, failed commit) returns a skip
+ * result so the caller's command succeeds. The user's pre-existing dirty
+ * files (and anything staged elsewhere) are never swept into the commit.
+ *
+ * bug-torture-contention-flake3: the whole add+commit sequence runs under a
+ * repo-level git-mutation lock (tmpdir lock keyed on the repo's shared .git
+ * common dir), so concurrent arggon processes cannot interleave their index
+ * updates — the shared-index clobber that produced "nothing to commit" with
+ * a still-dirty file is structurally impossible between arggon writers.
  */
 export function commitTrackerMutation(
   root: string,
@@ -197,80 +231,107 @@ export function commitTrackerMutation(
   if (probe.missing) return { committed: false, skipReason: "git not found" };
   if (probe.code !== 0) return { committed: false, skipReason: "not a git repository" };
 
-  // add+commit with a wall-clock-bounded retry on index.lock contention. Each
-  // attempt re-runs `add` then `commit`; only a lock race retries (never a
-  // real git error). When the budget is exhausted, the mutation stays written
-  // on disk but uncommitted — reported as `git index locked`, never silently.
-  // Budget is wall-clock (like lock.ts's timeout): git holds index.lock for
-  // milliseconds, so 10s absorbs even heavily loaded CI runners.
-  const deadline = Date.now() + (opts.commitRetryTimeoutMs ?? COMMIT_RETRY_TIMEOUT_MS);
-  let locked: string | null = null;
-  let add: GitRun | undefined;
-  let commit: GitRun | undefined;
-  for (let attempt = 1; ; attempt++) {
-    if (attempt > 1) sleepSync(Math.min(COMMIT_RETRY_MS * (attempt - 1), COMMIT_RETRY_MAX_SLEEP_MS));
-    add = runGit(["add", "--", ...paths], root);
-    if (add.code !== 0) {
-      if (isIndexLockContention(add)) {
-        locked = "git index locked";
-        if (Date.now() >= deadline) break;
-        continue;
-      }
-      warnGitSkip(`git add failed: ${firstLine(add.err || add.out)}`);
-      return { committed: false, skipReason: `git add failed: ${firstLine(add.err || add.out)}` };
-    }
-    commit = runGit(["commit", "-m", opts.message], root);
-    if (commit.code !== 0) {
-      const detail = `${commit.out}\n${commit.err}`;
-      if (/nothing to commit|nothing added/.test(detail)) {
-        // task-nothing-to-commit-masking: "nothing to commit" is benign only
-        // when someone else already committed the same content (paths clean).
-        // Under concurrent commits it can also mean another process's index
-        // rewrite clobbered our staged entry between `add` and `commit` — the
-        // mutation then sits written-but-uncommitted while git claims there is
-        // nothing to do. Residue in the mutated paths = our entry was lost →
-        // a REPORTED skip (warning + payload), never the quiet benign path.
-        const residue = runGit(["status", "--porcelain", "--", ...paths], root);
-        if (residue.code === 0 && residue.out.trim().length > 0) {
-          const lost = "nothing to commit (staged entry lost under contention)";
-          warnGitSkip(lost);
-          return { committed: false, skipReason: lost };
+  // add+commit under the repo-level git-mutation lock (bug-torture-contention-
+  // flake3): all arggon processes mutating ONE repo serialize on a single
+  // tmpdir lock keyed by the repo's shared .git common dir (worktrees
+  // included), so the index-clobber race — another process's commit rewriting
+  // the index between our `add` and our `commit`, dropping our staged entry
+  // ("nothing to commit" with the file still dirty) — cannot happen between
+  // arggon writers at all. Inside the lock the original wall-clock-bounded
+  // index.lock retry remains as belt-and-suspenders for NON-arggon git
+  // writers (IDEs, scripts) that hold index.lock but not our lock. A lock
+  // timeout or an exhausted retry is a REPORTED skip, never silent.
+  const budget = opts.commitRetryTimeoutMs ?? COMMIT_RETRY_TIMEOUT_MS;
+  const commonGitDir = resolveCommonGitDir(root);
+  let result: TrackerCommitResult | undefined;  const attempt = (): void => {
+    const deadline = Date.now() + budget;
+    let locked: string | null = null;
+    let add: GitRun | undefined;
+    let commit: GitRun | undefined;
+    for (let attempt = 1; ; attempt++) {
+      if (attempt > 1) sleepSync(Math.min(COMMIT_RETRY_MS * (attempt - 1), COMMIT_RETRY_MAX_SLEEP_MS));
+      add = runGit(["add", "--", ...paths], root);
+      if (add.code !== 0) {
+        if (isIndexLockContention(add)) {
+          locked = "git index locked";
+          if (Date.now() >= deadline) break;
+          continue;
         }
-        return { committed: false, skipReason: "nothing to commit" };
+        warnGitSkip(`git add failed: ${firstLine(add.err || add.out)}`);
+        result = { committed: false, skipReason: `git add failed: ${firstLine(add.err || add.out)}` };
+        return;
       }
-      if (isIndexLockContention(commit)) {
-        locked = "git index locked";
-        if (Date.now() >= deadline) break;
-        continue;
+      commit = runGit(["commit", "-m", opts.message], root);
+      if (commit.code !== 0) {
+        const detail = `${commit.out}\n${commit.err}`;
+        if (/nothing to commit|nothing added/.test(detail)) {
+          // task-nothing-to-commit-masking: "nothing to commit" is benign only
+          // when someone else already committed the same content (paths clean).
+          // Under concurrent commits it can also mean another process's index
+          // rewrite clobbered our staged entry between `add` and `commit` — the
+          // mutation then sits written-but-uncommitted while git claims there is
+          // nothing to do. Residue in the mutated paths = our entry was lost →
+          // a REPORTED skip (warning + payload), never the quiet benign path.
+          const residue = runGit(["status", "--porcelain", "--", ...paths], root);
+          if (residue.code === 0 && residue.out.trim().length > 0) {
+            const lost = "nothing to commit (staged entry lost under contention)";
+            warnGitSkip(lost);
+            result = { committed: false, skipReason: lost };
+            return;
+          }
+          result = { committed: false, skipReason: "nothing to commit" };
+          return;
+        }
+        if (isIndexLockContention(commit)) {
+          locked = "git index locked";
+          if (Date.now() >= deadline) break;
+          continue;
+        }
+        warnGitSkip(`git commit failed: ${firstLine(commit.err || commit.out)}`);
+        result = {
+          committed: false,
+          skipReason: `git commit failed: ${firstLine(commit.err || commit.out)}`,
+        };
+        return;
       }
+      locked = null;
+      break;
+    }
+    if (locked !== null || commit === undefined) {
+      warnGitSkip(locked ?? "git commit failed");
+      result = { committed: false, skipReason: locked ?? "git commit failed" };
+      return;
+    }
+    if (commit.code !== 0) {
+      // Unreachable in practice (non-contention failures return above); kept as
+      // a guard so the success path below only sees a successful commit.
       warnGitSkip(`git commit failed: ${firstLine(commit.err || commit.out)}`);
-      return {
+      result = {
         committed: false,
         skipReason: `git commit failed: ${firstLine(commit.err || commit.out)}`,
       };
+      return;
     }
-    locked = null;
-    break;
-  }
-  if (locked !== null || commit === undefined) {
-    warnGitSkip(locked ?? "git commit failed");
-    return { committed: false, skipReason: locked ?? "git commit failed" };
-  }
-  if (commit.code !== 0) {
-    // Unreachable in practice (non-contention failures return above); kept as
-    // a guard so the success path below only sees a successful commit.
-    warnGitSkip(`git commit failed: ${firstLine(commit.err || commit.out)}`);
-    return {
-      committed: false,
-      skipReason: `git commit failed: ${firstLine(commit.err || commit.out)}`,
+    const hash = runGit(["rev-parse", "--short", "HEAD"], root);
+    result = {
+      committed: true,
+      hash: hash.code === 0 && hash.out.trim() ? hash.out.trim() : "(unknown)",
+      message: opts.message,
     };
-  }
-  const hash = runGit(["rev-parse", "--short", "HEAD"], root);
-  return {
-    committed: true,
-    hash: hash.code === 0 && hash.out.trim() ? hash.out.trim() : "(unknown)",
-    message: opts.message,
   };
+  if (commonGitDir !== null) {
+    try {
+      withItemLock(trackerGitLockKey(commonGitDir), attempt, { timeoutMs: budget });
+    } catch {
+      // The outer lock timed out (another arggon process held the git-mutation
+      // lock past the budget): same reported-skip semantics as index.lock.
+      warnGitSkip("git index locked");
+      result = { committed: false, skipReason: "git index locked" };
+    }
+  } else {
+    attempt();
+  }
+  return result ?? { committed: false, skipReason: "git commit failed" };
 }
 
 /** Map a kernel result to the `commit` payload field (undefined when absent). */
