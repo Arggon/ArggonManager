@@ -4,6 +4,7 @@ status: in_progress
 id: task-review-bar-smoke-gate
 title: "Review bar: non-functional dimensions + blocking smoke gate (ADR 0008)"
 assignee: Arggon
+branch: feat/task-review-bar-smoke-gate
 parent: story-dogfood-self-host
 labels: [p2]
 created: "2026-09-16"
