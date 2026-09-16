@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-spec-analyze-baseline
 title: "spec analyze --baseline: persisted findings baseline per wave"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-spec-pipeline
 labels: [p2]
 created: "2026-09-16"
 updated: "2026-09-16"
-claimed_at: "2026-09-16T21:25:45.567Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-spec-pipeline/task-spec-analyze-baseline.md
