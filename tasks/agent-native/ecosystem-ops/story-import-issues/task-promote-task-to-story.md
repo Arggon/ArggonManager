@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-promote-task-to-story
 title: promote/convert task to story (import flattens ideas under one container)
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-import-issues
 labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-16"
-claimed_at: "2026-09-16T00:41:55.284Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-import-issues/task-promote-task-to-story.md
