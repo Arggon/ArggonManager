@@ -57,6 +57,39 @@ arggon spec analyze --json            # v1 envelope with findings arrays
   structural failure (unreadable file) reusing `SPEC_FAILED` — no new error
   code.
 
+### Baselines (`--save-baseline` / `--baseline`)
+
+The multi-wave refactor gate ("no NEW findings vs the previous wave") is
+mechanical, not manual JSON diffing. Both flags are options on the existing
+`spec analyze` command (no new subcommands); they are mutually exclusive in
+one run — a run either writes a snapshot or compares against one.
+
+- **Snapshot format**: `{ schemaVersion, conventionVersion, count, findings }`
+  where `findings` merges ambiguity + consistency findings sorted
+  deterministically by file, kind, line (null-safe), severity, message. No
+  timestamps or volatile fields: a re-run over unchanged specs produces a
+  byte-identical, pretty-printed file, so committed baselines diff cleanly in
+  git.
+- **Comparison identity**: two findings match only when ALL of
+  file/kind/line/severity/message are equal. New = in current, not in
+  baseline; resolved = in baseline, not in current; unchanged = in both.
+  Comparison is set-based, independent of findings order.
+- **Exit-code policy**: a `--baseline` run with >= 1 NEW finding exits `1`
+  (this is the wave gate — a regression); zero new findings exits `0`;
+  resolved findings are good news and never fail the run; `--no-fail-on-new`
+  opts out (report-only). Without `--baseline`, behavior is unchanged (exit 0
+  with findings; only structural failures exit 1). Rationale: the plain
+  analyze contract ("findings never fail") stays intact for reporting; the
+  gate exists ONLY where a caller has declared a reference point. Structural
+  failures (missing/invalid snapshot, unreadable spec) still exit 1 with
+  `SPEC_FAILED`. With `--json`, a failing gate still emits a success envelope
+  (`ok: true`) carrying the additive `baseline` payload — the exit code
+  carries the gate, so `--json` pipelines branch on `status`/`baseline.failed`
+  and CI on the exit code.
+- **Recommended wave-gate flow**: save the baseline once at wave 0 and commit
+  it, then run `spec analyze --baseline <file>` per PR/wave — non-zero exit =
+  regression, fix or (deliberately) re-save the baseline.
+
 ## Contrato JSON
 
 `--json` envelope: `{ ok: true, schemaVersion, conventionVersion,

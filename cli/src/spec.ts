@@ -624,6 +624,175 @@ export function formatSpecAnalyzeHuman(result: SpecAnalyzeResult): string {
   return `${lines.join("\n")}\n`;
 }
 
+/**
+ * Persisted findings baselines for `spec analyze` (--save-baseline /
+ * --baseline): the "no NEW findings vs previous wave" gate, mechanical instead
+ * of manual JSON diffing.
+ *
+ * Snapshot format (stable, committable — NO timestamps or volatile fields):
+ * `{ schemaVersion, conventionVersion, count, findings }` with `findings`
+ * sorted deterministically (file, kind, line null-safe, severity, message), so
+ * a re-run over unchanged specs is byte-identical and committed baselines
+ * diff cleanly.
+ *
+ * Exit-code policy: a `--baseline` run with >= 1 NEW finding exits 1 (the
+ * wave gate); zero new findings exits 0; `--no-fail-on-new` is report-only.
+ * Without `--baseline` behavior is unchanged (exit 0 with findings; only a
+ * structural failure exits 1). With `--json`, a failing gate still emits a
+ * success envelope (`ok: true`) carrying the additive `baseline` payload —
+ * the exit code carries the gate.
+ */
+
+export const SPEC_BASELINE_SCHEMA_VERSION = 1;
+
+/** Deterministic ordering: file, kind, line (null-safe), severity, message. */
+export function sortSpecFindings(findings: SpecFinding[]): SpecFinding[] {
+  const sorted = [...findings];
+  sorted.sort(
+    (a, b) =>
+      a.file.localeCompare(b.file) ||
+      a.kind.localeCompare(b.kind) ||
+      (a.line ?? 0) - (b.line ?? 0) ||
+      a.severity.localeCompare(b.severity) ||
+      a.message.localeCompare(b.message),
+  );
+  return sorted;
+}
+
+/** Comparison identity: the WHOLE finding (all five fields must match). */
+function findingKey(f: SpecFinding): string {
+  return JSON.stringify([f.file, f.kind, f.line ?? null, f.severity, f.message]);
+}
+
+export type SpecBaselineSnapshot = {
+  schemaVersion: number;
+  conventionVersion: number;
+  count: number;
+  findings: SpecFinding[];
+};
+
+/** Byte-stable serialization (pretty-printed so committed baselines diff cleanly). */
+export function serializeSpecBaseline(snapshot: SpecBaselineSnapshot): string {
+  return `${JSON.stringify(snapshot, null, 2)}\n`;
+}
+
+function snapshotFromResult(result: SpecAnalyzeResult): SpecBaselineSnapshot {
+  const findings = sortSpecFindings([...result.ambiguity, ...result.consistency]);
+  return {
+    schemaVersion: SPEC_BASELINE_SCHEMA_VERSION,
+    conventionVersion: result.conventionVersion,
+    count: findings.length,
+    findings,
+  };
+}
+
+function readBaselineSnapshot(file: string): SpecBaselineSnapshot {
+  let raw: string;
+  try {
+    raw = readFileSync(file, "utf8");
+  } catch (err) {
+    throw new Error(`cannot read baseline ${file}: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  let data: unknown;
+  try {
+    data = JSON.parse(raw);
+  } catch (err) {
+    throw new Error(`baseline ${file} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  const snap = data as Partial<SpecBaselineSnapshot> | null;
+  if (
+    snap === null ||
+    typeof snap !== "object" ||
+    !Array.isArray(snap.findings) ||
+    typeof snap.count !== "number"
+  ) {
+    throw new Error(`baseline ${file} is not a spec analyze baseline snapshot`);
+  }
+  return snap as SpecBaselineSnapshot;
+}
+
+export type SpecBaselineSaveOptions = {
+  cwd: string;
+  spec?: string;
+  /** Where to write the snapshot JSON. */
+  file: string;
+};
+
+export type SpecBaselineSaveResult = {
+  result: SpecAnalyzeResult;
+  /** Absolute path the snapshot was written to. */
+  file: string;
+  snapshot: SpecBaselineSnapshot;
+};
+
+/** `spec analyze --save-baseline <file>`: scan, then write the snapshot. */
+export function runSpecAnalyzeSaveBaseline(opts: SpecBaselineSaveOptions): SpecBaselineSaveResult {
+  const result = runSpecAnalyze({ cwd: opts.cwd, spec: opts.spec });
+  const abs = isAbsolute(opts.file) ? opts.file : resolve(opts.cwd, opts.file);
+  const snapshot = snapshotFromResult(result);
+  writeFileAtomic(abs, serializeSpecBaseline(snapshot));
+  return { result, file: abs, snapshot };
+}
+
+export type SpecBaselineComparison = {
+  result: SpecAnalyzeResult;
+  /** Absolute path of the baseline the current run was compared against. */
+  file: string;
+  /** Findings in the current run. */
+  total: number;
+  /** Current findings that also exist in the baseline (matched on all fields). */
+  unchanged: SpecFinding[];
+  /** In current, not in baseline. */
+  added: SpecFinding[];
+  /** In baseline, not in current. */
+  resolved: SpecFinding[];
+};
+
+/** `spec analyze --baseline <file>`: scan, then compare against the snapshot. */
+export function runSpecAnalyzeCompareBaseline(opts: SpecBaselineSaveOptions): SpecBaselineComparison {
+  const baseline = readBaselineSnapshot(opts.file);
+  const result = runSpecAnalyze({ cwd: opts.cwd, spec: opts.spec });
+  const baselineKeys = new Set(baseline.findings.map(findingKey));
+  const current = [...result.ambiguity, ...result.consistency];
+  const currentKeySet = new Set(current.map(findingKey));
+  const unchanged: SpecFinding[] = [];
+  const added: SpecFinding[] = [];
+  for (const f of current) {
+    (baselineKeys.has(findingKey(f)) ? unchanged : added).push(f);
+  }
+  const resolved = baseline.findings.filter((f) => !currentKeySet.has(findingKey(f)));
+  return {
+    result,
+    file: isAbsolute(opts.file) ? opts.file : resolve(opts.cwd, opts.file),
+    total: current.length,
+    unchanged: sortSpecFindings(unchanged),
+    added: sortSpecFindings(added),
+    resolved: sortSpecFindings(resolved),
+  };
+}
+
+export function formatSpecBaselineSaveHuman(r: SpecBaselineSaveResult): string {
+  const total = r.result.ambiguity.length + r.result.consistency.length;
+  return `arggon spec analyze: baseline written to ${r.file} (${total} finding(s) across ${r.result.scanned} spec(s))\n`;
+}
+
+export function formatSpecBaselineCompareHuman(c: SpecBaselineComparison): string {
+  const lines: string[] = [];
+  for (const f of c.added) {
+    const at = f.line === undefined ? "" : `${f.line}:`;
+    lines.push(`new ${f.severity} ${f.file}:${at} ${f.message} [${f.kind}]`);
+  }
+  for (const f of c.resolved) {
+    const at = f.line === undefined ? "" : `${f.line}:`;
+    lines.push(`resolved ${f.severity} ${f.file}:${at} ${f.message} [${f.kind}]`);
+  }
+  lines.push(
+    `arggon spec analyze vs baseline ${c.file}: ${c.added.length} new, ${c.resolved.length} resolved, ` +
+      `${c.unchanged.length} unchanged, ${c.total} total`,
+  );
+  return `${lines.join("\n")}\n`;
+}
+
 const SPEC_TEMPLATE_FALLBACK = `---
 spec_id: {{ID}}
 title: {{TITLE}}
