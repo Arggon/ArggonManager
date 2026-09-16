@@ -29,6 +29,6 @@ Reported by the casa-pendiente experiment (2026-09-15): the GitHub round-trip (x
 - [x] `arggon create --issue <n>` wires the existing kernel option
 - [x] `arggon update --issue <n>` (and a way to clear it) writes the `issue:` field — same validation, additive payload
   - clear semantics: `--issue 0` clears (single mechanism across CLI and MCP; documented in the flag help, README, json-output.md, agents.md §0)
-- [x] Parity harness covers --issue for create/update; tests for set, clear, invalid value; docs (README + json-output done; docs/agents.md §0 updated. The convention.md x-github cross-reference is NOT done — docs/convention.md is outside this item's file ownership; flagged as a follow-up)
+- [x] Parity harness covers --issue for create/update; tests for set, clear, invalid value; docs (README + json-output + convention.md x-github cross-reference, added on review)
 
 ## Notes
