@@ -33,3 +33,12 @@ Mapping (proven in production): OpenSpec `## Purpose` -> Purpose; `## Requiremen
 - [ ] Docs: README + docs/agents.md (spec pipeline section) + docs/json-output.md (import payload additive)
 
 ## Notes
+
+### 2026-09-16 @Arggon
+REVIEW (coordinator) — round 1: findings; round 2: APPROVED after in-PR fix, merging PR #290.
+
+Round 1 findings (P1, fixed in a7f45ff):
+1. CLI miswired: .command("import openspec") made commander bind the literal 'openspec' to the handler's first positional and silently ignore the real <path> (resolved <cwd>/openspec). Unit tests passed because they call runSpecImport directly — no e2e coverage of the wiring. Fixed: flat spec import <format> <path> (keeps documented invocation, adds explicit format dispatch with SPEC_IMPORT_FAILED for unknown formats, no introspection changes needed). Added 5 e2e CLI tests via spawnSync; strengthened zero-loss tests to exercise the real diff path (preamble prose dropped by mapping) instead of the parse-rejection path the original mutation hit.
+2. Minor (accepted as-is): dry-run JSON success envelope used successEnvelope() with default conventionVersion instead of readConventionVersion(root) — behaviorally identical (both v3); not blocking.
+
+Verified by coordinator: full diff read; suite 967/967 green, lint/build/validate/spec-validate clean, doctor 0 modified / 0 drifted; live CLI probe on a synthetic corpus (dry-run inventory, real run with global numbering 006/007, unknown-format refusal exit 1, parse failure loud with failures[] + exit 1, zero-written on failure). Spec-first satisfied (spec-import-openspec-005 flipped implemented in-PR); adapter extension point documented.
