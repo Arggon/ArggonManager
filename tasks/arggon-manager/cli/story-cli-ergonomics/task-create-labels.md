@@ -4,7 +4,7 @@ status: todo
 id: task-create-labels
 title: "create --labels: label a new item at creation"
 parent: story-cli-ergonomics
-labels: []
+labels: [p2]
 created: "2026-09-16"
 updated: "2026-09-16"
 ---
