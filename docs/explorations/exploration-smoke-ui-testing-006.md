@@ -37,6 +37,11 @@ this exploration picks the tooling so the gate is codified, not tribal.
    renders key markers; no real browser, no drag-and-drop coverage.
 8. **AI testing platforms (QA Wolf, Applitools/Percy, Sauce, …)** — SaaS
    agent/visual-testing platforms.
+9. **Webwright (`microsoft/Webwright`)** — MIT Python "SWE-style browser
+   agent framework": turns a coding LLM into a browser agent via
+   code-as-action (the model writes and runs Playwright *Python* scripts in
+   a terminal loop). First public release 2026-05-04; ~1.5k LoC; needs an
+   LLM backend (OpenAI/Anthropic/OpenRouter).
 
 ## Criteria
 
@@ -112,6 +117,14 @@ Weighted, "better" means:
   without an ADR: hosted/SaaS anything" (docs/engineering.md) (source:
   https://www.qawolf.com/blog/the-12-best-ai-testing-tools-in-2026,
   2026-09-16).
+- **Webwright** (`https://github.com/microsoft/webwright`, read 2026-09-16)
+  sits a layer ABOVE Playwright, not against it: its agent writes and runs
+  Playwright Python scripts (code-as-action). Built for long-horizon agentic
+  web TASKS (flight search, forms; Online-Mind2Web 86.7%, Odysseys 60.1%)
+  and explicitly not for website testing. Its **Skill Factory** distills a
+  solved task into a parameterized skill that replays in ~40s with zero
+  tokens (WebArena reuse 55% → 70%) — the same shape as our tier-2 scripted
+  `@smoke` spec: verification should end up deterministic and token-free.
 - The board UI routes UI-initiated updates through the same kernel
   read/update paths as the CLI (ADR 0002; `cli/src/board-serve.ts` imports
   `runUpdate`), so a UI smoke test can assert end-to-end persistence with
@@ -141,6 +154,13 @@ WebDriver-protocol bound, no agent-first CLI — its wins are mobile and
 ecosystem breadth, both out of scope here), Puppeteer (library
 only, no runner), plain HTTP smoke (can't see drag-and-drop; fine as an inner
 assertion inside tier 2), AI/SaaS platforms (boundary: no SaaS without ADR).
+**Webwright is a near-miss, not a loser on quality:** it is MIT OSS and
+impressive, but it is the wrong layer for this gate — the smoke verifier is
+already an agent (the reviewer) with browser hands, so Webwright's added LLM
+harness means a second model, Python runtime (repo is Node/TS), token cost
+per run, and non-determinism where the gate needs bounded, reviewable steps.
+Watch its Skill Factory pattern; revisit if a future need is autonomous
+multi-step web tasks rather than verification.
 
 **Out of scope for a browser:** TUI (`arggon tui`) — smoke stays a scripted
 pty render check or manual; noted in the methodology text as the exception.
