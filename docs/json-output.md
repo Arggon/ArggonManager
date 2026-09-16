@@ -229,6 +229,18 @@ Failures use `error.code: "SPEC_FAILED"` (invalid slug, refusing to overwrite, m
 
 Failures use `error.code: "SPEC_IMPORT_FAILED"` and exit code 1, plus an additive `failures` array (`{ capability, source, message, diff? }` — `diff` is the per-file `- source` / `+ output` line diff for zero-loss mismatches). Nothing is written when the run fails.
 
+`spec audit [--duplicate-threshold <n>] [--merge-threshold <n>] [--min-shared-titles <n>] [--shared-title-floor <n>] [--report-floor <n>]` (report-only pairwise duplication detection over `docs/specs/*.md`; findings never fail the run). On success (`command: "spec"`):
+
+| Field        | Type         | Notes |
+| ------------ | ------------ | ----- |
+| `specs`      | `number`     | Spec documents scanned |
+| `pairs`      | `number`     | Pairs compared (`specs*(specs-1)/2`) |
+| `thresholds` | `object`     | Thresholds in effect: `{ duplicateThreshold, mergeThreshold, minSharedTitles, sharedTitleFloor, reportFloor }` (defaults 0.85 / 0.45 / 2 / 0.15 / 0.15) |
+| `findings`   | `AuditFinding[]` | Reported pairs: `{ classification: "duplicate"\|"merge"\|"keep-separate", files: [a, b], similarity, sharedTitles: string[], note }` — `files` posix, repo-relative, sorted; `sharedTitles` is the verbatim intersection of `### Requirement:` / `#### Scenario:` titles |
+| `counts`     | `object`     | `{ duplicate, merge, keepSeparate, belowFloor }` — `belowFloor` pairs are counted but not reported |
+
+Failures (missing/empty `docs/specs`, unreadable spec, invalid threshold values) use `error.code: "SPEC_FAILED"` and exit code 1.
+
 ### `explore`
 
 `stack explore <topic> [--title <t>]` scaffolds `docs/explorations/exploration-<slug>-NNN.md` (candidates, criteria, findings with dated sources, recommendation, Decision/ADR placeholder); never overwrites. The envelope `command` is `"explore"`.

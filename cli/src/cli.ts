@@ -55,6 +55,7 @@ import {
   runSpecValidate,
 } from "./spec.js";
 import { runSpecImport, SpecImportError } from "./spec-import.js";
+import { formatSpecAuditHuman, runSpecAudit, SPEC_AUDIT_DEFAULTS } from "./spec-audit.js";
 
 import { runSync } from "./sync-command.js";
 import { runTuiBoard } from "./tui.js";
@@ -1333,6 +1334,90 @@ spec
       process.exitCode = 1;
     }
   });
+
+spec
+  .command("audit")
+  .description(
+    "Pairwise duplication detection over docs/specs/*.md (Jaccard + shared titles) — report only, never edits",
+  )
+  .option(
+    "--duplicate-threshold <n>",
+    `similarity at/above this classifies a pair DUPLICATE (default ${SPEC_AUDIT_DEFAULTS.duplicateThreshold})`,
+    Number.parseFloat,
+  )
+  .option(
+    "--merge-threshold <n>",
+    `similarity at/above this classifies a pair MERGE (default ${SPEC_AUDIT_DEFAULTS.mergeThreshold})`,
+    Number.parseFloat,
+  )
+  .option(
+    "--min-shared-titles <n>",
+    `shared titles at/above this (with similarity >= --shared-title-floor) classify MERGE (default ${SPEC_AUDIT_DEFAULTS.minSharedTitles})`,
+    Number.parseInt,
+  )
+  .option(
+    "--shared-title-floor <n>",
+    `minimum similarity for the shared-titles MERGE path (default ${SPEC_AUDIT_DEFAULTS.sharedTitleFloor})`,
+    Number.parseFloat,
+  )
+  .option(
+    "--report-floor <n>",
+    `pairs below this similarity and with no shared titles are only counted (default ${SPEC_AUDIT_DEFAULTS.reportFloor})`,
+    Number.parseFloat,
+  )
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action(
+    (opts: {
+      duplicateThreshold?: number;
+      mergeThreshold?: number;
+      minSharedTitles?: number;
+      sharedTitleFloor?: number;
+      reportFloor?: number;
+      json?: boolean;
+    }) => {
+      const json = jsonEnabled(opts);
+      try {
+        const result = runSpecAudit({
+          cwd: process.cwd(),
+          thresholds: {
+            duplicateThreshold: opts.duplicateThreshold,
+            mergeThreshold: opts.mergeThreshold,
+            minSharedTitles: opts.minSharedTitles,
+            sharedTitleFloor: opts.sharedTitleFloor,
+            reportFloor: opts.reportFloor,
+          },
+        });
+        if (json) {
+          emitJson({
+            ok: true,
+            schemaVersion: JSON_SCHEMA_VERSION,
+            conventionVersion: readConventionVersion(result.root),
+            command: "spec",
+            specs: result.specs,
+            pairs: result.pairs,
+            thresholds: result.thresholds,
+            findings: result.findings,
+            counts: result.counts,
+          });
+          return;
+        }
+        process.stdout.write(formatSpecAuditHuman(result));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (json) {
+          failJson({
+            command: "spec",
+            message,
+            code: "SPEC_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
+        console.error(`arggon spec audit: ${message}`);
+        process.exitCode = 1;
+      }
+    },
+  );
 
 spec
   .command("new")
