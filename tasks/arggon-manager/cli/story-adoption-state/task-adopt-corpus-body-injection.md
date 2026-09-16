@@ -30,3 +30,8 @@ Follow-up from task-adopt-corpus-fingerprints (PR #286, review round): detectSpe
 - [ ] No corpora -> template unchanged; tests both ways
 
 ## Notes
+
+### 2026-09-16 @Arggon
+REVIEW (coordinator) — APPROVED, merging PR #296.
+
+Verified: full diff read (generic section extracted as ADOPT_CORPUS_SECTION_GENERIC interpolated into ADOPT_TASK_BODY — byte-identity of the no-corpus template pinned by a toBe test; pure composer; call site reuses inventory.corpora, no re-detection; no envelope/JSON/skills changes). Suite 999/999 green, lint/build/validate clean, doctor 0 modified / 0 drifted. E2E probe by coordinator on two fresh fixture repos (init + adopt): without corpus the created task keeps the generic 'No corpus: skip this section.' primer byte-for-byte; with an openspec fixture the created task carries '## Spec corpus — detected' with format, file count, origin, and the explicit Fase 0-4 + gates pointer, checklist items 9-14 intact.
