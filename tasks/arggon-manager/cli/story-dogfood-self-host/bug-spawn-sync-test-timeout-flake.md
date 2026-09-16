@@ -4,7 +4,7 @@ status: todo
 id: bug-spawn-sync-test-timeout-flake
 title: spawnSync e2e tests flake at vitest 5s timeout under load (2nd instance of the class)
 parent: story-dogfood-self-host
-labels: []
+labels: [p3]
 created: "2026-09-16"
 updated: "2026-09-16"
 ---
