@@ -81,7 +81,7 @@ CLI create examples:
 
 `parent` is an **id**, not a path. Moving `story-login/` from under `auth/` to under `onboarding/` updates only that story’s `parent` (`auth` → `onboarding`). Nested tasks keep `parent: story-login`.
 
-`arggon update <id> --parent <new-parent>` performs this reparent mechanically: it validates the edge (task/bug under a story, story under an epic, epic under an initiative; no cycles — a parent that is the item's own descendant is refused), rewrites `parent`, and moves the file (leaves) or the whole directory (containers) per the layout rules. Same parent = no-op.
+`arggon update <id> --parent <new-parent>` performs this reparent mechanically: it validates the edge (task/bug under a story, story under an epic, epic under an initiative; no cycles — a parent that is the item's own descendant is refused), rewrites `parent`, and moves the file (leaves) or the whole directory (containers) per the layout rules. Same parent = no-op. `arggon update <task-id> --type story` promotes a task to a story in place: the file moves to the story index layout under the task's grandparent epic and the id is renamed `task-x` → `story-x` (container ids must not start with `task-`/`bug-`), with `depends_on` references rewritten; demotion is not supported in v1.
 
 ### Invalid layouts (reject / fail validate)
 

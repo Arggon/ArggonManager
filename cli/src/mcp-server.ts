@@ -172,6 +172,12 @@ const TOOLS: ToolDefinition[] = [
           description:
             "reparent the item under this container id (same edge validation as the CLI: unknown parent, wrong parent type, cycles fail)",
         },
+        type: {
+          type: "string",
+          enum: ["story"],
+          description:
+            "convert the item's type in place; v1 supports only 'story' (promote a task: moves the file to the story layout under the grandparent epic, renames task-x to story-x, rewrites depends_on references, keeps issue/labels/body; refuses bugs, stories, and missing epics)",
+        },
         unassign: { type: "boolean", description: "clear assignee", default: false },
         labels: { type: "string", description: "replace the full labels list (comma-separated)" },
         depends_on: {
@@ -486,6 +492,7 @@ export function runMcpServer(opts: McpServerOptions): void {
           assignee: str(args.assignee),
           branch: str(args.branch),
           parent: str(args.parent),
+          type: str(args.type),
           unassign: args.unassign === true,
           labels: str(args.labels),
           dependsOn: str(args.depends_on),
@@ -506,6 +513,8 @@ export function runMcpServer(opts: McpServerOptions): void {
             autoCompleted: result.autoCompleted,
             cascadeLevels: result.cascadeLevels,
             cascadeSkipped: result.cascadeSkipped,
+            ...(result.movedFrom ? { movedFrom: result.movedFrom } : {}),
+            ...(result.renamedFrom ? { renamedFrom: result.renamedFrom } : {}),
             ...(commit ? { commit: commitPayload(commit) } : {}),
           },
           conventionVersion(),
