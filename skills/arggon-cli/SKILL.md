@@ -142,11 +142,11 @@ emits one envelope (`{serving, url, port}`) then keeps serving.
 ## 4. Planning documents (specs, playbooks, explorations)
 
 ```bash
-<!-- arggon:generated-commands start: spec validate,spec analyze,spec new,spec import openspec,stack explore,playbook new,playbook status,playbook refresh -->
+<!-- arggon:generated-commands start: spec validate,spec analyze,spec new,spec import,stack explore,playbook new,playbook status,playbook refresh -->
 arggon spec validate  # Validate spec/plan frontmatter and section structure (pure read)
 arggon spec analyze  # Checklist-driven ambiguity scan + spec/task consistency report (report-only, never edits; exit 0 with findings)
 arggon spec new <slug>  # Scaffold docs/specs/spec-<slug>-NNN.md (and docs/plans/plan-<slug>-NNN.md with --plan); never overwrites
-arggon spec import openspec <path>  # Migrate an OpenSpec corpus (<path>/specs/<capability>/spec.md) into Arggon spec docs with a per-file zero-loss assertion; all-or-nothing per run, never overwrites
+arggon spec import <format> <path>  # Migrate a foreign spec corpus into Arggon spec docs with a per-file zero-loss assertion; all-or-nothing per run, never overwrites (formats: openspec)
 arggon stack explore <topic>  # Scaffold docs/explorations/exploration-<slug>-NNN.md (candidates, criteria, findings, recommendation); never overwrites
 arggon playbook new <tech>  # Scaffold docs/playbooks/<tech>.md pinning the chosen version; never overwrites (research is the caller's job)
 arggon playbook status  # Report playbook freshness: age since `researched` vs the stale threshold (default 90, x-playbooks.max-age-days)

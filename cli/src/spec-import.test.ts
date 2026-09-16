@@ -1,6 +1,8 @@
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   normalizeForZeroLoss,
@@ -155,8 +157,18 @@ describe("spec import openspec — zero-loss", () => {
   it("fails loudly with a per-file diff on a mutated source and writes nothing", () => {
     const repo = makeRepo();
     const corpus = mkdtempSync(join(tmpdir(), "arggon-corpus-"));
-    // Mutate: an unsupported extra section the mapper would drop.
-    writeCapability(corpus, "broken", `${GOLDEN_SPEC_MD}\n## Extra\n\nmystery content\n`);
+    // Mutate with preamble prose after the H1: the section shape still parses
+    // (only Purpose/Requirements), but the paragraph is dropped by the mapping,
+    // so this hits the zero-loss mismatch path with a real diff. (An
+    // unsupported `## Extra` section fails earlier, at parse.)
+    writeCapability(
+      corpus,
+      "broken",
+      GOLDEN_SPEC_MD.replace(
+        "\n## Purpose",
+        "\nStray preamble paragraph the mapper must not drop.\n\n## Purpose",
+      ),
+    );
     let error: unknown;
     try {
       runSpecImport({ cwd: repo, path: corpus, today: "2026-09-16" });
@@ -166,7 +178,8 @@ describe("spec import openspec — zero-loss", () => {
     expect(error).toBeInstanceOf(SpecImportError);
     const failure = (error as SpecImportError).failures[0]!;
     expect(failure.capability).toBe("broken");
-    expect(failure.message).toMatch(/zero-loss|unsupported section/);
+    expect(failure.message).toMatch(/zero-loss mismatch/);
+    expect(failure.diff?.some((line) => line.includes("Stray preamble"))).toBe(true);
     expect(existsSync(join(repo, "docs", "specs"))).toBe(false);
   });
 });
@@ -250,6 +263,107 @@ describe("spec import openspec — dry run", () => {
     // A subsequent real import produces the same plan and succeeds
     const real = runSpecImport({ cwd: repo, path: corpus, today: "2026-09-16" });
     expect(real.created.map((e) => e.file)).toEqual(result.inventory.map((e) => e.file));
+  });
+});
+
+describe("spec import openspec — CLI wiring (e2e)", () => {
+  // Regression: `.command("import openspec")` bound the literal "openspec" to
+  // the handler's first positional and silently ignored the real <path>. These
+  // tests exercise the commander wiring end-to-end, not just runSpecImport.
+  const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+  const cli = resolve(root, "cli/src/cli.ts");
+  const tsx = resolve(root, "node_modules/tsx/dist/cli.mjs");
+  function runCli(args: string[], cwd: string) {
+    return spawnSync(process.execPath, [tsx, cli, ...args], { encoding: "utf8", cwd });
+  }
+  function makeCorpus(): string {
+    const corpus = mkdtempSync(join(tmpdir(), "arggon-corpus-"));
+    writeCapability(corpus, "auth-core", GOLDEN_SPEC_MD);
+    writeCapability(corpus, "billing", GOLDEN_SPEC_MD.replace("auth-core", "billing"));
+    return corpus;
+  }
+
+  it("creates the mapped specs through the real CLI", () => {
+    const repo = makeRepo();
+    const corpus = makeCorpus();
+    const proc = runCli(["spec", "import", "openspec", corpus], repo);
+    expect(proc.status).toBe(0);
+    expect(proc.stdout).toContain("created 2 file(s)");
+    expect(existsSync(join(repo, "docs", "specs", "spec-auth-core-001.md"))).toBe(true);
+    expect(existsSync(join(repo, "docs", "specs", "spec-billing-002.md"))).toBe(true);
+  });
+
+  it("emits a success envelope with created entries (--json)", () => {
+    const repo = makeRepo();
+    const corpus = makeCorpus();
+    const proc = runCli(["spec", "import", "openspec", corpus, "--json"], repo);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      ok: boolean;
+      command: string;
+      created: Array<{ specId: string }>;
+    };
+    expect(body.ok).toBe(true);
+    expect(body.command).toBe("spec");
+    expect(body.created.map((e) => e.specId)).toEqual(["auth-core-001", "billing-002"]);
+  });
+
+  it("dry-run via the CLI writes nothing and reports the inventory", () => {
+    const repo = makeRepo();
+    const corpus = makeCorpus();
+    const proc = runCli(["spec", "import", "openspec", corpus, "--dry-run", "--json"], repo);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      dryRun: boolean;
+      inventory: Array<{ file: string }>;
+    };
+    expect(body.dryRun).toBe(true);
+    expect(body.inventory).toHaveLength(2);
+    expect(existsSync(join(repo, "docs"))).toBe(false);
+  });
+
+  it("rejects an unsupported format with SPEC_IMPORT_FAILED", () => {
+    const repo = makeRepo();
+    const corpus = makeCorpus();
+    const proc = runCli(["spec", "import", "raindrops", corpus, "--json"], repo);
+    expect(proc.status).toBe(1);
+    const body = JSON.parse(proc.stdout) as {
+      ok: boolean;
+      error: { code: string; message: string };
+    };
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("SPEC_IMPORT_FAILED");
+    expect(body.error.message).toContain("supported: openspec");
+    expect(existsSync(join(repo, "docs"))).toBe(false);
+  });
+
+  it("reports a zero-loss failure through the CLI with per-file diffs and writes nothing", () => {
+    const repo = makeRepo();
+    const corpus = mkdtempSync(join(tmpdir(), "arggon-corpus-"));
+    // Preamble prose between the H1 and the first H2: accepted by the parser
+    // shape (only Purpose/Requirements sections) but dropped by the mapping,
+    // so this exercises the zero-loss mismatch path with a real line diff
+    // (an unsupported `## Extra` section would fail earlier, at parse).
+    writeCapability(
+      corpus,
+      "broken",
+      GOLDEN_SPEC_MD.replace(
+        "\n## Purpose",
+        "\nStray preamble paragraph the mapper must not drop.\n\n## Purpose",
+      ),
+    );
+    const proc = runCli(["spec", "import", "openspec", corpus, "--json"], repo);
+    expect(proc.status).toBe(1);
+    const body = JSON.parse(proc.stdout) as {
+      ok: boolean;
+      error: { code: string };
+      failures: Array<{ capability: string; diff?: string[] }>;
+    };
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("SPEC_IMPORT_FAILED");
+    expect(body.failures[0]!.capability).toBe("broken");
+    expect(body.failures[0]!.diff?.some((line) => line.includes("Stray preamble"))).toBe(true);
+    expect(existsSync(join(repo, "docs"))).toBe(false);
   });
 });
 

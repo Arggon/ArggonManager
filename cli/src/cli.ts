@@ -1313,15 +1313,35 @@ spec
   });
 
 spec
-  .command("import openspec")
+  .command("import")
   .description(
-    "Migrate an OpenSpec corpus (<path>/specs/<capability>/spec.md) into Arggon spec docs with a per-file zero-loss assertion; all-or-nothing per run, never overwrites",
+    "Migrate a foreign spec corpus into Arggon spec docs with a per-file zero-loss assertion; all-or-nothing per run, never overwrites (formats: openspec)",
   )
-  .argument("<path>", "OpenSpec corpus root (contains specs/<capability>/spec.md)")
+  .argument("<format>", "corpus format (currently: openspec)")
+  .argument("<path>", "corpus root (openspec: contains specs/<capability>/spec.md)")
   .option("--dry-run", "inventory only: discover files and preview the mapping without writing", false)
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((path: string, opts: { dryRun?: boolean; json?: boolean }) => {
+  .action((format: string, path: string, opts: { dryRun?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
+    const unsupported = () =>
+      `unsupported corpus format '${format}' (supported: openspec) — add an adapter in cli/src/spec-import.ts`;
+    if (format !== "openspec") {
+      if (json) {
+        emitJson(
+          failEnvelope({
+            command: "spec",
+            message: unsupported(),
+            code: "SPEC_IMPORT_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          }),
+        );
+        process.exitCode = 1;
+        return;
+      }
+      console.error(`arggon spec import ${format}: ${unsupported()}`);
+      process.exitCode = 1;
+      return;
+    }
     try {
       const result = runSpecImport({ cwd: process.cwd(), path, dryRun: Boolean(opts.dryRun) });
       if (json) {

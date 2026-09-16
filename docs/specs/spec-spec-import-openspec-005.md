@@ -22,6 +22,7 @@ Invariants, in priority order:
 arggon spec import openspec <path> [--dry-run] [--json]
 ```
 
+- The command is `spec import <format> <path>` — the first positional selects the corpus format (currently only `openspec`; an unknown format fails with `SPEC_IMPORT_FAILED` naming the supported set). `arggon spec import openspec <path>` is the canonical invocation.
 - `<path>` — OpenSpec corpus root; must contain `specs/<capability>/spec.md` for each capability directory. Capabilities are processed in sorted directory order.
 - For each capability the command scaffolds a new Arggon spec (same mechanics as `spec new`: global sequential NNN numbering across `docs/specs` + `docs/plans`, never overwrite) with the mapped content. Spec id and filename derive from the capability directory name: `spec_id: <capability>-NNN`, file `docs/specs/spec-<capability>-NNN.md`.
 - `--dry-run` — inventories the run (files discovered, per-file mapping preview, next spec ids) and writes nothing.
@@ -63,7 +64,7 @@ export type CorpusAdapter = {
 };
 ```
 
-`runSpecImport` orchestrates: discover → read → parse → map → zero-loss assert (per file, all files first) → collision check → write all. A new format only implements the adapter; assertions and orchestration are shared.
+`runSpecImport` orchestrates: discover → read → parse → map → zero-loss assert (per file, all files first) → collision check → write all. A new format only implements the adapter; assertions and orchestration are shared. On the command surface a format is a positional of `spec import`, so adding one is an adapter plus a dispatch entry — no new command tree.
 
 ## Acceptance criteria
 
