@@ -4,6 +4,7 @@ status: in_progress
 id: bug-torture-contention-flake3
 title: "labs/torture auto-commit contention flakes in CI for the THIRD time (post-#214 hardening)"
 assignee: Arggon
+branch: fix/bug-torture-contention-flake3
 parent: story-self-improvement
 labels: []
 created: "2026-09-15"
