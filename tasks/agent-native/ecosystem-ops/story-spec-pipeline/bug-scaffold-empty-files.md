@@ -1,12 +1,14 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-scaffold-empty-files
 title: scaffolded docs reported truncated to 0 lines (spec new / playbook new / stack explore)
+assignee: Arggon
 parent: story-spec-pipeline
 labels: [p3]
 created: "2026-09-15"
-updated: "2026-09-15"
+updated: "2026-09-16"
+claimed_at: "2026-09-16T01:08:16.859Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-spec-pipeline/bug-scaffold-empty-files.md
