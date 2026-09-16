@@ -211,6 +211,8 @@ Any agent executing the adoption task follows this procedure (the task body carr
 7. **Verify**: `arggon validate` + `arggon spec validate` (if specs exist) + `arggon playbook status`.
 8. **Report**: comment on the adoption task (`arggon comment task-adopt-arggon`) listing the extracted content, archived files, and created playbooks; flip the task done when the human reviews.
 
+If the adopting repo carries a pre-existing spec corpus (OpenSpec — `openspec/config.yaml` + `specs/*/spec.md` — or another format such as ADR/RFC markdown), follow the phased migration checklist the adoption task generates: detection fingerprints, then Fase 0 mapping (format -> spec template, e.g. OpenSpec `## Requirements` -> Acceptance criteria verbatim), Fase 1 one spec per capability with a zero-loss assertion, Fase 2 duplication audit, Fase 3 consolidation, Fase 4 contract refactor in file-disjoint waves — with the gates per phase (`spec validate` 0/0, `spec analyze` without NEW findings vs baseline; consolidar antes de reescribir).
+
 ## Reference integrations
 
 Copy-paste wiring so agents follow ArggonManager rules **by default** — same CLI, same rules, no private dialect (Phase 3, [#20](https://github.com/Arggon/ArggonManager/issues/20)).
