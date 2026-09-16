@@ -86,8 +86,8 @@ describe("runAdopt: task creation", () => {
     const task = loadItems(join(dir, "tasks")).find((item) => item.id === ADOPT_TASK_ID)!;
     const body = readFileSync(task.filePath, "utf8");
     expect(body).toContain(ADOPT_TASK_BODY);
-    // Eight ordered checklist steps (1-8).
-    expect(body.match(/^- \[ \] /gm)).toHaveLength(8);
+    // Eight ordered checklist steps (1-8) plus the spec-corpus phases (9-14).
+    expect(body.match(/^- \[ \] /gm)).toHaveLength(14);
     // Step 1: read the generated governing docs.
     expect(body).toContain("AGENTS.md");
     expect(body).toContain("docs/convention.md");
@@ -115,6 +115,22 @@ describe("runAdopt: task creation", () => {
     expect(body).toContain("arggon playbook status");
     // Step 8: report + handoff to the human.
     expect(body).toContain("arggon comment task-adopt-arggon");
+    // Spec-corpus section: detection fingerprints.
+    expect(body).toContain("Spec corpus");
+    expect(body).toContain("openspec/config.yaml");
+    expect(body).toContain("docs/specs/spec-*.md");
+    // Phased procedure.
+    expect(body).toContain("Fase 0");
+    expect(body).toContain("Fase 1");
+    expect(body).toContain("Zero-loss assertion");
+    expect(body).toContain("DUPLICATE / MERGE / KEEP-SEPARATE");
+    expect(body).toContain("strictest copy wins");
+    expect(body).toContain("inventing SHALLs forbidden");
+    // Gates + principles.
+    expect(body).toContain("arggon spec analyze");
+    expect(body).toContain("no NEW findings vs the baseline");
+    expect(body).toContain("never cosmetically cited");
+    expect(body).toContain("Consolidar antes de reescribir");
   });
 
   it("--story override parents the task to the given story (no auto story)", () => {

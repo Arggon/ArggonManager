@@ -437,7 +437,7 @@ describe("lab: synthetic legacy tree, full adoption flow (guardian/cuentas/suizo
       join(dir, "tasks/arggon-adoption/epic-arggon-adoption/story-arggon-adoption/task-adopt-arggon.md"),
       "utf8",
     );
-    expect(taskFile.match(/^- \[ \] /gm)).toHaveLength(8);
+    expect(taskFile.match(/^- \[ \] /gm)).toHaveLength(14);
 
     // Sanctioned sweep edit (step 3 of the checklist): fill in a placeholder.
     const agentsPath = join(dir, "AGENTS.md");
