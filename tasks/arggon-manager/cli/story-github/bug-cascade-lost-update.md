@@ -38,3 +38,6 @@ Follow-up from the bug-torture-contention-flake3 investigation (PR #280): labs/t
 - docs: docs/json-output.md cascadeSkipped row updated for the additive `lock-timeout` reason; human output prints a reason-aware `cascade skipped:` line (cli/src/cli.ts).
 
 ## Notes
+
+### 2026-09-16 @Arggon
+Lead-architect review: APPROVED (deep-validated). The interleave analysis is precise (child lock ≠ ancestor write set — P1 writes the ancestor snapshot while P2 holds the ancestor lock), the fix acquires the ANCESTOR's item lock around a FRESH re-read + acceptance check + write (killing the stale-snapshot race, not just the write race), lock-timeout degrades to a reported skip with the additive reason, and the deadlock audit documents leaf-first ordering with no reverse acquisition. Pre-fix red verified via stash, deterministic repro, sibling race x3 rounds green, torture x6. The reason-aware human line (fixing the pre-existing cli.ts misprint) is a bonus. Merge follows.
