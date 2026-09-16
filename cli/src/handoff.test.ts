@@ -378,8 +378,10 @@ describe("mcp arggon_handoff tool", () => {
       handoff: { branch: "feat/x", next: "resume with the cascade tests" },
       comment: { author: "agent-x", lines: ["- branch: feat/x"] },
     });
-    expect(raw(path)).toContain(
-      "### handoff 2026-09-15 @agent-x — next: resume with the cascade tests\n- branch: feat/x\n",
+    // The MCP tool renders the heading with the REAL current date (no injectable
+    // now over MCP) — assert the structure with a date regex, not a literal.
+    expect(raw(path)).toMatch(
+      /### handoff \d{4}-\d{2}-\d{2} @agent-x — next: resume with the cascade tests\n- branch: feat\/x\n/,
     );
   });
 
@@ -397,8 +399,8 @@ describe("mcp arggon_handoff tool", () => {
       ok: true,
       handoff: { next: "resume with the cascade tests", session: "sess_mcp_7" },
     });
-    expect(raw(path)).toContain(
-      "### handoff 2026-09-15 @agent-x (session: sess_mcp_7) — next: resume with the cascade tests\n",
+    expect(raw(path)).toMatch(
+      /### handoff \d{4}-\d{2}-\d{2} @agent-x \(session: sess_mcp_7\) — next: resume with the cascade tests\n/,
     );
   });
 
