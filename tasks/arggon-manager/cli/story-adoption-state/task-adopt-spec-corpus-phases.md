@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adopt-spec-corpus-phases
 title: "adopt: spec-corpus detection + phased migration checklist in the adoption template"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-adoption-state
 labels: []
 created: "2026-09-16"
 updated: "2026-09-16"
-claimed_at: "2026-09-16T19:58:22.899Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-adoption-state/task-adopt-spec-corpus-phases.md
