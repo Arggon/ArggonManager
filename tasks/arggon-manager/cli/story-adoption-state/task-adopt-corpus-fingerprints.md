@@ -19,10 +19,12 @@ updated: "2026-09-16"
 
 ## Context
 
-<!-- Why this task exists. -->
+Rollout step beyond the text-first proposal (extends task-adopt-spec-corpus-phases): make the CLI ITSELF detect spec corpora at inventory time (adopt and init --dry-run). Fingerprints: openspec/config.yaml + specs/*/spec.md (OpenSpec); docs/specs/spec-*.md with arggon frontmatter (already migrated); ADR directories; RFC markdown. The inventory reports: format detected, file count, origin tool. With detection in the inventory, the adoption task template can reference the detected corpus specifically (task-adopt-spec-corpus-phases text covers the procedure).
 
 ## Acceptance
 
-- [ ] 
+- [ ] adopt inventory (and init --dry-run) detects spec corpora by fingerprint and reports format/count/origin in the inventory output (--json additive)
+- [ ] The detection feeds the adoption task body (the corpus section becomes specific: "detected OpenSpec corpus: N specs — follow the phased checklist")
+- [ ] Tests per fingerprint (OpenSpec fixture, already-migrated fixture, no-corpus fixture); docs additive
 
 ## Notes
