@@ -95,6 +95,18 @@ Weighted, "better" means:
   architecture, worker overhead, slower parallel runs (source:
   https://medium.com/lets-code-future/cypress-vs-playwright-i-ran-500-e2e-tests-in-both-heres-what-broke-2afc448470ee,
   2026-09-16).
+- **WebdriverIO** (raised during review of this spike; closest name to a
+  suggested "webright" — no tool by that exact name exists): built on the W3C
+  WebDriver + DevTools protocols vs Playwright's direct engine; Playwright
+  runs 30–50% faster on equivalent suites; WebdriverIO's wins are mobile via
+  Appium and ecosystem breadth — neither applies here (local HTML board, no
+  mobile). Crucially, WebdriverIO has no agent-first CLI rivaling
+  `@playwright/cli`, the niche this gate needs (source:
+  https://www.deviqa.com/blog/playwright-vs-webdriverio-how-to-choose-in-2026/,
+  2026-09-16; source: https://pie.inc/blog/webdriverio-vs-playwright/,
+  2026-09-16; source:
+  https://getautonoma.com/blog/webdriverio-vs-playwright-enterprise,
+  2026-09-16).
 - AI testing platforms (QA Wolf, Applitools, Sauce, TestGuild lists) are
   SaaS or paid services — they collide with the repo boundary "Still out
   without an ADR: hosted/SaaS anything" (docs/engineering.md) (source:
@@ -124,7 +136,9 @@ Weighted, "better" means:
    Playwright becomes a devDependency (or npx-pinned), Chromium-only in CI —
    no runtime dependency, no SaaS.
 
-**Losers:** Cypress (loses head-to-head, single engine), Puppeteer (library
+**Losers:** Cypress (loses head-to-head, single engine), WebdriverIO (slower,
+WebDriver-protocol bound, no agent-first CLI — its wins are mobile and
+ecosystem breadth, both out of scope here), Puppeteer (library
 only, no runner), plain HTTP smoke (can't see drag-and-drop; fine as an inner
 assertion inside tier 2), AI/SaaS platforms (boundary: no SaaS without ADR).
 
