@@ -37,3 +37,6 @@ Rollout step beyond the text-first proposal (extends task-adopt-spec-corpus-phas
 - Follow-up (unfiled): inject the detected corpora into the task-adopt-arggon task body at creation time (template would need to become composed, or the corpus line appended) — coordinate with the parallel PR that owns ADOPT_TASK_BODY text.
 
 ## Notes
+
+### 2026-09-16 @Arggon
+Lead-architect review: APPROVED. Pure-read detection with coexisting corpora, additive JSON, and the scope decision documented (init has no dry-run inventory today — landed on adopt). Box 2 (dynamic corpus injection into the task body) stays honestly unticked: ADOPT_TASK_BODY was the parallel PR's territory. Filing the follow-up (task-body composition + reusing detectSpecCorpora if init grows a dry-run) so it is not lost. Merge follows.
