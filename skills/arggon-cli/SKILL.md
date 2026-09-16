@@ -110,6 +110,11 @@ Nuances (hand-written, review-covered):
   in file-disjoint waves (one subagent per worktree), then code-review every
   subagent PR as lead architect before merge — per the generated AGENTS.md.
 
+- The **smoke gate blocks merge** (ADR 0008): probe changed commands on a
+  fixture repo and record expected-vs-observed evidence in the review verdict;
+  UI changes get a real-browser drive via Playwright CLI (`@playwright/cli`,
+  fallback Playwright MCP); docs-only PRs are exempt.
+
 - Full `--json` envelope: `{ok, schemaVersion: 1, conventionVersion, command, ...payload}`;
   failures `{ok: false, error: {message, code}}` + non-zero exit. Error codes:
   `INIT_FAILED, CREATE_FAILED, LIST_FAILED, UPDATE_FAILED, VALIDATE_FAILED, BRANCH_FAILED,
