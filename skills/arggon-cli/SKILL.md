@@ -236,6 +236,11 @@ lean. A 40-line spec beats a 4-page one nobody reads.
   branch and restart tracker work from fresh main. For stacked/multi-item branches,
   `--no-commit` on mutations is the alternative — let the PR itself carry the tracker
   change so there are no local auto-commits to diverge.
+  **Prevention beats the recovery recipe**: when mutating the tracker from the PRIMARY
+  checkout (auto-commits land on local main), `git push origin main` immediately after
+  every mutation — before opening or merging any PR — so a PR merge never reaches
+  origin first and the post-merge pull stays fast-forward (casa-pendiente hit the
+  divergence twice before adopting this).
 - `update --labels a,b` REPLACES the label list (kebab-case, unique). Same for
   `--depends-on a,b` (empty clears; `--add-depends-on <id>` appends; unknown ids fail).
   **Dependencies are advisory**: they gate `next`/`--ready` suggestions, never updates.
