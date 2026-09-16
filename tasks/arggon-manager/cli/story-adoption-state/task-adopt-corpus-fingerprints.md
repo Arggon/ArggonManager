@@ -4,7 +4,7 @@ status: todo
 id: task-adopt-corpus-fingerprints
 title: "adopt/init inventory: CLI-native spec-corpus detection by fingerprints"
 parent: story-adoption-state
-labels: []
+labels: [p3]
 created: "2026-09-16"
 updated: "2026-09-16"
 ---
