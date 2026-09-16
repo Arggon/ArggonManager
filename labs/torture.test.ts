@@ -321,9 +321,18 @@ describe("lab: concurrent tracker auto-commit contention (suizo lock-transitorio
       // and its commit picks up the uncommitted mutation too. This keeps the
       // contract below intact under scheduler starvation and the index-clobber
       // race without weakening the clean-tree assertion.
+      // bug-torture-contention-flake3: the RETRY's own commit used to be
+      // unchecked — under CI load it could re-enter contention and skip again
+      // (ok:true, commit.skipped), leaving its mutation dirty with no
+      // explanation and tripping the clean-tree assert below. With the
+      // repo-level git-mutation lock a retry cannot re-enter contention, so a
+      // skipped retry commit is itself a failure now, not a tolerated state.
       for (const id of cleanSkips) {
         const retry = runCli(["comment", id, `note on ${id}`, "--author", "agent", "--json"], dir);
         expect(retry.body, retry.stderr).toMatchObject({ ok: true });
+        const retryCommit = retry.body!.commit as Json | undefined;
+        expect(retryCommit, `retry commit for ${id} skipped: ${JSON.stringify(retryCommit)}`)
+          .toMatchObject({ hash: expect.any(String) });
       }
 
       // Every comment actually landed in its item file.
