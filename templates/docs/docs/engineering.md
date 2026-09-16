@@ -20,6 +20,13 @@ A change is acceptable when it satisfies the bar above and a reviewer can answer
 - Is the failure mode handled (errors, empty states, concurrency)?
 - Does it make the next change easier or harder?
 
+**Non-functional bar** (every behavior change):
+
+- Scalability: payloads stay bounded; complexity is declared wherever inputs grow with the data (an O(n²) scan must justify its input ceiling); no unbounded reads or renders.
+- Security: untrusted content is parsed defensively; subprocess arguments are arrays, never shell-interpolated; nothing writes outside the repo root; secrets are never committed or logged; new runtime dependencies are justified in the PR.
+
+**Smoke gate (blocks merge):** a change is executed end-to-end before approval, not just unit-tested. CLI behavior changes: probe the changed commands on a fixture and record expected-vs-observed evidence in the review verdict. UI changes: smoke in a real browser (e.g. Playwright CLI) — it renders, matches the data, and one state change round-trips and persists. Docs-only changes are exempt.
+
 ## Definition of done
 
 - [ ] Acceptance checklist in the work item body is complete.
