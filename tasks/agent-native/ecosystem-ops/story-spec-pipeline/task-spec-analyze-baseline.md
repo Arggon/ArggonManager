@@ -32,3 +32,12 @@ Rollout step 3 of the spec-corpus migration proposal: during the ArggonStores-am
 - [ ] The ArggonStores-am-style wave gate becomes: save-baseline once, assert no-new per wave — documented in README as the recommended flow
 
 ## Notes
+
+### 2026-09-16 @Arggon
+REVIEW (coordinator) — APPROVED, merging PR #292.
+
+Verified: full diff read (spec.ts baseline engine, cli.ts option wiring on the existing command — no subcommands, spec-004 additive section, e2e tests); suite 976/976 green, lint/build/validate clean; doctor 0 modified / 0 drifted. Live probe of the wave gate on this repo's own specs: save-baseline (3 findings/6 specs) -> compare 0 new exit 0; injected a dirty spec -> 4 new findings reported with evidence, exit 1 (gate bites); two consecutive saves byte-identical (deterministic, committable snapshots confirmed).
+
+Exit-code policy accepted: gate = exit 1 on >=1 new finding only where a caller declared a baseline via --baseline; --no-fail-on-new opts out; plain analyze contract (findings never fail) untouched; --json gate-fail keeps ok:true with additive baseline payload, exit code carries the gate. Rationale documented in spec-004 + README.
+
+Nits (non-blocking): human --save-baseline output prints only the baseline-written line while the option help says 'then report as usual' (JSON carries the full findings; fine); snapshot ordering uses localeCompare — same-machine deterministic, a theoretical cross-ICU reorder would only churn committed baselines, not break the set-based comparison.
