@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-push-main-after-mutations
 title: "SKILL pitfall extension: push main immediately after primary-checkout tracker mutations"
+assignee: Arggon
 parent: story-tracker-hygiene
 labels: [p3]
 created: "2026-09-15"
-updated: "2026-09-15"
+updated: "2026-09-16"
+claimed_at: "2026-09-16T01:27:28.356Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tracker-hygiene/task-push-main-after-mutations.md
