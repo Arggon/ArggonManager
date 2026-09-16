@@ -4,6 +4,7 @@ status: in_progress
 id: task-adopt-corpus-fingerprints
 title: "adopt/init inventory: CLI-native spec-corpus detection by fingerprints"
 assignee: Arggon
+branch: feat/task-adopt-corpus-fingerprints
 parent: story-adoption-state
 labels: [p3]
 created: "2026-09-16"
