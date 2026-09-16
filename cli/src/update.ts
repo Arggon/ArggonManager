@@ -142,7 +142,7 @@ export type UpdateResult = {
   cascadeSkipped: Array<{
     id: string;
     type: string;
-    reason: "acceptance-incomplete" | "subtree-open";
+    reason: "acceptance-incomplete" | "subtree-open" | "lock-timeout";
     /**
      * For reason "subtree-open" (task-cascade-subtree-open-visibility): the id
      * of the direct child of the skipped container whose subtree still contains
@@ -791,6 +791,23 @@ const TERMINAL: ReadonlySet<string> = new Set(["done", "cancelled"]);
  * the skipped container stays non-terminal, so its parent's subtree is not
  * closed either and nothing above it completes — the conservative outcome
  * (no ancestor flips while a contract below is unfinished).
+ *
+ * Lock-guarded (bug-cascade-lost-update): each ancestor's read-decide-write
+ * runs under THAT ancestor's item lock (withItemLock), with a FRESH re-read
+ * of the container file inside the lock. Without the guard, the cascade
+ * writes ancestor files while holding only the CHILD's item lock, so a
+ * concurrent direct update of the container (holding the container's lock)
+ * or a sibling cascade could interleave with this write — last-write-wins
+ * on the container file loses one side's change. LOCK ORDERING: locks are
+ * acquired strictly CHILD -> ANCESTORS upward (leaf-first), one ancestor at
+ * a time; every other lock site (update/start item lock, comment item lock)
+ * takes exactly one item lock and the tracker git lock (tracker-commit.ts)
+ * is a different lock family acquired only after the item locks are
+ * released — no code path acquires an ancestor before its descendant, so
+ * the ordering is deadlock-free. A lock timeout is a REPORTED skip
+ * (`reason: "lock-timeout"` in cascadeSkipped, walk stops there): the child
+ * write has already landed, so failing the whole update would misreport a
+ * succeeded mutation; the next terminal update retriggers the cascade.
  */
 function autoCompleteAncestors(
   tasksDir: string,
@@ -801,7 +818,7 @@ function autoCompleteAncestors(
   skipped: Array<{
     id: string;
     type: string;
-    reason: "acceptance-incomplete" | "subtree-open";
+    reason: "acceptance-incomplete" | "subtree-open" | "lock-timeout";
     sibling?: string;
   }>;
 } {
@@ -809,7 +826,7 @@ function autoCompleteAncestors(
   const skipped: Array<{
     id: string;
     type: string;
-    reason: "acceptance-incomplete" | "subtree-open";
+    reason: "acceptance-incomplete" | "subtree-open" | "lock-timeout";
     sibling?: string;
   }> = [];
   const byId = itemsById(loadItems(tasksDir));
@@ -836,24 +853,58 @@ function autoCompleteAncestors(
       break;
     }
     if (!TERMINAL.has(container.status)) {
-      // Acceptance contract check happens BEFORE the write: an unchecked box
-      // in the container's own body vetoes auto-completion.
-      if (!acceptanceComplete(container.body)) {
-        skipped.push({ id: container.id, type: container.type, reason: "acceptance-incomplete" });
-        break;
+      // Guarded write (bug-cascade-lost-update): hold the ANCESTOR's item
+      // lock across a fresh re-read + the write, so a concurrent direct
+      // update of this container (serialized by the same lock) can never
+      // interleave with the cascade's read-modify-write. Lock ordering is
+      // strictly child -> ancestors upward (see the function comment).
+      let stop = false;
+      try {
+        withItemLock(container.filePath, () => {
+          const fresh = tryLoadItem(container.filePath);
+          if (!fresh) {
+            throw new Error(`Cascade ancestor unreadable: ${container.filePath}`);
+          }
+          if (TERMINAL.has(fresh.status)) {
+            // Another writer completed it between our snapshot and the lock:
+            // keep the in-memory copy fresh for the ancestors check below.
+            container.status = fresh.status;
+            return;
+          }
+          // Acceptance contract check happens BEFORE the write (on the FRESH
+          // body): an unchecked box in the container's own body vetoes
+          // auto-completion.
+          if (!acceptanceComplete(fresh.body)) {
+            skipped.push({ id: fresh.id, type: fresh.type, reason: "acceptance-incomplete" });
+            stop = true;
+            return;
+          }
+          writeFileSync(
+            fresh.filePath,
+            stringifyFrontmatter(
+              { ...fresh.data, status: "done", updated: formatDate(now) },
+              fresh.body,
+            ),
+            "utf8",
+          );
+          // Keep the in-memory copy fresh: the next ancestor's children check
+          // must see this container as terminal.
+          container.status = "done";
+          completed.push(fresh);
+        });
+      } catch (err) {
+        // Reported-skip semantics (bug-cascade-lost-update): the lock family
+        // convention throws after LOCK_TIMEOUT_MS; here the timeout degrades
+        // to a reported skip instead of failing the update — the child write
+        // already landed, and the next terminal update retriggers the cascade.
+        if (err instanceof Error && /failed to acquire lock/.test(err.message)) {
+          skipped.push({ id: container.id, type: container.type, reason: "lock-timeout" });
+          stop = true;
+        } else {
+          throw err;
+        }
       }
-      writeFileSync(
-        container.filePath,
-        stringifyFrontmatter(
-          { ...container.data, status: "done", updated: formatDate(now) },
-          container.body,
-        ),
-        "utf8",
-      );
-      // Keep the in-memory copy fresh: the next ancestor's children check
-      // must see this container as terminal.
-      container.status = "done";
-      completed.push(container);
+      if (stop) break;
     }
     parentId = container.parent;
   }
