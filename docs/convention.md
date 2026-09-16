@@ -454,7 +454,7 @@ x-github:
   issue-roundtrip: true
 ```
 
-- Opt-in and **default OFF**: without `x-github.issue-roundtrip: true`, flipping an item to `done` never touches GitHub, even for items carrying an `issue:` field (imported via `arggon import-issues`).
+- Opt-in and **default OFF**: without `x-github.issue-roundtrip: true`, flipping an item to `done` never touches GitHub, even for items carrying an `issue:` field (imported via `arggon import-issues`, or set on hand-built items via `arggon create --issue <n>` / `arggon update <id> --issue <n>`; `--issue 0` clears it).
 - When enabled, flipping such an item to `done` closes the linked GitHub issue via `gh` (best effort, never blocking the flip); `arggon start <id> --open-pr` appends `Closes #N` to the PR body so GitHub also closes the issue on merge.
 - `--json` reports the additive `issueRoundtrip` field on the update: `{ closed: true, issue: <number>, repo: "owner/name" }`, or `{ closed: false, issue: <number>, skipped: <reason> }` when the close degraded (gh missing/unauthenticated, non-GitHub origin, gh failure) — the flip itself always succeeds, and skips are warned on stderr.
 - Unknown option keys inside `x-github` are ignored (ignore-unknown, forward compat); a scalar `x-github` value is a parse error.
