@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-budget-adopter-trees
 title: doctor --budget measures nothing in adopter trees (resolves cli/src from cwd)
 assignee: Arggon
@@ -8,8 +8,7 @@ branch: fix/bug-budget-adopter-trees
 parent: operating-principles
 labels: [p2]
 created: "2026-09-15"
-updated: "2026-09-15"
-claimed_at: "2026-09-15T23:52:14.977Z"
+updated: "2026-09-16"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/operating-principles/bug-budget-adopter-trees.md
