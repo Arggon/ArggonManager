@@ -4,6 +4,7 @@ status: in_progress
 id: task-spec-import-openspec
 title: "spec import openspec: mechanical migration with zero-loss check"
 assignee: Arggon
+branch: feat/task-spec-import-openspec
 parent: story-spec-pipeline
 labels: [p2]
 created: "2026-09-16"
