@@ -32,3 +32,10 @@ Rollout step 3 of the spec-corpus migration proposal: during the ArggonStores-am
 - [ ] Docs: README spec section + docs/agents.md spec pipeline mention
 
 ## Notes
+
+### 2026-09-16 @Arggon
+REVIEW (coordinator) — APPROVED, merging PR #294.
+
+Verified: full diff read (pure-function module, single-word command, validated threshold flags, sorted deterministic findings); suite 993/993 green, lint/build clean, spec validate 0 errors, doctor 0 modified / 0 drifted, SKILL marker + sync done (cross-check test green). Independent reproduction of the real-corpus validation: ran the built audit against ArggonStores-am (133 specs / 8,778 pairs, read-only synthetic repo) -> 0 duplicate, 0 merge, 8 keep-separate, 8,770 below floor — consistent with the post-consolidation expected state (the known 1 duplicate + 6 consolidations were already applied; the 8 keep-separate include the exact pairs the manual audit verified, e.g. 037<->039). Report-only invariant proven by md5 snapshot of the foreign corpus: byte-identical before/after.
+
+Notes accepted: SPEC_FAILED reuse for audit failures (documented); k=3 shingles + the shared-titles MERGE path as the diverging-duplicate detector (corpus max text-Jaccard 0.174 confirms prose similarity alone would miss requirement-level duplication — the dual signal is the right design).
