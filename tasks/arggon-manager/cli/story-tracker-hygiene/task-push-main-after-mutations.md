@@ -4,6 +4,7 @@ status: in_progress
 id: task-push-main-after-mutations
 title: "SKILL pitfall extension: push main immediately after primary-checkout tracker mutations"
 assignee: Arggon
+branch: feat/task-push-main-after-mutations
 parent: story-tracker-hygiene
 labels: [p3]
 created: "2026-09-15"
