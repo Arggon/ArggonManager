@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-skill-copy-pretest-sync
 title: generate the .agents skill copy in a pretest/globalSetup step
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-init-docs
 labels: [p3]
 created: "2026-09-15"
 updated: "2026-09-16"
-claimed_at: "2026-09-16T01:37:23.016Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-init-docs/task-skill-copy-pretest-sync.md
