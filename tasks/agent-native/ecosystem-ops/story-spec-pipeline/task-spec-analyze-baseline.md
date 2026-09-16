@@ -4,7 +4,7 @@ status: todo
 id: task-spec-analyze-baseline
 title: "spec analyze --baseline: persisted findings baseline per wave"
 parent: story-spec-pipeline
-labels: []
+labels: [p2]
 created: "2026-09-16"
 updated: "2026-09-16"
 ---
