@@ -4,6 +4,7 @@ status: in_progress
 id: task-adopt-corpus-body-injection
 title: "adopt task body: inject detected spec corpus at creation"
 assignee: Arggon
+branch: feat/task-adopt-corpus-body-injection
 parent: story-adoption-state
 labels: []
 created: "2026-09-16"
