@@ -32,3 +32,7 @@ Rollout step 1 ("barato y ya") of the spec-corpus migration proposal, motivated 
 
 ## Notes
 Evidence (ArggonStores-am, 2026-09-15): 14 PRs, 138->133 specs, zero-loss asserted, `spec analyze` 224 -> 113 warnings.
+
+
+### 2026-09-16 @Arggon
+Lead-architect review: APPROVED. The phased checklist (Fase 0-4 + gates + principles) landed in ADOPT_TASK_BODY with the ArggonStores-am evidence cited in Notes — the method stops being tribal and becomes the default adoption path for corpus adopters. The labs count bump (8->14) is the honest cost of a richer checklist. The duplicated count assertion across tests is noted as a micro-task candidate. Merge follows.
