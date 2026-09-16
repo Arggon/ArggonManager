@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   readGeneratedState,
@@ -10,6 +10,7 @@ import { runCreate } from "./create.js";
 import { runDoctor } from "./doctor.js";
 import { itemId } from "./ids.js";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
+import { parseFrontmatter, stringField } from "./frontmatter.js";
 import { findTasksDir } from "./paths.js";
 import {
   commitTrackerMutation,
@@ -101,6 +102,101 @@ export const STACK_MANIFESTS: string[] = [
   "pom.xml",
 ];
 
+/**
+ * Spec-corpus formats detected by fingerprint at inventory time
+ * (task-adopt-corpus-fingerprints): an existing documentation corpus the
+ * adoption sweep should know about before it touches anything. Pure read.
+ */
+export type CorpusFormat = "openspec" | "arggon" | "adr" | "rfc";
+
+/** One detected spec corpus (inventory snapshot). */
+export type DetectedCorpus = {
+  /** Fingerprint family the corpus matched. */
+  format: CorpusFormat;
+  /** Number of corpus files matched. */
+  files: number;
+  /** The tool/practice the corpus originates from. */
+  origin: string;
+};
+
+/**
+ * Fingerprint rules (posix, relative to the repo root) — multiple corpora can
+ * coexist and are all reported:
+ *  - `openspec`: `openspec/config.yaml` present; file count is the number of
+ *    `openspec/specs/<capability>/spec.md` files.
+ *  - `arggon`: `docs/specs/spec-*.md` files carrying arggon frontmatter (a
+ *    `spec_id` field) — the already-migrated corpus.
+ *  - `adr`: a `docs/adr/` directory with `*.md` records.
+ *  - `rfc`: RFC markdown under `docs/rfc/` or `rfc/`.
+ */
+export function detectSpecCorpora(root: string): DetectedCorpus[] {
+  const corpora: DetectedCorpus[] = [];
+  const countMd = (dir: string): number => {
+    try {
+      return readdirSync(dir).filter((name) => name.endsWith(".md")).length;
+    } catch {
+      return 0;
+    }
+  };
+  // OpenSpec: config.yaml plus per-capability spec.md files.
+  if (existsSync(join(root, "openspec", "config.yaml"))) {
+    const specsDir = join(root, "openspec", "specs");
+    let files = 0;
+    let entries: string[] = [];
+    try {
+      entries = existsSync(specsDir) ? readdirSync(specsDir) : [];
+    } catch {
+      entries = [];
+    }
+    for (const entry of entries) {
+      if (existsSync(join(specsDir, entry, "spec.md"))) files++;
+    }
+    corpora.push({ format: "openspec", files, origin: "OpenSpec" });
+  }
+  // Already-migrated arggon specs: spec-*.md with a `spec_id` frontmatter field.
+  const arggonSpecsDir = join(root, "docs", "specs");
+  if (existsSync(arggonSpecsDir)) {
+    let files = 0;
+    let entries: string[] = [];
+    try {
+      entries = readdirSync(arggonSpecsDir);
+    } catch {
+      entries = [];
+    }
+    for (const entry of entries) {
+      if (!/^spec-.*\.md$/.test(entry)) continue;
+      try {
+        const data = parseFrontmatter(readFileSync(join(arggonSpecsDir, entry), "utf8")).data;
+        if (stringField(data, "spec_id") !== undefined) files++;
+      } catch {
+        // Unreadable/malformed file: not a fingerprint match.
+      }
+    }
+    if (files > 0) {
+      corpora.push({ format: "arggon", files, origin: "ArggonManager" });
+    }
+  }
+  // ADR directory.
+  const adrDir = join(root, "docs", "adr");
+  if (existsSync(adrDir)) {
+    const files = countMd(adrDir);
+    if (files > 0) {
+      corpora.push({ format: "adr", files, origin: "ADR" });
+    }
+  }
+  // RFC markdown (docs/rfc/ preferred, plain rfc/ as the alternate).
+  for (const rfcRel of ["docs/rfc", "rfc"]) {
+    const abs = join(root, ...rfcRel.split("/"));
+    if (!existsSync(abs)) continue;
+    const files = countMd(abs);
+    if (files > 0) {
+      corpora.push({ format: "rfc", files, origin: "RFC" });
+      break;
+    }
+  }
+  return corpora;
+}
+
 /** One scanned governing doc (read-only snapshot). */
 export type InventoryDoc = {
   /** Posix path relative to the repo root. */
@@ -124,6 +220,12 @@ export type Inventory = {
   docs: InventoryDoc[];
   /** Stack manifest filenames found at the repo root (detection order). */
   stackHints: string[];
+  /**
+   * Spec corpora detected by fingerprint (task-adopt-corpus-fingerprints),
+   * in detection order: openspec, arggon, adr, rfc. Empty when the tree has
+   * no spec corpus.
+   */
+  corpora: DetectedCorpus[];
 };
 
 /**
@@ -147,7 +249,7 @@ export function buildInventory(root: string): Inventory {
   const stackHints = STACK_MANIFESTS.filter((manifest) =>
     existsSync(join(root, manifest)),
   );
-  return { docs, stackHints };
+  return { docs, stackHints, corpora: detectSpecCorpora(root) };
 }
 
 /**
@@ -459,6 +561,12 @@ export function formatAdoptReport(result: AdoptResult): string {
   }
   if (result.inventory.stackHints.length > 0) {
     lines.push(`  stack hints: ${result.inventory.stackHints.join(", ")}`);
+  }
+  if (result.inventory.corpora.length > 0) {
+    const corpora = result.inventory.corpora
+      .map((corpus) => `${corpus.format} (${corpus.files} files, ${corpus.origin})`)
+      .join(", ");
+    lines.push(`  spec corpora: ${corpora}`);
   }
   return `${lines.join("\n")}\n`;
 }

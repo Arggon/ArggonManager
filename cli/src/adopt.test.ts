@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,6 +10,7 @@ import {
   ADOPT_TASK_ID,
   ADOPT_TASK_TITLE,
   buildInventory,
+  detectSpecCorpora,
   formatAdoptAckReport,
   formatAdoptReport,
   runAdopt,
@@ -277,6 +278,123 @@ describe("buildInventory", () => {
     expect(inventory.stackHints).toEqual([]);
     const after = existsSync(yml) ? readFileSync(yml, "utf8") : null;
     expect(after).toBe(before);
+  });
+});
+
+describe("spec-corpus detection (task-adopt-corpus-fingerprints)", () => {
+  it("no corpus: empty corpora on a plain initialized tree", () => {
+    const dir = seedTree();
+    const inventory = buildInventory(dir);
+    expect(inventory.corpora).toEqual([]);
+  });
+
+  it("OpenSpec fingerprint: config.yaml plus specs/*/spec.md capabilities", () => {
+    const dir = seedTree();
+    mkdirSync(join(dir, "openspec/specs/auth"), { recursive: true });
+    mkdirSync(join(dir, "openspec/specs/billing"), { recursive: true });
+    writeFileSync(join(dir, "openspec/config.yaml"), "name: demo\n", "utf8");
+    writeFileSync(join(dir, "openspec/specs/auth/spec.md"), "# Auth\n", "utf8");
+    writeFileSync(join(dir, "openspec/specs/billing/spec.md"), "# Billing\n", "utf8");
+    expect(buildInventory(dir).corpora).toEqual([
+      { format: "openspec", files: 2, origin: "OpenSpec" },
+    ]);
+    // No config.yaml -> no OpenSpec corpus, even with the specs present.
+    rmSync(join(dir, "openspec/config.yaml"));
+    expect(buildInventory(dir).corpora).toEqual([]);
+  });
+
+  it("arggon fingerprint: docs/specs/spec-*.md with a spec_id frontmatter field", () => {
+    const dir = seedTree();
+    mkdirSync(join(dir, "docs/specs"), { recursive: true });
+    writeFileSync(
+      join(dir, "docs/specs/spec-deps-001.md"),
+      "---\nspec_id: deps-001\ntitle: Deps\nstatus: implemented\n---\n\n# Spec\n",
+      "utf8",
+    );
+    writeFileSync(
+      join(dir, "docs/specs/spec-show-002.md"),
+      "---\nspec_id: show-002\ntitle: Show\nstatus: draft\n---\n\n# Spec\n",
+      "utf8",
+    );
+    // No arggon frontmatter -> not part of the migrated corpus.
+    writeFileSync(
+      join(dir, "docs/specs/spec-orphan-003.md"),
+      "---\ntitle: no spec_id\n---\n\n# Spec\n",
+      "utf8",
+    );
+    // Wrong filename pattern -> never scanned.
+    writeFileSync(join(dir, "docs/specs/notes.md"), "---\nspec_id: x\n---\n", "utf8");
+    expect(buildInventory(dir).corpora).toEqual([
+      { format: "arggon", files: 2, origin: "ArggonManager" },
+    ]);
+  });
+
+  it("ADR fingerprint: docs/adr/*.md records", () => {
+    const dir = seedTree();
+    mkdirSync(join(dir, "docs/adr"), { recursive: true });
+    writeFileSync(join(dir, "docs/adr/0001-stack.md"), "# 1. Stack\n", "utf8");
+    writeFileSync(join(dir, "docs/adr/0002-board.md"), "# 2. Board\n", "utf8");
+    writeFileSync(join(dir, "docs/adr/README.md"), "# ADRs\n", "utf8");
+    expect(buildInventory(dir).corpora).toEqual([
+      { format: "adr", files: 3, origin: "ADR" },
+    ]);
+  });
+
+  it("RFC fingerprint: markdown under docs/rfc/ (preferred) or rfc/", () => {
+    const dir = seedTree();
+    mkdirSync(join(dir, "docs/rfc"), { recursive: true });
+    writeFileSync(join(dir, "docs/rfc/rfc-001-review.md"), "# RFC 001\n", "utf8");
+    expect(buildInventory(dir).corpora).toEqual([
+      { format: "rfc", files: 1, origin: "RFC" },
+    ]);
+  });
+
+  it("multiple corpora coexist and are all reported in detection order", () => {
+    const dir = seedTree();
+    mkdirSync(join(dir, "openspec/specs/auth"), { recursive: true });
+    writeFileSync(join(dir, "openspec/config.yaml"), "name: demo\n", "utf8");
+    writeFileSync(join(dir, "openspec/specs/auth/spec.md"), "# Auth\n", "utf8");
+    mkdirSync(join(dir, "docs/specs"), { recursive: true });
+    writeFileSync(
+      join(dir, "docs/specs/spec-deps-001.md"),
+      "---\nspec_id: deps-001\n---\n",
+      "utf8",
+    );
+    mkdirSync(join(dir, "docs/adr"), { recursive: true });
+    writeFileSync(join(dir, "docs/adr/0001-stack.md"), "# 1. Stack\n", "utf8");
+    mkdirSync(join(dir, "rfc"), { recursive: true });
+    writeFileSync(join(dir, "rfc/rfc-002.md"), "# RFC 002\n", "utf8");
+    expect(detectSpecCorpora(dir)).toEqual([
+      { format: "openspec", files: 1, origin: "OpenSpec" },
+      { format: "arggon", files: 1, origin: "ArggonManager" },
+      { format: "adr", files: 1, origin: "ADR" },
+      { format: "rfc", files: 1, origin: "RFC" },
+    ]);
+  });
+
+  it("the human report lists detected corpora", () => {
+    const dir = seedTree();
+    mkdirSync(join(dir, "docs/adr"), { recursive: true });
+    writeFileSync(join(dir, "docs/adr/0001-stack.md"), "# 1. Stack\n", "utf8");
+    const report = formatAdoptReport(runAdopt({ cwd: dir, dryRun: true }));
+    expect(report).toContain("spec corpora: adr (1 files, ADR)");
+  });
+
+  it("adopt --dry-run --json reports corpora additively", () => {
+    const dir = seedTree();
+    mkdirSync(join(dir, "openspec/specs/auth"), { recursive: true });
+    writeFileSync(join(dir, "openspec/config.yaml"), "name: demo\n", "utf8");
+    writeFileSync(join(dir, "openspec/specs/auth/spec.md"), "# Auth\n", "utf8");
+    const proc = runCli(["adopt", "--dry-run", "--json"], dir);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      ok: boolean;
+      inventory: { corpora: { format: string; files: number; origin: string }[] };
+    };
+    expect(body.ok).toBe(true);
+    expect(body.inventory.corpora).toEqual([
+      { format: "openspec", files: 1, origin: "OpenSpec" },
+    ]);
   });
 });
 
