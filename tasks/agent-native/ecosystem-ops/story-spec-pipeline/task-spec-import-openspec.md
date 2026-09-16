@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-spec-import-openspec
 title: "spec import openspec: mechanical migration with zero-loss check"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-spec-pipeline
 labels: [p2]
 created: "2026-09-16"
 updated: "2026-09-16"
-claimed_at: "2026-09-16T20:45:01.930Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-spec-pipeline/task-spec-import-openspec.md
