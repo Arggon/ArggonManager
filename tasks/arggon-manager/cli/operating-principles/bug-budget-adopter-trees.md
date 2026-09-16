@@ -48,3 +48,6 @@ rm -rf "$ADOPTER"
 ```
 
 No `budgetError`; budget section fully populated. From-source path re-verified in the worktree: `npm run arggon -- doctor --json --budget` → budget present, no budgetError; `doctor --json` → 0 modified / 0 drifted. Tests: `npx vitest run` 58 files / 911 tests pass, incl. new measure.test.ts case "resolves the CLI from the RUNNING installation: doctor --json --budget works from an adopter tree outside the repo (bug-budget-adopter-trees)" (locates the CLI via the product `cliCommand()` resolution). `npm run lint` clean; `validate --json` ok:true.
+
+### 2026-09-16 @Arggon
+Lead-architect review: APPROVED. cliCommand() resolving from import.meta.url of the EXECUTING module (source->tsx in-repo, installed->dist/cli.js) is the correct fix — the measured tree stays subject-only and the adopter gets the ADR 0006 report on their own tree, which was the entire point. End-to-end adopter evidence with real numbers (init tree 54 KB, mcp 9,232 B vs the new 12 KiB budget) and a regression test that covers the resolution itself, not just the happy path. Merge follows.
