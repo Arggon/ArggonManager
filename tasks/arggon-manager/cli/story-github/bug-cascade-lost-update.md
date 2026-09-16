@@ -4,6 +4,7 @@ status: in_progress
 id: bug-cascade-lost-update
 title: cascade lost-update on shared ancestor writes
 assignee: Arggon
+branch: fix/bug-cascade-lost-update
 parent: story-github
 labels: [p2]
 created: "2026-09-16"
