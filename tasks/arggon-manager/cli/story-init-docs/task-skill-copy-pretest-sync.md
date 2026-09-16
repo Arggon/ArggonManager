@@ -4,6 +4,7 @@ status: in_progress
 id: task-skill-copy-pretest-sync
 title: generate the .agents skill copy in a pretest/globalSetup step
 assignee: Arggon
+branch: feat/task-skill-copy-pretest-sync
 parent: story-init-docs
 labels: [p3]
 created: "2026-09-15"
