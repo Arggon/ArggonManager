@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adopt-corpus-body-injection
 title: "adopt task body: inject detected spec corpus at creation"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-adoption-state
 labels: []
 created: "2026-09-16"
 updated: "2026-09-16"
-claimed_at: "2026-09-16T22:04:03.823Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-adoption-state/task-adopt-corpus-body-injection.md
