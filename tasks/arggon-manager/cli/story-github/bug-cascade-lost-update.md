@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-cascade-lost-update
 title: cascade lost-update on shared ancestor writes
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-github
 labels: [p2]
 created: "2026-09-16"
 updated: "2026-09-16"
-claimed_at: "2026-09-16T12:45:14.778Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-github/bug-cascade-lost-update.md
