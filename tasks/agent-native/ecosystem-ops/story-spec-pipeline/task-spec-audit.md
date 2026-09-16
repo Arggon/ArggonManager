@@ -4,7 +4,7 @@ status: todo
 id: task-spec-audit
 title: "spec audit: duplication detection command (pairwise Jaccard + shared titles)"
 parent: story-spec-pipeline
-labels: []
+labels: [p3]
 created: "2026-09-16"
 updated: "2026-09-16"
 ---
