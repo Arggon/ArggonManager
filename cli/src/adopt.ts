@@ -253,9 +253,27 @@ export function buildInventory(root: string): Inventory {
 }
 
 /**
+ * The generic (no-corpus) spec-corpus section of the adoption task body: the
+ * detection-fingerprint primer. Kept as a constant so composeAdoptTaskBody
+ * can swap it out verbatim when corpora were detected.
+ */
+const ADOPT_CORPUS_SECTION_GENERIC = `## Spec corpus (if the repo has one)
+
+Detection fingerprints (run before the prose sweep above):
+- \`openspec/config.yaml\` + \`specs/*/spec.md\` = OpenSpec corpus.
+- \`docs/specs/spec-*.md\` with arggon frontmatter = already migrated (skip).
+- ADR directories, RFC markdown = other formats (map conservatively into the same phases).
+No corpus: skip this section.
+
+`;
+
+/**
  * The adoption task body: the full agent checklist (task-adopt-agent-playbook).
  * A template constant, verbatim via runCreate's `body` override — the
  * executing agent follows it end-to-end, so it must stay rich and ordered.
+ * With detected corpora, composeAdoptTaskBody swaps the generic corpus
+ * section (interpolated above) for a concrete one; without corpora the
+ * composed body is byte-identical to this constant.
  */
 export const ADOPT_TASK_BODY = `## Context
 
@@ -278,21 +296,37 @@ arggon adopt --dry-run --json
 - [ ] 7. Verify: \`arggon validate\` + \`arggon spec validate\` (if specs exist) + \`arggon playbook status\`.
 - [ ] 8. Report: comment on this task (\`arggon comment task-adopt-arggon\`) listing the extracted content, archived files, and created playbooks; flip this task done when the human reviews.
 
-## Spec corpus (if the repo has one)
-
-Detection fingerprints (run before the prose sweep above):
-- \`openspec/config.yaml\` + \`specs/*/spec.md\` = OpenSpec corpus.
-- \`docs/specs/spec-*.md\` with arggon frontmatter = already migrated (skip).
-- ADR directories, RFC markdown = other formats (map conservatively into the same phases).
-No corpus: skip this section.
-
-- [ ] 9. Fase 0 — Mapeo: build the format->template table per spec. OpenSpec mapping: \`## Purpose\` -> Purpose; \`## Requirements\` (\`### Requirement:\` / \`#### Scenario:\` Given/When/Then) -> Acceptance criteria verbatim; add a \`### Verification checklist\` per requirement; provenance as an italic line (source path + date).
+${ADOPT_CORPUS_SECTION_GENERIC}- [ ] 9. Fase 0 — Mapeo: build the format->template table per spec. OpenSpec mapping: \`## Purpose\` -> Purpose; \`## Requirements\` (\`### Requirement:\` / \`#### Scenario:\` Given/When/Then) -> Acceptance criteria verbatim; add a \`### Verification checklist\` per requirement; provenance as an italic line (source path + date).
 - [ ] 10. Fase 1 — Migración 1:1: one new spec per capability with the mapped content. Mechanical, no judgment. Zero-loss assertion: re-assembled content == source body (normalized).
 - [ ] 11. Fase 2 — Auditoría: duplication detection (shingle-Jaccard similarity + shared verbatim requirement/scenario titles) -> candidates classified DUPLICATE / MERGE / KEEP-SEPARATE with evidence.
 - [ ] 12. Fase 3 — Consolidación: apply merges (strictest copy wins on divergence); citation sweep for absorbed ids; new shared-pattern spec where patterns repeat. Consolidation reconciles, never deletes normative text; file deletion only after verified absorption.
 - [ ] 13. Fase 4 — Refactor al contrato in file-disjoint waves: real Synopsis, TBDs filled from code, error paths verified against the implementation — inventing SHALLs forbidden. Spec-code gaps -> tracker items.
 - [ ] 14. Gates per phase: \`arggon spec validate\` 0 errors / 0 warnings; \`arggon spec analyze\` with no NEW findings vs the baseline (orphans reported and accepted, never cosmetically cited). Consolidar antes de reescribir. One requirement one owner (reference by spec_id); implemented = verified against code.
 `;
+
+/**
+ * Compose the adoption task body for the detected spec corpora
+ * (task-adopt-corpus-body-injection). With no corpora the body is the static
+ * template, byte-identical. With corpora, the generic fingerprint primer is
+ * replaced by a concrete section (format, file count, origin, in detection
+ * order) and the executing agent is pointed at the phased checklist below —
+ * the detection already ran, so the section is no longer conditional.
+ * Deterministic: corpora appear in the order detection reports them.
+ */
+export function composeAdoptTaskBody(corpora: DetectedCorpus[]): string {
+  if (corpora.length === 0) return ADOPT_TASK_BODY;
+  const list = corpora
+    .map((corpus) => `- \`${corpus.format}\` — ${corpus.files} file(s), origin: ${corpus.origin}.`)
+    .join("\n");
+  const concrete =
+    `## Spec corpus — detected\n\n` +
+    `Detection already ran at inventory time (fingerprint match — do not re-derive it). ` +
+    `This repo has ${corpora.length} spec ${corpora.length === 1 ? "corpus" : "corpora"}:\n` +
+    `${list}\n\n` +
+    `Follow the phased checklist below (Fase 0–4 + gates) for THIS corpus, in the order listed. ` +
+    `OpenSpec corpora map per the Fase 0 table; other formats map conservatively into the same phases.\n\n`;
+  return ADOPT_TASK_BODY.replace(ADOPT_CORPUS_SECTION_GENERIC, concrete);
+}
 
 export type AdoptOptions = {
   cwd: string;
@@ -497,7 +531,7 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
       title: ADOPT_TASK_TITLE,
       parent: storyId,
       id: ADOPT_TASK_STEM,
-      body: ADOPT_TASK_BODY,
+      body: composeAdoptTaskBody(inventory.corpora),
       commit: false,
       now: opts.now,
     });

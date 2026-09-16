@@ -10,6 +10,7 @@ import {
   ADOPT_TASK_ID,
   ADOPT_TASK_TITLE,
   buildInventory,
+  composeAdoptTaskBody,
   detectSpecCorpora,
   formatAdoptAckReport,
   formatAdoptReport,
@@ -116,8 +117,10 @@ describe("runAdopt: task creation", () => {
     expect(body).toContain("arggon playbook status");
     // Step 8: report + handoff to the human.
     expect(body).toContain("arggon comment task-adopt-arggon");
-    // Spec-corpus section: detection fingerprints.
-    expect(body).toContain("Spec corpus");
+    // Spec-corpus section: detection fingerprints (no corpora on this tree —
+    // the generic section, byte-identical to the template).
+    expect(body).toContain(ADOPT_TASK_BODY);
+    expect(body).toContain("Spec corpus (if the repo has one)");
     expect(body).toContain("openspec/config.yaml");
     expect(body).toContain("docs/specs/spec-*.md");
     // Phased procedure.
@@ -411,6 +414,91 @@ describe("spec-corpus detection (task-adopt-corpus-fingerprints)", () => {
     expect(body.inventory.corpora).toEqual([
       { format: "openspec", files: 1, origin: "OpenSpec" },
     ]);
+  });
+});
+
+describe("composeAdoptTaskBody (task-adopt-corpus-body-injection)", () => {
+  it("no corpora: byte-identical to the static template", () => {
+    expect(composeAdoptTaskBody([])).toBe(ADOPT_TASK_BODY);
+  });
+
+  it("with corpora: concrete detected section, phased checklist intact", () => {
+    const body = composeAdoptTaskBody([
+      { format: "openspec", files: 2, origin: "OpenSpec" },
+    ]);
+    // The generic fingerprint primer is gone.
+    expect(body).not.toContain("Spec corpus (if the repo has one)");
+    expect(body).not.toContain("No corpus: skip this section.");
+    // Concrete section: format, count, origin, detection-already-ran prose.
+    expect(body).toContain("## Spec corpus — detected");
+    expect(body).toContain("openspec");
+    expect(body).toContain("2 file(s)");
+    expect(body).toContain("OpenSpec");
+    expect(body).toContain("Detection already ran");
+    // The phased checklist (items 9-14) survives.
+    expect(body).toContain("Fase 0");
+    expect(body).toContain("Fase 4");
+    expect(body.match(/^- \[ \] /gm)).toHaveLength(14);
+    expect(body).toContain("arggon spec analyze");
+    expect(body).toContain("Consolidar antes de reescribir");
+    // The non-corpus parts are untouched.
+    expect(body.startsWith(ADOPT_TASK_BODY.slice(0, ADOPT_TASK_BODY.indexOf("## Spec corpus")))).toBe(true);
+  });
+
+  it("multiple corpora: each format and count appears, in detection order", () => {
+    const corpora = [
+      { format: "openspec" as const, files: 3, origin: "OpenSpec" },
+      { format: "adr" as const, files: 5, origin: "ADR" },
+      { format: "rfc" as const, files: 1, origin: "RFC" },
+    ];
+    const body = composeAdoptTaskBody(corpora);
+    expect(body).toContain("3 spec corpora");
+    const detectedAt = body.indexOf("## Spec corpus — detected");
+    expect(detectedAt).toBeGreaterThan(-1);
+    expect(body.indexOf("`openspec`")).toBeGreaterThan(detectedAt);
+    expect(body.indexOf("`adr`")).toBeGreaterThan(body.indexOf("`openspec`"));
+    expect(body.indexOf("`rfc`")).toBeGreaterThan(body.indexOf("`adr`"));
+    expect(body).toContain("5 file(s)");
+    expect(body).toContain("1 file(s)");
+  });
+
+  it("is deterministic: same corpora, same body, twice", () => {
+    const corpora = [{ format: "arggon" as const, files: 4, origin: "ArggonManager" }];
+    expect(composeAdoptTaskBody(corpora)).toBe(composeAdoptTaskBody([...corpora]));
+  });
+});
+
+describe("adopt task body carries the detected corpus (task-adopt-corpus-body-injection)", () => {
+  it("no corpora: the created task keeps the generic corpus section", () => {
+    const dir = seedTree();
+    runAdopt({ cwd: dir });
+    const task = loadItems(join(dir, "tasks")).find((item) => item.id === ADOPT_TASK_ID)!;
+    const body = readFileSync(task.filePath, "utf8");
+    expect(body).toContain("Spec corpus (if the repo has one)");
+    expect(body).toContain("No corpus: skip this section.");
+    expect(body).not.toContain("## Spec corpus — detected");
+  });
+
+  it("with an OpenSpec corpus: the created task names the format, count, and keeps the phases", () => {
+    const dir = seedTree();
+    // Same fixture shape as the fingerprint tests.
+    mkdirSync(join(dir, "openspec/specs/auth"), { recursive: true });
+    mkdirSync(join(dir, "openspec/specs/billing"), { recursive: true });
+    writeFileSync(join(dir, "openspec/config.yaml"), "name: demo\n", "utf8");
+    writeFileSync(join(dir, "openspec/specs/auth/spec.md"), "# Auth\n", "utf8");
+    writeFileSync(join(dir, "openspec/specs/billing/spec.md"), "# Billing\n", "utf8");
+    const result = runAdopt({ cwd: dir });
+    expect(result.taskCreated).toBe(true);
+    const task = loadItems(join(dir, "tasks")).find((item) => item.id === ADOPT_TASK_ID)!;
+    const body = readFileSync(task.filePath, "utf8");
+    // Detection is injected: format name + file count.
+    expect(body).toContain("## Spec corpus — detected");
+    expect(body).toContain("openspec");
+    expect(body).toContain("2 file(s)");
+    // The phased checklist and gates survive; the conditional line is gone.
+    expect(body).toContain("Fase 0");
+    expect(body).toContain("Consolidar antes de reescribir");
+    expect(body).not.toContain("No corpus: skip this section.");
   });
 });
 
