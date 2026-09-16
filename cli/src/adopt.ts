@@ -175,6 +175,21 @@ arggon adopt --dry-run --json
 - [ ] 6. Baseline the sanctioned edits: run \`arggon adopt --ack\` so the generated docs you completed in step 3 become the new x-generated baseline (their checksums are refreshed and they stop reporting as modified). Hand edits made AFTER this ack leave the file adopter-owned: init re-runs never overwrite or regenerate it, and \`arggon doctor\` surfaces any such edit in the informational \`acknowledgedDrifted\` bucket (it never counts as \`modified\`).
 - [ ] 7. Verify: \`arggon validate\` + \`arggon spec validate\` (if specs exist) + \`arggon playbook status\`.
 - [ ] 8. Report: comment on this task (\`arggon comment task-adopt-arggon\`) listing the extracted content, archived files, and created playbooks; flip this task done when the human reviews.
+
+## Spec corpus (if the repo has one)
+
+Detection fingerprints (run before the prose sweep above):
+- \`openspec/config.yaml\` + \`specs/*/spec.md\` = OpenSpec corpus.
+- \`docs/specs/spec-*.md\` with arggon frontmatter = already migrated (skip).
+- ADR directories, RFC markdown = other formats (map conservatively into the same phases).
+No corpus: skip this section.
+
+- [ ] 9. Fase 0 — Mapeo: build the format->template table per spec. OpenSpec mapping: \`## Purpose\` -> Purpose; \`## Requirements\` (\`### Requirement:\` / \`#### Scenario:\` Given/When/Then) -> Acceptance criteria verbatim; add a \`### Verification checklist\` per requirement; provenance as an italic line (source path + date).
+- [ ] 10. Fase 1 — Migración 1:1: one new spec per capability with the mapped content. Mechanical, no judgment. Zero-loss assertion: re-assembled content == source body (normalized).
+- [ ] 11. Fase 2 — Auditoría: duplication detection (shingle-Jaccard similarity + shared verbatim requirement/scenario titles) -> candidates classified DUPLICATE / MERGE / KEEP-SEPARATE with evidence.
+- [ ] 12. Fase 3 — Consolidación: apply merges (strictest copy wins on divergence); citation sweep for absorbed ids; new shared-pattern spec where patterns repeat. Consolidation reconciles, never deletes normative text; file deletion only after verified absorption.
+- [ ] 13. Fase 4 — Refactor al contrato in file-disjoint waves: real Synopsis, TBDs filled from code, error paths verified against the implementation — inventing SHALLs forbidden. Spec-code gaps -> tracker items.
+- [ ] 14. Gates per phase: \`arggon spec validate\` 0 errors / 0 warnings; \`arggon spec analyze\` with no NEW findings vs the baseline (orphans reported and accepted, never cosmetically cited). Consolidar antes de reescribir. One requirement one owner (reference by spec_id); implemented = verified against code.
 `;
 
 export type AdoptOptions = {
