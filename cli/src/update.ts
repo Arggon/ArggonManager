@@ -66,6 +66,12 @@ export type UpdateOptions = {
    * there is no CLI flag.
    */
   worktreePath?: string;
+  /**
+   * Set the additive `issue` frontmatter field (task-issue-field-cli): the
+   * GitHub issue number (positive integer). `0` clears it. Same validation as
+   * the create kernel — a malformed value fails before anything is written.
+   */
+  issue?: number;
   /** Allow reassignment of an already-claimed item (claim steal). */
   force?: boolean;
   /**
@@ -206,6 +212,13 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     parentRequest = opts.parent.trim();
     if (!parentRequest) throw new Error("--parent requires a non-empty item id");
   }
+  let issueRequest: number | null | undefined;
+  if (opts.issue !== undefined) {
+    if (!Number.isInteger(opts.issue) || opts.issue < 0) {
+      throw new Error("issue must be a positive integer (the GitHub issue number), or 0 to clear it");
+    }
+    issueRequest = opts.issue > 0 ? opts.issue : null;
+  }
   let worktreeRequest: string | null | undefined;
   if (opts.worktreePath !== undefined) {
     const trimmed = opts.worktreePath.trim();
@@ -224,6 +237,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     labels !== undefined ||
     depsReplace !== undefined ||
     opts.addDependsOn !== undefined ||
+    issueRequest !== undefined ||
     opts.blockedReason !== undefined;
   if (!requested) {
     throw new Error("nothing to update (pass --title, --status, --assignee, --branch, ...)");
@@ -425,6 +439,16 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
       data.worktree_path = worktreeRequest;
     }
     changed.push("worktree_path");
+  }
+  // issue (task-issue-field-cli): positive integer sets the field, 0 clears.
+  const currentIssue = item.issue ?? null;
+  if (issueRequest !== undefined && issueRequest !== currentIssue) {
+    if (issueRequest === null) {
+      delete data.issue;
+    } else {
+      data.issue = issueRequest;
+    }
+    changed.push("issue");
   }
   if (labels !== undefined && labels.join("\u0000") !== item.labels.join("\u0000")) {
     data.labels = labels;

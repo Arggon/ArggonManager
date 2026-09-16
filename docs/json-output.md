@@ -82,7 +82,7 @@ Stable fields aligned with convention v0 plus the additive `branch` (v1) and `mi
 | `depends_on`     | `string[]`                                                    | Ids this item waits for (v3, ADR 0004); empty = none. Additive within `schemaVersion: 1`; `blocked_by` is the computed inverse and is never stored |
 | `claimed_at`     | `string` \| `null`                                          | Soft lease: ISO date-time set when a claimable item is claimed (`in_progress` + assignee, via `update`/`start`) and cleared when the claim is released. Reporting only — never gates a transition. Additive within `schemaVersion: 1`; `null` for items claimed before the field existed |
 | `worktree_path`  | `string` \| `null`                                          | Absolute path of the git worktree created by `start --worktree` (`../<repo-name>-<id>`). Additive within `schemaVersion: 1`; `null` when the item was started without worktree isolation |
-| `issue`          | `number` \| `null`                                          | GitHub issue number recorded by `import-issues` (frontmatter `issue`). Additive within `schemaVersion: 1`; `null` when the item was not imported from an issue. `start --open-pr` appends `Closes #N` to the PR body for items carrying it |
+| `issue`          | `number` \| `null`                                          | GitHub issue number recorded by `import-issues` or set directly via `create --issue <n>` / `update --issue <n>` (`--issue 0` clears; frontmatter `issue`). Additive within `schemaVersion: 1`; `null` when the item carries no linked issue. `start --open-pr` appends `Closes #N` to the PR body for items carrying it |
 
 Enums match [`docs/convention.md`](./convention.md) v0.
 

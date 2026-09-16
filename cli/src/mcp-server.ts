@@ -131,6 +131,12 @@ const TOOLS: ToolDefinition[] = [
           type: "string",
           description: "required when status is blocked",
         },
+        issue: {
+          type: "integer",
+          minimum: 1,
+          description:
+            "GitHub issue number recorded in the additive issue frontmatter field (start --open-pr appends Closes #N)",
+        },
         full: {
           type: "boolean",
           description:
@@ -176,6 +182,12 @@ const TOOLS: ToolDefinition[] = [
         add_depends_on: {
           type: "string",
           description: "append one depends_on id (no-op when already present)",
+        },
+        issue: {
+          type: "integer",
+          minimum: 0,
+          description:
+            "set the GitHub issue number in the additive issue frontmatter field (positive integer; 0 clears it)",
         },
         blocked_reason: {
           type: "string",
@@ -449,6 +461,7 @@ export function runMcpServer(opts: McpServerOptions): void {
           assignee: str(args.assignee),
           status: str(args.status),
           blockedReason: str(args.blocked_reason),
+          issue: typeof args.issue === "number" ? args.issue : undefined,
           // Tracker auto-commit resolves like the CLI (`x-tracker.auto-commit`,
           // default ON) so both entry points stay envelope-identical.
         });
@@ -477,6 +490,7 @@ export function runMcpServer(opts: McpServerOptions): void {
           labels: str(args.labels),
           dependsOn: str(args.depends_on),
           addDependsOn: str(args.add_depends_on),
+          issue: typeof args.issue === "number" ? args.issue : undefined,
           blockedReason: str(args.blocked_reason),
           cascade: args.no_cascade !== true,
           agent: true,
