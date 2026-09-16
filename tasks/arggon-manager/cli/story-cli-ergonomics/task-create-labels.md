@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-create-labels
 title: "create --labels: label a new item at creation"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-cli-ergonomics
 labels: [p2]
 created: "2026-09-16"
 updated: "2026-09-16"
-claimed_at: "2026-09-16T13:09:59.541Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-cli-ergonomics/task-create-labels.md
