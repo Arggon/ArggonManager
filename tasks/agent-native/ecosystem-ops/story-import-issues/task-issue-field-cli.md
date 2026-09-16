@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-issue-field-cli
 title: "expose --issue on create/update: round-trip is unreachable for hand-built items"
+assignee: Arggon
 parent: story-import-issues
 labels: [p2]
 created: "2026-09-15"
-updated: "2026-09-15"
+updated: "2026-09-16"
+claimed_at: "2026-09-16T00:04:53.722Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/ecosystem-ops/story-import-issues/task-issue-field-cli.md
