@@ -32,3 +32,6 @@ Code analysis at filing time: the scaffold write paths (cli/src/spec.ts:727/737,
 - [ ] If the environment cause is identified during investigation, document it in this item
 
 ## Notes
+
+### 2026-09-16 @Arggon
+Lead-architect review: APPROVED. writeFileAtomic (same-dir temp + rename(2)) with a byte-length shrink guard that throws loudly on mismatch is precisely the hardening the bug asked for — an interrupted process can now never leave a truncated scaffold doc, regardless of what the environment was doing. Fault injection proves the atomicity contract (rename failure leaves the target untouched). The third box left honestly unticked (cause unreproduced; the conditional acceptance was met by making truncation un-landable). The board.ts non-atomic write is noted for a follow-up candidate. Merge follows.
