@@ -4,6 +4,7 @@ status: in_progress
 id: task-adopt-spec-corpus-phases
 title: "adopt: spec-corpus detection + phased migration checklist in the adoption template"
 assignee: Arggon
+branch: feat/task-adopt-spec-corpus-phases
 parent: story-adoption-state
 labels: []
 created: "2026-09-16"
