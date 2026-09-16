@@ -4,6 +4,7 @@ status: in_progress
 id: task-create-labels
 title: "create --labels: label a new item at creation"
 assignee: Arggon
+branch: feat/task-create-labels
 parent: story-cli-ergonomics
 labels: [p2]
 created: "2026-09-16"
