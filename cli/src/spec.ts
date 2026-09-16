@@ -8,8 +8,9 @@
  * about presence of frontmatter fields and acceptance criteria.
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { writeFileAtomic } from "./atomic.js";
 import { readConventionVersion } from "./convention.js";
 import { bundledTemplatesDir, findTasksDir, repoRootFromTasks } from "./paths.js";
 import type { Issue } from "./types.js";
@@ -724,7 +725,7 @@ export function runSpecNew(opts: SpecNewOptions): SpecNewResult {
 
   const files: string[] = [];
   mkdirSync(specDir, { recursive: true });
-  writeFileSync(specPath, renderTemplate("spec", vars), "utf8");
+  writeFileAtomic(specPath, renderTemplate("spec", vars));
   files.push(posixRel(root, specPath));
 
   if (opts.plan) {
@@ -734,7 +735,7 @@ export function runSpecNew(opts: SpecNewOptions): SpecNewResult {
       throw new Error(`refusing to overwrite existing file ${posixRel(root, planPath)}`);
     }
     mkdirSync(planDir, { recursive: true });
-    writeFileSync(planPath, renderTemplate("plan", vars), "utf8");
+    writeFileAtomic(planPath, renderTemplate("plan", vars));
     files.push(posixRel(root, planPath));
   }
 

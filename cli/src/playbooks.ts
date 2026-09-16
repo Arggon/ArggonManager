@@ -10,8 +10,9 @@
  * caller's job at creation time — the CLI records and tracks freshness.
  */
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
+import { writeFileAtomic } from "./atomic.js";
 import { readConventionConfig, readConventionVersion, type PlaybooksConfig } from "./convention.js";
 import { formatDate } from "./dates.js";
 import { itemsById, loadItems } from "./items.js";
@@ -190,7 +191,7 @@ export function runStackExplore(opts: StackExploreOptions): StackExploreResult {
   });
 
   mkdirSync(dir, { recursive: true });
-  writeFileSync(path, content, "utf8");
+  writeFileAtomic(path, content);
   return { root, files: [posixRel(root, path)] };
 }
 
@@ -284,7 +285,7 @@ export function runPlaybookNew(opts: PlaybookNewOptions): PlaybookNewResult {
   const researched = todayUtc(opts.now);
 
   mkdirSync(join(root, "docs", "playbooks"), { recursive: true });
-  writeFileSync(path, renderPlaybook(tech, title, version, researched), "utf8");
+  writeFileAtomic(path, renderPlaybook(tech, title, version, researched));
   return { root, files: [posixRel(root, path)] };
 }
 
@@ -487,7 +488,7 @@ export function runPlaybookRefresh(opts: PlaybookRefreshOptions): PlaybookRefres
     const block = ["---", ...Object.entries(updates).map(([k, v]) => `${k}: ${v}`), "---", ""].join(
       "\n",
     );
-    writeFileSync(path, `${block}\n${raw}`, "utf8");
+    writeFileAtomic(path, `${block}\n${raw}`);
     return { root, path: posixRel(root, path), version, researched };
   }
 
@@ -515,7 +516,7 @@ export function runPlaybookRefresh(opts: PlaybookRefreshOptions): PlaybookRefres
   if (missing.length > 0) {
     lines.splice(close, 0, ...missing.map(([k, v]) => `${k}: ${v}`));
   }
-  writeFileSync(path, `${lines.join("\n")}`, "utf8");
+  writeFileAtomic(path, `${lines.join("\n")}`);
   return { root, path: posixRel(root, path), version, researched };
 }
 

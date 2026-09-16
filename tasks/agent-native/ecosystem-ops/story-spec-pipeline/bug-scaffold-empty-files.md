@@ -28,8 +28,8 @@ Code analysis at filing time: the scaffold write paths (cli/src/spec.ts:727/737,
 
 ## Acceptance
 
-- [ ] Scaffold writes hardened: temp-file + rename (atomic) across spec new / playbook new / stack explore write paths
-- [ ] Shrink guard: a post-write check that the written byte length matches the rendered content, failing loudly instead of leaving a truncated doc
+- [x] Scaffold writes hardened: temp-file + rename (atomic) across spec new / playbook new / stack explore write paths
+- [x] Shrink guard: a post-write check that the written byte length matches the rendered content, failing loudly instead of leaving a truncated doc
 - [ ] If the environment cause is identified during investigation, document it in this item
 
 ## Notes
