@@ -1,7 +1,7 @@
 ---
 exploration_id: smoke-ui-testing-006
 title: Smoke testing tooling: UI smoke gate for review (and CLI probe codification)
-status: open
+status: decided
 created: 2026-09-16
 ---
 
@@ -167,6 +167,9 @@ pty render check or manual; noted in the methodology text as the exception.
 
 ## Decision
 
-Proposed: `docs/adr/0008-review-smoke-gate.md` — smoke gate + tooling choice
-(Playwright CLI for agent-driven review smoke; `@playwright/test` for the
-optional CI smoke job). Pending acceptance.
+**Adopted — [ADR 0008](../adr/0008-review-smoke-gate.md)** (Accepted
+2026-09-16): blocking smoke gate with Playwright CLI for agent-driven review
+smoke, `@playwright/test` for the optional CI smoke job, plus explicit
+scalability/security review dimensions. Methodology text:
+docs/engineering.md (review bar + testing expectations), docs/agents.md
+(coordinator review + subagent rules).

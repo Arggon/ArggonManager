@@ -76,9 +76,27 @@ A PR merges only when **all** applicable bars pass:
 - Code is readable; public CLI flags/commands documented in README or `cli` help.
 - Errors are actionable (especially validate failures).
 
+### Non-functional bar (quality · scalability · security)
+
+Quality is the operating principle above; **scalability and security are named review dimensions**, not aspirations. Every behavior change is reviewed against:
+
+- **Scalability** — payloads stay bounded (ADR 0006 spirit); algorithms declare their complexity wherever inputs grow with the corpus (items, specs, docs): an O(n²) pairwise scan must say so and justify its input ceiling; no unbounded reads/renders over the task tree; JSON envelopes grow sub-linearly or are capped.
+- **Security** — untrusted content (adopted repos' markdown/frontmatter/JSON) is parsed defensively; subprocess arguments are arrays, never shell-interpolated; no writes outside the repo root; secrets never committed or logged; the dependency surface stays minimal (a new runtime dependency needs justification in the PR).
+
+### Smoke test (blocks merge)
+
+Before a change is approved it is **smoked — executed end-to-end, not just unit-tested**. The bar is blocking for applicable changes; docs-only PRs are exempt.
+
+- **CLI behavior changes:** the reviewer probes every changed/new command on a fixture repo and records the evidence in the review verdict (commands run, expected vs observed). Prefer deterministic `--json` output for evidence.
+- **UI changes (board HTML / `board --serve`):** the reviewer drives a real browser against `arggon board --serve` on a fixture tree — the board renders, cards match `arggon list`, and one status change round-trips through the UI and persists (verified with `arggon show`). Tool: **Playwright CLI** (`@playwright/cli`, agent-first; fallback Playwright MCP) — see [ADR 0008](./adr/0008-review-smoke-gate.md).
+- **TUI:** no browser automation applies; smoke is a scripted pty render check or a documented manual check in the verdict.
+- **CI tier (optional):** a `@smoke`-tagged `@playwright/test` spec (board loads, cards render, one mutation round-trips) may run as a CI job; the review-time gate above stays the blocking bar. Playwright is dev-only, Chromium-only in CI — never a runtime dependency.
+
+The gate is repo-agnostic: adopting repos run the same bar against their own surface — UI-rich adopters (e.g. ArggonStores) are its primary beneficiaries.
+
 ### UI (UI Tester)
 
-- N/A in Phase 1 unless a PR introduces UI.
+- When a PR touches UI, the **smoke-test bar above applies** (real-browser drive); UI QA ownership (UI Tester) remains as scoped in Phase 2.
 
 ### Docs
 
@@ -95,6 +113,7 @@ A PR merges only when **all** applicable bars pass:
 | Fixture / golden | Yes | Valid tree must pass `validate`; each invalid layout rule has a failing fixture |
 | Integration | Yes for file-mutating commands | `create` / `update` / claim against a temp copy of fixtures; assert git-friendly file output |
 | E2E against real `tasks/` | Optional | Nice-to-have; fixtures are the merge gate |
+| Smoke (review gate) | Blocking for behavior/UI changes | Probe evidence in the review verdict; UI changes get a real-browser drive via Playwright CLI ([ADR 0008](./adr/0008-review-smoke-gate.md)); docs-only exempt |
 
 **Rules**
 
@@ -180,6 +199,6 @@ Details belong in later ADRs — do not pre-build those packages in Phase 1.
 ## Related
 
 - Task convention: [`docs/convention.md`](./convention.md)
-- CLI stack: [ADR 0001](./adr/0001-cli-stack.md) · board: [ADR 0002](./adr/0002-board-viewer-v0.md) · milestone field (Proposed): [ADR 0003](./adr/0003-milestone-field.md)
+- CLI stack: [ADR 0001](./adr/0001-cli-stack.md) · board: [ADR 0002](./adr/0002-board-viewer-v0.md) · milestone field (Proposed): [ADR 0003](./adr/0003-milestone-field.md) · review smoke gate: [ADR 0008](./adr/0008-review-smoke-gate.md)
 - Claim concurrency: [`docs/claim.md`](./claim.md)
 - Agent playbook: [`docs/agents.md`](./agents.md) · JSON contract: [`docs/json-output.md`](./json-output.md)
