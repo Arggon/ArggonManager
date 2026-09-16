@@ -31,3 +31,6 @@ Reported by the casa-pendiente experiment (2026-09-15): the GitHub round-trip (x
 - [x] Parity harness covers --issue for create/update; tests for set, clear, invalid value; docs (README + json-output + convention.md x-github cross-reference, added on review)
 
 ## Notes
+
+### 2026-09-16 @Arggon
+Lead-architect review: APPROVED (round 2). The convention.md cross-reference completes the loop: import-issues and hand-built items now both reach the round-trip through the documented surface. Clear semantics (--issue 0, one mechanism CLI+MCP), kernel-first implementation (create needed zero changes), and the parity harness covers set/clear through both entry points. Merge follows.
