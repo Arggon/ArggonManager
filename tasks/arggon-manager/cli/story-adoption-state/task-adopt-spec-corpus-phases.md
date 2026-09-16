@@ -19,10 +19,13 @@ updated: "2026-09-16"
 
 ## Context
 
-<!-- Why this task exists. -->
+Rollout step 1 ("barato y ya") of the spec-corpus migration proposal, motivated by the ArggonStores-am adoption (2026-09-15: OpenSpec -> ArggonManager, 14 PRs, 138->133 specs, zero-loss asserted): `adopt` does not know pre-existing spec corpora exist. An adopter arriving with OpenSpec (or any foreign spec corpus) gets an adoption task that only speaks of governance docs — the corpus migration, duplication audit, consolidation and contract refactor happen out-of-method, requiring senior judgment + ad-hoc scripts (repeatable but not reproducible by default). This task lands the METHOD as text in the adoption checklist template — no CLI changes (those are task-spec-import-openspec / task-adopt-corpus-fingerprints / task-spec-analyze-baseline / task-spec-audit).
 
 ## Acceptance
 
-- [ ] 
+- [ ] cli/src/adopt.ts ADOPT_TASK_BODY gains a spec-corpus section: detection fingerprints (openspec/config.yaml + specs/*/spec.md = OpenSpec; docs/specs/spec-*.md with arggon frontmatter = already migrated; ADR dirs, RFC markdown = other), and if a corpus is found, the phased procedure as checklist text: Fase 0 mapping table (OpenSpec: ## Purpose->Purpose; ## Requirements->Acceptance criteria verbatim GWT; ### Verification checklist per requirement; provenance as italic line), Fase 1 1:1 migration with zero-loss assertion (mechanical, no judgment), Fase 2 duplication audit (shingle-Jaccard + shared requirement/scenario titles -> DUPLICATE/MERGE/KEEP-SEPARATE with evidence), Fase 3 consolidation (strictest copy wins, absorbed ids with citation sweep, new shared-pattern spec), Fase 4 contract refactor in file-disjoint waves (real Synopsis, TBDs from code, error paths verified against implementation — inventing SHALLs forbidden; spec-code gaps -> tracker items)
+- [ ] Gates stated in the template: spec validate 0/0 per phase; spec analyze no NEW findings vs baseline (orphans reported and accepted, never cosmetically cited); consolidar antes de reescribir
+- [ ] Principles codified in the template text: zero loss (consolidation reconciles, never deletes normative text; file deletion only after verified absorption); one requirement one owner (reference by spec_id); implemented = verified against code; orphans honest
+- [ ] Evidence: the real ArggonStores-am case cited in the item (14 PRs, 138->133, analyze 224->113 warns)
 
 ## Notes
