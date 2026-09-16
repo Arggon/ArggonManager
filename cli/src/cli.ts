@@ -45,8 +45,12 @@ import {
 } from "./playbooks.js";
 import {
   formatSpecAnalyzeHuman,
+  formatSpecBaselineCompareHuman,
+  formatSpecBaselineSaveHuman,
   formatSpecValidateHuman,
   runSpecAnalyze,
+  runSpecAnalyzeCompareBaseline,
+  runSpecAnalyzeSaveBaseline,
   runSpecNew,
   runSpecValidate,
 } from "./spec.js";
@@ -1237,10 +1241,70 @@ spec
     "Checklist-driven ambiguity scan + spec/task consistency report (report-only, never edits; exit 0 with findings)",
   )
   .option("--spec <path>", "scan a single spec file (also outside docs/specs)")
+  .option(
+    "--save-baseline <file>",
+    "write the findings snapshot to <file> (deterministic, committable JSON), then report as usual",
+  )
+  .option("--baseline <file>", "compare against a saved snapshot; report only new/resolved findings")
+  .option(
+    "--no-fail-on-new",
+    "with --baseline: report-only — do not exit 1 when new findings exist",
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { spec?: string; json?: boolean }) => {
+  .action((opts: { spec?: string; saveBaseline?: string; baseline?: string; failOnNew?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
+      if (opts.saveBaseline && opts.baseline) {
+        throw new Error(
+          "--baseline and --save-baseline are mutually exclusive — a run either compares against a snapshot or writes one",
+        );
+      }
+      if (opts.saveBaseline) {
+        const saved = runSpecAnalyzeSaveBaseline({ cwd: process.cwd(), spec: opts.spec, file: opts.saveBaseline });
+        if (json) {
+          emitJson({
+            ok: true,
+            schemaVersion: JSON_SCHEMA_VERSION,
+            conventionVersion: saved.result.conventionVersion,
+            command: "spec",
+            scanned: saved.result.scanned,
+            findings: { ambiguity: saved.result.ambiguity, consistency: saved.result.consistency },
+            baseline: { file: saved.file, written: true, count: saved.snapshot.count },
+          });
+          return;
+        }
+        process.stdout.write(formatSpecBaselineSaveHuman(saved));
+        return;
+      }
+      if (opts.baseline) {
+        const cmp = runSpecAnalyzeCompareBaseline({ cwd: process.cwd(), spec: opts.spec, file: opts.baseline });
+        const failed = cmp.added.length > 0;
+        if (json) {
+          // The gate rides on the exit code: a failing gate still emits a
+          // success envelope (ok: true) with the additive baseline payload.
+          emitJson({
+            ok: true,
+            schemaVersion: JSON_SCHEMA_VERSION,
+            conventionVersion: cmp.result.conventionVersion,
+            command: "spec",
+            scanned: cmp.result.scanned,
+            findings: { ambiguity: cmp.result.ambiguity, consistency: cmp.result.consistency },
+            baseline: {
+              file: cmp.file,
+              total: cmp.total,
+              unchanged: cmp.unchanged.length,
+              added: cmp.added,
+              resolved: cmp.resolved,
+              failed,
+            },
+          });
+          if (failed && opts.failOnNew !== false) process.exitCode = 1;
+          return;
+        }
+        process.stdout.write(formatSpecBaselineCompareHuman(cmp));
+        if (failed && opts.failOnNew !== false) process.exitCode = 1;
+        return;
+      }
       const result = runSpecAnalyze({ cwd: process.cwd(), spec: opts.spec });
       if (json) {
         emitJson({

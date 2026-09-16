@@ -207,6 +207,18 @@ Failures use `error.code: "SPEC_FAILED"` (invalid slug, refusing to overwrite, m
 
 `Finding` is `{ file, kind, line?, severity, message }` — `file` posix, repo-relative; `severity` is `"info"` or `"warn"`; `line` (1-based, present when the finding is tied to a line) is reported against the full file including frontmatter. Kinds: `vague-quantifier`, `todo-marker`, `no-error-path`, `no-acceptance`, `untestable-acceptance` (ambiguity); `spec-orphaned`, `plan-spec-missing` (consistency).
 
+`spec analyze --save-baseline <file>` behaves like a plain analyze run plus an additive `baseline` field; the snapshot written to `<file>` is deterministic, committable JSON (`{ schemaVersion, conventionVersion, count, findings }` with findings sorted by file/kind/line/severity/message — no timestamps, byte-identical over unchanged specs).
+
+| Field           | Type      | Notes |
+| --------------- | --------- | ----- |
+| `baseline`      | `object`  | `{ file, written: true, count }` — absolute path written to and finding count in the snapshot |
+
+`spec analyze --baseline <file>` compares the current run against the snapshot and reports only new/resolved findings. The envelope keeps `ok: true` on a completed comparison (including a FAILED gate — the exit code carries the gate: >=1 NEW finding exits 1 unless `--no-fail-on-new`); structural failures (missing/invalid snapshot, unreadable spec) use `error.code: "SPEC_FAILED"`.
+
+| Field      | Type             | Notes |
+| ---------- | ---------------- | ----- |
+| `baseline` | `object`         | `{ file, total, unchanged, added: Finding[], resolved: Finding[], failed }` — `total` is the current finding count, `unchanged` its count of findings that also exist in the baseline (all of file/kind/line/severity/message equal), `added`/`resolved` are the new and fixed findings, `failed` is `added.length > 0` |
+
 `spec import openspec <path> [--dry-run]` (mechanical OpenSpec migration; never overwrites, all-or-nothing per run). On success (`command: "spec"`):
 
 | Field      | Type                    | Notes |
