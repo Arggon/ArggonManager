@@ -13,7 +13,6 @@ import { bundledTemplatesDir } from "./paths.js";
 import {
   CONVENTION_VERSION,
   DEFAULT_BRANCH_PATTERNS,
-  parseGeneratedProjectName,
   readGeneratedProjectName,
   readGeneratedState,
   updateGeneratedSection,
