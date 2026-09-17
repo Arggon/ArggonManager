@@ -7,6 +7,7 @@ parent: story-next
 labels: [p2]
 created: "2026-09-17"
 updated: "2026-09-17"
+depends_on: [task-priority-field-schema]
 ---
 <!--
   Placement (v0): tasks/scale-adoption/agent-loop/story-next/task-next-priority-ranking.md
