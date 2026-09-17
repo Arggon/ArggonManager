@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-init-propose-acked-updates
 title: "init --propose: side-file upgrade proposals for acked/modified docs"
+assignee: Arggon
 parent: story-adoption-state
 labels: [p1]
 created: "2026-09-16"
 updated: "2026-09-17"
+claimed_at: "2026-09-17T01:35:47.262Z"
 depends_on: [task-init-dry-run-plan]
 ---
 <!--
