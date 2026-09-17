@@ -29,3 +29,8 @@ The upgrade channel (init --dry-run/--propose, doctor outdated, EOL-normalized c
 - [ ] Tests: init generates both skills (created/provenance/ack); existing suites green
 - [ ] Release 0.3.0: package.json bump, CHANGELOG section (section-backports, CRLF fix, priority v4 + migrate + ranking, upgrade skill), tag v0.3.0 post-merge (coordinator)
 - [ ] Gates: validate ok, spec validate ok, suite green, lint/build clean, doctor 0 modified / 0 drifted
+
+### 2026-09-17 @Arggon
+REVIEW (coordinator) — APPROVED, merging PR #320. Implemented by the coordinator directly (rate-limit-cut subagent pattern).
+
+Verified: full diff read (BUNDLED_SKILLS list with per-skill existsSync guards — fixture layouts without the new skill keep working; all five former SKILL_SOURCE sites generalized; adopter convention template carries the v4 priority section; skill content distilled from the two real absorb runs including the judgment rules and the never-overwrite warning). Gates mine: 1047/1047, lint/build clean (after removing the two unused constants my refactor orphaned), validate + spec validate ok, doctor 0 modified / 0 drifted after re-acking our own docs/convention.md (its v4 edit was sanctioned-diverged — adopt --ack refreshed the baseline). arggon --version 0.3.0. Release: CHANGELOG 0.3.0 section lists adopter-facing changes; tag v0.3.0 lands on the merge commit per the runbook.
