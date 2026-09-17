@@ -7,6 +7,7 @@ parent: story-adoption-state
 labels: [p3]
 created: "2026-09-17"
 updated: "2026-09-17"
+depends_on: [bug-project-name-dir-derived]
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-adoption-state/task-propose-section-backports.md
