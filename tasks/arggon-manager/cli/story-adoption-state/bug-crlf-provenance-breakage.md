@@ -31,10 +31,10 @@ Checksums in `x-generated` are byte-based (sha256 of the file as written); the c
 
 ## Acceptance
 
-- [ ] EOL-tolerant comparison layer: doctor's untouched/modified/acknowledgedDrifted checksum verification, the outdated render-vs-disk compare, propose's divergence decision, and `extractProjectNameFromContent` all normalize `\r\n`/`\r` to `\n` on both sides before comparing (state checksums stay as recorded; normalize at compare time only)
-- [ ] A CRLF working tree of a repo whose blobs are LF yields the same doctor buckets / projectName / proposals as the LF checkout (test: fixture committed with LF, checked out with a `text=auto eol=crlf` .gitattributes + `core.eol=crlf`, or a CRLF-written fixture variant — doctor projectName recovered, 0 false drifted, propose emits the same proposals)
-- [ ] Regenerated docs: decide + document the write convention (write LF and let gitattributes smudge, or match the on-disk EOL of the existing file) — either is fine, it must not re-break checksums on the next compare
-- [ ] Docs: README provenance section notes EOL-normalized comparison
+- [x] EOL-tolerant comparison layer: doctor's untouched/modified/acknowledgedDrifted checksum verification, the outdated render-vs-disk compare, propose's divergence decision, and `extractProjectNameFromContent` all normalize `\r\n`/`\r` to `\n` on both sides before comparing (state checksums stay as recorded; normalize at compare time only)
+- [x] A CRLF working tree of a repo whose blobs are LF yields the same doctor buckets / projectName / proposals as the LF checkout (test: fixture committed with LF, checked out with a `text=auto eol=crlf` .gitattributes + `core.eol=crlf`, or a CRLF-written fixture variant — doctor projectName recovered, 0 false drifted, propose emits the same proposals)
+- [x] Regenerated docs: decide + document the write convention (write LF and let gitattributes smudge, or match the on-disk EOL of the existing file) — either is fine, it must not re-break checksums on the next compare
+- [x] Docs: README provenance section notes EOL-normalized comparison
 
 ## Notes
 
