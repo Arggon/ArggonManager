@@ -50,6 +50,16 @@ import {
  * The checksum covers the exact written bytes (marker included), so any
  * adopter edit — even one that keeps the marker — flips the file to
  * adopter-modified.
+ *
+ * Write convention / line endings (bug-crlf-provenance-breakage): generated
+ * docs are always WRITTEN with LF bytes. Git attributes such as
+ * `* text=auto eol=crlf` may smudge them to CRLF on checkout — that is
+ * supported, because every provenance comparison normalizes `\r\n`/`\r` to
+ * `\n` at COMPARE TIME (`normalizeEol` + `checksumMatches`): state checksums
+ * stay exactly as recorded (never rewritten), files on disk are never
+ * rewritten to change EOLs, and an `eol=crlf` working tree reports the same
+ * buckets/proposals as the LF primary checkout. Regeneration keeps writing
+ * LF, which the tolerant compares absorb, so it never re-breaks checksums.
  */
 
 export type GenerateDocsOptions = {
@@ -176,6 +186,42 @@ export function checksumOf(content: string): string {
   return `sha256:${createHash("sha256").update(content, "utf8").digest("hex")}`;
 }
 
+/**
+ * Normalize line endings to LF (bug-crlf-provenance-breakage): `\r\n` and
+ * lone `\r` become `\n`. COMPARE TIME only — callers use this to make
+ * provenance comparisons insensitive to git's checkout smudging
+ * (`* text=auto eol=crlf` in an adopter repo turns every LF doc CRLF on a
+ * fresh checkout/worktree); nothing on disk or in the recorded state is ever
+ * rewritten by this fix.
+ */
+export function normalizeEol(text: string): string {
+  return text.replaceAll("\r\n", "\n").replaceAll("\r", "\n");
+}
+
+/**
+ * EOL-tolerant provenance match (bug-crlf-provenance-breakage): does `content`
+ * (the bytes on disk) match the recorded `checksum`, ignoring line-ending
+ * differences? Clause matrix, all compare-time only — the recorded checksum
+ * and the adopter's file are never rewritten:
+ *
+ *   1. exact bytes              — pre-existing behavior (mixed EOLs included);
+ *                                 also covers state recorded on THIS tree's EOL.
+ *   2. content normalized to LF — LF-recorded state (init/arggon write LF) on
+ *                                 a CRLF working tree (`* text=auto eol=crlf`
+ *                                 smudges every fresh checkout): the bug.
+ *   3. content normalized to CRLF — the reverse: an ack recorded over CRLF
+ *                                 bytes on a CRLF tree (adopt --ack hashes the
+ *                                 current bytes) later compared from an LF
+ *                                 checkout.
+ */
+export function checksumMatches(checksum: string, content: string): boolean {
+  if (checksum === checksumOf(content)) return true;
+  const lf = normalizeEol(content);
+  return (
+    checksum === checksumOf(lf) || checksum === checksumOf(lf.replaceAll("\n", "\r\n"))
+  );
+}
+
 /** ArggonManager version recorded in `x-generated` entries (package.json). */
 export function arggonVersion(): string {
   try {
@@ -225,11 +271,19 @@ export function renderDocPlaceholders(
  * file was generated. `null` when the template has no placeholder, the disk
  * content no longer fits the template structure, or the extracted value is
  * empty / has an implausible charset.
+ *
+ * bug-crlf-provenance-breakage: both sides are EOL-normalized before the
+ * anchor match, so LF-anchored template text still matches a doc that git
+ * smudged to CRLF on checkout (`* text=auto eol=crlf` trees) — without the
+ * normalization, projectName recovery (and with it propose/doctor's
+ * name-bearing comparisons) goes inert on those trees.
  */
 export function extractProjectNameFromContent(
-  templateRaw: string,
-  disk: string,
+  rawTemplate: string,
+  rawDisk: string,
 ): string | null {
+  const templateRaw = normalizeEol(rawTemplate);
+  const disk = normalizeEol(rawDisk);
   const placeholder = "{{PROJECT_NAME}}";
   const i = templateRaw.indexOf(placeholder);
   if (i === -1) return null;
@@ -541,8 +595,12 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
         reason: "acknowledged baseline (arggon adopt --ack) — adopter-owned, never regenerated",
       };
     }
-    const onDisk = checksumOf(readFileSync(destAbs, "utf8"));
-    if (prev?.checksum && prev.checksum === onDisk) {
+    const onDisk = readFileSync(destAbs, "utf8");
+    // bug-crlf-provenance-breakage: EOL-tolerant match — an untouched doc on a
+    // git-smudged CRLF working tree still counts as untouched (LF-recorded
+    // state matches via the normalized clause), so it keeps regenerating
+    // instead of degrading to adopter-modified.
+    if (prev?.checksum && checksumMatches(prev.checksum, onDisk)) {
       if (nameBearing && nameRes.name === null) return nameSkip();
       // Untouched: silently regenerate from the current template.
       return {

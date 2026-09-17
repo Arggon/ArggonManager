@@ -21,6 +21,7 @@ import {
   applyDocsPlan,
   arggonVersion,
   currentGeneratedTemplates,
+  normalizeEol,
   planGenerateDocs,
   renderGeneratedDoc,
   resolveProjectName,
@@ -608,7 +609,14 @@ export function planProposals(
         basedOnVersion: v,
       });
     }
-    if (disk === render) {
+    // bug-crlf-provenance-breakage: every render-vs-disk compare and diff
+    // below is EOL-normalized — a git-smudged CRLF working tree (`* text=auto
+    // eol=crlf`) is "absorbed"/identical exactly when the LF checkout is, and
+    // diff region/line counts never inflate from line endings alone. Compare
+    // time only: the adopter's files are never rewritten.
+    const diskN = normalizeEol(disk);
+    const renderN = normalizeEol(render);
+    if (diskN === renderN) {
       // Absorbed: someone merged (or the template caught up); this run's own
       // same-version leftover is removed by the real run.
       if (versions.has(version)) {
@@ -623,7 +631,7 @@ export function planProposals(
     if (!wholeFile) {
       const base = gitFirstCommittedContent(root, destAbs);
       if (base !== null) {
-        const regionDetails = diffRegions(base, render).filter((r) => r.added > 0);
+        const regionDetails = diffRegions(normalizeEol(base), renderN).filter((r) => r.added > 0);
         if (regionDetails.length === 0) {
           // Removed-only diff (or base === render): the template gained
           // nothing backportable — never propose deleting adopter content.
@@ -658,7 +666,7 @@ export function planProposals(
         continue;
       }
     }
-    const { added, removed } = diffSummary(disk, render);
+    const { added, removed } = diffSummary(diskN, renderN);
     out.push({
       dest,
       proposalPath,
