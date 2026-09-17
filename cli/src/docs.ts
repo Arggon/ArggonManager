@@ -140,7 +140,7 @@ const DOC_PATH_MAP: Record<string, string> = {
 };
 
 /** Destination-relative paths of the tier-2 set (generated only with `full`). */
-const TIER2_DESTS = new Set([
+export const TIER2_DESTS = new Set([
   "ARCHITECTURE.md",
   "CHANGELOG.md",
   "SUPPORT.md",
