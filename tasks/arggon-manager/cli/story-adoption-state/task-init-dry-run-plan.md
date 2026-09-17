@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-init-dry-run-plan
 title: "init --dry-run: plan-only upgrade preview (pure read)"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-adoption-state
 labels: [p2]
 created: "2026-09-16"
 updated: "2026-09-17"
-claimed_at: "2026-09-17T00:06:15.194Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-adoption-state/task-init-dry-run-plan.md
