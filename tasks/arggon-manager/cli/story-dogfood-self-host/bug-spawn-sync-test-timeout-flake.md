@@ -1,14 +1,15 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-spawn-sync-test-timeout-flake
 title: spawnSync e2e tests flake at vitest 5s timeout under load (2nd instance of the class)
+assignee: Arggon
 parent: story-dogfood-self-host
 labels: [p3]
 created: "2026-09-16"
-updated: "2026-09-16"
+updated: "2026-09-17"
+claimed_at: "2026-09-17T07:47:32.755Z"
 ---
-
 # spawnSync e2e tests flake at vitest 5s timeout under load (2nd instance of the class)
 
 ## Context
