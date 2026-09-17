@@ -304,7 +304,7 @@ const TOOLS: ToolDefinition[] = [
   {
     name: "arggon_next",
     description:
-      "Suggest the next claimable item (ADR 0006 next-first): ready items (depends_on all done/cancelled) rank first by downstream weight — the unblocks count — with lexicographic id on ties; blocked items are suggested only when nothing is ready. Pure read — never writes. Returns the arggon `next --json` envelope: {ok, schemaVersion, conventionVersion, command, suggestion} where suggestion is {item, parentChain, reason, blockedBy, unblocks} or null when the pool is empty.",
+      "Suggest the next claimable item (ADR 0006 next-first + ADR 0009 priority-major): ready items (depends_on all done/cancelled) rank first by the orchestrator priority (p0 best; unprioritized with the p3 tier), then by downstream weight — the unblocks count — with lexicographic id on ties; blocked items are suggested only when nothing is ready. Pure read — never writes. Returns the arggon `next --json` envelope: {ok, schemaVersion, conventionVersion, command, suggestion} where suggestion is {item, parentChain, reason, blockedBy, unblocks} or null when the pool is empty.",
     inputSchema: {
       type: "object",
       properties: {
