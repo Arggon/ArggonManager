@@ -30,3 +30,10 @@ Exploration adopter-upgrade-experience-007 (option C, propose-files variant — 
 - [ ] Idempotent: re-running --propose overwrites its own proposal file for the same version (never accumulates junk); a dest already matching upstream gets its stale proposal cleaned or reported as absorbed
 - [ ] The full loop is documented in README (propose -> agent diffs/merges as a work item -> re-ack -> proposal file removed) and the pilot is named: ArggonStores-am's 14 acked docs
 - [ ] Tests: acked doc with changed template -> proposal written + original intact; unchanged -> no proposal; modified doc -> proposal; idempotent re-run; existing init/adopt suites green
+
+### 2026-09-17 @Arggon
+REVIEW (coordinator) — APPROVED, merging PR #306.
+
+Verified: full diff read (pure planProposals + applyProposals layered on the landed planner; header-comment proposals, header-less JSON dests documented; same-version overwrite / absorbed cleanup / stale-older-version reported-never-deleted; --dry-run --propose pure read; --backup/--force combos rejected with clear errors; additive proposals[] JSON + human listing with +/- line summaries). Gates mine: suite 1021/1021, lint/build clean, validate ok, doctor 0/0. Live probe on a fixture: hand-edited AGENTS.md -> proposal side file AGENTS.md.proposed-0.2.0 with the instruction header, original byte-intact, no state mutation; idempotent re-run overwrites (1 file); doc restored to render -> side file removed, reported absorbed; --dry-run --propose writes nothing.
+
+Deviation noted, accepted: tests simulate upstream drift via hand-edit-after-ack (same render-vs-disk code path) instead of mutating bundled templates; a doctor-style templatesDir injection into planProposals is future hardening — not blocking. Next: the pilot this item names — run --propose on our own repo's outdated docs as the first merged proposals.
