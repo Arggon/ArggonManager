@@ -207,17 +207,66 @@ export function renderDocPlaceholders(
  * template ids to flag stale `x-generated` entries.
  */
 export function currentGeneratedTemplates(): { dest: string; template: string }[] {
-  const docsSrc = resolve(bundledTemplatesDir(), "docs");
+  return currentGeneratedTemplatesFrom(bundledTemplatesDir());
+}
+
+/**
+ * Same walk, but rooted at an explicit templates dir (task-doctor-outdated-
+ * bucket injection point for tests: doctor points it at a mutable fixture
+ * copy of `templates/` to simulate upstream template movement). The layout
+ * must mirror the package root: `<templatesDir>/docs/**` plus the bundled
+ * skill at `<templatesDir>/../skills/arggon-cli/SKILL.md`.
+ */
+export function currentGeneratedTemplatesFrom(templatesDir: string): { dest: string; template: string }[] {
+  const docsSrc = resolve(templatesDir, "docs");
   const found: { dest: string; template: string }[] = [];
   if (existsSync(docsSrc)) {
     for (const rel of walkTemplates(docsSrc)) {
       found.push({ dest: DOC_PATH_MAP[rel] ?? rel, template: `docs/${rel}` });
     }
   }
-  if (existsSync(resolve(packageRoot(), ...SKILL_SOURCE.split("/")))) {
+  if (existsSync(resolve(templatesDir, "..", ...SKILL_SOURCE.split("/")))) {
     found.push({ dest: SKILL_DEST, template: SKILL_SOURCE });
   }
   return found.sort((a, b) => a.dest.localeCompare(b.dest));
+}
+
+/**
+ * Pure render of a managed doc exactly as `generateDocs` would write it
+ * (task-doctor-outdated-bucket): marker line (except JSON destinations) plus
+ * placeholder resolution — {{PROJECT_NAME}} from the target root's dir name,
+ * {{YEAR}} from the current year. Zero writes, never throws: a missing or
+ * unreadable template yields `null` (doctor treats that as "cannot decide",
+ * i.e. not outdated). `template` is the `x-generated` template id
+ * (package-root relative, e.g. "docs/AGENTS.md" or the skill source path).
+ */
+export function renderGeneratedDoc(opts: {
+  templatesDir: string;
+  root: string;
+  template: string;
+  dest: string;
+  now?: Date;
+}): string | null {
+  try {
+    const path =
+      opts.template === SKILL_SOURCE
+        ? resolve(opts.templatesDir, "..", ...SKILL_SOURCE.split("/"))
+        : resolve(opts.templatesDir, ...opts.template.split("/"));
+    if (!existsSync(path)) return null;
+    const raw = readFileSync(path, "utf8");
+    const vars = { projectName: basename(opts.root), year: (opts.now ?? new Date()).getFullYear() };
+    const rendered = renderDocPlaceholders(raw, vars);
+    if (opts.dest.endsWith(".json")) return rendered;
+    // Mirror generateDocs' marker convention: doc templates are stamped with
+    // the docs-dir-relative name ("AGENTS.md"), the skill with its full
+    // package-root-relative path — while the x-generated state template id is
+    // the "docs/"-prefixed path for docs.
+    const markerTemplate =
+      opts.template === SKILL_SOURCE ? SKILL_SOURCE : opts.template.replace(/^docs\//, "");
+    return `${generatedMarker(markerTemplate)}\n${rendered}`;
+  } catch {
+    return null;
+  }
 }
 
 /**

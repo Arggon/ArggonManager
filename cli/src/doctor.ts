@@ -10,10 +10,10 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { readConventionConfig, readConventionVersion } from "./convention.js";
-import { checksumOf, currentGeneratedTemplates } from "./docs.js";
+import { checksumOf, currentGeneratedTemplatesFrom, renderGeneratedDoc } from "./docs.js";
 import { loadItems } from "./items.js";
 import { measureBudget, formatBudgetLines, type BudgetResult } from "./measure.js";
-import { findTasksDir, repoRootFromTasks } from "./paths.js";
+import { findTasksDir, repoRootFromTasks, bundledTemplatesDir } from "./paths.js";
 
 export type DoctorDocs = {
   /** Total x-generated provenance entries. */
@@ -38,6 +38,22 @@ export type DoctorDocs = {
   stale: number;
   /** State entries whose destination file is absent. */
   missing: number;
+  /**
+   * Managed docs whose CURRENT template render differs from the on-disk
+   * content (task-doctor-outdated-bucket): the upstream template moved since
+   * the doc was generated/acked, so it is not receiving upstream
+   * improvements. Orthogonal to the untouched/modified/acknowledged buckets
+   * (upstream moved regardless of local state); docs in `stale` (template no
+   * longer generated) or `missing` are never outdated, and a missing or
+   * unreadable template file counts as "cannot decide" — not outdated,
+   * never a throw.
+   */
+  outdated: number;
+  /**
+   * Destinations counted in `outdated` (posix, relative to root) — the
+   * per-destination detail behind the count.
+   */
+  outdatedDocs: string[];
 };
 
 /**
@@ -88,6 +104,8 @@ const ZERO_DOCS: DoctorDocs = {
   acknowledgedDrifted: 0,
   stale: 0,
   missing: 0,
+  outdated: 0,
+  outdatedDocs: [],
 };
 
 const NOT_A_REPO: DoctorGit = { isRepo: false, dirty: null, remote: null };
@@ -132,7 +150,16 @@ export async function measureBudgetForDoctor(): Promise<{ budget?: BudgetResult;
   }
 }
 
-export function runDoctor(opts: { cwd: string }): DoctorResult {
+export function runDoctor(opts: {
+  cwd: string;
+  /**
+   * Templates root override (task-doctor-outdated-bucket): the package
+   * `templates/` dir doctor re-renders from. Defaults to the bundled dir;
+   * tests point it at a mutable fixture copy to simulate upstream template
+   * movement. Doctor never writes to it.
+   */
+  templatesRoot?: string;
+}): DoctorResult {
   let tasksDir: string;
   let root: string;
   try {
@@ -153,7 +180,8 @@ export function runDoctor(opts: { cwd: string }): DoctorResult {
 
   const conventionVersion = readConventionVersion(root);
   const config = readConventionConfig(root);
-  const currentTemplates = new Set(currentGeneratedTemplates().map((t) => t.template));
+  const templatesDir = opts.templatesRoot ?? bundledTemplatesDir();
+  const currentTemplates = new Set(currentGeneratedTemplatesFrom(templatesDir).map((t) => t.template));
 
   let untouched = 0;
   let modified = 0;
@@ -161,6 +189,8 @@ export function runDoctor(opts: { cwd: string }): DoctorResult {
   let acknowledgedDrifted = 0;
   let stale = 0;
   let missing = 0;
+  let outdated = 0;
+  const outdatedDocs: string[] = [];
   const entries = Object.entries(config.generated);
   for (const [dest, entry] of entries) {
     const destAbs = join(root, ...dest.split("/"));
@@ -172,35 +202,40 @@ export function runDoctor(opts: { cwd: string }): DoctorResult {
       stale++;
       continue;
     }
+    let diskContent: string;
+    try {
+      diskContent = readFileSync(destAbs, "utf8");
+    } catch {
+      // Unreadable file: still acknowledged if acked, else modified; outdated
+      // is undecidable either way.
+      if (entry.acknowledged) acknowledged++;
+      else modified++;
+      continue;
+    }
+    // Outdated check (task-doctor-outdated-bucket): re-render the CURRENT
+    // template exactly as init would (same resolution + placeholders) and
+    // compare with the on-disk bytes. Pure read; a missing/unreadable
+    // template renders null → not outdated. Applies to every local state
+    // (untouched, modified, acked, acked-drifted): upstream moved regardless.
+    const render = renderGeneratedDoc({ templatesDir, root, template: entry.template, dest });
+    if (render !== null && render !== diskContent) {
+      outdated++;
+      outdatedDocs.push(dest);
+    }
     if (entry.acknowledged) {
       // Acknowledged baseline (bug-ack-baseline-regen-loss): sanctioned
       // content — never a candidate for regeneration and never `modified`.
       // bug-ack-drift-promise: if the current bytes no longer match the
       // acked baseline, a hand edit landed after the ack — surface it in
       // the informational `acknowledgedDrifted` bucket.
-      let actual: string;
-      try {
-        actual = checksumOf(readFileSync(destAbs, "utf8"));
-      } catch {
-        // Unreadable acked file: still acknowledged, drift undecidable.
-        acknowledged++;
-        continue;
-      }
-      if (entry.checksum && actual !== entry.checksum) {
+      if (entry.checksum && checksumOf(diskContent) !== entry.checksum) {
         acknowledgedDrifted++;
       } else {
         acknowledged++;
       }
       continue;
     }
-    let actual: string;
-    try {
-      actual = checksumOf(readFileSync(destAbs, "utf8"));
-    } catch {
-      modified++;
-      continue;
-    }
-    if (entry.checksum && actual === entry.checksum) {
+    if (entry.checksum && checksumOf(diskContent) === entry.checksum) {
       untouched++;
     } else {
       modified++;
@@ -220,6 +255,8 @@ export function runDoctor(opts: { cwd: string }): DoctorResult {
       acknowledgedDrifted,
       stale,
       missing,
+      outdated,
+      outdatedDocs: outdatedDocs.sort(),
     },
     tracker: {
       items: items.length,
@@ -250,7 +287,8 @@ export function formatDoctorReport(result: DoctorResult): string {
     `  docs: ${result.docs.managed} managed, ${result.docs.untouched} untouched, ` +
       `${result.docs.modified} modified, ${result.docs.acknowledged} acknowledged, ` +
       `${result.docs.acknowledgedDrifted} acknowledgedDrifted, ` +
-      `${result.docs.stale} stale, ${result.docs.missing} missing`,
+      `${result.docs.stale} stale, ${result.docs.missing} missing, ` +
+      `${result.docs.outdated} outdated`,
     `  tracker: ${result.tracker.items} item(s), ${result.tracker.todo} todo`,
     `  git: ${formatGitLine(result.git)}`,
   ];
@@ -264,6 +302,13 @@ export function formatDoctorReport(result: DoctorResult): string {
       "  note: " +
         `${result.docs.acknowledgedDrifted} acknowledged doc(s) drifted from the acked baseline ` +
         "(hand edit after `adopt --ack`) — still yours, never regenerated",
+    );
+  }
+  if (result.docs.outdated > 0) {
+    lines.push(
+      "  hint: " +
+        `${result.docs.outdated} doc(s) have newer templates — run ` +
+        "`arggon init --dry-run` for the plan",
     );
   }
   if (result.docs.modified > 0) {
