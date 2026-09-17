@@ -39,3 +39,12 @@ REVIEW (coordinator) — APPROVED, merging PR #306.
 Verified: full diff read (pure planProposals + applyProposals layered on the landed planner; header-comment proposals, header-less JSON dests documented; same-version overwrite / absorbed cleanup / stale-older-version reported-never-deleted; --dry-run --propose pure read; --backup/--force combos rejected with clear errors; additive proposals[] JSON + human listing with +/- line summaries). Gates mine: suite 1021/1021, lint/build clean, validate ok, doctor 0/0. Live probe on a fixture: hand-edited AGENTS.md -> proposal side file AGENTS.md.proposed-0.2.0 with the instruction header, original byte-intact, no state mutation; idempotent re-run overwrites (1 file); doc restored to render -> side file removed, reported absorbed; --dry-run --propose writes nothing.
 
 Deviation noted, accepted: tests simulate upstream drift via hand-edit-after-ack (same render-vs-disk code path) instead of mutating bundled templates; a doctor-style templatesDir injection into planProposals is future hardening — not blocking. Next: the pilot this item names — run --propose on our own repo's outdated docs as the first merged proposals.
+
+### 2026-09-17 @Arggon
+PILOT EXECUTED (coordinator, 2026-09-17) — first init --propose run on this self-host repo, per the item's named pilot.
+
+Result: all 11 proposals (tier-1 + --full) correctly REJECTED — each was a wholesale generic-template render against curated content (CHANGELOG with the real 0.2.0 history, convention.md with 511 real lines, SECURITY with the filled support table, ARCHITECTURE with the real problem statement). The review step of the flow did its job: a naive regenerate/--backup would have destroyed 11 docs. Docs stay acked at current content; doctor keeps the honest outdated signal for deliberately diverged docs.
+
+Findings born from the pilot (filed, see board): bug-project-name-dir-derived (P1 — {{PROJECT_NAME}} from dir basename contaminates renders in worktrees/renamed clones; the proposal side files literally contained 'pilot-absorb'; doctor from the #301 worktree over-reported 10 vs the true 7) and task-propose-section-backports (P3 — for completed docs the valuable proposal is section-level backports of template gains, not whole-file swaps; also notes the doctor-walks-state vs propose-walks-bundle scope difference and propose's tier-1 default scope).
+
+Channel status: propose shipped and piloted; the upgrade channel needs the dir-name fix before worktree-based agents can trust its renders — that bug is the natural next wave head.
