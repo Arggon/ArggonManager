@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-doctor-outdated-bucket
 title: "doctor: outdated bucket — managed docs whose template render moved upstream"
+assignee: Arggon
 parent: story-adoption-state
 labels: [p2]
 created: "2026-09-16"
-updated: "2026-09-16"
+updated: "2026-09-17"
+claimed_at: "2026-09-17T00:06:19.494Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-adoption-state/task-doctor-outdated-bucket.md
