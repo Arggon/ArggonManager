@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  readGeneratedProjectName,
   readGeneratedState,
   updateGeneratedSection,
   type GeneratedEntry,
@@ -711,7 +712,13 @@ export function runAdoptAck(opts: AdoptAckOptions): AdoptAckResult {
 
   writeFileSync(
     statePath,
-    updateGeneratedSection(readFileSync(statePath, "utf8"), nextState),
+    // Preserve the recorded project name (bug-project-name-dir-derived): the
+    // ack rewrites the x-generated section but must not drop x-generated.projectName.
+    updateGeneratedSection(
+      readFileSync(statePath, "utf8"),
+      nextState,
+      readGeneratedProjectName(root),
+    ),
     "utf8",
   );
   return { root, acked, count: acked.length };

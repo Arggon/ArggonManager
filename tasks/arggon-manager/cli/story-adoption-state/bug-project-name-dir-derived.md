@@ -1,12 +1,15 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-project-name-dir-derived
 title: PROJECT_NAME derived from dir basename — init/doctor/propose renders wrong in worktrees and renamed clones
+assignee: Arggon
+branch: feat/bug-project-name-dir-derived
 parent: story-adoption-state
 labels: [p1]
 created: "2026-09-17"
 updated: "2026-09-17"
+claimed_at: "2026-09-17T02:30:39.025Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-adoption-state/bug-project-name-dir-derived.md

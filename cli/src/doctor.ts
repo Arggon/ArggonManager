@@ -10,7 +10,12 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { readConventionConfig, readConventionVersion } from "./convention.js";
-import { checksumOf, currentGeneratedTemplatesFrom, renderGeneratedDoc } from "./docs.js";
+import {
+  checksumOf,
+  currentGeneratedTemplatesFrom,
+  renderGeneratedDoc,
+  resolveProjectName,
+} from "./docs.js";
 import { loadItems } from "./items.js";
 import { measureBudget, formatBudgetLines, type BudgetResult } from "./measure.js";
 import { findTasksDir, repoRootFromTasks, bundledTemplatesDir } from "./paths.js";
@@ -76,6 +81,15 @@ export type DoctorResult = {
   initialized: boolean;
   /** Convention version from tasks/.convention.yml (0-3; 0 when missing). */
   conventionVersion: number;
+  /**
+   * Project name used for `{{PROJECT_NAME}}` renders this run
+   * (bug-project-name-dir-derived, additive): the value recorded in
+   * `x-generated.projectName`, or recovered from the on-disk generated docs
+   * (legacy trees), or the directory basename for fresh scaffolds. `null`
+   * when unrecoverable: name-sensitive outdated comparisons are SKIPPED for
+   * that run instead of comparing against a guessed directory basename.
+   */
+  projectName: string | null;
   docs: DoctorDocs;
   tracker: {
     /** Total work items under tasks/. */
@@ -172,6 +186,7 @@ export function runDoctor(opts: {
       root: null,
       initialized: false,
       conventionVersion: 0,
+      projectName: null,
       docs: { ...ZERO_DOCS },
       tracker: { items: 0, todo: 0 },
       git: gitState(opts.cwd),
@@ -180,6 +195,12 @@ export function runDoctor(opts: {
 
   const conventionVersion = readConventionVersion(root);
   const config = readConventionConfig(root);
+  // Project-name resolution once per run (bug-project-name-dir-derived):
+  // recorded state → legacy content recovery → fresh dir-basename fallback.
+  const nameRes = resolveProjectName(root, {
+    entries: config.generated,
+    recorded: config.generatedProjectName,
+  });
   const templatesDir = opts.templatesRoot ?? bundledTemplatesDir();
   const currentTemplates = new Set(currentGeneratedTemplatesFrom(templatesDir).map((t) => t.template));
 
@@ -217,7 +238,17 @@ export function runDoctor(opts: {
     // compare with the on-disk bytes. Pure read; a missing/unreadable
     // template renders null → not outdated. Applies to every local state
     // (untouched, modified, acked, acked-drifted): upstream moved regardless.
-    const render = renderGeneratedDoc({ templatesDir, root, template: entry.template, dest });
+    // bug-project-name-dir-derived: the render uses the run's resolved
+    // project name; when it is unrecoverable (`null`), the render is refused
+    // → the name-sensitive comparison SKIPS (no false outdated signal from a
+    // guessed directory basename).
+    const render = renderGeneratedDoc({
+      templatesDir,
+      root,
+      template: entry.template,
+      dest,
+      projectName: nameRes.name,
+    });
     if (render !== null && render !== diskContent) {
       outdated++;
       outdatedDocs.push(dest);
@@ -247,6 +278,7 @@ export function runDoctor(opts: {
     root,
     initialized: true,
     conventionVersion,
+    projectName: nameRes.name,
     docs: {
       managed: entries.length,
       untouched,
@@ -302,6 +334,13 @@ export function formatDoctorReport(result: DoctorResult): string {
       "  note: " +
         `${result.docs.acknowledgedDrifted} acknowledged doc(s) drifted from the acked baseline ` +
         "(hand edit after `adopt --ack`) — still yours, never regenerated",
+    );
+  }
+  if (result.projectName === null) {
+    lines.push(
+      "  note: project-name-unrecoverable — the project name could not be recovered " +
+        "from x-generated.projectName or the generated docs; name-bearing outdated " +
+        "comparisons were skipped (no false signals from the directory name)",
     );
   }
   if (result.docs.outdated > 0) {
