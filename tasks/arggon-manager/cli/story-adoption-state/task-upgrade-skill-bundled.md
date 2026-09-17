@@ -1,12 +1,14 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-upgrade-skill-bundled
 title: upgrade skill bundled at init + convention v4 template + release 0.3.0
+assignee: Arggon
 parent: story-adoption-state
 labels: [p1]
 created: "2026-09-17"
 updated: "2026-09-17"
+claimed_at: "2026-09-17T17:43:53.142Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-adoption-state/task-upgrade-skill-bundled.md
