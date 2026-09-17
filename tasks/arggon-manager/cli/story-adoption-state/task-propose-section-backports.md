@@ -4,6 +4,7 @@ status: in_progress
 id: task-propose-section-backports
 title: "propose: section-level backports for completed (acked) docs"
 assignee: Arggon
+branch: feat/task-propose-section-backports
 parent: story-adoption-state
 labels: [p3]
 created: "2026-09-17"
