@@ -265,7 +265,7 @@ describe("init docs: --json payload", () => {
     expect(body.created).toEqual(
       ["ARCHITECTURE.md", "CHANGELOG.md", "SUPPORT.md", "docs/convention.md", "docs/deploy.md", "docs/engineering.md", "docs/runbooks/README.md"].sort(),
     );
-    expect(body.updated.length).toBe(11); // 10 tier-1 docs (incl. .mcp.json) + bundled skill
+    expect(body.updated.length).toBe(12); // 11 tier-1 docs (incl. .mcp.json) + 2 bundled skills
     expect(body.updated).toContain("AGENTS.md");
     expect(body.updated).toContain(".agents/skills/arggon-cli/SKILL.md");
     expect(body.skipped).toEqual([]);

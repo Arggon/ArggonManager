@@ -151,9 +151,26 @@ export type DocsPlan = {
   stateWrite?: { path: string; content: string };
 };
 
-/** Source (package-root relative) and destination of the bundled agent skill. */
-const SKILL_SOURCE = "skills/arggon-cli/SKILL.md";
-const SKILL_DEST = ".agents/skills/arggon-cli/SKILL.md";
+/**
+ * Bundled agent skills: package-root-relative source inside this package and
+ * destination in the adopter tree (task-upgrade-skill-bundled). init copies
+ * each with full provenance semantics; both flow through every comparison and
+ * proposal surface like any managed doc.
+ */
+const BUNDLED_SKILLS = [
+  { source: "skills/arggon-cli/SKILL.md", dest: ".agents/skills/arggon-cli/SKILL.md" },
+  { source: "skills/arggon-upgrade/SKILL.md", dest: ".agents/skills/arggon-upgrade/SKILL.md" },
+];
+
+/** Is this template id one of the bundled skill sources? */
+function isBundledSkill(templateRel: string): boolean {
+  return BUNDLED_SKILLS.some((s) => s.source === templateRel);
+}
+
+/** Resolve a bundled skill source against the package templates dir (sibling `skills/`). */
+function bundledSkillPath(templatesDir: string, source: string): string {
+  return resolve(templatesDir, "..", ...source.split("/"));
+}
 
 /** Template-relative path → destination-relative path. Unlisted paths map 1:1. */
 const DOC_PATH_MAP: Record<string, string> = {
@@ -359,10 +376,9 @@ export function resolveProjectName(
       currentGeneratedTemplates().find((t) => t.dest === dest)?.template;
     if (templateRel === undefined) continue;
     try {
-      const templatePath =
-        templateRel === SKILL_SOURCE
-          ? resolve(bundledTemplatesDir(), "..", ...SKILL_SOURCE.split("/"))
-          : resolve(bundledTemplatesDir(), ...templateRel.split("/"));
+      const templatePath = isBundledSkill(templateRel)
+        ? bundledSkillPath(bundledTemplatesDir(), templateRel)
+        : resolve(bundledTemplatesDir(), ...templateRel.split("/"));
       if (!existsSync(templatePath)) continue;
       const disk = readFileSync(join(root, ...dest.split("/")), "utf8");
       if (disk.startsWith(GENERATED_PREFIX)) sawGeneratedContent = true;
@@ -409,8 +425,10 @@ export function currentGeneratedTemplatesFrom(templatesDir: string): { dest: str
       found.push({ dest: DOC_PATH_MAP[rel] ?? rel, template: `docs/${rel}` });
     }
   }
-  if (existsSync(resolve(templatesDir, "..", ...SKILL_SOURCE.split("/")))) {
-    found.push({ dest: SKILL_DEST, template: SKILL_SOURCE });
+  for (const skill of BUNDLED_SKILLS) {
+    if (existsSync(bundledSkillPath(templatesDir, skill.source))) {
+      found.push({ dest: skill.dest, template: skill.source });
+    }
   }
   return found.sort((a, b) => a.dest.localeCompare(b.dest));
 }
@@ -442,10 +460,9 @@ export function renderGeneratedDoc(opts: {
   projectName?: string | null;
 }): string | null {
   try {
-    const path =
-      opts.template === SKILL_SOURCE
-        ? resolve(opts.templatesDir, "..", ...SKILL_SOURCE.split("/"))
-        : resolve(opts.templatesDir, ...opts.template.split("/"));
+    const path = isBundledSkill(opts.template)
+      ? bundledSkillPath(opts.templatesDir, opts.template)
+      : resolve(opts.templatesDir, ...opts.template.split("/"));
     if (!existsSync(path)) return null;
     if (opts.projectName === null) return null; // project-name-unrecoverable
     const raw = readFileSync(path, "utf8");
@@ -459,8 +476,9 @@ export function renderGeneratedDoc(opts: {
     // the docs-dir-relative name ("AGENTS.md"), the skill with its full
     // package-root-relative path — while the x-generated state template id is
     // the "docs/"-prefixed path for docs.
-    const markerTemplate =
-      opts.template === SKILL_SOURCE ? SKILL_SOURCE : opts.template.replace(/^docs\//, "");
+    const markerTemplate = isBundledSkill(opts.template)
+      ? opts.template
+      : opts.template.replace(/^docs\//, "");
     return `${generatedMarker(markerTemplate)}\n${rendered}`;
   } catch {
     return null;
@@ -488,7 +506,10 @@ function utcDate(now: Date): string {
  */
 export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
   const packageRootDir = resolve(bundledTemplatesDir(), "..");
-  const skillSrc = resolve(packageRootDir, ...SKILL_SOURCE.split("/"));
+  const bundledSkillSources = BUNDLED_SKILLS.map((s) => ({
+    ...s,
+    src: resolve(packageRootDir, ...s.source.split("/")),
+  }));
   const docsSrc = resolve(bundledTemplatesDir(), "docs");
   if (!existsSync(docsSrc)) {
     throw new Error(`Bundled doc templates not found at ${docsSrc}`);
@@ -641,12 +662,13 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
     );
   }
 
-  // Bundle the arggon-cli skill from its single source (skills/ in this repo —
-  // NOT a template duplicate) so agents in the adopter repo use it by default.
-  if (existsSync(skillSrc)) {
-    const skillRaw = readFileSync(skillSrc, "utf8");
+  // Bundle the agent skills from their single sources (skills/ in this repo —
+  // NOT template duplicates) so agents in the adopter repo use them by default.
+  for (const skill of bundledSkillSources) {
+    if (!existsSync(skill.src)) continue;
+    const skillRaw = readFileSync(skill.src, "utf8");
     entries.push(
-      decide(SKILL_DEST, SKILL_SOURCE, SKILL_SOURCE, () => skillRaw,
+      decide(skill.dest, skill.source, skill.source, () => skillRaw,
         skillRaw.includes("{{PROJECT_NAME}}")),
     );
   }

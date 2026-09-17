@@ -6,6 +6,21 @@ All notable changes to ArggonManager are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+## [0.3.0] - 2026-09-17
+
+### Added
+
+- **Upgrade channel, complete**: `arggon init --dry-run` (plan-only preview), doctor `outdated` bucket, and `arggon init --propose` — section-level upgrade proposals for acked/modified docs (side files with anchors; originals untouched; `--propose-whole-file` for full renders). The bundled **arggon-upgrade skill** (delivered by init alongside the arggon-cli skill) walks adopters through the flow.
+- **Convention v4: `priority` field** on every item type (`p0|p1|p2|p3`, optional): `create/update --priority`, `priority:` filter (`priority:none` = unprioritized), `arggon priority migrate` (moves legacy `pN` labels into the field), board chip. `arggon next` ranks the ready pool **priority-major** (ADR 0009) — priority first, downstream weight within a priority — with the cost of misprioritization visible in the reason.
+- EOL-normalized provenance comparisons: `eol=crlf` working trees (`.gitattributes eol=crlf`, Windows checkouts) no longer produce false `acknowledgedDrifted`/inert proposals; `projectName` is recovered on re-runs (worktree/renamed-clone-safe renders); `init --dry-run`/`--propose` are worktree-safe.
+
+### Fixed
+
+- CRLF working trees no longer break doctor buckets, propose, or project-name recovery (bug-crlf-provenance-breakage).
+- Project name no longer leaks from the working-directory basename into renders (bug-project-name-dir-derived).
+- spawnSync e2e tests no longer flake at vitest's 5s default under load (bug-spawn-sync-test-timeout-flake).
+
+
 
 ## [0.2.0] - 2026-09-16
 
