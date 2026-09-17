@@ -106,7 +106,12 @@ program
   )
   .option(
     "--propose",
-    "upgrade channel for acked/modified docs: write fresh template renders to <dest>.proposed-<version> side files (originals untouched, state unmutated, nothing committed) — diff/merge/re-ack to adopt (task-init-propose-acked-updates)",
+    "upgrade channel for acked/modified docs: write template updates to <dest>.proposed-<version> side files (originals untouched, state unmutated, nothing committed) — diff/merge/re-ack to adopt (task-init-propose-acked-updates; section-level regions by default, spec-propose-section-backports-007)",
+    false,
+  )
+  .option(
+    "--propose-whole-file",
+    "with --propose: force whole-file proposals (the pre-007 behavior) instead of the default section-level region backports",
     false,
   )
   .option(
@@ -127,6 +132,7 @@ program
         full?: boolean;
         backup?: boolean;
         propose?: boolean;
+        proposeWholeFile?: boolean;
         dryRun?: boolean;
         commit?: boolean;
         json?: boolean;
@@ -146,6 +152,7 @@ program
             full: Boolean(opts.full),
             backup: Boolean(opts.backup),
             propose: Boolean(opts.propose),
+            proposeWholeFile: Boolean(opts.proposeWholeFile),
           });
           if (json) {
             successJson(
@@ -179,6 +186,7 @@ program
           full: Boolean(opts.full),
           backup: Boolean(opts.backup),
           propose: Boolean(opts.propose),
+          proposeWholeFile: Boolean(opts.proposeWholeFile),
           commit: opts.commit === false ? false : undefined,
         });
         if (json) {
@@ -2201,7 +2209,16 @@ function proposalPayload(proposals: ProposalEntry[]): unknown[] {
     decision: p.decision,
     template: p.template,
     basedOnVersion: p.basedOnVersion,
-    ...(p.decision === "proposed" ? { added: p.added, removed: p.removed } : {}),
+    ...(p.decision === "proposed"
+      ? {
+          added: p.added,
+          removed: p.removed,
+          // Additive (spec-propose-section-backports-007).
+          mode: p.mode,
+          ...(p.regions ? { regions: p.regions } : {}),
+        }
+      : {}),
+    ...(p.note !== undefined ? { note: p.note } : {}),
   }));
 }
 
@@ -2218,10 +2235,16 @@ function printInitProposeHuman(result: InitResult): void {
   for (const p of proposals) {
     if (p.decision === "proposed") {
       console.log(
-        `  proposed  ${p.dest}  ->  ${p.proposalPath}  (+${p.added ?? 0}/-${p.removed ?? 0} lines vs current template)`,
+        `  proposed  ${p.dest}  ->  ${p.proposalPath}  (${p.mode === "sections" ? `sections: ${p.regions?.length ?? 0} region(s)` : "whole file"}; +${p.added ?? 0}/-${p.removed ?? 0} lines vs current template)`,
       );
+      // Section mode (spec-propose-section-backports-007): list each region.
+      for (const [idx, r] of (p.regions ?? []).entries()) {
+        console.log(`    region ${idx + 1}: ${r.kind} (+${r.added}/-${r.removed})`);
+      }
     } else if (p.decision === "absorbed") {
       console.log(`  absorbed  ${p.dest}  (matches upstream — removed ${p.proposalPath})`);
+    } else if (p.decision === "informational") {
+      console.log(`  info      ${p.dest}  (${p.note ?? "nothing to backport"})`);
     } else {
       console.log(
         `  stale     ${p.dest}  (${p.proposalPath} is from an older arggon version — delete it after checking)`,
