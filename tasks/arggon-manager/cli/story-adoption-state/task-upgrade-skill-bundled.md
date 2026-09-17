@@ -4,6 +4,7 @@ status: in_progress
 id: task-upgrade-skill-bundled
 title: upgrade skill bundled at init + convention v4 template + release 0.3.0
 assignee: Arggon
+branch: feat/task-upgrade-skill-bundled
 parent: story-adoption-state
 labels: [p1]
 created: "2026-09-17"
