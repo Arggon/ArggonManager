@@ -4,6 +4,7 @@ status: in_progress
 id: task-next-priority-ranking
 title: "next: priority-major orchestrator ranking (reason + MCP lockstep, ADR 0009)"
 assignee: Arggon
+branch: feat/task-next-priority-ranking
 parent: story-next
 labels: [p2]
 created: "2026-09-17"
