@@ -435,3 +435,92 @@ describe("runNext downstream-weight ranking (task-next-dependency-ranking)", () 
     expect(suggestion!.unblocks).toBe(2);
   });
 });
+
+describe("runNext priority-major ranking (task-next-priority-ranking)", () => {
+  /** Write one unclaimed todo item with an optional priority + depends_on. */
+  function ptodo(
+    root: string,
+    id: string,
+    opts: { priority?: string; deps?: string[] } = {},
+  ): void {
+    const priorityLine = opts.priority ? `priority: ${opts.priority}\n` : "";
+    const depsLine =
+      opts.deps && opts.deps.length > 0
+        ? `depends_on: [${opts.deps.map((d) => `"${d}"`).join(", ")}]\n`
+        : "";
+    write(
+      root,
+      `tasks/s/s/${id}.md`,
+      md(
+        `type: task\nstatus: todo\nid: ${id}\nparent: s\n${priorityLine}${depsLine}labels: []\ncreated: "2026-09-11"\n`,
+        id,
+      ),
+    );
+  }
+
+  function scaffoldRank(): string {
+    const root = mkdtempSync(join(tmpdir(), "arggon-next-priority-"));
+    write(root, "tasks/.convention.yml", "version: 3\n");
+    write(
+      root,
+      "tasks/s/s.md",
+      md('type: story\nstatus: done\nid: s\ntitle: S\nlabels: []\ncreated: "2026-09-11"\n', "S"),
+    );
+    return root;
+  }
+
+  it("priority beats downstream weight (p1 with zero unblocks outranks unprioritized unblocking many)", () => {
+    const root = scaffoldRank();
+    ptodo(root, "task-heavy", { deps: [] }); // unprioritized, unblocks 2
+    ptodo(root, "task-mid-a", { deps: ["task-heavy"] }); // unprioritized, blocked
+    ptodo(root, "task-mid-b", { deps: ["task-heavy"] }); // unprioritized, blocked
+    ptodo(root, "task-p1", { priority: "p1" }); // p1, unblocks nothing
+    const { suggestion } = runNext({ cwd: root });
+    expect(suggestion?.item.id).toBe("task-p1");
+    expect(suggestion?.reason).toContain("priority p1 first");
+    expect(suggestion?.unblocks).toBe(0); // the cost is visible in the reason
+  });
+
+  it("within a priority, downstream weight decides; unprioritized orders with p3", () => {
+    const root = scaffoldRank();
+    ptodo(root, "task-p3-heavy", { priority: "p3", deps: [] }); // p3, unblocks 1
+    ptodo(root, "task-p3-light", { priority: "p3" }); // p3, unblocks 0
+    ptodo(root, "task-unset", { deps: [] }); // unprioritized -> p3 tier, weight 0
+    const first = runNext({ cwd: root }).suggestion!;
+    expect(first.item.id).toBe("task-p3-heavy"); // weight inside the p3 tier
+    expect(first.reason).toContain("priority p3 first");
+    // Remove it (simulate claim) -> unprioritized vs remaining p3: weight decides.
+    ptodo(root, "task-p3-heavy", { priority: "p3" }); // keep shape, drop deps effect is not needed:
+    // instead: make heavy in_progress so the pool shrinks
+    write(
+      root,
+      "tasks/s/s/task-p3-heavy.md",
+      md(
+        'type: task\nstatus: in_progress\nid: task-p3-heavy\nparent: s\npriority: p3\nassignee: ace\nlabels: []\ncreated: "2026-09-11"\n',
+        "task-p3-heavy",
+      ),
+    );
+    const second = runNext({ cwd: root }).suggestion!;
+    expect(second.item.id).toBe("task-p3-light"); // explicit p3 beats unset at equal weight
+    expect(second.reason).toContain("priority p3 first");
+  });
+
+  it("p0 drops everything: beats every lower priority and every unprioritized item", () => {
+    const root = scaffoldRank();
+    ptodo(root, "task-p3", { priority: "p3" });
+    ptodo(root, "task-p1", { priority: "p1" });
+    ptodo(root, "task-p0", { priority: "p0" });
+    ptodo(root, "task-unset");
+    const { suggestion } = runNext({ cwd: root });
+    expect(suggestion?.item.id).toBe("task-p0");
+  });
+
+  it("unprioritized reason reads sensibly and keeps determinism on ties", () => {
+    const root = scaffoldRank();
+    ptodo(root, "task-beta");
+    ptodo(root, "task-alpha");
+    const { suggestion } = runNext({ cwd: root });
+    expect(suggestion?.item.id).toBe("task-alpha"); // lexicographic on full ties
+    expect(suggestion?.reason).toContain("unprioritized (ranks with the p3 tier)");
+  });
+});

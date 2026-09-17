@@ -2,6 +2,7 @@ import { isClaimable } from "./status.js";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 import { buildBlockedByIndex } from "./filter.js";
+import { priorityRank, type Priority } from "./priority.js";
 
 export type NextOptions = {
   cwd: string;
@@ -101,9 +102,10 @@ export function downstreamWeight(
 /**
  * Suggest the next claimable item: claimable type (story/task/bug) in
  * `todo` with no assignee. Ready items (all depends_on terminal) rank
- * first; among ready candidates, higher downstream weight wins — the
- * number of items that become claimable transitively once the item
- * completes (deepest/loaded subtrees first) — with the existing
+ * first; among ready candidates the ranking is PRIORITY-MAJOR (ADR 0009):
+ * the orchestrator's judgment priority first (p0 best; unprioritized orders
+ * with the p3 tier), then higher downstream weight — the number of items
+ * that become claimable transitively once the item completes — with the
  * lexicographic id order as the deterministic tie-break. Blocked items
  * (suggested only when nothing is ready) keep the lexicographic order.
  * With `--ready` the pool is limited to ready items only. Stories are
@@ -131,11 +133,21 @@ export function runNext(opts: NextOptions): NextResult {
     .sort(lexicographic);
   const ready = todos.filter((item) => openDependencies(item, byId).length === 0);
   const blocked = todos.filter((item) => openDependencies(item, byId).length > 0);
-  // Rank ready candidates by downstream weight (desc); ties fall back to
-  // the existing lexicographic order — deterministic.
+  // Rank ready candidates PRIORITY-MAJOR (ADR 0009): the orchestrator's
+  // judgment priority first (p0 best; unprioritized orders with the p3 tier),
+  // downstream weight within a priority, lexicographic id on ties —
+  // deterministic. The unblocks count stays visible in the reason so the cost
+  // of a misprioritization is readable in every suggestion.
+  const priorityTier = (item: WorkItem): number =>
+    item.priority ? priorityRank(item.priority as Priority) : priorityRank("p3");
   const rankedReady = ready
     .map((item) => ({ item, weight: downstreamWeight(item.id, blockedByIndex) }))
-    .sort((a, b) => b.weight - a.weight || lexicographic(a.item, b.item))
+    .sort(
+      (a, b) =>
+        priorityTier(a.item) - priorityTier(b.item) ||
+        b.weight - a.weight ||
+        lexicographic(a.item, b.item),
+    )
     .map((entry) => entry.item);
   const pool = opts.ready ? rankedReady : [...rankedReady, ...blocked];
 
@@ -161,6 +173,9 @@ export function runNext(opts: NextOptions): NextResult {
     blockedBy.length > 0
       ? `no ready candidate ranks above it; blocked by ${blockedBy.join(", ")} (open dependencies); `
       : "";
+  const priorityNote = item.priority
+    ? `priority ${item.priority} first, `
+    : `unprioritized (ranks with the p3 tier), `;
   const weightNote =
     blockedBy.length === 0 && unblocks > 0
       ? `unblocks ${unblocks} item${unblocks === 1 ? "" : "s"} downstream; `
@@ -172,8 +187,9 @@ export function runNext(opts: NextOptions): NextResult {
     ? `; stories included via --include-stories`
     : `; stories excluded by default (--include-stories to include them)`;
   const reason =
-    `unclaimed todo ${item.type}${where}; ${weightNote}${blockedNote}` +
-    `highest downstream weight first among ${pool.length} candidate(s), lexicographic id on ties ` +
+    `unclaimed todo ${item.type}${where}; ${priorityNote}${weightNote}${blockedNote}` +
+    `ranking: priority first (unprioritized with p3), downstream weight within a priority, ` +
+    `lexicographic id on ties, among ${pool.length} candidate(s) ` +
     `(skipped claimed, non-claimable, and non-todo items${storiesNote}${readyNote})`;
 
   return {
