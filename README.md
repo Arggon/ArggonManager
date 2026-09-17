@@ -161,6 +161,14 @@ Every generated doc carries a visible provenance marker as its **first line** (`
 
 The arggon-cli skill bundle (`.agents/skills/arggon-cli/SKILL.md`) follows exactly the same rules. Hand edits keep the marker (harmless) but the checksum betrays the edit. `arggon validate` accepts the `x-generated` section (namespaced extension, ignore-unknown).
 
+**Preview first: `arggon init --dry-run` (task-init-dry-run-plan).** Before committing to an upgrade, `--dry-run` computes the exact same per-destination decisions a real run would make — without writing anything: no files, no `backup/` dir, no auto-commit, no state mutation (a pure read; even the git tree stays untouched). It combines with `--force` / `--full` / `--backup` so the plan reflects the real invocation. Human output renders the plan as a decision table with a `nothing was written (dry run)` footer; with `--json` the usual init envelope gains `dryRun: true` and a `plan[]` array (per destination: `decision` — `created` | `updated` | `modified-skip` | `modified-backup` | `acked-skip` | `stale` | `overwritten` — plus `reason`, see [`docs/json-output.md`](docs/json-output.md)). Because the plan and a real run share one decision implementation, the plan's buckets map 1:1 onto what the real run then reports:
+
+```bash
+arggon init . --dry-run --full --backup   # what would this upgrade do?
+arggon init . --dry-run --json            # same plan for agents
+arggon init . --full --backup             # then apply it
+```
+
 ### `arggon doctor`
 
 Report-only installation check (exit 0, pure read): is ArggonManager installed here, and in what shape?
