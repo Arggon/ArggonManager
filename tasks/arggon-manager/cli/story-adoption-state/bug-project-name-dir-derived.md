@@ -4,6 +4,7 @@ status: in_progress
 id: bug-project-name-dir-derived
 title: PROJECT_NAME derived from dir basename — init/doctor/propose renders wrong in worktrees and renamed clones
 assignee: Arggon
+branch: feat/bug-project-name-dir-derived
 parent: story-adoption-state
 labels: [p1]
 created: "2026-09-17"
