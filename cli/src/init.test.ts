@@ -25,6 +25,7 @@ const tsx = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
 const TIER1_DOCS = [
   ".agents/skills/arggon-cli/SKILL.md",
+  ".agents/skills/arggon-upgrade/SKILL.md",
   ".editorconfig",
   ".github/CODEOWNERS",
   ".github/PULL_REQUEST_TEMPLATE.md",

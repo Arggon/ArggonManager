@@ -32,6 +32,7 @@ Every work item is a Markdown file with YAML frontmatter:
 | `title`         | yes      | Human-readable summary                         |
 | `parent`        | yes*     | Container id; tasks/bugs live only under a story |
 | `labels`        | no       | Kebab-case list                                |
+| `priority`      | no       | `p0` \| `p1` \| `p2` \| `p3` (v4)             |
 | `created`       | yes      | `YYYY-MM-DD`                                   |
 | `updated`       | yes      | `YYYY-MM-DD`                                   |
 | `assignee`      | no       | Required when `status: in_progress` (claimable types) |
@@ -45,6 +46,20 @@ Every work item is a Markdown file with YAML frontmatter:
 - Claim = claimable type + `assignee` + `status: in_progress`. Never steal a claim.
 - `todo` → `done` directly is not allowed: claim first, then complete.
 - Agents never reopen `done`/`cancelled`; file a follow-up with `arggon create`.
+
+## Priority (v4)
+
+Every item type carries an optional judgment priority — set it at filing time and
+`arggon next` ranks suggestions by it:
+
+```yaml
+priority: p1
+```
+
+- Values: `p0` (drop everything) | `p1` | `p2` | `p3`. Omit = unprioritized.
+- `arggon create <type> <title> --priority p1` / `arggon update <id> --priority p2`.
+- `arggon list --filter "status:todo priority:none"` finds unprioritized work.
+- Legacy `pN` labels migrate into the field: `arggon priority migrate`.
 
 ## Namespaced extensions
 
