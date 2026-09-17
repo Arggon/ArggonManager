@@ -4,6 +4,7 @@ status: in_progress
 id: task-priority-field-schema
 title: "priority field: schema v4 on all item types (validate, flags, filter, migrate)"
 assignee: Arggon
+branch: feat/task-priority-field-schema
 parent: story-deps-schema
 labels: [p1]
 created: "2026-09-17"
