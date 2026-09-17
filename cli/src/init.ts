@@ -13,6 +13,8 @@ import { bundledTemplatesDir } from "./paths.js";
 import {
   CONVENTION_VERSION,
   DEFAULT_BRANCH_PATTERNS,
+  parseGeneratedProjectName,
+  readGeneratedProjectName,
   readGeneratedState,
   updateGeneratedSection,
 } from "./convention.js";
@@ -22,6 +24,7 @@ import {
   currentGeneratedTemplates,
   planGenerateDocs,
   renderGeneratedDoc,
+  resolveProjectName,
   TIER2_DESTS,
   type DocsPlan,
 } from "./docs.js";
@@ -239,6 +242,10 @@ export function planInit(opts: InitOptions): InitPlan {
   // over so untouched docs keep regenerating instead of degrading to
   // adopter-modified — the doc plan must see the carried state).
   const carried = opts.force && alreadyInitialized ? readGeneratedState(root) : {};
+  // Carry the recorded project name over the re-scaffold too
+  // (bug-project-name-dir-derived): the plan must record the same name the
+  // tree already uses, not re-derive it from the (possibly worktree) dirname.
+  const carriedName = opts.force && alreadyInitialized ? readGeneratedProjectName(root) : null;
   const scaffold: InitPlanEntry[] = [
     alreadyInitialized
       ? {
@@ -268,10 +275,11 @@ export function planInit(opts: InitOptions): InitPlan {
       backup: opts.backup,
       now: opts.now,
       prev: carried,
+      prevProjectName: carriedName,
       // The scaffold write (above, in runInit) lands before docs are applied,
       // so the plan sees the convention file it will exist by then and plans
       // the pending x-generated rewrite against the scaffolded content.
-      rawState: updateGeneratedSection(CONVENTION_YML, carried),
+      rawState: updateGeneratedSection(CONVENTION_YML, carried, carriedName),
     }),
   };
 }
@@ -372,6 +380,15 @@ function existingProposals(destAbs: string): Map<string, boolean> {
 export function planProposals(root: string, full: boolean, now?: Date): ProposalEntry[] {
   const version = arggonVersion();
   const out: ProposalEntry[] = [];
+  // Project-name resolution once per run (bug-project-name-dir-derived):
+  // recorded state, then legacy content recovery. When unrecoverable
+  // (`name === null`), renderGeneratedDoc refuses name-bearing renders, so
+  // those destinations get NO proposal — a divergence signal built on a
+  // guessed directory basename would be a false positive.
+  const nameRes = resolveProjectName(root, {
+    entries: readGeneratedState(root),
+    recorded: readGeneratedProjectName(root),
+  });
   for (const { dest, template } of currentGeneratedTemplates()) {
     if (!full && TIER2_DESTS.has(dest)) continue;
     const destAbs = join(root, ...dest.split("/"));
@@ -388,6 +405,7 @@ export function planProposals(root: string, full: boolean, now?: Date): Proposal
       template,
       dest,
       now,
+      projectName: nameRes.name,
     });
     if (render === null) continue; // template absent/unreadable: cannot decide
     const proposalPath = `${dest}.proposed-${version}`;
@@ -423,6 +441,12 @@ export function planProposals(root: string, full: boolean, now?: Date): Proposal
  * never mutated, nothing is committed (proposals are untracked working files).
  */
 export function applyProposals(root: string, proposals: ProposalEntry[], now?: Date): void {
+  // Same resolution as planProposals (bug-project-name-dir-derived): the
+  // name must be identical between plan and apply.
+  const nameRes = resolveProjectName(root, {
+    entries: readGeneratedState(root),
+    recorded: readGeneratedProjectName(root),
+  });
   for (const p of proposals) {
     const abs = join(root, ...p.proposalPath.split("/"));
     if (p.decision === "stale") continue;
@@ -436,6 +460,7 @@ export function applyProposals(root: string, proposals: ProposalEntry[], now?: D
       template: p.template,
       dest: p.dest,
       now,
+      projectName: nameRes.name,
     });
     if (render === null) continue; // vanished between plan and apply: skip
     mkdirSync(dirname(abs), { recursive: true });
@@ -630,7 +655,8 @@ export function runInit(opts: InitOptions): InitResult {
   // A forced re-scaffold carries the x-generated provenance section over so
   // untouched docs keep regenerating instead of degrading to adopter-modified.
   const carried = opts.force && plan.alreadyInitialized ? readGeneratedState(root) : {};
-  writeFileSync(conventionPath, updateGeneratedSection(CONVENTION_YML, carried), "utf8");
+  const carriedName = opts.force && plan.alreadyInitialized ? readGeneratedProjectName(root) : null;
+  writeFileSync(conventionPath, updateGeneratedSection(CONVENTION_YML, carried, carriedName), "utf8");
   const copiedTemplates = ensureTemplates(root, opts.force).map((name) => `templates/${name}`);
   const docs = applyDocsPlan(root, plan.docs);
   const created = ["tasks/.convention.yml", ...copiedTemplates, ...docs.created].sort();

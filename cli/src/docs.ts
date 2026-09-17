@@ -3,6 +3,8 @@ import { createHash } from "node:crypto";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { bundledTemplatesDir, packageRoot } from "./paths.js";
 import {
+  parseGeneratedProjectName,
+  readGeneratedProjectName,
   readGeneratedState,
   updateGeneratedSection,
   type GeneratedEntry,
@@ -18,8 +20,14 @@ import {
  *   templates/docs/github/<file>              → <root>/.github/<file>
  *   anything else (relative path)             → <root>/<relative path>
  *
- * Placeholders rendered at write time: {{PROJECT_NAME}} (repo root dir name)
- * and {{YEAR}}. Unknown placeholders are left as-is.
+ * Placeholders rendered at write time: {{PROJECT_NAME}} and {{YEAR}}. Unknown
+ * placeholders are left as-is. {{PROJECT_NAME}} resolution is layered
+ * (bug-project-name-dir-derived): the name recorded in `x-generated.projectName`
+ * wins, then template-pattern recovery from existing on-disk generated docs,
+ * and the target directory basename ONLY as the fresh-scaffold fallback (no
+ * generated content on disk). When an existing tree's name cannot be
+ * recovered, name-bearing writes are skipped (`project-name-unrecoverable`)
+ * instead of contaminating the docs with the directory basename.
  *
  * Provenance (story-adoption-state, Copier/Helm precedent): every generated
  * file carries a visible marker as its first line —
@@ -68,6 +76,13 @@ export type GenerateDocsOptions = {
    * always planned (the caller guarantees the file will exist).
    */
   rawState?: string;
+  /**
+   * Pre-resolved project name (bug-project-name-dir-derived): what the
+   * caller already read from `x-generated.projectName` (or from `rawState`).
+   * When omitted, the plan resolves it itself (recorded → content extraction
+   * → fresh dir-basename fallback). `null` explicitly means unrecoverable.
+   */
+  prevProjectName?: string | null;
 };
 
 export type DocsResult = {
@@ -94,7 +109,8 @@ export type DocsPlanDecision =
   | "modified-skip"
   | "modified-backup"
   | "acked-skip"
-  | "stale";
+  | "stale"
+  | "project-name-unrecoverable";
 
 export type DocsPlanEntry = {
   dest: string;
@@ -202,6 +218,120 @@ export function renderDocPlaceholders(
 }
 
 /**
+ * Recover the `{{PROJECT_NAME}}` value that was baked into a generated doc at
+ * generation time (bug-project-name-dir-derived): split the CURRENT template
+ * on the placeholder and match the on-disk content against the surrounding
+ * text. Deterministic when the surrounding text has not changed since the
+ * file was generated. `null` when the template has no placeholder, the disk
+ * content no longer fits the template structure, or the extracted value is
+ * empty / has an implausible charset.
+ */
+export function extractProjectNameFromContent(
+  templateRaw: string,
+  disk: string,
+): string | null {
+  const placeholder = "{{PROJECT_NAME}}";
+  const i = templateRaw.indexOf(placeholder);
+  if (i === -1) return null;
+  const prefix = templateRaw.slice(0, i);
+  // Anchor: the literal text between the placeholder and the NEXT template
+  // placeholder — later placeholders ({{YEAR}}) were rendered at write time
+  // with a value we cannot know, so only the verbatim in-between text can be
+  // matched against the on-disk content.
+  const suffixAnchor = templateRaw
+    .slice(i + placeholder.length)
+    .split("{{")[0]!
+    .slice(0, 200);
+  if (suffixAnchor.length === 0) return null; // no usable anchor: refuse
+  const start = disk.indexOf(prefix);
+  if (start === -1) return null;
+  const nameStart = start + prefix.length;
+  const suffixAt = disk.indexOf(suffixAnchor, nameStart);
+  if (suffixAt === -1) return null;
+  const name = disk.slice(nameStart, suffixAt);
+  // Sane charset: repo/project directory names (letters, digits, dot, dash,
+  // underscore), no whitespace or separators, bounded length.
+  return /^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$/.test(name) ? name : null;
+}
+
+/** How the project name for a run was resolved (bug-project-name-dir-derived). */
+export type ProjectNameResolution = {
+  /** The name to render with; `null` = unrecoverable (skip name-bearing writes/compares). */
+  name: string | null;
+  /** "recorded" (x-generated.projectName), "content" (legacy recovery), "fresh" (dir basename, no generated content), "unrecoverable". */
+  source: "recorded" | "content" | "fresh" | "unrecoverable";
+};
+
+/**
+ * Layered project-name resolution for a run (bug-project-name-dir-derived),
+ * in order of preference:
+ *
+ *   1. "recorded" — `x-generated.projectName` (state written by this fix).
+ *   2. "content"  — legacy recovery: template-pattern extraction from the
+ *      on-disk content of managed docs (tried in sorted destination order;
+ *      the most frequent candidate wins, ties keep the first — deterministic).
+ *   3. "fresh"    — no generated doc exists on disk anywhere: the tree is a
+ *      fresh scaffold, where the target directory basename IS the project
+ *      name.
+ *   4. "unrecoverable" — generated content exists but no layer yields a
+ *      name: surfaces must SKIP name-sensitive comparisons/regeneration
+ *      instead of emitting false signals with a guessed name.
+ */
+export function resolveProjectName(
+  root: string,
+  opts: {
+    entries: Record<string, GeneratedEntry>;
+    /** Value from x-generated.projectName, when the caller already read it. */
+    recorded?: string | null;
+  },
+): ProjectNameResolution {
+  if (opts.recorded) return { name: opts.recorded, source: "recorded" };
+  // Marker prefix of any arggon-generated doc: content WITHOUT it is
+  // adopter-owned, never generated — it must not count as prior generation
+  // (a fresh scaffold may legitimately have an adopter AGENTS.md on disk).
+  const GENERATED_PREFIX = "<!-- arggon:generated ";
+  const candidates: string[] = [];
+  let sawGeneratedContent = false;
+  // Managed-doc candidates: every x-generated entry, plus every destination
+  // arggon currently generates (covers pre-projectName trees whose state was
+  // hand-migrated and marker-bearing docs with no state entry).
+  const dests = new Set<string>([
+    ...Object.keys(opts.entries),
+    ...currentGeneratedTemplates().map((t) => t.dest),
+  ]);
+  for (const dest of [...dests].sort()) {
+    const templateRel =
+      opts.entries[dest]?.template ??
+      currentGeneratedTemplates().find((t) => t.dest === dest)?.template;
+    if (templateRel === undefined) continue;
+    try {
+      const templatePath =
+        templateRel === SKILL_SOURCE
+          ? resolve(bundledTemplatesDir(), "..", ...SKILL_SOURCE.split("/"))
+          : resolve(bundledTemplatesDir(), ...templateRel.split("/"));
+      if (!existsSync(templatePath)) continue;
+      const disk = readFileSync(join(root, ...dest.split("/")), "utf8");
+      if (disk.startsWith(GENERATED_PREFIX)) sawGeneratedContent = true;
+      else continue; // adopter-owned (no provenance marker): never extract from it
+      const raw = readFileSync(templatePath, "utf8");
+      const name = extractProjectNameFromContent(raw, disk);
+      if (name !== null) candidates.push(name);
+    } catch {
+      continue; // unreadable template or doc: try the next managed doc
+    }
+  }
+  if (candidates.length > 0) {
+    const counts = new Map<string, number>();
+    for (const c of candidates) counts.set(c, (counts.get(c) ?? 0) + 1);
+    let best = candidates[0]!;
+    for (const [c, n] of counts) if (n > counts.get(best)!) best = c;
+    return { name: best, source: "content" };
+  }
+  if (!sawGeneratedContent) return { name: basename(root), source: "fresh" };
+  return { name: null, source: "unrecoverable" };
+}
+
+/**
  * Every doc arggon currently generates (tier-1 + tier-2 + skill), as
  * destination path → source template (package-root relative). Doctor uses the
  * template ids to flag stale `x-generated` entries.
@@ -234,11 +364,14 @@ export function currentGeneratedTemplatesFrom(templatesDir: string): { dest: str
 /**
  * Pure render of a managed doc exactly as `generateDocs` would write it
  * (task-doctor-outdated-bucket): marker line (except JSON destinations) plus
- * placeholder resolution — {{PROJECT_NAME}} from the target root's dir name,
- * {{YEAR}} from the current year. Zero writes, never throws: a missing or
- * unreadable template yields `null` (doctor treats that as "cannot decide",
- * i.e. not outdated). `template` is the `x-generated` template id
- * (package-root relative, e.g. "docs/AGENTS.md" or the skill source path).
+ * placeholder resolution — {{PROJECT_NAME}} from `projectName` when given
+ * (bug-project-name-dir-derived: the resolved/recorded name, consistent
+ * across the whole run; `null` means unrecoverable → renders `null`, i.e.
+ * "cannot decide"), falling back to the target root's dir name — and {{YEAR}}
+ * from the current year. Zero writes, never throws: a missing or unreadable
+ * template yields `null` (doctor treats that as "cannot decide", i.e. not
+ * outdated). `template` is the `x-generated` template id (package-root
+ * relative, e.g. "docs/AGENTS.md" or the skill source path).
  */
 export function renderGeneratedDoc(opts: {
   templatesDir: string;
@@ -246,6 +379,13 @@ export function renderGeneratedDoc(opts: {
   template: string;
   dest: string;
   now?: Date;
+  /**
+   * Resolved project name (bug-project-name-dir-derived). `null` = the name
+   * could not be recovered: the render is refused (null) so name-sensitive
+   * comparisons skip with `project-name-unrecoverable` semantics. Omitted =
+   * legacy behavior (dir basename).
+   */
+  projectName?: string | null;
 }): string | null {
   try {
     const path =
@@ -253,8 +393,12 @@ export function renderGeneratedDoc(opts: {
         ? resolve(opts.templatesDir, "..", ...SKILL_SOURCE.split("/"))
         : resolve(opts.templatesDir, ...opts.template.split("/"));
     if (!existsSync(path)) return null;
+    if (opts.projectName === null) return null; // project-name-unrecoverable
     const raw = readFileSync(path, "utf8");
-    const vars = { projectName: basename(opts.root), year: (opts.now ?? new Date()).getFullYear() };
+    const vars = {
+      projectName: opts.projectName ?? basename(opts.root),
+      year: (opts.now ?? new Date()).getFullYear(),
+    };
     const rendered = renderDocPlaceholders(raw, vars);
     if (opts.dest.endsWith(".json")) return rendered;
     // Mirror generateDocs' marker convention: doc templates are stamped with
@@ -295,9 +439,6 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
   if (!existsSync(docsSrc)) {
     throw new Error(`Bundled doc templates not found at ${docsSrc}`);
   }
-  const vars = { projectName: basename(opts.root), year: new Date().getFullYear() };
-  const entries: DocsPlanEntry[] = [];
-
   const now = opts.now ?? new Date();
   const version = arggonVersion();
   const generatedAt = now.toISOString();
@@ -305,6 +446,28 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
   const hasStateFile = opts.rawState !== undefined || existsSync(statePath);
   const prevState = opts.prev ?? (hasStateFile ? readGeneratedState(opts.root) : {});
   const nextState: Record<string, GeneratedEntry> = { ...prevState };
+
+  // Project-name resolution (bug-project-name-dir-derived): recorded state
+  // first, then legacy content recovery, then the dir-basename fallback for
+  // fresh scaffolds. `null` = unrecoverable: name-bearing writes are skipped
+  // (in `decide`) instead of baking in a guessed name.
+  const recordedName =
+    opts.prevProjectName !== undefined
+      ? opts.prevProjectName
+      : opts.rawState !== undefined
+        ? parseGeneratedProjectName(opts.rawState)
+        : hasStateFile
+          ? readGeneratedProjectName(opts.root)
+          : null;
+  const nameRes = resolveProjectName(opts.root, {
+    entries: prevState,
+    recorded: recordedName,
+  });
+  const vars = {
+    projectName: nameRes.name ?? basename(opts.root),
+    year: new Date().getFullYear(),
+  };
+  const entries: DocsPlanEntry[] = [];
 
   const stamp = (
     markerTemplate: string,
@@ -339,10 +502,24 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
     markerTemplate: string,
     stateTemplate: string,
     render: () => string,
+    nameBearing: boolean,
   ): DocsPlanEntry => {
     const destAbs = join(opts.root, ...dest.split("/"));
     const { content, entry } = stamp(markerTemplate, stateTemplate, render(), dest);
+    // Safe degradation (bug-project-name-dir-derived): on an already-written
+    // tree whose project name cannot be recovered, never write a render that
+    // bakes the directory basename in. The file/state are left exactly as
+    // they are — nothing degrades.
+    const nameSkip = (): DocsPlanEntry => ({
+      dest,
+      decision: "project-name-unrecoverable",
+      reason:
+        "project-name-unrecoverable — existing generated docs are present but the " +
+        "project name could not be recovered (no x-generated.projectName, content " +
+        "extraction failed); skipped instead of rendering the directory basename in",
+    });
     if (!existsSync(destAbs)) {
+      if (nameBearing && nameRes.name === null) return nameSkip();
       return {
         dest,
         decision: "created",
@@ -366,6 +543,7 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
     }
     const onDisk = checksumOf(readFileSync(destAbs, "utf8"));
     if (prev?.checksum && prev.checksum === onDisk) {
+      if (nameBearing && nameRes.name === null) return nameSkip();
       // Untouched: silently regenerate from the current template.
       return {
         dest,
@@ -377,6 +555,7 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
     }
     // Adopter-modified (edited, or on disk with no provenance state).
     if (opts.backup) {
+      if (nameBearing && nameRes.name === null) return nameSkip();
       const backupDest = `backup/${utcDate(now)}/${dest}`;
       return {
         dest,
@@ -397,17 +576,21 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
   for (const rel of walkTemplates(docsSrc)) {
     const dest = DOC_PATH_MAP[rel] ?? rel;
     if (!opts.full && TIER2_DESTS.has(dest)) continue;
+    const raw = readFileSync(join(docsSrc, ...rel.split("/")), "utf8");
     entries.push(
-      decide(dest, rel, `docs/${rel}`, () =>
-        renderDocPlaceholders(readFileSync(join(docsSrc, ...rel.split("/")), "utf8"), vars),
-      ),
+      decide(dest, rel, `docs/${rel}`, () => renderDocPlaceholders(raw, vars),
+        raw.includes("{{PROJECT_NAME}}")),
     );
   }
 
   // Bundle the arggon-cli skill from its single source (skills/ in this repo —
   // NOT a template duplicate) so agents in the adopter repo use it by default.
   if (existsSync(skillSrc)) {
-    entries.push(decide(SKILL_DEST, SKILL_SOURCE, SKILL_SOURCE, () => readFileSync(skillSrc, "utf8")));
+    const skillRaw = readFileSync(skillSrc, "utf8");
+    entries.push(
+      decide(SKILL_DEST, SKILL_SOURCE, SKILL_SOURCE, () => skillRaw,
+        skillRaw.includes("{{PROJECT_NAME}}")),
+    );
   }
   // Missing skill source (e.g. stripped packaging): skip silently — docs
   // generation must never fail because an optional bundle is absent.
@@ -438,7 +621,12 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
       .sort(),
     backedUp: applied.filter((e) => e.decision === "modified-backup").map((e) => e.dest).sort(),
     skipped: entries
-      .filter((e) => e.decision === "modified-skip" || e.decision === "acked-skip")
+      .filter(
+        (e) =>
+          e.decision === "modified-skip" ||
+          e.decision === "acked-skip" ||
+          e.decision === "project-name-unrecoverable",
+      )
       .map((e) => e.dest)
       .sort(),
   };
@@ -453,6 +641,10 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
       content: updateGeneratedSection(
         opts.rawState ?? readFileSync(statePath, "utf8"),
         nextState,
+        // Record the resolved project name once (bug-project-name-dir-
+        // derived) so future runs — including from worktrees and renamed
+        // clones — never re-derive it from the directory basename.
+        nameRes.name ?? recordedName ?? undefined,
       ),
     };
   }

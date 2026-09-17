@@ -151,6 +151,14 @@ export type ConventionConfig = {
    * (posix, relative to the repo root) -> provenance entry.
    */
   generated: Record<string, GeneratedEntry>;
+  /**
+   * Project name recorded once under `x-generated.projectName`
+   * (bug-project-name-dir-derived): the `{{PROJECT_NAME}}` value used at
+   * generation time, so re-runs (from worktrees/renamed clones whose
+   * directory basename differs) recover it instead of re-deriving it from
+   * the directory name. `null` when absent (legacy state).
+   */
+  generatedProjectName: string | null;
 };
 
 function stripQuotes(value: string): string {
@@ -184,6 +192,7 @@ export function parseConventionConfig(
   const playbooks: PlaybooksConfig = { maxAgeDays: null };
   const tracker: TrackerConfig = { autoCommit: null, allowSteal: null };
   const generated: Record<string, GeneratedEntry> = {};
+  let generatedProjectName: string | null = null;
   const importLabelTypes: Record<string, ItemType> = {};
   let importHasLabelTypes = false;
   const worktree: WorktreeConfig = { postStart: null, postStartShell: null };
@@ -261,6 +270,14 @@ export function parseConventionConfig(
       // the file reports as adopter-modified). Hand edits must never break
       // init or doctor.
       if (indent <= 2) {
+        // x-generated.projectName (bug-project-name-dir-derived): the recorded
+        // {{PROJECT_NAME}} value, one level above the per-destination entries.
+        // A known scalar key, never a destination — hand-written legacy state
+        // without it parses identically (ignore-unknown in reverse).
+        if (key === "projectName") {
+          generatedProjectName = stripQuotes(value) || null;
+          continue;
+        }
         const dest = stripQuotes(key);
         generatedDest = dest !== "" ? dest : null;
         if (generatedDest !== null && !(generatedDest in generated)) {
@@ -434,6 +451,7 @@ export function parseConventionConfig(
     worktree,
     github,
     generated,
+    generatedProjectName,
   };
 }
 
@@ -451,6 +469,7 @@ export function readConventionConfig(dir: string): ConventionConfig {
       worktree: { postStart: null, postStartShell: null },
       github: { issueRoundtrip: false },
       generated: {},
+      generatedProjectName: null,
     };
   }
   return parseConventionConfig(readFileSync(path, "utf8"), path);
@@ -472,6 +491,37 @@ export function readGeneratedState(dir: string): Record<string, GeneratedEntry> 
   }
 }
 
+/**
+ * Read the project name recorded under `x-generated.projectName`
+ * (bug-project-name-dir-derived). Tolerant: missing file, missing key, or a
+ * malformed `.convention.yml` yields `null` (legacy state — the caller falls
+ * back to content-based recovery).
+ */
+export function readGeneratedProjectName(dir: string): string | null {
+  const path = join(dir, "tasks/.convention.yml");
+  if (!existsSync(path)) return null;
+  try {
+    return parseConventionConfig(readFileSync(path, "utf8"), path).generatedProjectName;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Parse the `x-generated.projectName` scalar out of raw `.convention.yml`
+ * text without touching the filesystem (task-init-dry-run-plan: the plan
+ * must be able to resolve the recorded name against the state content the
+ * caller is about to scaffold, not the not-yet-written file). `null` when
+ * the key is absent or empty.
+ */
+export function parseGeneratedProjectName(raw: string): string | null {
+  try {
+    return parseConventionConfig(raw).generatedProjectName;
+  } catch {
+    return null;
+  }
+}
+
 /** Serialize one quoted YAML scalar (double quotes, backslash-escaped). */
 function yamlQuote(value: string): string {
   return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
@@ -484,12 +534,18 @@ function yamlKey(key: string): string {
 
 /**
  * Serialize the `x-generated` section (destinations sorted) for the given
- * provenance entries. Empty entries serialize as no section at all.
+ * provenance entries. `projectName` (bug-project-name-dir-derived) is
+ * recorded once above the per-destination entries when non-null. Empty
+ * entries with no projectName serialize as no section at all.
  */
-export function serializeGeneratedSection(entries: Record<string, GeneratedEntry>): string[] {
+export function serializeGeneratedSection(
+  entries: Record<string, GeneratedEntry>,
+  projectName: string | null = null,
+): string[] {
   const dests = Object.keys(entries).sort();
-  if (dests.length === 0) return [];
+  if (dests.length === 0 && projectName === null) return [];
   const lines: string[] = ["x-generated:"];
+  if (projectName !== null) lines.push(`  projectName: ${yamlQuote(projectName)}`);
   for (const dest of dests) {
     const entry = entries[dest]!;
     lines.push(`  ${yamlKey(dest)}:`);
@@ -508,11 +564,16 @@ export function serializeGeneratedSection(entries: Record<string, GeneratedEntry
  * Splice a fresh `x-generated` section into raw `.convention.yml` text,
  * replacing any existing section. Everything outside the section — version,
  * branch_patterns, x-views, x-playbooks, comments, blank lines, unknown keys —
- * is preserved byte-for-byte. With no entries, an existing section is removed.
+ * is preserved byte-for-byte. `projectName` (bug-project-name-dir-derived) is
+ * recorded once above the per-destination entries; `null`/`undefined` omits
+ * it (and preserves legacy byte-identical serialization for callers that
+ * never recorded one). With no entries and no projectName, an existing
+ * section is removed.
  */
 export function updateGeneratedSection(
   raw: string,
   entries: Record<string, GeneratedEntry>,
+  projectName?: string | null,
 ): string {
   const lines = raw.split(/\r?\n/);
   const start = lines.findIndex((line) => /^x-generated:\s*$/.test(line));
@@ -524,7 +585,7 @@ export function updateGeneratedSection(
     lines.splice(start, end - start);
   }
   while (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
-  const section = serializeGeneratedSection(entries);
+  const section = serializeGeneratedSection(entries, projectName ?? null);
   if (section.length === 0) {
     return lines.length > 0 ? `${lines.join("\n")}\n` : "";
   }

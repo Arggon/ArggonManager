@@ -252,6 +252,9 @@ program
           {
             root: result.root,
             initialized: result.initialized,
+            // Resolved {{PROJECT_NAME}} for this run (null = unrecoverable;
+            // bug-project-name-dir-derived, additive).
+            projectName: result.projectName,
             docs: result.docs,
             tracker: result.tracker,
             git: result.git,

@@ -587,6 +587,8 @@ Init still **writes** `tasks/.convention.yml` (including the `x-generated` prove
 
 Non-initialized repos return the same shape with `root: null`, `initialized: false`, zeroed `docs`/`tracker`, `conventionVersion: 0`, and the `git` section probed from the cwd (a non-git tree reports `{ isRepo: false, dirty: null, remote: null }`).
 
+Additive (bug-project-name-dir-derived): `projectName` carries the `{{PROJECT_NAME}}` value this run resolved — recorded in `x-generated.projectName`, recovered from existing generated docs (legacy trees), or the directory basename for fresh scaffolds. `null` = unrecoverable: name-sensitive comparisons (the `outdated` bucket) are skipped for that run instead of comparing against a guessed directory basename.
+
 With `--budget`, an additive `budget` section appears (values illustrative; re-measure with `arggon doctor --json --budget`):
 
 ```json
