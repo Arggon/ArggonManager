@@ -37,3 +37,10 @@ For fresh scaffolds the dir name is a fine default. The bug is RE-RUNS on an alr
 ## Notes
 
 Related scope observations from the same pilot (not this bug's fix, decide separately): (a) `doctor` outdated walks x-generated state while `propose` walks the whole bundle (pre-provenance files like CONTRIBUTING.md get proposals but no outdated signal); (b) default propose scope is tier-1, `--full` adds tier-2 — documented but easy to miss; doctor has no tier filter. Also recorded: the pilot itself — all 11 proposals for our self-host docs were correctly REJECTED (generic templates vs curated content); see task-propose-section-backports for the follow-up idea.
+
+### 2026-09-17 @Arggon
+REVIEW (coordinator) — APPROVED, merging PR #308.
+
+Provenance note: the dispatched subagent was interrupted mid-flight (usage limit) leaving uncommitted source work + 13 junk fixture commits on the branch (its test fixtures were created with a RELATIVE mkdtemp prefix inside the worktree, and init auto-committed them). I recovered the 736-line source patch, reset the branch, and completed the work myself: fixed the test helper bugs (normalize compared values-not-keys and missed uppercase suffixes; fixtures now use absolute tmpdir prefixes) and refined the unrecoverable-degradation assertion to per-entry state semantics (non-name-bearing untouched docs may regenerate harmlessly; name-bearing docs keep bytes AND their state entry intact).
+
+Verified: full diff read (layered resolution recorded -> content-extraction -> fresh -> unrecoverable; renderGeneratedDoc refuses null-name renders; additive x-generated.projectName with tolerant ignore-unknown parsing; wired through init plan/apply, --dry-run, --propose plan+apply, doctor outdated + additive projectName in --json). Gates mine: 1026/1026 (64 files, new project-name suite), lint/build clean, validate ok. KEY evidence re-taken live: doctor from this very worktree now recovers projectName "ArggonManager" from content and reports exactly the primary's 7 outdated (before: 10 contaminated). Docs updated (README init section + json-output doctor payload).
