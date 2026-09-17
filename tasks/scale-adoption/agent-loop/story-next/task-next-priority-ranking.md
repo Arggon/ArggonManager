@@ -31,3 +31,10 @@ Exploration priority-model-008 (approved 2026-09-17, decision i): `next` ranks t
 - [ ] Tests: ordering across priorities, intra-priority weight, unprioritized tier, ties, --ready, reason content, MCP parity
 - [ ] Docs: README next section; skills sync only if the generated region text changes (it renders descriptions -> yes it will: run skills:sync)
 - [ ] Gates: validate ok, suite green, lint/build clean, doctor 0 modified / 0 drifted
+
+### 2026-09-17 @Arggon
+REVIEW (coordinator) — APPROVED, merging PR #318.
+
+Provenance: implemented by the coordinator directly (subagent dispatches were being cut by provider rate limits; per established fallback). Priority-major ranking in next.ts (priorityTier: unprioritized orders with p3), reason states the priority and keeps unblocks visible, MCP arggon_next description updated in lockstep, ADR 0009 records schema v4 + ranking with rejected alternatives. Also carries the test-expectation fixes lost with the pruned task-priority-field-schema worktree (second commit).
+
+Verified: full diff read; suite 1047/1047 (66 files; existing fixtures carry no priorities so legacy ordering is unchanged — covered by the untouched downstream-weight describe); lint/build clean; validate ok; doctor 0 modified / 0 drifted; skills:sync run. Live probe on a fixture: t-p1 (zero unblocks) suggested over t-p3-heavy with reason 'priority p1 first, ranking: priority first (unprioritized with p3), downstream weight …'; new tests cover p0-drops-everything, weight-within-priority, unprioritized tier, and full-tie lexicographic determinism.
