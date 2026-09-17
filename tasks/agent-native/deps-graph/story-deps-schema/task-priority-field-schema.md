@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-priority-field-schema
 title: "priority field: schema v4 on all item types (validate, flags, filter, migrate)"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-deps-schema
 labels: [p1]
 created: "2026-09-17"
 updated: "2026-09-17"
-claimed_at: "2026-09-17T15:14:24.444Z"
 ---
 <!--
   Placement (v0): tasks/agent-native/deps-graph/story-deps-schema/task-priority-field-schema.md
