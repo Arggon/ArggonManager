@@ -38,6 +38,7 @@ export const COMMAND_EXCLUSIONS: Record<string, string> = {
   spec: "grouping command (no action of its own) — its subcommands are documented instead",
   stack: "grouping command (no action of its own) — its subcommands are documented instead",
   playbook: "grouping command (no action of its own) — its subcommands are documented instead",
+  priority: "grouping command (no action of its own) — its subcommands are documented instead",
 };
 
 /** Extract the CLI command surface from the cli.ts source. */

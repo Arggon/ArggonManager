@@ -33,6 +33,7 @@ function item(overrides: Partial<WorkItem> & Pick<WorkItem, "id" | "type" | "sta
     branch: null,
     parent: null,
     labels: [],
+    priority: null,
     created: "2026-09-07",
     updated: "2026-09-07",
     path: `tasks/x/${overrides.id}.md`,

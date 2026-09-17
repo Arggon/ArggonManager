@@ -542,7 +542,7 @@ describe("adopt via the CLI (--json)", () => {
     };
     expect(body.ok).toBe(true);
     expect(body.schemaVersion).toBe(1);
-    expect(body.conventionVersion).toBe(3);
+    expect(body.conventionVersion).toBe(4);
     expect(body.command).toBe("adopt");
     expect(body.taskId).toBe("task-adopt-arggon");
     expect(body.storyId).toBe("story-arggon-adoption");
@@ -732,7 +732,7 @@ describe("adopt --ack via the CLI (--json)", () => {
     };
     expect(body.ok).toBe(true);
     expect(body.schemaVersion).toBe(1);
-    expect(body.conventionVersion).toBe(3);
+    expect(body.conventionVersion).toBe(4);
     expect(body.command).toBe("adopt");
     const agents = body.acked.find((doc) => doc.path === "AGENTS.md")!;
     expect(agents.checksum).toBe(checksumOf("SWEEP: project description\n"));

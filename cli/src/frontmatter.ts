@@ -59,6 +59,7 @@ const OFFICIAL_ORDER = [
   "branch",
   "parent",
   "labels",
+  "priority",
   "created",
   "updated",
   "blocked_reason",

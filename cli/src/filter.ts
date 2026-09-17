@@ -9,6 +9,7 @@ export const FILTER_FIELDS = [
   "depends-on",
   "blocked-by",
   "ancestor",
+  "priority",
 ] as const;
 
 export type FilterField = (typeof FILTER_FIELDS)[number];
@@ -104,6 +105,11 @@ export type FilterableItem = {
   parent?: string | null;
   /** Ids this item waits for (convention v3). Optional for call sites that don't carry deps. */
   dependsOn?: string[];
+  /**
+   * Judgment priority (convention v4): `p0`-`p3` exact match, `none` matches
+   * unset. Optional for call sites that don't carry the field.
+   */
+  priority?: string | null;
 };
 
 /**
@@ -202,6 +208,14 @@ export function matchesPredicate(
       break;
     case "ancestor":
       hit = (ancestorIndex?.get(item.id ?? "") ?? []).includes(pred.value);
+      break;
+    case "priority":
+      // `priority:none` matches UNSET items (the unprioritized worklist);
+      // anything else is an exact match against the field value.
+      hit =
+        pred.value === "none"
+          ? (item.priority ?? null) === null
+          : (item.priority ?? null) === pred.value;
       break;
   }
   return pred.negated ? !hit : hit;

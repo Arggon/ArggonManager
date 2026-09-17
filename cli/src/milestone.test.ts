@@ -108,6 +108,7 @@ const BARE = (id: string) => ({
   path: `tasks/x/${id}.md`,
   blocked_reason: null,
   milestone: null,
+  priority: null,
   depends_on: [],
   claimed_at: null,
   worktree_path: null,

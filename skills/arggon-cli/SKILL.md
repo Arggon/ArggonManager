@@ -120,13 +120,13 @@ Nuances (hand-written, review-covered):
   `INIT_FAILED, CREATE_FAILED, LIST_FAILED, UPDATE_FAILED, VALIDATE_FAILED, BRANCH_FAILED,
   START_FAILED, BOARD_FAILED, SYNC_FAILED, NEXT_FAILED, REPORT_FAILED, TREND_FAILED,
   DOCTOR_FAILED, ADOPT_FAILED, SPEC_FAILED, INSTRUCTIONS_FAILED, EXPLORE_FAILED,
-  PLAYBOOK_FAILED, COMMENT_FAILED, IMPORT_FAILED, CLEANUP_FAILED`.
+  PLAYBOOK_FAILED, COMMENT_FAILED, IMPORT_FAILED, CLEANUP_FAILED, PRIORITY_FAILED`.
 - Human output (no `--json`) is for eyes only — never parse it; re-run with `--json`.
 
 ## 3. Views, reporting, tooling
 
 ```bash
-<!-- arggon:generated-commands start: board,report,doctor,sync,import-issues,instructions,cleanup -->
+<!-- arggon:generated-commands start: board,report,doctor,sync,import-issues,instructions,cleanup,priority migrate -->
 arggon board  # Write a static read-only HTML board from tasks/ (git files stay the source of truth)
 arggon report  # Aggregate leaf statuses per container, grouped by epic (display only)
 arggon doctor  # Report installation state: convention version, generated-doc provenance, tracker counts (pure read); with --budget, also the ADR 0006 context-budget surfaces incl. the live MCP tool-schema size (report-only)
@@ -134,6 +134,7 @@ arggon sync  # Reconcile task branch fields with open GitHub PRs
 arggon import-issues  # One-shot import of GitHub issues into tasks/ as tasks/bugs (idempotent; x-import maps labels to types)
 arggon instructions  # Print the agent wiring (install, pre-commit, CI) extracted from docs/agents.md
 arggon cleanup  # List worktrees of done/cancelled items whose branches are merged (--prune removes them)
+arggon priority migrate  # Move legacy pN labels into the priority field on all items (highest label wins, all pN labels removed, non-priority labels kept; idempotent; never auto-commits — review and commit once)
 <!-- arggon:generated-commands end -->
 arggon mcp                           # internal stdio MCP server (arggon_list/_create/_update/
                                      # _comment/_show/_handoff/_next/_report/_validate tools);
@@ -143,6 +144,13 @@ arggon mcp                           # internal stdio MCP server (arggon_list/_c
 Board nuances: `--serve` binds 127.0.0.1 only and is incompatible with
 `--github`/`--tui`; `--tui` needs an interactive terminal; `--serve --json`
 emits one envelope (`{serving, url, port}`) then keeps serving.
+
+Priority (convention v4): items carry an optional `priority: p0|p1|p2|p3`
+(absent = unprioritized). Set with `create/update --priority` (empty value
+clears); filter with `priority:p1` / `priority:none` / `!priority:p1`.
+`priority migrate` moves the legacy `pN` LABELS into the field once (highest
+label wins, labels removed, idempotent) and never auto-commits — review the
+diff and commit once.
 
 ## 4. Planning documents (specs, playbooks, explorations)
 

@@ -76,7 +76,7 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     const result = runDoctor({ cwd: dir });
     expect(result.initialized).toBe(true);
     expect(result.root).toBe(dir);
-    expect(result.conventionVersion).toBe(3);
+    expect(result.conventionVersion).toBe(4);
     expect(result.docs).toEqual({ managed: GENERATED_DOC_COUNT, untouched: GENERATED_DOC_COUNT, modified: 0, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0, outdated: 0, outdatedDocs: [] });
     expect(result.tracker).toEqual({ items: 0, todo: 0 });
   });
@@ -216,7 +216,7 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     };
     expect(body.ok).toBe(true);
     expect(body.schemaVersion).toBe(1);
-    expect(body.conventionVersion).toBe(3);
+    expect(body.conventionVersion).toBe(4);
     expect(body.command).toBe("doctor");
     expect(body.initialized).toBe(true);
     expect(body.root).toBe(dir);

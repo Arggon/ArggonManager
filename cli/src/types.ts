@@ -21,6 +21,13 @@ export type WorkItem = {
   branch: string | null;
   parent: string | null;
   labels: string[];
+  /**
+   * Judgment priority (convention v4, spec-priority-field-008):
+   * `p0 | p1 | p2 | p3`, or `null` when unset (never defaulted). Additive
+   * within `schemaVersion: 1`. An invalid hand-edited token surfaces as-is
+   * and fails `validate` with `PRIORITY_INVALID`.
+   */
+  priority: string | null;
   created: string | null;
   updated: string | null;
   path: string;

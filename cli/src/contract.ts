@@ -26,6 +26,7 @@ export function toContractWorkItem(
     branch: item.branch ?? null,
     parent: item.parent ?? null,
     labels: [...item.labels],
+    priority: item.priority ?? null,
     created: item.created ?? null,
     updated: item.updated ?? null,
     path: relative(rootDir, item.filePath).split(sep).join("/"),

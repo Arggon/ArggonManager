@@ -29,6 +29,7 @@ import { runImportIssues } from "./import-issues.js";
 import { runInstructions } from "./instructions.js";
 import { runMcpServer } from "./mcp-server.js";
 import { runNext } from "./next.js";
+import { runPriorityMigrate } from "./priority.js";
 import { formatReportMarkdown, formatReportTable, runReport } from "./report.js";
 import {
   formatTrendMarkdown,
@@ -376,6 +377,10 @@ program
   .option("--id <id>", "override id stem (CLI still adds task-/bug- for leaves)")
   .option("--assignee <login>", "assignee (omit when unassigned)")
   .option("--labels <csv>", "label the new item at creation (comma-separated; same kebab-case rules as update --labels)")
+  .option(
+    "--priority <p>",
+    "set the priority field at creation (convention v4): p0 | p1 | p2 | p3 (optional; absent = unprioritized)",
+  )
   .option("--status <status>", "status (default: todo)", "todo")
   .option("--blocked-reason <text>", "required when --status blocked")
   .option(
@@ -397,6 +402,7 @@ program
         id?: string;
         assignee?: string;
         labels?: string;
+        priority?: string;
         status?: string;
         blockedReason?: string;
         issue?: string;
@@ -415,6 +421,7 @@ program
           id: opts.id,
           assignee: opts.assignee,
           labels: opts.labels !== undefined ? parseCsvList(opts.labels) : undefined,
+          priority: opts.priority,
           status: opts.status,
           blockedReason: opts.blockedReason,
           issue: opts.issue !== undefined ? Number(opts.issue) : undefined,
@@ -468,7 +475,7 @@ program
   )
   .option(
     "--filter <expr>",
-    'compact filter (e.g. "status:todo !label:security"); fields status, type, assignee, label, parent, depends-on, blocked-by, ancestor; ! negates; quotes allow spaces',
+    'compact filter (e.g. "status:todo !label:security"); fields status, type, assignee, label, parent, depends-on, blocked-by, ancestor, priority; ! negates; quotes allow spaces',
   )
   .option(
     "--view <name>",
@@ -787,6 +794,10 @@ program
   .option("--unassign", "clear assignee (in_progress -> todo does this by default)", false)
   .option("--labels <csv>", "replace the full labels list (comma-separated)")
   .option(
+    "--priority <p>",
+    "set the priority field (convention v4): p0 | p1 | p2 | p3 (empty string clears it)",
+  )
+  .option(
     "--depends-on <csv>",
     "replace the full depends_on list of item ids (comma-separated; empty clears)",
   )
@@ -826,6 +837,7 @@ program
         type?: string;
         unassign?: boolean;
         labels?: string;
+        priority?: string;
         dependsOn?: string;
         addDependsOn?: string;
         issue?: string;
@@ -872,6 +884,7 @@ program
           type: opts.type,
           unassign: opts.unassign,
           labels: opts.labels,
+          priority: opts.priority,
           dependsOn: opts.dependsOn,
           addDependsOn: opts.addDependsOn,
           issue: opts.issue !== undefined ? Number(opts.issue) : undefined,
@@ -962,6 +975,69 @@ program
       void main();
     },
   );
+
+const priority = program
+  .command("priority")
+  .description("Priority field tools (convention v4, spec-priority-field-008)");
+
+priority
+  .command("migrate")
+  .description(
+    "Move legacy pN labels into the priority field on all items (highest label wins, all pN labels removed, non-priority labels kept; idempotent; never auto-commits — review and commit once)",
+  )
+  .option("--dry-run", "plan only: print the per-item changes and write NOTHING", false)
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { dryRun?: boolean; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      const result = runPriorityMigrate({ cwd: process.cwd(), dryRun: Boolean(opts.dryRun) });
+      if (json) {
+        successJson(
+          "priority",
+          {
+            dryRun: result.dryRun,
+            scanned: result.scanned,
+            changed: result.changed,
+            entries: result.entries,
+          },
+          readConventionVersion(result.root),
+        );
+        return;
+      }
+      console.log(
+        `arggon priority migrate${result.dryRun ? " (dry run)" : ""}: scanned ${result.scanned} item(s), ${result.changed} change(s)`,
+      );
+      for (const entry of result.entries) {
+        const source =
+          entry.prioritySource === "label"
+            ? "from label"
+            : `kept explicit${entry.conflictLabel ? `; label said ${entry.conflictLabel}` : ""}`;
+        console.log(
+          `  ${entry.id}: priority ${entry.priority} (${source}); removed labels: ${entry.labelsRemoved.join(", ")}`,
+        );
+      }
+      if (result.dryRun) {
+        console.log("nothing was written (dry run)");
+      } else if (result.changed > 0) {
+        console.log(
+          "migrate never auto-commits — review `git diff tasks/` and commit the migration as one change.",
+        );
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "priority",
+          message,
+          code: "PRIORITY_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      console.error(`arggon priority migrate: ${message}`);
+      process.exitCode = 1;
+    }
+  });
 
 program
   .command("comment")

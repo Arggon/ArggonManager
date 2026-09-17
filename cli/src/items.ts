@@ -20,6 +20,14 @@ export type WorkItem = {
   branch?: string;
   parent?: string | null;
   labels: string[];
+  /**
+   * Judgment priority (convention v4, spec-priority-field-008): p0|p1|p2|p3;
+   * omit/null = unprioritized (never defaulted). Parsed unconditionally, so
+   * v0-v3 trees that adopt the field early keep loading and validating. The
+   * raw token is kept (not enum-narrowed) so a hand-edited invalid value
+   * still round-trips; `validate` reports it as PRIORITY_INVALID.
+   */
+  priority?: string | null;
   created?: string;
   updated?: string;
   blockedReason?: string;
@@ -60,6 +68,7 @@ const OFFICIAL_KEYS = new Set([
   "branch",
   "parent",
   "labels",
+  "priority",
   "created",
   "updated",
   "blocked_reason",
@@ -72,6 +81,7 @@ const OFFICIAL_KEYS = new Set([
  * convention v3 (ADR 0004). issue records the GitHub issue number written by
  * `import-issues` (story-tracker-hygiene). All parse unconditionally:
  * parsing is additive, so v0-v2 trees keep loading (and validating) unchanged.
+ * (priority became OFFICIAL in convention v4 — spec-priority-field-008.)
  */
 const PROTOTYPE_KEYS = new Set([
   "milestone",
@@ -201,6 +211,10 @@ export function softTryLoadItem(filePath: string): SoftLoadResult {
     });
   }
 
+  // Convention v4 (spec-priority-field-008): parse unconditionally, keep the
+  // raw token (enum enforcement lives in validate's PRIORITY_INVALID rule).
+  const priority = stringField(data, "priority") ?? null;
+
   const extras: Frontmatter = {};
   const unknownKeys: string[] = [];
   for (const [k, v] of Object.entries(data)) {
@@ -221,6 +235,7 @@ export function softTryLoadItem(filePath: string): SoftLoadResult {
     branch: stringField(data, "branch"),
     parent: stringField(data, "parent") ?? null,
     labels,
+    priority,
     created: stringField(data, "created"),
     updated: stringField(data, "updated"),
     blockedReason: stringField(data, "blocked_reason"),

@@ -355,11 +355,15 @@ const PARITY_EXCEPTIONS: Record<string, Record<string, string>> = {
     "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
     "--no-commit":
       "default-on flip semantics governed tree-wide by x-tracker.auto-commit; MCP resolves commit identically without a flag",
+    "--priority":
+      "convention v4 field ships CLI/kernel-first (task-priority-field-schema); the arggon_create/arggon_update schemas gain `priority` with the ranking wave (task-next-priority-ranking)",
   },
   update: {
     "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
     "--no-commit":
       "default-on flip semantics governed tree-wide by x-tracker.auto-commit; MCP resolves commit identically without a flag",
+    "--priority":
+      "convention v4 field ships CLI/kernel-first (task-priority-field-schema); the arggon_create/arggon_update schemas gain `priority` with the ranking wave (task-next-priority-ranking)",
     "--force": "human-only claim steal; the shared rules layer refuses agents (MCP passes agent: true)",
     "--steal": "human-only supervised takeover (TTY-gated); agents are refused by the shared rules layer",
     "--reason": "rationale recorded only by the human-only --steal takeover; meaningless without it",

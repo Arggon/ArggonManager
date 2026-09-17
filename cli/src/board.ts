@@ -391,8 +391,13 @@ export function renderBoardHtml(
               .map((label) => `<span class="label">${esc(label)}</span>`)
               .join("")}</div>`
           : "";
+      // Priority chip (convention v4, spec-priority-field-008): additive —
+      // unprioritized cards render byte-identical to the pre-v4 output.
+      const priorityChip = item.priority
+        ? `<span class="priority ${esc(item.priority)}">${esc(item.priority)}</span>`
+        : "";
       return `<div class="card${blocked.length ? " dep-blocked" : ""}" draggable="true" data-id="${esc(item.id)}" data-type="${esc(item.type)}" data-status="${esc(item.status)}"${item.assignee ? ` data-assignee="${esc(item.assignee)}"` : ""}${milestoneOf(item) ? ` data-milestone="${esc(milestoneOf(item)!)}"` : ""}>
-  <div class="card-head"><span class="type" data-type="${esc(item.type)}" style="--type-color: ${TYPE_COLORS[item.type]}">${esc(item.type)}</span><code>${esc(item.id)}</code>${blockedBadge}</div>
+  <div class="card-head"><span class="type" data-type="${esc(item.type)}" style="--type-color: ${TYPE_COLORS[item.type]}">${esc(item.type)}</span>${priorityChip}<code>${esc(item.id)}</code>${blockedBadge}</div>
   <div class="title">${title}</div>
   ${breadcrumb}
   ${assignee}
@@ -476,6 +481,11 @@ header .meta { color: #59636e; font-size: 13px; }
 .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
 .card code { font-size: 11px; color: #59636e; }
 .type { background: var(--type-color); color: #fff; border-radius: 4px; padding: 1px 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+.priority { color: #fff; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
+.priority.p0 { background: #cf222e; }
+.priority.p1 { background: #bc4c00; }
+.priority.p2 { background: #0550ae; }
+.priority.p3 { background: #59636e; }
 .title { font-weight: 600; margin-bottom: 4px; overflow-wrap: anywhere; }
 .parent { color: #59636e; font-size: 11px; margin-bottom: 4px; }
 .parent::before { content: "↳ "; }

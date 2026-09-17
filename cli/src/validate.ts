@@ -2,6 +2,7 @@ import { existsSync, readdirSync, statSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
 import { CONVENTION_VERSION, readConventionConfig, readConventionVersion } from "./convention.js";
 import { assertValidId, BRANCH_PATTERN } from "./ids.js";
+import { isPriority } from "./priority.js";
 import { softTryLoadItem, walkTasksTree, type WorkItem } from "./items.js";
 import { findTasksDir, newItemPath, repoRootFromTasks } from "./paths.js";
 import { assertParentEdge, expectedParentType } from "./relations.js";
@@ -114,6 +115,19 @@ function checkItemShape(item: SoftItem, errors: Issue[]): void {
       push(errors, rel, `duplicate label ${JSON.stringify(label)}`, "INVALID_LABELS");
     }
     seenLabels.add(label);
+  }
+
+  // Convention v4 (spec-priority-field-008): optional on every type, enum
+  // p0|p1|p2|p3, lowercase, exact. Enforced regardless of tree version — the
+  // same additive, version-gate-free rule as `depends_on` in v3 (absent stays
+  // absent; nothing here demands the field or backfills a default).
+  if (item.priority !== undefined && item.priority !== null && !isPriority(item.priority)) {
+    push(
+      errors,
+      rel,
+      `priority must be one of p0, p1, p2, p3 (got ${JSON.stringify(item.priority)})`,
+      "PRIORITY_INVALID",
+    );
   }
 }
 
@@ -233,7 +247,9 @@ export function runValidate(opts: ValidateOptions): ValidateResult {
     for (const issue of loaded.issues) {
       push(errors, rel, issue.message, issue.code);
     }
-    const reserved = new Set(["order", "rank", "blocked_by", "priority", "estimate"]);
+    // priority is OFFICIAL as of convention v4 (spec-priority-field-008);
+    // order/rank, blocked_by and estimate stay reserved for later versions.
+    const reserved = new Set(["order", "rank", "blocked_by", "estimate"]);
     for (const key of loaded.unknownKeys) {
       if (reserved.has(key)) {
         push(errors, rel, `reserved frontmatter key '${key}' is invalid in v0`, "RESERVED_KEY");
