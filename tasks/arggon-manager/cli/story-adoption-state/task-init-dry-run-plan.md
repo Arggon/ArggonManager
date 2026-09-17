@@ -19,10 +19,13 @@ updated: "2026-09-16"
 
 ## Context
 
-<!-- Why this task exists. -->
+Exploration adopter-upgrade-experience-007 (option A, approved 2026-09-16, staged plan B+A -> C -> D): re-running `arggon init` is the designed upgrade path for generated docs, but there is no way to see what it WOULD do without running it — and init writes + auto-commits. Adopters (and their agents) need a pure-read plan before deciding. Computation already exists in runInit; only the write gets gated. Parent decision record: exploration-adopter-upgrade-experience-007.
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] `arggon init <dir> --dry-run` computes the full per-destination decision (created / would-update / modified-skip / acked-skip / backedUp-if---backup / stale / missing) and writes NOTHING: no file changes, no backup dir, no auto-commit (fs snapshot-verified in tests)
+- [ ] Planner logic is a pure function shared with runInit (no duplicated decision code); runInit calls it then applies
+- [ ] `--json` payload additive: same envelope + `dryRun: true` and the `plan` array (per-destination decision + reason); human output renders the plan as a table with a "nothing was written" footer
+- [ ] `--dry-run` combines cleanly with `--force`/`--full`/`--backup` flags (plan reflects them)
+- [ ] Tests: untouched doc whose template changed shows would-update with the new render pending; acked doc shows acked-skip; fs-unchanged invariant; existing init suite stays green
+- [ ] Docs: README "Re-running init" section + docs/json-output.md (additive)

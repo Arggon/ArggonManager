@@ -19,10 +19,12 @@ updated: "2026-09-16"
 
 ## Context
 
-<!-- Why this task exists. -->
+Exploration adopter-upgrade-experience-007 (option B, approved 2026-09-16): doctor reports provenance vs the RECORDED state (untouched/modified/acked/acknowledgedDrifted/stale/missing) but nothing says "the upstream template changed since this doc was generated/acked" — staleness is invisible until someone re-runs init. Evidence: all 14 managed docs of ArggonStores-am are acked, so updates silently stop reaching it. This makes staleness continuously visible, pure read.
 
 ## Acceptance
 
-- [ ] 
-
-## Notes
+- [ ] For each managed destination, doctor re-renders the CURRENT template (same placeholders: {{PROJECT_NAME}}, {{YEAR}}, target-dir-derived values; rendering must be pure and side-effect-free) and compares with the on-disk file; render differs -> counted as `outdated` (new bucket) in docs counts + `--json` payload additive (per-doc `outdated: true` + reason)
+- [ ] Bucket semantics: applies to untouched AND acknowledged AND modified docs (upstream moved regardless of local state); `stale` (template no longer generated) keeps its current meaning; missing template file on disk -> graceful (counted unknown-outdated, never throws)
+- [ ] Human output: "N doc(s) have newer templates — run `arggon init --dry-run` for the plan" hint line; doctor stays exit 0 (report-only)
+- [ ] Tests: template changed -> outdated detected; template unchanged -> not outdated; acked+changed -> outdated; template file absent -> no crash; full doctor suite green
+- [ ] Docs: README doctor section + docs/json-output.md (additive)
