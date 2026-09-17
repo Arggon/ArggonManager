@@ -117,8 +117,19 @@ export function withItemLock<T>(itemFilePath: string, fn: () => T, opts: LockOpt
     }
     // Contended. Break a stale lock so a crashed process cannot wedge the
     // tracker; for a corrupt/unreadable lock file fall back to its mtime.
-    const info = readLockInfo(lockPath);
-    const acquiredMs = info ? Date.parse(info.acquiredAt) : statSync(lockPath).mtimeMs;
+    // The lock can also vanish entirely between our failed create and this
+    // check (the holder released it) — retry the create instead of letting
+    // statSync's ENOENT escape (bug-spawn-sync-test-timeout-flake: transient
+    // ENOENT in concurrent sibling done-flips).
+    let acquiredMs: number;
+    try {
+      const info = readLockInfo(lockPath);
+      acquiredMs = info ? Date.parse(info.acquiredAt) : statSync(lockPath).mtimeMs;
+    } catch {
+      // Lock gone (released or stale-broken by another waiter): loop and
+      // retry the create.
+      continue;
+    }
     const age = now() - acquiredMs;
     if (Number.isNaN(age) || age > LOCK_STALE_MS) {
       try {
