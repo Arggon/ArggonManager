@@ -30,3 +30,8 @@ Pilot finding (2026-09-17, first `init --propose` run on this self-host repo): a
 - [ ] Pilot re-run on this repo post-fix: proposals for convention.md/engineering.md should surface only genuinely new template sections (if any), not skeleton swaps
 
 ## Notes
+
+### 2026-09-17 @Arggon
+REVIEW (coordinator) — APPROVED, merging PR #310.
+
+Verified: full diff read (spec-007 spec-first flipped implemented; LCS region extraction with anchors from the git-history as-generated baseline — first committed version of each dest; sections default + --propose-whole-file explicit + automatic whole-file fallback when baseline unrecoverable; informational decision for removed-only diffs — adopter content never proposed for deletion; same-version idempotency/absorbed/stale rules reused). Gates mine: suite 1030/1030 (5 new tests; first run had 5 load flakes — the exact class #311 fixes), lint/build clean, spec validate 0 errors, validate ok. Pilot reproduced independently: init --propose --full on this repo now yields section-level proposals (mode=sections, 1-19 regions per doc, anchors quote unchanged context) instead of the 11 skeleton-swap regressions of the first pilot; runbooks/README correctly informational (template gained nothing); originals byte-intact. Year-boundary {{YEAR}} churn documented as acceptable noise in the spec.
