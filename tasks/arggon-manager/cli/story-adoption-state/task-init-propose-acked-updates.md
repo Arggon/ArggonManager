@@ -4,6 +4,7 @@ status: in_progress
 id: task-init-propose-acked-updates
 title: "init --propose: side-file upgrade proposals for acked/modified docs"
 assignee: Arggon
+branch: feat/task-init-propose-acked-updates
 parent: story-adoption-state
 labels: [p1]
 created: "2026-09-16"
