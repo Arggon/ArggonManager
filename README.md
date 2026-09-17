@@ -169,6 +169,17 @@ arggon init . --dry-run --json            # same plan for agents
 arggon init . --full --backup             # then apply it
 ```
 
+**Upgrading acked/modified docs: `arggon init --propose` (task-init-propose-acked-updates).** The skip rules above mean a fully-adopted repo — every doc acked via `arggon adopt --ack` — receives zero template updates by mechanism ("it is yours"). `--propose` is the safe upgrade channel for exactly those docs: for every acked OR adopter-modified destination whose CURRENT template render differs from what is on disk, init writes the fresh render to a side file next to the original (`<dest>.proposed-<arggonVersion>`, e.g. `docs/agents.md.proposed-0.2.0`). Originals are byte-untouched, the `x-generated` state is never mutated, and nothing is committed — proposals are untracked working files (add `*.proposed-*` to `.gitignore` if you do not want to commit them). Each proposal carries a header comment above the generated marker (`<!-- arggon:proposed-update dest="..." version="..." generated="..."; diff against the original, merge what you want, then re-ack via arggon adopt --ack and delete this file -->`) so an agent reading only the proposal file knows the flow.
+
+The full loop: **propose → diff/merge → re-ack** — run `arggon init . --propose`, the adopting agent diffs each side file against its original and merges what it wants as a normal work item, then refreshes the ack (`arggon adopt --ack`) and deletes the proposal file. Re-running `--propose` is idempotent: it overwrites its own same-version proposal (never accumulates `<dest>.proposed-<same-version>` junk); a destination that now matches upstream gets its same-version leftover removed and reported as `absorbed`; a proposal from a different (older) arggon version left behind is reported as `stale` and never silently deleted. Combine with `--full` to include tier-2 docs; `--dry-run --propose` lists what would be written/removed without touching anything; `--backup`/`--force` do not combine with `--propose` (proposals never touch originals or regenerate — that is a clear error). With `--json`, the init envelope gains an additive `proposals[]` array (`{ dest, proposalPath, decision: proposed | absorbed | stale, template, basedOnVersion, added?, removed? }`); human output lists each proposal with its `+added/-removed` line summary. Pilot: ArggonStores-am's 14 acked docs.
+
+```bash
+arggon init . --propose --dry-run         # which docs would get proposals?
+arggon init . --propose                   # write <dest>.proposed-<version> side files
+# ... agent diffs/merges each proposal as a work item ...
+arggon adopt --ack                        # re-ack the merged docs; delete the .proposed-* files
+```
+
 ### `arggon doctor`
 
 Report-only installation check (exit 0, pure read): is ArggonManager installed here, and in what shape?

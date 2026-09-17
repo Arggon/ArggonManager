@@ -13,7 +13,7 @@ import { readConventionVersion } from "./convention.js";
 import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
 import { runDoctor, formatDoctorReport, measureBudgetForDoctor } from "./doctor.js";
-import { runInit, dryRunInit, type InitResult, type InitDryRunResult } from "./init.js";
+import { runInit, dryRunInit, type InitResult, type InitDryRunResult, type ProposalEntry } from "./init.js";
 import {
   bindJsonProgram,
   emitJson,
@@ -105,6 +105,11 @@ program
     false,
   )
   .option(
+    "--propose",
+    "upgrade channel for acked/modified docs: write fresh template renders to <dest>.proposed-<version> side files (originals untouched, state unmutated, nothing committed) — diff/merge/re-ack to adopt (task-init-propose-acked-updates)",
+    false,
+  )
+  .option(
     "--dry-run",
     "plan only: print exactly what init would do per destination and write NOTHING — no files, no backup dir, no auto-commit (pure read)",
     false,
@@ -121,6 +126,7 @@ program
         force: boolean;
         full?: boolean;
         backup?: boolean;
+        propose?: boolean;
         dryRun?: boolean;
         commit?: boolean;
         json?: boolean;
@@ -128,12 +134,18 @@ program
     ) => {
       const json = jsonEnabled(opts);
       try {
+        if (opts.propose && (opts.backup || opts.force)) {
+          throw new Error(
+            "init --propose does not combine with --backup/--force (proposals never touch originals or regenerate)",
+          );
+        }
         if (opts.dryRun) {
           const result = dryRunInit({
             dir,
             force: Boolean(opts.force),
             full: Boolean(opts.full),
             backup: Boolean(opts.backup),
+            propose: Boolean(opts.propose),
           });
           if (json) {
             successJson(
@@ -149,6 +161,7 @@ program
                 skipped: result.skipped,
                 restored: result.restored,
                 conventionPath: result.conventionPath,
+                ...(result.proposals ? { proposals: proposalPayload(result.proposals) } : {}),
                 dryRun: true,
                 plan: result.plan,
                 ...(result.warning ? { warning: result.warning } : {}),
@@ -165,6 +178,7 @@ program
           force: Boolean(opts.force),
           full: Boolean(opts.full),
           backup: Boolean(opts.backup),
+          propose: Boolean(opts.propose),
           commit: opts.commit === false ? false : undefined,
         });
         if (json) {
@@ -181,11 +195,16 @@ program
               skipped: result.skipped,
               restored: result.restored,
               conventionPath: result.conventionPath,
+              ...(result.proposals ? { proposals: proposalPayload(result.proposals) } : {}),
               commit: commitPayload(result.commit),
               ...(result.warning ? { warning: result.warning } : {}),
             },
             readConventionVersion(result.root),
           );
+          return;
+        }
+        if (result.proposals) {
+          printInitProposeHuman(result);
           return;
         }
         printInitHuman(result);
@@ -2171,8 +2190,50 @@ program
     }
   });
 
-function printInitDryRun(result: InitDryRunResult): void {
-  // bug-init-git-doctor-blindspot: same warning surface as a real run.
+/** JSON shape of the additive `proposals[]` payload (task-init-propose-acked-updates). */
+function proposalPayload(proposals: ProposalEntry[]): unknown[] {
+  return proposals.map((p) => ({
+    dest: p.dest,
+    proposalPath: p.proposalPath,
+    decision: p.decision,
+    template: p.template,
+    basedOnVersion: p.basedOnVersion,
+    ...(p.decision === "proposed" ? { added: p.added, removed: p.removed } : {}),
+  }));
+}
+
+/**
+ * Human output for `init --propose` (task-init-propose-acked-updates): every
+ * proposal with its compact diff summary, plus the flow hint.
+ */
+function printInitProposeHuman(result: InitResult): void {
+  if (result.warning) {
+    console.error(`arggon: warning: ${result.warning}`);
+  }
+  const proposals = result.proposals ?? [];
+  console.log(`arggon init --propose: ${proposals.length} proposal(s) at ${result.root}`);
+  for (const p of proposals) {
+    if (p.decision === "proposed") {
+      console.log(
+        `  proposed  ${p.dest}  ->  ${p.proposalPath}  (+${p.added ?? 0}/-${p.removed ?? 0} lines vs current template)`,
+      );
+    } else if (p.decision === "absorbed") {
+      console.log(`  absorbed  ${p.dest}  (matches upstream — removed ${p.proposalPath})`);
+    } else {
+      console.log(
+        `  stale     ${p.dest}  (${p.proposalPath} is from an older arggon version — delete it after checking)`,
+      );
+    }
+  }
+  if (proposals.length === 0) {
+    console.log("  (nothing to propose — every doc matches its current template)");
+  }
+  console.log(
+    "Originals untouched. Next: diff each proposal, merge what you want as normal work, then re-ack via `arggon adopt --ack` and delete the proposal file.",
+  );
+}
+
+function printInitDryRun(result: InitDryRunResult): void {  // bug-init-git-doctor-blindspot: same warning surface as a real run.
   if (result.warning) {
     console.error(`arggon: warning: ${result.warning}`);
   }

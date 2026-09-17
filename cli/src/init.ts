@@ -1,6 +1,14 @@
 import { execFileSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join, resolve } from "node:path";
 import { bundledTemplatesDir } from "./paths.js";
 import {
   CONVENTION_VERSION,
@@ -8,7 +16,15 @@ import {
   readGeneratedState,
   updateGeneratedSection,
 } from "./convention.js";
-import { applyDocsPlan, planGenerateDocs, type DocsPlan } from "./docs.js";
+import {
+  applyDocsPlan,
+  arggonVersion,
+  currentGeneratedTemplates,
+  planGenerateDocs,
+  renderGeneratedDoc,
+  TIER2_DESTS,
+  type DocsPlan,
+} from "./docs.js";
 import type { ItemType } from "./ids.js";
 import {
   commitTrackerMutation,
@@ -44,6 +60,16 @@ export type InitOptions = {
    * and git-absent machines skip with a reason, command stays ok).
    */
   commit?: boolean;
+  /**
+   * Proposal mode (task-init-propose-acked-updates): instead of the normal
+   * regenerate/skip buckets, write fresh template renders for every acked OR
+   * adopter-modified destination whose CURRENT render differs from disk to
+   * SIDE FILES (`<dest>.proposed-<arggonVersion>`); originals are never
+   * touched and the x-generated state is never mutated. The adopting agent
+   * diffs/merges as normal work, re-acks via `arggon adopt --ack`, and
+   * deletes the proposal. Never auto-commits anything.
+   */
+  propose?: boolean;
 };
 
 export type InitResult = {
@@ -61,6 +87,8 @@ export type InitResult = {
   skipped: string[];
   restored: string[];
   conventionPath: string;
+  /** Side-file upgrade proposals (--propose, task-init-propose-acked-updates, additive). */
+  proposals?: ProposalEntry[];
   /** Tracker auto-commit outcome for the files written this run. */
   commit?: TrackerCommitResult;
   /**
@@ -248,12 +276,182 @@ export function planInit(opts: InitOptions): InitPlan {
   };
 }
 
-/** Template .md file names in the bundled templates dir (best effort). */
+/**
+ * Template .md file names in the bundled templates dir (best effort).
+ */
 function listBundledTemplates(): string[] {
   const templatesSrc = bundledTemplatesDir();
   if (!existsSync(templatesSrc)) return [];
   return readdirSync(templatesSrc).filter((name) => name.endsWith(".md"));
 }
+
+/**
+ * One side-file upgrade proposal (task-init-propose-acked-updates). `basedOnVersion`
+ * is the arggon version the fresh render comes from (and the proposal filename
+ * suffix); `added`/`removed` carry the compact line-diff summary (human output).
+ */
+export type ProposalEntry = {
+  /** Destination the proposal upgrades (posix, relative to root). */
+  dest: string;
+  /** Side-file path (posix, relative to root): `<dest>.proposed-<version>`. */
+  proposalPath: string;
+  /**
+   * `proposed` — fresh render differs from disk, side file written/overwritten;
+   * `absorbed` — the destination now matches the render, so this run's own
+   * same-version stale side file was removed; `stale` — a side file from a
+   * DIFFERENT (older) arggon version is still on disk: reported, never deleted.
+   */
+  decision: "proposed" | "absorbed" | "stale";
+  /** Source template id (x-generated style, package-root relative). */
+  template: string;
+  /** Arggon version of the render (and filename suffix) behind this entry. */
+  basedOnVersion: string;
+  /** Diff summary vs the on-disk original (proposed only). */
+  added?: number;
+  removed?: number;
+};
+
+/**
+ * Distinguishing header ABOVE the standard generated marker (task-init-propose-
+ * acked-updates): an agent reading only the proposal file must know what to do.
+ * JSON destinations stay header-less (and marker-less, like normal generation)
+ * so the proposal remains parseable.
+ */
+export function proposalContent(
+  dest: string,
+  version: string,
+  render: string,
+  now?: Date,
+): string {
+  if (dest.endsWith(".json")) return render;
+  const header =
+    `<!-- arggon:proposed-update dest="${dest}" version="${version}" ` +
+    `generated="${(now ?? new Date()).toISOString()}"; diff against the original, ` +
+    `merge what you want, then re-ack via arggon adopt --ack and delete this file -->\n`;
+  return header + render;
+}
+
+/** Naive line-diff summary (LCS) for the human proposal listing. */
+function diffSummary(before: string, after: string): { added: number; removed: number } {
+  const a = before.split("\n");
+  const b = after.split("\n");
+  const lcs: number[][] = Array.from({ length: a.length + 1 }, () =>
+    new Array<number>(b.length + 1).fill(0),
+  );
+  for (let i = a.length - 1; i >= 0; i--) {
+    for (let j = b.length - 1; j >= 0; j--) {
+      lcs[i][j] = a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+    }
+  }
+  return { added: b.length - lcs[0][0], removed: a.length - lcs[0][0] };
+}
+
+/** Proposal side files already on disk for a dest: version -> present. */
+function existingProposals(destAbs: string): Map<string, boolean> {
+  const dir = dirname(destAbs);
+  const base = destAbs.split("/").pop()!;
+  const found = new Map<string, boolean>();
+  if (!existsSync(dir)) return found;
+  for (const name of readdirSync(dir)) {
+    if (!name.startsWith(`${base}.proposed-`)) continue;
+    found.set(name.slice(`${base}.proposed-`.length), true);
+  }
+  return found;
+}
+
+/**
+ * Pure plan (task-init-propose-acked-updates) of exactly what `init --propose`
+ * would write/remove, computed with ZERO writes: for every generated
+ * destination (acked OR adopter-modified — unchanged untouched docs are
+ * regenerated by a plain init anyway) whose CURRENT template render differs
+ * from disk, a `proposed` side-file entry; a destination that now matches its
+ * render reports its own same-version leftover as `absorbed` (removed on
+ * apply); older-version side files are reported `stale` and left alone.
+ * Requires an initialized tree (x-generated state reader).
+ */
+export function planProposals(root: string, full: boolean, now?: Date): ProposalEntry[] {
+  const version = arggonVersion();
+  const out: ProposalEntry[] = [];
+  for (const { dest, template } of currentGeneratedTemplates()) {
+    if (!full && TIER2_DESTS.has(dest)) continue;
+    const destAbs = join(root, ...dest.split("/"));
+    if (!existsSync(destAbs)) continue; // a plain init generates it; nothing to propose
+    let disk: string;
+    try {
+      disk = readFileSync(destAbs, "utf8");
+    } catch {
+      continue;
+    }
+    const render = renderGeneratedDoc({
+      templatesDir: bundledTemplatesDir(),
+      root,
+      template,
+      dest,
+      now,
+    });
+    if (render === null) continue; // template absent/unreadable: cannot decide
+    const proposalPath = `${dest}.proposed-${version}`;
+    const versions = existingProposals(destAbs);
+    // Older-version side files: reported as stale, never silently deleted.
+    for (const v of [...versions.keys()].filter((v) => v !== version).sort()) {
+      out.push({
+        dest,
+        proposalPath: `${dest}.proposed-${v}`,
+        decision: "stale",
+        template,
+        basedOnVersion: v,
+      });
+    }
+    if (disk === render) {
+      // Absorbed: someone merged (or the template caught up); this run's own
+      // same-version leftover is removed by the real run.
+      if (versions.has(version)) {
+        out.push({ dest, proposalPath, decision: "absorbed", template, basedOnVersion: version });
+      }
+      continue;
+    }
+    const { added, removed } = diffSummary(disk, render);
+    out.push({ dest, proposalPath, decision: "proposed", template, basedOnVersion: version, added, removed });
+  }
+  return out.sort((a, b) => a.proposalPath.localeCompare(b.proposalPath));
+}
+
+/**
+ * Apply a proposal plan (task-init-propose-acked-updates): write/overwrite the
+ * `proposed` side files, remove the `absorbed` same-version leftovers, and
+ * touch NOTHING else — originals stay byte-identical, x-generated state is
+ * never mutated, nothing is committed (proposals are untracked working files).
+ */
+export function applyProposals(root: string, proposals: ProposalEntry[], now?: Date): void {
+  for (const p of proposals) {
+    const abs = join(root, ...p.proposalPath.split("/"));
+    if (p.decision === "stale") continue;
+    if (p.decision === "absorbed") {
+      rmSync(abs, { force: true });
+      continue;
+    }
+    const render = renderGeneratedDoc({
+      templatesDir: bundledTemplatesDir(),
+      root,
+      template: p.template,
+      dest: p.dest,
+      now,
+    });
+    if (render === null) continue; // vanished between plan and apply: skip
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(abs, proposalContent(p.dest, p.basedOnVersion, render, now), "utf8");
+  }
+}
+
+/** Preconditions shared by the propose paths of runInit and dryRunInit. */
+function proposePreconditions(opts: InitOptions): string | undefined {
+  if (opts.force) return "init --propose does not combine with --force (proposals never touch originals; drop --force)";
+  if (opts.backup) return "init --propose does not combine with --backup (proposals never regenerate; drop --backup)";
+  return undefined;
+}
+
+const NOT_INITIALIZED_PROPOSE_ERROR =
+  "not an arggon-managed tree — run `arggon init` first (--propose upgrades already-generated docs)";
 
 /**
  * Pure-read dry run (task-init-dry-run-plan): the full init plan per
@@ -277,16 +475,53 @@ export type InitDryRunResult = {
   backedUp: string[];
   skipped: string[];
   restored: string[];
+  /** Proposal plan with --propose (task-init-propose-acked-updates, additive). */
+  proposals?: ProposalEntry[];
   /** Same not-a-git-repo warning a real run would surface. */
   warning?: string;
 };
 
 export function dryRunInit(opts: InitOptions): InitDryRunResult {
+  const proposeError = opts.propose ? proposePreconditions(opts) : undefined;
+  if (proposeError) throw new Error(proposeError);
   const plan = planInit(opts);
   if (plan.error) throw new Error(plan.error);
   const root = plan.root;
   const conventionPath = join(root, "tasks", ".convention.yml");
   const warning = isGitRepo(root) ? undefined : NOT_A_REPO_WARNING;
+
+  // Propose dry run: list the proposal writes/removals, write nothing.
+  if (opts.propose) {
+    if (!existsSync(conventionPath)) throw new Error(NOT_INITIALIZED_PROPOSE_ERROR);
+    const proposals = planProposals(root, Boolean(opts.full), opts.now);
+    return {
+      root,
+      alreadyInitialized: true,
+      force: false,
+      full: Boolean(opts.full),
+      backup: false,
+      conventionPath,
+      plan: proposals.map((p) => ({
+        dest: p.dest,
+        decision: p.decision,
+        reason:
+          p.decision === "proposed"
+            ? `would write ${p.proposalPath} (template render differs from disk)`
+            : p.decision === "absorbed"
+              ? `destination matches upstream — would remove its ${p.basedOnVersion} proposal`
+              : `older-version proposal left on disk — reported, not removed`,
+      })),
+      created: [],
+      updated: [],
+      modified: [],
+      backedUp: [],
+      skipped: [],
+      restored: [],
+      proposals,
+      warning,
+    };
+  }
+
   const docEntries: InitPlanEntry[] = plan.docs.entries.map((e) => ({
     dest: e.dest,
     decision: e.decision,
@@ -333,6 +568,31 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
 }
 
 export function runInit(opts: InitOptions): InitResult {
+  // Propose mode (task-init-propose-acked-updates): side-file upgrade
+  // proposals only — originals untouched, state unmutated, nothing committed.
+  if (opts.propose) {
+    const proposeError = proposePreconditions(opts);
+    if (proposeError) throw new Error(proposeError);
+    const root = resolve(opts.dir);
+    const conventionPath = join(root, "tasks", ".convention.yml");
+    if (!existsSync(conventionPath)) throw new Error(NOT_INITIALIZED_PROPOSE_ERROR);
+    const proposals = planProposals(root, Boolean(opts.full), opts.now);
+    applyProposals(root, proposals, opts.now);
+    return {
+      root,
+      alreadyInitialized: true,
+      force: false,
+      created: [],
+      updated: [],
+      modified: [],
+      backedUp: [],
+      skipped: [],
+      restored: [],
+      conventionPath,
+      proposals,
+      warning: isGitRepo(root) ? undefined : NOT_A_REPO_WARNING,
+    };
+  }
   // Plan first (task-init-dry-run-plan): the shared pure planner computes
   // every per-destination decision; runInit then applies it. No duplicated
   // decision code between the real run and `--dry-run`.

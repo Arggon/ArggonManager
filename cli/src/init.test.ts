@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { runInit, dryRunInit } from "./init.js";
+import { runInit, dryRunInit, type ProposalEntry } from "./init.js";
+import { arggonVersion, renderGeneratedDoc } from "./docs.js";
 import { readGeneratedState, updateGeneratedSection } from "./convention.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
@@ -338,6 +339,197 @@ function ackDoc(dir: string, dest: string): void {
   state[dest] = { ...state[dest]!, acknowledged: true };
   writeFileSync(statePath, updateGeneratedSection(readFileSync(statePath, "utf8"), state), "utf8");
 }
+
+// task-init-propose-acked-updates: `init --propose` is the safe upgrade
+// channel for acked/modified docs — fresh template renders land in
+// `<dest>.proposed-<version>` SIDE FILES; originals stay byte-identical,
+// x-generated state is never mutated, nothing is committed.
+describe("init --propose", () => {
+  const NOW = new Date("2026-09-17T12:00:00Z");
+
+  /** Fixture: initialized tree, AGENTS.md acked then hand-edited (outdated). */
+  function setupAckedDrift(dir: string): string {
+    runInit({ dir, force: false, now: NOW });
+    ackDoc(dir, "AGENTS.md");
+    const original = readFileSync(join(dir, "AGENTS.md"), "utf8");
+    writeFileSync(join(dir, "AGENTS.md"), `${original}\nadopter edit\n`, "utf8");
+    return original;
+  }
+
+  function proposalOf(proposals: ProposalEntry[], dest: string): ProposalEntry {
+    const p = proposals.find((e) => e.dest === dest);
+    expect(p).toBeDefined();
+    return p!;
+  }
+
+  it("proposes for an acked doc whose render differs from disk: side file written, original intact, state unmutated", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-"));
+    const original = setupAckedDrift(dir);
+    const before = snapshot(dir);
+    const version = arggonVersion();
+
+    const result = runInit({ dir, force: false, propose: true, now: NOW });
+
+    const p = proposalOf(result.proposals ?? [], "AGENTS.md");
+    expect(p.decision).toBe("proposed");
+    expect(p.proposalPath).toBe(`AGENTS.md.proposed-${version}`);
+    expect(p.template).toBe("docs/AGENTS.md");
+    expect(p.basedOnVersion).toBe(version);
+    const proposalFile = join(dir, ...p.proposalPath.split("/"));
+    expect(existsSync(proposalFile)).toBe(true);
+    const content = readFileSync(proposalFile, "utf8");
+    // Distinguishing header ABOVE the standard generated marker.
+    expect(content).toContain(`arggon:proposed-update dest="AGENTS.md" version="${version}"`);
+    expect(content.indexOf("arggon:proposed-update")).toBeLessThan(content.indexOf("arggon:generated"));
+    expect(content).toContain("arggon adopt --ack");
+    expect(p.removed).toBeGreaterThan(0);
+    expect(p.added).toBeGreaterThanOrEqual(0);
+    // Original byte-untouched.
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(`${original}\nadopter edit\n`);
+    // x-generated state NOT mutated, and only the side file changed on disk.
+    const after = snapshot(dir);
+    expect(after.files["tasks/.convention.yml"]).toBe(before.files["tasks/.convention.yml"]);
+    const proposalKey = `AGENTS.md.proposed-${version}`;
+    expect(Object.keys(after.files)).toContain(proposalKey);
+    delete (after.files as Record<string, string>)[proposalKey];
+    expect(after.files).toEqual(before.files);
+    expect(result.commit).toBeUndefined();
+  });
+
+  it("proposes nothing for unchanged dests (render matches disk)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-"));
+    runInit({ dir, force: false, now: NOW });
+    const result = runInit({ dir, force: false, propose: true, now: NOW });
+    expect(result.proposals ?? []).toEqual([]);
+    expect(existsSync(join(dir, "AGENTS.md.proposed-0.0.0"))).toBe(false);
+  });
+
+  it("proposes for a modified (unacked) doc too; tier-2 only with --full", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-"));
+    runInit({ dir, force: false, full: true, now: NOW });
+    writeFileSync(join(dir, "ARCHITECTURE.md"), "CUSTOM\n", "utf8");
+    writeFileSync(join(dir, "CLAUDE.md"), `${readFileSync(join(dir, "CLAUDE.md"), "utf8")}\nx\n`, "utf8");
+
+    const tier1 = runInit({ dir, force: false, propose: true, now: NOW });
+    expect((tier1.proposals ?? []).map((p) => p.dest)).toContain("CLAUDE.md");
+    expect((tier1.proposals ?? []).map((p) => p.dest)).not.toContain("ARCHITECTURE.md");
+
+    const tier2 = runInit({ dir, force: false, full: true, propose: true, now: NOW });
+    expect((tier2.proposals ?? []).map((p) => p.dest)).toContain("ARCHITECTURE.md");
+    expect(existsSync(join(dir, `ARCHITECTURE.md.proposed-${arggonVersion()}`))).toBe(true);
+  });
+
+  it("is idempotent: re-running overwrites its own same-version proposal (never accumulates)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-"));
+    setupAckedDrift(dir);
+    runInit({ dir, force: false, propose: true, now: NOW });
+    const first = readdirSync(dir).filter((n) => n.startsWith("AGENTS.md.proposed-"));
+    expect(first).toEqual([`AGENTS.md.proposed-${arggonVersion()}`]);
+    const second = runInit({ dir, force: false, propose: true, now: NOW });
+    expect(proposalOf(second.proposals ?? [], "AGENTS.md").decision).toBe("proposed");
+    expect(readdirSync(dir).filter((n) => n.startsWith("AGENTS.md.proposed-"))).toEqual(first);
+  });
+
+  it("absorbs: a dest that now matches upstream gets its same-version proposal removed and reported", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-"));
+    setupAckedDrift(dir);
+    runInit({ dir, force: false, propose: true, now: NOW });
+    // The agent merges: restores the doc to the sanctioned template render.
+    const render = renderGeneratedDoc({
+      templatesDir: resolve(repoRoot, "templates"),
+      root: dir,
+      template: "docs/AGENTS.md",
+      dest: "AGENTS.md",
+      now: NOW,
+    });
+    expect(render).not.toBeNull();
+    writeFileSync(join(dir, "AGENTS.md"), render!, "utf8");
+
+    const result = runInit({ dir, force: false, propose: true, now: NOW });
+    const p = proposalOf(result.proposals ?? [], "AGENTS.md");
+    expect(p.decision).toBe("absorbed");
+    expect(existsSync(join(dir, ...p.proposalPath.split("/")))).toBe(false);
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(render!);
+  });
+
+  it("reports an older-version proposal as stale and leaves it on disk", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-"));
+    setupAckedDrift(dir);
+    writeFileSync(join(dir, "AGENTS.md.proposed-0.1.0"), "OLD PROPOSAL\n", "utf8");
+    const result = runInit({ dir, force: false, propose: true, now: NOW });
+    const stale = (result.proposals ?? []).filter((p) => p.decision === "stale");
+    expect(stale.map((p) => p.proposalPath)).toContain("AGENTS.md.proposed-0.1.0");
+    expect(stale.find((p) => p.proposalPath === "AGENTS.md.proposed-0.1.0")?.basedOnVersion).toBe("0.1.0");
+    expect(readFileSync(join(dir, "AGENTS.md.proposed-0.1.0"), "utf8")).toBe("OLD PROPOSAL\n");
+    // And the current-version proposal is still written alongside.
+    expect((result.proposals ?? []).some((p) => p.decision === "proposed" && p.dest === "AGENTS.md")).toBe(true);
+  });
+
+  it("dry-run + propose lists would-write/would-remove and writes NOTHING", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-"));
+    setupAckedDrift(dir);
+    writeFileSync(join(dir, "AGENTS.md.proposed-0.1.0"), "OLD\n", "utf8");
+    const before = snapshot(dir);
+    const result = dryRunInit({ dir, force: false, propose: true, now: NOW });
+    expect((result.proposals ?? []).some((p) => p.decision === "proposed")).toBe(true);
+    expect(result.plan.map((e) => e.dest)).toContain("AGENTS.md");
+    // Pure read: no proposal file written, stale file untouched, fs + git intact.
+    expect(existsSync(join(dir, `AGENTS.md.proposed-${arggonVersion()}`))).toBe(false);
+    expect(snapshot(dir)).toEqual(before);
+  });
+
+  it("errors on nonsensical combos and on a non-initialized tree", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-"));
+    expect(() => runInit({ dir, force: false, propose: true, backup: true })).toThrow(/--backup/);
+    expect(() => runInit({ dir, force: true, propose: true })).toThrow(/--force/);
+    expect(() => runInit({ dir, force: false, propose: true })).toThrow(/arggon init` first/);
+    expect(() => dryRunInit({ dir, force: false, propose: true, backup: true })).toThrow(/--backup/);
+  });
+
+  it("e2e: init --propose --json carries the additive proposals[] shape; human output lists proposals; --propose --backup fails", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-"));
+    gitInit(dir);
+    runInit({ dir, force: false, now: NOW });
+    setupAckedDrift(dir); // acks + edits AGENTS.md (already initialized)
+    const version = arggonVersion();
+
+    const json = spawnSync(process.execPath, [tsx, cli, "init", "--propose", "--json", dir], {
+      encoding: "utf8",
+      cwd: dir,
+    });
+    expect(json.status).toBe(0);
+    const body = JSON.parse(json.stdout) as {
+      ok: boolean;
+      proposals?: { dest: string; proposalPath: string; decision: string; template: string; basedOnVersion: string }[];
+      commit?: unknown;
+    };
+    expect(body.ok).toBe(true);
+    const p = body.proposals?.find((e) => e.dest === "AGENTS.md");
+    expect(p?.decision).toBe("proposed");
+    expect(p?.proposalPath).toBe(`AGENTS.md.proposed-${version}`);
+    expect(p?.template).toBe("docs/AGENTS.md");
+    expect(p?.basedOnVersion).toBe(version);
+    expect(body.commit).toBeUndefined();
+    expect(existsSync(join(dir, `AGENTS.md.proposed-${version}`))).toBe(true);
+
+    const human = spawnSync(process.execPath, [tsx, cli, "init", "--propose", dir], {
+      encoding: "utf8",
+      cwd: dir,
+    });
+    expect(human.status).toBe(0);
+    expect(human.stdout).toMatch(/proposed/);
+    expect(human.stdout).toMatch(/adopt --ack/);
+
+    const combo = spawnSync(process.execPath, [tsx, cli, "init", "--propose", "--backup", "--json", dir], {
+      encoding: "utf8",
+      cwd: dir,
+    });
+    expect(combo.status).not.toBe(0);
+    const comboBody = JSON.parse(combo.stdout) as { ok: boolean; error?: { message?: string } };
+    expect(comboBody.ok).toBe(false);
+    expect(comboBody.error?.message).toMatch(/--propose does not combine with --backup/);
+  });
+});
 
 /** Byte-identical fs + git snapshot (task-init-dry-run-plan invariants). */
 function snapshot(dir: string): { head: string | null; files: Record<string, string> } {
