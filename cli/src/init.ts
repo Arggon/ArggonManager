@@ -8,7 +8,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { bundledTemplatesDir } from "./paths.js";
 import {
   CONVENTION_VERSION,
@@ -72,6 +72,14 @@ export type InitOptions = {
    * deletes the proposal. Never auto-commits anything.
    */
   propose?: boolean;
+  /**
+   * Force whole-file proposals (spec-propose-section-backports-007): opt back
+   * OUT of the default section-level mode. Without it, destinations with
+   * recoverable git history get section-level region proposals; whole-file
+   * remains the automatic fallback when the as-generated baseline cannot be
+   * recovered (no git history / untracked dest).
+   */
+  proposeWholeFile?: boolean;
 };
 
 export type InitResult = {
@@ -293,9 +301,39 @@ function listBundledTemplates(): string[] {
 }
 
 /**
+ * One region of a section-level proposal (spec-propose-section-backports-007):
+ * a maximal run the template ADDED (`kind: "added"`) or CHANGED relative to the
+ * as-generated baseline (the dest's first committed version). Anchors quote
+ * UNCHANGED surrounding baseline text so the adopting agent can locate the
+ * insertion point in THEIR curated file.
+ */
+export type ProposalRegionDetail = {
+  kind: "added" | "changed";
+  added: number;
+  removed: number;
+  /** New-render lines of the region (what to insert). */
+  content: string;
+  /** Up to 3 unchanged baseline lines immediately before the region. */
+  anchorBefore: string;
+  /** Up to 3 unchanged baseline lines immediately after the region. */
+  anchorAfter: string;
+};
+
+/** Compact per-region summary carried on the entry (and the JSON payload). */
+export type ProposalRegionSummary = {
+  kind: "added" | "changed";
+  added: number;
+  removed: number;
+};
+
+/**
  * One side-file upgrade proposal (task-init-propose-acked-updates). `basedOnVersion`
  * is the arggon version the fresh render comes from (and the proposal filename
  * suffix); `added`/`removed` carry the compact line-diff summary (human output).
+ * Spec-propose-section-backports-007 adds the `mode` split: section-level
+ * region proposals are the DEFAULT for destinations whose as-generated
+ * baseline is recoverable from git history; whole-file remains the explicit
+ * (`--propose-whole-file`) and automatic-fallback mode.
  */
 export type ProposalEntry = {
   /** Destination the proposal upgrades (posix, relative to root). */
@@ -306,16 +344,26 @@ export type ProposalEntry = {
    * `proposed` — fresh render differs from disk, side file written/overwritten;
    * `absorbed` — the destination now matches the render, so this run's own
    * same-version stale side file was removed; `stale` — a side file from a
-   * DIFFERENT (older) arggon version is still on disk: reported, never deleted.
+   * DIFFERENT (older) arggon version is still on disk: reported, never deleted;
+   * `informational` — section-mode diff yielded ONLY removals (the template
+   * lost content the adopter has): reported, no side file, nothing deleted.
    */
-  decision: "proposed" | "absorbed" | "stale";
+  decision: "proposed" | "absorbed" | "stale" | "informational";
   /** Source template id (x-generated style, package-root relative). */
   template: string;
   /** Arggon version of the render (and filename suffix) behind this entry. */
   basedOnVersion: string;
-  /** Diff summary vs the on-disk original (proposed only). */
+  /** Diff summary vs the on-disk original (proposed only; region sums in sections mode). */
   added?: number;
   removed?: number;
+  /** Proposal mode (proposed only; spec-propose-section-backports-007). */
+  mode?: "sections" | "whole-file";
+  /** Per-region summaries (sections mode only). */
+  regions?: ProposalRegionSummary[];
+  /** Why nothing is proposed (informational only). */
+  note?: string;
+  /** Full region details for apply (sections mode; not serialized to JSON). */
+  regionDetails?: ProposalRegionDetail[];
 };
 
 /**
@@ -340,17 +388,145 @@ export function proposalContent(
 
 /** Naive line-diff summary (LCS) for the human proposal listing. */
 function diffSummary(before: string, after: string): { added: number; removed: number } {
+  const regions = diffRegions(before, after);
+  let a = 0;
+  let r = 0;
+  for (const region of regions) {
+    a += region.added;
+    r += region.removed;
+  }
+  return { added: a, removed: r };
+}
+
+/**
+ * Structural line diff (spec-propose-section-backports-007): LCS backtrace
+ * grouping every maximal run of non-matching lines into one region. Regions
+ * carry the new-render lines plus up to 3 UNCHANGED baseline lines on each
+ * side as anchors for locating the insertion point in the adopter's file.
+ * A removed-only diff yields zero regions (callers report it informational —
+ * adopter content is never proposed for deletion).
+ */
+function diffRegions(before: string, after: string): ProposalRegionDetail[] {
   const a = before.split("\n");
   const b = after.split("\n");
+  // lcs[i][j] = LCS length of a[i..] and b[j..] (same core as diffSummary).
   const lcs: number[][] = Array.from({ length: a.length + 1 }, () =>
     new Array<number>(b.length + 1).fill(0),
   );
   for (let i = a.length - 1; i >= 0; i--) {
     for (let j = b.length - 1; j >= 0; j--) {
-      lcs[i][j] = a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
+      lcs[i]![j] = a[i] === b[j] ? lcs[i + 1]![j + 1]! + 1 : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
     }
   }
-  return { added: b.length - lcs[0][0], removed: a.length - lcs[0][0] };
+  const regions: ProposalRegionDetail[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < a.length || j < b.length) {
+    if (i < a.length && j < b.length && a[i] === b[j]) {
+      i++;
+      j++;
+      continue;
+    }
+    const startI = i;
+    const addedLines: string[] = [];
+    while (
+      (i < a.length || j < b.length) &&
+      !(i < a.length && j < b.length && a[i] === b[j])
+    ) {
+      if (i < a.length && (j >= b.length || lcs[i + 1]![j]! >= lcs[i]![j + 1]!)) {
+        i++; // baseline line consumed (removed or replaced)
+      } else {
+        addedLines.push(b[j]!);
+        j++;
+      }
+    }
+    const anchor = (from: number, to: number): string =>
+      a.slice(Math.max(0, from), to).join("\n");
+    regions.push({
+      kind: startI === i ? "added" : "changed",
+      added: addedLines.length,
+      removed: i - startI,
+      content: addedLines.join("\n"),
+      anchorBefore: anchor(Math.max(0, startI - 3), startI),
+      anchorAfter: anchor(i, Math.min(a.length, i + 3)),
+    });
+  }
+  return regions;
+}
+
+/**
+ * Recover the AS-GENERATED baseline of a destination from git history
+ * (spec-propose-section-backports-007): the file's FIRST committed version
+ * (init auto-commits what it writes) is exactly what the old template
+ * rendered. `null` when the tree is not a repo, the dest was never committed,
+ * or git is absent — callers fall back to whole-file proposals.
+ */
+function gitFirstCommittedContent(root: string, destAbs: string): string | null {
+  try {
+    const toplevel = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+    const rel = relative(toplevel, destAbs).split(sep).join("/");
+    if (rel.startsWith("..")) return null; // dest outside the repo: no history
+    const hash = execFileSync(
+      "git",
+      ["log", "--diff-filter=A", "-n1", "--format=%H", "--", rel],
+      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
+    ).trim();
+    if (hash === "") return null;
+    return execFileSync("git", ["show", `${hash}:${rel}`], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Section-level proposal side file (spec-propose-section-backports-007): ONE
+ * file per dest, delimited region blocks. Each region quotes unchanged
+ * surrounding text (the anchors) so the agent can locate the insertion point
+ * in THEIR curated file, then the new-render lines to insert. Bodies are
+ * indented (4 spaces), not fenced, so embedded backticks cannot break a block.
+ */
+export function sectionProposalContent(
+  dest: string,
+  version: string,
+  regions: ProposalRegionDetail[],
+  now?: Date,
+): string {
+  const header =
+    `<!-- arggon:proposed-update dest="${dest}" version="${version}" ` +
+    `generated="${(now ?? new Date()).toISOString()}" mode="sections"; the template ` +
+    `changed ${regions.length} region(s) since this doc was generated — apply each ` +
+    `region to YOUR file at the quoted anchors, then re-ack via arggon adopt --ack ` +
+    `and delete this file -->\n`;
+  const blocks = regions.map((r, idx) => {
+    const parts = [
+      `## region ${idx + 1} of ${regions.length} — ${r.kind} (+${r.added}/-${r.removed})`,
+    ];
+    if (r.anchorBefore) {
+      parts.push("anchor-before (insert after the matching text in YOUR file):", indent(r.anchorBefore));
+    }
+    parts.push("insert:", indent(r.content));
+    if (r.anchorAfter) {
+      parts.push("anchor-after (insert before the matching text in YOUR file):", indent(r.anchorAfter));
+    }
+    return parts.join("\n\n");
+  });
+  return blocks.length > 0 ? `${header}\n${blocks.join("\n\n")}\n` : header;
+}
+
+/** Indent every line of a block by 4 spaces (empty lines stay empty). */
+function indent(block: string): string {
+  return block
+    .split("\n")
+    .map((line) => (line === "" ? "" : `    ${line}`))
+    .join("\n");
 }
 
 /** Proposal side files already on disk for a dest: version -> present. */
@@ -375,8 +551,21 @@ function existingProposals(destAbs: string): Map<string, boolean> {
  * render reports its own same-version leftover as `absorbed` (removed on
  * apply); older-version side files are reported `stale` and left alone.
  * Requires an initialized tree (x-generated state reader).
+ *
+ * Mode selection (spec-propose-section-backports-007): by default a dest whose
+ * AS-GENERATED baseline is recoverable from git history (its first committed
+ * version) gets a SECTION-LEVEL proposal containing only the regions the
+ * template ADDED/CHANGED since generation; a removed-only diff becomes an
+ * `informational` entry (adopter content is never proposed for deletion);
+ * without recoverable history (or with `wholeFile`) the dest falls back to
+ * today's whole-file proposal.
  */
-export function planProposals(root: string, full: boolean, now?: Date): ProposalEntry[] {
+export function planProposals(
+  root: string,
+  full: boolean,
+  now?: Date,
+  wholeFile?: boolean,
+): ProposalEntry[] {
   const version = arggonVersion();
   const out: ProposalEntry[] = [];
   // Project-name resolution once per run (bug-project-name-dir-derived):
@@ -427,8 +616,59 @@ export function planProposals(root: string, full: boolean, now?: Date): Proposal
       }
       continue;
     }
+    // Section-level mode (spec-propose-section-backports-007): diff the
+    // as-generated baseline (first committed version) against the current
+    // render; propose only the added/changed regions. Any baseline failure
+    // (no git, untracked dest) falls back to whole-file.
+    if (!wholeFile) {
+      const base = gitFirstCommittedContent(root, destAbs);
+      if (base !== null) {
+        const regionDetails = diffRegions(base, render).filter((r) => r.added > 0);
+        if (regionDetails.length === 0) {
+          // Removed-only diff (or base === render): the template gained
+          // nothing backportable — never propose deleting adopter content.
+          out.push({
+            dest,
+            proposalPath,
+            decision: "informational",
+            template,
+            basedOnVersion: version,
+            note:
+              "template gained nothing since this doc was generated (removed-only or no " +
+              "template drift vs the as-generated baseline) — nothing to backport",
+          });
+          continue;
+        }
+        const totals = regionDetails.reduce(
+          (acc, r) => ({ added: acc.added + r.added, removed: acc.removed + r.removed }),
+          { added: 0, removed: 0 },
+        );
+        out.push({
+          dest,
+          proposalPath,
+          decision: "proposed",
+          template,
+          basedOnVersion: version,
+          added: totals.added,
+          removed: totals.removed,
+          mode: "sections",
+          regions: regionDetails.map(({ kind, added, removed }) => ({ kind, added, removed })),
+          regionDetails,
+        });
+        continue;
+      }
+    }
     const { added, removed } = diffSummary(disk, render);
-    out.push({ dest, proposalPath, decision: "proposed", template, basedOnVersion: version, added, removed });
+    out.push({
+      dest,
+      proposalPath,
+      decision: "proposed",
+      template,
+      basedOnVersion: version,
+      added,
+      removed,
+      mode: "whole-file",
+    });
   }
   return out.sort((a, b) => a.proposalPath.localeCompare(b.proposalPath));
 }
@@ -448,9 +688,20 @@ export function applyProposals(root: string, proposals: ProposalEntry[], now?: D
   });
   for (const p of proposals) {
     const abs = join(root, ...p.proposalPath.split("/"));
-    if (p.decision === "stale") continue;
+    if (p.decision === "stale" || p.decision === "informational") continue;
     if (p.decision === "absorbed") {
       rmSync(abs, { force: true });
+      continue;
+    }
+    // Section-level proposal (spec-propose-section-backports-007): the plan
+    // captured the region details; write only those, never the whole render.
+    if (p.mode === "sections" && p.regionDetails && p.regionDetails.length > 0) {
+      mkdirSync(dirname(abs), { recursive: true });
+      writeFileSync(
+        abs,
+        sectionProposalContent(p.dest, p.basedOnVersion, p.regionDetails, now),
+        "utf8",
+      );
       continue;
     }
     const render = renderGeneratedDoc({
@@ -517,7 +768,7 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
   // Propose dry run: list the proposal writes/removals, write nothing.
   if (opts.propose) {
     if (!existsSync(conventionPath)) throw new Error(NOT_INITIALIZED_PROPOSE_ERROR);
-    const proposals = planProposals(root, Boolean(opts.full), opts.now);
+    const proposals = planProposals(root, Boolean(opts.full), opts.now, opts.proposeWholeFile);
     return {
       root,
       alreadyInitialized: true,
@@ -530,10 +781,12 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
         decision: p.decision,
         reason:
           p.decision === "proposed"
-            ? `would write ${p.proposalPath} (template render differs from disk)`
+            ? `would write ${p.proposalPath} (template render differs from disk${p.mode === "sections" ? `, ${p.regions?.length ?? 0} region(s)` : ", whole file"})`
             : p.decision === "absorbed"
               ? `destination matches upstream — would remove its ${p.basedOnVersion} proposal`
-              : `older-version proposal left on disk — reported, not removed`,
+              : p.decision === "informational"
+                ? (p.note ?? "nothing to backport")
+                : `older-version proposal left on disk — reported, not removed`,
       })),
       created: [],
       updated: [],
@@ -600,7 +853,7 @@ export function runInit(opts: InitOptions): InitResult {
     const root = resolve(opts.dir);
     const conventionPath = join(root, "tasks", ".convention.yml");
     if (!existsSync(conventionPath)) throw new Error(NOT_INITIALIZED_PROPOSE_ERROR);
-    const proposals = planProposals(root, Boolean(opts.full), opts.now);
+    const proposals = planProposals(root, Boolean(opts.full), opts.now, opts.proposeWholeFile);
     applyProposals(root, proposals, opts.now);
     return {
       root,

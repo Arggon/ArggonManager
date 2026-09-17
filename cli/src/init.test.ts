@@ -362,6 +362,140 @@ describe("init --propose", () => {
     return p!;
   }
 
+  /**
+   * Simulate upstream template drift (spec-propose-section-backports-007):
+   * rewrite AGENTS.md's FIRST committed version (init's auto-commit, amended)
+   * to the current render MINUS its last few lines, so the current template
+   * render "gained" those lines after this repo was inited. Returns the
+   * current render and the gained lines.
+   */
+  function simulateTemplateGain(dir: string): { render: string; gainedLines: string[] } {
+    const render = renderGeneratedDoc({
+      templatesDir: resolve(repoRoot, "templates"),
+      root: dir,
+      template: "docs/AGENTS.md",
+      dest: "AGENTS.md",
+      now: NOW,
+    })!;
+    const lines = render.split("\n");
+    const cut = Math.max(1, lines.length - 4);
+    const base = lines.slice(0, cut).join("\n");
+    writeFileSync(join(dir, "AGENTS.md"), base, "utf8");
+    git(dir, ["add", "AGENTS.md"]);
+    git(dir, ["commit", "--amend", "--no-edit"]);
+    return { render, gainedLines: lines.slice(cut) };
+  }
+
+  /** Fixture: git-inited tree whose committed AGENTS.md predates a template gain. */
+  function setupSectionFixture(dir: string): { render: string; gainedLines: string[] } {
+    gitInit(dir);
+    runInit({ dir, force: false, now: NOW });
+    const gained = simulateTemplateGain(dir);
+    writeFileSync(join(dir, "AGENTS.md"), `${gained.render}\nadopter edit\n`, "utf8");
+    ackDoc(dir, "AGENTS.md");
+    return gained;
+  }
+
+  it("section-level: template gained a section since init -> region proposal only, original untouched", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-sec-"));
+    const { render, gainedLines } = setupSectionFixture(dir);
+    const disk = `${render}\nadopter edit\n`;
+    const version = arggonVersion();
+
+    const result = runInit({ dir, force: false, propose: true, now: NOW });
+
+    const p = proposalOf(result.proposals ?? [], "AGENTS.md");
+    expect(p.decision).toBe("proposed");
+    expect(p.mode).toBe("sections");
+    expect(p.regions).toEqual([{ kind: "added", added: gainedLines.length, removed: 0 }]);
+    const proposalFile = join(dir, ...p.proposalPath.split("/"));
+    expect(existsSync(proposalFile)).toBe(true);
+    const content = readFileSync(proposalFile, "utf8");
+    expect(content).toContain(`arggon:proposed-update dest="AGENTS.md" version="${version}"`);
+    expect(content).toContain('mode="sections"');
+    expect(content).toContain("arggon adopt --ack");
+    expect(content).toContain(`region 1 of 1 — added (+${gainedLines.length}/-0)`);
+    for (const line of gainedLines) {
+      if (line.trim()) expect(content).toContain(`    ${line}`);
+    }
+    // Anchors: the unchanged baseline text just before the gained region.
+    expect(content).toContain("anchor-before");
+    // Does NOT contain the rest of the doc: an early render line is absent.
+    const earlyLine = render.split("\n")[1]!;
+    expect(gainedLines).not.toContain(earlyLine);
+    expect(content).not.toContain(earlyLine);
+    // Original byte-untouched; state unmutated (acked stays acked).
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(disk);
+  });
+
+  it("no git history -> whole-file fallback (today's behavior)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-"));
+    const original = setupAckedDrift(dir); // no gitInit: no committed baseline
+    const result = runInit({ dir, force: false, propose: true, now: NOW });
+    const p = proposalOf(result.proposals ?? [], "AGENTS.md");
+    expect(p.decision).toBe("proposed");
+    expect(p.mode).toBe("whole-file");
+    expect(p.regions).toBeUndefined();
+    expect(p.removed).toBeGreaterThan(0);
+    const content = readFileSync(join(dir, ...p.proposalPath.split("/")), "utf8");
+    // Whole render, not a region block list.
+    expect(content).toContain(original);
+    expect(content).not.toContain("anchor-before");
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(`${original}\nadopter edit\n`);
+  });
+
+  it("removed-only template content -> informational entry, no side file, nothing deleted", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-rem-"));
+    gitInit(dir);
+    runInit({ dir, force: false, now: NOW });
+    // Amend the FIRST committed version to carry a section the template LOST.
+    const render = renderGeneratedDoc({
+      templatesDir: resolve(repoRoot, "templates"),
+      root: dir,
+      template: "docs/AGENTS.md",
+      dest: "AGENTS.md",
+      now: NOW,
+    })!;
+    writeFileSync(
+      join(dir, "AGENTS.md"),
+      `${render}\n## Removed upstream section\n\nThe template later lost this.\n`,
+      "utf8",
+    );
+    git(dir, ["add", "AGENTS.md"]);
+    git(dir, ["commit", "--amend", "--no-edit"]);
+    const disk = `${render}\nadopter edit\n`;
+    writeFileSync(join(dir, "AGENTS.md"), disk, "utf8");
+    ackDoc(dir, "AGENTS.md");
+
+    const result = runInit({ dir, force: false, propose: true, now: NOW });
+    const p = proposalOf(result.proposals ?? [], "AGENTS.md");
+    expect(p.decision).toBe("informational");
+    expect(p.note).toBeDefined();
+    expect(existsSync(join(dir, ...p.proposalPath.split("/")))).toBe(false);
+    // Adopter content untouched.
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(disk);
+  });
+
+  it("--propose-whole-file forces today's whole-file proposal for the same fixture", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-wf-"));
+    const { render } = setupSectionFixture(dir);
+    const result = runInit({
+      dir,
+      force: false,
+      propose: true,
+      proposeWholeFile: true,
+      now: NOW,
+    });
+    const p = proposalOf(result.proposals ?? [], "AGENTS.md");
+    expect(p.decision).toBe("proposed");
+    expect(p.mode).toBe("whole-file");
+    expect(p.regions).toBeUndefined();
+    const content = readFileSync(join(dir, ...p.proposalPath.split("/")), "utf8");
+    expect(content).toContain(render);
+    expect(content).not.toContain('mode="sections"');
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(`${render}\nadopter edit\n`);
+  });
+
   it("proposes for an acked doc whose render differs from disk: side file written, original intact, state unmutated", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-"));
     const original = setupAckedDrift(dir);
@@ -488,9 +622,7 @@ describe("init --propose", () => {
 
   it("e2e: init --propose --json carries the additive proposals[] shape; human output lists proposals; --propose --backup fails", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-"));
-    gitInit(dir);
-    runInit({ dir, force: false, now: NOW });
-    setupAckedDrift(dir); // acks + edits AGENTS.md (already initialized)
+    const { gainedLines } = setupSectionFixture(dir); // git-inited + template gain simulated
     const version = arggonVersion();
 
     const json = spawnSync(process.execPath, [tsx, cli, "init", "--propose", "--json", dir], {
@@ -500,12 +632,22 @@ describe("init --propose", () => {
     expect(json.status).toBe(0);
     const body = JSON.parse(json.stdout) as {
       ok: boolean;
-      proposals?: { dest: string; proposalPath: string; decision: string; template: string; basedOnVersion: string }[];
+      proposals?: {
+        dest: string;
+        proposalPath: string;
+        decision: string;
+        template: string;
+        basedOnVersion: string;
+        mode?: string;
+        regions?: { kind: string; added: number; removed: number }[];
+      }[];
       commit?: unknown;
     };
     expect(body.ok).toBe(true);
     const p = body.proposals?.find((e) => e.dest === "AGENTS.md");
     expect(p?.decision).toBe("proposed");
+    expect(p?.mode).toBe("sections");
+    expect(p?.regions).toEqual([{ kind: "added", added: gainedLines.length, removed: 0 }]);
     expect(p?.proposalPath).toBe(`AGENTS.md.proposed-${version}`);
     expect(p?.template).toBe("docs/AGENTS.md");
     expect(p?.basedOnVersion).toBe(version);
