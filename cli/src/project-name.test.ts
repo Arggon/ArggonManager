@@ -86,6 +86,27 @@ describe("bug-project-name-dir-derived: project-name recovery", () => {
     expect(extractProjectNameFromContent(template, "completely different\n")).toBeNull();
     expect(extractProjectNameFromContent(template, "# \n\nsome fixed text 2031\n")).toBeNull();
     expect(extractProjectNameFromContent(template, "# bad name!\n\nsome fixed text 2031\n")).toBeNull();
+    // bug-crlf-provenance-breakage: LF-anchored template text must also match
+    // a git-smudged CRLF disk (`* text=auto eol=crlf` trees) — and vice versa —
+    // otherwise name recovery (and with it propose/doctor's name-bearing
+    // comparisons) goes inert on those trees.
+    expect(
+      extractProjectNameFromContent(template, "# my-repo.1\r\n\r\nsome fixed text 2031\r\n"),
+    ).toBe("my-repo.1");
+    expect(
+      extractProjectNameFromContent(
+        template.replaceAll("\n", "\r\n"),
+        "# Acme\r\n\r\nsome fixed text 2031\r\n",
+      ),
+    ).toBe("Acme");
+    // Lone CR terminators normalize too.
+    expect(
+      extractProjectNameFromContent(template, "# my-repo.1\r\rsome fixed text 2031\r"),
+    ).toBe("my-repo.1");
+    // A CRLF disk content that genuinely drifts still refuses.
+    expect(
+      extractProjectNameFromContent(template, "# my-repo.1\r\n\r\nCHANGED STRUCTURE\r\n"),
+    ).toBeNull();
   });
 
   it("records the project name in x-generated.projectName on init", () => {

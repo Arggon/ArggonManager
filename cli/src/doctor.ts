@@ -11,8 +11,9 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { readConventionConfig, readConventionVersion } from "./convention.js";
 import {
-  checksumOf,
+  checksumMatches,
   currentGeneratedTemplatesFrom,
+  normalizeEol,
   renderGeneratedDoc,
   resolveProjectName,
 } from "./docs.js";
@@ -249,7 +250,10 @@ export function runDoctor(opts: {
       dest,
       projectName: nameRes.name,
     });
-    if (render !== null && render !== diskContent) {
+    // bug-crlf-provenance-breakage: the render-vs-disk compare is
+    // EOL-normalized, so a git-smudged CRLF working tree (`* text=auto
+    // eol=crlf`) is not reported outdated when only the line endings differ.
+    if (render !== null && normalizeEol(render) !== normalizeEol(diskContent)) {
       outdated++;
       outdatedDocs.push(dest);
     }
@@ -259,14 +263,17 @@ export function runDoctor(opts: {
       // bug-ack-drift-promise: if the current bytes no longer match the
       // acked baseline, a hand edit landed after the ack — surface it in
       // the informational `acknowledgedDrifted` bucket.
-      if (entry.checksum && checksumOf(diskContent) !== entry.checksum) {
+      // bug-crlf-provenance-breakage: the match is EOL-tolerant in both
+      // directions (LF-recorded state vs CRLF tree, and an ack recorded over
+      // CRLF bytes vs an LF checkout) — only real content edits drift.
+      if (entry.checksum && !checksumMatches(entry.checksum, diskContent)) {
         acknowledgedDrifted++;
       } else {
         acknowledged++;
       }
       continue;
     }
-    if (entry.checksum && checksumOf(diskContent) === entry.checksum) {
+    if (entry.checksum && checksumMatches(entry.checksum, diskContent)) {
       untouched++;
     } else {
       modified++;
