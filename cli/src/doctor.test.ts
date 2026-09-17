@@ -1,5 +1,5 @@
 import { spawnSync, execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -45,7 +45,7 @@ describe("doctor: non-initialized repos", () => {
     expect(result.initialized).toBe(false);
     expect(result.root).toBeNull();
     expect(result.conventionVersion).toBe(0);
-    expect(result.docs).toEqual({ managed: 0, untouched: 0, modified: 0, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0 });
+    expect(result.docs).toEqual({ managed: 0, untouched: 0, modified: 0, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0, outdated: 0, outdatedDocs: [] });
     expect(result.tracker).toEqual({ items: 0, todo: 0 });
     expect(formatDoctorReport(result)).toContain("not initialized");
   });
@@ -77,7 +77,7 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     expect(result.initialized).toBe(true);
     expect(result.root).toBe(dir);
     expect(result.conventionVersion).toBe(3);
-    expect(result.docs).toEqual({ managed: GENERATED_DOC_COUNT, untouched: GENERATED_DOC_COUNT, modified: 0, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0 });
+    expect(result.docs).toEqual({ managed: GENERATED_DOC_COUNT, untouched: GENERATED_DOC_COUNT, modified: 0, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0, outdated: 0, outdatedDocs: [] });
     expect(result.tracker).toEqual({ items: 0, todo: 0 });
   });
 
@@ -100,7 +100,7 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     runInit({ dir, force: false, full: true, backup: true });
     expect(existsSync(join(dir, "backup"))).toBe(true);
     const result = runDoctor({ cwd: dir });
-    expect(result.docs).toEqual({ managed: GENERATED_DOC_COUNT, untouched: GENERATED_DOC_COUNT, modified: 0, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0 });
+    expect(result.docs).toEqual({ managed: GENERATED_DOC_COUNT, untouched: GENERATED_DOC_COUNT, modified: 0, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0, outdated: 0, outdatedDocs: [] });
   });
 
   it("counts a deleted managed doc as missing", () => {
@@ -153,6 +153,11 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
       acknowledged: GENERATED_DOC_COUNT,
       acknowledgedDrifted: 0,
       stale: 0,
+      // The sweep edits differ from the CURRENT template render, so the two
+      // sweep docs count as outdated too (task-doctor-outdated-bucket):
+      // upstream moved regardless of the acked local state.
+      outdated: 2,
+      outdatedDocs: ["AGENTS.md", "CONTRIBUTING.md"],
       missing: 0,
     });
     const report = formatDoctorReport(result);
@@ -173,6 +178,10 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
       acknowledged: GENERATED_DOC_COUNT - 1,
       acknowledgedDrifted: 1,
       stale: 0,
+      // The late hand edit also differs from the CURRENT template render
+      // (task-doctor-outdated-bucket) — orthogonal to acknowledgedDrifted.
+      outdated: 1,
+      outdatedDocs: ["AGENTS.md"],
       missing: 0,
     });
     const report = formatDoctorReport(result);
@@ -211,7 +220,7 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     expect(body.command).toBe("doctor");
     expect(body.initialized).toBe(true);
     expect(body.root).toBe(dir);
-    expect(body.docs).toEqual({ managed: GENERATED_DOC_COUNT, untouched: GENERATED_DOC_COUNT - 1, modified: 1, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0 });
+    expect(body.docs).toEqual({ managed: GENERATED_DOC_COUNT, untouched: GENERATED_DOC_COUNT - 1, modified: 1, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0, outdated: 1, outdatedDocs: ["CONTRIBUTING.md"] });
     expect(body.tracker).toEqual({ items: 0, todo: 0 });
   });
 
@@ -274,5 +283,126 @@ describe("doctor: git section (bug-init-git-doctor-blindspot)", () => {
     };
     expect(body.ok).toBe(true);
     expect(body.git).toEqual({ isRepo: false, dirty: null, remote: null });
+  });
+});
+
+describe("doctor: outdated bucket (task-doctor-outdated-bucket)", () => {
+  /**
+   * Mutable fixture copy of the bundled templates dir: doctor re-renders from
+   * the CURRENT templates, so tests simulate upstream movement by editing the
+   * copy and pointing runDoctor's injectable templatesRoot at it. Init keeps
+   * using the real bundle, exactly as an adopter would experience it.
+   */
+  function fixtureTemplates(): string {
+    const root = mkdtempSync(join(tmpdir(), "arggon-templates-"));
+    // Mirror the package layout: templates/ plus the sibling skills/ the
+    // bundled skill template is resolved from (<templatesDir>/../skills/...).
+    cpSync(resolve(repoRoot, "templates"), join(root, "templates"), { recursive: true });
+    cpSync(resolve(repoRoot, "skills"), join(root, "skills"), { recursive: true });
+    return join(root, "templates");
+  }
+
+  it("fresh init reports zero outdated against the pristine bundle", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const result = runDoctor({ cwd: dir, templatesRoot: fixtureTemplates() });
+    expect(result.docs.outdated).toBe(0);
+    expect(result.docs.outdatedDocs).toEqual([]);
+    expect(formatDoctorReport(result)).not.toContain("newer templates");
+  });
+
+  it("counts docs whose template render moved upstream as outdated", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const templates = fixtureTemplates();
+    writeFileSync(join(templates, "docs/AGENTS.md"), "UPSTREAM IMPROVEMENT\n", "utf8");
+    const result = runDoctor({ cwd: dir, templatesRoot: templates });
+    expect(result.docs.outdated).toBe(1);
+    expect(result.docs.outdatedDocs).toEqual(["AGENTS.md"]);
+    expect(result.docs.untouched).toBe(GENERATED_DOC_COUNT);
+    expect(formatDoctorReport(result)).toContain("1 doc(s) have newer templates");
+    expect(formatDoctorReport(result)).toContain("init --dry-run");
+  });
+
+  it("stops reporting outdated once the template matches the bundle again", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const templates = fixtureTemplates();
+    writeFileSync(join(templates, "docs/AGENTS.md"), "UPSTREAM IMPROVEMENT\n", "utf8");
+    expect(runDoctor({ cwd: dir, templatesRoot: templates }).docs.outdated).toBe(1);
+    writeFileSync(
+      join(templates, "docs/AGENTS.md"),
+      readFileSync(resolve(repoRoot, "templates/docs/AGENTS.md"), "utf8"),
+      "utf8",
+    );
+    const result = runDoctor({ cwd: dir, templatesRoot: templates });
+    expect(result.docs.outdated).toBe(0);
+    expect(result.docs.outdatedDocs).toEqual([]);
+  });
+
+  it("flags acked docs as outdated too (upstream moved regardless of local state)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    writeFileSync(join(dir, "AGENTS.md"), "SANCTIONED BASELINE\n", "utf8");
+    runAdoptAck({ cwd: dir });
+    const templates = fixtureTemplates();
+    writeFileSync(join(templates, "docs/AGENTS.md"), "UPSTREAM IMPROVEMENT\n", "utf8");
+    const result = runDoctor({ cwd: dir, templatesRoot: templates });
+    expect(result.docs.acknowledged).toBe(GENERATED_DOC_COUNT);
+    expect(result.docs.modified).toBe(0);
+    expect(result.docs.outdated).toBe(1);
+    expect(result.docs.outdatedDocs).toEqual(["AGENTS.md"]);
+  });
+
+  it("modified docs can be outdated at the same time (orthogonal buckets)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    writeFileSync(join(dir, "AGENTS.md"), "ADOPTER EDIT\n", "utf8");
+    const templates = fixtureTemplates();
+    writeFileSync(join(templates, "docs/AGENTS.md"), "UPSTREAM IMPROVEMENT\n", "utf8");
+    const result = runDoctor({ cwd: dir, templatesRoot: templates });
+    expect(result.docs.modified).toBe(1);
+    expect(result.docs.outdated).toBe(1);
+  });
+
+  it("never throws when a template file is absent (stale keeps its meaning, not outdated)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const templates = fixtureTemplates();
+    rmSync(join(templates, "docs/AGENTS.md"));
+    const result = runDoctor({ cwd: dir, templatesRoot: templates });
+    expect(result.docs.stale).toBe(1);
+    expect(result.docs.outdated).toBe(0);
+    expect(result.docs.outdatedDocs).toEqual([]);
+  });
+
+  it("exposes the outdated fields via the CLI --json (additive, exit 0)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const templates = fixtureTemplates();
+    writeFileSync(join(templates, "docs/AGENTS.md"), "UPSTREAM IMPROVEMENT\n", "utf8");
+    // CLI runs against the real bundle — assert the additive fields exist and
+    // the exit-0 report-only contract holds.
+    const proc = runCli(["doctor", "--json"], dir);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      ok: boolean;
+      docs: { outdated: number; outdatedDocs: string[] };
+    };
+    expect(body.ok).toBe(true);
+    expect(body.docs.outdated).toBe(0);
+    expect(body.docs.outdatedDocs).toEqual([]);
+  });
+
+  it("never writes anything while re-rendering (report-only)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false, full: true });
+    const templates = fixtureTemplates();
+    writeFileSync(join(templates, "docs/AGENTS.md"), "UPSTREAM IMPROVEMENT\n", "utf8");
+    const before = readFileSync(join(dir, "tasks/.convention.yml"), "utf8");
+    const agentsBefore = readFileSync(join(dir, "AGENTS.md"), "utf8");
+    runDoctor({ cwd: dir, templatesRoot: templates });
+    expect(readFileSync(join(dir, "tasks/.convention.yml"), "utf8")).toBe(before);
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(agentsBefore);
   });
 });
