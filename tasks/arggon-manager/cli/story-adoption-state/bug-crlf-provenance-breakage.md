@@ -4,6 +4,7 @@ status: in_progress
 id: bug-crlf-provenance-breakage
 title: CRLF working trees (eol=crlf .gitattributes) break provenance checksums and project-name recovery
 assignee: Arggon
+branch: feat/bug-crlf-provenance-breakage
 parent: story-adoption-state
 labels: [p1]
 created: "2026-09-17"
