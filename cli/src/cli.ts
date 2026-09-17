@@ -13,7 +13,7 @@ import { readConventionVersion } from "./convention.js";
 import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
 import { runDoctor, formatDoctorReport, measureBudgetForDoctor } from "./doctor.js";
-import { runInit, type InitResult } from "./init.js";
+import { runInit, dryRunInit, type InitResult, type InitDryRunResult } from "./init.js";
 import {
   bindJsonProgram,
   emitJson,
@@ -105,6 +105,11 @@ program
     false,
   )
   .option(
+    "--dry-run",
+    "plan only: print exactly what init would do per destination and write NOTHING — no files, no backup dir, no auto-commit (pure read)",
+    false,
+  )
+  .option(
     "--no-commit",
     "keep the generated docs untracked: skip the auto-commit of what init wrote (default: on; x-tracker.auto-commit: false opts out tree-wide)",
   )
@@ -112,10 +117,49 @@ program
   .action(
     (
       dir: string,
-      opts: { force: boolean; full?: boolean; backup?: boolean; commit?: boolean; json?: boolean },
+      opts: {
+        force: boolean;
+        full?: boolean;
+        backup?: boolean;
+        dryRun?: boolean;
+        commit?: boolean;
+        json?: boolean;
+      },
     ) => {
       const json = jsonEnabled(opts);
       try {
+        if (opts.dryRun) {
+          const result = dryRunInit({
+            dir,
+            force: Boolean(opts.force),
+            full: Boolean(opts.full),
+            backup: Boolean(opts.backup),
+          });
+          if (json) {
+            successJson(
+              "init",
+              {
+                root: result.root,
+                alreadyInitialized: result.alreadyInitialized,
+                force: result.force,
+                created: result.created,
+                updated: result.updated,
+                modified: result.modified,
+                backedUp: result.backedUp,
+                skipped: result.skipped,
+                restored: result.restored,
+                conventionPath: result.conventionPath,
+                dryRun: true,
+                plan: result.plan,
+                ...(result.warning ? { warning: result.warning } : {}),
+              },
+              readConventionVersion(result.root),
+            );
+            return;
+          }
+          printInitDryRun(result);
+          return;
+        }
         const result = runInit({
           dir,
           force: Boolean(opts.force),
@@ -2126,6 +2170,25 @@ program
       process.exitCode = 1;
     }
   });
+
+function printInitDryRun(result: InitDryRunResult): void {
+  // bug-init-git-doctor-blindspot: same warning surface as a real run.
+  if (result.warning) {
+    console.error(`arggon: warning: ${result.warning}`);
+  }
+  console.log(
+    `arggon init (dry run): ${result.alreadyInitialized ? "already initialized" : "fresh scaffold"} at ${result.root}`,
+  );
+  const width = Math.max("decision".length, ...result.plan.map((e) => e.decision.length));
+  console.log(`  ${"decision".padEnd(width)}  destination`);
+  for (const e of result.plan) {
+    console.log(`  ${e.decision.padEnd(width)}  ${e.dest}  ${e.reason}`);
+  }
+  if (result.plan.length === 0) {
+    console.log("  (nothing to do — tree already up to date)");
+  }
+  console.log("nothing was written (dry run)");
+}
 
 function printInitHuman(result: InitResult): void {
   // bug-init-git-doctor-blindspot: human path warns on stderr; the --json

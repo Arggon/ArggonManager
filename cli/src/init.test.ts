@@ -1,10 +1,11 @@
-import { existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { runInit } from "./init.js";
+import { runInit, dryRunInit } from "./init.js";
+import { readGeneratedState, updateGeneratedSection } from "./convention.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -210,6 +211,157 @@ describe("init", () => {
     expect(result.warning).toBeUndefined();
   });
 });
+
+// task-init-dry-run-plan: --dry-run is a pure read — the full per-destination
+// plan with ZERO writes (no files, no backup dir, no auto-commit, no state
+// mutation; even the git tree stays byte-identical).
+describe("init --dry-run", () => {
+  it("plans a fresh scaffold and writes NOTHING (fs + git untouched)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-dry-"));
+    gitInit(dir);
+    const before = snapshot(dir);
+    const result = dryRunInit({ dir, force: false, full: true });
+    const byDest = new Map(result.plan.map((e) => [e.dest, e]));
+    expect(byDest.get("tasks/.convention.yml")?.decision).toBe("created");
+    expect(byDest.get("AGENTS.md")?.decision).toBe("created");
+    expect(byDest.get("AGENTS.md")?.reason).toMatch(/missing on disk/);
+    expect(byDest.get("ARCHITECTURE.md")?.decision).toBe("created"); // --full tier-2
+    expect(result.created).toContain("AGENTS.md");
+    expect(result.restored).toEqual([]);
+    // Nothing on disk: no scaffold, no docs, no backup dir.
+    expect(existsSync(join(dir, "tasks"))).toBe(false);
+    expect(existsSync(join(dir, "AGENTS.md"))).toBe(false);
+    expect(existsSync(join(dir, "templates"))).toBe(false);
+    expect(snapshot(dir)).toEqual(before);
+    expect(git(dir, ["status", "--porcelain"])).toBe("");
+  });
+
+  it("flags untouched docs would-update, modified docs modified-skip, acked docs acked-skip; --backup flips modified to modified-backup — still zero writes", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-dry-"));
+    runInit({ dir, force: false, full: true, now: new Date("2026-09-14T12:00:00Z") });
+    // Adopter edit on one doc; sanctioned ack on another.
+    const agentsBefore = readFileSync(join(dir, "AGENTS.md"), "utf8");
+    writeFileSync(join(dir, "AGENTS.md"), `${agentsBefore}\nadopter edit\n`, "utf8");
+    ackDoc(dir, "CLAUDE.md");
+    const before = snapshot(dir);
+
+    const dry = dryRunInit({ dir, force: false, full: true });
+    const byDest = new Map(dry.plan.map((e) => [e.dest, e]));
+    // Untouched since last generation → regenerated from the current template.
+    expect(byDest.get(".editorconfig")?.decision).toBe("updated");
+    expect(dry.updated).toEqual(
+      expect.arrayContaining([".editorconfig", "docs/tracking.md", ".mcp.json"]),
+    );
+    expect(byDest.get("AGENTS.md")?.decision).toBe("modified-skip");
+    expect(byDest.get("AGENTS.md")?.reason).toMatch(/--backup/);
+    expect(byDest.get("CLAUDE.md")?.decision).toBe("acked-skip");
+    expect(dry.skipped).toEqual(expect.arrayContaining(["AGENTS.md", "CLAUDE.md"]));
+
+    const dryBackup = dryRunInit({ dir, force: false, full: true, backup: true });
+    const byDestB = new Map(dryBackup.plan.map((e) => [e.dest, e]));
+    expect(byDestB.get("AGENTS.md")?.decision).toBe("modified-backup");
+    expect(byDestB.get("AGENTS.md")?.backupDest).toMatch(/^backup\/\d{4}-\d{2}-\d{2}\/AGENTS\.md$/);
+    expect(byDestB.get("CLAUDE.md")?.decision).toBe("acked-skip"); // ack wins over --backup
+
+    // Pure read: the edited file, the ack, fs layout and git are all untouched.
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(`${agentsBefore}\nadopter edit\n`);
+    expect(existsSync(join(dir, "backup"))).toBe(false);
+    expect(snapshot(dir)).toEqual(before);
+  });
+
+  it("plan buckets match a subsequent real run 1:1 (plan-then-run equivalence)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-dry-"));
+    runInit({ dir, force: false, full: true, now: new Date("2026-09-14T12:00:00Z") });
+    writeFileSync(join(dir, "AGENTS.md"), "CUSTOM ADOPTER CONTENT\n", "utf8");
+    const dry = dryRunInit({ dir, force: false, full: true, backup: true });
+    const real = runInit({
+      dir,
+      force: false,
+      full: true,
+      backup: true,
+      now: new Date("2026-09-14T12:00:00Z"),
+    });
+    for (const key of ["created", "updated", "modified", "backedUp", "skipped", "restored"] as const) {
+      expect(real[key]).toEqual(dry[key]);
+    }
+    expect(real.backedUp).toEqual(["AGENTS.md"]);
+    // A follow-up dry run on the refreshed tree plans nothing but regeneration.
+    const after = dryRunInit({ dir, force: false, full: true });
+    expect(after.backedUp).toEqual([]);
+  });
+
+  it("e2e: init --dry-run --json is additive to the envelope and writes nothing; human output carries the plan + footer", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-dry-"));
+    gitInit(dir);
+    const proc = spawnSync(process.execPath, [tsx, cli, "init", "--dry-run", "--full", "--json", dir], {
+      encoding: "utf8",
+      cwd: dir,
+    });
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      ok: boolean;
+      command: string;
+      dryRun?: boolean;
+      plan?: { dest: string; decision: string; reason: string }[];
+      commit?: unknown;
+    };
+    expect(body.ok).toBe(true);
+    expect(body.command).toBe("init");
+    expect(body.dryRun).toBe(true);
+    expect(body.plan?.map((e) => e.dest)).toContain("AGENTS.md");
+    expect(body.commit).toBeUndefined();
+    expect(existsSync(join(dir, "tasks"))).toBe(false);
+    expect(git(dir, ["status", "--porcelain"])).toBe("");
+
+    const human = spawnSync(process.execPath, [tsx, cli, "init", "--dry-run", dir], {
+      encoding: "utf8",
+      cwd: dir,
+    });
+    expect(human.status).toBe(0);
+    expect(human.stdout).toContain("nothing was written (dry run)");
+    expect(human.stdout).toContain("created");
+    expect(existsSync(join(dir, "AGENTS.md"))).toBe(false);
+  });
+
+  it("surfaces the tasks-exists precondition error like a real run", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-dry-"));
+    mkdirSync(join(dir, "tasks"));
+    writeFileSync(join(dir, "tasks/note.txt"), "x", "utf8");
+    expect(() => dryRunInit({ dir, force: false })).toThrow(/--force/);
+  });
+});
+
+/** Acknowledge one generated doc as the sanctioned baseline (adopt --ack effect). */
+function ackDoc(dir: string, dest: string): void {
+  const statePath = join(dir, "tasks", ".convention.yml");
+  const state = readGeneratedState(dir);
+  state[dest] = { ...state[dest]!, acknowledged: true };
+  writeFileSync(statePath, updateGeneratedSection(readFileSync(statePath, "utf8"), state), "utf8");
+}
+
+/** Byte-identical fs + git snapshot (task-init-dry-run-plan invariants). */
+function snapshot(dir: string): { head: string | null; files: Record<string, string> } {
+  const files: Record<string, string> = {};
+  const walk = (current: string): void => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const abs = join(current, entry.name);
+      const rel = relative(dir, abs);
+      if (rel.startsWith(".git")) continue;
+      if (entry.isDirectory()) walk(abs);
+      else files[rel] = readFileSync(abs, "utf8");
+    }
+  };
+  walk(dir);
+  // Fresh scaffolds may have no commit yet (unborn HEAD) — that's fine: the
+  // invariant is that the snapshot (and the porcelain status) does not move.
+  let head: string | null = null;
+  try {
+    head = git(dir, ["rev-parse", "HEAD"]).trim();
+  } catch {
+    head = null;
+  }
+  return { head, files };
+}
 
 /** Minimal git repo with a committer identity so auto-commits can land. */function gitInit(dir: string): void {
   execFileSync("git", ["init", "-q"], { cwd: dir, stdio: "pipe" });

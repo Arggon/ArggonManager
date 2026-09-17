@@ -52,6 +52,22 @@ export type GenerateDocsOptions = {
   backup?: boolean;
   /** Injection point for tests: generation timestamp (defaults to now). */
   now?: Date;
+  /**
+   * Provenance-state override (task-init-dry-run-plan): what init's forced
+   * re-scaffold would carry over into tasks/.convention.yml. When set, the
+   * plan decides against this state instead of reading the (not-yet-written)
+   * state file — a force re-scaffold plans as if the carried state were
+   * already on disk, exactly as the real run behaves.
+   */
+  prev?: Record<string, GeneratedEntry>;
+  /**
+   * Raw `.convention.yml` content the caller is about to scaffold (task-init-
+   * dry-run-plan): with `prev`, this lets init's fresh/forced re-scaffold plan
+   * the pending state rewrite against the file it will have written by apply
+   * time, instead of the not-yet-existing one. When set, the state rewrite is
+   * always planned (the caller guarantees the file will exist).
+   */
+  rawState?: string;
 };
 
 export type DocsResult = {
@@ -65,6 +81,48 @@ export type DocsResult = {
   backedUp: string[];
   /** Docs left untouched this run (adopter-owned, never overwritten). */
   skipped: string[];
+};
+
+/**
+ * Per-destination plan decision (task-init-dry-run-plan): the same buckets a
+ * real run emits, named so a plan maps 1:1 onto created/updated/modified/
+ * backedUp/skipped.
+ */
+export type DocsPlanDecision =
+  | "created"
+  | "updated"
+  | "modified-skip"
+  | "modified-backup"
+  | "acked-skip"
+  | "stale";
+
+export type DocsPlanEntry = {
+  dest: string;
+  decision: DocsPlanDecision;
+  reason: string;
+  /** Exact bytes a real run would write (absent on skip decisions). */
+  write?: string;
+  /** State entry a real run would record for this destination. */
+  entry?: GeneratedEntry;
+  /** Where the modified file is archived before regeneration (relative). */
+  backupDest?: string;
+};
+
+/**
+ * Pure plan (zero writes) of exactly what generateDocs would do: the
+ * per-destination decisions, the derived buckets, and the pending
+ * `x-generated` state rewrite. Applying it with `applyDocsPlan` reproduces a
+ * real run byte-for-byte; `generateDocs` is exactly plan + apply.
+ */
+export type DocsPlan = {
+  entries: DocsPlanEntry[];
+  created: string[];
+  updated: string[];
+  modified: string[];
+  backedUp: string[];
+  skipped: string[];
+  /** Pending provenance-state rewrite (present only when the state file exists). */
+  stateWrite?: { path: string; content: string };
 };
 
 /** Source (package-root relative) and destination of the bundled agent skill. */
@@ -175,7 +233,13 @@ function utcDate(now: Date): string {
   return now.toISOString().slice(0, 10);
 }
 
-export function generateDocs(opts: GenerateDocsOptions): DocsResult {
+/**
+ * Pure planner (task-init-dry-run-plan): computes the full per-destination
+ * decision table WITHOUT touching the filesystem — no files, no backup dir,
+ * no state mutation. Shared by `generateDocs` (plan, then apply) and init's
+ * `--dry-run` preview, so there is exactly one decision implementation.
+ */
+export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
   const packageRootDir = resolve(bundledTemplatesDir(), "..");
   const skillSrc = resolve(packageRootDir, ...SKILL_SOURCE.split("/"));
   const docsSrc = resolve(bundledTemplatesDir(), "docs");
@@ -183,18 +247,14 @@ export function generateDocs(opts: GenerateDocsOptions): DocsResult {
     throw new Error(`Bundled doc templates not found at ${docsSrc}`);
   }
   const vars = { projectName: basename(opts.root), year: new Date().getFullYear() };
-  const created: string[] = [];
-  const updated: string[] = [];
-  const modified: string[] = [];
-  const backedUp: string[] = [];
-  const skipped: string[] = [];
+  const entries: DocsPlanEntry[] = [];
 
   const now = opts.now ?? new Date();
   const version = arggonVersion();
   const generatedAt = now.toISOString();
   const statePath = join(opts.root, "tasks", ".convention.yml");
-  const hasStateFile = existsSync(statePath);
-  const prevState = hasStateFile ? readGeneratedState(opts.root) : {};
+  const hasStateFile = opts.rawState !== undefined || existsSync(statePath);
+  const prevState = opts.prev ?? (hasStateFile ? readGeneratedState(opts.root) : {});
   const nextState: Record<string, GeneratedEntry> = { ...prevState };
 
   const stamp = (
@@ -222,22 +282,25 @@ export function generateDocs(opts: GenerateDocsOptions): DocsResult {
   };
 
   /**
-   * Shared per-destination provenance decision (Copier/Helm semantics):
-   * returns the bytes to write and the state entry when the file should be
-   * (re)generated, or null when the adopter owns the file.
+   * Shared per-destination provenance decision (Copier/Helm semantics) — the
+   * single source of truth for what a run would do with this destination.
    */
   const decide = (
     dest: string,
     markerTemplate: string,
     stateTemplate: string,
     render: () => string,
-  ): { write: string; entry: GeneratedEntry } | null => {
+  ): DocsPlanEntry => {
     const destAbs = join(opts.root, ...dest.split("/"));
     const { content, entry } = stamp(markerTemplate, stateTemplate, render(), dest);
     if (!existsSync(destAbs)) {
-      created.push(dest);
-      nextState[dest] = entry;
-      return { write: content, entry };
+      return {
+        dest,
+        decision: "created",
+        reason: "missing on disk — generated from the current template",
+        write: content,
+        entry,
+      };
     }
     const prev = prevState[dest];
     if (prev?.acknowledged) {
@@ -246,77 +309,136 @@ export function generateDocs(opts: GenerateDocsOptions): DocsResult {
       // adopter's sanctioned content, NOT the template render — regenerating
       // here destroyed adopter content. Acknowledged entries are never
       // touched; the skip reason is implicit (sanctioned-diverged baseline).
-      skipped.push(dest);
-      nextState[dest] = prev;
-      return null;
+      return {
+        dest,
+        decision: "acked-skip",
+        reason: "acknowledged baseline (arggon adopt --ack) — adopter-owned, never regenerated",
+      };
     }
     const onDisk = checksumOf(readFileSync(destAbs, "utf8"));
     if (prev?.checksum && prev.checksum === onDisk) {
       // Untouched: silently regenerate from the current template.
-      updated.push(dest);
-      nextState[dest] = entry;
-      return { write: content, entry };
+      return {
+        dest,
+        decision: "updated",
+        reason: "untouched since last generation — regenerated from the current template",
+        write: content,
+        entry,
+      };
     }
     // Adopter-modified (edited, or on disk with no provenance state).
-    modified.push(dest);
     if (opts.backup) {
-      const backupAbs = join(opts.root, "backup", utcDate(now), ...dest.split("/"));
-      mkdirSync(dirname(backupAbs), { recursive: true });
-      renameSync(destAbs, backupAbs);
-      backedUp.push(dest);
-      nextState[dest] = entry;
-      return { write: content, entry };
+      const backupDest = `backup/${utcDate(now)}/${dest}`;
+      return {
+        dest,
+        decision: "modified-backup",
+        reason: `adopter-modified — archived to ${backupDest}, then regenerated`,
+        write: content,
+        entry,
+        backupDest,
+      };
     }
-    skipped.push(dest);
-    return null;
+    return {
+      dest,
+      decision: "modified-skip",
+      reason: "adopter-modified — kept (rerun with --backup to archive and regenerate)",
+    };
   };
 
   for (const rel of walkTemplates(docsSrc)) {
     const dest = DOC_PATH_MAP[rel] ?? rel;
     if (!opts.full && TIER2_DESTS.has(dest)) continue;
-    const destAbs = join(opts.root, ...dest.split("/"));
-    const decision = decide(dest, rel, `docs/${rel}`, () =>
-      renderDocPlaceholders(readFileSync(join(docsSrc, ...rel.split("/")), "utf8"), vars),
+    entries.push(
+      decide(dest, rel, `docs/${rel}`, () =>
+        renderDocPlaceholders(readFileSync(join(docsSrc, ...rel.split("/")), "utf8"), vars),
+      ),
     );
-    if (decision) {
-      mkdirSync(dirname(destAbs), { recursive: true });
-      writeFileSync(destAbs, decision.write, "utf8");
-    }
   }
 
   // Bundle the arggon-cli skill from its single source (skills/ in this repo —
   // NOT a template duplicate) so agents in the adopter repo use it by default.
   if (existsSync(skillSrc)) {
-    const destAbs = join(opts.root, ...SKILL_DEST.split("/"));
-    const decision = decide(SKILL_DEST, SKILL_SOURCE, SKILL_SOURCE, () =>
-      readFileSync(skillSrc, "utf8"),
-    );
-    if (decision) {
-      mkdirSync(dirname(destAbs), { recursive: true });
-      writeFileSync(destAbs, decision.write, "utf8");
-    }
+    entries.push(decide(SKILL_DEST, SKILL_SOURCE, SKILL_SOURCE, () => readFileSync(skillSrc, "utf8")));
   }
   // Missing skill source (e.g. stripped packaging): skip silently — docs
   // generation must never fail because an optional bundle is absent.
 
+  // Template removed from the bundle: the `x-generated` entry is orphaned
+  // (doctor reports the same destinations as `stale`). Informational only —
+  // a real run leaves the entry exactly as it is.
+  const generatedDests = new Set(currentGeneratedTemplates().map((t) => t.dest));
+  for (const dest of Object.keys(prevState)) {
+    if (!generatedDests.has(dest)) {
+      entries.push({
+        dest,
+        decision: "stale",
+        reason: "template no longer generated — x-generated entry is orphaned",
+      });
+    }
+  }
+
+  const applied = entries.filter((e) => e.write !== undefined);
+  for (const e of applied) nextState[e.dest] = e.entry!;
+  const plan: DocsPlan = {
+    entries: entries.sort((a, b) => a.dest.localeCompare(b.dest)),
+    created: applied.filter((e) => e.decision === "created").map((e) => e.dest).sort(),
+    updated: applied.filter((e) => e.decision === "updated").map((e) => e.dest).sort(),
+    modified: entries
+      .filter((e) => e.decision === "modified-skip" || e.decision === "modified-backup")
+      .map((e) => e.dest)
+      .sort(),
+    backedUp: applied.filter((e) => e.decision === "modified-backup").map((e) => e.dest).sort(),
+    skipped: entries
+      .filter((e) => e.decision === "modified-skip" || e.decision === "acked-skip")
+      .map((e) => e.dest)
+      .sort(),
+  };
   // Record the provenance state whenever the convention file exists (init
   // writes it before generating). Outside init (bare generateDocs on a dir
   // without a tasks/ tree) there is no state file to extend — markers are
   // still stamped, and those files later count as adopter-modified until a
   // run with a state file adopts them.
   if (hasStateFile) {
-    writeFileSync(
-      statePath,
-      updateGeneratedSection(readFileSync(statePath, "utf8"), nextState),
-      "utf8",
-    );
+    plan.stateWrite = {
+      path: statePath,
+      content: updateGeneratedSection(
+        opts.rawState ?? readFileSync(statePath, "utf8"),
+        nextState,
+      ),
+    };
   }
+  return plan;
+}
 
+/**
+ * Apply a pure plan (task-init-dry-run-plan): exactly the writes a real run
+ * performs — archive-then-write per destination plus the pending state
+ * rewrite — and nothing else. `generateDocs` = plan + apply.
+ */
+export function applyDocsPlan(root: string, plan: DocsPlan): DocsResult {
+  for (const e of plan.entries) {
+    if (e.write === undefined) continue;
+    if (e.backupDest !== undefined) {
+      const backupAbs = join(root, ...e.backupDest.split("/"));
+      mkdirSync(dirname(backupAbs), { recursive: true });
+      renameSync(join(root, ...e.dest.split("/")), backupAbs);
+    }
+    const destAbs = join(root, ...e.dest.split("/"));
+    mkdirSync(dirname(destAbs), { recursive: true });
+    writeFileSync(destAbs, e.write, "utf8");
+  }
+  if (plan.stateWrite) {
+    writeFileSync(plan.stateWrite.path, plan.stateWrite.content, "utf8");
+  }
   return {
-    created: created.sort(),
-    updated: updated.sort(),
-    modified: modified.sort(),
-    backedUp: backedUp.sort(),
-    skipped: skipped.sort(),
+    created: plan.created,
+    updated: plan.updated,
+    modified: plan.modified,
+    backedUp: plan.backedUp,
+    skipped: plan.skipped,
   };
+}
+
+export function generateDocs(opts: GenerateDocsOptions): DocsResult {
+  return applyDocsPlan(opts.root, planGenerateDocs(opts));
 }
