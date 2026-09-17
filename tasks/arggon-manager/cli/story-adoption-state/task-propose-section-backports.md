@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-propose-section-backports
 title: "propose: section-level backports for completed (acked) docs"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-adoption-state
 labels: [p3]
 created: "2026-09-17"
 updated: "2026-09-17"
-claimed_at: "2026-09-17T07:46:35.239Z"
 depends_on: [bug-project-name-dir-derived]
 ---
 <!--
