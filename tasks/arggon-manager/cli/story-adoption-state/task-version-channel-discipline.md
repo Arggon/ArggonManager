@@ -4,6 +4,7 @@ status: in_progress
 id: task-version-channel-discipline
 title: "Version channel: bump + tag discipline so arggonVersion stamps mean something"
 assignee: Arggon
+branch: feat/task-version-channel-discipline
 parent: story-adoption-state
 labels: [p3]
 created: "2026-09-16"
