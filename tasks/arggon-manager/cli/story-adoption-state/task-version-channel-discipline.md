@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-version-channel-discipline
 title: "Version channel: bump + tag discipline so arggonVersion stamps mean something"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-adoption-state
 labels: [p3]
 created: "2026-09-16"
 updated: "2026-09-17"
-claimed_at: "2026-09-17T00:06:24.481Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-adoption-state/task-version-channel-discipline.md
