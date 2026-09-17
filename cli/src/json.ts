@@ -41,7 +41,13 @@ export function jsonEnabled(cmdOpts?: { json?: unknown }): boolean {
  * is unchanged: omission is a documented default (docs/json-output.md), not a
  * shape break — consumers read `item.blocked_reason ?? null` either way.
  */
-const COMPACT_OMIT_WHEN_NULL = ["blocked_reason", "milestone", "worktree_path", "issue"] as const;
+const COMPACT_OMIT_WHEN_NULL = [
+  "blocked_reason",
+  "milestone",
+  "worktree_path",
+  "issue",
+  "priority",
+] as const;
 const COMPACT_OMIT_WHEN_EMPTY = ["depends_on", "labels"] as const;
 
 export function compactWorkItem<T extends Record<string, unknown>>(item: T): T {

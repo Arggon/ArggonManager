@@ -12,6 +12,7 @@ import {
 import { assertUpdateRules } from "./rules.js";
 import { formatDate, formatDateTime } from "./dates.js";
 import { assertBranchName, assertLabels } from "./ids.js";
+import { assertPriority } from "./priority.js";
 import {
   acceptanceComplete,
   itemsById,
@@ -65,6 +66,12 @@ export type UpdateOptions = {
   unassign?: boolean;
   /** Replace the full labels list (comma-separated). */
   labels?: string;
+  /**
+   * Set the v4 `priority` field (spec-priority-field-008): p0 | p1 | p2 | p3.
+   * Empty string clears it (the key is removed — absent, not empty). Invalid
+   * values fail before anything is written.
+   */
+  priority?: string;
   /**
    * Replace the full depends_on list (comma-separated ids; v3 field).
    * Empty string clears. Unknown ids fail.
@@ -211,6 +218,18 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   }
   const labels = opts.labels !== undefined ? parseCsvList(opts.labels) : undefined;
   if (labels !== undefined) assertLabels(labels);
+  // priority (v4, spec-priority-field-008): set with the exact enum, clear
+  // with the empty string (null request).
+  let priorityRequest: string | null | undefined;
+  if (opts.priority !== undefined) {
+    const trimmed = opts.priority.trim();
+    if (trimmed) {
+      assertPriority(trimmed);
+      priorityRequest = trimmed;
+    } else {
+      priorityRequest = null;
+    }
+  }
   const depsReplace = opts.dependsOn !== undefined ? parseCsvList(opts.dependsOn) : undefined;
   let depsAdd: string | undefined;
   if (opts.addDependsOn !== undefined) {
@@ -270,6 +289,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     opts.steal === true ||
     worktreeRequest !== undefined ||
     labels !== undefined ||
+    priorityRequest !== undefined ||
     depsReplace !== undefined ||
     opts.addDependsOn !== undefined ||
     issueRequest !== undefined ||
@@ -541,6 +561,17 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   if (labels !== undefined && labels.join("\u0000") !== item.labels.join("\u0000")) {
     data.labels = labels;
     changed.push("labels");
+  }
+  // priority (v4, spec-priority-field-008): set with the enum value, clear by
+  // removing the key (absent stays absent — never an empty string or null).
+  const currentPriority = item.priority ?? null;
+  if (priorityRequest !== undefined && priorityRequest !== currentPriority) {
+    if (priorityRequest === null) {
+      delete data.priority;
+    } else {
+      data.priority = priorityRequest;
+    }
+    changed.push("priority");
   }
   if (newDeps !== undefined && newDeps.join("\u0000") !== item.dependsOn.join("\u0000")) {
     data.depends_on = newDeps;

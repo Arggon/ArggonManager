@@ -3,6 +3,7 @@ import { dirname, join } from "node:path";
 import { stringifyFrontmatter, type Frontmatter } from "./frontmatter.js";
 import { assertLabels, innerSlug, isItemType, itemId, slugify, type ItemType } from "./ids.js";
 import { itemsById, loadItems, tryLoadItem, type WorkItem } from "./items.js";
+import { assertPriority } from "./priority.js";
 import { bundledTemplatesDir, findTasksDir, newItemPath, repoRootFromTasks } from "./paths.js";
 import { assertParentEdge, expectedParentType } from "./relations.js";
 import {
@@ -32,6 +33,12 @@ export type CreateOptions = {
   blockedReason?: string;
   /** Replace the default empty labels list (must satisfy the kebab-case rules). */
   labels?: string[];
+  /**
+   * Set the v4 `priority` field at creation (spec-priority-field-008):
+   * p0 | p1 | p2 | p3. Omit/empty = unprioritized (the field is never
+   * defaulted); invalid values fail before anything is written.
+   */
+  priority?: string;
   /**
    * GitHub issue number recorded in the additive `issue` frontmatter field
    * (import-issues provenance; `start --open-pr` turns it into `Closes #N`).
@@ -78,6 +85,10 @@ export function runCreate(opts: CreateOptions): CreateResult {
   assertCreatableStatus(status);
   if (opts.assignee !== undefined) assertAssignee(opts.assignee);
   if (opts.labels !== undefined) assertLabels(opts.labels);
+  // priority (v4, spec-priority-field-008): empty = not requested (create has
+  // nothing to clear); anything else must be the exact enum.
+  const priority = opts.priority?.trim() ? opts.priority.trim() : undefined;
+  if (priority !== undefined) assertPriority(priority);
   assertClaimAndBlocked({
     type,
     status,
@@ -148,6 +159,7 @@ export function runCreate(opts: CreateOptions): CreateResult {
   };
   if (opts.assignee) data.assignee = opts.assignee;
   if (parentItem) data.parent = parentItem.id;
+  if (priority !== undefined) data.priority = priority;
   if (opts.issue !== undefined) {
     if (!Number.isInteger(opts.issue) || opts.issue <= 0) {
       throw new Error("issue must be a positive integer (the GitHub issue number)");

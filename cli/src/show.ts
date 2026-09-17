@@ -122,6 +122,7 @@ export function renderShowText(result: ShowResult): string[] {
   if (item.assignee) lines.push(`  assignee: ${item.assignee}`);
   if (item.branch) lines.push(`  branch: ${item.branch}`);
   if (item.labels.length > 0) lines.push(`  labels: ${item.labels.join(", ")}`);
+  if (item.priority) lines.push(`  priority: ${item.priority}`);
   if (item.dependsOn.length > 0) lines.push(`  depends_on: ${item.dependsOn.join(", ")}`);
   if (item.blockedReason) lines.push(`  blocked_reason: ${item.blockedReason}`);
   if (item.milestone) lines.push(`  milestone: ${item.milestone}`);

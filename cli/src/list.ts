@@ -9,6 +9,7 @@ import {
 } from "./filter.js";
 import { isItemType, ITEM_TYPES } from "./ids.js";
 import { loadItems, type WorkItem } from "./items.js";
+import { isPriority, PRIORITIES } from "./priority.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 import { isStatus, isClaimed, STATUSES } from "./status.js";
 
@@ -122,6 +123,12 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
       }
       if (pred.field === "status" && !isStatus(pred.value)) {
         throw new Error(`unknown status "${pred.value}". Allowed: ${STATUSES.join(", ")}`);
+      }
+      // priority (v4): exact enum values or `none` (unset); typos fail loudly.
+      if (pred.field === "priority" && pred.value !== "none" && !isPriority(pred.value)) {
+        throw new Error(
+          `unknown priority "${pred.value}". Allowed: ${PRIORITIES.join(", ")}, none`,
+        );
       }
       if (pred.field === "assignee" && pred.value === "@me") {
         const login = resolveMe();
