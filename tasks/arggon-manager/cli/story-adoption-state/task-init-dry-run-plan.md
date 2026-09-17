@@ -29,3 +29,8 @@ Exploration adopter-upgrade-experience-007 (option A, approved 2026-09-16, stage
 - [ ] `--dry-run` combines cleanly with `--force`/`--full`/`--backup` flags (plan reflects them)
 - [ ] Tests: untouched doc whose template changed shows would-update with the new render pending; acked doc shows acked-skip; fs-unchanged invariant; existing init suite stays green
 - [ ] Docs: README "Re-running init" section + docs/json-output.md (additive)
+
+### 2026-09-17 @Arggon
+REVIEW (coordinator) — APPROVED, merging PR #302.
+
+Verified: full diff read (pure planInit shared by runInit plan-then-apply — one decision implementation; dryRunInit zero-write; additive JSON with dryRun:true + plan[]; human table + footer). Gates mine: suite 1003-1004/1004 (1 failure = the known spawnSync 5s-timeout flake bug-spawn-sync-test-timeout-flake, passes on re-run; subagent saw the same), lint/build/validate clean, doctor 0/0. Live probe on a fixture repo: real init -> template mutated in the CLI tree -> --dry-run --json emits dryRun:true with per-destination plan; engineering.md (tier-2) planned created under --full; fs+git byte-unchanged after repeated dry-runs (0 dirty, 1 commit); plan buckets map 1:1 onto a real run. Foundation for init --propose is in place (exported planner).
