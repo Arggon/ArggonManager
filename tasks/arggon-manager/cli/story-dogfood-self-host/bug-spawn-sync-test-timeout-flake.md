@@ -8,7 +8,6 @@ labels: [p3]
 created: "2026-09-16"
 updated: "2026-09-16"
 ---
-
 # spawnSync e2e tests flake at vitest 5s timeout under load (2nd instance of the class)
 
 ## Context
@@ -30,3 +29,8 @@ Reproduce: run `npm test` while the machine is under parallel load (or repeatedl
 - [ ] Full suite passes repeatedly (3 consecutive local runs) and CI stays green
 
 ## Notes
+
+### 2026-09-17 @Arggon
+REVIEW (coordinator) — APPROVED, merging PR #311. Provenance: dispatched subagent was cut by a transient infra error mid-work (uncommitted lock.ts + vitest.config.ts, no report); I verified and completed the change myself.
+
+Verified: (1) class fix = root-config testTimeout/hookTimeout 30s — spawnSync e2e tests launch node+tsx+cli per invocation and flakily exceeded 5s under load; a timeout only fires on a genuinely hung test so passing runs pay nothing, no assertion weakened. The subagent's scoped vitest-projects variant was DOUBLED the suite (each file ran under both projects, racing tmp-hygiene tests against themselves) — rejected with the evidence documented in the config. (2) cascade ENOENT subclass FIXED in cli/src/lock.ts: the lock can vanish between a failed create and the stale-check statSync; the acquisition loop now retries instead of letting ENOENT escape. Gates mine: 3 consecutive full-suite runs 1026/1026 green x3 (one earlier deterministic failure diagnosed as a stale /tmp/arggon-budget-* leftover from the projects experiment's doubled suite — environmental, removed), lint/build clean, validate ok, doctor 0/0.
