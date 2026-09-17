@@ -124,6 +124,7 @@ Every work item file begins with YAML frontmatter between `---` fences.
 | `branch`         | no          | string \| null  | Working branch name (v1 field, e.g. `feat/task-rate-limit`). Omit or `null` = none. Set on claim/`start`, cleared on unclaim        |
 | `parent`         | conditional | string \| null  | **Required** for epic/story/task/bug; omit or `null` for initiative. Must equal filesystem parent container’s `id`                  |
 | `labels`         | no          | list of strings | Default `[]`. Kebab-case ASCII, unique, case-sensitive (no folding)                                                                 |
+| `priority`       | no          | string \| null  | Judgment priority (v4 field, spec-priority-field-008): `p0` \| `p1` \| `p2` \| `p3`. Omit or `null` = unprioritized. Valid on all item types; unknown values are validate errors (`PRIORITY_INVALID`). Set via `create --priority` / `update --priority`; legacy `pN` labels move in via `arggon priority migrate`. See [Priority (v4)](#priority-v4) |
 | `created`        | no          | string          | Quoted `YYYY-MM-DD` only in v0 (e.g. `created: "2026-09-03"`)                                                                       |
 | `updated`        | no          | string          | Quoted `YYYY-MM-DD` only in v0                                                                                                      |
 | `blocked_reason` | conditional | string          | **Required non-empty** when `status: blocked`; must be **absent or empty** otherwise                                                |
@@ -355,6 +356,27 @@ Semantics are deliberately **advisory-only** (ADR 0004):
 - They do **not** interact with the container auto-completion cascade: containment and dependency are two different graphs with two different rules.
 
 CLI surface: `arggon update <id> --depends-on "a,b"` **replaces** the full list (empty string clears; mirrors `--labels`) and `arggon update <id> --add-depends-on c` appends one edge (no-op when already present). Unknown ids fail `update` with an actionable error; the full graph is re-checked by `validate`.
+
+### Priority (v4)
+
+Every item type carries an optional judgment priority — the orchestrator sets it
+at filing time and `next` ranks by it (see ADR 0009 and
+[exploration priority-model-008](../docs/explorations/exploration-priority-model-008.md)):
+
+```yaml
+priority: p1
+```
+
+- Values: `p0` (drop everything) | `p1` | `p2` | `p3` — lowercase, exact.
+- Omit or `null` = unprioritized; never defaulted by the CLI. In `next`'s
+  ranking unprioritized orders with the `p3` tier.
+- Unknown values are validate errors (`PRIORITY_INVALID`).
+- Set via `arggon create <type> <title> --priority p1` / `arggon update <id>
+  --priority p2` (clear: `--priority ""`).
+- Legacy `pN` labels migrate into the field with `arggon priority migrate`
+  (highest label wins, all pN labels removed, non-priority labels kept,
+  idempotent, never auto-commits). New code must not use `pN` labels for
+  priority — the field is the only official carrier.
 
 ### Saved views (`x-views`)
 

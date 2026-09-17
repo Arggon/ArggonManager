@@ -74,6 +74,7 @@ Stable fields aligned with convention v0 plus the additive `branch` (v1) and `mi
 | `branch`         | `string` \| `null`                                            | Working branch (v1, additive); `null` when unset                            |
 | `parent`         | `string` \| `null`                                            |                                                                             |
 | `labels`         | `string[]`                                                    | Kebab-case; set at creation with `create --labels <csv>` (task-create-labels) or replaced with `update --labels <csv>`; omitted from compact envelopes when empty |
+| `priority`       | `string` \| `null`                                          | Judgment priority (v4, spec-priority-field-008): `p0`\|`p1`\|`p2`\|`p3`; `null`/omitted = unprioritized. Set with `create --priority` / `update --priority` (clear: `--priority ""`); legacy `pN` labels move in via `arggon priority migrate` |
 | `created`        | `string` \| `null`                                            | `YYYY-MM-DD`                                                                |
 | `updated`        | `string` \| `null`                                            | `YYYY-MM-DD`                                                                |
 | `path`           | `string`                                                      | Posix path relative to repo/tree root, e.g. `tasks/launch-mvp/auth/auth.md` |

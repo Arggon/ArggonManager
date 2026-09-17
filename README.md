@@ -404,6 +404,8 @@ arggon playbook refresh postgres --version 16.4   # after re-research: version +
 
 ### `arggon import-issues`
 
+**Priority (convention v4).** Items of every type carry an optional judgment priority — `p0` (drop everything) | `p1` | `p2` | `p3`. Set it at creation with `arggon create <type> <title> --priority p1`, re-rank with `arggon update <id> --priority p2` (clear: `--priority ""`), and find unprioritized work with `arggon list --filter "status:todo priority:none"`. Legacy `pN` labels migrate into the field with `arggon priority migrate` (highest label wins, idempotent, never auto-commits — review and land one commit). `arggon next` ranks the ready pool priority-first (then downstream weight) and says so in its `reason`.
+
 One-shot migration of an existing GitHub issue backlog into `tasks/` (the docs/agents.md §0 promise). Reads issues via `gh issue list --state all --limit 200 --json number,title,state,body,labels` and writes one task per issue through the same kernel as `create`/`update`. **Idempotent**: target ids are `task-issue-<number>`, so a re-run imports nothing (`created: 0`, everything skipped).
 
 - status mapping: open → `todo`, closed → `done` (closed items are created `todo` and closed through the legal kernel path in the same run; the container auto-completion cascade may fire)
