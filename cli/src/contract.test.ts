@@ -38,6 +38,7 @@ describe("toContractWorkItem", () => {
       path: "tasks/launch-mvp/auth/story-login/task-rate-limit.md",
       blocked_reason: null,
       milestone: null,
+      priority: null,
       depends_on: [],
       claimed_at: null,
       worktree_path: null,

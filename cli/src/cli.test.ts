@@ -180,7 +180,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 3,
+      conventionVersion: 4,
       command: "create",
       path: "tasks/launch-mvp/launch-mvp.md",
     });
@@ -229,7 +229,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 3,
+      conventionVersion: 4,
       command: "list",
     });
     expect(Array.isArray(body.items)).toBe(true);
@@ -320,7 +320,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 3,
+      conventionVersion: 4,
       command: "update",
     });
     expect(body.item).toMatchObject({
@@ -373,7 +373,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 3,
+      conventionVersion: 4,
       command: "board",
       path: "board.html",
       itemCount: 2,
@@ -659,7 +659,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 3,
+      conventionVersion: 4,
       command: "branch",
       branch: "feat/launch-mvp",
       created: false,
@@ -690,7 +690,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 3,
+      conventionVersion: 4,
       command: "start",
       branch: "feat/launch-mvp",
       created: true,

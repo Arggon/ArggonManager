@@ -402,7 +402,7 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
     // Content is byte-identical (same template, same placeholders).
     expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(before);
     const raw = readFileSync(join(dir, "tasks/.convention.yml"), "utf8");
-    expect(raw).toContain("version: 3");
+    expect(raw).toContain("version: 4");
     expect(raw).toContain('bug: "fix/{id}"');
     const config = parseConventionConfig(raw);
     expect(config.generated["AGENTS.md"]!.checksum).toBe(checksumOf(before));

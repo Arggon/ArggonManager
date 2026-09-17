@@ -172,7 +172,7 @@ describe("validate dependency rules", () => {
     writeFileSync(join(dir, "tasks/.convention.yml"), "version: 3\n", "utf8");
     setFrontmatter(paths["task-a"], { depends_on: ["task-b"] });
     expect(runValidate({ cwd: dir }).errors).toEqual([]);
-    writeFileSync(join(dir, "tasks/.convention.yml"), "version: 4\n", "utf8");
+    writeFileSync(join(dir, "tasks/.convention.yml"), "version: 5\n", "utf8");
     const newer = runValidate({ cwd: dir });
     expect(codes(newer)).toContain("CONVENTION_VERSION");
   });
