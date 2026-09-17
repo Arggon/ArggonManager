@@ -7,6 +7,7 @@ Operational runbooks for ArggonManager: step-by-step procedures for incidents, m
 
 <!-- One bullet per runbook, most-used first. -->
 
+- release.md — cutting a release: version bump rules, tag, changelog entry
 - <!-- runbook-name.md — when to use it -->
 
 ## Writing a runbook
