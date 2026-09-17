@@ -36,3 +36,10 @@ Exploration priority-model-008 (approved 2026-09-17, decision c): priorities exi
 - [ ] Board: priority chip additive in the static board render
 - [ ] Docs: convention.md v4 section, json-output.md payloads, README; SKILL marker gains `priority migrate` + `npm run skills:sync` (new top-level command -> generated region + coverage invariant)
 - [ ] Gates: validate ok, suite green, lint/build clean, doctor 0 modified / 0 drifted
+
+### 2026-09-17 @Arggon
+REVIEW (coordinator) — APPROVED, merging PR #316.
+
+Provenance: dispatched subagent was cut twice by provider rate limits mid-flight; I recovered its substantial uncommitted work (spec-008, priority.ts kernel, 23-file wiring), completed the missing deliverables myself (convention.md v4 section, README, json-output payloads, migrate test suite 6 tests, convention-version-high fixture bump to version 9, test-expectation updates for conventionVersion 4 + priority:null contract field) and verified end to end.
+
+Verified: full diff read (parse/serialize on all types; PRIORITY_INVALID validate rule; priority left the reserved-key set — official as of v4; create/update flags with clear semantics; priority filter incl. none + negation; migrate kernel highest-wins/kept-explicit-with-conflict/idempotent/dry-run/never-commits; board chip; SKILL generated region + sync). Gates mine: 1043/1043 (66 files), lint/build clean, validate + spec validate ok, doctor 0 modified / 0 drifted.
