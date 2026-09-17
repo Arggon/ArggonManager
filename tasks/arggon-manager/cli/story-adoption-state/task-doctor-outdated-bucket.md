@@ -31,3 +31,8 @@ Exploration adopter-upgrade-experience-007 (option B, approved 2026-09-16): doct
 - [ ] Human output: "N doc(s) have newer templates — run `arggon init --dry-run` for the plan" hint line; doctor stays exit 0 (report-only)
 - [ ] Tests: template changed -> outdated detected; template unchanged -> not outdated; acked+changed -> outdated; template file absent -> no crash; full doctor suite green
 - [ ] Docs: README doctor section + docs/json-output.md (additive)
+
+### 2026-09-17 @Arggon
+REVIEW (coordinator) — APPROVED, merging PR #301 (reviewed after rebase on post-#302 main: docs.ts combination clean, 1012/1012 green).
+
+Verified: full diff read (renderGeneratedDoc pure + identical to init's resolution/markers incl. the docs-dir-relative marker-name convention and JSON-dest exception; outdated orthogonal to untouched/modified/acked partitions; missing template -> stale-not-outdated; unreadable -> undecidable, never throws; injectable templatesRoot documented for tests). Gates mine: suite 1012/1012, lint/build clean, validate ok, self-doctor 0 modified / 0 drifted with outdated: 10 — the exact motivating signal from exploration 007 on our own acked docs. Live probe on a fixture: fresh init -> 0 outdated (11 untouched); AGENTS.md template mutated -> outdated:1 [AGENTS.md] + hint line 'run arggon init --dry-run for the plan'; restored -> 0. Exit 0 report-only throughout, zero writes.
