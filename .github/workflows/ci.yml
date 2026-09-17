@@ -16,6 +16,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Fail if package.json version is already tagged (release forgotten)
+        # PRs only: on main this would stay red between a tag and the next
+        # bump, wedging every tracker commit and auto-done flip in between.
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --tags --force
+          v=$(node -p "require('./package.json').version")
+          if git rev-parse -q --verify "refs/tags/v$v" >/dev/null; then echo "version $v already tagged - bump package.json"; exit 1; fi
       - run: npm run build
       - run: npm run test
       - run: npm run lint
