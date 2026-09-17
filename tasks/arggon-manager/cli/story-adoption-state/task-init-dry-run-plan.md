@@ -4,6 +4,7 @@ status: in_progress
 id: task-init-dry-run-plan
 title: "init --dry-run: plan-only upgrade preview (pure read)"
 assignee: Arggon
+branch: feat/task-init-dry-run-plan
 parent: story-adoption-state
 labels: [p2]
 created: "2026-09-16"
