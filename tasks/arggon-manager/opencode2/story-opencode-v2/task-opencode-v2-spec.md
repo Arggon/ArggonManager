@@ -92,3 +92,54 @@ provenance + parity discipline.
 
 ### 2026-09-18 @Arggon
 Review verdict (independent reviewer, PR #322): NO-MERGE, 4 change requests. (1) MAJOR: an adopter .opencode config added after init does not stop generation (findOpenCodeConfig shadows our own file; fix so any non-arggon config wins, with tests). (2) MAJOR: CI cannot run for PRs based on opencode2 (.github/workflows/ci.yml filters branches to main); add opencode2 to the triggers. (3) Tests: cover all four adopter-config shapes end-to-end, signature-replacement present-skip, and --backup round-trip on a seam file; drop the vacuous GENERATED_DOC_COUNT assert. (4) Docs: present-skip missing from docs/json-output.md; program spec and dogfood task still say .opencode/opencode.jsonc; the docs/agents.md playbook link resolves with W1c. NIT-9 (CRLF marker) fixed in-PR; remaining nits deferred to task-opencode2-seam-polish. Evidence: reviewer ran 17 probes + full suite (1056 green) + tsc + eslint; details in the PR thread.
+
+### 2026-09-18 @Arggon
+PR #322 review change requests applied (branch `feat/task-opencode-v2-spec`).
+
+**Fix list**
+
+1. **MAJOR-1 — `cli/src/docs.ts`:** `findOpenCodeConfig` now scans all four adopter shapes and skips arggon's own generated file (recognized by its signature comment). Any non-arggon config at any shape wins → `present-skip`, nothing written, destination in `skipped[]`. `isArggonGeneratedConfig` kept; stateless `generateDocs` semantics unchanged.
+2. **MAJOR-2 — `.github/workflows/ci.yml`:** `opencode2` added to the `push` and `pull_request` branch filters. Before: `gh pr checks 322` → `no checks reported on the 'feat/task-opencode-v2-spec' branch`. After-push observation in the follow-up comment.
+3. **MINOR-3 — `cli/src/init-opencode.test.ts`:** all four adopter shapes covered end-to-end through `init` (each asserting `skipped` contains `opencode.jsonc`, no `created`/`updated`, and exact adopter bytes); MAJOR-1 regression tests for `.opencode/opencode.json` and `.opencode/opencode.jsonc` added after init while our root file exists; signature-removal test (rewritten `opencode.jsonc` without the signature → `present-skip`, bytes untouched); `--backup` round-trip on `.opencode/agents/arggon-worker.md` (dated archive keeps the edit, destination regenerated); vacuous `expect(GENERATED_DOC_COUNT).toBeGreaterThan(0)` and its import removed.
+4. **MINOR-4 — `cli/src/init.ts`:** `proposalContent` treats `.jsonc` like `.json` (returned verbatim, no HTML proposal header).
+5. **MINOR-6 — docs:** `docs/specs/spec-opencode2-009.md` and `task-opencode2-dogfood.md` now say root `opencode.jsonc` (root config lets a later `.opencode/` config override it).
+6. **NIT-9 — `cli/src/docs.ts`:** `stampGeneratedContent` tolerates a CRLF frontmatter opener (`/^---\r?\n/`) and keeps the marker frontmatter-first, matching the opener's EOL; unit test added.
+7. **NIT-13 — `docs/specs/spec-opencode-seam-010.md`:** one sentence stating `default_agent` is deliberately not set (agents are discovered; the session default stays `build`).
+
+**Evidence — fixture probes (`/tmp/opencode/major1-probes.sh`)**
+
+```text
+=== probe1: fresh init, then add adopter .opencode/opencode.json, re-run ===
+init#1: generated root opencode.jsonc sha256=619fc5a13003fbf900ae064c588c1393264102ef5a243d097c502c0af61fb665
+re-run buckets (opencode*):
+  skipped: ["opencode.jsonc"]
+  updated: [".opencode/agents/arggon-coordinator.md",...,".opencode/commands/arggon-status.md"]
+  created: []
+  modified: []
+bytes: root opencode.jsonc 619fc5a1... -> 619fc5a1...
+bytes: adopter config    d803ab32... -> d803ab32...
+RESULT: PASS (opencode.jsonc present-skip in skipped[], not updated, bytes unchanged)
+
+=== probe2: fresh init, then add adopter .opencode/opencode.jsonc, re-run ===
+re-run buckets (opencode*):
+  skipped: ["opencode.jsonc"]
+  updated: [...agents/commands...]  (no opencode.jsonc)
+  created: []; modified: []
+bytes: root opencode.jsonc 619fc5a1... -> 619fc5a1...
+bytes: adopter config    66098034... -> 66098034...
+RESULT: PASS
+
+=== probe3: four adopter-config shapes on fresh init (matrix) ===
+opencode.json               skipped=true updated=false created=false root-dest-exists=false
+opencode.jsonc              skipped=true updated=false created=false root-dest-exists=true
+.opencode/opencode.json     skipped=true updated=false created=false root-dest-exists=false
+.opencode/opencode.jsonc    skipped=true updated=false created=false root-dest-exists=false
+```
+
+**Gates**
+
+- `npm test`: **1063 passed / 67 files** green (+7 tests vs 1056; `init-opencode.test.ts` 9 → 16).
+- `npm run arggon --silent -- validate --json` → `{"ok":true,...}`.
+- `npm run arggon --silent -- spec validate --json` → `{"ok":true,...}`.
+- `npx tsc -p tsconfig.json --noEmit` → clean; `npm run lint` (eslint .) → clean.
+- `proposalContent("opencode.jsonc", "0.3.0", "{\n  // c\n}\n")` probe → verbatim render, no HTML header.
