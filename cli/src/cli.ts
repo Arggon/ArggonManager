@@ -13,6 +13,7 @@ import { readConventionVersion } from "./convention.js";
 import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
 import { runDoctor, formatDoctorReport, measureBudgetForDoctor } from "./doctor.js";
+import { sanitizeHumanError } from "./sanitize.js";
 import { runInit, dryRunInit, type InitResult, type InitDryRunResult, type ProposalEntry } from "./init.js";
 import {
   bindJsonProgram,
@@ -67,6 +68,18 @@ import { arggonVersion } from "./docs.js";
 import { DEFAULT_TAIL_COMMENTS, renderShowText, runShow } from "./show.js";
 import { gateSteal, findItemStatus, gateReopen } from "./steal-gate.js";
 const program = new Command();
+
+/**
+ * Human failure line for a command: one display-sanitized line on stderr
+ * (bug-cli-error-output-injection F1). Failure messages can embed
+ * repo-controlled values (item file paths, config keys, git output); escaping
+ * them at this boundary keeps a hostile repo from forging a line or emitting a
+ * raw control sequence. Display only: the `--json` error envelope keeps the
+ * raw message, byte for byte (docs/json-output.md §Failures).
+ */
+function printHumanError(label: string, message: string): void {
+  console.error(`${label}: ${sanitizeHumanError(message)}`);
+}
 
 program
   .name("arggon")
@@ -228,7 +241,7 @@ program
           });
           return;
         }
-        console.error(`arggon init: ${message}`);
+        printHumanError("arggon init", message);
         process.exitCode = 1;
       }
     },
@@ -288,7 +301,7 @@ program
         });
         return;
       }
-      console.error(`arggon doctor: ${message}`);
+      printHumanError("arggon doctor", message);
       process.exitCode = 1;
     }
   });
@@ -362,7 +375,7 @@ program
         });
         return;
       }
-      console.error(`arggon adopt: ${message}`);
+      printHumanError("arggon adopt", message);
       process.exitCode = 1;
     }
   });
@@ -456,7 +469,7 @@ program
           });
           return;
         }
-        console.error(`arggon create: ${message}`);
+        printHumanError("arggon create", message);
         process.exitCode = 1;
       }
     },
@@ -541,7 +554,7 @@ program
           });
           return;
         }
-        console.error(`arggon list: ${message}`);
+        printHumanError("arggon list", message);
         process.exitCode = 1;
       }
     },
@@ -618,7 +631,7 @@ program
         });
         return;
       }
-      console.error(`arggon next: ${message}`);
+      printHumanError("arggon next", message);
       process.exitCode = 1;
     }
   });
@@ -677,7 +690,7 @@ program
         });
         return;
       }
-      console.error(`arggon show: ${message}`);
+      printHumanError("arggon show", message);
       process.exitCode = 1;
     }
   });
@@ -703,7 +716,7 @@ program
         });
         return;
       }
-      console.error(`arggon report: ${message}`);
+      printHumanError("arggon report", message);
       process.exitCode = 1;
       return;
     }
@@ -718,7 +731,7 @@ program
         });
         return;
       }
-      console.error(`arggon report: ${message}`);
+      printHumanError("arggon report", message);
       process.exitCode = 1;
       return;
     }
@@ -732,7 +745,7 @@ program
         });
         return;
       }
-      console.error(`arggon report: ${message}`);
+      printHumanError("arggon report", message);
       process.exitCode = 1;
     };
     let trend: TrendResult | null = null;
@@ -772,7 +785,7 @@ program
         });
         return;
       }
-      console.error(`arggon report: ${message}`);
+      printHumanError("arggon report", message);
       process.exitCode = 1;
     }
   });
@@ -970,7 +983,7 @@ program
           });
           return;
         }
-        console.error(`arggon update: ${message}`);
+        printHumanError("arggon update", message);
         process.exitCode = 1;
       }
       };
@@ -1036,7 +1049,7 @@ priority
         });
         return;
       }
-      console.error(`arggon priority migrate: ${message}`);
+      printHumanError("arggon priority migrate", message);
       process.exitCode = 1;
     }
   });
@@ -1110,7 +1123,7 @@ program
           });
           return;
         }
-        console.error(`arggon comment: ${message}`);
+        printHumanError("arggon comment", message);
         process.exitCode = 1;
       }
     },
@@ -1207,7 +1220,7 @@ program
           });
           return;
         }
-        console.error(`arggon handoff: ${message}`);
+        printHumanError("arggon handoff", message);
         process.exitCode = 1;
       }
     },
@@ -1279,7 +1292,7 @@ program
           });
           return;
         }
-        console.error(`arggon import-issues: ${message}`);
+        printHumanError("arggon import-issues", message);
         process.exitCode = 1;
       }
     },
@@ -1329,7 +1342,7 @@ program
         });
         return;
       }
-      console.error(`arggon validate: ${message}`);
+      printHumanError("arggon validate", message);
       process.exitCode = 1;
     }
   });
@@ -1383,7 +1396,7 @@ spec
         });
         return;
       }
-      console.error(`arggon spec: ${message}`);
+      printHumanError("arggon spec", message);
       process.exitCode = 1;
     }
   });
@@ -1482,7 +1495,7 @@ spec
         });
         return;
       }
-      console.error(`arggon spec analyze: ${message}`);
+      printHumanError("arggon spec analyze", message);
       process.exitCode = 1;
     }
   });
@@ -1565,7 +1578,7 @@ spec
           });
           return;
         }
-        console.error(`arggon spec audit: ${message}`);
+        printHumanError("arggon spec audit", message);
         process.exitCode = 1;
       }
     },
@@ -1608,7 +1621,7 @@ spec
         });
         return;
       }
-      console.error(`arggon spec new: ${message}`);
+      printHumanError("arggon spec new", message);
       process.exitCode = 1;
     }
   });
@@ -1639,7 +1652,7 @@ spec
         process.exitCode = 1;
         return;
       }
-      console.error(`arggon spec import ${format}: ${unsupported()}`);
+      console.error(sanitizeHumanError(`arggon spec import ${format}: ${unsupported()}`));
       process.exitCode = 1;
       return;
     }
@@ -1680,7 +1693,7 @@ spec
         process.exitCode = 1;
         return;
       }
-      console.error(`arggon spec import openspec: ${message}`);
+      printHumanError("arggon spec import openspec", message);
       process.exitCode = 1;
     }
   });
@@ -1724,7 +1737,7 @@ stack
         });
         return;
       }
-      console.error(`arggon stack explore: ${message}`);
+      printHumanError("arggon stack explore", message);
       process.exitCode = 1;
     }
   });
@@ -1770,7 +1783,7 @@ playbook
         });
         return;
       }
-      console.error(`arggon playbook new: ${message}`);
+      printHumanError("arggon playbook new", message);
       process.exitCode = 1;
     }
   });
@@ -1803,7 +1816,7 @@ playbook
           });
           return;
         }
-        console.error(`arggon playbook status: ${message}`);
+        printHumanError("arggon playbook status", message);
         process.exitCode = 1;
         return;
       }
@@ -1823,7 +1836,7 @@ playbook
           });
           return;
         }
-        console.error(`arggon playbook status: ${message}`);
+        printHumanError("arggon playbook status", message);
         process.exitCode = 1;
         return;
       }
@@ -1867,7 +1880,7 @@ playbook
         });
         return;
       }
-      console.error(`arggon playbook status: ${message}`);
+      printHumanError("arggon playbook status", message);
       process.exitCode = 1;
     }
   });
@@ -1910,7 +1923,7 @@ playbook
         });
         return;
       }
-      console.error(`arggon playbook refresh: ${message}`);
+      printHumanError("arggon playbook refresh", message);
       process.exitCode = 1;
     }
   });
@@ -1950,7 +1963,7 @@ program
         });
         return;
       }
-      console.error(`arggon branch: ${message}`);
+      printHumanError("arggon branch", message);
       process.exitCode = 1;
     }
   });
@@ -1994,7 +2007,7 @@ program
           failJson({ command: "start", message, code: "START_FAILED", conventionVersion: readConventionVersion(process.cwd()) });
           return;
         }
-        console.error(`arggon start: ${message}`);
+        printHumanError("arggon start", message);
         process.exitCode = 1;
         return;
       }
@@ -2058,7 +2071,7 @@ program
           });
           return;
         }
-        console.error(`arggon start: ${message}`);
+        printHumanError("arggon start", message);
         process.exitCode = 1;
       }
     },
@@ -2125,7 +2138,7 @@ program
       for (const action of result.pruned) {
         if (action.action === "failed") {
           const leftover = action.leftoverBranch ? ` (leftover branch: ${action.leftoverBranch})` : "";
-          console.error(`  failed:    ${action.id}: ${action.error}${leftover}`);
+          console.error(sanitizeHumanError(`  failed:    ${action.id}: ${action.error}${leftover}`));
         } else {
           console.log(`  pruned:    ${action.id}: ${action.action}`);
         }
@@ -2133,7 +2146,7 @@ program
       const commitLine = formatCommitLine(result.commit);
       if (commitLine) console.log(`  ${commitLine}`);
       for (const failure of result.failures) {
-        console.error(`  failed:    ${failure}`);
+        console.error(sanitizeHumanError(`  failed:    ${failure}`));
       }
       if (!opts.prune && removable.length > 0) {
         console.log(`next: arggon cleanup --prune removes ${removable.length} worktree(s)`);
@@ -2150,7 +2163,7 @@ program
         });
         return;
       }
-      console.error(`arggon cleanup: ${message}`);
+      printHumanError("arggon cleanup", message);
       process.exitCode = 1;
     }
   });
@@ -2185,7 +2198,7 @@ program
         });
         return;
       }
-      console.error(`arggon board: ${message}`);
+      printHumanError("arggon board", message);
       process.exitCode = 1;
     };
     if (opts.tui) {
@@ -2280,7 +2293,7 @@ program
         });
         return;
       }
-      console.error(`arggon board: ${message}`);
+      printHumanError("arggon board", message);
       process.exitCode = 1;
     }
   });
@@ -2489,7 +2502,7 @@ program
           );
         }
         if (result.errors.length > 0) {
-          console.error(`  errors: ${result.errors.join("; ")}`);
+          console.error(sanitizeHumanError(`  errors: ${result.errors.join("; ")}`));
         }
       }
       // CI gate: non-zero when sync is needed (--check) or sync could not finish.
@@ -2505,7 +2518,7 @@ program
         });
         return;
       }
-      console.error(`arggon sync: ${message}`);
+      printHumanError("arggon sync", message);
       process.exitCode = 1;
     }
   });
@@ -2553,7 +2566,7 @@ program
         });
         return;
       }
-      console.error(`arggon instructions: ${message}`);
+      printHumanError("arggon instructions", message);
       process.exitCode = 1;
     }
   });

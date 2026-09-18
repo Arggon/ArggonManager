@@ -48,6 +48,8 @@ error: { message: string, code?: string }
 
 Process exit code is **non-zero**. Do **not** mix human text onto stdout when `--json` is set; human diagnostics go to **stderr** only if needed (prefer a single JSON object on stdout).
 
+Human failure lines are display-sanitized (bug-cli-error-output-injection, additive): the failure message can embed repo-controlled values (item file paths, config keys, git output), so the same policy as doctor human output applies — C0/DEL/C1/LS/PS escaped as inert text, and the raw message capped at `MAX_HUMAN_ERROR_CHARS` (2000, larger than the doctor report-value cap because error diagnostics are composite `<path>: <reason>` text). This is display only: the envelope's `error.message` always keeps the raw text, byte for byte.
+
 ### Empty success
 
 Empty success stays `ok: true` (e.g. future `list` with no items → `items: []`).
@@ -181,7 +183,7 @@ The additive `opencode` block (task-opencode-v2-doctor) reports the OpenCode V2 
 
 Human output mirrors the block with one `opencode:` summary line (`config ... , seam N artifact(s), N bundled skill(s), MCP native | MCP only in .mcp.json | MCP not registered`) plus a `hint:` line per finding class (V1-shaped keys, `.mcp.json`-only registration). On non-initialized trees the line prints only when something is actually present.
 
-Human output is display-sanitized for terminal hygiene (bug-doctor-human-output-injection, additive): every untrusted value interpolated into a human line — the `git.remote` URL, the report `root` path, the `budgetError` message, and `opencode.v1` config keys — escapes C0 controls (ESC, newline), `U+007F`–`U+009F` (DEL/C1: 8-bit CSI/OSC introducers) and `U+2028`/`U+2029` as inert `\n`/`\uXXXX` text, and caps each rendered value at `MAX_HUMAN_VALUE_CHARS` (200) characters plus `…`. Config-key tokens are JSON-quoted; paths and URLs keep their ordinary punctuation unquoted. Bidi/zero-width format characters are deliberately not escaped — they cannot emit a control sequence or forge a line, and doctor output is a report, not an injection boundary. The `--json` payload always keeps the raw, uncapped value; this is display only.
+Human output is display-sanitized for terminal hygiene (bug-doctor-human-output-injection, additive): every untrusted value interpolated into a human line — the `git.remote` URL, the report `root` path, the `budgetError` message, and `opencode.v1` config keys — escapes C0 controls (ESC, newline), `U+007F`–`U+009F` (DEL/C1: 8-bit CSI/OSC introducers) and `U+2028`/`U+2029` as inert `\n`/`\uXXXX` text, and caps each raw value at `MAX_HUMAN_VALUE_CHARS` (200) characters **before** escaping (the `…` ellipsis is appended after the cut). Escaping expands each unsafe code point to at most 6 characters (`\uXXXX`), so one rendered value can reach `6 × (200 + 1)` = 1206 characters even though the raw value was capped at 200. Config-key tokens are JSON-quoted; paths and URLs keep their ordinary punctuation unquoted. Bidi/zero-width format characters are deliberately not escaped — they cannot emit a control sequence or forge a line, and doctor output is a report, not an injection boundary. The `--json` payload always keeps the raw, uncapped value; this is display only.
 
 ### `list`
 
