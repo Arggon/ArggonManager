@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-opencode-v2-doctor-polish
 title: "Doctor polish: sanitize hint keys + parser regression tests"
+assignee: Arggon
+branch: feat/task-opencode-v2-doctor-polish
 parent: opencode2-hardening
 labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T14:08:57.624Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-doctor-polish
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/story-opencode-v2/task-opencode-v2-doctor-polish.md
