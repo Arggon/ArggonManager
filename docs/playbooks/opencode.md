@@ -23,7 +23,7 @@ or the V1 schema for V2 work.
 - `arggon init` generates the tier-1 seam: `opencode.jsonc` **only when the repo
   has no OpenCode config of its own** (`opencode.json(c)` at the root or
   `.opencode/opencode.json(c)`), plus `.opencode/agents/arggon-{coordinator,worker,reviewer}.md`
-  and `.opencode/commands/arggon-{next,start,done,handoff,review,status}.md` —
+  and `.opencode/commands/arggon-{next,start,done,handoff,review,status,spec,adr,explore,playbook}.md` —
   never overwriting modified files (contract:
   [spec-opencode-seam-010](../specs/spec-opencode-seam-010.md)).
 - `arggon init` also bundles the optional plugin at
@@ -58,7 +58,8 @@ or the V1 schema for V2 work.
   `.mcp.json` still serves other clients (e.g. Claude Code). Check with
   `opencode mcp list` / `/mcps`.
 - Skills (https://opencode.ai/v2/docs/skills/): `.agents/skills` is auto-discovered,
-  so the bundled `arggon-cli` (and `arggon-upgrade`) load with no config.
+  so the bundled `arggon-cli` (an umbrella `SKILL.md` plus `references/` read on
+  demand) and `arggon-upgrade` load with no config.
   Discovery order: `.claude/skills` → `.agents/skills` → global
   `~/.config/opencode/skills` → project `.opencode/skills` → explicit `skills`
   entries.
