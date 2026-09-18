@@ -71,3 +71,7 @@ Real opencode run sessions (opencode 2.0.7, model opencode-go/deepseek-v4-flash,
 Gates: npm test 1112 passed (69 files); lint+build clean; arggon validate ok; spec validate ok.
 
 Ownership exceptions (needed for green suite): cli/src/init.test.ts TIER1_DOCS and cli/src/doctor.test.ts commands list/'seam 14' — both mechanical, no active worker owns them. Playbook NOT edited per brief: suggested docs/playbooks/opencode.md lines 60-61 (umbrella references on demand) and 84-88 (methodology commands); README init notes still list 6 commands/single-file skill (out of scope).
+
+### handoff 2026-09-18 @Arggon — next: Review PR #328 (draft, base opencode2) — seam tests, skill split, evidence in the item comments. If it passes: merge (merge-commit; tracker auto-commits ride the branch), verify, then flip item done.
+- branch: feat/task-opencode2-methodology
+- open questions: Docs to update in W7 dogfood (reported, not edited): docs/playbooks/opencode.md lines 60-61 + 84-88, README init notes. W5 touched cli/src/init.test.ts and cli/src/doctor.test.ts mechanically to keep…
