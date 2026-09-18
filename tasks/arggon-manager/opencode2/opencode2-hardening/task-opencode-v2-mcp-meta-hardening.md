@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode-v2-mcp-meta-hardening
 title: "MCP meta hardening: normalize/cap the meta-derived author (F1) + edge tests (F3)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T14:09:11.273Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-mcp-meta-hardening
 ---
 <!--
@@ -91,3 +90,6 @@ Probe: `/tmp/opencode/mcp-meta-probe.mts` + `mcp-meta-probe-{before,after}.json`
 
 ### handoff 2026-09-18 @Arggon (session: ses_f4b26f46dffeWx74XM6jc8Ey4V) — next: Review draft PR (F1 normalization in sessionIDFromMeta + F3 edge tests + docs bounded claims), re-run gates, merge, then flip this item to done.
 - branch: feat/task-opencode-v2-mcp-meta-hardening
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; independently probed before→after over real stdio (300-char author 300→64, injected heading eliminated, control/bidi values fall back, explicit precedence + empty-explicit fallback preserved); regex covers LF/TAB/CR/NUL/DEL/C1/NBSP/ZWSP/bidi/LS/PS/astral-Cf; docs accurate; 1130 tests + parity green; merged with cli pass. Informational nits filed as task-opencode2-mcp-nits (surrogate-safe cap, table-row wording); explicit-arg pass-through and U+2028 stdio framing are by-design/documented scope. Closing.
