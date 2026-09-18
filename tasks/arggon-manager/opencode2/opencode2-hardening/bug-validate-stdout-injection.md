@@ -91,3 +91,10 @@ Hostile fixture: `tasks/bad\nspoof: fake item<ESC>[31m<U+0085><DEL><U+2028><U+20
 **Gates.** `npm test` 73 files / 1203 tests green; `npm run lint` clean; `npm run build` clean; `npm run arggon -- validate --json` ok (0/0) and `spec validate --json` ok. Diff is clean of formatter churn; no files outside validate/spec/tracker-commit/update/cli(display-only)/their tests/docs touched.
 
 **Observation for a future round (not filed here).** Remaining success-stdout dynamic values (e.g. `arggon update`'s `result.path`/`movedFrom`/`renamedFrom`, other commands' path/status lines) are still raw; this item fixed the channels it names (validate/spec stdout + the two dynamic warning channels + their stdout twins).
+
+### 2026-09-18 @Arggon
+### handoff 2026-09-18 @Arggon — next: Review draft PR #348 (https://github.com/Arggon/ArggonManager/pull/348) against opencode2; file any findings as follow-ups; coordinator/reviewer merges and flips status (worker does not merge or flip).
+- branch: fix/bug-validate-stdout-injection (origin/opencode2 merged before push; full suite re-run green on the merged tree)
+- deliverables: M1 (validate / spec validate / spec analyze + spec analyze --baseline human output sanitized via cli/src/sanitize.ts; hostile-filename repro inert; exit codes and --json unchanged), L2 (warnGitSkip + issueRoundtrip.skipped warnings sanitized with the composite-diagnostic cap 2000; stdout twins formatCommitLine and the update round-trip lines sanitized too; 3 static init warnings untouched), L1 (docs/json-output.md true bound 6 × 200 + 1 = 1201 with 1206 noted as the conservative bound)
+- gates: 73 files / 1203 tests green, lint clean, build clean, repo validate + spec validate ok
+- open questions: none blocking. One observation recorded in the evidence comment: remaining success-stdout dynamic values (e.g. `arggon update` result.path/movedFrom/renamedFrom, other commands' path/status lines) are still raw — the next channel in this hygiene family, not part of this item's acceptance.
