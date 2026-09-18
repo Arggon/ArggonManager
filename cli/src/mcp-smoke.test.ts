@@ -8,17 +8,21 @@
  * tools/call round trip returns the documented `--json` envelope.
  */
 import { spawn } from "node:child_process";
-import { mkdirSync, mkdtempSync as _mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync as _mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runInit } from "./init.js";
+import { removeFixtureTree } from "./test-tmp.js";
 
-// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test
+// through the shared bounded-retry helper (test-tmp.ts) — the MCP server
+// child is killed in-test and confirmed exited, but a still-settling fs entry
+// must never trip the one-shot ENOTEMPTY race in plain recursive rmSync.
 const tmpDirs: string[] = [];
 afterEach(() => {
-  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  for (const dir of tmpDirs.splice(0)) removeFixtureTree(dir);
 });
 function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
   const dir = _mkdtempSync(prefix, options);

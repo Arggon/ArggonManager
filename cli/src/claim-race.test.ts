@@ -10,7 +10,7 @@
  * --open-pr). The CLI runs from source via tsx, like cli.test.ts.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +18,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { runCreate } from "./create.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { runInit } from "./init.js";
+import { removeFixtureTree } from "./test-tmp.js";
 
 const NOW = new Date("2026-09-13T12:00:00Z");
 const TIMEOUT_MS = 120_000;
@@ -29,18 +30,9 @@ const tsxLoader = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
 // bug-tmp-fixture-leak: track mkdtemp dirs (plus `arggon start --worktree`
 // sibling worktrees named `<basename>-task-*`) and remove them once the
 // spawned CLI children have finished (afterEach runs after the test's awaits).
+// Teardown goes through the shared retrying helper (test-tmp.ts) so a
+// still-settling child/fs entry can never trip ENOTEMPTY.
 const tmpDirs: string[] = [];
-function removeFixtureTree(dir: string): void {
-  rmSync(dir, { recursive: true, force: true });
-  try {
-    const base = basename(dir);
-    for (const entry of readdirSync(dirname(dir))) {
-      if (entry.startsWith(`${base}-task`)) rmSync(join(dirname(dir), entry), { recursive: true, force: true });
-    }
-  } catch {
-    // parent already gone
-  }
-}
 afterEach(() => {
   for (const dir of tmpDirs.splice(0)) removeFixtureTree(dir);
 });
@@ -169,7 +161,7 @@ describe("concurrent claim starts (bug-claim-race-no-lock)", () => {
           ).toBe(true);
         }
       } finally {
-        rmSync(dir, { recursive: true, force: true });
+        removeFixtureTree(dir);
       }
     },
     TIMEOUT_MS,
@@ -205,7 +197,7 @@ describe("concurrent claim starts (bug-claim-race-no-lock)", () => {
         expect(data.status).toBe("in_progress");
         expect(data.assignee).toBe(claimants[0]);
       } finally {
-        rmSync(dir, { recursive: true, force: true });
+        removeFixtureTree(dir);
       }
     },
     TIMEOUT_MS,

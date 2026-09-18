@@ -8,7 +8,7 @@
  * so callers can tell when the cascade reached epic level or above.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync as _mkdtempSync, closeSync, openSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync as _mkdtempSync, closeSync, openSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,12 +18,17 @@ import { runCreate } from "./create.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { runInit } from "./init.js";
 import { lockFilePathFor } from "./lock.js";
+import { removeFixtureTree } from "./test-tmp.js";
 import { runUpdate } from "./update.js";
 
-// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test
+// through the shared bounded-retry helper (test-tmp.ts) — the real CLI
+// children spawned by the race tests settle only on close, and a
+// still-settling fs entry must never trip the one-shot ENOTEMPTY race in
+// plain recursive rmSync.
 const tmpDirs: string[] = [];
 afterEach(() => {
-  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+  for (const dir of tmpDirs.splice(0)) removeFixtureTree(dir);
 });
 function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
   const dir = _mkdtempSync(prefix, options);
@@ -620,7 +625,7 @@ describe("cascade ancestor-write guard (bug-cascade-lost-update)", () => {
       expect(statusOf(dir, "story-a")).toBe("done");
       expect(statusOf(dir, "epic-a")).toBe("done");
       expect(statusOf(dir, "launch")).toBe("done");
-      rmSync(dir, { recursive: true, force: true });
+      removeFixtureTree(dir);
     }
   }, 120_000);
 });
