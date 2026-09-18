@@ -45,12 +45,13 @@ Non-blocking findings from the independent review of PR #345
 
 ## Acceptance
 
-- [ ] F-A fixed with a test (`echo \$(arggon …)` → `undefined`), docstring
+- [x] F-A fixed with a test (`echo \$(arggon …)` → `undefined`), docstring
       accurate.
-- [ ] F-B decided (fix or documented best-effort).
-- [ ] F-C fixed with stateful token quotes + tests for both quote styles.
-- [ ] F-D tests added.
-- [ ] Full suite + `smoke:opencode` green; small PR to `opencode2`.
+- [x] F-B decided (fixed: `command -v/-V` queries and quoted opener/assignment
+      words; nothing documented as a live false positive).
+- [x] F-C fixed with stateful token quotes + tests for both quote styles.
+- [x] F-D tests added.
+- [x] Full suite + `smoke:opencode` green; small PR to `opencode2`.
 
 ## Notes
 
