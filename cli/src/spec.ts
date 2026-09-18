@@ -819,7 +819,7 @@ export function runSpecAnalyzeCompareBaseline(opts: SpecBaselineSaveOptions): Sp
 
 export function formatSpecBaselineSaveHuman(r: SpecBaselineSaveResult): string {
   const total = r.result.ambiguity.length + r.result.consistency.length;
-  return `arggon spec analyze: baseline written to ${r.file} (${total} finding(s) across ${r.result.scanned} spec(s))\n`;
+  return `arggon spec analyze: baseline written to ${sanitizeHumanError(r.file)} (${total} finding(s) across ${r.result.scanned} spec(s))\n`;
 }
 
 /**
@@ -829,6 +829,13 @@ export function formatSpecBaselineSaveHuman(r: SpecBaselineSaveResult): string {
  * fields are untrusted. Every dynamic field is sanitized at this boundary and
  * `line` is rendered only when it is a number — a hostile string line is
  * dropped instead of interpolated. `--json` keeps the raw snapshot values.
+ *
+ * The baseline snapshot PATH is operator argv (`--baseline`), but it is
+ * sanitized too (task-success-stdout-sanitize): a path can be pasted from repo
+ * data by automation, and path-like values are sanitized consistently across
+ * the success-path channel, with the composite-diagnostic cap (absolute paths
+ * are not bounded by the 200-char report cap). Ordinary paths render
+ * byte-identical.
  */
 export function formatSpecBaselineCompareHuman(c: SpecBaselineComparison): string {
   const lines: string[] = [];
@@ -847,7 +854,7 @@ export function formatSpecBaselineCompareHuman(c: SpecBaselineComparison): strin
     );
   }
   lines.push(
-    `arggon spec analyze vs baseline ${c.file}: ${c.added.length} new, ${c.resolved.length} resolved, ` +
+    `arggon spec analyze vs baseline ${sanitizeHumanError(c.file)}: ${c.added.length} new, ${c.resolved.length} resolved, ` +
       `${c.unchanged.length} unchanged, ${c.total} total`,
   );
   return `${lines.join("\n")}\n`;
