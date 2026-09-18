@@ -267,6 +267,8 @@ program
             docs: result.docs,
             tracker: result.tracker,
             git: result.git,
+            // OpenCode integration state (task-opencode-v2-doctor, additive).
+            opencode: result.opencode,
             ...(result.budget ? { budget: result.budget } : {}),
             ...(result.budgetError !== undefined ? { budgetError: result.budgetError } : {}),
           },
