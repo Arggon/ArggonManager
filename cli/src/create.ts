@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { writeFileAtomic } from "./atomic.js";
 import { stringifyFrontmatter, type Frontmatter } from "./frontmatter.js";
 import { assertLabels, innerSlug, isItemType, itemId, slugify, type ItemType } from "./ids.js";
 import { itemsById, loadItems, tryLoadItem, type WorkItem } from "./items.js";
@@ -171,7 +172,9 @@ export function runCreate(opts: CreateOptions): CreateResult {
   }
 
   mkdirSync(dirname(filePath), { recursive: true });
-  writeFileSync(filePath, stringifyFrontmatter(data, body), "utf8");
+  // Atomic (bug-comment-torn-read audit): a concurrent reader (list/validate/
+  // MCP) must never observe the new item half-written.
+  writeFileAtomic(filePath, stringifyFrontmatter(data, body));
 
   const created = tryLoadItem(filePath);
   if (!created) {

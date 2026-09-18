@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, renameSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
+import { writeFileAtomic } from "./atomic.js";
 import { withItemLock } from "./lock.js";
 import { stringifyFrontmatter } from "./frontmatter.js";
 import {
@@ -678,7 +679,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
       // into the auto-commit via movedNewPaths staging.
       for (const other of byId.values()) {
         if (other.id === id || !other.dependsOn.includes(id)) continue;
-        writeFileSync(
+        writeFileAtomic(
           other.filePath,
           stringifyFrontmatter(
             {
@@ -688,7 +689,6 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
             },
             other.body,
           ),
-          "utf8",
         );
         movedNewPaths.push(other.filePath);
       }
@@ -696,7 +696,10 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     targetPath = promoteNewPath;
   }
 
-  writeFileSync(targetPath, stringifyFrontmatter(data, newBody), "utf8");
+  // Atomic (bug-comment-torn-read audit): update is the other hot item writer;
+  // a non-locking reader (list/validate/MCP) must never see a torn item here
+  // either.
+  writeFileAtomic(targetPath, stringifyFrontmatter(data, newBody));
 
   const updated = tryLoadItem(targetPath);
   if (!updated) {
@@ -911,13 +914,12 @@ function autoCompleteAncestors(
             stop = true;
             return;
           }
-          writeFileSync(
+          writeFileAtomic(
             fresh.filePath,
             stringifyFrontmatter(
               { ...fresh.data, status: "done", updated: formatDate(now) },
               fresh.body,
             ),
-            "utf8",
           );
           // Keep the in-memory copy fresh: the next ancestor's children check
           // must see this container as terminal.

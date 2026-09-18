@@ -50,15 +50,15 @@ Reproduced locally (2026-09-18):
 
 ## Acceptance
 
-- [ ] `runComment` writes the item atomically (temp file + rename, e.g. the
+- [x] `runComment` writes the item atomically (temp file + rename, e.g. the
       existing `writeFileAtomic`) so a reader can never observe a truncated or
       partial item file.
-- [ ] The initial lookup runs under `withItemLock` (or retries a transient skip
+- [x] The initial lookup runs under `withItemLock` (or retries a transient skip
       of the target file), so a live item cannot look missing to a contender.
-- [ ] Regression test: a reader racing `comment` never observes the item
+- [x] Regression test: a reader racing `comment` never observes the item
       without its frontmatter, and no process reports "not found" while the
       file exists.
-- [ ] `comment-race.test.ts` can drop its transient "not found" retry branch
+- [x] `comment-race.test.ts` can drop its transient "not found" retry branch
       (added by bug-tracker-commit-enotempty-flake) once this is fixed.
 
 ## Notes
