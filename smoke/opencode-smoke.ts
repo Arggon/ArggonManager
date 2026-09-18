@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * OpenCode V2 smoke harness (plan-opencode2-009 T8, W2 scope).
+ * OpenCode V2 smoke harness (plan-opencode2-009 T8 W2 + T9–T10 W3).
  *
  * Boots throwaway fixture repos, runs a real headless `opencode run`
  * (standalone server, JSON transcript + runtime logs) and asserts the bundled
  * plugin behavior end to end:
  *
+ *   W2 — MCP auto-registration:
  *   1. fresh init      — plugin bundled with its `//` marker, loads, and the
  *                        arggon MCP server is registered and usable (the model
  *                        executes `tools.arggon.arggon_next`).
@@ -19,6 +20,28 @@
  *                        keep working.
  *   5. plugin absent   — the CLI and the config-registered MCP server are
  *                        unaffected without the plugin.
+ *
+ *   W3 — session context:
+ *   6. branch          — a claimed item on `feat/<id>` resolves, injects the
+ *                        bounded item block (byte bound asserted from the
+ *                        plugin's own log line) and renames the session.
+ *   7. storage map     — an observed `arggon_show` call on a non-matching
+ *                        branch correlates the item for the next model call.
+ *   8. env override    — `ARGON_ITEM` resolves with no branch match.
+ *   9. nothing resolves — tasks/ present, no claim/branch/env/observed call:
+ *                        the hook is silent.
+ *  10. outside trees   — no tasks/: silent, session unaffected.
+ *  11. hygiene         — a shell `git commit` with a broken tracker item logs
+ *                        the `arggon validate` warning; the commit is not
+ *                        blocked.
+ *
+ * Compaction note: the block is re-injected on every agent-loop model call
+ * (`ctx.session.hook("context")`), which is by construction the same call that
+ * follows a compaction checkpoint. A headless run cannot force compaction
+ * deterministically; the closest reproducible evidence is scenario 7, where
+ * the block appears on a *later* model call of the same session, plus the W3
+ * probe transcript (`.smoke-evidence/`): one `context` hook firing per model
+ * request, including tool-driven continuations.
  *
  * Bounded and cheap by design: one short prompt per session, `--format json`,
  * and a pinned small model (`OPENCODE_SMOKE_MODEL` overrides). Exit codes:
@@ -46,11 +69,15 @@ import { fileURLToPath } from "node:url";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(repoRoot, "cli/src/cli.ts");
 const tsx = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
+const PLUGIN_SOURCE = join(repoRoot, "opencode/plugins/arggon/index.ts");
 const PLUGIN_DEST = ".opencode/plugins/arggon/index.ts";
 const PLUGIN_MARKER = `// arggon:generated template="opencode/plugins/arggon/index.ts"`;
 const MCP_TOOL_CODE = "return await tools.arggon.arggon_next({})";
 const MODEL = process.env.OPENCODE_SMOKE_MODEL ?? "opencode-go/deepseek-v4-flash";
 const TIMEOUT_MS = Number(process.env.OPENCODE_SMOKE_TIMEOUT_MS ?? 240_000);
+// Mirrors ITEM_BLOCK_MAX_BYTES in the plugin source; asserted in unit tests.
+// The smoke independently checks the byte count the plugin reports per call.
+const CONTEXT_BLOCK_MAX_BYTES = 1024;
 
 const TOOL_PROMPT = [
   "Use the execute tool with exactly this code:",
@@ -102,21 +129,25 @@ class Fixture {
     chmodSync(shim, 0o755);
   }
 
-  private env(): NodeJS.ProcessEnv {
+  private env(overrides?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     // PWD must follow cwd: OpenCode resolves the project directory from PWD
     // when present, and an inherited value would silently point the session at
-    // the caller's repo instead of the fixture.
+    // the caller's repo instead of the fixture. ARGON_ITEM is cleared by
+    // default so the harness is deterministic even under a leaked env; the
+    // env-override scenario passes it explicitly.
     return {
       ...process.env,
+      ARGON_ITEM: undefined,
       PWD: this.dir,
       PATH: `${this.binDir}:${process.env.PATH ?? ""}`,
+      ...overrides,
     };
   }
 
-  private run(command: string, args: string[]): RunResult {
+  private run(command: string, args: string[], overrides?: NodeJS.ProcessEnv): RunResult {
     const proc = spawnSync(command, args, {
       cwd: this.dir,
-      env: this.env(),
+      env: this.env(overrides),
       encoding: "utf8",
       timeout: TIMEOUT_MS,
       maxBuffer: 64 * 1024 * 1024,
@@ -128,23 +159,94 @@ class Fixture {
     return this.run(process.execPath, [tsx, cli, ...args]);
   }
 
+  git(args: string[]): RunResult {
+    return this.run("git", args);
+  }
+
+  /** git repo + identity so the tracker's auto-commits and shell commits work. */
+  bootstrap(): void {
+    this.git(["init", "-q"]);
+    this.git(["config", "user.email", "smoke@example.com"]);
+    this.git(["config", "user.name", "smoke-smoke"]);
+  }
+
   init(): RunResult {
     return this.cli(["init", this.dir, "--json"]);
   }
 
-  opencode(message: string): RunResult {
-    return this.run("opencode", [
-      "run",
-      "--standalone",
-      "--print-logs",
-      "--log-level",
-      "info",
-      "--model",
-      MODEL,
-      "--format",
-      "json",
-      message,
-    ]);
+  /** Copy the committed plugin source into the fixture (no `arggon init`). */
+  copyPlugin(): void {
+    this.write(PLUGIN_DEST, readFileSync(PLUGIN_SOURCE, "utf8"));
+  }
+
+  private json(result: RunResult): Record<string, unknown> | undefined {
+    try {
+      return JSON.parse(result.stdout) as Record<string, unknown>;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private itemId(result: RunResult): string | undefined {
+    const item = this.json(result)?.item;
+    const id = item !== null && typeof item === "object" ? (item as { id?: unknown }).id : undefined;
+    return typeof id === "string" ? id : undefined;
+  }
+
+  /** initiative → epic → story → task; returns the task id and its directory. */
+  createTaskChain(): { id: string; directory: string } | undefined {
+    const initiative = this.itemId(this.cli(["create", "initiative", "Smoke Initiative", "--json"]));
+    if (initiative === undefined) return undefined;
+    const epic = this.itemId(this.cli(["create", "epic", "Smoke Epic", "--parent", initiative, "--json"]));
+    if (epic === undefined) return undefined;
+    const story = this.itemId(this.cli(["create", "story", "Smoke Story", "--parent", epic, "--json"]));
+    if (story === undefined) return undefined;
+    const task = this.json(this.cli(["create", "task", "Smoke Item", "--parent", story, "--json"]));
+    const item = task?.item as { id?: unknown; path?: unknown } | undefined;
+    if (typeof item?.id !== "string" || typeof item.path !== "string") return undefined;
+    const directory = item.path.split("/").slice(0, -1).join("/");
+    return { id: item.id, directory };
+  }
+
+  claim(id: string): RunResult {
+    return this.cli(["update", id, "--status", "in_progress", "--assignee", "smoke"]);
+  }
+
+  opencode(message: string, overrides?: NodeJS.ProcessEnv): RunResult {
+    return this.run(
+      "opencode",
+      [
+        "run",
+        "--standalone",
+        "--print-logs",
+        "--log-level",
+        "info",
+        "--model",
+        MODEL,
+        "--format",
+        "json",
+        message,
+      ],
+      overrides,
+    );
+  }
+
+  /** Session titles persisted by the standalone server for this project. */
+  sessionTitles(): string[] {
+    const listed = this.run("opencode", ["session", "list", "--standalone", "--format", "json"]);
+    try {
+      const parsed = JSON.parse(listed.stdout) as Array<{ title?: unknown }>;
+      return parsed
+        .map((entry) => (typeof entry?.title === "string" ? entry.title : undefined))
+        .filter((title): title is string => title !== undefined);
+    } catch {
+      return [];
+    }
+  }
+
+  /** Subject of the newest commit in the fixture. */
+  headCommitSubject(): string {
+    return this.git(["log", "-1", "--pretty=%s"]).stdout.trim();
   }
 
   path(rel: string): string {
@@ -210,6 +312,36 @@ function pluginLoaded(result: RunResult): boolean {
 
 function mcpConnected(result: RunResult): boolean {
   return result.stderr.includes('message="mcp connected" server=arggon');
+}
+
+type Injection = { id: string; bytes: number };
+
+/** `[arggon] context: injected item <id> (<bytes> bytes)` observations. */
+function contextInjections(stderr: string): Injection[] {
+  const injections: Injection[] = [];
+  const pattern = /\[arggon\] context: injected item (\S+) \((\d+) bytes\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(stderr)) !== null) {
+    injections.push({ id: match[1], bytes: Number(match[2]) });
+  }
+  return injections;
+}
+
+function renameLogged(stderr: string, id: string): boolean {
+  return stderr.includes(`[arggon] session renamed to ${id}`);
+}
+
+/** Fixture with an initialized tracker and a claimed item; `<id>` is undefined on failure. */
+function claimedItemFixture(name: string): { fixture: Fixture; item: { id: string; directory: string } | undefined } {
+  const fixture = new Fixture(name);
+  fixture.bootstrap();
+  const init = fixture.init();
+  check("init exits 0", init.status === 0, runTail(init));
+  const item = fixture.createTaskChain();
+  if (item === undefined) return { fixture, item };
+  const claim = fixture.claim(item.id);
+  check("fixture item claimed", claim.status === 0, runTail(claim));
+  return { fixture, item };
 }
 
 function scenarioFreshInit(): void {
@@ -316,8 +448,168 @@ function scenarioPluginAbsent(): void {
   check("CLI unaffected without the plugin", next.status === 0 && next.stdout.includes('"ok":true'), runTail(next));
 }
 
+// ---------------------------------------------------------------------------
+// W3 — session context
+// ---------------------------------------------------------------------------
+
+function scenarioContextBranch(): void {
+  scenario("context: claimed item on feat/<id> injects the bounded block and renames the session");
+  const { fixture: f, item } = claimedItemFixture("context-branch");
+  if (item === undefined) {
+    check("fixture item created", false, "create chain failed");
+    return;
+  }
+  f.git(["checkout", "-q", "-b", `feat/${item.id}`]);
+  const session = f.opencode("Reply with only the work item id shown in your system context.");
+  f.saveTranscript("context-branch", session);
+  const injections = contextInjections(session.stderr);
+  check(
+    `item block injected for ${item.id} within ${CONTEXT_BLOCK_MAX_BYTES} bytes`,
+    injections.some((entry) => entry.id === item.id && entry.bytes > 0 && entry.bytes <= CONTEXT_BLOCK_MAX_BYTES),
+    `${injections.map((entry) => `${entry.id}:${entry.bytes}B`).join(", ") || "no injection"}\n${runTail(session)}`,
+  );
+  check(
+    "model echoed the injected item id (block reached the model)",
+    textContains(session.stdout, item.id),
+    runTail(session),
+  );
+  check("plugin logged the session rename", renameLogged(session.stderr, item.id), runTail(session));
+  check(
+    "session title persisted by the server as the item id",
+    f.sessionTitles().includes(item.id),
+    JSON.stringify(f.sessionTitles()),
+  );
+}
+
+function scenarioContextStorage(): void {
+  scenario("context: observed arggon_show call correlates the item on a non-matching branch");
+  const { fixture: f, item } = claimedItemFixture("context-storage");
+  if (item === undefined) {
+    check("fixture item created", false, "create chain failed");
+    return;
+  }
+  f.git(["checkout", "-q", "-b", "smoke-base"]);
+  const session = f.opencode(
+    [
+      "Use the execute tool with exactly this code:",
+      `return await tools.arggon.arggon_show({ id: "${item.id}" })`,
+      "If the tool is not found, run the same code once more (the tool catalog can lag server startup).",
+      "Then reply with only the work item id that appears in your system context.",
+    ].join("\n"),
+  );
+  f.saveTranscript("context-storage", session);
+  check("branch does not match feat/fix", f.git(["branch", "--show-current"]).stdout.trim() === "smoke-base");
+  const injections = contextInjections(session.stderr);
+  check(
+    `item block injected for ${item.id} after the observed call`,
+    injections.some((entry) => entry.id === item.id && entry.bytes > 0 && entry.bytes <= CONTEXT_BLOCK_MAX_BYTES),
+    `${injections.map((entry) => `${entry.id}:${entry.bytes}B`).join(", ") || "no injection"}\n${runTail(session)}`,
+  );
+  check(
+    "model echoed the injected item id (storage map reached the model)",
+    textContains(session.stdout, item.id),
+    runTail(session),
+  );
+}
+
+function scenarioContextEnv(): void {
+  scenario("context: ARGON_ITEM resolves with no branch match");
+  const f = new Fixture("context-env");
+  f.bootstrap();
+  const init = f.init();
+  check("init exits 0", init.status === 0, runTail(init));
+  const item = f.createTaskChain();
+  if (item === undefined) {
+    check("fixture item created", false, "create chain failed");
+    return;
+  }
+  f.git(["checkout", "-q", "-b", "smoke-base"]);
+  const session = f.opencode("Reply with only the work item id shown in your system context.", {
+    ARGON_ITEM: item.id,
+  });
+  f.saveTranscript("context-env", session);
+  const injections = contextInjections(session.stderr);
+  check(
+    `item block injected for ${item.id} from the env override`,
+    injections.some((entry) => entry.id === item.id && entry.bytes <= CONTEXT_BLOCK_MAX_BYTES),
+    `${injections.map((entry) => `${entry.id}:${entry.bytes}B`).join(", ") || "no injection"}\n${runTail(session)}`,
+  );
+  check(
+    "model echoed the injected item id (env override reached the model)",
+    textContains(session.stdout, item.id),
+    runTail(session),
+  );
+}
+
+function scenarioContextSilent(): void {
+  scenario("context: nothing resolves (tasks/ present, no claim/branch/env/observed call) is silent");
+  const f = new Fixture("context-silent");
+  f.bootstrap();
+  f.init();
+  const item = f.createTaskChain();
+  check("fixture item created (left unclaimed)", item !== undefined);
+  f.git(["checkout", "-q", "-b", "smoke-base"]);
+  const session = f.opencode("Reply with exactly: SILENT_OK");
+  f.saveTranscript("context-silent", session);
+  check(
+    "session still succeeds",
+    session.status === 0 && textContains(session.stdout, "SILENT_OK"),
+    runTail(session),
+  );
+  check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
+  check("no item context injected", contextInjections(session.stderr).length === 0, runTail(session));
+}
+
+function scenarioContextOutside(): void {
+  scenario("context: outside ArggonManager trees (no tasks/) the session context is silent");
+  const f = new Fixture("context-outside");
+  f.bootstrap();
+  f.copyPlugin();
+  check("plugin copied into the fixture", existsSync(f.path(PLUGIN_DEST)));
+  const session = f.opencode("Reply with exactly: OUTSIDE_OK");
+  f.saveTranscript("context-outside", session);
+  check(
+    "session still succeeds",
+    session.status === 0 && textContains(session.stdout, "OUTSIDE_OK"),
+    runTail(session),
+  );
+  check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
+  check("no item context injected", contextInjections(session.stderr).length === 0, runTail(session));
+}
+
+function scenarioHygiene(): void {
+  scenario("hygiene: failing validate after an agent git commit logs a warning, never blocks");
+  const f = new Fixture("hygiene");
+  f.bootstrap();
+  f.init();
+  const item = f.createTaskChain();
+  if (item === undefined) {
+    check("fixture item created", false, "create chain failed");
+    return;
+  }
+  f.write(
+    `${item.directory}/task-smoke-bad.md`,
+    '---\ntype: task\nstatus: nope\nid: task-smoke-bad\ntitle: "Bad state"\nparent: smoke-story\n---\n\nbroken on purpose\n',
+  );
+  const session = f.opencode(
+    'Run the shell command: git add -A && git commit -m "hygiene check" --no-verify. Then reply with exactly: HYGIENE_OK',
+  );
+  f.saveTranscript("hygiene", session);
+  check(
+    "session succeeds (warning is not blocking)",
+    session.status === 0 && textContains(session.stdout, "HYGIENE_OK"),
+    runTail(session),
+  );
+  check("the commit ran", f.headCommitSubject() === "hygiene check", runTail(session));
+  check(
+    "validate warning logged after the commit",
+    session.stderr.includes("[arggon] validate failed after git commit:"),
+    runTail(session),
+  );
+}
+
 function main(): void {
-  console.log("smoke:opencode — OpenCode V2 plugin harness (W2)");
+  console.log("smoke:opencode — OpenCode V2 plugin harness (W2 + W3)");
   if (!opencodeAvailable()) {
     console.log("skipped: opencode not installed");
     return;
@@ -328,6 +620,12 @@ function main(): void {
   scenarioNeverClobber();
   scenarioFailureIsolation();
   scenarioPluginAbsent();
+  scenarioContextBranch();
+  scenarioContextStorage();
+  scenarioContextEnv();
+  scenarioContextSilent();
+  scenarioContextOutside();
+  scenarioHygiene();
 
   if (failures.length > 0) {
     console.error(`\nsmoke:opencode FAILED — ${failures.length} check(s):\n${failures.map((f) => `- ${f}`).join("\n")}`);
