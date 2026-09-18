@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-atomic-write-followups
 title: "atomic-write follow-ups: .convention.yml torn-write exposure + guard/mode nits"
-priority: p3
+assignee: Arggon
+branch: fix/bug-atomic-write-followups
 parent: story-self-improvement
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T16:15:12.599Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-atomic-write-followups
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/bug-atomic-write-followups.md
