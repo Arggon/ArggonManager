@@ -349,26 +349,46 @@ function isEnvAssignment(token: string): boolean {
   return ENV_ASSIGNMENT.test(token) && !token.includes("$(")
 }
 
+/** `true` for text bash resolves as a path: `/…`, `./…`, `../…` or `~…`. */
+function isPathLike(text: string): boolean {
+  return (
+    text.startsWith("/") ||
+    text.startsWith("./") ||
+    text.startsWith("../") ||
+    text.startsWith("~")
+  )
+}
+
+/**
+ * Command name of one token text. Whitespace-free text keeps the last path
+ * segment (`/usr/local/bin/arggon` → `arggon`). Whitespace means the token is
+ * a fused quoted span, i.e. ONE command word looked up as a whole (bash:
+ * `"echo /usr/bin/arggon"` → 127), so only path-like text keeps the segment
+ * rule: `"echo /usr/bin/arggon"` must not reduce to `arggon`, while
+ * `"/opt/my tools/arggon"` is a real path to the binary.
+ */
+function commandName(text: string): string {
+  if (/\s/.test(text) && !isPathLike(text)) return text
+  return text.split("/").pop() ?? ""
+}
+
 /**
  * Command head of one token: quotes/escapes and a leading `VAR=` assignment
  * stripped, `$(`/`(`/`{` grouping openers removed (so `x=$(arggon`, `(arggon`
  * and `$(arggon` all yield `arggon`), trailing group closers dropped, then the
- * last path segment kept (`/usr/local/bin/arggon` → `arggon`). A word token
- * (started in quotes, or starting with a literal escaped `$(`/`\(`) keeps
- * only its last path segment: grouping prefixes and assignments in its text
- * stay literal.
+ * path rule of `commandName` applied. A word token (started in quotes, or
+ * starting with a literal escaped `$(`/`\(`) keeps grouping prefixes and
+ * assignments in its text literal.
  */
 function commandHead(token: ShellToken): string {
-  if (token.word) return token.text.split("/").pop() ?? ""
-  return (
+  if (token.word) return commandName(token.text)
+  return commandName(
     token.text
       .replace(/^["'\\]+/, "")
       .replace(/^[A-Za-z_][A-Za-z0-9_]*=/, "")
       .replace(/^\$?\(+/, "")
       .replace(/^\{+/, "")
-      .replace(/[)}]+$/, "")
-      .split("/")
-      .pop() ?? ""
+      .replace(/[)}]+$/, ""),
   )
 }
 
@@ -559,9 +579,13 @@ function parseCommandText(command: string, depth: number): string | undefined {
  * `npm run "arggon show task-x"`, `x="line1\narggon show task-x"`) is one
  * word, never a command, while `echo "$(arggon show task-x)"` does correlate
  * (the substitution runs) and a quoted grouping word (`"(" arggon …`) is a
- * command name, never an opener. A token starting with an escaped `\(` is
- * likewise a literal word (F2), while a quoted assignment before the command
- * (`x="a b" arggon show task-x`) stays an assignment and the command runs (F1).
+ * command name, never an opener. A whitespace-bearing word reduces to its
+ * last path segment only when path-like: `"echo /usr/bin/arggon" show task-x`
+ * is a command literally named `echo /usr/bin/arggon` (127) and stays inert,
+ * while `"/opt/my tools/arggon" show task-x` names the binary and correlates.
+ * A token starting with an escaped `\(` is likewise a literal word (F2),
+ * while a quoted assignment before the command (`x="a b" arggon show task-x`)
+ * stays an assignment and the command runs (F1).
  *
  * Best effort, misses are harmless and false positives are not: aliases,
  * backticks, `sh -c "arggon …"`, `timeout 5 arggon …` and `xargs arggon …`
