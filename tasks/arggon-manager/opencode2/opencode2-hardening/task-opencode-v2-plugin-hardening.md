@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode-v2-plugin-hardening
 title: "Plugin hardening: command-position parsing, storage guard order, cache keying (plus F3/F5/F6/F8)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T14:33:40.398Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-plugin-hardening
 ---
 <!--
@@ -51,18 +50,18 @@ session layers of `opencode/plugins/arggon/index.ts`.
 
 ## Acceptance
 
-- [ ] Command parsing anchored to command position (start, after `&&;|`,
+- [x] Command parsing anchored to command position (start, after `&&;|`,
       or after `npm run arggon --`), or the heuristic is explicitly documented
       as best-effort; tests cover the false-positive cases above.
-- [ ] The `tasks/` tree guard runs before any storage write (no-op outside
+- [x] The `tasks/` tree guard runs before any storage write (no-op outside
       trees is literal).
-- [ ] Cache keying/eviction decided and implemented (project-scoped key and/or
+- [x] Cache keying/eviction decided and implemented (project-scoped key and/or
       bounded eviction); documented for long-lived servers (`opencode serve`).
-- [ ] `boundText` hardened or documented with a test for the multibyte
+- [x] `boundText` hardened or documented with a test for the multibyte
       boundary; stale comments fixed.
-- [ ] Smoke measures the injected block text independently (or logs it once
+- [x] Smoke measures the injected block text independently (or logs it once
       with the reported size for cross-checking).
-- [ ] Full suite + `smoke:opencode` green; small PR to `opencode2`.
+- [x] Full suite + `smoke:opencode` green; small PR to `opencode2`.
 
 ## Notes
 
@@ -92,3 +91,6 @@ Files: `opencode/plugins/arggon/index.ts`, `opencode/plugins/arggon/index.test.t
 ### handoff 2026-09-18 @Arggon (session: ses_f4b101430ffeSOXIssuxq2Mw5r) — next: Review draft PR #337 against the item acceptance checklist (F2/F4/F5/F3/F6/F8), re-run npm test + lint + build + arggon validate + spec validate + smoke:opencode, then merge to opencode2 and close th…
 - branch: feat/task-opencode-v2-plugin-hardening
 - open questions: docs/playbooks/opencode.md W3 bullet update requested from the docs owner (command-position anchoring, best-effort arggon_* regex, bounded/project-scoped caches, smoke block= independent measurement)
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; F2 false positives eliminated with true positives preserved (7+7 probed), F4 guard literal (independent fake-ctx probe), F5 LRU/project-scoped keying safe for long-lived servers, F3 fuzzed across 4 charsets × 200 lengths × 10 bounds (bound always enforced), F8 smoke measurement verified in a real runtime (11/11); 1144 tests; merged with cli pass. F1/F2/F4-residual filed as task-opencode2-plugin-nits. Closing.
