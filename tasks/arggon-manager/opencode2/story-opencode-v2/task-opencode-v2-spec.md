@@ -4,15 +4,15 @@ status: in_progress
 id: task-opencode-v2-spec
 title: "Spec and plan: generated .opencode seam (config, agents, commands)"
 assignee: Arggon
-priority: p1
-depends_on: [task-opencode-v2-adr]
-parent: story-opencode-v2
 branch: feat/task-opencode-v2-spec
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-spec
+parent: story-opencode-v2
 labels: []
+priority: p1
 created: "2026-09-18"
 updated: "2026-09-18"
 claimed_at: "2026-09-18T00:36:59.370Z"
+depends_on: [task-opencode-v2-adr]
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-spec
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/story-opencode-v2/task-opencode-v2-spec.md
@@ -86,3 +86,6 @@ and free of rule duplication (prompts and permissions only, pointing at
 **Next:** W2 (task-opencode-v2-plugin) consumes this seam as the integration
 base; the plugin bundles into `.opencode/plugins/arggon/` with the same
 provenance + parity discipline.
+
+### handoff 2026-09-18 @Arggon — next: Review draft PR #322 (base opencode2). After merge: W1b doctor (task-opencode-v2-doctor) + W1c playbook (task-opencode-v2-playbook); then W2 plugin (task-opencode-v2-plugin) consumes this seam.
+- branch: feat/task-opencode-v2-spec
