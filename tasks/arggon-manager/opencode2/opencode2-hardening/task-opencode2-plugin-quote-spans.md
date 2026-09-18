@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode2-plugin-quote-spans
 title: "Plugin quote-span integrity: multi-word quoted mentions correlate (splitTokens splits inside quotes)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T21:42:55.690Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-plugin-quote-spans
 ---
 <!--
@@ -44,11 +43,11 @@ make the item's "nothing left as a live false positive" wording too broad.
 
 ## Acceptance
 
-- [ ] Quoted spans stay one token; the F1 true/miss matrix and F2 forms render
+- [x] Quoted spans stay one token; the F1 true/miss matrix and F2 forms render
       `undefined`/correlate per bash ground truth, with tests.
-- [ ] Docstrings/claims accurate; no regression of the #337/#345/#352
+- [x] Docstrings/claims accurate; no regression of the #337/#345/#352
       eliminations or true positives.
-- [ ] Full suite + `smoke:opencode` green; small PR to `opencode2`.
+- [x] Full suite + `smoke:opencode` green; small PR to `opencode2`.
 
 ## Notes
 
@@ -103,3 +102,6 @@ FP matrix (`parseArggonItemFromCommand`; bash truth via stub `arggon` on PATH; r
 No true-positive regressions (25-case probe green: direct/`VAR=`/runners/wrappers/`$(…)`/quoted absolute path/`x="it's"`/`"(" arggon`/`echo "…"` eliminations unchanged).
 
 Gates on 09b1291: `npm test` → 73 files / 1221 tests pass (private TMPDIR); `npm run smoke:opencode` → 11 scenarios / 0 failures; lint, build, `arggon validate` (0/0), `arggon spec validate` (16 docs, 0 warnings) clean. No merge, no status flip.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict NO-MERGE→fixed (09b1291: whitespace-bearing word tokens keep their whole text unless path-like, killing the "echo /usr/bin/arggon" FP class while keeping /opt/my tools/arggon; mid-token \( assertion added). Reviewer's FP matrix re-verified in the fix evidence (5 FP forms → undefined, legitimate path still correlates, 25-case regression green); plugin tests 37 + CI pass; merged. Pre-existing escape-edge forms filed as task-opencode2-plugin-escape-nits. Closing.
