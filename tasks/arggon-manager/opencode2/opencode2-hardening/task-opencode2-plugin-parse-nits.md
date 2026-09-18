@@ -84,3 +84,6 @@ Bash cross-checks: `bash -n -c 'echo \$(arggon show task-x)'` → exit 2; `'\$(a
 Decisions: F-A fixed in both paths (group + token word); F-B fixed (name queries and quoted opener/assignment words), nothing left as a live FP; F-C stateful quotes (the item's `echo "it's" …` example runs only `echo`, so it correctly stays `undefined` — the miss was the assignment form); F-D tests plus exported `MAX_SUBSTITUTION_DEPTH`. Docstrings updated, no playbook change needed.
 
 Gates on merged tree `2b6fd43`: `npm test` → 73 files / 1211 tests pass (private TMPDIR); `npm run smoke:opencode` → 11 scenarios / 0 failures; lint, build, `arggon validate` (0/0), `arggon spec validate` (0/0) clean. No merge, no status flip.
+
+### handoff 2026-09-18 @Arggon (session: ses_f4a703652ffe9qo36Nf8Crwoig) — next: Review draft PR #352 (base opencode2): F-A escaped \$( opener, F-B command -v + quoted opener/assignment words, F-C stateful token quotes, F-D depth/comment/newline/wrapper-value tests. Gates green o…
+- branch: feat/task-opencode2-plugin-parse-nits
