@@ -45,15 +45,15 @@ Workaround (used by both workers): `git worktree add <path> -b <branch>`,
 
 ## Acceptance
 
-- [ ] Repro recorded on a fixture (hook-enabled repo, no deps in the worktree)
+- [x] Repro recorded on a fixture (hook-enabled repo, no deps in the worktree)
       with expected vs observed.
-- [ ] Behavior decided and implemented per `start-worktree-ergonomics`:
+- [x] Behavior decided and implemented per `start-worktree-ergonomics`:
       prepare the worktree (link the primary `node_modules` when present) **or**
       keep the worktree on hook failure with an actionable error **or** make the
       manual sequence the documented path.
-- [ ] Regression test covers the chosen behavior (fixture with a pre-commit
+- [x] Regression test covers the chosen behavior (fixture with a pre-commit
       gate).
-- [ ] `docs/agents.md` worktree guidance + the `arggon-cli` skill updated; no
+- [x] `docs/agents.md` worktree guidance + the `arggon-cli` skill updated; no
       hook is silently bypassed.
 
 ## Notes
