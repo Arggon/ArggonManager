@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-handoff-field-cap-surrogate
 title: "handoff capField surrogate-safety: astral pairs split at the 199/200 boundary (U+FFFD on disk)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T21:42:19.079Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-handoff-field-cap-surrogate
 ---
 <!--
@@ -71,3 +70,6 @@ lone surrogate in the tail and U+FFFD in the body.
 
 ### handoff 2026-09-18 @Arggon (session: ses_f4987ad2effd6z23DBBS0MxdV1) — next: Review draft PR #355 (handoff capField surrogate-safety); verify evidence, then merge to opencode2 and flip the item done.
 - branch: feat/task-handoff-field-cap-surrogate
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; shared capUnits verified (drop-before-cap, pair back-off, marker arithmetic, capSession semantics preserved by differential), the 199/200 boundary repro fixed for next/branch/openQuestions (200→199 units, no lone surrogate, no U+FFFD on disk), ordinary output byte-identical to base (differential 9/9 + 2000-case fuzz), tests discriminate (3 fail on base), gates 1223 + CI green; merged. P3 notes (post-drop whitespace edge, duplicated back-off helper) are informational. Closing.
