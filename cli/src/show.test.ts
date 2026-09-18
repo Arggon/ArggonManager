@@ -1,17 +1,32 @@
-import { mkdtempSync, readFileSync } from "node:fs";
+import { mkdtempSync as _mkdtempSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { runComment } from "./comment.js";
 import { runCreate } from "./create.js";
 import { runInit } from "./init.js";
 import { runShow, DEFAULT_TAIL_COMMENTS } from "./show.js";
+import { removeFixtureTree } from "./test-tmp.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const cli = join(repoRoot, "cli/src/cli.ts");
 const tsx = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
+
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test
+// through the shared bounded-retry helper (test-tmp.ts) — the CLI children are
+// spawnSync and already reaped, but a still-settling fs entry must never trip
+// the one-shot ENOTEMPTY race in plain recursive rmSync.
+const tmpDirs: string[] = [];
+afterEach(() => {
+  for (const dir of tmpDirs.splice(0)) removeFixtureTree(dir);
+});
+function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
+  const dir = _mkdtempSync(prefix, options);
+  tmpDirs.push(dir);
+  return dir;
+}
 
 const NOW = new Date("2026-09-11T12:00:00Z");
 
