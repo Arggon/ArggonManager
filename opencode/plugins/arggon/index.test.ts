@@ -1,15 +1,22 @@
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
+  CACHE_MAX_ENTRIES,
   ITEM_BLOCK_MAX_BYTES,
   boundText,
   buildItemBlock,
   isArggonItemId,
+  itemCacheKey,
   itemIdFromBranch,
   looksLikeCommitCommand,
+  onToolAfter,
   parseArggonItemFromCode,
   parseArggonItemFromCommand,
   parseArggonItemFromTool,
   parseValidateFailure,
+  setBounded,
 } from "./index.js";
 
 // plan-opencode2-009 W3 (T9-T10): the plugin's correlation/formatting logic is
@@ -45,6 +52,28 @@ describe("plugin-context: arggon invocation parsing", () => {
     expect(parseArggonItemFromCommand("argonite show task-x")).toBeUndefined();
     expect(parseArggonItemFromCommand("node cli/src/cli.ts show task-x")).toBeUndefined();
     expect(parseArggonItemFromCommand(undefined)).toBeUndefined();
+  });
+
+  it("anchors item correlation to command position (F2)", () => {
+    expect(parseArggonItemFromCommand('grep -rn "arggon show task-x" .')).toBeUndefined();
+    expect(parseArggonItemFromCommand('echo "arggon update task-fake"')).toBeUndefined();
+    expect(parseArggonItemFromCommand('git commit -m "arggon handoff task-x"')).toBeUndefined();
+    expect(parseArggonItemFromCommand("echo arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand("cd repo && grep arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCode('const cmd = "grep -rn \'arggon show task-x\' ."')).toBeUndefined();
+    expect(
+      parseArggonItemFromCode('await tools.shell({ command: \'echo "arggon update task-fake"\' })'),
+    ).toBeUndefined();
+  });
+
+  it("still correlates command-position invocations (F2)", () => {
+    expect(parseArggonItemFromCommand("ARGON_QUIET=1 arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("git status && arggon comment task-x 'note'")).toBe("task-x");
+    expect(parseArggonItemFromCommand("pnpm run arggon -- show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("yarn run arggon start task-x")).toBe("task-x");
+    expect(
+      parseArggonItemFromCode('await tools.shell({ command: "cd repo && arggon show task-x" })'),
+    ).toBe("task-x");
   });
 
   it("parses Code Mode MCP calls and embedded shell commands", () => {
@@ -189,5 +218,102 @@ describe("plugin-context: bounded item block", () => {
     expect(bounded.bytes).toBeLessThanOrEqual(128);
     expect(bounded.text.endsWith("… (truncated)")).toBe(true);
     expect(boundText("short", 128).truncated).toBe(false);
+  });
+
+  it("never overshoots the byte bound when cutting a multibyte line (F3)", () => {
+    const bounded = boundText("あ".repeat(100), 20);
+    expect(bounded.truncated).toBe(true);
+    expect(bounded.bytes).toBe(byteLength(bounded.text));
+    expect(bounded.bytes).toBeLessThanOrEqual(20);
+    expect(bounded.text.startsWith("あ")).toBe(true);
+    expect(bounded.text.endsWith("… (truncated)")).toBe(true);
+  });
+
+  it("returns an empty truncated block when the bound cannot fit the marker (F3)", () => {
+    const bounded = boundText("anything", 4);
+    expect(bounded.truncated).toBe(true);
+    expect(bounded.bytes).toBe(0);
+    expect(bounded.text).toBe("");
+  });
+});
+
+describe("plugin-context: bounded caches", () => {
+  it("keys cached item views by project directory and id (F5)", () => {
+    expect(itemCacheKey("/p/a", "task-x")).not.toBe(itemCacheKey("/p/b", "task-x"));
+    expect(itemCacheKey("/p/a", "task-x")).toBe(itemCacheKey("/p/a", "task-x"));
+  });
+
+  it("evicts the oldest entries beyond the bound (F5)", () => {
+    const map = new Map<string, number>();
+    setBounded(map, "a", 1, 2);
+    setBounded(map, "b", 2, 2);
+    setBounded(map, "c", 3, 2);
+    expect([...map.keys()]).toEqual(["b", "c"]);
+    setBounded(map, "b", 22, 2); // re-insert refreshes recency
+    setBounded(map, "d", 4, 2);
+    expect([...map.entries()]).toEqual([
+      ["b", 22],
+      ["d", 4],
+    ]);
+  });
+
+  it("keeps the default bound finite for long-lived servers (F5)", () => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < CACHE_MAX_ENTRIES + 10; i += 1) setBounded(map, `k${i}`, i);
+    expect(map.size).toBe(CACHE_MAX_ENTRIES);
+    expect(map.has("k0")).toBe(false);
+  });
+});
+
+describe("plugin-context: storage guard order", () => {
+  function fakeContext(directory: string): {
+    writes: Array<[string, unknown]>;
+    ctx: Parameters<typeof onToolAfter>[0];
+  } {
+    const writes: Array<[string, unknown]> = [];
+    const ctx: Parameters<typeof onToolAfter>[0] = {
+      location: { directory },
+      storage: {
+        get: async () => undefined,
+        set: async (key, value) => {
+          writes.push([key, value]);
+        },
+        remove: async () => undefined,
+      },
+    };
+    return { writes, ctx };
+  }
+
+  it("writes nothing when the tree has no tasks/ directory (F4)", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "arggon-guard-outside-"));
+    try {
+      const { writes, ctx } = fakeContext(directory);
+      await onToolAfter(ctx, {
+        status: "completed",
+        sessionID: "ses-guard",
+        tool: "shell",
+        input: { command: "arggon show task-x" },
+      });
+      expect(writes).toEqual([]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("correlates an observed invocation once tasks/ exists (F4)", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "arggon-guard-inside-"));
+    try {
+      mkdirSync(join(directory, "tasks"));
+      const { writes, ctx } = fakeContext(directory);
+      await onToolAfter(ctx, {
+        status: "completed",
+        sessionID: "ses-guard",
+        tool: "shell",
+        input: { command: "arggon show task-x" },
+      });
+      expect(writes).toEqual([["arggon/session/ses-guard", "task-x"]]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });
