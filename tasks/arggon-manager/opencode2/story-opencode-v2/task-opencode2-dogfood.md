@@ -74,3 +74,7 @@ cannot run ArggonManager's own work loop, the program is not done.
 **PR:** draft close-out to `opencode2` (merge-commit — it carries tracker auto-commits). No container/status flips by this worker.
 
 **For coordinator triage (not filed, subagent rule):** (1) `init` re-runs here report `commit.skipped: git add failed ... ignored ...` because it stages the ignored bundles — a self-hosting tree can be left with a dirty index; plain adopters unaffected. (2) `/tmp/arggon-budget-*` hygiene race between `measure.test.ts` and a concurrent `doctor --budget` (known transient; serial run green). (3) generated `formatter: true` prettier-formatted whole files on agent edits (reverted; PR diff kept surgical). (4) open p3 follow-ups under `story-opencode-v2` block the acceptance-aware cascade for the story/epic — decide before merge.
+
+### handoff 2026-09-18 @Arggon (session: ses_f4d633ecdffea04CaLlXaunx72) — next: Coordinator: review draft PR #331 (base opencode2, MERGE commit — tracker auto-commits). Decide the 7 open p3 follow-ups before flipping this item done; they block the story/epic cascade.
+- branch: feat/task-opencode2-dogfood
+- open questions: File the init commit.skipped-on-ignored-bundles observation?; Keep story-opencode-v2 open until the p3 follow-ups land, or waive/cancel them at close-out?
