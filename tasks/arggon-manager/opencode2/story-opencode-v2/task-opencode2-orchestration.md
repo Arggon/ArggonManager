@@ -93,3 +93,6 @@ Branch `feat/task-opencode2-orchestration`. All gates green: full suite 69 files
 ### handoff 2026-09-18 @Arggon — next: Review PR #330 (draft) and its evidence comment; then merge and flip done — no further code work expected.
 - branch: feat/task-opencode2-orchestration
 - open questions: None blocking; reviewer keeps shell by design (edit denied only).
+
+### 2026-09-18 @Arggon
+PR: https://github.com/Arggon/ArggonManager/pull/330 (draft, base `opencode2`).
