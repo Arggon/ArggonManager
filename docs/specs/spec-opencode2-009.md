@@ -1,7 +1,7 @@
 ---
 spec_id: opencode2-009
 title: OpenCode2 complete refactor
-status: proposed
+status: implemented
 created: 2026-09-18
 ---
 
