@@ -397,9 +397,7 @@ export function runValidate(opts: ValidateOptions): ValidateResult {
 export function formatValidateHuman(result: ValidateResult): string {
   const lines: string[] = [];
   for (const e of result.errors) {
-    lines.push(
-      `error ${sanitizeHumanError(e.path)}: ${sanitizeHumanError(e.message)} [${e.code}]`,
-    );
+    lines.push(`error ${sanitizeHumanError(e.path)}: ${sanitizeHumanError(e.message)} [${e.code}]`);
   }
   for (const w of result.warnings) {
     lines.push(
