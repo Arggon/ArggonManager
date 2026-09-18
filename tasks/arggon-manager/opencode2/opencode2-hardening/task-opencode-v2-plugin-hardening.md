@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-opencode-v2-plugin-hardening
 title: "Plugin hardening: command-position parsing, storage guard order, cache keying (plus F3/F5/F6/F8)"
+assignee: Arggon
+branch: feat/task-opencode-v2-plugin-hardening
 parent: opencode2-hardening
 labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T14:33:40.398Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-plugin-hardening
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/story-opencode-v2/task-opencode-v2-plugin-hardening.md
