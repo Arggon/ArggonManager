@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-start-worktree-node-modules
-title: "arggon start --worktree fails and rolls back in fresh worktrees without node_modules"
-priority: p2
+title: arggon start --worktree fails and rolls back in fresh worktrees without node_modules
+assignee: Arggon
+branch: fix/bug-start-worktree-node-modules
 parent: start-worktree-ergonomics
 labels: []
+priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T13:07:36.745Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-start-worktree-node-modules
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/start-worktree-ergonomics/bug-start-worktree-node-modules.md
