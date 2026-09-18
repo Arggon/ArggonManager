@@ -133,7 +133,7 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     // The orphaned file still exists on disk — only its template is gone.
     writeFileSync(join(dir, "docs/legacy.md"), "old generated content\n", "utf8");
     const result = runDoctor({ cwd: dir });
-    expect(result.docs.managed).toBe(20); // 19 current + 1 stale legacy entry
+    expect(result.docs.managed).toBe(GENERATED_DOC_COUNT + 1); // current + 1 stale legacy entry
     expect(result.docs.stale).toBe(1);
     expect(result.docs.untouched).toBe(GENERATED_DOC_COUNT);
   });
