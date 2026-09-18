@@ -144,3 +144,6 @@ Evidence + decisions — row/table human stdout sanitized (draft PR pending revi
 ### handoff 2026-09-18 @Arggon — next: Review the draft PR against opencode2 (row/table stdout sanitization: list, show, report, playbook status, spec audit, tui, adopt/adopt --ack); coordinator/reviewer merges and flips status (worker do…
 - branch: feat/task-row-table-stdout-sanitize
 - open questions: None blocking. Decisions recorded in the evidence comment: uncapped escape-only sanitizer for row/table channels (byte-identity incl. quotes/backslashes, documented cap decision); show prose/comments…
+
+### 2026-09-18 @Arggon
+Draft PR #357: https://github.com/Arggon/ArggonManager/pull/357 (base opencode2, draft). Ready for review; per worker contract no merge and no status flip.
