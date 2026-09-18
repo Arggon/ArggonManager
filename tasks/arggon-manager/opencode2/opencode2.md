@@ -21,6 +21,7 @@ updated: "2026-09-18"
 
 ## Acceptance
 
-- [ ] 
+- [x] Program: spec-opencode2-009 implemented and merged on `opencode2` (W0-W7).
+- [ ] Hardening backlog (`story-opencode2-hardening`) complete and validated.
 
 ## Notes

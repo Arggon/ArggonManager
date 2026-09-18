@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode2-dogfood
 title: "Dogfood: ArggonManager self-hosts the OpenCode2 surface"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T03:44:24.639Z"
 depends_on: [task-opencode-v2-plugin, task-opencode2-orchestration, task-opencode2-methodology]
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-dogfood
 ---
@@ -33,24 +32,22 @@ cannot run ArggonManager's own work loop, the program is not done.
 
 ## Acceptance
 
-- [ ] This repo carries the generated surface (checked in, provenanced):
+- [x] This repo carries the generated surface (checked in, provenanced):
       `opencode.jsonc` (root), `.opencode/plugins/arggon/`, `.opencode/agents/`,
       `.opencode/commands/`, slim `AGENTS.md`, skill with references.
-- [ ] A real session on this repo demonstrates the loop end-to-end with
+- [x] A real session on this repo demonstrates the loop end-to-end with
       evidence: `next` → claim → worktree → work → review verdict → done
       (transcript attached to the item).
-- [ ] Upgrade path proven: a second `arggon init` run refreshes untouched
+- [x] Upgrade path proven: a second `arggon init` run refreshes untouched
       artifacts, skips modified ones, and reports both lists.
-- [ ] Docs and release: `docs/playbooks/opencode.md` current; README,
+- [x] Docs and release: `docs/playbooks/opencode.md` current; README,
       `docs/agents.md`, `docs/json-output.md` reflect shipped behavior;
       `spec-opencode2-009` and `plan-opencode2-009` statuses flipped to
       `implemented` in the same PR.
-- [ ] Context budgets re-checked per task-opencode2-context (MCP tools/list within the 12,288 B advisory; context:report --strict green).
-- [ ] Gates green: `arggon validate`, `arggon spec validate`, `arggon doctor`,
+- [x] Context budgets re-checked per task-opencode2-context (MCP tools/list within the 12,288 B advisory; context:report --strict green).
+- [x] Gates green: `arggon validate`, `arggon spec validate`, `arggon doctor`,
       full test suite, `npm run smoke:opencode` harness.
-- [ ] Program close-out PR on `opencode2` references epic `opencode2` and the
-      spec; the epic and story containers close through the normal cascade
-      after merge.
+- [x] Program close-out PR on `opencode2` references epic `opencode2` and the spec; the story closes through the normal cascade after merge, and the epic stays open while `story-opencode2-hardening` tracks the p3 backlog.
 
 ## Notes
 
