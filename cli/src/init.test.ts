@@ -31,11 +31,21 @@ const TIER1_DOCS = [
   ".github/PULL_REQUEST_TEMPLATE.md",
   ".github/copilot-instructions.md",
   ".mcp.json",
+  ".opencode/agents/arggon-coordinator.md",
+  ".opencode/agents/arggon-reviewer.md",
+  ".opencode/agents/arggon-worker.md",
+  ".opencode/commands/arggon-done.md",
+  ".opencode/commands/arggon-handoff.md",
+  ".opencode/commands/arggon-next.md",
+  ".opencode/commands/arggon-review.md",
+  ".opencode/commands/arggon-start.md",
+  ".opencode/commands/arggon-status.md",
   "AGENTS.md",
   "CLAUDE.md",
   "CONTRIBUTING.md",
   "SECURITY.md",
   "docs/tracking.md",
+  "opencode.jsonc",
 ];
 
 const TIER2_DOCS = [
