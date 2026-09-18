@@ -696,6 +696,9 @@ describe("CLI --json", () => {
       created: true,
       pushed: true,
       prUrl: "https://github.com/o/r/pull/1",
+      // Additive JSON field (bug-start-worktree-node-modules): always present,
+      // false when no node_modules link happened (no --worktree here).
+      linkedNodeModules: false,
     });
     expect(body.item).toMatchObject({
       id: "launch-mvp",
@@ -763,5 +766,44 @@ describe("CLI --json", () => {
     expect(body.command).toBe("start");
     expect(body.postStart).toEqual({ command: "echo hooked > .hook-ran", ok: true });
     expect(existsSync(join(dirname(dir), "work-task-hooked", ".hook-ran"))).toBe(true);
+  });
+
+  it("arggon start --worktree reports linkedNodeModules: true and runs the dependency gate", () => {
+    const { dir, env } = initStartTree(true);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Prepared", "--parent", "login"], dir).status).toBe(0);
+    // Primary install stand-in + the documented pre-commit gate that needs it:
+    // without the link the claim commit would die here (the original bug).
+    const dep = join(dir, "node_modules", "fake-gate-dep");
+    mkdirSync(dep, { recursive: true });
+    writeFileSync(
+      join(dep, "package.json"),
+      JSON.stringify({ name: "fake-gate-dep", version: "1.0.0", main: "index.js" }),
+    );
+    writeFileSync(join(dep, "index.js"), "module.exports = true;\n");
+    const hook = join(dir, ".git", "hooks", "pre-commit");
+    mkdirSync(dirname(hook), { recursive: true });
+    writeFileSync(hook, '#!/bin/sh\nnode -e "require(\'fake-gate-dep\')" || exit 1\n');
+    chmodSync(hook, 0o755);
+
+    const result = runCli(
+      ["start", "task-prepared", "--worktree", "--assignee", "arggon", "--json"],
+      dir,
+      env,
+    );
+
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body.ok).toBe(true);
+    expect(body.command).toBe("start");
+    expect(body.linkedNodeModules).toBe(true);
+    const wt = join(dirname(dir), "work-task-prepared");
+    expect(body.worktreePath).toBe(wt);
+    expect(body.pushed).toBe(true);
+    // The gate really ran (the claim commit landed through it) and the link is
+    // only an untracked symlink — start's surgical commit never staged it.
+    expect(existsSync(join(wt, "node_modules", "fake-gate-dep", "index.js"))).toBe(true);
+    expect(runGit(["log", "--format=%s"], wt).stdout).toContain("claim: task-prepared");
   });
 });

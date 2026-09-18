@@ -1,6 +1,13 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { basename, relative, resolve, sep } from "node:path";
+import {
+  existsSync,
+  lstatSync,
+  readlinkSync,
+  rmdirSync,
+  symlinkSync,
+  unlinkSync,
+} from "node:fs";
+import { basename, join, relative, resolve, sep } from "node:path";
 import { readConventionConfig, resolveBranchName } from "./convention.js";
 import { runBranch, type GitRunner } from "./branch.js";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
@@ -53,6 +60,16 @@ export type StartResult = {
   worktreePath: string | null;
   /** True when the worktree was created this run; false on attach or without --worktree. */
   worktreeCreated: boolean;
+  /**
+   * True when `--worktree` linked the primary checkout's `node_modules` into
+   * the worktree this run (bug-start-worktree-node-modules): a fresh worktree
+   * has no dependencies, so the documented pre-commit gate
+   * (`npm run arggon -- validate`) would fail with ERR_MODULE_NOT_FOUND and
+   * the claim commit could never land. Best-effort: false when the primary has
+   * no `node_modules`, the worktree already has one, the link could not be
+   * created, or the start ran without `--worktree`.
+   */
+  linkedNodeModules: boolean;
   /**
    * `x-worktree.post-start` outcome (task-start-post-hook): set only when a
    * new worktree was created, a hook is configured, and `--no-hook` was not
@@ -458,9 +475,133 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
       prUrl,
       worktreePath: null,
       worktreeCreated: false,
+      linkedNodeModules: false,
       item: branch.item,
     };
   });
+}
+
+/**
+ * Link the primary checkout's `node_modules` into a worktree that lacks one
+ * (bug-start-worktree-node-modules). A fresh worktree has no dependencies, so
+ * the documented pre-commit gate (`npm run arggon -- validate`) dies with
+ * ERR_MODULE_NOT_FOUND and the claim commit never lands — and the old flow
+ * deleted the worktree, so the documented manual symlink order could not work.
+ * Best-effort by design: never throws (a platform without symlink support,
+ * missing permissions, or a racing creator degrades to `false` and the commit
+ * failure is still reported actionably). The link is untracked and, because a
+ * `node_modules/` ignore pattern matches directories only, not ignored — but
+ * start's claim commit stages only the item file, so start never commits it
+ * (stage explicit paths; `git add -A` would stage the link). Returns true only
+ * when a link was created.
+ */
+export function linkNodeModules(primaryRoot: string, worktreePath: string): boolean {
+  const target = join(primaryRoot, "node_modules");
+  const link = join(worktreePath, "node_modules");
+  if (!existsSync(target) || existsSync(link)) return false;
+  try {
+    // "junction" is the no-privilege directory link on Windows; POSIX ignores
+    // the type argument.
+    symlinkSync(target, link, process.platform === "win32" ? "junction" : "dir");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Remove a start-created `node_modules` link from a worktree, if present
+ * (bug-start-worktree-node-modules). Only ever removes a SYMLINK whose target
+ * resolves to the primary checkout's `node_modules`: a real directory or a
+ * link pointing anywhere else is left alone. Removing the link never follows
+ * it, so the primary install is untouched. Returns true only when a matching
+ * link was removed. Best-effort: never throws.
+ */
+export function unlinkNodeModulesLink(primaryRoot: string, worktreePath: string): boolean {
+  const target = resolve(join(primaryRoot, "node_modules"));
+  const link = join(worktreePath, "node_modules");
+  try {
+    if (!lstatSync(link).isSymbolicLink()) return false;
+    if (resolve(readlinkSync(link)) !== target) return false;
+  } catch {
+    return false;
+  }
+  try {
+    unlinkSync(link);
+    return true;
+  } catch {
+    try {
+      // Windows junctions are directory links; unlink can refuse them.
+      rmdirSync(link);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+/**
+ * Step-specific remediation for a failure that kept the worktree. Returns the
+ * complete "what to do next" sentence for the step: most steps are fixed and
+ * retried by the attach re-run, but a failed push is NOT retried by attach
+ * (attach only lands a pending claim commit — review F3), so the branch must be
+ * pushed manually there.
+ */
+function worktreeRemediation(input: { step: string; id: string; branch: string }): string {
+  const attach =
+    `re-run \`arggon start ${input.id} --worktree\` — it attaches to the existing worktree`;
+  if (input.step.startsWith("committing the claim")) {
+    return (
+      "The pre-commit gate (or the git commit itself) failed inside the worktree — fix the " +
+      "reported cause there (install dependencies, or link the primary checkout's node_modules: " +
+      "`ln -s <primary>/node_modules <worktree>/node_modules`; start does this itself when the " +
+      `primary has one), then ${attach}.`
+    );
+  }
+  if (input.step.startsWith("pushing")) {
+    return (
+      "Fix remote access (`git fetch origin`, credentials), then push the kept branch manually: " +
+      `\`git push -u origin ${input.branch}\` — a re-run of ` +
+      `\`arggon start ${input.id} --worktree\` attaches to the worktree but does not retry the push.`
+    );
+  }
+  if (input.step.startsWith("opening the draft PR")) {
+    return `Check \`gh auth status\` (and the remote), then ${attach}.`;
+  }
+  if (input.step.startsWith("recording the claim")) {
+    return (
+      "Resolve the reported tracker error in the worktree (claim conflict or branch mismatch); " +
+      `no claim commit was made. Then ${attach}.`
+    );
+  }
+  return `Fix the reported cause in the worktree, then ${attach}.`;
+}
+
+/**
+ * Failure report for a start that already created (or attached) the worktree.
+ * The worktree is NEVER rolled back (bug-start-worktree-node-modules): the
+ * diagnostic context survives, and the message names the failing step, the
+ * kept path, the remediation, and the attach re-run.
+ */
+function worktreeFailureMessage(input: {
+  id: string;
+  branch: string;
+  worktreePath: string;
+  createBranch: boolean;
+  step: string;
+  err: unknown;
+}): string {
+  const detail = input.err instanceof Error ? input.err.message : String(input.err);
+  const discard = input.createBranch
+    ? `git worktree remove --force ${input.worktreePath} && git branch -D ${input.branch}`
+    : `git worktree remove --force ${input.worktreePath}`;
+  return (
+    `start failed while ${input.step}; the worktree was kept at ${input.worktreePath} ` +
+    `(nothing was rolled back).\n` +
+    `${detail}\n` +
+    `${worktreeRemediation({ step: input.step, id: input.id, branch: input.branch })} ` +
+    `To discard it instead: \`${discard}\`.`
+  );
 }
 
 type WorktreeStartInput = {
@@ -477,8 +618,14 @@ type WorktreeStartInput = {
  * worktree path, create or attach the worktree, then run claim, branch record,
  * `worktree_path` record, claim commit, push, and the optional draft PR from
  * INSIDE the worktree. The main checkout stays on its current branch and clean.
- * A freshly created worktree is rolled back (best effort) if a later step fails,
- * so a taken claim leaves the repo as it was.
+ * The worktree is prepared for the project gate first (the primary checkout's
+ * `node_modules` is linked in when the worktree lacks one —
+ * bug-start-worktree-node-modules); the link is removed before a configured
+ * post-start hook runs (so `npm ci` cannot reify through it and empty the
+ * primary install) and re-created only when the hook leaves no `node_modules`.
+ * A failure after the worktree exists NEVER rolls it back: the worktree and
+ * branch are kept, and the error names the failing step, the kept path, the
+ * remediation, and the attach re-run.
  */
 function startInWorktree(input: WorktreeStartInput): StartResult {
   const { id, item, assignee, root, gitRunner, opts } = input;
@@ -514,8 +661,15 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     worktreeCreated = true;
   }
 
+  // Name of the step in progress: a failure after the worktree exists keeps it
+  // and reports exactly where the flow stopped (bug-start-worktree-node-modules).
+  let step = "preparing the worktree";
+  let linkedNodeModules = false;
   try {
+    linkedNodeModules = linkNodeModules(root, worktreePath);
+
     // All item writes and git steps run from the worktree from here on.
+    step = "loading the item in the worktree";
     const wtTasksDir = findTasksDir(worktreePath);
     const existing = itemsById(loadItems(wtTasksDir)).get(id);
     if (!existing) throw new Error(`id '${id}' not found under tasks/`);
@@ -526,6 +680,7 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       );
     }
 
+    step = "recording the claim";
     const update = (patch: {
       status?: string;
       assignee?: string;
@@ -538,21 +693,25 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     if (existing.branch !== name) update({ branch: name });
     update({ worktreePath });
 
+    step = "reading back the claim";
     const itemInWorktree = itemsById(loadItems(wtTasksDir)).get(id);
     if (!itemInWorktree) throw new Error(`id '${id}' not found under tasks/`);
 
+    step = "committing the claim (pre-commit gate)";
     let committed = false;
     if (gitRunner.fileStatus(worktreePath, itemInWorktree.filePath).trim()) {
       gitRunner.commitFile(worktreePath, itemInWorktree.filePath, `claim: ${id}`);
       committed = true;
     }
 
+    step = "pushing the branch";
     let pushed = false;
     if (committed || worktreeCreated) {
       gitRunner.pushBranch(worktreePath, name);
       pushed = true;
     }
 
+    step = "opening the draft PR";
     let prUrl: string | null = null;
     if (opts.openPr && pushed) {
       const rel = relative(worktreePath, itemInWorktree.filePath).split(sep).join("/");
@@ -562,19 +721,31 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       });
     }
 
+    step = "reading back the item";
     const finalItem = itemsById(loadItems(wtTasksDir)).get(id);
     if (!finalItem) throw new Error(`id '${id}' not found under tasks/`);
 
     // Post-start bootstrap hook (task-start-post-hook): only on new-worktree
     // creation, never on attach re-runs. Failure is reported, not fatal — the
-    // worktree exists and the claim stands — so it must not trigger rollback.
+    // worktree exists and the claim stands.
+    step = "running the post-start hook";
     let postStart: PostStartResult | undefined;
     if (worktreeCreated && !opts.noHook) {
       const hookCommand = config.worktree.postStart;
       if (hookCommand) {
+        // The hook owns the worktree's node_modules once it runs: npm's reify
+        // step removes a symlinked node_modules and can empty the PRIMARY
+        // checkout's install through it (review F1). The start-created link is
+        // therefore removed before the hook sees the worktree, and re-created
+        // after only when the hook left no install (a hook that does not
+        // bootstrap, or one that failed).
+        const hadLink = unlinkNodeModulesLink(root, worktreePath);
         // Flag wins over config (task-post-start-env); config unset = inherit.
         const shell = opts.postStartShell ?? config.worktree.postStartShell ?? "inherit";
         postStart = runPostStart(hookCommand, worktreePath, shell);
+        if (hadLink && !existsSync(join(worktreePath, "node_modules"))) {
+          linkNodeModules(root, worktreePath);
+        }
       }
     }
 
@@ -589,20 +760,17 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       prUrl,
       worktreePath,
       worktreeCreated,
+      linkedNodeModules,
       postStart,
       item: finalItem,
     };
   } catch (err) {
-    if (worktreeCreated) {
-      // Best-effort rollback: the worktree (and branch, when we created it)
-      // did not exist before this call, so a failed start leaves no debris.
-      try {
-        git(["worktree", "remove", "--force", worktreePath], root);
-        if (createBranch) git(["branch", "-D", name], root);
-      } catch {
-        // Rollback is advisory; surface the original error either way.
-      }
-    }
-    throw err;
+    // Never roll the worktree back (bug-start-worktree-node-modules): a deleted
+    // worktree destroys the diagnostic context (hook output, partial claim) and
+    // forces the manual pre-create + symlink dance. The worktree and branch are
+    // kept; the error names the failing step, the path and the attach re-run.
+    throw new Error(
+      worktreeFailureMessage({ id, branch: name, worktreePath, createBranch, step, err }),
+    );
   }
 }

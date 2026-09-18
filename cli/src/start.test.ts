@@ -1,10 +1,10 @@
-import { mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCreate } from "./create.js";
 import { runInit } from "./init.js";
-import { runStart, type StartGit } from "./start.js";
+import { linkNodeModules, runStart, unlinkNodeModulesLink, type StartGit } from "./start.js";
 import { runUpdate } from "./update.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
@@ -91,6 +91,8 @@ describe("start", () => {
     expect(result.committed).toBe(true);
     expect(result.pushed).toBe(true);
     expect(result.prUrl).toBe("https://github.com/o/r/pull/1");
+    // No --worktree: the additive link field is present and false (never linked).
+    expect(result.linkedNodeModules).toBe(false);
     expect(result.item).toMatchObject({
       status: "in_progress",
       assignee: "arggon",
@@ -218,5 +220,60 @@ describe("start --open-pr closes the linked GitHub issue (task-closes-issue-link
         "Draft opened by `arggon start`.",
     );
     expect(pr?.body).not.toContain("Closes");
+  });
+});
+
+describe("linkNodeModules (bug-start-worktree-node-modules)", () => {
+  it("links only when the primary has node_modules and the worktree lacks one", () => {
+    const primary = mkdtempSync(join(tmpdir(), "arggon-link-primary-"));
+    const wt = mkdtempSync(join(tmpdir(), "arggon-link-wt-"));
+    mkdirSync(join(primary, "node_modules"), { recursive: true });
+
+    expect(linkNodeModules(primary, wt)).toBe(true);
+    const link = join(wt, "node_modules");
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    // Idempotent: a second call never re-links or fails.
+    expect(linkNodeModules(primary, wt)).toBe(false);
+
+    // Primary without node_modules: no-op.
+    const barePrimary = mkdtempSync(join(tmpdir(), "arggon-link-bare-"));
+    const bareWt = mkdtempSync(join(tmpdir(), "arggon-link-barewt-"));
+    expect(linkNodeModules(barePrimary, bareWt)).toBe(false);
+    expect(existsSync(join(bareWt, "node_modules"))).toBe(false);
+
+    // Worktree with its own install: never replaced by a link.
+    const ownWt = mkdtempSync(join(tmpdir(), "arggon-link-own-"));
+    mkdirSync(join(ownWt, "node_modules"), { recursive: true });
+    expect(linkNodeModules(primary, ownWt)).toBe(false);
+    expect(lstatSync(join(ownWt, "node_modules")).isSymbolicLink()).toBe(false);
+  });
+});
+
+describe("unlinkNodeModulesLink (review F1/F2)", () => {
+  it("removes only a symlink pointing at the primary install, never its target", () => {
+    const primary = mkdtempSync(join(tmpdir(), "arggon-unlink-primary-"));
+    const wt = mkdtempSync(join(tmpdir(), "arggon-unlink-wt-"));
+    mkdirSync(join(primary, "node_modules"), { recursive: true });
+    writeFileSync(join(primary, "node_modules", "keep.txt"), "keep");
+
+    // A real install is never touched.
+    const ownWt = mkdtempSync(join(tmpdir(), "arggon-unlink-own-"));
+    mkdirSync(join(ownWt, "node_modules"), { recursive: true });
+    expect(unlinkNodeModulesLink(primary, ownWt)).toBe(false);
+    expect(existsSync(join(ownWt, "node_modules"))).toBe(true);
+
+    // A symlink to somewhere else is never touched.
+    const otherWt = mkdtempSync(join(tmpdir(), "arggon-unlink-other-"));
+    symlinkSync(primary, join(otherWt, "node_modules"), "dir");
+    expect(unlinkNodeModulesLink(primary, otherWt)).toBe(false);
+    expect(existsSync(join(otherWt, "node_modules"))).toBe(true);
+
+    // The start-created link is removed and the primary install survives.
+    expect(linkNodeModules(primary, wt)).toBe(true);
+    expect(unlinkNodeModulesLink(primary, wt)).toBe(true);
+    expect(existsSync(join(wt, "node_modules"))).toBe(false);
+    expect(readFileSync(join(primary, "node_modules", "keep.txt"), "utf8")).toBe("keep");
+    // Idempotent: nothing left to remove.
+    expect(unlinkNodeModulesLink(primary, wt)).toBe(false);
   });
 });
