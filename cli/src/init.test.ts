@@ -40,6 +40,8 @@ const TIER1_DOCS = [
   ".opencode/commands/arggon-review.md",
   ".opencode/commands/arggon-start.md",
   ".opencode/commands/arggon-status.md",
+  // plan-opencode2-009 W2: the bundled OpenCode plugin is a tier-1 destination.
+  ".opencode/plugins/arggon/index.ts",
   "AGENTS.md",
   "CLAUDE.md",
   "CONTRIBUTING.md",
