@@ -19,6 +19,7 @@ import { itemsById, loadItems } from "./items.js";
 import { slugify } from "./ids.js";
 import { bundledTemplatesDir, findTasksDir, repoRootFromTasks } from "./paths.js";
 import { runCreate } from "./create.js";
+import { sanitizeHumanTextUncapped } from "./sanitize.js";
 
 /** Default stale threshold for `arggon playbook status` (docs/convention.md x-playbooks). */
 export const PLAYBOOK_MAX_AGE_DAYS_DEFAULT = 90;
@@ -281,7 +282,8 @@ export function runPlaybookNew(opts: PlaybookNewOptions): PlaybookNewResult {
   }
 
   const version = opts.version && opts.version.trim() !== "" ? opts.version.trim() : "unpinned";
-  const title = opts.title && opts.title.trim() !== "" ? opts.title.trim() : tech.replace(/-/g, " ");
+  const title =
+    opts.title && opts.title.trim() !== "" ? opts.title.trim() : tech.replace(/-/g, " ");
   const researched = todayUtc(opts.now);
 
   mkdirSync(join(root, "docs", "playbooks"), { recursive: true });
@@ -338,10 +340,7 @@ function listPlaybooks(root: string): string[] {
     .map((name) => join(dir, name));
 }
 
-function resolveMaxAgeDays(
-  opts: PlaybookStatusOptions,
-  config: PlaybooksConfig,
-): number {
+function resolveMaxAgeDays(opts: PlaybookStatusOptions, config: PlaybooksConfig): number {
   if (opts.maxAgeDays !== undefined) return opts.maxAgeDays;
   if (config.maxAgeDays !== null) return config.maxAgeDays;
   return PLAYBOOK_MAX_AGE_DAYS_DEFAULT;
@@ -530,8 +529,16 @@ export function formatPlaybookStatusTable(result: {
   staleCount: number;
 }): string {
   const lines: string[] = [];
-  const techWidth = Math.max("tech".length, ...result.playbooks.map((p) => p.id.length));
-  const versionWidth = Math.max("version".length, ...result.playbooks.map((p) => p.version.length));
+  // Tech id and version are repo-controlled (docs/playbooks/ filenames and
+  // frontmatter): escape in place before the width math so hostile bytes stay
+  // inert and the columns stay aligned (task-row-table-stdout-sanitize).
+  const id = (p: PlaybookStatusEntry): string => sanitizeHumanTextUncapped(p.id);
+  const version = (p: PlaybookStatusEntry): string => sanitizeHumanTextUncapped(p.version);
+  const techWidth = Math.max("tech".length, ...result.playbooks.map((p) => id(p).length));
+  const versionWidth = Math.max(
+    "version".length,
+    ...result.playbooks.map((p) => version(p).length),
+  );
   const researchedWidth = Math.max(
     "researched".length,
     ...result.playbooks.map((p) => p.researched?.length ?? "unknown".length),
@@ -544,7 +551,7 @@ export function formatPlaybookStatusTable(result: {
     const age = p.ageDays === null ? "unknown" : String(p.ageDays);
     const status = p.stale ? "STALE" : "current";
     lines.push(
-      `${p.id.padEnd(techWidth)}  ${p.version.padEnd(versionWidth)}  ${researched.padEnd(researchedWidth)}  ${age.padEnd(8)}  ${status}`,
+      `${id(p).padEnd(techWidth)}  ${version(p).padEnd(versionWidth)}  ${researched.padEnd(researchedWidth)}  ${age.padEnd(8)}  ${status}`,
     );
   }
   if (result.playbooks.length === 0) {
@@ -555,7 +562,9 @@ export function formatPlaybookStatusTable(result: {
         "re-research and `arggon playbook refresh <tech> --version <v>`, or file tasks with --file-task <story-id>",
     );
   } else {
-    lines.push(`${result.playbooks.length} playbook(s), none stale (threshold: ${result.maxAgeDays} days)`);
+    lines.push(
+      `${result.playbooks.length} playbook(s), none stale (threshold: ${result.maxAgeDays} days)`,
+    );
   }
   return `${lines.join("\n")}\n`;
 }

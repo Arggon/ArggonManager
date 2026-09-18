@@ -13,6 +13,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
+import { sanitizeHumanTextUncapped } from "./sanitize.js";
 
 // ---------------------------------------------------------------------------
 // Normalization + similarity (exported for tests)
@@ -68,7 +69,10 @@ export function jaccard(a: Set<string>, b: Set<string>): number {
   return inter / (a.size + b.size - inter);
 }
 
-const TITLE_PATTERNS = [/^###\s+Requirement:\s*(.+?)\s*$/, /^####\s+Scenario:\s*(.+?)\s*$/] as const;
+const TITLE_PATTERNS = [
+  /^###\s+Requirement:\s*(.+?)\s*$/,
+  /^####\s+Scenario:\s*(.+?)\s*$/,
+] as const;
 
 /**
  * Extract `### Requirement:` / `#### Scenario:` titles VERBATIM (text after
@@ -135,14 +139,23 @@ export function resolveSpecAuditThresholds(
       if (value !== undefined) (t as Record<string, number>)[key] = value;
     }
   }
-  for (const key of ["duplicateThreshold", "mergeThreshold", "sharedTitleFloor", "reportFloor"] as const) {
+  for (const key of [
+    "duplicateThreshold",
+    "mergeThreshold",
+    "sharedTitleFloor",
+    "reportFloor",
+  ] as const) {
     const v = t[key];
     if (typeof v !== "number" || Number.isNaN(v) || v < 0 || v > 1) {
-      throw new Error(`--${key.replace(/([A-Z])/g, "-$1").toLowerCase()} must be a number in [0,1] (got ${v})`);
+      throw new Error(
+        `--${key.replace(/([A-Z])/g, "-$1").toLowerCase()} must be a number in [0,1] (got ${v})`,
+      );
     }
   }
   if (!Number.isInteger(t.minSharedTitles) || t.minSharedTitles < 0) {
-    throw new Error(`--min-shared-titles must be a non-negative integer (got ${t.minSharedTitles})`);
+    throw new Error(
+      `--min-shared-titles must be a non-negative integer (got ${t.minSharedTitles})`,
+    );
   }
   if (t.duplicateThreshold < t.mergeThreshold) {
     throw new Error(
@@ -176,7 +189,9 @@ export function runSpecAudit(opts: SpecAuditOptions): SpecAuditResult {
   if (!existsSync(specsDir)) {
     throw new Error(`no docs/specs directory under ${root} — nothing to audit`);
   }
-  const names = readdirSync(specsDir).filter((n) => n.endsWith(".md")).sort();
+  const names = readdirSync(specsDir)
+    .filter((n) => n.endsWith(".md"))
+    .sort();
   if (names.length === 0) {
     throw new Error(`no *.md specs under docs/specs — nothing to audit`);
   }
@@ -209,7 +224,9 @@ export function runSpecAudit(opts: SpecAuditOptions): SpecAuditResult {
       const a = docs[i]!;
       const b = docs[j]!;
       const similarity = jaccard(a.shingleSet, b.shingleSet);
-      const sharedTitles = a.titles.filter((t) => b.titles.includes(t)).sort((x, y) => x.localeCompare(y));
+      const sharedTitles = a.titles
+        .filter((t) => b.titles.includes(t))
+        .sort((x, y) => x.localeCompare(y));
       const c = classify(similarity, sharedTitles.length, thresholds);
       if (c === "below-floor") {
         belowFloor++;
@@ -278,11 +295,17 @@ export function formatSpecAuditHuman(result: SpecAuditResult): string {
     if (group.length === 0) continue;
     lines.push(`${label} (${group.length})`);
     for (const f of group) {
-      lines.push(`  ${f.files[0]} <-> ${f.files[1]}`);
+      // Spec paths and requirement/scenario titles are repo-controlled: escape
+      // in place (task-row-table-stdout-sanitize); --json keeps them raw.
+      lines.push(
+        `  ${sanitizeHumanTextUncapped(f.files[0])} <-> ${sanitizeHumanTextUncapped(f.files[1])}`,
+      );
       lines.push(`    similarity: ${f.similarity.toFixed(2)}`);
       if (f.sharedTitles.length > 0) {
         lines.push(`    shared titles (${f.sharedTitles.length}):`);
-        for (const t of truncateList(f.sharedTitles, 5)) lines.push(`      - ${t}`);
+        for (const t of truncateList(f.sharedTitles, 5)) {
+          lines.push(`      - ${sanitizeHumanTextUncapped(t)}`);
+        }
       }
       lines.push(`    note: ${f.note}`);
     }
