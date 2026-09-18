@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-validate-stdout-injection
 title: "Validation/spec human output injection + dynamic warning channels (validate stdout, tracker-commit, issue-roundtrip)"
-priority: p2
+assignee: Arggon
+branch: fix/bug-validate-stdout-injection
 parent: opencode2-hardening
 labels: []
+priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T16:42:50.534Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-validate-stdout-injection
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/opencode2-hardening/bug-validate-stdout-injection.md
