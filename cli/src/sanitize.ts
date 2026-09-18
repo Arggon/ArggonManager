@@ -110,3 +110,29 @@ export function sanitizeHumanText(value: string): string {
 export function sanitizeHumanError(message: string): string {
   return escapeHumanText(clipHumanValue(message, MAX_HUMAN_ERROR_CHARS));
 }
+
+/**
+ * Escape-only sanitizer for the row/table human channels (list/show/report/
+ * playbook status/spec audit/adopt/tui; task-row-table-stdout-sanitize): the
+ * same unsafe code points as every sanitizer in this module (C0/DEL/C1,
+ * U+2028/29) are escaped in place, but printable characters — including `"`
+ * and `\`, which `sanitizeHumanText` re-escapes for its JSON-quoted contexts —
+ * pass through unchanged, and there is NO length cap.
+ *
+ * Cap decision (deliberate, documented on the task): those channels render
+ * repository content whose size is already bounded by the on-disk file, and
+ * byte-identity for ordinary values is the display contract. The 200-char
+ * report cap would clip ordinary long titles/`blocked_reason` prose and TUI
+ * cards; a table cell is not a diagnostic value. The TUI additionally clips
+ * each rendered line to the terminal width, so a hostile mega-title cannot
+ * flood the screen there. Display only: the `--json` payload keeps the raw
+ * value byte for byte.
+ *
+ * Note the rendering difference from `sanitizeHumanText`: without the
+ * JSON.stringify pass every C0 code point renders as `\uXXXX` (a newline is
+ * `\u000a`, not `\n`). Both forms are inert one-line text; this one keeps
+ * printable `"`/`\` intact, which is the point here.
+ */
+export function sanitizeHumanTextUncapped(value: string): string {
+  return value.replace(HUMAN_UNSAFE, escapeUnsafeCodePoint);
+}

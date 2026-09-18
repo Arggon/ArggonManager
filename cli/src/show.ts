@@ -1,5 +1,6 @@
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 import { itemsById, loadItems } from "./items.js";
+import { sanitizeHumanTextUncapped } from "./sanitize.js";
 import type { WorkItem } from "./items.js";
 
 /**
@@ -99,7 +100,11 @@ export function runShow(opts: ShowOptions): ShowResult {
   const meta = opts.meta === true;
   const full = !meta && opts.body === true;
   const tail = opts.tailComments ?? DEFAULT_TAIL_COMMENTS;
-  const included = meta ? [] : full ? comments : comments.slice(Math.max(0, comments.length - tail));
+  const included = meta
+    ? []
+    : full
+      ? comments
+      : comments.slice(Math.max(0, comments.length - tail));
 
   return {
     id,
@@ -117,21 +122,39 @@ export function runShow(opts: ShowOptions): ShowResult {
 export function renderShowText(result: ShowResult): string[] {
   const item = result.item;
   const lines: string[] = [];
-  lines.push(`arggon show: ${item.id} — ${item.title ?? item.id}`);
-  lines.push(`  type: ${item.type} · status: ${item.status} · parent: ${item.parent ?? "(none)"}`);
-  if (item.assignee) lines.push(`  assignee: ${item.assignee}`);
-  if (item.branch) lines.push(`  branch: ${item.branch}`);
-  if (item.labels.length > 0) lines.push(`  labels: ${item.labels.join(", ")}`);
-  if (item.priority) lines.push(`  priority: ${item.priority}`);
-  if (item.dependsOn.length > 0) lines.push(`  depends_on: ${item.dependsOn.join(", ")}`);
-  if (item.blockedReason) lines.push(`  blocked_reason: ${item.blockedReason}`);
-  if (item.milestone) lines.push(`  milestone: ${item.milestone}`);
-  if (item.claimedAt) lines.push(`  claimed_at: ${item.claimedAt}`);
-  if (item.worktreePath) lines.push(`  worktree: ${item.worktreePath}`);
+  // Field lines are a line-oriented status channel: every repo-controlled
+  // value is escaped in place (task-row-table-stdout-sanitize). The prose and
+  // comment BLOCKS below are the verbatim content view and stay raw by design
+  // (same `cat`-like contract as `show --body` / `arggon instructions`); see
+  // the boundary note before the prose push.
+  lines.push(
+    `arggon show: ${sanitizeHumanTextUncapped(item.id)} — ${sanitizeHumanTextUncapped(item.title ?? item.id)}`,
+  );
+  lines.push(
+    `  type: ${item.type} · status: ${item.status} · parent: ${sanitizeHumanTextUncapped(item.parent ?? "(none)")}`,
+  );
+  if (item.assignee) lines.push(`  assignee: ${sanitizeHumanTextUncapped(item.assignee)}`);
+  if (item.branch) lines.push(`  branch: ${sanitizeHumanTextUncapped(item.branch)}`);
+  if (item.labels.length > 0)
+    lines.push(`  labels: ${sanitizeHumanTextUncapped(item.labels.join(", "))}`);
+  if (item.priority) lines.push(`  priority: ${sanitizeHumanTextUncapped(item.priority)}`);
+  if (item.dependsOn.length > 0)
+    lines.push(`  depends_on: ${sanitizeHumanTextUncapped(item.dependsOn.join(", "))}`);
+  if (item.blockedReason)
+    lines.push(`  blocked_reason: ${sanitizeHumanTextUncapped(item.blockedReason)}`);
+  if (item.milestone) lines.push(`  milestone: ${sanitizeHumanTextUncapped(item.milestone)}`);
+  if (item.claimedAt) lines.push(`  claimed_at: ${sanitizeHumanTextUncapped(item.claimedAt)}`);
+  if (item.worktreePath) lines.push(`  worktree: ${sanitizeHumanTextUncapped(item.worktreePath)}`);
   if (item.issue !== null) lines.push(`  issue: #${item.issue}`);
-  lines.push(`  path: ${result.path}`);
+  lines.push(`  path: ${sanitizeHumanTextUncapped(result.path)}`);
   if (!result.includeBody) return lines;
 
+  // Verbatim content boundary (task-row-table-stdout-sanitize decision): prose
+  // and comment text are the item's content, not a status row — a `show` of a
+  // hostile item body is the same trust question as `cat`-ing the file (and
+  // `--body` / `arggon instructions` expose it explicitly). They stay raw by
+  // design; only the reconstructed comment heading (CLI-composed structure:
+  // `### <date> @<author>`) has its repo-controlled author escaped.
   const prose = result.prose.trim();
   if (prose) {
     lines.push("");
@@ -146,7 +169,7 @@ export function renderShowText(result: ShowResult): string[] {
     }
     for (const comment of comments) {
       lines.push("");
-      lines.push(`### ${comment.date} @${comment.author}`);
+      lines.push(`### ${comment.date} @${sanitizeHumanTextUncapped(comment.author)}`);
       lines.push(...comment.lines);
     }
   }

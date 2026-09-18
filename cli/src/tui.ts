@@ -15,6 +15,7 @@
 import { toContractWorkItem } from "./contract.js";
 import { loadItems } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
+import { sanitizeHumanTextUncapped } from "./sanitize.js";
 import { STATUSES } from "./status.js";
 import type { WorkItem } from "./types.js";
 
@@ -215,11 +216,15 @@ function padEndTo(text: string, n: number): string {
 function cardLine(item: WorkItem, selected: boolean, depBlocked: boolean): string {
   const marker = selected ? ">" : " ";
   const badge = TYPE_BADGES[item.type];
-  const title = item.title ?? item.id;
+  // Ids/titles are repo-controlled (frontmatter + filename-derived ids): escape
+  // them before the width clip so hostile bytes cannot emit ANSI/OSC sequences
+  // or extend the frame (task-row-table-stdout-sanitize). The surrounding frame
+  // escapes are the TUI's own trusted output.
+  const title = sanitizeHumanTextUncapped(item.title ?? item.id);
   // task-board-dependency-visuals: dependency-blocked items carry a `⌫` tag
   // (open deps = deps not done/cancelled; same rule as the HTML board).
   const blockedTag = depBlocked ? " ⌫" : "";
-  return `${marker} ${badge} ${item.id}${blockedTag} ${title}`;
+  return `${marker} ${badge} ${sanitizeHumanTextUncapped(item.id)}${blockedTag} ${title}`;
 }
 
 /**
@@ -262,7 +267,10 @@ export function renderTui(
   const columnCards = STATUSES.map((status, i) =>
     tuiColumnItems(items, state.filter, status).map((item, j) => {
       const line = padEndTo(
-        clipLine(cardLine(item, i === state.column && j === state.card, tuiDepBlocked(items, item)), colWidth),
+        clipLine(
+          cardLine(item, i === state.column && j === state.card, tuiDepBlocked(items, item)),
+          colWidth,
+        ),
         colWidth,
       );
       if (!color) return line;
@@ -287,7 +295,9 @@ export function renderTui(
   if (state.searching) {
     footer = `/${state.filter}█ — enter to apply, esc to cancel`;
   } else if (state.message !== null) {
-    footer = state.message;
+    // The message is the selected item's file path (Enter), i.e. repo-
+    // controlled filename bytes: escape before rendering.
+    footer = sanitizeHumanTextUncapped(state.message);
   } else {
     footer = "←/→ column · ↑/↓ card · / search · enter path · q quit";
   }
@@ -309,7 +319,10 @@ export type TuiOutput = {
 export type TuiLoopOptions = {
   cwd: string;
   /** Defaults to process.stdin; only needs to be readable + (optionally) raw-capable. */
-  input?: NodeJS.ReadableStream & { setRawMode?: (mode: boolean) => unknown; resume?: () => unknown };
+  input?: NodeJS.ReadableStream & {
+    setRawMode?: (mode: boolean) => unknown;
+    resume?: () => unknown;
+  };
   /** Defaults to process.stdout; must report isTTY (checked). */
   output?: TuiOutput;
   /** Geometry overrides (tests); defaults to the real size, then 80x24. */

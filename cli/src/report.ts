@@ -1,5 +1,6 @@
 import { itemsById, loadItems, type WorkItem } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
+import { sanitizeHumanTextUncapped } from "./sanitize.js";
 import { STATUSES, type Status } from "./status.js";
 
 export type StatusCounts = Record<Status, number> & { total: number };
@@ -135,13 +136,19 @@ export function runReport(opts: { cwd: string }): ReportResult {
 export function formatReportTable(groups: ReportGroup[]): string {
   const lines: string[] = [];
   for (const group of groups) {
-    const scope = group.initiative ? ` [${group.initiative.id}]` : "";
-    lines.push(`epic: ${group.epic.id} — ${group.epic.title}${scope}`);
+    // Ids/titles are repo-controlled (frontmatter + filename-derived ids):
+    // escape them in place before interpolation (task-row-table-stdout-sanitize).
+    const scope = group.initiative ? ` [${sanitizeHumanTextUncapped(group.initiative.id)}]` : "";
+    lines.push(
+      `epic: ${sanitizeHumanTextUncapped(group.epic.id)} — ${sanitizeHumanTextUncapped(group.epic.title)}${scope}`,
+    );
     if (group.empty) {
       lines.push(`  (empty — no stories)`);
     }
     for (const c of group.containers) {
-      lines.push(`  ${c.id}: ${formatCounts(c.counts)}${c.empty ? " (empty — no leaves)" : ""}`);
+      lines.push(
+        `  ${sanitizeHumanTextUncapped(c.id)}: ${formatCounts(c.counts)}${c.empty ? " (empty — no leaves)" : ""}`,
+      );
     }
     lines.push(`  totals: ${formatCounts(group.totals)}`);
   }
@@ -159,25 +166,29 @@ function formatCounts(counts: StatusCounts): string {
  * matching the story's read-only rollup definition. Pure tree data — no
  * network, no GitHub calls, never mutates frontmatter.
  */
-export function formatReportMarkdown(
-  result: ReportResult,
-  opts: { date?: string } = {},
-): string {
+export function formatReportMarkdown(result: ReportResult, opts: { date?: string } = {}): string {
   const date = opts.date ?? new Date().toISOString().slice(0, 10);
   const lines: string[] = [`# Progress report — ${date}`, ""];
 
   for (const group of result.groups) {
-    const scope = group.initiative ? ` (${group.initiative.id})` : "";
-    lines.push(`## ${group.epic.id} — ${group.epic.title}${scope}`, "");
+    // Repo-controlled ids/titles: escaped in place (task-row-table-stdout-sanitize);
+    // ordinary markdown stays byte-identical (escape-only, no cap).
+    const scope = group.initiative ? ` (${sanitizeHumanTextUncapped(group.initiative.id)})` : "";
+    lines.push(
+      `## ${sanitizeHumanTextUncapped(group.epic.id)} — ${sanitizeHumanTextUncapped(group.epic.title)}${scope}`,
+      "",
+    );
     if (group.empty) {
       lines.push("_Empty — no stories._", "");
       continue;
     }
     for (const c of group.containers) {
       const done = c.counts.done + c.counts.cancelled;
+      const id = sanitizeHumanTextUncapped(c.id);
+      const title = sanitizeHumanTextUncapped(c.title);
       const line = c.empty
-        ? `- **${c.id}** — ${c.title}: empty (no leaves)`
-        : `- **${c.id}** — ${c.title}: ${done}/${c.counts.total} complete (${c.counts.in_progress} in progress, ${c.counts.blocked} blocked)`;
+        ? `- **${id}** — ${title}: empty (no leaves)`
+        : `- **${id}** — ${title}: ${done}/${c.counts.total} complete (${c.counts.in_progress} in progress, ${c.counts.blocked} blocked)`;
       lines.push(line);
     }
     const totalDone = group.totals.done + group.totals.cancelled;
@@ -189,9 +200,14 @@ export function formatReportMarkdown(
     lines.push("_Nothing blocked._", "");
   } else {
     for (const b of result.blocked) {
-      const where = [b.storyId, b.epicId].filter(Boolean).join(" ← ");
+      const where = [b.storyId, b.epicId]
+        .filter((part): part is string => Boolean(part))
+        .map((part) => sanitizeHumanTextUncapped(part))
+        .join(" ← ");
       const scope = where ? ` (${where})` : "";
-      lines.push(`- **${b.id}**${scope} — ${b.blockedReason}`);
+      lines.push(
+        `- **${sanitizeHumanTextUncapped(b.id)}**${scope} — ${sanitizeHumanTextUncapped(b.blockedReason)}`,
+      );
     }
     lines.push("");
   }
