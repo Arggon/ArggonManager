@@ -88,3 +88,7 @@ Files: `opencode/plugins/arggon/index.ts`, `opencode/plugins/arggon/index.test.t
 **Gates.** `npm test` 1144/1144 (69 files; plugin file 23 tests, +9); `npm run lint` clean; `npm run build` clean; `arggon validate` ok (0/0); `arggon spec validate` ok (0/0); `npm run smoke:opencode` 11 scenarios / 0 failures (baseline before the change: 11/0).
 
 **Docs not edited (reported).** `docs/playbooks/opencode.md` §Conventions W3 bullet should mention command-position anchoring (quoted `arggon …` arguments ignored; `arggon_*` regex best-effort), bounded/project-scoped caches, and the smoke's independent `block=` measurement.
+
+### handoff 2026-09-18 @Arggon (session: ses_f4b101430ffeSOXIssuxq2Mw5r) — next: Review draft PR #337 against the item acceptance checklist (F2/F4/F5/F3/F6/F8), re-run npm test + lint + build + arggon validate + spec validate + smoke:opencode, then merge to opencode2 and close th…
+- branch: feat/task-opencode-v2-plugin-hardening
+- open questions: docs/playbooks/opencode.md W3 bullet update requested from the docs owner (command-position anchoring, best-effort arggon_* regex, bounded/project-scoped caches, smoke block= independent measurement)
