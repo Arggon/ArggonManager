@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-success-stdout-sanitize
 title: "Success-path stdout: sanitize remaining dynamic values (update path/movedFrom/renamedFrom, command path lines)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T21:04:03.859Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-success-stdout-sanitize
 ---
 <!--
@@ -108,3 +107,6 @@ Reviewer verdict: NO-MERGE (soft — tracker/doc fixes only; the code diff is ap
 - **F2 (byte-identity boundary).** The "ordinary values render byte-identical" claim is qualified — `sanitizeHumanError` JSON-escapes `"` and `\` in place — and `cli/src/success-stdout.test.ts` gains a pinning test for `Fix "quoted" \ thing` (human line escaped, `--json` raw).
 - **F3 (`list` rationale).** Corrected in `task-row-table-stdout-sanitize`: frontmatter scalars are line-oriented, so a real newline never renders from a parsed title (it lands as a separate frontmatter line or, after a writer round-trip, as the inert literal `\n` text); the verified leak is raw ESC/C1/DEL/LS/PS (LS/PS can still break a line visually).
 - **F4 (evidence).** Test count corrected to the actual suite (1229 at the reviewed head; +1 with the F2 pinning test); the prettier claim qualified to "no new non-conformance beyond base" (both files fail at base; prettier-format diff line counts equal the raw diff); success-path policy line added to `docs/json-output.md` beside the failure/doctor/validate/spec channel policies.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict NO-MERGE→fixed (audit extended: adopt/adopt --ack now tracked in task-row-table-stdout-sanitize with repro; list newline rationale corrected; count 1230; byte-identity qualified with the quote/backslash pin test; prettier claim qualified; success-path policy line added to docs/json-output.md). Code approved by the reviewer (hostile update movedFrom/renamedFrom + next + baseline argv inert, JSON raw, ordinary byte-identity, 5 tests fail pre-fix); 1230 tests + CI green; merged. Remaining table/row channel tracked. Closing.
