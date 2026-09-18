@@ -143,6 +143,134 @@ describe("handoff", () => {
     expect(body).not.toContain("x".repeat(HANDOFF_FIELD_CAP + 1));
   });
 
+  it("caps next/branch/openQuestions without splitting a pair at the 199/200 boundary (no U+FFFD on disk)", () => {
+    const { dir, id, path } = primedTask();
+    // In each field the pair occupies units 199-200: a raw code-unit cut at
+    // 199 would keep only the high half, which the UTF-8 write turns into
+    // U+FFFD (task-handoff-field-cap-surrogate). The back-off drops the pair
+    // whole.
+    const next = `${"x".repeat(198)}😀${"y".repeat(10)}`;
+    const branch = `${"b".repeat(198)}😀${"z".repeat(10)}`;
+    const openQuestions = `${"q".repeat(198)}😀${"r".repeat(10)}`;
+    const expectedNext = `${"x".repeat(198)}…`;
+    const expectedBranch = `${"b".repeat(198)}…`;
+    const expectedOpen = `${"q".repeat(198)}…`;
+
+    const result = runHandoff({
+      cwd: dir,
+      id,
+      next,
+      branch,
+      openQuestions,
+      author: "a",
+      now: NOW,
+    });
+    expect(result.handoff.next).toBe(expectedNext);
+    expect(result.handoff.branch).toBe(expectedBranch);
+    expect(result.handoff.openQuestions).toBe(expectedOpen);
+    for (const value of [expectedNext, expectedBranch, expectedOpen]) {
+      expect(value.length).toBeLessThanOrEqual(HANDOFF_FIELD_CAP);
+      expect(value.endsWith("…")).toBe(true);
+      expect(hasLoneSurrogate(value)).toBe(false);
+    }
+
+    const body = raw(path);
+    expect(hasLoneSurrogate(body)).toBe(false);
+    expect(body).not.toContain("\ufffd");
+    expect(body).toContain(`next: ${expectedNext}\n`);
+    expect(body).toContain(`- branch: ${expectedBranch}\n`);
+    expect(body).toContain(`- open questions: ${expectedOpen}\n`);
+  });
+
+  it("keeps a pair whole when the cut does not split it, and passes under-cap astral fields through", () => {
+    const { dir, id } = primedTask();
+    // Pair at units 198-199: the cut at 199 keeps both halves, so the field is
+    // 199 units + marker; only a straddling pair triggers the back-off.
+    const kept = `${"x".repeat(197)}😀${"y".repeat(10)}`;
+    const astral = "😀".repeat(30);
+    const result = runHandoff({
+      cwd: dir,
+      id,
+      next: kept,
+      branch: astral,
+      author: "a",
+      now: NOW,
+    });
+    expect(result.handoff.next).toBe(`${"x".repeat(197)}😀…`);
+    expect(result.handoff.next.length).toBe(HANDOFF_FIELD_CAP);
+    expect(result.handoff.branch).toBe(astral);
+    for (const value of [result.handoff.next, result.handoff.branch]) {
+      expect(hasLoneSurrogate(value)).toBe(false);
+    }
+  });
+
+  it("drops lone surrogates from next/branch/openQuestions instead of writing U+FFFD", () => {
+    const { dir, id, path } = primedTask();
+    const result = runHandoff({
+      cwd: dir,
+      id,
+      next: "do \ud83d the thing",
+      branch: "feat/\udc00branch",
+      openQuestions: "why \ud83d now?",
+      author: "a",
+      now: NOW,
+    });
+    // Same policy as capSession: drop the malformed unit, keep every valid
+    // code point the caller sent.
+    expect(result.handoff).toEqual({
+      branch: "feat/branch",
+      next: "do  the thing",
+      openQuestions: "why  now?",
+    });
+    const body = raw(path);
+    expect(hasLoneSurrogate(body)).toBe(false);
+    expect(body).not.toContain("\ufffd");
+  });
+
+  it("treats a lone-surrogate-only field value as absent (next still required)", () => {
+    const { dir, id, path } = primedTask();
+    const result = runHandoff({
+      cwd: dir,
+      id,
+      next: "step",
+      branch: "\ud83d",
+      openQuestions: "\udc00",
+      author: "a",
+      now: NOW,
+    });
+    // branch falls back to auto-detection (no git here => unknown); open
+    // questions are omitted entirely.
+    expect(result.handoff).toEqual({ branch: "unknown", next: "step" });
+    expect(() => runHandoff({ cwd: dir, id, next: "\ud83d", author: "a", now: NOW })).toThrow(
+      /handoff requires --next/,
+    );
+    expect(raw(path)).not.toContain("\ufffd");
+  });
+
+  it("renders ordinary (ASCII/BMP) fields byte-identically to the legacy raw cut", () => {
+    const { dir, id, path } = primedTask();
+    const next = "a".repeat(HANDOFF_FIELD_CAP + 50);
+    const branch = "é".repeat(HANDOFF_FIELD_CAP + 50); // BMP: one unit per char
+    const openQuestions = "b".repeat(HANDOFF_FIELD_CAP + 50);
+    const result = runHandoff({
+      cwd: dir,
+      id,
+      next,
+      branch,
+      openQuestions,
+      author: "a",
+      now: NOW,
+    });
+    // Exactly the legacy cut: HANDOFF_FIELD_CAP - marker units + marker.
+    expect(result.handoff.next).toBe(`${"a".repeat(HANDOFF_FIELD_CAP - 1)}…`);
+    expect(result.handoff.branch).toBe(`${"é".repeat(HANDOFF_FIELD_CAP - 1)}…`);
+    expect(result.handoff.openQuestions).toBe(`${"b".repeat(HANDOFF_FIELD_CAP - 1)}…`);
+    const body = raw(path);
+    expect(body).toContain(`next: ${"a".repeat(HANDOFF_FIELD_CAP - 1)}…\n`);
+    expect(body).toContain(`- branch: ${"é".repeat(HANDOFF_FIELD_CAP - 1)}…\n`);
+    expect(body).toContain(`- open questions: ${"b".repeat(HANDOFF_FIELD_CAP - 1)}…\n`);
+  });
+
   it("renders the session identifier in the heading when provided (provenance)", () => {
     const { dir, id, path } = primedTask();
     const before = raw(path);
