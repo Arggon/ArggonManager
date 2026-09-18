@@ -10,6 +10,7 @@ import {
   trackerCommitMessage,
   type TrackerCommitResult,
 } from "./tracker-commit.js";
+import { unlinkNodeModulesLink } from "./start.js";
 import { runUpdate } from "./update.js";
 
 const TERMINAL: ReadonlySet<string> = new Set(["done", "cancelled"]);
@@ -385,6 +386,13 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
         : (branch: string) => gitRunner.deleteBranch(root, branch);
       try {
         if (entry.action?.startsWith("remove worktree")) {
+          // Start-created node_modules links are untracked, and `node_modules/`
+          // ignore patterns match directories only, so git refuses to remove
+          // the worktree because of the link (review F2). Remove only a symlink
+          // whose target is the primary checkout's install — never a real
+          // directory, never a link elsewhere — then let git do the removal (it
+          // can still refuse for other untracked files, reported per item).
+          unlinkNodeModulesLink(root, entry.path);
           gitRunner.removeWorktree(root, entry.path);
           pruned.push({ id: entry.id, action: `removed worktree ${entry.path}`, ...(entry.via ? { via: entry.via } : {}) });
         }

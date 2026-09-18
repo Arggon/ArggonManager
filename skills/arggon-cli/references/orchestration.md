@@ -40,7 +40,13 @@ inline. Trivial items (one-line fixes, doc tweaks) stay inline. Full rules:
 
 `arggon start <id> --worktree` claims, creates (or attaches to) the worktree at
 `../<repo-name>-<id>`, runs the claim commit/push inside it, and records
-`worktree_path` on the item. Move the session into that path
+`worktree_path` on the item. Start prepares the worktree first — it links the
+primary checkout's `node_modules` when the worktree lacks one, so the repo's
+pre-commit gate can run (the link is untracked and start never commits it; it is
+removed before a configured `x-worktree.post-start` hook runs, so `npm ci`
+cannot reify through it and empty the primary install) — and a failure after
+creation keeps the worktree and branch instead of deleting them (the error names
+the failing step, path and remediation; re-running attaches). Move the session into that path
 (`session_move` in OpenCode V2) so every later command runs there. When the work
 is merged, `arggon cleanup` lists stale worktrees and `--prune` removes them.
 

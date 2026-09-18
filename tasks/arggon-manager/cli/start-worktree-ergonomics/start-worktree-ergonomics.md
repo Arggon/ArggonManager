@@ -30,18 +30,18 @@ Surfaced by two OpenCode2 program workers on 2026-09-18 (evidence in
 
 ## Acceptance
 
-- [ ] The failure mode is reproduced on a fixture and the chosen behavior is
+- [x] The failure mode is reproduced on a fixture and the chosen behavior is
       decided and recorded (link the ADR if the fix is cross-cutting): the
       candidate space is (a) prepare the worktree so the project gate can run
       (e.g. link the primary checkout's `node_modules` when present — the
       convention already documented for this repo), (b) do not roll back the
       worktree on a hook failure and surface an actionable remediation, or
       (c) document the manual sequence as the supported path.
-- [ ] Implementation + regression test: `start --worktree` on a hook-enabled
+- [x] Implementation + regression test: `start --worktree` on a hook-enabled
       repo fixture behaves per the decision, with expected-vs-observed evidence.
-- [ ] Guidance updated (`docs/agents.md` worktree section, the `arggon-cli`
+- [x] Guidance updated (`docs/agents.md` worktree section, the `arggon-cli`
       skill, and any `start` help text) so agents need no manual workaround.
-- [ ] No shortcuts: the pre-commit gate keeps running where the project wired
+- [x] No shortcuts: the pre-commit gate keeps running where the project wired
       it; the fix must not silently bypass hooks.
 
 ## Notes
