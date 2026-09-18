@@ -50,12 +50,12 @@ which made every item-file write atomic.
 
 ## Acceptance
 
-- [ ] The three `.convention.yml` writes use `writeFileAtomic`; a torn-read
+- [x] The three `.convention.yml` writes use `writeFileAtomic`; a torn-read
       probe on the config path shows no partial observation; readers unchanged.
-- [ ] F1 decided and implemented: the guard tolerates same-path replacement, or
+- [x] F1 decided and implemented: the guard tolerates same-path replacement, or
       the lock scope is extended where feasible (rationale recorded).
-- [ ] F2 decided: mode preserved (stat+chmod) or explicitly accepted.
-- [ ] Full suite, lint, `validate`/`spec validate` green; small PR to
+- [x] F2 decided: mode preserved (stat+chmod) or explicitly accepted.
+- [x] Full suite, lint, `validate`/`spec validate` green; small PR to
       `opencode2`.
 
 ## Notes
