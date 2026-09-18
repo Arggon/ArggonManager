@@ -5,7 +5,7 @@ id: bug-tracker-commit-enotempty-flake
 title: "Flaky concurrency/cleanup tests on CI: tracker-commit ENOTEMPTY + comment-race fixture race"
 parent: story-self-improvement
 labels: []
-priority: p2
+priority: p1
 created: "2026-09-18"
 updated: "2026-09-18"
 ---

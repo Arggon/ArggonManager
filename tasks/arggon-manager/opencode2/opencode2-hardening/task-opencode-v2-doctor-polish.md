@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode-v2-doctor-polish
 title: "Doctor polish: sanitize hint keys + parser regression tests"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T14:08:57.624Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-doctor-polish
 ---
 <!--
@@ -82,7 +81,7 @@ Regression test asserts both directions: `sanitizes ANSI escapes and newlines in
 
 **Gates** (worktree `../ArggonManager-opencode2-task-opencode-v2-doctor-polish`):
 
-- `npm test`: 69 files, 1132 tests passed
+- `npm test`: 69 files, 1135 tests passed
 - `npm run lint`: clean
 - `npm run build` (tsc): clean
 - `arggon validate --json`: ok (0 errors/warnings)
@@ -94,3 +93,6 @@ Regression test asserts both directions: `sanitizes ANSI escapes and newlines in
 
 ### 2026-09-18 @Arggon
 PR: https://github.com/Arggon/ArggonManager/pull/336 (draft, base `opencode2`, head `feat/task-opencode-v2-doctor-polish`).
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; MINOR-1 sanitization probed both directions (hostile key inert/single-line in human, raw in JSON), MINOR-2 tests behavioral, MINOR-3 shared candidate export with parity pin (behavior byte-identical); evidence count corrected to 1135; merged with cli pass. Residual channels filed as bug-doctor-human-output-injection (git remote URL + C1 controls). Closing.
