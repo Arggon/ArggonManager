@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-opencode-v2-plugin-import-gotcha
 title: "Plugin import gotcha: static @opencode/plugin import fails without node_modules (v2.0.7)"
+assignee: Arggon
+branch: feat/task-opencode-v2-plugin-import-gotcha
 parent: opencode2-hardening
 labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T13:30:08.007Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-plugin-import-gotcha
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/story-opencode-v2/task-opencode-v2-plugin-import-gotcha.md
