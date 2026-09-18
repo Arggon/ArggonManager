@@ -89,3 +89,7 @@ Branch `feat/task-opencode2-orchestration`. All gates green: full suite 69 files
 - No GitHub in the fixture: the “PR” is the local branch and the merge is local; no CI check.
 - Coordinator autonomy is bounded to four sequential prompts in one session (single-prompt full autonomy is flaky headless on a cheap model); the harness hard-fails when a phase's observable outcome is missing (never fakes).
 - The reviewer keeps `shell` (it must run the gates): the `edit` action is denied, shell-based mutation is a documented, deliberate trade-off.
+
+### handoff 2026-09-18 @Arggon — next: Review PR #330 (draft) and its evidence comment; then merge and flip done — no further code work expected.
+- branch: feat/task-opencode2-orchestration
+- open questions: None blocking; reviewer keeps shell by design (edit denied only).
