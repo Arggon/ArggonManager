@@ -3,7 +3,8 @@
  * OpenCode V2 orchestration wave harness (plan-opencode2-009 T12–T13, W4).
  *
  * Boots throwaway fixture repos with a **local bare remote** (no GitHub), runs
- * real headless `opencode run` sessions on opencode v2.0.7 and asserts the two
+ * real headless `opencode run` sessions on the installed `opencode` runtime
+ * (the version is probed at startup, never hardcoded) and asserts the two
  * halves of W4:
  *
  *   T12 — permission probes on the generated agents:
@@ -42,6 +43,15 @@
  * items, the local merges are ancestors of main, `arggon validate` is green,
  * and the tracker reads back done. Transcripts are kept under
  * `<fixture>/.wave-evidence/` (review evidence, ADR 0008 spirit).
+ *
+ * Verdict provenance limit: the fixture's `arggon comment` resolves the same
+ * author for workers and reviewer, so a verdict comment on an item cannot be
+ * attributed to the reviewer session by author. Phase 3 therefore asserts the
+ * reviewer subagent call completed (the source of truth for the review), that
+ * each item carries a merge verdict, and that no verdict text existed on the
+ * item before the review phase — a worker comment written in phase 2 cannot
+ * satisfy the check. A coordinator relaying the reviewer's verdict stays
+ * indistinguishable; the fixture cannot do better.
  *
  * Bounded and cheap by design: one pinned small model, `--format json`, and
  * per-command timeouts (`OPENCODE_WAVE_TIMEOUT_MS`, default 10 min).
@@ -116,6 +126,8 @@ type SubagentCall = {
   error?: string;
   output?: string;
   messageID?: string;
+  /** Raw `input.background`: `true` means a background child (must not happen). */
+  background?: unknown;
 };
 type ToolCall = { tool: string; status?: string; messageID?: string };
 
@@ -137,9 +149,13 @@ function info(line: string): void {
   console.log(`  --  ${line}`);
 }
 
-function opencodeAvailable(): boolean {
+/** Version token from the `opencode --version` probe, or undefined when absent. */
+function opencodeVersion(): string | undefined {
   const probe = spawnSync("opencode", ["--version"], { encoding: "utf8", timeout: 30_000 });
-  return probe.error === undefined && probe.status === 0;
+  if (probe.error !== undefined || probe.status !== 0) return undefined;
+  const output = (probe.stdout ?? "").trim();
+  const match = /v?(\d+\.\d+\.\d+(?:[-\w.]+)?)/.exec(output);
+  return match?.[1] ?? (output.length > 0 ? output : undefined);
 }
 
 // ---------------------------------------------------------------------------
@@ -429,9 +445,15 @@ function subagentCalls(events: TranscriptEvent[]): SubagentCall[] {
       error: event.part.state?.error,
       output: event.part.state?.output,
       messageID: event.part.messageID,
+      background: input.background,
     });
   }
   return calls;
+}
+
+/** Subagent calls that explicitly asked for a background child (must be none). */
+function backgroundCalls(calls: SubagentCall[]): SubagentCall[] {
+  return calls.filter((call) => call.background === true);
 }
 
 function tokenTotals(events: TranscriptEvent[]): Tokens {
@@ -471,6 +493,11 @@ function exportedTokenTotals(f: Fixture, sessionID: string | undefined): Tokens 
     totals.cacheWrite += tokens.cache?.write ?? 0;
   }
   return totals;
+}
+
+/** Session export shape intact: at least one model call was exported. */
+function exportHasCalls(totals: Tokens | undefined): boolean {
+  return (totals?.calls ?? 0) >= 1;
 }
 
 /** `[arggon] context: injected item <id> (<bytes> bytes)` observations. */
@@ -557,8 +584,14 @@ function scenarioReviewerEditDenied(f: Fixture): void {
     !existsSync(f.path("reviewer-write.txt")),
     `reviewer-write.txt exists (edit permission not enforced)`,
   );
+  const reply = textOf(events);
+  check(
+    "reviewer said the NO_EDIT_TOOL marker (probe instruction honored)",
+    reply.includes("NO_EDIT_TOOL"),
+    reply.slice(-400),
+  );
   info(
-    `reviewer tool list reported by the model: ${textOf(events).split("\n").slice(-1)[0]?.slice(0, 400)}`,
+    `reviewer tool list reported by the model: ${reply.split("\n").slice(-1)[0]?.slice(0, 400)}`,
   );
 }
 
@@ -586,7 +619,13 @@ function scenarioWorkerSubagentDenied(f: Fixture): void {
     !result.stdout.includes("<subagent sessionID="),
     runTail(result),
   );
-  info(`worker reply: ${textOf(events).trim().split("\n").slice(-1)[0]?.slice(0, 300)}`);
+  const reply = textOf(events);
+  check(
+    "worker said the NO_SUBAGENT_TOOL marker (probe instruction honored)",
+    reply.includes("NO_SUBAGENT_TOOL"),
+    reply.slice(-300),
+  );
+  info(`worker reply: ${reply.trim().split("\n").slice(-1)[0]?.slice(0, 300)}`);
 }
 
 function scenarioCoordinatorLaunch(
@@ -729,18 +768,31 @@ function waveFixture(): { fixture: Fixture; chain: WaveChain } | undefined {
 
 function assertWavePhase2(f: Fixture, chain: WaveChain, result: RunResult): void {
   const events = eventsOf(result);
-  const workers = subagentCalls(events).filter(
-    (call) => call.agent === "arggon-worker" && call.status === "completed",
-  );
+  const calls = subagentCalls(events);
+  const workerCalls = calls.filter((call) => call.agent === "arggon-worker");
+  const workers = workerCalls.filter((call) => call.status === "completed");
   check(
-    "phase 2 launched two arggon-worker subagents, foreground, completed",
+    "phase 2 launched two arggon-worker subagents, completed",
     workers.length === 2,
-    JSON.stringify(subagentCalls(events)),
+    JSON.stringify(calls),
+  );
+  const background = backgroundCalls(workerCalls);
+  check(
+    "phase 2 worker launches were foreground (no input.background=true)",
+    background.length === 0,
+    JSON.stringify(background),
   );
   const batched = batchedSteps(events);
-  info(
-    `batching: ${toolCalls(events).length} tool call(s) in ${tokenTotals(events).calls} step(s); ${batched.length} step(s) with >=2 calls (subagent launches batched: ${batched.some((step) => step.tools.filter((tool) => tool === "subagent").length >= 2)})`,
+  const batchedLaunches = batched.filter(
+    (step) => step.tools.filter((tool) => tool === "subagent").length >= 2,
   );
+  const batching = `${toolCalls(events).length} tool call(s) in ${tokenTotals(events).calls} step(s); ${batched.length} step(s) with >=2 calls, ${batchedLaunches.length} with >=2 subagent launches`;
+  check(
+    "phase 2 batched both worker launches into one step (>=2 subagent calls)",
+    batchedLaunches.length >= 1,
+    batching,
+  );
+  info(`batching: ${batching}`);
   for (const [task, sibling] of [
     [chain.alpha, chain.beta],
     [chain.beta, chain.alpha],
@@ -773,22 +825,38 @@ function assertWavePhase2(f: Fixture, chain: WaveChain, result: RunResult): void
   }
 }
 
-function assertWavePhase3(f: Fixture, chain: WaveChain, result: RunResult): void {
+function assertWavePhase3(
+  f: Fixture,
+  chain: WaveChain,
+  result: RunResult,
+  preReview: Map<string, string>,
+): void {
   const events = eventsOf(result);
-  const reviewers = subagentCalls(events).filter(
-    (call) => call.agent === "arggon-reviewer" && call.status === "completed",
-  );
+  const reviewerCalls = subagentCalls(events).filter((call) => call.agent === "arggon-reviewer");
+  const reviewers = reviewerCalls.filter((call) => call.status === "completed");
   check(
     "phase 3 reviewer subagent completed",
     reviewers.length >= 1,
     JSON.stringify(subagentCalls(events)),
   );
+  const background = backgroundCalls(reviewerCalls);
+  check(
+    "phase 3 reviewer launch was foreground (no input.background=true)",
+    reviewers.length >= 1 && background.length === 0,
+    JSON.stringify(background),
+  );
   for (const task of [chain.alpha, chain.beta]) {
+    const before = preReview.get(task.id) ?? "";
     const item = f.git(["show", `feat/${task.id}:${task.path}`]).stdout;
     check(
       `${task.id} branch carries the reviewer verdict`,
       /verdict/i.test(item) && /merge/i.test(item),
       item.slice(-400),
+    );
+    check(
+      `${task.id} had no verdict before the review phase (vacuous-match guard)`,
+      !(/verdict/i.test(before) && /merge/i.test(before)),
+      `before: ${before.slice(-300)}`,
     );
   }
 }
@@ -838,7 +906,7 @@ function assertWavePhase4(f: Fixture, chain: WaveChain, result: RunResult): void
 // T13 — context accounting (feeds task-opencode2-context)
 // ---------------------------------------------------------------------------
 
-function scenarioContextAccounting(f: Fixture, chain: WaveChain): void {
+function scenarioContextAccounting(f: Fixture, chain: WaveChain, runtimeVersion: string): void {
   scenario("context accounting: injected item block + per-worker token totals");
   const prompt = "Reply with exactly: CTX. Do not use any tools.";
   const withBlock = f.runPrompt("accounting-with-block", prompt, {
@@ -861,13 +929,19 @@ function scenarioContextAccounting(f: Fixture, chain: WaveChain): void {
     injectionsWithout.length === 0,
     runTail(withoutBlock),
   );
-  const withTokens =
-    exportedTokenTotals(f, firstSessionId(eventsOf(withBlock))) ?? tokenTotals(eventsOf(withBlock));
-  const withoutTokens =
-    exportedTokenTotals(f, firstSessionId(eventsOf(withoutBlock))) ??
-    tokenTotals(eventsOf(withoutBlock));
+  const withExport = exportedTokenTotals(f, firstSessionId(eventsOf(withBlock)));
+  const withoutExport = exportedTokenTotals(f, firstSessionId(eventsOf(withoutBlock)));
+  check(
+    "accounting: both arms exported >=1 model call (session export shape intact)",
+    exportHasCalls(withExport) && exportHasCalls(withoutExport),
+    `with block: ${withExport === undefined ? "no export" : `${withExport.calls} call(s)`}; without block: ${withoutExport === undefined ? "no export" : `${withoutExport.calls} call(s)`}`,
+  );
+  const withTokens = withExport ?? tokenTotals(eventsOf(withBlock));
+  const withoutTokens = withoutExport ?? tokenTotals(eventsOf(withoutBlock));
   const bytes = injectionsWith[0]?.bytes ?? 0;
-  info(`item-block accounting (model ${MODEL}, opencode v2.0.7; tokens via opencode session export):`);
+  info(
+    `item-block accounting (model ${MODEL}, opencode v${runtimeVersion}; tokens via opencode session export):`,
+  );
   info(
     `  with block:    ${withTokens.calls} model call(s), ${injectionsWith.length} injection(s) x ${bytes} B, input ${withTokens.input} tok (fresh) + ${withTokens.cacheRead} cache-read, output ${withTokens.output} tok`,
   );
@@ -908,11 +982,13 @@ function scenarioWorkerSessionStats(f: Fixture, result: RunResult): void {
 
 function main(): void {
   console.log("smoke:opencode:wave — OpenCode V2 orchestration harness (T12 + T13)");
-  if (!opencodeAvailable()) {
+  const runtimeVersion = opencodeVersion();
+  if (runtimeVersion === undefined) {
     console.log("skipped: opencode not installed");
     return;
   }
   console.log(`model: ${MODEL}`);
+  console.log(`opencode: v${runtimeVersion}`);
 
   // T12 — permission probes on the generated agents.
   const permissions = permissionFixture();
@@ -963,12 +1039,18 @@ function main(): void {
       scenarioWorkerSessionStats(f, delegate);
 
       scenario("wave: phase 3 — reviewer verdicts on the items");
+      const preReview = new Map(
+        [chain.alpha, chain.beta].map((task) => [
+          task.id,
+          f.git(["show", `feat/${task.id}:${task.path}`]).stdout,
+        ]),
+      );
       const review = f.runPrompt("wave-3-review", waveReviewPrompt(f, chain), {
         agent: "arggon-coordinator",
         session: sessionID,
       });
       check("review phase ran", review.status === 0, runTail(review));
-      assertWavePhase3(f, chain, review);
+      assertWavePhase3(f, chain, review, preReview);
 
       scenario("wave: phase 4 — merge verification and done flips");
       const merge = f.runPrompt("wave-4-merge", waveMergePrompt(chain), {
@@ -977,7 +1059,7 @@ function main(): void {
       });
       assertWavePhase4(f, chain, merge);
 
-      scenarioContextAccounting(f, chain);
+      scenarioContextAccounting(f, chain, runtimeVersion);
     }
   }
 
