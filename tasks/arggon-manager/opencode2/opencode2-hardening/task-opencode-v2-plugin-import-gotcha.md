@@ -122,3 +122,7 @@ unchanged on 2.0.8 (same fallbacks exercised). Only `opencode --version` changed
 `npm run smoke:opencode` on 2.0.8: **11 scenarios, 0 failures** (fixtures kept
 with `ARGON_SMOKE_KEEP=1`; the harness' own `.smoke-evidence/` holds the
 per-scenario transcripts).
+
+### handoff 2026-09-18 @Arggon — next: Coordinator review of draft PR #334; on approval merge to opencode2 (merge, not squash - tracker auto-commits). No further task-side changes expected.
+- branch: feat/task-opencode-v2-plugin-import-gotcha
+- open questions: Raw A/B transcripts are fixture-local (/tmp/opencode/opencode-plugin-import-probe-208/.smoke-evidence); key lines are quoted in the PR body and item comment.
