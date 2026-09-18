@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-show-fixture-cleanup
 title: "show.test.ts leaks argon-show-* fixture dirs (no teardown)"
-priority: p3
+assignee: Arggon
+branch: feat/task-show-fixture-cleanup
 parent: story-self-improvement
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T17:28:22.879Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-show-fixture-cleanup
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/task-show-fixture-cleanup.md
