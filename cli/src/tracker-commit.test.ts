@@ -6,7 +6,7 @@
  * non-git trees.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";import { tmpdir } from "node:os";
+import { mkdtempSync as _mkdtempSync, readFileSync, writeFileSync } from "node:fs";import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runAdopt } from "./adopt.js";
@@ -33,19 +33,14 @@ import {
 } from "./tracker-commit.js";
 import { lockFilePathFor } from "./lock.js";
 import { maybeCommitUpdate, runUpdate } from "./update.js";
+import { removeFixtureTree } from "./test-tmp.js";
 
 // bug-tmp-fixture-leak + bug-tracker-commit-enotempty-flake: track mkdtemp
-// dirs and the detached lock-release children, then remove the dirs with
-// bounded retries.
-//
-// Recursive rmSync does readdir -> unlink -> rmdir; when a still-settling
-// writer (a spawned git child, the detached lock-release node below, or just
-// fs timing on a loaded CI runner) adds/leaves an entry in that window, the
-// rmdir fails ENOTEMPTY and `force` does NOT suppress it (force only swallows
-// ENOENT). Node only retries ENOTEMPTY while maxRetries > 0, so the default 0
-// makes the cleanup a one-shot race. maxRetries/retryDelay re-read and re-try
-// the tree across that window.
-const RM_RETRY = { maxRetries: 10, retryDelay: 50 } as const;
+// dirs and the detached lock-release children, then remove the dirs through
+// the shared bounded-retry helper (test-tmp.ts). Recursive rmSync is a
+// one-shot ENOTEMPTY race against a still-settling writer (spawned git child,
+// the detached lock-release node below, or fs timing on a loaded CI runner)
+// and `force` does NOT suppress ENOTEMPTY — only maxRetries > 0 does.
 const tmpDirs: string[] = [];
 /** Detached node children spawned to release lock files mid-test. */
 const lockReleaseChildren = new Set<ChildProcess>();
@@ -55,7 +50,7 @@ afterEach(async () => {
   await Promise.all([...lockReleaseChildren].map(settleChild));
   lockReleaseChildren.clear();
   for (const dir of tmpDirs.splice(0)) {
-    rmSync(dir, { recursive: true, force: true, ...RM_RETRY });
+    removeFixtureTree(dir);
   }
 });
 

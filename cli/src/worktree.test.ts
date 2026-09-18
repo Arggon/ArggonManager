@@ -4,7 +4,7 @@
  * (sync-smoke pattern); only push/PR are stubbed so no remote is needed.
  */
 import { spawnSync } from "node:child_process";
-import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync as _mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, readlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,33 +14,23 @@ import { runCreate } from "./create.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { runInit } from "./init.js";
 import { defaultStartGit, runStart } from "./start.js";
+import { removeFixtureTree } from "./test-tmp.js";
 import { runUpdate } from "./update.js";
 import { runValidate } from "./validate.js";
 
 // bug-tmp-fixture-leak + bug-tracker-commit-enotempty-flake: track mkdtemp
 // dirs (plus any `arggon start --worktree` sibling worktrees named
-// `<basename>-task-*`) and remove them after each test.
+// `<basename>-task-*`) and remove them after each test through the shared
+// bounded-retry helper (test-tmp.ts).
 //
 // Every git command in this file returns synchronously, but `git commit` also
 // forks a detached `git maintenance run --auto --detach` child, and on a
 // loaded CI runner the kernel can still surface entries while rmdir runs.
-// Recursive rmSync (readdir -> unlink -> rmdir) fails ENOTEMPTY if an entry
-// appears in that window; `force` only swallows ENOENT, and Node retries
-// ENOTEMPTY only when maxRetries > 0. The retry window makes the teardown
-// deterministic without weakening anything the tests assert.
-const RM_RETRY = { recursive: true, force: true, maxRetries: 10, retryDelay: 50 } as const;
+// Recursive rmSync is a one-shot ENOTEMPTY race in that window; `force` only
+// swallows ENOENT, and Node retries ENOTEMPTY only when maxRetries > 0. The
+// helper's retry window makes the teardown deterministic without weakening
+// anything the tests assert.
 const tmpDirs: string[] = [];
-function removeFixtureTree(dir: string): void {
-  rmSync(dir, RM_RETRY);
-  try {
-    const base = basename(dir);
-    for (const entry of readdirSync(dirname(dir))) {
-      if (entry.startsWith(`${base}-task`)) rmSync(join(dirname(dir), entry), RM_RETRY);
-    }
-  } catch {
-    // parent already gone
-  }
-}
 afterEach(() => {
   for (const dir of tmpDirs.splice(0)) removeFixtureTree(dir);
 });

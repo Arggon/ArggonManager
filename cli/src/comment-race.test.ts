@@ -18,13 +18,14 @@
  * The CLI runs from source via tsx, like cli.test.ts / claim-race.test.ts.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { runCreate } from "./create.js";
 import { runInit } from "./init.js";
+import { removeFixtureTree } from "./test-tmp.js";
 
 const NOW = new Date("2026-09-14T12:00:00Z");
 const TIMEOUT_MS = 120_000;
@@ -217,11 +218,11 @@ describe("concurrent comments on one item (bug-comment-race-no-lock)", () => {
       } finally {
         // bug-tracker-commit-enotempty-flake: the four CLI children are
         // awaited on "close" above, so teardown is already sequenced after
-        // them; the retry window only covers a still-settling fs entry under
-        // CI load (rmdir -> ENOTEMPTY is never suppressed by `force`). The
-        // mkdtemp name is unique per call, so concurrent runs can never
-        // collide on this fixture.
-        rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
+        // them; the shared helper's retry window (test-tmp.ts) only covers a
+        // still-settling fs entry under CI load (rmdir -> ENOTEMPTY is never
+        // suppressed by `force`). The mkdtemp name is unique per call, so
+        // concurrent runs can never collide on this fixture.
+        removeFixtureTree(dir);
       }
     },
     TIMEOUT_MS,
