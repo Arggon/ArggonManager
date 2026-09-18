@@ -54,3 +54,25 @@ docs the integration points to. Local version verified: `opencode v2.0.7`
 - Docs travel with code: if Phase 1 or 2 lands first, this task absorbs the
   as-shipped wiring rather than the intended wiring.
 - Keep the playbook lean (≤1 page): version pin, the five sections, and links.
+
+### 2026-09-18 @Arggon
+W1c playbook evidence (task-opencode-v2-playbook)
+
+playbook new:
+{"ok":true,"schemaVersion":1,"conventionVersion":3,"command":"playbook","files":["docs/playbooks/opencode.md"]}
+
+playbook refresh:
+{"ok":true,"schemaVersion":1,"conventionVersion":3,"command":"playbook","path":"docs/playbooks/opencode.md","version":"2.0.7","researched":"2026-09-18"}
+
+playbook status: opencode v2.0.7 researched 2026-09-18 ageDays 0 stale=false; staleCount=0 of 4 playbooks.
+
+Consistency check vs the seam code (PR #322 b1d8630, re-checked after merging origin/opencode2 8d79c2e):
+- templates/docs/opencode.jsonc: mcp.servers.arggon {type: local, command: ["arggon","mcp"]}, formatter: true, compaction.keep.tokens: 15000 — matches playbook Setup and the docs/agents.md stanza.
+- artifacts: .opencode/agents/arggon-{coordinator,worker,reviewer}.md + .opencode/commands/arggon-{next,start,done,handoff,review,status}.md — matches both docs.
+- cli/src/docs.ts: findOpenCodeConfig candidates (opencode.json/jsonc, .opencode/opencode.json/jsonc) and present-skip→skipped[] — matches the "config only when absent" claim and the precedence rationale.
+- skills bundled to .agents/skills/ (arggon-cli, arggon-upgrade), cli/src/docs.ts:161-162.
+- V2 claims re-verified against https://opencode.ai/v2/docs/{skills,config,mcp-servers,instructions}/ (accessed 2026-09-17): AGENTS.md only / no CLAUDE.md fallback; instructions array accepted but inert; mcp.servers + disabled; .opencode configs override direct configs.
+
+Gates after merge 8d79c2e: argon validate ok, spec validate ok, npm run build ok, npm run lint ok; npm test 66 files / 1047 passed (the 1056 baseline = 1047 + the 9 init-opencode.test.ts tests that live in still-open PR #322).
+
+Not done, reported instead: README untouched (file ownership; PR #322's README bullet already lists the OpenCode seam). Optional `arggon instructions` extraction hook skipped deliberately (small-scope choice; follow-up candidate if the stanza should be printable).
