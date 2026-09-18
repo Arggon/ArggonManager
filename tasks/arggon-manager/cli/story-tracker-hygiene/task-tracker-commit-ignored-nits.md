@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-tracker-commit-ignored-nits
 title: "Tracker-commit ignored[] nits: dedupe after normalization, fallback/exotic-path tests"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T22:50:00.197Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-tracker-commit-ignored-nits
 ---
 <!--
@@ -62,8 +61,11 @@ Findings F1/F2/F4 from the independent review of PR #359
 
 **F4 — exotic path fixture** (spaces/unicode/newline/backslash): `ignored: ["tasks/back\\slash.md","tasks/line\nbreak.md"]` byte-for-byte, `(2 ignored path(s) skipped)`, status clean, tracked exotic names in HEAD. Removing `-z` from the probe makes the test fail (line-split probe misses the newline file).
 
-**Gates**: full suite 1278 tests / 76 files green (private TMPDIR), lint, build, `validate`, `spec validate` green.
+**Gates**: full suite 1281 tests / 76 files green (private TMPDIR), lint, build, `validate`, `spec validate` green.
 
 ### handoff 2026-09-18 @Arggon — next: Coordinator review of draft PR #363 (feat/task-tracker-commit-ignored-nits -> opencode2); on approval merge (do not squash: branch carries chore(tasks) auto-commits) and flip the item done.
 - branch: feat/task-tracker-commit-ignored-nits
 - open questions: None. Branch created by start is feat/... (prompt said fix/...); PR is draft by design.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; F1 dedupe-after-normalization mutation-checked (revert → 2 failing tests, single-form parity intact), F2 mocked fallback pins the exact pre-fix degradation and the :( edge documented, F4 NUL fixture fails without -z with byte-for-byte exotic names; 1281 tests + CI pass; merged. Evidence count noted (1281). Closing.
