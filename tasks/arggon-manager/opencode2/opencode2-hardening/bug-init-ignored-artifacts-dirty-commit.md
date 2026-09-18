@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-init-ignored-artifacts-dirty-commit
 title: arggon init leaves a dirty index when generated paths are gitignored (commit.skipped)
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T22:17:08.010Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-init-ignored-artifacts-dirty-commit
 ---
 <!--
@@ -95,3 +94,6 @@ tracker auto-commit paragraph), `docs/convention.md` §`x-tracker`.
 ### handoff 2026-09-18 @Arggon — next: Review draft PR #359 against the item checklist; merge to opencode2 (merge, do not squash); verify; then flip the item done.
 - branch: fix/bug-init-ignored-artifacts-dirty-commit
 - open questions: None blocking. Review note: init commit message counts all written paths; the ignored subset is listed in the additive commit.ignored array.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; root cause independently reproduced (partial-staging git add refusal → clean commit with ignored[] disclosure), partition semantics verified (index-aware tracked case, NUL hygiene, no force-add, no empty commit), normal mutation parity unchanged, docs/JSON contract updated in-PR, adopter fixture end-to-end clean (re-init too), 1267 tests + CI pass; merged. F1/F2/F4 (dedupe after normalization; fallback/exotic-path tests) filed as task-tracker-commit-ignored-nits. Closing.
