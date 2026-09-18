@@ -73,3 +73,7 @@ Evidence — F2/F3 implementation (PR #341, draft; no merge, no status flip)
 **Gates**: `npm test` 70 files / 1162 tests passed; `npm run lint` clean; `npm run build` clean; `arggon validate --json` ok (0 warnings); `arggon spec validate --json` ok; pre-commit `arggon validate` ok.
 
 Files: `cli/src/doctor.ts`, `cli/src/doctor.test.ts`, `docs/json-output.md`. PR: https://github.com/Arggon/ArggonManager/pull/341
+
+### handoff 2026-09-18 @Arggon (session: ses_f4ad40e77fferCmzyNYYkx3bNI) — next: Review draft PR #341 against opencode2; address any review findings as follow-up items; coordinator/reviewer merges and flips status (worker does not merge or flip).
+- branch: fix/bug-doctor-human-output-injection
+- open questions: None — bounded-length decision recorded: cap 200 chars + ellipsis (MAX_HUMAN_VALUE_CHARS), JSON raw/uncapped
