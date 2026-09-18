@@ -76,3 +76,7 @@ Consistency check vs the seam code (PR #322 b1d8630, re-checked after merging or
 Gates after merge 8d79c2e: argon validate ok, spec validate ok, npm run build ok, npm run lint ok; npm test 66 files / 1047 passed (the 1056 baseline = 1047 + the 9 init-opencode.test.ts tests that live in still-open PR #322).
 
 Not done, reported instead: README untouched (file ownership; PR #322's README bullet already lists the OpenCode seam). Optional `arggon instructions` extraction hook skipped deliberately (small-scope choice; follow-up candidate if the stanza should be printable).
+
+### handoff 2026-09-18 @Arggon — next: Review docs/playbooks/opencode.md + docs/agents.md OpenCode V2 section against PR #322's seam code; merge #322 first so the spec-opencode-seam-010 link resolves.
+- branch: feat/task-opencode-v2-playbook
+- open questions: README acceptance bullet left untouched (file ownership) — confirm #322's README bullet covers it; optional argpon instructions extraction hook skipped.
