@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { writeFileAtomic } from "./atomic.js";
 import { bundledTemplatesDir } from "./paths.js";
 import {
   CONVENTION_VERSION,
@@ -918,7 +919,10 @@ export function runInit(opts: InitOptions): InitResult {
   // untouched docs keep regenerating instead of degrading to adopter-modified.
   const carried = opts.force && plan.alreadyInitialized ? readGeneratedState(root) : {};
   const carriedName = opts.force && plan.alreadyInitialized ? readGeneratedProjectName(root) : null;
-  writeFileSync(conventionPath, updateGeneratedSection(CONVENTION_YML, carried, carriedName), "utf8");
+  // Atomic (bug-atomic-write-followups F3): a concurrent reader
+  // (readConventionConfig in branch/list/view paths) must never observe the
+  // truncate window of this rewrite.
+  writeFileAtomic(conventionPath, updateGeneratedSection(CONVENTION_YML, carried, carriedName));
   const copiedTemplates = ensureTemplates(root, opts.force).map((name) => `templates/${name}`);
   const docs = applyDocsPlan(root, plan.docs);
   const created = ["tasks/.convention.yml", ...copiedTemplates, ...docs.created].sort();
