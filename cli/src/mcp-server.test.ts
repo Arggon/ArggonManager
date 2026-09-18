@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { runCreate } from "./create.js";
 import { arggonVersion } from "./docs.js";
+import { HANDOFF_SESSION_CAP } from "./handoff.js";
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
 
@@ -539,23 +540,25 @@ describe("mcp server _meta.sessionID attribution (task-opencode-v2-mcp-meta)", (
     expect(textContent(comment)).toMatchObject({ comment: { author: "explicit-user" } });
   });
 
-  it("treats empty explicit author/session as absent and falls back to params._meta.sessionID", async () => {
+  it("treats empty/whitespace-only explicit author/session as absent and falls back to params._meta.sessionID", async () => {
     await seedTask();
-    const comment = await client.request("tools/call", {
-      name: "arggon_comment",
-      arguments: { id: "task-rate-limit", text: "empty author", author: "" },
-      _meta: { sessionID: "ses_meta_empty_explicit" },
-    });
-    expect(comment.isError).toBeUndefined();
-    expect(textContent(comment)).toMatchObject({
-      ok: true,
-      command: "comment",
-      comment: { author: "ses_meta_empty_explicit", lines: ["empty author"] },
-    });
+    for (const explicit of ["", "   ", "\t"]) {
+      const comment = await client.request("tools/call", {
+        name: "arggon_comment",
+        arguments: { id: "task-rate-limit", text: "empty author", author: explicit },
+        _meta: { sessionID: "ses_meta_empty_explicit" },
+      });
+      expect(comment.isError).toBeUndefined();
+      expect(textContent(comment)).toMatchObject({
+        ok: true,
+        command: "comment",
+        comment: { author: "ses_meta_empty_explicit", lines: ["empty author"] },
+      });
+    }
 
     const handoff = await client.request("tools/call", {
       name: "arggon_handoff",
-      arguments: { id: "task-rate-limit", next: "resume", branch: "feat/x", session: "", author: "" },
+      arguments: { id: "task-rate-limit", next: "resume", branch: "feat/x", session: "  ", author: "\t" },
       _meta: { sessionID: "ses_meta_empty_explicit" },
     });
     expect(handoff.isError).toBeUndefined();
@@ -611,6 +614,90 @@ describe("mcp server _meta.sessionID attribution (task-opencode-v2-mcp-meta)", (
       });
       expect(textContent(result)).toMatchObject({ comment: { author: "fallback-user" } });
     }
+  });
+
+  it("treats whitespace-only _meta.sessionID as absent and falls back to @me", async () => {
+    await seedTask();
+    for (const sessionID of [" ", "\t", "\n\t ", "\u00a0"]) {
+      const comment = await client.request("tools/call", {
+        name: "arggon_comment",
+        arguments: { id: "task-rate-limit", text: "whitespace meta" },
+        _meta: { sessionID },
+      });
+      expect(textContent(comment)).toMatchObject({ comment: { author: "fallback-user" } });
+    }
+
+    const handoff = await client.request("tools/call", {
+      name: "arggon_handoff",
+      arguments: { id: "task-rate-limit", next: "resume", branch: "feat/x" },
+      _meta: { sessionID: "   " },
+    });
+    const envelope = textContent(handoff) as Record<string, unknown>;
+    expect(envelope).toMatchObject({ comment: { author: "fallback-user" } });
+    expect((envelope.handoff as Record<string, unknown>)).not.toHaveProperty("session");
+  });
+
+  it("normalizes control characters to a single-line token (no heading injection)", async () => {
+    await seedTask();
+    const cases: Array<[string, string]> = [
+      ["ses_safe\n### injected heading", "ses_safe"],
+      ["ses_tab\tmore", "ses_tab"],
+      ["ses_cr\rmore", "ses_cr"],
+      ["ses_nul\u0000evil", "ses_nul"],
+      // U+200B is a format character (Cf), not whitespace: still a delimiter.
+      ["ses_zero\u200bwidth", "ses_zero"],
+    ];
+    for (const [sessionID, expected] of cases) {
+      const comment = await client.request("tools/call", {
+        name: "arggon_comment",
+        arguments: { id: "task-rate-limit", text: "control meta" },
+        _meta: { sessionID },
+      });
+      expect(textContent(comment)).toMatchObject({ comment: { author: expected } });
+    }
+    const body = readFileSync(taskPath(), "utf8");
+    expect(body).not.toContain("### injected heading");
+    expect(body).toContain("@ses_safe\n");
+    expect(body).toContain("@ses_nul\n");
+
+    // Control-only and leading-control values normalize to nothing -> @me.
+    for (const sessionID of ["\u0000\u0001", "\u0000ses_hidden", "\u200b"]) {
+      const comment = await client.request("tools/call", {
+        name: "arggon_comment",
+        arguments: { id: "task-rate-limit", text: "control-only meta" },
+        _meta: { sessionID },
+      });
+      expect(textContent(comment)).toMatchObject({ comment: { author: "fallback-user" } });
+    }
+  });
+
+  it("caps a long _meta.sessionID at the handoff session cap (64 chars + …)", async () => {
+    await seedTask();
+    const long = "s".repeat(300);
+    const bounded = `${"s".repeat(HANDOFF_SESSION_CAP - 1)}…`;
+    expect(bounded.length).toBe(HANDOFF_SESSION_CAP);
+
+    const comment = await client.request("tools/call", {
+      name: "arggon_comment",
+      arguments: { id: "task-rate-limit", text: "long meta" },
+      _meta: { sessionID: long },
+    });
+    expect(textContent(comment)).toMatchObject({ comment: { author: bounded } });
+
+    const handoff = await client.request("tools/call", {
+      name: "arggon_handoff",
+      arguments: { id: "task-rate-limit", next: "resume", branch: "feat/x" },
+      _meta: { sessionID: long },
+    });
+    expect(textContent(handoff)).toMatchObject({
+      comment: { author: bounded },
+      handoff: { session: bounded },
+    });
+
+    const body = readFileSync(taskPath(), "utf8");
+    expect(body).not.toContain(long);
+    expect(body).toContain(`@${bounded} (session: ${bounded}) — next: resume`);
+    expect(body.split("\n").filter((line) => line.startsWith("### "))).toHaveLength(2);
   });
 
   it("keeps the envelope payloads byte-compatible otherwise (only the attributed value differs)", async () => {

@@ -1,13 +1,16 @@
 ---
 type: task
-status: todo
+status: done
 id: task-opencode-v2-mcp-meta-hardening
 title: "MCP meta hardening: normalize/cap the meta-derived author (F1) + edge tests (F3)"
+assignee: Arggon
+branch: feat/task-opencode-v2-mcp-meta-hardening
 parent: opencode2-hardening
 labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-mcp-meta-hardening
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/story-opencode-v2/task-opencode-v2-mcp-meta-hardening.md
@@ -39,19 +42,54 @@ Non-blocking findings from the independent review of PR #326
 
 ## Acceptance
 
-- [ ] The meta-derived value is normalized before it can reach an item body:
+- [x] The meta-derived value is normalized before it can reach an item body:
       single-line token (reject/trim at control characters or whitespace) and a
       documented cap (64 chars + `…`, consistent with the handoff `session`
       cap) **or** an explicit documented decision that the author is opaque and
       uncapped, with `docs/json-output.md`'s bounded claim updated to match.
-- [ ] Tests cover whatever is missing after PR #326: whitespace-only, long ID
+- [x] Tests cover whatever is missing after PR #326: whitespace-only, long ID
       bound, control-character value, empty-explicit fallback.
-- [ ] `docs/agents.md` and `docs/json-output.md` consistent with the shipped
+- [x] `docs/agents.md` and `docs/json-output.md` consistent with the shipped
       behavior.
-- [ ] Full suite, lint, `validate`/`spec validate` green; small PR to
+- [x] Full suite, lint, `validate`/`spec validate` green; small PR to
       `opencode2`.
 
 ## Notes
 
 - Prefer normalizing at the boundary (`sessionIDFromMeta`) over per-consumer
   logic, so every future consumer inherits the invariant.
+
+### 2026-09-18 @Arggon
+## F1 + F3 delivered — meta author normalized at the boundary (PR pending)
+
+**Decision (preferred path): normalize once in `sessionIDFromMeta`**, so every consumer (`handoff.session`, `comment.author`, `handoff` author) inherits the invariant instead of per-consumer logic. A value is a single-line token: trimmed, cut at the first whitespace/control/format character (`/[\s\p{Cc}\p{Cf}]/u`), capped at `HANDOFF_SESSION_CAP` (64) with `…` (63 + marker), and normalize-to-empty counts as absent (falls back to `@me` / no session). Explicit tool args keep their existing kernel semantics (comment trims; handoff caps `session` at 64) — unchanged, per the F1 scope note.
+
+**Files:** `cli/src/mcp-server.ts` (`normalizeSessionID` + `sessionIDFromMeta`, module doc, tool descriptions), `cli/src/mcp-server.test.ts` (F3 edge tests), `docs/agents.md` §MCP server, `docs/json-output.md` (comment/handoff bounded claims + MCP paragraph).
+
+**Gates:** full suite **69 files / 1130 tests passed** (incl. `mcp-parity.test.ts`; schema additive-only); `npm run lint` clean; `npm run build` clean; `arggon validate` `{ok:true,errors:[]}`; `arggon spec validate` `{ok:true,errors:[]}`.
+
+**Raw stdio probe** (`tools/call` JSON-RPC lines into `arggon mcp` from source, throwaway fixture tree, `GITHUB_USER=fallback-user` pins `@me`; expected vs observed):
+
+| case (meta / args) | expected | before | after |
+| --- | --- | --- | --- |
+| handoff, `ses_meta_ok` | unchanged | author+session `ses_meta_ok` ✅ | same ✅ |
+| handoff, 300×`s` | both bounded | author **300 chars**, session 64 (`63×s…`) | author+session 64 (`63×s…`) ✅ |
+| comment, 300×`s` | author bounded | author **300 chars** | author 64 (`63×s…`) ✅ |
+| comment, `ses_safe\n### injected heading` | `ses_safe`, no injected line | author raw 29 chars, **literal `### injected heading` line** (2 headings) | `@ses_safe`, 1 heading ✅ |
+| comment, `\u0000\u0001` (control-only) | absent | author raw control chars | `fallback-user` ✅ |
+| comment, `"   "` (whitespace-only) | absent | `fallback-user` | `fallback-user` ✅ |
+| comment, meta absent | `@me` | `fallback-user` | `fallback-user` ✅ |
+| comment, explicit `author:""` + meta | meta wins (PR #326) | `ses_meta_empty_explicit` | same ✅ |
+| handoff, explicit session/author + meta | explicit wins | `explicit-user` / `sess_explicit` | same ✅ |
+
+Probe: `/tmp/opencode/mcp-meta-probe.mts` + `mcp-meta-probe-{before,after}.json` (local run artifacts, not committed).
+
+**Notes:**
+- A raw U+2028/U+2029 inside a JSON-RPC line is treated as a line terminator by `node:readline`, so it can never reach `sessionIDFromMeta` over stdio (the server sees two parse errors); the edge tests therefore pin `\r`, `\t`, NUL and U+200B (all escaped/valid inside JSON strings) while `\s` still covers U+2028/U+2029 for non-stdio transports (e.g. Streamable HTTP).
+- `docs/json-output.md` bounded claims reconciled: the meta-derived default carries the same 64-char single-line bound as `handoff.session`, so the ~800-char handoff section bound holds for meta-attributed MCP calls too.
+
+### handoff 2026-09-18 @Arggon (session: ses_f4b26f46dffeWx74XM6jc8Ey4V) — next: Review draft PR (F1 normalization in sessionIDFromMeta + F3 edge tests + docs bounded claims), re-run gates, merge, then flip this item to done.
+- branch: feat/task-opencode-v2-mcp-meta-hardening
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; independently probed before→after over real stdio (300-char author 300→64, injected heading eliminated, control/bidi values fall back, explicit precedence + empty-explicit fallback preserved); regex covers LF/TAB/CR/NUL/DEL/C1/NBSP/ZWSP/bidi/LS/PS/astral-Cf; docs accurate; 1130 tests + parity green; merged with cli pass. Informational nits filed as task-opencode2-mcp-nits (surrogate-safe cap, table-row wording); explicit-arg pass-through and U+2028 stdio framing are by-design/documented scope. Closing.

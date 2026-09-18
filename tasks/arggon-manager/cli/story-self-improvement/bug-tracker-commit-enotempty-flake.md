@@ -53,3 +53,8 @@ parallel CLI processes under CI load) should be hardened together.
 
 - Surfaced by the PR #334 review (blocking only in the sense that CI must be
   re-run); fix in a small PR to `opencode2`.
+
+### 2026-09-18 @Arggon
+### New instance (2026-09-18): `worktree.test.ts` afterEach ENOTEMPTY
+
+CI run [35355987158](https://github.com/Arggon/ArggonManager/actions/runs/35355987158/job/105635334028) on PR #336 (`task-opencode-v2-doctor-polish`, head `b00bbeb`) failed with `Error: ENOTEMPTY: directory not empty, rmdir '/tmp/arggon-worktree-my80VX/.git'` in `cli/src/worktree.test.ts` > `start --worktree` > "attaches on re-run instead of failing or duplicating the worktree" → `removeFixtureTree` (afterEach `rmSync`). Result: 1 failed / 1131 passed; the PR diff touches only `cli/src/doctor.ts`, `cli/src/doctor.test.ts`, `cli/src/docs.ts` and the item file, so this is the same temp-fixture/parallel-git cleanup family tracked here (no separate item; this is the worktree.test.ts sibling the `task-vitest-global-teardown` review mentioned). Local full suite is 1132/1132 green.

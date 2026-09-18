@@ -11,7 +11,7 @@ arggon <command> --json
 
 Example: `arggon --json hello`.
 
-The MCP server (`arggon mcp`) returns these same envelope objects as tool-result text content for its `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`, `arggon_handoff`, `arggon_show`, `arggon_next`, `arggon_report`, and `arggon_validate` tools; kernel failures become tool errors carrying the same `ok: false` shape (see [`docs/agents.md`](./agents.md) §MCP server). The tool input schemas are parity-tested against the CLI option surface (`cli/src/mcp-parity.test.ts`): the two surfaces stay in sync by test, not by convention — schema changes are **additive only**; a breaking change bumps `schemaVersion`.
+The MCP server (`arggon mcp`) returns these same envelope objects as tool-result text content for its `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`, `arggon_handoff`, `arggon_show`, `arggon_next`, `arggon_report`, and `arggon_validate` tools; kernel failures become tool errors carrying the same `ok: false` shape (see [`docs/agents.md`](./agents.md) §MCP server). When `arggon_comment`/`arggon_handoff` take their default `author`/`session` from `CallToolRequest.params._meta.sessionID`, the value is normalized before it reaches the envelope or the item body (task-opencode-v2-mcp-meta-hardening): a single-line token cut at the first whitespace/control/format character, capped at 64 characters with `…`, with a value that normalizes to empty treated as absent (see §MCP server in `docs/agents.md`). The tool input schemas are parity-tested against the CLI option surface (`cli/src/mcp-parity.test.ts`): the two surfaces stay in sync by test, not by convention — schema changes are **additive only**; a breaking change bumps `schemaVersion`.
 
 This flag is a formatter only. It does not walk `tasks/` or parse frontmatter. Commands that load domain objects pass those objects to the formatter. Human vs JSON printing lives in the CLI entrypoint.
 
@@ -340,7 +340,7 @@ Appends a timestamped, author-attributed comment section (`### <date> @<author>`
 | ----------------- | ---------- | ---------------------------------------------- |
 | `id`              | `string`   | Commented item id                              |
 | `path`            | `string`   | Absolute path of the item file                 |
-| `comment.author`  | `string`   | Resolved author login (rendered `@<author>`)   |
+| `comment.author`  | `string`   | Resolved author login (rendered `@<author>`). Explicit logins are trimmed; the MCP `_meta.sessionID` default is normalized to a single line and capped at 64 chars with `…` (see [`docs/agents.md`](./agents.md) §MCP server) |
 | `comment.date`    | `string`   | `YYYY-MM-DD` (UTC) rendered in the heading     |
 | `comment.lines`   | `string[]` | Comment text lines appended under the heading  |
 | `commit`          | `object`   | Tracker auto-commit outcome: `{ hash, message }` when the commented file was committed, `{ skipped: <reason> }` otherwise. Additive within `schemaVersion: 1`. |
@@ -349,19 +349,19 @@ Failures use `error.code: "COMMENT_FAILED"` (unknown id, empty text, unresolvabl
 
 ### `handoff`
 
-Appends a structured, bounded session-end handoff section (`### handoff <date> @<author>[ (session: <id>)] — next: <step>` + `- branch: …` / `- open questions: …` lines) to the item **body** through the same machinery as `comment`: body-only write (frontmatter unchanged, no `updated` bump), works on `done`/`cancelled` items. Bounded by construction: each field (`--branch`, `--next`, `--open-questions`) is capped at 200 characters — the optional `--session` provenance identifier at 64 — longer input truncates with `…` — so the whole section stays under ~800 characters.
+Appends a structured, bounded session-end handoff section (`### handoff <date> @<author>[ (session: <id>)] — next: <step>` + `- branch: …` / `- open questions: …` lines) to the item **body** through the same machinery as `comment`: body-only write (frontmatter unchanged, no `updated` bump), works on `done`/`cancelled` items. Bounded by construction: each field (`--branch`, `--next`, `--open-questions`) is capped at 200 characters — the optional `--session` provenance identifier at 64 — longer input truncates with `…` — so the whole section stays under ~800 characters. The meta-derived default `session`/`author` carries the same 64-char bound (normalized to a single line; see [`docs/agents.md`](./agents.md) §MCP server), so an MCP call with `_meta.sessionID` stays bounded too.
 
 | Field                   | Type       | Notes                                                                        |
 | ----------------------- | ---------- | ---------------------------------------------------------------------------- |
 | `id`                    | `string`   | Handed-off item id                                                           |
 | `path`                  | `string`   | Absolute path of the item file                                               |
-| `comment.author`        | `string`   | Resolved author login (rendered `@<author>` in the heading)                  |
+| `comment.author`        | `string`   | Resolved author login (rendered `@<author>` in the heading); explicit logins are trimmed, the MCP `_meta.sessionID` default is normalized and capped at 64 chars |
 | `comment.date`          | `string`   | `YYYY-MM-DD` (UTC) rendered in the heading                                   |
 | `comment.lines`         | `string[]` | The `- branch: …` / `- open questions: …` lines appended under the heading   |
 | `handoff.branch`        | `string`   | Working branch as rendered (auto-detected from git when omitted; `unknown` outside git); capped at 200 chars |
 | `handoff.next`          | `string`   | The next step (required); capped at 200 chars                                |
 | `handoff.openQuestions` | `string`   | Present only when `--open-questions` was given; capped at 200 chars          |
-| `handoff.session`       | `string`   | Present only when `--session` was given; provenance session identifier rendered in the heading; capped at 64 chars |
+| `handoff.session`       | `string`   | Present when `--session` was given or the client sent `_meta.sessionID` (normalized to a single line); provenance session identifier rendered in the heading; capped at 64 chars |
 | `commit`                | `object`   | Tracker auto-commit outcome, same shape as `comment`. Additive within `schemaVersion: 1`. |
 
 Failures reuse `error.code: "COMMENT_FAILED"` by design (task-handoff-command): the handoff kernel IS the comment kernel — same body-append path, same failure modes (unknown id, missing `--next`, unresolvable author).
