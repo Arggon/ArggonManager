@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode-v2-doctor
 title: "arggon doctor: OpenCode integration checks"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T00:57:27.680Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-doctor
 ---
 <!--
@@ -80,3 +79,6 @@ Note: one intermediate full-suite run failed `measure.test.ts > always deletes t
 ### handoff 2026-09-18 @Arggon — next: Review against the docs/engineering.md bar, smoke the 4 probes in the evidence comment, mark the draft PR ready and merge to opencode2 (merge commit — branch carries tracker auto-commits).
 - branch: feat/task-opencode-v2-doctor
 - open questions: Approve the one-line cli.ts wiring (outside my assigned files, required for --json)? Reconcile doctor's config candidate list with findOpenCodeConfig once W1a (task-opencode-v2-spec) merges.
+
+### 2026-09-18 @Arggon
+Review verdict (independent reviewer, PR #324): MERGE. Verified: report-only (tree hash-identical, exit 0), JSONC tolerance incl. malformed input, V1 detection (mcp.timeout excluded), caps, candidate order, cli.ts wiring doctor-only; tests 36/36 + full suite 1074; docs shape matches. Non-blocking minors filed as task-opencode-v2-doctor-polish. Merged after cli pass — W1 closes.
