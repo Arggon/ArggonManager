@@ -280,6 +280,38 @@ describe("success stdout: other commands keep repo values inert", () => {
     expect(body.suggestion.item.title).toBe(title);
   });
 
+  it("re-escapes quotes and backslashes on the human line (pinning); --json keeps them raw", () => {
+    // Boundary of the byte-identity claim: `sanitizeHumanError` JSON-escapes
+    // `"` and `\` in place (escaping exactly as `JSON.stringify` would), so a
+    // title using them renders escaped on the human line while `--json` keeps
+    // the raw bytes. This pins the escape boundary of the shared human policy.
+    const dir = initTree();
+    const title = 'Fix "quoted" \\ thing';
+    writeFileSync(
+      join(dir, "tasks", "launch-mvp", "auth", "story-login", "task-quotes.md"),
+      "---\n" +
+        "type: task\n" +
+        "status: todo\n" +
+        "id: task-quotes\n" +
+        `title: ${title}\n` +
+        "parent: story-login\n" +
+        "created: 2026-09-14\n" +
+        "updated: 2026-09-14\n" +
+        "---\n\nbody\n",
+      "utf8",
+    );
+
+    const proc = runCli(["next"], dir);
+    expect(proc.status).toBe(0);
+    expect(proc.stdout).toContain('arggon next: task-quotes — Fix \\"quoted\\" \\\\ thing');
+    expect(proc.stderr).toBe("");
+
+    const json = runCli(["next", "--json"], dir);
+    expect(json.status).toBe(0);
+    const body = JSON.parse(json.stdout) as { suggestion: { item: { title: string } } };
+    expect(body.suggestion.item.title).toBe(title);
+  });
+
   it("leaves an ordinary (longer-than-200-chars) next rationale byte-identical", () => {
     // The `why` line is ~330 chars: the 200-char report-value cap would clip
     // it, breaking ordinary byte-identity. The success channel uses the

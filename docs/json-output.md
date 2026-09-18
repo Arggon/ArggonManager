@@ -50,6 +50,8 @@ Process exit code is **non-zero**. Do **not** mix human text onto stdout when `-
 
 Human failure lines are display-sanitized (bug-cli-error-output-injection, additive): the failure message can embed repo-controlled values (item file paths, config keys, git output), so the same policy as doctor human output applies — C0/DEL/C1/LS/PS escaped as inert text, and the raw message capped at `MAX_HUMAN_ERROR_CHARS` (2000, larger than the doctor report-value cap because error diagnostics are composite `<path>: <reason>` text). This is display only: the envelope's `error.message` always keeps the raw text, byte for byte.
 
+Human success lines are display-sanitized too (task-success-stdout-sanitize, additive): dynamic values interpolated into success stdout — item ids/titles/paths and cascade lines from `create`/`update`/`next`/`comment`/`handoff`, branch names, `start` worktree/hook/PR values, GitHub issue titles from `import-issues`, and echoed argv paths such as `spec analyze --baseline`/`--save-baseline` — escape C0/DEL/C1/LS/PS as inert text and are capped at `MAX_HUMAN_ERROR_CHARS` (2000, the composite-diagnostic cap). Ordinary values render byte-identical except that `"` and `\` are JSON-escaped in place by the shared policy. `--json` payloads keep the raw values, byte for byte.
+
 ### Empty success
 
 Empty success stays `ok: true` (e.g. future `list` with no items → `items: []`).

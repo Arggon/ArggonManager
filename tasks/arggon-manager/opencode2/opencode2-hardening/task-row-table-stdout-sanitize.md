@@ -2,7 +2,7 @@
 type: task
 status: todo
 id: task-row-table-stdout-sanitize
-title: "Row/table success stdout: sanitize repo-controlled columns (list, show, report, playbooks status, spec audit, tui)"
+title: "Row/table success stdout: sanitize repo-controlled columns (list, show, report, adopt, playbooks status, spec audit, tui)"
 parent: opencode2-hardening
 labels: []
 created: "2026-09-18"
@@ -16,7 +16,7 @@ updated: "2026-09-18"
   parent MUST be the story id. Omit assignee when unassigned. Omit blocked_reason unless status is blocked.
 -->
 
-# Row/table success stdout: sanitize repo-controlled columns (list, show, report, playbooks status, spec audit, tui)
+# Row/table success stdout: sanitize repo-controlled columns (list, show, report, adopt, playbooks status, spec audit, tui)
 
 ## Context
 
@@ -26,8 +26,24 @@ remaining human stdout **formatters** live outside `cli/src/cli.ts` and still
 interpolate repo-controlled values raw:
 
 - `arggon list` — `formatListTable` (`cli/src/list.ts`): the `title`/`id`/
-  `assignee`/`branch` columns are frontmatter values. A title with a real
-  newline forges a column-0 row; ESC/C1/DEL/LS/PS pass through raw.
+  `assignee`/`branch` columns are frontmatter values. Frontmatter scalars are
+  line-oriented, so a real newline in a title never reaches the formatter: it
+  lands as a separate frontmatter line (a forged unknown key at worst, or a
+  parse error), or — after a writer round-trip like `create`/`update` — is
+  JSON-escaped to the literal two-character `\n` text, which is inert. The
+  verified leak is raw ESC/C1/DEL plus LS/PS (verified: `arggon list` prints
+  them raw, exit 0); LS/PS can still break a line visually, which is why they
+  are in the escape set.
+- `arggon adopt` / `arggon adopt --ack` — `formatAdoptReport` /
+  `formatAdoptAckReport` (`cli/src/adopt.ts`): the idempotent skip path takes
+  `storyId` from the existing `task-adopt-arggon` item's `parent:` frontmatter,
+  and the report prints `taskPath`, the `x-generated` `doc.path` values
+  (dry-run inventory / ack list), `createdContainers`, and stack/corpus lines.
+  `cli/src/cli.ts` writes both formatters to stdout raw. Verified repro: an
+  item whose `parent:` is `story-badfake<LS>item<PS> <ESC>31m<C1><DEL>` →
+  `arggon adopt` prints the raw ESC/C1/DEL/LS/PS on the `story:` line, exit 0;
+  an `x-generated` key carrying the same bytes with an on-disk file of that
+  name → `arggon adopt --ack` prints it raw, exit 0.
 - `arggon show` — `renderShowText` (`cli/src/show.ts`): frontmatter fields and
   comments (verbatim content view; needs a decision like `instructions`).
 - `arggon report` — `formatReportTable` / `formatReportMarkdown`
@@ -49,10 +65,17 @@ channel) — keep them raw but say so in the item that fixes this one.
 - [ ] Each formatter above sanitizes its repo-controlled columns/values with the
       `cli/src/sanitize.ts` policy before interpolation (same policy as
       `task-success-stdout-sanitize`: escape C0/DEL/C1/LS/PS, composite cap for
-      free text; ordinary rows/titles byte-identical).
+      free text; ordinary rows/titles byte-identical except `"`/`\`, which the
+      shared policy re-escapes).
 - [ ] Hostile repro per channel: an item/spec/playbook file whose title/path
-      carries `\nspoof:` + ESC/C1/DEL/LS/PS renders inert (no forged row, no raw
-      control) on the human path; `--json` payloads keep raw values.
+      carries ESC/C1/DEL/LS/PS renders inert (no raw control, no visually
+      broken line) on the human path; `--json` payloads keep raw values.
+      Frontmatter scalars are line-oriented, so drive the repro with
+      controls + LS/PS, not a real newline (see the `list` note).
+- [ ] `adopt`/`adopt --ack` covered: the skip-path `storyId` (hostile
+      `parent:` frontmatter on the existing adoption task) and the
+      `x-generated` `doc.path` values render inert on the human path;
+      `--json` keeps raw values. (Review finding F1 on PR #354.)
 - [ ] `show`/`instructions` verbatim-content boundary explicitly recorded (or
       sanitized with a documented reason if the audit says otherwise); TUI
       either sanitizes or records why it cannot.
@@ -66,3 +89,8 @@ channel) — keep them raw but say so in the item that fixes this one.
   that item's audit comment.
 - `board.ts` already escapes HTML (`escapeHtml`), so the static board is not part
   of this item.
+- Review follow-up (PR #354 findings F1/F3): `adopt`/`adopt --ack` added to the
+  left-raw inventory with the verified repro, and the `list` rationale corrected
+  — frontmatter scalars are line-oriented, so the verified leak is raw
+  ESC/C1/DEL/LS/PS (LS/PS can still break a line visually), not a real-newline
+  forged row.
