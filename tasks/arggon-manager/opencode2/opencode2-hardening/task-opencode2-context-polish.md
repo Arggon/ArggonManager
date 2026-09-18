@@ -107,3 +107,7 @@ context:report -- --strict` exit 0, 0 regressions (AGENTS.md 1,863 B ≤ 2,048;
 MCP `tools/list` 10,450 B ≤ 12,288 advisory; item block max 252 B ≤ 1,024;
 before/after measured from `dc9fa40`). Draft PR follows; no merge, no status
 flip from this worker.
+
+### handoff 2026-09-18 @Arggon — next: Coordinator: review draft PR #340 (F4-F7 polish; strict-gate decision recorded as manual/release gate). Verify the F4 probes (pre-split + shallow), the pad before/after, the 13 helper tests and the g…
+- branch: feat/task-opencode2-context-polish
+- open questions: F4 probes used temp simulated repos (not a real bisect checkout); F5 keeps the pad() truncation backstop even though the dynamic column now prevents truncation for current labels; F6 decided manual/r…
