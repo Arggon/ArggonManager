@@ -41,10 +41,10 @@ Findings F1/F2/F4 from the independent review of PR #359
 
 ## Acceptance
 
-- [ ] `ignored[]` deduped after normalization; test with abs+relative forms.
-- [ ] Fallback path covered by a mocked test; `:(` edge documented.
-- [ ] One fixture covering spaces/unicode/newline/backslash path shapes.
-- [ ] Full suite green; small PR to `opencode2`.
+- [x] `ignored[]` deduped after normalization; test with abs+relative forms.
+- [x] Fallback path covered by a mocked test; `:(` edge documented.
+- [x] One fixture covering spaces/unicode/newline/backslash path shapes.
+- [x] Full suite green; small PR to `opencode2`.
 
 ## Notes
 
@@ -63,3 +63,7 @@ Findings F1/F2/F4 from the independent review of PR #359
 **F4 — exotic path fixture** (spaces/unicode/newline/backslash): `ignored: ["tasks/back\\slash.md","tasks/line\nbreak.md"]` byte-for-byte, `(2 ignored path(s) skipped)`, status clean, tracked exotic names in HEAD. Removing `-z` from the probe makes the test fail (line-split probe misses the newline file).
 
 **Gates**: full suite 1278 tests / 76 files green (private TMPDIR), lint, build, `validate`, `spec validate` green.
+
+### handoff 2026-09-18 @Arggon — next: Coordinator review of draft PR #363 (feat/task-tracker-commit-ignored-nits -> opencode2); on approval merge (do not squash: branch carries chore(tasks) auto-commits) and flip the item done.
+- branch: feat/task-tracker-commit-ignored-nits
+- open questions: None. Branch created by start is feat/... (prompt said fix/...); PR is draft by design.
