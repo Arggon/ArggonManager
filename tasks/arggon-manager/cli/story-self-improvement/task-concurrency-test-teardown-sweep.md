@@ -72,3 +72,7 @@ Stress (parallel peer load, private TMPDIR per process, zero failures / zero lef
 Gates (private TMPDIR): npm run build ok; npm run lint ok; npm test 73 files / 1190 tests passed; arggon validate ok (0 warnings, convention v3); arggon spec validate ok (16 docs, 0 warnings).
 
 Finding for coordinator (pre-existing, outside this item's file scope): cli/src/show.test.ts creates `arggon-show-*` mkdtemp dirs with NO teardown at all (8 leftover dirs observed after a full-suite run). It spawns no children and has no rmSync, so it is not part of the spawned-child teardown family — candidate follow-up task under this story.
+
+### handoff 2026-09-18 @Arggon — next: Review draft PR #347 against the recorded audit list + evidence; verify the acceptance checklist, then merge to opencode2 and flip the item. Worker does not merge or flip.
+- branch: feat/task-concurrency-test-teardown-sweep
+- open questions: show.test.ts leaks arggon-show-* dirs with no teardown (pre-existing, outside this item) - candidate follow-up. Branch is feat/task-concurrency-test-teardown-sweep per task branch_patterns.
