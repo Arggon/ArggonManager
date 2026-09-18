@@ -88,3 +88,6 @@ Probe: `/tmp/opencode/mcp-meta-probe.mts` + `mcp-meta-probe-{before,after}.json`
 **Notes:**
 - A raw U+2028/U+2029 inside a JSON-RPC line is treated as a line terminator by `node:readline`, so it can never reach `sessionIDFromMeta` over stdio (the server sees two parse errors); the edge tests therefore pin `\r`, `\t`, NUL and U+200B (all escaped/valid inside JSON strings) while `\s` still covers U+2028/U+2029 for non-stdio transports (e.g. Streamable HTTP).
 - `docs/json-output.md` bounded claims reconciled: the meta-derived default carries the same 64-char single-line bound as `handoff.session`, so the ~800-char handoff section bound holds for meta-attributed MCP calls too.
+
+### handoff 2026-09-18 @Arggon (session: ses_f4b26f46dffeWx74XM6jc8Ey4V) — next: Review draft PR (F1 normalization in sessionIDFromMeta + F3 edge tests + docs bounded claims), re-run gates, merge, then flip this item to done.
+- branch: feat/task-opencode-v2-mcp-meta-hardening
