@@ -52,14 +52,14 @@ Residual, non-blocking findings from the two-round review of PR #333
 
 ## Acceptance
 
-- [ ] R1 fixed with a relative-link unit case; foreign links and real dirs
+- [x] R1 fixed with a relative-link unit case; foreign links and real dirs
       still untouched.
-- [ ] R2 decided: automated guard implemented with a test, or the documented
+- [x] R2 decided: automated guard implemented with a test, or the documented
       warning kept and explicitly accepted in this item (rationale recorded).
-- [ ] R3 fixed: `cleanup` recognizes start links that point at the main
+- [x] R3 fixed: `cleanup` recognizes start links that point at the main
       checkout when it runs from a linked worktree; nested case covered by a
       test (the 6 pending worktrees from the program then prune cleanly).
-- [ ] Full suite, lint, `validate`/`spec validate` green; small PR to
+- [x] Full suite, lint, `validate`/`spec validate` green; small PR to
       `opencode2`.
 
 ## Notes
@@ -76,3 +76,7 @@ Rationale:
 4. The failure mode is loud and recoverable (`npm ci` in the primary restores it), and the review classified R2 as optional / non-blocking.
 
 Evidence: the guarded hook path stays covered by cli/src/worktree.test.ts "hides the link from a configured post-start hook so npm ci cannot empty the primary" and "re-links after a post-start hook that leaves no node_modules".
+
+### handoff 2026-09-18 @Arggon (session: ses_f4a703667ffeIQ4WdhWlBCLWGa) — next: Review draft PR #351 and the R2 rationale comment; after merge, run cleanup --prune from the linked worktree to prune the 6 pending items and flip this item done.
+- branch: feat/task-start-worktree-relpath-nits
+- open questions: Branch is feat/task-start-worktree-relpath-nits (task -> feat pattern), not the fix/... name in the brief; R3 verified on a fixture, not the live 6 program worktrees.
