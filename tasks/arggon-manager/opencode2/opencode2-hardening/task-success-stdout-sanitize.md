@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-success-stdout-sanitize
 title: "Success-path stdout: sanitize remaining dynamic values (update path/movedFrom/renamedFrom, command path lines)"
-priority: p3
+assignee: Arggon
+branch: feat/task-success-stdout-sanitize
 parent: opencode2-hardening
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T21:04:03.859Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-success-stdout-sanitize
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/opencode2-hardening/task-success-stdout-sanitize.md
