@@ -47,3 +47,24 @@ lone surrogate in the tail and U+FFFD in the body.
 - Provenance-only fields; cosmetic/hygiene, no security impact. The fix pattern
   exists in `capSession` and `normalizeSessionID`.
 - PR: https://github.com/Arggon/ArggonManager/pull/355 (draft).
+
+### 2026-09-18 @Arggon
+## capField surrogate-safety — implemented, gates green, draft PR #355
+
+**Fix (cli/src/handoff.ts).** `capField` and `capSession` now share `capUnits(token, cap)`: it drops lone surrogates anywhere in the value first, then caps with a one-unit back-off when the cut would split a valid pair (marker counts against the cap). Policy choice for pre-existing lone surrogates is the same as `capSession` — **drop, not cut**: fields are caller-supplied UTF-16 with no delimiter to sanitize, and dropping preserves every valid code point. A value left empty by the drop counts as absent; for the required `next` this now raises the documented `handoff requires --next` error (previously a lone-surrogate-only value was accepted and written as U+FFFD).
+
+**Repro evidence (real `runHandoff`, on-disk read).** Before → after for `next = "x".repeat(198) + "😀" + "y".repeat(10)` and the same pair-at-199/200 shape in the other two fields:
+
+| field | units | lone surrogate | U+FFFD on disk |
+| --- | --- | --- | --- |
+| `next` | 200 → 199 | true → false | true → false |
+| `branch` (`198×b + 😀 + z…`) | 200 → 199 | true → false | true → false |
+| `openQuestions` (`198×q + 😀 + r…`) | 200 → 199 | true → false | true → false |
+
+**Ordinary path byte-identical** (sha256 of appended section, before → after): pair-kept-whole `5b175e11…` = `5b175e11…`; over-cap ASCII `70bcf82e…` = `70bcf82e…`; over-cap BMP `3dc7a502…` = `3dc7a502…`; astral under cap `d480de0a…` = `d480de0a…`. Over-cap ASCII/BMP still renders exactly the legacy `slice(0, 199) + "…"` (200 units).
+
+**Tests** (`cli/src/handoff.test.ts`, +5): boundary for all three fields (pair split, no U+FFFD on disk), pair-kept-whole + astral under cap pin, lone-surrogate drop/absence policy, legacy byte-identity.
+
+**Gates:** full suite 1223/1223 (private TMPDIR), lint, build, `validate` ok, `spec validate` ok.
+
+**Deliverable:** draft PR https://github.com/Arggon/ArggonManager/pull/355 to `opencode2` — only `cli/src/handoff.ts` + `cli/src/handoff.test.ts` + tracker; no merge, no status flip (worker).
