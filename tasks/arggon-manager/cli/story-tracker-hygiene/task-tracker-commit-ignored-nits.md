@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-tracker-commit-ignored-nits
 title: "Tracker-commit ignored[] nits: dedupe after normalization, fallback/exotic-path tests"
-priority: p3
+assignee: Arggon
+branch: feat/task-tracker-commit-ignored-nits
 parent: story-tracker-hygiene
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T22:50:00.197Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-tracker-commit-ignored-nits
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tracker-hygiene/task-tracker-commit-ignored-nits.md
