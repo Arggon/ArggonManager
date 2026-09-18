@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-tracker-commit-ignored-nits
 title: "Tracker-commit ignored[] nits: dedupe after normalization, fallback/exotic-path tests"
-priority: p3
+assignee: Arggon
+branch: feat/task-tracker-commit-ignored-nits
 parent: story-tracker-hygiene
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T22:50:00.197Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-tracker-commit-ignored-nits
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tracker-hygiene/task-tracker-commit-ignored-nits.md
@@ -37,11 +41,29 @@ Findings F1/F2/F4 from the independent review of PR #359
 
 ## Acceptance
 
-- [ ] `ignored[]` deduped after normalization; test with abs+relative forms.
-- [ ] Fallback path covered by a mocked test; `:(` edge documented.
-- [ ] One fixture covering spaces/unicode/newline/backslash path shapes.
-- [ ] Full suite green; small PR to `opencode2`.
+- [x] `ignored[]` deduped after normalization; test with abs+relative forms.
+- [x] Fallback path covered by a mocked test; `:(` edge documented.
+- [x] One fixture covering spaces/unicode/newline/backslash path shapes.
+- [x] Full suite green; small PR to `opencode2`.
 
 ## Notes
 
 - Robustness only; every production path is correct today.
+
+### 2026-09-18 @Arggon
+## Worker evidence (F1/F2/F4)
+
+**F1 — dedupe AFTER normalization** (`[...new Set(rootRelativePaths(root, ...))]` in `commitTrackerMutation`):
+- before (fix reverted, same fixture): `ignored: ["tasks/generated.bundle","tasks/generated.bundle"]`, human line `(2 ignored path(s) skipped)`
+- after: `ignored: ["tasks/generated.bundle"]`, human line `(1 ignored path(s) skipped)`
+- tests: "dedupes an ignored file passed in both absolute and root-relative forms" and "dedupes the all-ignored skip payload across string forms too" — both FAIL against the reverted implementation (mutation-verified).
+
+**F2 — probe-failure fallback** (mocked `check-ignore` exit 128): result `{ committed: false, skipReason: "git add failed: The following paths are ignored by one of your .gitignore files:" }` + stderr warning; the non-ignored path is left staged and HEAD unmoved — the pre-fix degradation preserved, never silent. Real edge probe: a `:(badmagic)` input makes `git check-ignore --stdin -z` exit 128 → fallback (`git add failed: fatal: Invalid pathspec magic ...`). The `:(`-prefixed pathspec-magic exception is documented on `findIgnoredPaths` ("paths may carry any character except ...").
+
+**F4 — exotic path fixture** (spaces/unicode/newline/backslash): `ignored: ["tasks/back\\slash.md","tasks/line\nbreak.md"]` byte-for-byte, `(2 ignored path(s) skipped)`, status clean, tracked exotic names in HEAD. Removing `-z` from the probe makes the test fail (line-split probe misses the newline file).
+
+**Gates**: full suite 1278 tests / 76 files green (private TMPDIR), lint, build, `validate`, `spec validate` green.
+
+### handoff 2026-09-18 @Arggon — next: Coordinator review of draft PR #363 (feat/task-tracker-commit-ignored-nits -> opencode2); on approval merge (do not squash: branch carries chore(tasks) auto-commits) and flip the item done.
+- branch: feat/task-tracker-commit-ignored-nits
+- open questions: None. Branch created by start is feat/... (prompt said fix/...); PR is draft by design.
