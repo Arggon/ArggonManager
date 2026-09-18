@@ -80,3 +80,7 @@ Evidence — F-1/F-2/F-3 implementation (PR #343, draft; no merge, no status fli
 **Gates** — `npm test` 71 files / 1175 tests green; `npm run lint` clean; `npm run build` clean; `arggon validate --json` ok (0/0); `arggon spec validate --json` ok. One intermediate full-suite run failed only the known cross-checkout `/tmp/arggon-budget-*` hygiene race in `measure.test.ts` (already documented in `task-opencode2-seam-polish`); a serial rerun is 1175/1175 green.
 
 Files: `cli/src/sanitize.ts` (new), `cli/src/sanitize.test.ts` (new), `cli/src/cli.ts` (failure output only), `cli/src/doctor.ts` (import swap + re-export), `cli/src/doctor.test.ts`, `docs/json-output.md`. PR: https://github.com/Arggon/ArggonManager/pull/343
+
+### handoff 2026-09-18 @Arggon — next: Review draft PR #343 against opencode2; file any findings as follow-up items; coordinator/reviewer merges and flips status (worker does not merge or flip).
+- branch: fix/bug-cli-error-output-injection
+- open questions: None — error-channel cap decision recorded (MAX_HUMAN_ERROR_CHARS = 2000 raw; JSON error.message stays raw/uncapped).
