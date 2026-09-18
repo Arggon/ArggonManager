@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode-v2-mcp-meta
 title: "MCP: session attribution from _meta.sessionID"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T02:22:29.019Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-mcp-meta
 ---
 <!--
@@ -35,15 +34,15 @@ stays unchanged.
 
 ## Acceptance
 
-- [ ] `cli/src/mcp-server.ts` reads `params._meta.sessionID` (absent-safe,
+- [x] `cli/src/mcp-server.ts` reads `params._meta.sessionID` (absent-safe,
       typed as unknown and narrowed) and passes it as the **default**
       `session` for `arggon_handoff` and the **default** `author` for
       `arggon_comment`/`arggon_handoff`; explicit tool arguments always win.
-- [ ] Attribution is documented as opaque correlation only (never auth), with
+- [x] Attribution is documented as opaque correlation only (never auth), with
       the V2 source, in `docs/agents.md` §MCP server.
-- [ ] Additive only: no tool schema break; `mcp-parity.test.ts` stays green;
+- [x] Additive only: no tool schema break; `mcp-parity.test.ts` stays green;
       new tests cover meta present, meta absent, and explicit-arg precedence.
-- [ ] `docs/json-output.md` updated if any documented envelope text changes
+- [x] `docs/json-output.md` updated if any documented envelope text changes
       (comment/handoff payloads should stay identical).
 
 ## Notes
@@ -75,3 +74,6 @@ Repro script: `/tmp/opencode/mcp-meta-probe/probe.sh` (local evidence, not commi
 ### handoff 2026-09-18 @Arggon (session: ses_f4dadcc7fffehkUkI3RuIzyXRk) — next: Coordinator: review PR #326 (draft, base opencode2) against the W3 contract, then tick the acceptance checklist and flip to done after merge.
 - branch: feat/task-opencode-v2-mcp-meta
 - open questions: None; docs/json-output.md intentionally unchanged (no envelope contract change).
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; the F2 docs-precision fix landed (4085642: explicit NON-EMPTY args win + empty-explicit fallback test); merged with cli pass. F1/F3 deferred to task-opencode-v2-mcp-meta-hardening.
