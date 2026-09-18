@@ -1,10 +1,14 @@
-import { mkdirSync, mkdtempSync as _mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-
-
   CONVENTION_VERSION,
   CONVENTION_VERSION_DEFAULT,
   parseConventionConfig,
@@ -14,6 +18,7 @@ import {
   resolveBranchName,
   updateGeneratedSection,
 } from "./convention.js";
+import { runInit } from "./init.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -155,7 +160,9 @@ describe("x-views (saved views)", () => {
   });
 
   it("still ignores unknown x-* keys (only x-views is official)", () => {
-    const config = parseConventionConfig("version: 0\nx-widgets: yes\nx-views:\n  open: status:todo\n");
+    const config = parseConventionConfig(
+      "version: 0\nx-widgets: yes\nx-views:\n  open: status:todo\n",
+    );
     expect(config.views).toEqual({ open: "status:todo" });
   });
 
@@ -263,12 +270,12 @@ describe("x-worktree (worktree bootstrap, task-start-post-hook)", () => {
     expect(
       parseConventionConfig("x-worktree:\n  post-start-shell: inherit\n").worktree.postStartShell,
     ).toBe("inherit");
-    expect(() =>
-      parseConventionConfig("x-worktree:\n  post-start-shell: bash\n"),
-    ).toThrow(/'post-start-shell' must be "inherit" or "login"/);
-    expect(() =>
-      parseConventionConfig("x-worktree:\n  post-start-shell: ''\n"),
-    ).toThrow(/'post-start-shell' must be "inherit" or "login"/);
+    expect(() => parseConventionConfig("x-worktree:\n  post-start-shell: bash\n")).toThrow(
+      /'post-start-shell' must be "inherit" or "login"/,
+    );
+    expect(() => parseConventionConfig("x-worktree:\n  post-start-shell: ''\n")).toThrow(
+      /'post-start-shell' must be "inherit" or "login"/,
+    );
   });
 });
 
@@ -351,10 +358,10 @@ describe("x-generated (generated-doc provenance, story-adoption-state)", () => {
 
   it("updateGeneratedSection appends the section when missing and removes it when empty", () => {
     const appended = updateGeneratedSection(
-      "version: 3\nbranch_patterns:\n  bug: \"fix/{id}\"\n",
+      'version: 3\nbranch_patterns:\n  bug: "fix/{id}"\n',
       {},
     );
-    expect(appended).toBe("version: 3\nbranch_patterns:\n  bug: \"fix/{id}\"\n");
+    expect(appended).toBe('version: 3\nbranch_patterns:\n  bug: "fix/{id}"\n');
     const withEntry = updateGeneratedSection("version: 3\n# keep me\n", {
       "AGENTS.md": {
         template: "docs/AGENTS.md",
@@ -379,5 +386,156 @@ describe("x-generated (generated-doc provenance, story-adoption-state)", () => {
     );
     // Round-trip: parsing the serialized section yields the same entry.
     expect(parseConventionConfig(withEntry).generated["AGENTS.md"]!.checksum).toBe("sha256:x");
+  });
+});
+
+/** Raw (file-level) backslashes in one line. */
+function rawBackslashes(line: string): number {
+  return (line.match(/\\/g) ?? []).length;
+}
+
+/** The exact `projectName:` line of a `.convention.yml` (raw bytes, escapes intact). */
+function rawProjectNameLine(raw: string): string {
+  const line = raw.match(/^ {2}projectName:.*$/m)?.[0];
+  if (!line) throw new Error("no x-generated.projectName line in convention file");
+  return line;
+}
+
+/**
+ * bug-convention-config-scalar-unescape: follow-up from the tracker-title fix
+ * (bug-tracker-title-rescape); `stripQuotes` returned the inner text of a
+ * quoted `.convention.yml` scalar verbatim while `yamlQuote` re-escaped it, so
+ * every init/upgrade rewrite doubled literal backslashes. Latent today — the
+ * 2026-09-18 audit found no live scalar with backslashes (this repo's own
+ * state records `projectName: "ArggonManager"`) — but any quoted value with a
+ * backslash, quote or control character would compound silently.
+ */
+describe("convention quoted-scalar round-trip (bug-convention-config-scalar-unescape)", () => {
+  it("decodes a YAML double-quoted scalar instead of returning raw bytes", () => {
+    // Raw file text has TWO backslashes (YAML escape for one literal `\`).
+    const config = parseConventionConfig(
+      String.raw`x-generated:
+  projectName: "nits: \\( here"
+`,
+    );
+    expect(config.generatedProjectName).toBe("nits: \\( here"); // one literal backslash
+  });
+
+  it("decodes the full YAML double-quoted escape set (unknown escapes preserved)", () => {
+    const config = parseConventionConfig(
+      String.raw`x-generated:
+  projectName: "a\tb \u0041 \x42 \\ \"q\" \q \ "
+`,
+    );
+    expect(config.generatedProjectName).toBe('a\tb A B \\ "q" \\q  ');
+    // A trailing lone backslash is preserved verbatim, never thrown on.
+    expect(
+      parseConventionConfig(String.raw`x-generated:
+  projectName: "a\"
+`).generatedProjectName,
+    ).toBe("a\\");
+  });
+
+  it("decodes doubled single quotes in a single-quoted scalar", () => {
+    expect(
+      parseConventionConfig("x-generated:\n  projectName: 'it''s fine'\n").generatedProjectName,
+    ).toBe("it's fine");
+  });
+
+  it("decodes quoted escapes for every config scalar, not just projectName", () => {
+    const config = parseConventionConfig(
+      [
+        "version: 4",
+        "branch_patterns:",
+        String.raw`  task: "feat/{id}\t(v2)"`,
+        "x-views:",
+        String.raw`  open: "status:todo \"hot\""`,
+        "x-worktree:",
+        String.raw`  post-start: "echo \"a\\b\""`,
+        "x-import:",
+        "  label-types:",
+        String.raw`    "help \"x\"": task`,
+        "",
+      ].join("\n"),
+    );
+    expect(config.branchPatterns.task).toBe("feat/{id}\t(v2)");
+    expect(config.views.open).toBe('status:todo "hot"');
+    expect(config.worktree.postStart).toBe('echo "a\\b"');
+    expect(config.import.labelTypes).toEqual({ 'help "x"': "task" });
+  });
+
+  it("writes backslash-bearing values quoted and keeps the rewrite byte-stable", () => {
+    const projectName = 'nits: escaped \\\\( in "cmd"'; // two literal backslashes
+    const once = updateGeneratedSection("version: 4\n", {}, projectName);
+    // JSON-escaped: two backslashes -> four raw, plus one per escaped quote.
+    expect(rawBackslashes(rawProjectNameLine(once))).toBe(6);
+    expect(parseConventionConfig(once).generatedProjectName).toBe(projectName);
+    const cfg = parseConventionConfig(once);
+    expect(updateGeneratedSection(once, cfg.generated, cfg.generatedProjectName)).toBe(once);
+  });
+
+  it("escapes control characters so a hand-written \\n escape cannot corrupt the file", () => {
+    for (const value of [
+      "a\nb",
+      "\x00nul",
+      "\x07bell",
+      "\x1besc",
+      "\u007fdel",
+      "\u2028sep",
+      "\u2029par",
+    ]) {
+      const once = updateGeneratedSection("version: 4\n", {}, value);
+      expect(/[\u0000-\u001f\u007f\u2028\u2029]/.test(rawProjectNameLine(once))).toBe(false);
+      expect(parseConventionConfig(once).generatedProjectName).toBe(value);
+      const cfg = parseConventionConfig(once);
+      expect(updateGeneratedSection(once, cfg.generated, cfg.generatedProjectName)).toBe(once);
+    }
+  });
+
+  it("does not grow an ALREADY-corrupted value on repeated rewrites", () => {
+    // Eight raw backslashes decode to four; the rewrite must stay at eight.
+    const corrupt = String.raw`version: 4
+x-generated:
+  projectName: "nits: \\\\\\\\( here"
+`;
+    let out = corrupt;
+    for (let i = 0; i < 3; i++) {
+      const cfg = parseConventionConfig(out);
+      out = updateGeneratedSection(out, cfg.generated, cfg.generatedProjectName);
+      expect(rawBackslashes(rawProjectNameLine(out))).toBe(8);
+    }
+    expect(parseConventionConfig(out).generatedProjectName).toBe(String.raw`nits: \\\\( here`);
+  });
+
+  it("init rewrite cycles keep a backslash-bearing projectName byte-stable (raw-file)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-conv-escape-"));
+    // Fixed timestamp: init rewrites `generatedAt` on every run, so the whole
+    // file stays byte-identical only when the clock stands still.
+    const now = new Date("2026-09-18T12:00:00Z");
+    runInit({ dir, force: false, commit: false, now });
+    const path = join(dir, "tasks/.convention.yml");
+    // Hand-write the escaped form of two literal backslashes (four raw bytes).
+    writeFileSync(
+      path,
+      readFileSync(path, "utf8").replace(
+        /^ {2}projectName:.*$/m,
+        String.raw`  projectName: "acme\\\\tools"`,
+      ),
+      "utf8",
+    );
+    const expectStable = (step: string) => {
+      const raw = readFileSync(path, "utf8");
+      expect(rawBackslashes(rawProjectNameLine(raw)), `after ${step}`).toBe(4);
+      expect(parseConventionConfig(raw).generatedProjectName, `after ${step}`).toBe(
+        String.raw`acme\\tools`,
+      );
+    };
+    expectStable("hand-edit");
+    runInit({ dir, force: false, commit: false, now });
+    expectStable("init 1");
+    const afterFirst = readFileSync(path, "utf8");
+    runInit({ dir, force: false, commit: false, now });
+    expectStable("init 2");
+    expect(readFileSync(path, "utf8")).toBe(afterFirst);
   });
 });

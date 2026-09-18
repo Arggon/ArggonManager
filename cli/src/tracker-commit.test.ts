@@ -116,6 +116,13 @@ function committedPaths(cwd: string, ref = "HEAD"): string[] {
   return out.split("\n").filter((line) => line.length > 0).sort();
 }
 
+/** Raw (unquoted) tracked paths at HEAD, NUL-split — exotic names survive. */
+function lsTreeZ(cwd: string): string[] {
+  return git(["ls-tree", "-r", "--name-only", "-z", "HEAD"], cwd)
+    .split("\0")
+    .filter((p) => p.length > 0);
+}
+
 function status(cwd: string): string {
   return git(["status", "--porcelain"], cwd);
 }
@@ -251,6 +258,94 @@ describe("tracker auto-commit with gitignored paths", () => {
     });
   });
 
+  // F1 (task-tracker-commit-ignored-nits): one file can reach the primitive
+  // in two string forms (absolute + root-relative). The dedupe must run AFTER
+  // normalization so `ignored[]` — and the human count derived from it —
+  // carries one entry per file, not one per string form.
+  it("dedupes an ignored file passed in both absolute and root-relative forms", () => {
+    const { dir, tracked, ignored } = ignoredRepo();
+
+    const result = commitTrackerMutation(
+      dir,
+      [join(dir, ignored), ignored, join(dir, tracked), tracked],
+      { message: trackerCommitMessage("generated", ["init docs (2 files)"]) },
+    );
+
+    expect(result).toMatchObject({ committed: true, ignored: [ignored] });
+    expect(result.ignored).toEqual([ignored]);
+    expect(committedPaths(dir)).toEqual([tracked]);
+    expect(status(dir)).toBe("");
+    // The human count reads the deduped array: 1 path, not 2.
+    expect(formatCommitLine(result)).toContain("(1 ignored path(s) skipped)");
+  });
+
+  it("dedupes the all-ignored skip payload across string forms too", () => {
+    const { dir, ignored } = ignoredRepo({ trackedDirty: false });
+
+    const result = commitTrackerMutation(dir, [join(dir, ignored), ignored], {
+      message: trackerCommitMessage("generated", ["init docs (1 files)"]),
+    });
+
+    expect(result).toEqual({
+      committed: false,
+      skipReason: "all mutated paths are ignored by .gitignore",
+      ignored: [ignored],
+    });
+    expect(status(dir)).toBe("");
+  });
+
+  // F2 (task-tracker-commit-ignored-nits): a check-ignore probe failure (git
+  // absent, unexpected exit — the `:(`-prefixed pathspec-magic rejection is
+  // one real trigger) deliberately keeps the pre-fix behavior: stage
+  // everything and let `git add` report. Deterministic replay with a broken
+  // check-ignore while every other git call runs for real.
+  it("falls back to staging everything when the check-ignore probe fails", async () => {
+    const { dir, tracked, ignored } = ignoredRepo();
+    const realExecFileSync = (await import("node:child_process")).execFileSync;
+    vi.doMock("node:child_process", () => ({
+      execFileSync: (file: string, args: string[], opts: unknown) => {
+        if (args?.[0] === "check-ignore") {
+          // Shape of the real pathspec-magic death (exit 128): the probe
+          // cannot answer, so nothing may be filtered out on a guess.
+          throw Object.assign(new Error("git failed"), {
+            status: 128,
+            stdout: "",
+            stderr: "fatal: Invalid pathspec magic ':(bad)' in ':(bad)tasks/generated.bundle'\n",
+          });
+        }
+        return realExecFileSync(file, args, opts as never);
+      },
+    }));
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    vi.resetModules();
+    try {
+      const { commitTrackerMutation: mockedMutation } = await import("./tracker-commit.js");
+      const result = mockedMutation(dir, [join(dir, tracked), join(dir, ignored)], {
+        message: trackerCommitMessage("generated", ["init docs (2 files)"]),
+      });
+
+      // Pre-fix behavior preserved, and never silent: the batch `git add`
+      // refuses on the ignored path AFTER staging the rest (dirty index, no
+      // commit) — reported as a warned skip, ignored[] stays unset.
+      expect(result.committed).toBe(false);
+      expect(result.skipReason).toMatch(/^git add failed: The following paths are ignored/);
+      expect(result.ignored).toBeUndefined();
+      expect(commitPayload(result)).toEqual({
+        skipped: expect.stringMatching(/^git add failed: The following paths are ignored/),
+      });
+      expect(stderr).toHaveBeenCalledWith(
+        expect.stringContaining("commit skipped: git add failed: The following paths are ignored"),
+      );
+      // The documented degradation this fallback preserves: the non-ignored
+      // path sits staged, the ignored one stays untracked, HEAD unmoved.
+      expect(status(dir)).toContain(`M  ${tracked}`);
+      expect(git(["log", "--format=%s", "-1"], dir)).toBe("fixture");
+    } finally {
+      vi.doUnmock("node:child_process");
+      stderr.mockRestore();
+    }
+  });
+
   it("skips with a precise reason and reports when every path is ignored", () => {
     const { dir, ignored } = ignoredRepo({ trackedDirty: false });
 
@@ -300,6 +395,62 @@ describe("tracker auto-commit with gitignored paths", () => {
     ).toBe(
       "committed: abc1234 chore(tasks): generated init docs (2 files) (1 ignored path(s) skipped)",
     );
+  });
+});
+
+// F4 (task-tracker-commit-ignored-nits): exotic path shapes pin the NUL
+// hygiene of the ignored-path partition. `git check-ignore --stdin -z` must
+// round-trip each path byte-for-byte — a newline-containing path cannot be
+// split, a backslash cannot be quoted — or the partition misses the ignored
+// file and the whole `git add` aborts. Spaces and unicode cover the
+// quoting-adjacent shapes too.
+describe("tracker auto-commit with exotic path shapes (NUL hygiene)", () => {
+  /** Repo with two tracked and two ignored exotic-name files, all mutated. */
+  function exoticRepo(): { dir: string; tracked: string[]; ignored: string[] } {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-exotic-"));
+    git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
+    git(["config", "user.email", "test@example.com"], dir);
+    git(["config", "user.name", "Test"], dir);
+    // `?` matches any single non-`/` character, so these patterns reach the
+    // newline (`line\nbreak.md`) and backslash (`back\slash.md`) names.
+    writeFileSync(join(dir, ".gitignore"), "tasks/line?break.md\ntasks/back?slash.md\n", "utf8");
+    mkdirSync(join(dir, "tasks"), { recursive: true });
+    const tracked = ["tasks/with space.md", "tasks/uni-üñí.md"];
+    const ignored = ["tasks/line\nbreak.md", "tasks/back\\slash.md"];
+    for (const rel of tracked) writeFileSync(join(dir, rel), "seed\n", "utf8");
+    git(["add", ".gitignore", ...tracked], dir);
+    git(["commit", "--quiet", "-m", "fixture"], dir);
+    for (const rel of tracked) writeFileSync(join(dir, rel), "updated\n", "utf8");
+    for (const rel of ignored) writeFileSync(join(dir, rel), "derived\n", "utf8");
+    return { dir, tracked, ignored };
+  }
+
+  it("partitions spaces/unicode/newline/backslash paths byte-for-byte", () => {
+    const { dir, tracked, ignored } = exoticRepo();
+
+    const result = commitTrackerMutation(
+      dir,
+      [...tracked.map((rel) => join(dir, rel)), ...ignored],
+      { message: trackerCommitMessage("updated", ["exotic"]) },
+    );
+
+    // Sorted root-relative posix, byte-for-byte: the newline and the backslash
+    // survive NUL-delimited transit (a line-based probe would split the
+    // former, a quoted one would escape the latter).
+    expect(result).toMatchObject({
+      committed: true,
+      message: "chore(tasks): updated exotic",
+      ignored: ["tasks/back\\slash.md", "tasks/line\nbreak.md"],
+    });
+    expect(result.hash).toMatch(/^[0-9a-f]+$/);
+    // Exactly 2 — not 3 from a split newline path, not 4 from quoting.
+    expect(formatCommitLine(result)).toContain("(2 ignored path(s) skipped)");
+    // The tracked exotic names landed in the commit exactly as recorded...
+    expect(lsTreeZ(dir)).toEqual([".gitignore", ...[...tracked].sort()]);
+    // ...the ignored exotic files stay untracked-and-ignored with content, and
+    // the tree is clean afterwards.
+    for (const rel of ignored) expect(readFileSync(join(dir, rel), "utf8")).toBe("derived\n");
+    expect(status(dir)).toBe("");
   });
 });
 

@@ -161,12 +161,91 @@ export type ConventionConfig = {
   generatedProjectName: string | null;
 };
 
+/**
+ * YAML 1.2 double-quoted escapes (a superset of JSON's). Mirrors the private
+ * helper in `frontmatter.ts` (bug-tracker-title-rescape), which is not
+ * exported; keeps both hand-rolled YAML readers decoding identically.
+ * bug-convention-config-scalar-unescape: returning the inner text verbatim
+ * re-escaped literal backslashes on every init/upgrade rewrite
+ * (2 -> 4 -> 8 -> ...). Unknown escapes and a trailing lone backslash are
+ * preserved verbatim: a malformed scalar must stay readable, never throw.
+ */
+const DOUBLE_QUOTED_ESCAPES: Readonly<Record<string, string>> = {
+  "0": "\0",
+  a: "\x07",
+  b: "\b",
+  t: "\t",
+  n: "\n",
+  v: "\v",
+  f: "\f",
+  r: "\r",
+  e: "\x1b",
+  " ": " ",
+  '"': '"',
+  "/": "/",
+  "\\": "\\",
+  N: "\u0085",
+  _: "\u00a0",
+  L: "\u2028",
+  P: "\u2029",
+};
+
+/** Decode the inner text of a double-quoted YAML scalar (bug-convention-config-scalar-unescape). */
+function unescapeDoubleQuoted(raw: string): string {
+  let out = "";
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i]!;
+    if (ch !== "\\") {
+      out += ch;
+      continue;
+    }
+    const next = raw[i + 1];
+    if (next === undefined) {
+      out += ch;
+      break;
+    }
+    if (next === "x" || next === "u" || next === "U") {
+      const width = next === "x" ? 2 : next === "u" ? 4 : 8;
+      const hex = raw.slice(i + 2, i + 2 + width);
+      if (hex.length === width && /^[0-9a-fA-F]+$/.test(hex)) {
+        const code = Number.parseInt(hex, 16);
+        try {
+          out += String.fromCodePoint(code);
+          i += 1 + width;
+          continue;
+        } catch {
+          // Out-of-range code point: keep the escape text verbatim.
+        }
+      }
+      out += ch + next;
+      i += 1;
+      continue;
+    }
+    const mapped = DOUBLE_QUOTED_ESCAPES[next];
+    if (mapped !== undefined) {
+      out += mapped;
+      i += 1;
+      continue;
+    }
+    // Unknown escape: keep the backslash and the character verbatim.
+    out += ch + next;
+    i += 1;
+  }
+  return out;
+}
+
+/**
+ * Strip the YAML quoting from a scalar and decode its escape sequences:
+ * double-quoted style decodes the YAML 1.2 escape set, single-quoted style
+ * only un-doubles `''` (its sole escape). Unquoted values pass through
+ * unchanged (bug-convention-config-scalar-unescape).
+ */
 function stripQuotes(value: string): string {
-  if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    return value.slice(1, -1);
+  if (value.startsWith('"') && value.endsWith('"')) {
+    return unescapeDoubleQuoted(value.slice(1, -1));
+  }
+  if (value.startsWith("'") && value.endsWith("'")) {
+    return value.slice(1, -1).replaceAll("''", "'");
   }
   return value;
 }
@@ -175,12 +254,12 @@ function stripQuotes(value: string): string {
  * Parse `tasks/.convention.yml` (line-oriented, no YAML dependency).
  * Unknown top-level keys are ignored for forward compatibility;
  * `x-views` (saved views), `x-playbooks` (playbook staleness options),
-   * `x-tracker` (tracker-hygiene options), `x-import` (issue-import options),
-   * `x-worktree` (worktree-bootstrap options), `x-github` (GitHub round-trip
-   * options), and `x-generated` (generated-doc
-   * provenance) are the official namespaced extensions.
-   * Throws with file context on malformed `branch_patterns`, `x-views`,
-   * `x-playbooks`, `x-tracker`, `x-import`, `x-worktree`, or `x-github`; `x-generated`
+ * `x-tracker` (tracker-hygiene options), `x-import` (issue-import options),
+ * `x-worktree` (worktree-bootstrap options), `x-github` (GitHub round-trip
+ * options), and `x-generated` (generated-doc
+ * provenance) are the official namespaced extensions.
+ * Throws with file context on malformed `branch_patterns`, `x-views`,
+ * `x-playbooks`, `x-tracker`, `x-import`, `x-worktree`, or `x-github`; `x-generated`
  * parses tolerantly (machine-written state).
  */
 export function parseConventionConfig(
@@ -522,9 +601,19 @@ export function parseGeneratedProjectName(raw: string): string | null {
   }
 }
 
-/** Serialize one quoted YAML scalar (double quotes, backslash-escaped). */
+/**
+ * Serialize one quoted YAML scalar (double quotes, YAML-escaped).
+ * bug-convention-config-scalar-unescape: `JSON.stringify` escapes backslashes,
+ * quotes and control characters (`\n`, NUL, ...); DEL and the JS/YAML line
+ * separators are left raw by JSON and escaped explicitly with YAML escapes
+ * `stripQuotes` decodes back. A decoded `\n` would otherwise be written raw,
+ * splitting the line-oriented section and corrupting the file.
+ */
 function yamlQuote(value: string): string {
-  return `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
+  return JSON.stringify(value)
+    .replaceAll("\u007f", "\\x7F")
+    .replaceAll("\u2028", "\\L")
+    .replaceAll("\u2029", "\\P");
 }
 
 /** Quote a mapping key when it is not a plain safe path token. */
@@ -579,7 +668,10 @@ export function updateGeneratedSection(
   const start = lines.findIndex((line) => /^x-generated:\s*$/.test(line));
   if (start !== -1) {
     let end = start + 1;
-    while (end < lines.length && (lines[end] === "" || (lines[end]!.length - lines[end]!.trimStart().length) > 0)) {
+    while (
+      end < lines.length &&
+      (lines[end] === "" || lines[end]!.length - lines[end]!.trimStart().length > 0)
+    ) {
       end++;
     }
     lines.splice(start, end - start);
