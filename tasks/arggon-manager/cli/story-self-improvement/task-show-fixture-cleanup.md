@@ -37,14 +37,43 @@ close: `cli/src/test-tmp.ts` (`removeFixtureTree`) exists after PR #347.
 
 ## Acceptance
 
-- [ ] `show.test.ts` tracks its temp dirs and removes them (adopt
+- [x] `show.test.ts` tracks its temp dirs and removes them (adopt
       `removeFixtureTree`); no `arggon-show-*` leftovers after a run.
-- [ ] Quick audit: any other `mkdtemp`-creating test without teardown gets the
+- [x] Quick audit: any other `mkdtemp`-creating test without teardown gets the
       same treatment in this PR (list recorded).
-- [ ] Full suite green; small PR to `opencode2`.
+- [x] Full suite green; small PR to `opencode2`.
 
-- [ ] The tracker-commit fake-holder lock is released (or the documented leak is explicitly accepted), with the audit list updated.
+- [x] The tracker-commit fake-holder lock is released (or the documented leak is explicitly accepted), with the audit list updated.
 ## Notes
 
 - Leaks are harmless individually but accumulate on shared machines (the
   age-gated global teardown is a backstop, not a substitute).
+
+### 2026-09-18 @Arggon
+Evidence (worker Arggon, branch `feat/task-show-fixture-cleanup`).
+
+**Leak measurements** — full suite with a private `TMPDIR`, before → after:
+
+| leftover | before (`6f378d6`) | after (fix) |
+| --- | --- | --- |
+| `arggon-show-*` dirs | 9 | 0 |
+| `arggon-lock-*.lock` files | 1 | 0 |
+| any other `arggon-*` entry | 0 | 0 |
+
+- before: `TMPDIR=/tmp/opencode/fixture-baseline npx vitest run` → 73 files / 1190 tests passed; 9 `arggon-show-*` dirs and `arggon-lock-8d57dfdd….lock` survived the run.
+- after: `TMPDIR=/tmp/opencode/fixture-post npx vitest run` → 73 files / 1190 tests passed; zero `arggon-*` entries survived.
+
+**Changes** (2 files, +24/−3):
+- `cli/src/show.test.ts` — aliased `_mkdtempSync` + tracked wrapper (`tmpDirs`); `afterEach` removes via `removeFixtureTree`; assertions untouched.
+- `cli/src/tracker-commit.test.ts` — the warned-skip test releases the fake `holdRepoLock` holder in its `finally` (`rmSync(repoLock(dir), { force: true })`); previously one tmpdir lock file per run.
+
+**Audit — `mkdtemp`-creating tests without teardown:** only `cli/src/show.test.ts`. Verified clean:
+- `cli/src` (57 other test files): wrapper → tracked `tmpDirs` + `afterEach` `rmSync`/`removeFixtureTree`; or per-test `finally` (`comment-race`, `claim-race`, `config-race`, `atomic`, `atomic-config-writers`).
+- `labs/torture.test.ts` — `removeFixtureTree` at every teardown site.
+- `opencode/plugins/arggon/index.test.ts` — `rmSync` in `finally` (both sites).
+- `skills/arggon-cli/evals/run.mjs` — `rmSync` before exit.
+- `smoke/context-report.ts` (`finally`), `smoke/opencode-smoke.ts`, `smoke/opencode-wave.ts` (teardown loops) — clean; unchanged (item scope excludes `smoke/**`).
+- `cli/src/measure.ts` (product) — `rmSync` in `finally`.
+- Lock-file writers audited: `lock.test.ts` releases/unlinks each lock; `cascade.test.ts` `holdLock` released in `finally`; only `tracker-commit.test.ts:808` leaked.
+
+**Gates** (private `TMPDIR`): `npm run build` ok · `npm run lint` ok · `npm test` 73 files / 1190 tests passed · `arggon validate` ok (0 warnings, convention v3) · `arggon spec validate` ok (16 docs, 0 warnings).
