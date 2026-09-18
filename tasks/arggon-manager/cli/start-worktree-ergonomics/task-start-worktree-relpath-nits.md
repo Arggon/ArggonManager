@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-start-worktree-relpath-nits
 title: "Worktree-start nits: relative-link resolution + manual npm-ci guard"
-priority: p3
+assignee: Arggon
+branch: feat/task-start-worktree-relpath-nits
 parent: start-worktree-ergonomics
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T17:28:19.614Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-start-worktree-relpath-nits
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/start-worktree-ergonomics/task-start-worktree-relpath-nits.md
@@ -48,16 +52,31 @@ Residual, non-blocking findings from the two-round review of PR #333
 
 ## Acceptance
 
-- [ ] R1 fixed with a relative-link unit case; foreign links and real dirs
+- [x] R1 fixed with a relative-link unit case; foreign links and real dirs
       still untouched.
-- [ ] R2 decided: automated guard implemented with a test, or the documented
+- [x] R2 decided: automated guard implemented with a test, or the documented
       warning kept and explicitly accepted in this item (rationale recorded).
-- [ ] R3 fixed: `cleanup` recognizes start links that point at the main
+- [x] R3 fixed: `cleanup` recognizes start links that point at the main
       checkout when it runs from a linked worktree; nested case covered by a
       test (the 6 pending worktrees from the program then prune cleanly).
-- [ ] Full suite, lint, `validate`/`spec validate` green; small PR to
+- [x] Full suite, lint, `validate`/`spec validate` green; small PR to
       `opencode2`.
 
 ## Notes
 
 - Both are fail-safe nits; the bug fix and its regression tests are merged.
+
+### 2026-09-18 @Arggon
+R2 decision (worker note): keep the documented warning and explicitly accept the residual manual-`npm ci` risk; no automated guard.
+
+Rationale:
+1. The sanctioned path is already guarded: `start` removes the link before any configured `x-worktree.post-start` hook runs and re-links only when the hook leaves no `node_modules`, so the canonical `post-start: "npm ci"` can never reify through a link. The residual case is a *manual* `npm ci` in a worktree whose link start re-created (no hook configured, or a hook that left no deps).
+2. A bare marker file is inert — npm only executes project code through a lifecycle hook (`preinstall`), so "unlink before npm can reify" requires wiring one into the repo's `package.json`. That file is outside this item's file ownership and would impose an install-time code path on every checkout for a narrow manual case.
+3. The documented warning (docs/convention.md, `x-worktree` / "Worktree bootstrap") names the case explicitly and the mitigation is one command: `rm <worktree>/node_modules` before `npm ci`. `cleanup --prune` also removes such links when reaping worktrees (F2 / this item's R3).
+4. The failure mode is loud and recoverable (`npm ci` in the primary restores it), and the review classified R2 as optional / non-blocking.
+
+Evidence: the guarded hook path stays covered by cli/src/worktree.test.ts "hides the link from a configured post-start hook so npm ci cannot empty the primary" and "re-links after a post-start hook that leaves no node_modules".
+
+### handoff 2026-09-18 @Arggon (session: ses_f4a703667ffeIQ4WdhWlBCLWGa) — next: Review draft PR #351 and the R2 rationale comment; after merge, run cleanup --prune from the linked worktree to prune the 6 pending items and flip this item done.
+- branch: feat/task-start-worktree-relpath-nits
+- open questions: Branch is feat/task-start-worktree-relpath-nits (task -> feat pattern), not the fix/... name in the brief; R3 verified on a fixture, not the live 6 program worktrees.

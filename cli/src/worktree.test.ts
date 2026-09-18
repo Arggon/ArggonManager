@@ -792,6 +792,42 @@ describe("arggon cleanup", () => {
     expect(existsSync(join(dir, "node_modules", "fake-gate-dep", "index.js"))).toBe(true);
   });
 
+  it("prunes a main-checkout link when run from a linked worktree (review R3)", () => {
+    const dir = initRepo();
+    addFakeDependency(dir, "fake-gate-dep");
+    // task-alpha's worktree was created by a start run from the MAIN checkout,
+    // so its link points at dir/node_modules.
+    const alpha = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    const wt = alpha.worktreePath!;
+    expect(readlinkSync(join(wt, "node_modules"))).toBe(join(dir, "node_modules"));
+    runUpdate({ cwd: wt, id: "task-alpha", status: "done", now: NOW });
+    git(["add", "tasks"], wt);
+    git(["commit", "--quiet", "-m", "close task-alpha"], wt);
+    git(["merge", "--quiet", "feat/task-alpha"], dir);
+
+    // Nested case: cleanup runs inside a LINKED worktree of the same repo (no
+    // node_modules of its own), so its root is not the checkout the link points
+    // at — exactly the program repro.
+    const session = resolve(dirname(dir), `${basename(dir)}-task-session`);
+    git(["worktree", "add", "--quiet", "-b", "feat/session", session], dir);
+    expect(existsSync(join(session, "node_modules"))).toBe(false);
+
+    const result = runCleanup({ cwd: session, prune: true, noGh: true });
+
+    expect(result.failures).toEqual([]);
+    expect(result.pruned.map((a) => a.action)).toEqual([
+      `removed worktree ${wt}`,
+      "deleted branch feat/task-alpha",
+      "cleared worktree_path",
+    ]);
+    expect(existsSync(wt)).toBe(false);
+    // Only the worktree's link was removed: the main install is untouched.
+    expect(existsSync(join(dir, "node_modules", "fake-gate-dep", "index.js"))).toBe(true);
+  });
+
   it("emits the standard --json envelope via the CLI", () => {
     const { dir } = initCleanupRepo();
     const r = spawnSync(process.execPath, [tsx, cli, "cleanup", "--json", "--no-gh"], {

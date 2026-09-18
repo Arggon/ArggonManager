@@ -392,7 +392,16 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
           // whose target is the primary checkout's install — never a real
           // directory, never a link elsewhere — then let git do the removal (it
           // can still refuse for other untracked files, reported per item).
-          unlinkNodeModulesLink(root, entry.path);
+          //
+          // Ownership (review R3): the link points at the checkout that ran
+          // `arggon start`. When cleanup runs from a LINKED worktree, that is
+          // the MAIN checkout, not the current root, so resolve the canonical
+          // (first) `git worktree list` entry as the ownership target. The
+          // current root is checked too: a start run from this worktree links
+          // this worktree's install.
+          const mainRoot = resolve(gitRunner.worktreeList(root)[0] ?? root);
+          unlinkNodeModulesLink(mainRoot, entry.path);
+          if (mainRoot !== resolve(root)) unlinkNodeModulesLink(root, entry.path);
           gitRunner.removeWorktree(root, entry.path);
           pruned.push({ id: entry.id, action: `removed worktree ${entry.path}`, ...(entry.via ? { via: entry.via } : {}) });
         }

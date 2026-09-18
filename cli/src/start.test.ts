@@ -1,6 +1,6 @@
-import { existsSync, lstatSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCreate } from "./create.js";
 import { runInit } from "./init.js";
@@ -275,5 +275,35 @@ describe("unlinkNodeModulesLink (review F1/F2)", () => {
     expect(readFileSync(join(primary, "node_modules", "keep.txt"), "utf8")).toBe("keep");
     // Idempotent: nothing left to remove.
     expect(unlinkNodeModulesLink(primary, wt)).toBe(false);
+  });
+
+  it("resolves a relative link target against the link's directory (review R1)", () => {
+    const primary = mkdtempSync(join(tmpdir(), "arggon-unlink-rel-primary-"));
+    const wt = mkdtempSync(join(tmpdir(), "arggon-unlink-rel-wt-"));
+    mkdirSync(join(primary, "node_modules"), { recursive: true });
+    writeFileSync(join(primary, "node_modules", "keep.txt"), "keep");
+
+    // A hand-made relative link (`ln -s ../<primary>/node_modules`): readlink
+    // returns a relative path, so it must be resolved against the link's own
+    // directory. Resolving against process.cwd() only matches when the command
+    // happens to run from the primary directory.
+    const rawTarget = relative(wt, join(primary, "node_modules"));
+    expect(rawTarget.startsWith("/")).toBe(false);
+    symlinkSync(rawTarget, join(wt, "node_modules"), "dir");
+    expect(readlinkSync(join(wt, "node_modules"))).toBe(rawTarget);
+
+    expect(unlinkNodeModulesLink(primary, wt)).toBe(true);
+    expect(existsSync(join(wt, "node_modules"))).toBe(false);
+    // Removing the link never followed it: the primary install survived.
+    expect(readFileSync(join(primary, "node_modules", "keep.txt"), "utf8")).toBe("keep");
+
+    // A relative link resolving somewhere else is still untouched.
+    const other = mkdtempSync(join(tmpdir(), "arggon-unlink-rel-other-"));
+    mkdirSync(join(other, "node_modules"), { recursive: true });
+    const foreignWt = mkdtempSync(join(tmpdir(), "arggon-unlink-rel-foreign-"));
+    symlinkSync(relative(foreignWt, join(other, "node_modules")), join(foreignWt, "node_modules"), "dir");
+    expect(unlinkNodeModulesLink(primary, foreignWt)).toBe(false);
+    expect(lstatSync(join(foreignWt, "node_modules")).isSymbolicLink()).toBe(true);
+    expect(existsSync(join(other, "node_modules"))).toBe(true);
   });
 });
