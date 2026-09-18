@@ -95,3 +95,7 @@ remaining attempt, and the error surfaces as the ENOTEMPTY `rmdir` on `.git`.
 
 No reopen of `bug-tracker-commit-enotempty-flake` (done); this is a new instance
 under the hardened helper.
+
+### handoff 2026-09-18 @Arggon — next: Review draft PR #362 (base opencode2, CI green: https://github.com/Arggon/ArggonManager/actions/runs/35403358563) — root-cause trace2 test + settling helper + fixture opt-out; merge it, verify on mai…
+- branch: fix/bug-ci-enotempty-rmretry
+- open questions: The removeFixtureTree backstop also covers the other fixture suites (claim-race, cascade, comment-race, config-race, board-serve, mcp-smoke, show, torture); extending disableAutoMaintenance to those …
