@@ -32,6 +32,7 @@ import {
 } from "./tracker-commit.js";
 import { closeLinkedIssue, type IssueRoundtripResult } from "./issue-roundtrip.js";
 import { readConventionConfig } from "./convention.js";
+import { sanitizeHumanError } from "./sanitize.js";
 
 export type UpdateOptions = {
   cwd: string;
@@ -734,8 +735,11 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   ) {
     issueRoundtrip = closeLinkedIssue(root, id, issueNumber, opts.execGh);
     if (!issueRoundtrip.closed) {
+      // bug-validate-stdout-injection L2: the gh failure text embeds the
+      // repo-controlled slug/command (origin remote, item id), so the
+      // warning is display-sanitized; the payload keeps the raw skipped text.
       process.stderr.write(
-        `arggon: warning: issue round-trip skipped: ${issueRoundtrip.skipped}\n`,
+        `arggon: warning: issue round-trip skipped: ${sanitizeHumanError(issueRoundtrip.skipped)}\n`,
       );
     }
   }
