@@ -6,7 +6,8 @@
  * non-git trees.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { mkdtempSync as _mkdtempSync, readFileSync, writeFileSync } from "node:fs";import { tmpdir } from "node:os";
+import { mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runAdopt } from "./adopt.js";
@@ -821,6 +822,11 @@ describe("repo-level git-mutation lock (bug-torture-contention-flake3)", () => {
       expect(status(dir)).toContain("task-rate-limit.md");
     } finally {
       stderr.mockRestore();
+      // Release the fake holder: initRepo's fixture is removed in afterEach,
+      // so an unreleased lock file would be stranded under tmpdir forever
+      // (the age-gated global backstop reclaims dirs, not lock files). The
+      // mutation already returned its warned skip above, so nothing contends.
+      rmSync(repoLock(dir), { force: true });
     }
   }, 15_000);
 
