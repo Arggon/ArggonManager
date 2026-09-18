@@ -34,7 +34,7 @@ import {
 } from "./tracker-commit.js";
 import { lockFilePathFor } from "./lock.js";
 import { maybeCommitUpdate, runUpdate } from "./update.js";
-import { disableAutoMaintenance, removeFixtureTree } from "./test-tmp.js";
+import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
 
 // bug-tmp-fixture-leak + bug-tracker-commit-enotempty-flake +
 // bug-ci-enotempty-rmretry: track mkdtemp dirs and the detached lock-release
@@ -43,9 +43,9 @@ import { disableAutoMaintenance, removeFixtureTree } from "./test-tmp.js";
 // `git maintenance run --auto --detach` child (spawned by commit/merge): it
 // holds `.git/objects/maintenance.lock` for its whole run, and Node's rmSync
 // retry loop only re-tries the bare rmdir, never re-reads the children, so a
-// held lock defeats the whole window. Fixtures opt out via
-// disableAutoMaintenance(); removeFixtureTree() re-traverses on retriable
-// errors.
+// held lock defeats the whole window. Every fixture repo comes from
+// initFixtureRepo (git init + maintenance.auto=false, read back at creation);
+// removeFixtureTree() re-traverses on retriable errors.
 const tmpDirs: string[] = [];
 /** Detached node children spawned to release lock files mid-test. */
 const lockReleaseChildren = new Set<ChildProcess>();
@@ -123,11 +123,8 @@ function status(cwd: string): string {
 /** Git repo with the init scaffold committed and a story + task ready to mutate. */
 function initRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), "arggon-tracker-commit-"));
-  git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
-  git(["config", "user.email", "test@example.com"], dir);
-  git(["config", "user.name", "Test"], dir);
   // bug-ci-enotempty-rmretry: no detached maintenance daemon in fixtures.
-  disableAutoMaintenance(dir);
+  initFixtureRepo(dir);
   runInit({ dir, force: false });
   runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
   runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch", id: "auth", now: NOW });
@@ -222,9 +219,9 @@ describe("tracker auto-commit with gitignored paths", () => {
   } {
     const { trackedDirty = true, ignoredDirty = true } = opts;
     const dir = mkdtempSync(join(tmpdir(), "arggon-ignored-"));
-    git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
-    git(["config", "user.email", "test@example.com"], dir);
-    git(["config", "user.name", "Test"], dir);
+    // bug-ci-enotempty-rmretry: no detached maintenance daemon in fixtures
+    // (initFixtureRepo opts out and reads the config back).
+    initFixtureRepo(dir);
     writeFileSync(join(dir, ".gitignore"), "*.bundle\n", "utf8");
     mkdirSync(join(dir, "tasks"), { recursive: true });
     writeFileSync(join(dir, "tasks/state.yml"), "state\n", "utf8");
@@ -653,11 +650,8 @@ const IMPORT_PAYLOAD = JSON.stringify([
 /** Git-committed variant of primed(): init + initiative + epic, all committed. */
 function initImportRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), "arggon-tracker-import-"));
-  git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
-  git(["config", "user.email", "test@example.com"], dir);
-  git(["config", "user.name", "Test"], dir);
   // bug-ci-enotempty-rmretry: no detached maintenance daemon in fixtures.
-  disableAutoMaintenance(dir);
+  initFixtureRepo(dir);
   runInit({ dir, force: false });
   runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
   runCreate({ cwd: dir, type: "epic", title: "Backlog", parent: "launch", id: "backlog", now: NOW });

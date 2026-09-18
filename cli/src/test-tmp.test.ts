@@ -10,7 +10,9 @@
  * Pinned here:
  *   1. the writer identity: a plain commit's trace2 stream has the
  *      `child_start` for `maintenance run --auto`; a fixture that opted out
- *      via disableAutoMaintenance() spawns no child at all;
+ *      via disableAutoMaintenance() spawns no child at all; initFixtureRepo()
+ *      leaves `maintenance.auto=false` on worktree and bare fixtures, so
+ *      deleting that opt-out fails a test instead of leaning on the backstop;
  *   2. the failure shape: while a writer recreates the maintenance lock,
  *      removeFixtureTree() settles the tree instead of exhausting rmdir
  *      retries;
@@ -29,7 +31,7 @@ import { availableParallelism, tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { disableAutoMaintenance, removeFixtureTree } from "./test-tmp.js";
+import { disableAutoMaintenance, initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "../..");
@@ -121,6 +123,18 @@ describe("fixture teardown vs git's detached auto-maintenance child", () => {
     expect(quietEvents).toContain('"event":"start"'); // trace2 really captured this run
     expect(quietEvents).not.toContain("maintenance");
     expect(quietEvents).not.toContain('"child_start"');
+  });
+
+  it("initFixtureRepo pins maintenance.auto=false on regular and bare fixtures", () => {
+    const repo = tmp("arggon-init-fixture-");
+    initFixtureRepo(repo);
+    expect(git(repo, ["config", "--get", "maintenance.auto"]).trim()).toBe("false");
+    expect(git(repo, ["rev-parse", "--is-bare-repository"]).trim()).toBe("false");
+
+    const remote = tmp("arggon-init-fixture-bare-");
+    initFixtureRepo(remote, { bare: true });
+    expect(git(remote, ["config", "--get", "maintenance.auto"]).trim()).toBe("false");
+    expect(git(remote, ["rev-parse", "--is-bare-repository"]).trim()).toBe("true");
   });
 
   /**

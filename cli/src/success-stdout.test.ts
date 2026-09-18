@@ -5,14 +5,13 @@ import {
   mkdtempSync as _mkdtempSync,
   readFileSync,
   renameSync,
-  rmSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { RM_RETRY } from "./test-tmp.js";
+import { removeFixtureTree } from "./test-tmp.js";
 
 /**
  * task-success-stdout-sanitize: the success-path human channel is the last
@@ -38,11 +37,14 @@ function runGit(args: string[], cwd: string) {
   return spawnSync("git", args, { encoding: "utf8", cwd });
 }
 
-// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test
-// with the bounded ENOTEMPTY retry window (spawned children settle late).
+// bug-tmp-fixture-leak + bug-ci-enotempty-rmretry: track mkdtemp dirs and
+// remove them after each test through the shared settling helper (re-reads
+// the tree on retriable errors instead of burning the retry window on bare
+// rmdirs; the CLI auto-commits inside these fixtures, so git's maintenance
+// daemon can still be settling when the test returns).
 const tmpDirs: string[] = [];
 afterEach(() => {
-  for (const dir of tmpDirs.splice(0)) rmSync(dir, RM_RETRY);
+  for (const dir of tmpDirs.splice(0)) removeFixtureTree(dir);
 });
 function mkdtempSync(prefix: string): string {
   const dir = _mkdtempSync(prefix);

@@ -21,9 +21,11 @@
  *   ENOTEMPTY on `.git` (or `.git/objects`).
  *
  * Two layers keep teardown deterministic without weakening any assertion:
- *   1. Fixture repos opt out of auto-maintenance ({@link disableAutoMaintenance}).
- *      With `maintenance.auto=false`, commit/merge spawn no detached child at
- *      all, so the writer is never created (pinned by trace2 in test-tmp.test.ts).
+ *   1. Fixture repos opt out of auto-maintenance ({@link disableAutoMaintenance},
+ *      routed through {@link initFixtureRepo}, which reads the config back).
+ *      With `maintenance.auto=false`, commit/merge and receive-pack spawn no
+ *      detached child at all, so the writer is never created (pinned by trace2
+ *      in test-tmp.test.ts).
  *   2. {@link removeFixtureTree} re-runs the recursive removal (fresh readdir)
  *      on retriable errors until a deadline, so a late writer from any other
  *      source is settled instead of being retried with bare rmdirs.
@@ -65,6 +67,32 @@ function sleepSync(ms: number): void {
  */
 export function disableAutoMaintenance(dir: string): void {
   execFileSync("git", ["config", "maintenance.auto", "false"], { cwd: dir, stdio: "ignore" });
+}
+
+/**
+ * Create a git fixture repository the way every git-backed suite expects:
+ * `init.defaultBranch=main` (bare with `{ bare: true }`), fixture user config,
+ * and the {@link disableAutoMaintenance} opt-out. The opt-out is read back, so
+ * deleting it fails fixture setup here instead of silently leaning on
+ * {@link removeFixtureTree}'s settling backstop. Route fixture repos through
+ * this helper instead of raw `git init` + config.
+ */
+export function initFixtureRepo(dir: string, opts: { bare?: boolean } = {}): void {
+  const initArgs = ["-c", "init.defaultBranch=main", "init", "--quiet"];
+  if (opts.bare) initArgs.push("--bare");
+  execFileSync("git", initArgs, { cwd: dir, stdio: "ignore" });
+  execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: dir, stdio: "ignore" });
+  execFileSync("git", ["config", "user.name", "Test"], { cwd: dir, stdio: "ignore" });
+  disableAutoMaintenance(dir);
+  const auto = execFileSync("git", ["config", "--get", "--default", "unset", "maintenance.auto"], {
+    cwd: dir,
+    encoding: "utf8",
+  }).trim();
+  if (auto !== "false") {
+    throw new Error(
+      `${dir}: maintenance.auto=${auto}, expected false (see disableAutoMaintenance)`,
+    );
+  }
 }
 
 /** Recursive removal that re-reads the tree after a retriable failure. */

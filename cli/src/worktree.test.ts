@@ -14,7 +14,7 @@ import { runCreate } from "./create.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { runInit } from "./init.js";
 import { defaultStartGit, runStart } from "./start.js";
-import { disableAutoMaintenance, removeFixtureTree } from "./test-tmp.js";
+import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
 import { runUpdate } from "./update.js";
 import { runValidate } from "./validate.js";
 
@@ -27,9 +27,10 @@ import { runValidate } from "./validate.js";
 // `git maintenance run --auto --detach` child: `git commit`/`git merge` spawn
 // it, it holds `.git/objects/maintenance.lock` for its whole run, and under CI
 // load that run can outlive the ~2.75s rmSync retry window while teardown is
-// removing the tree (CI run 35401030576). Fixture repos therefore opt out via
-// disableAutoMaintenance(), and removeFixtureTree() re-reads the tree on
-// retriable errors instead of trusting bare rmdir retries.
+// removing the tree (CI run 35401030576). Fixture repos therefore come from
+// initFixtureRepo (git init + maintenance.auto=false, read back at creation),
+// and removeFixtureTree() re-reads the tree on retriable errors instead of
+// trusting bare rmdir retries.
 const tmpDirs: string[] = [];
 afterEach(() => {
   for (const dir of tmpDirs.splice(0)) removeFixtureTree(dir);
@@ -68,11 +69,8 @@ function commitAllIfDirty(dir: string, message: string): void {
 
 function initRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), "arggon-worktree-"));
-  git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
-  git(["config", "user.email", "test@example.com"], dir);
-  git(["config", "user.name", "Test"], dir);
   // bug-ci-enotempty-rmretry: no detached maintenance daemon in fixtures.
-  disableAutoMaintenance(dir);
+  initFixtureRepo(dir);
   runInit({ dir, force: false });
   runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
   runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch", id: "auth", now: NOW });
@@ -871,7 +869,9 @@ describe("arggon cleanup", () => {
   function initRemoteCleanupRepo(amend: boolean): { dir: string; paths: Record<string, string> } {
     const dir = initRepo();
     const remote = mkdtempSync(join(tmpdir(), "arggon-remote-"));
-    git(["-c", "init.defaultBranch=main", "init", "--bare", "--quiet"], remote);
+    // bug-ci-enotempty-rmretry: the bare remote opts out too — receive-pack
+    // spawns the same detached maintenance daemon on push (trace2-verified).
+    initFixtureRepo(remote, { bare: true });
     git(["remote", "add", "origin", remote], dir);
 
     const alpha = runStart(

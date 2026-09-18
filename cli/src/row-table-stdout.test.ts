@@ -1,11 +1,5 @@
 import { spawnSync } from "node:child_process";
-import {
-  mkdirSync,
-  mkdtempSync as _mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,7 +8,7 @@ import { updateGeneratedSection } from "./convention.js";
 import { arggonVersion, checksumOf } from "./docs.js";
 import { formatListTable, runList } from "./list.js";
 import { renderShowText, runShow } from "./show.js";
-import { RM_RETRY } from "./test-tmp.js";
+import { removeFixtureTree } from "./test-tmp.js";
 import { initialTuiState, renderTui } from "./tui.js";
 import type { WorkItem } from "./types.js";
 
@@ -46,11 +40,14 @@ function runGit(args: string[], cwd: string) {
   return spawnSync("git", args, { encoding: "utf8", cwd });
 }
 
-// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after the file,
-// with the bounded ENOTEMPTY retry window (spawned children settle late).
+// bug-tmp-fixture-leak + bug-ci-enotempty-rmretry: track mkdtemp dirs and
+// remove them after the file through the shared settling helper (re-reads the
+// tree on retriable errors instead of burning the retry window on bare
+// rmdirs; the CLI auto-commits inside these fixtures, so git's maintenance
+// daemon can still be settling when the test returns).
 const tmpDirs: string[] = [];
 afterAll(() => {
-  for (const dir of tmpDirs.splice(0)) rmSync(dir, RM_RETRY);
+  for (const dir of tmpDirs.splice(0)) removeFixtureTree(dir);
 });
 function mkdtempSync(prefix: string): string {
   const dir = _mkdtempSync(prefix);
