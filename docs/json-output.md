@@ -365,7 +365,7 @@ Appends a structured, bounded session-end handoff section (`### handoff <date> @
 | `handoff.branch`        | `string`   | Working branch as rendered (auto-detected from git when omitted; `unknown` outside git); capped at 200 chars |
 | `handoff.next`          | `string`   | The next step (required); capped at 200 chars                                |
 | `handoff.openQuestions` | `string`   | Present only when `--open-questions` was given; capped at 200 chars          |
-| `handoff.session`       | `string`   | Present when `--session` was given or the client sent `_meta.sessionID` (normalized to a single line); provenance session identifier rendered in the heading; capped at 64 chars |
+| `handoff.session`       | `string`   | Present when `--session` was given or the client sent a `_meta.sessionID` with a non-empty normalized value; provenance session identifier rendered in the heading; capped at 64 chars |
 | `commit`                | `object`   | Tracker auto-commit outcome, same shape as `comment`. Additive within `schemaVersion: 1`. |
 
 Failures reuse `error.code: "COMMENT_FAILED"` by design (task-handoff-command): the handoff kernel IS the comment kernel — same body-append path, same failure modes (unknown id, missing `--next`, unresolvable author).
