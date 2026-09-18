@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-opencode2-seam-polish
 title: "Seam polish: deferred review nits (present-skip docs, signature anchoring, tool permissions)"
+assignee: Arggon
+branch: feat/task-opencode2-seam-polish
 parent: opencode2-hardening
 labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T13:06:52.341Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-seam-polish
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/story-opencode-v2/task-opencode2-seam-polish.md
