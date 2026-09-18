@@ -50,3 +50,20 @@ Informational findings from the independent review of PR #335
 
 - Both are cosmetic; explicit-argument pass-through and the U+2028 stdio
   framing limit are documented by-design scope, not gaps.
+
+### 2026-09-18 @Arggon
+Worker evidence — draft PR #349 (feat/task-opencode2-mcp-nits). STOP: no merge, no status flip.
+
+1) Surrogate-safe cap (cli/src/mcp-server.ts): META_TOKEN_DELIMITER += \p{Cs} (under /u only lone/unpaired surrogates match); the 64-unit cut backs off one unit when it would land inside a pair (same pattern as sanitize.ts clipHumanValue), so the value keeps the handoff capSession bound and never carries a lone surrogate.
+2) docs/json-output.md handoff.session row: now "a _meta.sessionID with a non-empty normalized value".
+3) #335 semantics untouched: trim -> cut at first delimiter -> cap; normalize-to-empty = absent; explicit non-empty wins; schemas untouched (parity tests included in the suite).
+
+Evidence:
+- Both new unit tests fail on origin/opencode2 (28 tests | 2 failed) and pass with the fix.
+- Astral: 40xU+1F600 -> 31xU+1F600 + … (63 code units / 32 code points), no lone surrogate in comment author, handoff session or written body (no U+FFFD).
+- Lone surrogate: ses_high<lone-high>more -> ses_high; ses_low<lone-low>more -> ses_low; surrogate-only values -> absent (@me fallback), handoff session omitted.
+- Raw stdio probe (built dist, temp repo): astral observedAuthor 63 code units / 32 code points / loneSurrogate false; mid-value lone surrogate observedAuthor "ses_lone"; written body has no U+FFFD and no lone surrogate.
+
+Gates post-merge with origin/opencode2: build ok; npm test 73 files / 1206 passed; lint clean; arggon validate ok (0 errors, 0 warnings); arggon spec validate ok (0/0).
+
+Note: docs/agents.md section MCP server enumerates the delimiter as whitespace/control/format and does not mention the added surrogate class; that file is outside this item's file ownership, flagged in the PR body for the reviewer.
