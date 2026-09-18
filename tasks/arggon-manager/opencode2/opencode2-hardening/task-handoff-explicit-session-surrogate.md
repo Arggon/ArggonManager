@@ -61,3 +61,7 @@ Evidence (real runHandoff, temp repo):
 Gates post origin/opencode2 merge (bfd59cd): build ok; `npm test` 73 files / 1218 passed; lint clean; `arggon validate` ok (0 warnings); `arggon spec validate` ok (0 warnings).
 
 Files: cli/src/handoff.ts, cli/src/handoff.test.ts (+ this tracker comment). No `comment.ts`/`comment.test.ts` change needed (shared body path untouched); no docs edit needed (user-visible contract unchanged; `docs/agents.md` §MCP server delimiter note concerns the meta path only).
+
+### handoff 2026-09-18 @Arggon (session: ses_f49aac31cffelLHTjOh43g0tv9) — next: Review draft PR #353 (evidence in the comment above); if gates and review are green, merge to opencode2 and flip the item to done — reviewer owns merge and status.
+- branch: feat/task-handoff-explicit-session-surrogate
+- open questions: mid-value lone surrogates are dropped (not cut at the first one, as the meta path does) to keep the caller's valid code points — flag if meta-path consistency is preferred; docs unchanged because the…
