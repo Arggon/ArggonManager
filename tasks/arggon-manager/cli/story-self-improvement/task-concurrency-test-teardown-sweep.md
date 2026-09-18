@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-concurrency-test-teardown-sweep
 title: "Concurrency test teardown sweep: shared retrying fixture cleanup"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T16:42:47.537Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-concurrency-test-teardown-sweep
 ---
 <!--
@@ -33,12 +32,12 @@ failed there yet; the family is simply unhardened.
 
 ## Acceptance
 
-- [ ] A shared fixture-removal helper (retry window `{ maxRetries, retryDelay }`
+- [x] A shared fixture-removal helper (retry window `{ maxRetries, retryDelay }`
       as in the fixed files) exists and is applied to the concurrency test
       files that spawn child processes; the audited file list is recorded.
-- [ ] No test behavior/assertion changes; fixtures still removed deterministically
+- [x] No test behavior/assertion changes; fixtures still removed deterministically
       under concurrent load (spot stress evidence).
-- [ ] Full suite green; small PR to `opencode2`.
+- [x] Full suite green; small PR to `opencode2`.
 
 ## Notes
 
@@ -76,3 +75,6 @@ Finding for coordinator (pre-existing, outside this item's file scope): cli/src/
 ### handoff 2026-09-18 @Arggon — next: Review draft PR #347 against the recorded audit list + evidence; verify the acceptance checklist, then merge to opencode2 and flip the item. Worker does not merge or flip.
 - branch: feat/task-concurrency-test-teardown-sweep
 - open questions: show.test.ts leaks arggon-show-* dirs with no teardown (pre-existing, outside this item) - candidate follow-up. Branch is feat/task-concurrency-test-teardown-sweep per task branch_patterns.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; sibling glob collision-safe by construction (mkdtemp suffix + literal '-task' boundary; all prefixes cross-checked), safe-on-missing probe-verified, all 9 async-child files adopt the helper on every teardown path with zero assertion/sequencing changes, audit closure exact; stress rounds 0 leftovers; 73 files/1190 with private TMPDIR + CI green. Pre-existing show/lock leaks tracked in task-show-fixture-cleanup (extended). Closing.

@@ -1,11 +1,12 @@
 ---
 type: task
-status: todo
+status: done
 id: task-opencode2-seam-nits
 title: "Seam nits: anchor docstring scope + propose plan decision enumeration"
-priority: p3
+assignee: Arggon
 parent: opencode2-hardening
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
 ---
@@ -36,12 +37,15 @@ Two non-blocking findings from the independent review of PR #332
 
 ## Acceptance
 
-- [ ] Docstring and behavior agree for the anchor rule, with a test pinning the
+- [x] Docstring and behavior agree for the anchor rule, with a test pinning the
       chosen semantics (string-value/later-comment shapes keep `present-skip`).
-- [ ] `docs/json-output.md` `plan` row cross-references the propose values.
-- [ ] Full suite, lint, `validate`/`spec validate` green; small PR to
+- [x] `docs/json-output.md` `plan` row cross-references the propose values.
+- [x] Full suite, lint, `validate`/`spec validate` green; small PR to
       `opencode2`.
 
 ## Notes
 
 - Both are wording/robustness nits; behavior is already safe.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; the two-line anchor still claims the generated shape (LF/CRLF), rejects the below-JSON comment (negative test fails against the old implementation at init-opencode.test.ts:269, verified in a scratch copy), keeps the updated[] positive path and the NIT-12 string-value present-skip; F2 plan↔proposals decision equality reproduced across section/whole-file modes and the doc row matches the init.ts emission; diff exactly 3 files +59/−6 plus tracker; 1192 tests + CI green; merged. Residual two-line-window case is safe-by-default and left as an optional future nit. Closing.
