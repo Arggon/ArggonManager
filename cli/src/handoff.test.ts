@@ -53,6 +53,21 @@ function frontmatterOf(file: string): string {
   return file.slice(0, file.indexOf("\n---\n") + 5);
 }
 
+/** True when `value` carries a UTF-16 surrogate code unit that is not half of a valid pair. */
+function hasLoneSurrogate(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const unit = value.charCodeAt(index);
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+      index += 1; // skip the low half of a valid pair
+    } else if (unit >= 0xdc00 && unit <= 0xdfff) {
+      return true; // low surrogate without a preceding high half
+    }
+  }
+  return false;
+}
+
 describe("handoff", () => {
   it("renders the full structured section (heading + branch + open questions) on the body", () => {
     const { dir, id, path } = primedTask();
@@ -164,6 +179,86 @@ describe("handoff", () => {
     expect(result.handoff.session!.length).toBe(HANDOFF_SESSION_CAP);
     expect(result.handoff.session!.endsWith("…")).toBe(true);
     expect(raw(path)).toContain(`(session: ${"s".repeat(HANDOFF_SESSION_CAP - 1)}…)`);
+  });
+
+  it("caps an astral explicit session without splitting a surrogate pair (no U+FFFD in the body)", () => {
+    const { dir, id, path } = primedTask();
+    // 40 astral characters = 80 UTF-16 code units: over the 64-unit cap, so a
+    // raw code-unit cut would land inside the 32nd pair (task-handoff-explicit-session-surrogate).
+    const astral = "😀".repeat(40);
+    // The pair at the cut is dropped whole: 31 astral characters + the marker
+    // are 63 code units (32 code points), within the cap.
+    const bounded = `${"😀".repeat(31)}…`;
+    expect(hasLoneSurrogate(astral)).toBe(false);
+    expect(hasLoneSurrogate(bounded)).toBe(false);
+    expect(bounded.length).toBeLessThanOrEqual(HANDOFF_SESSION_CAP);
+    expect(Array.from(bounded)).toHaveLength(32);
+
+    const result = runHandoff({
+      cwd: dir,
+      id,
+      next: "resume",
+      branch: "feat/x",
+      session: astral,
+      author: "a",
+      now: NOW,
+    });
+    expect(result.handoff.session).toBe(bounded);
+    expect(hasLoneSurrogate(result.handoff.session!)).toBe(false);
+
+    const body = raw(path);
+    expect(hasLoneSurrogate(body)).toBe(false);
+    expect(body).not.toContain("\ufffd");
+    expect(body).toContain(`(session: ${bounded})`);
+  });
+
+  it("capSession backs off at the cut for a plain-prefixed pair (boundary pin)", () => {
+    const { dir, id, path } = primedTask();
+    // The pair occupies units 62-63: the raw cut at 63 would keep only the
+    // high half, the back-off drops the pair whole (62 units + marker).
+    const session = `${"a".repeat(62)}😀${"x".repeat(10)}`;
+    const bounded = `${"a".repeat(62)}…`;
+    expect(bounded.length).toBeLessThanOrEqual(HANDOFF_SESSION_CAP);
+
+    const result = runHandoff({ cwd: dir, id, next: "step", session, author: "a", now: NOW });
+    expect(result.handoff.session).toBe(bounded);
+    const body = raw(path);
+    expect(hasLoneSurrogate(body)).toBe(false);
+    expect(body).not.toContain("\ufffd");
+    expect(body).toContain(`(session: ${bounded})`);
+  });
+
+  it("drops lone surrogates from explicit session values instead of writing U+FFFD", () => {
+    const { dir, id, path } = primedTask();
+    const cases: Array<[string, string | undefined]> = [
+      ["ses_high\ud83dmore", "ses_highmore"], // lone high surrogate mid-value
+      ["ses_low\udc00more", "ses_lowmore"], // lone low surrogate mid-value
+      // Lone surrogate ahead of a pair at the cut: drop the lone unit, then the
+      // back-off still drops the pair whole.
+      [`${"a".repeat(62)}\ud83d😀xxxxx`, `${"a".repeat(62)}…`],
+      // Lone surrogate inside an over-cap value: dropping it re-enables the
+      // ordinary 64-cap path.
+      [`${"a".repeat(62)}\ud83d${"x".repeat(10)}`, `${"a".repeat(62)}x…`],
+      ["\ud83d", undefined], // lone-surrogate-only values render no session
+      ["\udc00", undefined],
+      ["\ud83d\ud83d", undefined],
+    ];
+    let withSession = 0;
+    for (const [session, expected] of cases) {
+      const result = runHandoff({ cwd: dir, id, next: "step", session, author: "a", now: NOW });
+      expect(result.handoff.session).toBe(expected);
+      if (expected === undefined) continue;
+      withSession += 1;
+      expect(hasLoneSurrogate(expected)).toBe(false);
+    }
+
+    const body = raw(path);
+    expect(hasLoneSurrogate(body)).toBe(false);
+    expect(body).not.toContain("\ufffd");
+    // Lone-surrogate-only values are absent: no empty/marker placeholder.
+    expect((body.match(/\(session:/g) ?? []).length).toBe(withSession);
+    expect(body).toContain("(session: ses_highmore)");
+    expect(body).toContain("(session: ses_lowmore)");
   });
 
   it("omits the session cleanly when absent (no empty placeholder)", () => {
