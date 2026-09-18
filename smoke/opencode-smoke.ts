@@ -23,8 +23,9 @@
  *
  *   W3 — session context:
  *   6. branch          — a claimed item on `feat/<id>` resolves, injects the
- *                        bounded item block (byte bound asserted from the
- *                        plugin's own log line) and renames the session.
+ *                        bounded item block (the smoke measures the logged
+ *                        block text itself, not the reported count) and
+ *                        renames the session.
  *   7. storage map     — an observed `arggon_show` call on a non-matching
  *                        branch correlates the item for the next model call.
  *   8. env override    — `ARGON_ITEM` resolves with no branch match.
@@ -76,7 +77,8 @@ const MCP_TOOL_CODE = "return await tools.arggon.arggon_next({})";
 const MODEL = process.env.OPENCODE_SMOKE_MODEL ?? "opencode-go/deepseek-v4-flash";
 const TIMEOUT_MS = Number(process.env.OPENCODE_SMOKE_TIMEOUT_MS ?? 240_000);
 // Mirrors ITEM_BLOCK_MAX_BYTES in the plugin source; asserted in unit tests.
-// The smoke independently checks the byte count the plugin reports per call.
+// The smoke measures the logged block text itself instead of trusting the
+// byte count the plugin reports (F8).
 const CONTEXT_BLOCK_MAX_BYTES = 1024;
 
 const TOOL_PROMPT = [
@@ -314,17 +316,59 @@ function mcpConnected(result: RunResult): boolean {
   return result.stderr.includes('message="mcp connected" server=arggon');
 }
 
-type Injection = { id: string; bytes: number };
+type Injection = { id: string; bytes: number; text?: string };
 
-/** `[arggon] context: injected item <id> (<bytes> bytes)` observations. */
+/**
+ * `[arggon] context: injected item <id> (<bytes> bytes) block=<json>`
+ * observations. `text` is the exact injected block the plugin logs after
+ * `block=`; the smoke measures it itself (F8). The suffix is optional so an
+ * older runtime still parses (the independent check then fails loudly).
+ */
 function contextInjections(stderr: string): Injection[] {
   const injections: Injection[] = [];
-  const pattern = /\[arggon\] context: injected item (\S+) \((\d+) bytes\)/g;
+  const pattern = /\[arggon\] context: injected item (\S+) \((\d+) bytes\)(?: block=(.+))?$/gm;
   let match: RegExpExecArray | null;
   while ((match = pattern.exec(stderr)) !== null) {
-    injections.push({ id: match[1], bytes: Number(match[2]) });
+    let text: string | undefined;
+    if (match[3] !== undefined) {
+      try {
+        const parsed: unknown = JSON.parse(match[3]);
+        if (typeof parsed === "string") text = parsed;
+      } catch {
+        // Not JSON: leave `text` unset and let the measured check report it.
+      }
+    }
+    injections.push({ id: match[1], bytes: Number(match[2]), text });
   }
   return injections;
+}
+
+/** Independent UTF-8 measurement of a logged injection block (F8). */
+function measuredInjectionBytes(injection: Injection): number | undefined {
+  return injection.text === undefined ? undefined : Buffer.byteLength(injection.text, "utf8");
+}
+
+/**
+ * The logged block text independently measures to the plugin-reported byte
+ * count and stays within the hard bound — the smoke never trusts the plugin's
+ * arithmetic alone (F8).
+ */
+function injectionMeasuredWithin(injection: Injection): boolean {
+  const measured = measuredInjectionBytes(injection);
+  return (
+    measured !== undefined &&
+    measured > 0 &&
+    measured === injection.bytes &&
+    measured <= CONTEXT_BLOCK_MAX_BYTES
+  );
+}
+
+/** `id:reportedB/measuredB` detail for injection checks. */
+function injectionDetail(injections: Injection[]): string {
+  const entries = injections.map(
+    (entry) => `${entry.id}:${entry.bytes}B/${measuredInjectionBytes(entry) ?? "?"}B`,
+  );
+  return entries.join(", ") || "no injection";
 }
 
 function renameLogged(stderr: string, id: string): boolean {
@@ -463,10 +507,16 @@ function scenarioContextBranch(): void {
   const session = f.opencode("Reply with only the work item id shown in your system context.");
   f.saveTranscript("context-branch", session);
   const injections = contextInjections(session.stderr);
+  const forItem = injections.filter((entry) => entry.id === item.id);
   check(
     `item block injected for ${item.id} within ${CONTEXT_BLOCK_MAX_BYTES} bytes`,
-    injections.some((entry) => entry.id === item.id && entry.bytes > 0 && entry.bytes <= CONTEXT_BLOCK_MAX_BYTES),
-    `${injections.map((entry) => `${entry.id}:${entry.bytes}B`).join(", ") || "no injection"}\n${runTail(session)}`,
+    forItem.some((entry) => entry.bytes > 0 && entry.bytes <= CONTEXT_BLOCK_MAX_BYTES),
+    `${injectionDetail(forItem)}\n${runTail(session)}`,
+  );
+  check(
+    "logged block text independently measures to the reported size",
+    forItem.length > 0 && forItem.every((entry) => injectionMeasuredWithin(entry)),
+    `${injectionDetail(forItem)}\n${runTail(session)}`,
   );
   check(
     "model echoed the injected item id (block reached the model)",
@@ -500,10 +550,16 @@ function scenarioContextStorage(): void {
   f.saveTranscript("context-storage", session);
   check("branch does not match feat/fix", f.git(["branch", "--show-current"]).stdout.trim() === "smoke-base");
   const injections = contextInjections(session.stderr);
+  const forItem = injections.filter((entry) => entry.id === item.id);
   check(
     `item block injected for ${item.id} after the observed call`,
-    injections.some((entry) => entry.id === item.id && entry.bytes > 0 && entry.bytes <= CONTEXT_BLOCK_MAX_BYTES),
-    `${injections.map((entry) => `${entry.id}:${entry.bytes}B`).join(", ") || "no injection"}\n${runTail(session)}`,
+    forItem.some((entry) => entry.bytes > 0 && entry.bytes <= CONTEXT_BLOCK_MAX_BYTES),
+    `${injectionDetail(forItem)}\n${runTail(session)}`,
+  );
+  check(
+    "logged block text independently measures to the reported size",
+    forItem.length > 0 && forItem.every((entry) => injectionMeasuredWithin(entry)),
+    `${injectionDetail(forItem)}\n${runTail(session)}`,
   );
   check(
     "model echoed the injected item id (storage map reached the model)",
@@ -529,10 +585,16 @@ function scenarioContextEnv(): void {
   });
   f.saveTranscript("context-env", session);
   const injections = contextInjections(session.stderr);
+  const forItem = injections.filter((entry) => entry.id === item.id);
   check(
     `item block injected for ${item.id} from the env override`,
-    injections.some((entry) => entry.id === item.id && entry.bytes <= CONTEXT_BLOCK_MAX_BYTES),
-    `${injections.map((entry) => `${entry.id}:${entry.bytes}B`).join(", ") || "no injection"}\n${runTail(session)}`,
+    forItem.some((entry) => entry.bytes > 0 && entry.bytes <= CONTEXT_BLOCK_MAX_BYTES),
+    `${injectionDetail(forItem)}\n${runTail(session)}`,
+  );
+  check(
+    "logged block text independently measures to the reported size",
+    forItem.length > 0 && forItem.every((entry) => injectionMeasuredWithin(entry)),
+    `${injectionDetail(forItem)}\n${runTail(session)}`,
   );
   check(
     "model echoed the injected item id (env override reached the model)",

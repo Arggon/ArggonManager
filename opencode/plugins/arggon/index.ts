@@ -40,8 +40,10 @@
  *   default export below is a valid V2 plugin definition and loads on 2.0.x
  *   without it.
  *
- * The pure helpers are exported for unit tests (cli/src/plugin-context.test.ts):
- * they contain no OpenCode or filesystem dependency.
+ * Pure helpers are exported for unit tests
+ * (opencode/plugins/arggon/index.test.ts); `onToolAfter` is exported so its
+ * tree-guard order can be tested with a fake context. The helpers contain no
+ * OpenCode dependency.
  */
 
 import { execFile } from "node:child_process"
@@ -119,6 +121,9 @@ export const ITEM_BLOCK_MAX_BYTES = 1024
 /** How long a resolved item/block is reused before the CLI is asked again. */
 export const CACHE_TTL_MS = 5_000
 
+/** Upper bound of each in-memory cache; the oldest entry is evicted first. */
+export const CACHE_MAX_ENTRIES = 256
+
 /** Branch prefixes correlated to an item id (arggon branch <id> defaults). */
 export const BRANCH_PREFIXES = ["feat/", "fix/"] as const
 
@@ -150,39 +155,95 @@ export function isArggonItemId(value: unknown): value is string {
 
 const ARGON_ITEM_SUBCOMMANDS = new Set(["update", "show", "comment", "handoff", "branch", "start"])
 
+/** Package runners whose `run <script>` form may launch the arggon CLI. */
+const COMMAND_RUNNERS = new Set(["npm", "pnpm", "yarn", "bun"])
+
+const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
+
+/** Whitespace tokens of one `;`/`&`/`|` segment, with surrounding quotes stripped. */
+function splitTokens(segment: string): string[] {
+  return segment
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((token) => token.replace(/^["']|["']$/g, ""))
+}
+
 /**
- * Extract the item id of an `arggon <subcommand> <id>` shell invocation.
- * Handles `npm run arggon -- show <id>` and absolute/relative binary paths.
+ * Index of the `arggon` binary when it is in command position, or -1.
+ *
+ * Anchored to the command: the first token of a `&&`/`;`/`|` segment, after
+ * leading `VAR=value` assignments, or the script slot of
+ * `npm|pnpm|yarn|bun run arggon …`. Tokens that merely *mention* arggon —
+ * `grep -rn "arggon show task-x"`, `echo "arggon update task-fake"`,
+ * `git commit -m "arggon handoff task-x"` — are arguments, not commands.
+ * Best effort: indirect invocations (`sh -c "arggon …"`, `xargs arggon …`,
+ * backticks) are not detected; misses are harmless, false positives are not.
+ */
+function argCommandIndex(tokens: string[]): number {
+  let index = 0
+  let head = tokens[index]
+  while (head !== undefined && ENV_ASSIGNMENT.test(head)) {
+    index += 1
+    head = tokens[index]
+  }
+  if (head === undefined) return -1
+  if (head.split("/").pop() === "arggon") return index
+  const runner = head.split("/").pop()
+  if (
+    runner !== undefined &&
+    COMMAND_RUNNERS.has(runner) &&
+    tokens[index + 1] === "run" &&
+    tokens[index + 2] === "arggon"
+  ) {
+    return index + 2
+  }
+  return -1
+}
+
+/**
+ * Extract the item id of an `arggon <subcommand> <id>` shell invocation that
+ * occurs in command position (see `argCommandIndex`). Handles
+ * `npm run arggon -- show <id>`, `VAR=1 arggon …` and absolute/relative binary
+ * paths; quoted arguments that merely mention an arggon command are ignored.
  */
 export function parseArggonItemFromCommand(command: unknown): string | undefined {
   if (typeof command !== "string" || command === "") return undefined
   for (const segment of command.split(/[;&|]+/)) {
-    const tokens = segment
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .map((token) => token.replace(/^["']|["']$/g, ""))
-    for (let i = 0; i < tokens.length; i += 1) {
-      const base = tokens[i]?.split("/").pop()
-      if (base !== "arggon") continue
-      let j = i + 1
-      while (j < tokens.length && (tokens[j] === "--" || tokens[j].startsWith("-"))) j += 1
-      const subcommand = tokens[j]
-      if (subcommand === undefined || !ARGON_ITEM_SUBCOMMANDS.has(subcommand)) continue
-      // CLI grammar: `<id>` is the positional immediately after the subcommand.
-      const candidate = tokens[j + 1]
-      if (candidate !== undefined && !candidate.startsWith("-") && isArggonItemId(candidate)) {
-        return candidate
-      }
+    const tokens = splitTokens(segment)
+    const at = argCommandIndex(tokens)
+    if (at === -1) continue
+    let j = at + 1
+    while (j < tokens.length && (tokens[j] === "--" || tokens[j].startsWith("-"))) j += 1
+    const subcommand = tokens[j]
+    if (subcommand === undefined || !ARGON_ITEM_SUBCOMMANDS.has(subcommand)) continue
+    // CLI grammar: `<id>` is the positional immediately after the subcommand.
+    const candidate = tokens[j + 1]
+    if (candidate !== undefined && !candidate.startsWith("-") && isArggonItemId(candidate)) {
+      return candidate
     }
   }
   return undefined
 }
 
 /**
+ * `command: "<cmd>"` string argument of a Code Mode shell call, e.g.
+ * `tools.shell({ command: "…" })`. Best effort: the first such property in the
+ * source wins; a `command:` key in unrelated data can over-correlate.
+ */
+const COMMAND_ARG_PATTERN = /\bcommand\s*:\s*(["'`])((?:\\.|(?!\1)[\s\S])*?)\1/
+
+/**
  * Extract the item id from Code Mode source calling an arggon MCP tool
  * (`tools.arggon.arggon_update({ id: "task-x" })`) or embedding a shell
- * invocation of the CLI.
+ * invocation of the CLI (command-position parsing only).
+ *
+ * Best effort: the call regex scans raw source text, so an `arggon_*` call
+ * written inside a string literal or comment can still correlate an id. That
+ * over-correlation is deliberately bounded — an unrelated but existing id can
+ * win for the session, while a stale id self-heals in `onContext`; a full
+ * lexer is out of scope here. The embedded-shell fallback is anchored to
+ * command position, so quoted text alone no longer correlates.
  */
 export function parseArggonItemFromCode(code: unknown): string | undefined {
   if (typeof code !== "string" || code === "") return undefined
@@ -197,6 +258,15 @@ export function parseArggonItemFromCode(code: unknown): string | undefined {
       const positional = /["'`]([^"'`]+)["'`]/.exec(args)
       if (positional !== null && isArggonItemId(positional[1])) return positional[1]
     }
+  }
+  // A Code Mode shell call carries its command as a string argument
+  // (`tools.shell({ command: "arggon show task-x" })`): parse that command in
+  // command position instead of scanning the wrapping source.
+  const shellCommand = COMMAND_ARG_PATTERN.exec(code)
+  if (shellCommand !== null) {
+    const command = (shellCommand[2] ?? "").replace(/\\(["'`\\])/g, "$1")
+    const id = parseArggonItemFromCommand(command)
+    if (id !== undefined) return id
   }
   return parseArggonItemFromCommand(code)
 }
@@ -233,11 +303,7 @@ export function itemIdFromBranch(branch: unknown): string | undefined {
 export function looksLikeCommitCommand(command: unknown): boolean {
   if (typeof command !== "string" || command === "") return false
   for (const segment of command.split(/[;&|]+/)) {
-    const tokens = segment
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .map((token) => token.replace(/^["']|["']$/g, ""))
+    const tokens = splitTokens(segment)
     const gitAt = tokens.findIndex((token) => token.split("/").pop() === "git")
     if (gitAt === -1) continue
     if (tokens.slice(gitAt + 1).some((token) => token === "commit" || token.startsWith("commit-"))) {
@@ -282,7 +348,12 @@ export function buildItemBlock(
   return boundText(lines.join("\n"))
 }
 
-/** Enforce a UTF-8 byte bound on a generated text block, cutting on a line end. */
+/**
+ * Enforce a UTF-8 byte bound on generated text. Multi-line input is cut back to
+ * the last complete line in range; single-line input is cut mid-line at a
+ * code-point boundary — an incomplete multibyte sequence is never decoded into
+ * a replacement character that could overshoot the bound.
+ */
 export function boundText(
   text: string,
   max = ITEM_BLOCK_MAX_BYTES,
@@ -290,9 +361,21 @@ export function boundText(
   const bytes = byteLength(text)
   if (bytes <= max) return { text, bytes, truncated: false }
   const marker = "\n… (truncated)"
-  const budget = Math.max(0, max - byteLength(marker))
-  const encoded = new TextEncoder().encode(text).subarray(0, budget)
-  let cut = new TextDecoder().decode(encoded)
+  const markerBytes = byteLength(marker)
+  // Degenerate bound smaller than the marker: the byte bound is the contract,
+  // so return an empty truncated block rather than overshoot.
+  if (max < markerBytes) return { text: "", bytes: 0, truncated: true }
+  const budget = max - markerBytes
+  const encoded = new TextEncoder().encode(text)
+  let cut = ""
+  for (let keep = budget; keep > 0; keep -= 1) {
+    try {
+      cut = new TextDecoder("utf-8", { fatal: true }).decode(encoded.subarray(0, keep))
+      break
+    } catch {
+      // `keep` bytes end inside a multibyte sequence: try one byte shorter.
+    }
+  }
   const lastLine = cut.lastIndexOf("\n")
   if (lastLine > 0) cut = cut.slice(0, lastLine)
   const bounded = `${cut}${marker}`
@@ -402,9 +485,30 @@ async function storageRemove(ctx: PluginContext, key: string): Promise<void> {
 }
 
 type CacheEntry = { at: number; item?: Record<string, unknown> }
+// Per-server in-memory caches. `opencode serve` is long-lived and can host many
+// projects and sessions, so each cache is bounded (CACHE_MAX_ENTRIES, oldest
+// first) on top of the 5 s TTL, and the item cache is keyed by project
+// directory + item id: two projects that happen to share an id must never
+// share a cached `arggon show` view (F5).
 const itemCache = new Map<string, CacheEntry>()
 const branchCache = new Map<string, { at: number; branch?: string }>()
 const renamedSessions = new Map<string, string>()
+
+/** Project-scoped cache key for one item view. */
+export function itemCacheKey(directory: string, id: string): string {
+  return `${directory}\u0000${id}`
+}
+
+/** Insert into a bounded cache: re-inserted keys refresh; the oldest evicts. */
+export function setBounded<T>(map: Map<string, T>, key: string, value: T, max = CACHE_MAX_ENTRIES): void {
+  map.delete(key)
+  map.set(key, value)
+  while (map.size > max) {
+    const oldest = map.keys().next()
+    if (oldest.done === true) break
+    map.delete(oldest.value)
+  }
+}
 
 /** Read the current branch: `ctx.vcs` first, `git` fallback (probe: 2.0.7 vcs.get is empty). */
 async function readBranch(ctx: PluginContext, directory: string): Promise<string | undefined> {
@@ -431,7 +535,7 @@ async function readBranch(ctx: PluginContext, directory: string): Promise<string
     const value = result.stdout.trim()
     if (result.code === 0 && value !== "" && value !== "HEAD") branch = value
   }
-  branchCache.set(directory, { at: now, branch })
+  setBounded(branchCache, directory, { at: now, branch })
   return branch
 }
 
@@ -457,7 +561,8 @@ async function loadItem(
   directory: string,
   id: string,
 ): Promise<Record<string, unknown> | undefined> {
-  const cached = itemCache.get(id)
+  const key = itemCacheKey(directory, id)
+  const cached = itemCache.get(key)
   const now = Date.now()
   if (cached !== undefined && now - cached.at < CACHE_TTL_MS) return cached.item
   const result = await run(ARGGON_SERVER, ["show", id, "--meta", "--json"], directory, 5_000)
@@ -470,7 +575,7 @@ async function loadItem(
   } catch {
     // Non-JSON stdout (arggon absent, older CLI): nothing to inject.
   }
-  itemCache.set(id, { at: now, item })
+  setBounded(itemCache, key, { at: now, item })
   return item
 }
 
@@ -503,14 +608,14 @@ async function maybeRename(
   if (id === undefined || status !== "in_progress" || assignee === undefined) return
   if (renamedSessions.get(sessionID) === id) return
   if ((await storageGet(ctx, renamedKey(sessionID))) === id) {
-    renamedSessions.set(sessionID, id)
+    setBounded(renamedSessions, sessionID, id)
     return
   }
   if (typeof ctx.session?.get === "function") {
     try {
       const current = (await ctx.session.get({ sessionID })) as Record<string, unknown> | undefined
       if (asString(current?.title) === id) {
-        renamedSessions.set(sessionID, id)
+        setBounded(renamedSessions, sessionID, id)
         await storageSet(ctx, renamedKey(sessionID), id)
         return
       }
@@ -519,7 +624,7 @@ async function maybeRename(
     }
   }
   if (await renameSession(ctx, sessionID, id)) {
-    renamedSessions.set(sessionID, id)
+    setBounded(renamedSessions, sessionID, id)
     await storageSet(ctx, renamedKey(sessionID), id)
     console.error(`[arggon] session renamed to ${id}`)
   }
@@ -537,18 +642,25 @@ function isShellTool(tool: unknown): boolean {
   return tool === "shell" || (typeof tool === "string" && (tool.endsWith(".shell") || tool.endsWith("_shell")))
 }
 
-async function onToolAfter(ctx: PluginContext, event: ToolEvent): Promise<void> {
+/** Handles one `execute.after` event (exported so the guard order is testable). */
+export async function onToolAfter(ctx: PluginContext, event: ToolEvent): Promise<void> {
   try {
     if (event.status !== undefined && event.status !== "completed") return
+    // Tree guard first: outside ArggonManager trees nothing is written or run,
+    // so the "no-op outside trees" claim covers storage too.
+    const directory = locationDirectory(ctx)
+    if (directory === undefined || !hasTasksTree(directory)) return
     const sessionID = asString(event.sessionID)
     if (sessionID !== undefined) {
       const id = parseArggonItemFromTool(event.tool, event.input)
       if (id !== undefined) await storageSet(ctx, sessionKey(sessionID), id)
     }
     if (isShellTool(event.tool)) {
-      const directory = locationDirectory(ctx)
-      const input = event.input !== null && typeof event.input === "object" ? (event.input as Record<string, unknown>) : undefined
-      if (directory !== undefined && hasTasksTree(directory) && looksLikeCommitCommand(input?.command)) {
+      const input =
+        event.input !== null && typeof event.input === "object"
+          ? (event.input as Record<string, unknown>)
+          : undefined
+      if (looksLikeCommitCommand(input?.command)) {
         await checkTrackerHygiene(directory)
       }
     }
@@ -583,7 +695,11 @@ async function onContext(ctx: PluginContext, event: ContextEvent): Promise<void>
     if (marker) return
     const block = buildItemBlock(item, { currentDirectory: directory })
     system.push({ type: "text", text: block.text })
-    console.error(`[arggon] context: injected item ${asString(item.id) ?? resolved.id} (${block.bytes} bytes)`)
+    // `block=` carries the exact injected text so the smoke can measure its
+    // bytes independently instead of trusting the reported count (F8).
+    console.error(
+      `[arggon] context: injected item ${asString(item.id) ?? resolved.id} (${block.bytes} bytes) block=${JSON.stringify(block.text)}`,
+    )
   } catch (error) {
     logOnce("context", "context injection failed", error)
   }
