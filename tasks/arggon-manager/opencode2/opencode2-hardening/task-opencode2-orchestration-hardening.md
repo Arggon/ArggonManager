@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode2-orchestration-hardening
 title: "Wave harness hardening: probe marker assertions, batching checks, A/B export guard"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T15:39:13.806Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-orchestration-hardening
 ---
 <!--
@@ -48,17 +47,17 @@ its failure detection.
 
 ## Acceptance
 
-- [ ] Deny probes assert the expected marker text in addition to the negative
+- [x] Deny probes assert the expected marker text in addition to the negative
       checks.
-- [ ] `background !== true` and the one-step batching are asserted, not just
+- [x] `background !== true` and the one-step batching are asserted, not just
       printed.
-- [ ] Verdict provenance limit documented in the harness header (or asserted if
+- [x] Verdict provenance limit documented in the harness header (or asserted if
       technically possible).
-- [ ] A/B sessions assert ≥1 exported call each.
-- [ ] `smoke:opencode:wave` still passes end-to-end; full suite green; small PR
+- [x] A/B sessions assert ≥1 exported call each.
+- [x] `smoke:opencode:wave` still passes end-to-end; full suite green; small PR
       to `opencode2`.
 
-- [ ] Wave-harness version strings interpolate the probed runtime (no hardcoded 2.0.x literals).
+- [x] Wave-harness version strings interpolate the probed runtime (no hardcoded 2.0.x literals).
 
 ## Notes
 
@@ -85,3 +84,6 @@ Draft PR to `opencode2` follows. Acceptance checkboxes left for the coordinator 
 ### handoff 2026-09-18 @Arggon — next: Coordinator: review draft PR #342 (findings 1-5 assertions in smoke/opencode-wave.ts, fail-demo, wave run 2 fixtures/0 failures, smoke:opencode 11/11), verify and flip done. Worker did not merge or f…
 - branch: feat/task-opencode2-orchestration-hardening
 - open questions: Wave harness run covered the pre-format file (post-run edits were prettier line-wraps only, same logic); reviewer may re-run smoke:opencode:wave for independent evidence.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: static pass by the independent reviewer (all five fixes are real checks, not logs; AST-identical formatting claim; coverage audit 43→50 check literals with zero removed; phase-3 transcript corroborates the documented provenance limit) + coordinator blocking smoke: smoke:opencode:wave PASS (2 fixtures, 0 failures; new marker/background/batching/export-guard checks ok; accounting 1 call per arm, +324 B/≈+95 fresh input tokens) and smoke:opencode 11/11; suite/lint/build/validators green; merged with cli pass. Closing.
