@@ -34,14 +34,18 @@ import {
 } from "./tracker-commit.js";
 import { lockFilePathFor } from "./lock.js";
 import { maybeCommitUpdate, runUpdate } from "./update.js";
-import { removeFixtureTree } from "./test-tmp.js";
+import { disableAutoMaintenance, removeFixtureTree } from "./test-tmp.js";
 
-// bug-tmp-fixture-leak + bug-tracker-commit-enotempty-flake: track mkdtemp
-// dirs and the detached lock-release children, then remove the dirs through
-// the shared bounded-retry helper (test-tmp.ts). Recursive rmSync is a
-// one-shot ENOTEMPTY race against a still-settling writer (spawned git child,
-// the detached lock-release node below, or fs timing on a loaded CI runner)
-// and `force` does NOT suppress ENOTEMPTY — only maxRetries > 0 does.
+// bug-tmp-fixture-leak + bug-tracker-commit-enotempty-flake +
+// bug-ci-enotempty-rmretry: track mkdtemp dirs and the detached lock-release
+// children, then remove the dirs through the shared settling helper
+// (test-tmp.ts). The writer that broke teardown is git's detached
+// `git maintenance run --auto --detach` child (spawned by commit/merge): it
+// holds `.git/objects/maintenance.lock` for its whole run, and Node's rmSync
+// retry loop only re-tries the bare rmdir, never re-reads the children, so a
+// held lock defeats the whole window. Fixtures opt out via
+// disableAutoMaintenance(); removeFixtureTree() re-traverses on retriable
+// errors.
 const tmpDirs: string[] = [];
 /** Detached node children spawned to release lock files mid-test. */
 const lockReleaseChildren = new Set<ChildProcess>();
@@ -122,6 +126,8 @@ function initRepo(): string {
   git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
   git(["config", "user.email", "test@example.com"], dir);
   git(["config", "user.name", "Test"], dir);
+  // bug-ci-enotempty-rmretry: no detached maintenance daemon in fixtures.
+  disableAutoMaintenance(dir);
   runInit({ dir, force: false });
   runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
   runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch", id: "auth", now: NOW });
@@ -549,6 +555,8 @@ function initImportRepo(): string {
   git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
   git(["config", "user.email", "test@example.com"], dir);
   git(["config", "user.name", "Test"], dir);
+  // bug-ci-enotempty-rmretry: no detached maintenance daemon in fixtures.
+  disableAutoMaintenance(dir);
   runInit({ dir, force: false });
   runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
   runCreate({ cwd: dir, type: "epic", title: "Backlog", parent: "launch", id: "backlog", now: NOW });

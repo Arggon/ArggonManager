@@ -14,22 +14,22 @@ import { runCreate } from "./create.js";
 import { parseFrontmatter } from "./frontmatter.js";
 import { runInit } from "./init.js";
 import { defaultStartGit, runStart } from "./start.js";
-import { removeFixtureTree } from "./test-tmp.js";
+import { disableAutoMaintenance, removeFixtureTree } from "./test-tmp.js";
 import { runUpdate } from "./update.js";
 import { runValidate } from "./validate.js";
 
-// bug-tmp-fixture-leak + bug-tracker-commit-enotempty-flake: track mkdtemp
-// dirs (plus any `arggon start --worktree` sibling worktrees named
-// `<basename>-task-*`) and remove them after each test through the shared
-// bounded-retry helper (test-tmp.ts).
+// bug-tmp-fixture-leak + bug-tracker-commit-enotempty-flake +
+// bug-ci-enotempty-rmretry: track mkdtemp dirs (plus any `arggon start
+// --worktree` sibling worktrees named `<basename>-task-*`) and remove them
+// after each test through the shared helper (test-tmp.ts).
 //
-// Every git command in this file returns synchronously, but `git commit` also
-// forks a detached `git maintenance run --auto --detach` child, and on a
-// loaded CI runner the kernel can still surface entries while rmdir runs.
-// Recursive rmSync is a one-shot ENOTEMPTY race in that window; `force` only
-// swallows ENOENT, and Node retries ENOTEMPTY only when maxRetries > 0. The
-// helper's retry window makes the teardown deterministic without weakening
-// anything the tests assert.
+// The writer behind the ENOTEMPTY failures is git's detached
+// `git maintenance run --auto --detach` child: `git commit`/`git merge` spawn
+// it, it holds `.git/objects/maintenance.lock` for its whole run, and under CI
+// load that run can outlive the ~2.75s rmSync retry window while teardown is
+// removing the tree (CI run 35401030576). Fixture repos therefore opt out via
+// disableAutoMaintenance(), and removeFixtureTree() re-reads the tree on
+// retriable errors instead of trusting bare rmdir retries.
 const tmpDirs: string[] = [];
 afterEach(() => {
   for (const dir of tmpDirs.splice(0)) removeFixtureTree(dir);
@@ -71,6 +71,8 @@ function initRepo(): string {
   git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
   git(["config", "user.email", "test@example.com"], dir);
   git(["config", "user.name", "Test"], dir);
+  // bug-ci-enotempty-rmretry: no detached maintenance daemon in fixtures.
+  disableAutoMaintenance(dir);
   runInit({ dir, force: false });
   runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
   runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch", id: "auth", now: NOW });
