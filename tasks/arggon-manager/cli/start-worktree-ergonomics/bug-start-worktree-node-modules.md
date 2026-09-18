@@ -61,3 +61,15 @@ Workaround (used by both workers): `git worktree add <path> -b <branch>`,
 - The failure is honest (it surfaces the missing dependency), but the rollback
   destroys the diagnostic context and forces every agent to redo the manual
   dance; the fix is about ergonomics, not about skipping gates.
+
+### 2026-09-18 @Arggon
+Decision (worker Arggon): prepare the worktree + never destroy it on failure.
+
+Repro (documented in the body, hit by two workers + coordinator): fresh worktree has no node_modules, the wired pre-commit gate ('npm run arggon -- validate') dies with ERR_MODULE_NOT_FOUND, and start removes the worktree instead of leaving it diagnosable.
+
+Decided behavior:
+1. Prepare: after worktree add (create or attach) and before the claim commit, if the primary checkout has node_modules and the worktree does not, symlink it into the worktree. Best-effort (try/catch, no-op when the primary has none); reported in human output and as the additive JSON field linkedNodeModules.
+2. Never destroy: no rollback path remains. Any failure after the worktree exists keeps the worktree and branch, and the error names the failing step, the worktree path, a step-specific remediation, and that re-running 'start --worktree' attaches.
+3. No hook bypass: --no-verify is never used; the fixture test proves the pre-commit gate executes inside the worktree (the gate's dependency require is what makes the first start succeed).
+
+Out of scope note: the post-start x-worktree hook remains non-fatal and unchanged.
