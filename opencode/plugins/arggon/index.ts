@@ -254,10 +254,11 @@ function splitSegments(command: string): string[] {
 /**
  * One whitespace token: unquoted text plus whether the token is a plain shell
  * word rather than a syntax construct. A token is a word when it began inside
- * a quoted span or begins with an escaped `\$(`/`\(`, so it can never be a
- * grouping opener and `commandHead` must not strip grouping prefixes from it
- * (F-A/F-B/F2: `"(" arggon …` runs a command named `(`, `\$(arggon …` and
- * `\(arggon …` syntax-error).
+ * a quoted span, begins with an escaped `\$(`/`\(`, or pairs an escaped
+ * backslash with an adjacent `(` (`\\(`), so it can never be a grouping opener
+ * and `commandHead` must not strip grouping prefixes from it (F-A/F-B/F2/F3:
+ * `"(" arggon …` runs a command named `(`, `\$(arggon …`, `\(arggon …` and
+ * `\\(arggon …` syntax-error).
  */
 type ShellToken = { text: string; word: boolean }
 
@@ -269,8 +270,10 @@ type ShellToken = { text: string; word: boolean }
  * (F1). Quote handling is stateful like `splitSegments`: a `'` inside an open
  * double quote (and vice versa) is a literal character, never a toggle (F-C).
  * Backslashes escape the next character outside single quotes; an escaped
- * `$(` is kept literal and marks the token a word (F-A), and a token that
- * *starts* with an escaped `\(` is likewise a word, never an opener (F2).
+ * `$(` is kept literal and marks the token a word (F-A), a token that
+ * *starts* with an escaped `\(` is likewise a word, never an opener (F2), and
+ * an escaped backslash followed by `(` (`\\(arggon …`) is a word too: bash
+ * ends a word on the backslash and syntax-errors at the adjacent `(` (F3).
  */
 function splitTokens(segment: string): ShellToken[] {
   const tokens: ShellToken[] = []
@@ -301,6 +304,9 @@ function splitTokens(segment: string): ShellToken[] {
         word = true
       } else if (ch === "(" && escapedAtStart) {
         current += "(" // a token starting with literal `\(` is a word (F2)
+        word = true
+      } else if (ch === "\\" && segment[i + 1] === "(") {
+        current += ch // escaped backslash; the adjacent `(` syntax-errors (F3)
         word = true
       } else {
         current += ch
@@ -359,16 +365,30 @@ function isPathLike(text: string): boolean {
   )
 }
 
+/** Shell syntax that keeps a slash-bearing word from being a plain path. */
+const SHELL_SYNTAX_IN_PATH = /[\s\\"'`$(){}&;|<>*?\[\]#!]/
+
 /**
- * Command name of one token text. Whitespace-free text keeps the last path
- * segment (`/usr/local/bin/arggon` → `arggon`). Whitespace means the token is
- * a fused quoted span, i.e. ONE command word looked up as a whole (bash:
- * `"echo /usr/bin/arggon"` → 127), so only path-like text keeps the segment
- * rule: `"echo /usr/bin/arggon"` must not reduce to `arggon`, while
- * `"/opt/my tools/arggon"` is a real path to the binary.
+ * `true` when every `/`-separated component is plain path text (no quotes,
+ * expansions, grouping, globs or whitespace). `(/usr/local/bin/arggon` is not
+ * a path bash resolves to the binary: the quoted word starts with a literal
+ * `(` and execs a pathname (127), so it must not reduce to `arggon` (F3).
+ */
+function isPlainPath(text: string): boolean {
+  return text.split("/").every((part) => part !== "" && !SHELL_SYNTAX_IN_PATH.test(part))
+}
+
+/**
+ * Command name of one token text. Path text keeps the last segment
+ * (`/usr/local/bin/arggon` → `arggon`). Text that is neither path-like nor a
+ * plain path — a fused quoted span such as `"echo /usr/bin/arggon"` (bash:
+ * ONE command word looked up as a whole, 127) or a word starting with shell
+ * syntax such as `(/usr/local/bin/arggon` (F3) — is kept whole, so it can
+ * never reduce to `arggon`; `"/opt/my tools/arggon"` is a real path to the
+ * binary and still correlates.
  */
 function commandName(text: string): string {
-  if (/\s/.test(text) && !isPathLike(text)) return text
+  if (!isPathLike(text) && !isPlainPath(text)) return text
   return text.split("/").pop() ?? ""
 }
 
@@ -377,8 +397,8 @@ function commandName(text: string): string {
  * stripped, `$(`/`(`/`{` grouping openers removed (so `x=$(arggon`, `(arggon`
  * and `$(arggon` all yield `arggon`), trailing group closers dropped, then the
  * path rule of `commandName` applied. A word token (started in quotes, or
- * starting with a literal escaped `$(`/`\(`) keeps grouping prefixes and
- * assignments in its text literal.
+ * starting with a literal escaped `$(`/`\(`/`\\(`) keeps grouping prefixes
+ * and assignments in its text literal.
  */
 function commandHead(token: ShellToken): string {
   if (token.word) return commandName(token.text)
@@ -483,15 +503,16 @@ function itemFromTokens(tokens: ShellToken[], at: number): string | undefined {
 /**
  * Contents of command substitutions (`$(…)`) and subshells (`(…)`) in one
  * segment, in source order. Quote-aware: `$(…)` inside double quotes runs,
- * everything inside single quotes is inert, escaped openers (`\$(…)`) are
- * skipped. Best effort: not a full shell lexer (documented limits in the
- * docstring of `parseArggonItemFromCommand`).
+ * everything inside single quotes is inert, escaped openers (`\$(…)` and
+ * `\\(`) are skipped. Best effort: not a full shell lexer (documented limits
+ * in the docstring of `parseArggonItemFromCommand`).
  */
 function findCommandGroups(text: string): string[] {
   const groups: string[] = []
   let quote: '"' | "'" | null = null
   let escaped = false
   let escapedDollar = false
+  let escapedBackslash = false
   let depth = 0
   let start = -1
   for (let i = 0; i < text.length; i += 1) {
@@ -503,12 +524,19 @@ function findCommandGroups(text: string): string[] {
     if (escaped) {
       escaped = false
       escapedDollar = ch === "$"
+      escapedBackslash = ch === "\\"
       continue
     }
     if (escapedDollar) {
       escapedDollar = false
       // `\$(…)` is a literal `$` followed by `(`: bash syntax-errors on it,
       // nothing executes, so the `(` must not open a group (F-A).
+      if (ch === "(") continue
+    }
+    if (escapedBackslash) {
+      escapedBackslash = false
+      // `\\(` ends a word on the escaped backslash and bash syntax-errors at
+      // the adjacent `(`: nothing executes, so it opens no group (F3).
       if (ch === "(") continue
     }
     if (ch === "\\") {
@@ -585,13 +613,19 @@ function parseCommandText(command: string, depth: number): string | undefined {
  * while `"/opt/my tools/arggon" show task-x` names the binary and correlates.
  * A token starting with an escaped `\(` is likewise a literal word (F2),
  * while a quoted assignment before the command (`x="a b" arggon show task-x`)
- * stays an assignment and the command runs (F1).
+ * stays an assignment and the command runs (F1). An escaped backslash before
+ * `(` (`\\(arggon show task-x)`) and a quoted word that begins with shell
+ * syntax (`'(/usr/local/bin/arggon' show task-x`, bash 127) are syntax-error
+ * shapes too: both reduce to no command, never to `arggon` (F3). Best effort
+ * residual: a bare `(` in argument position (`\\( (arggon …)`) syntax-errors
+ * in bash but is still followed as a group, like any unquoted `(` outside
+ * command position (`echo (arggon …)`).
  *
  * Best effort, misses are harmless and false positives are not: aliases,
  * backticks, `sh -c "arggon …"`, `timeout 5 arggon …` and `xargs arggon …`
- * are not detected; `#` comments are dropped, escaped `\$(…)` and `\(` are
- * literal (F-A/F2), while heredoc bodies and nested quoting inside a group are
- * not modeled. The `arggon_*` Code Mode regex (see `parseArggonItemFromCode`)
+ * are not detected; `#` comments are dropped, escaped `\$(…)`, `\(` and
+ * `\\(` are literal (F-A/F2/F3), while heredoc bodies and nested quoting
+ * inside a group are not modeled. The `arggon_*` Code Mode regex (see `parseArggonItemFromCode`)
  * stays a raw-source best effort of its own.
  */
 export function parseArggonItemFromCommand(command: unknown): string | undefined {

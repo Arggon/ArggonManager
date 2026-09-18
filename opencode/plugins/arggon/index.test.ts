@@ -164,6 +164,28 @@ describe("plugin-context: arggon invocation parsing", () => {
     expect(parseArggonItemFromCommand("(arggon show task-x)")).toBe("task-x");
   });
 
+  it("keeps an escaped backslash before ( a syntax-error word (F3)", () => {
+    // bash: `\\(arggon …` ends a word on the escaped backslash and
+    // syntax-errors at the adjacent `(` (exit 2, nothing executes).
+    expect(parseArggonItemFromCommand("\\\\(arggon show task-x)")).toBeUndefined();
+    expect(parseArggonItemFromCommand("sudo \\\\(arggon show task-x)")).toBeUndefined();
+    expect(parseArggonItemFromCommand("X=1 \\\\(arggon show task-x)")).toBeUndefined();
+    expect(parseArggonItemFromCommand("echo \\\\(arggon show task-x)")).toBeUndefined();
+    // The escaped backslash no longer hides a real `$(` substitution behind it.
+    expect(parseArggonItemFromCommand("echo \\\\$(arggon show task-x)")).toBe("task-x");
+  });
+
+  it("keeps quoted words that begin with shell syntax out of the path rule (F3)", () => {
+    // bash: the quoted word IS the command name `(/usr/local/bin/arggon`
+    // (exit 127), not a path that resolves to the binary.
+    expect(parseArggonItemFromCommand("'(/usr/local/bin/arggon' show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand('"(/usr/local/bin/arggon" show task-x')).toBeUndefined();
+    expect(parseArggonItemFromCommand("my'(/usr/bin/arggon' show task-x")).toBeUndefined();
+    // Plain quoted paths and relative paths still name the binary.
+    expect(parseArggonItemFromCommand("'/usr/local/bin/arggon' show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("node_modules/.bin/arggon show task-x")).toBe("task-x");
+  });
+
   it("does not read quoted or query forms as executions (F-B)", () => {
     expect(parseArggonItemFromCommand("command -v arggon show task-x")).toBeUndefined();
     expect(parseArggonItemFromCommand("command -V arggon show task-x")).toBeUndefined();
