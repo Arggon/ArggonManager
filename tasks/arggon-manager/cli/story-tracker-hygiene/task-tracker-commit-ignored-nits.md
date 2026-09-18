@@ -49,3 +49,17 @@ Findings F1/F2/F4 from the independent review of PR #359
 ## Notes
 
 - Robustness only; every production path is correct today.
+
+### 2026-09-18 @Arggon
+## Worker evidence (F1/F2/F4)
+
+**F1 — dedupe AFTER normalization** (`[...new Set(rootRelativePaths(root, ...))]` in `commitTrackerMutation`):
+- before (fix reverted, same fixture): `ignored: ["tasks/generated.bundle","tasks/generated.bundle"]`, human line `(2 ignored path(s) skipped)`
+- after: `ignored: ["tasks/generated.bundle"]`, human line `(1 ignored path(s) skipped)`
+- tests: "dedupes an ignored file passed in both absolute and root-relative forms" and "dedupes the all-ignored skip payload across string forms too" — both FAIL against the reverted implementation (mutation-verified).
+
+**F2 — probe-failure fallback** (mocked `check-ignore` exit 128): result `{ committed: false, skipReason: "git add failed: The following paths are ignored by one of your .gitignore files:" }` + stderr warning; the non-ignored path is left staged and HEAD unmoved — the pre-fix degradation preserved, never silent. Real edge probe: a `:(badmagic)` input makes `git check-ignore --stdin -z` exit 128 → fallback (`git add failed: fatal: Invalid pathspec magic ...`). The `:(`-prefixed pathspec-magic exception is documented on `findIgnoredPaths` ("paths may carry any character except ...").
+
+**F4 — exotic path fixture** (spaces/unicode/newline/backslash): `ignored: ["tasks/back\\slash.md","tasks/line\nbreak.md"]` byte-for-byte, `(2 ignored path(s) skipped)`, status clean, tracked exotic names in HEAD. Removing `-z` from the probe makes the test fail (line-split probe misses the newline file).
+
+**Gates**: full suite 1278 tests / 76 files green (private TMPDIR), lint, build, `validate`, `spec validate` green.
