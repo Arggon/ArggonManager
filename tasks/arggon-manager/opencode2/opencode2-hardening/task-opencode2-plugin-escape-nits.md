@@ -2,7 +2,7 @@
 type: task
 status: in_progress
 id: task-opencode2-plugin-escape-nits
-title: "Plugin escape-edge nits: escaped \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\( in command position + unbalanced quoted paths correlate"
+title: "Plugin escape-edge nits: escaped \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\( in command position + unbalanced quoted paths correlate"
 assignee: Arggon
 branch: feat/task-opencode2-plugin-escape-nits
 parent: opencode2-hardening
@@ -70,3 +70,6 @@ Documented residual (best effort, unchanged): a bare `(` in argument position (`
 Bash cross-checks: stub `arggon` on PATH; byte-exact commands written from Python and run via `bash`; exit 2/127/0 and executed/no-hit as tabulated.
 
 Gates on HEAD+fix: `npm test` → 74 files / 1240 tests pass (private TMPDIR); `npm run smoke:opencode` → 11 scenarios / 0 failures; lint, build, `arggon validate` (0/0), `arggon spec validate` (0/0) clean. Draft PR to `opencode2`; no merge, no status flip.
+
+### handoff 2026-09-18 @Arggon (session: ses_f49700672ffeZXvF0u0iEzbWri) — next: Review draft PR #358 against base opencode2; on approval merge it, then complete the acceptance checklist and set task-opencode2-plugin-escape-nits to done. Worker did not merge and did not flip stat…
+- branch: feat/task-opencode2-plugin-escape-nits
