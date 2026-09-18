@@ -102,3 +102,7 @@ Actual mechanism: `runComment` (`cli/src/comment.ts`) serializes the read-modify
 - Full suite after the change: **69 files / 1135 tests green, twice consecutively**; `npm run lint`, `npm run build`, `arggon validate` (0 warnings), `arggon spec validate` (16 docs, 0 warnings) all green.
 
 Acceptance mapping (left unticked for the coordinator): race explained (this comment), cleanup robust (maxRetries + child settlement), stress evidence (above), no shared `/tmp` collisions (reviewed), full suite green (above); "CI stable across two consecutive PR runs" needs the PR checks after opening.
+
+### handoff 2026-09-18 @Arggon (session: ses_f4b101437ffendcj1ieIfOBiXK) — next: Review draft PR #338: wait for CI on the two runs, tick the acceptance boxes, merge (auto-done flips the item). No product code in this PR.
+- branch: fix/bug-tracker-commit-enotempty-flake
+- open questions: comment-race retry is a stopgap for product race bug-comment-torn-read (unowned, product fix needed); 'CI stable across two PR runs' box needs PR checks; tracker-commit/worktree stress passed 10/10 l…
