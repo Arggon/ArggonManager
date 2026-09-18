@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-start-worktree-node-modules
 title: arggon start --worktree fails and rolls back in fresh worktrees without node_modules
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T13:07:36.745Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-start-worktree-node-modules
 ---
 <!--
@@ -120,3 +119,6 @@ Gates re-run: full suite 1124 passed / 69 files; `lint` clean; `build` clean; `a
 ### handoff 2026-09-18 @Arggon (session: ses_f4b44e5faffe0ekr04eVu0CZg9) — next: Coordinator/reviewer: re-review PR #333 (draft, base opencode2) against the F1–F5 findings and the probe evidence above, confirm CI, then merge. Worker stops here: no merge, no status flip.
 - branch: fix/bug-start-worktree-node-modules
 - open questions: None blocking.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification (two review rounds): round 1 found the F1 data-destruction blocker (link before post-start hook + npm ci empties the primary install) plus F2-F5; round 2 verified all fixed on 9bafcf0 — F1 independently reproduced fixed (hook sees no link, primary dep survives, worktree re-linked/real-installed; regression test discriminates old vs new order), F2 prune restored with a foreign-link guard, F3 message matches behavior, F4 wording accurate, F5 tests behavioral. Merged with cli pass. R1/R2 filed as task-start-worktree-relpath-nits. Closing.
