@@ -76,3 +76,7 @@ Implementation commit 579982c on `feat/task-opencode-v2-doctor`; probed with the
 Note: one intermediate full-suite run failed `measure.test.ts > always deletes the measurement temp tree` because a concurrent baseline suite (another checkout) raced on shared `/tmp/arggon-budget-*`; a serial rerun is green — transient, unrelated to this change.
 
 **Ownership disclosure**: the `doctor --json` payload is whitelisted in `cli/src/cli.ts`, so the block cannot reach `--json` without the one-line wiring `opencode: result.opencode,` there. `cli/src/cli.ts` was outside my assigned file list and no other wave item touches it; I made that single-line edit and disclose it for review. Also: `OPENCODE_CONFIG_CANDIDATES` in `doctor.ts` mirrors `findOpenCodeConfig` (docs.ts, W1a) by hand because doctor reports ALL present configs while that helper returns the first only — reconcile when the seam branch lands (or leave the comment).
+
+### handoff 2026-09-18 @Arggon — next: Review against the docs/engineering.md bar, smoke the 4 probes in the evidence comment, mark the draft PR ready and merge to opencode2 (merge commit — branch carries tracker auto-commits).
+- branch: feat/task-opencode-v2-doctor
+- open questions: Approve the one-line cli.ts wiring (outside my assigned files, required for --json)? Reconcile doctor's config candidate list with findOpenCodeConfig once W1a (task-opencode-v2-spec) merges.
