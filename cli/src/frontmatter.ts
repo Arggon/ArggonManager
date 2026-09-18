@@ -43,11 +43,87 @@ function parseValue(raw: string): unknown {
 }
 
 function parseScalar(raw: string): string | number {
-  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
-    return raw.slice(1, -1);
+  if (raw.startsWith('"') && raw.endsWith('"')) {
+    return unescapeDoubleQuoted(raw.slice(1, -1));
+  }
+  if (raw.startsWith("'") && raw.endsWith("'")) {
+    // YAML single-quoted style: the ONLY escape is a doubled quote.
+    return raw.slice(1, -1).replaceAll("''", "'");
   }
   if (/^-?\d+$/.test(raw)) return Number(raw);
   return raw;
+}
+
+/**
+ * YAML 1.2 double-quoted escapes (a superset of JSON's).
+ * bug-tracker-title-rescape: the inner text used to be returned verbatim, so
+ * `stringifyFrontmatter`'s JSON escaping re-escaped it on EVERY write and a
+ * title containing literal backslashes doubled per mutation (4 -> 8 -> 16...).
+ * Unknown escapes and a trailing lone backslash are preserved verbatim: a
+ * malformed scalar must stay readable, never throw.
+ */
+const DOUBLE_QUOTED_ESCAPES: Readonly<Record<string, string>> = {
+  "0": "\0",
+  a: "\x07",
+  b: "\b",
+  t: "\t",
+  n: "\n",
+  v: "\v",
+  f: "\f",
+  r: "\r",
+  e: "\x1b",
+  " ": " ",
+  '"': '"',
+  "/": "/",
+  "\\": "\\",
+  N: "\u0085",
+  _: "\u00a0",
+  L: "\u2028",
+  P: "\u2029",
+};
+
+/** Decode the inner text of a double-quoted YAML scalar (bug-tracker-title-rescape). */
+function unescapeDoubleQuoted(raw: string): string {
+  let out = "";
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i]!;
+    if (ch !== "\\") {
+      out += ch;
+      continue;
+    }
+    const next = raw[i + 1];
+    if (next === undefined) {
+      out += ch;
+      break;
+    }
+    if (next === "x" || next === "u" || next === "U") {
+      const width = next === "x" ? 2 : next === "u" ? 4 : 8;
+      const hex = raw.slice(i + 2, i + 2 + width);
+      if (hex.length === width && /^[0-9a-fA-F]+$/.test(hex)) {
+        const code = Number.parseInt(hex, 16);
+        try {
+          out += String.fromCodePoint(code);
+          i += 1 + width;
+          continue;
+        } catch {
+          // Out-of-range code point: keep the escape text verbatim.
+        }
+      }
+      out += ch + next;
+      i += 1;
+      continue;
+    }
+    const mapped = DOUBLE_QUOTED_ESCAPES[next];
+    if (mapped !== undefined) {
+      out += mapped;
+      i += 1;
+      continue;
+    }
+    // Unknown escape: keep the backslash and the character verbatim.
+    out += ch + next;
+    i += 1;
+  }
+  return out;
 }
 
 const OFFICIAL_ORDER = [
@@ -104,8 +180,22 @@ function formatValue(key: string, value: unknown): string {
 }
 
 function formatScalar(value: string, forceQuote: boolean): string {
-  if (forceQuote || /[:#{}[\],&*?!'"]|^\s|\s$|^$/.test(value)) {
-    return JSON.stringify(value);
+  // Backslashes force the quoted (JSON-escaped) form too
+  // (bug-tracker-title-rescape): that keeps an input double-quoted scalar
+  // byte-identical instead of silently down-converting it to a plain scalar.
+  // Control characters force it as well (PR #360 review F1): a decoded `\n`
+  // used to be written raw, splitting the frontmatter and corrupting the tree.
+  if (
+    forceQuote ||
+    /[\u0000-\u001f\u007f\u2028\u2029]|[:#{}[\],&*?!'"\\]|^\s|\s$|^$/.test(value)
+  ) {
+    // JSON.stringify escapes \u0000-\u001f, but leaves DEL and the YAML/JS
+    // line separators raw; escape those explicitly with YAML escapes the
+    // parser decodes back.
+    return JSON.stringify(value)
+      .replaceAll("\u007f", "\\x7F")
+      .replaceAll("\u2028", "\\L")
+      .replaceAll("\u2029", "\\P");
   }
   return value;
 }
