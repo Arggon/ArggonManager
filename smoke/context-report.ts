@@ -480,12 +480,14 @@ function printReport(m: Measurement): void {
     "-",
   );
   const mcpGrowth = m.mcp.totalBytes - m.mcp.baselineBytes;
+  const mcpGrowthPct = ((mcpGrowth / m.mcp.baselineBytes) * 100).toFixed(1);
+  const growthSign = mcpGrowth >= 0 ? "+" : "";
   push(
     `MCP tools/list (${m.mcp.toolCount} tools)`,
     fmt(m.mcp.totalBytes),
     String(m.mcp.tokenEstimate),
     `<=${fmt(m.mcp.budget)} B adv.`,
-    m.mcp.pass ? `pass (${mcpGrowth >= 0 ? "+" : ""}${fmt(mcpGrowth)} B vs baseline)` : "FAIL",
+    m.mcp.pass ? `pass (${growthSign}${fmt(mcpGrowth)} B (${growthSign}${mcpGrowthPct}%) vs baseline)` : "FAIL",
   );
   const measuredBlock = Math.max(...m.itemBlock.measuredBytes);
   push(

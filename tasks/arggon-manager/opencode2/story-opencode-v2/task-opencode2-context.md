@@ -76,7 +76,7 @@ imported, never copied); the pre-W5 skill is reconstructed from git history
 | skill entry `arggon-cli` (description) | per session | 176 | 44 | — | pass |
 | skill entry `arggon-upgrade` (description) | per session | 324 | 81 | — | pass |
 | agent descriptions ×3 | per session | 393 | 98 | — | pass |
-| MCP `tools/list` (9 tools, live) | per session | 10,096 | 2,524 | ≤12,288 B advisory | pass; **+1,046 B (+11.6%)** vs 9,050 B (2026-09-15) |
+| MCP `tools/list` (9 tools, live) | per session | 10,096 | 2,524 | ≤12,288 B advisory | pass; **+1,056 B (+11.7%)** vs 9,040 B at baseline commit `5d6c504` (2026-09-15) |
 | **fixed per-session total** | per session | **12,852** | **3,213** | — | — |
 | injected item block | per model call | 193 / 252 measured | 48 / 63 | ≤1,024 B | pass; W3 smoke 181–204 B |
 | compaction `keep.tokens` | compaction | 15,000 retained | — | V2 default 15,000 | keep |
@@ -101,9 +101,10 @@ than the single file held; the per-session cost is what dropped). On-load delta:
   the V2 docs say to raise it only when exact recent detail matters. No
   template change → no adopter churn.
 - Skill descriptions/umbrella: **no change** — `arggon-cli`'s description was
-  already trimmed to 176 B (from 245 B pre-W5); `arggon-upgrade`'s 324 B is
-  routing text ("Use when `doctor` reports `outdated`…") loaded only when the
-  skill is; the 9.5 KB umbrella is mostly generated command regions.
+  already trimmed to 176 B (from 237 B pre-W5); `arggon-upgrade`'s 324 B is
+  routing text ("Use when `doctor` reports `outdated`…") advertised every
+  session (counted in `fixedTotalBytes`; only its body is loaded on demand);
+  the 9.5 KB umbrella is mostly generated command regions.
 - Agent prompts: **read-only** (templates owned by the W4 orchestration item);
   4.8 KB total across the three agents, paid only when the agent runs → no
   action.
@@ -117,13 +118,22 @@ than the single file held; the per-session cost is what dropped). On-load delta:
 **Deviation (honest).** W1–W5 all landed before W6 started (this is the last
 wave), so per-wave before/after captures were not possible. The table cites the
 pre-existing measurements (ADR 0006 re-measure 2026-09-15: AGENTS.md 2,043 B →
-1,863/1,872 B now after the headroom trim; MCP 9,050 → 10,096 B; W3 block
+1,863/1,872 B now after the headroom trim; MCP 9,040 → 10,096 B (baseline
+commit `5d6c504`); W3 block
 181–204 B) and reconstructs the pre-W5 skill from git.
 
 **Gates.** `npm test` 69 files / 1112 passed · `npm run lint` clean ·
 `npm run build` clean · `arggon validate --json` ok (0 warnings) ·
 `arggon spec validate --json` ok · `npm run context:report -- --strict` exit 0,
 0 regressions.
+
+**Review fix (PR #329, F2/F3).** MCP baseline constant corrected to **9,040 B**
+(reproduced at baseline commit `5d6c504` two ways: that commit's own
+`doctor --budget` and an independent stdio `tools/list` `JSON.stringify` sum)
+→ delta is now **+1,056 B (+11.7%)**, and the doctor/report output prints the
+corrected reference; pre-W5 `arggon-cli` description corrected to **237 B**;
+the `arggon-upgrade` 324 B description is part of the per-session advertised
+surface (inside `fixedTotalBytes`) — only its body is on-demand.
 
 Repro: `npm run context:report` (add `--json` for machine output;
 `CONTEXT_REPORT_BEFORE_REV=<rev>` pins the before/after reconstruction).
@@ -133,4 +143,4 @@ W6 draft PR: https://github.com/Arggon/ArggonManager/pull/329 (base opencode2). 
 
 ### handoff 2026-09-18 @Arggon — next: Coordinator: review draft PR #329 (report script + numbers + playbook budgets docs). Verify the reused bound constants, the before/after reconstruction and the gate results; if accepted, merge to ope…
 - branch: feat/task-opencode2-context
-- open questions: Per-wave baselines for W1-W5 were impossible (W6 ran last); reconstructed pre-W5 skill + cited earlier measurements instead. MCP tools/list grew +11.6% vs the 2026-09-15 baseline but stays under the …
+- open questions: Per-wave baselines for W1-W5 were impossible (W6 ran last); reconstructed pre-W5 skill + cited earlier measurements instead. MCP tools/list grew +11.7% vs the baseline commit `5d6c504` (9,040 B) but stays under the …
