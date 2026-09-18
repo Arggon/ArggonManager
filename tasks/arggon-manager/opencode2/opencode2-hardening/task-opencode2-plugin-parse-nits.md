@@ -57,3 +57,30 @@ Non-blocking findings from the independent review of PR #345
 
 - All one-sided or contrived: the parser never yields a wrong id for executed
   commands, and the dominant forms are covered.
+
+### 2026-09-18 @Arggon
+Worker evidence for F-A..F-D (PR #345 review). Draft PR: #352 (base `opencode2`), branch `feat/task-opencode2-plugin-parse-nits`. Files: `opencode/plugins/arggon/index.ts`, `opencode/plugins/arggon/index.test.ts` (34 tests = 27 + 7 new).
+
+Parse probe before→after (`before` = branch point `de667a5`, `after` = `ca65ddf`; 40 cases via `tsx` against the exported `parseArggonItemFromCommand`); delta rows:
+
+```text
+input                                            | before    | after
+echo \$(arggon show task-x)  (bash syntax error) | task-x    | undefined
+\$(arggon show task-x)       (bash syntax error) | task-x    | undefined
+command -v arggon show task-x                    | task-x    | undefined
+command -V arggon show task-x                    | task-x    | undefined
+command -pv arggon show task-x                   | task-x    | undefined
+"(" arggon show task-x                           | task-x    | undefined
+'(' arggon show task-x                           | task-x    | undefined
+"$(" arggon show task-x                          | task-x    | undefined
+"x=1" arggon show task-x                         | task-x    | undefined
+x="it's" arggon show task-x                      | undefined | task-x
+```
+
+Unchanged anchors: `arggon show task-x --json`, `arggon handoff "task-x"`, `npx`/`sudo -u`/`command`/`command -p`/`command --`/`time (`, `( arggon show task-x)`, `echo "$(arggon show task-x)"`, `x="it's"; arggon show task-x`. Negatives stay negative: `echo "&& arggon show task-x"`, `grep -rn "arggon show task-x"`, `echo "arggon update task-fake"`, `git commit -m "arggon handoff task-x"`, `# note && arggon show task-x`.
+
+Bash cross-checks: `bash -n -c 'echo \$(arggon show task-x)'` → exit 2; `'\$(arggon show task-x)'` → exit 2; `x=\$(arggon show task-x)` → exit 2; `"(" arggon show task-x` parses but runs a command named `(`; stub `arggon()` prints `EXECUTED show task-x` for `x="it's" arggon show task-x`.
+
+Decisions: F-A fixed in both paths (group + token word); F-B fixed (name queries and quoted opener/assignment words), nothing left as a live FP; F-C stateful quotes (the item's `echo "it's" …` example runs only `echo`, so it correctly stays `undefined` — the miss was the assignment form); F-D tests plus exported `MAX_SUBSTITUTION_DEPTH`. Docstrings updated, no playbook change needed.
+
+Gates on merged tree `2b6fd43`: `npm test` → 73 files / 1211 tests pass (private TMPDIR); `npm run smoke:opencode` → 11 scenarios / 0 failures; lint, build, `arggon validate` (0/0), `arggon spec validate` (0/0) clean. No merge, no status flip.
