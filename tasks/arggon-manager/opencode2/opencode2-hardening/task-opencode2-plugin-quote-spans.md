@@ -82,3 +82,24 @@ F3 correction: the "nothing left as a live FP" wording in task-opencode2-plugin-
 ### handoff 2026-09-18 @Arggon (session: ses_f4987ad2effeUkIV0hlq0tL7K7) — next: Review draft PR #356 (base opencode2): F1 quoted spans one token (multi-word mention matrix + miss case), F2 escaped \( word, F3 newline test renamed + parse-nits claim correction. Gates green on 7a8…
 - branch: feat/task-opencode2-plugin-quote-spans
 - open questions: Extra probe found one pre-existing contrived FP outside this item: quoted-char prefix concatenated with an absolute path, e.g. '('/usr/local/bin/arggon show task-x, still correlates (commandHead spli…
+
+### 2026-09-18 @Arggon
+Review fix for PR #356 (NO-MERGE verdict; F1 + F2 test). Files: `opencode/plugins/arggon/index.ts`, `opencode/plugins/arggon/index.test.ts` (37 tests = 36 + 1 new F1 block; F2 mid-token assertion added).
+
+F1 root cause: `commandHead` reduced every `word` token to its last `/`-segment, so a whitespace-bearing fused span matched (`"echo /usr/bin/arggon" show task-x` → task-x; bash 127). Fix: `commandName` keeps a whitespace-bearing token's whole text unless it is path-like (`/`, `./`, `../`, `~`), where the last-segment rule still applies. The same guard covers non-word fused prefixes (`my" tools/arggon"`, `x" /usr/bin/arggon"`), same FP class.
+
+FP matrix (`parseArggonItemFromCommand`; bash truth via stub `arggon` on PATH; rc 127 = never runs):
+
+| input | bash | base 19f052c | head a4e26d5 | fix 09b1291 |
+| --- | --- | --- | --- | --- |
+| `"echo /usr/bin/arggon" show task-x` | 127 | undefined | task-x | undefined |
+| `"cat /usr/bin/arggon" show task-x` | 127 | undefined | task-x | undefined |
+| `"vscode /home/u/bin/arggon" show task-x` | 127 | undefined | task-x | undefined |
+| `my" tools/arggon" show task-x` | 127 | undefined | task-x | undefined |
+| `x" /usr/bin/arggon" show task-x` | 127 | undefined | task-x | undefined |
+| `"/opt/my tools/arggon" show task-x` | runs (execs the path) | undefined | task-x | task-x |
+| `X=a\(b arggon show task-x` | runs | task-x | task-x | task-x |
+
+No true-positive regressions (25-case probe green: direct/`VAR=`/runners/wrappers/`$(…)`/quoted absolute path/`x="it's"`/`"(" arggon`/`echo "…"` eliminations unchanged).
+
+Gates on 09b1291: `npm test` → 73 files / 1221 tests pass (private TMPDIR); `npm run smoke:opencode` → 11 scenarios / 0 failures; lint, build, `arggon validate` (0/0), `arggon spec validate` (16 docs, 0 warnings) clean. No merge, no status flip.
