@@ -65,3 +65,14 @@ Residual, non-blocking findings from the two-round review of PR #333
 ## Notes
 
 - Both are fail-safe nits; the bug fix and its regression tests are merged.
+
+### 2026-09-18 @Arggon
+R2 decision (worker note): keep the documented warning and explicitly accept the residual manual-`npm ci` risk; no automated guard.
+
+Rationale:
+1. The sanctioned path is already guarded: `start` removes the link before any configured `x-worktree.post-start` hook runs and re-links only when the hook leaves no `node_modules`, so the canonical `post-start: "npm ci"` can never reify through a link. The residual case is a *manual* `npm ci` in a worktree whose link start re-created (no hook configured, or a hook that left no deps).
+2. A bare marker file is inert — npm only executes project code through a lifecycle hook (`preinstall`), so "unlink before npm can reify" requires wiring one into the repo's `package.json`. That file is outside this item's file ownership and would impose an install-time code path on every checkout for a narrow manual case.
+3. The documented warning (docs/convention.md, `x-worktree` / "Worktree bootstrap") names the case explicitly and the mitigation is one command: `rm <worktree>/node_modules` before `npm ci`. `cleanup --prune` also removes such links when reaping worktrees (F2 / this item's R3).
+4. The failure mode is loud and recoverable (`npm ci` in the primary restores it), and the review classified R2 as optional / non-blocking.
+
+Evidence: the guarded hook path stays covered by cli/src/worktree.test.ts "hides the link from a configured post-start hook so npm ci cannot empty the primary" and "re-links after a post-start hook that leaves no node_modules".
