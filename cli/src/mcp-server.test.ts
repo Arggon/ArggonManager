@@ -104,6 +104,21 @@ function textContent(result: Record<string, unknown>): unknown {
   return JSON.parse(content[0]!.text);
 }
 
+/** True when `value` carries a UTF-16 surrogate code unit that is not half of a valid pair. */
+function hasLoneSurrogate(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const unit = value.charCodeAt(index);
+    if (unit >= 0xd800 && unit <= 0xdbff) {
+      const next = value.charCodeAt(index + 1);
+      if (!(next >= 0xdc00 && next <= 0xdfff)) return true;
+      index += 1; // skip the low half of a valid pair
+    } else if (unit >= 0xdc00 && unit <= 0xdfff) {
+      return true; // low surrogate without a preceding high half
+    }
+  }
+  return false;
+}
+
 describe("mcp server", () => {
   let client: McpTestClient;
   let repoDir: string;
@@ -698,6 +713,82 @@ describe("mcp server _meta.sessionID attribution (task-opencode-v2-mcp-meta)", (
     expect(body).not.toContain(long);
     expect(body).toContain(`@${bounded} (session: ${bounded}) — next: resume`);
     expect(body.split("\n").filter((line) => line.startsWith("### "))).toHaveLength(2);
+  });
+
+  it("caps an astral _meta.sessionID without splitting a surrogate pair", async () => {
+    await seedTask();
+    // 40 astral characters = 80 UTF-16 code units: over the 64-unit cap, so a
+    // raw code-unit cut would land inside the 32nd pair.
+    const astral = "😀".repeat(40);
+    // The pair at the cut is dropped whole: 31 astral characters + the marker
+    // are 63 code units (32 code points), within the cap.
+    const bounded = `${"😀".repeat(31)}…`;
+    expect(hasLoneSurrogate(astral)).toBe(false);
+    expect(hasLoneSurrogate(bounded)).toBe(false);
+    expect(bounded.length).toBeLessThanOrEqual(HANDOFF_SESSION_CAP);
+    expect(Array.from(bounded)).toHaveLength(32);
+
+    const comment = await client.request("tools/call", {
+      name: "arggon_comment",
+      arguments: { id: "task-rate-limit", text: "astral meta" },
+      _meta: { sessionID: astral },
+    });
+    expect(textContent(comment)).toMatchObject({ comment: { author: bounded } });
+
+    const handoff = await client.request("tools/call", {
+      name: "arggon_handoff",
+      arguments: { id: "task-rate-limit", next: "resume", branch: "feat/x" },
+      _meta: { sessionID: astral },
+    });
+    expect(textContent(handoff)).toMatchObject({
+      comment: { author: bounded },
+      handoff: { session: bounded },
+    });
+
+    // End to end: a split pair would have been written to disk as U+FFFD.
+    const body = readFileSync(taskPath(), "utf8");
+    expect(hasLoneSurrogate(body)).toBe(false);
+    expect(body).not.toContain("\ufffd");
+    expect(body).toContain(`@${bounded} (session: ${bounded}) — next: resume`);
+  });
+
+  it("cuts _meta.sessionID at a lone surrogate instead of forwarding malformed UTF-16", async () => {
+    await seedTask();
+    const cases: Array<[string, string]> = [
+      ["ses_high\ud83dmore", "ses_high"], // lone high surrogate mid-value
+      ["ses_low\udc00more", "ses_low"], // lone low surrogate mid-value
+    ];
+    for (const [sessionID, expected] of cases) {
+      const comment = await client.request("tools/call", {
+        name: "arggon_comment",
+        arguments: { id: "task-rate-limit", text: "lone surrogate meta" },
+        _meta: { sessionID },
+      });
+      expect(textContent(comment)).toMatchObject({ comment: { author: expected } });
+    }
+
+    // Lone-surrogate-only values normalize to nothing -> the @me fallback.
+    for (const sessionID of ["\ud83d", "\udc00", "\ud83d\ud83d"]) {
+      const comment = await client.request("tools/call", {
+        name: "arggon_comment",
+        arguments: { id: "task-rate-limit", text: "lone surrogate only" },
+        _meta: { sessionID },
+      });
+      expect(textContent(comment)).toMatchObject({ comment: { author: "fallback-user" } });
+    }
+
+    const handoff = await client.request("tools/call", {
+      name: "arggon_handoff",
+      arguments: { id: "task-rate-limit", next: "resume", branch: "feat/x" },
+      _meta: { sessionID: "\ud83d\ud83d" },
+    });
+    const envelope = textContent(handoff) as Record<string, unknown>;
+    expect(envelope).toMatchObject({ comment: { author: "fallback-user" } });
+    expect(envelope.handoff as Record<string, unknown>).not.toHaveProperty("session");
+
+    const body = readFileSync(taskPath(), "utf8");
+    expect(hasLoneSurrogate(body)).toBe(false);
+    expect(body).not.toContain("\ufffd");
   });
 
   it("keeps the envelope payloads byte-compatible otherwise (only the attributed value differs)", async () => {
