@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-doctor-human-output-injection
 title: "doctor human output: sanitize remaining untrusted channels (git remote URL, C1 controls)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T15:39:32.655Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-doctor-human-output-injection
 ---
 <!--
@@ -38,15 +37,15 @@ which fixed the `opencode` hint channel. Two residual channels remain:
 
 ## Acceptance
 
-- [ ] `git.remote` (and other interpolated repo values such as the root path)
+- [x] `git.remote` (and other interpolated repo values such as the root path)
       run through the same sanitizer; a test with a newline+ESC remote renders
       one inert line.
-- [ ] The sanitizer fallback also escapes `U+007F`–`U+009F` and `U+2028/29`
+- [x] The sanitizer fallback also escapes `U+007F`–`U+009F` and `U+2028/29`
       (or the boundary is explicitly documented with rationale); tests both
       directions.
-- [ ] Untrusted rendered values get a bounded length (or the decision to keep
+- [x] Untrusted rendered values get a bounded length (or the decision to keep
       them uncapped is recorded).
-- [ ] Full suite, lint, `validate`/`spec validate` green; small PR to
+- [x] Full suite, lint, `validate`/`spec validate` green; small PR to
       `opencode2`.
 
 ## Notes
@@ -77,3 +76,6 @@ Files: `cli/src/doctor.ts`, `cli/src/doctor.test.ts`, `docs/json-output.md`. PR:
 ### handoff 2026-09-18 @Arggon (session: ses_f4ad40e77fferCmzyNYYkx3bNI) — next: Review draft PR #341 against opencode2; address any review findings as follow-up items; coordinator/reviewer merges and flips status (worker does not merge or flip).
 - branch: fix/bug-doctor-human-output-injection
 - open questions: None — bounded-length decision recorded: cap 200 chars + ellipsis (MAX_HUMAN_VALUE_CHARS), JSON raw/uncapped
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; F2/F3 channels probed (hostile remote/root/C1 key inert single-line in human, raw in JSON; ordinary values byte-identical; 200-char pre-escape cap bounded to ~1.1k rendered; JSON uncapped), diff clean of formatter churn; 1162 tests; merged with cli pass. Residual error-path channel (cli.ts stderr) + cap wording + 2 test gaps filed as bug-cli-error-output-injection. Closing.
