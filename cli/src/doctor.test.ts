@@ -18,7 +18,7 @@ import {
   updateGeneratedSection,
   type GeneratedEntry,
 } from "./convention.js";
-import { GENERATED_DOC_COUNT } from "./docs.js";
+import { GENERATED_DOC_COUNT, OPENCODE_CONFIG_CANDIDATES } from "./docs.js";
 import {
   formatDoctorReport,
   MAX_OPENCODE_NAMES,
@@ -524,6 +524,42 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     expect(report).not.toContain("hint:");
   });
 
+  it("parses a block comment (/* */) outside strings (MINOR-2)", () => {
+    const dir = tempDir();
+    bareTree(dir);
+    writeFileSync(
+      join(dir, "opencode.json"),
+      '{\n  "formatter": true, /* one-line */\n' +
+        '  /* multi-line\n     block comment */ "mcp": { "servers": { "arggon": {} } }\n}\n',
+      "utf8",
+    );
+    const result = runDoctor({ cwd: dir });
+    // The `mcp.servers.arggon` AFTER the block comments is read: a stripper
+    // that dropped or corrupted block comments would yield no findings and no
+    // native registration.
+    expect(result.opencode.v1).toEqual({ findings: [], truncated: false });
+    expect(result.opencode.mcp.native).toBe(true);
+  });
+
+  it("parses // and /* */ markers inside string values, not as comments (MINOR-2)", () => {
+    const dir = tempDir();
+    bareTree(dir);
+    writeFileSync(
+      join(dir, "opencode.json"),
+      '{\n  "$schema": "https://opencode.ai/config.json",\n' +
+        '  "formatter": "value /* not a comment */ // still literal",\n' +
+        '  "enabled": true\n}\n',
+      "utf8",
+    );
+    const result = runDoctor({ cwd: dir });
+    // The V1-shaped `enabled` AFTER the marker-bearing string is found: a
+    // string-unaware stripper would corrupt the JSON and return no findings.
+    expect(result.opencode.v1).toEqual({
+      findings: [{ file: "opencode.json", keys: ["enabled"] }],
+      truncated: false,
+    });
+  });
+
   it("detects V1-shaped keys and emits the migration hint", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
@@ -552,6 +588,50 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     const report = formatDoctorReport(result);
     expect(report).toContain("hint: V1-shaped OpenCode config opencode.json");
     expect(report).toContain("V2 does not read .mcp.json");
+  });
+
+  it("does not flag the documented V2-valid mcp.timeout key (MINOR-2)", () => {
+    const dir = tempDir();
+    bareTree(dir);
+    writeAdopterConfig(dir, { mcp: { timeout: 30 } });
+    const result = runDoctor({ cwd: dir });
+    // `mcp.timeout` is a documented V2 child (docs/json-output.md) — flagging
+    // it would be a false positive. No seam and no `.mcp.json` on this tree, so
+    // the only possible hint source is the V1 findings list.
+    expect(result.opencode.v1).toEqual({ findings: [], truncated: false });
+    expect(formatDoctorReport(result)).not.toContain("hint:");
+  });
+
+  it("sanitizes ANSI escapes and newlines in untrusted config keys for human output (MINOR-1)", () => {
+    const dir = tempDir();
+    bareTree(dir);
+    // An `mcp.<name>` key copied verbatim from an adopter config: the ESC
+    // sequence could recolor/spoof the terminal and the newline could
+    // fabricate a whole extra `hint:` line.
+    const hostileName = "evil\u001b[31m\nspoof: fake hint";
+    const rawKey = `mcp.${hostileName}`;
+    writeAdopterConfig(dir, { enabled: true, mcp: { [hostileName]: { type: "local" } } });
+    const result = runDoctor({ cwd: dir });
+    // JSON payload keeps the raw key — one finding, sorted.
+    expect(result.opencode.v1).toEqual({
+      findings: [{ file: "opencode.json", keys: ["enabled", rawKey] }],
+      truncated: false,
+    });
+    const report = formatDoctorReport(result);
+    // Human output: no raw ESC and no fabricated line; the key is JSON-escaped
+    // (`\u001b`, `\n`) while the ordinary key still renders bare.
+    expect(report).not.toContain("\u001b");
+    expect(report).not.toContain("\nspoof");
+    expect(report).toContain('opencode.json (enabled, "mcp.evil\\u001b[31m\\nspoof: fake hint")');
+    // JSON output unchanged: the raw key survives the CLI JSON round trip.
+    const proc = runCli(["doctor", "--json"], dir);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      opencode: { v1: { findings: Array<{ file: string; keys: string[] }> } };
+    };
+    expect(body.opencode.v1.findings).toEqual([
+      { file: "opencode.json", keys: ["enabled", rawKey] },
+    ]);
   });
 
   it("adopter config with native mcp.servers.arggon registration: no hint", () => {
@@ -642,6 +722,21 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     const result = runDoctor({ cwd: dir });
     expect(result.opencode.configs).toEqual(["opencode.json", ".opencode/opencode.json"]);
     expect(result.opencode.mcp.native).toBe(true);
+  });
+
+  it("scans exactly the shared OPENCODE_CONFIG_CANDIDATES list from docs.ts (MINOR-3 parity)", () => {
+    const dir = tempDir();
+    bareTree(dir);
+    for (const rel of OPENCODE_CONFIG_CANDIDATES) {
+      const abs = join(dir, ...rel.split("/"));
+      mkdirSync(dirname(abs), { recursive: true });
+      writeFileSync(abs, "{}\n", "utf8");
+    }
+    const result = runDoctor({ cwd: dir });
+    // Doctor reports ALL present files in the shared candidate order; the pin
+    // fails if doctor ever re-hardcodes a divergent list.
+    expect(result.opencode.configs).toEqual([...OPENCODE_CONFIG_CANDIDATES]);
+    expect(result.opencode.v1).toEqual({ findings: [], truncated: false });
   });
 
   it("probes the cwd on non-initialized trees (block still additive)", () => {
