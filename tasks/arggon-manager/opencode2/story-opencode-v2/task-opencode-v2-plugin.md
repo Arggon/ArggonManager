@@ -35,18 +35,18 @@ is optional and failure-isolated.
 
 ## Acceptance
 
-- [ ] **Skeleton + bundling (W2):** source `opencode/plugins/arggon/index.ts`
+- [x] **Skeleton + bundling (W2):** source `opencode/plugins/arggon/index.ts`
       bundled by `init` to `.opencode/plugins/arggon/` with a generated marker
       and an `x-generated` provenance entry; byte-parity test against the
       bundled copy (mirrors `skill-copy.test.ts`); init re-runs refresh
       untouched copies and skip modified ones.
-- [ ] **MCP auto-registration:** `ctx.mcp.transform` registers the arggon
+- [x] **MCP auto-registration:** `ctx.mcp.transform` registers the arggon
       server only when `editor.get("arggon")` is absent (never clobbers a
       configured server); a pre-existing config is respected.
-- [ ] **Failure isolation:** every plugin path is wrapped so any failure logs
+- [x] **Failure isolation:** every plugin path is wrapped so any failure logs
       and no-ops; CLI and MCP keep working with the plugin broken or absent;
       no-op outside ArggonManager trees.
-- [ ] **Smoke harness:** scripted `opencode run` evidence (`npm run
+- [x] **Smoke harness:** scripted `opencode run` evidence (`npm run
       smoke:opencode`) asserting skill discovery, agents/commands visibility,
       MCP registration, context injection and a full next → start → done cycle
       on a fixture; transcripts stored as review evidence.
