@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-tracker-title-rescape
 title: Tracker serializer doubles backslashes in quoted titles on every mutation
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T22:26:56.651Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-tracker-title-rescape
 ---
 <!--
@@ -75,8 +74,11 @@ Parsed all 246 tracker `*.md` files with the fixed parser: exactly one backslash
 
 ### Gates
 
-Full suite 76 files / 1268 tests green (private TMPDIR), `lint`, `build`, `arggon validate` (0 warnings), `arggon spec validate` (16 docs, 0 warnings) all green.
+Full suite 76 files / 1274 tests green (private TMPDIR), `lint`, `build`, `arggon validate` (0 warnings), `arggon spec validate` (16 docs, 0 warnings) all green.
 
 ### handoff 2026-09-18 @Arggon (session: ses_f495ec723ffe3PVYOH04jwj9Af) — next: Review draft PR #360 (fix/bug-tracker-title-rescape), merge to opencode2, then flip this item to done. No code work outstanding; all acceptance boxes checked.
 - branch: fix/bug-tracker-title-rescape
 - open questions: latent follow-up bug-convention-config-scalar-unescape (cli/src/convention.ts yamlQuote/stripQuotes) is filed but unclaimed; no live .convention.yml value is affected
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; root cause fixed (parseScalar decodes the YAML double-quoted escape set; formatScalar quotes backslash- and control-bearing values), the live corruption was restored byte-faithfully against the create commit (512→4) and the 248-file scan shows no other value's meaning changed; the F1 latent regression (decoded control chars written raw) was folded in with the quote-class fix + kernel regression test; 76 files/1274 tests + CI pass; merged. Closing.
