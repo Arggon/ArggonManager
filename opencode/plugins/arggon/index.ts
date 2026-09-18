@@ -155,75 +155,348 @@ export function isArggonItemId(value: unknown): value is string {
 
 const ARGON_ITEM_SUBCOMMANDS = new Set(["update", "show", "comment", "handoff", "branch", "start"])
 
-/** Package runners whose `run <script>` form may launch the arggon CLI. */
+/** Package runners whose `<launcher> arggon` form may launch the arggon CLI. */
 const COMMAND_RUNNERS = new Set(["npm", "pnpm", "yarn", "bun"])
+const RUNNER_LAUNCHERS = new Set(["run", "exec", "dlx"])
+
+/** Wrappers that run the next command (`npx arggon …`, `sudo arggon …`). */
+const WRAPPERS = new Set(["npx", "bunx", "sudo", "env", "command", "time"])
+
+/** Wrapper options that consume the following token (best effort, common forms). */
+const WRAPPER_VALUE_OPTIONS: Record<string, ReadonlySet<string>> = {
+  sudo: new Set([
+    "-u", "--user", "-g", "--group", "-h", "--host", "-p", "--prompt", "-C", "--close-from",
+    "-T", "--command-timeout", "-R", "--chroot", "-D", "--chdir", "-r", "--role", "-t", "--type",
+  ]),
+  env: new Set(["-u", "--unset", "-C", "--chdir", "-S", "--split-string"]),
+  npx: new Set(["-p", "--package", "--cache", "--userconfig", "--node-options", "--prefix"]),
+  bunx: new Set(["-p", "--package"]),
+  time: new Set(["-o", "--output", "-f", "--format"]),
+  command: new Set(),
+}
 
 const ENV_ASSIGNMENT = /^[A-Za-z_][A-Za-z0-9_]*=/
 
-/** Whitespace tokens of one `;`/`&`/`|` segment, with surrounding quotes stripped. */
+/** Bare grouping tokens (`( cmd`, `$( cmd`) skipped before the command. */
+const SHELL_OPENERS = new Set(["(", "$("])
+
+/**
+ * Shell-ish segment splitter: `;`/`&`/`|` runs and newlines split commands only
+ * outside single/double quotes (`echo "&& arggon show task-x"` stays ONE
+ * segment, F2) and `#` comments are dropped. Quotes stay in the text for
+ * `splitTokens`. Best effort: not a full shell lexer (no heredocs, no `$'…'`).
+ */
+function splitSegments(command: string): string[] {
+  const segments: string[] = []
+  let current = ""
+  let quote: '"' | "'" | null = null
+  let escaped = false
+  let wordStart = true
+  let comment = false
+  for (let i = 0; i < command.length; i += 1) {
+    const ch = command[i]
+    if (comment) {
+      if (ch === "\n") {
+        comment = false
+        segments.push(current)
+        current = ""
+        wordStart = true
+      }
+      continue
+    }
+    if (quote === "'") {
+      current += ch
+      if (ch === "'") {
+        quote = null
+        wordStart = false
+      }
+      continue
+    }
+    if (escaped) {
+      current += ch
+      escaped = false
+      wordStart = false
+      continue
+    }
+    if (ch === "\\") {
+      current += ch
+      escaped = true
+      continue
+    }
+    if (ch === '"' || ch === "'") {
+      current += ch
+      if (quote === ch) {
+        quote = null
+        wordStart = false
+      } else if (quote === null) {
+        quote = ch
+      }
+      continue
+    }
+    if (quote === null && ch === "#" && wordStart) {
+      comment = true
+      continue
+    }
+    if (quote === null && (ch === ";" || ch === "&" || ch === "|" || ch === "\n" || ch === "\r")) {
+      segments.push(current)
+      current = ""
+      wordStart = true
+      continue
+    }
+    current += ch
+    wordStart =
+      ch === " " || ch === "\t" || ch === "(" || ch === ")" || ch === "{" || ch === "}"
+  }
+  segments.push(current)
+  return segments
+}
+
+/**
+ * Whitespace tokens of one segment. Quoted spans stay one token (quotes
+ * stripped) so `echo "arggon show task-x"` is `["echo", "arggon show task-x"]`
+ * — a mention, never a command. Backslashes escape the next character outside
+ * single quotes.
+ */
 function splitTokens(segment: string): string[] {
-  return segment
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((token) => token.replace(/^["']|["']$/g, ""))
+  const tokens: string[] = []
+  let current = ""
+  let quote: '"' | "'" | null = null
+  let escaped = false
+  let started = false
+  for (let i = 0; i < segment.length; i += 1) {
+    const ch = segment[i]
+    if (quote === "'") {
+      if (ch === "'") quote = null
+      else current += ch
+      continue
+    }
+    if (escaped) {
+      current += ch
+      escaped = false
+      started = true
+      continue
+    }
+    if (ch === "\\") {
+      escaped = true
+      started = true
+      continue
+    }
+    if (ch === '"') {
+      if (quote === '"') quote = null
+      else if (quote === null) quote = '"'
+      started = true
+      continue
+    }
+    if (ch === "'") {
+      quote = "'"
+      started = true
+      continue
+    }
+    if (/\s/.test(ch)) {
+      if (started) {
+        tokens.push(current)
+        current = ""
+        started = false
+      }
+      continue
+    }
+    current += ch
+    started = true
+  }
+  if (started) tokens.push(current)
+  return tokens
+}
+
+/** Assignment token (`VAR=value`) that does not itself hide a substitution. */
+function isEnvAssignment(token: string): boolean {
+  return ENV_ASSIGNMENT.test(token) && !token.includes("$(")
+}
+
+/**
+ * Command head of one token: quotes/escapes and a leading `VAR=` assignment
+ * stripped, `$(`/`(`/`{` grouping openers removed (so `x=$(arggon`, `(arggon`
+ * and `$(arggon` all yield `arggon`), trailing group closers dropped, then the
+ * last path segment kept (`/usr/local/bin/arggon` → `arggon`).
+ */
+function commandHead(token: string): string {
+  return (
+    token
+      .replace(/^["'\\]+/, "")
+      .replace(/^[A-Za-z_][A-Za-z0-9_]*=/, "")
+      .replace(/^\$?\(+/, "")
+      .replace(/^\{+/, "")
+      .replace(/[)}]+$/, "")
+      .split("/")
+      .pop() ?? ""
+  )
+}
+
+/** Skip `-x`/`--long` wrapper options; known value options eat their value. */
+function skipWrapperOptions(tokens: string[], index: number, wrapper: string): number {
+  const valueOptions = WRAPPER_VALUE_OPTIONS[wrapper]
+  let at = index
+  while (at < tokens.length && tokens[at].startsWith("-")) {
+    const option = tokens[at]
+    at += 1
+    if (valueOptions !== undefined && valueOptions.has(option)) at += 1
+  }
+  return at
 }
 
 /**
  * Index of the `arggon` binary when it is in command position, or -1.
  *
- * Anchored to the command: the first token of a `&&`/`;`/`|` segment, after
- * leading `VAR=value` assignments, or the script slot of
- * `npm|pnpm|yarn|bun run arggon …`. Tokens that merely *mention* arggon —
- * `grep -rn "arggon show task-x"`, `echo "arggon update task-fake"`,
- * `git commit -m "arggon handoff task-x"` — are arguments, not commands.
- * Best effort: indirect invocations (`sh -c "arggon …"`, `xargs arggon …`,
- * backticks) are not detected; misses are harmless, false positives are not.
+ * Anchored to the command: the first token of a `;`/`&`/`|`/newline segment,
+ * after leading `VAR=value` assignments and wrapper prefixes
+ * (`npx`/`bunx`/`sudo`/`env`/`command`/`time`, with their options), or the
+ * script slot of `npm|pnpm|yarn|bun (run|exec|dlx) arggon …`. Tokens that
+ * merely *mention* arggon — `grep -rn "arggon show task-x"`, `echo "arggon
+ * update task-fake"`, `git commit -m "arggon handoff task-x"` — are
+ * arguments, not commands. Best effort: indirect invocations (`sh -c "arggon
+ * …"`, `timeout 5 arggon …`, `xargs arggon …`, backticks) are not detected;
+ * misses are harmless, false positives are not.
  */
 function argCommandIndex(tokens: string[]): number {
   let index = 0
-  let head = tokens[index]
-  while (head !== undefined && ENV_ASSIGNMENT.test(head)) {
-    index += 1
-    head = tokens[index]
-  }
-  if (head === undefined) return -1
-  if (head.split("/").pop() === "arggon") return index
-  const runner = head.split("/").pop()
-  if (
-    runner !== undefined &&
-    COMMAND_RUNNERS.has(runner) &&
-    tokens[index + 1] === "run" &&
-    tokens[index + 2] === "arggon"
-  ) {
-    return index + 2
+  while (index < tokens.length) {
+    const token = tokens[index]
+    if (SHELL_OPENERS.has(token)) {
+      index += 1
+      continue
+    }
+    if (isEnvAssignment(token)) {
+      index += 1
+      continue
+    }
+    const head = commandHead(token)
+    if (head === "arggon") return index
+    if (COMMAND_RUNNERS.has(head)) {
+      return tokens[index + 1] !== undefined &&
+        RUNNER_LAUNCHERS.has(tokens[index + 1]) &&
+        tokens[index + 2] === "arggon"
+        ? index + 2
+        : -1
+    }
+    if (WRAPPERS.has(head)) {
+      index = skipWrapperOptions(tokens, index + 1, head)
+      continue
+    }
+    return -1
   }
   return -1
 }
 
+/** Item id from an `arggon <subcommand> <id>` token stream at the binary index. */
+function itemFromTokens(tokens: string[], at: number): string | undefined {
+  let j = at + 1
+  while (j < tokens.length && (tokens[j] === "--" || tokens[j].startsWith("-"))) j += 1
+  const subcommand = tokens[j]
+  if (subcommand === undefined || !ARGON_ITEM_SUBCOMMANDS.has(subcommand)) return undefined
+  // CLI grammar: `<id>` is the positional immediately after the subcommand.
+  // A trailing group closer (`$(arggon show task-x)`) is not part of the id.
+  const candidate = tokens[j + 1]?.replace(/[)}]+$/, "")
+  if (candidate !== undefined && !candidate.startsWith("-") && isArggonItemId(candidate)) {
+    return candidate
+  }
+  return undefined
+}
+
 /**
- * Extract the item id of an `arggon <subcommand> <id>` shell invocation that
- * occurs in command position (see `argCommandIndex`). Handles
- * `npm run arggon -- show <id>`, `VAR=1 arggon …` and absolute/relative binary
- * paths; quoted arguments that merely mention an arggon command are ignored.
+ * Contents of command substitutions (`$(…)`) and subshells (`(…)`) in one
+ * segment, in source order. Quote-aware: `$(…)` inside double quotes runs,
+ * everything inside single quotes is inert, escaped openers are skipped.
+ * Best effort: not a full shell lexer (documented limits in the docstring of
+ * `parseArggonItemFromCommand`).
  */
-export function parseArggonItemFromCommand(command: unknown): string | undefined {
-  if (typeof command !== "string" || command === "") return undefined
-  for (const segment of command.split(/[;&|]+/)) {
+function findCommandGroups(text: string): string[] {
+  const groups: string[] = []
+  let quote: '"' | "'" | null = null
+  let escaped = false
+  let depth = 0
+  let start = -1
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i]
+    if (quote === "'") {
+      if (ch === "'") quote = null
+      continue
+    }
+    if (escaped) {
+      escaped = false
+      continue
+    }
+    if (ch === "\\") {
+      escaped = true
+      continue
+    }
+    if (ch === '"') {
+      if (quote === '"') quote = null
+      else if (quote === null) quote = '"'
+      continue
+    }
+    if (ch === "'" && quote === null) {
+      quote = "'"
+      continue
+    }
+    const dollarParen = ch === "$" && text[i + 1] === "("
+    if (dollarParen || (ch === "(" && quote === null)) {
+      if (depth === 0) start = i + (dollarParen ? 2 : 1)
+      depth += 1
+      if (dollarParen) i += 1
+      continue
+    }
+    if (ch === ")" && depth > 0) {
+      depth -= 1
+      if (depth === 0 && start >= 0) {
+        groups.push(text.slice(start, i))
+        start = -1
+      }
+    }
+  }
+  return groups
+}
+
+const MAX_SUBSTITUTION_DEPTH = 3
+
+/** One command text: command-position match per segment, then `$(…)`/`(…)` contents. */
+function parseCommandText(command: string, depth: number): string | undefined {
+  for (const segment of splitSegments(command)) {
     const tokens = splitTokens(segment)
     const at = argCommandIndex(tokens)
-    if (at === -1) continue
-    let j = at + 1
-    while (j < tokens.length && (tokens[j] === "--" || tokens[j].startsWith("-"))) j += 1
-    const subcommand = tokens[j]
-    if (subcommand === undefined || !ARGON_ITEM_SUBCOMMANDS.has(subcommand)) continue
-    // CLI grammar: `<id>` is the positional immediately after the subcommand.
-    const candidate = tokens[j + 1]
-    if (candidate !== undefined && !candidate.startsWith("-") && isArggonItemId(candidate)) {
-      return candidate
+    if (at !== -1) {
+      const id = itemFromTokens(tokens, at)
+      if (id !== undefined) return id
+    }
+    if (depth < MAX_SUBSTITUTION_DEPTH) {
+      for (const group of findCommandGroups(segment)) {
+        const id = parseCommandText(group, depth + 1)
+        if (id !== undefined) return id
+      }
     }
   }
   return undefined
+}
+
+/**
+ * Extract the item id of an `arggon <subcommand> <id>` shell invocation that
+ * occurs in command position (see `argCommandIndex`).
+ *
+ * Recognized: `VAR=1 arggon …`, absolute/relative binary paths, wrapper
+ * prefixes (`npx`/`bunx`/`sudo`/`env`/`command`/`time`, including common
+ * options), `npm|pnpm|yarn|bun (run|exec|dlx) arggon …`, `$(…)` command
+ * substitutions and `(…)` subshells, and `;`/`&`/`|`/newline-separated
+ * commands. Quoted text is inert: `grep -rn "arggon show task-x"`,
+ * `echo "&& arggon show task-x"` and `echo '(arggon show task-x)'` do not
+ * correlate, while `echo "$(arggon show task-x)"` does (the substitution runs).
+ *
+ * Best effort, misses are harmless and false positives are not: aliases,
+ * backticks, `sh -c "arggon …"`, `timeout 5 arggon …` and `xargs arggon …`
+ * are not detected; `#` comments are dropped, while heredoc bodies and nested
+ * quoting inside a group are not modeled. The `arggon_*` Code Mode regex (see
+ * `parseArggonItemFromCode`) stays a raw-source best effort of its own.
+ */
+export function parseArggonItemFromCommand(command: unknown): string | undefined {
+  if (typeof command !== "string" || command === "") return undefined
+  return parseCommandText(command, 0)
 }
 
 /**
@@ -302,7 +575,7 @@ export function itemIdFromBranch(branch: unknown): string | undefined {
 /** True when a shell command looks like a git commit (best effort). */
 export function looksLikeCommitCommand(command: unknown): boolean {
   if (typeof command !== "string" || command === "") return false
-  for (const segment of command.split(/[;&|]+/)) {
+  for (const segment of splitSegments(command)) {
     const tokens = splitTokens(segment)
     const gitAt = tokens.findIndex((token) => token.split("/").pop() === "git")
     if (gitAt === -1) continue

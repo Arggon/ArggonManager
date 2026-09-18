@@ -40,21 +40,33 @@ or the V1 schema for V2 work.
   - **W3 session context** — resolves the session's active item in this order:
     `ARGON_ITEM` env override → item ids observed from `arggon` invocations
     (shell commands, `arggon_*` MCP calls, Code Mode code) stored per session
-    via `ctx.storage` → VCS branch (`feat/<id>` / `fix/<id>`). The branch read
-    uses `ctx.vcs.get()` first and falls back to `git rev-parse --abbrev-ref
-    HEAD` (probe: on 2.0.7 `vcs.get()` returns an empty `data.branch`), both
+    via `ctx.storage` → VCS branch (`feat/<id>` / `fix/<id>`). Observed shell
+    invocations are anchored to command position: quoted mentions (`grep -rn
+    "arggon show task-x"`, `echo "arggon update task-fake"`), quoted separators
+    and single-quoted `$()` never correlate, while wrapper prefixes
+    (`npx`/`bunx`/`sudo`/`env`/`command`/`time`), `$(…)`/subshell forms and
+    newline-separated commands do; the Code Mode `arggon_*` regex stays a
+    raw-source best effort (a call inside a string literal can correlate, then
+    self-heals when `arggon show` disagrees). The branch read uses
+    `ctx.vcs.get()` first and falls back to `git rev-parse --abbrev-ref HEAD`
+    (probe: on 2.0.7 `vcs.get()` returns an empty `data.branch`), both
     `execFile` argument arrays. On every agent-loop model call it appends a
     bounded advisory block (`arggon show <id> --meta --json`, **≤ 1024 UTF-8
     bytes**, cached ~5 s) through `session.hook("context")` — per-call
-    injection, so the block is present again after compaction. A claimed item
+    injection, so the block is present again after compaction. All plugin
+    caches are bounded (256 entries, oldest-first) and the item cache is keyed
+    by project directory + item id, so a long-lived `opencode serve` cannot
+    cross-contaminate item views across projects. A claimed item
     (`in_progress` + assignee) renames the session to the item id
     (`ctx.session.update` on 2.0.7, where `ctx.session.rename` is absent);
     a recorded `worktree_path` is surfaced for `session_move` guidance. After a
     shell `git commit` it runs `arggon validate --json` and logs a warning on
     failure — never blocking; pre-commit/CI stay authoritative. No `tasks/`
     tree, no resolution, no CLI → the hook is silent. Evidence harness:
-    `npm run smoke:opencode` (real headless `opencode run`; exits 0 with
-    `skipped: opencode not installed` when absent).
+    `npm run smoke:opencode` (real headless `opencode run`) — it logs the
+    injected text as `block=<json>` and measures those bytes independently
+    (reported = measured, ≤ 1024) instead of trusting the reported count; exits
+    0 with `skipped: opencode not installed` when absent.
 - MCP (https://opencode.ai/v2/docs/mcp-servers/): V2 does not use `.mcp.json`
   as a registration mechanism — register the server under `mcp.servers` as
   `{ "type": "local", "command": ["arggon", "mcp"] }`; the generated
@@ -94,8 +106,11 @@ or the V1 schema for V2 work.
   ≤ 1024-byte item block per model call (never the comment tail), `ARGON_ITEM`
   is read per call, and every surface is feature-detected — on 2.0.7
   `ctx.session.rename` and `ctx.vcs.branches` are absent, so the plugin uses
-  `ctx.session.update` and `git` respectively. The tracker, pre-commit and CI
-  remain the only authority; a missing surface degrades to a no-op.
+  `ctx.session.update` and `git` respectively. Correlation is anchored to
+  command position and quoted text is inert; its caches are bounded
+  (`CACHE_MAX_ENTRIES = 256`, oldest-first) and the item cache is keyed by
+  project directory + item id. The tracker, pre-commit and CI remain the only
+  authority; a missing surface degrades to a no-op.
 - **Vendored plugin imports stay guarded.** The V2 plugin docs show a static
   `import { Plugin } from "@opencode/plugin"`; in a dependency-less tree (no
   `node_modules` — the `arggon init` adopter shape) an auto-discovered plugin
