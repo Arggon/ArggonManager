@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   CACHE_MAX_ENTRIES,
   ITEM_BLOCK_MAX_BYTES,
+  MAX_SUBSTITUTION_DEPTH,
   boundText,
   buildItemBlock,
   isArggonItemId,
@@ -111,6 +112,71 @@ describe("plugin-context: arggon invocation parsing", () => {
     expect(
       parseArggonItemFromCommand('echo "&& arggon show task-fake" && arggon show task-x'),
     ).toBe("task-x");
+  });
+
+  it("keeps escaped $() openers literal (F-A)", () => {
+    // bash: `echo \$(arggon show task-x)` is a syntax error — nothing executes.
+    expect(parseArggonItemFromCommand("echo \\$(arggon show task-x)")).toBeUndefined();
+    expect(parseArggonItemFromCommand("\\$(arggon show task-x)")).toBeUndefined();
+    expect(parseArggonItemFromCommand('echo "\\$(arggon show task-x)"')).toBeUndefined();
+    // A literal backslash before the substitution leaves `$(` real, so it runs.
+    expect(parseArggonItemFromCommand("echo \\\\$(arggon show task-x)")).toBe("task-x");
+    expect(parseArggonItemFromCommand("echo $(arggon show task-x)")).toBe("task-x");
+  });
+
+  it("does not read quoted or query forms as executions (F-B)", () => {
+    expect(parseArggonItemFromCommand("command -v arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand("command -V arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand("command -pv arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand('"(" arggon show task-x')).toBeUndefined();
+    expect(parseArggonItemFromCommand("'(' arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand('"$(" arggon show task-x')).toBeUndefined();
+    expect(parseArggonItemFromCommand('"x=1" arggon show task-x')).toBeUndefined();
+    // The executable neighbours of those forms stay recognized.
+    expect(parseArggonItemFromCommand("command arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("command -p arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("command -- arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("( arggon show task-x)")).toBe("task-x");
+    expect(parseArggonItemFromCommand("time ( arggon show task-x)")).toBe("task-x");
+    expect(parseArggonItemFromCommand('"/usr/local/bin/arggon" show task-x')).toBe("task-x");
+  });
+
+  it("keeps token quote state like the segment splitter (F-C)", () => {
+    // A `'` inside an open double quote is literal text: the assignment prefix
+    // and the command after it still correlate (bash runs arggon).
+    expect(parseArggonItemFromCommand(`x="it's" arggon show task-x`)).toBe("task-x");
+    expect(parseArggonItemFromCommand(`VAR='say "hi"' arggon show task-x`)).toBe("task-x");
+    // Mentions stay inert with either quote style.
+    expect(parseArggonItemFromCommand(`echo "it's" arggon show task-x`)).toBeUndefined();
+    expect(parseArggonItemFromCommand(`echo 'say "hi"' arggon show task-x`)).toBeUndefined();
+  });
+
+  it("caps substitution depth at MAX_SUBSTITUTION_DEPTH (F-D)", () => {
+    const nested = (levels: number): string =>
+      `${"echo $(".repeat(levels)}arggon show task-x${")".repeat(levels)}`;
+    expect(parseArggonItemFromCommand(nested(1))).toBe("task-x");
+    expect(parseArggonItemFromCommand(nested(MAX_SUBSTITUTION_DEPTH))).toBe("task-x");
+    expect(parseArggonItemFromCommand(nested(MAX_SUBSTITUTION_DEPTH + 1))).toBeUndefined();
+  });
+
+  it("drops # comments outside quotes (F-D)", () => {
+    expect(parseArggonItemFromCommand("# note && arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand("arggon show task-x # arggon update task-y")).toBe("task-x");
+    expect(parseArggonItemFromCommand("# arggon show task-x\narggon show task-y")).toBe("task-y");
+    expect(parseArggonItemFromCommand("arggon show task-x#frag")).toBeUndefined();
+    expect(parseArggonItemFromCommand('echo "text # more" && arggon show task-x')).toBe("task-x");
+  });
+
+  it("keeps newlines inside quotes inside one token (F-D)", () => {
+    expect(parseArggonItemFromCommand('echo "line1\narggon show task-x"')).toBeUndefined();
+    expect(parseArggonItemFromCommand('arggon comment task-x "line1\nline2"')).toBe("task-x");
+  });
+
+  it("eats wrapper value options (F-D)", () => {
+    expect(parseArggonItemFromCommand("env -u FOO arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("env --unset FOO arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("time -o /tmp/time.txt arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("time -f %e arggon show task-x")).toBe("task-x");
   });
 
   it("does not confuse wrapper-prefixed non-arggon commands (F1)", () => {
