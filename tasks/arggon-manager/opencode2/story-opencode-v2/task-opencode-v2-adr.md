@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode-v2-adr
 title: "ADR 0010: OpenCode V2 integration architecture"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p1
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T00:30:56.401Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/story-opencode-v2/task-opencode-v2-adr.md
@@ -47,7 +46,7 @@ plan, because a plan cannot point at a decision that does not exist yet.
       plugin-only rewrite.
 - [x] Non-goals stated: no rules outside `cli/src/rules.ts`, no OpenCode
       dependency in the core, no reliance on inert V2 surfaces.
-- [ ] Status flips `Proposed` → `Accepted` on merge of the ADR (W0/W1 PR).
+- [x] Status flips `Proposed` → `Accepted` on merge of the ADR (W0/W1 PR).
 
 ## Notes
 

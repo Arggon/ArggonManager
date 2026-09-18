@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode-v2-playbook
 title: "Playbook: OpenCode 2.0.7 and docs reference integration"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T00:57:29.519Z"
 depends_on: [task-opencode-v2-adr]
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-playbook
 ---
@@ -34,20 +33,20 @@ docs the integration points to. Local version verified: `opencode v2.0.7`
 
 ## Acceptance
 
-- [ ] `arggon playbook new opencode --version 2.0.7` then `playbook refresh`
+- [x] `arggon playbook new opencode --version 2.0.7` then `playbook refresh`
       once research is recorded; sections filled: Setup, Conventions, Testing,
       Security, Upgrade policy — sourced from the exploration (V2 docs URLs,
       access date).
-- [ ] `docs/playbooks/opencode.md` records the verified wiring: `.agents/skills`
+- [x] `docs/playbooks/opencode.md` records the verified wiring: `.agents/skills`
       auto-discovery, `AGENTS.md` as the only instruction mechanism (V2 ignores
       `CLAUDE.md`), `mcp.servers` registration, config precedence, never-invent
       V2 fields from the V1 schema.
-- [ ] `docs/agents.md` §Reference integrations gains an OpenCode V2 subsection
+- [x] `docs/agents.md` §Reference integrations gains an OpenCode V2 subsection
       (generated-stanza excerpt + link to the playbook); add an
       `arggon instructions` extraction hook only if the snippet should be
       printable (`cli/src/instructions.ts` heading contract, plus its test).
-- [ ] README user-facing note where the agent wiring is described.
-- [ ] `arggon playbook status` shows the playbook current (no stale finding).
+- [x] README user-facing note where the agent wiring is described.
+- [x] `arggon playbook status` shows the playbook current (no stale finding).
 
 ## Notes
 
@@ -80,3 +79,6 @@ Not done, reported instead: README untouched (file ownership; PR #322's README b
 ### handoff 2026-09-18 @Arggon — next: Review docs/playbooks/opencode.md + docs/agents.md OpenCode V2 section against PR #322's seam code; merge #322 first so the spec-opencode-seam-010 link resolves.
 - branch: feat/task-opencode-v2-playbook
 - open questions: README acceptance bullet left untouched (file ownership) — confirm #322's README bullet covers it; optional argpon instructions extraction hook skipped.
+
+### 2026-09-18 @Arggon
+Coordinator review + merge verification: merged via PR #323 (cli pass). Playbook current (playbook status stale-free, researched 2026-09-18), README pointer + .mcp.json precision fix landed (2fc3686), agents.md OpenCode V2 subsection verified. Closing.

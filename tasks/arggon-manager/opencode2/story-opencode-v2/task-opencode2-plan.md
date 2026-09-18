@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode2-plan
 title: "Program plan: OpenCode2 refactor waves"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p1
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T00:30:56.139Z"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/story-opencode-v2/task-opencode2-plan.md

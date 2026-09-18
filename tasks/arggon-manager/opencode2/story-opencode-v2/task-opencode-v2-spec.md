@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode-v2-spec
 title: "Spec and plan: generated .opencode seam (config, agents, commands)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p1
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T00:36:59.370Z"
 depends_on: [task-opencode-v2-adr]
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-spec
 ---
@@ -151,3 +150,6 @@ PR #322 fix verification — after push (ff08631):
 - After: workflow run 35294337596 (`pull_request` on feat/task-opencode-v2-spec — the opencode2 trigger) ran the `cli` job to completion: **cli pass (2m1s)**. MAJOR-2 verified end-to-end.
 
 PR body updated with a "Review fixes" section. No status change (review fixes only).
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: PR #322 merged into opencode2 (cli pass). Review fixes independently probed by the coordinator (adopter .opencode config wins; both files byte-identical before/after). Closing; W1 remaining: task-opencode-v2-doctor (PR #324, CI fix in flight).
