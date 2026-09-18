@@ -95,3 +95,7 @@ D. `spec analyze --save-baseline "<dir>/bad\nspoof: fake item<ESC>[31m<C1><DEL><
 **Gates.** `npm test` 74 files / 1219 tests green (private TMPDIR); `npm run lint` clean; `npm run build` clean; `arggon validate --json` ok (0 errors/0 warnings); `arggon spec validate --json` ok. Changed hunks are prettier-clean (base files have pre-existing non-conformance).
 
 **Scope.** `cli/src/cli.ts`, `cli/src/spec.ts` (2 baseline formatter lines + doc note), new test file, tracker (this item + the filed follow-up). No changes to `handoff.ts`, `mcp-server.ts`, `start.ts`/`cleanup.ts`, plugin files, or docs.
+
+### handoff 2026-09-18 @Arggon — next: Review draft PR #354 (https://github.com/Arggon/ArggonManager/pull/354) against opencode2; file any findings as follow-ups; coordinator/reviewer merges and flips status (worker does not merge or flip…
+- branch: feat/task-success-stdout-sanitize
+- open questions: None blocking. Audit decisions are in the evidence comment: sanitizeHumanError (2000 cap) for success values, argv path-like values sanitized anyway, instructions/show-body verbatim-content boundary,…
