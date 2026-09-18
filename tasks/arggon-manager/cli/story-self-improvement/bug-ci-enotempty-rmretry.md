@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-ci-enotempty-rmretry
 title: "CI ENOTEMPTY recurs even with rmSync retries (worktree.test.ts, run 35401030576)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T22:26:59.188Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-ci-enotempty-rmretry
 ---
 <!--
@@ -99,3 +98,6 @@ under the hardened helper.
 ### handoff 2026-09-18 @Arggon — next: Review draft PR #362 (base opencode2, CI green: https://github.com/Arggon/ArggonManager/actions/runs/35403358563) — root-cause trace2 test + settling helper + fixture opt-out; merge it, verify on mai…
 - branch: fix/bug-ci-enotempty-rmretry
 - open questions: The removeFixtureTree backstop also covers the other fixture suites (claim-race, cascade, comment-race, config-race, board-serve, mcp-smoke, show, torture); extending disableAutoMaintenance to those …
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; the diagnosis is source-verified (detached git maintenance daemon holds objects/maintenance.lock for its lifetime; Node 22 rmSync children-pass-then-bare-rmdir semantics) and reproduced both directions (old helper 3/3 ENOTEMPTY at ~2.75s vs new settles at ~3.0s; non-retriable errors throw at 0ms; 15s deadline bounded), production-neutral, and all three review follow-ups were folded in (initFixtureRepo shared opt-out incl. the bare remote and the post-#363 exoticRepo reconciliation, row-table/success-stdout migrated to removeFixtureTree, opt-outs pinned). 77 files/1293 tests + CI pass; merged. Closing.
