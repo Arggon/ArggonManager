@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-ci-enotempty-rmretry
 title: "CI ENOTEMPTY recurs even with rmSync retries (worktree.test.ts, run 35401030576)"
-priority: p2
+assignee: Arggon
+branch: fix/bug-ci-enotempty-rmretry
 parent: story-self-improvement
 labels: []
+priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T22:26:59.188Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-ci-enotempty-rmretry
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/bug-ci-enotempty-rmretry.md
