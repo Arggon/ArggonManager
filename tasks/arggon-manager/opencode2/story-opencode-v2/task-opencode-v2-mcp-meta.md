@@ -71,3 +71,7 @@ Raw stdio probe (expected vs observed): fixture tree + JSON-RPC `tools/call` lin
 - explicit `session`/`author` + ignored meta → observed `explicit-user` / `sess_explicit` (explicit wins ✅).
 
 Repro script: `/tmp/opencode/mcp-meta-probe/probe.sh` (local evidence, not committed). Full raw output is in the PR body of #326.
+
+### handoff 2026-09-18 @Arggon (session: ses_f4dadcc7fffehkUkI3RuIzyXRk) — next: Coordinator: review PR #326 (draft, base opencode2) against the W3 contract, then tick the acceptance checklist and flip to done after merge.
+- branch: feat/task-opencode-v2-mcp-meta
+- open questions: None; docs/json-output.md intentionally unchanged (no envelope contract change).
