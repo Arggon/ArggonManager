@@ -55,3 +55,55 @@ Non-blocking findings from the independent review of PR #329
 ## Notes
 
 - Report-only tool; none of this blocks W7.
+
+### 2026-09-18 @Arggon
+**F4 — history robustness (done).** `reconstructBeforeAfter()` now detects the
+W5 split from the revision's own tree
+(`git ls-tree -r --name-only <rev> -- skills/arggon-cli/references`), never one
+hardcoded `json-contract.md`; it checks the working tree for the
+`SKILL.md` + `references/` pair before walking revisions and never throws — it
+returns an explicit reason, printed as `before/after: unavailable (<reason>)`
+and surfaced in JSON as `skillBeforeAfterUnavailable` (`null` when measured).
+
+- Probe `context-report-pre-split` (temp repo: post-split commit, then a
+  simulated pre-W5 checkout with no `references/`): old script exit 1,
+  `ENOENT ... readdirSync ... reconstructBeforeAfter`; fixed script exit 0,
+  `before/after: unavailable (working tree has no skills/arggon-cli/SKILL.md +
+skills/arggon-cli/references/ pair (pre-W5 checkout?): the after side cannot
+be measured)`.
+- Probe `context-report-shallow` (post-split tree, history depth 1, no
+  pre-split revision): exit 0, `before/after: unavailable (no revision of
+skills/arggon-cli/SKILL.md without a references/ tree in the available
+history (shallow clone?))`.
+
+**F5 — column collision (done).** The first table column grows to its longest
+label (min 38, +2 gap) and `pad()` truncates over-width cells with `…` as a
+backstop, so no cell can run into the next column. Before/after:
+`skill entry arggon-upgrade (description)324` →
+`skill entry arggon-upgrade (description)  324` (full label kept).
+
+**F6 — strict gate decision (done). DECISION: `context:report --strict` stays
+a manual/release gate; it is NOT wired into CI.** Rationale: the only bound CI
+would newly enforce is the advisory MCP `tools/list` size (schema drift with
+OpenCode/MCP versions would be red-CI noise, not a product regression); the
+enforced bounds (AGENTS.md ≤ 2048 B, item block ≤ 1024 B) are already
+test-enforced by the suite. Recorded in `docs/playbooks/opencode.md` (Context
+budgets), the script's exit-code docblock, this comment and the PR body. New
+`smoke/context-report.test.ts`: 13 unit tests (`frontmatter` 4,
+`stripJsonComments` 6, `pad` 3), collected via a minimal
+`smoke/**/*.test.ts` vitest include; the report body sits behind an
+`isDirectRun()` guard so importing the helpers in tests spawns nothing (no
+model calls anywhere).
+
+**F7 — playbook bases (done).** The Context budgets baseline labels the W5
+skill numbers as **source bytes** (repo `skills/arggon-cli/`, before marker
+stamping) vs the report's **fixture bytes** (9,582 B umbrella / 15,804 B
+references after `arggon init` stamping) and says not to sum the two bases.
+
+**Gates (this branch).** `npm test` 70 files / 1157 passed (69/1112 before +
+the new file) · `npm run lint` clean · `npm run build` clean · `arggon
+validate --json` 0/0 · `arggon spec validate --json` 0/0 · `npm run
+context:report -- --strict` exit 0, 0 regressions (AGENTS.md 1,863 B ≤ 2,048;
+MCP `tools/list` 10,450 B ≤ 12,288 advisory; item block max 252 B ≤ 1,024;
+before/after measured from `dc9fa40`). Draft PR follows; no merge, no status
+flip from this worker.
