@@ -25,6 +25,12 @@ directories under the shared `/tmp` on every run. Outside the spawn-family scope
 of `task-concurrency-test-teardown-sweep`, but the family is now trivial to
 close: `cli/src/test-tmp.ts` (`removeFixtureTree`) exists after PR #347.
 
+- **Stale lock file (PR #347 review finding #3).** `cli/src/tracker-commit.test.ts:808`
+  (`holdRepoLock`) writes a fake-holder lock and never releases it, leaving one
+  `/tmp/.../arggon-lock-*.lock` per run (the sibling at ~:791 releases via a
+  detached child). Release it or document the leak with the age-gated cleanup
+  as the backstop.
+
 ## Acceptance
 
 - [ ] `show.test.ts` tracks its temp dirs and removes them (adopt
@@ -33,6 +39,7 @@ close: `cli/src/test-tmp.ts` (`removeFixtureTree`) exists after PR #347.
       same treatment in this PR (list recorded).
 - [ ] Full suite green; small PR to `opencode2`.
 
+- [ ] The tracker-commit fake-holder lock is released (or the documented leak is explicitly accepted), with the audit list updated.
 ## Notes
 
 - Leaks are harmless individually but accumulate on shared machines (the
