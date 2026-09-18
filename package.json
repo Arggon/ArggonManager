@@ -13,6 +13,7 @@
     "arggon": "tsx cli/src/cli.ts",
     "skills:sync": "tsx cli/src/sync-skills.ts",
     "smoke:opencode": "tsx smoke/opencode-smoke.ts",
+    "smoke:opencode:wave": "tsx smoke/opencode-wave.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint .",
