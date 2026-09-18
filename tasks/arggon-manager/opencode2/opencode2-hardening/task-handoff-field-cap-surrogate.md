@@ -34,15 +34,16 @@ lone surrogate in the tail and U+FFFD in the body.
 
 ## Acceptance
 
-- [ ] `capField` gets the same surrogate-safe treatment as `capSession`
+- [x] `capField` gets the same surrogate-safe treatment as `capSession`
       (back-off at the cut; lone surrogates cannot reach the body) — or a shared
       helper serves both.
-- [ ] Tests for `next`/`branch`/`openQuestions` with a pair at the boundary;
+- [x] Tests for `next`/`branch`/`openQuestions` with a pair at the boundary;
       ordinary (ASCII/BMP) output byte-identical; no U+FFFD on disk.
-- [ ] Full suite, lint, `validate`/`spec validate` green; small PR to
+- [x] Full suite, lint, `validate`/`spec validate` green; small PR to
       `opencode2`.
 
 ## Notes
 
 - Provenance-only fields; cosmetic/hygiene, no security impact. The fix pattern
   exists in `capSession` and `normalizeSessionID`.
+- PR: https://github.com/Arggon/ArggonManager/pull/355 (draft).
