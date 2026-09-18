@@ -1,5 +1,12 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, symlinkSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  readlinkSync,
+  rmdirSync,
+  symlinkSync,
+  unlinkSync,
+} from "node:fs";
 import { basename, join, relative, resolve, sep } from "node:path";
 import { readConventionConfig, resolveBranchName } from "./convention.js";
 import { runBranch, type GitRunner } from "./branch.js";
@@ -482,9 +489,11 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
  * deleted the worktree, so the documented manual symlink order could not work.
  * Best-effort by design: never throws (a platform without symlink support,
  * missing permissions, or a racing creator degrades to `false` and the commit
- * failure is still reported actionably). `node_modules/` is gitignored in
- * every documented setup, and the claim commit stages only the item file, so
- * the link is never committed. Returns true only when a link was created.
+ * failure is still reported actionably). The link is untracked and, because a
+ * `node_modules/` ignore pattern matches directories only, not ignored — but
+ * start's claim commit stages only the item file, so start never commits it
+ * (stage explicit paths; `git add -A` would stage the link). Returns true only
+ * when a link was created.
  */
 export function linkNodeModules(primaryRoot: string, worktreePath: string): boolean {
   const target = join(primaryRoot, "node_modules");
@@ -500,29 +509,72 @@ export function linkNodeModules(primaryRoot: string, worktreePath: string): bool
   }
 }
 
-/** Step-specific remediation for a failure that kept the worktree. */
-function worktreeRemediation(step: string): string {
-  if (step.startsWith("committing the claim")) {
+/**
+ * Remove a start-created `node_modules` link from a worktree, if present
+ * (bug-start-worktree-node-modules). Only ever removes a SYMLINK whose target
+ * resolves to the primary checkout's `node_modules`: a real directory or a
+ * link pointing anywhere else is left alone. Removing the link never follows
+ * it, so the primary install is untouched. Returns true only when a matching
+ * link was removed. Best-effort: never throws.
+ */
+export function unlinkNodeModulesLink(primaryRoot: string, worktreePath: string): boolean {
+  const target = resolve(join(primaryRoot, "node_modules"));
+  const link = join(worktreePath, "node_modules");
+  try {
+    if (!lstatSync(link).isSymbolicLink()) return false;
+    if (resolve(readlinkSync(link)) !== target) return false;
+  } catch {
+    return false;
+  }
+  try {
+    unlinkSync(link);
+    return true;
+  } catch {
+    try {
+      // Windows junctions are directory links; unlink can refuse them.
+      rmdirSync(link);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+/**
+ * Step-specific remediation for a failure that kept the worktree. Returns the
+ * complete "what to do next" sentence for the step: most steps are fixed and
+ * retried by the attach re-run, but a failed push is NOT retried by attach
+ * (attach only lands a pending claim commit — review F3), so the branch must be
+ * pushed manually there.
+ */
+function worktreeRemediation(input: { step: string; id: string; branch: string }): string {
+  const attach =
+    `re-run \`arggon start ${input.id} --worktree\` — it attaches to the existing worktree`;
+  if (input.step.startsWith("committing the claim")) {
     return (
       "The pre-commit gate (or the git commit itself) failed inside the worktree — fix the " +
       "reported cause there (install dependencies, or link the primary checkout's node_modules: " +
       "`ln -s <primary>/node_modules <worktree>/node_modules`; start does this itself when the " +
-      "primary has one), then"
+      `primary has one), then ${attach}.`
     );
   }
-  if (step.startsWith("pushing")) {
-    return "Fix remote access (`git fetch origin`, credentials), then";
+  if (input.step.startsWith("pushing")) {
+    return (
+      "Fix remote access (`git fetch origin`, credentials), then push the kept branch manually: " +
+      `\`git push -u origin ${input.branch}\` — a re-run of ` +
+      `\`arggon start ${input.id} --worktree\` attaches to the worktree but does not retry the push.`
+    );
   }
-  if (step.startsWith("opening the draft PR")) {
-    return "Check `gh auth status` (and the remote), then";
+  if (input.step.startsWith("opening the draft PR")) {
+    return `Check \`gh auth status\` (and the remote), then ${attach}.`;
   }
-  if (step.startsWith("recording the claim")) {
+  if (input.step.startsWith("recording the claim")) {
     return (
       "Resolve the reported tracker error in the worktree (claim conflict or branch mismatch); " +
-      "no claim commit was made. Then"
+      `no claim commit was made. Then ${attach}.`
     );
   }
-  return "Fix the reported cause in the worktree, then";
+  return `Fix the reported cause in the worktree, then ${attach}.`;
 }
 
 /**
@@ -547,8 +599,8 @@ function worktreeFailureMessage(input: {
     `start failed while ${input.step}; the worktree was kept at ${input.worktreePath} ` +
     `(nothing was rolled back).\n` +
     `${detail}\n` +
-    `${worktreeRemediation(input.step)} re-run \`arggon start ${input.id} --worktree\` — it ` +
-    `attaches to the existing worktree. To discard it instead: \`${discard}\`.`
+    `${worktreeRemediation({ step: input.step, id: input.id, branch: input.branch })} ` +
+    `To discard it instead: \`${discard}\`.`
   );
 }
 
@@ -568,9 +620,12 @@ type WorktreeStartInput = {
  * INSIDE the worktree. The main checkout stays on its current branch and clean.
  * The worktree is prepared for the project gate first (the primary checkout's
  * `node_modules` is linked in when the worktree lacks one —
- * bug-start-worktree-node-modules), and a failure after the worktree exists
- * NEVER rolls it back: the worktree and branch are kept, and the error names
- * the failing step, the kept path, the remediation, and the attach re-run.
+ * bug-start-worktree-node-modules); the link is removed before a configured
+ * post-start hook runs (so `npm ci` cannot reify through it and empty the
+ * primary install) and re-created only when the hook leaves no `node_modules`.
+ * A failure after the worktree exists NEVER rolls it back: the worktree and
+ * branch are kept, and the error names the failing step, the kept path, the
+ * remediation, and the attach re-run.
  */
 function startInWorktree(input: WorktreeStartInput): StartResult {
   const { id, item, assignee, root, gitRunner, opts } = input;
@@ -678,9 +733,19 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     if (worktreeCreated && !opts.noHook) {
       const hookCommand = config.worktree.postStart;
       if (hookCommand) {
+        // The hook owns the worktree's node_modules once it runs: npm's reify
+        // step removes a symlinked node_modules and can empty the PRIMARY
+        // checkout's install through it (review F1). The start-created link is
+        // therefore removed before the hook sees the worktree, and re-created
+        // after only when the hook left no install (a hook that does not
+        // bootstrap, or one that failed).
+        const hadLink = unlinkNodeModulesLink(root, worktreePath);
         // Flag wins over config (task-post-start-env); config unset = inherit.
         const shell = opts.postStartShell ?? config.worktree.postStartShell ?? "inherit";
         postStart = runPostStart(hookCommand, worktreePath, shell);
+        if (hadLink && !existsSync(join(worktreePath, "node_modules"))) {
+          linkNodeModules(root, worktreePath);
+        }
       }
     }
 
