@@ -13,6 +13,7 @@ updated: "2026-09-18"
 claimed_at: "2026-09-18T22:26:56.651Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-tracker-title-rescape
 ---
+
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tracker-hygiene/bug-tracker-title-rescape.md
   Leaves live only under a story. id is the filename stem: bug-tracker-title-rescape.
@@ -33,18 +34,19 @@ count the raw backslashes in the frontmatter.
 
 ## Acceptance
 
-- [ ] The serializer round-trips a double-quoted title byte-stably across
+- [x] The serializer round-trips a double-quoted title byte-stably across
       `create`/`claim`/`comment`/`update` (no accumulation; idempotent rewrite).
-- [ ] Regression test with a backslash-bearing title mutated several times.
-- [ ] Restore the corrupted title on `task-opencode2-plugin-escape-nits` (and
+- [x] Regression test with a backslash-bearing title mutated several times.
+- [x] Restore the corrupted title on `task-opencode2-plugin-escape-nits` (and
       check other items for accidental backslash growth).
-- [ ] Full suite, lint, `validate` green; small PR to `opencode2`.
+- [x] Full suite, lint, `validate` green; small PR to `opencode2`.
 
 ## Notes
 
 - Silent metadata corruption beats loud failures for severity; p2.
 
 ### 2026-09-18 @Arggon
+
 ### Root cause
 
 `parseScalar` returned the inner bytes of a double-quoted YAML scalar verbatim while `formatScalar` serializes with `JSON.stringify`. Every full-file write (create/claim/comment/update all call `stringifyFrontmatter`) re-escaped the existing backslashes, so the raw count doubled per mutation. `validate` parsed through the same path, so it stayed clean while the value drifted silently.
