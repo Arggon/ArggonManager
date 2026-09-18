@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-opencode-v2-mcp-meta-hardening
 title: "MCP meta hardening: normalize/cap the meta-derived author (F1) + edge tests (F3)"
+assignee: Arggon
+branch: feat/task-opencode-v2-mcp-meta-hardening
 parent: opencode2-hardening
 labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T14:09:11.273Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-mcp-meta-hardening
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/story-opencode-v2/task-opencode-v2-mcp-meta-hardening.md
