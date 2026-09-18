@@ -26,9 +26,10 @@ or the V1 schema for V2 work.
   and `.opencode/commands/arggon-{next,start,done,handoff,review,status}.md` —
   never overwriting modified files (contract:
   [spec-opencode-seam-010](../specs/spec-opencode-seam-010.md)).
-- MCP (https://opencode.ai/v2/docs/mcp-servers/): V2 does **not** read
-  `.mcp.json`; register the server under `mcp.servers` as
-  `{ "type": "local", "command": ["arggon", "mcp"] }` and check it with
+- MCP (https://opencode.ai/v2/docs/mcp-servers/): V2 does not use `.mcp.json`
+  as a registration mechanism — register the server under `mcp.servers` as
+  `{ "type": "local", "command": ["arggon", "mcp"] }`; the generated
+  `.mcp.json` still serves other clients (e.g. Claude Code). Check with
   `opencode mcp list` / `/mcps`.
 - Skills (https://opencode.ai/v2/docs/skills/): `.agents/skills` is auto-discovered,
   so the bundled `arggon-cli` (and `arggon-upgrade`) load with no config.
