@@ -70,8 +70,12 @@ server under `mcp.servers` (`type: local`, `command: ["arggon","mcp"]`),
 `default_agent` is deliberately not set: agents are discovered from
 `.opencode/agents/`, and the session default stays `build`. Agents:
 `arggon-coordinator` (primary; subagent allow-list worker/reviewer/explore),
-`arggon-worker` (subagent; subagent launches denied), `arggon-reviewer`
-(subagent; `edit` denied). Commands: prompt templates that drive the MCP tools
+`arggon-worker` (subagent; subagent launches denied, `arggon_create` denied at
+the tool level), `arggon-reviewer` (subagent; `edit` denied, plus tracker
+mutations beyond `arggon_comment` — `arggon_create`/`arggon_update`/
+`arggon_handoff` — denied via the normalized MCP action `<server>_<tool>`,
+probe-verified on a real V2 session). Commands: prompt templates that drive the
+MCP tools
 (`/arggon-next`, `/arggon-start`, `/arggon-done`, `/arggon-handoff`,
 `/arggon-status`) plus `/arggon-review` (`agent: arggon-reviewer`,
 `subagent: true`); no shell blocks with argument placeholders.
@@ -94,7 +98,8 @@ existing machinery.
       commands start with `---` and carry the `# arggon:generated` YAML marker
       as the first frontmatter line.
 - [ ] Agents declare the intended modes/permissions (coordinator allow-list,
-      worker no-subagents, reviewer edit-deny) and commands declare the
+      worker no-subagents and no `arggon_create`, reviewer edit-deny and no
+      tracker mutations beyond `arggon_comment`) and commands declare the
       intended agents/subagent flags.
 - [ ] `GENERATED_DOC_COUNT` and the derived counts in `init-docs.test.ts` stay
       green (no hardcoded totals left behind).
