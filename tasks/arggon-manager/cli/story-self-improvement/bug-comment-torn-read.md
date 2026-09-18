@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-comment-torn-read
 title: comment initial loadItems can read a torn in-place write
+assignee: Arggon
+branch: fix/bug-comment-torn-read
 parent: story-self-improvement
 labels: []
 priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T15:14:23.818Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-comment-torn-read
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/bug-comment-torn-read.md
