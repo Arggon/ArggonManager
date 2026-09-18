@@ -1,4 +1,4 @@
-import { mkdtempSync as _mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -157,6 +157,45 @@ title: "nits: \\\\\\\\( here"
 
     // The tree stays valid throughout (validate reads the same parse path).
     expect(runValidate({ cwd: dir }).errors).toEqual([]);
+  });
+
+  it("escapes control characters so a hand-written \\n escape cannot corrupt the tree", () => {
+    // Serializer: decoded control characters are escaped, never written raw.
+    for (const value of ["a\nb", "\x00nul", "\x07bell", "\x1besc", "\u007fdel", "\u2028sep"]) {
+      const once = stringifyFrontmatter({ type: "task", id: "task-x", title: value }, "");
+      const reread = parseFrontmatter(once);
+      expect(reread.data.title).toBe(value);
+      expect(/[\u0000-\u001f\u007f\u2028\u2029]/.test(rawTitleLineFrom(once))).toBe(false);
+      expect(stringifyFrontmatter(reread.data, reread.body)).toBe(once);
+    }
+
+    // Kernel: a hand-written YAML `\n` escape (raw bytes backslash+n, value =
+    // newline) survives update, leaves the tree valid, and is byte-stable.
+    const { dir } = primedTask();
+    const created = runCreate({
+      cwd: dir,
+      type: "task",
+      title: "escape probe",
+      parent: "story-login",
+      id: "control-escape",
+      now: NOW,
+      commit: false,
+    });
+    const path = created.path;
+    writeFileSync(
+      path,
+      readFileSync(path, "utf8").replace(/^title:.*$/m, String.raw`title: "a\nb"`),
+    );
+
+    runUpdate({ cwd: dir, id: created.id, priority: "p1", now: LATER });
+    expect(rawTitleLine(path)).toBe(String.raw`title: "a\nb"`);
+    expect(parseFrontmatter(readFileSync(path, "utf8")).data.title).toBe("a\nb");
+    expect(runValidate({ cwd: dir }).errors).toEqual([]);
+
+    // Re-running the same update rewrites identical bytes.
+    const after = readFileSync(path, "utf8");
+    runUpdate({ cwd: dir, id: created.id, priority: "p1", now: LATER });
+    expect(readFileSync(path, "utf8")).toBe(after);
   });
 });
 

@@ -183,8 +183,19 @@ function formatScalar(value: string, forceQuote: boolean): string {
   // Backslashes force the quoted (JSON-escaped) form too
   // (bug-tracker-title-rescape): that keeps an input double-quoted scalar
   // byte-identical instead of silently down-converting it to a plain scalar.
-  if (forceQuote || /[:#{}[\],&*?!'"\\]|^\s|\s$|^$/.test(value)) {
-    return JSON.stringify(value);
+  // Control characters force it as well (PR #360 review F1): a decoded `\n`
+  // used to be written raw, splitting the frontmatter and corrupting the tree.
+  if (
+    forceQuote ||
+    /[\u0000-\u001f\u007f\u2028\u2029]|[:#{}[\],&*?!'"\\]|^\s|\s$|^$/.test(value)
+  ) {
+    // JSON.stringify escapes \u0000-\u001f, but leaves DEL and the YAML/JS
+    // line separators raw; escape those explicitly with YAML escapes the
+    // parser decodes back.
+    return JSON.stringify(value)
+      .replaceAll("\u007f", "\\x7F")
+      .replaceAll("\u2028", "\\L")
+      .replaceAll("\u2029", "\\P");
   }
   return value;
 }
