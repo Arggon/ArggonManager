@@ -13,6 +13,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import { writeFileAtomic } from "./atomic.js";
 import { readConventionVersion } from "./convention.js";
 import { bundledTemplatesDir, findTasksDir, repoRootFromTasks } from "./paths.js";
+import { sanitizeHumanError } from "./sanitize.js";
 import type { Issue } from "./types.js";
 
 export type SpecValidateOptions = {
@@ -324,13 +325,23 @@ export function runSpecValidate(opts: SpecValidateOptions): SpecValidateResult {
   return { root, conventionVersion, checked: infos.length, errors, warnings };
 }
 
+/**
+ * Human report for `arggon spec validate` (bug-validate-stdout-injection M1):
+ * same display policy as `formatValidateHuman` — path and message are
+ * repo-controlled, each is sanitized at this boundary, the `[CODE]` stays
+ * visible, and `--json` keeps the raw values.
+ */
 export function formatSpecValidateHuman(result: SpecValidateResult): string {
   const lines: string[] = [];
   for (const e of result.errors) {
-    lines.push(`error ${e.path}: ${e.message} [${e.code}]`);
+    lines.push(
+      `error ${sanitizeHumanError(e.path)}: ${sanitizeHumanError(e.message)} [${e.code}]`,
+    );
   }
   for (const w of result.warnings) {
-    lines.push(`warning ${w.path}: ${w.message} [${w.code}]`);
+    lines.push(
+      `warning ${sanitizeHumanError(w.path)}: ${sanitizeHumanError(w.message)} [${w.code}]`,
+    );
   }
   if (result.errors.length === 0) {
     lines.push(
@@ -604,14 +615,25 @@ export function runSpecAnalyze(opts: SpecAnalyzeOptions): SpecAnalyzeResult {
   return { root, conventionVersion, scanned, ambiguity, consistency };
 }
 
+/**
+ * Human report for `arggon spec analyze` (bug-validate-stdout-injection M1,
+ * same policy as `formatSpecValidateHuman`): finding `file` and `message` can
+ * embed repo-controlled bytes (hostile spec filename, frontmatter value), so
+ * both are sanitized per line; severity/kind are static enums. `--json`
+ * findings keep the raw values.
+ */
 export function formatSpecAnalyzeHuman(result: SpecAnalyzeResult): string {
   const lines: string[] = [];
   for (const f of result.consistency) {
-    lines.push(`${f.severity} ${f.file}: ${f.message} [${f.kind}]`);
+    lines.push(
+      `${f.severity} ${sanitizeHumanError(f.file)}: ${sanitizeHumanError(f.message)} [${f.kind}]`,
+    );
   }
   for (const f of result.ambiguity) {
     const at = f.line === undefined ? "" : `${f.line}:`;
-    lines.push(`${f.severity} ${f.file}:${at} ${f.message} [${f.kind}]`);
+    lines.push(
+      `${f.severity} ${sanitizeHumanError(f.file)}:${at} ${sanitizeHumanError(f.message)} [${f.kind}]`,
+    );
   }
   const total = result.ambiguity.length + result.consistency.length;
   if (total === 0) {
@@ -686,6 +708,25 @@ function snapshotFromResult(result: SpecAnalyzeResult): SpecBaselineSnapshot {
   };
 }
 
+/**
+ * Structural check for one finding read back from a committed snapshot
+ * (defensive, one bounded pass): the file is a repo artifact, so an entry may
+ * be anything. Only the presence and type of the four string fields is
+ * checked — `line` is deliberately left to the display-time guard in
+ * `formatSpecBaselineCompareHuman`, which renders it only when it is a number,
+ * so a hostile value cannot reach the terminal either way.
+ */
+function isBaselineFinding(value: unknown): boolean {
+  if (value === null || typeof value !== "object") return false;
+  const f = value as Record<string, unknown>;
+  return (
+    typeof f.file === "string" &&
+    typeof f.kind === "string" &&
+    typeof f.severity === "string" &&
+    typeof f.message === "string"
+  );
+}
+
 function readBaselineSnapshot(file: string): SpecBaselineSnapshot {
   let raw: string;
   try {
@@ -707,6 +748,11 @@ function readBaselineSnapshot(file: string): SpecBaselineSnapshot {
     typeof snap.count !== "number"
   ) {
     throw new Error(`baseline ${file} is not a spec analyze baseline snapshot`);
+  }
+  if (!snap.findings.every(isBaselineFinding)) {
+    throw new Error(
+      `baseline ${file} has a malformed finding (expected string file/kind/severity/message)`,
+    );
   }
   return snap as SpecBaselineSnapshot;
 }
@@ -776,15 +822,29 @@ export function formatSpecBaselineSaveHuman(r: SpecBaselineSaveResult): string {
   return `arggon spec analyze: baseline written to ${r.file} (${total} finding(s) across ${r.result.scanned} spec(s))\n`;
 }
 
+/**
+ * Human report for `spec analyze --baseline` (bug-validate-stdout-injection
+ * F1 follow-up): unlike `added` (current-scan findings, static severity/kind),
+ * `resolved` findings are read back from a committed snapshot, so ALL their
+ * fields are untrusted. Every dynamic field is sanitized at this boundary and
+ * `line` is rendered only when it is a number — a hostile string line is
+ * dropped instead of interpolated. `--json` keeps the raw snapshot values.
+ */
 export function formatSpecBaselineCompareHuman(c: SpecBaselineComparison): string {
   const lines: string[] = [];
   for (const f of c.added) {
-    const at = f.line === undefined ? "" : `${f.line}:`;
-    lines.push(`new ${f.severity} ${f.file}:${at} ${f.message} [${f.kind}]`);
+    const at = typeof f.line === "number" ? `${f.line}:` : "";
+    lines.push(
+      `new ${sanitizeHumanError(f.severity)} ${sanitizeHumanError(f.file)}:${at} ` +
+        `${sanitizeHumanError(f.message)} [${sanitizeHumanError(f.kind)}]`,
+    );
   }
   for (const f of c.resolved) {
-    const at = f.line === undefined ? "" : `${f.line}:`;
-    lines.push(`resolved ${f.severity} ${f.file}:${at} ${f.message} [${f.kind}]`);
+    const at = typeof f.line === "number" ? `${f.line}:` : "";
+    lines.push(
+      `resolved ${sanitizeHumanError(f.severity)} ${sanitizeHumanError(f.file)}:${at} ` +
+        `${sanitizeHumanError(f.message)} [${sanitizeHumanError(f.kind)}]`,
+    );
   }
   lines.push(
     `arggon spec analyze vs baseline ${c.file}: ${c.added.length} new, ${c.resolved.length} resolved, ` +
