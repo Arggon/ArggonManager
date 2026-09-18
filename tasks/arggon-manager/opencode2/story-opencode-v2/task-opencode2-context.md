@@ -130,3 +130,7 @@ Repro: `npm run context:report` (add `--json` for machine output;
 
 ### 2026-09-18 @Arggon
 W6 draft PR: https://github.com/Arggon/ArggonManager/pull/329 (base opencode2). Stops here: no merge, no status flip.
+
+### handoff 2026-09-18 @Arggon — next: Coordinator: review draft PR #329 (report script + numbers + playbook budgets docs). Verify the reused bound constants, the before/after reconstruction and the gate results; if accepted, merge to ope…
+- branch: feat/task-opencode2-context
+- open questions: Per-wave baselines for W1-W5 were impossible (W6 ran last); reconstructed pre-W5 skill + cited earlier measurements instead. MCP tools/list grew +11.6% vs the 2026-09-15 baseline but stays under the …
