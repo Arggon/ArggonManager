@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-tracker-commit-enotempty-flake
 title: "Flaky concurrency/cleanup tests on CI: tracker-commit ENOTEMPTY + comment-race fixture race"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p1
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T14:33:56.017Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-tracker-commit-enotempty-flake
 ---
 <!--
@@ -43,16 +42,16 @@ parallel CLI processes under CI load) should be hardened together.
 
 ## Acceptance
 
-- [ ] The race is explained in the item (what writes into the temp dir after
+- [x] The race is explained in the item (what writes into the temp dir after
       the test body returns) and the cleanup becomes robust: bounded `rmSync`
       retries and/or waiting for spawned git processes to exit before removal.
-- [ ] Stress evidence: the file (or the suite) runs N consecutive times green
+- [x] Stress evidence: the file (or the suite) runs N consecutive times green
       (e.g. 20x) with the fix, recorded in the item.
-- [ ] No shared `/tmp` name collisions across concurrent runs (unique prefix
+- [x] No shared `/tmp` name collisions across concurrent runs (unique prefix
       per test/worker) reviewed while fixing.
-- [ ] Full suite green; CI stable across two consecutive PR runs.
+- [x] Full suite green; CI stable across two consecutive PR runs.
 
-- [ ] `comment-race.test.ts` N=4 no longer loses its fixture under CI load (deterministic fixture setup/teardown or serialized creation), with stress evidence.
+- [x] `comment-race.test.ts` N=4 no longer loses its fixture under CI load (deterministic fixture setup/teardown or serialized creation), with stress evidence.
 ## Notes
 
 - Surfaced by the PR #334 review (blocking only in the sense that CI must be
@@ -110,3 +109,6 @@ Acceptance mapping (left unticked for the coordinator): race explained (this com
 ### 2026-09-18 @Arggon
 CI evidence on draft PR #338 (base `opencode2`): two consecutive `cli` runs green —
 run [35360053524](https://github.com/Arggon/ArggonManager/actions/runs/35360053524) on head `dccc46e` (fix + origin/opencode2 merge) and run [35360089419](https://github.com/Arggon/ArggonManager/actions/runs/35360089419) on head `b84c196` (handoff commit). That covers the "CI stable across two consecutive PR runs" acceptance box together with the local 10/10 stress recorded above.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; independent reproduction of the ENOTEMPTY mechanism (detached git maintenance child + rmSync retry semantics: bare 4/4 ENOTEMPTY vs retries 4/4 clean) and of the torn-read window (in-place truncate→write with the initial lookup outside the lock); the comment-race retry is correctly scoped (cannot mask persistent/wrong-id/lost-comment regressions); 10/10 stress runs under peer load + 3 consecutive green CI; 1144 tests; merged with cli pass. The real product race stays open as bug-comment-torn-read; sibling teardown sweep filed as task-concurrency-test-teardown-sweep. Closing.
