@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-handoff-explicit-session-surrogate
 title: handoff explicit --session cap is not surrogate-safe (astral split + U+FFFD in body)
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T21:03:59.150Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-handoff-explicit-session-surrogate
 ---
 <!--
@@ -34,11 +33,11 @@ exists in `cli/src/mcp-server.ts`.
 
 ## Acceptance
 
-- [ ] `capSession` back-off is surrogate-safe (or the residual is explicitly
+- [x] `capSession` back-off is surrogate-safe (or the residual is explicitly
       documented with rationale); tests with astral/lone-surrogate explicit
       values assert no lone surrogate and no U+FFFD in the rendered value/body.
-- [ ] Explicit non-empty precedence and the 64-cap semantics unchanged.
-- [ ] Full suite, lint, `validate`/`spec validate` green; small PR to
+- [x] Explicit non-empty precedence and the 64-cap semantics unchanged.
+- [x] Full suite, lint, `validate`/`spec validate` green; small PR to
       `opencode2`.
 
 ## Notes
@@ -65,3 +64,6 @@ Files: cli/src/handoff.ts, cli/src/handoff.test.ts (+ this tracker comment). No 
 ### handoff 2026-09-18 @Arggon (session: ses_f49aac31cffelLHTjOh43g0tv9) — next: Review draft PR #353 (evidence in the comment above); if gates and review are green, merge to opencode2 and flip the item to done — reviewer owns merge and status.
 - branch: feat/task-handoff-explicit-session-surrogate
 - open questions: mid-value lone surrogates are dropped (not cut at the first one, as the meta path does) to keep the caller's valid code points — flag if meta-path consistency is preferred; docs unchanged because the…
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; the pair back-off + lone-surrogate drop cannot manufacture a lone surrogate or exceed 64 units (code read + 1500-case differential fuzz + 12 hostile probes), empty-after-drop = absent, explicit precedence/envelopes untouched, ASCII/valid-Unicode byte-identical except the intended fix, pre-fix failure reproduced exactly (3 failed), body clean on disk through runHandoff and the real MCP stdio path; 1218 tests + CI pass; merged. Pre-existing capField residual (next/branch/openQuestions) filed as task-handoff-field-cap-surrogate. Closing.
