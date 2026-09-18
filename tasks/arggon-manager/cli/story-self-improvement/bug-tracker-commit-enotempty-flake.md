@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-tracker-commit-enotempty-flake
 title: "Flaky concurrency/cleanup tests on CI: tracker-commit ENOTEMPTY + comment-race fixture race"
+assignee: Arggon
+branch: fix/bug-tracker-commit-enotempty-flake
 parent: story-self-improvement
 labels: []
 priority: p1
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T14:33:56.017Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-tracker-commit-enotempty-flake
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/bug-tracker-commit-enotempty-flake.md
