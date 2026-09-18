@@ -52,3 +52,24 @@ which fixed the `opencode` hint channel. Two residual channels remain:
 ## Notes
 
 - Report-only command; no data risk — this is terminal-output hygiene.
+
+### 2026-09-18 @Arggon
+Evidence — F2/F3 implementation (PR #341, draft; no merge, no status flip)
+
+**F2 — git.remote + root path sanitized** (`cli/src/doctor.ts`):
+- `formatGitLine` -> `sanitizeHumanText(git.remote)`; report header -> `sanitizeHumanText(root)`; `budgetError` line sanitized too. Escape-in-place keeps clean output byte-identical (no JSON quoting of ordinary paths/URLs).
+- Fixture remote `https://example.com/evil\nspoof: fake hint.git\u001b[31m`:
+  - BEFORE human: fabricated column-0 `spoof: fake hint.git` line + raw ESC (`^[[31m`).
+  - AFTER human (5 lines): `  git: repo, dirty, remote https://example.com/evil\nspoof: fake hint.git\u001b[31m` — literal `\n` / `\u001b`, no raw ESC, no fabricated line.
+  - JSON before == after: `{"isRepo":true,"dirty":true,"remote":"https://example.com/evil\nspoof: fake hint.git\u001b[31m"}`; CLI `--json` round trip pinned by test.
+- Hostile root path (ESC + newline + NEL + U+2028 in the directory name) renders inert on the header line; `result.root` stays raw.
+
+**F3 — sanitizer fallback extended** (shared C0/DEL/C1/U+2028/29 escape pass):
+- Key carrying U+009B/U+009D/U+0085/U+007F/U+2028/U+2029 renders as `"mcp.csi\u009bosc\u009dnel\u0085del\u007fls\u2028ps\u2029end"` (no raw DEL/C1/LS/PS in the report); `doctor --json` keeps the raw key bytes.
+- Bidi/zero-width boundary documented (code comment + `docs/json-output.md`).
+
+**Bounded length — DECISION: cap** at `MAX_HUMAN_VALUE_CHARS = 200` + `…`, applied before escaping (escapes add <= 6x); JSON stays raw/uncapped. Long remote: human `git:` line 228 chars ending in `…`, JSON 620 chars; long config keys capped the same way.
+
+**Gates**: `npm test` 70 files / 1162 tests passed; `npm run lint` clean; `npm run build` clean; `arggon validate --json` ok (0 warnings); `arggon spec validate --json` ok; pre-commit `arggon validate` ok.
+
+Files: `cli/src/doctor.ts`, `cli/src/doctor.test.ts`, `docs/json-output.md`. PR: https://github.com/Arggon/ArggonManager/pull/341
