@@ -1,14 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-opencode-v2-playbook
 title: "Playbook: OpenCode 2.0.7 and docs reference integration"
-priority: p2
-depends_on: [task-opencode-v2-adr]
+assignee: Arggon
+branch: feat/task-opencode-v2-playbook
 parent: story-opencode-v2
 labels: []
+priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T00:57:29.519Z"
+depends_on: [task-opencode-v2-adr]
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-playbook
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-opencode-v2/task-opencode-v2-playbook.md
