@@ -177,6 +177,54 @@ describe("init", () => {
     }
   });
 
+  // bug-init-ignored-artifacts-dirty-commit: adopters gitignore generated
+  // bundles by design (.agents/skills/**, the V2 plugin). Pre-fix, `git add`
+  // aborted on the ignored paths AFTER staging the rest, leaving
+  // `M tasks/.convention.yml` staged-but-uncommitted (commit.skipped) with
+  // no HEAD commit. The auto-commit must stage only non-ignored paths,
+  // commit the state update, and report exactly what it skipped.
+  it("commits the state update when generated paths are gitignored (no dirty index)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-ignored-"));
+    gitInit(dir);
+    writeFileSync(
+      join(dir, ".gitignore"),
+      ".agents/skills/\n.opencode/plugins/arggon/index.ts\n",
+      "utf8",
+    );
+    git(dir, ["add", ".gitignore"]);
+    git(dir, ["commit", "--quiet", "-m", "adopter gitignore"]);
+
+    const result = runInit({ dir, force: false });
+
+    expect(result.commit?.committed).toBe(true);
+    // Exactly the ignored generated bundles are skipped — nothing else.
+    expect(result.commit?.ignored).toEqual([
+      ".agents/skills/arggon-cli/SKILL.md",
+      ".agents/skills/arggon-cli/references/json-contract.md",
+      ".agents/skills/arggon-cli/references/methodology.md",
+      ".agents/skills/arggon-cli/references/orchestration.md",
+      ".agents/skills/arggon-cli/references/pitfalls.md",
+      ".agents/skills/arggon-upgrade/SKILL.md",
+      ".opencode/plugins/arggon/index.ts",
+    ]);
+    // start's clean-tree gate: nothing staged, nothing modified/untracked.
+    expect(git(dir, ["status", "--porcelain"])).toBe("");
+    // The state update IS committed; the ignored bundles are not tracked.
+    const committed = git(dir, ["show", "--name-only", "--format=", "HEAD"])
+      .split("\n")
+      .filter((line) => line.length > 0);
+    expect(committed).toContain("tasks/.convention.yml");
+    expect(committed).not.toContain(".agents/skills/arggon-cli/SKILL.md");
+    expect(git(dir, ["ls-files", "--", ".agents/skills"]).trim()).toBe("");
+
+    // Fresh-clone shape: convention already tracked, state rewritten, ignored
+    // bundles regenerated — still one clean tree and no staged leftovers.
+    const second = runInit({ dir, force: false, now: new Date("2026-09-15T12:00:00Z") });
+    expect(second.commit?.committed).toBe(true);
+    expect(second.commit?.ignored).toContain(".agents/skills/arggon-cli/SKILL.md");
+    expect(git(dir, ["status", "--porcelain"])).toBe("");
+  });
+
   it("stays ok in a non-git directory (commit skipped, not a failure)", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-"));
     const result = runInit({ dir, force: false });

@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-init-ignored-artifacts-dirty-commit
-title: "arggon init leaves a dirty index when generated paths are gitignored (commit.skipped)"
-priority: p3
+title: arggon init leaves a dirty index when generated paths are gitignored (commit.skipped)
+assignee: Arggon
+branch: fix/bug-init-ignored-artifacts-dirty-commit
 parent: opencode2-hardening
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T22:17:08.010Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-init-ignored-artifacts-dirty-commit
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/opencode2-hardening/bug-init-ignored-artifacts-dirty-commit.md
@@ -33,16 +37,61 @@ adopter that gitignores a generated path.
 
 ## Acceptance
 
-- [ ] `arggon init`'s auto-commit stages only non-ignored paths (surgical
+- [x] `arggon init`'s auto-commit stages only non-ignored paths (surgical
       staging is already the norm) and commits the state update without
       failing, **or** reports a precise non-failing status explaining exactly
       which paths were skipped and why.
-- [ ] No dirty index after a successful init on a tree with an ignored
+- [x] No dirty index after a successful init on a tree with an ignored
       generated path (fixture test).
-- [ ] If the user-visible behavior changes, README/docs and the init JSON
+- [x] If the user-visible behavior changes, README/docs and the init JSON
       contract are updated in the same PR.
 
 ## Notes
 
 - Surfaced by W7 (`task-opencode2-dogfood`); filed here per the review rule.
   Generic CLI behavior — reparent to a `cli`-owned story if maintainers prefer.
+
+### 2026-09-18 @Arggon
+## Fix (worker evidence)
+
+**Root cause:** `commitTrackerMutation` staged every written path in one
+`git add -- <paths>`. Git stages the non-ignored entries and THEN refuses the
+batch on the ignored untracked paths ("The following paths are ignored…"), so
+init's state update (`tasks/.convention.yml` + non-ignored docs) was left
+staged-but-uncommitted with `commit.skipped` — the dirty index.
+
+**Fix (`cli/src/tracker-commit.ts`):** the commit primitive now partitions
+ignored paths out before staging with `git check-ignore --stdin -z`
+(NUL-delimited, index-aware: a TRACKED path that matches a pattern still
+stages normally), commits the remaining paths, and reports the skipped ones in
+the additive `commit.ignored` array (root-relative posix, sorted). All paths
+ignored → non-failing skip with reason
+`all mutated paths are ignored by .gitignore` (never an empty commit, never
+force-added). The human commit line carries `(N ignored path(s) skipped)`.
+A check-ignore probe failure falls back to staging everything (pre-fix
+behavior). JSON additive within `schemaVersion: 1`.
+
+**Before** (fresh fixture, `.gitignore` = `.agents/skills/` +
+`.opencode/plugins/arggon/index.ts`):
+
+- `commit: { "skipped": "git add failed: The following paths are ignored by one of your .gitignore files:" }`
+- `git status --porcelain`: 33× `A …` including `A tasks/.convention.yml`; `git log` empty (no commit).
+
+**After** (same fixture):
+
+- `commit: { "hash": "2de9077", "message": "chore(tasks): generated init docs (40 files)", "ignored": [<the 7 ignored bundles>] }`
+- `git status --porcelain` → empty; HEAD = `2de9077 chore(tasks): generated init docs (40 files)`; `git ls-files tasks/.convention.yml` → tracked; `git ls-files .agents/skills` → 0.
+- Re-init (fresh-clone shape: convention tracked, state rewritten, ignored bundles regenerated) → committed again, status clean.
+
+**Tests:** init fixture test (fresh + re-init, exact `ignored` list, clean
+`git status`, state file in HEAD) plus 4 tracker-commit primitive tests
+(partial ignored commit + payload; all-ignored precise skip; tracked-ignored
+path still stages; human line suffix). Full suite 1265 passed (75 files);
+lint, build, `arggon validate`, `arggon spec validate` green.
+
+**Docs:** README init paragraph, `docs/json-output.md` (init `commit` row +
+tracker auto-commit paragraph), `docs/convention.md` §`x-tracker`.
+
+### handoff 2026-09-18 @Arggon — next: Review draft PR #359 against the item checklist; merge to opencode2 (merge, do not squash); verify; then flip the item done.
+- branch: fix/bug-init-ignored-artifacts-dirty-commit
+- open questions: None blocking. Review note: init commit message counts all written paths; the ignored subset is listed in the additive commit.ignored array.
