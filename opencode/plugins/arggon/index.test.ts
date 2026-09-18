@@ -77,6 +77,34 @@ describe("plugin-context: arggon invocation parsing", () => {
     ).toBe("task-x");
   });
 
+  it("keeps multi-word quoted spans one token (F1)", () => {
+    // A quoted span is ONE word: bash runs a command named `arggon show
+    // task-x` (127), `command`/`npm run` look that name up, and the bare
+    // assignment executes nothing.
+    expect(parseArggonItemFromCommand('"arggon show task-x"')).toBeUndefined();
+    expect(parseArggonItemFromCommand('command "arggon show task-x"')).toBeUndefined();
+    expect(parseArggonItemFromCommand('npm run "arggon show task-x"')).toBeUndefined();
+    expect(parseArggonItemFromCommand('x="line1\narggon show task-x"')).toBeUndefined();
+    // The miss side: the quotes close before the command word, so bash runs
+    // arggon; splitting the assignment value used to hide it.
+    expect(parseArggonItemFromCommand('x="a b" arggon show task-x')).toBe("task-x");
+  });
+
+  it("never reduces a whitespace-bearing span to its last segment (F1)", () => {
+    // Bash runs a command literally named `echo /usr/bin/arggon` (127): the
+    // fused span must stay one word, not collapse to `arggon` through the
+    // last-path-segment rule.
+    expect(parseArggonItemFromCommand('"echo /usr/bin/arggon" show task-x')).toBeUndefined();
+    expect(parseArggonItemFromCommand('"cat /usr/bin/arggon" show task-x')).toBeUndefined();
+    expect(parseArggonItemFromCommand('"vscode /home/u/bin/arggon" show task-x')).toBeUndefined();
+    // A path-like span is one word too, but names the binary: bash execs
+    // `/opt/my tools/arggon`.
+    expect(parseArggonItemFromCommand('"/opt/my tools/arggon" show task-x')).toBe("task-x");
+    // Same rule when the quoted span fuses after an unquoted prefix.
+    expect(parseArggonItemFromCommand('my" tools/arggon" show task-x')).toBeUndefined();
+    expect(parseArggonItemFromCommand('x" /usr/bin/arggon" show task-x')).toBeUndefined();
+  });
+
   it("sees through wrapper prefixes and package runners (F1)", () => {
     expect(parseArggonItemFromCommand("npx arggon show task-x")).toBe("task-x");
     expect(parseArggonItemFromCommand("bunx arggon show task-x")).toBe("task-x");
@@ -124,6 +152,18 @@ describe("plugin-context: arggon invocation parsing", () => {
     expect(parseArggonItemFromCommand("echo $(arggon show task-x)")).toBe("task-x");
   });
 
+  it("keeps a token starting with an escaped \\( a word (F2)", () => {
+    // bash: an escaped `\(` is a literal `(` and the line syntax-errors on
+    // the trailing `)` — nothing executes; the token is a word, not an opener.
+    expect(parseArggonItemFromCommand("\\(arggon show task-x)")).toBeUndefined();
+    expect(parseArggonItemFromCommand("X=1 \\(arggon show task-x)")).toBeUndefined();
+    // A mid-token escaped `\(` is not a word: bash parses `X=a(b` as the
+    // assignment and runs arggon.
+    expect(parseArggonItemFromCommand("X=a\\(b arggon show task-x")).toBe("task-x");
+    // Unescaped, the same form is a real subshell and runs arggon.
+    expect(parseArggonItemFromCommand("(arggon show task-x)")).toBe("task-x");
+  });
+
   it("does not read quoted or query forms as executions (F-B)", () => {
     expect(parseArggonItemFromCommand("command -v arggon show task-x")).toBeUndefined();
     expect(parseArggonItemFromCommand("command -V arggon show task-x")).toBeUndefined();
@@ -167,8 +207,13 @@ describe("plugin-context: arggon invocation parsing", () => {
     expect(parseArggonItemFromCommand('echo "text # more" && arggon show task-x')).toBe("task-x");
   });
 
-  it("keeps newlines inside quotes inside one token (F-D)", () => {
+  it("keeps a newline-bearing quoted span one inert token (F1/F-D)", () => {
+    // The span (newline included) is a single word, so none of these can split
+    // into a command-position `arggon`. Before F1 this test passed because the
+    // newline split the span, not because the span stayed intact.
     expect(parseArggonItemFromCommand('echo "line1\narggon show task-x"')).toBeUndefined();
+    expect(parseArggonItemFromCommand('"line1\narggon show task-x"')).toBeUndefined();
+    expect(parseArggonItemFromCommand('x="line1\narggon show task-x"')).toBeUndefined();
     expect(parseArggonItemFromCommand('arggon comment task-x "line1\nline2"')).toBe("task-x");
   });
 
