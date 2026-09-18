@@ -377,9 +377,12 @@ function isPathLike(text: string): boolean {
  * bash parses the word — quotes/backslashes, whitespace from a quoted span
  * (ambiguous with a fused command word, F1), expansions (`$`, backtick),
  * grouping (`()`, `{}`), redirection (`<`, `>`) and control operators that
- * survive escaped/quoted (`;`, `|`, `&`: `x\;arggon` is one word, never a
- * path lookup). `#`, `!` and glob characters (`*?[]`) are literal inside a
- * word — any glob expansion still ends in the pattern's final `/arggon`
+ * only occur escaped or quoted inside a word (`;`, `|`, `&`): the token text
+ * no longer distinguishes an escaped operator from a quoted one, so such a
+ * word is conservatively kept out of the path rule — bash does exec
+ * `dir\;x/arggon` (and `"dir;x/arggon"`) when that relative path exists, a
+ * documented miss. `#`, `!` and glob characters (`*?[]`) are literal inside
+ * a word — any glob expansion still ends in the pattern's final `/arggon`
  * component — so they stay plain path text.
  */
 const SHELL_SYNTAX_IN_PATH = /[\s\\"'`$(){}<>;|&]/
@@ -632,17 +635,19 @@ function parseCommandText(command: string, depth: number): string | undefined {
  * A token starting with an escaped `\(` is likewise a literal word (F2),
  * while a quoted assignment before the command (`x="a b" arggon show task-x`)
  * stays an assignment and the command runs (F1). An escaped backslash word
- * (`\\arggon …`, `\\\(arggon …`, `\\\\\(arggon …`) and a quoted word that
+ * (`\\arggon …`: command name `\arggon`, exit 127), a quoted word that
  * begins with shell syntax (`'(/usr/local/bin/arggon' show task-x`, bash 127)
- * are syntax-error shapes too: all reduce to no command, never to `arggon`
- * (F3, PR #358 review F2). A slash-bearing word keeps its last component when
- * every component is plain path text: literal `#`/`!` and glob characters are
- * fine (`dir#x/arggon`, `'dir*x/arggon'`, `dir!x/arggon`), as are collapsed
- * empty components (`a//b/arggon`), because bash execs those paths (PR #358
- * review F1). Best effort residual: a bare `(` in argument position
- * (`\\( (arggon …)`) syntax-errors in bash but is still followed as a group,
- * like any unquoted `(` outside command position (`echo (arggon …)`,
- * `\\((arggon …))`); pinned by tests.
+ * and the 3/5/7-backslash `\(` forms (`\\\(arggon …`, `\\\\\(arggon …`,
+ * `\\\\\\\(arggon …`) all reduce to no command, never to `arggon`: the first
+ * two are name lookups (bash 127), the `\(` forms syntax-error on the trailing
+ * unescaped `)` (exit 2) (F3, PR #358 review F2). A slash-bearing word keeps
+ * its last component when every component is plain path text: literal `#`/`!`
+ * and glob characters are fine (`dir#x/arggon`, `'dir*x/arggon'`,
+ * `dir!x/arggon`), as are collapsed empty components (`a//b/arggon`), because
+ * bash execs those paths (PR #358 review F1). Best effort residual: a bare `(`
+ * in argument position (`\\( (arggon …)`) syntax-errors in bash but is still
+ * followed as a group, like any unquoted `(` outside command position
+ * (`echo (arggon …)`, `\\((arggon …))`); pinned by tests.
  *
  * Best effort, misses are harmless and false positives are not: aliases,
  * backticks, `sh -c "arggon …"`, `timeout 5 arggon …` and `xargs arggon …`
