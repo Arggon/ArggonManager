@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-comment-torn-read
 title: comment initial loadItems can read a torn in-place write
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T15:14:23.818Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-comment-torn-read
 ---
 <!--
@@ -77,3 +76,6 @@ Left/reported (no code filed here): adopt --ack and init still write tasks/.conv
 ### handoff 2026-09-18 @Arggon — next: Review PR #339 (draft, base opencode2) against the evidence above; if green, merge (merge commit, not squash) and flip the item to done. Worker is not allowed to merge or flip.
 - branch: fix/bug-comment-torn-read
 - open questions: none blocking; PR notes the config-writer and cross-item lock-scope observations as out-of-scope reports.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; root causes confirmed (in-place truncate window + pre-lock lookup), regression test discriminates (scratch revert fails 2/2 with 68/88 torn reads), race harness 5/5 standalone, persistent not-found still fails identically, update/create sites behavior-preserving; 1144 tests; merged with cli pass. Follow-ups filed as bug-atomic-write-followups (convention.yml writes + guard/mode nits). Closing.
