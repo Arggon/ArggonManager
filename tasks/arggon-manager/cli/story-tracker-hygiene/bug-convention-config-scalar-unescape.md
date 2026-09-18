@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-convention-config-scalar-unescape
 title: Convention config scalar parsing leaves backslashes raw (x-generated.projectName doubles on rewrite)
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T22:49:57.652Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-convention-config-scalar-unescape
 ---
 <!--
@@ -42,13 +41,13 @@ projectName line; each run doubles them.
 
 ## Acceptance
 
-- [ ] `stripQuotes` decodes double-quoted YAML escapes (share the
+- [x] `stripQuotes` decodes double-quoted YAML escapes (share the
       `frontmatter.ts` unescape helper if it is exported, or mirror it) and
       single-quoted `''`.
-- [ ] `yamlQuote`/`stripQuotes` round-trip a backslash-bearing project name
+- [x] `yamlQuote`/`stripQuotes` round-trip a backslash-bearing project name
       byte-stably across repeated init/upgrade serializations; regression test
       with raw-file assertions.
-- [ ] Suite, lint, validate green; small PR to `opencode2`.
+- [x] Suite, lint, validate green; small PR to `opencode2`.
 
 ## Notes
 
@@ -76,7 +75,10 @@ Worker evidence — fix implemented, gates green, draft PR next.
 
 **Tests (`cli/src/convention.test.ts`, +7):** full escape set including `\\`, `\"`, `\n`, `\x`/`\u`, unknown escapes, trailing lone backslash, single-quote `''`; decoding for branch_patterns/x-views/x-worktree/x-import scalars; writer raw-file round-trip; already-corrupted value no-growth; repeated init rewrite byte-stable with raw-file assertions.
 
-**Gates:** full suite 76 files / 1282 tests passed (private TMPDIR); eslint clean; tsc build clean; `arggon validate` ok (no errors/warnings); `arggon spec validate` ok (16 docs, 0 warnings).
+**Gates:** full suite 76 files / 1285 tests passed (private TMPDIR); eslint clean; tsc build clean; `arggon validate` ok (no errors/warnings); `arggon spec validate` ok (16 docs, 0 warnings).
 
 ### 2026-09-18 @Arggon
 Draft PR open for review: https://github.com/Arggon/ArggonManager/pull/364 (base `opencode2`, draft, not merged). Gates green on merged HEAD; no status flip by the worker.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; the decoder is textually and behaviorally identical to the merged frontmatter reference (437-case parity fuzz, 0 mismatches), ASCII rewrites are byte-identical across all 38 in-repo configs (parse/writer/idempotency diffs 0), the latent-only claim verified, and all 8 new tests fail against the pre-fix implementation; gates 1285 + CI pass; merged. Counts corrected (+8 tests, 1285). Closing.
