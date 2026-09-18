@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode-v2-plugin
 title: "Optional OpenCode V2 plugin: MCP auto-registration and item context"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T01:35:48.435Z"
 depends_on: [task-opencode-v2-adr, task-opencode-v2-spec]
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-plugin
 ---
@@ -59,7 +58,7 @@ is optional and failure-isolated.
       item id; surfaces the worktree path for `session_move` guidance;
       optional warning on failing `arggon validate --json` after a shell commit
       (never blocking; pre-commit/CI stay authoritative).
-- [ ] Docs updated in the same PRs (playbook, `docs/agents.md`), and no rule
+- [x] Docs updated in the same PRs (playbook, `docs/agents.md`), and no rule
       logic exists in the plugin beyond calling the kernel.
 
 ## Notes
@@ -145,3 +144,6 @@ W3 landed on `feat/task-opencode-v2-plugin`; PR: https://github.com/Arggon/Arggo
 ### handoff 2026-09-18 @Arggon — next: Coordinator: review draft PR #327 (W3 T9-T10; W2 scenarios kept green). Verify plugin thinness, the 1024 B bound, silent paths. If accepted: merge to opencode2, verify, then W4 (T12).
 - branch: feat/task-opencode-v2-plugin
 - open questions: docs/agents.md W3 paragraph owned by the MCP-meta worker (reported, not edited); ARGON_ITEM env name follows the task text (ARGON vs Arggon); compaction not forceable headless (per-call injection evi…
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict NO-MERGE→fixed (F1 docs/agents.md W3 scope refreshed in 515aeae; F2-F8 filed as task-opencode-v2-plugin-hardening); blocking smoke 11/11 on opencode v2.0.7; merged with cli pass. W2+W3 complete — closing.

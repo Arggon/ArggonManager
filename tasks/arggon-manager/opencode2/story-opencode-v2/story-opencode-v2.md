@@ -45,7 +45,7 @@ as needed.
       (task-opencode-v2-spec, task-opencode-v2-doctor, task-opencode-v2-playbook).
 - [ ] W2 — vendored plugin: MCP auto-registration, failure isolation, smoke
       harness with `opencode run` evidence (task-opencode-v2-plugin).
-- [ ] W3 — session context: item correlation, bounded injection, rename,
+- [x] W3 — session context: item correlation, bounded injection, rename,
       hygiene signal, MCP `_meta.sessionID` attribution
       (task-opencode-v2-plugin, task-opencode-v2-mcp-meta).
 - [ ] W4 — orchestration: coordinator/worker/reviewer agents, review + done
