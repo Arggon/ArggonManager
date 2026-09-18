@@ -118,6 +118,13 @@ Agents **MUST NOT** reopen `done` / `cancelled`. This is enforced, not just docu
 
 Non-trivial items are **orchestrated by default**: a coordinator agent delegates them to subagents instead of working them inline. Trivial items (one-line fixes, doc tweaks) stay inline.
 
+**OpenCode V2 is the reference implementation** ([ADR 0010](./adr/0010-opencode2-native-architecture.md)): the rules below are unchanged, but on V2 they are enforced with native primitives. `arggon init` generates the surface (`.opencode/agents/`, `.opencode/commands/`):
+
+- **Agents**: `arggon-coordinator` (primary) plans waves, delegates, reviews and owns the tracker; `arggon-worker` (subagent) owns exactly one item; `arggon-reviewer` (subagent) reviews read-only.
+- **Permissions keep the model honest**: the coordinator's `subagent` allow-list is `arggon-worker` / `arggon-reviewer` / `explore` (any other agent is denied); workers cannot launch subagents (nesting stops at one level); the reviewer cannot edit — `edit`/`write`/`patch` are removed from its catalog while reads and shell stay available for the review.
+- **Flow**: each worker claims its item and creates its worktree with `arggon start <id> --worktree` (one worktree per item, recorded on `worktree_path`; `opencode.session_move` follows the session where the work lives); the coordinator launches workers **foreground** (a background child would outlive a headless `opencode run`); the `arggon_*` MCP tools carry tracker reads/writes while the CLI carries git; verdicts land **on the item** with `arggon comment`, never as GitHub comments. `/arggon-review` runs the reviewer pass; `/arggon-done` verifies the checklist, the merge and the gates before the coordinator flips the item.
+- **Evidence harness**: `npm run smoke:opencode:wave` runs headless `opencode run` sessions on a fixture with a **local bare remote** — permission probes (reviewer edit denied, worker subagent denied, coordinator allow-list), then a scripted four-phase wave (plan → two foreground workers in disjoint worktrees → reviewer verdicts → merge verification and done flips) and the run's context accounting. Separate from `npm test` and from `npm run smoke:opencode`; exits 0 with `skipped: opencode not installed` when the binary is absent.
+
 **Coordinator duties:**
 
 - **Wave planning by file-disjointness:** group claimable items into waves whose members touch disjoint files/modules. Items that would collide go in different waves.

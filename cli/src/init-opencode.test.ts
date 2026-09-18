@@ -94,6 +94,17 @@ describe("opencode seam: fresh init", () => {
     expect(review).toContain("subagent: true");
   });
 
+  it("agents deny nested subagents and the reviewer denies edits (W4 probes)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const worker = readFileSync(join(dir, ".opencode/agents/arggon-worker.md"), "utf8");
+    const reviewer = readFileSync(join(dir, ".opencode/agents/arggon-reviewer.md"), "utf8");
+    // One nesting level: workers and reviewers never launch subagents.
+    expect(worker).toMatch(/action: subagent\s+resource: "\*"\s+effect: deny/);
+    expect(reviewer).toMatch(/action: subagent\s+resource: "\*"\s+effect: deny/);
+    expect(reviewer).toMatch(/action: edit\s+resource: "\*"\s+effect: deny/);
+  });
+
   it("records x-generated provenance for every seam file", () => {
     const dir = tempDir();
     runInit({ dir, force: false });

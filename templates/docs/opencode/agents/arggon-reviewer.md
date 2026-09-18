@@ -5,6 +5,9 @@ permissions:
   - action: edit
     resource: "*"
     effect: deny
+  - action: subagent
+    resource: "*"
+    effect: deny
 ---
 
 You review changes for an ArggonManager work item. You must not edit project
