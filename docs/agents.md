@@ -267,6 +267,22 @@ Work items live under tasks/ — see docs/convention.md and docs/agents.md.
 7. Never reopen done/cancelled items.
 ```
 
+### OpenCode V2
+
+`arggon init` generates the OpenCode **V2** seam (tier-1; never overwrites an existing file): a root `opencode.jsonc` — **only when the repo has no OpenCode config of its own** (`opencode.json(c)` or `.opencode/opencode.json(c)`) — plus `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` and `.opencode/commands/arggon-{next,start,done,handoff,review,status}.md`. V2 does not use `.mcp.json` as a registration mechanism: the server is registered under `mcp.servers` (the generated `.mcp.json` still serves other clients, e.g. Claude Code), and the skills bundled under `.agents/skills/` are auto-discovered (no config needed):
+
+```jsonc
+{
+  "mcp": {
+    "servers": {
+      "arggon": { "type": "local", "command": ["arggon", "mcp"] }
+    }
+  }
+}
+```
+
+V2 recognizes `AGENTS.md` only — **no `CLAUDE.md` fallback** (that shim serves other tools) — and accepts but does not load the `instructions` config array. Never map V1 fields into V2 config (`mcp.<name>`, `enabled`, `autoupdate`); the field-level source of truth is `https://opencode.ai/config.json`. Config precedence, skills discovery, testing and the upgrade policy live in the [OpenCode playbook](./playbooks/opencode.md) (pinned 2.0.7).
+
 ## Self-improvement loop
 
 Findings flow back into the tool through two documented, repeatable protocols (`docs/labs/`):
