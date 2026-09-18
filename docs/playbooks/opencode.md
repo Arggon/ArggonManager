@@ -93,6 +93,36 @@ or the V1 schema for V2 work.
   `ctx.session.rename` and `ctx.vcs.branches` are absent, so the plugin uses
   `ctx.session.update` and `git` respectively. The tracker, pre-commit and CI
   remain the only authority; a missing surface degrades to a no-op.
+- **Code Mode batching.** V2 Code Mode exposes the MCP server as
+  `tools.arggon.*` (probe: `tools.arggon.arggon_next({})`); batch read-only
+  calls in ONE `execute` script (`arggon_next` + `arggon_show` +
+  `arggon_report` + `arggon_validate`) instead of one model step per call.
+  The schemas are advertised once per session and only the composed result
+  enters the transcript — the ADR 0006 spirit applied to coordinators.
+
+## Context budgets
+
+The V2 prompt surface is measured, not assumed (ADR 0006, W6
+`task-opencode2-context`):
+
+- `npm run context:report` — report-only, no model calls. Runs `arggon init`
+  on a temp fixture and prints bytes (plus `~bytes/4` tokens) for the
+  generated `AGENTS.md`, the advertised skill/agent descriptions, the umbrella
+  `SKILL.md` vs each `references/*.md`, the live MCP `tools/list` payload
+  (reused from `arggon doctor --budget --json`), the plugin's injected item
+  block and the generated compaction `keep.tokens`. `--json` emits the same
+  numbers; `--strict` exits 1 when a bound is crossed.
+- Enforced bounds: generated `AGENTS.md` ≤ 2048 B (test-enforced),
+  injected item block ≤ 1024 B (`ITEM_BLOCK_MAX_BYTES`, per-field clipping),
+  MCP `tools/list` ≤ 12,288 B advisory (`task-schema-budget`). The report
+  flags crossings inline like `doctor --budget` does.
+- Baseline (2026-09-18, W6 report): fixed per-session surface ~12.9 KB
+  (~3.2k tokens) — MCP `tools/list` 10,096 B is the dominant cost, AGENTS.md
+  1,863 B, advertised descriptions 893 B total. The W5 skill split cut the
+  on-load skill from 21,955 B (single file) to a 9,518 B umbrella, with the
+  15,479 B of references paid only when a task needs them. `keep.tokens:
+  15000` matches the V2 default: retention is ~4.6x the fixed surface, so
+  keep it unless exact recent detail matters more than new-work headroom.
 
 ## Testing
 
