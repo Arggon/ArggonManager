@@ -30,9 +30,10 @@
  * Exit codes: 0 report written (budgets flagged inline, like `doctor
  * --budget`); 1 measurement failed; with `--strict`, 1 when any enforced/
  * advisory bound is exceeded too. `--strict` is a manual/release gate, NOT
- * wired into CI: the only bound it adds over the test suite is the advisory
- * MCP `tools/list` size (schema drift, not a product regression).
- * `ARGON_CONTEXT_REPORT_KEEP=1` keeps the fixture for inspection.
+ * wired into CI: over the test suite it adds the advisory MCP `tools/list`
+ * size (schema drift, not a product regression) and the generated compaction
+ * `keep.tokens` regression check (expected 15,000; no suite test enforces
+ * it). `ARGON_CONTEXT_REPORT_KEEP=1` keeps the fixture for inspection.
  *
  * Pure helpers (frontmatter, stripJsonComments, pad) are exported for
  * `smoke/context-report.test.ts`; the report body only runs when this file is

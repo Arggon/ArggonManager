@@ -131,25 +131,29 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   block and the generated compaction `keep.tokens`. `--json` emits the same
   numbers; `--strict` exits 1 when a bound is crossed. Gate scope (decided in
   `task-opencode2-context-polish`): `--strict` is a **manual/release gate**,
-  not wired into CI — the only bound it adds over `npm test` is the advisory
-  MCP `tools/list` size, which drifts with the OpenCode/MCP schema instead of
-  flagging a product regression. Run it before a release and whenever a change
-  touches a context surface (AGENTS.md, skills, agents, tool schemas).
+  not wired into CI — over `npm test` it adds the advisory MCP `tools/list`
+  size, which drifts with the OpenCode/MCP schema instead of flagging a
+  product regression, and the generated compaction `keep.tokens` regression
+  check (expected 15,000), which no suite test enforces. Run it before a
+  release and whenever a change touches a context surface (AGENTS.md, skills,
+  agents, tool schemas).
 - Enforced bounds: generated `AGENTS.md` ≤ 2048 B (test-enforced),
   injected item block ≤ 1024 B (`ITEM_BLOCK_MAX_BYTES`, per-field clipping),
   MCP `tools/list` ≤ 12,288 B advisory (`task-schema-budget`). The report
   flags crossings inline like `doctor --budget` does.
-- Baseline (2026-09-18, W6 report): fixed per-session surface ~12.9 KB
-  (~3.2k tokens) — MCP `tools/list` 10,096 B is the dominant cost, AGENTS.md
-  1,863 B, advertised descriptions 893 B total. The W5 skill split cut the
-  on-load skill from 21,955 B (single file) to a 9,518 B umbrella, with the
-  15,479 B of references paid only when a task needs them. Those skill
-  numbers are **source bytes** (this repo's `skills/arggon-cli/`, before
-  marker stamping); the report's on-demand table prints **fixture bytes**
-  after `arggon init` stamping (9,582 B umbrella, 15,804 B references).
-  Compare within one basis, never sum source and fixture numbers. `keep.tokens:
-15000` matches the V2 default: retention is ~4.6x the fixed surface, so
-  keep it unless exact recent detail matters more than new-work headroom.
+- Snapshot (2026-09-18, W6 report refreshed at merge — values move when the
+  skills or tool schemas do, so re-run the report before relying on them):
+  fixed per-session surface ~13.2 KB (~3.3k tokens) — MCP `tools/list`
+  10,450 B is the dominant cost, AGENTS.md 1,863 B, advertised descriptions
+  893 B total. The W5 skill split cut the on-load skill from 21,955 B (single
+  file) to a 9,978 B umbrella, with the 17,208 B of references paid only when
+  a task needs them. Those skill numbers are **source bytes** (this repo's
+  `skills/arggon-cli/`, before marker stamping); the report's on-demand table
+  prints **fixture bytes** after `arggon init` stamping (10,042 B umbrella,
+  17,533 B references). Compare within one basis, never sum source and
+  fixture numbers. `keep.tokens: 15000` matches the V2 default: retention is
+  ~4.5x the fixed surface, so keep it unless exact recent detail matters more
+  than new-work headroom.
 
 ## Testing
 
