@@ -7,7 +7,7 @@ import {
   symlinkSync,
   unlinkSync,
 } from "node:fs";
-import { basename, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { readConventionConfig, resolveBranchName } from "./convention.js";
 import { runBranch, type GitRunner } from "./branch.js";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
@@ -522,7 +522,11 @@ export function unlinkNodeModulesLink(primaryRoot: string, worktreePath: string)
   const link = join(worktreePath, "node_modules");
   try {
     if (!lstatSync(link).isSymbolicLink()) return false;
-    if (resolve(readlinkSync(link)) !== target) return false;
+    // readlink returns the RAW target: a relative target is relative to the
+    // link's own directory, never to process.cwd() (review R1). Resolving
+    // against cwd would miss a relative link whenever the command runs from
+    // anywhere but the primary checkout.
+    if (resolve(dirname(link), readlinkSync(link)) !== target) return false;
   } catch {
     return false;
   }
