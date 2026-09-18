@@ -10,6 +10,37 @@ x-tracker:
   auto-commit: true
 
 x-generated:
+  projectName: "ArggonManager"
+  .agents/skills/arggon-cli/SKILL.md:
+    template: "skills/arggon-cli/SKILL.md"
+    checksum: "sha256:1b3fd9dc51d2b29ac7813a49e4cb3b5309476224c04e3f6ff093d4c8bfdd6738"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .agents/skills/arggon-cli/references/json-contract.md:
+    template: "skills/arggon-cli/references/json-contract.md"
+    checksum: "sha256:b649309e9eb362a410841ab8e35e6f1b8e76d776ea2419e8746b782bb98a3212"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .agents/skills/arggon-cli/references/methodology.md:
+    template: "skills/arggon-cli/references/methodology.md"
+    checksum: "sha256:296f7a84d2f4d54e079dab0744d1d8d29632e1ec8051b100c25bc75d3c6383ff"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .agents/skills/arggon-cli/references/orchestration.md:
+    template: "skills/arggon-cli/references/orchestration.md"
+    checksum: "sha256:d9f686b53c4eda5aac754f80604955e96e548f73f175399acc8dc579e7840bbd"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .agents/skills/arggon-cli/references/pitfalls.md:
+    template: "skills/arggon-cli/references/pitfalls.md"
+    checksum: "sha256:4f58b5489e922ff58d33a1606d2d490726b5b0e8b15f093017f3cbecedd82ea9"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .agents/skills/arggon-upgrade/SKILL.md:
+    template: "skills/arggon-upgrade/SKILL.md"
+    checksum: "sha256:b08d09ab479141d8a062420bab074372fe334bbc4b3ea59295eebb06859e0a20"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
   .editorconfig:
     template: "docs/editorconfig"
     checksum: "sha256:13683ae1820c1cf4ef46cc076940c7b43c7e895890ea93dfb885029163793698"
@@ -34,6 +65,81 @@ x-generated:
     arggonVersion: "0.3.0"
     generatedAt: "2026-09-17T17:52:07.195Z"
     acknowledged: true
+  .mcp.json:
+    template: "docs/mcp-json"
+    checksum: "sha256:a2052811395c3dadbf77593031b72d7572f50e6103ddd35c8e2ca3b05e6b29fc"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .opencode/agents/arggon-coordinator.md:
+    template: "docs/opencode/agents/arggon-coordinator.md"
+    checksum: "sha256:437b6d2fd489f5b057e0d14f123df607f0425917408d8f37f87a8fc3f3a939f1"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .opencode/agents/arggon-reviewer.md:
+    template: "docs/opencode/agents/arggon-reviewer.md"
+    checksum: "sha256:1d975d583aa511f34f9c9746458ac1055eb78a0a60ee05bae6c69993c52ddc09"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .opencode/agents/arggon-worker.md:
+    template: "docs/opencode/agents/arggon-worker.md"
+    checksum: "sha256:8d7c51842dabcce88fdf7797c6bd22f64f0764aba6ec9149336fc722eaaa5ef9"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .opencode/commands/arggon-adr.md:
+    template: "docs/opencode/commands/arggon-adr.md"
+    checksum: "sha256:3b957e64f36abaa10327c38454d19bc6360f6b8b7d9b3f7f0438da0e15a03647"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .opencode/commands/arggon-done.md:
+    template: "docs/opencode/commands/arggon-done.md"
+    checksum: "sha256:fa5d76b57c2b7c221b968d3736cea2feee32ab12275f85854b4093b2fb896e8b"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .opencode/commands/arggon-explore.md:
+    template: "docs/opencode/commands/arggon-explore.md"
+    checksum: "sha256:6014720accfe39abe3dc5cf47027744a6b08e03ae3b4293a2528b01ffc0979db"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .opencode/commands/arggon-handoff.md:
+    template: "docs/opencode/commands/arggon-handoff.md"
+    checksum: "sha256:527c63f1773fc17da1d7b5b96b552992d2eaca0295eecf1d06168dcce716bfcb"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .opencode/commands/arggon-next.md:
+    template: "docs/opencode/commands/arggon-next.md"
+    checksum: "sha256:f387b68d9d4d8efe8b9fa705dd74c14661e9f36db02bc30d1cb2d27e30da0468"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .opencode/commands/arggon-playbook.md:
+    template: "docs/opencode/commands/arggon-playbook.md"
+    checksum: "sha256:5c7ebed7c594321503ac6a161cc8d417a9018e14e7b6cde169e15c88d4387817"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .opencode/commands/arggon-review.md:
+    template: "docs/opencode/commands/arggon-review.md"
+    checksum: "sha256:40001624a1a6ad164935b560220330b55d05fee93843d28aded824b1e0c3dc7f"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .opencode/commands/arggon-spec.md:
+    template: "docs/opencode/commands/arggon-spec.md"
+    checksum: "sha256:eb040c13164f8d37b9949c419402760b3fd936b699a4c99e92dae22888cb19ae"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .opencode/commands/arggon-start.md:
+    template: "docs/opencode/commands/arggon-start.md"
+    checksum: "sha256:796456b09efb774c7cfa1eea4cdf1607294fd2355fc1ce674215d7fb6e9c3965"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .opencode/commands/arggon-status.md:
+    template: "docs/opencode/commands/arggon-status.md"
+    checksum: "sha256:16d65855ec2a81a44870a014c3ec23339ab6cd89da7527e80b50849b89897b5c"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
+  .opencode/plugins/arggon/index.ts:
+    template: "opencode/plugins/arggon/index.ts"
+    checksum: "sha256:90b95cd67bf108e8bfe4fdb7ad18581e9507a99ae0bb52c09ecee5da66bc03f2"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
   ARCHITECTURE.md:
     template: "docs/ARCHITECTURE.md"
     checksum: "sha256:7298450ad056fcadd6716a3c5ed6423e34d5cb37763f7d845746147077efabc7"
@@ -76,3 +182,8 @@ x-generated:
     arggonVersion: "0.3.0"
     generatedAt: "2026-09-17T17:52:07.195Z"
     acknowledged: true
+  opencode.jsonc:
+    template: "docs/opencode.jsonc"
+    checksum: "sha256:619fc5a13003fbf900ae064c588c1393264102ef5a243d097c502c0af61fb665"
+    arggonVersion: "0.3.0"
+    generatedAt: "2026-09-18T03:46:42.367Z"
