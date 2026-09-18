@@ -22,7 +22,8 @@ updated: "2026-09-18"
 
 W7 of [plan-opencode2-009](../../../../docs/plans/plan-opencode2-009.md): this
 repository becomes the reference adopter of its own V2 surface, the program
-documents close, and the promotion PR to `main` lands. The dogfood is the
+documents close, and the program closes on the `opencode2` branch (`main`
+stays untouched by product decision). The dogfood is the
 strongest acceptance signal: if the generated seam + plugin + agents/commands
 cannot run ArggonManager's own work loop, the program is not done.
 
@@ -42,8 +43,9 @@ cannot run ArggonManager's own work loop, the program is not done.
       `implemented` in the same PR.
 - [ ] Gates green: `arggon validate`, `arggon spec validate`, `arggon doctor`,
       full test suite, `npm run smoke:opencode` harness.
-- [ ] Program PR to `main` references epic `opencode2` and the spec; the epic
-      and story containers close through the normal cascade after merge.
+- [ ] Program close-out PR on `opencode2` references epic `opencode2` and the
+      spec; the epic and story containers close through the normal cascade
+      after merge.
 
 ## Notes
 

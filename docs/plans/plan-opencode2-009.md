@@ -13,9 +13,11 @@ verifiable acceptance criterion and links back to the spec. Waves are ordered
 by dependency; items within a wave are file-disjoint and can be orchestrated in
 parallel per [docs/agents.md](../agents.md) (one worktree per item).
 
-Branch model: the program lands on the integration branch **`opencode2`** (one
-worktree per wave item merged into it); the final promotion to `main` happens
-when W7 closes, via PR referencing the epic.
+Branch model: the program lands on the long-lived integration branch
+**`opencode2`** (one worktree per wave item merged into it). `main` stays
+untouched by product decision (2026-09-18): adopters who want the native
+OpenCode V2 surface use `opencode2`, which receives `main` merges as needed.
+W7 closes the program on that branch.
 
 ## T1: W0 — Program foundation
 
@@ -170,9 +172,9 @@ when W7 closes, via PR referencing the epic.
 
 - This repo carries the generated surface (self-host), the plugin is exercised
   by real sessions, the playbook is current, README + docs/agents.md +
-  docs/json-output.md updated, the program PR to `main` references epic
-  `opencode2` and closes the spec/plan (statuses `implemented`). Item:
-  `task-opencode2-dogfood`.
+  docs/json-output.md updated, the program close-out PR on `opencode2`
+  references epic `opencode2` and closes the spec/plan (statuses
+  `implemented`). Item: `task-opencode2-dogfood`.
 - **Acceptance:** `arggon validate`, `spec validate`, full test suite and the
   smoke harness green; a real session on this repo demonstrates the loop
   end-to-end; spec/plan statuses flipped in the same PR.

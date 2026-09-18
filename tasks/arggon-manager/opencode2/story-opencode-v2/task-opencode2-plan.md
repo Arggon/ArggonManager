@@ -46,12 +46,15 @@ exist yet.
 
 ## Notes
 
-- Branch: `opencode2` (integration branch per the product owner's request); wave
-  items branch from it and merge back into it; the final promotion to `main` is
-  the W7 PR referencing epic `opencode2`.
+- Branch: `opencode2` (long-lived integration branch per the product owner);
+  wave items branch from it and merge back. `main` stays untouched by product
+  decision (2026-09-18); adopters consume the native surface from `opencode2`.
 - The plan is the navigation document: when a wave starts, its items are already
   filed; new discoveries are filed as items, not grown into a wave's scope.
 
 ### handoff 2026-09-18 @Arggon — next: Start W1: write docs/specs/spec-opencode-seam + plan (task-opencode-v2-spec), then implement generation (T3), doctor (T4) and playbook (T5). W0 commit 78829a1 on branch opencode2 (pushed).
 - branch: opencode2
 - open questions: W0 PR strategy: open opencode2 -> main now, or let the W7 promotion PR carry W0?
+
+### 2026-09-18 @Arggon
+Product decision (2026-09-18): main stays untouched; opencode2 is the long-lived integration branch adopters can use for native OpenCode V2 support. W0/W1 PRs target opencode2; no promotion to main.

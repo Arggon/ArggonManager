@@ -30,8 +30,10 @@ done). Contracts:
   (two layers, one logic path, vendored plugin policy).
 - Research: [exploration-opencode-v2-native-009](../../../../docs/explorations/exploration-opencode-v2-native-009.md).
 
-Integration branch: `opencode2`; wave items branch from it and merge back; the
-final promotion to `main` is the W7 PR referencing this epic.
+Integration branch: `opencode2` (long-lived); wave items branch from it and
+merge back. `main` stays untouched by product decision (2026-09-18) — adopters
+who want the native OpenCode V2 surface use `opencode2`; `main` merges flow in
+as needed.
 
 ## Acceptance
 
