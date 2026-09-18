@@ -76,6 +76,49 @@ describe("plugin-context: arggon invocation parsing", () => {
     ).toBe("task-x");
   });
 
+  it("sees through wrapper prefixes and package runners (F1)", () => {
+    expect(parseArggonItemFromCommand("npx arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("bunx arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("sudo arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("sudo -u root arggon update task-x --status in_progress")).toBe(
+      "task-x",
+    );
+    expect(parseArggonItemFromCommand("env ARGON_QUIET=1 arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("env -i arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("command arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("time arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("time -p arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("npx --yes npm run arggon -- show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("pnpm exec arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("yarn dlx arggon show task-x")).toBe("task-x");
+  });
+
+  it("follows command substitutions, subshells and newlines (F1)", () => {
+    expect(parseArggonItemFromCommand("x=$(arggon show task-x)")).toBe("task-x");
+    expect(parseArggonItemFromCommand('echo "$(arggon show task-x)"')).toBe("task-x");
+    expect(parseArggonItemFromCommand("(arggon show task-x)")).toBe("task-x");
+    expect(parseArggonItemFromCommand("(cd repo; arggon show task-x)")).toBe("task-x");
+    expect(parseArggonItemFromCommand("echo $(echo $(arggon show task-x))")).toBe("task-x");
+    expect(parseArggonItemFromCommand("cd repo\narggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("arggon show task-x\narggon update task-y")).toBe("task-x");
+  });
+
+  it("keeps quoted separators and single-quoted substitutions inert (F2)", () => {
+    expect(parseArggonItemFromCommand('echo "&& arggon show task-x"')).toBeUndefined();
+    expect(parseArggonItemFromCommand("echo '; arggon show task-x'")).toBeUndefined();
+    expect(parseArggonItemFromCommand('echo "(arggon show task-x)"')).toBeUndefined();
+    expect(parseArggonItemFromCommand("echo '$(arggon show task-x)'")).toBeUndefined();
+    expect(
+      parseArggonItemFromCommand('echo "&& arggon show task-fake" && arggon show task-x'),
+    ).toBe("task-x");
+  });
+
+  it("does not confuse wrapper-prefixed non-arggon commands (F1)", () => {
+    expect(parseArggonItemFromCommand('sudo echo "arggon show task-x"')).toBeUndefined();
+    expect(parseArggonItemFromCommand("time grep arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand('npx grep -rn "arggon show task-x" .')).toBeUndefined();
+  });
+
   it("parses Code Mode MCP calls and embedded shell commands", () => {
     expect(
       parseArggonItemFromCode('return await tools.arggon.arggon_update({ id: "task-x", status: "in_progress" })'),
@@ -85,12 +128,16 @@ describe("plugin-context: arggon invocation parsing", () => {
     expect(parseArggonItemFromCode('return await tools.shell({ command: "arggon show task-cli" })')).toBe(
       "task-cli",
     );
+    expect(
+      parseArggonItemFromCode('return await tools.shell({ command: "npx arggon show task-wrapped" })'),
+    ).toBe("task-wrapped");
   });
 
   it("does not invent an item for unrelated Code Mode calls", () => {
     expect(parseArggonItemFromCode("return await tools.arggon.arggon_next({})")).toBeUndefined();
     expect(parseArggonItemFromCode('return await tools.arggon.arggon_update({ status: "in_progress" })')).toBeUndefined();
     expect(parseArggonItemFromCode("return await tools.read({ path: 'README.md' })")).toBeUndefined();
+    expect(parseArggonItemFromCode("const cmd = 'echo \"&& arggon show task-x\"';")).toBeUndefined();
   });
 
   it("parses observed tool executions by tool name", () => {
