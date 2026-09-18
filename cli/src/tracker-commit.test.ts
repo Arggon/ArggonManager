@@ -408,9 +408,9 @@ describe("tracker auto-commit with exotic path shapes (NUL hygiene)", () => {
   /** Repo with two tracked and two ignored exotic-name files, all mutated. */
   function exoticRepo(): { dir: string; tracked: string[]; ignored: string[] } {
     const dir = mkdtempSync(join(tmpdir(), "arggon-exotic-"));
-    git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
-    git(["config", "user.email", "test@example.com"], dir);
-    git(["config", "user.name", "Test"], dir);
+    // bug-ci-enotempty-rmretry: no detached maintenance daemon in fixtures
+    // (initFixtureRepo opts out and reads the config back).
+    initFixtureRepo(dir);
     // `?` matches any single non-`/` character, so these patterns reach the
     // newline (`line\nbreak.md`) and backslash (`back\slash.md`) names.
     writeFileSync(join(dir, ".gitignore"), "tasks/line?break.md\ntasks/back?slash.md\n", "utf8");
