@@ -73,3 +73,20 @@ Decided behavior:
 3. No hook bypass: --no-verify is never used; the fixture test proves the pre-commit gate executes inside the worktree (the gate's dependency require is what makes the first start succeed).
 
 Out of scope note: the post-start x-worktree hook remains non-fatal and unchanged.
+
+### 2026-09-18 @Arggon
+### Evidence: fixture probes (real CLI from this branch), expected vs observed
+
+Harness: scratch git repos (`init` + initiative/epic/story/task), bare `origin`, a fake `node_modules/fake-gate-dep`, and a pre-commit hook that `require`s it — the stand-in for the documented `npm run arggon -- validate` gate. Raw log: `/tmp/opencode/probe-bug-start-worktree-node-modules-output.txt`; script: `/tmp/opencode/probe-bug-start-worktree-node-modules.sh`.
+
+**(a) fresh worktree + dependency-requiring gate** — expected: exit 0, `linkedNodeModules:true`, gate ran, symlink, claim commit. Observed: exit 0; JSON `"linkedNodeModules":true`; `node_modules -> <primary>/node_modules` symlink; `.gate-ran` marker present (gate really ran inside the worktree — no bypass); `claim: task-alpha` commit; the claim commit touches only the item file, so the link was never committed.
+
+**(b) deliberately failing gate** — expected: exit 1 `START_FAILED`; message names failing step, worktree path, remediation, attach; worktree+branch kept. Observed: exit 1; message = `start failed while committing the claim (pre-commit gate); the worktree was kept at <path> (nothing was rolled back).` + git's `gate: deliberate failure` + `...re-run \`arggon start task-alpha --worktree\` — it attaches to the existing worktree. To discard it instead: ...`; worktree dir exists, 2 worktrees registered, `feat/task-alpha` branch exists, item staged-but-uncommitted (`M  tasks/launch/auth/login/task-alpha.md`). Follow-up probe: after fixing the hook, re-run attaches (`worktreeCreated:false`) and lands the claim commit.
+
+**(c) repo without a hook / without primary node_modules** — expected: exit 0, `linkedNodeModules:false`, no link, claim commit. Observed: exit 0; `"linkedNodeModules":false`; no `node_modules` in the worktree; `claim: task-alpha`.
+
+**(d) additive JSON field** — expected: key present, false when no link. Observed: non-worktree `start task-bravo` -> `"linkedNodeModules":false`; (a) true; (c) false; `cli/src/cli.test.ts` asserts the envelope key.
+
+Automated coverage: `cli/src/worktree.test.ts` (link+report; keep+remediation+attach re-run; no-hook unaffected), `cli/src/start.test.ts` (`linkNodeModules` unit matrix + field false without `--worktree`), `cli/src/cli.test.ts` (envelope key). Full suite 1117 passed / 69 files; `lint`, `build`, `validate`, `spec validate` green.
+
+Hooks are never bypassed: `--no-verify` is never passed, the gate must succeed for the commit to land, and its stderr is preserved in the kept-worktree failure.
