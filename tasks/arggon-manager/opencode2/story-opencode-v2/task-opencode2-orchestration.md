@@ -1,14 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-opencode2-orchestration
 title: "Orchestration on OpenCode V2: coordinator, workers, waves"
-priority: p1
-depends_on: [task-opencode-v2-spec, task-opencode-v2-plugin]
+assignee: Arggon
+branch: feat/task-opencode2-orchestration
 parent: story-opencode-v2
 labels: []
+priority: p1
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T02:50:47.555Z"
+depends_on: [task-opencode-v2-spec, task-opencode-v2-plugin]
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-orchestration
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/story-opencode-v2/task-opencode2-orchestration.md
