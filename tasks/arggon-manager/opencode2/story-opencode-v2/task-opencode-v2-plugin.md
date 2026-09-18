@@ -1,14 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-opencode-v2-plugin
 title: "Optional OpenCode V2 plugin: MCP auto-registration and item context"
-priority: p3
-depends_on: [task-opencode-v2-adr, task-opencode-v2-spec]
+assignee: Arggon
+branch: feat/task-opencode-v2-plugin
 parent: story-opencode-v2
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T01:35:48.435Z"
+depends_on: [task-opencode-v2-adr, task-opencode-v2-spec]
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-plugin
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/story-opencode-v2/task-opencode-v2-plugin.md
