@@ -11,6 +11,7 @@ import {
   generateDocs,
   generatedMarker,
   renderDocPlaceholders,
+  TIER2_DESTS,
 } from "./docs.js";
 import {
   parseConventionConfig,
@@ -265,7 +266,7 @@ describe("init docs: --json payload", () => {
     expect(body.created).toEqual(
       ["ARCHITECTURE.md", "CHANGELOG.md", "SUPPORT.md", "docs/convention.md", "docs/deploy.md", "docs/engineering.md", "docs/runbooks/README.md"].sort(),
     );
-    expect(body.updated.length).toBe(12); // 11 tier-1 docs (incl. .mcp.json) + 2 bundled skills
+    expect(body.updated.length).toBe(GENERATED_DOC_COUNT - TIER2_DESTS.size); // tier-1 docs (incl. .mcp.json) + bundled skills
     expect(body.updated).toContain("AGENTS.md");
     expect(body.updated).toContain(".agents/skills/arggon-cli/SKILL.md");
     expect(body.skipped).toEqual([]);

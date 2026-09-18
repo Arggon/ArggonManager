@@ -379,7 +379,9 @@ export function proposalContent(
   render: string,
   now?: Date,
 ): string {
-  if (dest.endsWith(".json")) return render;
+  // JSONC destinations take the same path as JSON (MINOR-4, PR #322 review):
+  // an HTML proposal header would make the proposed config invalid JSONC.
+  if (dest.endsWith(".json") || dest.endsWith(".jsonc")) return render;
   const header =
     `<!-- arggon:proposed-update dest="${dest}" version="${version}" ` +
     `generated="${(now ?? new Date()).toISOString()}"; diff against the original, ` +

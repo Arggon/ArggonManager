@@ -141,7 +141,7 @@ Pass `--json` on supported commands for a stable object on stdout (see [`docs/js
 
 ## MCP server
 
-`arggon mcp` starts a stdio MCP (JSON-RPC 2.0, newline-delimited) server that exposes the shared kernel and the bounded read surface as nine tools: `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`, `arggon_handoff`, `arggon_show`, `arggon_next`, `arggon_report`, and `arggon_validate` (task-mcp-parity-full: the pure-read `next`/`report`/`validate` commands complete the ADR 0006 next-first surface for MCP-only agents). Tool results are the documented `--json` envelope objects (see [`docs/json-output.md`](./json-output.md)) serialized as text content; kernel failures surface as tool errors with the CLI's message text. `arggon init` generates a `.mcp.json` that registers the server project-scoped; if your repo already has a `.mcp.json`, the arggon entry is never overwritten — add `{"command": "arggon", "args": ["mcp"]}` under `mcpServers` manually.
+`arggon mcp` starts a stdio MCP (JSON-RPC 2.0, newline-delimited) server that exposes the shared kernel and the bounded read surface as nine tools: `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`, `arggon_handoff`, `arggon_show`, `arggon_next`, `arggon_report`, and `arggon_validate` (task-mcp-parity-full: the pure-read `next`/`report`/`validate` commands complete the ADR 0006 next-first surface for MCP-only agents). Tool results are the documented `--json` envelope objects (see [`docs/json-output.md`](./json-output.md)) serialized as text content; kernel failures surface as tool errors with the CLI's message text. `arggon init` generates a `.mcp.json` that registers the server project-scoped; if your repo already has a `.mcp.json`, the arggon entry is never overwritten — add `{"command": "arggon", "args": ["mcp"]}` under `mcpServers` manually. For OpenCode V2 it also generates a project `opencode.jsonc` (only when the repo has no OpenCode config of its own) registering the server under `mcp.servers`, plus the OpenCode seam — `.opencode/agents/` (coordinator/worker/reviewer) and `.opencode/commands/arggon-*.md`; see [exploration-opencode-v2-native-009](explorations/exploration-opencode-v2-native-009.md) and `docs/playbooks/opencode.md`.
 
 The MCP layer always calls the kernel with the agent playbook rules applied: an MCP caller cannot reopen `done`/`cancelled` items and cannot steal a claim (there is no `force` parameter). These rules live in one module (`cli/src/rules.ts`) shared by the CLI and the MCP server, so both entry points enforce identical semantics.
 
@@ -266,6 +266,22 @@ Work items live under tasks/ — see docs/convention.md and docs/agents.md.
 6. Done = acceptance checklist complete + `arggon update <id> --status done` + PR linked.
 7. Never reopen done/cancelled items.
 ```
+
+### OpenCode V2
+
+`arggon init` generates the OpenCode **V2** seam (tier-1; never overwrites an existing file): a root `opencode.jsonc` — **only when the repo has no OpenCode config of its own** (`opencode.json(c)` or `.opencode/opencode.json(c)`) — plus `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` and `.opencode/commands/arggon-{next,start,done,handoff,review,status}.md`. V2 does not use `.mcp.json` as a registration mechanism: the server is registered under `mcp.servers` (the generated `.mcp.json` still serves other clients, e.g. Claude Code), and the skills bundled under `.agents/skills/` are auto-discovered (no config needed):
+
+```jsonc
+{
+  "mcp": {
+    "servers": {
+      "arggon": { "type": "local", "command": ["arggon", "mcp"] }
+    }
+  }
+}
+```
+
+V2 recognizes `AGENTS.md` only — **no `CLAUDE.md` fallback** (that shim serves other tools) — and accepts but does not load the `instructions` config array. Never map V1 fields into V2 config (`mcp.<name>`, `enabled`, `autoupdate`); the field-level source of truth is `https://opencode.ai/config.json`. Config precedence, skills discovery, testing and the upgrade policy live in the [OpenCode playbook](./playbooks/opencode.md) (pinned 2.0.7).
 
 ## Self-improvement loop
 
