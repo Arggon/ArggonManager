@@ -106,3 +106,7 @@ Acceptance mapping (left unticked for the coordinator): race explained (this com
 ### handoff 2026-09-18 @Arggon (session: ses_f4b101437ffendcj1ieIfOBiXK) — next: Review draft PR #338: wait for CI on the two runs, tick the acceptance boxes, merge (auto-done flips the item). No product code in this PR.
 - branch: fix/bug-tracker-commit-enotempty-flake
 - open questions: comment-race retry is a stopgap for product race bug-comment-torn-read (unowned, product fix needed); 'CI stable across two PR runs' box needs PR checks; tracker-commit/worktree stress passed 10/10 l…
+
+### 2026-09-18 @Arggon
+CI evidence on draft PR #338 (base `opencode2`): two consecutive `cli` runs green —
+run [35360053524](https://github.com/Arggon/ArggonManager/actions/runs/35360053524) on head `dccc46e` (fix + origin/opencode2 merge) and run [35360089419](https://github.com/Arggon/ArggonManager/actions/runs/35360089419) on head `b84c196` (handoff commit). That covers the "CI stable across two consecutive PR runs" acceptance box together with the local 10/10 stress recorded above.
