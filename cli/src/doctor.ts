@@ -583,11 +583,11 @@ export function runDoctor(opts: {
   };
 }
 
-/** One-line human summary of the git state: repo ✓/✗ + dirty + remote. */
+/** One-line human summary of the git state: repo ✓/✗ + dirty + remote (sanitized — the URL is repo-controlled). */
 function formatGitLine(git: DoctorGit): string {
   if (!git.isRepo) return "not a git repository (branch/worktree/push/PR flows unavailable)";
   const parts = ["repo", git.dirty ? "dirty" : "clean"];
-  if (git.remote) parts.push(`remote ${git.remote}`);
+  if (git.remote) parts.push(`remote ${sanitizeHumanText(git.remote)}`);
   else parts.push("no remote");
   return parts.join(", ");
 }
@@ -605,17 +605,80 @@ function hasOpenCodeSignal(opencode: DoctorOpenCode): boolean {
 }
 
 /**
- * Sanitize one config-derived value for a human (terminal) line. Keys in
+ * Rendered-length cap for one untrusted value on a human line (F3,
+ * bug-doctor-human-output-injection): a hostile config key or remote URL can
+ * be arbitrarily long, so the value is clipped to this many characters plus
+ * an ellipsis before escaping. Escaping adds at most 6x, so the rendered line
+ * stays bounded; the JSON payload always keeps the raw, uncapped value —
+ * this is display only.
+ */
+export const MAX_HUMAN_VALUE_CHARS = 200;
+
+/** Fast path for ordinary config keys: no escaping or quoting needed. */
+const HUMAN_SAFE_TOKEN = /^[A-Za-z0-9._-]+$/;
+
+/**
+ * Code points that must never reach a terminal raw: C0 controls (ESC, BEL,
+ * newline, ...), DEL and the C1 block (U+007F–U+009F — the 8-bit CSI/OSC
+ * introducers), and the Unicode line/paragraph separators (U+2028/29).
+ * `JSON.stringify` already escapes C0, quotes and backslashes; this extra
+ * pass covers the rest (F3, bug-doctor-human-output-injection). Bidi and
+ * zero-width format characters are deliberately OUT of scope: they cannot
+ * emit a control sequence or forge a line, and doctor output is a report,
+ * not an injection boundary.
+ */
+const HUMAN_UNSAFE = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g;
+
+function escapeUnsafeCodePoint(ch: string): string {
+  return `\\u${ch.charCodeAt(0).toString(16).padStart(4, "0")}`;
+}
+
+/** Clip one untrusted value to the cap; never split a surrogate pair at the cut. */
+function clipHumanValue(value: string): string {
+  if (value.length <= MAX_HUMAN_VALUE_CHARS) return value;
+  let end = MAX_HUMAN_VALUE_CHARS;
+  const last = value.charCodeAt(end - 1);
+  if (last >= 0xd800 && last <= 0xdbff) end -= 1; // high surrogate: the pair would be split
+  return `${value.slice(0, end)}…`;
+}
+
+/**
+ * JSON-escape the body of a value (C0/quotes/backslashes → inert `\n`/
+ * `\uXXXX` text) without the surrounding quotes, then escape the code points
+ * `JSON.stringify` leaves raw (DEL/C1, U+2028/29). Shared by both sanitizers
+ * below so they cannot drift.
+ */
+function escapeHumanText(value: string): string {
+  return JSON.stringify(value).slice(1, -1).replace(HUMAN_UNSAFE, escapeUnsafeCodePoint);
+}
+
+/**
+ * Sanitize one config-key-like token for a human (terminal) line. Keys in
  * `v1ShapedKeys` are copied verbatim from an adopter config, which is
  * untrusted, so an `mcp.<name>` key carrying ANSI escapes or newlines must not
  * reach the terminal raw (MINOR-1, PR #324 review). Values on the
  * `[A-Za-z0-9._-]` allowlist — every ordinary key — render unchanged;
- * anything else is JSON-escaped, which maps control characters (ESC, newline)
- * and quotes to inert `\uXXXX`/`\n` text in one bounded pass. This is display
- * only: the JSON payload keeps the raw key.
+ * anything else is JSON-quoted and escaped (C0/DEL/C1, U+2028/29) in one
+ * bounded pass, and capped at `MAX_HUMAN_VALUE_CHARS`. This is display only:
+ * the JSON payload keeps the raw key.
  */
 function sanitizeHumanValue(value: string): string {
-  return /^[A-Za-z0-9._-]+$/.test(value) ? value : JSON.stringify(value);
+  const clipped = clipHumanValue(value);
+  return HUMAN_SAFE_TOKEN.test(clipped) ? clipped : `"${escapeHumanText(clipped)}"`;
+}
+
+/**
+ * Sanitize one free-text repo value (root path, git remote URL, error
+ * message) for a human line (F2, bug-doctor-human-output-injection): these
+ * legitimately contain punctuation, so printable characters pass through
+ * unchanged — JSON-quoting every ordinary path would be noise — while the
+ * same unsafe code points as `sanitizeHumanValue` are escaped in place. A
+ * remote carrying a newline+ESC therefore renders as one inert line (`\n`,
+ * `\u001b` as literal text). Display only: the JSON payload keeps the raw
+ * value.
+ */
+function sanitizeHumanText(value: string): string {
+  return escapeHumanText(clipHumanValue(value));
 }
 
 /**
@@ -659,7 +722,7 @@ export function formatDoctorReport(result: DoctorResult): string {
     return `${lines.join("\n")}\n`;
   }
   const lines = [
-    `arggon doctor: initialized (convention v${result.conventionVersion}) at ${result.root}`,
+    `arggon doctor: initialized (convention v${result.conventionVersion}) at ${sanitizeHumanText(result.root ?? "null")}`,
     `  docs: ${result.docs.managed} managed, ${result.docs.untouched} untouched, ` +
       `${result.docs.modified} modified, ${result.docs.acknowledged} acknowledged, ` +
       `${result.docs.acknowledgedDrifted} acknowledgedDrifted, ` +
@@ -672,7 +735,7 @@ export function formatDoctorReport(result: DoctorResult): string {
   if (result.budget) {
     lines.push(...formatBudgetLines(result.budget));
   } else if (result.budgetError !== undefined) {
-    lines.push(`  budget: measurement failed: ${result.budgetError}`);
+    lines.push(`  budget: measurement failed: ${sanitizeHumanText(result.budgetError)}`);
   }
   if (result.docs.acknowledgedDrifted > 0) {
     lines.push(

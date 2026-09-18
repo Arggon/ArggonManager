@@ -21,6 +21,7 @@ import {
 import { GENERATED_DOC_COUNT, OPENCODE_CONFIG_CANDIDATES } from "./docs.js";
 import {
   formatDoctorReport,
+  MAX_HUMAN_VALUE_CHARS,
   MAX_OPENCODE_NAMES,
   MAX_OPENCODE_V1_KEYS_PER_FILE,
   OPENCODE_MCP_HINT,
@@ -213,6 +214,24 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     expect(result.tracker.todo).toBe(1);
   });
 
+  it("renders a hostile root path inert on the human line; JSON keeps it raw (F2)", () => {
+    // A directory name can legally carry ESC, newline, NEL (C1) and U+2028:
+    // the report root is interpolated into the human header line.
+    const dir = mkdtempSync(join(tmpdir(), "arggon-doctor-evil\u001b\nspoof\u0085\u2028-"));
+    mkdirSync(join(dir, "tasks"), { recursive: true });
+    writeFileSync(join(dir, "tasks/.convention.yml"), "version: 4\n", "utf8");
+    const result = runDoctor({ cwd: dir });
+    // JSON payload keeps the raw path.
+    expect(result.root).toBe(dir);
+    const report = formatDoctorReport(result);
+    // Human output: the path renders escaped in place, one header line.
+    expect(report).not.toContain("\u001b");
+    expect(report).not.toContain("\nspoof");
+    expect(report).not.toContain("\u0085");
+    expect(report).not.toContain("\u2028");
+    expect(report).toContain(`at ${join(tmpdir(), "arggon-doctor-evil\\u001b\\nspoof\\u0085\\u2028-")}`);
+  });
+
   it("exposes the initialized payload via the CLI --json (exit 0, report-only)", () => {
     const dir = tempDir();
     runInit({ dir, force: false, full: true });
@@ -276,6 +295,47 @@ describe("doctor: git section (bug-init-git-doctor-blindspot)", () => {
     execFileSync("git", ["remote", "add", "origin", "git@github.com:example/example.git"], { cwd: dir });
     const result = runDoctor({ cwd: dir });
     expect(result.git.remote).toBe("git@github.com:example/example.git");
+  });
+
+  it("renders a hostile remote URL as one inert human line; JSON keeps it raw (F2)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    // Review repro (bug-doctor-human-output-injection): a remote carrying a
+    // newline fabricates a column-0 `spoof:` line and an ESC reaches the
+    // terminal raw.
+    const hostile = "https://example.com/evil\nspoof: fake hint.git\u001b[31m";
+    execFileSync("git", ["remote", "add", "origin", hostile], { cwd: dir });
+    const result = runDoctor({ cwd: dir });
+    // JSON payload keeps the raw value, byte for byte.
+    expect(result.git.remote).toBe(hostile);
+    const report = formatDoctorReport(result);
+    // Human output: no raw ESC, no fabricated line; the remote is escaped
+    // in place on the single `git:` line (`\n`/`\u001b` as literal text).
+    expect(report).not.toContain("\u001b");
+    expect(report).not.toContain("\nspoof");
+    expect(report).toContain(
+      "git: repo, dirty, remote https://example.com/evil\\nspoof: fake hint.git\\u001b[31m",
+    );
+    expect(report.split("\n").filter((line) => line.startsWith("  git:"))).toHaveLength(1);
+    // CLI --json round trip: the raw remote survives unchanged.
+    const proc = runCli(["doctor", "--json"], dir);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as { git: { remote: string } };
+    expect(body.git.remote).toBe(hostile);
+  });
+
+  it("caps a long remote URL on the human line; JSON keeps it whole (F3, bounded length)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    const longRemote = `https://example.com/${"r".repeat(MAX_HUMAN_VALUE_CHARS * 3)}`;
+    execFileSync("git", ["remote", "add", "origin", longRemote], { cwd: dir });
+    const result = runDoctor({ cwd: dir });
+    expect(result.git.remote).toBe(longRemote);
+    const report = formatDoctorReport(result);
+    expect(report).toContain(`remote ${longRemote.slice(0, MAX_HUMAN_VALUE_CHARS)}…`);
+    expect(report).not.toContain(longRemote);
   });
 
   it("reports a clean tree as dirty: false after committing everything", () => {
@@ -632,6 +692,50 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     expect(body.opencode.v1.findings).toEqual([
       { file: "opencode.json", keys: ["enabled", rawKey] },
     ]);
+  });
+
+  it("escapes DEL/C1 and U+2028/29 in untrusted keys for human output; JSON keeps them raw (F3)", () => {
+    const dir = tempDir();
+    bareTree(dir);
+    // \u009b/\u009d are the 8-bit CSI/OSC introducers, \u0085 is NEL (a line
+    // break on some terminals), \u007f is DEL, and \u2028/29 are the Unicode
+    // line/paragraph separators — JSON.stringify leaves all of them raw.
+    const hostileName = "csi\u009bosc\u009dnel\u0085del\u007fls\u2028ps\u2029end";
+    const rawKey = `mcp.${hostileName}`;
+    writeAdopterConfig(dir, { enabled: true, mcp: { [hostileName]: { type: "local" } } });
+    const result = runDoctor({ cwd: dir });
+    expect(result.opencode.v1).toEqual({
+      findings: [{ file: "opencode.json", keys: ["enabled", rawKey] }],
+      truncated: false,
+    });
+    const report = formatDoctorReport(result);
+    for (const ch of ["\u007f", "\u0085", "\u009b", "\u009d", "\u2028", "\u2029"]) {
+      expect(report).not.toContain(ch);
+    }
+    expect(report).toContain('"mcp.csi\\u009bosc\\u009dnel\\u0085del\\u007fls\\u2028ps\\u2029end"');
+    // JSON direction: the CLI --json payload keeps the raw key bytes.
+    const proc = runCli(["doctor", "--json"], dir);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      opencode: { v1: { findings: Array<{ keys: string[] }> } };
+    };
+    expect(body.opencode.v1.findings[0]!.keys).toEqual(["enabled", rawKey]);
+  });
+
+  it("caps a long untrusted key on the human line; JSON keeps it whole (F3, bounded length)", () => {
+    const dir = tempDir();
+    bareTree(dir);
+    const longName = "k".repeat(MAX_HUMAN_VALUE_CHARS * 3);
+    const rawKey = `mcp.${longName}`;
+    writeAdopterConfig(dir, { enabled: true, mcp: { [longName]: {} } });
+    const result = runDoctor({ cwd: dir });
+    expect(result.opencode.v1).toEqual({
+      findings: [{ file: "opencode.json", keys: ["enabled", rawKey] }],
+      truncated: false,
+    });
+    const report = formatDoctorReport(result);
+    expect(report).toContain(`"${rawKey.slice(0, MAX_HUMAN_VALUE_CHARS)}…"`);
+    expect(report).not.toContain(rawKey);
   });
 
   it("adopter config with native mcp.servers.arggon registration: no hint", () => {

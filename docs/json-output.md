@@ -181,6 +181,8 @@ The additive `opencode` block (task-opencode-v2-doctor) reports the OpenCode V2 
 
 Human output mirrors the block with one `opencode:` summary line (`config ... , seam N artifact(s), N bundled skill(s), MCP native | MCP only in .mcp.json | MCP not registered`) plus a `hint:` line per finding class (V1-shaped keys, `.mcp.json`-only registration). On non-initialized trees the line prints only when something is actually present.
 
+Human output is display-sanitized for terminal hygiene (bug-doctor-human-output-injection, additive): every untrusted value interpolated into a human line — the `git.remote` URL, the report `root` path, the `budgetError` message, and `opencode.v1` config keys — escapes C0 controls (ESC, newline), `U+007F`–`U+009F` (DEL/C1: 8-bit CSI/OSC introducers) and `U+2028`/`U+2029` as inert `\n`/`\uXXXX` text, and caps each rendered value at `MAX_HUMAN_VALUE_CHARS` (200) characters plus `…`. Config-key tokens are JSON-quoted; paths and URLs keep their ordinary punctuation unquoted. Bidi/zero-width format characters are deliberately not escaped — they cannot emit a control sequence or forge a line, and doctor output is a report, not an injection boundary. The `--json` payload always keeps the raw, uncapped value; this is display only.
+
 ### `list`
 
 | Field   | Type         | Notes                                 |
