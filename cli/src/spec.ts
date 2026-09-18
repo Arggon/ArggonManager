@@ -13,6 +13,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import { writeFileAtomic } from "./atomic.js";
 import { readConventionVersion } from "./convention.js";
 import { bundledTemplatesDir, findTasksDir, repoRootFromTasks } from "./paths.js";
+import { sanitizeHumanError } from "./sanitize.js";
 import type { Issue } from "./types.js";
 
 export type SpecValidateOptions = {
@@ -324,13 +325,23 @@ export function runSpecValidate(opts: SpecValidateOptions): SpecValidateResult {
   return { root, conventionVersion, checked: infos.length, errors, warnings };
 }
 
+/**
+ * Human report for `arggon spec validate` (bug-validate-stdout-injection M1):
+ * same display policy as `formatValidateHuman` — path and message are
+ * repo-controlled, each is sanitized at this boundary, the `[CODE]` stays
+ * visible, and `--json` keeps the raw values.
+ */
 export function formatSpecValidateHuman(result: SpecValidateResult): string {
   const lines: string[] = [];
   for (const e of result.errors) {
-    lines.push(`error ${e.path}: ${e.message} [${e.code}]`);
+    lines.push(
+      `error ${sanitizeHumanError(e.path)}: ${sanitizeHumanError(e.message)} [${e.code}]`,
+    );
   }
   for (const w of result.warnings) {
-    lines.push(`warning ${w.path}: ${w.message} [${w.code}]`);
+    lines.push(
+      `warning ${sanitizeHumanError(w.path)}: ${sanitizeHumanError(w.message)} [${w.code}]`,
+    );
   }
   if (result.errors.length === 0) {
     lines.push(
@@ -604,14 +615,25 @@ export function runSpecAnalyze(opts: SpecAnalyzeOptions): SpecAnalyzeResult {
   return { root, conventionVersion, scanned, ambiguity, consistency };
 }
 
+/**
+ * Human report for `arggon spec analyze` (bug-validate-stdout-injection M1,
+ * same policy as `formatSpecValidateHuman`): finding `file` and `message` can
+ * embed repo-controlled bytes (hostile spec filename, frontmatter value), so
+ * both are sanitized per line; severity/kind are static enums. `--json`
+ * findings keep the raw values.
+ */
 export function formatSpecAnalyzeHuman(result: SpecAnalyzeResult): string {
   const lines: string[] = [];
   for (const f of result.consistency) {
-    lines.push(`${f.severity} ${f.file}: ${f.message} [${f.kind}]`);
+    lines.push(
+      `${f.severity} ${sanitizeHumanError(f.file)}: ${sanitizeHumanError(f.message)} [${f.kind}]`,
+    );
   }
   for (const f of result.ambiguity) {
     const at = f.line === undefined ? "" : `${f.line}:`;
-    lines.push(`${f.severity} ${f.file}:${at} ${f.message} [${f.kind}]`);
+    lines.push(
+      `${f.severity} ${sanitizeHumanError(f.file)}:${at} ${sanitizeHumanError(f.message)} [${f.kind}]`,
+    );
   }
   const total = result.ambiguity.length + result.consistency.length;
   if (total === 0) {
@@ -780,11 +802,15 @@ export function formatSpecBaselineCompareHuman(c: SpecBaselineComparison): strin
   const lines: string[] = [];
   for (const f of c.added) {
     const at = f.line === undefined ? "" : `${f.line}:`;
-    lines.push(`new ${f.severity} ${f.file}:${at} ${f.message} [${f.kind}]`);
+    lines.push(
+      `new ${f.severity} ${sanitizeHumanError(f.file)}:${at} ${sanitizeHumanError(f.message)} [${f.kind}]`,
+    );
   }
   for (const f of c.resolved) {
     const at = f.line === undefined ? "" : `${f.line}:`;
-    lines.push(`resolved ${f.severity} ${f.file}:${at} ${f.message} [${f.kind}]`);
+    lines.push(
+      `resolved ${f.severity} ${sanitizeHumanError(f.file)}:${at} ${sanitizeHumanError(f.message)} [${f.kind}]`,
+    );
   }
   lines.push(
     `arggon spec analyze vs baseline ${c.file}: ${c.added.length} new, ${c.resolved.length} resolved, ` +

@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  formatSpecBaselineCompareHuman,
   runSpecAnalyzeCompareBaseline,
   runSpecAnalyzeSaveBaseline,
   serializeSpecBaseline,
@@ -121,6 +122,25 @@ describe("spec baseline: comparison semantics", () => {
     expect(cmp.added).toEqual([]);
     expect(cmp.resolved.length).toBeGreaterThan(0);
     expect(cmp.resolved.every((f) => f.file.includes("spec-b-001.md"))).toBe(true);
+  });
+
+  it("renders hostile finding paths inert in the --baseline human report", () => {
+    // bug-validate-stdout-injection M1: `spec analyze --baseline` prints the
+    // same findings as the plain run; a hostile spec filename must stay inert.
+    const dir = makeRepo();
+    const hostileName = "spec-bad\nspoof\u001b[31m\u0085\u007f\u2028\u2029.md";
+    writeSpec(dir, hostileName, "b-001", CLEAN_BODY);
+    const file = join(dir, "baseline.json");
+    runSpecAnalyzeSaveBaseline({ cwd: dir, file });
+    writeSpec(dir, hostileName, "b-001", AMBIGUOUS_BODY);
+    const cmp = runSpecAnalyzeCompareBaseline({ cwd: dir, file });
+    expect(cmp.added.length).toBeGreaterThan(0);
+    const out = formatSpecBaselineCompareHuman(cmp);
+    expect(out).not.toMatch(/[\u001b\u007f-\u009f\u2028\u2029]/);
+    expect(out).not.toContain("\nspoof");
+    expect(out).toContain(
+      "new warn docs/specs/spec-bad\\nspoof\\u001b[31m\\u0085\\u007f\\u2028\\u2029.md:",
+    );
   });
 
   it("throws (SPEC_FAILED in the CLI) on a missing or invalid baseline file", () => {
