@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-cli-error-output-injection
 title: "CLI error output injection: raw err.message on stderr (C1/DEL/LS-PS) + doctor sanitizer polish"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T16:15:13.413Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-cli-error-output-injection
 ---
 <!--
@@ -43,12 +42,12 @@ Findings from the independent review of PR #341
 
 ## Acceptance
 
-- [ ] Doctor's stderr failure line (and the audited catch paths) sanitize
+- [x] Doctor's stderr failure line (and the audited catch paths) sanitize
       repo-controlled values; the hostile-item-name repro renders inert; JSON
       error output unchanged.
-- [ ] `docs/json-output.md` cap wording distinguishes raw cap vs rendered bound.
-- [ ] Tests: `budgetError` sanitization + ordinary remote/root byte-identity.
-- [ ] Full suite, lint, `validate`/`spec validate` green; small PR to
+- [x] `docs/json-output.md` cap wording distinguishes raw cap vs rendered bound.
+- [x] Tests: `budgetError` sanitization + ordinary remote/root byte-identity.
+- [x] Full suite, lint, `validate`/`spec validate` green; small PR to
       `opencode2`.
 
 ## Notes
@@ -84,3 +83,6 @@ Files: `cli/src/sanitize.ts` (new), `cli/src/sanitize.test.ts` (new), `cli/src/c
 ### handoff 2026-09-18 @Arggon — next: Review draft PR #343 against opencode2; file any findings as follow-up items; coordinator/reviewer merges and flips status (worker does not merge or flip).
 - branch: fix/bug-cli-error-output-injection
 - open questions: None — error-channel cap decision recorded (MAX_HUMAN_ERROR_CHARS = 2000 raw; JSON error.message stays raw/uncapped).
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; hostile-item repro exactly as claimed (one inert stderr line, exit 1, stdout empty; JSON raw+valid), extraction has no cycles and doctor behavior is byte-identical for ordinary output (5 commands), all 8 console.error sites accounted for (36 via printHumanError + 1 inline + 3 static), caps bounded; 1175 tests; merged with cli pass. M1/L2/L1 filed as bug-validate-stdout-injection. Closing.
