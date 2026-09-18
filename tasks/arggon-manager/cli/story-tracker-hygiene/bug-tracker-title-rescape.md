@@ -13,7 +13,6 @@ updated: "2026-09-18"
 claimed_at: "2026-09-18T22:26:56.651Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-tracker-title-rescape
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tracker-hygiene/bug-tracker-title-rescape.md
   Leaves live only under a story. id is the filename stem: bug-tracker-title-rescape.
@@ -77,3 +76,7 @@ Parsed all 246 tracker `*.md` files with the fixed parser: exactly one backslash
 ### Gates
 
 Full suite 76 files / 1268 tests green (private TMPDIR), `lint`, `build`, `arggon validate` (0 warnings), `arggon spec validate` (16 docs, 0 warnings) all green.
+
+### handoff 2026-09-18 @Arggon (session: ses_f495ec723ffe3PVYOH04jwj9Af) — next: Review draft PR #360 (fix/bug-tracker-title-rescape), merge to opencode2, then flip this item to done. No code work outstanding; all acceptance boxes checked.
+- branch: fix/bug-tracker-title-rescape
+- open questions: latent follow-up bug-convention-config-scalar-unescape (cli/src/convention.ts yamlQuote/stripQuotes) is filed but unclaimed; no live .convention.yml value is affected
