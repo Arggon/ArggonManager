@@ -96,8 +96,12 @@ travel with code; smoke evidence gates behavior changes.
 - **Negative / accepted risks**: a second surface to maintain (mitigated by
   generation + parity tests + provenance, not by hand-copying); V2 API churn at
   2.0.x (mitigated by pinning, feature detection, graceful degradation, and a
-  recorded revisist trigger); vendored copies in adopters are upgraded only by
-  re-running `init` (accepted until npm publishing is justified).
+  recorded revisit trigger — `task-opencode-v2-plugin-import-gotcha`: re-probed
+  on 2.0.8, the documented static `@opencode/plugin` import still fails to load
+  in dependency-less trees, so the guarded dynamic import stays; see the
+  [OpenCode playbook](../playbooks/opencode.md)); vendored copies in adopters
+  are upgraded only by re-running `init` (accepted until npm publishing is
+  justified).
 - **Neutral**: the plugin is optional by construction; ACP, desktop and web
   clients inherit the surface without extra work; inert V2 features
   (`instructions` config, `request` overlays, sharing) are documented as

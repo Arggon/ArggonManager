@@ -1,6 +1,6 @@
 ---
 playbook_id: opencode
-version: 2.0.7
+version: 2.0.8
 researched: 2026-09-18
 status: current
 ---
@@ -10,16 +10,18 @@ status: current
 Technology playbook: the chosen version and the current best practices for
 OpenCode **V2** in this repo.
 
-**Research record (2026-09-17):** local `opencode v2.0.7`. Sources are the **V2**
-docs only — https://opencode.ai/v2/docs/ (**accessed 2026-09-17**) — plus the
-[exploration](../explorations/exploration-opencode-v2-native-009.md) and
+**Research record (2026-09-18):** local `opencode v2.0.8` (original research
+2026-09-17 on v2.0.7; the plugin-import A/B was re-probed on 2.0.8). Sources are
+the **V2** docs only — https://opencode.ai/v2/docs/ (**accessed 2026-09-18**) —
+plus the [exploration](../explorations/exploration-opencode-v2-native-009.md) and
 [ADR 0010](../adr/0010-opencode2-native-architecture.md). Do not consult V1 docs
 or the V1 schema for V2 work.
 
 ## Setup
 
-- Install per https://opencode.ai/v2/docs/ (accessed 2026-09-17); verified local
-  version: `opencode --version` → `v2.0.7` (2026-09-17).
+- Install per https://opencode.ai/v2/docs/ (accessed 2026-09-18); verified local
+  version: `opencode --version` → `v2.0.8` (2026-09-18; the previous pin was
+  2.0.7).
 - `arggon init` generates the tier-1 seam: `opencode.jsonc` **only when the repo
   has no OpenCode config of its own** (`opencode.json(c)` at the root or
   `.opencode/opencode.json(c)`), plus `.opencode/agents/arggon-{coordinator,worker,reviewer}.md`
@@ -29,8 +31,9 @@ or the V1 schema for V2 work.
 - `arggon init` also bundles the optional plugin at
   `.opencode/plugins/arggon/index.ts` (auto-discovered, zero config). It is
   dependency-free (no local `node_modules`) and failure-isolated (every path
-  logs once and no-ops, never breaking a session/CLI/MCP). Ambient behavior
-  only — no rule logic, no native tools:
+  logs once and no-ops, never breaking a session/CLI/MCP); `Plugin.define` is
+  optional sugar behind a guarded import — see Conventions, "Vendored plugin
+  imports". Ambient behavior only — no rule logic, no native tools:
   - **W2** — registers `mcp.servers.arggon`
     (`{type:"local",command:["arggon","mcp"]}`) **only when no `arggon` server
     is configured** and never clobbers one.
@@ -93,6 +96,21 @@ or the V1 schema for V2 work.
   `ctx.session.rename` and `ctx.vcs.branches` are absent, so the plugin uses
   `ctx.session.update` and `git` respectively. The tracker, pre-commit and CI
   remain the only authority; a missing surface degrades to a no-op.
+- **Vendored plugin imports stay guarded.** The V2 plugin docs show a static
+  `import { Plugin } from "@opencode/plugin"`; in a dependency-less tree (no
+  `node_modules` — the `arggon init` adopter shape) an auto-discovered plugin
+  using it fails to load on **2.0.7 and 2.0.8** (`WARN failed to load plugin …
+  Cannot find package '@opencode/plugin'`; `setup` never runs; the session still
+  exits 0). The bundled plugin therefore exports a plain `{ id, setup }` object
+  (a valid V2 definition) and resolves `Plugin.define` behind a guarded,
+  computed dynamic import (computed so editors/`tsc` do not flag the
+  deliberately absent package). Condition to simplify: only when the runtime
+  resolves `@opencode/plugin` without a local `node_modules` (or the docs drop
+  it) — re-run the A/B probe on the new 2.x first. Evidence: the PR #325 probe
+  (2.0.7: static import fails, plain object loads) and
+  task-opencode-v2-plugin-import-gotcha (2.0.8 re-probe, same shape: the docs
+  plugin failed to load, the bundled plugin loaded, registered `arggon` MCP and
+  a real session executed `arggon_next`).
 - **Code Mode batching.** V2 Code Mode exposes the MCP server as
   `tools.arggon.*` (probe: `tools.arggon.arggon_next({})`); batch read-only
   calls in ONE `execute` script (`arggon_next` + `arggon_show` +
@@ -147,6 +165,11 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   be forced deterministically headless; the closest evidence is that the
   injection fires per model call (a later call in the same session gets the
   block again).
+- Re-verified on 2.0.8 (2026-09-18, `opencode v2.0.8`): the 11 scenarios above
+  pass unchanged, and the plugin-import A/B re-probe recorded in
+  task-opencode-v2-plugin-import-gotcha (dependency-less fixture: the docs
+  static import fails to load, the bundled guarded plugin loads and executes
+  `arggon_next`).
 
 ## Security
 
@@ -168,7 +191,10 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
 - Re-research when `arggon playbook status` flags this file stale (default 90
   days) and on every new 2.x minor — 2.0.x is young, hooks/API can drift. Read
   the V2 docs and the config schema, never V1 docs, then
-  `arggon playbook refresh opencode --version <v>`.
+  `arggon playbook refresh opencode --version <v>`. Every 2.x refresh also
+  re-runs the plugin-import A/B probe (dependency-less fixture; see Conventions)
+  and refreshes the smoke evidence before trusting the documented static
+  import.
 - Field or shape changes land in `cli/src/docs.ts` + `templates/docs/opencode*`
   (and their tests) in the same PR as the refresh; no doc statement may
   contradict the shipped seam.
