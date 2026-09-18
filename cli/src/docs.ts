@@ -318,6 +318,23 @@ function isArggonGeneratedConfig(root: string, rel: string): boolean {
 }
 
 /**
+ * OpenCode config discovery candidates (opencode-seam-010), in V2 discovery
+ * order: the root and `.opencode/` JSON/JSONC shapes, both of which V2 reads.
+ *
+ * MINOR-3 (PR #324 review): this is the single source of truth, imported by
+ * `findOpenCodeConfig` AND `doctor` (`cli/src/doctor.ts`) so the two cannot
+ * drift. The use differs intentionally: `findOpenCodeConfig` returns the first
+ * ADOPTER config (arggon's own generated config is skipped by signature), while
+ * doctor reports every present file.
+ */
+export const OPENCODE_CONFIG_CANDIDATES = [
+  "opencode.json",
+  "opencode.jsonc",
+  ".opencode/opencode.json",
+  ".opencode/opencode.jsonc",
+] as const;
+
+/**
  * First existing adopter OpenCode config (opencode-seam-010), posix-relative;
  * null when the adopter has none. The check covers root and `.opencode/`
  * configurations because V2 discovers both.
@@ -330,13 +347,7 @@ function isArggonGeneratedConfig(root: string, rel: string): boolean {
  * ignored.
  */
 export function findOpenCodeConfig(root: string): string | null {
-  const candidates = [
-    "opencode.json",
-    "opencode.jsonc",
-    ".opencode/opencode.json",
-    ".opencode/opencode.jsonc",
-  ];
-  for (const rel of candidates) {
+  for (const rel of OPENCODE_CONFIG_CANDIDATES) {
     if (!existsSync(join(root, ...rel.split("/")))) continue;
     if (isArggonGeneratedConfig(root, rel)) continue; // ours, not an adopter config
     return rel;
