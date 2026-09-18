@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-comment-torn-read
 title: comment initial loadItems can read a torn in-place write
+assignee: Arggon
+branch: fix/bug-comment-torn-read
 parent: story-self-improvement
 labels: []
 priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T15:14:23.818Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-comment-torn-read
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/bug-comment-torn-read.md
@@ -46,15 +50,15 @@ Reproduced locally (2026-09-18):
 
 ## Acceptance
 
-- [ ] `runComment` writes the item atomically (temp file + rename, e.g. the
+- [x] `runComment` writes the item atomically (temp file + rename, e.g. the
       existing `writeFileAtomic`) so a reader can never observe a truncated or
       partial item file.
-- [ ] The initial lookup runs under `withItemLock` (or retries a transient skip
+- [x] The initial lookup runs under `withItemLock` (or retries a transient skip
       of the target file), so a live item cannot look missing to a contender.
-- [ ] Regression test: a reader racing `comment` never observes the item
+- [x] Regression test: a reader racing `comment` never observes the item
       without its frontmatter, and no process reports "not found" while the
       file exists.
-- [ ] `comment-race.test.ts` can drop its transient "not found" retry branch
+- [x] `comment-race.test.ts` can drop its transient "not found" retry branch
       (added by bug-tracker-commit-enotempty-flake) once this is fixed.
 
 ## Notes
@@ -63,3 +67,13 @@ Reproduced locally (2026-09-18):
   concurrency test now retries this transient failure sequentially (clean,
   reported, zero data loss) so CI is deterministic until the product fix
   lands; the retry is not a substitute for this fix.
+
+### 2026-09-18 @Arggon
+Fixed on fix/bug-comment-torn-read — PR #339 (draft, base opencode2).
+Deliverable: comment.ts body write now uses writeFileAtomic (tmp+rename) and the locate step retries a transient miss bounded (5 x 20ms) before the authoritative read under withItemLock (returned/committed path comes from the under-lock read). Same-pattern audit: update.ts (main item write, promotion depends_on rewrite, cascade ancestor write) and create.ts switched to writeFileAtomic; handoff.ts delegates to runComment and has no write of its own.
+Evidence: deterministic probe (4 concurrent comment CLI children, 1.5MB body, 3 tight-loop readers): 133 torn observations pre-fix (len=0/partial) -> 0 post-fix. Regression test fails pre-fix (79 torn reads with only comment.ts reverted) and passes with the fix. comment-race.test.ts green 12/12 without the PR #338 transient not-found retry. Full suite 69 files / 1144 tests green; build + lint green; arggon validate and spec validate ok. 8 concurrent comments on a 2MB body: 8/8 ok, 0 torn.
+Left/reported (no code filed here): adopt --ack and init still write tasks/.convention.yml in place (config, not item files, out of ownership); update.ts promotion/cascade writes are atomic but hold only the initiating item's lock (cross-item lock scope is a separate class).
+
+### handoff 2026-09-18 @Arggon — next: Review PR #339 (draft, base opencode2) against the evidence above; if green, merge (merge commit, not squash) and flip the item to done. Worker is not allowed to merge or flip.
+- branch: fix/bug-comment-torn-read
+- open questions: none blocking; PR notes the config-writer and cross-item lock-scope observations as out-of-scope reports.

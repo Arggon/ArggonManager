@@ -6,10 +6,19 @@
  * bug-claim-race-no-lock / PR #134) last-full-file-write-wins silently drops one
  * comment while both processes exit ok.
  *
+ * Also the torn-read regression for bug-comment-torn-read: tight-loop reader
+ * children hammer the item file while the comments race, and every observation
+ * must carry the complete frontmatter. Before the fix the in-place
+ * `writeFileSync` (open+truncate, then write) let readers observe an empty or
+ * partial file, and the initial loadItems could skip the file entirely
+ * (COMMENT_FAILED "not found under tasks/"). The pre-fix harness (widened body,
+ * same shape as below) observed 100+ torn reads per run; with the atomic write
+ * (temp file + rename) it observes zero.
+ *
  * The CLI runs from source via tsx, like cli.test.ts / claim-race.test.ts.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -83,50 +92,104 @@ function commentConcurrently(dir: string, id: string, texts: string[]): Promise<
   );
 }
 
+type ReaderStats = { reads: number; torn: number; samples: string[] };
+
+/**
+ * Spawn N tight-loop reader children on the item file. A read is TORN when it
+ * is shorter than the baseline captured before the race, does not start with
+ * `---`, or has no closing frontmatter fence — i.e. the reader observed the
+ * item without its complete frontmatter. Readers spin until `stopFile` exists
+ * (the parent creates it after every comment child has exited), so they cover
+ * the whole contested window, and each reports `{reads, torn, samples}`.
+ */
+function startReaders(target: string, stopFile: string, baseLen: number, n: number): Array<Promise<ReaderStats>> {
+  const script = `
+    const fs = require("node:fs");
+    const [target, stop, baseLenRaw] = process.argv.slice(1);
+    const baseLen = Number(baseLenRaw);
+    let reads = 0, torn = 0; const samples = [];
+    const deadline = Date.now() + 120000;
+    while (Date.now() < deadline && !fs.existsSync(stop)) {
+      let s;
+      try { s = fs.readFileSync(target, "utf8"); }
+      catch (e) { torn++; if (samples.length < 3) samples.push("ERR " + e.code); continue; }
+      reads++;
+      if (s.length < baseLen || !s.startsWith("---") || !s.includes("\\n---\\n")) {
+        torn++;
+        if (samples.length < 3) samples.push("len=" + s.length + " head=" + JSON.stringify(s.slice(0, 24)));
+      }
+    }
+    console.log(JSON.stringify({ reads, torn, samples }));
+  `;
+  return Array.from({ length: n }, () =>
+    new Promise<ReaderStats>((resolvePromise) => {
+      const child = spawn(process.execPath, ["-e", script, target, stopFile, String(baseLen)], {
+        stdio: ["ignore", "pipe", "inherit"],
+      });
+      let out = "";
+      child.stdout.on("data", (chunk: string) => (out += chunk));
+      child.on("close", () => {
+        resolvePromise(
+          out.trim() ? (JSON.parse(out.trim()) as ReaderStats) : { reads: 0, torn: 0, samples: [] },
+        );
+      });
+    }),
+  );
+}
+
 describe("concurrent comments on one item (bug-comment-race-no-lock)", () => {
   it(
     "N=4 concurrent comments on the SAME item: every comment lands in the body",
     async () => {
       const dir = initRepo("same-item");
       try {
+        const file = join(dir, "tasks/launch/auth/login/task-race.md");
+        // Widen the body so a truncate->write window is actually observable:
+        // the pre-fix bug wrote this ~1.5MB file in place (truncate, then
+        // write), and the readers below observed 0-length and partial files
+        // every run. Atomic rename makes the window unobservable.
+        writeFileSync(
+          file,
+          `${readFileSync(file, "utf8")}filler\n${"x".repeat(1_500_000)}\n`,
+          "utf8",
+        );
+        const baseLen = Buffer.byteLength(readFileSync(file, "utf8"));
+
+        const stopFile = join(dir, "STOP");
+        const readers = startReaders(file, stopFile, baseLen, 3);
+
         const texts = ["alpha note", "bravo note", "charlie note", "delta note"];
         const results = await commentConcurrently(dir, "task-race", texts);
+        writeFileSync(stopFile, "");
+        const readerStats = await Promise.all(readers);
 
-        // Every process reports ok (or a clean, reported lock failure — under a
+        // Every process reports ok, or a clean, reported lock failure — under a
         // loaded CI runner a contender can legitimately exceed the 10s lock
         // deadline while the holder is descheduled; that is the actionable
-        // error path, never a crash or a silent loss). A clean lock failure is
+        // error path, never a crash or a silent loss. A clean lock failure is
         // retried sequentially below, so EVERY comment must still land.
+        //
+        // bug-comment-torn-read: the transient "not found under tasks/" retry
+        // that used to live here is GONE. It papered over the pre-fix in-place
+        // writeFileSync (open+truncate) race, where a contender scanned the
+        // item inside the truncate window and saw an empty file. The write is
+        // atomic now and the locate step retries transient misses bounded, so
+        // a not-found through this path is a real failure and must fail.
         const failedTexts: string[] = [];
         results.forEach((r, i) => {
           if (!r.ok) {
-            // bug-tracker-commit-enotempty-flake: the product's first loadItems
-            // (comment.ts) runs OUTSIDE withItemLock while the lock holder is in
-            // its in-place writeFileSync (open+truncate, then write). A
-            // contender scanning tasks/ in that window reads an empty file,
-            // softTryLoadItem skips it, and the process reports
-            // "id '<id>' not found under tasks/". Reproduced locally: 65+
-            // empty-file observations from readers racing the 4 comment
-            // processes, and the CLI itself fails this way once the write
-            // window is widened under load. That is a clean, REPORTED
-            // transient — the same class as the 10s lock deadline below — so it
-            // is retried sequentially below like the lock failures; a
-            // persistent not-found still fails at the retry's expect(status).
-            // The end-to-end contract (every comment lands exactly once,
-            // tree validates) is unchanged.
-            // Product-side fix tracked as bug-comment-torn-read (atomic write
-            // + locked initial read); this retry goes away with it.
-            if (r.error.code === "COMMENT_FAILED" && /not found under tasks\//.test(r.error.message)) {
-              failedTexts.push(texts[i]);
-              return;
-            }
             expect(r.error.code).toBe("COMMENT_FAILED");
             expect(r.error.message).toMatch(/failed to acquire lock/);
             failedTexts.push(texts[i]);
           }
         });
 
-        const file = join(dir, "tasks/launch/auth/login/task-race.md");
+        // Torn-read regression (bug-comment-torn-read): every reader actually
+        // ran, and none ever observed the item without its complete frontmatter
+        // (empty file, missing fences, or shorter than the pre-race baseline).
+        expect(readerStats.every((r) => r.reads > 0)).toBe(true);
+        const torn = readerStats.reduce((sum, r) => sum + r.torn, 0);
+        expect(torn, JSON.stringify(readerStats)).toBe(0);
 
         // A cleanly reported lock timeout is retried sequentially, like a real
         // caller would: the error is actionable and the comment still lands.

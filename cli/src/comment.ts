@@ -1,4 +1,5 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync } from "node:fs";
+import { writeFileAtomic } from "./atomic.js";
 import { stringifyFrontmatter } from "./frontmatter.js";
 import { formatDate } from "./dates.js";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
@@ -98,11 +99,11 @@ export function runComment(opts: CommentOptions): CommentResult {
   }
 
   const tasksDir = findTasksDir(opts.cwd);
-  const byId = itemsById(loadItems(tasksDir));
-  const item: WorkItem | undefined = byId.get(id);
-  if (!item) {
-    throw new Error(`id '${id}' not found under tasks/`);
-  }
+  // Peek only to LOCATE the item file so its lock can be taken: the
+  // authoritative read below runs under withItemLock (bug-comment-torn-read).
+  // The peek retries a transient miss a bounded number of times so a live item
+  // can never look absent to a contender (see locateItem).
+  const item: WorkItem = locateItem(tasksDir, id);
 
   const now = opts.now ?? new Date();
   const date = formatDate(now);
@@ -116,32 +117,72 @@ export function runComment(opts: CommentOptions): CommentResult {
   // one comment. The body is re-read INSIDE the lock so each process appends to
   // the other's result, not to a stale snapshot. Same lock family as the claim
   // path (bug-claim-race-no-lock, PR #134) and runUpdate.
+  let filePath = item.filePath;
   withItemLock(item.filePath, () => {
     const fresh: WorkItem | undefined = itemsById(loadItems(tasksDir)).get(id);
     if (!fresh) {
       throw new Error(`id '${id}' not found under tasks/`);
     }
+    filePath = fresh.filePath;
     const base =
       fresh.body.endsWith("\n") || fresh.body.length === 0 ? fresh.body : `${fresh.body}\n`;
     const newBody = `${base}\n${heading}\n${lines.join("\n")}\n`;
 
-    // Body-only write: frontmatter data round-trips unchanged (no `updated` bump).
-    writeFileSync(fresh.filePath, stringifyFrontmatter(fresh.data, newBody), "utf8");
+    // Body-only write: frontmatter data round-trips unchanged (no `updated`
+    // bump). Atomic (temp file + rename, bug-comment-torn-read): non-locking
+    // readers (list, validate, MCP tools) can never observe a truncated item
+    // in the old open+truncate window — rename(2) makes the swap invisible.
+    writeFileAtomic(fresh.filePath, stringifyFrontmatter(fresh.data, newBody));
   });
 
   const root = repoRootFromTasks(tasksDir);
-  const commit = commitTrackerMutation(root, [item.filePath], {
+  const commit = commitTrackerMutation(root, [filePath], {
     message: trackerCommitMessage("commented", [id]),
     commit: resolveAutoCommit(opts.commit, readAutoCommitConfig(root)),
   });
 
   return {
     id,
-    path: item.filePath,
+    path: filePath,
     root,
     comment: { author, date, lines },
     commit,
   };
+}
+
+/**
+ * Bounded retry for the initial item locate (bug-comment-torn-read).
+ *
+ * The locate step only needs the item's FILE PATH so the lock can be taken;
+ * the authoritative read runs inside `withItemLock`. Historically this first
+ * `loadItems` ran while a contender was inside its in-place `writeFileSync`
+ * truncate->write window: the scan read an empty file, `softTryLoadItem`
+ * skipped it, and the live item looked absent — the process then failed with
+ * `id '<id>' not found under tasks/` (COMMENT_FAILED) while the file existed
+ * the whole time. The write is atomic now (`writeFileAtomic`), so a same-path
+ * rewrite can never transiently hide the item; the bounded retry is the
+ * belt-and-braces guard for any residual rename window (the lookup happens
+ * outside the lock because the lock needs the path the lookup produces).
+ * A genuinely missing id pays at most LOCATE_ATTEMPTS scans + sleeps and then
+ * gets the exact same error as before.
+ */
+const LOCATE_ATTEMPTS = 5;
+const LOCATE_RETRY_MS = 20;
+
+function locateItem(tasksDir: string, id: string): WorkItem {
+  for (let attempt = 1; ; attempt++) {
+    const item = itemsById(loadItems(tasksDir)).get(id);
+    if (item) return item;
+    if (attempt >= LOCATE_ATTEMPTS) {
+      throw new Error(`id '${id}' not found under tasks/`);
+    }
+    sleepSync(LOCATE_RETRY_MS);
+  }
+}
+
+/** Synchronous sleep between bounded retries (mirrors the lock waiter in lock.ts). */
+function sleepSync(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 }
 
 /** Explicit `author` is handled by the caller; this resolves the @me fallback. */
