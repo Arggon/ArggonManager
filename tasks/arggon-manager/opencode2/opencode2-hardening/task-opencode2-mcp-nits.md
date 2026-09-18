@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode2-mcp-nits
 title: "MCP attribution nits: surrogate-safe cap + session table-row wording"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T17:28:18.190Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-mcp-nits
 ---
 <!--
@@ -40,10 +39,10 @@ Informational findings from the independent review of PR #335
 
 ## Acceptance
 
-- [ ] Cap truncation is surrogate-safe (or the decision to keep code-unit
+- [x] Cap truncation is surrogate-safe (or the decision to keep code-unit
       semantics is recorded with rationale) + a test with astral input.
-- [ ] `docs/json-output.md` row wording corrected.
-- [ ] Full suite, lint, `validate`/`spec validate` green; small PR to
+- [x] `docs/json-output.md` row wording corrected.
+- [x] Full suite, lint, `validate`/`spec validate` green; small PR to
       `opencode2`.
 
 ## Notes
@@ -67,3 +66,6 @@ Evidence:
 Gates post-merge with origin/opencode2: build ok; npm test 73 files / 1206 passed; lint clean; arggon validate ok (0 errors, 0 warnings); arggon spec validate ok (0/0).
 
 Note: docs/agents.md section MCP server enumerates the delimiter as whitespace/control/format and does not mention the added surrogate class; that file is outside this item's file ownership, flagged in the PR body for the reviewer.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict NO-MERGE→fixed (07bf1a8: both delimiter enumerations now include the lone-surrogate class; handoff.session row aligned to resolve-to-non-empty). Code approved by the reviewer: surrogate-safe cap verified (astral 31×😀+…, mid-value/lone/surrogate-only cases, no U+FFFD on the meta path), tests fail pre-fix, #335 semantics intact, parity green; CI pass. F2 (explicit-session cap) filed as task-handoff-explicit-session-surrogate. Closing.

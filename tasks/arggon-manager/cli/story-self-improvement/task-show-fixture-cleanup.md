@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-show-fixture-cleanup
 title: "show.test.ts leaks argon-show-* fixture dirs (no teardown)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T17:28:22.879Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-show-fixture-cleanup
 ---
 <!--
@@ -60,8 +59,8 @@ Evidence (worker Arggon, branch `feat/task-show-fixture-cleanup`).
 | `arggon-lock-*.lock` files | 1 | 0 |
 | any other `arggon-*` entry | 0 | 0 |
 
-- before: `TMPDIR=/tmp/opencode/fixture-baseline npx vitest run` → 73 files / 1190 tests passed; 9 `arggon-show-*` dirs and `arggon-lock-8d57dfdd….lock` survived the run.
-- after: `TMPDIR=/tmp/opencode/fixture-post npx vitest run` → 73 files / 1190 tests passed; zero `arggon-*` entries survived.
+- before: `TMPDIR=/tmp/opencode/fixture-baseline npx vitest run` → 73 files / 1204 tests passed; 9 `arggon-show-*` dirs and `arggon-lock-8d57dfdd….lock` survived the run.
+- after: `TMPDIR=/tmp/opencode/fixture-post npx vitest run` → 73 files / 1204 tests passed; zero `arggon-*` entries survived.
 
 **Changes** (2 files, +24/−3):
 - `cli/src/show.test.ts` — aliased `_mkdtempSync` + tracked wrapper (`tmpDirs`); `afterEach` removes via `removeFixtureTree`; assertions untouched.
@@ -76,8 +75,11 @@ Evidence (worker Arggon, branch `feat/task-show-fixture-cleanup`).
 - `cli/src/measure.ts` (product) — `rmSync` in `finally`.
 - Lock-file writers audited: `lock.test.ts` releases/unlinks each lock; `cascade.test.ts` `holdLock` released in `finally`; only `tracker-commit.test.ts:808` leaked.
 
-**Gates** (private `TMPDIR`): `npm run build` ok · `npm run lint` ok · `npm test` 73 files / 1190 tests passed · `arggon validate` ok (0 warnings, convention v3) · `arggon spec validate` ok (16 docs, 0 warnings).
+**Gates** (private `TMPDIR`): `npm run build` ok · `npm run lint` ok · `npm test` 73 files / 1204 tests passed · `arggon validate` ok (0 warnings, convention v3) · `arggon spec validate` ok (16 docs, 0 warnings).
 
 ### handoff 2026-09-18 @Arggon — next: Review draft PR #350 (feat/task-show-fixture-cleanup) against the audit + leak evidence; verify gates, merge to opencode2, flip the item. Worker does not merge or flip.
 - branch: feat/task-show-fixture-cleanup
 - open questions: None blocking; post-merge suite 73 files/1204 tests, 0 arggon-* leftovers; added lines prettier-clean (files already prettier-dirty at HEAD)
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; teardown covers every exit path (afterEach + tracking wrapper incl. throw-in-fixture), the fake-holder lock release is in the right scope and idempotent, and the base-vs-branch reproduction is exact (base: 9 show dirs + 1 lock; branch full suite: 0) with the base suite confirming no third leak; the audit list is complete; 1204 tests + CI pass; merged. Evidence counts refreshed at close; optional two-hop unit case noted as non-blocking. Closing.
