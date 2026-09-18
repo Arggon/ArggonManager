@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-seam-polish
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/story-opencode-v2/task-opencode2-seam-polish.md

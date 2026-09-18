@@ -11,7 +11,6 @@ priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
 depends_on: [task-opencode-v2-plugin]
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-context
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/story-opencode-v2/task-opencode2-context.md
