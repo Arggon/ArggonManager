@@ -89,3 +89,6 @@ provenance + parity discipline.
 
 ### handoff 2026-09-18 @Arggon — next: Review draft PR #322 (base opencode2). After merge: W1b doctor (task-opencode-v2-doctor) + W1c playbook (task-opencode-v2-playbook); then W2 plugin (task-opencode-v2-plugin) consumes this seam.
 - branch: feat/task-opencode-v2-spec
+
+### 2026-09-18 @Arggon
+Review verdict (independent reviewer, PR #322): NO-MERGE, 4 change requests. (1) MAJOR: an adopter .opencode config added after init does not stop generation (findOpenCodeConfig shadows our own file; fix so any non-arggon config wins, with tests). (2) MAJOR: CI cannot run for PRs based on opencode2 (.github/workflows/ci.yml filters branches to main); add opencode2 to the triggers. (3) Tests: cover all four adopter-config shapes end-to-end, signature-replacement present-skip, and --backup round-trip on a seam file; drop the vacuous GENERATED_DOC_COUNT assert. (4) Docs: present-skip missing from docs/json-output.md; program spec and dogfood task still say .opencode/opencode.jsonc; the docs/agents.md playbook link resolves with W1c. NIT-9 (CRLF marker) fixed in-PR; remaining nits deferred to task-opencode2-seam-polish. Evidence: reviewer ran 17 probes + full suite (1056 green) + tsc + eslint; details in the PR thread.
