@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-validate-stdout-injection
 title: "Validation/spec human output injection + dynamic warning channels (validate stdout, tracker-commit, issue-roundtrip)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T16:42:50.534Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-validate-stdout-injection
 ---
 <!--
@@ -107,3 +106,6 @@ Review fix round for PR #348 (verdict NO-MERGE: F1 HIGH + F3 nit). Commit `1847e
 - **F2 (out of scope here).** Baseline argv paths echoed raw remain → `task-success-stdout-sanitize` (filed on opencode2).
 - Regression test (new e2e in `spec-baseline.test.ts`, +1 test): hostile snapshot with `severity:"warn<ESC>[31m…"`, `kind:"kind\nspoof…"`, `line:"1\nspoof…"` → human output is one inert line per finding (no raw ESC/C1/DEL/LS/PS, no forged column-0 line, expected line count 3), exit 0; `--json` `baseline.resolved` stays byte-raw (`toEqual`). Extended the invalid-baseline test with a malformed finding (`file: 1`) → `malformed finding`. Verified the new test fails on the pre-fix formatter with raw `\u001b` in the rendered `resolved` line and passes after.
 - Gates on the fix commit: `npm test` 73 files / 1204 tests green; `npm run lint` clean; `npm run build` clean; `arggon validate` ok (0 warnings, convention v3); `spec validate` ok (16 docs, 0 warnings); `prettier --check cli/src/validate.ts` clean; new spec.ts hunks prettier-clean (base spec.ts non-conformance pre-existing).
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict NO-MERGE→fixed (1847e64: severity/kind sanitized on both branches, line rendered only when numeric, bounded snapshot shape guard, hostile-snapshot regression that fails pre-fix; prettier hunk clean). Coordinator re-check: spec.ts sanitizer present on all formatter branches + isBaselineFinding guard; focused tests 11/11; full suite 1204 with private TMPDIR; CI cli pass. Merged. F2 (argv baseline paths) tracked in task-success-stdout-sanitize. Closing.
