@@ -175,6 +175,56 @@ describe("plugin-context: arggon invocation parsing", () => {
     expect(parseArggonItemFromCommand("echo \\\\$(arggon show task-x)")).toBe("task-x");
   });
 
+  it("marks escaped-backslash word starts and long backslash runs (review F2)", () => {
+    // bash: a backslash at a word start is literal, so the word is a command
+    // name, never arggon (`\\arggon` lookups exit 127), and any run before an
+    // unescaped `(` syntax-errors (exit 2, nothing executes). The trailing `)`
+    // is what makes the 3+ forms syntax errors; the head must not reduce.
+    expect(parseArggonItemFromCommand("\\\\arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand("\\\\\\arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand("sudo \\\\arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand("X=1 \\\\arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand("\\\\\\(arggon show task-x)")).toBeUndefined();
+    expect(parseArggonItemFromCommand("\\\\\\\\\\(arggon show task-x)")).toBeUndefined();
+    expect(parseArggonItemFromCommand("\\\\\\\\\\\\\\(arggon show task-x)")).toBeUndefined();
+    // Mid-token escaped backslashes stay assignment text: bash runs arggon.
+    expect(parseArggonItemFromCommand("X=a\\\\b arggon show task-x")).toBe("task-x");
+  });
+
+  it("correlates literal #, !, glob chars and // in path words (review F1)", () => {
+    // bash execs each of these paths (stub exit 0): `#`/`!` are literal inside
+    // a word, a glob expansion still ends in the pattern's `/arggon` component,
+    // and `//` collapses. Only word-level syntax — quotes, expansions,
+    // grouping, redirection or whitespace — keeps a slash-bearing word from
+    // being a path (F1 review of PR #358).
+    expect(parseArggonItemFromCommand("dir#x/arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("'dir*x/arggon' show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("dir!x/arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("a//b/arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("dir\\*x/arggon show task-x")).toBe("task-x");
+    expect(parseArggonItemFromCommand("dir\\#x/arggon show task-x")).toBe("task-x");
+    // Guards on the retained class: `x>arggon` redirects to a file named
+    // arggon and runs `x`, escaped `;`/`|`/`&` form one literal command word,
+    // escaped whitespace stays ambiguous and a trailing `/` cannot exec.
+    expect(parseArggonItemFromCommand("x>arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand("x<arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand("x\\;arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand("x\\|arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand("x\\&arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand("dir\\ x/arggon show task-x")).toBeUndefined();
+    expect(parseArggonItemFromCommand("a/arggon/ show task-x")).toBeUndefined();
+  });
+
+  it("pins the documented group-following residual (review F3)", () => {
+    // A bare `(` in argument position is a bash syntax error (exit 2, nothing
+    // executes), but the parser still follows the `(…)` as a group. Known
+    // miss-side residual, pinned so behavior and the docstring wording cannot
+    // drift silently; a full command-position grammar is out of scope.
+    expect(parseArggonItemFromCommand("\\\\( (arggon show task-x)")).toBe("task-x");
+    expect(parseArggonItemFromCommand("echo (arggon show task-x)")).toBe("task-x");
+    expect(parseArggonItemFromCommand("\\\\((arggon show task-x))")).toBe("task-x");
+  });
+
   it("keeps quoted words that begin with shell syntax out of the path rule (F3)", () => {
     // bash: the quoted word IS the command name `(/usr/local/bin/arggon`
     // (exit 127), not a path that resolves to the binary.
