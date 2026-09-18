@@ -91,3 +91,7 @@ lint, build, `arggon validate`, `arggon spec validate` green.
 
 **Docs:** README init paragraph, `docs/json-output.md` (init `commit` row +
 tracker auto-commit paragraph), `docs/convention.md` §`x-tracker`.
+
+### handoff 2026-09-18 @Arggon — next: Review draft PR #359 against the item checklist; merge to opencode2 (merge, do not squash); verify; then flip the item done.
+- branch: fix/bug-init-ignored-artifacts-dirty-commit
+- open questions: None blocking. Review note: init commit message counts all written paths; the ignored subset is listed in the additive commit.ignored array.
