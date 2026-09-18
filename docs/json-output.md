@@ -606,7 +606,7 @@ Init still **writes** `tasks/.convention.yml` (including the `x-generated` prove
     "artifacts": {
       "config": true,
       "agents": ["arggon-coordinator", "arggon-reviewer", "arggon-worker"],
-      "commands": ["arggon-done", "arggon-handoff", "arggon-next", "arggon-review", "arggon-start", "arggon-status"],
+      "commands": ["arggon-adr", "arggon-done", "arggon-explore", "arggon-handoff", "arggon-next", "arggon-playbook", "arggon-review", "arggon-spec", "arggon-start", "arggon-status"],
       "skills": ["arggon-cli", "arggon-upgrade"],
       "truncated": false
     },

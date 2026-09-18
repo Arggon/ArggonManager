@@ -51,7 +51,7 @@ as needed.
 - [ ] W4 — orchestration: coordinator/worker/reviewer agents, review + done
       commands, permission probes, scripted end-to-end wave
       (task-opencode2-orchestration).
-- [ ] W5 — methodology commands + skill progressive disclosure with parity tests
+- [x] W5 — methodology commands + skill progressive disclosure with parity tests
       (task-opencode2-methodology).
 - [ ] W6 — measured context/token optimization with before/after evidence
       (task-opencode2-context).

@@ -351,3 +351,108 @@ describe("opencode seam: marker stamping", () => {
     ).toBe(true);
   });
 });
+
+describe("opencode seam: methodology commands and skill references (W5)", () => {
+  /** Methodology prompt templates (plan-opencode2-009 T14). */
+  const METHODOLOGY_COMMANDS = [
+    ".opencode/commands/arggon-adr.md",
+    ".opencode/commands/arggon-explore.md",
+    ".opencode/commands/arggon-playbook.md",
+    ".opencode/commands/arggon-spec.md",
+  ];
+  /** Bundled arggon-cli skill references (progressive disclosure). */
+  const SKILL_REFERENCES = [
+    ".agents/skills/arggon-cli/references/json-contract.md",
+    ".agents/skills/arggon-cli/references/methodology.md",
+    ".agents/skills/arggon-cli/references/orchestration.md",
+    ".agents/skills/arggon-cli/references/pitfalls.md",
+  ];
+  /** Bundled source -> destination, for the parity assertions. */
+  function sourceOf(dest: string): string {
+    return dest.replace(".agents/skills/", "skills/");
+  }
+  function markerOf(rel: string): string {
+    // Docs templates are stamped with their templates/docs-relative id.
+    return rel.startsWith(".opencode/")
+      ? rel.replace(".opencode/", "opencode/")
+      : rel.replace(".agents/skills/", "skills/");
+  }
+
+  it("creates the four methodology commands frontmatter-first, with provenance and no shell blocks", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const config = readConventionConfig(dir);
+    for (const rel of METHODOLOGY_COMMANDS) {
+      const raw = readFileSync(join(dir, ...rel.split("/")), "utf8");
+      expect(
+        raw.startsWith(`---\n# arggon:generated template="${markerOf(rel)}"\n`),
+        rel,
+      ).toBe(true);
+      // Prompt templates only: no shell-substitution blocks with argument
+      // placeholders — the agent runs the CLI through its shell tool under
+      // permissions.
+      expect(raw, rel).not.toMatch(/!`/);
+      expect(raw, rel).toContain("$ARGUMENTS");
+      expect(config.generated[rel]?.template, rel).toBe(`docs/${markerOf(rel)}`);
+    }
+  });
+
+  it("drives the existing CLI scaffolds instead of inventing a process", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const read = (rel: string): string => readFileSync(join(dir, ...rel.split("/")), "utf8");
+    expect(read(".opencode/commands/arggon-spec.md")).toContain("arggon spec new");
+    expect(read(".opencode/commands/arggon-spec.md")).toContain("arggon spec validate");
+    expect(read(".opencode/commands/arggon-explore.md")).toContain("arggon stack explore");
+    expect(read(".opencode/commands/arggon-playbook.md")).toContain("arggon playbook new");
+    expect(read(".opencode/commands/arggon-playbook.md")).toContain("arggon playbook refresh");
+    expect(read(".opencode/commands/arggon-adr.md")).toContain("docs/engineering.md");
+  });
+
+  it("creates the skill references with provenance and byte parity against their sources", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const config = readConventionConfig(dir);
+    for (const rel of SKILL_REFERENCES) {
+      const source = sourceOf(rel);
+      const sourceBytes = readFileSync(join(repoRoot, ...source.split("/")), "utf8");
+      expect(readFileSync(join(dir, ...rel.split("/")), "utf8"), rel).toBe(
+        stampGeneratedContent(rel, source, sourceBytes),
+      );
+      expect(config.generated[rel]?.template, rel).toBe(source);
+    }
+    // The umbrella points at every reference (V2 advertises the paths; the
+    // model reads them on demand).
+    const umbrella = readFileSync(join(dir, ".agents/skills/arggon-cli/SKILL.md"), "utf8");
+    for (const rel of SKILL_REFERENCES) {
+      expect(umbrella, rel).toContain(rel.split("/").slice(-2).join("/"));
+    }
+  });
+
+  it("re-runs refresh untouched references and skip adopter-modified ones (--backup round-trip)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const rel = ".agents/skills/arggon-cli/references/methodology.md";
+    const dest = join(dir, ...rel.split("/"));
+    const original = readFileSync(dest, "utf8");
+    const second = runCli(["init", dir, "--json"]);
+    const secondBody = JSON.parse(second.stdout) as { updated: string[]; modified: string[] };
+    expect(secondBody.updated).toContain(rel);
+    expect(secondBody.modified).toEqual([]);
+    const edited = `${original}\nADOPTER EDIT\n`;
+    writeFileSync(dest, edited, "utf8");
+    const third = runCli(["init", dir, "--json"]);
+    const thirdBody = JSON.parse(third.stdout) as { modified: string[]; skipped: string[] };
+    expect(thirdBody.modified).toContain(rel);
+    expect(thirdBody.skipped).toContain(rel);
+    expect(readFileSync(dest, "utf8")).toBe(edited);
+    const fourth = runCli(["init", dir, "--backup", "--json"]);
+    expect(fourth.status).toBe(0);
+    const fourthBody = JSON.parse(fourth.stdout) as { updated: string[]; backedUp: string[] };
+    expect(fourthBody.backedUp).toContain(rel);
+    expect(fourthBody.updated).not.toContain(rel);
+    const date = new Date().toISOString().slice(0, 10);
+    expect(readFileSync(join(dir, "backup", date, ...rel.split("/")), "utf8")).toBe(edited);
+    expect(readFileSync(dest, "utf8")).toBe(original);
+  });
+});

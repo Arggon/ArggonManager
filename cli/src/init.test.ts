@@ -25,6 +25,10 @@ const tsx = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
 const TIER1_DOCS = [
   ".agents/skills/arggon-cli/SKILL.md",
+  ".agents/skills/arggon-cli/references/json-contract.md",
+  ".agents/skills/arggon-cli/references/methodology.md",
+  ".agents/skills/arggon-cli/references/orchestration.md",
+  ".agents/skills/arggon-cli/references/pitfalls.md",
   ".agents/skills/arggon-upgrade/SKILL.md",
   ".editorconfig",
   ".github/CODEOWNERS",
@@ -34,10 +38,14 @@ const TIER1_DOCS = [
   ".opencode/agents/arggon-coordinator.md",
   ".opencode/agents/arggon-reviewer.md",
   ".opencode/agents/arggon-worker.md",
+  ".opencode/commands/arggon-adr.md",
   ".opencode/commands/arggon-done.md",
+  ".opencode/commands/arggon-explore.md",
   ".opencode/commands/arggon-handoff.md",
   ".opencode/commands/arggon-next.md",
+  ".opencode/commands/arggon-playbook.md",
   ".opencode/commands/arggon-review.md",
+  ".opencode/commands/arggon-spec.md",
   ".opencode/commands/arggon-start.md",
   ".opencode/commands/arggon-status.md",
   // plan-opencode2-009 W2: the bundled OpenCode plugin is a tier-1 destination.
