@@ -173,8 +173,9 @@ W7 closes the program on that branch.
   (≈3,213 tok): generated `AGENTS.md` 1,863 B (≤2,048 B test-enforced), skill
   entries 500 B, agent descriptions 393 B, live MCP `tools/list` 10,096 B
   (9 tools; under the 12,288 B advisory, +1,056 B/+11.7% vs the 9,040 B baseline
-  at commit `5d6c504`). Injected item block 193–252 B measured (≤1,024 B bound);
-  compaction `keep.tokens` kept at 15,000 (V2 default). W5 skill split:
+  at commit `5d6c504`). Injected item block: fixture max 252 B, real sessions
+  observed 312 B (≤1,024 B bound); compaction `keep.tokens` kept at 15,000 (V2
+  default). W5 skill split:
   21,955 B always-loaded before → 9,518 B umbrella + 15,479 B `references/` on
   demand (−57% on load). W1–W5 per-wave captures were impossible (W6 ran last);
   the item documents that deviation and the reconstruction honestly.
