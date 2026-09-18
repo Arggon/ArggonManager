@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode2-context-polish
 title: "Context report polish: git-history robustness, helper tests, CI gate decision"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T15:14:28.760Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-context-polish
 ---
 <!--
@@ -43,14 +42,14 @@ Non-blocking findings from the independent review of PR #329
 
 ## Acceptance
 
-- [ ] `reconstructBeforeAfter()` degrades to `unavailable` on checkouts without
+- [x] `reconstructBeforeAfter()` degrades to `unavailable` on checkouts without
       the W5 split; the detection no longer depends on a single hardcoded
       reference name.
-- [ ] Column padding handles over-width labels (no run-together output).
-- [ ] `--strict` gate decision recorded (CI wiring or documented manual gate)
+- [x] Column padding handles over-width labels (no run-together output).
+- [x] `--strict` gate decision recorded (CI wiring or documented manual gate)
       with rationale; unit tests cover the pure helpers.
-- [ ] Playbook bases labeled consistently.
-- [ ] Full suite + `context:report --strict` green; small PR to `opencode2`.
+- [x] Playbook bases labeled consistently.
+- [x] Full suite + `context:report --strict` green; small PR to `opencode2`.
 
 ## Notes
 
@@ -111,3 +110,6 @@ flip from this worker.
 ### handoff 2026-09-18 @Arggon — next: Coordinator: review draft PR #340 (F4-F7 polish; strict-gate decision recorded as manual/release gate). Verify the F4 probes (pre-split + shallow), the pad before/after, the 13 helper tests and the g…
 - branch: feat/task-opencode2-context-polish
 - open questions: F4 probes used temp simulated repos (not a real bisect checkout); F5 keeps the pad() truncation backstop even though the dynamic column now prevents truncation for current labels; F6 decided manual/r…
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; fixes applied in 9af21be (snapshot refreshed from current tool output with a dated label: source 9,978/17,208, fixture 10,042/17,533, MCP 10,450, fixed surface 13,206 B; strict-gate wording now names the advisory MCP bound + the keep.tokens regression check); F4 degrades honestly in 4 broken-history scenarios (pre-split, shallow, no-git, bogus rev), F5 column collision fixed, F6 helper tests collected (70 files/1157) and import side-effect-free; manual/release gate decision documented; merged with cli pass. Closing.
