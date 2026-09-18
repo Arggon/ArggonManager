@@ -1,7 +1,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { generatedMarker } from "./docs.js";
+import { BUNDLED_SKILLS, generatedMarker } from "./docs.js";
 import { loadCliCommands, spliceGeneratedCommands } from "./skill-commands.js";
 
 // task-adr0006-docs-budget: .agents/skills/arggon-cli/SKILL.md is a generated
@@ -11,16 +11,25 @@ import { loadCliCommands, spliceGeneratedCommands } from "./skill-commands.js";
 // parity test (cli/src/skill-copy.test.ts) regenerates it when missing too,
 // so CI never masks drift.
 //
+// task-opencode2-methodology (W5): the arggon-cli skill ships as an umbrella
+// (`SKILL.md`) plus `references/`; every file in BUNDLED_SKILLS is copied with
+// its generated marker, exactly like init bundles it into adopter trees.
+//
 // task-skill-generated-command-reference: the pipeline first splices the
 // `arggon:generated-commands` marker regions of the source SKILL with lines
 // rendered from live CLI introspection (cli/src/skill-commands.ts), then
 // writes the copy — so the committed source itself carries the fresh region.
+// Reference files carry no regions; splice is a no-op for them.
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const sourcePath = join(repoRoot, "skills/arggon-cli/SKILL.md");
-const copyPath = join(repoRoot, ".agents/skills/arggon-cli/SKILL.md");
+const commands = loadCliCommands();
 
-const spliced = spliceGeneratedCommands(readFileSync(sourcePath, "utf8"), loadCliCommands());
-writeFileSync(sourcePath, spliced);
-mkdirSync(dirname(copyPath), { recursive: true });
-writeFileSync(copyPath, `${generatedMarker("skills/arggon-cli/SKILL.md")}\n${spliced}`);
-console.log(`synced ${copyPath} from skills/arggon-cli/SKILL.md (generated regions refreshed)`);
+for (const { source, dest } of BUNDLED_SKILLS) {
+  const sourcePath = join(repoRoot, ...source.split("/"));
+  const copyPath = join(repoRoot, ...dest.split("/"));
+  const spliced = spliceGeneratedCommands(readFileSync(sourcePath, "utf8"), commands);
+  writeFileSync(sourcePath, spliced);
+  mkdirSync(dirname(copyPath), { recursive: true });
+  writeFileSync(copyPath, `${generatedMarker(source)}\n${spliced}`);
+}
+
+console.log(`synced ${BUNDLED_SKILLS.length} bundled skill file(s) from their single sources`);

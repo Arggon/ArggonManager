@@ -157,9 +157,30 @@ export type DocsPlan = {
  * destination in the adopter tree (task-upgrade-skill-bundled). init copies
  * each with full provenance semantics; both flow through every comparison and
  * proposal surface like any managed doc.
+ *
+ * task-opencode2-methodology (W5): the arggon-cli skill is an umbrella
+ * (`SKILL.md` + `references/`); the references are bundled files like the
+ * umbrella and are drift-tested by cli/src/skill-copy.test.ts. Exported so
+ * `skills:sync` and the parity test iterate the same single source list.
  */
-const BUNDLED_SKILLS = [
+export const BUNDLED_SKILLS = [
   { source: "skills/arggon-cli/SKILL.md", dest: ".agents/skills/arggon-cli/SKILL.md" },
+  {
+    source: "skills/arggon-cli/references/json-contract.md",
+    dest: ".agents/skills/arggon-cli/references/json-contract.md",
+  },
+  {
+    source: "skills/arggon-cli/references/methodology.md",
+    dest: ".agents/skills/arggon-cli/references/methodology.md",
+  },
+  {
+    source: "skills/arggon-cli/references/orchestration.md",
+    dest: ".agents/skills/arggon-cli/references/orchestration.md",
+  },
+  {
+    source: "skills/arggon-cli/references/pitfalls.md",
+    dest: ".agents/skills/arggon-cli/references/pitfalls.md",
+  },
   { source: "skills/arggon-upgrade/SKILL.md", dest: ".agents/skills/arggon-upgrade/SKILL.md" },
 ];
 
