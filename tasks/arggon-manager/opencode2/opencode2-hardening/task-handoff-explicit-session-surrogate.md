@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-handoff-explicit-session-surrogate
-title: "handoff explicit --session cap is not surrogate-safe (astral split + U+FFFD in body)"
-priority: p3
+title: handoff explicit --session cap is not surrogate-safe (astral split + U+FFFD in body)
+assignee: Arggon
+branch: feat/task-handoff-explicit-session-surrogate
 parent: opencode2-hardening
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T21:03:59.150Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-handoff-explicit-session-surrogate
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/opencode2-hardening/task-handoff-explicit-session-surrogate.md
