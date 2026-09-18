@@ -53,3 +53,28 @@ make the item's "nothing left as a live false positive" wording too broad.
 ## Notes
 
 - All contrived forms; the dominant invocations are covered.
+
+### 2026-09-18 @Arggon
+Worker evidence (F1/F2/F3). Files: `opencode/plugins/arggon/index.ts`, `opencode/plugins/arggon/index.test.ts` (36 tests = 34 + 2 new, 1 renamed); branch `feat/task-opencode2-plugin-quote-spans`.
+
+Root cause: `splitTokens` pushed on whitespace even inside quotes, so a quoted span split into fragments and only the first carried `word`. Fix: whitespace splits only when `quote === null`; quoted spans (inner whitespace/newlines included) are one token. F2: a token that *starts* with an escaped `\(` is marked `word` (a mid-token `\(` stays assignment-safe, e.g. `X=a\(b arggon …` still correlates). Docstrings updated; the F3 newline test now proves the span stays intact.
+
+Before→after probe (`parseArggonItemFromCommand`, 29 cases via `tsx`; before = 19f052c):
+
+| input | before | after | bash ground truth |
+| --- | --- | --- | --- |
+| `"arggon show task-x"` | task-x | undefined | 127 command not found |
+| `command "arggon show task-x"` | task-x | undefined | 127 command not found |
+| `npm run "arggon show task-x"` | task-x | undefined | npm missing script |
+| `x="line1\narggon show task-x"` | task-x | undefined | assignment executes nothing |
+| `x="a b" arggon show task-x` | undefined | task-x | arggon runs (miss fixed) |
+| `\(arggon show task-x)` | task-x | undefined | bash syntax error (exit 2) |
+| `X=1 \(arggon show task-x)` | task-x | undefined | bash syntax error (exit 2) |
+
+Preserved (probe green): direct/`VAR=1`/runners/wrappers (`npx`, `sudo -u`, `env -i`, `pnpm exec`)/`$(…)` including quoted substitution/quoted absolute path/`x="it's" arggon …`; eliminations `grep -rn "…"`, `echo "…"`, `git commit -m "…"`, `command -v`, `"(" arggon`, `"$(" arggon`, `echo '$(…)'`, `echo "&& arggon …"`, `echo \$(…)`. An extra 17-case probe is also green (quoted substitution inside a multi-word span, quoted span + `;`/`&&` with a real command, `x='…'`, wrapper + quoted span, `time -o … "arggon show task-x"`).
+
+Bash cross-checks: stub `arggon` on PATH for true positives; `bash -c` rc 127 / 1 / 0 / 2 as tabulated.
+
+Gates on 19f052c+fix: `npm test` → 73 files / 1220 tests pass (private TMPDIR); `npm run smoke:opencode` → 11 scenarios / 0 failures; lint, build, `arggon validate` (0/0), `arggon spec validate` (0/0) clean. No merge, no status flip.
+
+F3 correction: the "nothing left as a live FP" wording in task-opencode2-plugin-parse-nits was too broad — quoted multi-word spans and escaped `\(` remained live false positives; a correction comment is filed on that item.
