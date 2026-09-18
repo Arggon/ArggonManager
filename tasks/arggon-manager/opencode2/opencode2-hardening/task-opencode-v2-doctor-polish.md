@@ -91,3 +91,6 @@ Regression test asserts both directions: `sanitizes ANSI escapes and newlines in
 ### handoff 2026-09-18 @Arggon — next: Review the draft PR; on merge auto-done flips the item (acceptance ticked, tests green). No further code work expected.
 - branch: feat/task-opencode-v2-doctor-polish
 - open questions: none; docs/json-output.md intentionally unchanged
+
+### 2026-09-18 @Arggon
+PR: https://github.com/Arggon/ArggonManager/pull/336 (draft, base `opencode2`, head `feat/task-opencode-v2-doctor-polish`).
