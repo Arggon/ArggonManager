@@ -14,6 +14,7 @@ import {
   checksumMatches,
   currentGeneratedTemplatesFrom,
   normalizeEol,
+  OPENCODE_CONFIG_CANDIDATES,
   renderGeneratedDoc,
   resolveProjectName,
 } from "./docs.js";
@@ -89,12 +90,12 @@ export type DoctorGit = {
 export type DoctorOpenCode = {
   /**
    * Present OpenCode config files (posix, relative to the probed root), in the
-   * candidate order shared with `findOpenCodeConfig` (cli/src/docs.ts,
-   * opencode-seam-010): `opencode.json`, `opencode.jsonc`,
-   * `.opencode/opencode.json`, `.opencode/opencode.jsonc`. Unlike that helper
-   * (first match only — init uses it to decide whether to generate a config),
-   * doctor reports every present file; an unreadable or malformed one still
-   * appears here, it just contributes no findings.
+   * candidate order of the shared `OPENCODE_CONFIG_CANDIDATES` export
+   * (cli/src/docs.ts, opencode-seam-010; MINOR-3, PR #324 review): the list is
+   * imported, not mirrored. Unlike `findOpenCodeConfig` (first ADOPTER match
+   * only — init uses it to decide whether to generate a config), doctor reports
+   * every present file; an unreadable or malformed one still appears here, it
+   * just contributes no findings.
    */
   configs: string[];
   /**
@@ -130,19 +131,6 @@ export type DoctorOpenCode = {
     hint: string | null;
   };
 };
-
-/**
- * Config candidates in the discovery order of `findOpenCodeConfig`
- * (cli/src/docs.ts, opencode-seam-010) — kept in sync by hand because that
- * helper returns only the FIRST match, while doctor reports every present
- * file (it cannot import the list: the helper does not expose one).
- */
-const OPENCODE_CONFIG_CANDIDATES = [
-  "opencode.json",
-  "opencode.jsonc",
-  ".opencode/opencode.json",
-  ".opencode/opencode.jsonc",
-] as const;
 
 /** V1 top-level keys V2 renamed or dropped (task-opencode-v2-doctor). */
 const OPENCODE_V1_KEYS = ["enabled", "autoupdate", "permission", "tools", "maxSteps"] as const;
@@ -617,9 +605,25 @@ function hasOpenCodeSignal(opencode: DoctorOpenCode): boolean {
 }
 
 /**
+ * Sanitize one config-derived value for a human (terminal) line. Keys in
+ * `v1ShapedKeys` are copied verbatim from an adopter config, which is
+ * untrusted, so an `mcp.<name>` key carrying ANSI escapes or newlines must not
+ * reach the terminal raw (MINOR-1, PR #324 review). Values on the
+ * `[A-Za-z0-9._-]` allowlist — every ordinary key — render unchanged;
+ * anything else is JSON-escaped, which maps control characters (ESC, newline)
+ * and quotes to inert `\uXXXX`/`\n` text in one bounded pass. This is display
+ * only: the JSON payload keeps the raw key.
+ */
+function sanitizeHumanValue(value: string): string {
+  return /^[A-Za-z0-9._-]+$/.test(value) ? value : JSON.stringify(value);
+}
+
+/**
  * Bounded human lines for the OpenCode block (task-opencode-v2-doctor): a
  * one-line summary mirroring the JSON, plus a hint per finding class
- * (`V1-shaped` keys, `.mcp.json`-only registration). Never throws.
+ * (`V1-shaped` keys, `.mcp.json`-only registration). Never throws. Untrusted
+ * config keys pass through `sanitizeHumanValue` before joining the hint line
+ * (MINOR-1, PR #324 review).
  */
 function formatOpenCodeLines(opencode: DoctorOpenCode): string[] {
   const seam =
@@ -634,7 +638,9 @@ function formatOpenCodeLines(opencode: DoctorOpenCode): string[] {
   ];
   const lines = [`  opencode: ${parts.join(", ")}`];
   if (opencode.v1.findings.length > 0) {
-    const detail = opencode.v1.findings.map((f) => `${f.file} (${f.keys.join(", ")})`).join("; ");
+    const detail = opencode.v1.findings
+      .map((f) => `${f.file} (${f.keys.map(sanitizeHumanValue).join(", ")})`)
+      .join("; ");
     lines.push(
       `  hint: V1-shaped OpenCode config ${detail}${opencode.v1.truncated ? " (truncated)" : ""} — ` +
         "V2 expects MCP servers under mcp.servers and renamed/replaced several top-level keys",
