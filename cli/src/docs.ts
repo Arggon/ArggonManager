@@ -229,8 +229,16 @@ function isFrontmatterDestination(dest: string): boolean {
  */
 export function stampGeneratedContent(dest: string, markerTemplate: string, content: string): string {
   if (isJsonDestination(dest)) return content;
-  if (isFrontmatterDestination(dest) && content.startsWith("---\n")) {
-    return `---\n# arggon:generated template="${markerTemplate}"\n${content.slice("---\n".length)}`;
+  // NIT-9 (PR #322 review): tolerate a CRLF frontmatter opener so a CRLF
+  // template still gets a valid frontmatter-first file; the marker line
+  // matches the opener's EOL style.
+  const frontmatter = /^---\r?\n/.exec(content);
+  if (isFrontmatterDestination(dest) && frontmatter !== null) {
+    const eol = frontmatter[0].endsWith("\r\n") ? "\r\n" : "\n";
+    return (
+      `${frontmatter[0]}# arggon:generated template="${markerTemplate}"${eol}` +
+      content.slice(frontmatter[0].length)
+    );
   }
   return `${generatedMarker(markerTemplate)}\n${content}`;
 }
@@ -258,6 +266,13 @@ function isArggonGeneratedConfig(root: string, rel: string): boolean {
  * First existing adopter OpenCode config (opencode-seam-010), posix-relative;
  * null when the adopter has none. The check covers root and `.opencode/`
  * configurations because V2 discovers both.
+ *
+ * MAJOR-1 (PR #322 review): the scan skips arggon's own generated config
+ * (signature comment) instead of returning it as the first existing candidate.
+ * An adopter config at ANY of the four shapes always wins — before this, an
+ * arggon root `opencode.jsonc` shadowed an adopter `.opencode/opencode.json(c)`
+ * added after init, so generation continued and the adopter config was
+ * ignored.
  */
 export function findOpenCodeConfig(root: string): string | null {
   const candidates = [
@@ -267,7 +282,9 @@ export function findOpenCodeConfig(root: string): string | null {
     ".opencode/opencode.jsonc",
   ];
   for (const rel of candidates) {
-    if (existsSync(join(root, ...rel.split("/")))) return rel;
+    if (!existsSync(join(root, ...rel.split("/")))) continue;
+    if (isArggonGeneratedConfig(root, rel)) continue; // ours, not an adopter config
+    return rel;
   }
   return null;
 }
@@ -745,11 +762,14 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
     if (!opts.full && TIER2_DESTS.has(dest)) continue;
     // Conditional config seam (opencode-seam-010): never write an OpenCode
     // config over an adopter's existing one — report the skip with the path
-    // that was detected so `init` stays transparent. Only arggon's own file
-    // (signature comment) falls through to the normal provenance decision.
+    // that was detected so `init` stays transparent. findOpenCodeConfig
+    // returns only NON-arggon configs (MAJOR-1, PR #322 review), so any
+    // adopter config at any of the four shapes present-skip; arggon's own file
+    // falls through to the normal provenance decision (regenerate untouched,
+    // skip modified).
     if (dest === OPENCODE_CONFIG_DEST) {
       const existing = findOpenCodeConfig(opts.root);
-      if (existing !== null && !isArggonGeneratedConfig(opts.root, existing)) {
+      if (existing !== null) {
         entries.push({
           dest,
           decision: "present-skip",

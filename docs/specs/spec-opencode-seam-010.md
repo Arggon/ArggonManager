@@ -66,7 +66,9 @@ rule); `opencode.jsonc` maps 1:1 through the explicit destination map.
 
 Generated config content (JSONC, comments allowed): `$schema`, the `arggon` MCP
 server under `mcp.servers` (`type: local`, `command: ["arggon","mcp"]`),
-`formatter: true`, and a compaction retention (`keep.tokens: 15000`). Agents:
+`formatter: true`, and a compaction retention (`keep.tokens: 15000`).
+`default_agent` is deliberately not set: agents are discovered from
+`.opencode/agents/`, and the session default stays `build`. Agents:
 `arggon-coordinator` (primary; subagent allow-list worker/reviewer/explore),
 `arggon-worker` (subagent; subagent launches denied), `arggon-reviewer`
 (subagent; `edit` denied). Commands: prompt templates that drive the MCP tools

@@ -29,7 +29,7 @@ cannot run ArggonManager's own work loop, the program is not done.
 ## Acceptance
 
 - [ ] This repo carries the generated surface (checked in, provenanced):
-      `.opencode/opencode.jsonc`, `.opencode/plugins/arggon/`, `.opencode/agents/`,
+      `opencode.jsonc` (root), `.opencode/plugins/arggon/`, `.opencode/agents/`,
       `.opencode/commands/`, slim `AGENTS.md`, skill with references.
 - [ ] A real session on this repo demonstrates the loop end-to-end with
       evidence: `next` → claim → worktree → work → review verdict → done

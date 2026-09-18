@@ -56,7 +56,9 @@ Deliverable surface, per wave (plan:
 [plan-opencode2-009](../plans/plan-opencode2-009.md)):
 
 ```text
-.opencode/opencode.jsonc        # generated only when the adopter has no config
+opencode.jsonc                  # root config; generated only when the adopter
+                                # has none (root or .opencode/), so a later
+                                # .opencode/ config overrides ours
 .opencode/plugins/arggon/       # vendored plugin (marker + parity test)
 .opencode/agents/               # arggon-coordinator | arggon-worker | arggon-reviewer
 .opencode/commands/             # /arggon-next, -start, -done, -handoff, -review,
