@@ -51,6 +51,16 @@ agents in this codebase — read before mutating the tracker or merging.
 
 ## Repo hygiene and staging
 
+- **Worktree starts prepare and keep the worktree** (bug-start-worktree-node-modules):
+  `start --worktree` links the primary checkout's `node_modules` into a fresh
+  worktree before the claim commit (additive `linkedNodeModules` in `--json`), so
+  the wired pre-commit gate runs there — the old manual `git worktree add` +
+  `ln -s` + re-run dance is gone. A failure after the worktree exists never rolls
+  it back: the worktree and branch survive, the error names the failing step, path
+  and remediation, and re-running `start --worktree` attaches and retries the
+  failed claim commit. Hooks are never bypassed. Discard an unwanted worktree with
+  the command the error prints (`git worktree remove --force <path>`, plus
+  `git branch -D <branch>` when start created the branch).
 - **Stage explicit paths — never `git add -A` / `git add .`.** Directory patterns
   like `node_modules/` match directories only, so in worktrees where `node_modules`
   is a SYMLINK to a shared install it is untracked-but-not-ignored and `-A`

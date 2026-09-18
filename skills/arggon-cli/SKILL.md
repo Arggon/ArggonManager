@@ -101,7 +101,11 @@ arggon validate  # Validate tasks/ frontmatter and tree integrity
    full scans) → see `references/json-contract.md`. Empty is success.
 2. **Claim:** `start <id> --assignee <login> [--worktree] [--open-pr]` claims,
    branches, commits, pushes and (with `--worktree`) moves everything into
-   `../<repo-name>-<id>`. Claim taken (`START_FAILED`) → pick another item; never
+   `../<repo-name>-<id>`. `--worktree` prepares a fresh worktree before the claim
+   commit (links the primary checkout's `node_modules` when the worktree lacks
+   one — reported as `linkedNodeModules`) and never rolls the worktree back on
+   failure: fix the reported cause and re-run `start --worktree` to attach. Claim
+   taken (`START_FAILED`) → pick another item; never
    `--force`, never steal. Manual fallback:
    `update <id> --status in_progress --assignee <login>` + `branch <id>`.
 3. **Record findings:** `create task|bug "<title>" --parent <story-id>` — file new

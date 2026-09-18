@@ -4,7 +4,7 @@
  * (sync-smoke pattern); only push/PR are stubbed so no remote is needed.
  */
 import { spawnSync } from "node:child_process";
-import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync as _mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -106,6 +106,44 @@ function setPostStart(dir: string, command: string | null): void {
   git(["commit", "--quiet", "-m", "config: x-worktree.post-start"], dir);
 }
 
+/**
+ * Create a minimal package under `<dir>/node_modules/<name>` so a project gate
+ * can `require("<name>")` — the dependency stand-in for a real install
+ * (bug-start-worktree-node-modules).
+ */
+function addFakeDependency(dir: string, name: string): void {
+  const dep = join(dir, "node_modules", name);
+  mkdirSync(dep, { recursive: true });
+  writeFileSync(
+    join(dep, "package.json"),
+    JSON.stringify({ name, version: "1.0.0", main: "index.js" }),
+  );
+  writeFileSync(join(dep, "index.js"), "module.exports = true;\n");
+}
+
+/**
+ * Install a repo-wide pre-commit hook (worktrees share the common .git/hooks)
+ * and make it executable — the stand-in for the documented
+ * `npm run arggon -- validate` gate.
+ */
+function setPreCommitHook(dir: string, script: string): void {
+  const hooks = join(dir, ".git", "hooks");
+  mkdirSync(hooks, { recursive: true });
+  const hook = join(hooks, "pre-commit");
+  writeFileSync(hook, script.endsWith("\n") ? script : `${script}\n`);
+  chmodSync(hook, 0o755);
+}
+
+/** Run start --worktree and return the thrown message ("" when it succeeded). */
+function startError(dir: string, id: string, assignee: string): string {
+  try {
+    runStart({ cwd: dir, id, assignee, worktree: true, now: NOW }, { git: localGit() });
+    return "";
+  } catch (err) {
+    return err instanceof Error ? err.message : String(err);
+  }
+}
+
 describe("start --worktree", () => {
   it("creates the worktree, records worktree_path, and commits the claim inside it", () => {
     const dir = initRepo();
@@ -201,19 +239,111 @@ describe("start --worktree", () => {
     expect(worktreeCount(dir)).toBe(1);
   });
 
-  it("rolls back a freshly created worktree when the claim is taken", () => {
+  it("keeps the worktree and says how to discard it when the claim is taken", () => {
     const dir = initRepo();
-    // Claim the item on main first; the worktree copy is still todo, so the
+    // Claim the item on main first; the worktree copy still says todo, so the
     // claim conflict only surfaces once updates run inside the worktree.
     runUpdate({ cwd: dir, id: "task-alpha", status: "in_progress", assignee: "alice", now: NOW });
     git(["add", "tasks"], dir);
     git(["commit", "--quiet", "-m", "claim task-alpha"], dir);
-    expect(() =>
-      runStart({ cwd: dir, id: "task-alpha", assignee: "bob", worktree: true, now: NOW }, { git: localGit() }),
-    ).toThrow(/claim conflict/);
-    expect(worktreeCount(dir)).toBe(1);
-    expect(existsSync(resolve(dirname(dir), `${basename(dir)}-task-alpha`))).toBe(false);
+    const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
+
+    const message = startError(dir, "task-alpha", "bob");
+
+    expect(message).toMatch(/claim conflict/);
+    expect(message).toContain(expectedPath);
+    expect(message).toContain("attaches");
+    // bug-start-worktree-node-modules: no rollback — worktree AND branch stay.
+    expect(existsSync(expectedPath)).toBe(true);
+    expect(worktreeCount(dir)).toBe(2);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(true);
+    // The main checkout is untouched and still on main.
     expect(git(["status", "--porcelain"], dir)).toBe("");
+    expect(git(["symbolic-ref", "--short", "HEAD"], dir)).toBe("main");
+  });
+});
+
+describe("start --worktree prepares the worktree and keeps it on failure (bug-start-worktree-node-modules)", () => {
+  it("links the primary node_modules so a dependency gate can run, and reports it", () => {
+    const dir = initRepo();
+    addFakeDependency(dir, "fake-gate-dep");
+    // The fixture stand-in for the documented `npm run arggon -- validate`
+    // gate: it needs the project install, which only exists in the primary
+    // checkout before the fix. The marker proves the gate really ran.
+    setPreCommitHook(
+      dir,
+      '#!/bin/sh\nnode -e "require(\'fake-gate-dep\')" || exit 1\ntouch .gate-ran\n',
+    );
+    const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    expect(result.linkedNodeModules).toBe(true);
+    expect(result.committed).toBe(true);
+    // The worktree carries a symlink to the primary install, not a copy.
+    const link = join(expectedPath, "node_modules");
+    expect(lstatSync(link).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(link)).toBe(join(dir, "node_modules"));
+    // The gate ran inside the worktree — no hook bypass.
+    expect(existsSync(join(expectedPath, ".gate-ran"))).toBe(true);
+    // The claim commit landed and the link was never committed.
+    expect(git(["log", "--format=%s"], expectedPath)).toContain("claim: task-alpha");
+    expect(git(["show", "--name-only", "--format=", "HEAD"], expectedPath).trim()).toBe(
+      "tasks/launch/auth/login/task-alpha.md",
+    );
+  });
+
+  it("keeps the worktree, reports the failing step + remediation, and a re-run attaches", () => {
+    const dir = initRepo();
+    setPreCommitHook(dir, '#!/bin/sh\necho "gate: deliberate failure" >&2\nexit 1\n');
+    const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
+
+    const message = startError(dir, "task-alpha", "arggon");
+
+    // The gate's own output proves it ran (never --no-verify'd)...
+    expect(message).toContain("gate: deliberate failure");
+    expect(message).toContain("committing the claim");
+    expect(message).toContain(expectedPath);
+    expect(message).toContain("attaches");
+    expect(message).toMatch(/kept/);
+    // ...and nothing was rolled back: worktree, branch and the uncommitted
+    // claim all survive for inspection.
+    expect(existsSync(expectedPath)).toBe(true);
+    expect(worktreeCount(dir)).toBe(2);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(true);
+    expect(
+      git(["status", "--porcelain", "--", "tasks/launch/auth/login/task-alpha.md"], expectedPath),
+    ).not.toBe("");
+
+    // The remediation is real: fix the gate and re-run — it attaches and lands
+    // the claim commit that previously failed.
+    setPreCommitHook(dir, "#!/bin/sh\nexit 0\n");
+    const retry = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    expect(retry.worktreeCreated).toBe(false);
+    expect(retry.worktreePath).toBe(expectedPath);
+    expect(retry.committed).toBe(true);
+    expect(git(["log", "--format=%s"], expectedPath)).toContain("claim: task-alpha");
+  });
+
+  it("leaves repos without a pre-commit hook unaffected", () => {
+    const dir = initRepo();
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    expect(existsSync(join(dir, ".git", "hooks", "pre-commit"))).toBe(false);
+    expect(result.linkedNodeModules).toBe(false); // no primary node_modules to link
+    expect(result.committed).toBe(true);
+    expect(result.pushed).toBe(true);
+    expect(existsSync(join(result.worktreePath!, "node_modules"))).toBe(false);
+    expect(git(["log", "--format=%s"], result.worktreePath!)).toContain("claim: task-alpha");
   });
 });
 

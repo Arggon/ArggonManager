@@ -696,6 +696,9 @@ describe("CLI --json", () => {
       created: true,
       pushed: true,
       prUrl: "https://github.com/o/r/pull/1",
+      // Additive JSON field (bug-start-worktree-node-modules): always present,
+      // false when no node_modules link happened (no --worktree here).
+      linkedNodeModules: false,
     });
     expect(body.item).toMatchObject({
       id: "launch-mvp",

@@ -1963,7 +1963,7 @@ program
   .option("--open-pr", "open a draft PR after pushing", false)
   .option(
     "--worktree",
-    "run the flow inside a linked git worktree at ../<repo-name>-<id> (recorded on the item as worktree_path)",
+    "run the flow inside a linked git worktree at ../<repo-name>-<id> (recorded on the item as worktree_path; the worktree is prepared before the claim commit and kept on failure)",
     false,
   )
   .option(
@@ -2018,6 +2018,7 @@ program
               pushed: result.pushed,
               prUrl: result.prUrl,
               worktreePath: result.worktreePath,
+              linkedNodeModules: result.linkedNodeModules,
               postStart: result.postStart,
             },
             readConventionVersion(result.root),
@@ -2029,6 +2030,11 @@ program
           console.log(
             `  worktree: ${result.worktreePath} (${result.worktreeCreated ? "created" : "attached"})`,
           );
+          if (result.linkedNodeModules) {
+            console.log(
+              `  node_modules: linked from the primary checkout (the project gate can run in the worktree)`,
+            );
+          }
         }
         if (result.postStart) {
           if (result.postStart.ok) console.log(`  post-start: ${result.postStart.command}`);
