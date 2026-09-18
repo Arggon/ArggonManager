@@ -1,6 +1,6 @@
 # Evals — arggon-cli skill
 
-Method: for each case, derive commands using ONLY `SKILL.md` (fresh-eyes read), run them with `node dist/cli.js` in a temp fixture repo, and score the predicate. Fix the skill on failures, re-run failures + regression.
+Method: for each case, derive commands using ONLY the skill (fresh-eyes read of `SKILL.md` plus the `references/` files it points to), run them with `node dist/cli.js` in a temp fixture repo, and score the predicate. Fix the skill on failures, re-run failures + regression.
 
 Fixture setup per round: `node dist/cli.js init <tmp>` then seed via `create` (initiative `eval-mvp` → epic `auth` → story `story-login` → task `task-a`).
 

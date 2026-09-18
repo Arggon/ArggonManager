@@ -223,7 +223,7 @@ Copy-paste wiring so agents follow ArggonManager rules **by default** — same C
 
 Or print it on demand: `arggon instructions` extracts these snippets from this file at runtime (`--json` emits them as structured fields), so doc and command cannot drift.
 
-The generated AGENTS.md also mandates the bundled **arggon-cli skill** (`.agents/skills/arggon-cli/SKILL.md`, copied by `arggon init` from this repo's `skills/arggon-cli/SKILL.md` — single source, no duplicate): agents load it before any arggon invocation for the JSON contract, claim rules and pitfalls. A parity test (`cli/src/skill-copy.test.ts`) keeps that copy byte-equal to the source, modulo the generated marker.
+The generated AGENTS.md also mandates the bundled **arggon-cli skill** (`.agents/skills/arggon-cli/SKILL.md`, copied by `arggon init` from this repo's `skills/arggon-cli/SKILL.md` — single source, no duplicate): agents load it before any arggon invocation for the JSON contract, claim rules and pitfalls. It is an umbrella — `SKILL.md` plus `references/{json-contract,methodology,orchestration,pitfalls}.md`, bundled beside it; V2 advertises the supporting paths and the model reads the relevant reference on demand instead of carrying all detail per step. A parity test (`cli/src/skill-copy.test.ts`) keeps every bundled file byte-equal to its source, modulo the generated marker.
 
 ### Pre-commit gate
 
@@ -271,7 +271,7 @@ Work items live under tasks/ — see docs/convention.md and docs/agents.md.
 
 ### OpenCode V2
 
-`arggon init` generates the OpenCode **V2** seam (tier-1; never overwrites an existing file): a root `opencode.jsonc` — **only when the repo has no OpenCode config of its own** (`opencode.json(c)` or `.opencode/opencode.json(c)`) — plus `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` and `.opencode/commands/arggon-{next,start,done,handoff,review,status}.md`. V2 does not use `.mcp.json` as a registration mechanism: the server is registered under `mcp.servers` (the generated `.mcp.json` still serves other clients, e.g. Claude Code), and the skills bundled under `.agents/skills/` are auto-discovered (no config needed):
+`arggon init` generates the OpenCode **V2** seam (tier-1; never overwrites an existing file): a root `opencode.jsonc` — **only when the repo has no OpenCode config of its own** (`opencode.json(c)` or `.opencode/opencode.json(c)`) — plus `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` and `.opencode/commands/arggon-{next,start,done,handoff,review,status,spec,adr,explore,playbook}.md` (the methodology commands drive the `spec new` / `stack explore` / `playbook new` scaffolds plus `spec validate`/`spec analyze`). V2 does not use `.mcp.json` as a registration mechanism: the server is registered under `mcp.servers` (the generated `.mcp.json` still serves other clients, e.g. Claude Code), and the skills bundled under `.agents/skills/` are auto-discovered (no config needed):
 
 ```jsonc
 {

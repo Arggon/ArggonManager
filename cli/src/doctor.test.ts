@@ -485,7 +485,7 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     expect(result.opencode.artifacts).toEqual({
       config: true,
       agents: ["arggon-coordinator", "arggon-reviewer", "arggon-worker"],
-      commands: ["arggon-done", "arggon-handoff", "arggon-next", "arggon-review", "arggon-start", "arggon-status"],
+      commands: ["arggon-adr", "arggon-done", "arggon-explore", "arggon-handoff", "arggon-next", "arggon-playbook", "arggon-review", "arggon-spec", "arggon-start", "arggon-status"],
       skills: ["arggon-cli", "arggon-upgrade"],
       truncated: false,
     });
@@ -493,7 +493,7 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     expect(result.opencode.mcp).toEqual({ native: true, mcpJson: true, hint: null });
     const report = formatDoctorReport(result);
     expect(report).toContain("opencode: config opencode.jsonc");
-    expect(report).toContain("seam 10 artifact(s)"); // 1 config + 3 agents + 6 commands
+    expect(report).toContain("seam 14 artifact(s)"); // 1 config + 3 agents + 10 commands
     expect(report).toContain("2 bundled skill(s)");
     expect(report).toContain("MCP native");
     // Genuinely clean: every generated doc is untouched, so no hint line at all

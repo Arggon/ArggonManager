@@ -4,9 +4,11 @@ coverage/
 .DS_Store
 *.log
 
-# task-adr0006-docs-budget: generated copy of skills/arggon-cli/SKILL.md
-# (single committed source). Recreate with `npm run skills:sync`.
-.agents/skills/arggon-cli/SKILL.md
+# task-adr0006-docs-budget: generated copies of skills/arggon-cli/** under
+# .agents/skills/ (single committed source). task-opencode2-methodology (W5):
+# the umbrella's references/ are bundled copies too. Recreate with
+# `npm run skills:sync`.
+.agents/skills/
 
 # task-opencode-v2-plugin (W2): generated copy of
 # opencode/plugins/arggon/index.ts (single committed source). Recreated by
