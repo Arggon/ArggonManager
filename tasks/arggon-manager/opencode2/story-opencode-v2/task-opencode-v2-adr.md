@@ -55,3 +55,7 @@ plan, because a plan cannot point at a decision that does not exist yet.
   with the seam spec, task-opencode-v2-spec) carry the feature contracts.
 - If a later wave disproves a decision (e.g. MCP limitation), supersede this
   ADR with a new one instead of rewriting it.
+
+### handoff 2026-09-18 @Arggon — next: ADR 0010 is written (Proposed) on branch opencode2; flip to Accepted when the W0/W1 PR is reviewed and merged.
+- branch: opencode2
+- open questions: Vendored plugin vs npm package stays deferred per ADR; revisit trigger recorded.
