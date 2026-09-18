@@ -68,3 +68,6 @@ lone surrogate in the tail and U+FFFD in the body.
 **Gates:** full suite 1223/1223 (private TMPDIR), lint, build, `validate` ok, `spec validate` ok.
 
 **Deliverable:** draft PR https://github.com/Arggon/ArggonManager/pull/355 to `opencode2` — only `cli/src/handoff.ts` + `cli/src/handoff.test.ts` + tracker; no merge, no status flip (worker).
+
+### handoff 2026-09-18 @Arggon (session: ses_f4987ad2effd6z23DBBS0MxdV1) — next: Review draft PR #355 (handoff capField surrogate-safety); verify evidence, then merge to opencode2 and flip the item done.
+- branch: feat/task-handoff-field-cap-surrogate
