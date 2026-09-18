@@ -539,6 +539,34 @@ describe("mcp server _meta.sessionID attribution (task-opencode-v2-mcp-meta)", (
     expect(textContent(comment)).toMatchObject({ comment: { author: "explicit-user" } });
   });
 
+  it("treats empty explicit author/session as absent and falls back to params._meta.sessionID", async () => {
+    await seedTask();
+    const comment = await client.request("tools/call", {
+      name: "arggon_comment",
+      arguments: { id: "task-rate-limit", text: "empty author", author: "" },
+      _meta: { sessionID: "ses_meta_empty_explicit" },
+    });
+    expect(comment.isError).toBeUndefined();
+    expect(textContent(comment)).toMatchObject({
+      ok: true,
+      command: "comment",
+      comment: { author: "ses_meta_empty_explicit", lines: ["empty author"] },
+    });
+
+    const handoff = await client.request("tools/call", {
+      name: "arggon_handoff",
+      arguments: { id: "task-rate-limit", next: "resume", branch: "feat/x", session: "", author: "" },
+      _meta: { sessionID: "ses_meta_empty_explicit" },
+    });
+    expect(handoff.isError).toBeUndefined();
+    expect(textContent(handoff)).toMatchObject({
+      ok: true,
+      command: "handoff",
+      comment: { author: "ses_meta_empty_explicit" },
+      handoff: { branch: "feat/x", next: "resume", session: "ses_meta_empty_explicit" },
+    });
+  });
+
   it("behaves exactly as before when params._meta is absent", async () => {
     await seedTask();
     const handoff = await client.request("tools/call", {
