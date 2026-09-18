@@ -81,6 +81,20 @@ function printHumanError(label: string, message: string): void {
   console.error(`${label}: ${sanitizeHumanError(message)}`);
 }
 
+/**
+ * Success-path human lines share the display policy above
+ * (task-success-stdout-sanitize, the last channel of the human-output hygiene
+ * chain): every dynamic value interpolated into a human stdout line is
+ * sanitized at its print site — repo-controlled paths, ids, branch names,
+ * titles, labels, hook commands, external issue/PR data, and operator argv
+ * echoes (baseline paths) cannot forge a line or emit a raw control sequence.
+ * Like failures, the composite-diagnostic cap (`MAX_HUMAN_ERROR_CHARS`, 2000)
+ * is used rather than the 200-char report-value cap: these lines routinely
+ * carry absolute paths and generated sentences (the `next` rationale is
+ * ~330 chars), and the tighter cap would cut ordinary output. Ordinary values
+ * render byte-identical; `--json` keeps the raw value.
+ */
+
 program
   .name("arggon")
   .description("Git-native task CLI for ArggonManager")
@@ -454,8 +468,8 @@ program
           );
           return;
         }
-        console.log(`arggon create: ${result.item.type} ${result.id}`);
-        console.log(`  ${result.path}`);
+        console.log(`arggon create: ${result.item.type} ${sanitizeHumanError(result.id)}`);
+        console.log(`  ${sanitizeHumanError(result.path)}`);
         const commitLine = formatCommitLine(result.commit);
         if (commitLine) console.log(`  ${commitLine}`);
       } catch (err) {
@@ -614,12 +628,14 @@ program
         return;
       }
       const item = result.suggestion.item;
-      console.log(`arggon next: ${item.id} — ${item.title ?? item.id}`);
       console.log(
-        `  type: ${item.type} · parent: ${result.suggestion.parentChainDisplay.join(" > ") || "(none)"}`,
+        `arggon next: ${sanitizeHumanError(item.id)} — ${sanitizeHumanError(item.title ?? item.id)}`,
       );
-      console.log(`  why: ${result.suggestion.reason}`);
-      console.log(`  next: arggon start ${item.id} --assignee <login>`);
+      console.log(
+        `  type: ${item.type} · parent: ${sanitizeHumanError(result.suggestion.parentChainDisplay.join(" > ")) || "(none)"}`,
+      );
+      console.log(`  why: ${sanitizeHumanError(result.suggestion.reason)}`);
+      console.log(`  next: arggon start ${sanitizeHumanError(item.id)} --assignee <login>`);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (json) {
@@ -934,30 +950,32 @@ program
           return;
         }
         const what = result.changed.length > 0 ? ` (${result.changed.join(", ")})` : "";
-        console.log(`arggon update: ${result.item.type} ${result.id}${what}`);
-        console.log(`  ${result.path}`);
-        if (result.movedFrom) console.log(`  moved from: ${result.movedFrom}`);
-        if (result.renamedFrom) console.log(`  renamed from id: ${result.renamedFrom}`);
+        console.log(`arggon update: ${result.item.type} ${sanitizeHumanError(result.id)}${what}`);
+        console.log(`  ${sanitizeHumanError(result.path)}`);
+        if (result.movedFrom) console.log(`  moved from: ${sanitizeHumanError(result.movedFrom)}`);
+        if (result.renamedFrom)
+          console.log(`  renamed from id: ${sanitizeHumanError(result.renamedFrom)}`);
         for (const skipped of result.cascadeSkipped) {
           const why =
             skipped.reason === "subtree-open"
-              ? `subtree still open${"sibling" in skipped && skipped.sibling ? ` (sibling '${skipped.sibling}')` : ""}`
+              ? `subtree still open${"sibling" in skipped && skipped.sibling ? ` (sibling '${sanitizeHumanError(skipped.sibling)}')` : ""}`
               : skipped.reason === "lock-timeout"
                 ? "another arggon process holds its lock (re-run any terminal update to retrigger the cascade)"
                 : "acceptance checklist incomplete";
-          console.log(`  cascade skipped: ${skipped.type} '${skipped.id}' — ${why}`);
+          console.log(
+            `  cascade skipped: ${skipped.type} '${sanitizeHumanError(skipped.id)}' — ${why}`,
+          );
         }
         if (result.autoCompleted.length > 0) {
-          console.log(`  auto-completed: ${result.autoCompleted.join(", ")}`);
+          console.log(`  auto-completed: ${sanitizeHumanError(result.autoCompleted.join(", "))}`);
           const high = result.autoCompleted
             .map((cid, index) => ({ id: cid, level: result.cascadeLevels[index] }))
             .filter((c) => c.level === "epic" || c.level === "initiative");
           if (high.length > 0) {
             const more = high.length - 1;
-            const suffix =
-              more > 0 ? ` (and ${more} more ancestor${more === 1 ? "" : "s"})` : "";
+            const suffix = more > 0 ? ` (and ${more} more ancestor${more === 1 ? "" : "s"})` : "";
             console.log(
-              `⚠ cascade: auto-completed ${high[0].level} '${high[0].id}'${suffix}` +
+              `⚠ cascade: auto-completed ${high[0].level} '${sanitizeHumanError(high[0].id)}'${suffix}` +
                 ` — use --no-cascade to keep containers open`,
             );
           }
@@ -1028,9 +1046,9 @@ priority
         const source =
           entry.prioritySource === "label"
             ? "from label"
-            : `kept explicit${entry.conflictLabel ? `; label said ${entry.conflictLabel}` : ""}`;
+            : `kept explicit${entry.conflictLabel ? `; label said ${sanitizeHumanError(entry.conflictLabel)}` : ""}`;
         console.log(
-          `  ${entry.id}: priority ${entry.priority} (${source}); removed labels: ${entry.labelsRemoved.join(", ")}`,
+          `  ${sanitizeHumanError(entry.id)}: priority ${entry.priority} (${source}); removed labels: ${sanitizeHumanError(entry.labelsRemoved.join(", "))}`,
         );
       }
       if (result.dryRun) {
@@ -1109,9 +1127,9 @@ program
           return;
         }
         console.log(
-          `arggon comment: ${result.id} (${result.comment.date} @${result.comment.author})`,
+          `arggon comment: ${sanitizeHumanError(result.id)} (${result.comment.date} @${sanitizeHumanError(result.comment.author)})`,
         );
-        console.log(`  ${result.path}`);
+        console.log(`  ${sanitizeHumanError(result.path)}`);
         const commitLine = formatCommitLine(result.commit);
         if (commitLine) console.log(`  ${commitLine}`);
       } catch (err) {
@@ -1204,9 +1222,9 @@ program
           return;
         }
         console.log(
-          `arggon handoff: ${result.id} (${result.comment.date} @${result.comment.author} — next: ${result.handoff.next})`,
+          `arggon handoff: ${sanitizeHumanError(result.id)} (${result.comment.date} @${sanitizeHumanError(result.comment.author)} — next: ${sanitizeHumanError(result.handoff.next)})`,
         );
-        console.log(`  ${result.path}`);
+        console.log(`  ${sanitizeHumanError(result.path)}`);
         const commitLine = formatCommitLine(result.commit);
         if (commitLine) console.log(`  ${commitLine}`);
       } catch (err) {
@@ -1273,10 +1291,12 @@ program
           `arggon import-issues${result.dryRun ? " (dry run)" : ""}: ${result.entries.length} issue(s), ${result.created} created, ${result.skipped} skipped`,
         );
         console.log(
-          `  target story: ${result.story.id}${result.story.created ? " (created)" : result.dryRun ? " (would create when missing)" : ""}`,
+          `  target story: ${sanitizeHumanError(result.story.id)}${result.story.created ? " (created)" : result.dryRun ? " (would create when missing)" : ""}`,
         );
         for (const entry of result.entries) {
-          console.log(`  ${entry.action.padEnd(13)} ${entry.id}  ${entry.title} [${entry.status}]`);
+          console.log(
+            `  ${entry.action.padEnd(13)} ${sanitizeHumanError(entry.id)}  ${sanitizeHumanError(entry.title)} [${entry.status}]`,
+          );
         }
         console.log(
           `  labels: ${result.labelsMapped} mapped, ${result.labelsSkipped} skipped (invalid)`,
@@ -1610,7 +1630,7 @@ spec
       }
       console.log(`arggon spec new: created ${result.files.length} file(s)`);
       for (const file of result.files) {
-        console.log(`  ${file}`);
+        console.log(`  ${sanitizeHumanError(file)}`);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -1671,13 +1691,17 @@ spec
       if (result.dryRun) {
         console.log("arggon spec import openspec: dry run (nothing written)");
         for (const entry of result.inventory) {
-          console.log(`  ${entry.file} <- ${entry.source} (${entry.specId})`);
+          console.log(
+            `  ${sanitizeHumanError(entry.file)} <- ${sanitizeHumanError(entry.source)} (${sanitizeHumanError(entry.specId)})`,
+          );
         }
         return;
       }
       console.log(`arggon spec import openspec: created ${result.created.length} file(s)`);
       for (const entry of result.created) {
-        console.log(`  ${entry.file} <- ${entry.source} (${entry.specId})`);
+        console.log(
+          `  ${sanitizeHumanError(entry.file)} <- ${sanitizeHumanError(entry.source)} (${sanitizeHumanError(entry.specId)})`,
+        );
       }
     } catch (err) {
       const failures = err instanceof SpecImportError ? err.failures : undefined;
@@ -1726,7 +1750,7 @@ stack
       }
       console.log(`arggon stack explore: created ${result.files.length} file(s)`);
       for (const file of result.files) {
-        console.log(`  ${file}`);
+        console.log(`  ${sanitizeHumanError(file)}`);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -1772,7 +1796,7 @@ playbook
       }
       console.log(`arggon playbook new: created ${result.files.length} file(s)`);
       for (const file of result.files) {
-        console.log(`  ${file}`);
+        console.log(`  ${sanitizeHumanError(file)}`);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -1866,10 +1890,10 @@ playbook
       }
       process.stdout.write(formatPlaybookStatusTable(result));
       for (const id of result.created) {
-        console.log(`filed:   ${id}`);
+        console.log(`filed:   ${sanitizeHumanError(id)}`);
       }
       for (const id of result.skipped) {
-        console.log(`skipped: ${id} (re-research task already exists)`);
+        console.log(`skipped: ${sanitizeHumanError(id)} (re-research task already exists)`);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -1912,7 +1936,7 @@ playbook
         return;
       }
       console.log(
-        `arggon playbook refresh: ${result.path} → version ${result.version}, researched ${result.researched}`,
+        `arggon playbook refresh: ${sanitizeHumanError(result.path)} → version ${sanitizeHumanError(result.version)}, researched ${result.researched}`,
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -1952,7 +1976,7 @@ program
         return;
       }
       console.log(
-        `arggon branch: ${result.item.type} ${result.id} → ${result.branch} (${result.created ? "created" : "attached"})`,
+        `arggon branch: ${result.item.type} ${sanitizeHumanError(result.id)} → ${sanitizeHumanError(result.branch)} (${result.created ? "created" : "attached"})`,
       );
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -2040,10 +2064,12 @@ program
           );
           return;
         }
-        console.log(`arggon start: ${result.item.type} ${result.id} → ${result.branch}`);
+        console.log(
+          `arggon start: ${result.item.type} ${sanitizeHumanError(result.id)} → ${sanitizeHumanError(result.branch)}`,
+        );
         if (result.worktreePath) {
           console.log(
-            `  worktree: ${result.worktreePath} (${result.worktreeCreated ? "created" : "attached"})`,
+            `  worktree: ${sanitizeHumanError(result.worktreePath)} (${result.worktreeCreated ? "created" : "attached"})`,
           );
           if (result.linkedNodeModules) {
             console.log(
@@ -2052,11 +2078,14 @@ program
           }
         }
         if (result.postStart) {
-          if (result.postStart.ok) console.log(`  post-start: ${result.postStart.command}`);
-          else console.log(`  ${result.postStart.error}`);
+          if (result.postStart.ok) {
+            console.log(`  post-start: ${sanitizeHumanError(result.postStart.command)}`);
+          } else {
+            console.log(`  ${sanitizeHumanError(result.postStart.error ?? "")}`);
+          }
         }
         if (result.prUrl) {
-          console.log(`  draft PR: ${result.prUrl}`);
+          console.log(`  draft PR: ${sanitizeHumanError(result.prUrl)}`);
         } else if (result.pushed) {
           console.log(`  pushed (no PR; pass --open-pr)`);
         } else {
@@ -2128,13 +2157,17 @@ program
       }
       const removable = result.entries.filter((e) => e.removable);
       console.log(
-        `arggon cleanup: ${result.entries.length} tracked worktree(s), base ${result.base}`,
+        `arggon cleanup: ${result.entries.length} tracked worktree(s), base ${sanitizeHumanError(result.base)}`,
       );
       for (const entry of result.entries) {
         if (entry.removable) {
-          console.log(`  removable: ${entry.id} -> ${entry.path} (${entry.action})`);
+          console.log(
+            `  removable: ${sanitizeHumanError(entry.id)} -> ${sanitizeHumanError(entry.path)} (${entry.action})`,
+          );
         } else {
-          console.log(`  skipped:   ${entry.id} (${entry.reason})`);
+          console.log(
+            `  skipped:   ${sanitizeHumanError(entry.id)} (${sanitizeHumanError(entry.reason ?? "")})`,
+          );
         }
       }
       for (const action of result.pruned) {
@@ -2142,7 +2175,7 @@ program
           const leftover = action.leftoverBranch ? ` (leftover branch: ${action.leftoverBranch})` : "";
           console.error(sanitizeHumanError(`  failed:    ${action.id}: ${action.error}${leftover}`));
         } else {
-          console.log(`  pruned:    ${action.id}: ${action.action}`);
+          console.log(`  pruned:    ${sanitizeHumanError(action.id)}: ${action.action}`);
         }
       }
       const commitLine = formatCommitLine(result.commit);
@@ -2250,7 +2283,7 @@ program
             return;
           }
           console.log(
-            `arggon board: serving ${displayPath(handle.root, process.cwd())} on ${handle.url} (binds 127.0.0.1 only, Ctrl-C to stop)`,
+            `arggon board: serving ${sanitizeHumanError(displayPath(handle.root, process.cwd()))} on ${sanitizeHumanError(handle.url)} (binds 127.0.0.1 only, Ctrl-C to stop)`,
           );
         });
       } catch (err) {
@@ -2279,7 +2312,7 @@ program
         return;
       }
       console.log(
-        `arggon board: wrote ${displayPath(result.outPath, process.cwd())} (${result.itemCount} item(s)${result.groupBy ? `, grouped by ${result.groupBy}` : ""}${opts.github ? `, ${result.prCount} PR(s) linked` : ""})`,
+        `arggon board: wrote ${sanitizeHumanError(displayPath(result.outPath, process.cwd()))} (${result.itemCount} item(s)${result.groupBy ? `, grouped by ${result.groupBy}` : ""}${opts.github ? `, ${result.prCount} PR(s) linked` : ""})`,
       );
       console.log(
         "  Open it in a browser. Re-run after tree changes — tasks/ remains the source of truth.",
@@ -2330,23 +2363,29 @@ function printInitProposeHuman(result: InitResult): void {
     console.error(`arggon: warning: ${result.warning}`);
   }
   const proposals = result.proposals ?? [];
-  console.log(`arggon init --propose: ${proposals.length} proposal(s) at ${result.root}`);
+  console.log(
+    `arggon init --propose: ${proposals.length} proposal(s) at ${sanitizeHumanError(result.root)}`,
+  );
   for (const p of proposals) {
     if (p.decision === "proposed") {
       console.log(
-        `  proposed  ${p.dest}  ->  ${p.proposalPath}  (${p.mode === "sections" ? `sections: ${p.regions?.length ?? 0} region(s)` : "whole file"}; +${p.added ?? 0}/-${p.removed ?? 0} lines vs current template)`,
+        `  proposed  ${sanitizeHumanError(p.dest)}  ->  ${sanitizeHumanError(p.proposalPath)}  (${p.mode === "sections" ? `sections: ${p.regions?.length ?? 0} region(s)` : "whole file"}; +${p.added ?? 0}/-${p.removed ?? 0} lines vs current template)`,
       );
       // Section mode (spec-propose-section-backports-007): list each region.
       for (const [idx, r] of (p.regions ?? []).entries()) {
         console.log(`    region ${idx + 1}: ${r.kind} (+${r.added}/-${r.removed})`);
       }
     } else if (p.decision === "absorbed") {
-      console.log(`  absorbed  ${p.dest}  (matches upstream — removed ${p.proposalPath})`);
+      console.log(
+        `  absorbed  ${sanitizeHumanError(p.dest)}  (matches upstream — removed ${sanitizeHumanError(p.proposalPath)})`,
+      );
     } else if (p.decision === "informational") {
-      console.log(`  info      ${p.dest}  (${p.note ?? "nothing to backport"})`);
+      console.log(
+        `  info      ${sanitizeHumanError(p.dest)}  (${sanitizeHumanError(p.note ?? "nothing to backport")})`,
+      );
     } else {
       console.log(
-        `  stale     ${p.dest}  (${p.proposalPath} is from an older arggon version — delete it after checking)`,
+        `  stale     ${sanitizeHumanError(p.dest)}  (${sanitizeHumanError(p.proposalPath)} is from an older arggon version — delete it after checking)`,
       );
     }
   }
@@ -2363,12 +2402,14 @@ function printInitDryRun(result: InitDryRunResult): void {  // bug-init-git-doct
     console.error(`arggon: warning: ${result.warning}`);
   }
   console.log(
-    `arggon init (dry run): ${result.alreadyInitialized ? "already initialized" : "fresh scaffold"} at ${result.root}`,
+    `arggon init (dry run): ${result.alreadyInitialized ? "already initialized" : "fresh scaffold"} at ${sanitizeHumanError(result.root)}`,
   );
   const width = Math.max("decision".length, ...result.plan.map((e) => e.decision.length));
   console.log(`  ${"decision".padEnd(width)}  destination`);
   for (const e of result.plan) {
-    console.log(`  ${e.decision.padEnd(width)}  ${e.dest}  ${e.reason}`);
+    console.log(
+      `  ${e.decision.padEnd(width)}  ${sanitizeHumanError(e.dest)}  ${sanitizeHumanError(e.reason)}`,
+    );
   }
   if (result.plan.length === 0) {
     console.log("  (nothing to do — tree already up to date)");
@@ -2383,15 +2424,19 @@ function printInitHuman(result: InitResult): void {
     console.error(`arggon: warning: ${result.warning}`);
   }
   if (result.alreadyInitialized && !result.force) {
-    console.log(`arggon init: already initialized at ${result.conventionPath}`);
+    console.log(`arggon init: already initialized at ${sanitizeHumanError(result.conventionPath)}`);
     if (result.restored.length > 0) {
       const names = result.restored.map((p) => p.replace(/^templates\//, ""));
-      console.log(`arggon init: restored missing templates: ${names.join(", ")}`);
+      console.log(
+        `arggon init: restored missing templates: ${sanitizeHumanError(names.join(", "))}`,
+      );
     } else {
       console.log("arggon init: templates/ already complete");
     }
     if (result.created.length > 0) {
-      console.log(`arggon init: generated missing docs: ${result.created.join(", ")}`);
+      console.log(
+        `arggon init: generated missing docs: ${sanitizeHumanError(result.created.join(", "))}`,
+      );
     }
     if (result.updated.length > 0) {
       console.log(
@@ -2399,7 +2444,9 @@ function printInitHuman(result: InitResult): void {
       );
     }
     if (result.backedUp.length > 0) {
-      console.log(`arggon init: archived modified docs: ${result.backedUp.join(", ")}`);
+      console.log(
+        `arggon init: archived modified docs: ${sanitizeHumanError(result.backedUp.join(", "))}`,
+      );
     }
     if (result.skipped.length > 0) {
       console.log(
@@ -2414,22 +2461,22 @@ function printInitHuman(result: InitResult): void {
 
   const commitLine = formatCommitLine(result.commit);
   if (commitLine) console.log(`arggon init: ${commitLine}`);
-  console.log(`arggon init: ready in ${result.root}`);
+  console.log(`arggon init: ready in ${sanitizeHumanError(result.root)}`);
   console.log("  - tasks/.convention.yml (version: 0)");
   console.log("  - templates/ (initiative, epic, story, task, bug)");
   if (result.created.some((p) => !p.startsWith("templates/"))) {
     const docs = result.created.filter((p) => p !== "tasks/.convention.yml" && !p.startsWith("templates/"));
-    console.log(`  - governing docs (${docs.length}): ${docs.join(", ")}`);
+    console.log(`  - governing docs (${docs.length}): ${sanitizeHumanError(docs.join(", "))}`);
   }
   if (result.updated.length > 0) {
     console.log(`  - regenerated untouched docs: ${result.updated.length} file(s)`);
   }
   if (result.backedUp.length > 0) {
-    console.log(`  - archived modified docs: ${result.backedUp.join(", ")}`);
+    console.log(`  - archived modified docs: ${sanitizeHumanError(result.backedUp.join(", "))}`);
   }
   if (result.skipped.length > 0) {
     console.log(
-      `  - kept adopter-modified docs (never overwritten): ${result.skipped.join(", ")}`,
+      `  - kept adopter-modified docs (never overwritten): ${sanitizeHumanError(result.skipped.join(", "))}`,
     );
   }
   console.log("Next:");
@@ -2479,24 +2526,28 @@ program
           `arggon sync (${result.mode}): ${result.exit_code === 0 ? "in sync" : "sync needed"}`,
         );
         for (const id of result.matched) {
-          console.log(`  matched:   ${id}`);
+          console.log(`  matched:   ${sanitizeHumanError(id)}`);
         }
         for (const s of result.suggestions) {
-          console.log(`  fillable:  ${s.id} <- ${s.branch} (#${s.pr})`);
+          console.log(
+            `  fillable:  ${sanitizeHumanError(s.id)} <- ${sanitizeHumanError(s.branch)} (#${s.pr})`,
+          );
         }
         for (const id of result.pending) {
           if (!result.suggestions.some((s) => s.id === id)) {
-            console.log(`  pending:   ${id} (candidates disagree; pick a branch manually)`);
+            console.log(
+              `  pending:   ${sanitizeHumanError(id)} (candidates disagree; pick a branch manually)`,
+            );
           }
         }
         for (const id of result.unmatched) {
-          console.log(`  unmatched: ${id} (no open PR)`);
+          console.log(`  unmatched: ${sanitizeHumanError(id)} (no open PR)`);
         }
         for (const amb of result.ambiguous) {
-          console.log(`  ambiguous: ${amb.id} (PRs ${amb.prs.join(", ")})`);
+          console.log(`  ambiguous: ${sanitizeHumanError(amb.id)} (PRs ${amb.prs.join(", ")})`);
         }
         for (const [id, branch] of Object.entries(result.filled ?? {})) {
-          console.log(`  filled:    ${id} -> ${branch}`);
+          console.log(`  filled:    ${sanitizeHumanError(id)} -> ${sanitizeHumanError(branch)}`);
         }
         if (result.suggestions.length > 0 && result.mode === "check") {
           console.log(
@@ -2544,7 +2595,7 @@ program
         );
         return;
       }
-      console.log(`arggon instructions: agent wiring from ${result.source}\n`);
+      console.log(`arggon instructions: agent wiring from ${sanitizeHumanError(result.source)}\n`);
       const sections: Array<[string, { language: string; body: string }]> = [
         ["install", result.snippets.install],
         ["pre-commit gate (.git/hooks/pre-commit)", result.snippets.precommit],
