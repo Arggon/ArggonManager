@@ -34,14 +34,18 @@ import {
 } from "./tracker-commit.js";
 import { lockFilePathFor } from "./lock.js";
 import { maybeCommitUpdate, runUpdate } from "./update.js";
-import { removeFixtureTree } from "./test-tmp.js";
+import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
 
-// bug-tmp-fixture-leak + bug-tracker-commit-enotempty-flake: track mkdtemp
-// dirs and the detached lock-release children, then remove the dirs through
-// the shared bounded-retry helper (test-tmp.ts). Recursive rmSync is a
-// one-shot ENOTEMPTY race against a still-settling writer (spawned git child,
-// the detached lock-release node below, or fs timing on a loaded CI runner)
-// and `force` does NOT suppress ENOTEMPTY — only maxRetries > 0 does.
+// bug-tmp-fixture-leak + bug-tracker-commit-enotempty-flake +
+// bug-ci-enotempty-rmretry: track mkdtemp dirs and the detached lock-release
+// children, then remove the dirs through the shared settling helper
+// (test-tmp.ts). The writer that broke teardown is git's detached
+// `git maintenance run --auto --detach` child (spawned by commit/merge): it
+// holds `.git/objects/maintenance.lock` for its whole run, and Node's rmSync
+// retry loop only re-tries the bare rmdir, never re-reads the children, so a
+// held lock defeats the whole window. Every fixture repo comes from
+// initFixtureRepo (git init + maintenance.auto=false, read back at creation);
+// removeFixtureTree() re-traverses on retriable errors.
 const tmpDirs: string[] = [];
 /** Detached node children spawned to release lock files mid-test. */
 const lockReleaseChildren = new Set<ChildProcess>();
@@ -126,9 +130,8 @@ function status(cwd: string): string {
 /** Git repo with the init scaffold committed and a story + task ready to mutate. */
 function initRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), "arggon-tracker-commit-"));
-  git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
-  git(["config", "user.email", "test@example.com"], dir);
-  git(["config", "user.name", "Test"], dir);
+  // bug-ci-enotempty-rmretry: no detached maintenance daemon in fixtures.
+  initFixtureRepo(dir);
   runInit({ dir, force: false });
   runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
   runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch", id: "auth", now: NOW });
@@ -223,9 +226,9 @@ describe("tracker auto-commit with gitignored paths", () => {
   } {
     const { trackedDirty = true, ignoredDirty = true } = opts;
     const dir = mkdtempSync(join(tmpdir(), "arggon-ignored-"));
-    git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
-    git(["config", "user.email", "test@example.com"], dir);
-    git(["config", "user.name", "Test"], dir);
+    // bug-ci-enotempty-rmretry: no detached maintenance daemon in fixtures
+    // (initFixtureRepo opts out and reads the config back).
+    initFixtureRepo(dir);
     writeFileSync(join(dir, ".gitignore"), "*.bundle\n", "utf8");
     mkdirSync(join(dir, "tasks"), { recursive: true });
     writeFileSync(join(dir, "tasks/state.yml"), "state\n", "utf8");
@@ -405,9 +408,9 @@ describe("tracker auto-commit with exotic path shapes (NUL hygiene)", () => {
   /** Repo with two tracked and two ignored exotic-name files, all mutated. */
   function exoticRepo(): { dir: string; tracked: string[]; ignored: string[] } {
     const dir = mkdtempSync(join(tmpdir(), "arggon-exotic-"));
-    git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
-    git(["config", "user.email", "test@example.com"], dir);
-    git(["config", "user.name", "Test"], dir);
+    // bug-ci-enotempty-rmretry: no detached maintenance daemon in fixtures
+    // (initFixtureRepo opts out and reads the config back).
+    initFixtureRepo(dir);
     // `?` matches any single non-`/` character, so these patterns reach the
     // newline (`line\nbreak.md`) and backslash (`back\slash.md`) names.
     writeFileSync(join(dir, ".gitignore"), "tasks/line?break.md\ntasks/back?slash.md\n", "utf8");
@@ -798,9 +801,8 @@ const IMPORT_PAYLOAD = JSON.stringify([
 /** Git-committed variant of primed(): init + initiative + epic, all committed. */
 function initImportRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), "arggon-tracker-import-"));
-  git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
-  git(["config", "user.email", "test@example.com"], dir);
-  git(["config", "user.name", "Test"], dir);
+  // bug-ci-enotempty-rmretry: no detached maintenance daemon in fixtures.
+  initFixtureRepo(dir);
   runInit({ dir, force: false });
   runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
   runCreate({ cwd: dir, type: "epic", title: "Backlog", parent: "launch", id: "backlog", now: NOW });
