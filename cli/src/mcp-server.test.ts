@@ -1,5 +1,5 @@
 import { PassThrough } from "node:stream";
-import { mkdtempSync as _mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync as _mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -444,5 +444,222 @@ describe("mcp server next/report/validate (task-mcp-parity-full)", () => {
       command: "validate",
       error: { code: "VALIDATE_FAILED" },
     });
+  });
+});
+
+describe("mcp server _meta.sessionID attribution (task-opencode-v2-mcp-meta)", () => {
+  let client: McpTestClient;
+  let repoDir: string;
+  let previousUser: string | undefined;
+
+  const taskPath = (): string =>
+    join(repoDir, "tasks", "launch-mvp", "auth", "story-login", "task-rate-limit.md");
+
+  async function seedTask(): Promise<void> {
+    const created = await client.request("tools/call", {
+      name: "arggon_create",
+      arguments: { type: "task", title: "Add rate limiting", parent: "story-login", id: "rate-limit" },
+    });
+    expect(created.isError).toBeUndefined();
+  }
+
+  beforeEach(() => {
+    repoDir = primedRepo();
+    client = new McpTestClient();
+    client.cwd = repoDir;
+    client.start();
+    // Deterministic @me fallback for the meta-absent cases.
+    previousUser = process.env.GITHUB_USER;
+    process.env.GITHUB_USER = "fallback-user";
+  });
+
+  afterEach(() => {
+    if (previousUser === undefined) delete process.env.GITHUB_USER;
+    else process.env.GITHUB_USER = previousUser;
+  });
+
+  it("defaults the handoff session and author from params._meta.sessionID", async () => {
+    await seedTask();
+    const result = await client.request("tools/call", {
+      name: "arggon_handoff",
+      arguments: { id: "task-rate-limit", next: "resume the meta wiring", branch: "feat/x" },
+      _meta: { sessionID: "ses_meta_handoff" },
+    });
+    expect(result.isError).toBeUndefined();
+    expect(textContent(result)).toMatchObject({
+      ok: true,
+      command: "handoff",
+      comment: { author: "ses_meta_handoff" },
+      handoff: { branch: "feat/x", next: "resume the meta wiring", session: "ses_meta_handoff" },
+    });
+    expect(readFileSync(taskPath(), "utf8")).toMatch(
+      /### handoff \d{4}-\d{2}-\d{2} @ses_meta_handoff \(session: ses_meta_handoff\) — next: resume the meta wiring\n- branch: feat\/x\n/,
+    );
+  });
+
+  it("defaults the comment author from params._meta.sessionID", async () => {
+    await seedTask();
+    const result = await client.request("tools/call", {
+      name: "arggon_comment",
+      arguments: { id: "task-rate-limit", text: "from meta" },
+      _meta: { sessionID: "ses_meta_comment" },
+    });
+    expect(result.isError).toBeUndefined();
+    expect(textContent(result)).toMatchObject({
+      ok: true,
+      command: "comment",
+      comment: { author: "ses_meta_comment", lines: ["from meta"] },
+    });
+    expect(readFileSync(taskPath(), "utf8")).toContain("@ses_meta_comment\nfrom meta\n");
+  });
+
+  it("explicit session/author arguments always win over params._meta.sessionID", async () => {
+    await seedTask();
+    const handoff = await client.request("tools/call", {
+      name: "arggon_handoff",
+      arguments: {
+        id: "task-rate-limit",
+        next: "resume",
+        branch: "feat/x",
+        session: "sess_explicit",
+        author: "explicit-user",
+      },
+      _meta: { sessionID: "ses_meta_ignored" },
+    });
+    expect(textContent(handoff)).toMatchObject({
+      comment: { author: "explicit-user" },
+      handoff: { session: "sess_explicit" },
+    });
+
+    const comment = await client.request("tools/call", {
+      name: "arggon_comment",
+      arguments: { id: "task-rate-limit", text: "explicit", author: "explicit-user" },
+      _meta: { sessionID: "ses_meta_ignored" },
+    });
+    expect(textContent(comment)).toMatchObject({ comment: { author: "explicit-user" } });
+  });
+
+  it("treats empty explicit author/session as absent and falls back to params._meta.sessionID", async () => {
+    await seedTask();
+    const comment = await client.request("tools/call", {
+      name: "arggon_comment",
+      arguments: { id: "task-rate-limit", text: "empty author", author: "" },
+      _meta: { sessionID: "ses_meta_empty_explicit" },
+    });
+    expect(comment.isError).toBeUndefined();
+    expect(textContent(comment)).toMatchObject({
+      ok: true,
+      command: "comment",
+      comment: { author: "ses_meta_empty_explicit", lines: ["empty author"] },
+    });
+
+    const handoff = await client.request("tools/call", {
+      name: "arggon_handoff",
+      arguments: { id: "task-rate-limit", next: "resume", branch: "feat/x", session: "", author: "" },
+      _meta: { sessionID: "ses_meta_empty_explicit" },
+    });
+    expect(handoff.isError).toBeUndefined();
+    expect(textContent(handoff)).toMatchObject({
+      ok: true,
+      command: "handoff",
+      comment: { author: "ses_meta_empty_explicit" },
+      handoff: { branch: "feat/x", next: "resume", session: "ses_meta_empty_explicit" },
+    });
+  });
+
+  it("behaves exactly as before when params._meta is absent", async () => {
+    await seedTask();
+    const handoff = await client.request("tools/call", {
+      name: "arggon_handoff",
+      arguments: { id: "task-rate-limit", next: "resume", branch: "feat/x" },
+    });
+    const handoffEnvelope = textContent(handoff) as Record<string, unknown>;
+    expect(handoffEnvelope).toMatchObject({
+      ok: true,
+      command: "handoff",
+      comment: { author: "fallback-user" },
+      handoff: { branch: "feat/x" },
+    });
+    expect(handoffEnvelope.handoff as Record<string, unknown>).not.toHaveProperty("session");
+
+    const comment = await client.request("tools/call", {
+      name: "arggon_comment",
+      arguments: { id: "task-rate-limit", text: "no meta" },
+    });
+    expect(textContent(comment)).toMatchObject({
+      ok: true,
+      command: "comment",
+      comment: { author: "fallback-user", lines: ["no meta"] },
+    });
+  });
+
+  it("ignores malformed or non-string _meta.sessionID values (absent-safe narrowing)", async () => {
+    await seedTask();
+    const metas: Array<Record<string, unknown>> = [
+      {},
+      { _meta: null },
+      { _meta: "ses_not_an_object" },
+      { _meta: { sessionID: 42 } },
+      { _meta: { sessionID: "" } },
+      { _meta: { sessionID: ["ses_array"] } },
+    ];
+    for (const extra of metas) {
+      const result = await client.request("tools/call", {
+        name: "arggon_comment",
+        arguments: { id: "task-rate-limit", text: "malformed meta" },
+        ...extra,
+      });
+      expect(textContent(result)).toMatchObject({ comment: { author: "fallback-user" } });
+    }
+  });
+
+  it("keeps the envelope payloads byte-compatible otherwise (only the attributed value differs)", async () => {
+    await seedTask();
+    const withMeta = await client.request("tools/call", {
+      name: "arggon_comment",
+      arguments: { id: "task-rate-limit", text: "same text" },
+      _meta: { sessionID: "ses_meta_shape" },
+    });
+    const withoutMeta = await client.request("tools/call", {
+      name: "arggon_comment",
+      arguments: { id: "task-rate-limit", text: "same text" },
+    });
+    const a = textContent(withMeta) as Record<string, unknown>;
+    const b = textContent(withoutMeta) as Record<string, unknown>;
+    const aComment = a.comment as Record<string, unknown>;
+    const bComment = b.comment as Record<string, unknown>;
+    expect(Object.keys(a).sort()).toEqual(Object.keys(b).sort());
+    expect(Object.keys(aComment).sort()).toEqual(Object.keys(bComment).sort());
+    expect(aComment.date).toBe(bComment.date);
+    expect(aComment.lines).toEqual(bComment.lines);
+    // The only difference is the attributed author value.
+    expect(aComment.author).toBe("ses_meta_shape");
+    expect(bComment.author).toBe("fallback-user");
+    const withoutComment = (envelope: Record<string, unknown>): Record<string, unknown> => {
+      const copy = { ...envelope };
+      delete copy.comment;
+      return copy;
+    };
+    expect(withoutComment(a)).toEqual(withoutComment(b));
+  });
+
+  it("triggers no state transition: meta never claims or reopens anything", async () => {
+    await seedTask();
+    const before = readFileSync(taskPath(), "utf8");
+    const result = await client.request("tools/call", {
+      name: "arggon_comment",
+      arguments: { id: "task-rate-limit", text: "meta only" },
+      _meta: { sessionID: "ses_meta_no_state" },
+    });
+    expect(result.isError).toBeUndefined();
+    const after = readFileSync(taskPath(), "utf8");
+    const frontmatter = (text: string): string => text.slice(0, text.indexOf("\n---", 3) + 4);
+    expect(frontmatter(after)).toBe(frontmatter(before));
+    const shown = await client.request("tools/call", {
+      name: "arggon_show",
+      arguments: { id: "task-rate-limit", meta: true },
+    });
+    const shownEnvelope = textContent(shown) as Record<string, unknown>;
+    expect((shownEnvelope.item as Record<string, unknown>).status).toBe("todo");
   });
 });

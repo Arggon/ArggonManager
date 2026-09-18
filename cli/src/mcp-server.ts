@@ -25,6 +25,15 @@ import { arggonVersion } from "./docs.js";
  * as the CLI and return the documented `--json` envelope objects as tool text.
  * Agent playbook rules are enforced by passing `agent: true` to runUpdate —
  * the MCP layer cannot reopen done/cancelled items or steal claims.
+ *
+ * Session attribution (task-opencode-v2-mcp-meta): OpenCode V2 sends the
+ * invoking session ID in `CallToolRequest.params._meta.sessionID` for calls
+ * made on behalf of a session (https://opencode.ai/v2/docs/mcp-servers/). The
+ * server uses it as the DEFAULT `session` for arggon_handoff and the DEFAULT
+ * `author` for arggon_comment/arggon_handoff; explicit tool arguments always
+ * win. It is opaque correlation metadata only — never authentication or
+ * authorization, never logged, and it triggers no state transitions (the
+ * shared rules module stays the only path for updates).
  */
 
 const SUPPORTED_PROTOCOL_VERSIONS = ["2024-11-05", "2025-03-26", "2025-06-18"] as const;
@@ -436,6 +445,9 @@ export function runMcpServer(opts: McpServerOptions): void {
   const callTool = (params: Record<string, unknown>): Record<string, unknown> => {
     const name = params.name;
     const args = (params.arguments ?? {}) as Record<string, unknown>;
+    // OpenCode V2 session context (opaque correlation, may be absent); used
+    // only as the default attribution below, never for any decision.
+    const metaSession = sessionIDFromMeta(params);
     if (name === "arggon_list") {
       return toolEnvelope("arggon_list", () => {
         const result = runList({
@@ -532,7 +544,8 @@ export function runMcpServer(opts: McpServerOptions): void {
           cwd: opts.cwd,
           id: str(args.id) ?? "",
           text: str(args.text) ?? "",
-          author: str(args.author),
+          // Explicit author wins; otherwise the V2 session ID is the default.
+          author: explicitOrMeta(str(args.author), metaSession),
           // Tracker auto-commit resolves like the CLI.
         });
         return successEnvelope(
@@ -555,8 +568,10 @@ export function runMcpServer(opts: McpServerOptions): void {
           next: str(args.next) ?? "",
           branch: str(args.branch),
           openQuestions: str(args.open_questions),
-          session: str(args.session),
-          author: str(args.author),
+          // Explicit session/author win; otherwise the V2 session ID is both
+          // the default provenance session and the default author.
+          session: explicitOrMeta(str(args.session), metaSession),
+          author: explicitOrMeta(str(args.author), metaSession),
           // Tracker auto-commit resolves like the CLI.
         });
         return successEnvelope(
@@ -712,4 +727,32 @@ export function runMcpServer(opts: McpServerOptions): void {
 
 function str(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+/**
+ * Narrow `CallToolRequest.params._meta.sessionID` (OpenCode V2 session
+ * context, https://opencode.ai/v2/docs/mcp-servers/) from `unknown`:
+ * absent-safe — non-object `_meta`, non-string values and empty strings all
+ * yield undefined. The raw value is returned as-is; the kernel owns its
+ * semantics (handoff trims and caps it at HANDOFF_SESSION_CAP). This is
+ * correlation metadata only, never an authentication/authorization signal.
+ */
+function sessionIDFromMeta(params: Record<string, unknown>): string | undefined {
+  const meta: unknown = params._meta;
+  if (typeof meta !== "object" || meta === null) return undefined;
+  const value: unknown = (meta as Record<string, unknown>).sessionID;
+  if (typeof value !== "string" || value.trim() === "") return undefined;
+  return value;
+}
+
+/**
+ * Precedence for the attributed defaults: an explicit non-empty tool argument
+ * always wins; empty/whitespace-only arguments count as absent — matching how
+ * the comment/handoff kernels treat them — and fall back to `_meta.sessionID`.
+ */
+function explicitOrMeta(
+  explicit: string | undefined,
+  metaDefault: string | undefined,
+): string | undefined {
+  return explicit !== undefined && explicit.trim() !== "" ? explicit : metaDefault;
 }
