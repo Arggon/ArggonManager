@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode2-plugin-parser-residuals
 title: "Plugin parser residuals: SHELL_SYNTAX_IN_PATH false negatives, odd-backslash heads, residual pins"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T22:27:03.248Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-plugin-parser-residuals
 ---
 <!--
@@ -92,3 +91,6 @@ Branch head before commit: `34a482b`; probes run against a copy of the pre-fix s
 ### handoff 2026-09-18 @Arggon — next: Review DRAFT PR #361 against opencode2 (https://github.com/Arggon/ArggonManager/pull/361) and merge when green; worker stops here. Files: opencode/plugins/arggon/index.ts, index.test.ts + tracker.
 - branch: feat/task-opencode2-plugin-parser-residuals
 - open questions: Finding 3 residual is pinned, not fixed; a full command-position grammar is out of scope.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; the four F1 forms correlate again (bash-verified with a stub) with the narrowed class still rejecting real path-breaking syntax, F2 odd-backslash heads fixed, F3 residuals pinned, no regressions across the #337/#345/#352/#356/#358 matrix; the two docstring wording nits and the count were folded in (df84e44); 1270 tests + smoke 11/11 + CI pass; merged. This was the last open child of story-opencode2-hardening. Closing.

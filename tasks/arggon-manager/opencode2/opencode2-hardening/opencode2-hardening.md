@@ -1,6 +1,6 @@
 ---
 type: story
-status: todo
+status: done
 id: opencode2-hardening
 title: OpenCode2 hardening backlog
 parent: opencode2
@@ -33,11 +33,11 @@ hardening (probe marker assertions, batching checks, A/B export guard).
 
 ## Acceptance
 
-- [ ] Every child item's acceptance checklist is complete and the tree
+- [x] Every child item's acceptance checklist is complete and the tree
       validates clean; items are closed only on their own merits (never
       bulk-waived).
-- [ ] `arggon validate` green; no finding from the wave reviews is untracked.
-- [ ] The V2 playbook records anything learned while closing the backlog (e.g.
+- [x] `arggon validate` green; no finding from the wave reviews is untracked.
+- [x] The V2 playbook records anything learned while closing the backlog (e.g.
       the import gotcha re-verification on the next 2.x).
 
 ## Notes
