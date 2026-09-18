@@ -2,7 +2,7 @@
 plan_id: opencode2-009
 title: Plan for OpenCode2 complete refactor
 spec: docs/specs/spec-opencode2-009.md
-status: proposed
+status: implemented
 created: 2026-09-18
 ---
 
@@ -167,6 +167,17 @@ W7 closes the program on that branch.
 - **Acceptance:** before/after table with method and dates; no regression above
   the agreed bound on any wave; regressions fixed or explicitly waived with
   rationale.
+- **Recorded evidence (2026-09-18, `task-opencode2-context` / PR #329):**
+  reproducible report `npm run context:report [--strict]` (report-only, no model
+  calls; bytes/4 token heuristic). Fixed per-session surface ≈12,852 B
+  (≈3,213 tok): generated `AGENTS.md` 1,863 B (≤2,048 B test-enforced), skill
+  entries 500 B, agent descriptions 393 B, live MCP `tools/list` 10,096 B
+  (9 tools; under the 12,288 B advisory, +1,056 B/+11.7% vs the 9,040 B baseline
+  at commit `5d6c504`). Injected item block 193–252 B measured (≤1,024 B bound);
+  compaction `keep.tokens` kept at 15,000 (V2 default). W5 skill split:
+  21,955 B always-loaded before → 9,518 B umbrella + 15,479 B `references/` on
+  demand (−57% on load). W1–W5 per-wave captures were impossible (W6 ran last);
+  the item documents that deviation and the reconstruction honestly.
 
 ## T16: W7 — Dogfood and release
 
