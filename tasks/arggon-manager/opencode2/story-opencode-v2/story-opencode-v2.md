@@ -48,12 +48,12 @@ as needed.
 - [x] W3 — session context: item correlation, bounded injection, rename,
       hygiene signal, MCP `_meta.sessionID` attribution
       (task-opencode-v2-plugin, task-opencode-v2-mcp-meta).
-- [ ] W4 — orchestration: coordinator/worker/reviewer agents, review + done
+- [x] W4 — orchestration: coordinator/worker/reviewer agents, review + done
       commands, permission probes, scripted end-to-end wave
       (task-opencode2-orchestration).
 - [x] W5 — methodology commands + skill progressive disclosure with parity tests
       (task-opencode2-methodology).
-- [ ] W6 — measured context/token optimization with before/after evidence
+- [x] W6 — measured context/token optimization with before/after evidence
       (task-opencode2-context).
 - [ ] W7 — dogfood + release: this repo self-hosts the surface, upgrade path
       proven, docs current, spec/plan flipped `implemented`, program PR merged

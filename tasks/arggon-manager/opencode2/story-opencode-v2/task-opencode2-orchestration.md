@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode2-orchestration
 title: "Orchestration on OpenCode V2: coordinator, workers, waves"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p1
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T02:50:47.555Z"
 depends_on: [task-opencode-v2-spec, task-opencode-v2-plugin]
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-orchestration
 ---
@@ -33,24 +32,24 @@ agents, commands and flows — same rules, better runtime primitives
 
 ## Acceptance
 
-- [ ] Generated agents: `arggon-coordinator` (primary; wave planning, review,
+- [x] Generated agents: `arggon-coordinator` (primary; wave planning, review,
       merge verification, tracker ownership), `arggon-worker` (subagent; one
       item, own worktree, reports findings instead of filing), `arggon-reviewer`
       (subagent; edits denied through permissions, reads/tests allowed, encodes
       the review bar + smoke gate from engineering.md).
-- [ ] Commands: `/arggon-review` (reviewer verdict with smoke evidence, verdict
+- [x] Commands: `/arggon-review` (reviewer verdict with smoke evidence, verdict
       posted via `arggon comment`) and `/arggon-done` (verify checklist + gates,
       then `update --status done`); `agent`/`subagent` frontmatter correct.
-- [ ] Subagent permission probes: a worker is denied `subagent` launches
+- [x] Subagent permission probes: a worker is denied `subagent` launches
       (no nesting beyond one); the reviewer is denied `edit`; the coordinator
       can launch only the worker/reviewer ids (allow-list), verified with
       evidence.
-- [ ] End-to-end scripted wave on a fixture with a local bare remote: two
+- [x] End-to-end scripted wave on a fixture with a local bare remote: two
       file-disjoint items, two background workers with separate worktrees,
       reviewer verdict, coordinator merge verification; transcript as evidence.
-- [ ] Context accounting for the run recorded (feeds task-opencode2-context):
+- [x] Context accounting for the run recorded (feeds task-opencode2-context):
       per-worker prompt/tool token estimate before and after the item block.
-- [ ] Docs: orchestration section of `docs/agents.md` updated to describe the
+- [x] Docs: orchestration section of `docs/agents.md` updated to describe the
       V2 flow as the reference implementation (rules unchanged).
 
 ## Notes
@@ -96,3 +95,6 @@ Branch `feat/task-opencode2-orchestration`. All gates green: full suite 69 files
 
 ### 2026-09-18 @Arggon
 PR: https://github.com/Arggon/ArggonManager/pull/330 (draft, base `opencode2`).
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; the reviewer re-ran smoke:opencode:wave (2 fixtures/0 failures) and cross-checked the retained session exports byte-for-byte (two subagent launches in 1 step, distinct worktrees, verdicts on items, local merges + done, validate green; A/B +96 fresh input tokens for a 324 B item block); reviewer deny-subagent template fix verified. Findings 1-4 filed as task-opencode2-orchestration-hardening. Closing.

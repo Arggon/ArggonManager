@@ -41,6 +41,7 @@ cannot run ArggonManager's own work loop, the program is not done.
       `docs/agents.md`, `docs/json-output.md` reflect shipped behavior;
       `spec-opencode2-009` and `plan-opencode2-009` statuses flipped to
       `implemented` in the same PR.
+- [ ] Context budgets re-checked per task-opencode2-context (MCP tools/list within the 12,288 B advisory; context:report --strict green).
 - [ ] Gates green: `arggon validate`, `arggon spec validate`, `arggon doctor`,
       full test suite, `npm run smoke:opencode` harness.
 - [ ] Program close-out PR on `opencode2` references epic `opencode2` and the

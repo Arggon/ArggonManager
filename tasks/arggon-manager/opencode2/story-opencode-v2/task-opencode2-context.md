@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode2-context
 title: Context and token optimization for V2 runtime
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T03:15:43.469Z"
 depends_on: [task-opencode-v2-plugin]
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-context
 ---
@@ -33,18 +32,18 @@ evidence instead of intuition.
 
 ## Acceptance
 
-- [ ] Measurement method documented and reproducible: `doctor --budget`
+- [x] Measurement method documented and reproducible: `doctor --budget`
       surfaces plus a scripted count of V2 system-prompt contributions
       (AGENTS.md text, advertised skill ids/descriptions, agent prompts, MCP
       tool schemas, injected item block) on a fixture repo.
-- [ ] Baseline captured before each wave lands (W1–W5) and after; a results
+- [x] Baseline captured before each wave lands (W1–W5) and after; a results
       table inside this item's Notes with method, dates and numbers.
-- [ ] Tuning applied where the numbers justify it: skill description/bodies,
+- [x] Tuning applied where the numbers justify it: skill description/bodies,
       agent prompt lengths, item-block bound, compaction `keep.tokens` in the
       generated config, Code Mode batching guidance for coordinators.
-- [ ] No dimension regresses beyond the agreed bound; any waived regression has
+- [x] No dimension regresses beyond the agreed bound; any waived regression has
       an explicit rationale and a follow-up item.
-- [ ] Findings that affect docs (README, playbook, agents.md) updated in the
+- [x] Findings that affect docs (README, playbook, agents.md) updated in the
       same PR.
 
 ## Notes
@@ -144,3 +143,6 @@ W6 draft PR: https://github.com/Arggon/ArggonManager/pull/329 (base opencode2). 
 ### handoff 2026-09-18 @Arggon — next: Coordinator: review draft PR #329 (report script + numbers + playbook budgets docs). Verify the reused bound constants, the before/after reconstruction and the gate results; if accepted, merge to ope…
 - branch: feat/task-opencode2-context
 - open questions: Per-wave baselines for W1-W5 were impossible (W6 ran last); reconstructed pre-W5 skill + cited earlier measurements instead. MCP tools/list grew +11.7% vs the baseline commit `5d6c504` (9,040 B) but stays under the …
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; F2 baseline corrected to the reproducible 9,040 B (+1,056 B/+11.7% vs 5d6c504) and F3 notes fixed in 207f08a; report-only verified (hash-identical tree), numbers spot-checked independently; merged with cli pass. F4-F7 filed as task-opencode2-context-polish. Closing.
