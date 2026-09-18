@@ -6,7 +6,7 @@ import { failEnvelope, successEnvelope } from "./json.js";
 import { ITEM_TYPES } from "./ids.js";
 import { runCreate } from "./create.js";
 import { runComment } from "./comment.js";
-import { runHandoff } from "./handoff.js";
+import { HANDOFF_SESSION_CAP, runHandoff } from "./handoff.js";
 import { runList } from "./list.js";
 import { runNext } from "./next.js";
 import { runReport } from "./report.js";
@@ -31,9 +31,14 @@ import { arggonVersion } from "./docs.js";
  * made on behalf of a session (https://opencode.ai/v2/docs/mcp-servers/). The
  * server uses it as the DEFAULT `session` for arggon_handoff and the DEFAULT
  * `author` for arggon_comment/arggon_handoff; explicit tool arguments always
- * win. It is opaque correlation metadata only — never authentication or
- * authorization, never logged, and it triggers no state transitions (the
- * shared rules module stays the only path for updates).
+ * win. The value is normalized once at the boundary
+ * (task-opencode-v2-mcp-meta-hardening): a single-line token cut at the first
+ * whitespace/control/format character and capped at `HANDOFF_SESSION_CAP` (64)
+ * with `…`, so every consumer inherits the bound and a crafted value can never
+ * inject a heading line or an unbounded author. It is opaque correlation
+ * metadata only — never authentication or authorization, never logged, and it
+ * triggers no state transitions (the shared rules module stays the only path
+ * for updates).
  */
 
 const SUPPORTED_PROTOCOL_VERSIONS = ["2024-11-05", "2025-03-26", "2025-06-18"] as const;
@@ -241,7 +246,7 @@ const TOOLS: ToolDefinition[] = [
         author: {
           type: "string",
           description:
-            "author login (optional; default: @me resolution — GITHUB_USER, then GITHUB_ACTOR, then `gh api user`)",
+            "author login (optional; explicit non-empty value wins; default: the normalized `_meta.sessionID` when the client sends one — single line, capped at 64 chars — else @me resolution: GITHUB_USER, then GITHUB_ACTOR, then `gh api user`)",
         },
       },
       required: ["id", "text"],
@@ -271,12 +276,12 @@ const TOOLS: ToolDefinition[] = [
         session: {
           type: "string",
           description:
-            "session identifier for provenance, rendered in the heading (optional; capped at 64 chars)",
+            "session identifier for provenance, rendered in the heading (optional; explicit non-empty value wins; default: the normalized `_meta.sessionID` — single line, capped at 64 chars)",
         },
         author: {
           type: "string",
           description:
-            "author login (optional; default: @me resolution — GITHUB_USER, then GITHUB_ACTOR, then `gh api user`)",
+            "author login (optional; explicit non-empty value wins; default: the normalized `_meta.sessionID` when the client sends one — single line, capped at 64 chars — else @me resolution: GITHUB_USER, then GITHUB_ACTOR, then `gh api user`)",
         },
       },
       required: ["id", "next"],
@@ -730,25 +735,61 @@ function str(value: unknown): string | undefined {
 }
 
 /**
+ * Single-line token delimiter: any whitespace or control/format character.
+ * Session IDs are tokens (`ses_…`); everything from the first delimiter is
+ * dropped, so a crafted `_meta.sessionID` can never smuggle a second line or
+ * heading into an item body.
+ */
+const META_TOKEN_DELIMITER = /[\s\p{Cc}\p{Cf}]/u;
+
+/**
+ * Normalize the meta-derived session ID into a bounded single-line token:
+ * trim surrounding whitespace, cut at the first whitespace/control/format
+ * character, then cap at `HANDOFF_SESSION_CAP` (64) characters with `…` — the
+ * exact bound the handoff `session` field enforces. Returns undefined when the
+ * value normalizes to nothing (whitespace-only, control-only, empty), so
+ * consumers fall back to their normal defaults.
+ *
+ * Normalizing here (task-opencode-v2-mcp-meta-hardening, finding F1) means
+ * `comment.author` inherits the bound too — the comment kernel only trims its
+ * author — instead of forwarding a client-controlled 300-char value or a
+ * literal `\n### injected heading` line.
+ */
+function normalizeSessionID(value: string): string | undefined {
+  const token = value.trim().split(META_TOKEN_DELIMITER, 1)[0] ?? "";
+  if (!token) return undefined;
+  if (token.length > HANDOFF_SESSION_CAP) {
+    const marker = "…";
+    // The marker counts against the cap (same arithmetic as capSession in
+    // handoff.ts): the normalized value is never longer than the cap.
+    return token.slice(0, HANDOFF_SESSION_CAP - marker.length) + marker;
+  }
+  return token;
+}
+
+/**
  * Narrow `CallToolRequest.params._meta.sessionID` (OpenCode V2 session
  * context, https://opencode.ai/v2/docs/mcp-servers/) from `unknown`:
- * absent-safe — non-object `_meta`, non-string values and empty strings all
- * yield undefined. The raw value is returned as-is; the kernel owns its
- * semantics (handoff trims and caps it at HANDOFF_SESSION_CAP). This is
- * correlation metadata only, never an authentication/authorization signal.
+ * absent-safe — non-object `_meta`, non-string values and values that
+ * normalize to empty all yield undefined. The returned value is already
+ * normalized (single-line token, HANDOFF_SESSION_CAP bound), so every
+ * downstream consumer — handoff `session` and `author`/`comment` `author`
+ * alike — inherits the invariant. This is correlation metadata only, never an
+ * authentication/authorization signal.
  */
 function sessionIDFromMeta(params: Record<string, unknown>): string | undefined {
   const meta: unknown = params._meta;
   if (typeof meta !== "object" || meta === null) return undefined;
   const value: unknown = (meta as Record<string, unknown>).sessionID;
-  if (typeof value !== "string" || value.trim() === "") return undefined;
-  return value;
+  if (typeof value !== "string") return undefined;
+  return normalizeSessionID(value);
 }
 
 /**
  * Precedence for the attributed defaults: an explicit non-empty tool argument
  * always wins; empty/whitespace-only arguments count as absent — matching how
- * the comment/handoff kernels treat them — and fall back to `_meta.sessionID`.
+ * the comment/handoff kernels treat them — and fall back to `_meta.sessionID`
+ * (already normalized/capped by sessionIDFromMeta).
  */
 function explicitOrMeta(
   explicit: string | undefined,
