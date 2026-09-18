@@ -1,15 +1,18 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-convention-config-scalar-unescape
 title: Convention config scalar parsing leaves backslashes raw (x-generated.projectName doubles on rewrite)
+assignee: Arggon
+branch: fix/bug-convention-config-scalar-unescape
 parent: story-tracker-hygiene
 labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T22:49:57.652Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-convention-config-scalar-unescape
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tracker-hygiene/bug-convention-config-scalar-unescape.md
   Leaves live only under a story. id is the filename stem: bug-convention-config-scalar-unescape.
