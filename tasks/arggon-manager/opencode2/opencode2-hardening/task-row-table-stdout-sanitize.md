@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-row-table-stdout-sanitize
 title: "Row/table success stdout: sanitize repo-controlled columns (list, show, report, adopt, playbooks status, spec audit, tui)"
+assignee: Arggon
+branch: feat/task-row-table-stdout-sanitize
 parent: opencode2-hardening
 labels: []
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T21:57:38.236Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-row-table-stdout-sanitize
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/opencode2-hardening/task-row-table-stdout-sanitize.md
   Leaves live only under a story. id is the filename stem: task-row-table-stdout-sanitize.
