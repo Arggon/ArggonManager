@@ -76,15 +76,48 @@ function capField(value: string | undefined): string | undefined {
   return trimmed;
 }
 
-/** Cap the session identifier at HANDOFF_SESSION_CAP; undefined when empty. */
+/**
+ * Unicode code point class `Cs` under the `u` flag matches only lone/unpaired
+ * surrogates — a valid pair is a single astral code point and never matches.
+ */
+const LONE_SURROGATE = /\p{Cs}/gu;
+
+/**
+ * Cap the session identifier at HANDOFF_SESSION_CAP; undefined when empty.
+ *
+ * Surrogate-safety (task-handoff-explicit-session-surrogate): an explicit
+ * `--session` value is caller-supplied UTF-16 that may be malformed, while the
+ * handoff body is written as UTF-8 — a lone surrogate cannot round-trip (the
+ * write emits U+FFFD instead of the surrogate). Two guards keep the rendered
+ * token clean without touching the ordinary path:
+ *
+ * 1. Lone surrogates anywhere in the value are dropped before capping — the
+ *    value is caller-controlled, so unlike the meta path in `mcp-server.ts`
+ *    there is no delimiter cut to remove them; dropping them (rather than
+ *    cutting at the first one) keeps every valid code point the caller sent.
+ *    A value left empty by the drop counts as absent, like
+ *    `normalizeSessionID`'s normalize-to-empty.
+ * 2. When the 64-code-unit cut would land inside a surrogate pair, it backs
+ *    off one unit and drops the pair whole (same pattern as
+ *    `normalizeSessionID`), so the cut itself never manufactures a lone
+ *    surrogate. The marker counts against the cap: the rendered token is at
+ *    most HANDOFF_SESSION_CAP code units.
+ */
 function capSession(value: string | undefined): string | undefined {
   const trimmed = capField(value);
   if (!trimmed) return undefined;
-  if (trimmed.length > HANDOFF_SESSION_CAP) {
+  const token = trimmed.replace(LONE_SURROGATE, "");
+  if (!token) return undefined;
+  if (token.length > HANDOFF_SESSION_CAP) {
     const marker = "…";
-    return trimmed.slice(0, HANDOFF_SESSION_CAP - marker.length) + marker;
+    let end = HANDOFF_SESSION_CAP - marker.length;
+    const last = token.charCodeAt(end - 1);
+    // High surrogate at the cut: the low half is its pair (lone surrogates
+    // were dropped above), so back off one unit to drop both.
+    if (last >= 0xd800 && last <= 0xdbff) end -= 1;
+    return token.slice(0, end) + marker;
   }
-  return trimmed;
+  return token;
 }
 
 /**
