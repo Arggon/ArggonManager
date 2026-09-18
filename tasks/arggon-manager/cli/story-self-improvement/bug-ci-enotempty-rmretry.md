@@ -34,13 +34,64 @@ child keeps writing into `.git` longer than ~2.75 s.
 
 ## Acceptance
 
-- [ ] Root cause identified with evidence (which child writes `.git` after the
+- [x] Root cause identified with evidence (which child writes `.git` after the
       test body returns; why >~2.75 s under CI load).
-- [ ] Deterministic mitigation (e.g. settle/kill the child before removal, or a
+- [x] Deterministic mitigation (e.g. settle/kill the child before removal, or a
       longer/adaptive retry window) with a stress repro.
-- [ ] Link the failing run; no reopen of the done flake item (this is a new
+- [x] Link the failing run; no reopen of the done flake item (this is a new
       instance under the hardened helper).
 
 ## Notes
 
 - CI-only; local runs have not reproduced it since the retry helper landed.
+
+### 2026-09-18 @Arggon
+## Root cause (bug-ci-enotempty-rmretry)
+
+**Writer.** `git commit`/`git merge` spawn a detached
+`git maintenance run --auto --quiet --detach` child. Verified with
+`GIT_TRACE2_EVENT` on a fixture-like repo: the commit's own trace2 stream
+carries `"child_start" ... "argv":["git","maintenance","run","--auto","--quiet","--detach"]`.
+`maintenance_run_tasks()` (git `builtin/gc.c`) takes the repo lock
+`.git/objects/maintenance.lock` **before** `daemonize()` and rolls it back only
+after the background tasks, so the lock is held for the daemon's whole
+lifetime; under CI CPU starvation that lifetime can exceed the retry window.
+
+**Why the ~2.75s retry window cannot cover it.** Node 22's recursive `rmSync`
+(`internal/fs/rimraf.js`, `_rmdirSync`) removes a directory's children ONCE and
+then only re-tries the bare `rmdir` (maxRetries x retryDelay = 10 x 50ms with
+`RM_RETRY`); it never re-reads the children. An entry that arrives after that
+single children pass — the daemon's held/recreated lock — is invisible to every
+remaining attempt, and the error surfaces as the ENOTEMPTY `rmdir` on `.git`.
+
+## Evidence
+
+- Failing run: https://github.com/Arggon/ArggonManager/actions/runs/35401030576
+  (attempt 1, `cli/src/worktree.test.ts:35`,
+  `ENOTEMPTY rmdir '/tmp/arggon-worktree-vtFOi8/.git'`; attempt 2 passed).
+- trace2 control: plain `git commit` → `child_start` for
+  `maintenance run --auto`; same commit with `maintenance.auto=false` → no
+  child at all. Pinned in `cli/src/test-tmp.test.ts`.
+- Node 22 race harness (16 tight-loop writers recreating `.git` entries during
+  teardown; `/usr/bin/node` v22.23.2, same major as CI): old rmSync-only helper
+  throws **19/20** `ENOTEMPTY rmdir '<fixture>/.git'` at ~2.75s (30/30 on the
+  `.git/objects` variant); the new `removeFixtureTree` settles **0/20**.
+- In-suite stress repro: 4 parallel worker processes x 2 worktree-style
+  workloads (init / commit / merge / worktree add+remove) under 4 CPU loaders:
+  every teardown clean and every trace free of maintenance children.
+- Suite: `npm test` 76 files / 1265 tests passed (private TMPDIR);
+  `npm run lint` clean; `npm run build` clean; `arggon validate` ok 0/0;
+  `arggon spec validate` ok (16 docs, 0 warnings).
+
+## Mitigation
+
+1. Fixture repos opt out: `disableAutoMaintenance(dir)` (right after
+   `git init`, before the first commit) in `worktree.test.ts` and
+   `tracker-commit.test.ts` — with `maintenance.auto=false` commit/merge spawn
+   no detached child, so the writer never exists.
+2. `removeFixtureTree` now re-reads the tree from scratch on retriable errors
+   (short inner window, 15s deadline), so a late writer from any other source
+   is settled instead of being retried with bare rmdirs.
+
+No reopen of `bug-tracker-commit-enotempty-flake` (done); this is a new instance
+under the hardened helper.
