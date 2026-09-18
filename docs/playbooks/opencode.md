@@ -27,14 +27,31 @@ or the V1 schema for V2 work.
   never overwriting modified files (contract:
   [spec-opencode-seam-010](../specs/spec-opencode-seam-010.md)).
 - `arggon init` also bundles the optional plugin at
-  `.opencode/plugins/arggon/index.ts` (auto-discovered, zero config): it
-  registers `mcp.servers.arggon` (`{type:"local",command:["arggon","mcp"]}`)
-  **only when no `arggon` server is configured** and never clobbers one; it is
+  `.opencode/plugins/arggon/index.ts` (auto-discovered, zero config). It is
   dependency-free (no local `node_modules`) and failure-isolated (every path
-  logs once and no-ops, never breaking a session/CLI/MCP). W2 scope:
-  MCP auto-registration only — session↔item context is W3. Evidence harness:
-  `npm run smoke:opencode` (real headless `opencode run`; exits 0 with
-  `skipped: opencode not installed` when absent).
+  logs once and no-ops, never breaking a session/CLI/MCP). Ambient behavior
+  only — no rule logic, no native tools:
+  - **W2** — registers `mcp.servers.arggon`
+    (`{type:"local",command:["arggon","mcp"]}`) **only when no `arggon` server
+    is configured** and never clobbers one.
+  - **W3 session context** — resolves the session's active item in this order:
+    `ARGON_ITEM` env override → item ids observed from `arggon` invocations
+    (shell commands, `arggon_*` MCP calls, Code Mode code) stored per session
+    via `ctx.storage` → VCS branch (`feat/<id>` / `fix/<id>`). The branch read
+    uses `ctx.vcs.get()` first and falls back to `git rev-parse --abbrev-ref
+    HEAD` (probe: on 2.0.7 `vcs.get()` returns an empty `data.branch`), both
+    `execFile` argument arrays. On every agent-loop model call it appends a
+    bounded advisory block (`arggon show <id> --meta --json`, **≤ 1024 UTF-8
+    bytes**, cached ~5 s) through `session.hook("context")` — per-call
+    injection, so the block is present again after compaction. A claimed item
+    (`in_progress` + assignee) renames the session to the item id
+    (`ctx.session.update` on 2.0.7, where `ctx.session.rename` is absent);
+    a recorded `worktree_path` is surfaced for `session_move` guidance. After a
+    shell `git commit` it runs `arggon validate --json` and logs a warning on
+    failure — never blocking; pre-commit/CI stay authoritative. No `tasks/`
+    tree, no resolution, no CLI → the hook is silent. Evidence harness:
+    `npm run smoke:opencode` (real headless `opencode run`; exits 0 with
+    `skipped: opencode not installed` when absent).
 - MCP (https://opencode.ai/v2/docs/mcp-servers/): V2 does not use `.mcp.json`
   as a registration mechanism — register the server under `mcp.servers` as
   `{ "type": "local", "command": ["arggon", "mcp"] }`; the generated
@@ -69,6 +86,12 @@ or the V1 schema for V2 work.
   `.md` discovered; project files replace same-named global commands). Generated
   prompts drive the `arggon` CLI/MCP; they never restate the rules
   (https://opencode.ai/v2/docs/agents/, https://opencode.ai/v2/docs/commands/).
+- Session context is **advisory and bounded**: the plugin injects at most one
+  ≤ 1024-byte item block per model call (never the comment tail), `ARGON_ITEM`
+  is read per call, and every surface is feature-detected — on 2.0.7
+  `ctx.session.rename` and `ctx.vcs.branches` are absent, so the plugin uses
+  `ctx.session.update` and `git` respectively. The tracker, pre-commit and CI
+  remain the only authority; a missing surface degrades to a no-op.
 
 ## Testing
 
@@ -82,8 +105,17 @@ or the V1 schema for V2 work.
   and `arggon_next` resolves the next claimable item. Transcripts are the review
   evidence (ADR 0008 spirit); `npm run smoke:opencode` scripts it headless on
   temp fixtures (plugin load, MCP auto-registration + usability, never-clobber,
-  failure isolation, plugin-absent CLI/MCP) and exits 0 with
-  `skipped: opencode not installed` when the binary is absent.
+  failure isolation, plugin-absent CLI/MCP, and — W3 — item-block injection
+  bounded to 1024 B from a `feat/<id>` branch, correlation from an observed
+  `arggon_show` call, the `ARGON_ITEM` override, silence when nothing resolves
+  or there is no `tasks/`, session rename, and the failing-`validate` commit
+  warning) and exits 0 with `skipped: opencode not installed` when the binary
+  is absent. The plugin's pure parsers/block builder are unit-tested without
+  OpenCode next to the source (`opencode/plugins/arggon/index.test.ts`, run by
+  the suite via the `opencode/**/*.test.ts` vitest include). Compaction cannot
+  be forced deterministically headless; the closest evidence is that the
+  injection fires per model call (a later call in the same session gets the
+  block again).
 
 ## Security
 

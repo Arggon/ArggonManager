@@ -50,12 +50,12 @@ is optional and failure-isolated.
       smoke:opencode`) asserting skill discovery, agents/commands visibility,
       MCP registration, context injection and a full next → start → done cycle
       on a fixture; transcripts stored as review evidence.
-- [ ] **Session correlation + context (W3):** resolves the active item from
+- [x] **Session correlation + context (W3):** resolves the active item from
       observed `arggon` calls (storage map), VCS branch fallback and env
       override; injects a bounded `arggon show --json`-shaped block through
       `session.hook("context")`; present after compaction (per-call injection);
       measured block size within the documented bound.
-- [ ] **Session ergonomics + hygiene (W3):** renames the session to the claimed
+- [x] **Session ergonomics + hygiene (W3):** renames the session to the claimed
       item id; surfaces the worktree path for `session_move` guidance;
       optional warning on failing `arggon validate --json` after a shell commit
       (never blocking; pre-commit/CI stay authoritative).
@@ -113,3 +113,35 @@ Key log/transcript lines: `msg="loading plugin" id=<fixture>/.opencode/plugins/a
 ### handoff 2026-09-18 @Arggon — next: Coordinator review of draft PR #325 (W2). On approval: merge to opencode2; W3 (T9-T10) starts then on this item's plugin source: session<->item correlation + bounded context injection + session renam…
 - branch: feat/task-opencode-v2-plugin
 - open questions: @opencode/plugin static import fails on 2.0.7 without node_modules (guarded dynamic import used; follow-up item?); smoke harness model defaults to opencode-go/deepseek-v4-flash via OPENCODE_SMOKE_MOD…
+
+### 2026-09-18 @Arggon
+### 2026-09-18 @Arggon — W3 complete (plan-opencode2-009 T9–T10), draft PR #327
+W3 landed on `feat/task-opencode-v2-plugin`; PR: https://github.com/Arggon/ArggonManager/pull/327. Item stays `in_progress` for coordinator review (no merge, no done flip).
+
+**Deliverables**
+- `opencode/plugins/arggon/index.ts` — W2 MCP auto-registration unchanged; W3 adds: item resolution (`ARGON_ITEM` env → per-session `ctx.storage` map set from observed tool executions — shell `arggon show|update|comment|handoff|branch|start`, `arggon_*` MCP calls, Code Mode `execute` code — → VCS branch `feat/<id>`/`fix/<id>`); bounded injection via `session.hook("context")` from `arggon show <id> --meta --json` (`execFile` arg array), cached 5 s, block ≤ **1024 B** (per-field clipping + line-bound truncation), marker-deduped per call; session rename on claim (`ctx.session.update({sessionID,title})` on 2.0.7, where `ctx.session.rename` is absent); `worktree_path` surfaced as `session_move` guidance; after a shell `git commit`, `arggon validate --json` failure logs a bounded warning (never blocking). Every path try/catch + log-once; no `tasks/`, no resolution or no CLI → silent.
+- `opencode/plugins/arggon/index.test.ts` — 14 unit tests for the pure helpers. Placed next to the plugin (not `cli/src`): `tsc` rootDir is `cli/src` and the plugin must stay out of the CLI build graph (TS6059; no `@opencode/plugin` types by design). `vitest.config.ts` includes `opencode/**/*.test.ts`; rationale documented in the test header.
+- `smoke/opencode-smoke.ts` — 6 new headless scenarios (11 total): branch injection + rename, storage-map correlation on a non-matching branch, `ARGON_ITEM`, silence when nothing resolves, silence without `tasks/`, post-commit validate warning. W2's 5 scenarios stay green; skip path intact; still out of `npm test`.
+- `docs/playbooks/opencode.md` — W3 behavior (bounded, optional, degraded) + 2.0.7 probes.
+
+**2.0.7 probe (real sessions, `--print-logs`)**
+- `ctx.session.hook("context")` present; event `{sessionID, model, system[], messages, options, agent, tools}`; pushing a text part into `system` reaches the model.
+- `ctx.tool.hook("execute.before"/"execute.after")` present; shell event `{tool:"shell",sessionID,agent,messageID,id,input:{command},status:"completed",result}`.
+- `ctx.storage.{get,set,remove,scan}` present (roundtrip + scan verified).
+- `ctx.session.rename` **absent** → `ctx.session.update({sessionID,title})` performs the rename (title persisted, verified via `opencode session list`); `ctx.session.get`/`move` present.
+- `ctx.vcs.get()` returns `{location, data:{branch:{}}}` — empty branch even with remotes; `ctx.vcs.branches` absent (`ctx.vcs.branch.list()` has no "current") → `git rev-parse --abbrev-ref HEAD` fallback.
+- `ctx.shell.hook("create.before")` present (unused: `execute.after` covers the commit check).
+
+**Measured block size:** 181–204 B (bound 1024 B; ≈ 45–51 tokens at 4 chars/token). Exact lines: `[arggon] context: injected item task-smoke-item (204 bytes)`; `[arggon] session renamed to task-smoke-item`; `[arggon] validate failed after git commit: 1 error(s); first: unknown status 'nope'`.
+
+**Compaction:** cannot be forced deterministically headless; the hook fires per agent-loop model call (scenario 7 shows the block on a later call of the same session), so the post-compaction call re-injects by construction — documented in smoke header + playbook.
+
+**Smoke run (`npm run smoke:opencode`, v2.0.7):** `smoke:opencode passed — 11 scenarios, 0 failures` (W2 5/5 green). Transcripts: each fixture's `.smoke-evidence/` (fixtures kept with `ARGON_SMOKE_KEEP=1`).
+
+**Gates:** build ok · `npm test` 69 files / 1094 tests passed · `npm run lint` ok · `arggon validate` ok (0 warnings) · `arggon spec validate` ok.
+
+**docs/agents.md — not edited on purpose (other W3 worker owns it):** §OpenCode V2 (~line 284) still says "W2 scope: MCP auto-registration only; session↔item context is W3"; replace with the W3 behavior (bounded ≤1024 B context injection via `session.hook("context")`, correlation order env/storage/branch, rename on claim, non-authoritative post-commit warning).
+
+### handoff 2026-09-18 @Arggon — next: Coordinator: review draft PR #327 (W3 T9-T10; W2 scenarios kept green). Verify plugin thinness, the 1024 B bound, silent paths. If accepted: merge to opencode2, verify, then W4 (T12).
+- branch: feat/task-opencode-v2-plugin
+- open questions: docs/agents.md W3 paragraph owned by the MCP-meta worker (reported, not edited); ARGON_ITEM env name follows the task text (ARGON vs Arggon); compaction not forceable headless (per-call injection evi…
