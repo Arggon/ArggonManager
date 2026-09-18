@@ -13,8 +13,9 @@ import { runComment, type CommentResult } from "./comment.js";
  * touched, tracker auto-commit), so a handoff is history like a comment — it
  * works on done/cancelled items and is not a reopen. Bounded by construction
  * (token-context principle: structured + bounded beats prose): every field is
- * capped at `HANDOFF_FIELD_CAP` (200) characters and the whole section is at
- * most 3 capped lines plus the heading (< ~800 chars with a typical login).
+ * capped at `HANDOFF_FIELD_CAP` (200) UTF-16 code units, surrogate-safely (an
+ * astral pair at the cut is never split), and the whole section is at most 3
+ * capped lines plus the heading (< ~800 chars with a typical login).
  * Kernel failures reuse `COMMENT_FAILED` — the failure surface (unknown id,
  * unresolvable author, lock contention) is the comment kernel's.
  */
@@ -63,18 +64,8 @@ export type HandoffResult = CommentResult & {
   };
 };
 
-/** Trim and cap one field; returns undefined for empty input. */
-function capField(value: string | undefined): string | undefined {
-  const trimmed = value?.trim();
-  if (!trimmed) return undefined;
-  if (trimmed.length > HANDOFF_FIELD_CAP) {
-    const marker = "…";
-    // The marker counts against the cap: the rendered field is never longer
-    // than HANDOFF_FIELD_CAP characters.
-    return trimmed.slice(0, HANDOFF_FIELD_CAP - marker.length) + marker;
-  }
-  return trimmed;
-}
+/** The truncation marker; counts against the cap. */
+const MARKER = "…";
 
 /**
  * Unicode code point class `Cs` under the `u` flag matches only lone/unpaired
@@ -83,41 +74,56 @@ function capField(value: string | undefined): string | undefined {
 const LONE_SURROGATE = /\p{Cs}/gu;
 
 /**
+ * Bound one non-empty token to `cap` UTF-16 code units, marker included.
+ * Shared by every handoff field (`capField`) and the session identifier
+ * (`capSession`).
+ *
+ * Surrogate-safety (task-handoff-explicit-session-surrogate, extended to all
+ * fields by task-handoff-field-cap-surrogate): field values are caller-supplied
+ * UTF-16 that may be malformed, while the handoff body is written as UTF-8 — a
+ * lone surrogate cannot round-trip (the write emits U+FFFD instead of the
+ * surrogate). Two guards keep the rendered token clean without touching the
+ * ordinary path:
+ *
+ * 1. Lone surrogates anywhere in the token are dropped before capping. The
+ *    value is caller-controlled, so there is no delimiter cut to remove them;
+ *    dropping them (rather than cutting at the first one) keeps every valid
+ *    code point the caller sent. A token left empty by the drop counts as
+ *    absent, like `normalizeSessionID`'s normalize-to-empty.
+ * 2. When the cut would land between the halves of a valid pair, it backs off
+ *    one unit and drops the pair whole (same pattern as `normalizeSessionID`),
+ *    so the cut itself never manufactures a lone surrogate. The marker counts
+ *    against the cap: the rendered token is at most `cap` code units.
+ */
+function capUnits(token: string, cap: number): string {
+  const clean = token.replace(LONE_SURROGATE, "");
+  if (clean.length <= cap) return clean;
+  let end = cap - MARKER.length;
+  const last = clean.charCodeAt(end - 1);
+  // High surrogate at the cut: the low half is its pair (lone surrogates
+  // were dropped above), so back off one unit to drop both.
+  if (last >= 0xd800 && last <= 0xdbff) end -= 1;
+  return clean.slice(0, end) + MARKER;
+}
+
+/**
+ * Trim and cap one field; returns undefined for empty input (or input left
+ * empty by dropping lone surrogates).
+ */
+function capField(value: string | undefined): string | undefined {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  return capUnits(trimmed, HANDOFF_FIELD_CAP) || undefined;
+}
+
+/**
  * Cap the session identifier at HANDOFF_SESSION_CAP; undefined when empty.
- *
- * Surrogate-safety (task-handoff-explicit-session-surrogate): an explicit
- * `--session` value is caller-supplied UTF-16 that may be malformed, while the
- * handoff body is written as UTF-8 — a lone surrogate cannot round-trip (the
- * write emits U+FFFD instead of the surrogate). Two guards keep the rendered
- * token clean without touching the ordinary path:
- *
- * 1. Lone surrogates anywhere in the value are dropped before capping — the
- *    value is caller-controlled, so unlike the meta path in `mcp-server.ts`
- *    there is no delimiter cut to remove them; dropping them (rather than
- *    cutting at the first one) keeps every valid code point the caller sent.
- *    A value left empty by the drop counts as absent, like
- *    `normalizeSessionID`'s normalize-to-empty.
- * 2. When the 64-code-unit cut would land inside a surrogate pair, it backs
- *    off one unit and drops the pair whole (same pattern as
- *    `normalizeSessionID`), so the cut itself never manufactures a lone
- *    surrogate. The marker counts against the cap: the rendered token is at
- *    most HANDOFF_SESSION_CAP code units.
+ * Shares `capUnits` with `capField`, so the two stay on one truncation policy.
  */
 function capSession(value: string | undefined): string | undefined {
-  const trimmed = capField(value);
+  const trimmed = value?.trim();
   if (!trimmed) return undefined;
-  const token = trimmed.replace(LONE_SURROGATE, "");
-  if (!token) return undefined;
-  if (token.length > HANDOFF_SESSION_CAP) {
-    const marker = "…";
-    let end = HANDOFF_SESSION_CAP - marker.length;
-    const last = token.charCodeAt(end - 1);
-    // High surrogate at the cut: the low half is its pair (lone surrogates
-    // were dropped above), so back off one unit to drop both.
-    if (last >= 0xd800 && last <= 0xdbff) end -= 1;
-    return token.slice(0, end) + marker;
-  }
-  return token;
+  return capUnits(trimmed, HANDOFF_SESSION_CAP) || undefined;
 }
 
 /**
