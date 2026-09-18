@@ -143,3 +143,11 @@ opencode.jsonc              skipped=true updated=false created=false root-dest-e
 - `npm run arggon --silent -- spec validate --json` → `{"ok":true,...}`.
 - `npx tsc -p tsconfig.json --noEmit` → clean; `npm run lint` (eslint .) → clean.
 - `proposalContent("opencode.jsonc", "0.3.0", "{\n  // c\n}\n")` probe → verbatim render, no HTML header.
+
+### 2026-09-18 @Arggon
+PR #322 fix verification — after push (ff08631):
+
+- `gh pr checks 322` before the CI trigger fix: `no checks reported on the 'feat/task-opencode-v2-spec' branch` (exit 1).
+- After: workflow run 35294337596 (`pull_request` on feat/task-opencode-v2-spec — the opencode2 trigger) ran the `cli` job to completion: **cli pass (2m1s)**. MAJOR-2 verified end-to-end.
+
+PR body updated with a "Review fixes" section. No status change (review fixes only).
