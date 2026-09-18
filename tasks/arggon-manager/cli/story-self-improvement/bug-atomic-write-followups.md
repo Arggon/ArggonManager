@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-atomic-write-followups
 title: "atomic-write follow-ups: .convention.yml torn-write exposure + guard/mode nits"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T16:15:12.599Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-atomic-write-followups
 ---
 <!--
@@ -87,3 +86,6 @@ init scaffold (`cli/src/init.ts`), `applyDocsPlan` state rewrite (`cli/src/docs.
 ### handoff 2026-09-18 @Arggon (session: ses_f4ab32848ffeGpWnbmCAv9mN9e) — next: Coordinator: review draft PR #344 (https://github.com/Arggon/ArggonManager/pull/344), merge into opencode2, then flip the item done (acceptance checklist is complete).
 - branch: fix/bug-atomic-write-followups
 - open questions: None blocking; F1 lock-scope extension deliberately deferred as a separate architecture item if cross-item lost updates are prioritized.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; the inode-capture guard was verified with fault-injection tests and the discrimination independently reproduced (post-fix torn 0/0/0; reverting the four source files yields 120/182/93 with 3 failing tests); mode preservation probed across 4 modes + umask defaults; all three .convention.yml sites delegate to writeFileAtomic and readers are untouched; no remaining direct writes; suite 1173/72 files with a private TMPDIR + CI green. Residual TOCTOU/symlink/read-only/fsync notes are documented and accepted. Closing.

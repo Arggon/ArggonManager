@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode2-plugin-nits
 title: "Plugin parsing nits: wrapper-prefixed invocations + playbook W3 bullet"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T16:15:21.510Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-plugin-nits
 ---
 <!--
@@ -41,13 +40,13 @@ Non-blocking findings from the independent review of PR #337
 
 ## Acceptance
 
-- [ ] Wrapper-prefixed / `$()` / newline-separated invocations correlate again
+- [x] Wrapper-prefixed / `$()` / newline-separated invocations correlate again
       (tests), or the docstring documents exactly which forms are best-effort.
-- [ ] Quoted-separator case eliminated or documented; the "quoted-string false
+- [x] Quoted-separator case eliminated or documented; the "quoted-string false
       positives eliminated" claim is precise.
-- [ ] Playbook W3 bullet updated with anchoring, cache bounds, and smoke
+- [x] Playbook W3 bullet updated with anchoring, cache bounds, and smoke
       measurement.
-- [ ] Full suite + `smoke:opencode` green; small PR to `opencode2`.
+- [x] Full suite + `smoke:opencode` green; small PR to `opencode2`.
 
 ## Notes
 
@@ -109,3 +108,6 @@ Gates on `d4969f1`: `npm test` → 70 files / 1166 tests pass; `npm run smoke:op
 
 ### handoff 2026-09-18 @Arggon (session: ses_f4ab32847ffe5hahI8SSkOw3Rh) — next: Review draft PR #345 (base opencode2): F1 wrapper/$()/newline correlation, F2 quoted separators, F4 playbook W3 bullet. Gates already green on d4969f1 (suite 1166, smoke 11/11, lint/build/validate). …
 - branch: feat/task-opencode2-plugin-nits
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; the 38-case matrix reproduced exactly (20 changed, 0 failures), depth cap ≤3, $() semantics correct (substitution correlates, quoted mention inert), #337 false-positive eliminations intact with 0 test deletions, playbook claims match code+smoke (11/11), gates green (1166). F-A/F-B/F-C/F-D filed as task-opencode2-plugin-parse-nits. Closing.
