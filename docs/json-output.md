@@ -183,7 +183,7 @@ The additive `opencode` block (task-opencode-v2-doctor) reports the OpenCode V2 
 
 Human output mirrors the block with one `opencode:` summary line (`config ... , seam N artifact(s), N bundled skill(s), MCP native | MCP only in .mcp.json | MCP not registered`) plus a `hint:` line per finding class (V1-shaped keys, `.mcp.json`-only registration). On non-initialized trees the line prints only when something is actually present.
 
-Human output is display-sanitized for terminal hygiene (bug-doctor-human-output-injection, additive): every untrusted value interpolated into a human line — the `git.remote` URL, the report `root` path, the `budgetError` message, and `opencode.v1` config keys — escapes C0 controls (ESC, newline), `U+007F`–`U+009F` (DEL/C1: 8-bit CSI/OSC introducers) and `U+2028`/`U+2029` as inert `\n`/`\uXXXX` text, and caps each raw value at `MAX_HUMAN_VALUE_CHARS` (200) characters **before** escaping (the `…` ellipsis is appended after the cut). Escaping expands each unsafe code point to at most 6 characters (`\uXXXX`), so one rendered value can reach `6 × (200 + 1)` = 1206 characters even though the raw value was capped at 200. Config-key tokens are JSON-quoted; paths and URLs keep their ordinary punctuation unquoted. Bidi/zero-width format characters are deliberately not escaped — they cannot emit a control sequence or forge a line, and doctor output is a report, not an injection boundary. The `--json` payload always keeps the raw, uncapped value; this is display only.
+Human output is display-sanitized for terminal hygiene (bug-doctor-human-output-injection, additive): every untrusted value interpolated into a human line — the `git.remote` URL, the report `root` path, the `budgetError` message, and `opencode.v1` config keys — escapes C0 controls (ESC, newline), `U+007F`–`U+009F` (DEL/C1: 8-bit CSI/OSC introducers) and `U+2028`/`U+2029` as inert `\n`/`\uXXXX` text, and caps each raw value at `MAX_HUMAN_VALUE_CHARS` (200) characters **before** escaping (the `…` ellipsis is appended after the cut). Escaping expands each unsafe code point to at most 6 characters (`\uXXXX`), but only the clipped 200 characters can expand — the `…` is appended after the cut and is never itself escaped — so one rendered value reaches at most `6 × 200 + 1` = 1201 characters even though the raw value was capped at 200. (The conservative `6 × (200 + 1)` = 1206 bound additionally counts the ellipsis as if it could expand.) Config-key tokens are JSON-quoted; paths and URLs keep their ordinary punctuation unquoted. Bidi/zero-width format characters are deliberately not escaped — they cannot emit a control sequence or forge a line, and doctor output is a report, not an injection boundary. The `--json` payload always keeps the raw, uncapped value; this is display only.
 
 ### `list`
 
@@ -204,6 +204,8 @@ Stale-claim report: `arggon list --stale --older-than <duration>` (`<number><d|h
 
 `ok` is `false` **iff** `errors.length > 0` (warnings alone keep `ok: true`). When `ok` is false, the envelope still includes `error` so generic clients can branch on one field.
 
+Human output is display-sanitized (bug-validate-stdout-injection, additive): the repo-controlled `path` and `message` of each error/warning are escaped (C0/DEL/C1/LS/PS → inert text) and each capped at `MAX_HUMAN_ERROR_CHARS` (2000, the composite-diagnostic cap — an item path plus reason), so a hostile filename cannot forge a column-0 line on stdout. The `--json` `errors`/`warnings` arrays keep the raw values.
+
 ### `spec`
 
 Covers `spec validate`, `spec new`, and `spec analyze`; the envelope `command` is always `"spec"`.
@@ -216,6 +218,8 @@ Covers `spec validate`, `spec new`, and `spec analyze`; the envelope `command` i
 | `warnings` | `Issue[]` | Currently always empty |
 
 `ok` is `false` **iff** `errors.length > 0`; failed runs carry `error.code: "SPEC_FAILED"`.
+
+Human output follows the same display-sanitization policy as `validate` (bug-validate-stdout-injection): `spec validate` escapes each issue `path`/`message`, and `spec analyze` escapes each finding `file`/`message` (including the `--baseline` human report); `--json` payloads keep the raw values.
 
 `spec new <slug> [--title <t>] [--plan]` scaffolds `docs/specs/spec-<slug>-NNN.md` (plus `docs/plans/plan-<slug>-NNN.md` with `--plan`) from the bundled templates; never overwrites.
 

@@ -6,6 +6,7 @@ import { isPriority } from "./priority.js";
 import { softTryLoadItem, walkTasksTree, type WorkItem } from "./items.js";
 import { findTasksDir, newItemPath, repoRootFromTasks } from "./paths.js";
 import { assertParentEdge, expectedParentType } from "./relations.js";
+import { sanitizeHumanError } from "./sanitize.js";
 import { ASSIGNEE_PATTERN, assertClaimAndBlocked } from "./status.js";
 import type { Issue } from "./types.js";
 
@@ -383,13 +384,25 @@ export function runValidate(opts: ValidateOptions): ValidateResult {
   return { root, conventionVersion, errors, warnings };
 }
 
+/**
+ * Human report for `arggon validate` (bug-validate-stdout-injection M1):
+ * paths and messages are repo-controlled (a hostile filename or frontmatter
+ * value can carry `\nspoof:` + ESC/DEL/C1/LS/PS), so each dynamic field is
+ * display-sanitized before it is interpolated. The sanitizer is the
+ * composite-diagnostic one (`<path>: <reason>` text): the 200-char report cap
+ * would routinely cut deep item paths, and the code stays visible because the
+ * fields are capped individually. Display only: the `--json` payload keeps
+ * the raw values, byte for byte.
+ */
 export function formatValidateHuman(result: ValidateResult): string {
   const lines: string[] = [];
   for (const e of result.errors) {
-    lines.push(`error ${e.path}: ${e.message} [${e.code}]`);
+    lines.push(`error ${sanitizeHumanError(e.path)}: ${sanitizeHumanError(e.message)} [${e.code}]`);
   }
   for (const w of result.warnings) {
-    lines.push(`warning ${w.path}: ${w.message} [${w.code}]`);
+    lines.push(
+      `warning ${sanitizeHumanError(w.path)}: ${sanitizeHumanError(w.message)} [${w.code}]`,
+    );
   }
   if (result.errors.length === 0) {
     lines.push(
