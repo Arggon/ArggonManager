@@ -29,15 +29,24 @@
  *
  * Exit codes: 0 report written (budgets flagged inline, like `doctor
  * --budget`); 1 measurement failed; with `--strict`, 1 when any enforced/
- * advisory bound is exceeded too. `ARGON_CONTEXT_REPORT_KEEP=1` keeps the
- * fixture for inspection.
+ * advisory bound is exceeded too. `--strict` is a manual/release gate, NOT
+ * wired into CI: over the test suite it adds the advisory MCP `tools/list`
+ * size (schema drift, not a product regression) and the generated compaction
+ * `keep.tokens` regression check (expected 15,000; no suite test enforces
+ * it). `ARGON_CONTEXT_REPORT_KEEP=1` keeps the fixture for inspection.
+ *
+ * Pure helpers (frontmatter, stripJsonComments, pad) are exported for
+ * `smoke/context-report.test.ts`; the report body only runs when this file is
+ * the process entrypoint.
  */
 import { spawnSync } from "node:child_process";
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   statSync,
 } from "node:fs";
@@ -61,6 +70,10 @@ export const GENERATED_KEEP_TOKENS = 15_000;
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const CLI = join(repoRoot, "cli/src/cli.ts");
 const TSX = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
+
+/** Repo-relative paths of the W5 skill split, used for history detection. */
+const SKILL_PATH = "skills/arggon-cli/SKILL.md";
+const REFERENCES_DIR = "skills/arggon-cli/references";
 
 const args = process.argv.slice(2);
 const asJson = args.includes("--json");
@@ -111,7 +124,7 @@ function createdId(stdout: string): string {
 type Frontmatter = { name?: string; description?: string };
 
 /** Single-line YAML frontmatter fields the report needs (name, description). */
-function frontmatter(raw: string): Frontmatter {
+export function frontmatter(raw: string): Frontmatter {
   const lines = raw.split(/\r?\n/);
   const start = lines.findIndex((line) => line.trim() === "---");
   if (start === -1) return {};
@@ -131,7 +144,7 @@ function frontmatter(raw: string): Frontmatter {
 }
 
 /** Strip JSONC `//` and `/* *\/` comments without touching string values. */
-function stripJsonComments(raw: string): string {
+export function stripJsonComments(raw: string): string {
   let out = "";
   let inString = false;
   let escaped = false;
@@ -235,39 +248,73 @@ type BeforeAfter = {
   fullBytes: number;
 };
 
+type BeforeAfterResult =
+  { available: true; beforeAfter: BeforeAfter } | { available: false; reason: string };
+
+/**
+ * Reference files present in a revision's own tree. Empty means the revision
+ * predates the W5 split; detection scans the revision's whole reference set,
+ * never one hardcoded file (F4, PR #329 review). A missing/unresolvable rev
+ * also lists nothing, and the subsequent `git show` skips it.
+ */
+function revisionReferences(rev: string): string[] {
+  const listed = run("git", ["ls-tree", "-r", "--name-only", rev, "--", REFERENCES_DIR], repoRoot);
+  if (listed.status !== 0 || listed.stdout.trim() === "") return [];
+  return listed.stdout.trim().split("\n");
+}
+
 /**
  * Reconstruct the pre-W5 single `SKILL.md`: walk the commits that touched the
  * file and take the newest revision whose tree has no `references/` directory.
- * Returns null (reported as "unavailable") outside a usable git history.
+ * Never throws: outside a usable history, or on a pre-split working tree
+ * (bisect/revert) where the after side cannot be measured, it returns an
+ * explicit reason that the report prints as "unavailable".
  */
-function reconstructBeforeAfter(): BeforeAfter | null {
-  const override = process.env.CONTEXT_REPORT_BEFORE_REV;
-  const log = run("git", ["log", "--format=%H", "--", "skills/arggon-cli/SKILL.md"], repoRoot);
-  if (log.status !== 0 || log.stdout.trim() === "") return null;
-  const revisions = [override, ...log.stdout.trim().split("\n")].filter(
-    (rev): rev is string => typeof rev === "string" && rev !== "",
-  );
-  for (const rev of revisions) {
-    const hasReferences =
-      run("git", ["cat-file", "-e", `${rev}:skills/arggon-cli/references/json-contract.md`], repoRoot)
-        .status === 0;
-    if (hasReferences) continue;
-    const show = run("git", ["show", `${rev}:skills/arggon-cli/SKILL.md`], repoRoot);
-    if (show.status !== 0) continue;
-    const umbrellaBytes = statSync(join(repoRoot, "skills/arggon-cli/SKILL.md")).size;
-    const referencesBytes = readdirSync(join(repoRoot, "skills/arggon-cli/references"))
-      .map((file) => statSync(join(repoRoot, "skills/arggon-cli/references", file)).size)
-      .reduce((sum, size) => sum + size, 0);
+function reconstructBeforeAfter(): BeforeAfterResult {
+  const umbrella = join(repoRoot, SKILL_PATH);
+  const refDir = join(repoRoot, REFERENCES_DIR);
+  if (!existsSync(umbrella) || !existsSync(refDir)) {
     return {
-      beforeRev: rev,
-      beforeBytes: bytes(show.stdout),
-      beforeDescription: frontmatter(show.stdout).description ?? "",
-      umbrellaBytes,
-      referencesBytes,
-      fullBytes: umbrellaBytes + referencesBytes,
+      available: false,
+      reason:
+        `working tree has no ${SKILL_PATH} + ${REFERENCES_DIR}/ pair ` +
+        "(pre-W5 checkout?): the after side cannot be measured",
     };
   }
-  return null;
+  const log = run("git", ["log", "--format=%H", "--", SKILL_PATH], repoRoot);
+  if (log.status !== 0 || log.stdout.trim() === "") {
+    return { available: false, reason: `no git history for ${SKILL_PATH}` };
+  }
+  const revisions = [
+    process.env.CONTEXT_REPORT_BEFORE_REV,
+    ...log.stdout.trim().split("\n"),
+  ].filter((rev): rev is string => typeof rev === "string" && rev !== "");
+  for (const rev of revisions) {
+    if (revisionReferences(rev).length > 0) continue;
+    const show = run("git", ["show", `${rev}:${SKILL_PATH}`], repoRoot);
+    if (show.status !== 0) continue;
+    const umbrellaBytes = statSync(umbrella).size;
+    const referencesBytes = readdirSync(refDir)
+      .map((file) => statSync(join(refDir, file)).size)
+      .reduce((sum, size) => sum + size, 0);
+    return {
+      available: true,
+      beforeAfter: {
+        beforeRev: rev,
+        beforeBytes: bytes(show.stdout),
+        beforeDescription: frontmatter(show.stdout).description ?? "",
+        umbrellaBytes,
+        referencesBytes,
+        fullBytes: umbrellaBytes + referencesBytes,
+      },
+    };
+  }
+  return {
+    available: false,
+    reason:
+      `no revision of ${SKILL_PATH} without a references/ tree in the available history ` +
+      "(shallow clone?)",
+  };
 }
 
 type Measurement = {
@@ -296,6 +343,8 @@ type Measurement = {
   compaction: { keepTokens: number; v2Default: number };
   fixedTotalBytes: number;
   skillBeforeAfter: BeforeAfter | null;
+  /** Why `skillBeforeAfter` is null (pre-W5 checkout, shallow clone, no history). */
+  skillBeforeAfterUnavailable: string | null;
   doctor: BudgetResult;
   regressions: string[];
 };
@@ -393,6 +442,8 @@ function measure(): Measurement {
       );
     }
 
+    const beforeAfter = reconstructBeforeAfter();
+
     return {
       date: new Date().toISOString().slice(0, 10),
       fixture,
@@ -430,7 +481,8 @@ function measure(): Measurement {
         skills.reduce((sum, skill) => sum + skill.descriptionBytes, 0) +
         agents.reduce((sum, agent) => sum + agent.descriptionBytes, 0) +
         doctor.budget.mcp.totalBytes,
-      skillBeforeAfter: reconstructBeforeAfter(),
+      skillBeforeAfter: beforeAfter.available ? beforeAfter.beforeAfter : null,
+      skillBeforeAfterUnavailable: beforeAfter.available ? null : beforeAfter.reason,
       doctor: doctor.budget,
       regressions,
     };
@@ -439,14 +491,20 @@ function measure(): Measurement {
   }
 }
 
-function pad(text: string, width: number): string {
-  return text.length >= width ? text : text + " ".repeat(width - text.length);
+/**
+ * Pad to `width`. Cells longer than the column are truncated with an ellipsis
+ * so an over-width label can never run into the next column (F5, PR #329
+ * review).
+ */
+export function pad(text: string, width: number): string {
+  if (text.length > width) return `${text.slice(0, width - 1)}…`;
+  return text + " ".repeat(width - text.length);
 }
 
 function printReport(m: Measurement): void {
-  const rows: string[] = [];
+  const rows: Array<[string, string, string, string, string]> = [];
   const push = (surface: string, size: string, tok: string, bound: string, status: string): void => {
-    rows.push(`  ${pad(surface, 38)}${pad(size, 11)}${pad(tok, 8)}${pad(bound, 18)}${status}`);
+    rows.push([surface, size, tok, bound, status]);
   };
 
   console.log(`ArggonManager V2 context report - ${m.date}`);
@@ -455,7 +513,7 @@ function printReport(m: Measurement): void {
   console.log("        kernel surfaces (list/show/MCP) reused from `arggon doctor --budget --json`");
   console.log("");
   console.log("per-session fixed surface");
-  console.log(`  ${pad("surface", 38)}${pad("bytes", 11)}${pad("~tok", 8)}${pad("bound", 18)}status`);
+  push("surface", "bytes", "~tok", "bound", "status");
   push(
     "generated AGENTS.md",
     fmt(m.agentsMd.bytes),
@@ -512,7 +570,17 @@ function printReport(m: Measurement): void {
     `V2 default ${fmt(m.compaction.v2Default)}`,
     "keep",
   );
-  console.log(rows.join("\n"));
+  // The first column grows to its longest label (min 38, +2 gap) so a long
+  // skill id cannot run into the bytes column; `pad` truncates as a backstop.
+  const surfaceWidth = Math.max(38, ...rows.map(([surface]) => surface.length + 2));
+  console.log(
+    rows
+      .map(
+        ([surface, size, tok, bound, status]) =>
+          `  ${pad(surface, surfaceWidth)}${pad(size, 11)}${pad(tok, 8)}${pad(bound, 18)}${status}`,
+      )
+      .join("\n"),
+  );
   console.log(
     `  item block: bound ${fmt(m.itemBlock.boundBytes)} B = ITEM_BLOCK_MAX_BYTES reused from the plugin helper ` +
       `(buildItemBlock); fixture items ${m.itemBlock.measuredBytes.join(" B / ")} B; W3 smoke evidence ` +
@@ -558,7 +626,9 @@ function printReport(m: Measurement): void {
     );
   } else {
     console.log("");
-    console.log("before/after: unavailable (no git history for skills/arggon-cli/SKILL.md)");
+    console.log(
+      `before/after: unavailable (${m.skillBeforeAfterUnavailable ?? "reason not recorded"})`,
+    );
   }
 
   if (m.agents.length > 0) {
@@ -587,10 +657,27 @@ function printReport(m: Measurement): void {
   }
 }
 
-const measurement = measure();
-if (asJson) {
-  console.log(JSON.stringify(measurement, null, 2));
-} else {
-  printReport(measurement);
+/**
+ * True when this module is the process entrypoint. The unit tests import the
+ * pure helpers above; without the guard that import would run the whole
+ * report (spawning the CLI, git and the fixture) as a side effect.
+ */
+function isDirectRun(): boolean {
+  const entry = process.argv[1];
+  if (entry === undefined) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
 }
-if (strict && measurement.regressions.length > 0) process.exitCode = 1;
+
+if (isDirectRun()) {
+  const measurement = measure();
+  if (asJson) {
+    console.log(JSON.stringify(measurement, null, 2));
+  } else {
+    printReport(measurement);
+  }
+  if (strict && measurement.regressions.length > 0) process.exitCode = 1;
+}
