@@ -31,9 +31,14 @@
  *   the CLI (`execFile` with argument arrays) or the MCP server.
  * - Dependency-free: only Node builtins (`node:child_process`, `node:fs`,
  *   `node:path`); `Plugin.define` from `@opencode/plugin` is optional sugar and
- *   is resolved with a guarded dynamic import (the documented static import
- *   fails in dependency-less trees on 2.0.7). The plain default export below is
- *   a valid V2 plugin definition and loads on OpenCode 2.0.7 without it.
+ *   is resolved with a guarded dynamic import. The documented static import
+ *   still fails to load an auto-discovered plugin in a dependency-less tree on
+ *   2.0.8, exactly as on 2.0.7 (A/B re-probe 2026-09-18,
+ *   task-opencode-v2-plugin-import-gotcha; details in docs/playbooks/opencode.md),
+ *   so the import stays dynamic, non-fatal and computed (editors/tsc must not
+ *   flag a package that is deliberately absent from adopter trees). The plain
+ *   default export below is a valid V2 plugin definition and loads on 2.0.x
+ *   without it.
  *
  * The pure helpers are exported for unit tests (cli/src/plugin-context.test.ts):
  * they contain no OpenCode or filesystem dependency.
@@ -648,9 +653,13 @@ function dispose(registration: unknown): void {
 // Optional `Plugin.define` sugar, resolved defensively: a missing
 // `@opencode/plugin` (no local node_modules) or a throwing runtime falls back
 // to the plain definition object, which OpenCode V2 loads identically.
+// Computed specifier: the package is deliberately absent from adopter trees
+// (and from this repo's dependency graph), so a literal specifier makes
+// editors/tsc flag the guarded, always-caught import.
+const OPENCODE_PLUGIN_PACKAGE = "@opencode/plugin"
 let define: ((input: PluginDefinition) => PluginDefinition) | undefined
 try {
-  const mod = (await import("@opencode/plugin")) as {
+  const mod = (await import(OPENCODE_PLUGIN_PACKAGE)) as {
     Plugin?: { define?: (input: PluginDefinition) => PluginDefinition }
   }
   define = typeof mod?.Plugin?.define === "function" ? mod.Plugin.define : undefined

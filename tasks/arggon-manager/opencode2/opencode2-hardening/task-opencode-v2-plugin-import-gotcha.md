@@ -39,17 +39,17 @@ workaround are not recorded, and nothing tracks re-verification on the next 2.x
 
 ## Acceptance
 
-- [ ] `docs/playbooks/opencode.md` (Conventions) records: the documented static
+- [x] `docs/playbooks/opencode.md` (Conventions) records: the documented static
       import fails without `node_modules` on 2.0.7; the bundled plugin's guarded
       pattern is the supported form; and the condition to simplify it (when the
       runtime resolves `@opencode/plugin` in dependency-less trees, or the docs
       change) — with the PR #325 probe as evidence.
-- [ ] ADR 0010's revisist trigger references this item so the next 2.x
+- [x] ADR 0010's revisist trigger references this item so the next 2.x
       re-verification is not lost.
-- [ ] On the next 2.x: re-run the A/B probe (static import vs plain object in a
+- [x] On the next 2.x: re-run the A/B probe (static import vs plain object in a
       dependency-less fixture). If the static import resolves, simplify the
       plugin and refresh the smoke evidence; if not, update the version-pin note.
-- [ ] Optional (review F3): a dedicated typecheck (or a computed specifier for
+- [x] Optional (review F3): a dedicated typecheck (or a computed specifier for
       the dynamic import) so editors/`tsc` do not flag the guarded import.
 
 ## Notes
