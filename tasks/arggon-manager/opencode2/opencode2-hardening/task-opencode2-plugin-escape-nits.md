@@ -1,8 +1,8 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode2-plugin-escape-nits
-title: "Plugin escape-edge nits: escaped \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\( in command position + unbalanced quoted paths correlate"
+title: "Plugin escape-edge nits: escaped \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\( in command position + unbalanced quoted paths correlate"
 assignee: Arggon
 branch: feat/task-opencode2-plugin-escape-nits
 parent: opencode2-hardening
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T22:08:51.360Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-plugin-escape-nits
 ---
 <!--
@@ -35,10 +34,10 @@ F3 (pre-existing, base == current) from the independent review of PR #356
 
 ## Acceptance
 
-- [ ] Both forms render `undefined` (or the residual is explicitly documented
+- [x] Both forms render `undefined` (or the residual is explicitly documented
       as best-effort with rationale); tests added.
-- [ ] No regression of the quote-span/word semantics or the true positives.
-- [ ] Full suite + `smoke:opencode` green; small PR to `opencode2`.
+- [x] No regression of the quote-span/word semantics or the true positives.
+- [x] Full suite + `smoke:opencode` green; small PR to `opencode2`.
 
 ## Notes
 
@@ -73,3 +72,6 @@ Gates on HEAD+fix: `npm test` → 74 files / 1240 tests pass (private TMPDIR); `
 
 ### handoff 2026-09-18 @Arggon (session: ses_f49700672ffeZXvF0u0iEzbWri) — next: Review draft PR #358 against base opencode2; on approval merge it, then complete the acceptance checklist and set task-opencode2-plugin-escape-nits to done. Worker did not merge and did not flip stat…
 - branch: feat/task-opencode2-plugin-escape-nits
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; both target forms and variants fixed vs bash ground truth, path-like reductions preserved, true-positive matrix intact, tests additive (39), gates 1262 + smoke 11/11 + CI pass (after one unrelated ENOTEMPTY rerun); merged. Follow-ups filed: tracker-title-rescape (p2, the title doubling this PR surfaced), ci-enotempty-rmretry (p2, ENOTEMPTY under RM_RETRY), opencode2-plugin-parser-residuals (p3). The item's 'unchanged' residual wording is superseded by the residuals item. Closing.
