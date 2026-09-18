@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-row-table-stdout-sanitize
 title: "Row/table success stdout: sanitize repo-controlled columns (list, show, report, adopt, playbooks status, spec audit, tui)"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: opencode2-hardening
 labels: []
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T21:57:38.236Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-row-table-stdout-sanitize
 ---
 <!--
@@ -65,24 +64,24 @@ channel) — keep them raw but say so in the item that fixes this one.
 
 ## Acceptance
 
-- [ ] Each formatter above sanitizes its repo-controlled columns/values with the
+- [x] Each formatter above sanitizes its repo-controlled columns/values with the
       `cli/src/sanitize.ts` policy before interpolation (same policy as
       `task-success-stdout-sanitize`: escape C0/DEL/C1/LS/PS, composite cap for
       free text; ordinary rows/titles byte-identical except `"`/`\`, which the
       shared policy re-escapes).
-- [ ] Hostile repro per channel: an item/spec/playbook file whose title/path
+- [x] Hostile repro per channel: an item/spec/playbook file whose title/path
       carries ESC/C1/DEL/LS/PS renders inert (no raw control, no visually
       broken line) on the human path; `--json` payloads keep raw values.
       Frontmatter scalars are line-oriented, so drive the repro with
       controls + LS/PS, not a real newline (see the `list` note).
-- [ ] `adopt`/`adopt --ack` covered: the skip-path `storyId` (hostile
+- [x] `adopt`/`adopt --ack` covered: the skip-path `storyId` (hostile
       `parent:` frontmatter on the existing adoption task) and the
       `x-generated` `doc.path` values render inert on the human path;
       `--json` keeps raw values. (Review finding F1 on PR #354.)
-- [ ] `show`/`instructions` verbatim-content boundary explicitly recorded (or
+- [x] `show`/`instructions` verbatim-content boundary explicitly recorded (or
       sanitized with a documented reason if the audit says otherwise); TUI
       either sanitizes or records why it cannot.
-- [ ] Full suite, lint, `validate`/`spec validate` green; small PR to
+- [x] Full suite, lint, `validate`/`spec validate` green; small PR to
       `opencode2`.
 
 ## Notes
@@ -137,7 +136,7 @@ Evidence + decisions — row/table human stdout sanitized (draft PR pending revi
 
 **Tests.** New `cli/src/row-table-stdout.test.ts` (18 tests: hostile + JSON-raw + ordinary exact/byte-identity per channel, TUI unit, show boundary pinning) and 4 new `sanitizeHumanTextUncapped` tests in `cli/src/sanitize.test.ts`. Existing formatter suites unchanged and green (ordinary outputs asserted there are the byte-identity regression net).
 
-**Gates.** `npm test` 75 files / 1257 tests green (private TMPDIR); `npm run lint` clean; `npm run build` clean; `arggon validate` ok (0 warnings); `arggon spec validate` ok (16 docs, 0 warnings).
+**Gates.** `npm test` 75 files / 1260 tests green (private TMPDIR); `npm run lint` clean; `npm run build` clean; `arggon validate` ok (0 warnings); `arggon spec validate` ok (16 docs, 0 warnings).
 
 **Files touched.** `cli/src/sanitize.ts`, `cli/src/{list,show,report,playbooks,spec-audit,tui,adopt}.ts`, `cli/src/sanitize.test.ts`, new `cli/src/row-table-stdout.test.ts`, tracker. Not touched: `handoff.ts`, `opencode/plugins/arggon/**`, `mcp-server.ts`, docs. Out of scope by audit: `trend` (static), HTML board (`escapeHtml`), `instructions`/`show --body` content.
 
@@ -147,3 +146,6 @@ Evidence + decisions — row/table human stdout sanitized (draft PR pending revi
 
 ### 2026-09-18 @Arggon
 Draft PR #357: https://github.com/Arggon/ArggonManager/pull/357 (base opencode2, draft). Ready for review; per worker contract no merge and no status flip.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; every claimed formatter sanitized (escaping before width math in list/playbook status; spec-audit's own formatter; TUI clipped; adopt/ack incl. the hostile-parent repro) with before/after raw-byte evidence on 8 channels and 8/8 base leaks, --json raw for 7 checks, ordinary byte-identity INCLUDING quotes/backslashes and a 250-char title (stronger than the allowance), and no-op discrimination (9/9 hostile tests fail). Deliberate waiver recorded: sanitizeHumanTextUncapped is escape-only with NO length bound (threat model is control/line forgery, not volume; a cap would break display byte-identity — a future hard-bound policy would be its own decision). show prose/comments remain the documented verbatim content boundary. Evidence count corrected to 1260. Merged with cli pass. Closing.
