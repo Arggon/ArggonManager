@@ -90,3 +90,7 @@ Harness: scratch git repos (`init` + initiative/epic/story/task), bare `origin`,
 Automated coverage: `cli/src/worktree.test.ts` (link+report; keep+remediation+attach re-run; no-hook unaffected), `cli/src/start.test.ts` (`linkNodeModules` unit matrix + field false without `--worktree`), `cli/src/cli.test.ts` (envelope key). Full suite 1117 passed / 69 files; `lint`, `build`, `validate`, `spec validate` green.
 
 Hooks are never bypassed: `--no-verify` is never passed, the gate must succeed for the commit to land, and its stderr is preserved in the kept-worktree failure.
+
+### handoff 2026-09-18 @Arggon (session: ses_f4b5fb92cffeP7AJAkzMXS6FvY) — next: Coordinator: review PR #333 (draft, base opencode2), verify the fixture evidence + gates, then merge. Worker stops here: no merge, no status flip.
+- branch: fix/bug-start-worktree-node-modules
+- open questions: None blocking. Note: a re-run attach retries a failed claim commit but not a failed push (message says to push manually) — push/resume semantics stay out of this bug's scope.
