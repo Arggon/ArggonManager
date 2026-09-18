@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode-v2-plugin-import-gotcha
 title: "Plugin import gotcha: static @opencode/plugin import fails without node_modules (v2.0.7)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T13:30:08.007Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-plugin-import-gotcha
 ---
 <!--
@@ -117,7 +116,7 @@ refresh opencode --version 2.0.8`; Conventions records the gotcha, the
 import is still unresolved without `node_modules`; the 11-scenario smoke passes
 unchanged on 2.0.8 (same fallbacks exercised). Only `opencode --version` changed.
 
-**Gates**: `npm test` 69 files / 1116 tests · `npm run lint` · `npm run build` ·
+**Gates**: `npm test` 69 files / 1127 tests · `npm run lint` · `npm run build` ·
 `arggon validate` 0 errors/0 warnings · `arggon spec validate` 0/0 ·
 `npm run smoke:opencode` on 2.0.8: **11 scenarios, 0 failures** (fixtures kept
 with `ARGON_SMOKE_KEEP=1`; the harness' own `.smoke-evidence/` holds the
@@ -126,3 +125,6 @@ per-scenario transcripts).
 ### handoff 2026-09-18 @Arggon — next: Coordinator review of draft PR #334; on approval merge to opencode2 (merge, not squash - tracker auto-commits). No further task-side changes expected.
 - branch: feat/task-opencode-v2-plugin-import-gotcha
 - open questions: Raw A/B transcripts are fixture-local (/tmp/opencode/opencode-plugin-import-probe-208/.smoke-evidence); key lines are quoted in the PR body and item comment.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE (conditional on CI); the head needed three CI attempts — the two failures were unrelated flakes now tracked in bug-tracker-commit-enotempty-flake (tracker-commit ENOTEMPTY + comment-race fixture race); the third run passed. Substance independently reproduced on opencode v2.0.8 (static import fails to load, guarded form loads + MCP 9 tools + real session; computed specifier behavior-preserving; smoke 11/11); playbook pin refreshed to 2.0.8, ADR trigger updated. Closing.
