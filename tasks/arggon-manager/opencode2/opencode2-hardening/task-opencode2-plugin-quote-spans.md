@@ -78,3 +78,7 @@ Bash cross-checks: stub `arggon` on PATH for true positives; `bash -c` rc 127 / 
 Gates on 19f052c+fix: `npm test` → 73 files / 1220 tests pass (private TMPDIR); `npm run smoke:opencode` → 11 scenarios / 0 failures; lint, build, `arggon validate` (0/0), `arggon spec validate` (0/0) clean. No merge, no status flip.
 
 F3 correction: the "nothing left as a live FP" wording in task-opencode2-plugin-parse-nits was too broad — quoted multi-word spans and escaped `\(` remained live false positives; a correction comment is filed on that item.
+
+### handoff 2026-09-18 @Arggon (session: ses_f4987ad2effeUkIV0hlq0tL7K7) — next: Review draft PR #356 (base opencode2): F1 quoted spans one token (multi-word mention matrix + miss case), F2 escaped \( word, F3 newline test renamed + parse-nits claim correction. Gates green on 7a8…
+- branch: feat/task-opencode2-plugin-quote-spans
+- open questions: Extra probe found one pre-existing contrived FP outside this item: quoted-char prefix concatenated with an absolute path, e.g. '('/usr/local/bin/arggon show task-x, still correlates (commandHead spli…
