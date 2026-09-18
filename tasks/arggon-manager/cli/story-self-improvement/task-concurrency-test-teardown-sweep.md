@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-concurrency-test-teardown-sweep
 title: "Concurrency test teardown sweep: shared retrying fixture cleanup"
-priority: p3
+assignee: Arggon
+branch: feat/task-concurrency-test-teardown-sweep
 parent: story-self-improvement
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T16:42:47.537Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-concurrency-test-teardown-sweep
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/task-concurrency-test-teardown-sweep.md
