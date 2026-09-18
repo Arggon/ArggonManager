@@ -3,9 +3,9 @@ type: task
 status: todo
 id: task-opencode2-seam-polish
 title: "Seam polish: deferred review nits (present-skip docs, signature anchoring, tool permissions)"
-priority: p3
-parent: story-opencode-v2
+parent: opencode2-hardening
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
 ---

@@ -3,9 +3,9 @@ type: task
 status: todo
 id: task-opencode-v2-mcp-meta-hardening
 title: "MCP meta hardening: normalize/cap the meta-derived author (F1) + edge tests (F3)"
-priority: p3
-parent: story-opencode-v2
+parent: opencode2-hardening
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
 ---

@@ -3,9 +3,9 @@ type: task
 status: todo
 id: task-opencode2-orchestration-hardening
 title: "Wave harness hardening: probe marker assertions, batching checks, A/B export guard"
-priority: p3
-parent: story-opencode-v2
+parent: opencode2-hardening
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
 ---

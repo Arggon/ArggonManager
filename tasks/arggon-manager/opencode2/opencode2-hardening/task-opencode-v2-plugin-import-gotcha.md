@@ -3,9 +3,9 @@ type: task
 status: todo
 id: task-opencode-v2-plugin-import-gotcha
 title: "Plugin import gotcha: static @opencode/plugin import fails without node_modules (v2.0.7)"
-priority: p3
-parent: story-opencode-v2
+parent: opencode2-hardening
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
 ---

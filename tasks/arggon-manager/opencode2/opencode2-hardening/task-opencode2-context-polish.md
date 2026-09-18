@@ -3,9 +3,9 @@ type: task
 status: todo
 id: task-opencode2-context-polish
 title: "Context report polish: git-history robustness, helper tests, CI gate decision"
-priority: p3
-parent: story-opencode-v2
+parent: opencode2-hardening
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
 ---

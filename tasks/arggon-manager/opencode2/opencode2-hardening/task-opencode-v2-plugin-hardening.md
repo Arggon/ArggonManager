@@ -3,9 +3,9 @@ type: task
 status: todo
 id: task-opencode-v2-plugin-hardening
 title: "Plugin hardening: command-position parsing, storage guard order, cache keying (plus F3/F5/F6/F8)"
-priority: p3
-parent: story-opencode-v2
+parent: opencode2-hardening
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
 ---
