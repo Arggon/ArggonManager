@@ -67,3 +67,9 @@ Reproduced locally (2026-09-18):
   concurrency test now retries this transient failure sequentially (clean,
   reported, zero data loss) so CI is deterministic until the product fix
   lands; the retry is not a substitute for this fix.
+
+### 2026-09-18 @Arggon
+Fixed on fix/bug-comment-torn-read — PR #339 (draft, base opencode2).
+Deliverable: comment.ts body write now uses writeFileAtomic (tmp+rename) and the locate step retries a transient miss bounded (5 x 20ms) before the authoritative read under withItemLock (returned/committed path comes from the under-lock read). Same-pattern audit: update.ts (main item write, promotion depends_on rewrite, cascade ancestor write) and create.ts switched to writeFileAtomic; handoff.ts delegates to runComment and has no write of its own.
+Evidence: deterministic probe (4 concurrent comment CLI children, 1.5MB body, 3 tight-loop readers): 133 torn observations pre-fix (len=0/partial) -> 0 post-fix. Regression test fails pre-fix (79 torn reads with only comment.ts reverted) and passes with the fix. comment-race.test.ts green 12/12 without the PR #338 transient not-found retry. Full suite 69 files / 1144 tests green; build + lint green; arggon validate and spec validate ok. 8 concurrent comments on a 2MB body: 8/8 ok, 0 torn.
+Left/reported (no code filed here): adopt --ack and init still write tasks/.convention.yml in place (config, not item files, out of ownership); update.ts promotion/cascade writes are atomic but hold only the initiating item's lock (cross-item lock scope is a separate class).
