@@ -5,7 +5,7 @@
  * paths, honor --no-commit and x-tracker.auto-commit, and skip silently on
  * non-git trees.
  */
-import { spawn, spawnSync } from "node:child_process";
+import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -34,11 +34,59 @@ import {
 import { lockFilePathFor } from "./lock.js";
 import { maybeCommitUpdate, runUpdate } from "./update.js";
 
-// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+// bug-tmp-fixture-leak + bug-tracker-commit-enotempty-flake: track mkdtemp
+// dirs and the detached lock-release children, then remove the dirs with
+// bounded retries.
+//
+// Recursive rmSync does readdir -> unlink -> rmdir; when a still-settling
+// writer (a spawned git child, the detached lock-release node below, or just
+// fs timing on a loaded CI runner) adds/leaves an entry in that window, the
+// rmdir fails ENOTEMPTY and `force` does NOT suppress it (force only swallows
+// ENOENT). Node only retries ENOTEMPTY while maxRetries > 0, so the default 0
+// makes the cleanup a one-shot race. maxRetries/retryDelay re-read and re-try
+// the tree across that window.
+const RM_RETRY = { maxRetries: 10, retryDelay: 50 } as const;
 const tmpDirs: string[] = [];
-afterEach(() => {
-  for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+/** Detached node children spawned to release lock files mid-test. */
+const lockReleaseChildren = new Set<ChildProcess>();
+afterEach(async () => {
+  // Settle (and, if stuck, kill) the detached children BEFORE deleting the
+  // fixtures, so nothing they do overlaps the recursive removal below.
+  await Promise.all([...lockReleaseChildren].map(settleChild));
+  lockReleaseChildren.clear();
+  for (const dir of tmpDirs.splice(0)) {
+    rmSync(dir, { recursive: true, force: true, ...RM_RETRY });
+  }
 });
+
+/** Resolve when `child` exits; SIGKILL it after a bounded grace period. */
+function settleChild(child: ChildProcess): Promise<void> {
+  if (child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
+  return new Promise<void>((done) => {
+    const timer = setTimeout(() => child.kill("SIGKILL"), 2_000);
+    timer.unref();
+    child.once("exit", () => {
+      clearTimeout(timer);
+      done();
+    });
+  });
+}
+
+/**
+ * Spawn a detached child that removes `lock` after `ms` (the mutation under
+ * test runs synchronously, so the release must come from another process).
+ * Registered with the afterEach so cleanup never races a live child.
+ */
+function spawnLockRelease(lock: string, ms: number): void {
+  const child = spawn(
+    process.execPath,
+    ["-e", `setTimeout(() => require("node:fs").rmSync(${JSON.stringify(lock)}), ${ms})`],
+    { stdio: "ignore" },
+  );
+  lockReleaseChildren.add(child);
+  child.once("exit", () => lockReleaseChildren.delete(child));
+  child.unref();
+}
 function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
   const dir = _mkdtempSync(prefix, options);
   tmpDirs.push(dir);
@@ -655,12 +703,7 @@ describe("commitTrackerMutation index.lock contention (bug-autocommit-silent-ski
   function releaseLockAfter(dir: string, ms: number): void {
     const lock = join(dir, ".git/index.lock");
     writeFileSync(lock, "", "utf8");
-    const child = spawn(
-      process.execPath,
-      ["-e", `setTimeout(() => require("node:fs").rmSync(${JSON.stringify(lock)}), ${ms})`],
-      { stdio: "ignore" },
-    );
-    child.unref();
+    spawnLockRelease(lock, ms);
   }
 
   it("retries and commits once the lock is released mid-backoff", () => {
@@ -753,12 +796,7 @@ describe("repo-level git-mutation lock (bug-torture-contention-flake3)", () => {
     holdRepoLock(dir);
     // Release from a detached child (the mutation is synchronous).
     const lock = repoLock(dir);
-    const child = spawn(
-      process.execPath,
-      ["-e", `setTimeout(() => require("node:fs").rmSync(${JSON.stringify(lock)}), 200)`],
-      { stdio: "ignore" },
-    );
-    child.unref();
+    spawnLockRelease(lock, 200);
 
     const result = commitTrackerMutation(dir, [itemPath], {
       message: trackerCommitMessage("commented", ["task-rate-limit"]),

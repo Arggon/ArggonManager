@@ -17,15 +17,25 @@ import { defaultStartGit, runStart } from "./start.js";
 import { runUpdate } from "./update.js";
 import { runValidate } from "./validate.js";
 
-// bug-tmp-fixture-leak: track mkdtemp dirs (plus any `arggon start --worktree`
-// sibling worktrees named `<basename>-task-*`) and remove them after each test.
+// bug-tmp-fixture-leak + bug-tracker-commit-enotempty-flake: track mkdtemp
+// dirs (plus any `arggon start --worktree` sibling worktrees named
+// `<basename>-task-*`) and remove them after each test.
+//
+// Every git command in this file returns synchronously, but `git commit` also
+// forks a detached `git maintenance run --auto --detach` child, and on a
+// loaded CI runner the kernel can still surface entries while rmdir runs.
+// Recursive rmSync (readdir -> unlink -> rmdir) fails ENOTEMPTY if an entry
+// appears in that window; `force` only swallows ENOENT, and Node retries
+// ENOTEMPTY only when maxRetries > 0. The retry window makes the teardown
+// deterministic without weakening anything the tests assert.
+const RM_RETRY = { recursive: true, force: true, maxRetries: 10, retryDelay: 50 } as const;
 const tmpDirs: string[] = [];
 function removeFixtureTree(dir: string): void {
-  rmSync(dir, { recursive: true, force: true });
+  rmSync(dir, RM_RETRY);
   try {
     const base = basename(dir);
     for (const entry of readdirSync(dirname(dir))) {
-      if (entry.startsWith(`${base}-task`)) rmSync(join(dirname(dir), entry), { recursive: true, force: true });
+      if (entry.startsWith(`${base}-task`)) rmSync(join(dirname(dir), entry), RM_RETRY);
     }
   } catch {
     // parent already gone
