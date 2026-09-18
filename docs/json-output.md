@@ -160,9 +160,26 @@ Pure-read installation report (exit 0 on every well-formed input, including non-
 | `docs.outdatedDocs` | `string[]` | Destinations (posix, relative to root, sorted) counted in `docs.outdated` — the per-destination detail behind the count (task-doctor-outdated-bucket, additive). Human output mirrors this with a `N doc(s) have newer templates — run \`arggon init --dry-run\` for the plan` hint line. |
 | `tracker`           | `object`  | `{ items, todo }` — total work items under `tasks/` and their `todo` count    |
 | `git`               | `object`  | Git state of the tree (bug-init-git-doctor-blindspot, additive): `{ isRepo, dirty, remote }` — `isRepo` from `git rev-parse --git-dir`; `dirty` is whether `git status --porcelain` is non-empty and `remote` the URL of `origin` (else the first remote), both `null` when the tree is not a git repository. Report-only; doctor's exit-0 charter is unchanged. |
+| `opencode`          | `object`  | OpenCode integration state (task-opencode-v2-doctor, additive): `{ configs, v1, artifacts, mcp }` — see the subfield table below. Report-only, bounded (fixed paths + one non-recursive readdir per artifact dir, explicit caps), exit-0 unchanged. |
 | `budget`            | `object`  | Present only with `--budget` (task-adr0006-remeasure, additive): context-budget measurement of the ADR 0006 agent-facing surfaces — `{ initTreeBytes, generatedAgentsMdBytes, listCompactBytes, listFullBytes, showBytes, fixtureItems, mcp }`. Method mirrors the 2026-09-14 baseline ([exploration-token-context-efficiency-001](explorations/exploration-token-context-efficiency-001.md)): a fresh `init --full` in a throwaway temp tree (ALWAYS deleted afterwards), a deterministic 8-item fixture (1 initiative + 1 epic + 1 story + 5 tasks, 1 comment) for the `list`/`show` payload sizes; the CLI is resolved from the RUNNING installation (from source via tsx inside the repo, the installed `dist/cli.js` in adopter trees — bug-budget-adopter-trees), so bytes are what an agent actually receives and the measurement works identically in ArggonManager and in any adopter tree. `mcp` (task-schema-budget, additive) sizes the live MCP `tools/list` payload fetched in-process against `runMcpServer`. Budget checks: `generatedAgentsMdBytes` <= 2048 B (ADR 0006 direction 4); `mcp.totalBytes` <= 12,288 B advisory (task-schema-budget; live baseline 9,050 B, 2026-09-15); `listCompactBytes < listFullBytes` shows the compact-envelope saving. Report-only; never touches the tree being examined; on measurement failure `budgetError` carries the message and doctor still exits 0. |
 
 Each `docs` entry falls in exactly one bucket (`missing`, else `stale`, else `acknowledged`/`acknowledgedDrifted`, else `untouched`/`modified`), so `untouched + modified + acknowledged + acknowledgedDrifted + stale + missing = managed`. `outdated` is orthogonal to that partition (task-doctor-outdated-bucket, additive): an entry in any local-state bucket can additionally be outdated when the current template render differs from the on-disk content. Failures use `error.code: "DOCTOR_FAILED"` (unexpected errors only — a missing tree is a normal report).
+
+#### `opencode` block
+
+The additive `opencode` block (task-opencode-v2-doctor) reports the OpenCode V2 seam without writing anything. It is probed at the repo root (for non-initialized trees, at the cwd, like `git`) and appears in every `--json` payload:
+
+| Field                     | Type       | Notes |
+| ------------------------- | ---------- | ----- |
+| `opencode.configs`        | `string[]` | Present OpenCode config files (posix, root-relative), in `findOpenCodeConfig` candidate order (`cli/src/docs.ts`, opencode-seam-010): `opencode.json`, `opencode.jsonc`, `.opencode/opencode.json`, `.opencode/opencode.jsonc`. Doctor lists **all** present files (init's helper returns the first match only). A config that is unreadable or malformed still appears here; it just contributes no findings. |
+| `opencode.v1.findings`    | `object[]` | V1-shaped keys detected, one entry per config file: `{ file, keys }` with sorted keys — top-level `enabled`, `autoupdate`, `permission`, `tools`, `maxSteps`, plus servers nested directly under `mcp` reported as `mcp.<name>` (V2 requires `mcp.servers`; V2-valid `mcp.timeout` is never flagged). Capped at `MAX_OPENCODE_V1_KEYS_PER_FILE` (20) keys per file. |
+| `opencode.v1.truncated`   | `boolean`  | A file had more V1-shaped hits than the cap. |
+| `opencode.artifacts`      | `object`   | Generated seam artifacts on disk, names only (sorted, each list capped at `MAX_OPENCODE_NAMES` = 50; `truncated` flags a cut): `config` (`opencode.jsonc` present), `agents` (`.opencode/agents/*.md` stems), `commands` (`.opencode/commands/*.md` stems), `skills` (`.agents/skills/*` directory names). |
+| `opencode.mcp.native`     | `boolean`  | Some present config registers `mcp.servers.arggon`. |
+| `opencode.mcp.mcpJson`    | `boolean`  | `.mcp.json` registers the `arggon` server under `mcpServers`. |
+| `opencode.mcp.hint`       | `string\|null` | Actionable hint with the exact stanza and path (`add "mcp.servers.arggon" in opencode.json(c): ...`) when only `.mcp.json` exists — V2 does not read it; `null` otherwise (native registration, or nothing wired at all: doctor does not nag non-OpenCode users). |
+
+Human output mirrors the block with one `opencode:` summary line (`config ... , seam N artifact(s), N bundled skill(s), MCP native | MCP only in .mcp.json | MCP not registered`) plus a `hint:` line per finding class (V1-shaped keys, `.mcp.json`-only registration). On non-initialized trees the line prints only when something is actually present.
 
 ### `list`
 
@@ -582,11 +599,23 @@ Init still **writes** `tasks/.convention.yml` (including the `x-generated` prove
     "isRepo": true,
     "dirty": false,
     "remote": "git@github.com:example/example-repo.git"
+  },
+  "opencode": {
+    "configs": ["opencode.jsonc"],
+    "v1": { "findings": [], "truncated": false },
+    "artifacts": {
+      "config": true,
+      "agents": ["arggon-coordinator", "arggon-reviewer", "arggon-worker"],
+      "commands": ["arggon-done", "arggon-handoff", "arggon-next", "arggon-review", "arggon-start", "arggon-status"],
+      "skills": ["arggon-cli", "arggon-upgrade"],
+      "truncated": false
+    },
+    "mcp": { "native": true, "mcpJson": true, "hint": null }
   }
 }
 ```
 
-Non-initialized repos return the same shape with `root: null`, `initialized: false`, zeroed `docs`/`tracker`, `conventionVersion: 0`, and the `git` section probed from the cwd (a non-git tree reports `{ isRepo: false, dirty: null, remote: null }`).
+Non-initialized repos return the same shape with `root: null`, `initialized: false`, zeroed `docs`/`tracker`, `conventionVersion: 0`, and the `git` section probed from the cwd (a non-git tree reports `{ isRepo: false, dirty: null, remote: null }`); `opencode` is probed from the cwd too. When the arggon server is registered only in `.mcp.json`, `mcp` reports `{ "native": false, "mcpJson": true, "hint": "OpenCode V2 does not read .mcp.json — add \"mcp.servers.arggon\" in opencode.json(c): \"mcp\": {\"servers\": {\"arggon\": {\"type\": \"local\", \"command\": [\"arggon\", \"mcp\"]}}}" }`, and a V1-shaped config adds `v1.findings` entries such as `{ "file": "opencode.json", "keys": ["autoupdate", "mcp.arggon"] }`.
 
 Additive (bug-project-name-dir-derived): `projectName` carries the `{{PROJECT_NAME}}` value this run resolved — recorded in `x-generated.projectName`, recovered from existing generated docs (legacy trees), or the directory basename for fresh scaffolds. `null` = unrecoverable: name-sensitive comparisons (the `outdated` bucket) are skipped for that run instead of comparing against a guessed directory basename.
 

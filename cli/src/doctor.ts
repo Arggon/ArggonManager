@@ -7,7 +7,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, type Dirent } from "node:fs";
 import { join } from "node:path";
 import { readConventionConfig, readConventionVersion } from "./convention.js";
 import {
@@ -76,6 +76,286 @@ export type DoctorGit = {
   remote: string | null;
 };
 
+/**
+ * OpenCode integration state (task-opencode-v2-doctor): additive, report-only
+ * answer to "does this tree carry a working OpenCode V2 seam?" — which config
+ * files exist, which V1-shaped keys they still carry, which generated
+ * `.opencode/`/`.agents/skills` artifacts are on disk (names only), and
+ * whether the arggon MCP server is registered natively (`mcp.servers.arggon`)
+ * or only in `.mcp.json` (which V2 does not read). Every path is either fixed
+ * or one non-recursive readdir, and every list is explicitly capped — no
+ * recursive scans, no writes, exit code unchanged.
+ */
+export type DoctorOpenCode = {
+  /**
+   * Present OpenCode config files (posix, relative to the probed root), in the
+   * candidate order shared with `findOpenCodeConfig` (cli/src/docs.ts,
+   * opencode-seam-010): `opencode.json`, `opencode.jsonc`,
+   * `.opencode/opencode.json`, `.opencode/opencode.jsonc`. Unlike that helper
+   * (first match only — init uses it to decide whether to generate a config),
+   * doctor reports every present file; an unreadable or malformed one still
+   * appears here, it just contributes no findings.
+   */
+  configs: string[];
+  /**
+   * V1-shaped config keys (task-opencode-v2-doctor): top-level `enabled`,
+   * `autoupdate`, `permission`, `tools`, `maxSteps`, plus MCP servers nested
+   * directly under `mcp` — V2 requires `mcp.servers`, and V2-valid children
+   * (`mcp.timeout`) are never flagged. One finding per config file with hits.
+   */
+  v1: {
+    findings: Array<{ file: string; keys: string[] }>;
+    /** True when a file had more hits than MAX_OPENCODE_V1_KEYS_PER_FILE. */
+    truncated: boolean;
+  };
+  /** Generated seam artifacts on disk (task-opencode-v2-doctor; names only). */
+  artifacts: {
+    /** `opencode.jsonc` exists — the config `arggon init` generates when no adopter config exists. */
+    config: boolean;
+    /** Agent names (`.md` stems) under `.opencode/agents`, sorted. */
+    agents: string[];
+    /** Command names (`.md` stems) under `.opencode/commands`, sorted. */
+    commands: string[];
+    /** Skill directory names under `.agents/skills`, sorted. */
+    skills: string[];
+    /** True when one of the name lists hit MAX_OPENCODE_NAMES and was cut. */
+    truncated: boolean;
+  };
+  mcp: {
+    /** A present OpenCode config registers `mcp.servers.arggon`. */
+    native: boolean;
+    /** `.mcp.json` registers the `arggon` server under `mcpServers`. */
+    mcpJson: boolean;
+    /** Actionable stanza/path hint when only `.mcp.json` exists; `null` otherwise. */
+    hint: string | null;
+  };
+};
+
+/**
+ * Config candidates in the discovery order of `findOpenCodeConfig`
+ * (cli/src/docs.ts, opencode-seam-010) — kept in sync by hand because that
+ * helper returns only the FIRST match, while doctor reports every present
+ * file (it cannot import the list: the helper does not expose one).
+ */
+const OPENCODE_CONFIG_CANDIDATES = [
+  "opencode.json",
+  "opencode.jsonc",
+  ".opencode/opencode.json",
+  ".opencode/opencode.jsonc",
+] as const;
+
+/** V1 top-level keys V2 renamed or dropped (task-opencode-v2-doctor). */
+const OPENCODE_V1_KEYS = ["enabled", "autoupdate", "permission", "tools", "maxSteps"] as const;
+
+/** Documented V2 children of `mcp` (https://opencode.ai/v2/docs/mcp-servers/, 2026-09-17). */
+const OPENCODE_V2_MCP_KEYS = new Set(["servers", "timeout"]);
+
+/** Per-list cap for named artifacts — the JSON block stays bounded. */
+export const MAX_OPENCODE_NAMES = 50;
+
+/** Per-file cap for V1-shaped key findings. */
+export const MAX_OPENCODE_V1_KEYS_PER_FILE = 20;
+
+/**
+ * Actionable hint when the arggon MCP server exists only in `.mcp.json`
+ * (which OpenCode V2 does not read): the exact stanza and path to add.
+ */
+export const OPENCODE_MCP_HINT =
+  'OpenCode V2 does not read .mcp.json — add "mcp.servers.arggon" in opencode.json(c): ' +
+  '"mcp": {"servers": {"arggon": {"type": "local", "command": ["arggon", "mcp"]}}}';
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Tolerant JSONC parse (task-opencode-v2-doctor): OpenCode configs may be
+ * `opencode.jsonc` with `//`/`/* *\/` comments and trailing commas, which
+ * `JSON.parse` rejects. Comments outside strings are stripped and trailing
+ * commas before `}`/`]` dropped by one linear string-aware scan each, then
+ * `JSON.parse` runs; malformed input returns null — doctor never throws on
+ * adopter content and never rewrites it.
+ */
+function parseJsonc(text: string): unknown | null {
+  let stripped = "";
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]!;
+    if (inString) {
+      stripped += ch;
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      stripped += ch;
+      continue;
+    }
+    if (ch === "/" && text[i + 1] === "/") {
+      while (i < text.length && text[i] !== "\n") i++;
+      stripped += "\n";
+      continue;
+    }
+    if (ch === "/" && text[i + 1] === "*") {
+      i += 2;
+      while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i++;
+      i++; // land on the closing '/'; the outer loop steps past it
+      continue;
+    }
+    stripped += ch;
+  }
+  let json = "";
+  inString = false;
+  escaped = false;
+  for (let i = 0; i < stripped.length; i++) {
+    const ch = stripped[i]!;
+    if (inString) {
+      json += ch;
+      if (escaped) escaped = false;
+      else if (ch === "\\") escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+      json += ch;
+      continue;
+    }
+    if (ch === ",") {
+      let j = i + 1;
+      while (j < stripped.length && /\s/.test(stripped[j]!)) j++;
+      if (stripped[j] === "}" || stripped[j] === "]") continue; // drop the trailing comma
+    }
+    json += ch;
+  }
+  try {
+    return JSON.parse(json) as unknown;
+  } catch {
+    return null;
+  }
+}
+
+/** Read + tolerant-parse a JSON(C) file; null when absent, unreadable, or malformed. */
+function readJsonObject(absPath: string): Record<string, unknown> | null {
+  let text: string;
+  try {
+    text = readFileSync(absPath, "utf8");
+  } catch {
+    return null;
+  }
+  const parsed = parseJsonc(text);
+  return isJsonObject(parsed) ? parsed : null;
+}
+
+/** V1-shaped key hits in one parsed OpenCode config, sorted. */
+function v1ShapedKeys(config: Record<string, unknown>): string[] {
+  const keys: string[] = [];
+  for (const key of OPENCODE_V1_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(config, key)) keys.push(key);
+  }
+  const mcp = config["mcp"];
+  if (isJsonObject(mcp)) {
+    for (const name of Object.keys(mcp)) {
+      if (!OPENCODE_V2_MCP_KEYS.has(name)) keys.push(`mcp.${name}`);
+    }
+  }
+  return keys.sort();
+}
+
+type NameList = { names: string[]; truncated: boolean };
+
+/** Sorted `.md` stems in a fixed directory, capped. Never recurses, never throws. */
+function listMarkdownNames(absDir: string): NameList {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(absDir, { withFileTypes: true });
+  } catch {
+    return { names: [], truncated: false };
+  }
+  const names = entries
+    .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
+    .map((entry) => entry.name.slice(0, -".md".length))
+    .sort();
+  return { names: names.slice(0, MAX_OPENCODE_NAMES), truncated: names.length > MAX_OPENCODE_NAMES };
+}
+
+/** Sorted directory names in a fixed directory, capped. Never recurses, never throws. */
+function listDirNames(absDir: string): NameList {
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(absDir, { withFileTypes: true });
+  } catch {
+    return { names: [], truncated: false };
+  }
+  const names = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+  return { names: names.slice(0, MAX_OPENCODE_NAMES), truncated: names.length > MAX_OPENCODE_NAMES };
+}
+
+/**
+ * OpenCode integration probe (task-opencode-v2-doctor): pure read over fixed
+ * paths — the four config candidates, `.mcp.json`, and one non-recursive
+ * readdir each for `.opencode/agents`, `.opencode/commands`, `.agents/skills`.
+ * Never throws, never writes; all lists are capped (MAX_OPENCODE_NAMES /
+ * MAX_OPENCODE_V1_KEYS_PER_FILE).
+ */
+export function detectOpenCode(root: string): DoctorOpenCode {
+  const configs: string[] = [];
+  const findings: Array<{ file: string; keys: string[] }> = [];
+  let v1Truncated = false;
+  let native = false;
+  for (const rel of OPENCODE_CONFIG_CANDIDATES) {
+    const abs = join(root, ...rel.split("/"));
+    if (!existsSync(abs)) continue;
+    configs.push(rel);
+    const parsed = readJsonObject(abs);
+    if (parsed === null) continue; // present but unreadable/malformed
+    const keys = v1ShapedKeys(parsed);
+    if (keys.length > 0) {
+      if (keys.length > MAX_OPENCODE_V1_KEYS_PER_FILE) {
+        keys.length = MAX_OPENCODE_V1_KEYS_PER_FILE;
+        v1Truncated = true;
+      }
+      findings.push({ file: rel, keys });
+    }
+    const mcp = parsed["mcp"];
+    const servers = isJsonObject(mcp) ? mcp["servers"] : undefined;
+    if (isJsonObject(servers) && Object.prototype.hasOwnProperty.call(servers, "arggon")) {
+      native = true;
+    }
+  }
+
+  const agents = listMarkdownNames(join(root, ".opencode", "agents"));
+  const commands = listMarkdownNames(join(root, ".opencode", "commands"));
+  const skills = listDirNames(join(root, ".agents", "skills"));
+  const mcpJsonConfig = readJsonObject(join(root, ".mcp.json"));
+  const mcpServers =
+    mcpJsonConfig && isJsonObject(mcpJsonConfig["mcpServers"]) ? mcpJsonConfig["mcpServers"] : undefined;
+  const mcpJson = mcpServers !== undefined && Object.prototype.hasOwnProperty.call(mcpServers, "arggon");
+
+  return {
+    configs,
+    v1: { findings, truncated: v1Truncated },
+    artifacts: {
+      config: existsSync(join(root, "opencode.jsonc")),
+      agents: agents.names,
+      commands: commands.names,
+      skills: skills.names,
+      truncated: agents.truncated || commands.truncated || skills.truncated,
+    },
+    mcp: {
+      native,
+      mcpJson,
+      hint: !native && mcpJson ? OPENCODE_MCP_HINT : null,
+    },
+  };
+}
+
 export type DoctorResult = {
   /** Repo root, or null when no tasks/.convention.yml was found. */
   root: string | null;
@@ -100,6 +380,12 @@ export type DoctorResult = {
   };
   /** Git state of the tree (additive; bug-init-git-doctor-blindspot). */
   git: DoctorGit;
+  /**
+   * OpenCode integration state (additive, task-opencode-v2-doctor): config
+   * files, V1-shaped keys, generated seam artifacts (names only), and native
+   * vs `.mcp.json`-only MCP registration. Report-only, bounded.
+   */
+  opencode: DoctorOpenCode;
   /**
    * Context-budget measurement (additive, task-adr0006-remeasure): present
    * only when `doctor --budget` is passed. Measures the ADR 0006 agent-facing
@@ -191,6 +477,9 @@ export function runDoctor(opts: {
       docs: { ...ZERO_DOCS },
       tracker: { items: 0, todo: 0 },
       git: gitState(opts.cwd),
+      // No tasks/ tree, so cwd is the best root for the OpenCode probe — the
+      // same directory gitState probes (task-opencode-v2-doctor).
+      opencode: detectOpenCode(opts.cwd),
     };
   }
 
@@ -302,6 +591,7 @@ export function runDoctor(opts: {
       todo: items.filter((item) => item.status === "todo").length,
     },
     git: gitState(root),
+    opencode: detectOpenCode(root),
   };
 }
 
@@ -314,12 +604,53 @@ function formatGitLine(git: DoctorGit): string {
   return parts.join(", ");
 }
 
+/** Any OpenCode signal worth printing on a non-initialized tree? */
+function hasOpenCodeSignal(opencode: DoctorOpenCode): boolean {
+  return (
+    opencode.configs.length > 0 ||
+    opencode.artifacts.config ||
+    opencode.artifacts.agents.length > 0 ||
+    opencode.artifacts.commands.length > 0 ||
+    opencode.artifacts.skills.length > 0 ||
+    opencode.mcp.mcpJson
+  );
+}
+
+/**
+ * Bounded human lines for the OpenCode block (task-opencode-v2-doctor): a
+ * one-line summary mirroring the JSON, plus a hint per finding class
+ * (`V1-shaped` keys, `.mcp.json`-only registration). Never throws.
+ */
+function formatOpenCodeLines(opencode: DoctorOpenCode): string[] {
+  const seam =
+    (opencode.artifacts.config ? 1 : 0) + opencode.artifacts.agents.length + opencode.artifacts.commands.length;
+  const parts = [
+    opencode.configs.length > 0 ? `config ${opencode.configs.join(", ")}` : "no config",
+    seam > 0 ? `seam ${seam} artifact(s)` : "no seam artifacts",
+    opencode.artifacts.skills.length > 0
+      ? `${opencode.artifacts.skills.length} bundled skill(s)`
+      : "no bundled skills",
+    opencode.mcp.native ? "MCP native" : opencode.mcp.mcpJson ? "MCP only in .mcp.json" : "MCP not registered",
+  ];
+  const lines = [`  opencode: ${parts.join(", ")}`];
+  if (opencode.v1.findings.length > 0) {
+    const detail = opencode.v1.findings.map((f) => `${f.file} (${f.keys.join(", ")})`).join("; ");
+    lines.push(
+      `  hint: V1-shaped OpenCode config ${detail}${opencode.v1.truncated ? " (truncated)" : ""} — ` +
+        "V2 expects MCP servers under mcp.servers and renamed/replaced several top-level keys",
+    );
+  }
+  if (opencode.mcp.hint) lines.push(`  hint: ${opencode.mcp.hint}`);
+  return lines;
+}
+
 /** Human-readable report (never writes; pairs with the doctor --json payload). */
 export function formatDoctorReport(result: DoctorResult): string {
   if (!result.initialized) {
-    const head = "arggon doctor: not initialized (no tasks/.convention.yml found) — run `arggon init`\n";
-    if (result.budget) return head + `${formatBudgetLines(result.budget).join("\n")}\n`;
-    return head;
+    const lines = ["arggon doctor: not initialized (no tasks/.convention.yml found) — run `arggon init`"];
+    if (hasOpenCodeSignal(result.opencode)) lines.push(...formatOpenCodeLines(result.opencode));
+    if (result.budget) lines.push(...formatBudgetLines(result.budget));
+    return `${lines.join("\n")}\n`;
   }
   const lines = [
     `arggon doctor: initialized (convention v${result.conventionVersion}) at ${result.root}`,
@@ -330,6 +661,7 @@ export function formatDoctorReport(result: DoctorResult): string {
       `${result.docs.outdated} outdated`,
     `  tracker: ${result.tracker.items} item(s), ${result.tracker.todo} todo`,
     `  git: ${formatGitLine(result.git)}`,
+    ...formatOpenCodeLines(result.opencode),
   ];
   if (result.budget) {
     lines.push(...formatBudgetLines(result.budget));
