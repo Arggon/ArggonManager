@@ -69,3 +69,22 @@ session layers of `opencode/plugins/arggon/index.ts`.
 - F7 from the same review (T8's remaining assertions: skill discovery,
   agents/commands visibility, full next→start→done cycle) is tracked by the
   W4 orchestration item and `task-opencode-v2-plugin-import-gotcha`, not here.
+
+### 2026-09-18 @Arggon
+**Hardening implemented — draft PR #337** (`feat/task-opencode-v2-plugin-hardening`)
+
+Files: `opencode/plugins/arggon/index.ts`, `opencode/plugins/arggon/index.test.ts`, `smoke/opencode-smoke.ts`.
+
+**F2 — command-position correlation.** `parseArggonItemFromCommand` resolves the arggon binary only in command position (segment start after `VAR=value` prefixes, or `npm|pnpm|yarn|bun run arggon …`); Code Mode `tools.shell({ command: "…" })` extracts the command string and parses it anchored; the `arggon_*` regex is documented best-effort. False positives before→after: `grep -rn "arggon show task-x" .` (task-x→undefined), `echo "arggon update task-fake"` (task-fake→undefined), `git commit -m "arggon handoff task-x"` (task-x→undefined), `echo arggon show task-x` (task-x→undefined), `cd repo && grep arggon show task-x` (task-x→undefined), embedded `tools.shell({command:'echo "arggon update task-fake"'})` (task-fake→undefined). True positives kept: `arggon show task-x`, `npm run arggon -- update task-x`, `cd repo && /usr/local/bin/arggon comment …`, `ARGON_QUIET=1 arggon show task-x`, `pnpm run arggon -- show task-x`, `tools.shell({command:"cd repo && arggon show task-x"})`, `tools.arggon.arggon_update({id:"task-x"})`.
+
+**F4 — guard order.** `onToolAfter` returns before storage when the location is missing or `tasks/` is absent; new fake-ctx tests prove no `arggon/session/<id>` write outside a tree and the write inside one.
+
+**F5 — caches.** `itemCache` keyed by `itemCacheKey(directory, id)`; `itemCache`/`branchCache`/`renamedSessions` bounded via `setBounded` (`CACHE_MAX_ENTRIES = 256`, oldest-first, re-insert refreshes); long-lived `opencode serve` rationale documented in code; tests cover project keys, eviction order and the default bound.
+
+**F3/F6 — boundText + comments.** Decodes the longest valid UTF-8 prefix (fatal decoder, ≤3-byte back-off) so single-line multibyte cuts cannot overshoot; degenerate `max < marker` returns `{text:"", bytes:0, truncated:true}`; docstring fixed; stale `cli/src/plugin-context.test.ts` path corrected to `opencode/plugins/arggon/index.test.ts`.
+
+**F8 — smoke cross-check.** Plugin logs `… (N bytes) block=<json>` (suffix only; `opencode-wave.ts`'s regex still matches); the smoke measures the logged text with `Buffer.byteLength` and asserts measured === reported and ≤ 1024 B in the branch/storage/env scenarios. Fixture evidence: `[arggon] context: injected item task-smoke-item (204 bytes) block="<arggon-item>…</arggon-item>"` → reported 204, measured 204, marker present.
+
+**Gates.** `npm test` 1144/1144 (69 files; plugin file 23 tests, +9); `npm run lint` clean; `npm run build` clean; `arggon validate` ok (0/0); `arggon spec validate` ok (0/0); `npm run smoke:opencode` 11 scenarios / 0 failures (baseline before the change: 11/0).
+
+**Docs not edited (reported).** `docs/playbooks/opencode.md` §Conventions W3 bullet should mention command-position anchoring (quoted `arggon …` arguments ignored; `arggon_*` regex best-effort), bounded/project-scoped caches, and the smoke's independent `block=` measurement.
