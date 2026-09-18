@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readConventionConfig } from "./convention.js";
 import { withItemLock } from "./lock.js";
-import { join, resolve } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { sanitizeHumanError } from "./sanitize.js";
 
 /**
@@ -14,6 +14,11 @@ import { sanitizeHumanError } from "./sanitize.js";
  *  - Staging is surgical: `git add -- <path>` for the mutated files only —
  *    never `git add -A` / `git add .`. The user's own pre-existing dirty
  *    files stay dirty (untracked by the tool's commit).
+ *  - Ignored paths are skipped, not fatal (bug-init-ignored-artifacts-dirty-
+ *    commit): `.gitignore`d mutated paths are partitioned out before staging
+ *    and reported in the additive `ignored` field; they are never force-added.
+ *    `git add` aborts the whole batch when one path is ignored (after staging
+ *    the rest), which used to leave a dirty index with no commit.
    *  - Best effort by design: non-git trees, missing git, or a no-op commit
    *    (nothing staged) skip with a reason instead of failing the command —
    *    the whole CLI already works without git. Exception (task-nothing-to-
@@ -27,7 +32,8 @@ import { sanitizeHumanError } from "./sanitize.js";
  */
 
 /** The commit result as it appears in the additive `commit` field of `--json` payloads. */
-export type CommitPayload = { hash: string; message: string } | { skipped: string };
+export type CommitPayload =
+  { hash: string; message: string; ignored?: string[] } | { skipped: string; ignored?: string[] };
 
 export type TrackerCommitResult = {
   committed: boolean;
@@ -37,6 +43,14 @@ export type TrackerCommitResult = {
   hash?: string;
   /** Commit message as recorded; present only when `committed` is true. */
   message?: string;
+  /**
+   * Mutated paths NOT staged or committed because a `.gitignore` rule matches
+   * them (bug-init-ignored-artifacts-dirty-commit). Git would refuse the whole
+   * `git add`, so they are partitioned out first and reported instead — never
+   * force-added (`-f`) and never left half-staged. Root-relative posix paths,
+   * sorted; present only when non-empty. Additive within `schemaVersion: 1`.
+   */
+  ignored?: string[];
 };
 
 export type TrackerCommitOptions = {
@@ -155,12 +169,15 @@ function warnGitSkip(skipReason: string): void {
   }
 }
 
-function runGit(args: string[], cwd: string): GitRun {
+function runGit(args: string[], cwd: string, input?: string): GitRun {
   try {
     const out = execFileSync("git", args, {
       encoding: "utf8",
       cwd,
-      stdio: ["ignore", "pipe", "pipe"],
+      // `input` needs a pipe on stdin (an explicit "ignore" wins over input
+      // in execFileSync); everything else keeps stdin closed.
+      stdio: input !== undefined ? ["pipe", "pipe", "pipe"] : ["ignore", "pipe", "pipe"],
+      ...(input !== undefined ? { input } : {}),
     });
     return { code: 0, out: String(out ?? ""), err: "", missing: false };
   } catch (err) {
@@ -184,6 +201,37 @@ function runGit(args: string[], cwd: string): GitRun {
 
 function firstLine(text: string): string {
   return text.split("\n").find((line) => line.trim().length > 0)?.trim() ?? "git failed";
+}
+
+/**
+ * Which of the given paths would git REFUSE to add because a `.gitignore`
+ * rule matches them? NUL-delimited `git check-ignore --stdin -z` (paths may
+ * carry any character; no quoting ambiguity in either direction). The index
+ * is consulted by git itself, so a TRACKED path that happens to match a
+ * pattern is NOT reported (it stages normally) — exactly the semantics of
+ * `git add`.
+ *
+ * bug-init-ignored-artifacts-dirty-commit: `git add` is all-or-nothing across
+ * its pathspecs — one ignored path aborts the whole add AFTER staging the
+ * rest, leaving the caller's state update staged-but-uncommitted (a dirty
+ * index with no commit). The commit primitive partitions these paths out
+ * first.
+ *
+ * Returns `null` when the probe itself cannot answer (git absent, unexpected
+ * exit): callers then stage everything, preserving the pre-probe behavior
+ * instead of guessing.
+ */
+function findIgnoredPaths(root: string, paths: string[]): string[] | null {
+  const run = runGit(["check-ignore", "--stdin", "-z"], root, `${paths.join("\0")}\0`);
+  if (run.missing) return null;
+  if (run.code === 1) return []; // exit 1 = none of the given paths is ignored
+  if (run.code !== 0) return null; // unexpected probe failure: do not filter
+  return run.out.split("\0").filter((p) => p.length > 0);
+}
+
+/** Root-relative posix form of paths that may arrive absolute or relative. */
+function rootRelativePaths(root: string, paths: string[]): string[] {
+  return paths.map((p) => relative(root, resolve(root, p)).split(sep).join("/")).sort();
 }
 
 /**
@@ -212,12 +260,19 @@ export function trackerGitLockKey(commonGitDir: string): string {
 }
 
 /**
- * Commit tracker mutations: stage ONLY the given absolute file paths (all
- * resolved inside tasks/), then create one commit with `message` containing
- * exactly those paths (`commit --only`). Never throws — every failure mode
- * (non-git tree, git absent, nothing staged, failed commit) returns a skip
- * result so the caller's command succeeds. The user's pre-existing dirty
- * files (and anything staged elsewhere) are never swept into the commit.
+ * Commit tracker mutations: stage ONLY the given file paths (absolute or
+ * root-relative, all resolved inside tasks/), then create one commit with
+ * `message` covering them. Never throws — every failure mode (non-git tree,
+ * git absent, nothing staged, failed commit) returns a skip result so the
+ * caller's command succeeds. The user's pre-existing dirty files (and
+ * anything staged elsewhere) are never swept into the commit.
+ *
+ * Paths a `.gitignore` rule matches are partitioned out before staging and
+ * reported in the additive `ignored` field (bug-init-ignored-artifacts-dirty-
+ * commit): `git add` refuses the whole batch when even one path is ignored,
+ * after staging the rest — a dirty index with no commit. Ignored paths are
+ * never force-added; when every path is ignored the commit skips with a
+ * precise reason and the tree stays clean.
  *
  * bug-torture-contention-flake3: the whole add+commit sequence runs under a
  * repo-level git-mutation lock (tmpdir lock keyed on the repo's shared .git
@@ -241,6 +296,26 @@ export function commitTrackerMutation(
   if (probe.missing) return { committed: false, skipReason: "git not found" };
   if (probe.code !== 0) return { committed: false, skipReason: "not a git repository" };
 
+  // bug-init-ignored-artifacts-dirty-commit: partition ignored paths out
+  // BEFORE the add — one ignored path makes `git add` abort after staging the
+  // non-ignored entries, leaving a dirty index and no commit. Ignored paths
+  // stay untracked (they are ignored BY DESIGN); the rest commit normally and
+  // the skipped ones are reported (payload + human line), never force-added.
+  const ignoredRun = findIgnoredPaths(root, paths);
+  const ignoredPaths = ignoredRun ?? [];
+  const ignoredSet = new Set(ignoredPaths);
+  const stagePaths =
+    ignoredPaths.length === 0 ? paths : paths.filter((p) => !ignoredSet.has(p));
+  if (stagePaths.length === 0) {
+    return {
+      committed: false,
+      skipReason: "all mutated paths are ignored by .gitignore",
+      ignored: rootRelativePaths(root, ignoredPaths),
+    };
+  }
+  const ignoredPayload =
+    ignoredPaths.length > 0 ? rootRelativePaths(root, ignoredPaths) : undefined;
+
   // add+commit under the repo-level git-mutation lock (bug-torture-contention-
   // flake3): all arggon processes mutating ONE repo serialize on a single
   // tmpdir lock keyed by the repo's shared .git common dir (worktrees
@@ -260,7 +335,7 @@ export function commitTrackerMutation(
     let commit: GitRun | undefined;
     for (let attempt = 1; ; attempt++) {
       if (attempt > 1) sleepSync(Math.min(COMMIT_RETRY_MS * (attempt - 1), COMMIT_RETRY_MAX_SLEEP_MS));
-      add = runGit(["add", "--", ...paths], root);
+      add = runGit(["add", "--", ...stagePaths], root);
       if (add.code !== 0) {
         if (isIndexLockContention(add)) {
           locked = "git index locked";
@@ -282,7 +357,7 @@ export function commitTrackerMutation(
           // mutation then sits written-but-uncommitted while git claims there is
           // nothing to do. Residue in the mutated paths = our entry was lost →
           // a REPORTED skip (warning + payload), never the quiet benign path.
-          const residue = runGit(["status", "--porcelain", "--", ...paths], root);
+          const residue = runGit(["status", "--porcelain", "--", ...stagePaths], root);
           if (residue.code === 0 && residue.out.trim().length > 0) {
             const lost = "nothing to commit (staged entry lost under contention)";
             warnGitSkip(lost);
@@ -341,16 +416,19 @@ export function commitTrackerMutation(
   } else {
     attempt();
   }
-  return result ?? { committed: false, skipReason: "git commit failed" };
+  const outcome = result ?? { committed: false, skipReason: "git commit failed" };
+  return ignoredPayload !== undefined ? { ...outcome, ignored: ignoredPayload } : outcome;
 }
 
 /** Map a kernel result to the `commit` payload field (undefined when absent). */
 export function commitPayload(result: TrackerCommitResult | undefined): CommitPayload | undefined {
   if (!result) return undefined;
+  const ignored =
+    result.ignored && result.ignored.length > 0 ? { ignored: result.ignored } : {};
   if (result.committed && result.hash) {
-    return { hash: result.hash, message: result.message ?? "" };
+    return { hash: result.hash, message: result.message ?? "", ...ignored };
   }
-  return { skipped: result.skipReason ?? "skipped" };
+  return { skipped: result.skipReason ?? "skipped", ...ignored };
 }
 
 /**
@@ -358,10 +436,21 @@ export function commitPayload(result: TrackerCommitResult | undefined): CommitPa
  * report). bug-validate-stdout-injection L2: the skip reason can embed git's
  * own output (hostile path), and the success message embeds tracker ids — both
  * are display-sanitized here; `commitPayload` keeps the raw values for `--json`.
+ * The ignored-path count suffix (bug-init-ignored-artifacts-dirty-commit)
+ * keeps the skipped paths visible on the human line; the exact list lives in
+ * the payload's additive `ignored` array.
  */
 export function formatCommitLine(result: TrackerCommitResult | undefined): string | null {
   if (!result) return null;
-  if (result.committed) return sanitizeHumanError(`committed: ${result.hash} ${result.message}`);
-  if (result.skipReason === "auto-commit disabled") return "no-commit: tasks dirty state kept";
-  return sanitizeHumanError(`no-commit: ${result.skipReason}`);
+  const suffix =
+    result.ignored && result.ignored.length > 0
+      ? ` (${result.ignored.length} ignored path(s) skipped)`
+      : "";
+  if (result.committed) {
+    return sanitizeHumanError(`committed: ${result.hash} ${result.message}${suffix}`);
+  }
+  if (result.skipReason === "auto-commit disabled") {
+    return sanitizeHumanError(`no-commit: tasks dirty state kept${suffix}`);
+  }
+  return sanitizeHumanError(`no-commit: ${result.skipReason}${suffix}`);
 }

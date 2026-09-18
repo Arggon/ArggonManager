@@ -6,7 +6,7 @@
  * non-git trees.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -195,6 +195,107 @@ describe("tracker-commit helpers", () => {
     // ordinary skip reasons stay byte-identical
     expect(formatCommitLine({ committed: false, skipReason: "git not found" })).toBe(
       "no-commit: git not found",
+    );
+  });
+});
+
+// bug-init-ignored-artifacts-dirty-commit: `git add` refuses the WHOLE batch
+// when one path is ignored, after staging the rest — init's generated-bundle
+// sweep hit that on adopters that gitignore `.agents/skills/**`, leaving a
+// dirty index with no commit. The primitive partitions ignored paths out,
+// commits the rest, and reports what it skipped.
+describe("tracker auto-commit with gitignored paths", () => {
+  /**
+   * Repo with one tracked (`tasks/state.yml`) and one ignored
+   * (`tasks/generated.bundle`) file; each is mutated on request.
+   */
+  function ignoredRepo(opts: { trackedDirty?: boolean; ignoredDirty?: boolean } = {}): {
+    dir: string;
+    tracked: string;
+    ignored: string;
+  } {
+    const { trackedDirty = true, ignoredDirty = true } = opts;
+    const dir = mkdtempSync(join(tmpdir(), "arggon-ignored-"));
+    git(["-c", "init.defaultBranch=main", "init", "--quiet"], dir);
+    git(["config", "user.email", "test@example.com"], dir);
+    git(["config", "user.name", "Test"], dir);
+    writeFileSync(join(dir, ".gitignore"), "*.bundle\n", "utf8");
+    mkdirSync(join(dir, "tasks"), { recursive: true });
+    writeFileSync(join(dir, "tasks/state.yml"), "state\n", "utf8");
+    git(["add", ".gitignore", "tasks/state.yml"], dir);
+    git(["commit", "--quiet", "-m", "fixture"], dir);
+    if (trackedDirty) writeFileSync(join(dir, "tasks/state.yml"), "state updated\n", "utf8");
+    if (ignoredDirty) writeFileSync(join(dir, "tasks/generated.bundle"), "derived\n", "utf8");
+    return { dir, tracked: "tasks/state.yml", ignored: "tasks/generated.bundle" };
+  }
+
+  it("stages only non-ignored paths, commits them, and reports the ignored ones", () => {
+    const { dir, tracked, ignored } = ignoredRepo();
+
+    // Absolute paths: the form tracker mutations (create/update/comment) pass.
+    const result = commitTrackerMutation(dir, [join(dir, tracked), join(dir, ignored)], {
+      message: trackerCommitMessage("generated", ["init docs (2 files)"]),
+    });
+
+    expect(result).toMatchObject({ committed: true, ignored: [ignored] });
+    expect(committedPaths(dir)).toEqual([tracked]);
+    // The ignored derived file stays untracked-and-ignored: clean status.
+    expect(status(dir)).toBe("");
+    expect(commitPayload(result)).toEqual({
+      hash: result.hash,
+      message: "chore(tasks): generated init docs (2 files)",
+      ignored: [ignored],
+    });
+  });
+
+  it("skips with a precise reason and reports when every path is ignored", () => {
+    const { dir, ignored } = ignoredRepo({ trackedDirty: false });
+
+    const result = commitTrackerMutation(dir, [ignored], {
+      message: trackerCommitMessage("generated", ["init docs (1 files)"]),
+    });
+
+    expect(result).toEqual({
+      committed: false,
+      skipReason: "all mutated paths are ignored by .gitignore",
+      ignored: [ignored],
+    });
+    expect(commitPayload(result)).toEqual({
+      skipped: "all mutated paths are ignored by .gitignore",
+      ignored: [ignored],
+    });
+    // No empty commit, no dirty index.
+    expect(git(["log", "--format=%s"], dir)).toBe("fixture");
+    expect(status(dir)).toBe("");
+  });
+
+  it("stages a TRACKED path that matches an ignore pattern (the index wins)", () => {
+    const { dir } = ignoredRepo({ trackedDirty: false });
+    // Force-add the ignored path, commit it; once tracked it stages normally.
+    git(["add", "-f", "tasks/generated.bundle"], dir);
+    git(["commit", "--quiet", "-m", "track derived bundle"], dir);
+    writeFileSync(join(dir, "tasks/generated.bundle"), "derived v2\n", "utf8");
+
+    const result = commitTrackerMutation(dir, ["tasks/generated.bundle"], {
+      message: trackerCommitMessage("updated", ["bundle"]),
+    });
+
+    expect(result).toMatchObject({ committed: true });
+    expect(result.ignored).toBeUndefined();
+    expect(committedPaths(dir)).toEqual(["tasks/generated.bundle"]);
+    expect(status(dir)).toBe("");
+  });
+
+  it("reports the ignored count on the human commit line", () => {
+    expect(
+      formatCommitLine({
+        committed: true,
+        hash: "abc1234",
+        message: "chore(tasks): generated init docs (2 files)",
+        ignored: ["tasks/generated.bundle"],
+      }),
+    ).toBe(
+      "committed: abc1234 chore(tasks): generated init docs (2 files) (1 ignored path(s) skipped)",
     );
   });
 });
