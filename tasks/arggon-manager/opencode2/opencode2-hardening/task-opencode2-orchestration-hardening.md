@@ -81,3 +81,7 @@ its failure detection.
 - Gates: `npm test` 70 files / 1157 passed; `npm run lint` clean; `npm run build` clean; `arggon validate` 0/0; `arggon spec validate` 0/0; `npm run smoke:opencode` 11/11.
 
 Draft PR to `opencode2` follows. Acceptance checkboxes left for the coordinator per the worker rule.
+
+### handoff 2026-09-18 @Arggon — next: Coordinator: review draft PR #342 (findings 1-5 assertions in smoke/opencode-wave.ts, fail-demo, wave run 2 fixtures/0 failures, smoke:opencode 11/11), verify and flip done. Worker did not merge or f…
+- branch: feat/task-opencode2-orchestration-hardening
+- open questions: Wave harness run covered the pre-format file (post-run edits were prettier line-wraps only, same logic); reviewer may re-run smoke:opencode:wave for independent evidence.
