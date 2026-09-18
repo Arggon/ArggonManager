@@ -361,6 +361,85 @@ describe("doctor: git section (bug-init-git-doctor-blindspot)", () => {
   });
 });
 
+describe("doctor: human output sanitization (F1/F3)", () => {
+  it("renders an ordinary root and remote byte-identical (positive F3 case)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    const remote = "git@github.com:example/example.git";
+    execFileSync("git", ["remote", "add", "origin", remote], { cwd: dir });
+    const result = runDoctor({ cwd: dir });
+    const report = formatDoctorReport(result);
+    // Ordinary ASCII values pass through untouched: no escaping artifacts.
+    expect(report).toContain(`at ${dir}`);
+    expect(report).toContain(`remote ${remote}`);
+    expect(report.split("\n").find((line) => line.startsWith("  git:"))).toBe(
+      `  git: repo, dirty, remote ${remote}`,
+    );
+  });
+
+  it("renders a hostile budgetError inert on the human line; JSON keeps it raw (F3)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const result = runDoctor({ cwd: dir });
+    const hostile = "boom\nspoof: fake budget\u001b[31m\u0085\u007f\u2028\u2029";
+    result.budgetError = hostile;
+    const report = formatDoctorReport(result);
+    expect(report).not.toContain("\u001b");
+    expect(report).not.toContain("\nspoof");
+    expect(report).not.toContain("\u0085");
+    expect(report).not.toContain("\u007f");
+    expect(report).not.toContain("\u2028");
+    expect(report).not.toContain("\u2029");
+    expect(report).toContain(
+      "budget: measurement failed: boom\\nspoof: fake budget\\u001b[31m\\u0085\\u007f\\u2028\\u2029",
+    );
+    // --json envelope: the raw message survives byte for byte.
+    expect(result.budgetError).toBe(hostile);
+  });
+
+  it("sanitizes a hostile item file name on the doctor stderr failure line; JSON error keeps it raw (F1, bug-cli-error-output-injection)", () => {
+    // Review repro: an item file named `bad\nspoof: fake item<ESC>[31m.md`
+    // with an unknown status makes runDoctor throw; the message embeds the
+    // repo-controlled file path.
+    const dir = tempDir();
+    mkdirSync(join(dir, "tasks"), { recursive: true });
+    writeFileSync(join(dir, "tasks/.convention.yml"), "version: 4\n", "utf8");
+    const hostileName = "bad\nspoof: fake item\u001b[31m\u0085\u007f\u2028\u2029.md";
+    writeFileSync(
+      join(dir, "tasks", hostileName),
+      "---\ntype: task\nid: task-bad\nstatus: bogus\n---\nbody\n",
+      "utf8",
+    );
+    const proc = runCli(["doctor"], dir);
+    expect(proc.status).toBe(1);
+    expect(proc.stdout).toBe("");
+    // One inert line: no raw ESC/DEL/C1/LS/PS and no forged column-0 line.
+    expect(proc.stderr).not.toContain("\u001b");
+    expect(proc.stderr).not.toContain("\u0085");
+    expect(proc.stderr).not.toContain("\u007f");
+    expect(proc.stderr).not.toContain("\u2028");
+    expect(proc.stderr).not.toContain("\u2029");
+    expect(proc.stderr).not.toContain("\nspoof");
+    expect(proc.stderr.split("\n").filter(Boolean)).toHaveLength(1);
+    expect(proc.stderr).toContain(
+      "bad\\nspoof: fake item\\u001b[31m\\u0085\\u007f\\u2028\\u2029.md: unknown status 'bogus'",
+    );
+    // --json error envelope: raw message, valid JSON, unchanged contract.
+    const jproc = runCli(["doctor", "--json"], dir);
+    expect(jproc.status).toBe(1);
+    const body = JSON.parse(jproc.stdout) as {
+      ok: boolean;
+      error: { message: string; code: string };
+    };
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("DOCTOR_FAILED");
+    expect(body.error.message).toContain(hostileName);
+    expect(body.error.message).toContain("unknown status 'bogus'");
+    expect(jproc.stdout).not.toContain("\u001b"); // JSON.stringify escapes it
+  });
+});
+
 describe("doctor: outdated bucket (task-doctor-outdated-bucket)", () => {
   /**
    * Mutable fixture copy of the bundled templates dir: doctor re-renders from
