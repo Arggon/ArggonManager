@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode2-seam-polish
 title: "Seam polish: deferred review nits (present-skip docs, signature anchoring, tool permissions)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T13:06:52.341Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-seam-polish
 ---
 <!--
@@ -50,19 +49,19 @@ Findings to resolve:
 
 ## Acceptance
 
-- [ ] `docs/json-output.md` documents every `plan[].decision` value emitted by
+- [x] `docs/json-output.md` documents every `plan[].decision` value emitted by
       `init --dry-run --json` (including `present-skip` and
       `project-name-unrecoverable`).
-- [ ] `cli/src/docs.ts` has a single source for the `opencode.jsonc` path
+- [x] `cli/src/docs.ts` has a single source for the `opencode.jsonc` path
       mapping; the redirect docstring is accurate; the YAML marker comes from a
       named helper.
-- [ ] Signature detection anchors to the generated comment line, with a test
+- [x] Signature detection anchors to the generated comment line, with a test
       proving an adopter config that merely contains the phrase is not claimed.
-- [ ] `spec-opencode-seam-010` notes the `default_agent` decision.
-- [ ] Agent templates carry the tool-level permission rules **after** a probe
+- [x] `spec-opencode-seam-010` notes the `default_agent` decision.
+- [x] Agent templates carry the tool-level permission rules **after** a probe
       confirms the normalized action names on a real V2 session; the probe is
       recorded in the item.
-- [ ] Full suite green; `arggon validate` and `spec validate` clean; changes
+- [x] Full suite green; `arggon validate` and `spec validate` clean; changes
       land in one small PR to `opencode2`.
 
 ## Notes
@@ -152,3 +151,6 @@ and clean full re-run green).
 
 ### 2026-09-18 @Arggon
 PR: https://github.com/Arggon/ArggonManager/pull/332 (draft, base `opencode2`).
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; tool-level permission rules independently re-probed on a real warm session (reviewer: arggon_update Unknown tool / arggon_comment OK; worker: arggon_create Unknown tool / arggon_comment OK; action = argon_arggon_<tool>); NIT-12 anchored detection verified for realistic adopter shapes; NIT-10/11 behavior-preserving; MINOR-5 matches emitted decisions; merged with cli pass. F1/F2 filed as task-opencode2-seam-nits; F3 (2.0.8 drift) triggers task-opencode-v2-plugin-import-gotcha, launched. Closing.
