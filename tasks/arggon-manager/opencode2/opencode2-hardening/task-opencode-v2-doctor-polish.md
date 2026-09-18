@@ -42,16 +42,16 @@ was MERGE with these minors deferred here.
 
 ## Acceptance
 
-- [ ] Untrusted values are sanitized before appearing in human output (JSON
+- [x] Untrusted values are sanitized before appearing in human output (JSON
       escaping or an equivalent bounded sanitizer), with a test using a
       config whose key contains an escape/newline; JSON output unchanged.
-- [ ] Regression tests: `mcp.timeout` present under `mcp` is **not** flagged;
+- [x] Regression tests: `mcp.timeout` present under `mcp` is **not** flagged;
       block comments (`/* */`) and `//`/`/* */` markers inside strings parse
       (one `doctor.test.ts` case each).
-- [ ] Candidate-list parity: either doctor imports a shared exported list, or
+- [x] Candidate-list parity: either doctor imports a shared exported list, or
       a test asserts the two lists match; note the intentional difference
       (doctor lists all present configs; the helper returns the first).
-- [ ] Full suite, lint, `validate`/`spec validate` green; small PR to
+- [x] Full suite, lint, `validate`/`spec validate` green; small PR to
       `opencode2`.
 
 ## Notes
@@ -59,3 +59,31 @@ was MERGE with these minors deferred here.
 - The review also nits the PR/item evidence counts that went stale when the CI
   fix added a test (`1057` → `1074`); no code action, fold into this PR's
   description if touched.
+
+### 2026-09-18 @Arggon
+### Doctor polish implementation — evidence (task-opencode-v2-doctor-polish)
+
+Implementation commit: `05115d1` on `feat/task-opencode-v2-doctor-polish` (draft PR opened right after this comment). All three PR #324 review minors addressed:
+
+**MINOR-1 — terminal-output injection.** `formatOpenCodeLines` now runs every `v1ShapedKeys` entry through `sanitizeHumanValue` (allowlist `[A-Za-z0-9._-]`; anything else `JSON.stringify`-escaped in one bounded pass) before the human `hint:` line. Fixture with an `mcp.<name>` key containing ESC + newline (`evil\u001b[31m\nspoof: fake hint`):
+
+- human (`doctor | cat -v`): `hint: V1-shaped OpenCode config opencode.json (enabled, "mcp.evil\u001b[31m\nspoof: fake hint") — ...` — no `^[` ESC, no fabricated line; ordinary keys still render bare.
+- JSON (`doctor --json`): `keys: ["enabled", "mcp.evil\u001b[31m\nspoof: fake hint"]` — raw key preserved (`raw key preserved exactly: true`).
+
+Regression test asserts both directions: `sanitizes ANSI escapes and newlines in untrusted config keys for human output (MINOR-1)`.
+
+**MINOR-2 — documented invariants pinned** (one case each in `cli/src/doctor.test.ts`):
+
+- `does not flag the documented V2-valid mcp.timeout key (MINOR-2)`
+- `parses a block comment (/* */) outside strings (MINOR-2)`
+- `parses // and /* */ markers inside string values, not as comments (MINOR-2)`
+
+**MINOR-3 — choice: shared export, not a parity-mirror test.** `OPENCODE_CONFIG_CANDIDATES` is now exported from `cli/src/docs.ts`; `findOpenCodeConfig` and `doctor` both import it. Added a pin test (`scans exactly the shared OPENCODE_CONFIG_CANDIDATES list from docs.ts (MINOR-3 parity)`). The intentional difference is documented on the export: doctor lists ALL present configs; the helper returns the first ADOPTER one (arggon's generated config skipped by signature). `docs/json-output.md` statements remain true — no doc edit.
+
+**Gates** (worktree `../ArggonManager-opencode2-task-opencode-v2-doctor-polish`):
+
+- `npm test`: 69 files, 1132 tests passed
+- `npm run lint`: clean
+- `npm run build` (tsc): clean
+- `arggon validate --json`: ok (0 errors/warnings)
+- `arggon spec validate --json`: ok (0 errors/warnings)
