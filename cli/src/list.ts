@@ -11,6 +11,7 @@ import { isItemType, ITEM_TYPES } from "./ids.js";
 import { loadItems, type WorkItem } from "./items.js";
 import { isPriority, PRIORITIES } from "./priority.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
+import { sanitizeHumanTextUncapped } from "./sanitize.js";
 import { isStatus, isClaimed, STATUSES } from "./status.js";
 
 export type ListOptions = {
@@ -202,13 +203,17 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
 /** Human-readable table for CLI stdout. Missing titles fall back to id. */
 export function formatListTable(items: WorkItem[]): string {
   const headers = ["id", "type", "status", "assignee", "branch", "title"] as const;
+  // Repo-controlled columns (frontmatter values, filename-derived ids) are
+  // escaped before any layout math, so widths account for the inert rendering
+  // and a hostile value can neither emit a control sequence nor break the row
+  // (task-row-table-stdout-sanitize). Display only; --json stays raw.
   const rows = items.map((item) => [
-    item.id,
+    sanitizeHumanTextUncapped(item.id),
     item.type,
     item.status,
-    item.assignee ?? "-",
-    item.branch ?? "-",
-    item.title ?? item.id,
+    sanitizeHumanTextUncapped(item.assignee ?? "-"),
+    sanitizeHumanTextUncapped(item.branch ?? "-"),
+    sanitizeHumanTextUncapped(item.title ?? item.id),
   ]);
   const all = [headers.map((h) => h), ...rows];
   const widths = headers.map((_, col) => Math.max(...all.map((row) => row[col].length)));

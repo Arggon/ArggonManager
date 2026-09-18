@@ -14,6 +14,7 @@ import { itemId } from "./ids.js";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
 import { parseFrontmatter, stringField } from "./frontmatter.js";
 import { findTasksDir } from "./paths.js";
+import { sanitizeHumanTextUncapped } from "./sanitize.js";
 import {
   commitTrackerMutation,
   formatCommitLine,
@@ -248,9 +249,7 @@ export function buildInventory(root: string): Inventory {
       managed: state[path] !== undefined,
     };
   }).sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
-  const stackHints = STACK_MANIFESTS.filter((manifest) =>
-    existsSync(join(root, manifest)),
-  );
+  const stackHints = STACK_MANIFESTS.filter((manifest) => existsSync(join(root, manifest)));
   return { docs, stackHints, corpora: detectSpecCorpora(root) };
 }
 
@@ -573,15 +572,20 @@ export function formatAdoptReport(result: AdoptResult): string {
   const adopterOwned = present.filter((doc) => !doc.managed);
   const absent = result.inventory.docs.length - present.length;
 
+  // Every value below can be repo-controlled (the skip path takes storyId from
+  // the existing adoption task's `parent:`, taskPath from the filename), so the
+  // interpolations escape in place (task-row-table-stdout-sanitize); --json
+  // keeps the raw values byte for byte.
+  const esc = sanitizeHumanTextUncapped;
   const lines: string[] = [];
   const action = result.skipped
-    ? `already tracked as ${result.taskId} (open adoption task — skipped)`
+    ? `already tracked as ${esc(result.taskId)} (open adoption task — skipped)`
     : result.dryRun
-      ? `would create ${result.taskId} under ${result.storyId}`
-      : `${result.taskId} under ${result.storyId}`;
+      ? `would create ${esc(result.taskId)} under ${esc(result.storyId)}`
+      : `${esc(result.taskId)} under ${esc(result.storyId)}`;
   lines.push(`arggon adopt${result.dryRun && !result.skipped ? " (dry run)" : ""}: ${action}`);
   if (!result.dryRun && !result.skipped) {
-    lines.push(`  ${result.taskPath}`);
+    lines.push(`  ${esc(result.taskPath)}`);
   }
   const storyState = result.skipped
     ? "(existing)"
@@ -590,10 +594,10 @@ export function formatAdoptReport(result: AdoptResult): string {
       : result.dryRun
         ? "(would create when missing)"
         : "(existing)";
-  lines.push(`  story: ${result.storyId} ${storyState}`);
+  lines.push(`  story: ${esc(result.storyId)} ${storyState}`);
   if (result.createdContainers.length > 0) {
     const state = result.dryRun ? "(planned)" : "(created)";
-    lines.push(`  containers: ${result.createdContainers.join(` ${state}, `)} ${state}`);
+    lines.push(`  containers: ${result.createdContainers.map(esc).join(` ${state}, `)} ${state}`);
   }
   const commitLine = formatCommitLine(result.commit);
   if (commitLine) {
@@ -607,7 +611,7 @@ export function formatAdoptReport(result: AdoptResult): string {
     for (const doc of result.inventory.docs) {
       const label = !doc.exists ? "absent" : doc.managed ? "managed" : "adopter";
       const size = doc.exists ? ` — ${doc.bytes} B` : "";
-      lines.push(`    [${label}] ${doc.path}${size}`);
+      lines.push(`    [${label}] ${esc(doc.path)}${size}`);
     }
   }
   if (result.inventory.stackHints.length > 0) {
@@ -732,7 +736,10 @@ export function formatAdoptAckReport(result: AdoptAckResult): string {
     `arggon adopt --ack: ${result.count} generated doc(s) acknowledged as the new baseline`,
   ];
   for (const doc of result.acked) {
-    lines.push(`  ${doc.path} — ${doc.checksum}`);
+    // The path comes from the x-generated keys (.convention.yml): repo-
+    // controlled bytes, escaped in place (task-row-table-stdout-sanitize).
+    // The checksum is a locally computed sha256 hex digest.
+    lines.push(`  ${sanitizeHumanTextUncapped(doc.path)} — ${doc.checksum}`);
   }
   return `${lines.join("\n")}\n`;
 }

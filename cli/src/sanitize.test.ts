@@ -4,6 +4,7 @@ import {
   MAX_HUMAN_VALUE_CHARS,
   sanitizeHumanError,
   sanitizeHumanText,
+  sanitizeHumanTextUncapped,
   sanitizeHumanValue,
 } from "./sanitize.js";
 
@@ -80,6 +81,47 @@ describe("sanitizeHumanText", () => {
     expect(sanitizeHumanError("ordinary error")).toBe("ordinary error");
     // The error channel escapes the same code points and stays one line.
     expect(sanitizeHumanError("bad\nspoof\u001b[31m")).toBe("bad\\nspoof\\u001b[31m");
+  });
+});
+
+describe("sanitizeHumanTextUncapped (row/table channel)", () => {
+  it("leaves every printable ordinary value byte-identical, quotes/backslashes included", () => {
+    const ordinary = [
+      "task-rate-limit",
+      "Feature: export as CSV",
+      'Fix "quoted" title with a \\ backslash',
+      "blocked_reason: waiting on review of PR #354",
+    ];
+    for (const value of ordinary) {
+      expect(sanitizeHumanTextUncapped(value)).toBe(value);
+    }
+  });
+
+  it("escapes the shared unsafe set in place (C0/DEL/C1/LS/PS) as inert text", () => {
+    expect(sanitizeHumanTextUncapped("a\nb")).toBe("a\\u000ab");
+    expect(sanitizeHumanTextUncapped("x\u001b[31m")).toBe("x\\u001b[31m");
+    expect(sanitizeHumanTextUncapped("a\u007fb")).toBe("a\\u007fb");
+    expect(sanitizeHumanTextUncapped("a\u0085b")).toBe("a\\u0085b");
+    expect(sanitizeHumanTextUncapped("a\u009fb")).toBe("a\\u009fb");
+    expect(sanitizeHumanTextUncapped("a\u2028b\u2029c")).toBe("a\\u2028b\\u2029c");
+    // Deliberate policy difference from sanitizeHumanText: printable quotes
+    // and backslashes are NOT re-escaped (no JSON-quoted context here).
+    expect(sanitizeHumanTextUncapped('say "hi" \\o/')).toBe('say "hi" \\o/');
+    expect(sanitizeHumanText('say "hi" \\o/')).toBe('say \\"hi\\" \\\\o/');
+  });
+
+  it("has no length cap: a long ordinary value renders in full", () => {
+    const long = "t".repeat(MAX_HUMAN_VALUE_CHARS * 3);
+    expect(sanitizeHumanTextUncapped(long)).toBe(long);
+    expect(sanitizeHumanText(long)).toBe(`${"t".repeat(MAX_HUMAN_VALUE_CHARS)}…`);
+  });
+
+  it("keeps the hostile repro inert (one line, no raw unsafe code point)", () => {
+    const hostile = "badfake\u2028item\u2029 \u001b31m\u0085\u007f";
+    const out = sanitizeHumanTextUncapped(hostile);
+    expect(out).not.toMatch(UNSAFE);
+    expect(out.split("\n")).toHaveLength(1);
+    expect(out).toBe("badfake\\u2028item\\u2029 \\u001b31m\\u0085\\u007f");
   });
 });
 
