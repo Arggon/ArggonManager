@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-opencode2-plugin-escape-nits
-title: "Plugin escape-edge nits: escaped \\\\( in command position + unbalanced quoted paths correlate"
-priority: p3
+title: "Plugin escape-edge nits: escaped \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\( in command position + unbalanced quoted paths correlate"
+assignee: Arggon
+branch: feat/task-opencode2-plugin-escape-nits
 parent: opencode2-hardening
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T22:08:51.360Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-plugin-escape-nits
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/opencode2-hardening/task-opencode2-plugin-escape-nits.md
