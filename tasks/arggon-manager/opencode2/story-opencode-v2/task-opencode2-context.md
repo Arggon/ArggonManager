@@ -127,3 +127,6 @@ pre-existing measurements (ADR 0006 re-measure 2026-09-15: AGENTS.md 2,043 B →
 
 Repro: `npm run context:report` (add `--json` for machine output;
 `CONTEXT_REPORT_BEFORE_REV=<rev>` pins the before/after reconstruction).
+
+### 2026-09-18 @Arggon
+W6 draft PR: https://github.com/Arggon/ArggonManager/pull/329 (base opencode2). Stops here: no merge, no status flip.
