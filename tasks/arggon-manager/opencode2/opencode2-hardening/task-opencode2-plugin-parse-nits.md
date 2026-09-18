@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-opencode2-plugin-parse-nits
 title: "Plugin parser edge cases: escaped $( opener, contrived openers, stateful quote tokens, depth/comment tests"
-priority: p3
+assignee: Arggon
+branch: feat/task-opencode2-plugin-parse-nits
 parent: opencode2-hardening
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T17:28:20.446Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-plugin-parse-nits
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/opencode2-hardening/task-opencode2-plugin-parse-nits.md
