@@ -40,6 +40,8 @@ its failure detection.
   `opencode session export` would print zeros and still pass. Add a check that
   both arms exported ≥1 call.
 
+- **Finding 5 — hardcoded runtime version.** `smoke/opencode-wave.ts` (header and the accounting `info` line) still literals `opencode v2.0.7`; the harness probes `opencode --version`, so interpolate the probed value (or drop the literal) — raised when the installed runtime moved to 2.0.8 while the strings stayed behind.
+
 ## Acceptance
 
 - [ ] Deny probes assert the expected marker text in addition to the negative
@@ -51,6 +53,8 @@ its failure detection.
 - [ ] A/B sessions assert ≥1 exported call each.
 - [ ] `smoke:opencode:wave` still passes end-to-end; full suite green; small PR
       to `opencode2`.
+
+- [ ] Wave-harness version strings interpolate the probed runtime (no hardcoded 2.0.x literals).
 
 ## Notes
 
