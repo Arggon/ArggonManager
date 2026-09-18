@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-tracker-title-rescape
-title: "Tracker serializer doubles backslashes in quoted titles on every mutation"
-priority: p2
+title: Tracker serializer doubles backslashes in quoted titles on every mutation
+assignee: Arggon
+branch: fix/bug-tracker-title-rescape
 parent: story-tracker-hygiene
 labels: []
+priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T22:26:56.651Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-tracker-title-rescape
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tracker-hygiene/bug-tracker-title-rescape.md
