@@ -77,3 +77,6 @@ Worker evidence — fix implemented, gates green, draft PR next.
 **Tests (`cli/src/convention.test.ts`, +7):** full escape set including `\\`, `\"`, `\n`, `\x`/`\u`, unknown escapes, trailing lone backslash, single-quote `''`; decoding for branch_patterns/x-views/x-worktree/x-import scalars; writer raw-file round-trip; already-corrupted value no-growth; repeated init rewrite byte-stable with raw-file assertions.
 
 **Gates:** full suite 76 files / 1282 tests passed (private TMPDIR); eslint clean; tsc build clean; `arggon validate` ok (no errors/warnings); `arggon spec validate` ok (16 docs, 0 warnings).
+
+### 2026-09-18 @Arggon
+Draft PR open for review: https://github.com/Arggon/ArggonManager/pull/364 (base `opencode2`, draft, not merged). Gates green on merged HEAD; no status flip by the worker.
