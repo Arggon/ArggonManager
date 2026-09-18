@@ -140,3 +140,7 @@ Evidence + decisions — row/table human stdout sanitized (draft PR pending revi
 **Gates.** `npm test` 75 files / 1257 tests green (private TMPDIR); `npm run lint` clean; `npm run build` clean; `arggon validate` ok (0 warnings); `arggon spec validate` ok (16 docs, 0 warnings).
 
 **Files touched.** `cli/src/sanitize.ts`, `cli/src/{list,show,report,playbooks,spec-audit,tui,adopt}.ts`, `cli/src/sanitize.test.ts`, new `cli/src/row-table-stdout.test.ts`, tracker. Not touched: `handoff.ts`, `opencode/plugins/arggon/**`, `mcp-server.ts`, docs. Out of scope by audit: `trend` (static), HTML board (`escapeHtml`), `instructions`/`show --body` content.
+
+### handoff 2026-09-18 @Arggon — next: Review the draft PR against opencode2 (row/table stdout sanitization: list, show, report, playbook status, spec audit, tui, adopt/adopt --ack); coordinator/reviewer merges and flips status (worker do…
+- branch: feat/task-row-table-stdout-sanitize
+- open questions: None blocking. Decisions recorded in the evidence comment: uncapped escape-only sanitizer for row/table channels (byte-identity incl. quotes/backslashes, documented cap decision); show prose/comments…
