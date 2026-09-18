@@ -83,3 +83,7 @@ init scaffold (`cli/src/init.ts`), `applyDocsPlan` state rewrite (`cli/src/docs.
 - Delegation test `cli/src/atomic-config-writers.test.ts`: `fs.writeFileSync` is never called with the config path by the three writers; `writeFileAtomic` sees the scaffold/state/ack contents.
 - Gates: `npm run build` ok, `npm run lint` ok, `npm test` 1172/1173 — the single failure is the known shared-machine `/tmp/arggon-budget-*` flake (another session's vitest creates those dirs; `measure.test.ts` passes 11/11 with a private `TMPDIR`). `arggon validate` ok, `arggon spec validate` ok.
 - Branch `fix/bug-atomic-write-followups`, draft PR to `opencode2` next.
+
+### handoff 2026-09-18 @Arggon (session: ses_f4ab32848ffeGpWnbmCAv9mN9e) — next: Coordinator: review draft PR #344 (https://github.com/Arggon/ArggonManager/pull/344), merge into opencode2, then flip the item done (acceptance checklist is complete).
+- branch: fix/bug-atomic-write-followups
+- open questions: None blocking; F1 lock-scope extension deliberately deferred as a separate architecture item if cross-item lost updates are prioritized.
