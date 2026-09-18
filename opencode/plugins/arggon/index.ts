@@ -254,26 +254,30 @@ function splitSegments(command: string): string[] {
 /**
  * One whitespace token: unquoted text plus whether the token is a plain shell
  * word rather than a syntax construct. A token is a word when it began inside
- * a quoted span or contains an escaped `\$(`, so it can never be a grouping
- * opener and `commandHead` must not strip grouping prefixes from it (F-A/F-B:
- * `"(" arggon …` runs a command named `(`, `\$(arggon …` syntax-errors).
+ * a quoted span or begins with an escaped `\$(`/`\(`, so it can never be a
+ * grouping opener and `commandHead` must not strip grouping prefixes from it
+ * (F-A/F-B/F2: `"(" arggon …` runs a command named `(`, `\$(arggon …` and
+ * `\(arggon …` syntax-error).
  */
 type ShellToken = { text: string; word: boolean }
 
 /**
  * Whitespace tokens of one segment. Quoted spans stay one token (quotes
- * stripped) so `echo "arggon show task-x"` is `["echo", "arggon show task-x"]`
- * — a mention, never a command. Quote handling is stateful like
- * `splitSegments`: a `'` inside an open double quote (and vice versa) is a
- * literal character, never a toggle (F-C). Backslashes escape the next
- * character outside single quotes; an escaped `$(` is kept literal and marks
- * the token a word (F-A).
+ * stripped, inner whitespace included) so `echo "arggon show task-x"` is
+ * `["echo", "arggon show task-x"]` — a mention, never a command — and
+ * `x="a b" arggon show task-x` keeps the assignment ahead of the real command
+ * (F1). Quote handling is stateful like `splitSegments`: a `'` inside an open
+ * double quote (and vice versa) is a literal character, never a toggle (F-C).
+ * Backslashes escape the next character outside single quotes; an escaped
+ * `$(` is kept literal and marks the token a word (F-A), and a token that
+ * *starts* with an escaped `\(` is likewise a word, never an opener (F2).
  */
 function splitTokens(segment: string): ShellToken[] {
   const tokens: ShellToken[] = []
   let current = ""
   let quote: '"' | "'" | null = null
   let escaped = false
+  let escapedAtStart = false
   let started = false
   let word = false
   const push = (): void => {
@@ -295,6 +299,9 @@ function splitTokens(segment: string): ShellToken[] {
         current += "$(" // literal `$(`: bash syntax-errors, never a group (F-A)
         i += 1
         word = true
+      } else if (ch === "(" && escapedAtStart) {
+        current += "(" // a token starting with literal `\(` is a word (F2)
+        word = true
       } else {
         current += ch
       }
@@ -303,6 +310,7 @@ function splitTokens(segment: string): ShellToken[] {
     }
     if (ch === "\\") {
       escaped = true
+      escapedAtStart = !started
       started = true
       continue
     }
@@ -325,7 +333,7 @@ function splitTokens(segment: string): ShellToken[] {
       started = true
       continue
     }
-    if (/\s/.test(ch)) {
+    if (quote === null && /\s/.test(ch)) {
       if (started) push()
       continue
     }
@@ -346,8 +354,9 @@ function isEnvAssignment(token: string): boolean {
  * stripped, `$(`/`(`/`{` grouping openers removed (so `x=$(arggon`, `(arggon`
  * and `$(arggon` all yield `arggon`), trailing group closers dropped, then the
  * last path segment kept (`/usr/local/bin/arggon` → `arggon`). A word token
- * (started in quotes, or carrying a literal escaped `$(`) keeps only its last
- * path segment: grouping prefixes and assignments in its text stay literal.
+ * (started in quotes, or starting with a literal escaped `$(`/`\(`) keeps
+ * only its last path segment: grouping prefixes and assignments in its text
+ * stay literal.
  */
 function commandHead(token: ShellToken): string {
   if (token.word) return token.text.split("/").pop() ?? ""
@@ -545,14 +554,19 @@ function parseCommandText(command: string, depth: number): string | undefined {
  * (run|exec|dlx) arggon …`, `$(…)` command substitutions and `(…)` subshells,
  * and `;`/`&`/`|`/newline-separated commands. Quoted text is inert:
  * `grep -rn "arggon show task-x"`, `echo "&& arggon show task-x"` and
- * `echo '(arggon show task-x)'` do not correlate, while `echo "$(arggon show
- * task-x)"` does (the substitution runs) and a quoted grouping word
- * (`"(" arggon …`) is a command name, never an opener.
+ * `echo '(arggon show task-x)'` do not correlate, and a multi-word quoted
+ * mention (`"arggon show task-x"`, `command "arggon show task-x"`,
+ * `npm run "arggon show task-x"`, `x="line1\narggon show task-x"`) is one
+ * word, never a command, while `echo "$(arggon show task-x)"` does correlate
+ * (the substitution runs) and a quoted grouping word (`"(" arggon …`) is a
+ * command name, never an opener. A token starting with an escaped `\(` is
+ * likewise a literal word (F2), while a quoted assignment before the command
+ * (`x="a b" arggon show task-x`) stays an assignment and the command runs (F1).
  *
  * Best effort, misses are harmless and false positives are not: aliases,
  * backticks, `sh -c "arggon …"`, `timeout 5 arggon …` and `xargs arggon …`
- * are not detected; `#` comments are dropped, escaped `\$(…)` openers are
- * literal (F-A), while heredoc bodies and nested quoting inside a group are
+ * are not detected; `#` comments are dropped, escaped `\$(…)` and `\(` are
+ * literal (F-A/F2), while heredoc bodies and nested quoting inside a group are
  * not modeled. The `arggon_*` Code Mode regex (see `parseArggonItemFromCode`)
  * stays a raw-source best effort of its own.
  */
