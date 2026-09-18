@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-atomic-write-followups
 title: "atomic-write follow-ups: .convention.yml torn-write exposure + guard/mode nits"
-priority: p3
+assignee: Arggon
+branch: fix/bug-atomic-write-followups
 parent: story-self-improvement
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T16:15:12.599Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-atomic-write-followups
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/bug-atomic-write-followups.md
@@ -46,14 +50,40 @@ which made every item-file write atomic.
 
 ## Acceptance
 
-- [ ] The three `.convention.yml` writes use `writeFileAtomic`; a torn-read
+- [x] The three `.convention.yml` writes use `writeFileAtomic`; a torn-read
       probe on the config path shows no partial observation; readers unchanged.
-- [ ] F1 decided and implemented: the guard tolerates same-path replacement, or
+- [x] F1 decided and implemented: the guard tolerates same-path replacement, or
       the lock scope is extended where feasible (rationale recorded).
-- [ ] F2 decided: mode preserved (stat+chmod) or explicitly accepted.
-- [ ] Full suite, lint, `validate`/`spec validate` green; small PR to
+- [x] F2 decided: mode preserved (stat+chmod) or explicitly accepted.
+- [x] Full suite, lint, `validate`/`spec validate` green; small PR to
       `opencode2`.
 
 ## Notes
 
 - None of this blocks; item-file writes are already atomic.
+
+### 2026-09-18 @Arggon
+## F1/F2 decisions + F3 evidence (worker)
+
+**F1 — guard tolerance, not lock-scope extension.**
+`writeFileAtomic` captures the temp file's `dev`+`ino` before the rename; the post-rename shrink guard now throws only while the path still holds that inode and the size mismatches. A non-locking co-writer's atomic rename inside the window (promotion `depends_on` rewrite, `priority migrate`, concurrent `create` of the same id) swaps the inode and is tolerated — the on-disk size then says nothing about our write. ENOENT after our own successful rename (co-writer moved/deleted the path, e.g. a reparent move) is tolerated the same way. When the inode is still ours, a short file still throws loudly (e.g. an in-place truncating writer touched it). Lock-scope extension was rejected for this item: promotion's tree rewrite and `priority migrate` are multi-item writers whose lock extension needs an ordered multi-lock protocol (architecture change), and `.convention.yml` has no lock at all; cross-item lost updates remain the documented separate lock-scope class.
+
+**F2 — mode preserved.**
+An existing target's permission bits are stat'ed and `chmod`'ed onto the temp file before the rename; new files keep the umask default. Ownership (needs privileges) and hard links (rename(2) semantics) are explicitly accepted — no CLI-created file relies on either.
+
+**F3 — all three `.convention.yml` writers atomic.**
+init scaffold (`cli/src/init.ts`), `applyDocsPlan` state rewrite (`cli/src/docs.ts`), and `adopt --ack` (`cli/src/adopt.ts`) now call `writeFileAtomic`; readers (`readConventionConfig`, `readConventionVersion`) unchanged.
+
+**Evidence**
+
+- Torn-read probe `cli/src/config-race.test.ts` (~1.2MB config; 3 tight-loop reader children vs 2 writer children x 8 iterations through the real paths):
+  - pre-fix (call sites stashed back to `writeFileSync`): torn = **169** (init rerun) / **115** (adopt --ack) / **94** (init --force)
+  - post-fix: torn = **0** in all three phases
+- Guard/mode units `cli/src/atomic.test.ts` (10 tests): same-path replacement tolerated; move tolerated; in-place truncation still throws; 0600 preserved; fresh file = umask default.
+- Delegation test `cli/src/atomic-config-writers.test.ts`: `fs.writeFileSync` is never called with the config path by the three writers; `writeFileAtomic` sees the scaffold/state/ack contents.
+- Gates: `npm run build` ok, `npm run lint` ok, `npm test` 1172/1173 — the single failure is the known shared-machine `/tmp/arggon-budget-*` flake (another session's vitest creates those dirs; `measure.test.ts` passes 11/11 with a private `TMPDIR`). `arggon validate` ok, `arggon spec validate` ok.
+- Branch `fix/bug-atomic-write-followups`, draft PR to `opencode2` next.
+
+### handoff 2026-09-18 @Arggon (session: ses_f4ab32848ffeGpWnbmCAv9mN9e) — next: Coordinator: review draft PR #344 (https://github.com/Arggon/ArggonManager/pull/344), merge into opencode2, then flip the item done (acceptance checklist is complete).
+- branch: fix/bug-atomic-write-followups
+- open questions: None blocking; F1 lock-scope extension deliberately deferred as a separate architecture item if cross-item lost updates are prioritized.

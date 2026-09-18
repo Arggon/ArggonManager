@@ -1,5 +1,6 @@
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { writeFileAtomic } from "./atomic.js";
 import {
   readGeneratedProjectName,
   readGeneratedState,
@@ -710,7 +711,9 @@ export function runAdoptAck(opts: AdoptAckOptions): AdoptAckResult {
     return { root, acked, count: 0 };
   }
 
-  writeFileSync(
+  // Atomic (bug-atomic-write-followups F3): readers must never observe a torn
+  // .convention.yml while the ack baseline is refreshed.
+  writeFileAtomic(
     statePath,
     // Preserve the recorded project name (bug-project-name-dir-derived): the
     // ack rewrites the x-generated section but must not drop x-generated.projectName.
@@ -719,7 +722,6 @@ export function runAdoptAck(opts: AdoptAckOptions): AdoptAckResult {
       nextState,
       readGeneratedProjectName(root),
     ),
-    "utf8",
   );
   return { root, acked, count: acked.length };
 }

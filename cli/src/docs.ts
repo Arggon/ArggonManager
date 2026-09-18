@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
+import { writeFileAtomic } from "./atomic.js";
 import { bundledTemplatesDir, packageRoot } from "./paths.js";
 import {
   parseGeneratedProjectName,
@@ -959,7 +960,9 @@ export function applyDocsPlan(root: string, plan: DocsPlan): DocsResult {
     writeFileSync(destAbs, e.write, "utf8");
   }
   if (plan.stateWrite) {
-    writeFileSync(plan.stateWrite.path, plan.stateWrite.content, "utf8");
+    // Atomic (bug-atomic-write-followups F3): readers (readConventionConfig,
+    // readConventionVersion) must never observe the truncate window.
+    writeFileAtomic(plan.stateWrite.path, plan.stateWrite.content);
   }
   return {
     created: plan.created,
