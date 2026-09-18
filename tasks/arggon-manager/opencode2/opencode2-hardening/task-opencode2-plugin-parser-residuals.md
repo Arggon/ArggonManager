@@ -88,3 +88,7 @@ Branch head before commit: `34a482b`; probes run against a copy of the pre-fix s
 **Regression set.** 71-case before→after probe: only the 16 intended lines changed. 20 true positives unchanged (`arggon`, absolute/relative/`//` paths, quoted spaces, `VAR=1`, wrappers, runners, `$(…)`, `echo \\$(…)`, `(arggon …)`, `X=a\(b arggon …`, `X=a\\b arggon …`, `git status && arggon`); all #337/#345/#352/#356/#358 eliminations unchanged (`\\(arggon`, escaped `\$(`, quoted mentions/spans, `"(" arggon`, `"$(" arggon`, `"echo /usr/bin/arggon"`, `'(/usr/local/bin/arggon'`, `command -v`, `#` comments).
 
 **Gates.** focused `opencode/plugins/arggon/index.test.ts` 42/42; full suite 75 files / 1265 tests green (private TMPDIR); `npm run lint` green; `npm run build` green; `arggon validate` ok 0 warnings; `arggon spec validate` ok (16 docs, 0 warnings); `npm run smoke:opencode` 11 scenarios, 0 failures.
+
+### handoff 2026-09-18 @Arggon — next: Review DRAFT PR #361 against opencode2 (https://github.com/Arggon/ArggonManager/pull/361) and merge when green; worker stops here. Files: opencode/plugins/arggon/index.ts, index.test.ts + tracker.
+- branch: feat/task-opencode2-plugin-parser-residuals
+- open questions: Finding 3 residual is pinned, not fixed; a full command-position grammar is out of scope.
