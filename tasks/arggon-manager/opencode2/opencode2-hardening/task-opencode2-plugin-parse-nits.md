@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-opencode2-plugin-parse-nits
 title: "Plugin parser edge cases: escaped $( opener, contrived openers, stateful quote tokens, depth/comment tests"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T17:28:20.446Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-plugin-parse-nits
 ---
 <!--
@@ -87,3 +86,6 @@ Gates on merged tree `2b6fd43`: `npm test` → 73 files / 1211 tests pass (priva
 
 ### handoff 2026-09-18 @Arggon (session: ses_f4a703652ffe9qo36Nf8Crwoig) — next: Review draft PR #352 (base opencode2): F-A escaped \$( opener, F-B command -v + quoted opener/assignment words, F-C stateful token quotes, F-D depth/comment/newline/wrapper-value tests. Gates green o…
 - branch: feat/task-opencode2-plugin-parse-nits
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; all four findings fixed and matched against bash ground truth (escaped $() in both paths, command -v/-V/-pv as queries, quoted openers/assignments as words with quoted paths still correlating, stateful quote tokens incl. the corrected F-C example, depth/comment/value-option tests); 69-case independent probe: 13 intent-changing deltas in the claimed directions + 1 FP elimination, zero new false positives, #337/#345 regressions intact; smoke 11/11 + CI pass; merged. Pre-existing quote-span/escaped-\( forms filed as task-opencode2-plugin-quote-spans. Closing.
