@@ -8,7 +8,7 @@
  * 127.0.0.1-only binding.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync as _mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync as _mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,8 +17,13 @@ import { startBoardServer, type BoardServeHandle } from "./board-serve.js";
 import type { BoardGithub, PrInfo } from "./board.js";
 import { runInit } from "./init.js";
 import { runCreate } from "./create.js";
+import { removeFixtureTree } from "./test-tmp.js";
 
-// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test
+// through the shared bounded-retry helper (test-tmp.ts) — the CLI `board
+// --serve` child is only SIGTERM'd (never awaited) and servers close on
+// teardown, so a still-settling fs entry must never trip the one-shot
+// ENOTEMPTY race in plain recursive rmSync.
 const tmpDirs: string[] = [];
 function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
   const dir = _mkdtempSync(prefix, options);
@@ -42,7 +47,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await handle.close();
-  for (const d of tmpDirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  for (const d of tmpDirs.splice(0)) removeFixtureTree(d);
 });
 
 describe("board --serve", () => {
@@ -215,7 +220,7 @@ describe("board --serve review surface (task-board-review-surface)", () => {
       expect(refreshed).toContain("#9 · open · ✓");
     } finally {
       await ghHandle.close();
-      rmSync(ghDir, { recursive: true, force: true });
+      removeFixtureTree(ghDir);
     }
   }, 15_000);
 
@@ -235,7 +240,7 @@ describe("board --serve review surface (task-board-review-surface)", () => {
       expect((await fetch(`${noGhHandle.url}/`)).status).toBe(200);
     } finally {
       await noGhHandle.close();
-      rmSync(noGhDir, { recursive: true, force: true });
+      removeFixtureTree(noGhDir);
     }
   }, 15_000);
 });

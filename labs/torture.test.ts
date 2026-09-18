@@ -77,13 +77,14 @@
  * trees under os.tmpdir().
  */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { runCreate } from "../cli/src/create.js";
 import { runInit } from "../cli/src/init.js";
+import { removeFixtureTree } from "../cli/src/test-tmp.js";
 import { runUpdate } from "../cli/src/update.js";
 import { GENERATED_DOC_COUNT } from "../cli/src/docs.js";
 
@@ -263,7 +264,7 @@ describe("lab: mixed concurrent operations on one item family (suizo / bug-claim
       // The tree is structurally sound after the storm.
       expect(runCli(["validate", "--json"], dir).body).toMatchObject({ ok: true });
 
-      rmSync(dir, { recursive: true, force: true });
+      removeFixtureTree(dir);
     },
     90_000, // 8 concurrent tsx processes; generous wall-clock budget
   );
@@ -351,7 +352,7 @@ describe("lab: concurrent tracker auto-commit contention (suizo lock-transitorio
 
       expect(runCli(["validate", "--json"], dir).body).toMatchObject({ ok: true });
 
-      rmSync(dir, { recursive: true, force: true });
+      removeFixtureTree(dir);
     },
     90_000, // 6 concurrent tsx processes + real git commits
   );
@@ -392,7 +393,7 @@ describe("lab: concurrent tracker auto-commit contention (suizo lock-transitorio
 
         expect(runCli(["validate", "--json"], dir).body).toMatchObject({ ok: true });
       } finally {
-        rmSync(dir, { recursive: true, force: true });
+        removeFixtureTree(dir);
       }
     },
     90_000,
@@ -465,7 +466,7 @@ describe("lab: synthetic legacy tree, full adoption flow (guardian/cuentas/suizo
     const cleanup = runCli(["cleanup", "--json"], dir);
     expect(cleanup.body).toMatchObject({ ok: true });
 
-    rmSync(dir, { recursive: true, force: true });
+    removeFixtureTree(dir);
   }, 60_000); // ~7 CLI spawns, each paying the tsx compile cost
 });
 
@@ -523,8 +524,8 @@ describe("lab: upgrade flow over acked state (guardian / bug-ack-baseline-regen-
     );
     expect(readFileSync(contributing, "utf8")).not.toBe("MY CONTRIBUTOR NOTES\n");
 
-    rmSync(dir, { recursive: true, force: true });
-    rmSync(plain, { recursive: true, force: true });
+    removeFixtureTree(dir);
+    removeFixtureTree(plain);
   }, 60_000);
 });
 
@@ -628,7 +629,7 @@ describe("lab: gate probes from every entry point (guardian/suizo)", () => {
     // alice's claim survived every probe.
     expect(frontmatter(dir, "launch", "auth", "story-login", "task-claimed.md").assignee).toBe("alice");
 
-    rmSync(dir, { recursive: true, force: true });
+    removeFixtureTree(dir);
   }, 60_000);
 
   it("reopen: refused via CLI non-TTY and MCP; kernel keeps the human-legal transition", async () => {
@@ -652,7 +653,7 @@ describe("lab: gate probes from every entry point (guardian/suizo)", () => {
     const kernel = runUpdate({ cwd: dir, id: doneId, status: "todo" });
     expect(kernel.item.status).toBe("todo");
 
-    rmSync(dir, { recursive: true, force: true });
+    removeFixtureTree(dir);
   }, 60_000);
 });
 
@@ -732,6 +733,6 @@ describe("lab: long MCP session (estanteria 53-call session)", () => {
 
     // The tree survived the session.
     expect(runCli(["validate", "--json"], dir).body).toMatchObject({ ok: true });
-    rmSync(dir, { recursive: true, force: true });
+    removeFixtureTree(dir);
   }, 90_000); // ~31 sequential MCP round trips over a tsx-hosted server
 });

@@ -19,13 +19,14 @@
  * committed assertion below observes 0.
  */
 import { spawn } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { CONVENTION_VERSION, readConventionConfig } from "./convention.js";
 import { runInit } from "./init.js";
+import { removeFixtureTree } from "./test-tmp.js";
 
 const TIMEOUT_MS = 120_000;
 const READERS = 3;
@@ -40,12 +41,13 @@ const tsxLoader = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
 type ReaderStats = { reads: number; torn: number; samples: string[] };
 type ChildResult = { code: number | null; stderr: string };
 
-// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
+// bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test
+// through the shared retrying helper (test-tmp.ts) — the reader/writer
+// children settle only on close, and a still-settling fs entry must never
+// trip the one-shot ENOTEMPTY race in plain recursive rmSync.
 const dirs: string[] = [];
 afterEach(() => {
-  for (const dir of dirs.splice(0)) {
-    rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 50 });
-  }
+  for (const dir of dirs.splice(0)) removeFixtureTree(dir);
 });
 
 function seed(prefix: string): string {
