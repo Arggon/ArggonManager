@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-init-ignored-artifacts-dirty-commit
-title: "arggon init leaves a dirty index when generated paths are gitignored (commit.skipped)"
-priority: p3
+title: arggon init leaves a dirty index when generated paths are gitignored (commit.skipped)
+assignee: Arggon
+branch: fix/bug-init-ignored-artifacts-dirty-commit
 parent: opencode2-hardening
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T22:17:08.010Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-init-ignored-artifacts-dirty-commit
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/opencode2-hardening/bug-init-ignored-artifacts-dirty-commit.md
