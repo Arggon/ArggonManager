@@ -1,6 +1,15 @@
-import { existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runSpecNew, runSpecValidate } from "./spec.js";
 
@@ -16,6 +25,14 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
 }
 
 const repoRoot = process.cwd();
+
+const cliRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const cli = resolve(cliRoot, "cli/src/cli.ts");
+const tsx = resolve(cliRoot, "node_modules/tsx/dist/cli.mjs");
+
+function runCli(args: string[], cwd: string) {
+  return spawnSync(process.execPath, [tsx, cli, ...args], { encoding: "utf8", cwd });
+}
 
 /** Temp repo skeleton: only what findTasksDir needs (tasks/.convention.yml). */
 function makeRepo(): string {
@@ -325,5 +342,97 @@ describe("spec new", () => {
   it("rejects a non-kebab-case slug", () => {
     const dir = makeRepo();
     expect(() => runSpecNew({ cwd: dir, slug: "Bad Slug" })).toThrow(/kebab-case/);
+  });
+});
+
+// bug-validate-stdout-injection M1: `spec validate` and `spec analyze` human
+// output interpolate repo-controlled file paths/messages (hostile spec
+// filename, frontmatter values), so every dynamic field is display-sanitized;
+// exit codes and --json are untouched.
+describe("spec human output sanitization (bug-validate-stdout-injection)", () => {
+  const HOSTILE = "bad\nspoof: fake item\u001b[31m\u0085\u007f\u2028\u2029.md";
+
+  /** Temp repo with a hostile spec filename that fails validation. */
+  function hostileRepo(): string {
+    const dir = makeRepo();
+    mkdirSync(join(dir, "docs", "specs"), { recursive: true });
+    writeFileSync(
+      join(dir, "docs", "specs", HOSTILE),
+      "---\ntitle: hostile\nstatus: bogus\ncreated: nope\n---\n\n# Spec: t\n\n## Purpose\n\nwhy\n",
+      "utf8",
+    );
+    return dir;
+  }
+
+  it("spec validate renders a hostile spec filename inert on stdout (exit 1)", () => {
+    const dir = hostileRepo();
+    const proc = runCli(["spec", "validate"], dir);
+    expect(proc.status).toBe(1);
+    expect(proc.stdout).not.toContain("\u001b");
+    expect(proc.stdout).not.toContain("\u0085");
+    expect(proc.stdout).not.toContain("\u007f");
+    expect(proc.stdout).not.toContain("\u2028");
+    expect(proc.stdout).not.toContain("\u2029");
+    expect(proc.stdout).not.toContain("\nspoof");
+    expect(proc.stdout).toContain(
+      "error docs/specs/bad\\nspoof: fake item\\u001b[31m\\u0085\\u007f\\u2028\\u2029.md: missing required frontmatter field 'spec_id' [SPEC_MISSING_FIELD]",
+    );
+    expect(proc.stderr).toBe("");
+  });
+
+  it("spec validate --json keeps the raw hostile path, stays valid (exit 1)", () => {
+    const dir = hostileRepo();
+    const proc = runCli(["spec", "validate", "--json"], dir);
+    expect(proc.status).toBe(1);
+    const body = JSON.parse(proc.stdout) as {
+      ok: boolean;
+      errors: { path: string }[];
+      error: { code: string };
+    };
+    expect(body.ok).toBe(false);
+    expect(body.errors.some((e) => e.path.includes(HOSTILE))).toBe(true);
+    expect(body.error.code).toBe("SPEC_FAILED");
+  });
+
+  it("spec analyze renders a hostile spec filename inert on stdout (exit 0)", () => {
+    const dir = hostileRepo();
+    const proc = runCli(["spec", "analyze"], dir);
+    expect(proc.status).toBe(0); // findings never fail the run
+    expect(proc.stdout).not.toContain("\u001b");
+    expect(proc.stdout).not.toContain("\u0085");
+    expect(proc.stdout).not.toContain("\u007f");
+    expect(proc.stdout).not.toContain("\u2028");
+    expect(proc.stdout).not.toContain("\u2029");
+    expect(proc.stdout).not.toContain("\nspoof");
+    expect(proc.stdout).toContain(
+      "warn docs/specs/bad\\nspoof: fake item\\u001b[31m\\u0085\\u007f\\u2028\\u2029.md: no error/failure path mentioned anywhere in the spec [no-error-path]",
+    );
+    expect(proc.stderr).toBe("");
+  });
+
+  it("spec analyze --json keeps the raw hostile finding path, stays valid (exit 0)", () => {
+    const dir = hostileRepo();
+    const proc = runCli(["spec", "analyze", "--json"], dir);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      ok: boolean;
+      findings: { ambiguity: { file: string }[]; consistency: { file: string }[] };
+    };
+    expect(body.ok).toBe(true);
+    const files = [...body.findings.ambiguity, ...body.findings.consistency].map((f) => f.file);
+    expect(files.some((f) => f.includes(HOSTILE))).toBe(true);
+  });
+
+  it("leaves ordinary output byte-identical (clean fixture)", () => {
+    const dir = makeRepo();
+    const cleanBody =
+      "# Spec: t\n\n## Purpose\n\nwhy\n\n## Synopsis\n\nusage\n\n## Acceptance\n\n- [x] surfaces error handling\n";
+    writeSpec(dir, "spec-plain-001.md", validSpecFm, cleanBody);
+    const validate = runCli(["spec", "validate"], dir);
+    expect(validate.status).toBe(0);
+    expect(validate.stdout).toBe("arggon spec: ok (1 doc(s), 0 warning(s))\n");
+    const analyze = runCli(["spec", "analyze"], dir);
+    expect(analyze.status).toBe(0);
+    expect(analyze.stdout).toBe("arggon spec analyze: clean (1 spec(s) scanned)\n");
   });
 });

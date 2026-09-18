@@ -1,7 +1,15 @@
-import { mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
-import { execFileSync } from "node:child_process";
-import { join } from "node:path";
+import { execFileSync, spawnSync } from "node:child_process";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCreate } from "./create.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
@@ -25,6 +33,19 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
 
 const NOW = new Date("2026-09-03T12:00:00Z");
 const LATER = new Date("2026-09-04T12:00:00Z");
+
+const cliRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const cli = resolve(cliRoot, "cli/src/cli.ts");
+const tsx = resolve(cliRoot, "node_modules/tsx/dist/cli.mjs");
+
+/** Spawn the real CLI (used for the human stdout/stderr channels). */
+function runCli(args: string[], cwd: string, env?: NodeJS.ProcessEnv) {
+  return spawnSync(process.execPath, [tsx, cli, ...args], {
+    encoding: "utf8",
+    cwd,
+    env: env ? { ...process.env, ...env } : process.env,
+  });
+}
 
 /** A task claimed in_progress, carrying `issue: 12` (as import-issues writes it). */
 function importedTask(dir: string): { id: string; path: string } {
@@ -146,6 +167,90 @@ describe("issue round-trip on done flips", () => {
     } finally {
       warn.mockRestore();
     }
+  });
+
+  // bug-validate-stdout-injection L2: the gh failure text embeds the
+  // repo-controlled slug/command; the warning must render inert while the
+  // payload keeps the raw skipped text.
+  it("renders a hostile gh failure message inert in the warning; skipped stays raw", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-roundtrip-"));
+    withGithubOrigin(dir);
+    enableRoundtrip(dir, true);
+    const { id } = importedTask(dir);
+    const hostile =
+      "Command failed: gh issue close 12 --repo evil\nspoof/repo \u001b[31m\u0085\u007f\u2028\u2029";
+    const execGh = vi.fn(() => {
+      throw Object.assign(new Error(hostile), { status: 1 });
+    });
+    const warn = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    try {
+      const result = runUpdate({
+        cwd: dir,
+        id,
+        status: "done",
+        now: LATER,
+        execGh: execGh as unknown as typeof execFileSync,
+      });
+      expect(result.item.status).toBe("done");
+      // Payload: raw, byte for byte.
+      expect(result.issueRoundtrip).toEqual({
+        closed: false,
+        issue: 12,
+        skipped: `gh issue close failed (${hostile})`,
+      });
+      // Warning: one inert line, escaped in place.
+      expect(warn).toHaveBeenCalledWith(
+        "arggon: warning: issue round-trip skipped: " +
+          "gh issue close failed (Command failed: gh issue close 12 --repo evil\\nspoof/repo " +
+          "\\u001b[31m\\u0085\\u007f\\u2028\\u2029)\n",
+      );
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  // Same value on the CLI human stdout channel: `arggon update` prints the
+  // skip line and the stderr warning; both must be inert, with the flip intact.
+  it("CLI renders the hostile gh skip inert on stdout and stderr (flip still succeeds)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-roundtrip-"));
+    const hostileOwner = "evil\nspoof\u001b[31m\u0085\u007f\u2028\u2029";
+    const { id, path: taskPath } = importedTask(dir);
+    // Git repo with a hostile origin slug (the real detectRepo resolves it and
+    // the slug lands in the gh command line).
+    execFileSync("git", ["init", "-q"], { cwd: dir });
+    execFileSync(
+      "git",
+      ["remote", "add", "origin", `https://github.com/${hostileOwner}/repo.git`],
+      {
+        cwd: dir,
+      },
+    );
+    enableRoundtrip(dir, true);
+    // A deterministic failing `gh` on PATH so the dynamic skip branch fires.
+    const bin = join(dir, "bin");
+    mkdirSync(bin, { recursive: true });
+    writeFileSync(join(bin, "gh"), "#!/bin/sh\nexit 1\n", "utf8");
+    chmodSync(join(bin, "gh"), 0o755);
+    const proc = runCli(["update", id, "--status", "done", "--no-commit"], dir, {
+      PATH: `${bin}:${process.env.PATH ?? ""}`,
+    });
+
+    expect(proc.status).toBe(0);
+    const escaped = "evil\\nspoof\\u001b[31m\\u0085\\u007f\\u2028\\u2029/repo";
+    // Neither channel emits a raw control sequence or a forged line.
+    expect(proc.stdout).not.toMatch(/[\u001b\u007f-\u009f\u2028\u2029]/);
+    expect(proc.stderr).not.toMatch(/[\u001b\u007f-\u009f\u2028\u2029]/);
+    expect(proc.stdout).not.toContain("\nspoof");
+    expect(proc.stderr).not.toContain("\nspoof");
+    expect(proc.stdout).toContain(
+      `issue round-trip skipped: gh issue close failed (Command failed: gh issue close 12 --repo ${escaped}`,
+    );
+    expect(proc.stderr).toContain(
+      `issue round-trip skipped: gh issue close failed (Command failed: gh issue close 12 --repo ${escaped}`,
+    );
+    // The flip itself succeeded on disk (raw value survives in the file).
+    const flipped = readFileSync(taskPath, "utf8");
+    expect(flipped).toContain("status: done");
   });
 
   it("does nothing for items without an issue field, even when enabled", () => {

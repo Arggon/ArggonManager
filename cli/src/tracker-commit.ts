@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readConventionConfig } from "./convention.js";
 import { withItemLock } from "./lock.js";
 import { join, resolve } from "node:path";
+import { sanitizeHumanError } from "./sanitize.js";
 
 /**
  * Tracker hygiene (story-tracker-hygiene, task-auto-commit-tracker): tracker
@@ -138,10 +139,19 @@ function isIndexLockContention(run: GitRun): boolean {
  * past every retry) warn on stderr in addition to the JSON `commit.skipped`
  * payload. Benign skips (`--no-commit`, nothing to commit, non-git tree) stay
  * quiet — they are the documented default behavior, not a lost mutation.
+ *
+ * bug-validate-stdout-injection L2: the dynamic part is git's own output
+ * (`firstLine` of stderr/stdout), which can quote a repo-controlled path, so
+ * the warning is display-sanitized. It uses the composite-diagnostic cap
+ * (2000) like the CLI failure channel — a git first line routinely carries a
+ * path, which the 200-char report cap could cut. The regex gate runs on the
+ * raw reason (the prefix is static); the payload keeps the raw text.
  */
 function warnGitSkip(skipReason: string): void {
   if (/^git (add|commit) failed|^git index locked|staged entry lost/.test(skipReason)) {
-    process.stderr.write(`arggon: warning: commit skipped: ${skipReason}\n`);
+    process.stderr.write(
+      `arggon: warning: commit skipped: ${sanitizeHumanError(skipReason)}\n`,
+    );
   }
 }
 
@@ -343,10 +353,15 @@ export function commitPayload(result: TrackerCommitResult | undefined): CommitPa
   return { skipped: result.skipReason ?? "skipped" };
 }
 
-/** One human output line for the commit outcome (null when there is nothing to report). */
+/**
+ * One human output line for the commit outcome (null when there is nothing to
+ * report). bug-validate-stdout-injection L2: the skip reason can embed git's
+ * own output (hostile path), and the success message embeds tracker ids — both
+ * are display-sanitized here; `commitPayload` keeps the raw values for `--json`.
+ */
 export function formatCommitLine(result: TrackerCommitResult | undefined): string | null {
   if (!result) return null;
-  if (result.committed) return `committed: ${result.hash} ${result.message}`;
+  if (result.committed) return sanitizeHumanError(`committed: ${result.hash} ${result.message}`);
   if (result.skipReason === "auto-commit disabled") return "no-commit: tasks dirty state kept";
-  return `no-commit: ${result.skipReason}`;
+  return sanitizeHumanError(`no-commit: ${result.skipReason}`);
 }

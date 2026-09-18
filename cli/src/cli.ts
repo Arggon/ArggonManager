@@ -967,9 +967,11 @@ program
         if (result.issueRoundtrip) {
           const rt = result.issueRoundtrip;
           if (rt.closed) {
-            console.log(`  issue round-trip: closed #${rt.issue} in ${rt.repo}`);
+            console.log(
+              `  issue round-trip: closed #${rt.issue} in ${sanitizeHumanError(rt.repo)}`,
+            );
           } else {
-            console.log(`  issue round-trip skipped: ${rt.skipped}`);
+            console.log(`  issue round-trip skipped: ${sanitizeHumanError(rt.skipped)}`);
           }
         }
       } catch (err) {

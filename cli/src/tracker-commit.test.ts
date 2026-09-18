@@ -181,6 +181,21 @@ describe("tracker-commit helpers", () => {
       "no-commit: not a git repository",
     );
   });
+
+  // bug-validate-stdout-injection L2: the skip reason embeds external-tool
+  // output (git stderr/stdout) which can quote a hostile repo path.
+  it("sanitizes a hostile skip reason on the human line; payload keeps it raw", () => {
+    const hostile = "git commit failed: \u001b[31m\u0085\u007f\u2028\u2029 bad path";
+    expect(formatCommitLine({ committed: false, skipReason: hostile })).toBe(
+      "no-commit: git commit failed: \\u001b[31m\\u0085\\u007f\\u2028\\u2029 bad path",
+    );
+    // payload view (--json commit.skipped) is untouched by the display policy
+    expect(commitPayload({ committed: false, skipReason: hostile })).toEqual({ skipped: hostile });
+    // ordinary skip reasons stay byte-identical
+    expect(formatCommitLine({ committed: false, skipReason: "git not found" })).toBe(
+      "no-commit: git not found",
+    );
+  });
 });
 
 describe("tracker auto-commit on create", () => {
@@ -674,6 +689,51 @@ describe("commitTrackerMutation edge cases", () => {
       // The mutation sits written-but-uncommitted, exactly as in the race.
       expect(readFileSync(itemPath, "utf8")).toContain("uncommitted mutation");
       expect(status(dir)).toContain("tasks/launch/auth/login/task-rate-limit.md");
+    } finally {
+      vi.doUnmock("node:child_process");
+      stderr.mockRestore();
+    }
+  });
+
+  // bug-validate-stdout-injection L2: git's own failure output can quote a
+  // repo-controlled path (raw ESC/DEL/C1/LS/PS). The warned skip and the human
+  // no-commit line must render it inert; the payload keeps the raw text.
+  it("renders hostile git failure output inert in the warned skip and human line", async () => {
+    const dir = initRepo();
+    const itemPath = join(dir, "tasks/launch/auth/login/task-rate-limit.md");
+    writeFileSync(itemPath, `${readFileSync(itemPath, "utf8")}\n- uncommitted mutation\n`, "utf8");
+    const hostile = "fatal: bad path \u001b[31m\u0085\u007f\u2028\u2029 end";
+    const rawReason = `git commit failed: error: ${hostile}`;
+    const inertReason =
+      "git commit failed: error: fatal: bad path \\u001b[31m\\u0085\\u007f\\u2028\\u2029 end";
+    const realExecFileSync = (await import("node:child_process")).execFileSync;
+    vi.doMock("node:child_process", () => ({
+      execFileSync: (file: string, args: string[], opts: unknown) => {
+        if (args?.[0] === "commit") {
+          throw Object.assign(new Error("git failed"), {
+            status: 1,
+            stdout: "",
+            stderr: `error: ${hostile}\n`,
+          });
+        }
+        return realExecFileSync(file, args, opts as never);
+      },
+    }));
+    const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    vi.resetModules();
+    try {
+      const mod = await import("./tracker-commit.js");
+      const result = mod.commitTrackerMutation(dir, [itemPath], {
+        message: trackerCommitMessage("commented", ["task-rate-limit"]),
+      });
+
+      expect(result).toEqual({ committed: false, skipReason: rawReason });
+      // stderr warning: exactly one inert line.
+      expect(stderr).toHaveBeenCalledWith(`arggon: warning: commit skipped: ${inertReason}\n`);
+      // human stdout line: same value, also inert.
+      expect(mod.formatCommitLine(result)).toBe(`no-commit: ${inertReason}`);
+      // payload view keeps the raw value.
+      expect(commitPayload(result)).toEqual({ skipped: rawReason });
     } finally {
       vi.doUnmock("node:child_process");
       stderr.mockRestore();

@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  formatSpecBaselineCompareHuman,
   runSpecAnalyzeCompareBaseline,
   runSpecAnalyzeSaveBaseline,
   serializeSpecBaseline,
@@ -123,6 +124,25 @@ describe("spec baseline: comparison semantics", () => {
     expect(cmp.resolved.every((f) => f.file.includes("spec-b-001.md"))).toBe(true);
   });
 
+  it("renders hostile finding paths inert in the --baseline human report", () => {
+    // bug-validate-stdout-injection M1: `spec analyze --baseline` prints the
+    // same findings as the plain run; a hostile spec filename must stay inert.
+    const dir = makeRepo();
+    const hostileName = "spec-bad\nspoof\u001b[31m\u0085\u007f\u2028\u2029.md";
+    writeSpec(dir, hostileName, "b-001", CLEAN_BODY);
+    const file = join(dir, "baseline.json");
+    runSpecAnalyzeSaveBaseline({ cwd: dir, file });
+    writeSpec(dir, hostileName, "b-001", AMBIGUOUS_BODY);
+    const cmp = runSpecAnalyzeCompareBaseline({ cwd: dir, file });
+    expect(cmp.added.length).toBeGreaterThan(0);
+    const out = formatSpecBaselineCompareHuman(cmp);
+    expect(out).not.toMatch(/[\u001b\u007f-\u009f\u2028\u2029]/);
+    expect(out).not.toContain("\nspoof");
+    expect(out).toContain(
+      "new warn docs/specs/spec-bad\\nspoof\\u001b[31m\\u0085\\u007f\\u2028\\u2029.md:",
+    );
+  });
+
   it("throws (SPEC_FAILED in the CLI) on a missing or invalid baseline file", () => {
     const dir = makeRepo();
     writeSpec(dir, "spec-b-001.md", "b-001", CLEAN_BODY);
@@ -135,6 +155,15 @@ describe("spec baseline: comparison semantics", () => {
     const wrong = join(dir, "wrong.json");
     writeFileSync(wrong, JSON.stringify({ hello: true }), "utf8");
     expect(() => runSpecAnalyzeCompareBaseline({ cwd: dir, file: wrong })).toThrow(/not a spec analyze baseline/);
+    const malformed = join(dir, "malformed.json");
+    writeFileSync(
+      malformed,
+      JSON.stringify({ schemaVersion: 1, conventionVersion: 0, count: 1, findings: [{ file: 1 }] }),
+      "utf8",
+    );
+    expect(() => runSpecAnalyzeCompareBaseline({ cwd: dir, file: malformed })).toThrow(
+      /malformed finding/,
+    );
   });
 });
 
@@ -187,6 +216,46 @@ describe("spec baseline: CLI contract (e2e)", () => {
     const fixed = runCli(["spec", "analyze", "--baseline", file], dir);
     expect(fixed.status).toBe(0);
     expect(fixed.stdout).toContain("resolved warn");
+  });
+
+  it("renders hostile snapshot fields inert (severity/kind/line), exit 0, raw in --json", () => {
+    // bug-validate-stdout-injection F1: `resolved` findings come from the
+    // committed baseline, not the current scan — severity/kind/line can carry
+    // arbitrary bytes and must be sanitized/dropped like file/message.
+    const dir = makeRepo();
+    writeSpec(dir, "spec-b-001.md", "b-001", CLEAN_BODY); // current scan: 0 findings
+    const file = join(dir, "baseline.json");
+    const hostile = {
+      schemaVersion: 1,
+      conventionVersion: 0,
+      count: 1,
+      findings: [
+        {
+          file: "docs/specs/spec-gone.md",
+          kind: "kind\nspoof\u001b[31m\u0085\u007f\u2028\u2029",
+          line: "1\nspoof\u001b[31m\u0085\u007f\u2028\u2029",
+          severity: "warn\u001b[31m\u0085\u007f\u2028\u2029",
+          message: "message\nspoof\u001b[31m\u0085\u007f\u2028\u2029",
+        },
+      ],
+    };
+    writeFileSync(file, JSON.stringify(hostile), "utf8");
+    const run = runCli(["spec", "analyze", "--baseline", file], dir);
+    expect(run.status).toBe(0);
+    expect(run.stdout).not.toMatch(/[\u001b\u007f-\u009f\u2028\u2029]/);
+    expect(run.stdout).not.toContain("\nspoof");
+    // one finding line + one summary line, nothing forged in between
+    expect(run.stdout.split("\n")).toHaveLength(3);
+    const rendered = run.stdout.split("\n").filter((l) => l.startsWith("resolved "));
+    expect(rendered).toHaveLength(1);
+    expect(rendered[0]).toContain("resolved warn\\u001b[31m\\u0085\\u007f\\u2028\\u2029");
+    expect(rendered[0]).toContain("[kind\\nspoof\\u001b[31m\\u0085\\u007f\\u2028\\u2029]");
+    // a non-numeric line is dropped, not sanitized into the report
+    expect(run.stdout).not.toContain("1\\nspoof");
+    const json = runCli(["spec", "analyze", "--baseline", file, "--json"], dir);
+    expect(json.status).toBe(0);
+    const payload = JSON.parse(json.stdout) as { baseline: { resolved: unknown[] } };
+    expect(payload.baseline.resolved).toEqual(hostile.findings);
   });
 
   it("refuses --baseline + --save-baseline in one run", () => {
