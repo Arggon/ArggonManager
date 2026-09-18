@@ -438,9 +438,10 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
   ].join("\n");
 
   /**
-   * Plant the generated seam artifacts (config + agents + commands) so the
-   * detection tests do not depend on whether this branch's `init` already
-   * generates them (opencode-seam-010 lands separately): doctor reads disk.
+   * Plant the generated seam artifacts (config + agents + commands) on a bare
+   * tree for tests that need a provenance-free fixture: with no `x-generated`
+   * entries the doctor report carries no doc hints, and SEAM_CONFIG exercises
+   * doctor's tolerant JSONC parse (comments + trailing commas).
    */
   function plantSeam(dir: string): void {
     rmSync(join(dir, ".opencode"), { recursive: true, force: true });
@@ -455,6 +456,18 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     }
   }
 
+  /**
+   * Bare initialized tree: `tasks/.convention.yml` only — no generated docs,
+   * no seam artifacts, no MCP registration. Post-#322 a fresh `init` always
+   * wires the MCP server (native `opencode.jsonc` + `.mcp.json`), so tests
+   * that need "nothing wired" must build the tree explicitly instead of
+   * assuming a fresh init leaves it empty.
+   */
+  function bareTree(dir: string): void {
+    mkdirSync(join(dir, "tasks"), { recursive: true });
+    writeFileSync(join(dir, "tasks/.convention.yml"), "version: 4\n", "utf8");
+  }
+
   /** Adopter-owned config: drop any generated seam config first so `configs` is exact. */
   function writeAdopterConfig(dir: string, config: unknown, name = "opencode.json"): void {
     rmSync(join(dir, "opencode.jsonc"), { force: true });
@@ -464,15 +477,15 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
   it("reports a clean seam (no adopter config, artifacts present, native registration, no hints)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
-    plantSeam(dir);
     const result = runDoctor({ cwd: dir });
-    // The generated opencode.jsonc is a config file too — listed, but V2-clean.
+    // Post-opencode-seam init generates the seam itself: opencode.jsonc is the
+    // only config, V2-shaped, and registers the arggon MCP server natively.
     expect(result.opencode.configs).toEqual(["opencode.jsonc"]);
     expect(result.opencode.v1).toEqual({ findings: [], truncated: false });
     expect(result.opencode.artifacts).toEqual({
       config: true,
       agents: ["arggon-coordinator", "arggon-reviewer", "arggon-worker"],
-      commands: ["arggon-done", "arggon-handoff", "arggon-next", "arggon-start"],
+      commands: ["arggon-done", "arggon-handoff", "arggon-next", "arggon-review", "arggon-start", "arggon-status"],
       skills: ["arggon-cli", "arggon-upgrade"],
       truncated: false,
     });
@@ -480,8 +493,33 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     expect(result.opencode.mcp).toEqual({ native: true, mcpJson: true, hint: null });
     const report = formatDoctorReport(result);
     expect(report).toContain("opencode: config opencode.jsonc");
-    expect(report).toContain("seam 8 artifact(s)"); // 1 config + 3 agents + 4 commands
+    expect(report).toContain("seam 10 artifact(s)"); // 1 config + 3 agents + 6 commands
     expect(report).toContain("2 bundled skill(s)");
+    expect(report).toContain("MCP native");
+    // Genuinely clean: every generated doc is untouched, so no hint line at all
+    // (a fresh init must not trip its own "newer templates"/"--backup" hints).
+    expect(report).not.toContain("hint:");
+  });
+
+  it("reads a hand-edited JSONC seam config (comments + trailing commas) without false hints", () => {
+    const dir = tempDir();
+    bareTree(dir);
+    plantSeam(dir);
+    const result = runDoctor({ cwd: dir });
+    // The planted SEAM_CONFIG is JSONC with a `//` comment and trailing commas:
+    // plain JSON.parse would reject it, so detecting native registration proves
+    // the tolerant parse — and the provenance-free fixture stays hint-free.
+    expect(result.opencode.configs).toEqual(["opencode.jsonc"]);
+    expect(result.opencode.v1).toEqual({ findings: [], truncated: false });
+    expect(result.opencode.artifacts).toEqual({
+      config: true,
+      agents: ["arggon-coordinator", "arggon-reviewer", "arggon-worker"],
+      commands: ["arggon-done", "arggon-handoff", "arggon-next", "arggon-start"],
+      skills: [],
+      truncated: false,
+    });
+    expect(result.opencode.mcp).toEqual({ native: true, mcpJson: false, hint: null });
+    const report = formatDoctorReport(result);
     expect(report).toContain("MCP native");
     expect(report).not.toContain("hint:");
   });
@@ -546,10 +584,18 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
 
   it("emits no hint when nothing is wired at all (report-only, no nagging)", () => {
     const dir = tempDir();
-    runInit({ dir, force: false });
-    unlinkSync(join(dir, ".mcp.json"));
+    // A fresh init can no longer be used here: post-#322 it always wires the
+    // MCP server (native opencode.jsonc + .mcp.json). A bare initialized tree
+    // makes "nothing wired" genuinely the on-disk state.
+    bareTree(dir);
     const result = runDoctor({ cwd: dir });
+    expect(result.initialized).toBe(true);
+    expect(result.opencode.configs).toEqual([]);
+    expect(result.opencode.artifacts).toEqual({ config: false, agents: [], commands: [], skills: [], truncated: false });
     expect(result.opencode.mcp).toEqual({ native: false, mcpJson: false, hint: null });
+    const report = formatDoctorReport(result);
+    expect(report).toContain("MCP not registered");
+    expect(report).not.toContain("hint:");
   });
 
   it("caps artifact lists and V1 findings (bounded output)", () => {
