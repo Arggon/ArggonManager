@@ -77,3 +77,7 @@ Evidence (worker Arggon, branch `feat/task-show-fixture-cleanup`).
 - Lock-file writers audited: `lock.test.ts` releases/unlinks each lock; `cascade.test.ts` `holdLock` released in `finally`; only `tracker-commit.test.ts:808` leaked.
 
 **Gates** (private `TMPDIR`): `npm run build` ok · `npm run lint` ok · `npm test` 73 files / 1190 tests passed · `arggon validate` ok (0 warnings, convention v3) · `arggon spec validate` ok (16 docs, 0 warnings).
+
+### handoff 2026-09-18 @Arggon — next: Review draft PR #350 (feat/task-show-fixture-cleanup) against the audit + leak evidence; verify gates, merge to opencode2, flip the item. Worker does not merge or flip.
+- branch: feat/task-show-fixture-cleanup
+- open questions: None blocking; post-merge suite 73 files/1204 tests, 0 arggon-* leftovers; added lines prettier-clean (files already prettier-dirty at HEAD)
