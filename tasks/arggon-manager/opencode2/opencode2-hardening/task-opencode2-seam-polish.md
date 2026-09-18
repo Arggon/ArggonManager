@@ -145,3 +145,7 @@ the spec's agent-permission contract was extended for NIT-14 instead.
 `measure.test.ts` (its global `/tmp/arggon-budget-*` hygiene check collided
 with a concurrent session's temp dir; no leftovers remained; isolated re-run
 and clean full re-run green).
+
+### handoff 2026-09-18 @Arggon (session: ses_f4b5fb92bffeCmAOyvyfbi93sj) — next: Review PR #332 (draft, base opencode2) with the evidence comment; verify the NIT-14 probe transcript and the anchored-detection test; then merge and flip the item to done.
+- branch: feat/task-opencode2-seam-polish
+- open questions: Probe ran on installed opencode v2.0.8 (v2.0.7 not fetchable from the public channel); NIT-13 was already satisfied on opencode2 (no diff) — confirm acceptance ticks read honestly.
