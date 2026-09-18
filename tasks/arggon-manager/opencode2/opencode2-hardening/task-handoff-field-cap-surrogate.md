@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-handoff-field-cap-surrogate
 title: "handoff capField surrogate-safety: astral pairs split at the 199/200 boundary (U+FFFD on disk)"
-priority: p3
+assignee: Arggon
+branch: feat/task-handoff-field-cap-surrogate
 parent: opencode2-hardening
 labels: []
+priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T21:42:19.079Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-handoff-field-cap-surrogate
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/opencode2-hardening/task-handoff-field-cap-surrogate.md
