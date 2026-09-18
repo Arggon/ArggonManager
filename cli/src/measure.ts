@@ -33,17 +33,22 @@ export const AGENTS_MD_BUDGET_BYTES = 2048;
 
 /**
  * MCP tool-schema budget (task-schema-budget). Live baseline measured
- * 2026-09-15 against the in-process tools/list: 9 tools, 9,050 B of tool
- * definitions (~2,263 tok at ~chars/4) — the item brief's "~4.7 KB" was an
+ * 2026-09-15 against the in-process tools/list: 9 tools, 9,040 B of tool
+ * definitions (~2,260 tok at ~chars/4) — the item brief's "~4.7 KB" was an
  * early estimate; the LIVE surface is the baseline of record. Advisory cap at
- * 12 KiB: ~35% headroom over the baseline, enough for several new tools or
+ * 12 KiB: ~36% headroom over the baseline, enough for several new tools or
  * schema growth without letting the 50K-token bloat spiral (Towards AI 2026)
  * start unnoticed. Advisory (no hard cap): report-only budget section.
  */
 export const MCP_TOOLS_BUDGET_BYTES = 12_288;
 
-/** Live tools/list bytes at the 2026-09-15 baseline measurement. */
-export const MCP_TOOLS_BASELINE_BYTES = 9_050;
+/**
+ * Live tools/list bytes at baseline commit 5d6c504 (2026-09-15), reproduced
+ * two ways: that commit's own `doctor --budget` and an independent stdio
+ * `tools/list` sum of `JSON.stringify(tool)` lengths (both 9,040 B, 9 tools,
+ * ~2,260 tok at ~chars/4).
+ */
+export const MCP_TOOLS_BASELINE_BYTES = 9_040;
 
 export type McpToolBytes = {
   /** MCP tool name (e.g. arggon_update). */

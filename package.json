@@ -12,6 +12,7 @@
     "dev": "tsx cli/src/cli.ts",
     "arggon": "tsx cli/src/cli.ts",
     "skills:sync": "tsx cli/src/sync-skills.ts",
+    "context:report": "tsx smoke/context-report.ts",
     "smoke:opencode": "tsx smoke/opencode-smoke.ts",
     "smoke:opencode:wave": "tsx smoke/opencode-wave.ts",
     "test": "vitest run",
