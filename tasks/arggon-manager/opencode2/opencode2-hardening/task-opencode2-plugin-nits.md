@@ -106,3 +106,6 @@ T handoff quoted id          | "arggon handoff \"task-x\" --next \"go\""        
 ```
 
 Gates on `d4969f1`: `npm test` → 70 files / 1166 tests pass; `npm run smoke:opencode` → 11 scenarios / 0 failures (incl. independent `block=` measurement); `npm run lint` clean; `npm run build` clean; `arggon validate` ok (0 errors/0 warnings); `arggon spec validate` ok. Environmental note: one earlier full-suite run failed `cli/src/measure.test.ts`'s global `/tmp` hygiene check (`/tmp/arggon-budget-*`) while two sibling worktrees ran the same suite concurrently — green in isolation and on a quiet full run. No smoke/**, cli/src/** or other docs touched; no merge, no status flip.
+
+### handoff 2026-09-18 @Arggon (session: ses_f4ab32847ffe5hahI8SSkOw3Rh) — next: Review draft PR #345 (base opencode2): F1 wrapper/$()/newline correlation, F2 quoted separators, F4 playbook W3 bullet. Gates already green on d4969f1 (suite 1166, smoke 11/11, lint/build/validate). …
+- branch: feat/task-opencode2-plugin-nits
