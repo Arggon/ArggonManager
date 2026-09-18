@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-cli-error-output-injection
 title: "CLI error output injection: raw err.message on stderr (C1/DEL/LS-PS) + doctor sanitizer polish"
-priority: p2
+assignee: Arggon
+branch: fix/bug-cli-error-output-injection
 parent: opencode2-hardening
 labels: []
+priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T16:15:13.413Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-cli-error-output-injection
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/opencode2-hardening/bug-cli-error-output-injection.md
