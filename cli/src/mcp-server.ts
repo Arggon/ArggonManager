@@ -735,12 +735,15 @@ function str(value: unknown): string | undefined {
 }
 
 /**
- * Single-line token delimiter: any whitespace or control/format character.
- * Session IDs are tokens (`ses_…`); everything from the first delimiter is
- * dropped, so a crafted `_meta.sessionID` can never smuggle a second line or
- * heading into an item body.
+ * Single-line token delimiter: any whitespace, control, format or surrogate
+ * character. Session IDs are tokens (`ses_…`); everything from the first
+ * delimiter is dropped, so a crafted `_meta.sessionID` can never smuggle a
+ * second line or heading into an item body. A surrogate (`Cs`) matches only
+ * when unpaired — a valid pair is one code point and matches nothing here —
+ * so cutting at one keeps a lone surrogate out of the normalized value
+ * (task-opencode2-mcp-nits).
  */
-const META_TOKEN_DELIMITER = /[\s\p{Cc}\p{Cf}]/u;
+const META_TOKEN_DELIMITER = /[\s\p{Cc}\p{Cf}\p{Cs}]/u;
 
 /**
  * Normalize the meta-derived session ID into a bounded single-line token:
@@ -754,15 +757,28 @@ const META_TOKEN_DELIMITER = /[\s\p{Cc}\p{Cf}]/u;
  * `comment.author` inherits the bound too — the comment kernel only trims its
  * author — instead of forwarding a client-controlled 300-char value or a
  * literal `\n### injected heading` line.
+ *
+ * The cap counts UTF-16 code units — the same bound `capSession` in
+ * handoff.ts enforces — but never splits a surrogate pair
+ * (task-opencode2-mcp-nits): a pair straddling the cut is dropped whole, so
+ * the normalized value carries no lone surrogate and still fits the cap,
+ * which means the downstream `capSession` sees an already-bounded value and
+ * never re-cuts it.
  */
 function normalizeSessionID(value: string): string | undefined {
   const token = value.trim().split(META_TOKEN_DELIMITER, 1)[0] ?? "";
   if (!token) return undefined;
   if (token.length > HANDOFF_SESSION_CAP) {
     const marker = "…";
-    // The marker counts against the cap (same arithmetic as capSession in
-    // handoff.ts): the normalized value is never longer than the cap.
-    return token.slice(0, HANDOFF_SESSION_CAP - marker.length) + marker;
+    // The marker counts against the cap: the normalized value is never longer
+    // than HANDOFF_SESSION_CAP code units.
+    let end = HANDOFF_SESSION_CAP - marker.length;
+    const last = token.charCodeAt(end - 1);
+    // High surrogate at the cut: drop it and its low half whole. The token
+    // cannot contain lone surrogates (the delimiter cut above removes them),
+    // so a high surrogate here is always one half of a valid pair.
+    if (last >= 0xd800 && last <= 0xdbff) end -= 1;
+    return token.slice(0, end) + marker;
   }
   return token;
 }
