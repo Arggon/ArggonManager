@@ -206,10 +206,12 @@ function firstLine(text: string): string {
 /**
  * Which of the given paths would git REFUSE to add because a `.gitignore`
  * rule matches them? NUL-delimited `git check-ignore --stdin -z` (paths may
- * carry any character; no quoting ambiguity in either direction). The index
- * is consulted by git itself, so a TRACKED path that happens to match a
- * pattern is NOT reported (it stages normally) — exactly the semantics of
- * `git add`.
+ * carry any character except a `:(`-prefixed pathspec-magic sequence — e.g.
+ * `:(exclude)…` or an invalid `:(…)` mnemonic makes check-ignore itself exit
+ * 128; that is a probe failure like any other; no quoting ambiguity in either
+ * direction). The index is consulted by git itself, so a TRACKED path that
+ * happens to match a pattern is NOT reported (it stages normally) — exactly
+ * the semantics of `git add`.
  *
  * bug-init-ignored-artifacts-dirty-commit: `git add` is all-or-nothing across
  * its pathspecs — one ignored path aborts the whole add AFTER staging the
@@ -218,8 +220,8 @@ function firstLine(text: string): string {
  * first.
  *
  * Returns `null` when the probe itself cannot answer (git absent, unexpected
- * exit): callers then stage everything, preserving the pre-probe behavior
- * instead of guessing.
+ * exit — including a pathspec-magic rejection): callers then stage everything,
+ * preserving the pre-probe behavior instead of guessing.
  */
 function findIgnoredPaths(root: string, paths: string[]): string[] | null {
   const run = runGit(["check-ignore", "--stdin", "-z"], root, `${paths.join("\0")}\0`);
@@ -288,7 +290,12 @@ export function commitTrackerMutation(
   if (opts.commit === false) {
     return { committed: false, skipReason: "auto-commit disabled" };
   }
-  const paths = [...new Set(filePaths.filter((p) => p.length > 0))];
+  // F1 (task-tracker-commit-ignored-nits): normalize BEFORE the dedupe. One
+  // file can arrive in two string forms (absolute + root-relative); the
+  // exact-string Set alone kept both, so `ignored[]` and its human count
+  // overcounted (the partition still worked — check-ignore echoes each input
+  // form verbatim). Normalizing first also makes the probe inputs canonical.
+  const paths = [...new Set(rootRelativePaths(root, filePaths.filter((p) => p.length > 0)))];
   if (paths.length === 0) {
     return { committed: false, skipReason: "no mutated files" };
   }
