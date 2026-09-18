@@ -87,3 +87,7 @@ Regression test asserts both directions: `sanitizes ANSI escapes and newlines in
 - `npm run build` (tsc): clean
 - `arggon validate --json`: ok (0 errors/warnings)
 - `arggon spec validate --json`: ok (0 errors/warnings)
+
+### handoff 2026-09-18 @Arggon — next: Review the draft PR; on merge auto-done flips the item (acceptance ticked, tests green). No further code work expected.
+- branch: feat/task-opencode-v2-doctor-polish
+- open questions: none; docs/json-output.md intentionally unchanged
