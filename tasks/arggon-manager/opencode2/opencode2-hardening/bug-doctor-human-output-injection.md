@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-doctor-human-output-injection
 title: "doctor human output: sanitize remaining untrusted channels (git remote URL, C1 controls)"
-priority: p2
+assignee: Arggon
+branch: fix/bug-doctor-human-output-injection
 parent: opencode2-hardening
 labels: []
+priority: p2
 created: "2026-09-18"
 updated: "2026-09-18"
+claimed_at: "2026-09-18T15:39:32.655Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-doctor-human-output-injection
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/opencode2-hardening/bug-doctor-human-output-injection.md
