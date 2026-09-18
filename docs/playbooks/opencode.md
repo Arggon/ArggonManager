@@ -26,6 +26,15 @@ or the V1 schema for V2 work.
   and `.opencode/commands/arggon-{next,start,done,handoff,review,status}.md` —
   never overwriting modified files (contract:
   [spec-opencode-seam-010](../specs/spec-opencode-seam-010.md)).
+- `arggon init` also bundles the optional plugin at
+  `.opencode/plugins/arggon/index.ts` (auto-discovered, zero config): it
+  registers `mcp.servers.arggon` (`{type:"local",command:["arggon","mcp"]}`)
+  **only when no `arggon` server is configured** and never clobbers one; it is
+  dependency-free (no local `node_modules`) and failure-isolated (every path
+  logs once and no-ops, never breaking a session/CLI/MCP). W2 scope:
+  MCP auto-registration only — session↔item context is W3. Evidence harness:
+  `npm run smoke:opencode` (real headless `opencode run`; exits 0 with
+  `skipped: opencode not installed` when absent).
 - MCP (https://opencode.ai/v2/docs/mcp-servers/): V2 does not use `.mcp.json`
   as a registration mechanism — register the server under `mcp.servers` as
   `{ "type": "local", "command": ["arggon", "mcp"] }`; the generated
@@ -71,7 +80,10 @@ or the V1 schema for V2 work.
 - V2 session smoke: `opencode mcp list` shows `arggon` connected, the
   `arggon-cli` skill is discoverable and the `/arggon-*` commands are listed,
   and `arggon_next` resolves the next claimable item. Transcripts are the review
-  evidence (ADR 0008 spirit); a scripted headless harness is planned.
+  evidence (ADR 0008 spirit); `npm run smoke:opencode` scripts it headless on
+  temp fixtures (plugin load, MCP auto-registration + usability, never-clobber,
+  failure isolation, plugin-absent CLI/MCP) and exits 0 with
+  `skipped: opencode not installed` when the binary is absent.
 
 ## Security
 

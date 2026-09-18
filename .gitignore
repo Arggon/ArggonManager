@@ -8,6 +8,11 @@ coverage/
 # (single committed source). Recreate with `npm run skills:sync`.
 .agents/skills/arggon-cli/SKILL.md
 
+# task-opencode-v2-plugin (W2): generated copy of
+# opencode/plugins/arggon/index.ts (single committed source). Recreated by
+# `arggon init` or the byte-parity test (cli/src/plugin-copy.test.ts).
+.opencode/plugins/arggon/index.ts
+
 # Tooling artifacts (video2code / video-agent sessions)
 .v2c/
 .video_agent/

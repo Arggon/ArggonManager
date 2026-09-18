@@ -53,12 +53,16 @@ const SEAM_COMMANDS = [
   ".opencode/commands/arggon-status.md",
 ];
 
+/** Bundled OpenCode V2 plugin destination (plan-opencode2-009 W2). */
+const SEAM_PLUGIN = ".opencode/plugins/arggon/index.ts";
+const SEAM_PLUGIN_SOURCE = "opencode/plugins/arggon/index.ts";
+
 describe("opencode seam: fresh init", () => {
   it("creates the config, agents and commands (tier-1, plain init)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
     expect(existsSync(join(dir, "opencode.jsonc"))).toBe(true);
-    for (const rel of [...SEAM_AGENTS, ...SEAM_COMMANDS]) {
+    for (const rel of [...SEAM_AGENTS, ...SEAM_COMMANDS, SEAM_PLUGIN]) {
       expect(existsSync(join(dir, ...rel.split("/"))), rel).toBe(true);
     }
   });
@@ -257,7 +261,72 @@ describe("opencode seam: provenance on re-runs", () => {
   });
 });
 
+describe("opencode seam: bundled plugin (W2)", () => {
+  it("is generated with the TypeScript provenance marker and x-generated entry", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const raw = readFileSync(join(dir, ...SEAM_PLUGIN.split("/")), "utf8");
+    expect(raw.startsWith(`// arggon:generated template="${SEAM_PLUGIN_SOURCE}"\n`)).toBe(true);
+    expect(raw).toContain('id: "arggon"');
+    expect(raw).toContain('command: ["arggon", "mcp"]');
+    const config = readConventionConfig(dir);
+    expect(config.generated[SEAM_PLUGIN]?.template).toBe(SEAM_PLUGIN_SOURCE);
+  });
+
+  it("stays in byte parity with its single source (modulo the generated marker)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const source = readFileSync(join(repoRoot, SEAM_PLUGIN_SOURCE), "utf8");
+    const expected = stampGeneratedContent(SEAM_PLUGIN, SEAM_PLUGIN_SOURCE, source);
+    expect(readFileSync(join(dir, ...SEAM_PLUGIN.split("/")), "utf8")).toBe(expected);
+  });
+
+  it("re-runs refresh the untouched plugin and skip the adopter-modified one", () => {
+    const dir = tempDir();
+    runCli(["init", dir, "--json"]);
+    const dest = join(dir, ...SEAM_PLUGIN.split("/"));
+    const original = readFileSync(dest, "utf8");
+    const second = runCli(["init", dir, "--json"]);
+    const secondBody = JSON.parse(second.stdout) as { updated: string[]; modified: string[] };
+    expect(secondBody.updated).toContain(SEAM_PLUGIN);
+    expect(secondBody.modified).toEqual([]);
+    writeFileSync(dest, `${original}\n// adopter edit\n`, "utf8");
+    const third = runCli(["init", dir, "--json"]);
+    const thirdBody = JSON.parse(third.stdout) as { modified: string[]; skipped: string[] };
+    expect(thirdBody.modified).toContain(SEAM_PLUGIN);
+    expect(thirdBody.skipped).toContain(SEAM_PLUGIN);
+    expect(readFileSync(dest, "utf8")).toBe(`${original}\n// adopter edit\n`);
+  });
+
+  it("--backup archives and regenerates a modified plugin", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const dest = join(dir, ...SEAM_PLUGIN.split("/"));
+    const original = readFileSync(dest, "utf8");
+    const edited = `${original}\nADOPTER EDIT\n`;
+    writeFileSync(dest, edited, "utf8");
+    const proc = runCli(["init", dir, "--backup", "--json"]);
+    expect(proc.status).toBe(0);
+    const body = JSON.parse(proc.stdout) as {
+      updated: string[];
+      modified: string[];
+      backedUp: string[];
+    };
+    expect(body.modified).toContain(SEAM_PLUGIN);
+    expect(body.backedUp).toContain(SEAM_PLUGIN);
+    expect(body.updated).not.toContain(SEAM_PLUGIN);
+    const date = new Date().toISOString().slice(0, 10);
+    expect(readFileSync(join(dir, "backup", date, ...SEAM_PLUGIN.split("/")), "utf8")).toBe(edited);
+    expect(readFileSync(dest, "utf8")).toBe(original);
+  });
+});
+
 describe("opencode seam: marker stamping", () => {
+  it("stamps a TypeScript destination with a // provenance marker (W2 plugin)", () => {
+    const out = stampGeneratedContent(SEAM_PLUGIN, SEAM_PLUGIN_SOURCE, "export default {}\n");
+    expect(out).toBe(`// arggon:generated template="${SEAM_PLUGIN_SOURCE}"\nexport default {}\n`);
+  });
+
   it("stamps a CRLF frontmatter template frontmatter-first (NIT-9)", () => {
     const out = stampGeneratedContent(
       ".opencode/agents/example.md",

@@ -163,13 +163,28 @@ const BUNDLED_SKILLS = [
   { source: "skills/arggon-upgrade/SKILL.md", dest: ".agents/skills/arggon-upgrade/SKILL.md" },
 ];
 
-/** Is this template id one of the bundled skill sources? */
-function isBundledSkill(templateRel: string): boolean {
-  return BUNDLED_SKILLS.some((s) => s.source === templateRel);
+/**
+ * Bundled OpenCode V2 plugin (plan-opencode2-009 W2): the plugin is a
+ * dependency-free TypeScript source at `opencode/plugins/arggon/`; init copies
+ * it to `.opencode/plugins/arggon/`, where V2 discovers it automatically. Like
+ * the skills, the copy carries a generated marker (a `//` line for TypeScript
+ * destinations), flows through the provenance decision table, and is guarded
+ * by a byte-parity test against this single source.
+ */
+const BUNDLED_PLUGINS = [
+  { source: "opencode/plugins/arggon/index.ts", dest: ".opencode/plugins/arggon/index.ts" },
+];
+
+/** Everything init bundles from a package-root source into an adopter destination. */
+const BUNDLED_SOURCES = [...BUNDLED_SKILLS, ...BUNDLED_PLUGINS];
+
+/** Is this template id one of the bundled (package-root source) artifacts? */
+function isBundledSource(templateRel: string): boolean {
+  return BUNDLED_SOURCES.some((s) => s.source === templateRel);
 }
 
-/** Resolve a bundled skill source against the package templates dir (sibling `skills/`). */
-function bundledSkillPath(templatesDir: string, source: string): string {
+/** Resolve a bundled source against the package templates dir (sibling `skills/`, `opencode/`). */
+function bundledSourcePath(templatesDir: string, source: string): string {
   return resolve(templatesDir, "..", ...source.split("/"));
 }
 
@@ -214,6 +229,15 @@ function isJsonDestination(dest: string): boolean {
 }
 
 /**
+ * TypeScript destinations (the bundled OpenCode plugin) take a `//` line
+ * comment as their visible provenance marker; `//` is valid TS at any position
+ * and keeps the first line syntactically inert.
+ */
+function isTypeScriptDestination(dest: string): boolean {
+  return dest.endsWith(".ts") || dest.endsWith(".tsx");
+}
+
+/**
  * Markdown artifacts whose syntax requires YAML frontmatter on the first line
  * (OpenCode agents/commands): their visible marker is a `#` comment INSIDE the
  * frontmatter instead of a leading HTML comment.
@@ -225,10 +249,14 @@ function isFrontmatterDestination(dest: string): boolean {
 /**
  * Visible provenance marker for a generated file (opencode-seam-010): HTML
  * comment first line by default, YAML comment inside frontmatter for OpenCode
- * Markdown artifacts, nothing for JSON/JSONC destinations.
+ * Markdown artifacts, `//` line comment for TypeScript destinations, nothing
+ * for JSON/JSONC destinations.
  */
 export function stampGeneratedContent(dest: string, markerTemplate: string, content: string): string {
   if (isJsonDestination(dest)) return content;
+  if (isTypeScriptDestination(dest)) {
+    return `// arggon:generated template="${markerTemplate}"\n${content}`;
+  }
   // NIT-9 (PR #322 review): tolerate a CRLF frontmatter opener so a CRLF
   // template still gets a valid frontmatter-first file; the marker line
   // matches the opener's EOL style.
@@ -483,8 +511,8 @@ export function resolveProjectName(
       currentGeneratedTemplates().find((t) => t.dest === dest)?.template;
     if (templateRel === undefined) continue;
     try {
-      const templatePath = isBundledSkill(templateRel)
-        ? bundledSkillPath(bundledTemplatesDir(), templateRel)
+      const templatePath = isBundledSource(templateRel)
+        ? bundledSourcePath(bundledTemplatesDir(), templateRel)
         : resolve(bundledTemplatesDir(), ...templateRel.split("/"));
       if (!existsSync(templatePath)) continue;
       const disk = readFileSync(join(root, ...dest.split("/")), "utf8");
@@ -509,7 +537,7 @@ export function resolveProjectName(
 }
 
 /**
- * Every doc arggon currently generates (tier-1 + tier-2 + skill), as
+ * Every doc arggon currently generates (tier-1 + tier-2 + bundled sources), as
  * destination path → source template (package-root relative). Doctor uses the
  * template ids to flag stale `x-generated` entries.
  */
@@ -522,7 +550,7 @@ export function currentGeneratedTemplates(): { dest: string; template: string }[
  * bucket injection point for tests: doctor points it at a mutable fixture
  * copy of `templates/` to simulate upstream template movement). The layout
  * must mirror the package root: `<templatesDir>/docs/**` plus the bundled
- * skill at `<templatesDir>/../skills/arggon-cli/SKILL.md`.
+ * sources at `<templatesDir>/../skills/...` and `<templatesDir>/../opencode/...`.
  */
 export function currentGeneratedTemplatesFrom(templatesDir: string): { dest: string; template: string }[] {
   const docsSrc = resolve(templatesDir, "docs");
@@ -532,10 +560,15 @@ export function currentGeneratedTemplatesFrom(templatesDir: string): { dest: str
       found.push({ dest: mapTemplateDest(rel), template: `docs/${rel}` });
     }
   }
-  for (const skill of BUNDLED_SKILLS) {
-    if (existsSync(bundledSkillPath(templatesDir, skill.source))) {
-      found.push({ dest: skill.dest, template: skill.source });
-    }
+  // Bundled sources are current destinations even when the render source is
+  // absent from an injected fixture layout: doctor's `templatesRoot` is only
+  // overridden by tests, and a fixture copy of `templates/` (plus `skills/`)
+  // may legitimately omit the sibling `opencode/` tree. Including the entry
+  // unconditionally keeps their `x-generated` state out of the `stale` bucket
+  // (the destination IS still current); `renderGeneratedDoc` returns null for
+  // a missing source, which doctor reads as "cannot decide", never outdated.
+  for (const bundled of BUNDLED_SOURCES) {
+    found.push({ dest: bundled.dest, template: bundled.source });
   }
   return found.sort((a, b) => a.dest.localeCompare(b.dest));
 }
@@ -550,7 +583,7 @@ export function currentGeneratedTemplatesFrom(templatesDir: string): { dest: str
  * from the current year. Zero writes, never throws: a missing or unreadable
  * template yields `null` (doctor treats that as "cannot decide", i.e. not
  * outdated). `template` is the `x-generated` template id (package-root
- * relative, e.g. "docs/AGENTS.md" or the skill source path).
+ * relative, e.g. "docs/AGENTS.md" or a bundled source path).
  */
 export function renderGeneratedDoc(opts: {
   templatesDir: string;
@@ -567,8 +600,8 @@ export function renderGeneratedDoc(opts: {
   projectName?: string | null;
 }): string | null {
   try {
-    const path = isBundledSkill(opts.template)
-      ? bundledSkillPath(opts.templatesDir, opts.template)
+    const path = isBundledSource(opts.template)
+      ? bundledSourcePath(opts.templatesDir, opts.template)
       : resolve(opts.templatesDir, ...opts.template.split("/"));
     if (!existsSync(path)) return null;
     if (opts.projectName === null) return null; // project-name-unrecoverable
@@ -579,11 +612,12 @@ export function renderGeneratedDoc(opts: {
     };
     const rendered = renderDocPlaceholders(raw, vars);
     // Mirror generateDocs' marker convention: doc templates are stamped with
-    // the docs-dir-relative name ("AGENTS.md"), the skill with its full
-    // package-root-relative path — while the x-generated state template id is
-    // the "docs/"-prefixed path for docs. JSON/JSONC destinations carry no
-    // marker; OpenCode Markdown artifacts take it inside frontmatter.
-    const markerTemplate = isBundledSkill(opts.template)
+    // the docs-dir-relative name ("AGENTS.md"), bundled sources (skill, plugin)
+    // with their full package-root-relative path — while the x-generated state
+    // template id is the "docs/"-prefixed path for docs. JSON/JSONC
+    // destinations carry no marker; OpenCode Markdown artifacts take it inside
+    // frontmatter; TypeScript takes a `//` line.
+    const markerTemplate = isBundledSource(opts.template)
       ? opts.template
       : opts.template.replace(/^docs\//, "");
     return stampGeneratedContent(opts.dest, markerTemplate, rendered);
@@ -594,10 +628,10 @@ export function renderGeneratedDoc(opts: {
 
 /**
  * How many files arggon currently generates with a full init (tier-1 + tier-2
- * docs, .mcp.json, and the bundled skill). Derived from the same template walk
- * generateDocs uses, so adding the next template touches only `templates/` and
- * this module — tests import this constant instead of hardcoding the count
- * (task-adopt-scan-count-constant).
+ * docs, .mcp.json, and the bundled skills/plugin). Derived from the same
+ * template walk generateDocs uses, so adding the next template touches only
+ * `templates/` and this module — tests import this constant instead of
+ * hardcoding the count (task-adopt-scan-count-constant).
  */
 export const GENERATED_DOC_COUNT: number = currentGeneratedTemplates().length;
 
@@ -613,7 +647,7 @@ function utcDate(now: Date): string {
  */
 export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
   const packageRootDir = resolve(bundledTemplatesDir(), "..");
-  const bundledSkillSources = BUNDLED_SKILLS.map((s) => ({
+  const bundledSources = BUNDLED_SOURCES.map((s) => ({
     ...s,
     src: resolve(packageRootDir, ...s.source.split("/")),
   }));
@@ -787,17 +821,18 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
     );
   }
 
-  // Bundle the agent skills from their single sources (skills/ in this repo —
-  // NOT template duplicates) so agents in the adopter repo use them by default.
-  for (const skill of bundledSkillSources) {
-    if (!existsSync(skill.src)) continue;
-    const skillRaw = readFileSync(skill.src, "utf8");
+  // Bundle the package-root artifacts — the agent skills (skills/) and the
+  // OpenCode V2 plugin (opencode/plugins/) — from their single sources, NOT
+  // template duplicates, so adopters get them by default.
+  for (const bundled of bundledSources) {
+    if (!existsSync(bundled.src)) continue;
+    const bundledRaw = readFileSync(bundled.src, "utf8");
     entries.push(
-      decide(skill.dest, skill.source, skill.source, () => skillRaw,
-        skillRaw.includes("{{PROJECT_NAME}}")),
+      decide(bundled.dest, bundled.source, bundled.source, () => bundledRaw,
+        bundledRaw.includes("{{PROJECT_NAME}}")),
     );
   }
-  // Missing skill source (e.g. stripped packaging): skip silently — docs
+  // Missing bundle source (e.g. stripped packaging): skip silently — docs
   // generation must never fail because an optional bundle is absent.
 
   // Template removed from the bundle: the `x-generated` entry is orphaned
