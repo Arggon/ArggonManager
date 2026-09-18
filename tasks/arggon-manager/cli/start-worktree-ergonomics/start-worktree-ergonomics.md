@@ -1,6 +1,6 @@
 ---
 type: story
-status: todo
+status: done
 id: start-worktree-ergonomics
 title: Worktree start ergonomics
 parent: cli

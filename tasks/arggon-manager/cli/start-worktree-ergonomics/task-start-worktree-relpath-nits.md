@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-start-worktree-relpath-nits
 title: "Worktree-start nits: relative-link resolution + manual npm-ci guard"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-18"
 updated: "2026-09-18"
-claimed_at: "2026-09-18T17:28:19.614Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-start-worktree-relpath-nits
 ---
 <!--
@@ -80,3 +79,6 @@ Evidence: the guarded hook path stays covered by cli/src/worktree.test.ts "hides
 ### handoff 2026-09-18 @Arggon (session: ses_f4a703667ffeIQ4WdhWlBCLWGa) — next: Review draft PR #351 and the R2 rationale comment; after merge, run cleanup --prune from the linked worktree to prune the 6 pending items and flip this item done.
 - branch: feat/task-start-worktree-relpath-nits
 - open questions: Branch is feat/task-start-worktree-relpath-nits (task -> feat pattern), not the fix/... name in the brief; R3 verified on a fixture, not the live 6 program worktrees.
+
+### 2026-09-18 @Arggon
+Coordinator merge verification: review verdict MERGE; R1 dirname-relative resolution verified (absolute/real-dir/foreign-relative untouched), R3 dual-root ownership safe (only a link resolving exactly to the current or canonical-main install, inside a registered worktree) with an independent pre-fix control failing exactly as reported and an 11/11 nested fixture smoke (alpha→main and two-hop bravo→linked pruned, relative foreign kept, installs intact), R2 decision recorded with rationale; 1206 tests + CI green; merged. Pre-existing show leak is tracked in task-show-fixture-cleanup (PR #350) and the two-hop unit case is optional. Closing.
