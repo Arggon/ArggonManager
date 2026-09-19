@@ -192,6 +192,17 @@ mechanics).**
   git directly; strategies give inventory/ownership but are project-scoped and
   loaded from the canonical checkout.
 
+### F3.1 — Revisiting ADR 0010's alternatives
+
+| ADR 0010 stance                                                        | This audit                                                                                                                                    |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Native plugin tools **deferred** ("no proven gain"; MCP parity)        | **Adopted**: native-first is the new directive, and `ctx.tool.transform` now offers namespaces + `codemode`; MCP loses its default role       |
+| In-process kernel **deferred** (packaging cost)                        | **Adopted**: publish the kernel as a library (candidate B assumes it) to remove the subprocess bridge while keeping one logic path            |
+| npm plugin package **deferred**                                        | **Required**: distribution + bootstrap (single package: kernel + plugin + thin bin)                                                           |
+| CLI rewritten as plugin-only **rejected** (portable core, cross-agent) | **Reconsidered** (candidate A as end-state); candidate B keeps a thin headless artifact for bootstrap/CI, not as daily UX                     |
+| MCP-only **rejected** (no ambient behavior)                            | Still rejected; MCP demoted to optional adapter                                                                                               |
+| SDK embedding / OpenCode as core dependency **rejected**               | Still rejected: even with an exclusive runtime, the git data contract and a headless bootstrap keep CI and migration independent of embedding |
+
 ### F4 — Risks
 
 1. **API churn at 2.0.x.** Native tools/domains are newer than the CLI. Mitigate:
