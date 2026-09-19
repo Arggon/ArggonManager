@@ -43,10 +43,17 @@ Required sections:
   board, claim, start/worktree, review gate, done/cascade, spec/ADR/plan docs,
   doctor, init/scaffold, orchestration, context injection) list the native
   mechanism(s) that could own it, with trade-offs.
-- **Decision points with options**: git-native `tasks/` vs OpenCode runtime
-  state; in-process plugin tools vs child-process kernel; TUI plugin as the
-  board; worktree strategy via `ctx.worktree.transform`; rule enforcement via
-  `ctx.permission.rules`; distribution (npm package vs vendored file).
+- **Decision points, each with a recommendation** (the product owner delegated
+  these to the audit, 2026-09-19):
+  - **D1 — source of truth**: git-native `tasks/` vs OpenCode runtime state
+    (storage/DB).
+  - **D2 — methodology contract**: keep the Agile tree + claim→worktree→PR→
+    review→done loop as fixed contract, or redesign the flow/states/gates with
+    native primitives.
+  - Implementation-level: in-process plugin tools vs child-process kernel; TUI
+    plugin as the board; worktree strategy via `ctx.worktree.transform`; rule
+    enforcement via `ctx.permission.rules`; distribution (npm package vs
+    vendored file).
 - **Risks**: API churn (pin 2.0.x), failure isolation, testing strategy
   without the CLI, adopter bootstrap without `arggon init`, migration of
   existing `tasks/` trees.
@@ -58,8 +65,8 @@ Required sections:
       `templates/exploration.md`, with dated sources.
 - [ ] Every ArggonManager capability is either assigned a native mechanism or
       explicitly dropped, with rationale.
-- [ ] The `tasks/`-vs-native-state question has a recommended answer with
-      trade-offs.
+- [ ] D1 (source of truth) and D2 (methodology contract) each have a
+      recommendation with trade-offs, ready for the ADR.
 - [ ] ADR outline ready (next ADR number, 0011) for the follow-up task.
 - [ ] `arggon validate` green; no code changes in this task.
 
