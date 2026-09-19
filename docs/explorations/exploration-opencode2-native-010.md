@@ -62,8 +62,9 @@ pins 2.0.8 — drift recorded in F1.13), [ADR 0010](../adr/0010-opencode2-native
 2. **Agents.** Markdown/JSONC with `mode` (`primary|subagent|all`), ordered
    `permissions` (last match wins), `model` (+`#variant`), `system`, `steps`,
    `hidden`, `disabled`, `color`; `request` overlays are accepted but **inert**
-   in V2. Subagents run in child sessions with fresh context; nesting default
-   is one level (source: <https://opencode.ai/v2/docs/agents/>, 2026-09-19).
+   in V2. Subagents run in child sessions with fresh context (source:
+   <https://opencode.ai/v2/docs/agents/>, 2026-09-19); nesting depth defaults
+   to one (source: <https://opencode.ai/v2/docs/tools/>, 2026-09-19).
 3. **Commands.** `.md`/JSON, `$ARGUMENTS`/`$1..$n`, `agent`, `model`,
    `subagent: true` (background child), shell blocks `` !`cmd` `` run outside
    the tool-permission flow, project sources replace global, hot reload
@@ -74,7 +75,8 @@ pins 2.0.8 — drift recorded in F1.13), [ADR 0010](../adr/0010-opencode2-native
    permission-gated by skill ID (source: <https://opencode.ai/v2/docs/skills/>, 2026-09-19).
 5. **Tools.** Built-ins: `read`, `glob`, `grep`, `edit`, `write`, `patch`,
    `shell`, `webfetch`, `websearch`, `question`, `skill`, `subagent`,
-   `execute` (Code Mode), `browser`; MCP tools are `<server>_<tool>`
+   `execute` (Code Mode), `browser` (desktop/Code Mode namespace); MCP tools
+   are `<server>_<tool>`
    (source: <https://opencode.ai/v2/docs/tools/>, 2026-09-19).
 6. **Permissions.** Ordered `{action, resource, effect}` rules, last match wins,
    `allow|ask|deny`, whole-value wildcards, defaults + per-agent policies,
@@ -89,9 +91,10 @@ pins 2.0.8 — drift recorded in F1.13), [ADR 0010](../adr/0010-opencode2-native
    `command`, `mcp`, `integration`, `reference`, `skill`, `tool`, `websearch`,
    `worktree`, `vcs`. Hooks: `prompt`, `context`, `compaction`, `generate`,
    `title`, `model.request`, `http.request/response`, experimental WS,
-   `retry`. Plus `storage` (durable + memory), `events.subscribe`,
-   `permission.rules`, `session.*` (create/get/context/switch/prompt/generate/
-   command/synthetic/interrupt/rename/wait), `generate.text`, `plugin.list`,
+   `retry`. Plus `ctx.storage` (durable), `ctx.event.subscribe`,
+   `ctx.permission.rules`, `ctx.session.*` (create/get/context/switch/prompt/
+   generate/command/synthetic/interrupt/rename/wait), `ctx.generate.text`,
+   `ctx.plugin.list`,
    `client`/SDK/RPC/Effect. `ctx.tool.transform` supports namespaces and
    `options.codemode: true`; `ctx.worktree` exposes
    `create/list/refresh/remove` and pluggable strategies; `ctx.vcs` exposes
@@ -112,16 +115,27 @@ pins 2.0.8 — drift recorded in F1.13), [ADR 0010](../adr/0010-opencode2-native
     permission gates availability, nested tools keep their own rules; tools
     registered with `codemode: true` join the catalog (sources: tools + build
     docs, 2026-09-19).
-13. **Runtime drift.** Local runtime is **v2.0.10**; `docs/playbooks/opencode.md`
+13. **Sharing.** Session sharing exists as a surface; ADR 0010 listed it as not
+    relied on and this audit keeps that stance: no tracker impact
+    (source: <https://opencode.ai/v2/docs/sharing/>, 2026-09-19).
+14. **Compaction and context.** `compaction` retention config plus the
+    `compaction` hook for checkpoint summaries; ADR 0006 budgets must be
+    re-measured for native tool schemas (sources:
+    <https://opencode.ai/v2/docs/config/>,
+    <https://opencode.ai/v2/docs/build/plugins/>, 2026-09-19).
+15. **API/client/SDK.** HTTP API (OpenAPI at `/openapi.json`), generated TS
+    clients and an SDK for embedding; TUI plugins can call the connected server
+    (including remote) through `context.client`
+    (sources: <https://opencode.ai/v2/docs/api/>,
+    <https://opencode.ai/v2/docs/build/client/>, 2026-09-19).
+16. **Runtime drift.** Local runtime is **v2.0.10**; `docs/playbooks/opencode.md`
     still records 2.0.8 and its A/B plugin-import probe. The playbook pin
     refresh + A/B re-probe is a follow-up outside this audit's diff.
 
 ### F2 — ArggonManager capability map
 
-Current surface from ADR 0010: kernel (`cli/src/rules.ts` + `run*`), CLI (human
-
-- `--json`), stdio MCP (9 tools), plugin (ambient), agents, commands, skill,
-  config seam. Native candidates per capability:
+Current surface from ADR 0010: kernel (`cli/src/rules.ts` + `run*`), CLI (human + `--json`), stdio MCP (9 tools), plugin (ambient), agents,
+commands, skill, config seam. Native candidates per capability:
 
 | Capability                                  | Current (v0)                          | Native candidate(s)                                                            | Notes / trade-offs                                                                               |
 | ------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
@@ -142,9 +156,20 @@ Current surface from ADR 0010: kernel (`cli/src/rules.ts` + `run*`), CLI (human
 | Hygiene after commit                        | plugin warning                        | Events/hooks + tool                                                            | Keep non-blocking                                                                                |
 | Session↔item correlation                    | plugin storage + VCS + observed calls | Same (already native)                                                          | Storage is cache, never source of truth                                                          |
 | Tracker data                                | `tasks/` Markdown (canonical)         | D1: keep git files, or `ctx.storage` (candidate C)                             | See D1                                                                                           |
+| `priority` (+ `migrate`)                    | CLI                                   | Tool (ranking surface) + command                                               | `next` already ranks; expose read/write                                                          |
+| `comment`/`handoff`                         | CLI + MCP (2 of 9 tools)              | Tool + session-end flow                                                        | Append-only history; allowed on done items                                                       |
+| `sync`/`import-issues` (GitHub)             | CLI                                   | Tool + `gh`/`ctx.integration`                                                  | Network-dependent; reconciliation stays explicit                                                 |
+| `adopt`                                     | CLI                                   | Command + skill + templates                                                    | Guided documentation adaptation                                                                  |
+| `cleanup`                                   | CLI                                   | Worktree domain `list/remove` + tool                                           | Tracker record clearing stays kernel                                                             |
+| `branch`                                    | CLI                                   | `ctx.vcs` (branches) + tool                                                    | Git stays the substrate                                                                          |
+| `instructions` (agent wiring)               | CLI                                   | Config seam + AGENTS.md router + skill                                         | No bespoke command needed                                                                        |
+| `migrate` (convention versions)             | CLI                                   | Tool                                                                           | Kernel migration logic unchanged                                                                 |
+| Status panels (`status`/`refresh`)          | CLI                                   | TUI panel/sidebar + tool                                                       | Native status surface                                                                            |
+| Config seam (`opencode.jsonc`)              | generated MCP stanza                  | Generation stays; **content changes** (MCP demoted; plugin/compaction only)    | Seam shape is an ADR 0011 detail                                                                 |
 
 Capabilities that are **explicitly native already** (no change needed): agents,
-commands, skill advertisement, context hook, session correlation, config seam.
+commands, skill advertisement, context hook, session correlation. `hello`
+(diagnostic banner) is dropped, and `mcp` is covered by the MCP row.
 
 ### F3 — Decision points
 
@@ -221,6 +246,10 @@ mechanics).**
 6. **Context budget.** Native tools add schemas to every request; `codemode`
    namespaces and skill progressive disclosure are the budget levers (ADR 0006
    measurement must be re-run).
+7. **Dependency-less plugin trees.** The guarded `@opencode/plugin` import
+   gotcha (playbook) still applies if the plugin stays vendored; the
+   kernel-as-library wave must decide vendoring vs published package without
+   breaking dependency-less adopters.
 
 ## Recommendation
 
@@ -252,6 +281,24 @@ D2 = contract kept, mechanics native.**
 6. Risks and revisit triggers (API churn, bootstrap, context budget).
 7. Waves to file: kernel-as-library; native tools + commands; permission
    gates; worktree domain; TUI board; CI/headless adapter; dogfood.
+
+### Open tensions for ADR 0011
+
+- **Bootstrap artifact form** (packaged bin vs template repo) and the explicit
+  B→A criteria.
+- **Kernel-as-library vs vendored dependency-less trees** (guarded-import
+  gotcha; F4.7).
+- **Config-seam content** after the MCP demote.
+- **MCP adapter**: drop now vs keep as a conditional export; the directive is
+  OpenCode-exclusive, so the default recommendation is drop.
+- **ADR 0006 re-measurement** as the gate for the native-tools wave.
+- **Playbook pin refresh** to 2.0.10 + A/B re-probe (filed as
+  `task-playbook-opencode-2-0-10`).
+
+### Follow-ups filed
+
+- `task-native-adr-0011` — ADR 0011 decision from this exploration.
+- `task-playbook-opencode-2-0-10` — refresh the playbook pin and re-probe.
 
 ## Decision
 
