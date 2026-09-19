@@ -11,6 +11,7 @@ priority: p0
 created: "2026-09-19"
 updated: "2026-09-19"
 ---
+
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-capability-audit.md
   Leaves live only under a story. id is the filename stem: task-native-capability-audit.
