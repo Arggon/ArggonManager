@@ -101,10 +101,11 @@ export function readBakedBuildInfo(root: string): GitIdentity | undefined {
 
 /**
  * Render the `--version` line: the semver prefix is always first and intact,
- * the identity (when known) rides in parentheses. Both values are
+ * the identity (when known) rides in parentheses. Live-probe values are
  * git-validated (hex sha, ref-format branch name — no whitespace or control
- * characters), so the line stays single-line by construction; an unknown
- * identity renders the bare version, never an empty `()`.
+ * characters); the baked fallback below only filters empty fields and trusts
+ * the build-time writer, so it is build output, not a validation boundary. An
+ * unknown identity renders the bare version, never an empty `()`.
  */
 export function formatBuildVersion(version: string, info: GitIdentity | undefined): string {
   const parts = [info?.sha, info?.branch].filter((p): p is string => Boolean(p));

@@ -61,10 +61,21 @@ function npm(args: string[], cwd: string) {
   return spawnSync(command, argv, { cwd, encoding: "utf8" });
 }
 
-/** `npm pack --json` is keyed by package name; older npm returned an array. */
-function parsePackResult(stdout: string): PackResult {
-  const start = stdout.indexOf("{");
-  const raw = JSON.parse(start >= 0 ? stdout.slice(start) : stdout) as unknown;
+/**
+ * `npm pack --json` shape differs by npm major: npm >= 12 prints one object
+ * keyed by package name, npm 10 prints a single-element array. Lifecycle
+ * script output (`prepare` banners) can precede the payload on stdout, so
+ * parse from the FIRST `[`/`{` — anchoring on `{` alone would truncate npm
+ * 10's array to `{...}]` (the JSON syntax error that went red in CI on npm
+ * 10.9.4). Exported for the shape fixtures below, so the suite does not depend
+ * on which npm the developer happens to run.
+ */
+export function parsePackResult(stdout: string): PackResult {
+  const payload = /[\[{]/.exec(stdout);
+  if (!payload) {
+    throw new Error(`no JSON payload in npm pack --json output: ${stdout.slice(0, 200)}`);
+  }
+  const raw = JSON.parse(stdout.slice(payload.index)) as unknown;
   const entry = Array.isArray(raw) ? raw[0] : Object.values(raw as Record<string, PackResult>)[0];
   if (!entry || typeof entry !== "object" || !Array.isArray(entry.files)) {
     throw new Error(`unexpected npm pack --json payload: ${stdout.slice(0, 200)}`);
@@ -100,6 +111,35 @@ function freshCloneCopy(): string {
   symlinkSync(join(root, "node_modules"), join(dir, "node_modules"), "junction");
   return dir;
 }
+
+describe("parsePackResult (npm 10 array vs npm 12 keyed payloads)", () => {
+  const file: PackedFile = { path: "dist/cli.js", size: 10, mode: 0o755 };
+  const result: PackResult = {
+    name: "arggon-manager",
+    version: "0.3.0",
+    size: 1,
+    unpackedSize: 2,
+    files: [file],
+  };
+
+  it("parses npm >= 12's object keyed by package name", () => {
+    expect(parsePackResult(JSON.stringify({ "arggon-manager": result }))).toEqual(result);
+  });
+
+  it("parses npm 10's single-element array (regression: truncated at the first `{`)", () => {
+    expect(parsePackResult(JSON.stringify([result]))).toEqual(result);
+  });
+
+  it("ignores lifecycle script output preceding the payload", () => {
+    const stdout = `> arggon-manager@0.3.0 prepare\n> npm run build\n\n${JSON.stringify([result])}\n`;
+    expect(parsePackResult(stdout)).toEqual(result);
+  });
+
+  it("fails clearly on output without package metadata", () => {
+    expect(() => parsePackResult("no json here")).toThrow(/no JSON payload/);
+    expect(() => parsePackResult('{"other":{}}')).toThrow(/unexpected npm pack --json payload/);
+  });
+});
 
 describe("npm pack contents", () => {
   it("pins prepare/postbuild as part of the install contract", () => {
