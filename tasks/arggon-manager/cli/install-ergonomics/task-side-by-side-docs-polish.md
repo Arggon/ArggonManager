@@ -35,11 +35,18 @@ merged as `bc6291e`):
   of git".
 - **F3 (info)** — the `plugin.list` example output is simplified (real output
   includes ~80 builtin plugins). No action.
+- **F4 (from `task-npm-packaging`, PR #366)** — npm 12 blocks dependency
+  install scripts by default: `npm link` / `npm install -g .` on an unbuilt
+  checkout exit 0 with no `dist/` and no bin. The working order is
+  `npm install` first, then link (or approve scripts); the tarball path
+  documented in README (PR #366) is the supported install. The side-by-side
+  Option B recipe must state this caveat.
 
 ## Acceptance
 
 - [ ] `docs/opencode2.md` distinguishes rebuild (Option A) vs reinstall/repack
       (Option B) in the dev bootstrap paragraph.
+- [ ] Option B notes the npm-12 script-blocking caveat (build/install order).
 - [ ] `.gitignore` covers `mise.local.toml`, or the docs no longer imply it is
       an in-tree file.
 - [ ] `arggon validate` green; docs-only diff.
