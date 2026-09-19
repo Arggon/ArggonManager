@@ -4,6 +4,7 @@ status: todo
 id: task-native-kernel-lib
 title: Kernel as a library
 parent: native-redesign
+depends_on: [task-native-spec-plan]
 labels: []
 priority: p0
 created: "2026-09-19"

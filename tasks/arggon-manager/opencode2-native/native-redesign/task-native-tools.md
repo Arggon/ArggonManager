@@ -22,7 +22,7 @@ updated: "2026-09-19"
 
 ## Context
 
-W2 of `plan-native-first-011`. Register the `arggon` tool namespace with `ctx.tool.transform` (`options.codemode: true`) for list/create/update/show/next/report/validate/comment/handoff/priority, calling the kernel library in-process. Inputs/outputs mirror `docs/json-output.md`; kernel failures surface as typed tool errors.
+W2 of `plan-native-first-011`. Register the `arggon` tool namespace with `ctx.tool.transform` (`options.codemode: true`) for list/create/update/show/next/report/validate/comment/handoff/priority and `sync`/`import-issues`, calling the kernel library in-process. Inputs/outputs mirror `docs/json-output.md`; kernel failures surface as typed tool errors.
 
 ## Acceptance
 
@@ -30,6 +30,7 @@ W2 of `plan-native-first-011`. Register the `arggon` tool namespace with `ctx.to
 - [ ] Contract tests pin tool output ≡ `--json` envelope per command.
 - [ ] A kernel error returns a typed tool error; the session continues (failure isolation).
 - [ ] The namespace appears in the Code Mode catalog with the expected description.
+- [ ] ADR 0006 tool-schema measurement re-runs and stays within budget.
 
 ## Notes
 

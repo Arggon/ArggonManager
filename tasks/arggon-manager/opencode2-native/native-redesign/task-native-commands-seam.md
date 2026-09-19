@@ -22,7 +22,8 @@ updated: "2026-09-19"
 
 ## Context
 
-W3 of `plan-native-first-011`. Replace the CLI-driving commands with native commands that drive tools; regenerate the config seam without the MCP stanza; ship the vendored single-file plugin build; update the AGENTS.md router and the skill. ADR 0011 decision 5/6.
+W3 of `plan-native-first-011`. Replace the CLI-driving commands with native commands that drive tools (including `/arggon-adopt` for guided
+adoption); regenerate the config seam without the MCP stanza; ship the vendored single-file plugin build; update the AGENTS.md router and the skill. ADR 0011 decision 5/6.
 
 ## Acceptance
 

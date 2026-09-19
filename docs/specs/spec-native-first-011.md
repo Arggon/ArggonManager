@@ -36,7 +36,7 @@ Invariants:
 # Daily UX (inside OpenCode V2)
 /arggon-next, /arggon-start, ...       native commands driving native tools
 arggon_list / arggon_create / ...      native tools, namespace `arggon` (Code Mode)
-Ctrl+P → argon board panel             TUI surface for status/board
+Ctrl+P → arggon board panel             TUI surface for status/board
 
 # Bootstrap + CI (headless, no model)
 npx arggon-manager init                generate/refresh the seam (provenance)
@@ -64,7 +64,7 @@ as tool errors, never as throws through hooks.
 ### Commands
 
 Native commands replace the CLI-driving prompt templates:
-`/arggon-{next,start,done,handoff,review,status,spec,adr,explore,playbook}`.
+`/arggon-{next,start,done,handoff,review,status,spec,adr,explore,playbook,adopt}`.
 Commands drive tools, never the headless adapter; `$ARGUMENTS` follows the V2
 commands contract; commands may select `agent`, `model` or `subagent`.
 
@@ -81,7 +81,9 @@ permissions are defense in depth, not the rule source.
 Item worktrees use the worktree domain (`ctx.worktree.create/list/remove`),
 named `<repo>-<id>`, recorded as `worktree_path` (tracker state) and removed by
 cleanup once the item is done and the branch is merged. Git remains the
-substrate; the domain supplies inventory and lifecycle.
+substrate; the domain supplies inventory and lifecycle. Branch creation and
+deletion stay part of the start/cleanup lifecycle, with branch state read
+through `ctx.vcs`.
 
 ### TUI
 
@@ -108,7 +110,8 @@ trees do not need `node_modules` for the plugin to load.
 `init`, `validate`, `doctor` (plus `list`/`show --json` for diagnostics) stay
 in the packaged bin for bootstrap and model-less CI. Every other capability is
 reachable through native tools. The `--json` envelopes remain the contract
-(`docs/json-output.md`).
+(`docs/json-output.md`). The headless artifact is transitional: the criteria
+for moving to candidate A (fully native, no adapter) are recorded in ADR 0011.
 
 ### Data contract
 

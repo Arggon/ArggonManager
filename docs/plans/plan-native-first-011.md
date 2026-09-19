@@ -6,7 +6,7 @@ status: proposed
 created: "2026-09-19"
 ---
 
-# Plan: Plan for the native-first ArggonManager rebuild (native-first-011)
+# Plan: Native-first ArggonManager rebuild (native-first-011)
 
 Derived from `docs/specs/spec-native-first-011.md`. Waves W1–W7; each wave is a
 tracker task under `native-redesign` with its acceptance criterion and
@@ -26,16 +26,18 @@ ADR 0006 surfaces it touches.
 
 - Register the `arggon` tool namespace (`ctx.tool.transform`,
   `options.codemode: true`) with contract-typed inputs/outputs for
-  list/create/update/show/next/report/validate/comment/handoff/priority;
-  parity tests against `--json`.
+  list/create/update/show/next/report/validate/comment/handoff/priority and
+  `sync`/`import-issues`; parity tests against `--json`.
 - **Acceptance:** headless smoke calls every tool; contract tests green; a
-  kernel error surfaces as a typed tool error and the session continues.
+  kernel error surfaces as a typed tool error and the session continues; the
+  ADR 0006 tool-schema measurement re-runs and stays within budget.
 
 ## T3: W3 — Native commands and seam
 
-- Replace CLI-driving commands with native commands driving tools; regenerate
-  the seam without the MCP stanza; ship the vendored single-file plugin build;
-  update the AGENTS.md router and the skill.
+- Replace CLI-driving commands with native commands driving tools (including
+  `/arggon-adopt` for guided adoption); regenerate the seam without the MCP
+  stanza; ship the vendored single-file plugin build; update the AGENTS.md
+  router and the skill.
 - **Acceptance:** fresh-`init` fixture plus one headless scenario per command;
   `init` stays idempotent with provenance; no MCP stanza is written.
 
