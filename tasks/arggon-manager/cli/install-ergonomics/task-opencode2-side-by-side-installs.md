@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-opencode2-side-by-side-installs
 title: "OpenCode2 side-by-side installs: named shim + per-project PATH"
+assignee: Arggon
+branch: feat/task-opencode2-side-by-side-installs
 parent: install-ergonomics
 labels: []
 priority: p3
 created: "2026-09-19"
 updated: "2026-09-19"
+claimed_at: "2026-09-19T20:09:29.372Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-side-by-side-installs
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/install-ergonomics/task-opencode2-side-by-side-installs.md
@@ -67,6 +71,20 @@ checkout. Verified options on this machine:
   tracked → `arggon init` from the oc2 build, plugin generated, headless
   `opencode run` activated the location, `plugin.list` → `arggon` local
   `active`, `mcp.list` → `arggon` `connected`.
+
+### 2026-09-19 @Arggon
+Docs-only implementation in worktree ../ArggonManager-opencode2-task-opencode2-side-by-side-installs — commit 8175ad2, draft PR #365 (base opencode2). docs/opencode2.md gains 'Side-by-side installs' (Option A named shim + per-project PATH; Option B frozen prefix; mise.toml vs mise.local.toml table; why bare arggon must resolve per project + server-PATH caveat; dev-checkout bootstrap; verification block) and docs/playbooks/opencode.md gains a Setup cross-ref. No code changes; no generated-marker files touched.
+
+Evidence (2026-09-19, this machine):
+- Option A reproduced from zero in a scratch git tree with tracked mise.toml: 'mise exec -- which arggon' -> ~/.local/share/arggon-oc2/bin/arggon in the project AND in a linked 'git worktree add' copy; the primary's mise.local.toml is NOT inherited by worktrees. Raw shell without mise still resolves main.
+- Option B nuance: on npm 12.0.2 'npm install -g --prefix <dir> <checkout>' LINKS the checkout (not frozen); documented '--install-links' (or a tarball install) yields a real copy at <prefix>/lib/node_modules/arggon-manager/dist/cli.js. 'npm pack' includes dist/ because it follows the declared bin into the gitignored dir.
+- 'opencode api plugin.list --param location[directory]=$PWD' -> argon local active; mcp.list -> connected. Bare 'arggon mcp' spawned by the running server resolved to MAIN even under the oc2 checkout (observed: node .../node/26.7.0/bin/arggon mcp); pinning the shim in the MCP command spawned the oc2 dist/cli.js.
+- 'npm run build' leaves dist/cli.js at mode 644 (tsc exec-bit gotcha).
+- Gates: npm test 1293 passed (final run), npm run lint clean, npm run arggon -- validate ok (convention v3). Earlier npm test runs flaked in cli/src/measure.test.ts while load average was ~26 from parallel agents (hygiene test races concurrent measureBudget callers; fixture subprocess exit 1 under load); the file passes isolated, so environmental.
+
+### handoff 2026-09-19 @Arggon — next: Coordinator review + merge of PR #365 (draft). Merge with a merge commit, not squash: the branch carries chore(tasks) auto-commits (claim, comment, handoff). After merge: tick the acceptance boxes if…
+- branch: feat/task-opencode2-side-by-side-installs
+- open questions: Pre-existing flake: cli/src/measure.test.ts '/tmp hygiene' races concurrent measureBudget callers (cli.test.ts doctor --budget) and fixture subprocesses exit 1 under high parallel-agent load; passes …
 
 ### 2026-09-19 @Arggon
 ## Review verdict — PR #365 (task-opencode2-side-by-side-installs)
