@@ -34,6 +34,9 @@ arggon init                                    # never overwrites adopter files
 opencode                                       # the seam is discovered automatically
 ```
 
+Keeping `main` installed side-by-side (so bare `arggon` stays on `main`)? See
+[Side-by-side installs](#side-by-side-installs).
+
 Within the session you get: the `arggon-cli` skill (umbrella + on-demand
 `references/`), the `/arggon-*` commands, the coordinator/worker/reviewer
 agents, the `arggon` MCP server (registered by the plugin when unset), and —
@@ -97,6 +100,143 @@ npm run smoke:opencode        # 11 headless scenarios on a real OpenCode runtime
 npm run smoke:opencode:wave   # scripted coordinator/worker/reviewer wave (2 fixtures)
 npm run context:report --strict   # context budgets: AGENTS.md, MCP schemas, item block, keep.tokens
 ```
+
+## Side-by-side installs
+
+Both branches declare the same `arggon` bin (`package.json` → `./dist/cli.js`),
+so two `npm link` installs collide: the last one wins and the global shim
+silently points at whichever checkout linked last. To keep `main` as bare
+`arggon` and still drive the OpenCode2 build from this checkout, give the oc2
+build a second name and let each project resolve it locally.
+
+**Option A (recommended): named shim + per-project PATH.** Leave `arggon` →
+`main`; add a wrapper for the oc2 checkout:
+
+```bash
+npm ci && npm run build        # dist/ is gitignored; build before shimming
+
+mkdir -p ~/.local/share/arggon-oc2/bin
+cat > ~/.local/share/arggon-oc2/bin/arggon <<'SH'
+#!/usr/bin/env bash
+exec node /home/<user>/Projects/ArggonManager-opencode2/dist/cli.js "$@"
+SH
+chmod +x ~/.local/share/arggon-oc2/bin/arggon
+ln -sf ~/.local/share/arggon-oc2/bin/arggon ~/.local/bin/arggon-oc2
+```
+
+The wrapper `exec`s `node`, so it is immune to the `tsc` exec bit (see the dev
+checkout notes below) and never touches the global `arggon`. It also needs
+`~/.local/bin` on `PATH` for the `arggon-oc2` name.
+
+Then make bare `arggon` resolve to the shim **inside the project** — a
+`mise.toml` at the project root:
+
+```toml
+[env]
+_.path = ["~/.local/share/arggon-oc2/bin"]
+```
+
+- mise prepends that directory ahead of the Node bin dir that owns the global
+  `arggon`; verified with `mise exec -- which arggon` →
+  `~/.local/share/arggon-oc2/bin/arggon`. Normal mode auto-trusts the config
+  on `mise exec`; paranoid mode needs `mise trust`.
+- The per-project PATH applies when mise is active in the shell
+  (`mise activate`) or via `mise exec`; a plain shell still gets `main`.
+- Both builds report `0.3.0`, so tell them apart by path
+  (`readlink -f "$(which arggon)"`). Build identity is
+  [`task-npm-packaging`](../tasks/arggon-manager/cli/install-ergonomics/task-npm-packaging.md)
+  scope.
+
+**Option B: frozen prefix install.** Pack the checkout into an isolated prefix
+instead of linking it:
+
+```bash
+npm ci && npm run build        # neither install nor pack builds dist/
+npm install -g --install-links --prefix ~/.local/share/arggon-oc2 <checkout>
+ln -sf ~/.local/share/arggon-oc2/bin/arggon ~/.local/bin/arggon-oc2
+```
+
+- `--install-links` makes npm pack the directory instead of symlinking it;
+  without it, npm 12 links `<checkout>` and the copy is not frozen (verified).
+  Installing a tarball (`npm pack`, then
+  `npm install -g --prefix ~/.local/share/arggon-oc2 <tarball>`) is
+  equivalent. The tarball carries `dist/` because npm follows the declared
+  `bin` into the gitignored directory (verified on npm 12.0.2).
+- Neither install nor pack builds `dist/`, so build the checkout first
+  (packaging debt: [`task-npm-packaging`](../tasks/arggon-manager/cli/install-ergonomics/task-npm-packaging.md)).
+
+Option B also benefits from the same `mise.toml` snippet: both layouts expose
+an `arggon` shim in `~/.local/share/arggon-oc2/bin`.
+
+### `mise.toml` (tracked) vs `mise.local.toml` (machine-local)
+
+| | `mise.toml` | `mise.local.toml` |
+| --- | --- | --- |
+| Committed | yes | no — keep it out of git |
+| Fresh clone | inherits the PATH | does not inherit |
+| New worktree | inherits the PATH | does not inherit |
+| Collaborators | inert path entry until they build their own shim | unaffected |
+
+Use the tracked `mise.toml` for oc2 projects: work happens in worktrees, and an
+untracked `mise.local.toml` silently disappears in every one of them — exactly
+where sessions and workers run, bare `arggon` would fall back to `main`. Keep
+`mise.local.toml` for personal overrides you do not want to impose.
+
+### Why bare `arggon` must resolve per project
+
+The generated seam calls bare `arggon` everywhere: the `arggon` MCP stanza in
+`opencode.jsonc` (`{ "type": "local", "command": ["arggon", "mcp"] }`), the
+plugin's MCP auto-registration when no server is configured, and the generated
+agents/commands/skills that drive the CLI. If an oc2 project resolves it to
+`main`, the session drives the wrong build.
+
+The sharper caveat: **the OpenCode server spawns `arggon` with the PATH of the
+shell that launched it**, not the project shell's. A background server started
+elsewhere keeps resolving `main` even inside an oc2 project (observed:
+`node …/node/26.7.0/bin/arggon mcp`, the global `main` link, spawned for the
+oc2 checkout). Two fixes:
+
+- Launch (or relaunch) OpenCode from a shell in the project with mise active:
+  `cd <project> && opencode`.
+- Or pin the absolute shim in the MCP command:
+  `"command": ["/home/<user>/.local/share/arggon-oc2/bin/arggon", "mcp"]` —
+  verified: the spawned server then runs the oc2 `dist/cli.js`. The path is
+  machine-specific, so keep the pin out of shared configs.
+
+### Dev checkout bootstrap
+
+- `npm run build` is plain `tsc`, which emits `dist/cli.js` at mode `644`. A
+  bare symlink to that file fails with `Permission denied`; `npm link` and
+  `npm install -g` fix the mode (npm's bin links), and Option A's wrapper
+  sidesteps the question (`exec node …` does not need the bit). Rebuild after
+  every pull or branch switch — both shims execute `dist/`, which is
+  gitignored.
+- `.opencode/plugins/arggon/index.ts` and `.agents/skills/*` are gitignored
+  generated copies of committed sources; a fresh dev checkout — and every new
+  worktree — has none. `arggon init` regenerates them (never overwriting
+  modified files), and the parity tests regenerate a missing or stale copy
+  (`cli/src/plugin-copy.test.ts`, `cli/src/skill-copy.test.ts`). Until then
+  `Ctrl+P → Plugins` will not list `arggon`.
+
+### Verify the side-by-side setup
+
+```bash
+# 1. the project shell resolves bare arggon to the oc2 shim
+which arggon                    # → ~/.local/share/arggon-oc2/bin/arggon
+readlink -f "$(which arggon)"   # → the shim (A) / <prefix>/lib/node_modules/…/dist/cli.js (B)
+
+# 2. the plugin is discovered by the project's OpenCode server
+#    TUI: Ctrl+P → Plugins → arggon (local, active)
+opencode api plugin.list --param "location[directory]=$PWD"
+# → {"id":"arggon","source":{"type":"local","path":"…/arggon/index.ts"},"state":{"status":"active"}}
+
+# 3. the MCP server connects
+opencode api mcp.list --param "location[directory]=$PWD"
+# → {"name":"arggon","status":{"status":"connected"}}
+```
+
+The first `plugin.list` call may boot the location and race the plugin load —
+run it twice, or start a session in the project first.
 
 ## Upgrading
 

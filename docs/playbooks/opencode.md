@@ -22,6 +22,11 @@ or the V1 schema for V2 work.
 - Install per https://opencode.ai/v2/docs/ (accessed 2026-09-18); verified local
   version: `opencode --version` → `v2.0.8` (2026-09-18; the previous pin was
   2.0.7).
+- Running this branch beside `main`: give the oc2 build a named shim and a
+  per-project PATH — see
+  [Side-by-side installs](../opencode2.md#side-by-side-installs). Note the MCP
+  stanza resolves bare `arggon` with the OpenCode server's PATH, not the
+  project's.
 - `arggon init` generates the tier-1 seam: `opencode.jsonc` **only when the repo
   has no OpenCode config of its own** (`opencode.json(c)` at the root or
   `.opencode/opencode.json(c)`), plus `.opencode/agents/arggon-{coordinator,worker,reviewer}.md`
