@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-native-capability-audit
 title: Audit every OpenCode V2 surface and map ArggonManager capabilities
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p0
 created: "2026-09-19"
 updated: "2026-09-19"
-claimed_at: "2026-09-19T20:16:52.992Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-capability-audit
 ---
 <!--
@@ -65,14 +64,14 @@ Required sections:
 
 ## Acceptance
 
-- [ ] Exploration doc merged under `docs/explorations/` following
+- [x] Exploration doc merged under `docs/explorations/` following
       `templates/exploration.md`, with dated sources.
-- [ ] Every ArggonManager capability is either assigned a native mechanism or
+- [x] Every ArggonManager capability is either assigned a native mechanism or
       explicitly dropped, with rationale.
-- [ ] D1 (source of truth) and D2 (methodology contract) each have a
+- [x] D1 (source of truth) and D2 (methodology contract) each have a
       recommendation with trade-offs, ready for the ADR.
-- [ ] ADR outline ready (next ADR number, 0011) for the follow-up task.
-- [ ] `arggon validate` green; no code changes in this task.
+- [x] ADR outline ready (next ADR number, 0011) for the follow-up task.
+- [x] `arggon validate` green; no code changes in this task.
 
 ## Notes
 
@@ -80,11 +79,13 @@ Required sections:
   lands.
 
 ### 2026-09-19 @Arggon
+
 ## Review PR #367 — `feat/task-native-capability-audit` (docs-only, draft, base `opencode2`)
 
 **Veredicto: NO-MERGE por ahora (cambios solicitados, baratos).** El doc es sólido en estructura, D1/D2 y fuentes, pero la checklist de aceptación no está completa: el mapa F2 omite capacidades shipped y el inventario F1 omite superficies que el item pide explícitamente.
 
 ### Verificado (evidencia)
+
 - **Diff docs-only y fuera de scope solo docs**: `docs/explorations/exploration-opencode2-native-010.md` (+258) y la nota de fuentes del item (2.0.8→2.0.10). Sin cambios de código. Smoke test exento por docs-only (docs/engineering.md, "Smoke test").
 - **Gates reproducidos en el worktree**: `arggon validate` → ok (0 warnings, convention v3); `npm run lint` limpio; `npx vitest run` → **1293/1293 en 77 archivos**; `prettier --check` OK en ambos archivos. CI `cli` en verde sobre el head `fad6ead` (run 35474034283). CI verde es necesario, no suficiente: el smoke no aplica aquí.
 - **Runtime/playbook**: `opencode --version` → v2.0.10; `docs/playbooks/opencode.md:3,23` sigue en 2.0.8. El drift declarado en F1.13 y en la nota del item es correcto.
@@ -92,6 +93,7 @@ Required sections:
 - **Spot-check de fuentes V2 (docs bajados 2026-09-19)**: `ctx.tool.transform` + namespaces + `options.codemode: true`; los 12 transforms (provider/model/agent/command/mcp/integration/reference/skill/tool/websearch/worktree/vcs); `ctx.worktree.transform` y `create/list/refresh/remove`; permisos con `execute`, `subagent`, `skill`, `<server>_<tool>`, last-match-wins y saved approvals durables project-scoped; snapshots best-effort con git-object DB separada y "not a transaction or backup"; `request` "preserved but does not yet send"; skills (dirs, autoinvoke/slash, permiso por skill ID); commands (shell blocks fuera del flujo de permisos, precedencia de proyecto); `ctx.generate.text`, `ctx.plugin.list`, `ctx.permission.rules`, sesiones create/get/context/switch/prompt/generate/command/synthetic/rename/interrupt/wait; Code Mode (execute gate + nested tools). Todo eso es correcto.
 
 ### Hallazgos (orden de severidad)
+
 1. **Bloqueante — mapa de capacidades incompleto (acceptance #2).** F2 no menciona: `sync` + `import-issues` (reconciliación GitHub; `docs/engineering.md:50` la lista como shipped; `cli/src/cli.ts:2488` y `:1250`), `comment` + `handoff` (**2 de los 9 tools MCP**: `cli/src/mcp-server.ts:238,257`), `adopt` (`cli.ts:324`), `cleanup` (`cli.ts:2112`), `priority`/`priority migrate` (`cli.ts:1015-1019`) e `instructions` (`cli.ts:2580`). `grep` sobre el doc de "sync|handoff|comment|adopt|cleanup|migrate|instructions|import-issues" solo devuelve la fila `next (priority ranking)`, "Migration" (riesgo 5) y "adopters". El item exige "cada capacidad asignada a un mecanismo nativo o descartada con razón": hoy no se puede saber si el rediseño conserva o descarta `sync`/`handoff`/`comment`/`adopt`.
    **Fix sugerido**: filas en F2 (p. ej. `sync`/`import-issues` → tool + `gh` o drop razonado; `comment`/`handoff` → tools nativos in-process, son parte del loop; `adopt` → init/template; `cleanup` → worktree domain; priority field → item CRUD) o un párrafo corto que declare la granularidad y los pliegue.
 2. **Mayor — inventario F1 incompleto frente a lo pedido por el item.** No hay finding de **compaction/context** (solo la clave `compaction retention` en F1.1 y el hook en F1.8) ni de **sharing** (0 menciones; el item lo pide y 009 lo registraba como inert). **API/client** queda en una frase dentro de F1.8 (`client/SDK/RPC/Effect`). Añadir 1-2 items cortos con fuente fechada y estado (compaction: checkpoint/lossy/hooks; sharing: inert).
@@ -104,6 +106,7 @@ Required sections:
 5. **Menor/proceso — follow-ups declarados sin item**: F1.13 y la nota del item dicen que el refresco del pin a 2.0.10 es follow-up, y el outline habla del "follow-up task" del ADR 0011; bajo `native-redesign` solo existe este task (`arggon list --parent native-redesign`). Con la regla "findings become items", conviene filearlos (p. ej. pin del playbook y `task-adr-0011-native-first`).
 
 ### Tensiones para ADR 0011 (no bloquean, pero el ADR debe cerrarlas)
+
 - **Bootstrap**: B conserva un "thin headless artifact" (init/CI/doctor) y el riesgo 2 admite que A necesitaría un bin/template; no se fija la forma (npx package vs template repo vs subcomandos) ni el criterio para pasar de B a A.
 - **Kernel como librería**: se asume publicarlo y consumirlo in-process, pero no se dice cómo lo resuelve el plugin en árboles dependency-less (el playbook registra que el import estático falla al cargar; bundle vs dependencia no aparece en F4).
 - **Config seam**: F2 lo marca "already native, no change needed", pero bajo B su razón de ser en ADR 0010 (registrar el MCP) queda desactivada: cambia o desaparece.
@@ -111,17 +114,20 @@ Required sections:
 - **Presupuesto de contexto**: riesgo 6 agenda re-medir ADR 0006; conviene declararlo gate de la wave de tools nativos.
 
 ### Merge
+
 - La rama trae claim commit (`3b68875`) + 2 commits docs → **merge commit, nunca squash**. `origin/opencode2` avanzó 23 commits desde el corte (merge-base `a8c15ef`, tip `5fad829`); GitHub lo da MERGEABLE y CI verde sobre `fad6ead`.
 - No marcar `done` (el item sigue `in_progress` en la rama).
 
 **Recomendación final: NO-MERGE hasta resolver #1 y #2 (con #3-#5 en el mismo pase); después, merge con merge commit.** El resto del doc (D1/D2, F3.1, riesgo, outline) está bien y no necesita rediseño.
 
 ### 2026-09-19 @Arggon
+
 ## Re-review PR #367 — head `2ff248c` ("review rework") — veredicto final
 
 **Veredicto: NO-MERGE por un último pase de erratas puntuales (no estructurales).** El rework cubre los hallazgos anteriores (mapa completo, inventario, citas, prosa, follow-ups). Lo que queda son 3-4 correcciones de texto/factualidad en el doc; con ellas, merge.
 
 ### Lo verificado OK
+
 - **F2 ya no omite capacidades shipped.** Contrasté la lista real de comandos (`cli/src/cli.ts`: hello, init, doctor, adopt, create, list, next, show, report, update, priority, comment, handoff, import-issues, validate, spec, stack, playbook, branch, start, cleanup, board, sync, instructions, mcp) y los 9 tools MCP (`cli/src/mcp-server.ts`: list/create/update/comment/handoff/show/next/report/validate): todas tienen fila o están cubiertas (hello dropped; mcp → ver errata 2c). `comment`/`handoff`, `sync`/`import-issues`, `adopt`, `cleanup`, `branch`, `instructions`, `priority` (+migrate) y config seam están ahora en la tabla.
 - **F1 completo**: Sharing (13), Compaction/context (14), API/client/SDK (15), drift renumerado (16).
 - **Citas corregidas**: nesting → tools (F1.2); `ctx.storage` durable vs memory del CLI/TUI (F1.8); `browser` desktop/Code Mode (F1.5); `ctx.event.subscribe` (F1.8). Spot-check de las nuevas: **compaction** correcta (config `keep` + hook "checkpoint summaries"); **API/client** correcta (`@opencode/client` "types and methods are generated from the same contract as the API reference"; `context.client` puede llamar al server remoto) salvo fuentes (errata 3).
@@ -132,6 +138,7 @@ Required sections:
 - **Historia**: claim `3b68875` + 3 commits docs + 2 items; merge commit, nunca squash. `origin/opencode2` avanzó 23 commits (tip `5fad829`); PR MERGEABLE.
 
 ### Erratas a corregir (último pase)
+
 1. **F1.13 Sharing contradice la fuente.** La página V2 dice literalmente "OpenCode V2 does not support session sharing yet"; el doc dice "Session sharing exists as a surface". Reescribir a "Sharing: no soportado en V2 todavía (inerte); ADR 0010 no se apoya en él; sin impacto en el tracker".
 2. **Filas F2 incorrectas o duplicadas** (el resto de la tabla está bien):
    - `migrate` (convention versions): **no existe** ese comando; el único `migrate` es `priority migrate` (`cli.ts:1019`), ya incluido en la fila `priority (+ migrate)`. Eliminar la fila o fusionarla.
