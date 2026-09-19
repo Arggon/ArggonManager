@@ -9,7 +9,6 @@ priority: p3
 created: "2026-09-19"
 updated: "2026-09-19"
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/cli/install-ergonomics/task-opencode2-side-by-side-installs.md
   Leaves live only under a story. id is the filename stem: task-opencode2-side-by-side-installs.
@@ -68,3 +67,42 @@ checkout. Verified options on this machine:
   tracked → `arggon init` from the oc2 build, plugin generated, headless
   `opencode run` activated the location, `plugin.list` → `arggon` local
   `active`, `mcp.list` → `arggon` `connected`.
+
+### 2026-09-19 @Arggon
+## Review verdict — PR #365 (task-opencode2-side-by-side-installs)
+
+**APROBADO para merge — merge commit, nunca squash** (la rama lleva auto-commits `chore(tasks)`). Sin hallazgos bloqueantes. Docs-only: el smoke gate obligatorio no aplica (docs/engineering.md §Smoke: docs-only exempt), pero re-verifiqué end-to-end los pasos documentados.
+
+### Alcance (verificado)
+Diff vs `opencode2`: `docs/opencode2.md` (+140), `docs/playbooks/opencode.md` (+5), y el propio item (frontmatter claim + comentarios). No se tocaron README.md, package.json ni archivos con marker `arggon:generated`. Sin scope creep: todo el contenido nuevo responde a la checklist del item.
+
+### Checklist de aceptación (6/6 cubiertos)
+1. Sección "Side-by-side installs" con ambas recetas y comandos exactos (A: shim nombrado + `mise.toml`; B: prefijo congelado) — ok.
+2. Tabla `mise.toml` (tracked, heredado por clones/worktrees) vs `mise.local.toml` (local, no heredado) + recomendación del tracked para proyectos oc2 — ok.
+3. Por qué bare `arggon` debe resolver por proyecto (stanza MCP en `opencode.jsonc`, auto-registro del plugin, agentes/comandos/skills) + caveat del PATH del server que lanza OpenCode — ok.
+4. Bloque "Verify the side-by-side setup": `which arggon`, `Ctrl+P → Plugins`, `opencode api plugin.list` — ok.
+5. Gotcha del exec-bit (`tsc` → 644) y bootstrap de copias generadas (`arggon init` / parity tests) en el path de dev — ok.
+6. Docs only, sin cambios de código — ok.
+
+### Evidencia re-ejecutada (2026-09-19, esta máquina)
+- `main` y `opencode2`: mismo bin `./dist/cli.js`, ambos `version 0.3.0` (`git show origin/main:package.json`, `origin/opencode2`) — confirma "both builds report 0.3.0".
+- mise 2026.9.9 en scratch: `[env] _.path` queda **antes** del bin de Node (posición 3 vs 12 en PATH); `mise exec -- which arggon` en el checkout oc2 → `~/.local/share/arggon-oc2/bin/arggon`. `MISE_PARANOID=1` falla pidiendo `mise trust`; modo normal no requiere trust — ambas afirmaciones del doc correctas.
+- Repo scratch: `mise.toml` tracked se hereda con `git worktree add`; sin ese archivo el worktree resuelve main. El `mise.local.toml` del checkout primario no aparece en el worktree — tabla correcta.
+- npm 12.0.2: `npm install -g --prefix <dir> <checkout>` sin flag deja `node_modules/arggon-manager` como **symlink** al checkout (no congelado); `--install-links` instala copia real, `dist/cli.js` modo 755, `readlink -f` → `<prefix>/lib/node_modules/arggon-manager/dist/cli.js`. `npm pack --dry-run --json` incluye `dist/cli.js` (mode 420) — el tarball sí lo lleva.
+- `npm run build` deja `dist/cli.js` en 644 (reproducido antes de los installs).
+- OpenCode v2.0.10: `opencode api plugin.list --param "location[directory]=$PWD"` → `arggon` local **active** (`path: …/arggon/index.ts`); `mcp.list` → **connected**. Sintaxis y resultado del bloque de verificación confirmados.
+- Parity tests regeneran las copias (leí `cli/src/plugin-copy.test.ts` y `skill-copy.test.ts`; los corrí: 8/8).
+- Gates: `npm run lint` limpio; `npm run arggon -- validate` ok (convention v3); `npx vitest run cli/src/measure.test.ts` 11/11 aislado (el flake reportado es ambiental). CI GitHub: check `cli` **pass** (2m31s), `mergeStateStatus: CLEAN`.
+
+### Hallazgos no bloqueantes
+1. **Baja — "Dev checkout bootstrap"**: "Rebuild after every pull or branch switch — both shims execute `dist/`" es exacto para Opción A, pero la copia de B con `--install-links` es congelada: un rebuild del checkout no la refresca, hay que reinstalar/repack. Sugerencia: separar A/B en esa frase (`docs/opencode2.md`).
+2. **Info**: `mise.local.toml` no está en `.gitignore` del repo (en esta máquina vive en `.git/info/exclude` local). El doc dice "keep it out of git", correcto como guía; opcional añadirlo a `.gitignore` como follow-up (fuera del alcance docs-only).
+3. **Info**: el ejemplo de salida de `plugin.list` está simplificado (la salida real trae ~80 plugins builtin y `features`); válido como ilustración.
+
+### No pude verificar
+- `Ctrl+P → Plugins` en la TUI (sin drive de TUI; evidencia equivalente vía `plugin.list` API).
+- Traza del spawn del server con su PATH (mecanismo y evidencia del worker coherentes; no re-observé el proceso).
+- Instalación desde tarball (solo `npm pack --dry-run` + copia `--install-links`; equivalente).
+
+### Estado
+PR #365 sigue **draft**: marcar ready antes de merge. Item queda `in_progress` con la checklist sin tildar — correcto hasta el merge; este review no lo marca done.
