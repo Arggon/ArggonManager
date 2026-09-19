@@ -3,7 +3,6 @@ type: task
 status: todo
 id: task-opencode2-side-by-side-installs
 title: "OpenCode2 side-by-side installs: named shim + per-project PATH"
-assignee: Arggon
 parent: install-ergonomics
 labels: []
 priority: p3

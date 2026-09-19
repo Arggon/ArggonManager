@@ -3,7 +3,6 @@ type: story
 status: todo
 id: install-ergonomics
 title: "Install ergonomics: packaging and side-by-side installs"
-assignee: Arggon
 parent: cli
 labels: []
 priority: p3

@@ -3,7 +3,6 @@ type: task
 status: todo
 id: task-npm-packaging
 title: "npm packaging: files allowlist, prepare, executable bin"
-assignee: Arggon
 parent: install-ergonomics
 labels: []
 priority: p3
