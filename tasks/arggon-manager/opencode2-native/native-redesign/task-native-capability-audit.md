@@ -10,7 +10,6 @@ labels: []
 priority: p0
 created: "2026-09-19"
 updated: "2026-09-19"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-capability-audit
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-capability-audit.md
