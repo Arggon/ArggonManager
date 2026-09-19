@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-native-capability-audit
 title: Audit every OpenCode V2 surface and map ArggonManager capabilities
+assignee: Arggon
+branch: feat/task-native-capability-audit
 parent: native-redesign
 labels: []
 priority: p0
 created: "2026-09-19"
 updated: "2026-09-19"
+claimed_at: "2026-09-19T20:16:52.992Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-capability-audit
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-capability-audit.md
@@ -26,7 +30,8 @@ inventories every OpenCode V2 surface and maps each ArggonManager capability to
 native mechanisms.
 
 Sources: `https://opencode.ai/v2/llms.txt` (docs index), the V2 docs (accessed
-2026-09-19), the installed runtime (v2.0.8), ADR 0010 + playbook +
+2026-09-19), the installed runtime (v2.0.10; the playbook pin refresh to
+2.0.10 is a follow-up), ADR 0010 + playbook +
 `exploration-opencode-v2-native-009` (baseline), and the current code
 (`cli/src/`, `opencode/plugins/arggon/`).
 
