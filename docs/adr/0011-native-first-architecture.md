@@ -1,6 +1,6 @@
 # 0011 Native-first architecture: OpenCode-native surface over a git-native tracker
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-09-19
 - Deciders: product owner (Gonzalo), coordinator/architect (Arggon)
 - Research: [exploration-opencode2-native-010](../explorations/exploration-opencode2-native-010.md) (task-native-capability-audit)
@@ -17,7 +17,9 @@ everything if needed and discarding the CLI and/or MCP. The audit
 (native-first hybrid). The product owner delegated D1 (source of truth) and D2
 (methodology contract) to that audit:
 
-- **D1**: git-native `tasks/` stays canonical; runtime storage is a cache.
+- **D1**: git-native `tasks/` stays canonical (layout amended by
+  [ADR 0012](0012-tracker-root-layout.md): root `ArggonManager/`, docs under
+  `ArggonManager/docs/`); runtime storage is a cache.
 - **D2**: the methodology stays the contract; the mechanics are redesigned with
   native primitives.
 
@@ -34,7 +36,9 @@ and the **one logic path** rule remain.
    agent policies enforce hard gates; item worktrees use the worktree domain;
    board/status surfaces are TUI plugin routes/slots/panels; context and
    hygiene stay on session hooks and events.
-2. **Git-native `tasks/` is the single source of truth.** Runtime storage is
+2. **The git-native tracker under `ArggonManager/`** (renamed from `tasks/`;
+   docs under `ArggonManager/docs/`; [ADR 0012](0012-tracker-root-layout.md))
+   **is the single source of truth.** Runtime storage is
    cache for session correlation only; CI, diffs and review of work items stay
    in git.
 3. **The methodology is the contract.** Agile tree, statuses, the claim

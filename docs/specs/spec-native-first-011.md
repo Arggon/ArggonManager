@@ -15,8 +15,8 @@ generated seam with native OpenCode surfaces over the same git-native tracker.
 
 Invariants:
 
-- **Git-native data** — `tasks/` Markdown + convention is the only source of
-  truth; runtime storage is a rebuildable cache.
+- **Git-native data** — the `ArggonManager/` tracker (Markdown + convention)
+  is the only source of truth; runtime storage is a rebuildable cache.
 - **One logic path** — tools, commands, hooks and the headless adapter all call
   the kernel library; no rule logic outside it.
 - **Failure isolation** — every plugin path is feature-detected and wrapped; a
@@ -48,7 +48,7 @@ npx arggon-manager doctor --json       installation/health report
 
 Native tools are registered with `ctx.tool.transform` under the `arggon`
 namespace with `options.codemode: true`. Their inputs and outputs mirror the
-documented `--json` envelopes (`docs/json-output.md`); kernel failures surface
+documented `--json` envelopes (`ArggonManager/docs/json-output.md`); kernel failures surface
 as tool errors, never as throws through hooks.
 
 | Tool                                  | Kernel                  |
@@ -110,14 +110,23 @@ trees do not need `node_modules` for the plugin to load.
 `init`, `validate`, `doctor` (plus `list`/`show --json` for diagnostics) stay
 in the packaged bin for bootstrap and model-less CI. Every other capability is
 reachable through native tools. The `--json` envelopes remain the contract
-(`docs/json-output.md`). The headless artifact is transitional: the criteria
+(`ArggonManager/docs/json-output.md`). The headless artifact is transitional: the criteria
 for moving to candidate A (fully native, no adapter) are recorded in ADR 0011.
 
 ### Data contract
 
-`tasks/` follows `docs/convention.md`; runtime storage keys are namespaced and
+`ArggonManager/` follows `ArggonManager/docs/convention.md`; runtime storage
+keys are namespaced and
 cache-only (for example `arggon:session-item:<sessionID>`), never
 authoritative.
+
+### Layout
+
+The tracker root is `ArggonManager/` and all product docs live under
+`ArggonManager/docs/` ([ADR 0012](../adr/0012-tracker-root-layout.md)). Legacy
+`tasks/` trees are auto-detected: the kernel keeps operating on them and the
+migration command moves the tree and docs (idempotent, provenance-safe), with
+`validate` reporting the legacy location. No hard break.
 
 ### Migration
 
@@ -138,7 +147,7 @@ as the ADR 0006 gate; CI green required for every wave.
       commands, agents, TUI panels, vendored plugin) with no MCP stanza and no
       `node_modules` requirement.
 - [ ] Every tool's output matches its declared contract (parity test vs
-      `docs/json-output.md`).
+      `ArggonManager/docs/json-output.md`).
 - [ ] Claim → worktree → review → done runs end-to-end through native surfaces
       in headless smoke.
 - [ ] The headless adapter covers bootstrap + CI (`init`, `validate`, `doctor`,
@@ -146,5 +155,7 @@ as the ADR 0006 gate; CI green required for every wave.
 - [ ] Context budgets re-measured within ADR 0006 limits; item block ≤ 1024 B.
 - [ ] Migration from an ADR 0010 tree is idempotent and never overwrites
       adopter files.
+- [ ] Legacy `tasks/` trees are auto-detected and migrate to `ArggonManager/`
+      without a hard break.
 - [ ] Distribution: one npm package installs the bin, and the prebuilt plugin
       loads without dependencies.

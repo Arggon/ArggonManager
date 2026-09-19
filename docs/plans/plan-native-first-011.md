@@ -8,11 +8,20 @@ created: "2026-09-19"
 
 # Plan: Native-first ArggonManager rebuild (native-first-011)
 
-Derived from `docs/specs/spec-native-first-011.md`. Waves W1–W7; each wave is a
+Derived from `docs/specs/spec-native-first-011.md`. Waves W0–W7; each wave is a
 tracker task under `native-redesign` with its acceptance criterion and
 `depends_on` edges. Waves execute serially (one at a time); the `depends_on`
 chain encodes that order, and semantic prerequisites are stated per task. Every wave keeps the CLI suite green and re-measures the
 ADR 0006 surfaces it touches.
+
+## T0: W0 — Layout rename and legacy migration
+
+- Rename the tracker root to `ArggonManager/` and move all product docs under
+  `ArggonManager/docs/` (kernel paths, convention, templates, generated seam,
+  skills/commands/agents, CI, this repo's dogfood tree); keep legacy `tasks/`
+  auto-detection and provide the migration command.
+- **Acceptance:** a legacy tree is detected and migrated by the command; this
+  repo dogfoods the new layout; all suites green; no hard break for adopters.
 
 ## T1: W1 — Kernel as a library
 
