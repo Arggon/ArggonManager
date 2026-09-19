@@ -80,3 +80,29 @@ the native-first rebuild under epic `opencode2-native`.
 
 ### 2026-09-19 @Arggon
 Coordinator note: rework c8a6d1b re-verified point by point (sync/import-issues ownership, adopt + ctx.vcs branches, W1 depends_on, ADR 0006 gate in W2, nits) with gates reproduced (validate, spec validate 18 docs, lint, prettier, 1311 tests) and CI cli pass on c8a6d1b. Merged as merge commit b10a768; item flipped to done.
+
+### 2026-09-19 @Arggon
+## Veredicto final PR #369 — head `c8a6d1b` ("review rework")
+
+**MERGE — confirmado.** Revisé el rework punto por punto: los 5 hallazgos quedaron cubiertos, sin inconsistencias nuevas spec↔plan↔tasks, con gates y CI verdes sobre `c8a6d1b`. El merge ya aterrizó como merge commit `b10a768` (parents `654abbd` base + `c8a6d1b` PR), consistente con esta recomendación; no modifiqué el estado del item.
+
+### Puntos del rework verificados
+
+1. **sync/import-issues** — plan T2:27-33 y `task-native-tools` (contexto + acceptance) los incluyen; spec:62 coincide (12 tools) y W2 los cubre con smoke/parity.
+2. **adopt** — spec:67 (lista de commands), plan T3:37-38, contexto de `task-native-commands-seam`; branch/`ctx.vcs` en spec:84-86 (creación/borrado en start/cleanup).
+3. **W1 con dependencia** — `task-native-kernel-lib:7` declara `depends_on: [task-native-spec-plan]`; cadena CLI completa verificada (spec-plan → kernel-lib → tools → commands-seam → permissions-worktrees → tui → headless-ci → dogfood-release); `arggon next --ready` ya no sugiere W1 mientras este item está `in_progress`.
+4. **Gate ADR 0006 de W2** — plan:33 y `task-native-tools:33` ("ADR 0006 tool-schema measurement re-runs and stays within budget").
+5. **Nits** — spec:39 "arggon"; H1 del plan sin duplicar; B→A criteria en spec:113-114.
+
+### Gates (worktree, head c8a6d1b)
+
+- `arggon validate` ok (0 warnings, v3); `arggon spec validate` ok (18 docs); `arggon spec analyze` 0 findings para `native-first-011`; lint 0; `prettier --check` limpio en los 5 archivos del rework; `npm test` **1311/1311** (79 archivos); frontmatter de una línea en todo `tasks/`.
+- CI `cli` **pass** (2m8s, run 35476452659); PR `MERGEABLE` con base `3f197e7` sin drift al momento del review.
+- Docs-only (12 archivos, solo `docs/` + `tasks/`); smoke exento (`docs/engineering.md`).
+- Estado aterrizado re-verificado en `opencode2` (`b10a768`): `arggon validate` ok y `arggon spec validate` ok (18 docs).
+
+### Lo que no verifiqué
+
+- No aplica smoke de CLI/UI (docs-only). No re-probé el runtime V2 live (`opencode v2.0.10`): la coherencia V2 se contrastó contra exploration 010/ADR 0011.
+
+**Recomendación final: MERGE (ya ejecutado como `b10a768`, merge commit, nunca squash). No se modifica el estado del item.**
