@@ -167,3 +167,7 @@ Verificado con npm 12.0.2:
 **Gates** (head `373ebd8`): `npm test` 79 files / **1311 tests green** (pack-contents 6/6, incl. on npm 10.9.4) · `npm run lint` · `npm run build` · `arggon validate` ok:true.
 
 **CI**: run [35469353813](https://github.com/Arggon/ArggonManager/actions/runs/35469353813) → `cli` **pass** (2m39s); `gh pr checks 366` = pass.
+
+### handoff 2026-09-19 @Arggon — next: Re-review the F1 fix + F2/F3 on PR #366 (head after tracker commits), then merge commit and flip done.
+- branch: feat/task-npm-packaging
+- open questions: None blocking; measure.test.ts /tmp flake already filed as a separate bug on opencode2.
