@@ -19,7 +19,7 @@ this audit.
 
 **Sources:** `https://opencode.ai/v2/llms.txt` and the linked V2 docs (accessed
 2026-09-19), local runtime `opencode v2.0.10` (2026-09-19; the playbook still
-pins 2.0.8 — drift recorded in F1.13), [ADR 0010](../adr/0010-opencode2-native-architecture.md),
+pins 2.0.8 — drift recorded in F1.16), [ADR 0010](../adr/0010-opencode2-native-architecture.md),
 [exploration-opencode-v2-native-009](exploration-opencode-v2-native-009.md),
 `docs/playbooks/opencode.md`, and the current code (`cli/src/`,
 `opencode/plugins/arggon/`).
@@ -115,57 +115,60 @@ pins 2.0.8 — drift recorded in F1.13), [ADR 0010](../adr/0010-opencode2-native
     permission gates availability, nested tools keep their own rules; tools
     registered with `codemode: true` join the catalog (sources: tools + build
     docs, 2026-09-19).
-13. **Sharing.** Session sharing exists as a surface; ADR 0010 listed it as not
-    relied on and this audit keeps that stance: no tracker impact
+13. **Sharing.** Session sharing is documented as **not supported yet** in V2;
+    ADR 0010 listed the sharing surface as not relied on and this audit keeps
+    that stance: no tracker impact
     (source: <https://opencode.ai/v2/docs/sharing/>, 2026-09-19).
 14. **Compaction and context.** `compaction` retention config plus the
     `compaction` hook for checkpoint summaries; ADR 0006 budgets must be
     re-measured for native tool schemas (sources:
     <https://opencode.ai/v2/docs/config/>,
     <https://opencode.ai/v2/docs/build/plugins/>, 2026-09-19).
-15. **API/client/SDK.** HTTP API (OpenAPI at `/openapi.json`), generated TS
-    clients and an SDK for embedding; TUI plugins can call the connected server
-    (including remote) through `context.client`
-    (sources: <https://opencode.ai/v2/docs/api/>,
-    <https://opencode.ai/v2/docs/build/client/>, 2026-09-19).
+15. **API/client/SDK.** The server exposes an HTTP API with an OpenAPI
+    document (the published spec is <https://opencode.ai/v2/openapi.json>) and
+    generated TypeScript clients; an SDK supports embedding OpenCode in an
+    application. TUI plugins can call the connected server (including remote)
+    through `context.client` (sources: <https://opencode.ai/v2/docs/api/>,
+    <https://opencode.ai/v2/docs/build/client/>,
+    <https://opencode.ai/v2/docs/build/sdk/>,
+    <https://opencode.ai/v2/docs/build/plugins/cli/>, 2026-09-19).
 16. **Runtime drift.** Local runtime is **v2.0.10**; `docs/playbooks/opencode.md`
     still records 2.0.8 and its A/B plugin-import probe. The playbook pin
-    refresh + A/B re-probe is a follow-up outside this audit's diff.
+    refresh + A/B re-probe is filed as `task-playbook-opencode-2-0-10`.
 
 ### F2 — ArggonManager capability map
 
 Current surface from ADR 0010: kernel (`cli/src/rules.ts` + `run*`), CLI (human + `--json`), stdio MCP (9 tools), plugin (ambient), agents,
 commands, skill, config seam. Native candidates per capability:
 
-| Capability                                  | Current (v0)                          | Native candidate(s)                                                            | Notes / trade-offs                                                                               |
-| ------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
-| Item CRUD/`show`/`list`                     | CLI + MCP                             | `ctx.tool.transform` namespaced `arggon` tools calling the kernel in-process   | Removes subprocess bridge; enables `codemode: true` catalog; needs kernel published as a library |
-| `validate`                                  | CLI                                   | Tool + post-commit hook + CI                                                   | Keep CI gate; hook stays advisory                                                                |
-| `next` (priority ranking)                   | CLI + MCP                             | Tool                                                                           | Pure function; ideal in-process                                                                  |
-| `report`/`trend`                            | CLI                                   | Tool + TUI route/panel                                                         | Output surfaces native (panel/sidebar)                                                           |
-| Board                                       | `arggon board` static HTML            | CLI plugin route (`ui.router.register`) + slots/panels; web app via API/client | Native TUI board; web console as an option                                                       |
-| Claim (+ never steal)                       | CLI kernel rule                       | Tool/kernel validation + `ctx.permission.rules`                                | Permissions complement, never replace, kernel invariants                                         |
-| `start` (claim+branch+worktree+PR)          | CLI                                   | `ctx.worktree.create/list/remove` (+ strategy) + tools + `session.*`           | Worktree domain can own naming/lifecycle; PR step stays a tool (`gh`)                            |
-| Review gate                                 | CLI + reviewer agent                  | Reviewer agent permissions (edit deny) + subagent + CI                         | Already native; formalize as contract                                                            |
-| `done`/cascade                              | CLI kernel                            | Tool                                                                           | Cascade stays kernel logic                                                                       |
-| Spec/ADR/plan/exploration docs              | CLI `spec`/`adr`/`explore`/`playbook` | Command transform + skill + templates                                          | Markdown artifacts unchanged                                                                     |
-| `doctor`                                    | CLI                                   | Tool + startup diagnostics (plugin setup)                                      | Can report per-session config health                                                             |
-| `init`/scaffold                             | CLI                                   | **No native path**: a plugin exists only after bootstrap                       | Requires a headless bootstrap artifact (npx package) — see D3                                    |
-| Orchestration (coordinator/worker/reviewer) | agents + subagents                    | agents + subagents + sessions + background commands + permission rules         | Mostly already native                                                                            |
-| Context injection                           | plugin `session.hook("context")`      | Same (already native)                                                          | Keep ≤1 KiB bound (ADR 0006)                                                                     |
-| Hygiene after commit                        | plugin warning                        | Events/hooks + tool                                                            | Keep non-blocking                                                                                |
-| Session↔item correlation                    | plugin storage + VCS + observed calls | Same (already native)                                                          | Storage is cache, never source of truth                                                          |
-| Tracker data                                | `tasks/` Markdown (canonical)         | D1: keep git files, or `ctx.storage` (candidate C)                             | See D1                                                                                           |
-| `priority` (+ `migrate`)                    | CLI                                   | Tool (ranking surface) + command                                               | `next` already ranks; expose read/write                                                          |
-| `comment`/`handoff`                         | CLI + MCP (2 of 9 tools)              | Tool + session-end flow                                                        | Append-only history; allowed on done items                                                       |
-| `sync`/`import-issues` (GitHub)             | CLI                                   | Tool + `gh`/`ctx.integration`                                                  | Network-dependent; reconciliation stays explicit                                                 |
-| `adopt`                                     | CLI                                   | Command + skill + templates                                                    | Guided documentation adaptation                                                                  |
-| `cleanup`                                   | CLI                                   | Worktree domain `list/remove` + tool                                           | Tracker record clearing stays kernel                                                             |
-| `branch`                                    | CLI                                   | `ctx.vcs` (branches) + tool                                                    | Git stays the substrate                                                                          |
-| `instructions` (agent wiring)               | CLI                                   | Config seam + AGENTS.md router + skill                                         | No bespoke command needed                                                                        |
-| `migrate` (convention versions)             | CLI                                   | Tool                                                                           | Kernel migration logic unchanged                                                                 |
-| Status panels (`status`/`refresh`)          | CLI                                   | TUI panel/sidebar + tool                                                       | Native status surface                                                                            |
-| Config seam (`opencode.jsonc`)              | generated MCP stanza                  | Generation stays; **content changes** (MCP demoted; plugin/compaction only)    | Seam shape is an ADR 0011 detail                                                                 |
+| Capability                                   | Current (v0)                          | Native candidate(s)                                                            | Notes / trade-offs                                                                               |
+| -------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| Item CRUD/`show`/`list`                      | CLI + MCP                             | `ctx.tool.transform` namespaced `arggon` tools calling the kernel in-process   | Removes subprocess bridge; enables `codemode: true` catalog; needs kernel published as a library |
+| `validate`                                   | CLI                                   | Tool + post-commit hook + CI                                                   | Keep CI gate; hook stays advisory                                                                |
+| `next` (priority ranking)                    | CLI + MCP                             | Tool                                                                           | Pure function; ideal in-process                                                                  |
+| `report`/`trend`                             | CLI                                   | Tool + TUI route/panel                                                         | Output surfaces native (panel/sidebar)                                                           |
+| Board                                        | `arggon board` static HTML            | CLI plugin route (`ui.router.register`) + slots/panels; web app via API/client | Native TUI board; web console as an option                                                       |
+| Claim (+ never steal)                        | CLI kernel rule                       | Tool/kernel validation + `ctx.permission.rules`                                | Permissions complement, never replace, kernel invariants                                         |
+| `start` (claim+branch+worktree+PR)           | CLI                                   | `ctx.worktree.create/list/remove` (+ strategy) + tools + `session.*`           | Worktree domain can own naming/lifecycle; PR step stays a tool (`gh`)                            |
+| Review gate                                  | CLI + reviewer agent                  | Reviewer agent permissions (edit deny) + subagent + CI                         | Already native; formalize as contract                                                            |
+| `done`/cascade                               | CLI kernel                            | Tool                                                                           | Cascade stays kernel logic                                                                       |
+| Methodology docs (spec/ADR/plan/exploration) | CLI + `/arggon-*` commands            | Command transform + skill + templates                                          | Markdown artifacts unchanged; ADR docs are authored, no CLI verb                                 |
+| `doctor`                                     | CLI                                   | Tool + startup diagnostics (plugin setup)                                      | Can report per-session config health                                                             |
+| `init`/scaffold                              | CLI                                   | **No native path**: a plugin exists only after bootstrap                       | Requires a headless bootstrap artifact (npx package) — see D3                                    |
+| Orchestration (coordinator/worker/reviewer)  | agents + subagents                    | agents + subagents + sessions + background commands + permission rules         | Mostly already native                                                                            |
+| Context injection                            | plugin `session.hook("context")`      | Same (already native)                                                          | Keep ≤1 KiB bound (ADR 0006)                                                                     |
+| Hygiene after commit                         | plugin warning                        | Events/hooks + tool                                                            | Keep non-blocking                                                                                |
+| Session↔item correlation                     | plugin storage + VCS + observed calls | Same (already native)                                                          | Storage is cache, never source of truth                                                          |
+| Tracker data                                 | `tasks/` Markdown (canonical)         | D1: keep git files, or `ctx.storage` (candidate C)                             | See D1                                                                                           |
+| `priority` (+ `migrate`)                     | CLI                                   | Tool (ranking surface) + command                                               | `next` already ranks; expose read/write                                                          |
+| `comment`/`handoff`                          | CLI + MCP (2 of 9 tools)              | Tool + session-end flow                                                        | Append-only history; allowed on done items                                                       |
+| `sync`/`import-issues` (GitHub)              | CLI                                   | Tool + `gh`/`ctx.integration`                                                  | Network-dependent; reconciliation stays explicit                                                 |
+| `adopt`                                      | CLI                                   | Command + skill + templates                                                    | Guided documentation adaptation                                                                  |
+| `cleanup`                                    | CLI                                   | Worktree domain `list/remove` + tool                                           | Tracker record clearing stays kernel                                                             |
+| `branch`                                     | CLI                                   | `ctx.vcs` (branches) + tool                                                    | Git stays the substrate                                                                          |
+| `instructions` (agent wiring)                | CLI                                   | Config seam + AGENTS.md router + skill                                         | No bespoke command needed                                                                        |
+| Config seam (`opencode.jsonc`)               | generated MCP stanza                  | Generation stays; **content changes** (MCP demoted; plugin/compaction only)    | Seam shape is an ADR 0011 detail                                                                 |
+| MCP surface (`arggon mcp`)                   | stdio server (9 tools)                | Optional adapter generated from the kernel; dropped from the default path      | See D3                                                                                           |
 
 Capabilities that are **explicitly native already** (no change needed): agents,
 commands, skill advertisement, context hook, session correlation. `hello`
