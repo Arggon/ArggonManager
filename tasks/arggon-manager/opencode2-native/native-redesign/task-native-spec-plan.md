@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-native-spec-plan
 title: "Spec and plan: native-first rebuild waves"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p0
 created: "2026-09-19"
 updated: "2026-09-19"
-claimed_at: "2026-09-19T23:20:20.525Z"
 depends_on: [task-native-adr-0011]
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-spec-plan
 ---
