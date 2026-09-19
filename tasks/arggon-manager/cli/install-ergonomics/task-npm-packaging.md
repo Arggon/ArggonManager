@@ -1,15 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-npm-packaging
 title: "npm packaging: files allowlist, prepare, executable bin"
+assignee: Arggon
+branch: feat/task-npm-packaging
 parent: install-ergonomics
 labels: []
 priority: p3
 created: "2026-09-19"
 updated: "2026-09-19"
+claimed_at: "2026-09-19T20:09:40.777Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-npm-packaging
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/cli/install-ergonomics/task-npm-packaging.md
   Leaves live only under a story. id is the filename stem: task-npm-packaging.
