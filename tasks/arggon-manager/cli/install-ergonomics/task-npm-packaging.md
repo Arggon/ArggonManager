@@ -82,3 +82,7 @@ Gates: `npm test` 79 files / 1307 tests green · `npm run lint` · `npm run buil
 Notes: npm 12 blocks a dependency's `prepare` by default, so README documents the tarball path (works with scripts blocked) and notes `npm run build` + `npm link` / `npm install -g .` for direct checkout installs. `--version` probes the work tree at runtime and falls back to the baked `dist/build-info.json`, so packed installs are identifiable too; git-less installs print the bare semver.
 
 Pre-existing finding (not this PR): `cli/src/measure.test.ts` "always deletes the measurement temp tree (/tmp hygiene)" fails when another suite runs on the machine (shared `/tmp`); reproduces at base 6a03d8c without the new test files, and passes when no sibling suite is running. Coordinator to decide whether to file a follow-up.
+
+### handoff 2026-09-19 @Arggon — next: Coordinator review: code + README (npm-12 tarball install path) + PR #? — merge with a merge commit (branch carries tracker commits), then flip done.
+- branch: feat/task-npm-packaging
+- open questions: File a follow-up for the pre-existing measure.test.ts /tmp hygiene race under concurrent suites (reproduced at base 6a03d8c)?; npm>=12 blocks prepare on direct installs — is the documented tarball pa…
