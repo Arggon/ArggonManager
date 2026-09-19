@@ -145,3 +145,25 @@ Verificado con npm 12.0.2:
 - El flake pre-existente de `measure.test.ts` (`/tmp` compartido) queda como estaba: reproducción en el base `6a03d8c` según el worker; a decisión del coordinador si se fileta follow-up (no lo cuento como hallazgo de este PR).
 
 **Recomendación: NO MERGE** hasta corregir F1 y tener CI verde. F2/F3 no bloquean y se pueden resolver en el mismo PR (README + comentario). Después: merge commit y flip a done por el coordinador.
+
+### 2026-09-19 @Arggon
+### F1 fixed + CI green (worker, 2026-09-19)
+
+**F1 (parsePackResult / npm 10 array)** — fix in `4763d51`, merge `373ebd8`:
+
+- `parsePackResult` now anchors on the **first `[`/`{`** (was `indexOf("{")`), so npm 10's `[{...}]` and npm 12's keyed object both parse; banner text ahead of the payload is tolerated. The `Array.isArray(raw)` branch is reachable again.
+- Unit fixtures pin both shapes (npm 10 array, npm 12 keyed), leading lifecycle-script output, and both failure messages — the test no longer depends on the local npm.
+- Reviewer repro with the pinned npm 10.9.4 (`$HOME/.npm/_npx/4b0cc92362cfffad/node_modules/npm/bin/npm-cli.js`):
+  - before: `SyntaxError: Unexpected non-whitespace character after JSON at position 16897` (1 failed)
+  - after: `cli/src/pack-contents.test.ts` **6/6 passed** (`ships the allowlist only…` green on npm 10)
+  - same file on local npm 12: 6/6 passed
+
+**F2 (README npm 12)** — new wording: the tarball install needs no scripts (the blocked-`prepare` warning is benign, the build is inside); a checkout installs in this order — `npm install` first (root `prepare` builds `dist/`), then `npm link` / `npm install -g .`; linking an *unbuilt* checkout exits 0 without `dist/`/bin, and the script can be approved by its resolved identity (`npm install -g . --allow-scripts=file:$PWD`, verified locally: prepare ran, bin linked, `arggon --version` OK).
+
+**F3** — `formatBuildVersion` docstring corrected: live-probe values are git-validated; the baked `dist/build-info.json` fallback only filters empty fields (build output, not a validation boundary).
+
+**Merge** — `origin/opencode2` merged (`373ebd8`) to resolve the item-file conflict between the review verdict and my tracker sections; PR `mergeStateStatus` back to CLEAN.
+
+**Gates** (head `373ebd8`): `npm test` 79 files / **1311 tests green** (pack-contents 6/6, incl. on npm 10.9.4) · `npm run lint` · `npm run build` · `arggon validate` ok:true.
+
+**CI**: run [35469353813](https://github.com/Arggon/ArggonManager/actions/runs/35469353813) → `cli` **pass** (2m39s); `gh pr checks 366` = pass.
