@@ -86,3 +86,6 @@ Pre-existing finding (not this PR): `cli/src/measure.test.ts` "always deletes th
 ### handoff 2026-09-19 @Arggon — next: Coordinator review: code + README (npm-12 tarball install path) + PR #? — merge with a merge commit (branch carries tracker commits), then flip done.
 - branch: feat/task-npm-packaging
 - open questions: File a follow-up for the pre-existing measure.test.ts /tmp hygiene race under concurrent suites (reproduced at base 6a03d8c)?; npm>=12 blocks prepare on direct installs — is the documented tarball pa…
+
+### 2026-09-19 @Arggon
+Draft PR: https://github.com/Arggon/ArggonManager/pull/366 (base opencode2, commit 751ac5b).
