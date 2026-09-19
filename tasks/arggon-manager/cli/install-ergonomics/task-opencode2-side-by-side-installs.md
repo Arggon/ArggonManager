@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-19"
 updated: "2026-09-19"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-side-by-side-installs
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/install-ergonomics/task-opencode2-side-by-side-installs.md

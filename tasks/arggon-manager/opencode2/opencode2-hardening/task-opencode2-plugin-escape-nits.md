@@ -9,8 +9,7 @@ parent: opencode2-hardening
 labels: []
 priority: p3
 created: "2026-09-18"
-updated: "2026-09-18"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode2-plugin-escape-nits
+updated: "2026-09-19"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2/opencode2-hardening/task-opencode2-plugin-escape-nits.md
