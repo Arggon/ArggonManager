@@ -1,6 +1,6 @@
 # 0010 OpenCode2 native architecture: portable kernel, native V2 surface
 
-- Status: Accepted
+- Status: Partially superseded by [ADR 0011](0011-native-first-architecture.md) (§2/§3 and its packaging deferrals)
 - Date: 2026-09-18
 - Deciders: product owner (Gonzalo), coordinator/architect (Arggon)
 - Research: [exploration-opencode-v2-native-009](../explorations/exploration-opencode-v2-native-009.md) (task-opencode-v2-proposal)
