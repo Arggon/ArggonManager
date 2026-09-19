@@ -81,3 +81,7 @@ Evidence (2026-09-19, this machine):
 - 'opencode api plugin.list --param location[directory]=$PWD' -> argon local active; mcp.list -> connected. Bare 'arggon mcp' spawned by the running server resolved to MAIN even under the oc2 checkout (observed: node .../node/26.7.0/bin/arggon mcp); pinning the shim in the MCP command spawned the oc2 dist/cli.js.
 - 'npm run build' leaves dist/cli.js at mode 644 (tsc exec-bit gotcha).
 - Gates: npm test 1293 passed (final run), npm run lint clean, npm run arggon -- validate ok (convention v3). Earlier npm test runs flaked in cli/src/measure.test.ts while load average was ~26 from parallel agents (hygiene test races concurrent measureBudget callers; fixture subprocess exit 1 under load); the file passes isolated, so environmental.
+
+### handoff 2026-09-19 @Arggon — next: Coordinator review + merge of PR #365 (draft). Merge with a merge commit, not squash: the branch carries chore(tasks) auto-commits (claim, comment, handoff). After merge: tick the acceptance boxes if…
+- branch: feat/task-opencode2-side-by-side-installs
+- open questions: Pre-existing flake: cli/src/measure.test.ts '/tmp hygiene' races concurrent measureBudget callers (cli.test.ts doctor --budget) and fixture subprocesses exit 1 under high parallel-agent load; passes …
