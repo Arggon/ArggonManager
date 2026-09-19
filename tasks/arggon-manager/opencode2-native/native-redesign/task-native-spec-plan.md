@@ -11,7 +11,6 @@ priority: p0
 created: "2026-09-19"
 updated: "2026-09-19"
 depends_on: [task-native-adr-0011]
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-spec-plan
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-spec-plan.md
