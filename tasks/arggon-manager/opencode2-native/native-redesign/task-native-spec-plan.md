@@ -14,6 +14,7 @@ claimed_at: "2026-09-19T23:20:20.525Z"
 depends_on: [task-native-adr-0011]
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-spec-plan
 ---
+
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-spec-plan.md
   Leaves live only under a story. id is the filename stem: task-native-spec-plan.
@@ -31,17 +32,17 @@ the native-first rebuild under epic `opencode2-native`.
 
 ## Acceptance
 
-- [ ] `docs/specs/spec-native-first-<nnn>.md` merged: surface map (tools,
+- [x] `docs/specs/spec-native-first-<nnn>.md` merged: surface map (tools,
       commands, permissions, worktree domain, TUI, seam), data contract
       (git-native tracker, storage as cache), distribution and migration.
-- [ ] `docs/plans/plan-native-first-<nnn>.md` merged: ordered waves with
+- [x] `docs/plans/plan-native-first-<nnn>.md` merged: ordered waves with
       per-wave acceptance and gates (kernel-as-library extraction; native
       tools; commands + seam; permissions + worktree domain; TUI board;
       headless bootstrap/CI; dogfood; context re-measurement).
-- [ ] Each wave filed as a story/task under `native-redesign`, with
+- [x] Each wave filed as a story/task under `native-redesign`, with
       dependencies reflected in `depends_on`.
-- [ ] ADR 0006 re-measurement planned as an explicit wave gate.
-- [ ] `arggon validate` and `arggon spec validate` green; docs-only diff.
+- [x] ADR 0006 re-measurement planned as an explicit wave gate.
+- [x] `arggon validate` and `arggon spec validate` green; docs-only diff.
 
 ## Notes
 
