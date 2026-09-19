@@ -14,7 +14,6 @@ claimed_at: "2026-09-19T23:20:20.525Z"
 depends_on: [task-native-adr-0011]
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-spec-plan
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-spec-plan.md
   Leaves live only under a story. id is the filename stem: task-native-spec-plan.
@@ -80,3 +79,6 @@ the native-first rebuild under epic `opencode2-native`.
 ### Merge
 
 **Recomendación final: NO-MERGE hasta cerrar #1 y #2** (son cambios de texto chicos; #3–#5 en el mismo pase). Después, merge con **merge commit, nunca squash**. No marcar `done`.
+
+### 2026-09-19 @Arggon
+Coordinator note: rework c8a6d1b re-verified point by point (sync/import-issues ownership, adopt + ctx.vcs branches, W1 depends_on, ADR 0006 gate in W2, nits) with gates reproduced (validate, spec validate 18 docs, lint, prettier, 1311 tests) and CI cli pass on c8a6d1b. Merged as merge commit b10a768; item flipped to done.
