@@ -65,6 +65,7 @@ import { maybeCommitUpdate, parseCsvList, runUpdate } from "./update.js";
 import { formatValidateHuman, runValidate } from "./validate.js";
 import { commitPayload, formatCommitLine } from "./tracker-commit.js";
 import { arggonVersion } from "./docs.js";
+import { buildVersion } from "./build-info.js";
 import { DEFAULT_TAIL_COMMENTS, renderShowText, runShow } from "./show.js";
 import { gateSteal, findItemStatus, gateReopen } from "./steal-gate.js";
 const program = new Command();
@@ -98,8 +99,19 @@ function printHumanError(label: string, message: string): void {
 program
   .name("arggon")
   .description("Git-native task CLI for ArggonManager")
-  // Package version (manual bump per release wave; see README "Versioning").
-  .version(arggonVersion())
+  // Package version (manual bump per release wave; see README "Versioning")
+  // plus the build's git sha/branch (task-npm-packaging), so side-by-side
+  // installs — main vs opencode2 — are distinguishable. The git probe is
+  // failure-isolated and only paid for `--version`: no other command needs the
+  // identity, and a plain `arggonVersion()` keeps generated-doc provenance
+  // byte-stable. Subcommand-local `--version` flags (playbook new/refresh) are
+  // scoped by enablePositionalOptions and never reach this root flag; seeing
+  // one here only costs an extra probe, it never changes behavior.
+  .version(
+    process.argv.slice(2).some((a) => a === "--version" || a === "-V")
+      ? buildVersion()
+      : arggonVersion(),
+  )
   // Positional options: the root --version flag must not swallow a subcommand's
   // own --version (playbook new/refresh), so options after the subcommand name
   // are parsed by that subcommand only.
