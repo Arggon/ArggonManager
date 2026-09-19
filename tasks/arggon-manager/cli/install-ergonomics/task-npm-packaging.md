@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-npm-packaging
 title: "npm packaging: files allowlist, prepare, executable bin"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-19"
 updated: "2026-09-19"
-claimed_at: "2026-09-19T20:09:40.777Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-npm-packaging
 ---
 <!--
