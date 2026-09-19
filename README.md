@@ -121,6 +121,27 @@ v0 stubs (YAML frontmatter + Context / Acceptance / Notes) live in [`templates/`
 
 Copy a stub into `tasks/` per [`docs/convention.md`](docs/convention.md), or use `arggon create` (copies from these templates). Spec/plan stubs are rendered into `docs/specs/` / `docs/plans/` by `arggon spec new` (see below).
 
+## Install
+
+Requires **Node.js 22.12+** (`engines` enforces it). The package is not published to npm; build it from a checkout and install the tarball — no pre-build step needed:
+
+```bash
+git clone https://github.com/Arggon/ArggonManager
+cd ArggonManager
+npm install                                   # deps; prepare builds dist/
+npm pack                                      # -> arggon-manager-<version>.tgz
+npm install -g ./arggon-manager-<version>.tgz
+arggon --version
+```
+
+The tarball ships production `dist/`, the `templates/`, `skills/` and `opencode/` assets `arggon init` reads, README and LICENSE. Installing it needs no scripts; npm may still warn that the tarball's blocked `prepare` was skipped — benign, the build is already inside the tarball.
+
+A checkout installs directly in this order: `npm install` first (its root `prepare` builds `dist/`), then `npm link` or `npm install -g .`. With npm 12 install scripts run only when approved, so linking an *unbuilt* checkout exits 0 without a `dist/` or a bin — build first, or approve the script by its resolved identity (`npm install -g . --allow-scripts=file:$PWD`).
+
+The bin is `dist/cli.js` and the build sets its executable bit, so a plain `ln -s <checkout>/dist/cli.js ~/.local/bin/arggon` also works (a manual symlink used to fail with `Permission denied`).
+
+`arggon --version` prints the package version plus the build's git sha and branch when one can be determined — `0.3.0 (abc1234, opencode2)` from a checkout, the recorded build metadata after installation, or the bare version when there is no git — so parallel installs of different branches stay distinguishable. Running `main` and `opencode2` side by side is documented in [docs/opencode2.md](docs/opencode2.md).
+
 ## CLI (Phase 1)
 
 Requires **Node.js 22.12+** (needed by vitest 5 in the dev toolchain; `engines` enforces it). Stack: [docs/adr/0001-cli-stack.md](docs/adr/0001-cli-stack.md) (ADR 0001 Accepted with this scaffold).
@@ -495,7 +516,7 @@ Fixtures: [fixtures/](fixtures/).
 
 ## Versioning
 
-The package version in `package.json` is bumped manually, once per release wave — not per commit or per PR. `CHANGELOG.md` documents what lands in each wave, so `arggon --version` (which reads the package version) plus the changelog answer "which build is this and what's in it?". No semver guarantees are made beyond that.
+The package version in `package.json` is bumped manually, once per release wave — not per commit or per PR. `CHANGELOG.md` documents what lands in each wave, so `arggon --version` (the package version plus the build's git sha/branch when available) plus the changelog answer "which build is this and what's in it?". No semver guarantees are made beyond that.
 
 ## Contributing
 

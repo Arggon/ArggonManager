@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-npm-packaging
 title: "npm packaging: files allowlist, prepare, executable bin"
+assignee: Arggon
+branch: feat/task-npm-packaging
 parent: install-ergonomics
 labels: []
 priority: p3
 created: "2026-09-19"
 updated: "2026-09-19"
+claimed_at: "2026-09-19T20:09:40.777Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-npm-packaging
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/install-ergonomics/task-npm-packaging.md
@@ -35,23 +39,56 @@ Found on 2026-09-18 while investigating side-by-side installs (see
 
 ## Acceptance
 
-- [ ] `files` allowlist in `package.json` (production `dist/**` without
+- [x] `files` allowlist in `package.json` (production `dist/**` without
       `*.test.*`, `templates/`, `skills/`, `opencode/`, README/LICENSE) so
       `npm pack --dry-run` no longer includes tests or dev artifacts.
-- [ ] Clean install works from a fresh clone without pre-building (`prepare`
+- [x] Clean install works from a fresh clone without pre-building (`prepare`
       builds `dist/`, or the supported install path is documented in README).
-- [ ] The bin is executable after `npm run build` (postbuild `chmod +x`) or the
+- [x] The bin is executable after `npm run build` (postbuild `chmod +x`) or the
       install flow guarantees it.
-- [ ] `arggon --version` identifies the build (e.g. version + git sha/branch)
+- [x] `arggon --version` identifies the build (e.g. version + git sha/branch)
       so side-by-side installs are distinguishable.
-- [ ] CI test pins the tarball contents (`npm pack --dry-run --json`) so
+- [x] CI test pins the tarball contents (`npm pack --dry-run --json`) so
       bundling tests or dropping `dist` fails the gate.
-- [ ] Before/after size and file counts recorded in the item.
+- [x] Before/after size and file counts recorded in the item.
 
 ## Notes
 
 - The side-by-side recipe docs live in the sibling task; this item is the
   packaging half.
+
+### 2026-09-19 @Arggon
+### Evidence — packaging before/after + install smoke (worker, 2026-09-19)
+
+`npm pack --dry-run --json` (worktree, commit b300eb9):
+
+| | before (opencode2 @6a03d8c) | after (b300eb9) |
+| --- | --- | --- |
+| tarball files | 977 | 164 |
+| packed size | 8,355,167 B (7.97 MiB) | 322,741 B (0.31 MiB) |
+| unpacked size | 12,474,559 B (11.90 MiB) | 1,089,052 B (1.04 MiB) |
+| test artifacts (`.test.*` / `test-tmp.*`) | 225 | 0 |
+| top level | cli, tasks, fixtures, docs, .github, dist, … | dist 113, templates 39, skills 8, opencode 1, README, LICENSE, package.json |
+| `dist/cli.js` mode | 0644 | 0755 |
+
+Fresh-clone smoke (real `git clone` of the branch — no `dist/` in the clone):
+- `npm install` → `prepare` runs: builds `dist/cli.js` (0755) + `dist/build-info.json` = `{version: 0.3.0, sha: b300eb9, branch: feat/task-npm-packaging}`
+- `npm pack` → `arggon-manager-0.3.0.tgz` (322,741 B, 164 entries)
+- `npm install -g --prefix <tmp> ./arggon-manager-0.3.0.tgz` → `arggon --version` prints `0.3.0 (b300eb9, feat/task-npm-packaging)`; `arggon hello` OK
+- manual `ln -s <checkout>/dist/cli.js` → runs (failed with `Permission denied` before)
+
+Gates: `npm test` 79 files / 1307 tests green · `npm run lint` · `npm run build` · `arggon validate` ok:true.
+
+Notes: npm 12 blocks a dependency's `prepare` by default, so README documents the tarball path (works with scripts blocked) and notes `npm run build` + `npm link` / `npm install -g .` for direct checkout installs. `--version` probes the work tree at runtime and falls back to the baked `dist/build-info.json`, so packed installs are identifiable too; git-less installs print the bare semver.
+
+Pre-existing finding (not this PR): `cli/src/measure.test.ts` "always deletes the measurement temp tree (/tmp hygiene)" fails when another suite runs on the machine (shared `/tmp`); reproduces at base 6a03d8c without the new test files, and passes when no sibling suite is running. Coordinator to decide whether to file a follow-up.
+
+### handoff 2026-09-19 @Arggon — next: Coordinator review: code + README (npm-12 tarball install path) + PR #? — merge with a merge commit (branch carries tracker commits), then flip done.
+- branch: feat/task-npm-packaging
+- open questions: File a follow-up for the pre-existing measure.test.ts /tmp hygiene race under concurrent suites (reproduced at base 6a03d8c)?; npm>=12 blocks prepare on direct installs — is the documented tarball pa…
+
+### 2026-09-19 @Arggon
+Draft PR: https://github.com/Arggon/ArggonManager/pull/366 (base opencode2, commit 751ac5b).
 
 ### 2026-09-19 @Arggon
 ### Revisión PR #366 (task-npm-packaging) — veredicto del reviewer
@@ -108,3 +145,29 @@ Verificado con npm 12.0.2:
 - El flake pre-existente de `measure.test.ts` (`/tmp` compartido) queda como estaba: reproducción en el base `6a03d8c` según el worker; a decisión del coordinador si se fileta follow-up (no lo cuento como hallazgo de este PR).
 
 **Recomendación: NO MERGE** hasta corregir F1 y tener CI verde. F2/F3 no bloquean y se pueden resolver en el mismo PR (README + comentario). Después: merge commit y flip a done por el coordinador.
+
+### 2026-09-19 @Arggon
+### F1 fixed + CI green (worker, 2026-09-19)
+
+**F1 (parsePackResult / npm 10 array)** — fix in `4763d51`, merge `373ebd8`:
+
+- `parsePackResult` now anchors on the **first `[`/`{`** (was `indexOf("{")`), so npm 10's `[{...}]` and npm 12's keyed object both parse; banner text ahead of the payload is tolerated. The `Array.isArray(raw)` branch is reachable again.
+- Unit fixtures pin both shapes (npm 10 array, npm 12 keyed), leading lifecycle-script output, and both failure messages — the test no longer depends on the local npm.
+- Reviewer repro with the pinned npm 10.9.4 (`$HOME/.npm/_npx/4b0cc92362cfffad/node_modules/npm/bin/npm-cli.js`):
+  - before: `SyntaxError: Unexpected non-whitespace character after JSON at position 16897` (1 failed)
+  - after: `cli/src/pack-contents.test.ts` **6/6 passed** (`ships the allowlist only…` green on npm 10)
+  - same file on local npm 12: 6/6 passed
+
+**F2 (README npm 12)** — new wording: the tarball install needs no scripts (the blocked-`prepare` warning is benign, the build is inside); a checkout installs in this order — `npm install` first (root `prepare` builds `dist/`), then `npm link` / `npm install -g .`; linking an *unbuilt* checkout exits 0 without `dist/`/bin, and the script can be approved by its resolved identity (`npm install -g . --allow-scripts=file:$PWD`, verified locally: prepare ran, bin linked, `arggon --version` OK).
+
+**F3** — `formatBuildVersion` docstring corrected: live-probe values are git-validated; the baked `dist/build-info.json` fallback only filters empty fields (build output, not a validation boundary).
+
+**Merge** — `origin/opencode2` merged (`373ebd8`) to resolve the item-file conflict between the review verdict and my tracker sections; PR `mergeStateStatus` back to CLEAN.
+
+**Gates** (head `373ebd8`): `npm test` 79 files / **1311 tests green** (pack-contents 6/6, incl. on npm 10.9.4) · `npm run lint` · `npm run build` · `arggon validate` ok:true.
+
+**CI**: run [35469353813](https://github.com/Arggon/ArggonManager/actions/runs/35469353813) → `cli` **pass** (2m39s); `gh pr checks 366` = pass.
+
+### handoff 2026-09-19 @Arggon — next: Re-review the F1 fix + F2/F3 on PR #366 (head after tracker commits), then merge commit and flip done.
+- branch: feat/task-npm-packaging
+- open questions: None blocking; measure.test.ts /tmp flake already filed as a separate bug on opencode2.
