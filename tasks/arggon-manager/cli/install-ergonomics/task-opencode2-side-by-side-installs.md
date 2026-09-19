@@ -48,6 +48,9 @@ checkout. Verified options on this machine:
 
 - [ ] `docs/opencode2.md` gains a "Side-by-side installs" section documenting
       both recipes, with the exact commands verified here.
+- [ ] It states the `mise.toml` (tracked, inherited by worktrees and clones)
+      vs `mise.local.toml` (machine-local, worktrees do not inherit it)
+      trade-off and recommends the tracked file for oc2 projects.
 - [ ] It explains why bare `arggon` must resolve per project (MCP command,
       skills, plugin) and the launch-dir/server-env caveat.
 - [ ] Verification steps included: `which arggon`, `Ctrl+P → Plugins`,
@@ -61,3 +64,7 @@ checkout. Verified options on this machine:
 - Option A is already mounted locally (wrapper + `arggon-oc2` +
   `mise.local.toml` in the opencode2 checkout, git-excluded); the docs should
   reproduce it.
+- Verified end-to-end in a fresh scratch project (2026-09-19): `mise.toml`
+  tracked → `arggon init` from the oc2 build, plugin generated, headless
+  `opencode run` activated the location, `plugin.list` → `arggon` local
+  `active`, `mcp.list` → `arggon` `connected`.
