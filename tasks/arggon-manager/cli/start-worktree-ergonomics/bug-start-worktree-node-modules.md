@@ -9,8 +9,7 @@ parent: start-worktree-ergonomics
 labels: []
 priority: p2
 created: "2026-09-18"
-updated: "2026-09-18"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-start-worktree-node-modules
+updated: "2026-09-19"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/start-worktree-ergonomics/bug-start-worktree-node-modules.md

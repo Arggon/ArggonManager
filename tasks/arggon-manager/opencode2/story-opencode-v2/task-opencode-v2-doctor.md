@@ -9,8 +9,7 @@ parent: story-opencode-v2
 labels: []
 priority: p2
 created: "2026-09-18"
-updated: "2026-09-18"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-opencode-v2-doctor
+updated: "2026-09-19"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-opencode-v2/task-opencode-v2-doctor.md

@@ -9,8 +9,7 @@ parent: story-tracker-hygiene
 labels: []
 priority: p3
 created: "2026-09-18"
-updated: "2026-09-18"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-convention-config-scalar-unescape
+updated: "2026-09-19"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tracker-hygiene/bug-convention-config-scalar-unescape.md

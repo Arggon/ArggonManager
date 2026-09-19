@@ -9,8 +9,7 @@ parent: story-self-improvement
 labels: []
 priority: p1
 created: "2026-09-18"
-updated: "2026-09-18"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-tracker-commit-enotempty-flake
+updated: "2026-09-19"
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-self-improvement/bug-tracker-commit-enotempty-flake.md
