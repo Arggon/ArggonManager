@@ -110,3 +110,33 @@ Required sections:
 - No marcar `done` (el item sigue `in_progress` en la rama).
 
 **Recomendación final: NO-MERGE hasta resolver #1 y #2 (con #3-#5 en el mismo pase); después, merge con merge commit.** El resto del doc (D1/D2, F3.1, riesgo, outline) está bien y no necesita rediseño.
+
+### 2026-09-19 @Arggon
+## Re-review PR #367 — head `2ff248c` ("review rework") — veredicto final
+
+**Veredicto: NO-MERGE por un último pase de erratas puntuales (no estructurales).** El rework cubre los hallazgos anteriores (mapa completo, inventario, citas, prosa, follow-ups). Lo que queda son 3-4 correcciones de texto/factualidad en el doc; con ellas, merge.
+
+### Lo verificado OK
+- **F2 ya no omite capacidades shipped.** Contrasté la lista real de comandos (`cli/src/cli.ts`: hello, init, doctor, adopt, create, list, next, show, report, update, priority, comment, handoff, import-issues, validate, spec, stack, playbook, branch, start, cleanup, board, sync, instructions, mcp) y los 9 tools MCP (`cli/src/mcp-server.ts`: list/create/update/comment/handoff/show/next/report/validate): todas tienen fila o están cubiertas (hello dropped; mcp → ver errata 2c). `comment`/`handoff`, `sync`/`import-issues`, `adopt`, `cleanup`, `branch`, `instructions`, `priority` (+migrate) y config seam están ahora en la tabla.
+- **F1 completo**: Sharing (13), Compaction/context (14), API/client/SDK (15), drift renumerado (16).
+- **Citas corregidas**: nesting → tools (F1.2); `ctx.storage` durable vs memory del CLI/TUI (F1.8); `browser` desktop/Code Mode (F1.5); `ctx.event.subscribe` (F1.8). Spot-check de las nuevas: **compaction** correcta (config `keep` + hook "checkpoint summaries"); **API/client** correcta (`@opencode/client` "types and methods are generated from the same contract as the API reference"; `context.client` puede llamar al server remoto) salvo fuentes (errata 3).
+- **Riesgo F4.7** (guarded `@opencode/plugin` / dependency-less) correcto y con la referencia al playbook.
+- **Items nuevos con calidad**: `task-native-adr-0011` (parent `native-redesign`, p0, contexto + acceptance de 4 cajas) y `task-playbook-opencode-2-0-10` (parent `story-tech-playbooks`, p2, contexto + acceptance). Parents válidos, sin solapamiento (el gotcha 2.0.8 ya está `done`; este es el re-probe 2.0.10). Observación, no bloqueante: `story-tech-playbooks` está `done` y es el único hijo abierto; la convención lo permite (parent status independiente, sin rollup) y `validate` da 0 warnings, pero el propio item se justifica como "version discipline" del programa native — si el coordinador prefiere, `native-redesign` es el hogar natural.
+- **Tensiones abiertas para ADR 0011**: añadidas y correctas (bootstrap + criterios B→A, kernel-as-library vs vendored, config seam, MCP drop/condicional, re-medición ADR 0006, pin del playbook).
+- **Gates**: `arggon validate` ok (0 warnings); lint limpio; prettier OK en los 3 archivos; **1293/1293 tests**; CI `cli` verde en `2ff248c` (run 35474355835). Docs-only → smoke exento.
+- **Historia**: claim `3b68875` + 3 commits docs + 2 items; merge commit, nunca squash. `origin/opencode2` avanzó 23 commits (tip `5fad829`); PR MERGEABLE.
+
+### Erratas a corregir (último pase)
+1. **F1.13 Sharing contradice la fuente.** La página V2 dice literalmente "OpenCode V2 does not support session sharing yet"; el doc dice "Session sharing exists as a surface". Reescribir a "Sharing: no soportado en V2 todavía (inerte); ADR 0010 no se apoya en él; sin impacto en el tracker".
+2. **Filas F2 incorrectas o duplicadas** (el resto de la tabla está bien):
+   - `migrate` (convention versions): **no existe** ese comando; el único `migrate` es `priority migrate` (`cli.ts:1019`), ya incluido en la fila `priority (+ migrate)`. Eliminar la fila o fusionarla.
+   - `Status panels (status/refresh)`: `status`/`refresh` son subcomandos de **`playbook`** (`cli.ts:1818,1915` — freshness y post-re-research), ya cubiertos por la fila "Spec/ADR/plan/exploration docs"; no son paneles de estado del tracker. Eliminar o renombrar la fila y corregir el mapeo a TUI.
+   - "**`mcp` is covered by the MCP row**": en F2 **no hay** fila MCP. Añadir fila explícita (`arggon mcp` stdio → adapter opcional; drop por defecto) o reescribir "covered by the MCP decision (D3/F3.1)".
+   - Pre-existente, misma clase: la fila "Spec/ADR/plan/exploration docs" lista `CLI `spec`/`adr`/`explore`/`playbook``, pero **`arggon adr` no existe** (`arggon adr --help` → help general; tampoco en `origin/opencode2`). Los ADRs se autoran desde plantilla; quitar `adr` de la lista o anotar "manual/plantilla".
+3. **Referencias obsoletas y fuentes**:
+   - Línea 22: "drift recorded in **F1.13**" → **F1.16**.
+   - F1.16: dice que el pin refresh es "a follow-up outside this audit's diff", pero el item ya viene **en este PR**; referenciar `task-playbook-opencode-2-0-10`.
+   - F1.15: el path documentado es `/v2/openapi.json` (el `/openapi.json` desnudo también responde 200, pero la fuente enlaza el de `/v2`); "SDK for embedding" no tiene fuente (añadir `build/sdk`); `context.client` está documentado en la página de plugins CLI/TUI, no en `api`/`build/client` (añadir esa fuente).
+4. Opcional (no bloquea): `task-native-adr-0011` podría declarar `depends_on: task-native-capability-audit` para que `next` no lo sugiera antes de que este audit cierre; y la nota del item audit podría apuntar a `task-playbook-opencode-2-0-10`.
+
+**Recomendación final: NO-MERGE hasta aterrizar las erratas 1-3 en un commit de texto (sin re-revisión completa: son cambios literales); después, merge con merge commit. No marcar `done`.**
