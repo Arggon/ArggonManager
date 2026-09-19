@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-native-adr-0011
 title: "ADR 0011: OpenCode2-native architecture"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p0
 created: "2026-09-19"
 updated: "2026-09-19"
-claimed_at: "2026-09-19T23:13:57.215Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-adr-0011
 ---
 <!--
@@ -45,12 +44,12 @@ ADR 0011 must decide and record:
 
 ## Acceptance
 
-- [ ] `docs/adr/0011-*.md` merged, following the ADR format, explicitly
+- [x] `docs/adr/0011-*.md` merged, following the ADR format, explicitly
       superseding ADR 0010 §2/§3 and its packaging deferrals.
-- [ ] Decision covers D1 (git-native data), D2 (methodology contract kept,
+- [x] Decision covers D1 (git-native data), D2 (methodology contract kept,
       mechanics native), distribution, migration and revisit triggers.
-- [ ] Follow-up spec/plan/wave tasks filed under `native-redesign`.
-- [ ] `arggon validate` green; docs-only diff.
+- [x] Follow-up spec/plan/wave tasks filed under `native-redesign`.
+- [x] `arggon validate` green; docs-only diff.
 
 ## Notes
 
@@ -58,6 +57,7 @@ ADR 0011 must decide and record:
   this ADR.
 
 ### 2026-09-19 @Arggon
+
 ### review PR #368 — ADR 0011 (DeepSeek V4.1 Flash, subagente revisor)
 
 **Veredicto: MERGE con merge commit (nunca squash).** Sin hallazgos bloqueantes. Revisión sobre `feat/task-native-adr-0011` (HEAD 1a2e8e1), base `opencode2`.

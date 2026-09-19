@@ -4,6 +4,7 @@ status: todo
 id: task-native-spec-plan
 title: "Spec and plan: native-first rebuild waves"
 parent: native-redesign
+depends_on: [task-native-adr-0011]
 labels: []
 priority: p0
 created: "2026-09-19"
