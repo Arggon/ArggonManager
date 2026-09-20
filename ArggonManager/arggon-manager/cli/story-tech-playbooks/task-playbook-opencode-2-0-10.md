@@ -1,15 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-playbook-opencode-2-0-10
-title: "Refresh OpenCode playbook pin to 2.0.10 + re-probe plugin import A/B"
+title: Refresh OpenCode playbook pin to 2.0.10 + re-probe plugin import A/B
+assignee: Arggon
+branch: feat/task-playbook-opencode-2-0-10
 parent: story-tech-playbooks
 labels: []
 priority: p2
 created: "2026-09-19"
-updated: "2026-09-19"
+updated: "2026-09-20"
+claimed_at: "2026-09-20T10:45:15.393Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-playbook-opencode-2-0-10
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tech-playbooks/task-playbook-opencode-2-0-10.md
   Leaves live only under a story. id is the filename stem: task-playbook-opencode-2-0-10.
