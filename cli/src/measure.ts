@@ -122,7 +122,10 @@ export function cliCommand(): { file: string; args: string[] } {
     const repoRoot = resolve(dirname(modulePath), "../..");
     return {
       file: process.execPath,
-      args: [join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs"), join(repoRoot, "cli", "src", "cli.ts")],
+      args: [
+        join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs"),
+        join(repoRoot, "cli", "src", "cli.ts"),
+      ],
     };
   }
   return { file: process.execPath, args: [resolve(dirname(modulePath), "cli.js")] };
@@ -195,7 +198,9 @@ export async function measureMcpSchema(): Promise<McpSchemaBudget> {
   });
   input.write(`${JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })}\n`);
   const response = await responsePromise;
-  const tools = (response.result as { tools: Array<{ name: string; inputSchema: Record<string, unknown> }> }).tools;
+  const tools = (
+    response.result as { tools: Array<{ name: string; inputSchema: Record<string, unknown> }> }
+  ).tools;
   return buildMcpSchemaBudget(tools);
 }
 
@@ -208,7 +213,9 @@ export async function measureBudget(): Promise<BudgetResult> {
   const cmd = cliCommand();
   const cliEntry = cmd.args[cmd.args.length - 1];
   if (!existsSync(cliEntry)) {
-    throw new Error(`budget measurement runs the CLI from the running installation — entry not found: ${cliEntry}`);
+    throw new Error(
+      `budget measurement runs the CLI from the running installation — entry not found: ${cliEntry}`,
+    );
   }
   const dir = mkdtempSync(join(tmpdir(), "arggon-budget-"));
   try {
@@ -223,8 +230,15 @@ export async function measureBudget(): Promise<BudgetResult> {
       return m[1];
     };
     // First stdout line is the envelope; ids are unique per type stem here.
-    const initiativeId = created(runCli(["create", "initiative", "budget fixture", "--json"], dir).trim());
-    const epicId = created(runCli(["create", "epic", "budget fixture epic", "--parent", initiativeId, "--json"], dir).trim());
+    const initiativeId = created(
+      runCli(["create", "initiative", "budget fixture", "--json"], dir).trim(),
+    );
+    const epicId = created(
+      runCli(
+        ["create", "epic", "budget fixture epic", "--parent", initiativeId, "--json"],
+        dir,
+      ).trim(),
+    );
     const storyId = created(
       runCli(["create", "story", "budget fixture story", "--parent", epicId, "--json"], dir).trim(),
     );
@@ -304,7 +318,9 @@ export function evaluateBudget(m: BudgetResult): BudgetCheck[] {
 
 /** Human lines appended to the doctor report when --budget is set. */
 export function formatBudgetLines(m: BudgetResult): string[] {
-  const lines = [`  budget (ADR 0006, fixture ${m.fixtureItems} items, method: 2026-09-14 baseline):`];
+  const lines = [
+    `  budget (ADR 0006, fixture ${m.fixtureItems} items, method: 2026-09-14 baseline):`,
+  ];
   for (const check of evaluateBudget(m)) {
     let line = `    ${check.name}: ${check.bytes.toLocaleString("en-US")} B`;
     if (check.budget !== undefined) {

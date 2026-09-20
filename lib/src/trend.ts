@@ -250,7 +250,7 @@ function unquote(raw: string): string {
   return value;
 }
 
-type ParsedLog = {
+export type ParsedLog = {
   /** Ordered status events (seq 0 = oldest commit). */
   events: StatusEvent[];
   /** rename-from → rename-to, as detected by git. */

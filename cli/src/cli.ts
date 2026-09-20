@@ -5,29 +5,63 @@ import { formatAdoptAckReport, formatAdoptReport, runAdopt, runAdoptAck } from "
 import { displayPath, runBoard } from "./board.js";
 import { startBoardServer } from "./board-serve.js";
 import { runBranch } from "./branch.js";
-import { runComment } from "./comment.js";
-import { runHandoff } from "./handoff.js";
-import { runStart } from "./start.js";
-import { runCleanup } from "./cleanup.js";
-import { readConventionVersion } from "./convention.js";
-import { toContractWorkItem } from "./contract.js";
-import { runCreate } from "./create.js";
 import {
+  DEFAULT_TAIL_COMMENTS,
+  JSON_SCHEMA_VERSION,
+  bindJsonProgram,
   commentOperation,
+  commitPayload,
   createOperation,
+  emitJson,
+  failEnvelope,
+  failJson,
+  formatCommitLine,
+  formatListTable,
+  formatReportMarkdown,
+  formatReportTable,
+  formatTrendMarkdown,
+  formatTrendTable,
+  formatValidateHuman,
   handoffOperation,
   importIssuesOperation,
+  jsonEnabled,
   listOperation,
+  maybeCommitUpdate,
   nextOperation,
+  parseCsvList,
   priorityOperation,
+  readConventionVersion,
+  renderShowText,
   reportOperation,
+  runComment,
+  runCreate,
+  runHandoff,
+  runImportIssues,
+  runList,
+  runNext,
+  runPriorityMigrate,
+  runReport,
+  runShow,
+  runSync,
+  runTrend,
+  runUpdate,
+  runValidate,
+  sanitizeHumanError,
   showOperation,
+  successEnvelope,
+  successJson,
   syncOperation,
+  toContractWorkItem,
   updateOperation,
   validateOperation,
-} from "./lib.js";
+  type TrendResult,
+} from "@arggon/lib";
+
+import { runStart } from "./start.js";
+import { runCleanup } from "./cleanup.js";
+
 import { runDoctor, formatDoctorReport, measureBudgetForDoctor } from "./doctor.js";
-import { sanitizeHumanError } from "./sanitize.js";
+
 import {
   runInit,
   dryRunInit,
@@ -35,25 +69,12 @@ import {
   type InitDryRunResult,
   type ProposalEntry,
 } from "./init.js";
-import {
-  bindJsonProgram,
-  emitJson,
-  failEnvelope,
-  failJson,
-  JSON_SCHEMA_VERSION,
-  jsonEnabled,
-  successEnvelope,
-  successJson,
-} from "./json.js";
-import { formatListTable, runList } from "./list.js";
-import { runImportIssues } from "./import-issues.js";
+
 import { runInstructions } from "./instructions.js";
 import { formatLayoutMigrateHuman, runLayoutMigrate } from "./layout-migrate.js";
 import { runMcpServer } from "./mcp-server.js";
-import { runNext } from "./next.js";
-import { runPriorityMigrate } from "./priority.js";
-import { formatReportMarkdown, formatReportTable, runReport } from "./report.js";
-import { formatTrendMarkdown, formatTrendTable, runTrend, type TrendResult } from "./trend.js";
+import { bundledTemplatesDir } from "./package-assets.js";
+
 import {
   formatPlaybookStatusTable,
   runPlaybookNew,
@@ -75,14 +96,11 @@ import {
 import { runSpecImport, SpecImportError } from "./spec-import.js";
 import { formatSpecAuditHuman, runSpecAudit, SPEC_AUDIT_DEFAULTS } from "./spec-audit.js";
 
-import { runSync } from "./sync-command.js";
 import { runTuiBoard } from "./tui.js";
-import { maybeCommitUpdate, parseCsvList, runUpdate } from "./update.js";
-import { formatValidateHuman, runValidate } from "./validate.js";
-import { commitPayload, formatCommitLine } from "./tracker-commit.js";
+
 import { arggonVersion } from "./docs.js";
 import { buildVersion } from "./build-info.js";
-import { DEFAULT_TAIL_COMMENTS, renderShowText, runShow } from "./show.js";
+
 import { gateSteal, findItemStatus, gateReopen } from "./steal-gate.js";
 const program = new Command();
 
@@ -515,6 +533,7 @@ program
             blockedReason: opts.blockedReason,
             issue: opts.issue !== undefined ? Number(opts.issue) : undefined,
             commit: opts.commit === false ? false : undefined,
+            templatesDir: bundledTemplatesDir(),
             full: opts.full === true,
           });
           emitJson(outcome.envelope);
@@ -534,6 +553,7 @@ program
           blockedReason: opts.blockedReason,
           issue: opts.issue !== undefined ? Number(opts.issue) : undefined,
           commit: opts.commit === false ? false : undefined,
+          templatesDir: bundledTemplatesDir(),
         });
         console.log(`arggon create: ${result.item.type} ${sanitizeHumanError(result.id)}`);
         console.log(`  ${sanitizeHumanError(result.path)}`);
@@ -1417,6 +1437,7 @@ program
             parent: opts.parent,
             dryRun: Boolean(opts.dryRun),
             commit: opts.commit === false ? false : undefined,
+            templatesDir: bundledTemplatesDir(),
           });
           emitJson(outcome.envelope);
           if (!outcome.ok) process.exitCode = 1;
@@ -1428,6 +1449,7 @@ program
           parent: opts.parent,
           dryRun: Boolean(opts.dryRun),
           commit: opts.commit === false ? false : undefined,
+          templatesDir: bundledTemplatesDir(),
         });
         console.log(
           `arggon import-issues${result.dryRun ? " (dry run)" : ""}: ${result.entries.length} issue(s), ${result.created} created, ${result.skipped} skipped`,

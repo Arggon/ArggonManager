@@ -15,7 +15,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runInit, dryRunInit, type ProposalEntry } from "./init.js";
 import { arggonVersion, renderGeneratedDoc } from "./docs.js";
-import { readGeneratedState, updateGeneratedSection } from "./convention.js";
+import { readGeneratedState, updateGeneratedSection } from "@arggon/lib";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];

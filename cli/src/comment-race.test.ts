@@ -23,7 +23,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { runCreate } from "./create.js";
+import { runCreate } from "@arggon/lib";
 import { runInit } from "./init.js";
 import { removeFixtureTree } from "./test-tmp.js";
 
@@ -59,21 +59,33 @@ function initRepo(prefix: string): string {
   runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
   runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch", id: "auth", now: NOW });
   runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "login", now: NOW });
-  runCreate({ cwd: dir, type: "task", title: "Race target", parent: "login", id: "task-race", now: NOW });
+  runCreate({
+    cwd: dir,
+    type: "task",
+    title: "Race target",
+    parent: "login",
+    id: "task-race",
+    now: NOW,
+  });
   commitAllIfDirty(dir, "init tasks");
   return dir;
 }
 
-type CommentJson = { ok: true; item: { id: string } } | { ok: false; error: { code: string; message: string } };
+type CommentJson =
+  { ok: true; item: { id: string } } | { ok: false; error: { code: string; message: string } };
 
 /** Spawn N `comment --json` processes at once on the same item and collect their JSON. */
 function commentConcurrently(dir: string, id: string, texts: string[]): Promise<CommentJson[]> {
   const children = texts.map((text) =>
-    spawn(process.execPath, [tsxLoader, cliEntry, "comment", id, text, "--author", "agent", "--json"], {
-      cwd: dir,
-      env: { ...process.env },
-      stdio: ["ignore", "pipe", "pipe"],
-    }),
+    spawn(
+      process.execPath,
+      [tsxLoader, cliEntry, "comment", id, text, "--author", "agent", "--json"],
+      {
+        cwd: dir,
+        env: { ...process.env },
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    ),
   );
   return Promise.all(
     children.map(
@@ -85,8 +97,12 @@ function commentConcurrently(dir: string, id: string, texts: string[]): Promise<
           child.stderr.on("data", (chunk: string) => (err += chunk));
           child.on("close", () => {
             const trimmed = out.trim();
-            const parsed = trimmed ? (JSON.parse(trimmed.split("\n").pop() ?? trimmed) as CommentJson) : null;
-            resolvePromise(parsed ?? { ok: false, error: { code: "NO_JSON", message: err || "no output" } });
+            const parsed = trimmed
+              ? (JSON.parse(trimmed.split("\n").pop() ?? trimmed) as CommentJson)
+              : null;
+            resolvePromise(
+              parsed ?? { ok: false, error: { code: "NO_JSON", message: err || "no output" } },
+            );
           });
         }),
     ),
@@ -103,7 +119,12 @@ type ReaderStats = { reads: number; torn: number; samples: string[] };
  * (the parent creates it after every comment child has exited), so they cover
  * the whole contested window, and each reports `{reads, torn, samples}`.
  */
-function startReaders(target: string, stopFile: string, baseLen: number, n: number): Array<Promise<ReaderStats>> {
+function startReaders(
+  target: string,
+  stopFile: string,
+  baseLen: number,
+  n: number,
+): Array<Promise<ReaderStats>> {
   const script = `
     const fs = require("node:fs");
     const [target, stop, baseLenRaw] = process.argv.slice(1);
@@ -122,19 +143,23 @@ function startReaders(target: string, stopFile: string, baseLen: number, n: numb
     }
     console.log(JSON.stringify({ reads, torn, samples }));
   `;
-  return Array.from({ length: n }, () =>
-    new Promise<ReaderStats>((resolvePromise) => {
-      const child = spawn(process.execPath, ["-e", script, target, stopFile, String(baseLen)], {
-        stdio: ["ignore", "pipe", "inherit"],
-      });
-      let out = "";
-      child.stdout.on("data", (chunk: string) => (out += chunk));
-      child.on("close", () => {
-        resolvePromise(
-          out.trim() ? (JSON.parse(out.trim()) as ReaderStats) : { reads: 0, torn: 0, samples: [] },
-        );
-      });
-    }),
+  return Array.from(
+    { length: n },
+    () =>
+      new Promise<ReaderStats>((resolvePromise) => {
+        const child = spawn(process.execPath, ["-e", script, target, stopFile, String(baseLen)], {
+          stdio: ["ignore", "pipe", "inherit"],
+        });
+        let out = "";
+        child.stdout.on("data", (chunk: string) => (out += chunk));
+        child.on("close", () => {
+          resolvePromise(
+            out.trim()
+              ? (JSON.parse(out.trim()) as ReaderStats)
+              : { reads: 0, torn: 0, samples: [] },
+          );
+        });
+      }),
   );
 }
 
@@ -214,7 +239,9 @@ describe("concurrent comments on one item (bug-comment-race-no-lock)", () => {
           encoding: "utf8",
           cwd: dir,
         });
-        expect(JSON.parse(validate.stdout.trim().split("\n").pop() ?? "{}")).toMatchObject({ ok: true });
+        expect(JSON.parse(validate.stdout.trim().split("\n").pop() ?? "{}")).toMatchObject({
+          ok: true,
+        });
       } finally {
         // bug-tracker-commit-enotempty-flake: the four CLI children are
         // awaited on "close" above, so teardown is already sequenced after

@@ -1,4 +1,11 @@
-import { existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -11,7 +18,7 @@ import {
   summarizeChecks,
 } from "./board.js";
 import type { BoardGithub, PrInfo } from "./board.js";
-import type { WorkItem } from "./types.js";
+import { type ContractWorkItem as WorkItem } from "@arggon/lib";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -588,10 +595,10 @@ describe("renderBoardHtml --group-by story (task-board-dependency-visuals)", () 
   });
 
   it("hides group headers entirely when no card has a parent (renders as before)", () => {
-    const html = renderBoardHtml(
-      [item({ id: "task-a", type: "task", status: "todo" })],
-      { generatedAt: GENERATED_AT, groupBy: "story" },
-    );
+    const html = renderBoardHtml([item({ id: "task-a", type: "task", status: "todo" })], {
+      generatedAt: GENERATED_AT,
+      groupBy: "story",
+    });
     expect(html).not.toContain('<div class="mgroup-head');
     expect(html).not.toContain("no story");
     expect(html).toContain('data-id="task-a"');

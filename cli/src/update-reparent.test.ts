@@ -2,12 +2,9 @@ import { existsSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCreate } from "./create.js";
-import { parseFrontmatter } from "./frontmatter.js";
+import { parseFrontmatter, runCreate, runList, runUpdate, runValidate } from "@arggon/lib";
+
 import { runInit } from "./init.js";
-import { runList } from "./list.js";
-import { runUpdate } from "./update.js";
-import { runValidate } from "./validate.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -77,7 +74,12 @@ describe("update --parent (reparent)", () => {
     const newPath = join(tasks, "launch-mvp", "onboarding", "story-handbook", "task-rate-limit.md");
     expect(existsSync(oldPath)).toBe(true);
 
-    const result = runUpdate({ cwd: dir, id: "task-rate-limit", parent: "story-handbook", now: LATER });
+    const result = runUpdate({
+      cwd: dir,
+      id: "task-rate-limit",
+      parent: "story-handbook",
+      now: LATER,
+    });
 
     expect(result.path).toBe(newPath);
     expect(result.movedFrom).toBe(oldPath);
@@ -102,7 +104,12 @@ describe("update --parent (reparent)", () => {
       assignee: "arggon",
       now: NOW,
     });
-    const result = runUpdate({ cwd: dir, id: "task-rate-limit", parent: "story-handbook", now: LATER });
+    const result = runUpdate({
+      cwd: dir,
+      id: "task-rate-limit",
+      parent: "story-handbook",
+      now: LATER,
+    });
     const { data } = fm(result.path);
     expect(data.status).toBe("in_progress");
     expect(data.assignee).toBe("arggon");
@@ -138,9 +145,13 @@ describe("update --parent (reparent)", () => {
 
     expect(runValidate({ cwd: dir }).errors).toEqual([]);
 
-    const underOnboarding = runList({ cwd: dir, filter: "parent:onboarding" }).items.map((i) => i.id);
+    const underOnboarding = runList({ cwd: dir, filter: "parent:onboarding" }).items.map(
+      (i) => i.id,
+    );
     expect(underOnboarding).toContain("story-login");
-    const underHandbook = runList({ cwd: dir, filter: "parent:story-handbook" }).items.map((i) => i.id);
+    const underHandbook = runList({ cwd: dir, filter: "parent:story-handbook" }).items.map(
+      (i) => i.id,
+    );
     expect(underHandbook).toContain("task-rate-limit");
     const underAuth = runList({ cwd: dir, filter: "parent:auth" }).items.map((i) => i.id);
     expect(underAuth).not.toContain("story-login");
@@ -149,9 +160,9 @@ describe("update --parent (reparent)", () => {
   it("refuses a wrong parent type without moving anything", () => {
     const { dir, tasks } = primedTree();
     const oldPath = join(tasks, "launch-mvp", "auth", "story-login", "task-rate-limit.md");
-    expect(() => runUpdate({ cwd: dir, id: "task-rate-limit", parent: "auth", now: LATER })).toThrow(
-      /must live under a story/,
-    );
+    expect(() =>
+      runUpdate({ cwd: dir, id: "task-rate-limit", parent: "auth", now: LATER }),
+    ).toThrow(/must live under a story/);
     expect(existsSync(oldPath)).toBe(true);
     expect(fm(oldPath).data.parent).toBe("story-login");
   });
@@ -186,7 +197,12 @@ describe("update --parent (reparent)", () => {
   it("treats the same parent as a no-op (no move, no change entry)", () => {
     const { dir, tasks } = primedTree();
     const oldPath = join(tasks, "launch-mvp", "auth", "story-login", "task-rate-limit.md");
-    const result = runUpdate({ cwd: dir, id: "task-rate-limit", parent: "story-login", now: LATER });
+    const result = runUpdate({
+      cwd: dir,
+      id: "task-rate-limit",
+      parent: "story-login",
+      now: LATER,
+    });
     expect(result.path).toBe(oldPath);
     expect(result.movedFrom).toBeUndefined();
     expect(result.changed).not.toContain("parent");

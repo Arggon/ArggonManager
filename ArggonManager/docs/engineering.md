@@ -23,11 +23,14 @@ This document is owned by **Software Architect**. It complements [`ArggonManager
 ```text
 ArggonManager/          # git-native work tree + product docs (see `ArggonManager/docs/convention.md`)
   docs/                 # product docs: convention, engineering, agents, adr/, specs/, plans/
-cli/                    # CLI package: TypeScript sources (cli/src), one module per command
-  src/                  # kernel (items/status/update/rules), commands, tests co-located
-  src/lib.ts            # kernel library entry (`arggon-manager/lib`); ADR 0011 §4
+lib/                    # @arggon/lib kernel package (ADR 0013): TypeScript sources (lib/src)
+  src/index.ts          # kernel entry: items, rules, paths, envelopes + operations
   src/operations.ts     # in-process operations: --json envelope + exit codes per command
-dist/                   # compiled bin + library (gitignored; npm run build)
+cli/                    # root package (arggon-manager): CLI, seam generation, MCP adapter
+  src/                  # commands + tests co-located
+  src/package-assets.ts # root package root + bundled templates dir (injected into the kernel)
+dist/                   # compiled bin (gitignored; npm run build)
+lib/dist/               # compiled kernel package (gitignored)
 templates/              # scaffolded by arggon init
 skills/arggon-cli/      # agent skill for the CLI (keep in sync with `ArggonManager/docs/json-output.md`)
 fixtures/               # golden trees for validate + integration tests
@@ -103,13 +106,13 @@ The gate is repo-agnostic: adopting repos run the same bar against their own sur
 
 ## Testing expectations
 
-| Layer                     | Required                         | Notes                                                                                                                                                        |
-| ------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Unit                      | Yes                              | Parsing, status transitions, claim rules, path/`id` checks                                                                                                   |
-| Fixture / golden          | Yes                              | Valid tree must pass `validate`; each invalid layout rule has a failing fixture                                                                              |
-| Integration               | Yes for file-mutating commands   | `create` / `update` / claim against a temp copy of fixtures; assert git-friendly file output                                                                 |
+| Layer                        | Required                         | Notes                                                                                                                                                        |
+| ---------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Unit                         | Yes                              | Parsing, status transitions, claim rules, path/`id` checks                                                                                                   |
+| Fixture / golden             | Yes                              | Valid tree must pass `validate`; each invalid layout rule has a failing fixture                                                                              |
+| Integration                  | Yes for file-mutating commands   | `create` / `update` / claim against a temp copy of fixtures; assert git-friendly file output                                                                 |
 | E2E against the real tracker | Optional                         | Nice-to-have; fixtures are the merge gate                                                                                                                    |
-| Smoke (review gate)       | Blocking for behavior/UI changes | Probe evidence in the review verdict; UI changes get a real-browser drive via Playwright CLI ([ADR 0008](./adr/0008-review-smoke-gate.md)); docs-only exempt |
+| Smoke (review gate)          | Blocking for behavior/UI changes | Probe evidence in the review verdict; UI changes get a real-browser drive via Playwright CLI ([ADR 0008](./adr/0008-review-smoke-gate.md)); docs-only exempt |
 
 **Rules**
 

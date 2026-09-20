@@ -1,5 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync as _mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -85,7 +92,9 @@ function writeSpec(dir: string, name: string, specId: string, body: string): voi
 function snapshot(dir: string): Map<string, string> {
   const out = new Map<string, string>();
   const visit = (current: string): void => {
-    for (const entry of readdirSync(current, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    for (const entry of readdirSync(current, { withFileTypes: true }).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    )) {
       const full = join(current, entry.name);
       if (entry.isDirectory()) visit(full);
       else out.set(full, readFileSync(full, "utf8"));
@@ -115,7 +124,9 @@ describe("spec audit: normalization, shingles, jaccard", () => {
     expect(normalizeForSimilarity(raw)).toBe("t the command reads inputs");
     // identical modulo frontmatter/fences/case/whitespace -> similarity 1
     const raw2 = "---\nspec_id: y-002\n---\n\n# t\n\nthe command reads inputs\n";
-    expect(jaccard(shingles(normalizeForSimilarity(raw)), shingles(normalizeForSimilarity(raw2)))).toBe(1);
+    expect(
+      jaccard(shingles(normalizeForSimilarity(raw)), shingles(normalizeForSimilarity(raw2))),
+    ).toBe(1);
   });
 
   it("two empty sets count as identical (1.0); one empty -> 0", () => {
@@ -124,7 +135,9 @@ describe("spec audit: normalization, shingles, jaccard", () => {
   });
 
   it("extracts requirement/scenario titles verbatim", () => {
-    const titles = extractTitles("### Requirement: it must validate input\n#### Scenario: valid input\n");
+    const titles = extractTitles(
+      "### Requirement: it must validate input\n#### Scenario: valid input\n",
+    );
     expect(titles).toEqual(["it must validate input", "valid input"]);
   });
 });
@@ -139,7 +152,9 @@ describe("spec audit: classification (golden fixtures)", () => {
     expect(result.pairs).toBe(1);
     expect(result.counts.duplicate).toBe(1);
     expect(result.findings[0]?.classification).toBe("duplicate");
-    expect(result.findings[0]?.similarity).toBeGreaterThanOrEqual(SPEC_AUDIT_DEFAULTS.duplicateThreshold);
+    expect(result.findings[0]?.similarity).toBeGreaterThanOrEqual(
+      SPEC_AUDIT_DEFAULTS.duplicateThreshold,
+    );
   });
 
   it("DIVERGING duplicate: same titles verbatim, rewritten prose -> MERGE via shared titles, not Jaccard", () => {
@@ -238,7 +253,10 @@ describe("spec audit: threshold boundaries", () => {
     // duplicate threshold exactly at the similarity: >= wins -> duplicate
     const atDup = makeRepo();
     pairAtOneThird(atDup);
-    const atDupResult = runSpecAudit({ cwd: atDup, thresholds: { mergeThreshold: 1 / 3, duplicateThreshold: 1 / 3 } });
+    const atDupResult = runSpecAudit({
+      cwd: atDup,
+      thresholds: { mergeThreshold: 1 / 3, duplicateThreshold: 1 / 3 },
+    });
     expect(atDupResult.findings[0]?.classification).toBe("duplicate");
     // just above the similarity: not duplicate, still merge
     const belowDup = makeRepo();
@@ -253,22 +271,32 @@ describe("spec audit: threshold boundaries", () => {
   it("report-floor boundary: exactly at floor is reported, below is counted only", () => {
     const dir = makeRepo();
     pairAtOneThird(dir); // 1/3 ~ 0.333
-    const atFloor = runSpecAudit({ cwd: dir, thresholds: { reportFloor: 1 / 3, mergeThreshold: 0.34 } });
+    const atFloor = runSpecAudit({
+      cwd: dir,
+      thresholds: { reportFloor: 1 / 3, mergeThreshold: 0.34 },
+    });
     expect(atFloor.counts.keepSeparate).toBe(1);
-    const aboveFloor = runSpecAudit({ cwd: dir, thresholds: { reportFloor: 0.34, mergeThreshold: 0.34 } });
+    const aboveFloor = runSpecAudit({
+      cwd: dir,
+      thresholds: { reportFloor: 0.34, mergeThreshold: 0.34 },
+    });
     expect(aboveFloor.counts.belowFloor).toBe(1);
     expect(aboveFloor.findings).toEqual([]);
   });
 
   it("invalid threshold values fail cleanly", () => {
     const dir = makeRepo();
-    expect(() => resolveSpecAuditThresholds({ duplicateThreshold: Number.NaN })).toThrow(/duplicate-threshold/);
+    expect(() => resolveSpecAuditThresholds({ duplicateThreshold: Number.NaN })).toThrow(
+      /duplicate-threshold/,
+    );
     expect(() => resolveSpecAuditThresholds({ reportFloor: 1.5 })).toThrow(/report-floor/);
     expect(() => resolveSpecAuditThresholds({ minSharedTitles: -1 })).toThrow(/min-shared-titles/);
-    expect(() => resolveSpecAuditThresholds({ duplicateThreshold: 0.3, mergeThreshold: 0.5 })).toThrow(
-      /duplicate-threshold .*merge-threshold/s,
+    expect(() =>
+      resolveSpecAuditThresholds({ duplicateThreshold: 0.3, mergeThreshold: 0.5 }),
+    ).toThrow(/duplicate-threshold .*merge-threshold/s);
+    expect(() => runSpecAudit({ cwd: dir, thresholds: { mergeThreshold: 2 } })).toThrow(
+      /merge-threshold/,
     );
-    expect(() => runSpecAudit({ cwd: dir, thresholds: { mergeThreshold: 2 } })).toThrow(/merge-threshold/);
   });
 });
 
@@ -324,7 +352,13 @@ describe("spec audit: CLI contract (e2e)", () => {
       specs: number;
       pairs: number;
       thresholds: Record<string, number>;
-      findings: Array<{ classification: string; files: string[]; similarity: number; sharedTitles: string[]; note: string }>;
+      findings: Array<{
+        classification: string;
+        files: string[];
+        similarity: number;
+        sharedTitles: string[];
+        note: string;
+      }>;
       counts: { duplicate: number; merge: number; keepSeparate: number; belowFloor: number };
     };
     expect(payload.ok).toBe(true);
@@ -334,7 +368,12 @@ describe("spec audit: CLI contract (e2e)", () => {
     expect(payload.thresholds).toEqual({ ...SPEC_AUDIT_DEFAULTS });
     expect(payload.counts.duplicate).toBe(1);
     expect(payload.counts.merge).toBe(0);
-    expect(payload.counts.duplicate + payload.counts.merge + payload.counts.keepSeparate + payload.counts.belowFloor).toBe(3);
+    expect(
+      payload.counts.duplicate +
+        payload.counts.merge +
+        payload.counts.keepSeparate +
+        payload.counts.belowFloor,
+    ).toBe(3);
     const dup = payload.findings.find((f) => f.classification === "duplicate")!;
     expect(dup.files).toEqual(["docs/specs/spec-a-001.md", "docs/specs/spec-b-002.md"]);
     expect(dup.similarity).toBeGreaterThanOrEqual(SPEC_AUDIT_DEFAULTS.duplicateThreshold);
@@ -351,13 +390,20 @@ describe("spec audit: CLI contract (e2e)", () => {
       dir,
     );
     expect(run.status).toBe(0);
-    const payload = JSON.parse(run.stdout) as { counts: { keepSeparate: number }; thresholds: Record<string, number> };
+    const payload = JSON.parse(run.stdout) as {
+      counts: { keepSeparate: number };
+      thresholds: Record<string, number>;
+    };
     expect(payload.thresholds.reportFloor).toBeCloseTo(0.15, 10);
     expect(payload.thresholds.duplicateThreshold).toBeCloseTo(0.9, 10);
     expect(payload.counts.keepSeparate).toBe(1);
     const bad = runCli(["spec", "audit", "--merge-threshold", "1.5", "--json"], dir);
     expect(bad.status).toBe(1);
-    const fail = JSON.parse(bad.stdout) as { ok: boolean; command: string; error: { code: string } };
+    const fail = JSON.parse(bad.stdout) as {
+      ok: boolean;
+      command: string;
+      error: { code: string };
+    };
     expect(fail.ok).toBe(false);
     expect(fail.command).toBe("spec");
     expect(fail.error.code).toBe("SPEC_FAILED");

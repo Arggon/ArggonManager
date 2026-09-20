@@ -5,7 +5,12 @@ import { parseRepoSlug } from "./get-open-prs.js";
 import { itemId, slugify } from "./ids.js";
 import { itemsById, loadItems } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
-import { commitTrackerMutation, readAutoCommitConfig, resolveAutoCommit, type TrackerCommitResult } from "./tracker-commit.js";
+import {
+  commitTrackerMutation,
+  readAutoCommitConfig,
+  resolveAutoCommit,
+  type TrackerCommitResult,
+} from "./tracker-commit.js";
 import { runUpdate } from "./update.js";
 
 /**
@@ -119,6 +124,11 @@ export type ImportIssuesOptions = {
    * error skips the commit and the partial run leaves tasks/ dirty.
    */
   commit?: boolean;
+  /**
+   * Fallback item-templates directory injected by the root adapter (ADR 0013);
+   * threaded to runCreate for repos without their own `templates/`.
+   */
+  templatesDir?: string;
   execGh?: GhExecutor;
   now?: Date;
 };
@@ -129,10 +139,7 @@ export type ImportIssuesOptions = {
  * (they map to `done`). Throws a plain technical error; runImportIssues
  * adds the IMPORT_FAILED context.
  */
-export function ghIssueListJson(opts: {
-  repo?: string;
-  execGh?: GhExecutor;
-}): GhIssue[] {
+export function ghIssueListJson(opts: { repo?: string; execGh?: GhExecutor }): GhIssue[] {
   const execGh = opts.execGh ?? defaultExecGh;
   const args = [
     "issue",
@@ -147,11 +154,11 @@ export function ghIssueListJson(opts: {
   if (opts.repo) args.push("--repo", opts.repo);
   let out: string;
   try {
-    out = execGh(
-      "gh",
-      args,
-      { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"], timeout: 30_000 },
-    ) as string;
+    out = execGh("gh", args, {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+      timeout: 30_000,
+    }) as string;
   } catch (err) {
     if (
       err !== null &&
@@ -313,6 +320,7 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
         // Internal suppression (task-autocommit-update-import): the
         // run-level commit below covers this file in ONE commit.
         commit: false,
+        templatesDir: opts.templatesDir,
         now,
       });
       storyCreated = true;
@@ -361,6 +369,7 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
         // Internal suppression (task-autocommit-update-import): the
         // run-level commit below covers this file in ONE commit.
         commit: false,
+        templatesDir: opts.templatesDir,
         now,
       });
       writtenPaths.push(createdItem.path);

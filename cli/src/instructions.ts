@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { docsDirForRoot, findTasksDir, repoRootFromTasks } from "./paths.js";
+import { docsDirForRoot, findTasksDir, repoRootFromTasks } from "@arggon/lib";
 
 /**
  * `arggon instructions` (task-instructions-command): print the agent wiring

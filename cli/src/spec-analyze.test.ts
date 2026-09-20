@@ -1,5 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,7 +41,12 @@ function makeRepo(): string {
   return dir;
 }
 
-function writeSpec(dir: string, name: string, frontmatter: Record<string, string>, body: string): void {
+function writeSpec(
+  dir: string,
+  name: string,
+  frontmatter: Record<string, string>,
+  body: string,
+): void {
   const dirPath = join(dir, "docs", "specs");
   mkdirSync(dirPath, { recursive: true });
   const fm = Object.entries(frontmatter)
@@ -77,12 +88,18 @@ describe("spec analyze: ambiguity scan", () => {
     writeSpec(dir, "spec-vague-001.md", fm({ spec_id: "vague-001" }), AMBIGUOUS_BODY);
     const result = runSpecAnalyze({ cwd: dir });
     const kinds = result.ambiguity.map((f) => f.kind).sort();
-    expect(kinds).toEqual(["no-error-path", "todo-marker", "untestable-acceptance", "vague-quantifier"]);
+    expect(kinds).toEqual([
+      "no-error-path",
+      "todo-marker",
+      "untestable-acceptance",
+      "vague-quantifier",
+    ]);
     const vague = result.ambiguity.find((f) => f.kind === "vague-quantifier");
     expect(vague?.severity).toBe("warn");
-    const fileLine = readFileSync(join(dir, "docs", "specs", "spec-vague-001.md"), "utf8")
-      .split(/\r?\n/)
-      .findIndex((l) => /\bfast\b/i.test(l)) + 1;
+    const fileLine =
+      readFileSync(join(dir, "docs", "specs", "spec-vague-001.md"), "utf8")
+        .split(/\r?\n/)
+        .findIndex((l) => /\bfast\b/i.test(l)) + 1;
     expect(vague?.line).toBe(fileLine); // frontmatter offset applied
     expect(vague?.message).toContain("fast");
   });
@@ -123,7 +140,10 @@ describe("spec analyze: ambiguity scan", () => {
   it("scans a single file with --spec and skips the consistency pass", () => {
     const dir = makeRepo();
     writeSpec(dir, "spec-single-001.md", fm({ spec_id: "single-001" }), AMBIGUOUS_BODY);
-    const result = runSpecAnalyze({ cwd: dir, spec: join(dir, "docs", "specs", "spec-single-001.md") });
+    const result = runSpecAnalyze({
+      cwd: dir,
+      spec: join(dir, "docs", "specs", "spec-single-001.md"),
+    });
     expect(result.scanned).toBe(1);
     expect(result.ambiguity.length).toBeGreaterThan(0);
     expect(result.consistency).toEqual([]);
@@ -131,7 +151,9 @@ describe("spec analyze: ambiguity scan", () => {
 
   it("throws (SPEC_FAILED in the CLI) on an unreadable file", () => {
     const dir = makeRepo();
-    expect(() => runSpecAnalyze({ cwd: dir, spec: join(dir, "missing.md") })).toThrow(/cannot read/);
+    expect(() => runSpecAnalyze({ cwd: dir, spec: join(dir, "missing.md") })).toThrow(
+      /cannot read/,
+    );
   });
 
   it("never writes: the scanned file is byte-identical after the run", () => {
@@ -147,9 +169,24 @@ describe("spec analyze: ambiguity scan", () => {
 describe("spec analyze: consistency", () => {
   it("reports an implemented spec that no task cites and no plan references", () => {
     const dir = makeRepo();
-    writeSpec(dir, "spec-orphan-001.md", fm({ spec_id: "orphan-001", status: "implemented" }), CLEAN_BODY);
-    writeSpec(dir, "spec-cited-001.md", fm({ spec_id: "cited-001", status: "implemented" }), CLEAN_BODY);
-    writeSpec(dir, "spec-planned-001.md", fm({ spec_id: "planned-001", status: "implemented" }), CLEAN_BODY);
+    writeSpec(
+      dir,
+      "spec-orphan-001.md",
+      fm({ spec_id: "orphan-001", status: "implemented" }),
+      CLEAN_BODY,
+    );
+    writeSpec(
+      dir,
+      "spec-cited-001.md",
+      fm({ spec_id: "cited-001", status: "implemented" }),
+      CLEAN_BODY,
+    );
+    writeSpec(
+      dir,
+      "spec-planned-001.md",
+      fm({ spec_id: "planned-001", status: "implemented" }),
+      CLEAN_BODY,
+    );
     writePlan(dir, "plan-ok-001.md", {
       plan_id: "ok-001",
       title: "Ok",
@@ -171,7 +208,12 @@ describe("spec analyze: consistency", () => {
 
   it("proposed specs are never reported as orphaned", () => {
     const dir = makeRepo();
-    writeSpec(dir, "spec-fresh-001.md", fm({ spec_id: "fresh-001", status: "proposed" }), CLEAN_BODY);
+    writeSpec(
+      dir,
+      "spec-fresh-001.md",
+      fm({ spec_id: "fresh-001", status: "proposed" }),
+      CLEAN_BODY,
+    );
     const result = runSpecAnalyze({ cwd: dir });
     expect(result.consistency).toEqual([]);
   });
@@ -195,7 +237,9 @@ describe("spec analyze: consistency", () => {
   it("passes clean on this repo's real corpus (finding counts are informational)", () => {
     const result = runSpecAnalyze({ cwd: repoRoot });
     expect(result.scanned).toBeGreaterThanOrEqual(4);
-    expect(result.consistency.every((f) => f.severity === "warn" || f.severity === "info")).toBe(true);
+    expect(result.consistency.every((f) => f.severity === "warn" || f.severity === "info")).toBe(
+      true,
+    );
   });
 });
 

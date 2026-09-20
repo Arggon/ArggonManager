@@ -4,7 +4,17 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { evaluateBudget, formatBudgetLines, measureBudget, measureMcpSchema, buildMcpSchemaBudget, cliCommand, AGENTS_MD_BUDGET_BYTES, MCP_TOOLS_BUDGET_BYTES, MCP_TOOLS_BASELINE_BYTES } from "./measure.js";
+import {
+  evaluateBudget,
+  formatBudgetLines,
+  measureBudget,
+  measureMcpSchema,
+  buildMcpSchemaBudget,
+  cliCommand,
+  AGENTS_MD_BUDGET_BYTES,
+  MCP_TOOLS_BUDGET_BYTES,
+  MCP_TOOLS_BASELINE_BYTES,
+} from "./measure.js";
 import { runDoctor } from "./doctor.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
@@ -42,9 +52,13 @@ describe("budget measurement (task-adr0006-remeasure, ADR 0006)", () => {
 
   it("always deletes the measurement temp tree (/tmp hygiene)", async () => {
     await measureBudget();
-    const leftovers = spawnSync("bash", ["-c", "ls -d ${TMPDIR:-/tmp}/arggon-budget-* 2>/dev/null || true"], {
-      encoding: "utf8",
-    });
+    const leftovers = spawnSync(
+      "bash",
+      ["-c", "ls -d ${TMPDIR:-/tmp}/arggon-budget-* 2>/dev/null || true"],
+      {
+        encoding: "utf8",
+      },
+    );
     expect(leftovers.stdout.trim()).toBe("");
   }, 60_000);
 
@@ -88,7 +102,12 @@ describe("budget measurement (task-adr0006-remeasure, ADR 0006)", () => {
         listCompactBytes: number;
         listFullBytes: number;
         showBytes: number;
-        mcp?: { toolCount: number; totalBytes: number; tokenEstimate: number; largestTools: unknown[] };
+        mcp?: {
+          toolCount: number;
+          totalBytes: number;
+          tokenEstimate: number;
+          largestTools: unknown[];
+        };
       };
       budgetError?: string;
     };
@@ -113,14 +132,21 @@ describe("budget measurement (task-adr0006-remeasure, ADR 0006)", () => {
     const cmd = cliCommand();
     const adopter = mkdtempSync(join(tmpdir(), "arggon-budget-adopter-"));
     try {
-      const init = spawnSync(cmd.file, [...cmd.args, "init", "--full", "--json"], { encoding: "utf8", cwd: adopter });
+      const init = spawnSync(cmd.file, [...cmd.args, "init", "--full", "--json"], {
+        encoding: "utf8",
+        cwd: adopter,
+      });
       expect(init.status).toBe(0);
       const doctor = spawnSync(cmd.file, [...cmd.args, "doctor", "--json", "--budget"], {
         encoding: "utf8",
         cwd: adopter,
       });
       expect(doctor.status).toBe(0);
-      const body = JSON.parse(doctor.stdout) as { ok: boolean; budget?: unknown; budgetError?: string };
+      const body = JSON.parse(doctor.stdout) as {
+        ok: boolean;
+        budget?: unknown;
+        budgetError?: string;
+      };
       expect(body.ok).toBe(true);
       expect(body.budgetError).toBeUndefined(); // the reported casa-pendiente failure
       expect(body.budget).toBeDefined();
@@ -139,15 +165,22 @@ describe("budget measurement (task-adr0006-remeasure, ADR 0006)", () => {
 
 describe("MCP tool-schema budget (task-schema-budget)", () => {
   it("buildMcpSchemaBudget sizes deterministic fixture tools exactly", () => {
-    const toolA = { name: "arggon_alpha", inputSchema: { type: "object", properties: { x: { type: "string" } } } };
+    const toolA = {
+      name: "arggon_alpha",
+      inputSchema: { type: "object", properties: { x: { type: "string" } } },
+    };
     const toolB = { name: "arggon_beta", inputSchema: { type: "object" } };
     const budget = buildMcpSchemaBudget([toolA, toolB]);
     expect(budget.toolCount).toBe(2);
     expect(budget.totalBytes).toBe(
-      Buffer.byteLength(JSON.stringify(toolA), "utf8") + Buffer.byteLength(JSON.stringify(toolB), "utf8"),
+      Buffer.byteLength(JSON.stringify(toolA), "utf8") +
+        Buffer.byteLength(JSON.stringify(toolB), "utf8"),
     );
     expect(budget.tokenEstimate).toBe(Math.round(budget.totalBytes / 4));
-    expect(budget.largestTools[0]).toEqual({ name: "arggon_alpha", bytes: Buffer.byteLength(JSON.stringify(toolA), "utf8") });
+    expect(budget.largestTools[0]).toEqual({
+      name: "arggon_alpha",
+      bytes: Buffer.byteLength(JSON.stringify(toolA), "utf8"),
+    });
     expect(budget.largestTools).toHaveLength(2);
   });
 

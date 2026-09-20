@@ -1,23 +1,25 @@
 /**
- * Kernel library surface (W1, task-native-kernel-lib): `cli/src/lib.ts` is the
- * one entry the machine surfaces (CLI today; MCP adapter; native tools in
- * W2/W3) consume, and the operations return the documented `--json` envelopes
- * with the CLI's exit-code semantics.
+ * Kernel library surface (W1 `task-native-kernel-lib`, repackaged as
+ * `@arggon/lib` by W1b/ADR 0013): the package entry is the one path the
+ * machine surfaces (CLI today; MCP adapter; native tools in W2/W3) consume,
+ * and the operations return the documented `--json` envelopes with the CLI's
+ * exit-code semantics.
  *
  * The clean-build import and the CLI byte parity of those envelopes are pinned
- * in lib-build.test.ts; this file drives the source entry in process.
+ * in lib-build.test.ts; this file drives the entry in process (vitest resolves
+ * `@arggon/lib` to the source entry, so no build is required).
  */
 import { mkdtempSync as _mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCreate } from "./create.js";
+import { runCreate } from "@arggon/lib";
 import { runInit } from "./init.js";
-import * as lib from "./lib.js";
-import * as nextModule from "./next.js";
-import * as relationsModule from "./relations.js";
-import * as rulesModule from "./rules.js";
-import * as statusModule from "./status.js";
+import * as lib from "@arggon/lib";
+import * as nextModule from "@arggon/lib";
+import * as relationsModule from "@arggon/lib";
+import * as rulesModule from "@arggon/lib";
+import * as statusModule from "@arggon/lib";
 import { removeFixtureTree } from "./test-tmp.js";
 
 /**

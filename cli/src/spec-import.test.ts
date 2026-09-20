@@ -1,5 +1,13 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -246,7 +254,9 @@ describe("spec import openspec — dry run", () => {
     writeCapability(corpus, "auth-core", GOLDEN_SPEC_MD);
     writeCapability(corpus, "billing", GOLDEN_SPEC_MD.replace("auth-core", "billing"));
 
-    const docsBefore = existsSync(join(repo, "docs")) ? JSON.stringify(readdirSync(join(repo, "docs"))) : null;
+    const docsBefore = existsSync(join(repo, "docs"))
+      ? JSON.stringify(readdirSync(join(repo, "docs")))
+      : null;
     const result = runSpecImport({ cwd: repo, path: corpus, dryRun: true, today: "2026-09-16" });
     expect(result.dryRun).toBe(true);
     expect(result.created).toEqual([]);
@@ -394,8 +404,16 @@ describe("spec import openspec — adapter extension point", () => {
       // the zero-loss comparison reconstructs from parsed instead.
       assembleSource: (_raw: string, parsed: { purpose: string; requirements: string }) =>
         `## Purpose\n\n${parsed.purpose}\n\n## Requirements\n\n${parsed.requirements}`,
-      map: (parsed: { purpose: string; requirements: string }, meta: { specId: string; title: string; date: string; sourceRel: string; capability: string }) =>
-        openspecAdapter.map(parsed, meta),
+      map: (
+        parsed: { purpose: string; requirements: string },
+        meta: {
+          specId: string;
+          title: string;
+          date: string;
+          sourceRel: string;
+          capability: string;
+        },
+      ) => openspecAdapter.map(parsed, meta),
     };
     const result = runSpecImport({ cwd: repo, path: corpus, adapter: custom, today: "2026-09-16" });
     expect(result.created[0]!.file).toBe("docs/specs/spec-widget-001.md");

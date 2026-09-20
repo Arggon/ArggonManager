@@ -10,7 +10,11 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import { parseConventionConfig, readGeneratedProjectName, updateGeneratedSection } from "./convention.js";
+import {
+  parseConventionConfig,
+  readGeneratedProjectName,
+  updateGeneratedSection,
+} from "@arggon/lib";
 import { checksumMatches, checksumOf, GENERATED_DOC_COUNT, normalizeEol } from "./docs.js";
 import { dryRunInit, runInit } from "./init.js";
 import { runAdoptAck } from "./adopt.js";
@@ -45,7 +49,9 @@ const FIXED_NOW = new Date("2026-09-17T12:00:00.000Z");
 
 /** Rewrite every managed doc's bytes (state checksums stay as recorded). */
 function rewriteManagedDocs(dir: string, transform: (content: string) => string): void {
-  const config = parseConventionConfig(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8"));
+  const config = parseConventionConfig(
+    readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8"),
+  );
   for (const dest of Object.keys(config.generated)) {
     const abs = join(dir, dest);
     if (!existsSync(abs)) continue;
@@ -73,7 +79,11 @@ function restampStateChecksums(dir: string): void {
     if (!existsSync(abs)) continue;
     entry.checksum = checksumOf(readFileSync(abs, "utf8"));
   }
-  writeFileSync(path, updateGeneratedSection(raw, config.generated, config.generatedProjectName), "utf8");
+  writeFileSync(
+    path,
+    updateGeneratedSection(raw, config.generated, config.generatedProjectName),
+    "utf8",
+  );
 }
 
 /** Strip the x-generated.projectName line, simulating a legacy tree. */
@@ -180,8 +190,16 @@ describe("bug-crlf-provenance-breakage: CRLF working tree vs LF checkout", () =>
 
     // A genuine adopter edit must still surface, identically on both trees
     // (line endings alone never inflate the diff or hide the divergence).
-    writeFileSync(join(lf, "AGENTS.md"), `${readFileSync(join(lf, "AGENTS.md"), "utf8")}\nADOPTER NOTE\n`, "utf8");
-    writeFileSync(join(crlf, "AGENTS.md"), `${readFileSync(join(crlf, "AGENTS.md"), "utf8")}\nADOPTER NOTE\r\n`, "utf8");
+    writeFileSync(
+      join(lf, "AGENTS.md"),
+      `${readFileSync(join(lf, "AGENTS.md"), "utf8")}\nADOPTER NOTE\n`,
+      "utf8",
+    );
+    writeFileSync(
+      join(crlf, "AGENTS.md"),
+      `${readFileSync(join(crlf, "AGENTS.md"), "utf8")}\nADOPTER NOTE\r\n`,
+      "utf8",
+    );
     const propEditLf = dryRunInit({ dir: lf, force: false, propose: true, now: FIXED_NOW });
     const propEditCrlf = dryRunInit({ dir: crlf, force: false, propose: true, now: FIXED_NOW });
     expect(propEditCrlf.proposals).toEqual(propEditLf.proposals);
@@ -317,7 +335,9 @@ describe("bug-crlf-provenance-breakage: regeneration writes LF, never re-breaks 
     // The refreshed state matches the fresh LF disk EXACTLY (clause 1), so
     // the next compare — including after another git smudge (clause 2) —
     // stays clean. Nothing re-breaks.
-    const config = parseConventionConfig(readFileSync(join(crlf, "ArggonManager/.convention.yml"), "utf8"));
+    const config = parseConventionConfig(
+      readFileSync(join(crlf, "ArggonManager/.convention.yml"), "utf8"),
+    );
     for (const [dest, entry] of Object.entries(config.generated)) {
       expect(entry.checksum).toBe(checksumOf(readFileSync(join(crlf, dest), "utf8")));
     }

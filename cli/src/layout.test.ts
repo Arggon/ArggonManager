@@ -18,11 +18,16 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runInit } from "./init.js";
-import { loadItems } from "./items.js";
-import { docsDirForRoot, findTrackerLocation, trackerAt } from "./paths.js";
-import { runCreate } from "./create.js";
-import { runList } from "./list.js";
-import { runValidate } from "./validate.js";
+import { bundledTemplatesDir } from "./package-assets.js";
+import {
+  docsDirForRoot,
+  findTrackerLocation,
+  loadItems,
+  runCreate,
+  runList,
+  runValidate,
+  trackerAt,
+} from "@arggon/lib";
 
 const tmpDirs: string[] = [];
 afterEach(() => {
@@ -78,7 +83,14 @@ describe("tracker layout detection (ADR 0012)", () => {
 
   it("a legacy tree keeps working: create/list/validate operate on tasks/ and report LEGACY_LAYOUT", () => {
     const dir = legacyTree();
-    const created = runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch" });
+    const created = runCreate({
+      cwd: dir,
+      type: "epic",
+      title: "Auth",
+      parent: "launch",
+      // Legacy fixtures carry no repo-local templates/ (ADR 0013).
+      templatesDir: bundledTemplatesDir(),
+    });
     expect(created.path).toBe(join(dir, "tasks/launch/auth/auth.md"));
     expect(existsSync(join(dir, "tasks/launch/auth/auth.md"))).toBe(true);
 

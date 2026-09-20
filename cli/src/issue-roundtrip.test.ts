@@ -11,11 +11,15 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { runCreate } from "./create.js";
-import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import {
+  conventionPathForRoot,
+  parseFrontmatter,
+  runCreate,
+  runUpdate,
+  stringifyFrontmatter,
+} from "@arggon/lib";
+
 import { runInit } from "./init.js";
-import { conventionPathForRoot } from "./paths.js";
-import { runUpdate } from "./update.js";
 
 // task-issue-roundtrip: done flips close the linked GitHub issue — opt-in via
 // tasks/.convention.yml `x-github.issue-roundtrip: true`, best effort (gh

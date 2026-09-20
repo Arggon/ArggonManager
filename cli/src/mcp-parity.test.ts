@@ -16,7 +16,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCreate } from "./create.js";
+import { runCreate } from "@arggon/lib";
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
 
@@ -122,7 +122,10 @@ describe("CLI <-> MCP parity", () => {
 
   it("update claims identically through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
-    cliJson(["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"], cliDir);
+    cliJson(
+      ["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"],
+      cliDir,
+    );
     await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
     const cliResult = cliJson(
       ["update", "task-rate-limit", "--status", "in_progress", "--assignee", "same-user"],
@@ -139,7 +142,10 @@ describe("CLI <-> MCP parity", () => {
 
   it("update --add-depends-on emits identical depends_on through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
-    cliJson(["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"], cliDir);
+    cliJson(
+      ["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"],
+      cliDir,
+    );
     await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
     cliJson(["create", "task", "Second", "--parent", "story-login", "--id", "second"], cliDir);
     await mcpCall(mcpDir, "arggon_create", {
@@ -217,7 +223,10 @@ describe("CLI <-> MCP parity", () => {
 
   it("list returns the same items through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
-    cliJson(["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"], cliDir);
+    cliJson(
+      ["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"],
+      cliDir,
+    );
     await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
     const cliResult = cliJson(["list", "--type", "task"], cliDir);
     const mcpResult = await mcpCall(mcpDir, "arggon_list", { type: "task" });
@@ -227,7 +236,10 @@ describe("CLI <-> MCP parity", () => {
 
   it("handoff appends the same structured section through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
-    cliJson(["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"], cliDir);
+    cliJson(
+      ["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"],
+      cliDir,
+    );
     await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
     const cliResult = cliJson(
       [
@@ -257,7 +269,10 @@ describe("CLI <-> MCP parity", () => {
 
   it("next suggests the same item with the same envelope through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
-    cliJson(["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"], cliDir);
+    cliJson(
+      ["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"],
+      cliDir,
+    );
     await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
     const cliResult = cliJson(["next"], cliDir);
     const mcpResult = await mcpCall(mcpDir, "arggon_next", {});
@@ -271,7 +286,10 @@ describe("CLI <-> MCP parity", () => {
 
   it("report returns the same groups through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
-    cliJson(["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"], cliDir);
+    cliJson(
+      ["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"],
+      cliDir,
+    );
     await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
     const cliResult = cliJson(["report"], cliDir);
     const mcpResult = await mcpCall(mcpDir, "arggon_report", {});
@@ -364,9 +382,12 @@ const PARITY_EXCEPTIONS: Record<string, Record<string, string>> = {
       "default-on flip semantics governed tree-wide by x-tracker.auto-commit; MCP resolves commit identically without a flag",
     "--priority":
       "convention v4 field ships CLI/kernel-first (task-priority-field-schema); the arggon_create/arggon_update schemas gain `priority` with the ranking wave (task-next-priority-ranking)",
-    "--force": "human-only claim steal; the shared rules layer refuses agents (MCP passes agent: true)",
-    "--steal": "human-only supervised takeover (TTY-gated); agents are refused by the shared rules layer",
-    "--reason": "rationale recorded only by the human-only --steal takeover; meaningless without it",
+    "--force":
+      "human-only claim steal; the shared rules layer refuses agents (MCP passes agent: true)",
+    "--steal":
+      "human-only supervised takeover (TTY-gated); agents are refused by the shared rules layer",
+    "--reason":
+      "rationale recorded only by the human-only --steal takeover; meaningless without it",
   },
   comment: {
     "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",

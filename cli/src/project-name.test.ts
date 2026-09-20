@@ -15,7 +15,7 @@ import {
   parseGeneratedProjectName,
   readGeneratedProjectName,
   updateGeneratedSection,
-} from "./convention.js";
+} from "@arggon/lib";
 import { dryRunInit, runInit } from "./init.js";
 import { runDoctor } from "./doctor.js";
 
@@ -71,9 +71,9 @@ function normalize(result: unknown): string {
 describe("bug-project-name-dir-derived: project-name recovery", () => {
   it("extractProjectNameFromContent recovers the name between template anchors", () => {
     const template = "# {{PROJECT_NAME}}\n\nsome fixed text {{YEAR}}\n";
-    expect(
-      extractProjectNameFromContent(template, "# my-repo.1\n\nsome fixed text 2031\n"),
-    ).toBe("my-repo.1");
+    expect(extractProjectNameFromContent(template, "# my-repo.1\n\nsome fixed text 2031\n")).toBe(
+      "my-repo.1",
+    );
     // Marker lines and other content before the anchor are tolerated.
     expect(
       extractProjectNameFromContent(
@@ -85,7 +85,9 @@ describe("bug-project-name-dir-derived: project-name recovery", () => {
     expect(extractProjectNameFromContent("no placeholder", "x")).toBeNull();
     expect(extractProjectNameFromContent(template, "completely different\n")).toBeNull();
     expect(extractProjectNameFromContent(template, "# \n\nsome fixed text 2031\n")).toBeNull();
-    expect(extractProjectNameFromContent(template, "# bad name!\n\nsome fixed text 2031\n")).toBeNull();
+    expect(
+      extractProjectNameFromContent(template, "# bad name!\n\nsome fixed text 2031\n"),
+    ).toBeNull();
     // bug-crlf-provenance-breakage: LF-anchored template text must also match
     // a git-smudged CRLF disk (`* text=auto eol=crlf` trees) — and vice versa —
     // otherwise name recovery (and with it propose/doctor's name-bearing
@@ -100,9 +102,9 @@ describe("bug-project-name-dir-derived: project-name recovery", () => {
       ),
     ).toBe("Acme");
     // Lone CR terminators normalize too.
-    expect(
-      extractProjectNameFromContent(template, "# my-repo.1\r\rsome fixed text 2031\r"),
-    ).toBe("my-repo.1");
+    expect(extractProjectNameFromContent(template, "# my-repo.1\r\rsome fixed text 2031\r")).toBe(
+      "my-repo.1",
+    );
     // A CRLF disk content that genuinely drifts still refuses.
     expect(
       extractProjectNameFromContent(template, "# my-repo.1\r\n\r\nCHANGED STRUCTURE\r\n"),
@@ -115,15 +117,17 @@ describe("bug-project-name-dir-derived: project-name recovery", () => {
     const recorded = readGeneratedProjectName(dir);
     expect(recorded).toBeTruthy();
     expect(recorded).toBe(dir.split("/").pop()); // fresh scaffold: dir basename
-    expect(parseGeneratedProjectName(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8"))).toBe(
-      recorded,
-    );
+    expect(
+      parseGeneratedProjectName(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8")),
+    ).toBe(recorded);
     // The generated docs carry that name, not the placeholder.
     const editorconfig = readFileSync(join(dir, ".editorconfig"), "utf8");
     expect(editorconfig).toContain(recorded);
     expect(editorconfig).not.toContain("{{PROJECT_NAME}}");
     // Additive + namespaced: the full parser accepts the new key (ignore-unknown).
-    const config = parseConventionConfig(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8"));
+    const config = parseConventionConfig(
+      readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8"),
+    );
     expect(config.generatedProjectName).toBe(recorded);
     expect(Object.keys(config.generated).length).toBeGreaterThan(0);
   });
@@ -136,12 +140,15 @@ describe("bug-project-name-dir-derived: project-name recovery", () => {
     // Both variants must behave identically: a tree WITH the recorded name
     // and a legacy tree whose state predates x-generated.projectName (the
     // content-extraction recovery layer).
-    for (const base of [fixture, (() => {
-      const legacy = mkdtempSync("arggon-pn-repo-x-legacy-");
-      cpSync(fixture, legacy, { recursive: true });
-      stripRecordedName(legacy);
-      return legacy;
-    })()]) {
+    for (const base of [
+      fixture,
+      (() => {
+        const legacy = mkdtempSync("arggon-pn-repo-x-legacy-");
+        cpSync(fixture, legacy, { recursive: true });
+        stripRecordedName(legacy);
+        return legacy;
+      })(),
+    ]) {
       const wt = copyFixture(base, "arggon-pn-repo-x-worktree-1-");
       const ctrl = copyFixture(base, "arggon-pn-ctrl-");
       expect(wt.split("/").pop()).not.toBe(base.split("/").pop());
@@ -219,7 +226,10 @@ describe("bug-project-name-dir-derived: project-name recovery", () => {
     writeFileSync(
       statePath,
       updateGeneratedSection(
-        readFileSync(statePath, "utf8").split("\n").filter((l) => !l.startsWith("  projectName:")).join("\n"),
+        readFileSync(statePath, "utf8")
+          .split("\n")
+          .filter((l) => !l.startsWith("  projectName:"))
+          .join("\n"),
         state.generated,
         null,
       ),

@@ -1,8 +1,14 @@
 import { execFileSync } from "node:child_process";
-import { readConventionConfig, resolveBranchName } from "./convention.js";
-import { itemsById, loadItems, type WorkItem } from "./items.js";
-import { findTasksDir, repoRootFromTasks } from "./paths.js";
-import { runUpdate } from "./update.js";
+import {
+  findTasksDir,
+  itemsById,
+  loadItems,
+  readConventionConfig,
+  repoRootFromTasks,
+  resolveBranchName,
+  runUpdate,
+  type WorkItem,
+} from "@arggon/lib";
 
 export type BranchOptions = {
   cwd: string;

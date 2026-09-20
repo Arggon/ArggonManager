@@ -12,8 +12,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import { writeFileAtomic } from "./atomic.js";
-import { docsDirForRoot, findTasksDir, repoRootFromTasks } from "./paths.js";
+import { docsDirForRoot, findTasksDir, repoRootFromTasks, writeFileAtomic } from "@arggon/lib";
 
 // ---------------------------------------------------------------------------
 // Shared corpus-adapter extension point

@@ -1,5 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,7 +25,7 @@ import {
   readConventionConfig,
   updateGeneratedSection,
   type GeneratedEntry,
-} from "./convention.js";
+} from "@arggon/lib";
 import { runInit } from "./init.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
@@ -46,14 +53,17 @@ function tempDir(): string {
 
 describe("init docs: placeholders", () => {
   it("renders {{PROJECT_NAME}} and {{YEAR}} at write time", () => {
-    expect(renderDocPlaceholders("# {{PROJECT_NAME}} ({{YEAR}})", { projectName: "acme", year: 2031 })).toBe(
-      "# acme (2031)",
-    );
+    expect(
+      renderDocPlaceholders("# {{PROJECT_NAME}} ({{YEAR}})", { projectName: "acme", year: 2031 }),
+    ).toBe("# acme (2031)");
   });
 
   it("leaves unknown placeholders untouched", () => {
     expect(
-      renderDocPlaceholders("hi {{PROJECT_NAME}} and {{UNKNOWN_TOKEN}}", { projectName: "acme", year: 2026 }),
+      renderDocPlaceholders("hi {{PROJECT_NAME}} and {{UNKNOWN_TOKEN}}", {
+        projectName: "acme",
+        year: 2026,
+      }),
     ).toBe("hi acme and {{UNKNOWN_TOKEN}}");
   });
 
@@ -172,7 +182,9 @@ describe("init docs: tier-2 content (--full)", () => {
 
   it("SUPPORT.md and docs/runbooks/README.md exist", () => {
     expect(readFileSync(join(dir, "SUPPORT.md"), "utf8")).toContain("# Support");
-    expect(readFileSync(join(dir, "ArggonManager/docs/runbooks/README.md"), "utf8")).toContain("# Runbooks");
+    expect(readFileSync(join(dir, "ArggonManager/docs/runbooks/README.md"), "utf8")).toContain(
+      "# Runbooks",
+    );
   });
 });
 
@@ -184,7 +196,9 @@ describe("init docs: no-overwrite guarantee", () => {
     writeFileSync(join(dir, "ArggonManager/docs/engineering.md"), "MY REVIEW BAR", "utf8");
     const result = runInit({ dir, force: false, full: true });
     expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe("MY OWN RULES v1");
-    expect(readFileSync(join(dir, "ArggonManager/docs/engineering.md"), "utf8")).toBe("MY REVIEW BAR");
+    expect(readFileSync(join(dir, "ArggonManager/docs/engineering.md"), "utf8")).toBe(
+      "MY REVIEW BAR",
+    );
     expect(result.created).not.toContain("AGENTS.md");
     expect(result.created).not.toContain("ArggonManager/docs/engineering.md");
     expect(result.skipped).toContain("AGENTS.md");
@@ -262,9 +276,21 @@ describe("init docs: --json payload", () => {
     runCli(["init", dir, "--json"]);
     const proc = runCli(["init", dir, "--full", "--json"]);
     expect(proc.status).toBe(0);
-    const body = JSON.parse(proc.stdout) as { created: string[]; updated: string[]; skipped: string[] };
+    const body = JSON.parse(proc.stdout) as {
+      created: string[];
+      updated: string[];
+      skipped: string[];
+    };
     expect(body.created).toEqual(
-      ["ARCHITECTURE.md", "CHANGELOG.md", "SUPPORT.md", "ArggonManager/docs/convention.md", "ArggonManager/docs/deploy.md", "ArggonManager/docs/engineering.md", "ArggonManager/docs/runbooks/README.md"].sort(),
+      [
+        "ARCHITECTURE.md",
+        "CHANGELOG.md",
+        "SUPPORT.md",
+        "ArggonManager/docs/convention.md",
+        "ArggonManager/docs/deploy.md",
+        "ArggonManager/docs/engineering.md",
+        "ArggonManager/docs/runbooks/README.md",
+      ].sort(),
     );
     expect(body.updated.length).toBe(GENERATED_DOC_COUNT - TIER2_DESTS.size); // tier-1 docs (incl. .mcp.json) + bundled skills
     expect(body.updated).toContain("AGENTS.md");
@@ -319,7 +345,9 @@ describe("init generates .mcp.json (task-init-mcp-config)", () => {
     const result = runInit({ dir, force: false });
     expect(result.created).toContain(".mcp.json");
     const raw = readFileSync(join(dir, ".mcp.json"), "utf8");
-    const parsed = JSON.parse(raw) as { mcpServers: Record<string, { command: string; args: string[] }> };
+    const parsed = JSON.parse(raw) as {
+      mcpServers: Record<string, { command: string; args: string[] }>;
+    };
     expect(parsed.mcpServers.arggon).toEqual({ command: "arggon", args: ["mcp"] });
     // MCP clients parse the file as JSON: the arggon:generated HTML comment
     // must never be prepended (it would break their parsers).
@@ -484,11 +512,15 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
 
 describe("init docs: acknowledged baselines are never regenerated (bug-ack-baseline-regen-loss)", () => {
   it("round-trips the acknowledged flag through the x-generated section", () => {
-    const raw = 'version: 3\n\nx-generated:\n  AGENTS.md:\n    template: "docs/AGENTS.md"\n    checksum: "sha256:x"\n    arggonVersion: "0.0.0"\n    generatedAt: "2026-09-13T00:00:00.000Z"\n    acknowledged: true\n';
+    const raw =
+      'version: 3\n\nx-generated:\n  AGENTS.md:\n    template: "docs/AGENTS.md"\n    checksum: "sha256:x"\n    arggonVersion: "0.0.0"\n    generatedAt: "2026-09-13T00:00:00.000Z"\n    acknowledged: true\n';
     const config = parseConventionConfig(raw);
     expect(config.generated["AGENTS.md"]!.acknowledged).toBe(true);
     // Entries without the flag parse as undefined (old sections stay valid).
-    expect(parseConventionConfig(raw.replace("    acknowledged: true\n", "")).generated["AGENTS.md"]!.acknowledged).toBeUndefined();
+    expect(
+      parseConventionConfig(raw.replace("    acknowledged: true\n", "")).generated["AGENTS.md"]!
+        .acknowledged,
+    ).toBeUndefined();
     // Serializing only emits the flag when set (byte-stable for old state).
     const reserialized = updateGeneratedSection("version: 3\n", config.generated);
     expect(reserialized).toContain("    acknowledged: true");
@@ -527,10 +559,14 @@ describe("init docs: acknowledged baselines are never regenerated (bug-ack-basel
     runInit({ dir, force: false, full: true });
     const yml = join(dir, "ArggonManager/.convention.yml");
     const state = readConventionConfig(dir).generated;
-    writeFileSync(yml, updateGeneratedSection(readFileSync(yml, "utf8"), {
-      ...state,
-      "AGENTS.md": { ...state["AGENTS.md"]!, acknowledged: true },
-    }), "utf8");
+    writeFileSync(
+      yml,
+      updateGeneratedSection(readFileSync(yml, "utf8"), {
+        ...state,
+        "AGENTS.md": { ...state["AGENTS.md"]!, acknowledged: true },
+      }),
+      "utf8",
+    );
     writeFileSync(join(dir, "AGENTS.md"), "LATE HAND EDIT\n", "utf8");
     const result = generateDocs({ root: dir, full: true });
     expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe("LATE HAND EDIT\n");
@@ -561,7 +597,15 @@ describe("init docs: generated convention.md documents the x-* namespaced extens
     runInit({ dir, force: false, full: true });
     const generated = readFileSync(join(dir, "ArggonManager/docs/convention.md"), "utf8");
     expect(generated).toMatch(/Namespaced extensions/);
-    for (const ext of ["x-views", "x-playbooks", "x-tracker", "x-import", "x-worktree", "x-github", "x-generated"]) {
+    for (const ext of [
+      "x-views",
+      "x-playbooks",
+      "x-tracker",
+      "x-import",
+      "x-worktree",
+      "x-github",
+      "x-generated",
+    ]) {
       expect(generated).toContain(ext);
     }
   });
@@ -605,6 +649,8 @@ describe("init docs: deploy defaults (task-adr0005-deploy-defaults)", () => {
     const second = runInit({ dir, force: false, full: true });
     expect(second.updated).toContain("ArggonManager/docs/deploy.md");
     expect(readFileSync(join(dir, "ArggonManager/docs/deploy.md"), "utf8")).toBe(first);
-    expect(readConventionConfig(dir).generated["ArggonManager/docs/deploy.md"]!.template).toBe("docs/docs/deploy.md");
+    expect(readConventionConfig(dir).generated["ArggonManager/docs/deploy.md"]!.template).toBe(
+      "docs/docs/deploy.md",
+    );
   });
 });

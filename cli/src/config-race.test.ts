@@ -24,7 +24,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { CONVENTION_VERSION, readConventionConfig } from "./convention.js";
+import { CONVENTION_VERSION, readConventionConfig } from "@arggon/lib";
 import { runInit } from "./init.js";
 import { removeFixtureTree } from "./test-tmp.js";
 

@@ -1,28 +1,35 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { writeFileAtomic } from "./atomic.js";
 import {
+  TRACKER_DIR_NAME,
+  commitTrackerMutation,
+  conventionPathForRoot,
+  docsDirForRoot,
+  findTasksDir,
+  formatCommitLine,
+  itemId,
+  itemsById,
+  loadItems,
+  parseFrontmatter,
+  readAutoCommitConfig,
   readGeneratedProjectName,
   readGeneratedState,
-  updateGeneratedSection,
-  type GeneratedEntry,
-} from "./convention.js";
-import { arggonVersion, checksumOf } from "./docs.js";
-import { runCreate } from "./create.js";
-import { runDoctor } from "./doctor.js";
-import { itemId } from "./ids.js";
-import { itemsById, loadItems, type WorkItem } from "./items.js";
-import { parseFrontmatter, stringField } from "./frontmatter.js";
-import { conventionPathForRoot, docsDirForRoot, findTasksDir, TRACKER_DIR_NAME } from "./paths.js";
-import { sanitizeHumanTextUncapped } from "./sanitize.js";
-import {
-  commitTrackerMutation,
-  formatCommitLine,
-  readAutoCommitConfig,
   resolveAutoCommit,
+  runCreate,
+  sanitizeHumanTextUncapped,
+  stringField,
   trackerCommitMessage,
+  updateGeneratedSection,
+  writeFileAtomic,
+  type GeneratedEntry,
   type TrackerCommitResult,
-} from "./tracker-commit.js";
+  type WorkItem,
+} from "@arggon/lib";
+
+import { arggonVersion, checksumOf } from "./docs.js";
+import { bundledTemplatesDir } from "./package-assets.js";
+
+import { runDoctor } from "./doctor.js";
 
 /**
  * `arggon adopt` (story-adopt, task-adopt-command): agent-assisted adoption
@@ -450,7 +457,9 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
   if (opts.story !== undefined) {
     const parent = byId.get(opts.story);
     if (!parent) {
-      throw new Error(`--story '${opts.story}' does not resolve to an existing item in the tracker`);
+      throw new Error(
+        `--story '${opts.story}' does not resolve to an existing item in the tracker`,
+      );
     }
     if (parent.type !== "story") {
       throw new Error(
@@ -480,6 +489,7 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
             title: ADOPT_CONTAINER_TITLE,
             id: ADOPT_INITIATIVE_ID,
             commit: false,
+            templatesDir: bundledTemplatesDir(),
             now: opts.now,
           });
           writtenPaths.push(initiative.path);
@@ -492,6 +502,7 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
           id: ADOPT_EPIC_ID,
           parent: existingInitiative ? existingInitiative.id : ADOPT_INITIATIVE_ID,
           commit: false,
+          templatesDir: bundledTemplatesDir(),
           now: opts.now,
         });
         writtenPaths.push(epic.path);
@@ -511,6 +522,7 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
         id: ADOPT_STORY_ID,
         parent: epicId,
         commit: false,
+        templatesDir: bundledTemplatesDir(),
         now: opts.now,
       });
       writtenPaths.push(story.path);
@@ -557,6 +569,7 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
         relative(root, docsDirForRoot(root)).split(sep).join("/"),
       ),
       commit: false,
+      templatesDir: bundledTemplatesDir(),
       now: opts.now,
     });
     writtenPaths.push(created.path);

@@ -39,10 +39,10 @@ cli.ts (commander)                     parse args, resolve repo root (paths.ts)
               └─> json.ts / contract.ts      schemaVersion 1 envelope + conventionVersion
 ```
 
-The kernel library entry (`cli/src/lib.ts`, package subpath `arggon-manager/lib`) exposes
+The kernel package entry (`lib/src/index.ts`, package `@arggon/lib`, ADR 0013) exposes
 this stack — items, rules, paths and the `--json` envelopes — as one typed surface; the
-CLI, the MCP adapter and (from W2/W3) the native plugin tools consume the same operations
-(ADR 0011 §4: one logic path, one library).
+root CLI, the MCP adapter and (from W2/W3) the native plugin tools consume the same
+operations (ADR 0011 §4: one logic path, one library).
 
 Read commands (`list`, `board`, `next`, `validate`, `doctor`) parse the tree and emit
 without writing. Mutation commands (`create`, `update`, `comment`, `adopt`) write through
@@ -65,28 +65,28 @@ never-overwrite (Copier/Helm semantics).
       agents.md     # agent playbook: claims, PRs, JSON contract, MCP
       adr/ specs/ plans/ playbooks/
     <initiative>/<epic>/<story>/  # work items (task-*.md / bug-*.md leaves)
-  cli/src/          # the CLI: one module per command + shared kernel, tests co-located
-    items|status|update|rules|relations|ids|frontmatter|dates|filter|json|contract.ts
-                    # kernel: item model, transitions, invariants, envelope contract
-    lib.ts          # kernel library entry (package subpath `arggon-manager/lib`, ADR 0011 §4)
-    operations.ts   # in-process operations: the --json envelope + exit-code semantics per command
+  lib/              # @arggon/lib: the kernel package (ADR 0013), tests co-located
+    src/index.ts    # kernel entry: items, rules, paths, envelopes + operations
+    src/items|status|update|rules|relations|ids|frontmatter|dates|filter|json|contract.ts
+                    # item model, transitions, invariants, envelope contract
+    src/operations.ts # in-process operations: the --json envelope + exit-code semantics per command
+  cli/src/          # the CLI/root package: one module per command, tests co-located
     cli.ts          # commander wiring; argv parsing, TTY gates and human output live here
-    create|comment|list|update|next|start|branch|cleanup|spec|report|trend.ts
-                    # work-loop commands
+    package-assets.ts # root package root + bundled templates dir (injected into the kernel)
     init|docs|adopt|doctor|instructions|playbooks.ts
                     # adoption/governance: scaffolding, doc generation, health checks
-    layout-migrate.ts # ADR 0012: tasks/ -> ArggonManager/ migration
-    sync-*|import-issues|get-open-prs|mcp-server.ts
-                    # integrations: GitHub reconciliation, issue import, stdio MCP
+    start|branch|cleanup|steal-gate|layout-migrate.ts
+                    # work-loop + lifecycle commands (claim, worktree, migration)
+    spec|spec-audit|spec-import|sync-skills|skill-commands|measure|build-info.ts
+                    # spec pipeline, skill sync, context budgets, build identity
+    mcp-server.ts   # stdio MCP adapter over the kernel operations (conditional surface)
     board|board-serve|tui.ts
                     # local static board + viewer (ADR 0002)
-    tracker-commit.ts  # x-tracker auto-commit (story-tracker-hygiene)
-    convention.ts|paths.ts|detect-repo.ts
-                    # tracker .convention.yml parsing, layout detection, repo/worktree resolution
   templates/        # item + doc scaffolds bundled by arggon init
   skills/           # agent skill source, bundled to adopters at .agents/skills/
   fixtures/         # golden trees for validate + integration tests
   dist/             # compiled bin (gitignored; npm run build)
+  lib/dist/         # compiled kernel package (gitignored)
 ```
 
 ## Boundaries and layering rules
@@ -95,8 +95,10 @@ never-overwrite (Copier/Helm semantics).
   status; the CLI implements it and `arggon validate` enforces it — never the reverse.
 - Commands import the kernel; kernel modules never import command modules.
 - Machine surfaces (CLI, MCP adapter, native tools) consume the kernel through the
-  `arggon-manager/lib` entry; envelope assembly lives in the kernel operations
-  (`cli/src/operations.ts`), never in a surface.
+  `@arggon/lib` package entry; envelope assembly lives in the kernel operations
+  (`lib/src/operations.ts`), never in a surface. The kernel ships no assets or
+  printing: the root adapter injects the item-templates dir
+  (`cli/src/package-assets.ts`).
 - All tree mutations go through command modules that run validation gates; raw
   tracker files edits that bypass validation are caught by CI and the pre-commit hook.
 - the tracker is data: product code must not depend on its contents (fixtures and tests
@@ -111,11 +113,11 @@ never-overwrite (Copier/Helm semantics).
 - `init`/doc generation never overwrites an adopter-modified file → guarded by
   `cli/src/init-docs.test.ts` (never-overwrite semantics) and provenance checksums.
 - A claimed item cannot be claimed again; `blocked` requires a reason → `rules.ts`
-  invariants, tested in `cli/src/validate.test.ts`.
+  invariants, tested in `lib/src/validate.test.ts`.
 - One branch per item, derived from `branch_patterns` in the tracker `.convention.yml` →
   `cli/src/branch.test.ts`.
 - Envelopes always carry `ok`, `schemaVersion`, `command`, `conventionVersion` →
-  `cli/src/contract.test.ts`.
+  `lib/src/contract.test.ts`.
 - Pure commands (`list`, `validate`, `doctor`) never write → temp-tree tests.
 
 ---

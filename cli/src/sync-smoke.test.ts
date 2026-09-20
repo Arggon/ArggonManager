@@ -9,12 +9,19 @@
  * the process exit code mirroring exit_code.
  */
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseFrontmatter } from "./frontmatter.js";
+import { parseFrontmatter } from "@arggon/lib";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -55,7 +62,12 @@ function runCli(args: string[], cwd: string, env: Record<string, string>) {
  * Items: story1 with task-fill (no branch), task-set (branch feat/task-set),
  * bug-fixme (no branch), task-ambig (no branch).
  */
-function initSyncTree(): { dir: string; env: Record<string, string>; setPrs: (prs: Pr[]) => void; setGhFails: (fail: boolean) => void } {
+function initSyncTree(): {
+  dir: string;
+  env: Record<string, string>;
+  setPrs: (prs: Pr[]) => void;
+  setGhFails: (fail: boolean) => void;
+} {
   const outer = mkdtempSync(join(tmpdir(), "arggon-sync-smoke-"));
   const dir = join(outer, "work");
   mkdirSync(dir, { recursive: true });

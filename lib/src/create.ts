@@ -5,7 +5,7 @@ import { stringifyFrontmatter, type Frontmatter } from "./frontmatter.js";
 import { assertLabels, innerSlug, isItemType, itemId, slugify, type ItemType } from "./ids.js";
 import { itemsById, loadItems, tryLoadItem, type WorkItem } from "./items.js";
 import { assertPriority } from "./priority.js";
-import { bundledTemplatesDir, findTasksDir, newItemPath, repoRootFromTasks } from "./paths.js";
+import { findTasksDir, newItemPath, repoRootFromTasks } from "./paths.js";
 import { assertParentEdge, expectedParentType } from "./relations.js";
 import {
   assertAssignee,
@@ -58,6 +58,13 @@ export type CreateOptions = {
    * stay uncommitted (import-issues) pass `false` explicitly.
    */
   commit?: boolean;
+  /**
+   * Fallback directory holding the distribution's item templates
+   * (`<templatesDir>/<type>.md`). The repo's own `templates/` always wins;
+   * the root package injects its bundled dir here (ADR 0013: the kernel
+   * library ships no assets).
+   */
+  templatesDir?: string;
   now?: Date;
 };
 
@@ -136,7 +143,7 @@ export function runCreate(opts: CreateOptions): CreateResult {
   }
 
   const today = formatDate(opts.now ?? new Date());
-  const templatePath = resolveTemplate(tasksDir, type);
+  const templatePath = resolveTemplate(tasksDir, type, opts.templatesDir);
   const template = readFileSync(templatePath, "utf8");
   const body =
     opts.body !== undefined
@@ -188,12 +195,14 @@ export function runCreate(opts: CreateOptions): CreateResult {
   return { id, path: filePath, root, item: created, commit };
 }
 
-function resolveTemplate(tasksDir: string, type: ItemType): string {
+function resolveTemplate(tasksDir: string, type: ItemType, templatesDir?: string): string {
   const name = `${type}.md`;
   const local = join(repoRootFromTasks(tasksDir), "templates", name);
   if (existsSync(local)) return local;
-  const bundled = join(bundledTemplatesDir(), name);
-  if (existsSync(bundled)) return bundled;
+  if (templatesDir !== undefined) {
+    const bundled = join(templatesDir, name);
+    if (existsSync(bundled)) return bundled;
+  }
   throw new Error(`Template not found: ${name}`);
 }
 

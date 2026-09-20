@@ -6,34 +6,41 @@
  * non-git trees.
  */
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runAdopt } from "./adopt.js";
 import { runCleanup } from "./cleanup.js";
-import { runComment } from "./comment.js";
-import { runCreate } from "./create.js";
-import { parseFrontmatter } from "./frontmatter.js";
-import { runInit } from "./init.js";
-import { runStart, defaultStartGit } from "./start.js";
-import {
-  readConventionConfig,
-} from "./convention.js";
-import { runImportIssues } from "./import-issues.js";
 import {
   commitPayload,
   commitTrackerMutation,
   formatCommitLine,
+  lockFilePathFor,
+  maybeCommitUpdate,
+  parseFrontmatter,
   readAutoCommitConfig,
+  readConventionConfig,
   resolveAutoCommit,
   resolveCommonGitDir,
+  runComment,
+  runCreate,
+  runImportIssues,
+  runUpdate,
   trackerCommitMessage,
   trackerGitLockKey,
   updateCommitMessage,
-} from "./tracker-commit.js";
-import { lockFilePathFor } from "./lock.js";
-import { maybeCommitUpdate, runUpdate } from "./update.js";
+} from "@arggon/lib";
+
+import { runInit } from "./init.js";
+import { runStart, defaultStartGit } from "./start.js";
+
 import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
 
 // bug-tmp-fixture-leak + bug-tracker-commit-enotempty-flake +
@@ -113,7 +120,10 @@ function git(args: string[], cwd: string): string {
 /** Paths touched by a commit (posix, repo-relative). */
 function committedPaths(cwd: string, ref = "HEAD"): string[] {
   const out = git(["show", "--name-only", "--format=", ref], cwd);
-  return out.split("\n").filter((line) => line.length > 0).sort();
+  return out
+    .split("\n")
+    .filter((line) => line.length > 0)
+    .sort();
 }
 
 /** Raw (unquoted) tracked paths at HEAD, NUL-split — exotic names survive. */
@@ -136,7 +146,14 @@ function initRepo(): string {
   runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
   runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch", id: "auth", now: NOW });
   runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "login", now: NOW });
-  runCreate({ cwd: dir, type: "task", title: "Rate limit", parent: "login", id: "rate-limit", now: NOW });
+  runCreate({
+    cwd: dir,
+    type: "task",
+    title: "Rate limit",
+    parent: "login",
+    id: "rate-limit",
+    now: NOW,
+  });
   // init also generates governing docs; commit the whole scaffold (fixture
   // setup in a throwaway temp repo — same as the worktree.test.ts pattern)
   // so per-test diffs only show the mutation under test.
@@ -319,7 +336,7 @@ describe("tracker auto-commit with gitignored paths", () => {
     const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     vi.resetModules();
     try {
-      const { commitTrackerMutation: mockedMutation } = await import("./tracker-commit.js");
+      const { commitTrackerMutation: mockedMutation } = await import("@arggon/lib");
       const result = mockedMutation(dir, [join(dir, tracked), join(dir, ignored)], {
         message: trackerCommitMessage("generated", ["init docs (2 files)"]),
       });
@@ -658,7 +675,13 @@ describe("tracker auto-commit on cleanup --prune", () => {
     const dir = initRepo();
     const started = runStart(
       { cwd: dir, id: "task-rate-limit", assignee: "arggon", worktree: true, now: NOW },
-      { git: { ...defaultStartGit(), pushBranch: () => {}, createDraftPr: () => "https://example/pr/1" } },
+      {
+        git: {
+          ...defaultStartGit(),
+          pushBranch: () => {},
+          createDraftPr: () => "https://example/pr/1",
+        },
+      },
     );
     const wt = started.worktreePath!;
     runUpdate({ cwd: wt, id: "task-rate-limit", status: "done", now: NOW });
@@ -719,10 +742,20 @@ describe("tracker auto-commit on update", () => {
       "ArggonManager/launch/auth/login/login.md",
     ]) {
       const full = join(dir, rel);
-      writeFileSync(full, readFileSync(full, "utf8").replaceAll("- [ ] ", "- [x] ticked\n"), "utf8");
+      writeFileSync(
+        full,
+        readFileSync(full, "utf8").replaceAll("- [ ] ", "- [x] ticked\n"),
+        "utf8",
+      );
     }
     // Legal kernel path to done: claim first (todo -> done is illegal).
-    runUpdate({ cwd: dir, id: "task-rate-limit", status: "in_progress", assignee: "arggon", now: NOW });
+    runUpdate({
+      cwd: dir,
+      id: "task-rate-limit",
+      status: "in_progress",
+      assignee: "arggon",
+      now: NOW,
+    });
     git(["add", "ArggonManager"], dir);
     git(["commit", "--quiet", "-m", "tick acceptance"], dir);
   }
@@ -764,7 +797,11 @@ describe("tracker auto-commit on update", () => {
   it("honors x-tracker.auto-commit: false from the config", () => {
     const dir = initRepo();
     acceptanceOpen(dir);
-    writeFileSync(join(dir, "ArggonManager/.convention.yml"), "version: 3\nx-tracker:\n  auto-commit: false\n", "utf8");
+    writeFileSync(
+      join(dir, "ArggonManager/.convention.yml"),
+      "version: 3\nx-tracker:\n  auto-commit: false\n",
+      "utf8",
+    );
 
     const result = runUpdate({ cwd: dir, id: "task-rate-limit", status: "done", now: NOW });
     const commit = maybeCommitUpdate(result, undefined);
@@ -805,7 +842,14 @@ function initImportRepo(): string {
   initFixtureRepo(dir);
   runInit({ dir, force: false });
   runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
-  runCreate({ cwd: dir, type: "epic", title: "Backlog", parent: "launch", id: "backlog", now: NOW });
+  runCreate({
+    cwd: dir,
+    type: "epic",
+    title: "Backlog",
+    parent: "launch",
+    id: "backlog",
+    now: NOW,
+  });
   commitAllIfDirty(dir, "init tasks");
   return dir;
 }
@@ -814,7 +858,7 @@ function execGh(payload: string) {
   return ((_file: string, args: string[]) => {
     if (args[0] === "issue") return payload;
     throw new Error(`Unexpected: ${args.join(" ")}`);
-  }) as unknown as import("./import-issues.js").GhExecutor;
+  }) as unknown as import("@arggon/lib").GhExecutor;
 }
 
 describe("tracker auto-commit on import-issues", () => {
@@ -899,11 +943,7 @@ describe("commitTrackerMutation edge cases", () => {
   it("reports a lost staged entry as a warned skip, not a quiet one", async () => {
     const dir = initRepo();
     const itemPath = join(dir, "ArggonManager/launch/auth/login/task-rate-limit.md");
-    writeFileSync(
-      itemPath,
-      `${readFileSync(itemPath, "utf8")}\n- uncommitted mutation\n`,
-      "utf8",
-    );
+    writeFileSync(itemPath, `${readFileSync(itemPath, "utf8")}\n- uncommitted mutation\n`, "utf8");
     const realExecFileSync = (await import("node:child_process")).execFileSync;
     vi.doMock("node:child_process", () => ({
       execFileSync: (file: string, args: string[], opts: unknown) => {
@@ -923,7 +963,7 @@ describe("commitTrackerMutation edge cases", () => {
     // import below re-evaluates tracker-commit.js against the mock.
     vi.resetModules();
     try {
-      const { commitTrackerMutation: mockedMutation } = await import("./tracker-commit.js");
+      const { commitTrackerMutation: mockedMutation } = await import("@arggon/lib");
       const result = mockedMutation(dir, [itemPath], {
         message: trackerCommitMessage("commented", ["task-rate-limit"]),
       });
@@ -977,7 +1017,7 @@ describe("commitTrackerMutation edge cases", () => {
     const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     vi.resetModules();
     try {
-      const mod = await import("./tracker-commit.js");
+      const mod = await import("@arggon/lib");
       const result = mod.commitTrackerMutation(dir, [itemPath], {
         message: trackerCommitMessage("commented", ["task-rate-limit"]),
       });
@@ -1154,7 +1194,10 @@ describe("repo-level git-mutation lock (bug-torture-contention-flake3)", () => {
     const itemPath = join(dir, "ArggonManager/launch/auth/login/task-rate-limit.md");
     // Four extra items to mutate, seeded in one commit.
     const ids = ["task-c1", "task-c2", "task-c3", "task-c4"];
-    const paths = [itemPath, ...ids.map((id) => join(dir, `ArggonManager/launch/auth/login/${id}.md`))];
+    const paths = [
+      itemPath,
+      ...ids.map((id) => join(dir, `ArggonManager/launch/auth/login/${id}.md`)),
+    ];
     for (const p of paths.slice(1)) writeFileSync(p, "---\nseed\n---\n", "utf8");
     commitAllIfDirty(dir, "seed concurrency items");
 
@@ -1165,7 +1208,7 @@ describe("repo-level git-mutation lock (bug-torture-contention-flake3)", () => {
     writeFileSync(
       runner,
       `import { commitTrackerMutation, trackerCommitMessage } from ${JSON.stringify(
-        resolve(new URL(".", import.meta.url).pathname, "./tracker-commit.js"),
+        resolve(new URL(".", import.meta.url).pathname, "../../lib/src/tracker-commit.js"),
       )};
 import { appendFileSync } from "node:fs";
 const [root, itemPath, id] = process.argv.slice(2);
@@ -1177,21 +1220,24 @@ console.log(JSON.stringify(r));
 `,
       "utf8",
     );
-    const tsxCli = resolve(new URL("../../node_modules/tsx/dist/cli.mjs", import.meta.url).pathname);
+    const tsxCli = resolve(
+      new URL("../../node_modules/tsx/dist/cli.mjs", import.meta.url).pathname,
+    );
     const results = await Promise.all(
-      paths.map((p, i) =>
-        new Promise<string>((done, fail) => {
-          const child = spawn(process.execPath, [tsxCli, runner, dir, p, `item-${i}`], {
-            cwd: dir,
-            stdio: ["ignore", "pipe", "pipe"],
-          });
-          let out = "";
-          child.stdout.on("data", (d: Buffer) => (out += d));
-          child.stderr.on("data", (d: Buffer) => (out += d));
-          child.on("close", (code) =>
-            code === 0 ? done(out) : fail(new Error(`child ${i} exited ${code}: ${out}`)),
-          );
-        }),
+      paths.map(
+        (p, i) =>
+          new Promise<string>((done, fail) => {
+            const child = spawn(process.execPath, [tsxCli, runner, dir, p, `item-${i}`], {
+              cwd: dir,
+              stdio: ["ignore", "pipe", "pipe"],
+            });
+            let out = "";
+            child.stdout.on("data", (d: Buffer) => (out += d));
+            child.stderr.on("data", (d: Buffer) => (out += d));
+            child.on("close", (code) =>
+              code === 0 ? done(out) : fail(new Error(`child ${i} exited ${code}: ${out}`)),
+            );
+          }),
       ),
     );
 
@@ -1204,6 +1250,7 @@ console.log(JSON.stringify(r));
     // The previously-flaky invariant: tree fully clean, every commit landed.
     expect(status(dir)).toBe("");
     const log = git(["log", "--format=%s", "-6"], dir);
-    for (let i = 0; i < paths.length; i++) expect(log).toContain(`chore(tasks): commented item-${i}`);
+    for (let i = 0; i < paths.length; i++)
+      expect(log).toContain(`chore(tasks): commented item-${i}`);
   }, 60_000);
 });

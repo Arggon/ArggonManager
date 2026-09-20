@@ -4,13 +4,9 @@
   "private": true,
   "description": "Git-native project management CLI (ArggonManager)",
   "type": "module",
-  "exports": {
-    "./lib": {
-      "types": "./dist/lib.d.ts",
-      "import": "./dist/lib.js"
-    },
-    "./package.json": "./package.json"
-  },
+  "workspaces": [
+    "lib"
+  ],
   "bin": {
     "arggon": "./dist/cli.js"
   },
@@ -25,7 +21,7 @@
     "!dist/test-tmp.*"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "npm run build --workspace @arggon/lib && tsc -p tsconfig.json",
     "postbuild": "node cli/write-build-info.mjs",
     "prepare": "npm run build",
     "dev": "tsx cli/src/cli.ts",
@@ -43,6 +39,7 @@
     "node": ">=22.12.0"
   },
   "dependencies": {
+    "@arggon/lib": "^0.3.0",
     "commander": "^13.1.0"
   },
   "devDependencies": {

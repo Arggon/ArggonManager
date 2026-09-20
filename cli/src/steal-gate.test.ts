@@ -16,8 +16,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseConventionConfig } from "./convention.js";
-import { runCreate } from "./create.js";
+import { parseConventionConfig, runCreate, runUpdate } from "@arggon/lib";
+
 import { runInit } from "./init.js";
 import {
   gateSteal,
@@ -25,7 +25,6 @@ import {
   STEAL_DISABLED_MESSAGE,
   STEAL_NON_TTY_MESSAGE,
 } from "./steal-gate.js";
-import { runUpdate } from "./update.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -96,13 +95,18 @@ function capture(): { lines: string[]; stream: NodeJS.WriteStream } {
 describe("x-tracker.allow-steal parsing", () => {
   it("defaults to null (not armed) when absent", () => {
     expect(parseConventionConfig("version: 3\n").tracker.allowSteal).toBeNull();
-    expect(parseConventionConfig("version: 3\nx-tracker:\n  auto-commit: false\n").tracker.allowSteal)
-      .toBeNull();
+    expect(
+      parseConventionConfig("version: 3\nx-tracker:\n  auto-commit: false\n").tracker.allowSteal,
+    ).toBeNull();
   });
 
   it("parses an explicit true/false", () => {
-    expect(parseConventionConfig("x-tracker:\n  allow-steal: true\n").tracker.allowSteal).toBe(true);
-    expect(parseConventionConfig("x-tracker:\n  allow-steal: false\n").tracker.allowSteal).toBe(false);
+    expect(parseConventionConfig("x-tracker:\n  allow-steal: true\n").tracker.allowSteal).toBe(
+      true,
+    );
+    expect(parseConventionConfig("x-tracker:\n  allow-steal: false\n").tracker.allowSteal).toBe(
+      false,
+    );
   });
 
   it("throws a parse error on invalid values (like auto-commit)", () => {
@@ -141,9 +145,9 @@ describe("gateSteal (CLI update action, before runUpdate)", () => {
     arm(dir);
     for (const answer of ["n\n", "\n", "ok\n"]) {
       const { stream } = capture();
-      await expect(gateSteal({ cwd: dir, id, input: ttyInput(answer), output: stream })).rejects.toThrow(
-        STEAL_DECLINED_MESSAGE,
-      );
+      await expect(
+        gateSteal({ cwd: dir, id, input: ttyInput(answer), output: stream }),
+      ).rejects.toThrow(STEAL_DECLINED_MESSAGE);
     }
   });
 
@@ -167,7 +171,10 @@ describe("steal gate through the CLI subprocess (piped stdin is never interactiv
 
   it("refuses --steal with the arm message when not armed", () => {
     const { dir, id } = primedTree();
-    const r = runCli(["update", id, "--steal", "--reason", "x", "--assignee", "bob", "--json"], dir);
+    const r = runCli(
+      ["update", id, "--steal", "--reason", "x", "--assignee", "bob", "--json"],
+      dir,
+    );
     expect(r.status).toBe(1);
     expect(JSON.parse(r.stdout)).toMatchObject({
       ok: false,

@@ -5,12 +5,10 @@ import { dirname, join, resolve } from "node:path";
 import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { runComment } from "./comment.js";
-import { runCreate } from "./create.js";
+import { runComment, runCreate, runUpdate, runValidate } from "@arggon/lib";
+
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
-import { runUpdate } from "./update.js";
-import { runValidate } from "./validate.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -253,9 +251,9 @@ describe("comment --file/stdin (task-comment-stdin-file)", () => {
     expect(envelope).toMatchObject({ ok: true, command: "comment", id: "task-rate-limit" });
     // Top-level path: the absolute path of the commented item file (bug-create-path-envelope).
     expect(envelope.path).toBe(path);
-    expect(raw(join(dir, "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md"))).toContain(
-      `@arggon\n${piped}\n`,
-    );
+    expect(
+      raw(join(dir, "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md")),
+    ).toContain(`@arggon\n${piped}\n`);
   });
 
   it("rejects passing both positional text and --file", () => {
@@ -402,7 +400,10 @@ describe("mcp arggon_comment tool", () => {
       comment: { author: "agent-x", date: expect.any(String), lines: ["handoff note"] },
     });
     expect(
-      readFileSync(join(dir, "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md"), "utf8"),
+      readFileSync(
+        join(dir, "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md"),
+        "utf8",
+      ),
     ).toContain("@agent-x\nhandoff note\n");
   });
 

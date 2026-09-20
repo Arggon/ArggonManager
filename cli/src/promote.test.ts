@@ -10,11 +10,15 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { runCreate } from "./create.js";
-import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import {
+  parseFrontmatter,
+  runCreate,
+  runUpdate,
+  runValidate,
+  stringifyFrontmatter,
+} from "@arggon/lib";
+
 import { runInit } from "./init.js";
-import { runUpdate } from "./update.js";
-import { runValidate } from "./validate.js";
 
 // task-promote-task-to-story: `arggon update <task-id> --type story` promotes
 // a task to a story in place — file moves to the story layout under the
@@ -189,14 +193,10 @@ describe("update --type story (task promotion)", () => {
     const storyPath = join(tasks, "launch-mvp", "auth", "story-login", "story-login.md");
     const raw = readFileSync(storyPath, "utf8");
     const { data, body } = parseFrontmatter(raw);
-    writeFileSync(
-      storyPath,
-      stringifyFrontmatter({ ...data, parent: "launch-mvp" }, body),
-      "utf8",
+    writeFileSync(storyPath, stringifyFrontmatter({ ...data, parent: "launch-mvp" }, body), "utf8");
+    expect(() => runUpdate({ cwd: dir, id: "task-rate-limit", type: "story", now: LATER })).toThrow(
+      /create the epic first/,
     );
-    expect(() =>
-      runUpdate({ cwd: dir, id: "task-rate-limit", type: "story", now: LATER }),
-    ).toThrow(/create the epic first/);
   });
 
   it("refuses --type combined with --parent", () => {
@@ -249,7 +249,13 @@ describe("update --type story (task promotion)", () => {
     const raw = readFileSync(task.path, "utf8");
     const { data, body } = parseFrontmatter(raw);
     writeFileSync(task.path, stringifyFrontmatter({ ...data, issue: 12 }, body), "utf8");
-    runUpdate({ cwd: dir, id: "task-rate-limit", status: "in_progress", assignee: "arggon", now: NOW });
+    runUpdate({
+      cwd: dir,
+      id: "task-rate-limit",
+      status: "in_progress",
+      assignee: "arggon",
+      now: NOW,
+    });
     mkdirSync(join(dir, "ArggonManager"), { recursive: true });
     writeFileSync(
       join(dir, "ArggonManager", ".convention.yml"),

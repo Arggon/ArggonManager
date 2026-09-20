@@ -12,8 +12,12 @@
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { docsDirForRoot, findTasksDir, repoRootFromTasks } from "./paths.js";
-import { sanitizeHumanTextUncapped } from "./sanitize.js";
+import {
+  docsDirForRoot,
+  findTasksDir,
+  repoRootFromTasks,
+  sanitizeHumanTextUncapped,
+} from "@arggon/lib";
 
 // ---------------------------------------------------------------------------
 // Normalization + similarity (exported for tests)

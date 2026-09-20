@@ -1,11 +1,20 @@
-import { existsSync, lstatSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCreate } from "./create.js";
+import { runCreate, runUpdate } from "@arggon/lib";
 import { runInit } from "./init.js";
 import { linkNodeModules, runStart, unlinkNodeModulesLink, type StartGit } from "./start.js";
-import { runUpdate } from "./update.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -145,7 +154,9 @@ describe("start", () => {
     const { dir, id } = primedTask();
     mkdirSync(join(dir, ".v2c"), { recursive: true });
     writeFileSync(join(dir, ".v2c", "state.json"), "{}");
-    const git = fakeGit({ fileStatus: (_c, f) => (f === "." ? "?? .v2c/\n?? notes.txt\n" : ` M ${f}`) });
+    const git = fakeGit({
+      fileStatus: (_c, f) => (f === "." ? "?? .v2c/\n?? notes.txt\n" : ` M ${f}`),
+    });
     const result = runStart({ cwd: dir, id, assignee: "arggon", now: NOW }, { git });
     expect(result.committed).toBe(true);
     expect(git.calls.map((c) => c.op)).toContain("commit");
@@ -201,7 +212,10 @@ describe("start --open-pr closes the linked GitHub issue (task-closes-issue-link
       now: NOW,
     });
     const git = fakeGit();
-    const result = runStart({ cwd: dir, id: item.id, assignee: "arggon", openPr: true, now: NOW }, { git });
+    const result = runStart(
+      { cwd: dir, id: item.id, assignee: "arggon", openPr: true, now: NOW },
+      { git },
+    );
     expect(result.prUrl).not.toBeNull();
     const pr = git.calls.find((c) => c.op === "pr");
     expect(pr?.body).toBe(
@@ -301,7 +315,11 @@ describe("unlinkNodeModulesLink (review F1/F2)", () => {
     const other = mkdtempSync(join(tmpdir(), "arggon-unlink-rel-other-"));
     mkdirSync(join(other, "node_modules"), { recursive: true });
     const foreignWt = mkdtempSync(join(tmpdir(), "arggon-unlink-rel-foreign-"));
-    symlinkSync(relative(foreignWt, join(other, "node_modules")), join(foreignWt, "node_modules"), "dir");
+    symlinkSync(
+      relative(foreignWt, join(other, "node_modules")),
+      join(foreignWt, "node_modules"),
+      "dir",
+    );
     expect(unlinkNodeModulesLink(primary, foreignWt)).toBe(false);
     expect(lstatSync(join(foreignWt, "node_modules")).isSymbolicLink()).toBe(true);
     expect(existsSync(join(other, "node_modules"))).toBe(true);

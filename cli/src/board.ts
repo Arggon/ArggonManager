@@ -1,11 +1,14 @@
 import { writeFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
-import { toContractWorkItem } from "./contract.js";
-import { ghPrListJson } from "./get-open-prs.js";
-import { loadItems } from "./items.js";
-import { findTasksDir, repoRootFromTasks } from "./paths.js";
-import { STATUSES } from "./status.js";
-import type { WorkItem } from "./types.js";
+import {
+  STATUSES,
+  findTasksDir,
+  ghPrListJson,
+  loadItems,
+  repoRootFromTasks,
+  toContractWorkItem,
+  type ContractWorkItem as WorkItem,
+} from "@arggon/lib";
 
 export const DEFAULT_BOARD_FILE = "board.html";
 
@@ -126,9 +129,7 @@ export function runBoard(opts: BoardOptions): BoardResult {
   let groupBy: BoardResult["groupBy"];
   if (opts.groupBy !== undefined) {
     if (opts.groupBy !== "milestone" && opts.groupBy !== "story") {
-      throw new Error(
-        `unknown --group-by field '${opts.groupBy}' (supported: milestone, story)`,
-      );
+      throw new Error(`unknown --group-by field '${opts.groupBy}' (supported: milestone, story)`);
     }
     groupBy = opts.groupBy;
   }
@@ -204,9 +205,7 @@ function prBadge(pr: PrInfo | undefined, diffLinks: boolean): string {
           : "";
   const text = `#${pr.number} · ${label}${checks}`;
   const diff =
-    diffLinks && pr.url
-      ? ` · <a class="diff" href="${escapeHtml(pr.url)}/files">diff</a>`
-      : "";
+    diffLinks && pr.url ? ` · <a class="diff" href="${escapeHtml(pr.url)}/files">diff</a>` : "";
   return pr.url
     ? `<div class="pr ${kind}"><a href="${escapeHtml(pr.url)}">${escapeHtml(text)}</a>${diff}</div>`
     : `<div class="pr ${kind}">${escapeHtml(text)}${diff}</div>`;

@@ -2,13 +2,18 @@ import { mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { toContractWorkItem } from "./contract.js";
-import { runCreate } from "./create.js";
-import { parseFrontmatter } from "./frontmatter.js";
+import {
+  parseFrontmatter,
+  parseOlderThan,
+  runCreate,
+  runList,
+  runUpdate,
+  toContractWorkItem,
+} from "@arggon/lib";
+
 import { runInit } from "./init.js";
-import { parseOlderThan, runList } from "./list.js";
+
 import { runStart, type StartGit } from "./start.js";
-import { runUpdate } from "./update.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -173,7 +178,12 @@ describe("stale detection (list --stale --older-than)", () => {
     runUpdate({ cwd: dir, id: ids[0]!, status: "in_progress", assignee: "alice", now: NOW });
     runUpdate({ cwd: dir, id: ids[1]!, status: "in_progress", assignee: "bob", now: LATER });
 
-    const stale = runList({ cwd: dir, stale: true, olderThan: "7d", now: new Date(LATER.getTime() + DAY) });
+    const stale = runList({
+      cwd: dir,
+      stale: true,
+      olderThan: "7d",
+      now: new Date(LATER.getTime() + DAY),
+    });
     expect(stale.items.map((i) => i.id)).toEqual([ids[0]]);
 
     const fresh = runList({ cwd: dir, stale: true, olderThan: "7d", now: LATER });
@@ -210,7 +220,12 @@ describe("stale detection (list --stale --older-than)", () => {
     const { dir, ids } = primedTree(1);
     runUpdate({ cwd: dir, id: ids[0]!, status: "in_progress", assignee: "alice", now: NOW });
     runUpdate({ cwd: dir, id: ids[0]!, status: "done", now: LATER });
-    const stale = runList({ cwd: dir, stale: true, olderThan: "1m", now: new Date(LATER.getTime() + DAY) });
+    const stale = runList({
+      cwd: dir,
+      stale: true,
+      olderThan: "1m",
+      now: new Date(LATER.getTime() + DAY),
+    });
     expect(stale.items).toEqual([]);
   });
 

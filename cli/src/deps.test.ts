@@ -11,13 +11,18 @@ import { mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { toContractWorkItem } from "./contract.js";
-import { runCreate } from "./create.js";
-import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import {
+  parseFrontmatter,
+  runCreate,
+  runUpdate,
+  runValidate,
+  softTryLoadItem,
+  stringifyFrontmatter,
+  toContractWorkItem,
+  tryLoadItem,
+} from "@arggon/lib";
+
 import { runInit } from "./init.js";
-import { softTryLoadItem, tryLoadItem } from "./items.js";
-import { runUpdate } from "./update.js";
-import { runValidate } from "./validate.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -36,9 +41,27 @@ function primedTree(): { dir: string; paths: Record<string, string> } {
   runCreate({ cwd: dir, type: "initiative", title: "Launch MVP" });
   runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp" });
   runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "story-login" });
-  const a = runCreate({ cwd: dir, type: "task", title: "First", parent: "story-login", id: "task-a" });
-  const b = runCreate({ cwd: dir, type: "task", title: "Second", parent: "story-login", id: "task-b" });
-  const c = runCreate({ cwd: dir, type: "task", title: "Third", parent: "story-login", id: "task-c" });
+  const a = runCreate({
+    cwd: dir,
+    type: "task",
+    title: "First",
+    parent: "story-login",
+    id: "task-a",
+  });
+  const b = runCreate({
+    cwd: dir,
+    type: "task",
+    title: "Second",
+    parent: "story-login",
+    id: "task-b",
+  });
+  const c = runCreate({
+    cwd: dir,
+    type: "task",
+    title: "Third",
+    parent: "story-login",
+    id: "task-c",
+  });
   return { dir, paths: { "task-a": a.path, "task-b": b.path, "task-c": c.path } };
 }
 

@@ -1,17 +1,21 @@
 import { execFileSync, ExecFileSyncOptions } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { itemsById, loadItems, type WorkItem } from "./items.js";
-import { findTasksDir, repoRootFromTasks } from "./paths.js";
 import {
   commitTrackerMutation,
+  findTasksDir,
+  itemsById,
+  loadItems,
   readAutoCommitConfig,
+  repoRootFromTasks,
   resolveAutoCommit,
+  runUpdate,
   trackerCommitMessage,
   type TrackerCommitResult,
-} from "./tracker-commit.js";
+  type WorkItem,
+} from "@arggon/lib";
+
 import { unlinkNodeModulesLink } from "./start.js";
-import { runUpdate } from "./update.js";
 
 const TERMINAL: ReadonlySet<string> = new Set(["done", "cancelled"]);
 
@@ -118,7 +122,8 @@ export type CleanupGit = {
 export type GhExecutor = (file: string, args: string[], options?: ExecFileSyncOptions) => string;
 
 /** Default gh executor bound for use as a default value (get-open-prs pattern). */
-const defaultExecGh: GhExecutor = (file, args, options) => execFileSync(file, args, options) as string;
+const defaultExecGh: GhExecutor = (file, args, options) =>
+  execFileSync(file, args, options) as string;
 
 export type CleanupDeps = {
   git?: CleanupGit;
@@ -229,7 +234,11 @@ export type MergedPr = { number: number; url: string; mergedAt: string | null };
  * error when gh is unavailable (missing binary, unauthenticated, failed);
  * callers treat that as a skip, never a crash.
  */
-export function findMergedPr(branch: string, cwd: string, execGh: GhExecutor = defaultExecGh): MergedPr | null {
+export function findMergedPr(
+  branch: string,
+  cwd: string,
+  execGh: GhExecutor = defaultExecGh,
+): MergedPr | null {
   let out: string;
   try {
     const runOpts: ExecFileSyncOptions = {
@@ -240,11 +249,27 @@ export function findMergedPr(branch: string, cwd: string, execGh: GhExecutor = d
     };
     out = execGh(
       "gh",
-      ["pr", "list", "--state", "merged", "--head", branch, "--json", "number,url,mergedAt", "--limit", "5"],
+      [
+        "pr",
+        "list",
+        "--state",
+        "merged",
+        "--head",
+        branch,
+        "--json",
+        "number,url,mergedAt",
+        "--limit",
+        "5",
+      ],
       runOpts,
     );
   } catch (err) {
-    if (err !== null && typeof err === "object" && "code" in err && (err.code === "ENOENT" || err.code === -2)) {
+    if (
+      err !== null &&
+      typeof err === "object" &&
+      "code" in err &&
+      (err.code === "ENOENT" || err.code === -2)
+    ) {
       throw new Error("gh not found (install gh and run `gh auth login`)");
     }
     const message = err instanceof Error ? err.message : String(err);
@@ -332,7 +357,12 @@ function classify(
   }
   if (!existsSync(path)) {
     entry.action = "clear stale worktree_path record (path missing on disk)";
-  } else if (!gitRunner.worktreeList(root).map((p) => resolve(p)).includes(path)) {
+  } else if (
+    !gitRunner
+      .worktreeList(root)
+      .map((p) => resolve(p))
+      .includes(path)
+  ) {
     entry.reason = "path exists but is not a git worktree of this repo (remove it manually)";
     return entry;
   } else {
@@ -403,12 +433,20 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
           unlinkNodeModulesLink(mainRoot, entry.path);
           if (mainRoot !== resolve(root)) unlinkNodeModulesLink(root, entry.path);
           gitRunner.removeWorktree(root, entry.path);
-          pruned.push({ id: entry.id, action: `removed worktree ${entry.path}`, ...(entry.via ? { via: entry.via } : {}) });
+          pruned.push({
+            id: entry.id,
+            action: `removed worktree ${entry.path}`,
+            ...(entry.via ? { via: entry.via } : {}),
+          });
         }
         if (entry.branch && gitRunner.branchExists(root, entry.branch)) {
           try {
             deleteBranch(entry.branch);
-            pruned.push({ id: entry.id, action: `deleted branch ${entry.branch}`, ...(entry.via ? { via: entry.via } : {}) });
+            pruned.push({
+              id: entry.id,
+              action: `deleted branch ${entry.branch}`,
+              ...(entry.via ? { via: entry.via } : {}),
+            });
           } catch (err) {
             // Race: pre-flight passed but the delete failed. The worktree is
             // already gone, so its record is obsolete either way; report the

@@ -4,13 +4,18 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import { updateGeneratedSection } from "./convention.js";
+import {
+  formatListTable,
+  renderShowText,
+  runList,
+  runShow,
+  updateGeneratedSection,
+  type ContractWorkItem as WorkItem,
+} from "@arggon/lib";
 import { arggonVersion, checksumOf } from "./docs.js";
-import { formatListTable, runList } from "./list.js";
-import { renderShowText, runShow } from "./show.js";
+
 import { removeFixtureTree } from "./test-tmp.js";
 import { initialTuiState, renderTui } from "./tui.js";
-import type { WorkItem } from "./types.js";
 
 /**
  * task-row-table-stdout-sanitize: the row/table human channels (`list`,

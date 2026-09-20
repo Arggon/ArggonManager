@@ -1,0 +1,26 @@
+{
+  "name": "@arggon/lib",
+  "version": "0.3.0",
+  "private": true,
+  "description": "ArggonManager kernel library: items, rules, paths and the --json envelopes (ADR 0013)",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist/**",
+    "!**/*.test.*",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}

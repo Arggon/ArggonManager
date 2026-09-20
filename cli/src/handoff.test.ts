@@ -5,11 +5,16 @@ import { dirname, join, resolve } from "node:path";
 import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCreate } from "./create.js";
-import { HANDOFF_FIELD_CAP, HANDOFF_SESSION_CAP, runHandoff } from "./handoff.js";
+import {
+  HANDOFF_FIELD_CAP,
+  HANDOFF_SESSION_CAP,
+  runCreate,
+  runHandoff,
+  runValidate,
+} from "@arggon/lib";
+
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
-import { runValidate } from "./validate.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -33,7 +38,14 @@ function primedTask(): { dir: string; id: string; path: string } {
   runInit({ dir, force: false });
   runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
   runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", now: NOW });
-  runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "story-login", now: NOW });
+  runCreate({
+    cwd: dir,
+    type: "story",
+    title: "Login",
+    parent: "auth",
+    id: "story-login",
+    now: NOW,
+  });
   const task = runCreate({
     cwd: dir,
     type: "task",
@@ -113,7 +125,9 @@ describe("handoff", () => {
       now: NOW,
     });
     expect(result.handoff).toEqual({ branch: "main", next: "ship it" });
-    expect(raw(path)).toBe(`${before}\n### handoff 2026-09-15 @arggon — next: ship it\n- branch: main\n`);
+    expect(raw(path)).toBe(
+      `${before}\n### handoff 2026-09-15 @arggon — next: ship it\n- branch: main\n`,
+    );
   });
 
   it("auto-detects the branch from git (falls back to 'unknown' outside git)", () => {
@@ -403,7 +417,9 @@ describe("handoff", () => {
     });
     expect(result.handoff).toEqual({ branch: "main", next: "ship it" });
     expect("session" in result.handoff).toBe(false);
-    expect(raw(path)).toBe(`${before}\n### handoff 2026-09-15 @arggon — next: ship it\n- branch: main\n`);
+    expect(raw(path)).toBe(
+      `${before}\n### handoff 2026-09-15 @arggon — next: ship it\n- branch: main\n`,
+    );
   });
 
   it("fails cleanly without --next (kernel: the documented error text)", () => {
@@ -439,7 +455,9 @@ describe("handoff", () => {
       now: NOW,
     });
     const body = raw(path);
-    expect(body).toContain("### handoff 2026-09-15 @a — next: first\n- branch: b1\n\n### handoff 2026-09-15 @b — next: second\n- branch: unknown\n- open questions: q?\n");
+    expect(body).toContain(
+      "### handoff 2026-09-15 @a — next: first\n- branch: b1\n\n### handoff 2026-09-15 @b — next: second\n- branch: unknown\n- open questions: q?\n",
+    );
   });
 
   it("leaves the tree valid (validate passes on a handed-off tree)", () => {
@@ -493,10 +511,7 @@ describe("handoff CLI", () => {
         openQuestions: "q1; q2",
       },
     });
-    expect(envelope.comment.lines).toEqual([
-      "- branch: feat/x",
-      "- open questions: q1; q2",
-    ]);
+    expect(envelope.comment.lines).toEqual(["- branch: feat/x", "- open questions: q1; q2"]);
   });
 
   it("passes --session through the CLI flag into the heading (provenance)", () => {

@@ -1,13 +1,20 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
-import { runCreate } from "./create.js";
-import { itemsById, loadItems } from "./items.js";
 import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { afterEach, describe, expect, it } from "vitest";
+import { itemsById, loadItems, runCreate } from "@arggon/lib";
+import { bundledTemplatesDir } from "./package-assets.js";
 
-
+import {
   normalizeVersionPrefix,
   PLAYBOOK_MAX_AGE_DAYS_DEFAULT,
   runPlaybookNew,
@@ -56,14 +63,25 @@ function writePlaybook(dir: string, tech: string, fm: Record<string, string>): s
 
 /** initiative -> epic -> story chain for --file-task parent resolution. */
 function makeStory(dir: string): string {
-  runCreate({ cwd: dir, type: "initiative", title: "Demo", id: "demo" });
-  runCreate({ cwd: dir, type: "epic", title: "Demo epic", id: "demo-e", parent: "demo" });
+  // These fixtures seed no repo-local templates/: pass the root package's
+  // bundled dir the way the CLI adapters do (ADR 0013).
+  const templatesDir = bundledTemplatesDir();
+  runCreate({ cwd: dir, type: "initiative", title: "Demo", id: "demo", templatesDir });
+  runCreate({
+    cwd: dir,
+    type: "epic",
+    title: "Demo epic",
+    id: "demo-e",
+    parent: "demo",
+    templatesDir,
+  });
   runCreate({
     cwd: dir,
     type: "story",
     title: "Demo story",
     id: "demo-s",
     parent: "demo-e",
+    templatesDir,
   });
   return "demo-s";
 }
@@ -81,7 +99,13 @@ describe("stack explore", () => {
     expect(content).toContain("# Exploration: Vector Database (vector-database-001)");
     expect(content).toContain("exploration_id: vector-database-001");
     expect(content).toContain(`created: ${TODAY}`);
-    for (const section of ["## Candidates", "## Criteria", "## Findings", "## Recommendation", "## Decision"]) {
+    for (const section of [
+      "## Candidates",
+      "## Criteria",
+      "## Findings",
+      "## Recommendation",
+      "## Decision",
+    ]) {
       expect(content).toContain(section);
     }
     expect(content).toMatch(/source: <url>/); // dated-sources guidance
@@ -99,7 +123,12 @@ describe("stack explore", () => {
     );
     // Same topic again: numbered up, first record byte-identical.
     const before = readFileSync(join(dir, first.files[0]!), "utf8");
-    const second = runStackExplore({ cwd: dir, topic: "cache-layer", title: "Cache layer", now: NOW });
+    const second = runStackExplore({
+      cwd: dir,
+      topic: "cache-layer",
+      title: "Cache layer",
+      now: NOW,
+    });
     expect(second.files).toEqual(["docs/explorations/exploration-cache-layer-006.md"]);
     expect(readFileSync(join(dir, first.files[0]!), "utf8")).toBe(before);
   });
@@ -136,7 +165,13 @@ describe("playbook new", () => {
     expect(content).toContain(`researched: ${TODAY}`);
     expect(content).toContain("status: current");
     expect(content).toContain("# vector db playbook (vector-db)");
-    for (const section of ["## Setup", "## Conventions", "## Testing", "## Security", "## Upgrade policy"]) {
+    for (const section of [
+      "## Setup",
+      "## Conventions",
+      "## Testing",
+      "## Security",
+      "## Upgrade policy",
+    ]) {
       expect(content).toContain(section);
     }
     expect(content).toMatch(/dated sources/);
@@ -172,7 +207,11 @@ describe("playbook status", () => {
   it("applies the 90-day default with the > threshold rule on a fixed clock", () => {
     const dir = makeRepo();
     writePlaybook(dir, "fresh", { playbook_id: "fresh", version: "1", researched: TODAY });
-    writePlaybook(dir, "boundary", { playbook_id: "boundary", version: "2", researched: "2026-06-14" });
+    writePlaybook(dir, "boundary", {
+      playbook_id: "boundary",
+      version: "2",
+      researched: "2026-06-14",
+    });
     writePlaybook(dir, "stale", { playbook_id: "stale", version: "3", researched: "2026-06-01" });
     const result = runPlaybookStatus({ cwd: dir, now: NOW });
     expect(result.maxAgeDays).toBe(PLAYBOOK_MAX_AGE_DAYS_DEFAULT);
@@ -217,7 +256,14 @@ describe("playbook status", () => {
     writePlaybook(dir, "handmade", { playbook_id: "handmade" });
     const result = runPlaybookStatus({ cwd: dir, now: NOW });
     expect(result.playbooks).toEqual([
-      { id: "handmade", version: "unknown", researched: null, ageDays: null, stale: true, path: "docs/playbooks/handmade.md" },
+      {
+        id: "handmade",
+        version: "unknown",
+        researched: null,
+        ageDays: null,
+        stale: true,
+        path: "docs/playbooks/handmade.md",
+      },
     ]);
     expect(result.staleCount).toBe(1);
   });
@@ -225,8 +271,16 @@ describe("playbook status", () => {
   it("--file-task files one re-research task per stale playbook through the kernel", () => {
     const dir = makeRepo();
     const story = makeStory(dir);
-    writePlaybook(dir, "stale-tech", { playbook_id: "stale-tech", version: "2.1", researched: "2026-06-01" });
-    writePlaybook(dir, "fresh-tech", { playbook_id: "fresh-tech", version: "9", researched: TODAY });
+    writePlaybook(dir, "stale-tech", {
+      playbook_id: "stale-tech",
+      version: "2.1",
+      researched: "2026-06-01",
+    });
+    writePlaybook(dir, "fresh-tech", {
+      playbook_id: "fresh-tech",
+      version: "9",
+      researched: TODAY,
+    });
 
     const result = runPlaybookStatus({ cwd: dir, fileTask: story, now: NOW });
     expect(result.created).toEqual(["task-re-research-stale-tech"]);
@@ -246,7 +300,11 @@ describe("playbook status", () => {
   it("--file-task does not double the v prefix when the stored version carries one", () => {
     const dir = makeRepo();
     const story = makeStory(dir);
-    writePlaybook(dir, "stale-tech", { playbook_id: "stale-tech", version: "v1.27.1", researched: "2026-06-01" });
+    writePlaybook(dir, "stale-tech", {
+      playbook_id: "stale-tech",
+      version: "v1.27.1",
+      researched: "2026-06-01",
+    });
 
     runPlaybookStatus({ cwd: dir, fileTask: story, now: NOW });
     const byId = itemsById(loadItems(join(dir, "tasks")));
@@ -264,7 +322,11 @@ describe("playbook status", () => {
   it("--file-task is idempotent: an existing re-research task is skipped", () => {
     const dir = makeRepo();
     const story = makeStory(dir);
-    writePlaybook(dir, "stale-tech", { playbook_id: "stale-tech", version: "2.1", researched: "2026-06-01" });
+    writePlaybook(dir, "stale-tech", {
+      playbook_id: "stale-tech",
+      version: "2.1",
+      researched: "2026-06-01",
+    });
     const first = runPlaybookStatus({ cwd: dir, fileTask: story, now: NOW });
     expect(first.created).toEqual(["task-re-research-stale-tech"]);
 
@@ -285,7 +347,11 @@ describe("playbook status", () => {
 
   it("--file-task errors when the story does not exist", () => {
     const dir = makeRepo();
-    writePlaybook(dir, "stale-tech", { playbook_id: "stale-tech", version: "2.1", researched: "2026-06-01" });
+    writePlaybook(dir, "stale-tech", {
+      playbook_id: "stale-tech",
+      version: "2.1",
+      researched: "2026-06-01",
+    });
     expect(() => runPlaybookStatus({ cwd: dir, fileTask: "story-nope", now: NOW })).toThrow(
       /parent 'story-nope' not found under the tracker/,
     );
@@ -325,15 +391,15 @@ describe("playbook refresh", () => {
 
   it("requires a version and an existing playbook", () => {
     const dir = makeRepo();
-    expect(() => runPlaybookRefresh({ cwd: dir, tech: "postgres", version: "  ", now: NOW })).toThrow(
-      /requires --version <v>/,
-    );
-    expect(() => runPlaybookRefresh({ cwd: dir, tech: "postgres", version: "17", now: NOW })).toThrow(
-      /no playbook for 'postgres'.*playbook new postgres/,
-    );
-    expect(() => runPlaybookRefresh({ cwd: dir, tech: "Bad Slug", version: "17", now: NOW })).toThrow(
-      /kebab-case/,
-    );
+    expect(() =>
+      runPlaybookRefresh({ cwd: dir, tech: "postgres", version: "  ", now: NOW }),
+    ).toThrow(/requires --version <v>/);
+    expect(() =>
+      runPlaybookRefresh({ cwd: dir, tech: "postgres", version: "17", now: NOW }),
+    ).toThrow(/no playbook for 'postgres'.*playbook new postgres/);
+    expect(() =>
+      runPlaybookRefresh({ cwd: dir, tech: "Bad Slug", version: "17", now: NOW }),
+    ).toThrow(/kebab-case/);
   });
 });
 
@@ -352,14 +418,25 @@ describe("playbook CLI --json parity", () => {
     const dir = makeRepo();
     const created = runCli(["playbook", "new", "redis", "--version", "7.2", "--json"], dir);
     expect(created.status).toBe(0);
-    const createdBody = JSON.parse(created.stdout) as { ok: boolean; command: string; files: string[] };
-    expect(createdBody).toMatchObject({ ok: true, command: "playbook", files: ["docs/playbooks/redis.md"] });
+    const createdBody = JSON.parse(created.stdout) as {
+      ok: boolean;
+      command: string;
+      files: string[];
+    };
+    expect(createdBody).toMatchObject({
+      ok: true,
+      command: "playbook",
+      files: ["docs/playbooks/redis.md"],
+    });
 
     // Pin the clock to the recorded `researched` date: otherwise a UTC-midnight
     // rollover between `new` and `status` flips ageDays 0 -> 1 (bug-playbook-age-rollover).
     const playbookFile = readFileSync(join(dir, "docs", "playbooks", "redis.md"), "utf8");
     const researched = /researched:\s*"?(\d{4}-\d{2}-\d{2})"?/.exec(playbookFile)![1]!;
-    const status = runCli(["playbook", "status", "--json", "--now", `${researched}T12:00:00Z`], dir);
+    const status = runCli(
+      ["playbook", "status", "--json", "--now", `${researched}T12:00:00Z`],
+      dir,
+    );
     expect(status.status).toBe(0);
     const statusBody = JSON.parse(status.stdout) as {
       ok: boolean;
@@ -371,7 +448,14 @@ describe("playbook CLI --json parity", () => {
     expect(statusBody.ok).toBe(true);
     expect(statusBody.command).toBe("playbook");
     expect(statusBody.playbooks).toEqual([
-      { id: "redis", version: "7.2", researched, ageDays: 0, stale: false, path: "docs/playbooks/redis.md" },
+      {
+        id: "redis",
+        version: "7.2",
+        researched,
+        ageDays: 0,
+        stale: false,
+        path: "docs/playbooks/redis.md",
+      },
     ]);
     expect(statusBody.staleCount).toBe(0);
     expect(statusBody.maxAgeDays).toBe(90);
@@ -395,18 +479,30 @@ describe("playbook CLI --json parity", () => {
   it("human output renders the freshness table and filed-task lines", () => {
     const dir = makeRepo();
     const story = makeStory(dir);
-    writePlaybook(dir, "stale-tech", { playbook_id: "stale-tech", version: "2.1", researched: "2026-06-01" });
+    writePlaybook(dir, "stale-tech", {
+      playbook_id: "stale-tech",
+      version: "2.1",
+      researched: "2026-06-01",
+    });
     const table = runCli(["playbook", "status", "--now", "2026-09-13T12:00:00Z"], dir);
     expect(table.status).toBe(0);
     expect(table.stdout).toContain("tech        version  researched  age-days  status");
     expect(table.stdout).toContain("stale-tech  2.1      2026-06-01  104       STALE");
     expect(table.stdout).toContain("--file-task <story-id>");
 
-    const filed = runCli(["playbook", "status", "--file-task", story, "--now", "2026-09-13T12:00:00Z"], dir);
+    const filed = runCli(
+      ["playbook", "status", "--file-task", story, "--now", "2026-09-13T12:00:00Z"],
+      dir,
+    );
     expect(filed.status).toBe(0);
     expect(filed.stdout).toContain("filed:   task-re-research-stale-tech");
-    const again = runCli(["playbook", "status", "--file-task", story, "--now", "2026-09-13T12:00:00Z"], dir);
-    expect(again.stdout).toContain("skipped: task-re-research-stale-tech (re-research task already exists)");
+    const again = runCli(
+      ["playbook", "status", "--file-task", story, "--now", "2026-09-13T12:00:00Z"],
+      dir,
+    );
+    expect(again.stdout).toContain(
+      "skipped: task-re-research-stale-tech (re-research task already exists)",
+    );
   });
 
   it("failures carry PLAYBOOK_FAILED / EXPLORE_FAILED codes and exit non-zero", () => {

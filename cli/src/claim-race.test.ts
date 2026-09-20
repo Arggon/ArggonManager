@@ -15,8 +15,8 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCreate } from "./create.js";
-import { parseFrontmatter } from "./frontmatter.js";
+import { parseFrontmatter, runCreate } from "@arggon/lib";
+
 import { runInit } from "./init.js";
 import { removeFixtureTree } from "./test-tmp.js";
 
@@ -67,7 +67,14 @@ function initRepoWithRemote(prefix: string): string {
   runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch", now: NOW });
   runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch", id: "auth", now: NOW });
   runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "login", now: NOW });
-  runCreate({ cwd: dir, type: "task", title: "Race target", parent: "login", id: "task-race", now: NOW });
+  runCreate({
+    cwd: dir,
+    type: "task",
+    title: "Race target",
+    parent: "login",
+    id: "task-race",
+    now: NOW,
+  });
   commitAllIfDirty(dir, "init tasks");
   // Bare remote so the real pushBranch step works without gh.
   const remote = trackedMkdtemp(`arggon-race-${prefix}-remote-`);
@@ -78,17 +85,26 @@ function initRepoWithRemote(prefix: string): string {
 }
 
 type StartJson =
-  | { ok: true; item: { id: string; assignee: string | null }; created: boolean; worktreePath: string | null }
+  | {
+      ok: true;
+      item: { id: string; assignee: string | null };
+      created: boolean;
+      worktreePath: string | null;
+    }
   | { ok: false; error: { code: string; message: string } };
 
 /** Spawn N `start --worktree --json` processes at once and collect their JSON. */
 function startConcurrently(dir: string, id: string, assignees: string[]): Promise<StartJson[]> {
   const children = assignees.map((assignee) =>
-    spawn(process.execPath, [tsxLoader, cliEntry, "start", id, "--assignee", assignee, "--worktree", "--json"], {
-      cwd: dir,
-      env: { ...process.env, GITHUB_USER: assignee },
-      stdio: ["ignore", "pipe", "pipe"],
-    }),
+    spawn(
+      process.execPath,
+      [tsxLoader, cliEntry, "start", id, "--assignee", assignee, "--worktree", "--json"],
+      {
+        cwd: dir,
+        env: { ...process.env, GITHUB_USER: assignee },
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    ),
   );
   return Promise.all(
     children.map(
@@ -100,7 +116,9 @@ function startConcurrently(dir: string, id: string, assignees: string[]): Promis
           child.stderr.on("data", (chunk: string) => (err += chunk));
           child.on("close", () => {
             const trimmed = out.trim();
-            const parsed = trimmed ? (JSON.parse(trimmed.split("\n").pop() ?? trimmed) as StartJson) : null;
+            const parsed = trimmed
+              ? (JSON.parse(trimmed.split("\n").pop() ?? trimmed) as StartJson)
+              : null;
             resolvePromise(
               parsed ?? { ok: false, error: { code: "NO_JSON", message: err || "no output" } },
             );

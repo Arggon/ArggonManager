@@ -113,7 +113,14 @@ function taskPath(dir: string): string {
 describe("success stdout: update", () => {
   it("renders a hostile movedFrom path inert on the reparent line", () => {
     const dir = initTree();
-    const hostilePath = join(dir, "ArggonManager", "launch-mvp", "auth", "story-login", `${HOSTILE}.md`);
+    const hostilePath = join(
+      dir,
+      "ArggonManager",
+      "launch-mvp",
+      "auth",
+      "story-login",
+      `${HOSTILE}.md`,
+    );
     renameSync(taskPath(dir), hostilePath);
 
     const proc = runCli(
@@ -147,7 +154,14 @@ describe("success stdout: update", () => {
 
   it("keeps movedFrom raw in the --json envelope", () => {
     const dir = initTree();
-    const hostilePath = join(dir, "ArggonManager", "launch-mvp", "auth", "story-login", `${HOSTILE}.md`);
+    const hostilePath = join(
+      dir,
+      "ArggonManager",
+      "launch-mvp",
+      "auth",
+      "story-login",
+      `${HOSTILE}.md`,
+    );
     renameSync(taskPath(dir), hostilePath);
 
     const proc = runCli(
@@ -333,7 +347,14 @@ describe("success stdout: other commands keep repo values inert", () => {
       dir,
     );
     expect(proc.status).toBe(0);
-    const path = join(dir, "ArggonManager", "launch-mvp", "auth", "story-login", "task-plain-work.md");
+    const path = join(
+      dir,
+      "ArggonManager",
+      "launch-mvp",
+      "auth",
+      "story-login",
+      "task-plain-work.md",
+    );
     expect(proc.stdout).toBe(
       "arggon create: task task-plain-work\n" +
         `  ${path}\n` +

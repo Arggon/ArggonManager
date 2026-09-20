@@ -16,10 +16,14 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCreate } from "./create.js";
+import { runCreate, runUpdate } from "@arggon/lib";
 import { runInit } from "./init.js";
-import { findItemStatus, gateReopen, REOPEN_DECLINED_MESSAGE, REOPEN_NON_TTY_MESSAGE } from "./steal-gate.js";
-import { runUpdate } from "./update.js";
+import {
+  findItemStatus,
+  gateReopen,
+  REOPEN_DECLINED_MESSAGE,
+  REOPEN_NON_TTY_MESSAGE,
+} from "./steal-gate.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -87,15 +91,21 @@ describe("gateReopen (CLI update action, before runUpdate)", () => {
   it("refuses non-TTY stdin — piped 'y' does not count", async () => {
     const input = ttyInput("y\n");
     (input as unknown as { isTTY: boolean }).isTTY = false;
-    await expect(
-      gateReopen({ id: "rate-limit", from: "done", to: "todo", input }),
-    ).rejects.toThrow(REOPEN_NON_TTY_MESSAGE);
+    await expect(gateReopen({ id: "rate-limit", from: "done", to: "todo", input })).rejects.toThrow(
+      REOPEN_NON_TTY_MESSAGE,
+    );
   });
 
   it("prompts and accepts y/yes (case-insensitive) on a TTY", async () => {
     for (const answer of ["y\n", "Y\n", "yes\n", "YES\n"]) {
       const { lines, stream } = capture();
-      await gateReopen({ id: "rate-limit", from: "done", to: "todo", input: ttyInput(answer), output: stream });
+      await gateReopen({
+        id: "rate-limit",
+        from: "done",
+        to: "todo",
+        input: ttyInput(answer),
+        output: stream,
+      });
       expect(lines).toEqual(["Reopen 'rate-limit' (from done)? [y/N] "]);
     }
   });
@@ -104,7 +114,13 @@ describe("gateReopen (CLI update action, before runUpdate)", () => {
     for (const answer of ["n\n", "\n", "ok\n"]) {
       const { stream } = capture();
       await expect(
-        gateReopen({ id: "rate-limit", from: "cancelled", to: "todo", input: ttyInput(answer), output: stream }),
+        gateReopen({
+          id: "rate-limit",
+          from: "cancelled",
+          to: "todo",
+          input: ttyInput(answer),
+          output: stream,
+        }),
       ).rejects.toThrow(REOPEN_DECLINED_MESSAGE);
     }
   });
@@ -187,8 +203,8 @@ describe("kernel reopen contract is unchanged by the CLI gate", () => {
 
   it("runUpdate with agent: true is still refused (shared with MCP, rules.ts unchanged)", () => {
     const { dir, id } = primedTree();
-    expect(() =>
-      runUpdate({ cwd: dir, id, status: "todo", agent: true, now: LATER }),
-    ).toThrow(/agents must not reopen done items/);
+    expect(() => runUpdate({ cwd: dir, id, status: "todo", agent: true, now: LATER })).toThrow(
+      /agents must not reopen done items/,
+    );
   });
 });

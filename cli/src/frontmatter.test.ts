@@ -2,12 +2,16 @@ import { mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runComment } from "./comment.js";
-import { runCreate } from "./create.js";
-import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import {
+  parseFrontmatter,
+  runComment,
+  runCreate,
+  runUpdate,
+  runValidate,
+  stringifyFrontmatter,
+} from "@arggon/lib";
+
 import { runInit } from "./init.js";
-import { runUpdate } from "./update.js";
-import { runValidate } from "./validate.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];

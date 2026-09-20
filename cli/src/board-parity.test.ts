@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { evaluateDrop, renderBoardHtml } from "./board.js";
-import { runUpdate } from "./update.js";
+import { runUpdate } from "@arggon/lib";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -94,19 +94,21 @@ describe("parity: embedded page script vs TS evaluateDrop", () => {
   it("blocks hostile globals: the sandboxed function cannot reach the update path", () => {
     const embedded = embeddedEvaluateDrop();
     expect(typeof embedded).toBe("function");
-    expect(
-      embeddedEvaluateDropSource().includes("fetch"),
-    ).toBe(false);
+    expect(embeddedEvaluateDropSource().includes("fetch")).toBe(false);
   });
 });
 
 // ---------- kernel parity (TS evaluateDrop vs runUpdate) ----------
 
-function itemFile(root: string, id: string, type: "story" | "epic", status: string, assignee?: string): string {
+function itemFile(
+  root: string,
+  id: string,
+  type: "story" | "epic",
+  status: string,
+  assignee?: string,
+): string {
   const rel =
-    type === "story"
-      ? `tasks/launch/epic-a/${id}/${id}.md`
-      : `tasks/launch/${id}/${id}.md`;
+    type === "story" ? `tasks/launch/epic-a/${id}/${id}.md` : `tasks/launch/${id}/${id}.md`;
   const full = join(root, rel);
   mkdirSync(join(full, ".."), { recursive: true });
   writeFileSync(
@@ -148,14 +150,20 @@ function newTree(): string {
 }
 
 /** Kernel verdict for the same drop, with the drop-flow inputs the page would send. */
-function kernelAccepts(root: string, card: Card, to: string, edit: { assignee?: string; force?: boolean }): boolean {
+function kernelAccepts(
+  root: string,
+  card: Card,
+  to: string,
+  edit: { assignee?: string; force?: boolean },
+): boolean {
   itemFile(root, card.id, card.type as "story" | "epic", card.status, card.assignee ?? undefined);
   try {
     runUpdate({
       cwd: root,
       id: card.id,
       status: to,
-      assignee: edit.assignee ?? (to === "in_progress" && card.type !== "epic" ? "carol" : undefined),
+      assignee:
+        edit.assignee ?? (to === "in_progress" && card.type !== "epic" ? "carol" : undefined),
       blockedReason: to === "blocked" ? "blocked on ci" : undefined,
       force: edit.force === true,
     });
