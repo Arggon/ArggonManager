@@ -2,6 +2,9 @@
 description: ArggonManager coordinator — plans waves, delegates to workers, reviews every PR as lead architect, verifies merges and owns the tracker
 mode: primary
 permissions:
+  # Subagent allow-list (W4 default): the coordinator delegates only to the
+  # shipped worker/reviewer roles and the read-only `explore` agent; every
+  # other subagent is denied.
   - action: subagent
     resource: "*"
     effect: deny

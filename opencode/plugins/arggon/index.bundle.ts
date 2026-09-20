@@ -39,6 +39,7 @@ __arggonEdges.set("lib/src/import-issues.ts\u0000./paths.js", "lib/src/paths.ts"
 __arggonEdges.set("lib/src/import-issues.ts\u0000./tracker-commit.js", "lib/src/tracker-commit.ts")
 __arggonEdges.set("lib/src/import-issues.ts\u0000./update.js", "lib/src/update.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./atomic.js", "lib/src/atomic.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./cleanup.js", "lib/src/cleanup.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./comment.js", "lib/src/comment.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./contract.js", "lib/src/contract.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./convention.js", "lib/src/convention.ts")
@@ -216,6 +217,226 @@ function verifyOnDisk(path, tmpStat, expected) {
         return;
     throw new Error(`shrink guard: wrote ${expected} bytes but ${path} has ${written.size} bytes on disk — ` +
         `refusing to leave a truncated doc`);
+}
+})
+
+__arggonModules.set("lib/src/cleanup.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.CLEANUP_TERMINAL_STATUSES = void 0;
+exports.defaultCleanupGit = defaultCleanupGit;
+exports.findMergedPr = findMergedPr;
+exports.classifyCleanupEntry = classifyCleanupEntry;
+const node_child_process_1 = require("node:child_process");
+const node_fs_1 = require("node:fs");
+const node_path_1 = require("node:path");
+exports.CLEANUP_TERMINAL_STATUSES = new Set(["done", "cancelled"]);
+const defaultExecGh = (file, args, options) => (0, node_child_process_1.execFileSync)(file, args, options);
+function git(args, cwd) {
+    try {
+        return (0, node_child_process_1.execFileSync)("git", args, {
+            encoding: "utf8",
+            cwd,
+            stdio: ["ignore", "pipe", "pipe"],
+        }).trim();
+    }
+    catch (err) {
+        const stderr = err !== null && typeof err === "object" && "stderr" in err ? String(err.stderr).trim() : "";
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`git ${args.join(" ")} failed${stderr ? `: ${stderr}` : ` (${message})`}`);
+    }
+}
+function defaultCleanupGit() {
+    return {
+        isRepo(cwd) {
+            try {
+                (0, node_child_process_1.execFileSync)("git", ["rev-parse", "--git-dir"], {
+                    encoding: "utf8",
+                    cwd,
+                    stdio: ["ignore", "pipe", "ignore"],
+                });
+                return true;
+            }
+            catch {
+                return false;
+            }
+        },
+        worktreeList(cwd) {
+            const out = git(["worktree", "list", "--porcelain"], cwd);
+            return out
+                .split("\n")
+                .filter((line) => line.startsWith("worktree "))
+                .map((line) => line.slice("worktree ".length).trim())
+                .filter((path) => path.length > 0);
+        },
+        defaultBranch(cwd) {
+            try {
+                const ref = git(["symbolic-ref", "--short", "refs/remotes/origin/HEAD"], cwd);
+                if (ref)
+                    return ref;
+            }
+            catch {
+            }
+            for (const name of ["main", "master"]) {
+                try {
+                    git(["show-ref", "--verify", "--quiet", `refs/heads/${name}`], cwd);
+                    return name;
+                }
+                catch {
+                }
+            }
+            throw new Error("could not detect the default branch (no origin/HEAD, main, or master); " +
+                "run `git remote set-head origin -a` or create the base branch first");
+        },
+        isAncestor(cwd, branch, base) {
+            try {
+                git(["merge-base", "--is-ancestor", branch, base], cwd);
+                return true;
+            }
+            catch {
+                return false;
+            }
+        },
+        remoteBranchExists(cwd, branch) {
+            try {
+                git(["show-ref", "--verify", "--quiet", `refs/remotes/origin/${branch}`], cwd);
+                return true;
+            }
+            catch {
+                return false;
+            }
+        },
+        removeWorktree(cwd, path) {
+            git(["worktree", "remove", path], cwd);
+        },
+        deleteBranch(cwd, branch) {
+            git(["branch", "-d", branch], cwd);
+        },
+        deleteBranchForce(cwd, branch) {
+            git(["branch", "-D", branch], cwd);
+        },
+        branchExists(cwd, name) {
+            try {
+                git(["show-ref", "--verify", "--quiet", `refs/heads/${name}`], cwd);
+                return true;
+            }
+            catch {
+                return false;
+            }
+        },
+    };
+}
+function findMergedPr(branch, cwd, execGh = defaultExecGh) {
+    let out;
+    try {
+        const runOpts = {
+            encoding: "utf8",
+            stdio: ["ignore", "pipe", "ignore"],
+            timeout: 30_000,
+            cwd,
+        };
+        out = execGh("gh", [
+            "pr",
+            "list",
+            "--state",
+            "merged",
+            "--head",
+            branch,
+            "--json",
+            "number,url,mergedAt",
+            "--limit",
+            "5",
+        ], runOpts);
+    }
+    catch (err) {
+        if (err !== null &&
+            typeof err === "object" &&
+            "code" in err &&
+            (err.code === "ENOENT" || err.code === -2)) {
+            throw new Error("gh not found (install gh and run `gh auth login`)");
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        throw new Error(`gh pr list failed (${message}; check \`gh auth status\`)`);
+    }
+    try {
+        const data = JSON.parse(out);
+        if (!Array.isArray(data))
+            throw new Error("not an array");
+        for (const pr of data) {
+            if (typeof pr.number === "number") {
+                return {
+                    number: pr.number,
+                    url: typeof pr.url === "string" ? pr.url : "",
+                    mergedAt: typeof pr.mergedAt === "string" ? pr.mergedAt : null,
+                };
+            }
+        }
+        return null;
+    }
+    catch {
+        throw new Error("gh pr list returned unparseable JSON (check `gh auth status`)");
+    }
+}
+function classifyCleanupEntry(item, root, base, gitRunner, deps = {}) {
+    const path = item.worktreePath ? (0, node_path_1.resolve)(item.worktreePath) : "";
+    const entry = {
+        id: item.id,
+        status: item.status,
+        branch: item.branch ?? null,
+        path,
+        removable: false,
+        reason: null,
+        action: null,
+    };
+    if (!exports.CLEANUP_TERMINAL_STATUSES.has(item.status)) {
+        entry.reason = `item is ${item.status} (only done/cancelled items are pruned)`;
+        return entry;
+    }
+    if (!item.branch) {
+        entry.reason = "no branch recorded (cannot verify it is merged)";
+        return entry;
+    }
+    if (!gitRunner.isAncestor(root, item.branch, base)) {
+        if (deps.noGh) {
+            entry.reason = `branch '${item.branch}' is not fully merged into '${base}'`;
+            return entry;
+        }
+        try {
+            const pr = findMergedPr(item.branch, root, deps.gh);
+            if (!pr) {
+                entry.reason = "branch not merged and no merged PR found";
+                return entry;
+            }
+            entry.via = `squash-merged PR #${pr.number}`;
+        }
+        catch {
+            entry.reason = "ancestry check failed and gh is unavailable to check for squash-merged PRs";
+            return entry;
+        }
+    }
+    if (entry.via === undefined &&
+        gitRunner.remoteBranchExists(root, item.branch) &&
+        !gitRunner.isAncestor(root, `origin/${item.branch}`, base)) {
+        entry.reason =
+            `remote branch divergent or behind (origin/${item.branch}) — ` +
+                `push or delete the remote branch first`;
+        return entry;
+    }
+    if (!(0, node_fs_1.existsSync)(path)) {
+        entry.action = "clear stale worktree_path record (path missing on disk)";
+    }
+    else if (!gitRunner
+        .worktreeList(root)
+        .map((p) => (0, node_path_1.resolve)(p))
+        .includes(path)) {
+        entry.reason = "path exists but is not a git worktree of this repo (remove it manually)";
+        return entry;
+    }
+    else {
+        entry.action = "remove worktree and delete the merged branch";
+    }
+    entry.removable = true;
+    return entry;
 }
 })
 
@@ -1961,8 +2182,8 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
 exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.runSync = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = void 0;
+exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.runSync = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2092,6 +2313,11 @@ Object.defineProperty(exports, "HANDOFF_SESSION_CAP", { enumerable: true, get: f
 Object.defineProperty(exports, "runHandoff", { enumerable: true, get: function () { return handoff_js_1.runHandoff; } });
 var sync_command_js_1 = require("./sync-command.js");
 Object.defineProperty(exports, "runSync", { enumerable: true, get: function () { return sync_command_js_1.runSync; } });
+var cleanup_js_1 = require("./cleanup.js");
+Object.defineProperty(exports, "CLEANUP_TERMINAL_STATUSES", { enumerable: true, get: function () { return cleanup_js_1.CLEANUP_TERMINAL_STATUSES; } });
+Object.defineProperty(exports, "classifyCleanupEntry", { enumerable: true, get: function () { return cleanup_js_1.classifyCleanupEntry; } });
+Object.defineProperty(exports, "defaultCleanupGit", { enumerable: true, get: function () { return cleanup_js_1.defaultCleanupGit; } });
+Object.defineProperty(exports, "findMergedPr", { enumerable: true, get: function () { return cleanup_js_1.findMergedPr; } });
 var import_issues_js_1 = require("./import-issues.js");
 Object.defineProperty(exports, "runImportIssues", { enumerable: true, get: function () { return import_issues_js_1.runImportIssues; } });
 var import_issues_js_2 = require("./import-issues.js");
@@ -5338,6 +5564,7 @@ exports.setBounded = setBounded;
 exports.onToolAfter = onToolAfter;
 exports.csvList = csvList;
 exports.sessionToken = sessionToken;
+exports.worktreeOptions = worktreeOptions;
 exports.nativeToolSchemas = nativeToolSchemas;
 exports.nativeToolsCatalogBytes = nativeToolsCatalogBytes;
 exports.argonToolDefinitions = argonToolDefinitions;
@@ -6148,6 +6375,7 @@ exports.PINNED_TOOL_NAMES = [
     "validate",
     "comment",
     "handoff",
+    "start",
 ];
 const TOOL_ERROR_DETAIL_MAX_BYTES = 8192;
 const SESSION_TOKEN_MAX_CHARS = 64;
@@ -6322,7 +6550,7 @@ const TOOL_SPECS = [
     },
     {
         name: "update",
-        description: "Update one item's frontmatter (status, claim, parent, labels, priority, depends_on). Agent rules: done/cancelled never reopen, claims are never stolen.",
+        description: "Update one item's frontmatter (status, claim, parent, labels, priority, depends_on); agents never reopen or steal.",
         input: {
             type: "object",
             properties: {
@@ -6393,7 +6621,7 @@ const TOOL_SPECS = [
     },
     {
         name: "show",
-        description: "Read one work item bounded (ADR 0006): frontmatter plus the last comments; `body: true` is the unbounded opt-in. Pure read.",
+        description: "Read one work item bounded (ADR 0006): frontmatter plus the last comments; `body: true` is the opt-in. Pure read.",
         input: {
             type: "object",
             properties: {
@@ -6472,7 +6700,7 @@ const TOOL_SPECS = [
     },
     {
         name: "validate",
-        description: "Validate tracker frontmatter and tree integrity. Pure read; a tree with errors raises a typed tool error carrying the envelope.",
+        description: "Validate tracker frontmatter and tree integrity. Pure read; errors raise a typed tool error carrying the envelope.",
         input: { type: "object", properties: {}, additionalProperties: false },
         output: envelopeSchema({
             layout: { type: "string" },
@@ -6660,8 +6888,471 @@ const TOOL_SPECS = [
         }),
     },
 ];
+function worktreeOptions(ctx) {
+    const project = ctx.location?.project;
+    const projectID = asString(project?.id);
+    const canonical = asString(project?.canonical);
+    return {
+        ...(projectID !== undefined ? { projectID } : {}),
+        ...(canonical !== undefined ? { canonical } : {}),
+        ...(ctx.worktree !== undefined ? { domain: ctx.worktree } : {}),
+    };
+}
+function worktreeFail(kernel, command, code, message, conventionVersion) {
+    return {
+        ok: false,
+        envelope: kernel.failEnvelope({
+            command,
+            code,
+            message,
+            ...(conventionVersion !== undefined ? { conventionVersion } : {}),
+        }),
+    };
+}
+function remapFailure(envelope, command, code) {
+    const error = envelope.error !== null && typeof envelope.error === "object"
+        ? envelope.error
+        : {};
+    return { ok: false, envelope: { ...envelope, command, error: { ...error, code } } };
+}
+function sessionRoot(kernel, cwd) {
+    return kernel.repoRootFromTasks(kernel.findTasksDir(cwd));
+}
+function itemBranch(kernel, root, item, explicit) {
+    const requested = asString(explicit) ?? asString(item.branch);
+    if (requested !== undefined)
+        return requested;
+    const type = asString(item.type);
+    const config = kernel.readConventionConfig(root);
+    const pattern = (type !== undefined ? config.branchPatterns[type] : undefined) ??
+        (type !== undefined ? kernel.DEFAULT_BRANCH_PATTERNS[type] : undefined) ??
+        "feat/{id}";
+    return kernel.resolveBranchName(pattern, {
+        id: asString(item.id) ?? "",
+        type: (type ?? "task"),
+    });
+}
+function canonicalRoot(options, fallback) {
+    return asString(options.worktree?.canonical) ?? fallback;
+}
+async function createItemWorktree(options, repoRoot, id) {
+    const domain = options.worktree?.domain;
+    const projectID = asString(options.worktree?.projectID);
+    if (domain?.create === undefined || projectID === undefined) {
+        return {
+            error: "the OpenCode worktree domain is unavailable (ctx.worktree.create/project id missing); " +
+                "use the CLI fallback `arggon start --worktree`",
+        };
+    }
+    const canonical = canonicalRoot(options, repoRoot);
+    const name = `${(0, node_path_1.basename)(canonical)}-${id}`;
+    try {
+        const created = (await domain.create({
+            projectID,
+            name,
+            directory: (0, node_path_1.resolve)(canonical, ".."),
+        }));
+        const directory = asString(created?.directory);
+        if (directory === undefined) {
+            return { error: "the worktree domain returned no directory for " + name };
+        }
+        return { directory };
+    }
+    catch (error) {
+        return { error: `worktree domain create failed for '${name}': ${detail(error)}` };
+    }
+}
+async function discardWorktree(options, directory, branch) {
+    const domain = options.worktree?.domain;
+    const projectID = asString(options.worktree?.projectID);
+    if (domain?.remove !== undefined && projectID !== undefined) {
+        try {
+            await domain.remove({ projectID, directory, force: true });
+        }
+        catch (error) {
+            logOnce("worktree-rollback", "worktree domain rollback failed", error);
+        }
+    }
+    else {
+        await run("git", ["worktree", "remove", "--force", directory], options.cwd, 30_000);
+    }
+    if (branch !== undefined) {
+        await run("git", ["branch", "-D", branch], options.cwd, 10_000);
+    }
+}
+async function ensureWorktreeBranch(worktreePath, branch) {
+    const exists = await run("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], worktreePath, 10_000);
+    if (exists.code === 0) {
+        const switched = await run("git", ["switch", branch], worktreePath, 10_000);
+        return switched.code === 0
+            ? { ok: true, created: false }
+            : { ok: false, created: false, error: switched.stderr.trim() || `git switch ${branch} failed` };
+    }
+    const created = await run("git", ["switch", "-c", branch], worktreePath, 10_000);
+    return created.code === 0
+        ? { ok: true, created: true }
+        : { ok: false, created: false, error: created.stderr.trim() || `git switch -c ${branch} failed` };
+}
+async function isRegisteredWorktree(canonical, path) {
+    const listed = await run("git", ["worktree", "list", "--porcelain"], canonical, 10_000);
+    if (listed.code !== 0)
+        return false;
+    const target = (0, node_path_1.resolve)(path);
+    return listed.stdout
+        .split("\n")
+        .filter((line) => line.startsWith("worktree "))
+        .map((line) => (0, node_path_1.resolve)(line.slice("worktree ".length).trim()))
+        .includes(target);
+}
+async function staleClaimFields(kernel, canonicalCwd, worktreePath, id) {
+    const fields = ["status", "assignee", "branch", "worktree_path"];
+    const read = (cwd) => {
+        const shown = kernel.showOperation({ cwd, id, meta: true });
+        return shown.ok ? (shown.envelope.item ?? {}) : undefined;
+    };
+    const canonical = read(canonicalCwd);
+    const worktree = read(worktreePath);
+    if (canonical === undefined || worktree === undefined)
+        return undefined;
+    const differing = fields.filter((field) => {
+        const left = canonical[field] ?? null;
+        const right = worktree[field] ?? null;
+        return left !== right;
+    });
+    return differing.length === 0 ? undefined : differing.join(", ");
+}
+async function nativeStart(kernel, input, options) {
+    const id = asString(input.id);
+    if (id === undefined)
+        return worktreeFail(kernel, "start", "START_FAILED", "id is required");
+    let root;
+    try {
+        root = sessionRoot(kernel, options.cwd);
+    }
+    catch (error) {
+        return worktreeFail(kernel, "start", "START_FAILED", detail(error));
+    }
+    const version = kernel.readConventionVersion(root);
+    const show = kernel.showOperation({ cwd: options.cwd, id, meta: true });
+    if (!show.ok)
+        return remapFailure(show.envelope, "start", "START_FAILED");
+    const item = (show.envelope.item ?? {});
+    const assignee = asString(input.assignee) ?? asString(kernel.resolveCurrentLogin()) ?? undefined;
+    if (assignee === undefined) {
+        return worktreeFail(kernel, "start", "START_FAILED", "could not resolve assignee (pass assignee, or set GITHUB_USER/GITHUB_ACTOR, or authenticate gh)", version);
+    }
+    const branch = itemBranch(kernel, root, item, input.branch);
+    const wantWorktree = input.worktree !== false;
+    let worktreePath = asString(item.worktree_path);
+    if (worktreePath !== undefined && !(0, node_fs_1.existsSync)(worktreePath))
+        worktreePath = undefined;
+    let worktreeCreated = false;
+    let branchCreated = false;
+    if (wantWorktree) {
+        if (worktreePath === undefined) {
+            const canonical = canonicalRoot(options, root);
+            const defaultPath = (0, node_path_1.join)((0, node_path_1.resolve)(canonical, ".."), `${(0, node_path_1.basename)(canonical)}-${id}`);
+            if ((0, node_fs_1.existsSync)(defaultPath)) {
+                if (!(await isRegisteredWorktree(canonical, defaultPath))) {
+                    return worktreeFail(kernel, "start", "START_FAILED", `${defaultPath} already exists and is not a git worktree of this repo ` +
+                        "(move or remove the path first, or use the CLI fallback `arggon start --worktree`)", version);
+                }
+                worktreePath = defaultPath;
+            }
+            else {
+                const created = await createItemWorktree(options, root, id);
+                if (created.directory === undefined) {
+                    return worktreeFail(kernel, "start", "START_FAILED", created.error ?? "worktree creation failed", version);
+                }
+                worktreePath = created.directory;
+                worktreeCreated = true;
+                const stale = await staleClaimFields(kernel, options.cwd, worktreePath, id);
+                if (stale !== undefined) {
+                    await discardWorktree(options, worktreePath, branch);
+                    return worktreeFail(kernel, "start", "START_FAILED", `the canonical checkout has uncommitted tracker changes for '${id}' (${stale}); ` +
+                        "commit or discard them, or use the CLI fallback `arggon start --worktree` " +
+                        "(the worktree created by this run was removed again)", version);
+                }
+            }
+        }
+        const ensured = await ensureWorktreeBranch(worktreePath, branch);
+        if (!ensured.ok) {
+            if (worktreeCreated)
+                await discardWorktree(options, worktreePath, branch);
+            return worktreeFail(kernel, "start", "START_FAILED", `branch setup failed in ${worktreePath}: ${ensured.error ?? "unknown git error"}`, version);
+        }
+        branchCreated = ensured.created;
+    }
+    const target = worktreePath ?? options.cwd;
+    const update = kernel.updateOperation({
+        cwd: target,
+        id,
+        status: "in_progress",
+        assignee,
+        branch,
+        ...(worktreePath !== undefined ? { worktreePath } : {}),
+        agent: true,
+    });
+    if (!update.ok) {
+        if (worktreeCreated && worktreePath !== undefined) {
+            await discardWorktree(options, worktreePath, branch);
+        }
+        const failure = remapFailure(update.envelope, "start", "START_FAILED");
+        if (worktreeCreated && worktreePath !== undefined) {
+            const error = failure.envelope.error;
+            error.message = `${String(error.message)} (the worktree created by this run was removed again)`;
+        }
+        return failure;
+    }
+    let pushed = false;
+    if (input.push === true && worktreePath !== undefined) {
+        const push = await run("git", ["push", "-u", "origin", branch], worktreePath, 60_000);
+        if (push.code !== 0) {
+            return worktreeFail(kernel, "start", "START_FAILED", `push failed (${push.stderr.trim() || `git push exit ${push.code}`}); the worktree was kept at ${worktreePath}`, version);
+        }
+        pushed = true;
+    }
+    return {
+        ok: true,
+        envelope: kernel.successEnvelope("start", {
+            id,
+            branch,
+            worktreePath: worktreePath ?? null,
+            worktreeCreated,
+            branchCreated,
+            pushed,
+            item: update.envelope.item,
+            ...(update.envelope.commit !== undefined ? { commit: update.envelope.commit } : {}),
+        }, version),
+    };
+}
+function nativeBranch(kernel, input, options) {
+    const id = asString(input.id);
+    if (id === undefined)
+        return worktreeFail(kernel, "branch", "BRANCH_FAILED", "id is required");
+    let root;
+    try {
+        root = sessionRoot(kernel, options.cwd);
+    }
+    catch (error) {
+        return worktreeFail(kernel, "branch", "BRANCH_FAILED", detail(error));
+    }
+    const version = kernel.readConventionVersion(root);
+    const show = kernel.showOperation({ cwd: options.cwd, id, meta: true });
+    if (!show.ok)
+        return remapFailure(show.envelope, "branch", "BRANCH_FAILED");
+    const branch = itemBranch(kernel, root, (show.envelope.item ?? {}), input.branch);
+    const update = kernel.updateOperation({ cwd: options.cwd, id, branch, agent: true });
+    if (!update.ok)
+        return remapFailure(update.envelope, "branch", "BRANCH_FAILED");
+    return {
+        ok: true,
+        envelope: kernel.successEnvelope("branch", {
+            id,
+            branch,
+            item: update.envelope.item,
+            ...(update.envelope.commit !== undefined ? { commit: update.envelope.commit } : {}),
+        }, version),
+    };
+}
+async function domainWorktrees(options) {
+    const domain = options.worktree?.domain;
+    const projectID = asString(options.worktree?.projectID);
+    if (domain?.list === undefined || projectID === undefined)
+        return [];
+    try {
+        if (domain.refresh !== undefined)
+            await domain.refresh({ projectID });
+        const entries = await domain.list({ projectID });
+        if (!Array.isArray(entries))
+            return [];
+        return entries
+            .map((entry) => asString(entry?.directory))
+            .filter((directory) => directory !== undefined);
+    }
+    catch (error) {
+        logOnce("worktree-list", "worktree domain inventory failed", error);
+        return [];
+    }
+}
+async function removeWorktree(kernel, options, root, directory) {
+    const domain = options.worktree?.domain;
+    const projectID = asString(options.worktree?.projectID);
+    if (domain?.remove !== undefined && projectID !== undefined) {
+        try {
+            await domain.remove({ projectID, directory, force: false });
+            return;
+        }
+        catch (error) {
+            logOnce("worktree-remove", "worktree domain remove failed; falling back to git", error);
+        }
+    }
+    kernel.defaultCleanupGit().removeWorktree(root, directory);
+}
+async function nativeCleanup(kernel, input, options) {
+    let root;
+    try {
+        root = sessionRoot(kernel, options.cwd);
+    }
+    catch (error) {
+        return worktreeFail(kernel, "cleanup", "CLEANUP_FAILED", detail(error));
+    }
+    const version = kernel.readConventionVersion(root);
+    const git = kernel.defaultCleanupGit();
+    if (!git.isRepo(root)) {
+        return worktreeFail(kernel, "cleanup", "CLEANUP_FAILED", `not a git repository (${root}); cleanup needs git`, version);
+    }
+    let base;
+    try {
+        base = git.defaultBranch(root);
+    }
+    catch (error) {
+        return worktreeFail(kernel, "cleanup", "CLEANUP_FAILED", detail(error), version);
+    }
+    const tasksDir = kernel.findTasksDir(options.cwd);
+    const byId = kernel.itemsById(kernel.loadItems(tasksDir));
+    const tracked = [...byId.values()]
+        .filter((item) => (item.worktreePath ?? null) !== null)
+        .sort((a, b) => a.id.localeCompare(b.id));
+    const inventory = await domainWorktrees(options);
+    const runner = {
+        ...git,
+        worktreeList: (cwd) => inventory.length > 0 ? inventory : git.worktreeList(cwd),
+    };
+    const entries = tracked.map((item) => kernel.classifyCleanupEntry(item, root, base, runner, { noGh: input.no_gh === true }));
+    const pruned = [];
+    const failures = [];
+    const clearedPaths = [];
+    const clearedIds = [];
+    if (input.prune === true) {
+        for (const entry of entries.filter((candidate) => candidate.removable)) {
+            try {
+                if (entry.action?.startsWith("remove worktree")) {
+                    await removeWorktree(kernel, options, root, entry.path);
+                    pruned.push({
+                        id: entry.id,
+                        action: `removed worktree ${entry.path}`,
+                        ...(entry.via !== undefined ? { via: entry.via } : {}),
+                    });
+                }
+                if (entry.branch !== null && git.branchExists(root, entry.branch)) {
+                    try {
+                        if (entry.via !== undefined)
+                            git.deleteBranchForce(root, entry.branch);
+                        else
+                            git.deleteBranch(root, entry.branch);
+                        pruned.push({
+                            id: entry.id,
+                            action: `deleted branch ${entry.branch}`,
+                            ...(entry.via !== undefined ? { via: entry.via } : {}),
+                        });
+                    }
+                    catch (error) {
+                        pruned.push({
+                            id: entry.id,
+                            action: "failed",
+                            error: detail(error),
+                            leftoverBranch: entry.branch,
+                        });
+                    }
+                }
+                const cleared = kernel.updateOperation({
+                    cwd: root,
+                    id: entry.id,
+                    worktreePath: "",
+                    commit: false,
+                    agent: true,
+                });
+                if (!cleared.ok)
+                    throw new Error(kernelError(cleared.envelope));
+                pruned.push({ id: entry.id, action: "cleared worktree_path" });
+                clearedPaths.push(byId.get(entry.id).filePath);
+                clearedIds.push(entry.id);
+            }
+            catch (error) {
+                const message = detail(error);
+                failures.push(`${entry.id}: ${message}`);
+                pruned.push({ id: entry.id, action: "failed", error: message });
+            }
+        }
+    }
+    let commit;
+    if (clearedPaths.length > 0) {
+        commit = kernel.commitTrackerMutation(root, clearedPaths, {
+            message: kernel.trackerCommitMessage("pruned", clearedIds),
+            commit: kernel.resolveAutoCommit(input.no_commit === true ? false : undefined, kernel.readAutoCommitConfig(root)),
+        });
+    }
+    return {
+        ok: true,
+        envelope: kernel.successEnvelope("cleanup", {
+            base,
+            candidates: entries,
+            pruned,
+            failures,
+            ...(commit !== undefined ? { commit: kernel.commitPayload(commit) } : {}),
+        }, version),
+    };
+}
+function kernelError(envelope) {
+    const error = envelope.error !== null && typeof envelope.error === "object"
+        ? envelope.error
+        : undefined;
+    return asString(error?.message) ?? "unknown kernel failure";
+}
+const WORKTREE_TOOL_SPECS = [
+    {
+        name: "start",
+        description: "Claim an item and create its worktree through the worktree domain, recording branch + worktree_path. Never steals a claim.",
+        input: {
+            type: "object",
+            properties: {
+                id: ID,
+                assignee: { type: "string" },
+                branch: { type: "string" },
+                worktree: BOOLEAN,
+                push: BOOLEAN,
+            },
+            required: ["id"],
+            additionalProperties: false,
+        },
+        output: OBJECT,
+        run: (kernel, input, options) => nativeStart(kernel, input, options),
+    },
+    {
+        name: "branch",
+        description: "Record the convention branch name (branch_patterns) on an item; the item worktree owns the git branch.",
+        input: {
+            type: "object",
+            properties: { id: ID, branch: { type: "string" } },
+            required: ["id"],
+            additionalProperties: false,
+        },
+        output: OBJECT,
+        run: (kernel, input, options) => nativeBranch(kernel, input, options),
+    },
+    {
+        name: "cleanup",
+        description: "List (prune: true removes) worktrees of done/cancelled items whose branches are merged; clears worktree_path.",
+        input: {
+            type: "object",
+            properties: {
+                prune: BOOLEAN,
+                no_gh: {
+                    type: "boolean",
+                    description: "Ancestry-only (skip the squash-merged PR lookup).",
+                },
+                no_commit: BOOLEAN,
+            },
+            additionalProperties: false,
+        },
+        output: OBJECT,
+        run: (kernel, input, options) => nativeCleanup(kernel, input, options),
+    },
+];
+const ALL_TOOL_SPECS = [...TOOL_SPECS, ...WORKTREE_TOOL_SPECS];
 function nativeToolSchemas() {
-    return TOOL_SPECS.map((spec) => ({
+    return ALL_TOOL_SPECS.map((spec) => ({
         name: spec.name,
         description: spec.description,
         input: spec.input,
@@ -6676,13 +7367,13 @@ function nativeToolsCatalogBytes() {
     }));
 }
 function argonToolDefinitions(kernel, options) {
-    return TOOL_SPECS.map((spec) => ({
+    return ALL_TOOL_SPECS.map((spec) => ({
         name: spec.name,
         description: spec.description,
         input: spec.input,
         output: spec.output,
         execute: async (input, tool) => {
-            const outcome = spec.run(kernel, input ?? {}, options, tool);
+            const outcome = await spec.run(kernel, input ?? {}, options, tool);
             const envelope = outcome.envelope;
             if (!outcome.ok)
                 throw new ArgonToolError(envelope);
@@ -6754,7 +7445,11 @@ const definition = {
         try {
             const directory = locationDirectory(ctx);
             if (directory !== undefined) {
-                await registerArgonTools(ctx, { cwd: directory, templatesDir: pluginTemplatesDir() });
+                await registerArgonTools(ctx, {
+                    cwd: directory,
+                    templatesDir: pluginTemplatesDir(),
+                    worktree: worktreeOptions(ctx),
+                });
             }
         }
         catch (error) {

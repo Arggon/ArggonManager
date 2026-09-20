@@ -118,15 +118,26 @@ describe("opencode seam: fresh init", () => {
     expect(reviewer).toMatch(/action: edit\s+resource: "\*"\s+effect: deny/);
   });
 
-  it("agents deny tracker mutations at the MCP tool level (NIT-14 probe)", () => {
+  it("agents deny tracker mutations at the tool level, native and MCP spellings (W4 probe)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
     const worker = readFileSync(join(dir, ".opencode/agents/arggon-worker.md"), "utf8");
     const reviewer = readFileSync(join(dir, ".opencode/agents/arggon-reviewer.md"), "utf8");
-    // Probe-verified on a real V2 session: an MCP tool action is the
-    // normalized `<server>_<tool>` (server `arggon`, tools `arggon_*`).
-    expect(worker).toMatch(/action: arggon_arggon_create\s+resource: "\*"\s+effect: deny/);
+    // Probe-verified on real V2 sessions: a native tool action is the
+    // normalized `<namespace>_<tool>` (namespace `arggon`), an MCP tool action
+    // the normalized `<server>_<tool>` (server `arggon`, tools `arggon_*`).
     for (const action of [
+      "arggon_create",
+      "arggon_arggon_create",
+    ]) {
+      expect(worker, action).toMatch(
+        new RegExp(`action: ${action}\\s+resource: "\\*"\\s+effect: deny`),
+      );
+    }
+    for (const action of [
+      "arggon_create",
+      "arggon_update",
+      "arggon_handoff",
       "arggon_arggon_create",
       "arggon_arggon_update",
       "arggon_arggon_handoff",
@@ -136,10 +147,55 @@ describe("opencode seam: fresh init", () => {
       );
     }
     // arggon_comment is the reviewer's one tracker write: never denied.
-    expect(reviewer).not.toMatch(/action: arggon_arggon_comment/);
+    expect(reviewer).not.toMatch(/action: arggon_comment|action: arggon_arggon_comment/);
     expect(worker).not.toMatch(
-      /action: arggon_arggon_comment|action: arggon_arggon_update|action: arggon_arggon_handoff/,
+      /action: arggon_comment|action: arggon_update|action: arggon_handoff|action: arggon_arggon_comment|action: arggon_arggon_update|action: arggon_arggon_handoff/,
     );
+  });
+
+  it("the reviewer never mutates history: minimal shell gates (W4)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const reviewer = readFileSync(join(dir, ".opencode/agents/arggon-reviewer.md"), "utf8");
+    for (const resource of ["git commit*", "git push*", "git merge*", "git rebase*"]) {
+      expect(reviewer, resource).toMatch(
+        new RegExp(`action: shell\\s+resource: "${resource.replace("*", "\\*")}"\\s+effect: deny`),
+      );
+    }
+    // Read-only inspection stays allowed: only the mutating git verbs are gated.
+    expect(reviewer).not.toMatch(/resource: "git (status|diff|log|show)/);
+  });
+
+  it("the coordinator subagent allow-list stays explicit (W4 default)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const coordinator = readFileSync(join(dir, ".opencode/agents/arggon-coordinator.md"), "utf8");
+    expect(coordinator).toMatch(/action: subagent\s+resource: "\*"\s+effect: deny/);
+    for (const agent of ["arggon-worker", "arggon-reviewer", "explore"]) {
+      expect(coordinator, agent).toMatch(
+        new RegExp(`action: subagent\\s+resource: ${agent}\\s+effect: allow`),
+      );
+    }
+  });
+
+  it("the generated seam carries the minimal shell gates without breaking ordinary sessions (W4)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const raw = readFileSync(join(dir, "opencode.jsonc"), "utf8");
+    const parsed = JSON.parse(raw.replace(/^\s*\/\/.*$/gm, "")) as {
+      permissions?: Array<{ action?: string; resource?: string; effect?: string }>;
+    };
+    expect(parsed.permissions).toEqual([
+      { action: "shell", resource: "git commit --no-verify*", effect: "deny" },
+      { action: "shell", resource: "git push --force*", effect: "deny" },
+      { action: "shell", resource: "git push -f*", effect: "deny" },
+    ]);
+    // Non-breaking by construction: the base policy stays allow-all — a global
+    // `ask`/deny-all would block ordinary and headless sessions.
+    for (const rule of parsed.permissions ?? []) {
+      expect(rule.resource, JSON.stringify(rule)).not.toBe("*");
+      expect(rule.effect).toBe("deny");
+    }
   });
 
   it("records x-generated provenance for every seam file", () => {

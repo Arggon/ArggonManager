@@ -21,7 +21,10 @@ import { PLUGIN_BUNDLE } from "../../../cli/src/plugin-bundle.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
-/** The twelve native tools (spec-native-first-011 §Tools). */
+/**
+ * The twelve spec tools (spec-native-first-011 §Tools) plus the three W4
+ * worktree-domain tools (task-native-permissions-worktrees).
+ */
 const TOOL_NAMES = [
   "list",
   "create",
@@ -35,10 +38,13 @@ const TOOL_NAMES = [
   "priority",
   "sync",
   "import_issues",
+  "start",
+  "branch",
+  "cleanup",
 ];
 
-/** Core tools pinned into the Code Mode catalog (W3 lever, plugin constant). */
-const PINNED = ["list", "create", "update", "show", "next", "validate", "comment", "handoff"];
+/** Core tools pinned into the Code Mode catalog (W3 lever + W4 `start`). */
+const PINNED = ["list", "create", "update", "show", "next", "validate", "comment", "handoff", "start"];
 
 const tempDirs: string[] = [];
 afterAll(() => {
@@ -106,7 +112,7 @@ describe("vendored plugin bundle: dependency-less load (W3)", () => {
     expect(typeof definition.setup).toBe("function");
   });
 
-  it("registers the twelve native tools and exercises them against a real tracker", async () => {
+  it("registers the fifteen native tools and exercises them against a real tracker", async () => {
     const mod = await importDependencyLess();
     const definition = mod.default as ArgonPlugin;
     const { ctx, tools } = fakeContext(repoRoot);
