@@ -1,6 +1,6 @@
 ---
 type: task
-status: todo
+status: cancelled
 id: task-native-kernel-lib-polish
 title: "Kernel library polish: MCP note, write parity, re-exports, clean-build test"
 parent: native-redesign
