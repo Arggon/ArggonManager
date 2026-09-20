@@ -503,6 +503,38 @@ describe("opencode seam: methodology commands and skill references (W5)", () => 
     expect(read(".opencode/commands/arggon-adr.md")).toContain("docs/engineering.md");
   });
 
+  it("every generated command carries valid V2 frontmatter (description; agent/subagent where they apply)", () => {
+    // The smoke harness runs command BODIES as prompts (it cannot exercise the
+    // V2 command loader headless); this test closes the frontmatter flank:
+    // schema-valid fields, the W3 agent placements and subagent mode.
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const frontmatter = (rel: string): Record<string, string> => {
+      const raw = readFileSync(join(dir, ...rel.split("/")), "utf8");
+      const match = /^---\n([\s\S]*?)\n---\n/.exec(raw);
+      expect(match, rel).not.toBeNull();
+      const fields: Record<string, string> = {};
+      for (const line of match![1].split("\n")) {
+        const kv = /^([a-z_]+):\s*(.+)$/.exec(line);
+        if (kv !== null) fields[kv[1]] = kv[2];
+      }
+      return fields;
+    };
+    for (const name of readdirSync(join(dir, ".opencode/commands")).sort()) {
+      const rel = `.opencode/commands/${name}`;
+      const fields = frontmatter(rel);
+      expect(fields.description, rel).toBeTruthy();
+      if (fields.agent !== undefined) {
+        expect(["arggon-coordinator", "arggon-reviewer"], rel).toContain(fields.agent);
+      }
+      if (fields.subagent !== undefined) expect(fields.subagent, rel).toBe("true");
+    }
+    expect(frontmatter(".opencode/commands/arggon-done.md").agent).toBe("arggon-coordinator");
+    expect(frontmatter(".opencode/commands/arggon-adopt.md").agent).toBe("arggon-coordinator");
+    expect(frontmatter(".opencode/commands/arggon-review.md").agent).toBe("arggon-reviewer");
+    expect(frontmatter(".opencode/commands/arggon-review.md").subagent).toBe("true");
+  });
+
   it("creates the skill references with provenance and byte parity against their sources", () => {
     const dir = tempDir();
     runInit({ dir, force: false });

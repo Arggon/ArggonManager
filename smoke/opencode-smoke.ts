@@ -31,7 +31,12 @@
  *                        (eleven), each expanded from the shipped
  *                        `.opencode/commands/arggon-*.md` body: the command
  *                        drives the native tools / writes the methodology
- *                        artifact and never shells out to the adapter.
+ *                        artifact and never shells out to the adapter. The
+ *                        harness submits the BODY as a prompt, so the V2
+ *                        command loader (discovery, frontmatter `agent:` /
+ *                        `subagent:` selection) is not exercised here; the
+ *                        generated frontmatter is validated by
+ *                        `cli/src/init-opencode.test.ts`.
  *
  *   W3 — session context:
  *   8. branch          — a claimed item on `feat/<id>` resolves, injects the

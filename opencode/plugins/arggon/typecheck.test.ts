@@ -3,12 +3,13 @@
  *
  * The root tsconfig includes `cli/src` only, vitest transpiles with esbuild (no
  * type-checking) and eslint is not type-aware — so
- * `opencode/plugins/arggon/index.ts`, the single file `arggon init` vendors
- * into every adopter tree, could ship a TypeScript error unnoticed (the review
+ * `opencode/plugins/arggon/index.ts`, the single source `arggon init` builds
+ * the vendored bundle from, could ship a TypeScript error unnoticed (the review
  * caught exactly that: an undefined `ToolEditorLike` → TS2304). This gate runs
  * the same strict `tsc --noEmit` the reviewer ran. Scope is the plugin source
- * alone: it imports no packages (Node builtins plus a computed dynamic
- * `@opencode/plugin` specifier), so the check needs no build.
+ * alone: it has no static package imports (Node builtins only; `@arggon/lib`
+ * stays behind a guarded dynamic import and `@opencode/plugin` is not imported
+ * at all since W3), so the check needs no build.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
