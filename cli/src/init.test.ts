@@ -719,6 +719,45 @@ describe("init --propose", () => {
     expect(snapshot(dir)).toEqual(before);
   });
 
+  it("is layout-aware: proposes for legacy trees with docs/ at the root (bug-propose-legacy-layout)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-legacy-"));
+    mkdirSync(join(dir, "tasks"), { recursive: true });
+    mkdirSync(join(dir, "docs"), { recursive: true });
+    writeFileSync(
+      join(dir, "tasks/.convention.yml"),
+      [
+        "version: 3",
+        "x-generated:",
+        '  projectName: "smoke"',
+        "  docs/tracking.md:",
+        '    template: "docs/tracking.md"',
+        '    checksum: "sha256:stale"',
+        '    arggonVersion: "0.3.0"',
+        '    generatedAt: "2026-09-18T00:00:00.000Z"',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    writeFileSync(join(dir, "docs/tracking.md"), "ADOPTER EDIT\n", "utf8");
+    writeFileSync(join(dir, "docs/convention.md"), "ADOPTER CONVENTION\n", "utf8"); // tier-2
+
+    // Tier-1: the legacy tracking.md gets a proposal at its ROOT docs path.
+    const tier1 = runInit({ dir, force: false, propose: true, now: NOW });
+    const tracking = proposalOf(tier1.proposals ?? [], "docs/tracking.md");
+    expect(tracking.decision).toBe("proposed");
+    expect(tracking.proposalPath).toBe(`docs/tracking.md.proposed-${arggonVersion()}`);
+    expect(existsSync(join(dir, "docs", `tracking.md.proposed-${arggonVersion()}`))).toBe(true);
+    // Tier-2 gating runs against the canonical set: skipped without --full.
+    expect((tier1.proposals ?? []).map((p) => p.dest)).not.toContain("docs/convention.md");
+    // Original bytes untouched; nothing materializes the v5 tree.
+    expect(readFileSync(join(dir, "docs/tracking.md"), "utf8")).toBe("ADOPTER EDIT\n");
+    expect(existsSync(join(dir, "ArggonManager"))).toBe(false);
+
+    // --full: the legacy tier-2 doc is proposed too.
+    const tier2 = runInit({ dir, force: false, full: true, propose: true, now: NOW });
+    expect((tier2.proposals ?? []).map((p) => p.dest)).toContain("docs/convention.md");
+  });
+
   it("errors on nonsensical combos and on a non-initialized tree", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-"));
     expect(() => runInit({ dir, force: false, propose: true, backup: true })).toThrow(/--backup/);

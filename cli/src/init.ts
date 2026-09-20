@@ -613,6 +613,16 @@ export function planProposals(
 ): ProposalEntry[] {
   const version = arggonVersion();
   const out: ProposalEntry[] = [];
+  // Layout-aware proposal sweep (bug-propose-legacy-layout): a legacy tree's
+  // docs live at `docs/...`, so the template destinations must follow the
+  // tree's layout — the canonical `ArggonManager/docs/...` dests do not exist
+  // there and the sweep used to skip every doc silently.
+  const layout = trackerAt(root)?.layout ?? "arggon-manager";
+  const isTier2 = (dest: string): boolean =>
+    TIER2_DESTS.has(dest) ||
+    (layout === "legacy" &&
+      dest.startsWith("docs/") &&
+      TIER2_DESTS.has(`${TRACKER_DIR_NAME}/${dest}`));
   // Project-name resolution once per run (bug-project-name-dir-derived):
   // recorded state, then legacy content recovery. When unrecoverable
   // (`name === null`), renderGeneratedDoc refuses name-bearing renders, so
@@ -622,8 +632,8 @@ export function planProposals(
     entries: readGeneratedState(root),
     recorded: readGeneratedProjectName(root),
   });
-  for (const { dest, template } of currentGeneratedTemplates()) {
-    if (!full && TIER2_DESTS.has(dest)) continue;
+  for (const { dest, template } of currentGeneratedTemplates({ layout })) {
+    if (!full && isTier2(dest)) continue;
     const destAbs = join(root, ...dest.split("/"));
     if (!existsSync(destAbs)) continue; // a plain init generates it; nothing to propose
     let disk: string;
