@@ -10,8 +10,6 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-
-
   formatTrendMarkdown,
   formatTrendTable,
   isoWeekKey,
@@ -19,6 +17,7 @@ import {
   parseSince,
   runTrend,
 } from "./trend.js";
+import { runLayoutMigrate } from "./layout-migrate.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -120,7 +119,14 @@ function initGoldenRepo(): string {
   // Quoted scalar status (stringifyFrontmatter quotes values when needed).
   write(
     "tasks/launch/epic-a/story-a/task-quoted.md",
-    item({ type: "task", status: '"todo"', id: "task-quoted", parent: "story-a", labels: [], created: '"2026-08-31"' }),
+    item({
+      type: "task",
+      status: '"todo"',
+      id: "task-quoted",
+      parent: "story-a",
+      labels: [],
+      created: '"2026-08-31"',
+    }),
   )(dir);
   write("tasks/launch/epic-a/story-a/task-stuck.md", LEAF("task", "task-stuck", "todo"))(dir);
   commit(dir, "c1: create tree", "2026-08-31T10:00:00+00:00");
@@ -134,14 +140,24 @@ function initGoldenRepo(): string {
 
   write("tasks/launch/epic-a/story-a/task-two.md", LEAF("task", "task-two", "done"))(dir);
   write("tasks/launch/epic-a/story-a/bug-one.md", LEAF("bug", "bug-one", "in_progress"))(dir);
-  write("tasks/launch/epic-a/story-a/task-stuck.md", LEAF("task", "task-stuck", "in_progress"))(dir);
+  write(
+    "tasks/launch/epic-a/story-a/task-stuck.md",
+    LEAF("task", "task-stuck", "in_progress"),
+  )(dir);
   commit(dir, "c4: task-two done, bug-one claimed", "2026-09-09T12:00:00+00:00");
 
   write("tasks/launch/epic-a/story-a/bug-one.md", LEAF("bug", "bug-one", "cancelled"))(dir);
   write("tasks/launch/epic-a/story-a/story-a.md", STORY("done"))(dir);
   write(
     "tasks/launch/epic-a/story-a/task-quoted.md",
-    item({ type: "task", status: '"done"', id: "task-quoted", parent: "story-a", labels: [], created: '"2026-08-31"' }),
+    item({
+      type: "task",
+      status: '"done"',
+      id: "task-quoted",
+      parent: "story-a",
+      labels: [],
+      created: '"2026-08-31"',
+    }),
   )(dir);
   commit(dir, "c5: bug cancelled, story done, quoted done", "2026-09-09T18:00:00+00:00");
   return dir;
@@ -170,7 +186,7 @@ function initStoryRepo(): string {
     "tasks/launch/epic-a/story-b/story-b.md",
     STORY("cancelled").replace("story-a", "story-b"),
   )(dir);
-  write("tasks/launch/epic-a/epic-a.md", EPIC.replace('status: todo', 'status: done'))(dir);
+  write("tasks/launch/epic-a/epic-a.md", EPIC.replace("status: todo", "status: done"))(dir);
   commit(dir, "c3: stories terminal, epic done", "2026-09-07T12:00:00+00:00");
   return dir;
 }
@@ -186,9 +202,7 @@ describe("runTrend story-driven tree", () => {
     const dir = initStoryRepo();
     // story-a: claim 09-01T10:00 -> done 09-07T12:00 = 6d2h (6.0833) -> 6.1.
     // story-b goes todo -> cancelled without a claim — not measurable.
-    expect(runTrend({ cwd: dir }).cycleTime).toEqual([
-      { type: "story", avgDays: 6.1, count: 1 },
-    ]);
+    expect(runTrend({ cwd: dir }).cycleTime).toEqual([{ type: "story", avgDays: 6.1, count: 1 }]);
   });
 
   it("still excludes container completions from cycleTime", () => {
@@ -271,6 +285,52 @@ describe("runTrend (golden temp repo)", () => {
       weeks: [{ week: "2026-W36", completions: 1 }],
       cycleTime: [{ type: "task", avgDays: 2, count: 1 }],
     });
+  });
+
+  it("keeps pre-move history across `arggon migrate --layout` (bug-trend-root-rename)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-trend-migrate-"));
+    gitInit(dir);
+    write("tasks/.convention.yml", "version: 3\n")(dir);
+    write("tasks/task-m.md", LEAF("task", "task-m", "todo"))(dir);
+    commit(dir, "c1: create", "2026-09-01T09:00:00+00:00");
+
+    write("tasks/task-m.md", LEAF("task", "task-m", "in_progress"))(dir);
+    commit(dir, "c2: claim", "2026-09-02T09:00:00+00:00");
+
+    write("tasks/task-m.md", LEAF("task", "task-m", "done"))(dir);
+    commit(dir, "c3: done", "2026-09-04T09:00:00+00:00");
+
+    const before = runTrend({ cwd: dir });
+    expect(before).toEqual({
+      weeks: [{ week: "2026-W36", completions: 1 }],
+      cycleTime: [{ type: "task", avgDays: 2, count: 1 }],
+    });
+
+    // Real migration (ADR 0012): tracker + version bump in one commit.
+    const migrated = runLayoutMigrate({ cwd: dir });
+    expect(migrated.changed).toBe(true);
+    git(["add", "-A"], dir);
+    git(["commit", "--quiet", "-m", "c4: migrate layout"], dir, "2026-10-01T09:00:00+00:00");
+
+    // The move commit must NOT be read as "every item created at migration
+    // time": the legacy `tasks/` pathspec keeps the pre-move transitions and
+    // the rename records re-anchor them to the new path.
+    const after = runTrend({ cwd: dir });
+    expect(after).toEqual(before);
+    expect(after.weeks).not.toContainEqual({ week: "2026-W40", completions: 1 });
+
+    // The in-tracker product docs are excluded from mining: their example
+    // frontmatter (type: bug / status: done in fenced YAML) must not register
+    // as a completion (bug-trend-docs-examples).
+    mkdirSync(join(dir, "ArggonManager", "docs"), { recursive: true });
+    writeFileSync(
+      join(dir, "ArggonManager", "docs", "notes.md"),
+      "# Notes\n\n```yaml\ntype: bug\nstatus: done\n```\n",
+      "utf8",
+    );
+    git(["add", "-A"], dir);
+    git(["commit", "--quiet", "-m", "c5: docs example"], dir, "2026-10-08T09:00:00+00:00");
+    expect(runTrend({ cwd: dir })).toEqual(before);
   });
 
   it("fails with an actionable error on a non-git tree", () => {
