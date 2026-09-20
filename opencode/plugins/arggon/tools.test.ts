@@ -48,6 +48,7 @@ import {
   loadArgonKernel,
   nativeToolSchemas,
   nativeToolsCatalogBytes,
+  PINNED_TOOL_NAMES,
   pluginTemplatesDir,
   registerArgonTools,
   sessionToken,
@@ -285,7 +286,10 @@ function tool(defs: ArgonToolDefinition[], name: string): ArgonToolDefinition {
 
 type Captured = {
   namespaces: Array<{ name: string; description: string }>;
-  tools: Array<{ name: string; options?: { namespace?: string; codemode?: boolean } }>;
+  tools: Array<{
+    name: string;
+    options?: { namespace?: string; codemode?: boolean; pinned?: boolean };
+  }>;
 };
 
 function fakeContext(captured: Captured, mode: "ok" | "no-transform" | "throw-on-add" = "ok") {
@@ -300,7 +304,7 @@ function fakeContext(captured: Captured, mode: "ok" | "no-transform" | "throw-on
                   captured.namespaces.push(input),
                 add: (input: {
                   name: string;
-                  options?: { namespace?: string; codemode?: boolean };
+                  options?: { namespace?: string; codemode?: boolean; pinned?: boolean };
                 }) => {
                   if (mode === "throw-on-add") throw new Error("synthetic registration failure");
                   captured.tools.push(input);
@@ -324,9 +328,19 @@ describe("native arggon tool registration (W2)", () => {
     ]);
     expect(captured.tools.map((entry) => entry.name)).toEqual([...EXPECTED_TOOLS]);
     for (const registration of captured.tools) {
-      // Code Mode catalog surface: namespace + codemode.
-      expect(registration.options).toEqual({ namespace: ARGON_TOOL_NAMESPACE, codemode: true });
+      // Code Mode catalog surface: namespace + codemode; the core subset the
+      // native commands depend on is additionally pinned (W3 catalog lever,
+      // PINNED_TOOL_NAMES).
+      const pinned = PINNED_TOOL_NAMES.includes(registration.name);
+      expect(registration.options).toEqual({
+        namespace: ARGON_TOOL_NAMESPACE,
+        codemode: true,
+        ...(pinned ? { pinned: true } : {}),
+      });
     }
+    expect(captured.tools.filter((entry) => entry.options?.pinned).map((entry) => entry.name)).toEqual(
+      [...PINNED_TOOL_NAMES],
+    );
   });
 
   it("every definition carries an input and an output schema", () => {
@@ -338,9 +352,19 @@ describe("native arggon tool registration (W2)", () => {
     }
   });
 
+  it("pins exactly the core workflow tools (W3 catalog lever)", () => {
+    const pinned = nativeToolSchemas()
+      .filter((schema) => schema.pinned)
+      .map((schema) => schema.name);
+    expect(pinned).toEqual([...PINNED_TOOL_NAMES]);
+    // Every pinned name is a real tool: the subset is the contract.
+    for (const name of PINNED_TOOL_NAMES) expect(EXPECTED_TOOLS).toContain(name);
+  });
+
   it("keeps the tool-schema payload within the ADR 0006 advisory budget", () => {
-    // Definitions JSON the Code Mode catalog is built from; the runtime renders
-    // it as one catalog line per tool under its own token budget.
+    // Definitions JSON the Code Mode catalog is built from (pinned flags
+    // included); the runtime renders it as one catalog line per tool under its
+    // own token budget.
     const bytes = nativeToolsCatalogBytes();
     expect(bytes).toBeLessThanOrEqual(NATIVE_TOOLS_BUDGET_BYTES);
     expect(nativeToolSchemas()).toHaveLength(EXPECTED_TOOLS.length);

@@ -316,6 +316,30 @@ describe("plugin-context: arggon invocation parsing", () => {
     ).toBe("task-wrapped");
   });
 
+  it("parses native Code Mode tool calls (W3: tools.arggon.<name>)", () => {
+    expect(
+      parseArggonItemFromCode(
+        'return await tools.arggon.update({ id: "task-native", status: "in_progress" })',
+      ),
+    ).toBe("task-native");
+    expect(parseArggonItemFromCode("await tools.arggon.show({ id: 'bug-native' })")).toBe("bug-native");
+    expect(parseArggonItemFromCode("tools.arggon.comment({ id: `task-native-z`, text: 'hi' })")).toBe(
+      "task-native-z",
+    );
+    expect(
+      parseArggonItemFromCode('await tools.arggon.handoff({ id: "task-native-h", next: "keep going" })'),
+    ).toBe("task-native-h");
+    expect(parseArggonItemFromCode('await tools.arggon.start({ id: "task-native-s" })')).toBe(
+      "task-native-s",
+    );
+    // Reads without an item argument never correlate.
+    expect(parseArggonItemFromCode("return await tools.arggon.next({})")).toBeUndefined();
+    expect(parseArggonItemFromCode("return await tools.arggon.report({ trend: true })")).toBeUndefined();
+    expect(parseArggonItemFromCode("return await tools.arggon.update({ status: 'todo' })")).toBeUndefined();
+    // MCP and native spellings coexist while the conditional adapter exists.
+    expect(parseArggonItemFromCode('tools.arggon.arggon_show({ id: "task-mcp" })')).toBe("task-mcp");
+  });
+
   it("does not invent an item for unrelated Code Mode calls", () => {
     expect(parseArggonItemFromCode("return await tools.arggon.arggon_next({})")).toBeUndefined();
     expect(parseArggonItemFromCode('return await tools.arggon.arggon_update({ status: "in_progress" })')).toBeUndefined();
@@ -327,6 +351,9 @@ describe("plugin-context: arggon invocation parsing", () => {
     expect(parseArggonItemFromTool("shell", { command: "arggon show task-x --json" })).toBe("task-x");
     expect(parseArggonItemFromTool("arggon_update", { id: "task-x", status: "in_progress" })).toBe("task-x");
     expect(parseArggonItemFromTool("arggon.arggon_handoff", { id: "task-x" })).toBe("task-x");
+    // Native tool names as the runtime may report them (W3).
+    expect(parseArggonItemFromTool("arggon.update", { id: "task-native" })).toBe("task-native");
+    expect(parseArggonItemFromTool("tools.arggon.show", { id: "task-native" })).toBe("task-native");
     expect(parseArggonItemFromTool("execute", { code: 'await tools.arggon.arggon_start({ id: "task-x" })' })).toBe(
       "task-x",
     );
