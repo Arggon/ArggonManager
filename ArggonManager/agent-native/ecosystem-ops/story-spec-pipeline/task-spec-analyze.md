@@ -20,7 +20,7 @@ updated: "2026-09-15"
 
 ## Context
 
-Candidate #3 of [product discovery](docs/explorations/exploration-product-discovery-002.md): specs pass structural validation yet stay ambiguous — agents implement guesses. Spec Kit's `/clarify` + `/analyze` loop (github.com/github/spec-kit, 2026-09-15) proved checklist-driven ambiguity scanning + plan/spec consistency checks valuable. Effort M; principle: architecture-first. SPEC FIRST per the methodology (this item IS spec tooling — dogfood the pipeline).
+Candidate #3 of [product discovery](../../../docs/explorations/exploration-product-discovery-002.md): specs pass structural validation yet stay ambiguous — agents implement guesses. Spec Kit's `/clarify` + `/analyze` loop (github.com/github/spec-kit, 2026-09-15) proved checklist-driven ambiguity scanning + plan/spec consistency checks valuable. Effort M; principle: architecture-first. SPEC FIRST per the methodology (this item IS spec tooling — dogfood the pipeline).
 
 ## Acceptance
 

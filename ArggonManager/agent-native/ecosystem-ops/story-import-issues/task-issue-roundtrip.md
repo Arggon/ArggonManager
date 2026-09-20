@@ -21,7 +21,7 @@ updated: "2026-09-15"
 
 ## Context
 
-Candidate #7 of [product discovery](docs/explorations/exploration-product-discovery-002.md): `import-issues` is one-shot — items carry the linked GitHub issue in the additive `issue` frontmatter field but never push status back, so dual-tracker teams drift. Linear×Copilot issue→PR→status flows are now the norm (github.blog, 2026-07-23). Effort S; principle: same-rules, repo-is-truth (the issue id is already in frontmatter).
+Candidate #7 of [product discovery](../../../docs/explorations/exploration-product-discovery-002.md): `import-issues` is one-shot — items carry the linked GitHub issue in the additive `issue` frontmatter field but never push status back, so dual-tracker teams drift. Linear×Copilot issue→PR→status flows are now the norm (github.blog, 2026-07-23). Effort S; principle: same-rules, repo-is-truth (the issue id is already in frontmatter).
 
 ## Acceptance
 

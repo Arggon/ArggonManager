@@ -22,7 +22,7 @@ depends_on: [task-opencode-v2-spec]
 
 ## Context
 
-W5 of [plan-opencode2-009](../../../../docs/plans/plan-opencode2-009.md): the
+W5 of [plan-opencode2-009](../../../docs/plans/plan-opencode2-009.md): the
 methodology pipeline (explorations, ADRs, specs, plans, playbooks) becomes
 native V2 workflow entry points, and the monolithic `arggon-cli` skill
 (313 lines, everything in the body) is refactored for progressive disclosure so

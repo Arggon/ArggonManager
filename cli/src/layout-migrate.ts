@@ -85,7 +85,8 @@ export function runLayoutMigrate(opts: LayoutMigrateOptions): LayoutMigrateResul
   // dir and the destination does not. A v5 tree with docs already inside is a
   // no-op; both existing is ambiguous (never merge silently).
   let docsMove: LayoutMigrateMove | null = null;
-  if (trackerDir !== legacyDocsDir && existsSync(legacyDocsDir)) {
+  // (trackerDir and legacyDocsDir are always distinct roots; the guard is existence only.)
+  if (existsSync(legacyDocsDir)) {
     if (existsSync(docsDir)) {
       throw new Error(
         `both ${rel(root, legacyDocsDir)}/ and ${rel(root, docsDir)}/ exist — refusing to ` +

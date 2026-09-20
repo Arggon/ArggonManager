@@ -21,7 +21,7 @@ updated: "2026-09-15"
 
 ## Context
 
-Candidate #9 of [product discovery](docs/explorations/exploration-product-discovery-002.md): board cards render deps as text lines with no visual blocking, and the TUI has no dependency awareness at all — agents/humans scan the board instead of reading edges (agent-kanban.dev, 2026-09-15). Effort S; principle: cheap-infra (same read path, presentation only).
+Candidate #9 of [product discovery](../../../docs/explorations/exploration-product-discovery-002.md): board cards render deps as text lines with no visual blocking, and the TUI has no dependency awareness at all — agents/humans scan the board instead of reading edges (agent-kanban.dev, 2026-09-15). Effort S; principle: cheap-infra (same read path, presentation only).
 
 ## Acceptance
 

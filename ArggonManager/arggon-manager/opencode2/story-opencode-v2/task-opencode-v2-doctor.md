@@ -22,7 +22,7 @@ updated: "2026-09-19"
 ## Context
 
 `arggon doctor` is the pure-read installation-state command. The research
-([exploration-opencode-v2-native-009](../../../../docs/explorations/exploration-opencode-v2-native-009.md))
+([exploration-opencode-v2-native-009](../../../docs/explorations/exploration-opencode-v2-native-009.md))
 found two gaps worth reporting without writing anything: V2 registers MCP
 servers under `mcp.servers` in `opencode.json(c)` (the generated `.mcp.json` is
 unverified for V2), and adopters may carry V1-shaped config keys. Doctor is the

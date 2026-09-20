@@ -54,7 +54,7 @@ unverified. Local OpenCode version: v2.0.7.
 ## Notes
 
 **Deliverable:**
-[docs/explorations/exploration-opencode-v2-native-009.md](../../../../docs/explorations/exploration-opencode-v2-native-009.md)
+[docs/explorations/exploration-opencode-v2-native-009.md](../../../docs/explorations/exploration-opencode-v2-native-009.md)
 (candidates A–D, criteria, capability findings, inert-surface table, risk
 register, staged recommendation).
 

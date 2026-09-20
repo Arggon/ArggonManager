@@ -21,7 +21,7 @@ updated: "2026-09-16"
 
 ## Context
 
-User decision (2026-09-16, coordinator session): adopt two methodology requirements, designed in [exploration smoke-ui-testing-006](../../../../../docs/explorations/exploration-smoke-ui-testing-006.md).
+User decision (2026-09-16, coordinator session): adopt two methodology requirements, designed in [exploration smoke-ui-testing-006](../../../docs/explorations/exploration-smoke-ui-testing-006.md).
 
 1. **Reviews focus on quality, scalability, security.** Today the review bar (docs/engineering.md) covers architecture + implementation quality but never names scalability or security. Concretely for this repo: bounded payloads (ADR 0006 spirit), declared complexity for corpus-scale inputs (`spec audit` is O(n²) over spec pairs), untrusted-content parsing (repos we adopt), no shell interpolation, no writes outside the repo root, minimal dependency surface.
 2. **Blocking smoke gate before approval.** Two tiers: CLI behavior changes → probe the changed commands end-to-end on a fixture, evidence recorded in the review verdict (codifies what the coordinator already does); UI changes → browser smoke via Playwright CLI (`@playwright/cli`, fallback Playwright MCP): board renders, matches `arggon list`, one mutation round-trips and persists. Docs-only PRs exempt; TUI = scripted pty check (no browser). Optional CI tier: `@playwright/test` `@smoke` job.

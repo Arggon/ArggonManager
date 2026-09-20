@@ -359,6 +359,15 @@ statuses and the methodology are exactly as before.
 - **Versioning disambiguation.** `v4` is the priority field
   ([Priority (v4)](#priority-v4)); the layout change is `v5`. A v3/v4 tree on
   the legacy layout stays valid without any data migration.
+- **Scope of the migration.** `arggon migrate --layout` moves the whole
+  `<root>/docs/` directory into the tracker root (every product doc, assets
+  included) and never asks per file; a repository with its own unrelated
+  `docs/` tree should reconcile it before or after migrating. Root meta-docs
+  stay at the repository root: `README.md`, `AGENTS.md`, `CLAUDE.md`,
+  `CONTRIBUTING.md`, `SECURITY.md`, `SUPPORT.md`, `ARCHITECTURE.md`,
+  `CHANGELOG.md`. `.github/**`, `.opencode/**`, `.agents/**`, `templates/**`
+  (packaged scaffolds), `fixtures/**` and `labs/**` are not product docs and
+  do not move either.
 
 ### Branch patterns (v2)
 

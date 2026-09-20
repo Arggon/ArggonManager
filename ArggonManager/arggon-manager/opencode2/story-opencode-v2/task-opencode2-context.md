@@ -22,7 +22,7 @@ depends_on: [task-opencode-v2-plugin]
 
 ## Context
 
-W6 of [plan-opencode2-009](../../../../docs/plans/plan-opencode2-009.md).
+W6 of [plan-opencode2-009](../../../docs/plans/plan-opencode2-009.md).
 ArggonManager's own ADR 0006 makes token/context efficiency a product value;
 the OpenCode2 surface changes what is in the prompt (AGENTS router, skill
 descriptions, agent prompts, tool schemas, injected item block, compaction

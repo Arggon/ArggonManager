@@ -22,7 +22,7 @@ depends_on: [task-board-dependency-visuals]
 
 ## Context
 
-Candidate #6 of [product discovery](docs/explorations/exploration-product-discovery-002.md): board cards show a PR badge only with `--github`; orchestration tools compete on diff-first review (Vibe Kanban, Conductor — vibekanban.com, madelove.com, 2026-09-15). A standing `--serve` board with per-item PR state, checks and diff links makes the board the review cockpit — reusing the existing gh read path. Effort M; principle: cheap-infra.
+Candidate #6 of [product discovery](../../../docs/explorations/exploration-product-discovery-002.md): board cards show a PR badge only with `--github`; orchestration tools compete on diff-first review (Vibe Kanban, Conductor — vibekanban.com, madelove.com, 2026-09-15). A standing `--serve` board with per-item PR state, checks and diff links makes the board the review cockpit — reusing the existing gh read path. Effort M; principle: cheap-infra.
 
 ## Acceptance
 

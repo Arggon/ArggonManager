@@ -22,13 +22,13 @@ native, maximally efficient OpenCode V2 citizen **without changing what it is**
 (git-native tracker, one rules kernel, claim → worktree → PR → review → merge →
 done). Contracts:
 
-- Spec: [spec-opencode2-009](../../../../docs/specs/spec-opencode2-009.md)
+- Spec: [spec-opencode2-009](../../../docs/specs/spec-opencode2-009.md)
   (invariants I1–I6, out-of-scope, program acceptance).
-- Plan: [plan-opencode2-009](../../../../docs/plans/plan-opencode2-009.md)
+- Plan: [plan-opencode2-009](../../../docs/plans/plan-opencode2-009.md)
   (waves W0–W7, T1–T16, dependencies, rollback).
-- Decision: [ADR 0010](../../../../docs/adr/0010-opencode2-native-architecture.md)
+- Decision: [ADR 0010](../../../docs/adr/0010-opencode2-native-architecture.md)
   (two layers, one logic path, vendored plugin policy).
-- Research: [exploration-opencode-v2-native-009](../../../../docs/explorations/exploration-opencode-v2-native-009.md).
+- Research: [exploration-opencode-v2-native-009](../../../docs/explorations/exploration-opencode-v2-native-009.md).
 
 Integration branch: `opencode2` (long-lived); wave items branch from it and
 merge back. `main` stays untouched by product decision (2026-09-18) — adopters

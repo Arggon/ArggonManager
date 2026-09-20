@@ -22,11 +22,11 @@ depends_on: [task-opencode-v2-adr, task-opencode-v2-spec]
 
 ## Context
 
-W2 + W3 of [plan-opencode2-009](../../../../docs/plans/plan-opencode2-009.md)
+W2 + W3 of [plan-opencode2-009](../../../docs/plans/plan-opencode2-009.md)
 (T6–T10). The plugin is the only layer that can provide **ambient** behavior:
 zero-config MCP discovery, session ↔ work-item correlation, bounded item
 context per model call, session ergonomics and hygiene signals. Per
-[ADR 0010](../../../../docs/adr/0010-opencode2-native-architecture.md) the
+[ADR 0010](../../../docs/adr/0010-opencode2-native-architecture.md) the
 plugin contributes ambient behavior only — the MCP server remains the tool
 surface, every state transition still goes through the kernel, and the plugin
 is optional and failure-isolated.

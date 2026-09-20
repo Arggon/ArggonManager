@@ -22,7 +22,7 @@ updated: "2026-09-18"
 ## Context
 
 W0 of the OpenCode2 program: turn the research
-([exploration-opencode-v2-native-009](../../../../docs/explorations/exploration-opencode-v2-native-009.md))
+([exploration-opencode-v2-native-009](../../../docs/explorations/exploration-opencode-v2-native-009.md))
 into a reviewable program contract and a wave-ordered implementation plan, and
 restructure the tracker under epic `opencode2`. This task owns the program
 documents; the ADR content is task-opencode-v2-adr's deliverable but ships in

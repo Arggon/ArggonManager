@@ -24,7 +24,7 @@ updated: "2026-09-18"
 Deferred (non-blocking) findings from the independent review of PR #322
 (`task-opencode-v2-spec`), recorded in the review verdict comment on that item.
 The blocking change requests were addressed in-PR; this item closes the rest so
-they do not get lost ([docs/agents.md](../../../../docs/agents.md) §0).
+they do not get lost ([docs/agents.md](../../../docs/agents.md) §0).
 
 Findings to resolve:
 

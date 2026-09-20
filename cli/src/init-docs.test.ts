@@ -106,7 +106,7 @@ describe("init docs: tier-1 content", () => {
 
   it("copilot instructions point at AGENTS.md", () => {
     const copilot = readFileSync(join(dir, ".github/copilot-instructions.md"), "utf8");
-    expect(copilot).toContain("Read [AGENTS.md](../../AGENTS.md) first and follow it");
+    expect(copilot).toContain("Read [AGENTS.md](../AGENTS.md) first and follow it");
   });
 
   it("SECURITY.md has supported-versions and reporting sections", () => {

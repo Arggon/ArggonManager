@@ -21,7 +21,7 @@ updated: "2026-09-15"
 
 ## Context
 
-Candidate #10 of [product discovery](docs/explorations/exploration-product-discovery-002.md) (ADR 0006 consequence): the token/context budgets were measured once (2026-09-14) and promised re-measurement after the directions landed. Compact envelopes, `show`, and the generated-docs budget are now live — without a repeatable measurement command the claim drifts. Effort S; principle: token-context (ADR 0006).
+Candidate #10 of [product discovery](../../../docs/explorations/exploration-product-discovery-002.md) (ADR 0006 consequence): the token/context budgets were measured once (2026-09-14) and promised re-measurement after the directions landed. Compact envelopes, `show`, and the generated-docs budget are now live — without a repeatable measurement command the claim drifts. Effort S; principle: token-context (ADR 0006).
 
 ## Acceptance
 

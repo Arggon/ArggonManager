@@ -22,7 +22,7 @@ updated: "2026-09-18"
 ## Context
 
 W0 of the OpenCode2 program. The research
-([exploration-opencode-v2-native-009](../../../../docs/explorations/exploration-opencode-v2-native-009.md))
+([exploration-opencode-v2-native-009](../../../docs/explorations/exploration-opencode-v2-native-009.md))
 established the V2 capability map; the product owner chose the complete-refactor
 direction and the `opencode2` integration branch. This task owns the
 architecture decision and ships its draft in the same W0 commit as the program
@@ -34,8 +34,8 @@ plan, because a plan cannot point at a decision that does not exist yet.
       documented minimum structure (Context, Decision, Consequences,
       Alternatives considered); status **Proposed**.
 - [x] Research section links the exploration; program section links
-      [spec-opencode2-009](../../../../docs/specs/spec-opencode2-009.md) and
-      [plan-opencode2-009](../../../../docs/plans/plan-opencode2-009.md).
+      [spec-opencode2-009](../../../docs/specs/spec-opencode2-009.md) and
+      [plan-opencode2-009](../../../docs/plans/plan-opencode2-009.md).
 - [x] Decides, with rationale: two layers (portable core + generated native V2
       surface); ambient-behavior-only plugin with MCP as the tool surface;
       one logic path through the kernel; vendored-plugin packaging with

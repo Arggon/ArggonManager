@@ -22,7 +22,7 @@ depends_on: [task-opencode-v2-plugin, task-opencode2-orchestration, task-opencod
 
 ## Context
 
-W7 of [plan-opencode2-009](../../../../docs/plans/plan-opencode2-009.md): this
+W7 of [plan-opencode2-009](../../../docs/plans/plan-opencode2-009.md): this
 repository becomes the reference adopter of its own V2 surface, the program
 documents close, and the program closes on the `opencode2` branch (`main`
 stays untouched by product decision). The dogfood is the

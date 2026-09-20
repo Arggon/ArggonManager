@@ -22,8 +22,8 @@ depends_on: [task-opencode-v2-spec, task-opencode-v2-plugin]
 
 ## Context
 
-W4 of [plan-opencode2-009](../../../../docs/plans/plan-opencode2-009.md):
-the orchestration model in [docs/agents.md](../../../../docs/agents.md)
+W4 of [plan-opencode2-009](../../../docs/plans/plan-opencode2-009.md):
+the orchestration model in [docs/agents.md](../../../docs/agents.md)
 (coordinator delegates, one subagent per item per worktree, lead-architect
 review of every PR, merge verification, tracker ownership) becomes native V2
 agents, commands and flows — same rules, better runtime primitives

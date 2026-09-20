@@ -21,7 +21,7 @@ depends_on: [task-handoff-command]
 
 ## Context
 
-Candidate #1 of [product discovery](docs/explorations/exploration-product-discovery-002.md) — TOP ranked: MCP-only agents fall back to raw file reads (unbounded context) or cannot get a suggestion at all; the ADR 0006 `next`-first win stops at the CLI. Orchestrator tools ship MCP as the agent surface (codeagentswarm.com, 2026-09-15). Effort M; principle: token-context (completes ADR 0006). MUST land after task-next-dependency-ranking and task-handoff-command (parity wraps their final behavior).
+Candidate #1 of [product discovery](../../../docs/explorations/exploration-product-discovery-002.md) — TOP ranked: MCP-only agents fall back to raw file reads (unbounded context) or cannot get a suggestion at all; the ADR 0006 `next`-first win stops at the CLI. Orchestrator tools ship MCP as the agent surface (codeagentswarm.com, 2026-09-15). Effort M; principle: token-context (completes ADR 0006). MUST land after task-next-dependency-ranking and task-handoff-command (parity wraps their final behavior).
 
 ## Acceptance
 

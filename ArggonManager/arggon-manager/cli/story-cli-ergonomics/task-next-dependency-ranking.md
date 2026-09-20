@@ -21,7 +21,7 @@ updated: "2026-09-15"
 
 ## Context
 
-Candidate #2 of [product discovery](docs/explorations/exploration-product-discovery-002.md): `next` ignores graph shape — lexicographic-first suggestions make agents pick arbitrary ready work instead of unblocking the most downstream items. Beads' core differentiator is enforced ready-work computation (steve-yegge.medium.com, 2026-09-15). Effort S; principles: architecture-first, token-context (one right answer saves round-trips).
+Candidate #2 of [product discovery](../../../docs/explorations/exploration-product-discovery-002.md): `next` ignores graph shape — lexicographic-first suggestions make agents pick arbitrary ready work instead of unblocking the most downstream items. Beads' core differentiator is enforced ready-work computation (steve-yegge.medium.com, 2026-09-15). Effort S; principles: architecture-first, token-context (one right answer saves round-trips).
 
 ## Acceptance
 

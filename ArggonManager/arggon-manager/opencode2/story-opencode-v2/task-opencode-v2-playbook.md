@@ -23,9 +23,9 @@ depends_on: [task-opencode-v2-adr]
 ## Context
 
 Adopting OpenCode V2 as a supported agent surface is an "introducing a
-technology" case in [docs/agents.md](../../../../docs/agents.md) §5: the
+technology" case in [docs/agents.md](../../../docs/agents.md) §5: the
 pipeline is explore → ADR → playbook → status. The exploration is done
-([exploration-opencode-v2-native-009](../../../../docs/explorations/exploration-opencode-v2-native-009.md))
+([exploration-opencode-v2-native-009](../../../docs/explorations/exploration-opencode-v2-native-009.md))
 and the ADR is task-opencode-v2-adr; this task produces the playbook and the
 docs the integration points to. Local version verified: `opencode v2.0.7`
 (2026-09-17).
