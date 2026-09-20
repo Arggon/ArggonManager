@@ -1,16 +1,19 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-native-kernel-lib
 title: Kernel as a library
+assignee: Arggon
+branch: feat/task-native-kernel-lib
 parent: native-redesign
-depends_on: [task-native-layout-rename]
 labels: []
 priority: p0
 created: "2026-09-19"
-updated: "2026-09-19"
+updated: "2026-09-20"
+claimed_at: "2026-09-20T05:57:37.025Z"
+depends_on: [task-native-layout-rename]
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-kernel-lib
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-kernel-lib.md
   Leaves live only under a story. id is the filename stem: task-native-kernel-lib.
