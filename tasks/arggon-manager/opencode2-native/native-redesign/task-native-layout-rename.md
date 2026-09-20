@@ -83,3 +83,32 @@ Alcance: head `f66affb` vs base `opencode2` (469 archivos, +4802/−3056). Leí 
 **Nits no bloqueantes:** el reformateo prettier del plugin (`opencode/plugins/arggon/index.ts`, ~900 líneas) es ruido de alcance (el cambio funcional es 1 línea + tests); el comentario del item dice "79 files" y son 81; `layout-migrate.ts:88` (`trackerDir !== legacyDocsDir`) es comparación muerta.
 
 **Recomendación: NO MERGE todavía** hasta que (1) y (2) estén **arreglados en el PR o fileados como items con repro y acceptance** (AGENTS.md: ningún finding accionable queda sin item antes del merge); (3) y (4) pueden ir en el mismo barrido o como follow-up. El resto del PR está sólido: kernel/detección/seam, migración idempotente y dogfood cumplen ADR 0012. Al mergear: **merge commit, nunca squash** (la rama lleva auto-commits del tracker).
+
+### 2026-09-20 @Arggon
+### Veredicto final — PR #371 head `2a6fded` (fixes F1–F4) — 2026-09-20
+
+Re-revisé los commits ff1b09b (F1), 4e52dd5 (F2), 45e198a (F3/F4), 3103a44 (nit plugin) y los tracker commits. Worktree intacto en `2a6fded`, sin artefactos.
+
+**Condición 1 — F1 trend: CUMPLIDA.**
+- **Baseline reproducido**: worktree v5 `report --trend --json` = primary legacy, idéntico: `weeks [{W36:1},{W37:98},{W38:156}]`, `cycleTime bug 31 / story 9 / task 135` (antes de F1: `[{W38:255}]` + cycleTime bug 1).
+- **Repro mínimo propio** (/tmp/opencode/trend-repro, 4 commits + move): post-migración ahora `{W36:1}` + `cycleTime task 1d` (antes `{W38:1}` + `[]`).
+- **Test de regresión verificado por mutación** (copia scratch, sin tocar el árbol): quitar `LEGACY_TRACKER_DIR_NAME` del pathspec → el test nuevo falla; quitar la exclusión `:(exclude)ArggonManager/docs` → falla con la semana extra (ejemplo yaml minado). Ambas mitades cubiertas; `trend.test.ts` 23/23 y `init.test.ts+trend.test.ts` 58/58 en el head real.
+- **Residual bajo (no bloqueante, requiere seguimiento)**: el pathspec incluye `tasks` siempre, así que un repo v5 con un `tasks/` ajeno con frontmatter item-like suma completions falsas (repro propio: fixture v5 + `tasks/example.md` con `type/status` → `{W38:1}`). Impacto solo en `--trend` y caso raro; sugiero filear bug de seguimiento con guard barato (incluir el path legacy solo si su historia registra `tasks/.convention.yml`).
+
+**Condición 2 — F2 `init --propose` legacy: CUMPLIDA.**
+- Probe legacy end-to-end: `proposals [{dest:"docs/tracking.md", decision:"proposed", path:"docs/tracking.md.proposed-0.3.0"}]`; con `--full` añade `docs/convention.md`; originales byte-intactos y no materializa `ArggonManager/`.
+- **Test mutante**: revirtiendo el cambio (canonical sin layout) → el test nuevo falla (`expected undefined to be defined`); con el fix pasa.
+
+**F3/F4 — verificado.**
+- Link-checker sobre 541 .md: tracker a **0 links roteados** (los 31 reescritos, incluidos los `docs/explorations/...` que ya venían rotos de base); el único match en `ArggonManager/docs/convention.md:129` es un falso positivo (regex en tabla). Los templates restantes resuelven al renderizarse; único roto real `templates/docs/SUPPORT.md -> ../SECURITY.md` es **pre-existente** (idéntico en base; opcional follow-up).
+- `templates/docs/github/copilot-instructions.md` → `../AGENTS.md` y coincide con la copia generada (sin drift).
+- README: `(0-5)`, tier-2, inventory de adopt, ejemplos `spec new/validate/audit`, `playbook`, `stack explore`, `instructions`, `mcp` y textos de link a `ArggonManager/docs/...`; sin refs stale fuera del árbol anidado correcto.
+- `ArggonManager/docs/convention.md` §Tracker layout (v5) documenta alcance de la migración y clasificación (root meta-docs + `.github/.opencode/.agents/templates/fixtures/labs` se quedan) — consistente con ADR 0012 §2 (el ADR enumera lo que se mueve; la convention desambigua el resto). Nit `layout-migrate.ts` eliminado.
+
+**Nit plugin — verificado.** Net vs base: `opencode/plugins/arggon/index.ts` 2+/2- (comentario + guard `ArggonManager || tasks`), `index.test.ts` +20/-3 (2 tests nuevos v5/legacy); la copia generada `.opencode/plugins/arggon/index.ts` y su checksum `x-generated` (`sha256:811cbf…`) matchean.
+
+**Gates en `2a6fded`:** `npm test` **1331/1331** (81 files, +2 tests), lint y build limpios, `validate` v5 (0 warnings), `spec validate` ok, CI `cli` **pass** (run 35492577647, head 2a6fded).
+
+**No pude verificar:** carga real del plugin dentro de una sesión OpenCode (solo tsc + unit tests).
+
+**Recomendación: MERGE.** Sin bloqueantes. Merge con **merge commit (nunca squash)**; filear (o aceptar explícitamente) el residual bajo del trend con `tasks/` ajeno antes/después del merge. No marqué done; el item sigue `in_progress` para el cierre post-merge.
