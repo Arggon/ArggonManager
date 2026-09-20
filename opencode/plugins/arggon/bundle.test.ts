@@ -8,22 +8,16 @@
  * deterministic, model-free proof of the dependency-less adopter shape; the
  * real OpenCode runtime load is covered by `npm run smoke:opencode`.
  *
- * The artifact is regenerated here when stale (like `plugin-copy.test.ts`), so
- * a source change can never leave the committed bundle behind silently.
+ * The committed artifact is read-only here: drift is gated by
+ * `cli/src/plugin-copy.test.ts` (assert-before-write) and `npm run check:plugin`
+ * in CI, never auto-healed by the suite.
  */
-import {
-  copyFileSync,
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { copyFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import { PLUGIN_BUNDLE, buildPluginBundle } from "../../../cli/src/plugin-bundle.js";
+import { PLUGIN_BUNDLE } from "../../../cli/src/plugin-bundle.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -50,13 +44,6 @@ const tempDirs: string[] = [];
 afterAll(() => {
   for (const dir of tempDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
-
-function regenerateBundle(): string {
-  const { code } = buildPluginBundle(repoRoot);
-  const path = join(repoRoot, ...PLUGIN_BUNDLE.split("/"));
-  if (!existsSync(path) || readFileSync(path, "utf8") !== code) writeFileSync(path, code);
-  return code;
-}
 
 /** Copy the artifact to a fresh dependency-less temp dir and import it. */
 async function importDependencyLess(): Promise<Record<string, unknown>> {
@@ -112,7 +99,6 @@ function fakeContext(directory: string): { ctx: Record<string, unknown>; tools: 
 
 describe("vendored plugin bundle: dependency-less load (W3)", () => {
   it("loads from a temp dir with no node_modules and exports the plugin definition", async () => {
-    regenerateBundle();
     const mod = await importDependencyLess();
     expect(Object.keys(mod)).toEqual(["default"]);
     const definition = mod.default as ArgonPlugin;
