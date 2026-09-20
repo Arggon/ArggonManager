@@ -234,7 +234,7 @@ export type Inventory = {
 
 /**
  * Pure inventory logic: no writes, no tracker access, no CLI wiring.
- * `root` is the repo root (parent of tasks/).
+ * `root` is the repo root (parent of the tracker dir).
  */
 export function buildInventory(root: string): Inventory {
   const state = readGeneratedState(root);
@@ -366,7 +366,7 @@ export type AdoptOptions = {
 };
 
 export type AdoptResult = {
-  /** Repo root (parent of tasks/). */
+  /** Repo root (parent of the tracker dir). */
   root: string;
   dryRun: boolean;
   inventory: Inventory;
@@ -667,7 +667,7 @@ export type AdoptAckOptions = {
 };
 
 export type AdoptAckResult = {
-  /** Repo root (parent of tasks/). */
+  /** Repo root (parent of the tracker dir). */
   root: string;
   /** Acknowledged docs, sorted by path. */
   acked: AckedDoc[];

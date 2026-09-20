@@ -46,17 +46,21 @@ function makeRepo(): string {
 function copyRealDocs(dir: string): void {
   mkdirSync(join(dir, "docs", "specs"), { recursive: true });
   mkdirSync(join(dir, "docs", "plans"), { recursive: true });
+  // The temp tree `makeRepo()` builds is a legacy `tasks/` + `docs/` tree, so
+  // the copied docs' canonical `ArggonManager/docs/` pointers are remapped to
+  // the legacy form — same content, layout the temp tree actually has.
+  const legacy = (text: string) => text.replaceAll("ArggonManager/docs", "docs");
   for (const name of ["spec-deps-001.md", "spec-sync-001.md"]) {
     writeFileSync(
       join(dir, "docs", "specs", name),
-      readFileSync(join(repoRoot, "docs", "specs", name), "utf8"),
+      legacy(readFileSync(join(repoRoot, "ArggonManager", "docs", "specs", name), "utf8")),
       "utf8",
     );
   }
   for (const name of ["plan-deps-001.md", "plan-sync-001.md"]) {
     writeFileSync(
       join(dir, "docs", "plans", name),
-      readFileSync(join(repoRoot, "docs", "plans", name), "utf8"),
+      legacy(readFileSync(join(repoRoot, "ArggonManager", "docs", "plans", name), "utf8")),
       "utf8",
     );
   }
@@ -139,7 +143,10 @@ describe("spec validate (error codes)", () => {
       writeSpec(dir, `spec-missing-${field}-001.md`, fm);
       const result = runSpecValidate({ cwd: dir });
       const hits = result.errors.filter((e) => e.code === "SPEC_MISSING_FIELD");
-      expect(hits.some((e) => e.message.includes(`'${field}'`)), field).toBe(true);
+      expect(
+        hits.some((e) => e.message.includes(`'${field}'`)),
+        field,
+      ).toBe(true);
     }
   });
 
@@ -284,7 +291,10 @@ describe("spec validate (error codes)", () => {
     const dir = makeRepo();
     writeSpec(dir, "spec-real-001.md", validSpecFm);
     writePlan(dir, "plan-single-001.md", validPlanFm("docs/specs/spec-real-001.md"));
-    const result = runSpecValidate({ cwd: dir, file: join(dir, "docs", "plans", "plan-single-001.md") });
+    const result = runSpecValidate({
+      cwd: dir,
+      file: join(dir, "docs", "plans", "plan-single-001.md"),
+    });
     expect(result.errors).toEqual([]);
     expect(result.checked).toBe(1);
   });

@@ -26,14 +26,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
-- Release discipline: every release bumps the version, gets a `vX.Y.Z` tag on the release commit in `main`, and a section here listing adopter-facing changes — so `arggonVersion` stamps in generated docs tell you which upgrades you missed. See `docs/runbooks/release.md` (task-version-channel-discipline).
+- Release discipline: every release bumps the version, gets a `vX.Y.Z` tag on the release commit in `main`, and a section here listing adopter-facing changes — so `arggonVersion` stamps in generated docs tell you which upgrades you missed. See `ArggonManager/docs/runbooks/release.md` (task-version-channel-discipline).
 - Non-functional review bar and a blocking smoke gate in CI (ADR 0008).
 - `spec import openspec` — import an existing OpenSpec tree.
 - `spec analyze --baseline` / `--save-baseline` — diff spec analysis against a saved baseline.
 - `spec audit` — audit a spec tree for convention violations.
 - `arggon adopt` now injects task body content (corpus) into adopter context.
 - Agent skill synced with the new command surface above.
-- Self-hosted governance stack (story-dogfood-self-host): convention v3 with `branch_patterns` and `x-tracker.auto-commit` in `tasks/.convention.yml`; bundled agent skill at `.agents/skills/arggon-cli/SKILL.md`; generated adopter docs (`.editorconfig`, `.github/CODEOWNERS`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/copilot-instructions.md`, `SECURITY.md`, `SUPPORT.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `docs/tracking.md`, `docs/runbooks/README.md`); technology playbooks for node/typescript/vitest under `docs/playbooks/`; a local pre-commit hook running `arggon validate`.
+- Self-hosted governance stack (story-dogfood-self-host): convention v3 with `branch_patterns` and `x-tracker.auto-commit` in the tracker `.convention.yml`; bundled agent skill at `.agents/skills/arggon-cli/SKILL.md`; generated adopter docs (`.editorconfig`, `.github/CODEOWNERS`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/copilot-instructions.md`, `SECURITY.md`, `SUPPORT.md`, `ARCHITECTURE.md`, `CHANGELOG.md`, `ArggonManager/docs/tracking.md`, `ArggonManager/docs/runbooks/README.md`); technology playbooks for node/typescript/vitest under `ArggonManager/docs/playbooks/`; a local pre-commit hook running `arggon validate`.
 
 ### Changed
 

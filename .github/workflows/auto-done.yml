@@ -6,7 +6,7 @@ name: auto-done
 # change to main. Only the legal in_progress -> done transition is performed;
 # anything else (unclaimed items, containers, unknown ids) is skipped with a
 # warning annotation. Acceptance checklists stay a human/agent responsibility.
-# Context: tasks/arggon-manager/cli/story-github/task-auto-done-on-merge.md
+# Context: ArggonManager/arggon-manager/cli/story-github/task-auto-done-on-merge.md
 
 on:
   pull_request:
@@ -95,7 +95,7 @@ jobs:
                 echo "::warning::$id is $status: $status -> done is not a legal v0 transition (claim first, then merge, or mark manually)"
                 ;;
               "")
-                echo "skip $id: not found under tasks/ (external reference?)"
+                echo "skip $id: not found in the tracker (external reference?)"
                 ;;
             esac
           done
@@ -110,7 +110,7 @@ jobs:
             npm test --silent && npm run lint --silent
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add tasks/
+            git add ArggonManager/
             if git diff --cached --quiet; then echo "no status flips to commit"; exit 0; fi
             git commit -m "chore(auto): mark items done (PR #$PR merged)"
             branch="chore/auto-done-${GITHUB_RUN_ID}"
@@ -184,7 +184,7 @@ jobs:
                     echo "redo: no status flips to commit (items already done on main?)"
                     exit 2
                   fi
-                  git add tasks/
+                  git add ArggonManager/
                   # The CLI may auto-commit the flip itself (it did in the
                   # wedge-3 repro), so an empty staged tree is NOT a failure.
                   if ! git diff --cached --quiet; then

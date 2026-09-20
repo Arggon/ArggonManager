@@ -53,7 +53,7 @@ export type CommentResult = {
   id: string;
   /** Absolute path of the commented item file. */
   path: string;
-  /** Repo root (parent of tasks/). */
+  /** Repo root (parent of the tracker dir). */
   root: string;
   /** The comment as appended to the body. */
   comment: {

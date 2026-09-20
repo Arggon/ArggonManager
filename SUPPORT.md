@@ -5,15 +5,15 @@ How to get help with ArggonManager.
 
 ## Where to ask
 
-- Questions / usage help: read [docs/agents.md](docs/agents.md) (workflow), [docs/convention.md](docs/convention.md) (task tree schema), and [ARCHITECTURE.md](ARCHITECTURE.md); agent users should load the bundled `arggon-cli` skill at `.agents/skills/arggon-cli/SKILL.md`.
-- Bug reports: this project tracks work in-tree under `tasks/` — see [`docs/tracking.md`](docs/tracking.md). Do not open GitHub issues unless the link above says otherwise.
-- Security issues: follow [`SECURITY.md`](../SECURITY.md) — never report vulnerabilities through public channels.
+- Questions / usage help: read [`ArggonManager/docs/agents.md`](ArggonManager/docs/agents.md) (workflow), [`ArggonManager/docs/convention.md`](ArggonManager/docs/convention.md) (task tree schema), and [ARCHITECTURE.md](ARCHITECTURE.md); agent users should load the bundled `arggon-cli` skill at `.agents/skills/arggon-cli/SKILL.md`.
+- Bug reports: this project tracks work in-tree under the tracker root — see [`ArggonManager/docs/tracking.md`](ArggonManager/docs/tracking.md). Do not open GitHub issues unless the link above says otherwise.
+- Security issues: follow [`SECURITY.md`](SECURITY.md) — never report vulnerabilities through public channels.
 
 ## Before opening a bug report
 
 1. Reproduce on the latest release.
 2. Collect the exact command and output (and version: `arggon --version` or the project equivalent).
-3. Check existing work items: `arggon list --status todo --json`, or search `tasks/`.
+3. Check existing work items: `arggon list --status todo --json`, or search the tracker.
 
 ## Commercial / long-term support
 

@@ -104,7 +104,7 @@ export type SoftLoadResult =
       unknownKeys: string[];
     };
 
-/** Collect every file and directory under tasks/ (skipping dotfiles). Shared by validate. */
+/** Collect every file and directory under the tracker root (skipping dotfiles). Shared by validate. */
 export function walkTasksTree(
   dir: string,
   opts?: { skipDirs?: string[] },

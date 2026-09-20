@@ -45,7 +45,7 @@ describe("generated SKILL command reference (task-skill-generated-command-refere
     const docs = [
       readFileSync(skillPath, "utf8"),
       readFileSync(join(repoRoot, "README.md"), "utf8"),
-      readFileSync(join(repoRoot, "docs/agents.md"), "utf8"),
+      readFileSync(join(repoRoot, "ArggonManager/docs/agents.md"), "utf8"),
     ].join("\n");
     const undocumented: string[] = [];
     for (const info of loadCliCommands()) {

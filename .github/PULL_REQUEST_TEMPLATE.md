@@ -1,7 +1,7 @@
 <!-- arggon:generated template="github/PULL_REQUEST_TEMPLATE.md" -->
 <!--
   Pull request template for ArggonManager.
-  Work items live under tasks/ — reference the item id (e.g. task-<slug>) below.
+  Work items live under the tracker root (ArggonManager/) — reference the item id (e.g. task-<slug>) below.
 -->
 
 ## Summary

@@ -68,10 +68,10 @@ export type PriorityMigrateEntry = {
 };
 
 export type PriorityMigrateResult = {
-  /** Repo root (parent of tasks/). */
+  /** Repo root (parent of the tracker dir). */
   root: string;
   dryRun: boolean;
-  /** Items scanned under tasks/. */
+  /** Items scanned in the tracker. */
   scanned: number;
   /** Items this run wrote (or would write under --dry-run). */
   changed: number;
@@ -81,7 +81,7 @@ export type PriorityMigrateResult = {
 
 /**
  * Move the legacy `pN` label convention into the v4 `priority` field across
- * every item under tasks/. An item participates when its labels contain a
+ * every item in the tracker. An item participates when its labels contain a
  * token matching `^p[0-9]$` (`p10`, `p2x`, `P2` are left alone). All pN
  * labels are removed; non-priority labels ride along untouched. The field
  * destination is the HIGHEST priority among the labels (lowest number);

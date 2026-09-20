@@ -116,7 +116,7 @@ export function defaultBoardGithub(): BoardGithub {
 /**
  * Load items from the shared kernel (same read path as `list`) and write a
  * static, self-contained HTML board. Read-only: nothing is read back from the
- * file, and no item in tasks/ is modified. With `github`, live PR state is
+ * file, and no item in the tracker is modified. With `github`, live PR state is
  * overlaid on cards with a `branch` (matched by head ref name); the overlay
  * never writes either.
  */

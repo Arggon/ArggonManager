@@ -919,7 +919,7 @@ arggon <command> [flags]
 const PLAN_TEMPLATE_FALLBACK = `---
 plan_id: {{ID}}
 title: Plan for {{TITLE}}
-spec: docs/specs/spec-{{SLUG}}-{{NNN}}.md
+spec: ArggonManager/docs/specs/spec-{{SLUG}}-{{NNN}}.md
 status: proposed
 created: {{DATE}}
 ---

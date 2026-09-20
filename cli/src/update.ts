@@ -128,7 +128,7 @@ export type UpdateOptions = {
 export type UpdateResult = {
   id: string;
   path: string;
-  /** Repo root (parent of tasks/). */
+  /** Repo root (parent of the tracker dir). */
   root: string;
   /** The updated item, reloaded from disk. */
   item: WorkItem;

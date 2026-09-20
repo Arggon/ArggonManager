@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 
 /**
  * Atomic file write for generated docs (scaffolds, templates) and the
- * `tasks/.convention.yml` config (bug-atomic-write-followups).
+ * the tracker `.convention.yml` config (bug-atomic-write-followups).
  *
  * Writes the content to a temp file in the SAME directory as the target, then
  * `renameSync`s it onto the target. rename(2) is atomic on POSIX, so the

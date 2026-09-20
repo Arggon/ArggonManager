@@ -133,6 +133,7 @@ arggon import-issues  # One-shot import of GitHub issues into the tracker as tas
 arggon instructions  # Print the agent wiring (install, pre-commit, CI) extracted from the agent playbook
 arggon cleanup  # List worktrees of done/cancelled items whose branches are merged (--prune removes them)
 arggon priority migrate  # Move legacy pN labels into the priority field on all items (highest label wins, all pN labels removed, non-priority labels kept; idempotent; never auto-commits — review and commit once)
+arggon migrate  # Move a legacy tasks/ tracker (and its product docs) to the ArggonManager/ layout (ADR 0012, convention v5; idempotent, never auto-commits)
 <!-- arggon:generated-commands end -->
 ```
 

@@ -2,7 +2,7 @@ import type { ItemType } from "./ids.js";
 import { canTransition, isClaimed, TRANSITIONS, type Status } from "./status.js";
 
 /**
- * Playbook rules (docs/agents.md) that must hold no matter how a caller
+ * Playbook rules (ArggonManager/docs/agents.md) that must hold no matter how a caller
  * reaches the kernel. Both the CLI and the MCP server funnel updates through
  * assertUpdateRules, so agent restrictions are encoded exactly once.
  */
@@ -30,13 +30,13 @@ export type UpdateIntent = {
 export function assertUpdateRules(intent: UpdateIntent, caller: CallerKind): void {
   if (caller === "agent" && intent.force) {
     throw new Error(
-      "agents must not steal a claim; --force is a human-only escape hatch (docs/agents.md)",
+      "agents must not steal a claim; --force is a human-only escape hatch (ArggonManager/docs/agents.md)",
     );
   }
 
   if (caller === "agent" && intent.steal) {
     throw new Error(
-      "agents must not steal a claim; --steal is a human-only supervised escape hatch (docs/agents.md)",
+      "agents must not steal a claim; --steal is a human-only supervised escape hatch (ArggonManager/docs/agents.md)",
     );
   }
 
@@ -57,7 +57,7 @@ export function assertUpdateRules(intent: UpdateIntent, caller: CallerKind): voi
     (intent.currentStatus === "done" || intent.currentStatus === "cancelled")
   ) {
     throw new Error(
-      `agents must not reopen ${intent.currentStatus} items (docs/agents.md); ask a human to reopen '${intent.id}'`,
+      `agents must not reopen ${intent.currentStatus} items (ArggonManager/docs/agents.md); ask a human to reopen '${intent.id}'`,
     );
   }
 

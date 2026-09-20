@@ -36,11 +36,15 @@ const byteLength = (text: string): number => new TextEncoder().encode(text).leng
 
 describe("plugin-context: arggon invocation parsing", () => {
   it("parses CLI subcommands that reference one item", () => {
-    expect(parseArggonItemFromCommand("arggon show task-smoke-item --json")).toBe("task-smoke-item");
-    expect(parseArggonItemFromCommand("npm run arggon -- update task-x --status in_progress")).toBe("task-x");
-    expect(parseArggonItemFromCommand("cd repo && /usr/local/bin/arggon comment bug-login-500 'note'")).toBe(
-      "bug-login-500",
+    expect(parseArggonItemFromCommand("arggon show task-smoke-item --json")).toBe(
+      "task-smoke-item",
     );
+    expect(parseArggonItemFromCommand("npm run arggon -- update task-x --status in_progress")).toBe(
+      "task-x",
+    );
+    expect(
+      parseArggonItemFromCommand("cd repo && /usr/local/bin/arggon comment bug-login-500 'note'"),
+    ).toBe("bug-login-500");
     expect(parseArggonItemFromCommand('arggon handoff "task-x" --next "go"')).toBe("task-x");
     expect(parseArggonItemFromCommand("arggon -q start task-x --worktree")).toBe("task-x");
   });
@@ -61,9 +65,11 @@ describe("plugin-context: arggon invocation parsing", () => {
     expect(parseArggonItemFromCommand('git commit -m "arggon handoff task-x"')).toBeUndefined();
     expect(parseArggonItemFromCommand("echo arggon show task-x")).toBeUndefined();
     expect(parseArggonItemFromCommand("cd repo && grep arggon show task-x")).toBeUndefined();
-    expect(parseArggonItemFromCode('const cmd = "grep -rn \'arggon show task-x\' ."')).toBeUndefined();
     expect(
-      parseArggonItemFromCode('await tools.shell({ command: \'echo "arggon update task-fake"\' })'),
+      parseArggonItemFromCode("const cmd = \"grep -rn 'arggon show task-x' .\""),
+    ).toBeUndefined();
+    expect(
+      parseArggonItemFromCode("await tools.shell({ command: 'echo \"arggon update task-fake\"' })"),
     ).toBeUndefined();
   });
 
@@ -109,9 +115,9 @@ describe("plugin-context: arggon invocation parsing", () => {
     expect(parseArggonItemFromCommand("npx arggon show task-x")).toBe("task-x");
     expect(parseArggonItemFromCommand("bunx arggon show task-x")).toBe("task-x");
     expect(parseArggonItemFromCommand("sudo arggon show task-x")).toBe("task-x");
-    expect(parseArggonItemFromCommand("sudo -u root arggon update task-x --status in_progress")).toBe(
-      "task-x",
-    );
+    expect(
+      parseArggonItemFromCommand("sudo -u root arggon update task-x --status in_progress"),
+    ).toBe("task-x");
     expect(parseArggonItemFromCommand("env ARGON_QUIET=1 arggon show task-x")).toBe("task-x");
     expect(parseArggonItemFromCommand("env -i arggon show task-x")).toBe("task-x");
     expect(parseArggonItemFromCommand("command arggon show task-x")).toBe("task-x");
@@ -304,32 +310,52 @@ describe("plugin-context: arggon invocation parsing", () => {
 
   it("parses Code Mode MCP calls and embedded shell commands", () => {
     expect(
-      parseArggonItemFromCode('return await tools.arggon.arggon_update({ id: "task-x", status: "in_progress" })'),
+      parseArggonItemFromCode(
+        'return await tools.arggon.arggon_update({ id: "task-x", status: "in_progress" })',
+      ),
     ).toBe("task-x");
-    expect(parseArggonItemFromCode("return await tools.arggon.arggon_show({ id: 'bug-y' })")).toBe("bug-y");
-    expect(parseArggonItemFromCode("await tools.arggon.arggon_comment({id: `task-z`, text: 'hi'})")).toBe("task-z");
-    expect(parseArggonItemFromCode('return await tools.shell({ command: "arggon show task-cli" })')).toBe(
-      "task-cli",
+    expect(parseArggonItemFromCode("return await tools.arggon.arggon_show({ id: 'bug-y' })")).toBe(
+      "bug-y",
     );
     expect(
-      parseArggonItemFromCode('return await tools.shell({ command: "npx arggon show task-wrapped" })'),
+      parseArggonItemFromCode("await tools.arggon.arggon_comment({id: `task-z`, text: 'hi'})"),
+    ).toBe("task-z");
+    expect(
+      parseArggonItemFromCode('return await tools.shell({ command: "arggon show task-cli" })'),
+    ).toBe("task-cli");
+    expect(
+      parseArggonItemFromCode(
+        'return await tools.shell({ command: "npx arggon show task-wrapped" })',
+      ),
     ).toBe("task-wrapped");
   });
 
   it("does not invent an item for unrelated Code Mode calls", () => {
     expect(parseArggonItemFromCode("return await tools.arggon.arggon_next({})")).toBeUndefined();
-    expect(parseArggonItemFromCode('return await tools.arggon.arggon_update({ status: "in_progress" })')).toBeUndefined();
-    expect(parseArggonItemFromCode("return await tools.read({ path: 'README.md' })")).toBeUndefined();
-    expect(parseArggonItemFromCode("const cmd = 'echo \"&& arggon show task-x\"';")).toBeUndefined();
+    expect(
+      parseArggonItemFromCode('return await tools.arggon.arggon_update({ status: "in_progress" })'),
+    ).toBeUndefined();
+    expect(
+      parseArggonItemFromCode("return await tools.read({ path: 'README.md' })"),
+    ).toBeUndefined();
+    expect(
+      parseArggonItemFromCode("const cmd = 'echo \"&& arggon show task-x\"';"),
+    ).toBeUndefined();
   });
 
   it("parses observed tool executions by tool name", () => {
-    expect(parseArggonItemFromTool("shell", { command: "arggon show task-x --json" })).toBe("task-x");
-    expect(parseArggonItemFromTool("arggon_update", { id: "task-x", status: "in_progress" })).toBe("task-x");
-    expect(parseArggonItemFromTool("arggon.arggon_handoff", { id: "task-x" })).toBe("task-x");
-    expect(parseArggonItemFromTool("execute", { code: 'await tools.arggon.arggon_start({ id: "task-x" })' })).toBe(
+    expect(parseArggonItemFromTool("shell", { command: "arggon show task-x --json" })).toBe(
       "task-x",
     );
+    expect(parseArggonItemFromTool("arggon_update", { id: "task-x", status: "in_progress" })).toBe(
+      "task-x",
+    );
+    expect(parseArggonItemFromTool("arggon.arggon_handoff", { id: "task-x" })).toBe("task-x");
+    expect(
+      parseArggonItemFromTool("execute", {
+        code: 'await tools.arggon.arggon_start({ id: "task-x" })',
+      }),
+    ).toBe("task-x");
     expect(parseArggonItemFromTool("read", { path: "tasks/task-x.md" })).toBeUndefined();
     expect(parseArggonItemFromTool(undefined, { id: "task-x" })).toBeUndefined();
   });
@@ -402,7 +428,9 @@ describe("plugin-context: bounded item block", () => {
     expect(block.text).toContain("title: Smoke item");
     expect(block.text).toContain("parent: smoke-story");
     expect(block.text).toContain("branch: feat/task-smoke-item");
-    expect(block.text).toContain("worktree: /tmp/worktrees/task-smoke-item (session_move available)");
+    expect(block.text).toContain(
+      "worktree: /tmp/worktrees/task-smoke-item (session_move available)",
+    );
     expect(block.text.trimEnd().endsWith("</arggon-item>")).toBe(true);
     expect(block.bytes).toBe(byteLength(block.text));
     expect(block.truncated).toBe(false);
@@ -416,7 +444,11 @@ describe("plugin-context: bounded item block", () => {
   });
 
   it("clips per-field values and stays within the byte bound for a long title", () => {
-    const clipped = buildItemBlock({ ...item, title: "x".repeat(5000), labels: Array.from({ length: 50 }, (_, i) => `label-${i}`) });
+    const clipped = buildItemBlock({
+      ...item,
+      title: "x".repeat(5000),
+      labels: Array.from({ length: 50 }, (_, i) => `label-${i}`),
+    });
     expect(clipped.truncated).toBe(false);
     expect(clipped.bytes).toBeLessThanOrEqual(ITEM_BLOCK_MAX_BYTES);
     expect(clipped.text).toContain("…");
@@ -443,7 +475,10 @@ describe("plugin-context: bounded item block", () => {
   });
 
   it("bounds arbitrary text on a line boundary", () => {
-    const bounded = boundText(["<arggon-item>", "a".repeat(2000), "</arggon-item>"].join("\n"), 128);
+    const bounded = boundText(
+      ["<arggon-item>", "a".repeat(2000), "</arggon-item>"].join("\n"),
+      128,
+    );
     expect(bounded.truncated).toBe(true);
     expect(bounded.bytes).toBeLessThanOrEqual(128);
     expect(bounded.text.endsWith("… (truncated)")).toBe(true);
@@ -514,7 +549,7 @@ describe("plugin-context: storage guard order", () => {
     return { writes, ctx };
   }
 
-  it("writes nothing when the tree has no tasks/ directory (F4)", async () => {
+  it("writes nothing when the tree has no tracker root (F4)", async () => {
     const directory = mkdtempSync(join(tmpdir(), "arggon-guard-outside-"));
     try {
       const { writes, ctx } = fakeContext(directory);
@@ -530,8 +565,25 @@ describe("plugin-context: storage guard order", () => {
     }
   });
 
-  it("correlates an observed invocation once tasks/ exists (F4)", async () => {
-    const directory = mkdtempSync(join(tmpdir(), "arggon-guard-inside-"));
+  it("correlates an observed invocation once the v5 ArggonManager/ root exists (F4)", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "arggon-guard-inside-v5-"));
+    try {
+      mkdirSync(join(directory, "ArggonManager"));
+      const { writes, ctx } = fakeContext(directory);
+      await onToolAfter(ctx, {
+        status: "completed",
+        sessionID: "ses-guard",
+        tool: "shell",
+        input: { command: "arggon show task-x" },
+      });
+      expect(writes).toEqual([["arggon/session/ses-guard", "task-x"]]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("correlates an observed invocation on a legacy tasks/ tree too (F4)", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "arggon-guard-inside-legacy-"));
     try {
       mkdirSync(join(directory, "tasks"));
       const { writes, ctx } = fakeContext(directory);

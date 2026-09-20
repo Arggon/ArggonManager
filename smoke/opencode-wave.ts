@@ -694,7 +694,7 @@ function wavePlanPrompt(): string {
     "1. Run: arggon next --json",
     "2. Run: arggon list --status todo --json",
     "3. Identify the two claimable task items and confirm they are file-disjoint.",
-    "4. Read both task files under tasks/ for their acceptance checklists.",
+    "4. Read both task files under ArggonManager/ for their acceptance checklists.",
     "Reply with a short numbered wave plan: each item id, its branch, the single file its worker will create, and the worker prompt skeleton. Do NOT claim anything, do NOT launch subagents, do NOT edit or commit anything yet.",
   ].join("\n");
 }

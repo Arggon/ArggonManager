@@ -41,7 +41,7 @@ export type ShowResult = {
   id: string;
   /** Absolute path of the item file. */
   path: string;
-  /** Repo root (parent of tasks/). */
+  /** Repo root (parent of the tracker dir). */
   root: string;
   item: WorkItem;
   /** Prose body (everything before the first comment heading). */

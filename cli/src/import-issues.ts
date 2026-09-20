@@ -82,7 +82,7 @@ export type ImportEntry = {
 };
 
 export type ImportIssuesResult = {
-  /** Repo root (parent of tasks/). */
+  /** Repo root (parent of the tracker dir). */
   root: string;
   dryRun: boolean;
   /** Target story for imported leaves. */

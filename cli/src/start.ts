@@ -43,7 +43,7 @@ export type StartOptions = {
 export type StartResult = {
   id: string;
   path: string;
-  /** Repo root (parent of tasks/; also the git cwd). With --worktree this is the worktree root. */
+  /** Repo root (parent of the tracker dir; also the git cwd). With --worktree this is the worktree root. */
   root: string;
   branch: string;
   /** True when `git checkout -b` ran; false when attaching to the recorded branch. */

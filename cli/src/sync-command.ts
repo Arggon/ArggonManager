@@ -6,7 +6,7 @@ import { matchItem, toSyncResult, type SyncFilled, type SyncResult } from "./syn
 import { runUpdate } from "./update.js";
 
 /**
- * Reconcile tasks/ with the repo's open GitHub PRs. Check mode (the default)
+ * Reconcile the tracker with the repo's open GitHub PRs. Check mode (the default)
  * only reports; write mode additionally fills empty `branch` fields via the
  * same matching. Never overwrites a set branch, never guesses an ambiguous
  * match, and never touches status (merge != acceptance). Returns data; the

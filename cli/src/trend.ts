@@ -1,6 +1,6 @@
 /**
  * Git-history trend mining (story-report-trend): every status transition of a
- * work item is a frontmatter diff in some commit under `tasks/`, so a single
+ * work item is a frontmatter diff in some commit under the tracker, so a single
  * `git log -p` pass over the tree is a free analytics database.
  *
  * Pure read — `git log` only, never writes, never touches the tree.
@@ -51,7 +51,7 @@ export type RunTrendOptions = {
 };
 
 /**
- * Mine `git log -p` over `tasks/` for status transitions and aggregate:
+ * Mine `git log -p` over the tracker for status transitions and aggregate:
  * weekly completions of ALL item types (ISO week of the first terminal
  * transition — story-driven projects get non-empty trends) and average cycle
  * time per leaf type (first claim → terminal, in days; leaves are

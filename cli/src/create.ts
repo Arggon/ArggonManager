@@ -64,7 +64,7 @@ export type CreateOptions = {
 export type CreateResult = {
   id: string;
   path: string;
-  /** Repo root (parent of tasks/). */
+  /** Repo root (parent of the tracker dir). */
   root: string;
   /** The created item, reloaded from disk. */
   item: WorkItem;

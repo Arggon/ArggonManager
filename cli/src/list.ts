@@ -24,7 +24,7 @@ export type ListOptions = {
   parent?: string;
   /** Compact expression (`status:todo !label:security`); ANDs with the flags above. */
   filter?: string;
-  /** Saved view name (`x-views` in tasks/.convention.yml); ANDs with the flags and --filter. */
+  /** Saved view name ((`x-views` in the tracker .convention.yml)); ANDs with the flags and --filter. */
   view?: string;
   /** Limit to claimed items whose claimed_at is older than `olderThan` (or missing). */
   stale?: boolean;
@@ -40,7 +40,7 @@ export type ListDeps = {
 };
 
 export type ListResult = {
-  /** Repo root (parent of tasks/). */
+  /** Repo root (parent of the tracker dir). */
   root: string;
   /** Kernel items, lexicographic by id. */
   items: WorkItem[];

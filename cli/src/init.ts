@@ -141,8 +141,8 @@ function ensureTemplates(root: string, force: boolean): string[] {
 
 /**
  * Tracker hygiene (bug-init-leaves-docs-untracked-start-blocks-on-clean-tree):
- * commit exactly the files this run wrote — docs, templates, tasks/ tree and
- * tasks/.convention.yml (its x-generated state must ride along so the first
+ * commit exactly the files this run wrote — docs, templates, the tracker tree and
+ * the tracker `.convention.yml` (its x-generated state must ride along so the first
  * commit is self-consistent). Surgical staging (`git add -- <path>`), never
  * `git add -A`; best effort — non-git trees and git-absent machines skip with
  * a reason and the command stays ok. A re-run that rewrote nothing (identical
@@ -181,7 +181,7 @@ function isGitRepo(root: string): boolean {
 }
 
 /**
- * One planned scaffold action (tasks/.convention.yml, templates/) — the doc
+ * One planned scaffold action (the tracker `.convention.yml`, templates/) — the doc
  * destinations carry the richer DocsPlanEntry shape.
  */
 export type InitPlanEntry = {

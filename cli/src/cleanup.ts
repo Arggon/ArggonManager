@@ -74,7 +74,7 @@ export type CleanupAction = {
 };
 
 export type CleanupResult = {
-  /** Repo root (parent of tasks/; the git cwd). */
+  /** Repo root (parent of the tracker dir; the git cwd). */
   root: string;
   /** Branch merge safety is checked against this ref (e.g. origin/main). */
   base: string;

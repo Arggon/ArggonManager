@@ -16,9 +16,9 @@ import { runUpdate } from "./update.js";
  * `arggon board --serve` (task-board-serve): serve the static board locally
  * with live reload. Binds 127.0.0.1 only. The browser page is the same static
  * board (rendered fresh per request) plus a tiny SSE client that reloads the
- * tab whenever any file under tasks/ changes. Edits posted by drag-and-drop
+ * tab whenever any tracker file changes. Edits posted by drag-and-drop
  * go through the kernel update path (runUpdate) — never raw file writes from
- * the browser, keeping "git files under tasks/ are the source of truth".
+ * the browser, keeping "git files under the tracker are the source of truth".
  *
  * Review surface (task-board-review-surface): the served board overlays live
  * PR state (open/draft/merged + checks) and per-PR diff links on cards with a
