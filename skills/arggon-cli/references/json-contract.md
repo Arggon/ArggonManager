@@ -53,11 +53,22 @@ PRIORITY_FAILED`.
   don't work around it, and keep it green before committing.
 - `board --json` → `{ok, command: "board", path, itemCount}` and the file exists.
 
+## Native tools (OpenCode V2)
+
+The vendored plugin registers the same operations as native `arggon` tools in
+Code Mode (`tools.arggon.list`, `create`, `update`, `show`, `next`, `report`,
+`validate`, `comment`, `handoff`, `priority`, `sync`, `import_issues`). Tool
+outputs are the documented `--json` envelopes verbatim (byte parity pinned by
+the plugin contract tests); a kernel failure throws a typed tool error carrying
+the failure code and the `ok:false` envelope instead of exiting the process.
+`comment`/`handoff` default their author/session to the calling session id, and
+the session keeps running after a tool error.
+
 ## MCP surface
 
-`arggon mcp` is the internal stdio MCP server — agents reach it through MCP
-client registration (`.mcp.json` / the OpenCode V2 config seam), never by typing
-it. Nine tools: `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`,
+`arggon mcp` is the optional stdio MCP server — it is **not** part of the
+OpenCode V2 default path (the native tools replace it); agents that want it
+register it through their MCP client (`.mcp.json`), never by typing it. Nine tools: `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`,
 `arggon_handoff`, `arggon_show`, `arggon_next`, `arggon_report`, `arggon_validate`.
 Results are the documented `--json` envelopes serialized as text content; kernel
 failures surface as tool errors with the CLI's message text. An MCP caller cannot
