@@ -142,3 +142,33 @@ Deferred findings untouched as instructed: correlation `tools.arggon.<name>(…)
 
 ### 2026-09-20 @Arggon
 Coordinator note: rework verified — F1 mutation check reproduced TS2304 with the declaration removed and the new type gate catches it; F2 parity 12/12 with fake-gh fixtures; wording/counters fixed; gates 1385 tests, lint/build/validate/spec, smoke 12/0 (worker) and CI pass on e081e59. Merged as merge commit; item flipped to done.
+
+### 2026-09-20 @Arggon
+**Veredicto final: MERGE (merge commit, nunca squash).** F1 y F2 cerrados y verificados; nits corregidos; gates/CI verdes; scope limpio. Nota: el merge ya ocurrió (`8034b2d`, parents `46da89b` + `e081e59`) mientras corría mi re-verificación; este veredicto confirma el árbol mergeado (ficheros del PR byte-idénticos a `e081e59`).
+
+**Follow-up verificado (sobre `e081e59`)**
+
+- **F1 — `ToolEditorLike`**: declarado estructuralmente (`opencode/plugins/arggon/index.ts:102-105`, junto a `ToolContext`). `tsc --noEmit --target ES2022 --module NodeNext --moduleResolution NodeNext --strict --skipLibCheck opencode/plugins/arggon/index.ts` → exit 0. Gate real dentro de `npm test`: `typecheck.test.ts` (vitest include `opencode/**/*.test.ts`) ejecuta ese mismo comando; **mutación reproducida** con el fuente pre-fix (`c635b98`) en un contexto con `@arggon/lib` + `@types/node` resueltos → exactamente `TS2304: Cannot find name 'ToolEditorLike'` (exit 2); el fijo pasa. Sin red (~0,7 s).
+- **F2 — paridad 12/12**: `tools.test.ts` +2 casos (28 en total) con shim falso de `gh` en PATH y fixtures gemelos, sin red ni auth:
+  - `sync --write`: envelope byte-igual a `arggon sync --write --json` + snapshots de tracker idénticos (branch relleno).
+  - `import_issues --dry-run`: envelope byte-igual a `arggon import-issues --dry-run --json` + sin escrituras en ninguno de los dos lados.
+  Pasaron aislados (2 files / 29 tests) y en la suite completa.
+- **Nits**: playbook corregido (13 checks; casos fake-gh y type gate documentados); `docs/opencode2.md` 1385+ (suite real 1385); comentario del item corregido.
+
+**Gates (reproducidos por mí)**
+
+- `npm test` → **85 files / 1385 passed**; `npm run lint` limpio; `npm run build` ok; `arggon validate` ok (0 warnings, v5); `spec validate` ok (18 docs).
+- `context:report --strict` → todos los bounds pasan (native 10.925 B/12 ≤ 12.288; MCP 10.507 B/9 sin cambio; item block 252 B ≤ 1024; total fijo 24.302 B).
+- **CI**: run `35511815703` success, headSha `e081e59`; PR `MERGEABLE`/`CLEAN` al momento del merge.
+- **Scope**: 9 ficheros; diff vacío en `cli/` y `lib/`; W3 intacto; copia vendored regenerada y en sync (marker + fuente); el delta de runtime del plugin en el follow-up es solo el tipo (se borra al ejecutar) — sin cambio de comportamiento.
+- **Merge**: `8034b2d` es merge commit real (parents `46da89b` + `e081e59`), nunca squash. Árbol mergeado byte-idéntico a `e081e59` en los ficheros del PR.
+
+**Smoke (evidencia y salvedad)**
+
+- Corrida completa previa al merge: 11/12 escenarios verdes y el escenario **native tools (W2) 13/13** (los 12 tools, envelopes, round-trip, errores tipados, catálogo).
+- El escenario **hygiene** (W3 pre-existente, byte-idéntico a la base) falló 2 checks porque el modelo **se negó** a ejecutar el `git add -A && git commit` pedido tras ver el fichero roto a propósito y el shim `.smoke-bin` (transcript conservado): rechazo de seguridad del modelo, no regresión de código. La segunda corrida quedó cortada por la eliminación del worktree durante el cleanup post-merge (ENOENT en el fuente del plugin), no por un fallo del producto.
+- El escenario relevante para este PR (nativo) pasó completo; la higiene no está tocada por el PR.
+
+**Follow-ups** (registrados por el coordinador en `46da89b`): F3 correlación + F6 `options.pinned` → `task-native-commands-seam`; F4 `gh` cwd de import_issues → `task-native-lib-hygiene`; F5 cache → notes de W3. No bloquean.
+
+**Sin hallazgos nuevos.** El merge con merge commit y el `done`+prune del item son correctos.
