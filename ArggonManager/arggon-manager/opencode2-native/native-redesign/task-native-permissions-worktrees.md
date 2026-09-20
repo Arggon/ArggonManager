@@ -1,16 +1,19 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-native-permissions-worktrees
 title: "Permissions, worktree domain and item lifecycle"
+assignee: Arggon
+branch: feat/task-native-permissions-worktrees
 parent: native-redesign
-depends_on: [task-native-commands-seam]
 labels: []
 priority: p0
 created: "2026-09-19"
-updated: "2026-09-19"
+updated: "2026-09-20"
+claimed_at: "2026-09-20T16:20:01.901Z"
+depends_on: [task-native-commands-seam]
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-permissions-worktrees
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-permissions-worktrees.md
   Leaves live only under a story. id is the filename stem: task-native-permissions-worktrees.
