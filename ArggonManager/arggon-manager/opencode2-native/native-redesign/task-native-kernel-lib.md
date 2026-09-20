@@ -54,3 +54,7 @@ ALINEACIÓN MCP (reportada, no es cambio del CLI): el envelope de `arggon_update
 DOCS: `ARCHITECTURE.md` (big picture + code map + boundary), `ArggonManager/docs/engineering.md` (layout del paquete), `ArggonManager/docs/json-output.md` (dónde se ensambla el envelope).
 
 DECISIÓN REPORTADA (no tomada): bundling del plugin vendored single-file de W3 (bundlear `dist/lib.js` vs dependencia npm). La entrada es side-effect-free, sin commander y sin printing, así que ambas siguen abiertas; publicar el paquete y `private: true` son de W7. Sin cambios de contrato de datos.
+
+### handoff 2026-09-20 @Arggon — next: Revisar PR #372 (head 5217233) contra ADR 0011 §4: lib.ts entry + operations compartidas por CLI/MCP; merge con MERGE commit (la rama lleva auto-commits del tracker); luego flip done.
+- branch: feat/task-native-kernel-lib
+- open questions: W3/W7 sin resolver (no bloquean W1): bundle de dist/lib.js en el plugin vendored single-file vs dependencia npm; publicar el paquete (private:true hoy). El MCP gana issueRoundtrip en update, alineado…
