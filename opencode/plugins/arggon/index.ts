@@ -1437,7 +1437,7 @@ const BOOLEAN = { type: "boolean" }
 const NUMBER = { type: "number" }
 
 /**
- * The twelve native tools (spec-native-first-011 §Tools), each one a thin
+ * The twelve kernel tools (spec-native-first-011 §Tools), each one a thin
  * adapter over its kernel operation. Inputs mirror the CLI/MCP option surface
  * (arrays where the kernel takes lists); outputs are the documented envelopes.
  *

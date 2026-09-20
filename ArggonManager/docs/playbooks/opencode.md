@@ -59,11 +59,11 @@ docs or the V1 schema for V2 work.
     `@arggon/lib`; the same `*Operation` the CLI's `--json` path uses) and
     returns the documented envelope; a kernel failure becomes an `ArgonToolError`
     (typed tool error carrying `code` + envelope) instead of a throw through a
-    hook — the session continues (failure isolation). The core eight
+    hook — the session continues (failure isolation). The core nine
     (`list`, `create`, `update`, `show`, `next`, `validate`, `comment`,
-    `handoff`) also set `options.pinned: true` (W3 catalog lever, see
-    Conventions); `create`/`import_issues` receive the `templatesDir` fallback
-    resolved from the plugin location (ADR 0013).
+    `handoff`, plus W4's `start`) also set `options.pinned: true` (W3/W4 catalog
+    lever, see Conventions); `create`/`import_issues` receive the `templatesDir`
+    fallback resolved from the plugin location (ADR 0013).
   - **MCP is out of the default path (W3)** — the plugin no longer registers
     `mcp.servers.arggon` and never touches `ctx.mcp`; `arggon mcp` and the
     generated `.mcp.json` stay for non-OpenCode clients that configure it

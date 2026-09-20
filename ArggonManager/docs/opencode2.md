@@ -69,14 +69,14 @@ skipped (or archived with `init --backup`), and nothing is ever clobbered.
 `.opencode/plugins/arggon/` contributes ambient behavior plus the native tool
 namespace:
 
-- **Native `arggon` tools (ADR 0011, W2/W3)** — registers twelve Code Mode tools
-  (`tools.arggon.list`, `create`, `update`, `show`, `next`, `report`,
+- **Native `arggon` tools (ADR 0011, W2/W3)** — registers the twelve kernel
+  tools (`tools.arggon.list`, `create`, `update`, `show`, `next`, `report`,
   `validate`, `comment`, `handoff`, `priority`, `sync`, `import_issues`) that
   call the kernel **in-process** (the bundle inlines `@arggon/lib`) and return
-  the documented `--json` envelopes. The core eight are `options.pinned` so the
-  runtime keeps them in its Code Mode catalog; a kernel failure becomes a typed
-  tool error (`ArgonToolError`: kernel code + envelope) and the session
-  continues.
+  the documented `--json` envelopes. The core eight are `options.pinned`
+  (W4 adds `start`: nine) so the runtime keeps them in its Code Mode catalog; a
+  kernel failure becomes a typed tool error (`ArgonToolError`: kernel code +
+  envelope) and the session continues.
 - **Worktree lifecycle tools (W4)** — `tools.arggon.start`, `branch` and
   `cleanup` own the item worktree through the V2 worktree domain
   (`ctx.worktree.create/list/remove`). `start` claims the item (kernel rules:
