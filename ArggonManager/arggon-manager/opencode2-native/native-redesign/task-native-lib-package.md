@@ -85,3 +85,7 @@ package and absorbs the W1 review polish (`task-native-kernel-lib-polish`).
 **Abierto para el coordinador**
 - ADR 0013 se registra como Accepted en este PR (decisión ya confirmada por el product owner); el merge la sella. `docs/adr/README.md` no listaba las filas 0005–0009 (pre-existente; no tocado).
 - Merge con **merge commit** (la rama lleva auto-commits del tracker), nunca squash.
+
+### handoff 2026-09-20 @Arggon — next: Revisar PR #374 (head tras los commits de tracker) contra ADR 0013: paquete lib/ con exports propios, consumo por workspace, paridad lectura+escritura y polish W1; merge con MERGE commit; después fli…
+- branch: feat/task-native-lib-package
+- open questions: W2/W3 deben inyectar templatesDir (o embeber plantillas) al consumir @arggon/lib; publicar y versionar @arggon/lib (private: true hoy) queda para W6/W7.
