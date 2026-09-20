@@ -11,7 +11,6 @@ priority: p0
 created: "2026-09-19"
 updated: "2026-09-20"
 depends_on: [task-native-tools]
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-commands-seam
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-commands-seam.md
