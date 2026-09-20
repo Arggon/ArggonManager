@@ -4,7 +4,7 @@ status: todo
 id: task-native-tools
 title: Native arggon tool namespace
 parent: native-redesign
-depends_on: [task-native-kernel-lib]
+depends_on: [task-native-kernel-lib-polish]
 labels: []
 priority: p0
 created: "2026-09-19"
