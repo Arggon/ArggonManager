@@ -141,3 +141,6 @@ Deferred findings untouched as instructed: correlation `tools.arggon.<name>(…)
 ### handoff 2026-09-20 @Arggon — next: Coordinator re-review of PR #375 (F1/F2/F3 addressed on 4ecae7d); merge with a merge commit (tracker commits live on the branch, never squash). No further worker action pending.
 - branch: feat/task-native-tools
 - open questions: options.pinned subset for the catalog budget (W3/W7 decision); no blocking questions left.
+
+### 2026-09-20 @Arggon
+Coordinator note: rework verified — F1 mutation check reproduced TS2304 with the declaration removed and the new type gate catches it; F2 parity 12/12 with fake-gh fixtures; wording/counters fixed; gates 1385 tests, lint/build/validate/spec, smoke 12/0 (worker) and CI pass on e081e59. Merged as merge commit; item flipped to done.
