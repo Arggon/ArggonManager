@@ -52,3 +52,6 @@ Non-blocking findings from the PR #372 review (`task-native-kernel-lib`, W1):
 - Filed per the review-findings rule; none blocked W1's merge.
 - W2 (`task-native-tools`) will consume the same library surface, so land this
   before or with W2.
+
+### 2026-09-20 @Arggon
+Absorbed into task-native-lib-package (ADR 0013 kernel package restructure covers these findings).
