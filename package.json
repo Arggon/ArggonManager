@@ -22,7 +22,8 @@
   ],
   "scripts": {
     "build": "npm run build --workspace @arggon/lib && tsc -p tsconfig.json",
-    "postbuild": "node cli/write-build-info.mjs",
+    "build:plugin": "tsx cli/src/build-plugin.ts",
+    "postbuild": "node cli/write-build-info.mjs && npm run build:plugin",
     "prepare": "npm run build",
     "dev": "tsx cli/src/cli.ts",
     "arggon": "tsx cli/src/cli.ts",
