@@ -28,5 +28,10 @@ jobs:
           v=$(node -p "require('./package.json').version")
           if git rev-parse -q --verify "refs/tags/v$v" >/dev/null; then echo "version $v already tagged - bump package.json"; exit 1; fi
       - run: npm run build
+      - name: Fail if the committed plugin bundle drifted from its source
+        # The artifact is committed and vendored to adopters by `init`; the
+        # build above regenerates it, so a diff against HEAD means the source
+        # changed without `npm run build:plugin` (review F1, PR #376).
+        run: npm run check:plugin
       - run: npm run test
       - run: npm run lint
