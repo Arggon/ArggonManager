@@ -21,17 +21,11 @@ This document is owned by **Software Architect**. It complements [`docs/conventi
 ### Locked / in-flight product layout
 
 ```text
-tasks/                  # git-native work tree (see docs/convention.md)
+ArggonManager/          # git-native work tree + product docs (see docs/convention.md)
+  docs/                 # product docs: convention, engineering, agents, adr/, specs/, plans/
 cli/                    # CLI package: TypeScript sources (cli/src), one module per command
   src/                  # kernel (items/status/update/rules), commands, tests co-located
 dist/                   # compiled bin (gitignored; npm run build)
-docs/
-  convention.md         # task layout + frontmatter + statuses (source of truth for CLI validate/create)
-  engineering.md        # this file
-  agents.md             # agent playbook (claims, PRs, JSON contract, MCP)
-  json-output.md        # --json contract (schemaVersion 1)
-  adr/                  # architecture decision records (see below)
-  specs/  plans/        # feature specs and implementation plans (see docs/agents.md)
 templates/              # scaffolded by arggon init
 skills/arggon-cli/      # agent skill for the CLI (keep in sync with docs/json-output.md)
 fixtures/               # golden trees for validate + integration tests
@@ -40,12 +34,12 @@ fixtures/               # golden trees for validate + integration tests
 
 **Boundaries**
 
-| Concern | Lives in | Does not |
-| --- | --- | --- |
-| Task schema / statuses / folder rules | `docs/convention.md` + sample `tasks/` | CLI source comments as sole source of truth |
-| Eng process, review bar, ADR, DoD | `docs/engineering.md` | Product roadmap (PM) |
-| CLI behavior | `cli/` (or stack equivalent) | Phase 2 board UI, Phase 3 SDK |
-| Durable decisions | `docs/adr/` | Long debate only in PR threads |
+| Concern                               | Lives in                                                          | Does not                                    |
+| ------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------- |
+| Task schema / statuses / folder rules | `ArggonManager/docs/convention.md` + sample `ArggonManager/` tree | CLI source comments as sole source of truth |
+| Eng process, review bar, ADR, DoD     | `ArggonManager/docs/engineering.md`                               | Product roadmap (PM)                        |
+| CLI behavior                          | `cli/` (or stack equivalent)                                      | Phase 2 board UI, Phase 3 SDK               |
+| Durable decisions                     | `ArggonManager/docs/adr/`                                         | Long debate only in PR threads              |
 
 **Shipped beyond the original Phase 1 scope** (each behind its own ADR/PR): static board + drag-and-drop + local serve (ADR 0002), GitHub reconciliation (`sync`), stdio MCP server. **Still out without an ADR:** hosted/SaaS anything, a parallel task schema, or an agent-only dialect of the rules.
 
@@ -107,13 +101,13 @@ The gate is repo-agnostic: adopting repos run the same bar against their own sur
 
 ## Testing expectations
 
-| Layer | Required | Notes |
-| --- | --- | --- |
-| Unit | Yes | Parsing, status transitions, claim rules, path/`id` checks |
-| Fixture / golden | Yes | Valid tree must pass `validate`; each invalid layout rule has a failing fixture |
-| Integration | Yes for file-mutating commands | `create` / `update` / claim against a temp copy of fixtures; assert git-friendly file output |
-| E2E against real `tasks/` | Optional | Nice-to-have; fixtures are the merge gate |
-| Smoke (review gate) | Blocking for behavior/UI changes | Probe evidence in the review verdict; UI changes get a real-browser drive via Playwright CLI ([ADR 0008](./adr/0008-review-smoke-gate.md)); docs-only exempt |
+| Layer                     | Required                         | Notes                                                                                                                                                        |
+| ------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Unit                      | Yes                              | Parsing, status transitions, claim rules, path/`id` checks                                                                                                   |
+| Fixture / golden          | Yes                              | Valid tree must pass `validate`; each invalid layout rule has a failing fixture                                                                              |
+| Integration               | Yes for file-mutating commands   | `create` / `update` / claim against a temp copy of fixtures; assert git-friendly file output                                                                 |
+| E2E against real `tasks/` | Optional                         | Nice-to-have; fixtures are the merge gate                                                                                                                    |
+| Smoke (review gate)       | Blocking for behavior/UI changes | Probe evidence in the review verdict; UI changes get a real-browser drive via Playwright CLI ([ADR 0008](./adr/0008-review-smoke-gate.md)); docs-only exempt |
 
 **Rules**
 
@@ -155,8 +149,11 @@ Use a 4-digit monotonic number. Title is kebab-case.
 - Deciders: …
 
 ## Context
+
 ## Decision
+
 ## Consequences
+
 ## Alternatives considered
 ```
 

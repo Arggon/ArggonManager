@@ -34,6 +34,7 @@ import {
 import { formatListTable, runList } from "./list.js";
 import { runImportIssues } from "./import-issues.js";
 import { runInstructions } from "./instructions.js";
+import { formatLayoutMigrateHuman, runLayoutMigrate } from "./layout-migrate.js";
 import { runMcpServer } from "./mcp-server.js";
 import { runNext } from "./next.js";
 import { runPriorityMigrate } from "./priority.js";
@@ -1139,6 +1140,62 @@ priority
         return;
       }
       printHumanError("arggon priority migrate", message);
+      process.exitCode = 1;
+    }
+  });
+
+program
+  .command("migrate")
+  .description(
+    "Move a legacy tasks/ tracker (and its product docs) to the ArggonManager/ layout (ADR 0012, convention v5; idempotent, never auto-commits)",
+  )
+  .option(
+    "--layout",
+    "migrate the tracker layout: tasks/ → ArggonManager/, docs/ → ArggonManager/docs/ (required)",
+    false,
+  )
+  .option("--dry-run", "plan only: print the actions and write NOTHING", false)
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { layout?: boolean; dryRun?: boolean; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      if (!opts.layout) {
+        throw new Error(
+          "arggon migrate requires a migration target — pass --layout (the only supported target today)",
+        );
+      }
+      const result = runLayoutMigrate({ cwd: process.cwd(), dryRun: Boolean(opts.dryRun) });
+      if (json) {
+        successJson(
+          "migrate",
+          {
+            dryRun: result.dryRun,
+            alreadyMigrated: result.alreadyMigrated,
+            trackerMove: result.trackerMove,
+            docsMove: result.docsMove,
+            versionBump: result.versionBump,
+            rewrittenGeneratedPaths: result.rewrittenGeneratedPaths,
+            changed: result.changed,
+            trackerDir: result.trackerDir,
+            docsDir: result.docsDir,
+          },
+          readConventionVersion(result.root),
+        );
+        return;
+      }
+      console.log(formatLayoutMigrateHuman(result));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "migrate",
+          message,
+          code: "MIGRATE_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      printHumanError("arggon migrate --layout", message);
       process.exitCode = 1;
     }
   });

@@ -1,6 +1,8 @@
 # Task convention (v0)
 
-ArggonManager stores work as Markdown files under `tasks/`. Humans and agents create, claim, and update items the same way: edit the file and commit.
+ArggonManager stores work as Markdown files under the tracker root — `ArggonManager/`
+(legacy `tasks/` trees are auto-detected and keep working; see [Tracker layout
+(v5)](#tracker-layout-v5)). Humans and agents create, claim, and update items the same way: edit the file and commit.
 
 **v0 fields and layout are locked.** See [Versioning](#versioning--forward-compatibility) for how unknown keys and future versions work.
 
@@ -11,8 +13,9 @@ This document is the source of truth for future CLI behavior (`validate`, `creat
 ## Folder layout
 
 ```text
-tasks/
+ArggonManager/                    # tracker root (legacy: tasks/)
   .convention.yml                 # tree version (optional; omit = 0)
+  docs/                           # product docs (convention, engineering, ADRs, specs, plans, ...)
   <initiative-id>/
     <initiative-id>.md            # REQUIRED index
     <epic-id>/
@@ -23,14 +26,17 @@ tasks/
         bug-<inner-slug>.md
 ```
 
+`docs/` directly under the tracker root is reserved for the product docs
+(ADR 0012): it is never an item container and the item walkers skip it.
+
 ### Hierarchy
 
-| Level      | Directory                | Index file           | Children                |
-| ---------- | ------------------------ | -------------------- | ----------------------- |
-| Initiative | `tasks/<initiative-id>/` | `<initiative-id>.md` | epic directories        |
-| Epic       | `.../<epic-id>/`         | `<epic-id>.md`       | story directories       |
-| Story      | `.../<story-id>/`        | `<story-id>.md`      | `task-*.md`, `bug-*.md` |
-| Task / Bug | _(files only)_           | n/a                  | none                    |
+| Level      | Directory                        | Index file           | Children                |
+| ---------- | -------------------------------- | -------------------- | ----------------------- |
+| Initiative | `ArggonManager/<initiative-id>/` | `<initiative-id>.md` | epic directories        |
+| Epic       | `.../<epic-id>/`                 | `<epic-id>.md`       | story directories       |
+| Story      | `.../<story-id>/`                | `<story-id>.md`      | `task-*.md`, `bug-*.md` |
+| Task / Bug | _(files only)_                   | n/a                  | none                    |
 
 In **v0**, tasks and bugs live **only** under a story. They must not sit directly under an epic or initiative.
 
@@ -42,11 +48,11 @@ Parent `status` is **independent** of children — **no rollup** in v0. Containe
 
 ### Vocabulary: `id`, inner slug, filename
 
-| Term       | Meaning                                                                                  |
-| ---------- | ---------------------------------------------------------------------------------------- |
-| `id`       | Canonical identifier = **filename stem** (no `.md`). **Globally unique** under `tasks/`. |
-| inner slug | Leaves only: `id` with the `task-` / `bug-` prefix stripped.                             |
-| filename   | Function of `type` + `id`, never an independent namespace.                               |
+| Term       | Meaning                                                                                          |
+| ---------- | ------------------------------------------------------------------------------------------------ |
+| `id`       | Canonical identifier = **filename stem** (no `.md`). **Globally unique** under the tracker root. |
+| inner slug | Leaves only: `id` with the `task-` / `bug-` prefix stripped.                                     |
+| filename   | Function of `type` + `id`, never an independent namespace.                                       |
 
 Rules:
 
@@ -95,14 +101,14 @@ CLI create examples:
 | Container `id` starts with `task-` or `bug-`                | Reserved leaf prefixes                                                              |
 | Epic/story/task/bug without `parent`                        | Parent required except for initiatives                                              |
 | Initiative with a non-null `parent`                         | Initiatives are roots                                                               |
-| **`id` not unique** under entire `tasks/` tree              | `parent` and lookup-by-id must be unambiguous                                       |
+| **`id` not unique** under the entire tracker tree           | `parent` and lookup-by-id must be unambiguous                                       |
 | **`parent` does not resolve** to an existing item           | No dangling references                                                              |
 | **`parent` type vs child type** mismatch                    | Allowed edges only: epic→initiative, story→epic, task/bug→story. No skip, no cycles |
 | **`parent` ≠ filesystem parent container’s `id`**           | Path and frontmatter are the **same** hierarchy                                     |
 | **`type` ≠ path role**                                      | e.g. index in an epic directory must be `type: epic`                                |
 | Unknown directories under a story                           | Only index + `task-*.md` / `bug-*.md` allowed in v0                                 |
 
-**Work-item detection:** any `*.md` under `tasks/` whose frontmatter has `type:` is a work item and must satisfy naming + placement. Other files (`README`, images, `.convention.yml`) are ignored by `validate`.
+**Work-item detection:** any `*.md` under the tracker root whose frontmatter has `type:` is a work item and must satisfy naming + placement. Other files (`README`, images, `.convention.yml`) are ignored by `validate`.
 
 Note: containers generated by `arggon init` carry placeholder acceptance checkboxes, so the acceptance-aware cascade will not auto-complete them until the boxes are replaced with real criteria.
 
@@ -114,22 +120,22 @@ Every work item file begins with YAML frontmatter between `---` fences.
 
 ### Fields
 
-| Field            | Required    | Type            | Notes                                                                                                                               |
-| ---------------- | ----------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `type`           | **yes**     | enum            | `initiative` \| `epic` \| `story` \| `task` \| `bug`                                                                                |
-| `status`         | **yes**     | enum            | see [Statuses](#statuses-v0)                                                                                                        |
-| `id`             | **yes**     | string          | Filename stem; globally unique under `tasks/`; rename = new identity                                                                |
-| `title`          | no          | string          | Canonical when present; else first Markdown H1; else display `id`. `list` does **not** rewrite the file                             |
-| `assignee`       | no          | string \| null  | Omit or `null` = unassigned; **empty string is invalid**. Pattern: `^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$` (GitHub login or agent id) |
-| `branch`         | no          | string \| null  | Working branch name (v1 field, e.g. `feat/task-rate-limit`). Omit or `null` = none. Set on claim/`start`, cleared on unclaim        |
-| `parent`         | conditional | string \| null  | **Required** for epic/story/task/bug; omit or `null` for initiative. Must equal filesystem parent container’s `id`                  |
-| `labels`         | no          | list of strings | Default `[]`. Kebab-case ASCII, unique, case-sensitive (no folding)                                                                 |
+| Field            | Required    | Type            | Notes                                                                                                                                                                                                                                                                                                                                                 |
+| ---------------- | ----------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`           | **yes**     | enum            | `initiative` \| `epic` \| `story` \| `task` \| `bug`                                                                                                                                                                                                                                                                                                  |
+| `status`         | **yes**     | enum            | see [Statuses](#statuses-v0)                                                                                                                                                                                                                                                                                                                          |
+| `id`             | **yes**     | string          | Filename stem; globally unique under the tracker root; rename = new identity                                                                                                                                                                                                                                                                          |
+| `title`          | no          | string          | Canonical when present; else first Markdown H1; else display `id`. `list` does **not** rewrite the file                                                                                                                                                                                                                                               |
+| `assignee`       | no          | string \| null  | Omit or `null` = unassigned; **empty string is invalid**. Pattern: `^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$` (GitHub login or agent id)                                                                                                                                                                                                                   |
+| `branch`         | no          | string \| null  | Working branch name (v1 field, e.g. `feat/task-rate-limit`). Omit or `null` = none. Set on claim/`start`, cleared on unclaim                                                                                                                                                                                                                          |
+| `parent`         | conditional | string \| null  | **Required** for epic/story/task/bug; omit or `null` for initiative. Must equal filesystem parent container’s `id`                                                                                                                                                                                                                                    |
+| `labels`         | no          | list of strings | Default `[]`. Kebab-case ASCII, unique, case-sensitive (no folding)                                                                                                                                                                                                                                                                                   |
 | `priority`       | no          | string \| null  | Judgment priority (v4 field, spec-priority-field-008): `p0` \| `p1` \| `p2` \| `p3`. Omit or `null` = unprioritized. Valid on all item types; unknown values are validate errors (`PRIORITY_INVALID`). Set via `create --priority` / `update --priority`; legacy `pN` labels move in via `arggon priority migrate`. See [Priority (v4)](#priority-v4) |
-| `created`        | no          | string          | Quoted `YYYY-MM-DD` only in v0 (e.g. `created: "2026-09-03"`)                                                                       |
-| `updated`        | no          | string          | Quoted `YYYY-MM-DD` only in v0                                                                                                      |
-| `blocked_reason` | conditional | string          | **Required non-empty** when `status: blocked`; must be **absent or empty** otherwise                                                |
-| `depends_on`     | no          | list of strings | Dependency graph (v3 field, ADR 0004): ids this item waits for; empty/omitted = none. See [Dependency graph (v3)](#dependency-graph-v3) |
-| `claimed_at`     | no          | string          | Soft claim lease (ISO date-time), written/cleared by the CLI on claim state changes; reporting only. See [Claim lease](#claim-lease-claimed_at) |
+| `created`        | no          | string          | Quoted `YYYY-MM-DD` only in v0 (e.g. `created: "2026-09-03"`)                                                                                                                                                                                                                                                                                         |
+| `updated`        | no          | string          | Quoted `YYYY-MM-DD` only in v0                                                                                                                                                                                                                                                                                                                        |
+| `blocked_reason` | conditional | string          | **Required non-empty** when `status: blocked`; must be **absent or empty** otherwise                                                                                                                                                                                                                                                                  |
+| `depends_on`     | no          | list of strings | Dependency graph (v3 field, ADR 0004): ids this item waits for; empty/omitted = none. See [Dependency graph (v3)](#dependency-graph-v3)                                                                                                                                                                                                               |
+| `claimed_at`     | no          | string          | Soft claim lease (ISO date-time), written/cleared by the CLI on claim state changes; reporting only. See [Claim lease](#claim-lease-claimed_at)                                                                                                                                                                                                       |
 
 ### Defaults when creating
 
@@ -253,7 +259,7 @@ Claims carry a **soft lease**: an ISO date-time `claimed_at` maintained by the C
 - **Cleared** automatically when the item leaves the claimed state: unclaim (`in_progress` → `todo`), terminal states, or `blocked` (a new lease starts on re-claim).
 - **Reporting only**: `claimed_at` never gates a transition and `validate` imposes no constraint on it. Items claimed before the field existed simply have no `claimed_at`.
 - **Staleness is advisory**: `arggon list --stale --older-than <duration>` (`<number><d|h|m>`, e.g. `7d`) surfaces claimed items whose lease started before the threshold. It filters reporting only — it never blocks work.
-- **Only humans may steal**: `arggon update <id> --steal --reason "<why>" --assignee <you>` is a supervised takeover of a claimed item. It requires a non-empty reason, refreshes `claimed_at`, and appends a dated note (`> stolen <date> by <you>: <reason>`) to the item body. It is double-gated at the CLI (bug-cli-steal-not-gated): the repo must arm `x-tracker.allow-steal: true` in `tasks/.convention.yml` (default: refused), and the invocation must run on an interactive terminal with a y/N confirmation — non-TTY callers are refused even when armed. Agent callers are refused by the playbook rules (`docs/agents.md`), exactly like `--force`.
+- **Only humans may steal**: `arggon update <id> --steal --reason "<why>" --assignee <you>` is a supervised takeover of a claimed item. It requires a non-empty reason, refreshes `claimed_at`, and appends a dated note (`> stolen <date> by <you>: <reason>`) to the item body. It is double-gated at the CLI (bug-cli-steal-not-gated): the repo must arm `x-tracker.allow-steal: true` in the tracker `.convention.yml` (default: refused), and the invocation must run on an interactive terminal with a y/N confirmation — non-TTY callers are refused even when armed. Agent callers are refused by the playbook rules (`docs/agents.md`), exactly like `--force`.
 
 Concurrency / conflict handling (refuse steal unless `--force`, unclaim recovery, stale reporting): see [`claim.md`](claim.md).
 
@@ -313,10 +319,10 @@ status: cancelled
 
 ### Tree version
 
-Add `tasks/.convention.yml`:
+Add the tracker `.convention.yml` (`ArggonManager/.convention.yml`, or legacy `tasks/.convention.yml`):
 
 ```yaml
-version: 3
+version: 5
 branch_patterns:
   initiative: "feat/{id}"
   epic: "feat/{id}"
@@ -326,6 +332,33 @@ branch_patterns:
 ```
 
 Omit = `0`. Layout is a tree concern. Per-file schema is optional and defaults to the tree version.
+
+### Tracker layout (v5)
+
+Per [ADR 0012](adr/0012-tracker-root-layout.md), v5 renames the tracker root
+`tasks/` → `ArggonManager/` and moves every product doc under
+`ArggonManager/docs/` (adr, specs, plans, explorations, playbooks,
+convention/engineering/agents/json-output, plus the docs generated by `init`
+such as `tracking.md`). The item schema is unchanged: ids, frontmatter,
+statuses and the methodology are exactly as before.
+
+- **Detection (no hard break).** The kernel walks up looking for
+  `ArggonManager/.convention.yml` first and falls back to a legacy
+  `tasks/.convention.yml`; a legacy tree keeps operating on `tasks/` with its
+  docs at `<repo root>/docs/`. `arggon validate` reports the legacy location as
+  a `LEGACY_LAYOUT` warning and `doctor` reports the detected layout; both are
+  informational, never errors.
+- **Migration.** `arggon migrate --layout [--dry-run]` moves `tasks/` →
+  `ArggonManager/` and `<root>/docs/` → `ArggonManager/docs/`, rewrites the
+  machine-written `x-generated` destination keys, and bumps the file to
+  `version: 5`. It is convergent (re-running finishes a half-done migration)
+  and idempotent (an already-migrated tree is a no-op), preserves file bytes,
+  and **never auto-commits** — review and commit the migration as one change.
+- **Reserved path.** `<tracker>/docs/` is the product-docs dir on v5 and is
+  never an item container; the item walkers skip it.
+- **Versioning disambiguation.** `v4` is the priority field
+  ([Priority (v4)](#priority-v4)); the layout change is `v5`. A v3/v4 tree on
+  the legacy layout stays valid without any data migration.
 
 ### Branch patterns (v2)
 
@@ -338,16 +371,16 @@ Per [ADR 0004](adr/0004-milestone-deps-v3.md), v3 = v2 + the official `milestone
 `depends_on` is a list of work-item ids this item waits for:
 
 - Permitted on **all** types; empty or omitted = no dependencies.
-- Entries are **ids** (globally unique under `tasks/`), not paths; edges between any types and across initiatives are allowed.
+- Entries are **ids** (globally unique under the tracker root), not paths; edges between any types and across initiatives are allowed.
 - `blocked_by` is a **computed inverse view, never stored** — one source of truth, no sync bugs (the key stays reserved).
 
 `validate` enforces that the dependency graph is a consistent DAG:
 
-| Code                 | Meaning                                          |
-| -------------------- | ------------------------------------------------ |
-| `UNKNOWN_DEPENDENCY` | a `depends_on` id does not resolve to an item    |
-| `SELF_DEPENDENCY`    | an item depends on itself                        |
-| `DEPENDENCY_CYCLE`   | the graph has a cycle (it must be a DAG)         |
+| Code                 | Meaning                                       |
+| -------------------- | --------------------------------------------- |
+| `UNKNOWN_DEPENDENCY` | a `depends_on` id does not resolve to an item |
+| `SELF_DEPENDENCY`    | an item depends on itself                     |
+| `DEPENDENCY_CYCLE`   | the graph has a cycle (it must be a DAG)      |
 
 Semantics are deliberately **advisory-only** (ADR 0004):
 
@@ -372,7 +405,7 @@ priority: p1
   ranking unprioritized orders with the `p3` tier.
 - Unknown values are validate errors (`PRIORITY_INVALID`).
 - Set via `arggon create <type> <title> --priority p1` / `arggon update <id>
-  --priority p2` (clear: `--priority ""`).
+--priority p2` (clear: `--priority ""`).
 - Legacy `pN` labels migrate into the field with `arggon priority migrate`
   (highest label wins, all pN labels removed, non-priority labels kept,
   idempotent, never auto-commits). New code must not use `pN` labels for
@@ -507,7 +540,7 @@ x-generated:
 - Re-running `arggon init`: destination absent → generate (`created[]`); entry flagged `acknowledged: true` → skip, never touch (`skipped[]`, regardless of hash — acknowledged baselines are adopter-owned content, see `arggon adopt --ack` below); file checksum matches the recorded one → untouched → silently regenerate from the current template and refresh the entry (`updated[]`); checksum differs, or the file exists with no entry (pre-provenance files) → adopter-modified → skip by default (`modified[]` + `skipped[]`, never overwritten, even with `--force`); `arggon init --backup` first moves the modified file to `backup/<YYYY-MM-DD>/<dest>` and then regenerates (`backedUp[]`).
 - Checksums are refreshed in exactly two sanctioned ways: `arggon adopt --ack` (the sanctioned adoption-sweep edits become the new baseline) and init re-runs (untouched docs); any other edit keeps the file adopter-modified. `adopt --ack` also sets `acknowledged: true` on each acked entry (bug-ack-baseline-regen-loss): the acked checksum equals the adopter's edited content, not the template render, so acknowledged entries are never regenerated by later init re-runs — they are yours.
 - State is machine-written: unknown nested fields are ignored, and incomplete entries never fail a command — they simply never match, so the file reports as adopter-modified (the conservative default). `arggon doctor` reports `managed`/`untouched`/`modified`/`acknowledged`/`stale`/`missing` counts from this section.
-- The section is spliced into `tasks/.convention.yml` without disturbing sibling content (comments, `branch_patterns`, `x-views`, `x-playbooks`); `arggon init --force` carries the section across a re-scaffold.
+- The section is spliced into the tracker `.convention.yml` without disturbing sibling content (comments, `branch_patterns`, `x-views`, `x-playbooks`); `arggon init --force` carries the section across a re-scaffold.
 - The key is namespaced (`x-*`), so older tools ignore it per the extension policy above.
 
 ### Extension namespace
@@ -532,8 +565,10 @@ These names are reserved for a future version — do not invent them as unknown 
 - Breaking changes bump `version`.
 - `validate` **rejects** trees with a higher convention version than it supports.
 - **v1** = v0 + official `branch` field. New trees are scaffolded at v1; v0 trees (explicit `version: 0` or omitted) remain fully supported.
-- **v2** = v1 + `branch_patterns` config in `tasks/.convention.yml`. New trees are scaffolded at v2 with explicit per-type patterns; older trees keep working (missing patterns fall back to defaults).
+- **v2** = v1 + `branch_patterns` config in the tracker `.convention.yml`. New trees are scaffolded at v2 with explicit per-type patterns; older trees keep working (missing patterns fall back to defaults).
 - **v3** = v2 + official `milestone` ([ADR 0003](adr/0003-milestone-field.md)) + `depends_on` ([ADR 0004](adr/0004-milestone-deps-v3.md)). New trees are scaffolded at v3. Purely additive migration: **v0–v2 trees stay valid unchanged, nothing to migrate** — the CLI parses `depends_on` (and `milestone`) unconditionally, so older trees that adopt the field early keep validating, and trees without it are unaffected (see [Dependency graph (v3)](#dependency-graph-v3)).
+- **v4** = v3 + the official `priority` field ([Priority (v4)](#priority-v4), ADR 0009). Additive; `v4` is NOT the layout version.
+- **v5** = v4 + the tracker root rename ([Tracker layout (v5)](#tracker-layout-v5), ADR 0012): items under `ArggonManager/`, product docs under `ArggonManager/docs/`. New trees are scaffolded at v5; legacy `tasks/` trees stay valid and keep working, and `arggon migrate --layout` is the supported move (it bumps the file to v5).
 
 ### Listing order (v0)
 
@@ -547,7 +582,7 @@ Independent of children — **no rollup** in v0.
 
 ## Templates
 
-Copy-paste stubs for each v0 work-item type live in [`templates/`](../templates/). Fill placeholders and place the file under `tasks/` per [Folder layout](#folder-layout). Future CLI `arggon create` should copy from these templates.
+Copy-paste stubs for each v0 work-item type live in [`templates/`](../templates/). Fill placeholders and place the file under the tracker root per [Folder layout](#folder-layout). Future CLI `arggon create` should copy from these templates.
 
 | Type       | Template                                                |
 | ---------- | ------------------------------------------------------- |
@@ -561,4 +596,4 @@ Templates default to `status: todo`, omit `assignee` (never an empty string), an
 
 ## Sample tree
 
-See [`tasks/launch-mvp/`](../tasks/launch-mvp/) for a small valid v0 example (initiative → epics → stories → tasks/bugs), plus [`tasks/.convention.yml`](../tasks/.convention.yml).
+See [`fixtures/tasks-valid/tasks/launch-mvp/`](../../fixtures/tasks-valid/tasks/launch-mvp/) for a small valid v0 example (initiative → epics → stories → tasks/bugs), plus the tracker `.convention.yml` in the same fixture.
