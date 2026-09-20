@@ -190,6 +190,7 @@ describe("npm pack contents", () => {
       "templates/task.md",
       "skills/arggon-cli/SKILL.md",
       "opencode/plugins/arggon/index.ts",
+      "opencode/plugins/arggon/index.bundle.ts",
       "README.md",
       "LICENSE",
       "package.json",

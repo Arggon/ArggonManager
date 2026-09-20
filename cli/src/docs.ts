@@ -204,15 +204,18 @@ export const BUNDLED_SKILLS = [
 ];
 
 /**
- * Bundled OpenCode V2 plugin (plan-opencode2-009 W2): the plugin is a
- * dependency-free TypeScript source at `opencode/plugins/arggon/`; init copies
- * it to `.opencode/plugins/arggon/`, where V2 discovers it automatically. Like
+ * Bundled OpenCode V2 plugin (plan-opencode2-009 W2; single-file bundle W3,
+ * `task-native-commands-seam`): `arggon init` vendors the **generated**
+ * `opencode/plugins/arggon/index.bundle.ts` — the plugin source with
+ * `@arggon/lib` inlined by `npm run build:plugin` — to
+ * `.opencode/plugins/arggon/index.ts`, where V2 discovers it automatically and
+ * loads it in a dependency-less adopter tree (ADR 0011 §5/§6, ADR 0013). Like
  * the skills, the copy carries a generated marker (a `//` line for TypeScript
- * destinations), flows through the provenance decision table, and is guarded
- * by a byte-parity test against this single source.
+ * destinations) and flows through the provenance decision table; parity with
+ * the committed artifact is pinned by `cli/src/plugin-copy.test.ts`.
  */
 const BUNDLED_PLUGINS = [
-  { source: "opencode/plugins/arggon/index.ts", dest: ".opencode/plugins/arggon/index.ts" },
+  { source: "opencode/plugins/arggon/index.bundle.ts", dest: ".opencode/plugins/arggon/index.ts" },
 ];
 
 /** Everything init bundles from a package-root source into an adopter destination. */

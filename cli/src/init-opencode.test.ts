@@ -4,6 +4,7 @@ import {
   mkdirSync,
   mkdtempSync as _mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -51,11 +52,13 @@ const SEAM_COMMANDS = [
   ".opencode/commands/arggon-handoff.md",
   ".opencode/commands/arggon-review.md",
   ".opencode/commands/arggon-status.md",
+  ".opencode/commands/arggon-adopt.md",
 ];
 
 /** Bundled OpenCode V2 plugin destination (plan-opencode2-009 W2). */
 const SEAM_PLUGIN = ".opencode/plugins/arggon/index.ts";
-const SEAM_PLUGIN_SOURCE = "opencode/plugins/arggon/index.ts";
+/** W3 single-file bundle vendored by init (kernel inlined, no node_modules). */
+const SEAM_PLUGIN_SOURCE = "opencode/plugins/arggon/index.bundle.ts";
 
 describe("opencode seam: fresh init", () => {
   it("creates the config, agents and commands (tier-1, plain init)", () => {
@@ -67,7 +70,7 @@ describe("opencode seam: fresh init", () => {
     }
   });
 
-  it("opencode.jsonc is valid JSONC (comments only), with no HTML marker", () => {
+  it("opencode.jsonc is valid JSONC (comments only), formatter/compaction and NO MCP stanza (W3)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
     const raw = readFileSync(join(dir, "opencode.jsonc"), "utf8");
@@ -75,10 +78,16 @@ describe("opencode seam: fresh init", () => {
     expect(raw).not.toContain("arggon:generated");
     const stripped = raw.replace(/^\s*\/\/.*$/gm, "");
     const parsed = JSON.parse(stripped) as {
-      mcp?: { servers?: Record<string, { type?: string; command?: string[] }> };
+      mcp?: unknown;
+      formatter?: unknown;
+      compaction?: { keep?: { tokens?: number } };
     };
-    expect(parsed.mcp?.servers?.arggon?.type).toBe("local");
-    expect(parsed.mcp?.servers?.arggon?.command).toEqual(["arggon", "mcp"]);
+    // W3 seam without MCP: the native tools/plugin are the default path; the
+    // optional stdio server can be registered by the adopter.
+    expect(parsed.mcp).toBeUndefined();
+    expect(raw).not.toContain('"arggon", "mcp"');
+    expect(parsed.formatter).toBe(true);
+    expect(parsed.compaction?.keep?.tokens).toBe(15000);
   });
 
   it("agents and commands are frontmatter-first with the YAML provenance marker", () => {
@@ -329,14 +338,18 @@ describe("opencode seam: provenance on re-runs", () => {
   });
 });
 
-describe("opencode seam: bundled plugin (W2)", () => {
-  it("is generated with the TypeScript provenance marker and x-generated entry", () => {
+describe("opencode seam: bundled plugin (W2/W3)", () => {
+  it("vendors the single-file dependency-free bundle with provenance (W3)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
     const raw = readFileSync(join(dir, ...SEAM_PLUGIN.split("/")), "utf8");
     expect(raw.startsWith(`// arggon:generated template="${SEAM_PLUGIN_SOURCE}"\n`)).toBe(true);
     expect(raw).toContain('id: "arggon"');
-    expect(raw).toContain('command: ["arggon", "mcp"]');
+    // W3: @arggon/lib is inlined (no npm dependency), the optional
+    // @opencode/plugin sugar and the MCP auto-registration are gone.
+    expect(raw).toContain('__arggonModules.set("lib/src/index.ts"');
+    expect(raw).not.toContain("@opencode/plugin");
+    expect(raw).not.toContain('"arggon", "mcp"');
     const config = readConventionConfig(dir);
     expect(config.generated[SEAM_PLUGIN]?.template).toBe(SEAM_PLUGIN_SOURCE);
   });
@@ -421,12 +434,13 @@ describe("opencode seam: marker stamping", () => {
 });
 
 describe("opencode seam: methodology commands and skill references (W5)", () => {
-  /** Methodology prompt templates (plan-opencode2-009 T14). */
+  /** Methodology prompt templates (plan-opencode2-009 T14; adopt W3). */
   const METHODOLOGY_COMMANDS = [
     ".opencode/commands/arggon-adr.md",
     ".opencode/commands/arggon-explore.md",
     ".opencode/commands/arggon-playbook.md",
     ".opencode/commands/arggon-spec.md",
+    ".opencode/commands/arggon-adopt.md",
   ];
   /** Bundled arggon-cli skill references (progressive disclosure). */
   const SKILL_REFERENCES = [
@@ -464,15 +478,28 @@ describe("opencode seam: methodology commands and skill references (W5)", () => 
     }
   });
 
-  it("drives the existing CLI scaffolds instead of inventing a process", () => {
+  it("drives the native arggon tools, never the headless adapter (W3)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
     const read = (rel: string): string => readFileSync(join(dir, ...rel.split("/")), "utf8");
-    expect(read(".opencode/commands/arggon-spec.md")).toContain("arggon spec new");
-    expect(read(".opencode/commands/arggon-spec.md")).toContain("arggon spec validate");
-    expect(read(".opencode/commands/arggon-explore.md")).toContain("arggon stack explore");
-    expect(read(".opencode/commands/arggon-playbook.md")).toContain("arggon playbook new");
-    expect(read(".opencode/commands/arggon-playbook.md")).toContain("arggon playbook refresh");
+    const commands = readdirSync(join(dir, ".opencode/commands"));
+    expect(commands.length).toBeGreaterThanOrEqual(11);
+    for (const name of commands) {
+      const body = read(`.opencode/commands/${name}`);
+      expect(body, name).toContain("$ARGUMENTS");
+      // Prompt templates only: no V2 shell blocks.
+      expect(body, name).not.toMatch(/!`/);
+      // No CLI-driving prose in the default path: `arggon <subcommand>`
+      // invocations belong to the headless adapter (bootstrap/CI), not here.
+      expect(body, name).not.toMatch(
+        /(^|[^.\w-])arggon (next|start|done|handoff|review|status|spec|adr|explore|playbook|adopt|stack|branch|create|update|validate|show|list|mcp)\b/,
+      );
+    }
+    expect(read(".opencode/commands/arggon-done.md")).toContain("tools.arggon.update");
+    expect(read(".opencode/commands/arggon-spec.md")).toContain("tools.arggon.validate");
+    expect(read(".opencode/commands/arggon-explore.md")).toContain("tools.arggon.create");
+    expect(read(".opencode/commands/arggon-playbook.md")).toContain("tools.arggon.create");
+    expect(read(".opencode/commands/arggon-adopt.md")).toContain("tools.arggon.create");
     expect(read(".opencode/commands/arggon-adr.md")).toContain("docs/engineering.md");
   });
 
