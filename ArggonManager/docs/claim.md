@@ -20,7 +20,7 @@ Coordinate first when possible. Prefer unclaim + reclaim over force.
 ## Concurrent claims (atomic check-and-set)
 
 The claim is a read-modify-write of the item file, so it is guarded by a file
-lock (`cli/src/lock.ts`, bug-claim-race-no-lock): `start` and claim-changing
+lock (`lib/src/lock.ts`, bug-claim-race-no-lock): `start` and claim-changing
 `update` runs take an exclusive-create lock (in `os.tmpdir()`, keyed by the
 item's absolute path) around read → verify → write. Locks older than 60s are
 broken automatically (a crashed process cannot wedge the tracker); a contender

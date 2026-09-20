@@ -1,10 +1,16 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { formatReportMarkdown, formatReportTable, runReport } from "./report.js";
+import { formatReportMarkdown, formatReportTable, runReport } from "@arggon/lib";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -153,12 +159,18 @@ function makeBlockedTree(): string {
   write(
     root,
     "tasks/launch/epic-a/epic-a.md",
-    md(`type: epic\nstatus: todo\nid: epic-a\nparent: launch\ntitle: Epic A\nlabels: []\n${D}`, "Epic A"),
+    md(
+      `type: epic\nstatus: todo\nid: epic-a\nparent: launch\ntitle: Epic A\nlabels: []\n${D}`,
+      "Epic A",
+    ),
   );
   write(
     root,
     "tasks/launch/epic-a/story-a/story-a.md",
-    md(`type: story\nstatus: in_progress\nid: story-a\nparent: epic-a\ntitle: Story A\nlabels: []\n${D}`, "Story A"),
+    md(
+      `type: story\nstatus: in_progress\nid: story-a\nparent: epic-a\ntitle: Story A\nlabels: []\n${D}`,
+      "Story A",
+    ),
   );
   write(
     root,
@@ -252,7 +264,9 @@ describe("arggon report --format (CLI)", () => {
     expect(proc.status).not.toBe(0);
     const envelope = JSON.parse(proc.stdout) as { ok: boolean; error: { message: string } };
     expect(envelope.ok).toBe(false);
-    expect(envelope.error.message).toMatch(/unknown --format 'html' \(supported: table, markdown\)/);
+    expect(envelope.error.message).toMatch(
+      /unknown --format 'html' \(supported: table, markdown\)/,
+    );
   });
 
   it("keeps the default table format unchanged", () => {

@@ -1,8 +1,14 @@
 import { existsSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
-import { CONVENTION_VERSION, parseConventionConfig, updateGeneratedSection } from "./convention.js";
-import { writeFileAtomic } from "./atomic.js";
-import { findTrackerLocation, LEGACY_TRACKER_DIR_NAME, TRACKER_DIR_NAME } from "./paths.js";
+import {
+  CONVENTION_VERSION,
+  LEGACY_TRACKER_DIR_NAME,
+  TRACKER_DIR_NAME,
+  findTrackerLocation,
+  parseConventionConfig,
+  updateGeneratedSection,
+  writeFileAtomic,
+} from "@arggon/lib";
 
 /**
  * `arggon migrate --layout` (ADR 0012): move a legacy `tasks/` tracker (and

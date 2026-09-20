@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { runComment } from "./comment.js";
-import { runCreate } from "./create.js";
+import { DEFAULT_TAIL_COMMENTS, runComment, runCreate, runShow } from "@arggon/lib";
+
 import { runInit } from "./init.js";
-import { runShow, DEFAULT_TAIL_COMMENTS } from "./show.js";
+
 import { removeFixtureTree } from "./test-tmp.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");

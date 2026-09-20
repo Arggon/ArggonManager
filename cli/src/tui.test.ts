@@ -5,10 +5,10 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { runList } from "./list.js";
-import { toContractWorkItem } from "./contract.js";
+import { runList, toContractWorkItem, type ContractWorkItem as WorkItem } from "@arggon/lib";
+
 import { renderBoardHtml } from "./board.js";
-import type { WorkItem } from "./types.js";
+
 import {
   clampTuiState,
   clipLine,
@@ -290,17 +290,17 @@ describe("clampTuiState and selection helpers", () => {
 
 // ---------- data parity with list / board (kernel read path) ----------
 
-function writeItem(
-  root: string,
-  rel: string,
-  frontmatter: Record<string, string>,
-): void {
+function writeItem(root: string, rel: string, frontmatter: Record<string, string>): void {
   const full = join(root, rel);
   mkdirSync(dirname(full), { recursive: true });
   const lines = Object.entries(frontmatter)
     .map(([k, v]) => `${k}: ${v}`)
     .join("\n");
-  writeFileSync(full, `---\n${lines}\nlabels: []\ncreated: "2026-09-11"\nupdated: "2026-09-11"\n---\n\n# body\n`, "utf8");
+  writeFileSync(
+    full,
+    `---\n${lines}\nlabels: []\ncreated: "2026-09-11"\nupdated: "2026-09-11"\n---\n\n# body\n`,
+    "utf8",
+  );
 }
 
 function newTree(): string {
@@ -308,23 +308,43 @@ function newTree(): string {
   mkdirSync(join(root, "tasks"), { recursive: true });
   writeFileSync(join(root, "tasks/.convention.yml"), "version: 0\n", "utf8");
   writeItem(root, "tasks/launch/launch.md", {
-    type: "initiative", status: "todo", id: "launch",
+    type: "initiative",
+    status: "todo",
+    id: "launch",
   });
   writeItem(root, "tasks/launch/epic-a/epic-a.md", {
-    type: "epic", status: "todo", id: "epic-a", parent: "launch",
+    type: "epic",
+    status: "todo",
+    id: "epic-a",
+    parent: "launch",
   });
   writeItem(root, "tasks/launch/epic-a/story-login/story-login.md", {
-    type: "story", status: "in_progress", id: "story-login", parent: "epic-a", assignee: "arggon",
+    type: "story",
+    status: "in_progress",
+    id: "story-login",
+    parent: "epic-a",
+    assignee: "arggon",
   });
   writeItem(root, "tasks/launch/epic-a/story-login/task-rate-limit.md", {
-    type: "task", status: "todo", id: "task-rate-limit", parent: "story-login", title: "Add rate limiting",
+    type: "task",
+    status: "todo",
+    id: "task-rate-limit",
+    parent: "story-login",
+    title: "Add rate limiting",
   });
   writeItem(root, "tasks/launch/epic-a/story-login/bug-login-500.md", {
-    type: "bug", status: "blocked", id: "bug-login-500", parent: "story-login",
-    blocked_reason: "waiting on oauth", title: "Login 500 on empty password",
+    type: "bug",
+    status: "blocked",
+    id: "bug-login-500",
+    parent: "story-login",
+    blocked_reason: "waiting on oauth",
+    title: "Login 500 on empty password",
   });
   writeItem(root, "tasks/launch/epic-a/story-archived/story-archived.md", {
-    type: "story", status: "done", id: "story-archived", parent: "epic-a",
+    type: "story",
+    status: "done",
+    id: "story-archived",
+    parent: "epic-a",
   });
   return root;
 }
@@ -485,7 +505,12 @@ describe("renderTui column alignment (bug-tui-column-shift)", () => {
   });
 
   it("keeps right-hand columns at their own x-offset when the selected column runs out of cards (color on)", () => {
-    const items = [mk("task-b1", "blocked"), mk("task-d1", "done"), mk("task-d2", "done"), mk("task-d3", "done")];
+    const items = [
+      mk("task-b1", "blocked"),
+      mk("task-d1", "done"),
+      mk("task-d2", "done"),
+      mk("task-d3", "done"),
+    ];
     const state = { ...initialTuiState(80, 12), column: 2 }; // blocked selected
     const lines = renderTui(items, state).split("\n"); // color ON (default)
     const colWidth = Math.floor(80 / 5);

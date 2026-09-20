@@ -1,5 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,13 +24,17 @@ import {
   runAdopt,
   runAdoptAck,
 } from "./adopt.js";
-import { readConventionConfig, updateGeneratedSection } from "./convention.js";
+import {
+  loadItems,
+  readConventionConfig,
+  runCreate,
+  runUpdate,
+  updateGeneratedSection,
+} from "@arggon/lib";
 import { arggonVersion, checksumOf, GENERATED_DOC_COUNT } from "./docs.js";
 import { runDoctor } from "./doctor.js";
-import { runCreate } from "./create.js";
+
 import { runInit } from "./init.js";
-import { loadItems } from "./items.js";
-import { runUpdate } from "./update.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -225,24 +236,31 @@ describe("runAdopt: --dry-run", () => {
   it("plans the container chain on a fresh tree without writing it", () => {
     const dir = tempDir("arggon-adopt-dryfresh-");
     runInit({ dir, force: false, full: true });
-    const before = loadItems(join(dir, "ArggonManager")).map((item) => item.id).sort();
+    const before = loadItems(join(dir, "ArggonManager"))
+      .map((item) => item.id)
+      .sort();
     const result = runAdopt({ cwd: dir, dryRun: true });
     expect(result.createdContainers).toEqual(["arggon-adoption", "epic-arggon-adoption"]);
-    const after = loadItems(join(dir, "ArggonManager")).map((item) => item.id).sort();
+    const after = loadItems(join(dir, "ArggonManager"))
+      .map((item) => item.id)
+      .sort();
     expect(after).toEqual(before);
   });
 
-
   it("reports the plan but creates nothing", () => {
     const dir = seedTree();
-    const before = loadItems(join(dir, "ArggonManager")).map((item) => item.id).sort();
+    const before = loadItems(join(dir, "ArggonManager"))
+      .map((item) => item.id)
+      .sort();
     const result = runAdopt({ cwd: dir, dryRun: true });
     expect(result.dryRun).toBe(true);
     expect(result.taskId).toBe(ADOPT_TASK_ID);
     expect(result.taskCreated).toBe(false);
     expect(result.storyCreated).toBe(false);
     expect(result.storyId).toBe(ADOPT_STORY_ID);
-    const after = loadItems(join(dir, "ArggonManager")).map((item) => item.id).sort();
+    const after = loadItems(join(dir, "ArggonManager"))
+      .map((item) => item.id)
+      .sort();
     expect(after).toEqual(before);
     expect(after).not.toContain(ADOPT_TASK_ID);
     expect(after).not.toContain(ADOPT_STORY_ID);
@@ -275,14 +293,29 @@ describe("buildInventory", () => {
     // Arggon-managed (generated with --full, x-generated state recorded).
     expect(byPath.get("CONTRIBUTING.md")).toMatchObject({ exists: true, managed: true });
     expect(byPath.get("ARCHITECTURE.md")).toMatchObject({ exists: true, managed: true });
-    expect(byPath.get("ArggonManager/docs/convention.md")).toMatchObject({ exists: true, managed: true });
-    expect(byPath.get("ArggonManager/docs/engineering.md")).toMatchObject({ exists: true, managed: true });
+    expect(byPath.get("ArggonManager/docs/convention.md")).toMatchObject({
+      exists: true,
+      managed: true,
+    });
+    expect(byPath.get("ArggonManager/docs/engineering.md")).toMatchObject({
+      exists: true,
+      managed: true,
+    });
     // Generated with --full and scanned by ADOPT_SCAN_PATHS (task-adopt-scan-count-constant).
-    expect(byPath.get("ArggonManager/docs/deploy.md")).toMatchObject({ exists: true, managed: true });
-    expect(byPath.get("ArggonManager/docs/runbooks/README.md")).toMatchObject({ exists: true, managed: true });
+    expect(byPath.get("ArggonManager/docs/deploy.md")).toMatchObject({
+      exists: true,
+      managed: true,
+    });
+    expect(byPath.get("ArggonManager/docs/runbooks/README.md")).toMatchObject({
+      exists: true,
+      managed: true,
+    });
     expect(byPath.get(".github/CODEOWNERS")).toMatchObject({ exists: true, managed: true });
     // Absent: nothing on disk, nothing managed.
-    expect(byPath.get("ArggonManager/docs/index.md")).toMatchObject({ exists: false, managed: false });
+    expect(byPath.get("ArggonManager/docs/index.md")).toMatchObject({
+      exists: false,
+      managed: false,
+    });
     expect(byPath.get(".github/CONTRIBUTING.md")).toMatchObject({ exists: false, managed: false });
 
     expect(inventory.stackHints).toEqual(["package.json", "go.mod"]);
@@ -354,18 +387,14 @@ describe("spec-corpus detection (task-adopt-corpus-fingerprints)", () => {
     writeFileSync(join(dir, "ArggonManager/docs/adr/0001-stack.md"), "# 1. Stack\n", "utf8");
     writeFileSync(join(dir, "ArggonManager/docs/adr/0002-board.md"), "# 2. Board\n", "utf8");
     writeFileSync(join(dir, "ArggonManager/docs/adr/README.md"), "# ADRs\n", "utf8");
-    expect(buildInventory(dir).corpora).toEqual([
-      { format: "adr", files: 3, origin: "ADR" },
-    ]);
+    expect(buildInventory(dir).corpora).toEqual([{ format: "adr", files: 3, origin: "ADR" }]);
   });
 
   it("RFC fingerprint: markdown under docs/rfc/ (preferred) or rfc/", () => {
     const dir = seedTree();
     mkdirSync(join(dir, "ArggonManager/docs/rfc"), { recursive: true });
     writeFileSync(join(dir, "ArggonManager/docs/rfc/rfc-001-review.md"), "# RFC 001\n", "utf8");
-    expect(buildInventory(dir).corpora).toEqual([
-      { format: "rfc", files: 1, origin: "RFC" },
-    ]);
+    expect(buildInventory(dir).corpora).toEqual([{ format: "rfc", files: 1, origin: "RFC" }]);
   });
 
   it("multiple corpora coexist and are all reported in detection order", () => {
@@ -411,9 +440,7 @@ describe("spec-corpus detection (task-adopt-corpus-fingerprints)", () => {
       inventory: { corpora: { format: string; files: number; origin: string }[] };
     };
     expect(body.ok).toBe(true);
-    expect(body.inventory.corpora).toEqual([
-      { format: "openspec", files: 1, origin: "OpenSpec" },
-    ]);
+    expect(body.inventory.corpora).toEqual([{ format: "openspec", files: 1, origin: "OpenSpec" }]);
   });
 });
 
@@ -423,9 +450,7 @@ describe("composeAdoptTaskBody (task-adopt-corpus-body-injection)", () => {
   });
 
   it("with corpora: concrete detected section, phased checklist intact", () => {
-    const body = composeAdoptTaskBody([
-      { format: "openspec", files: 2, origin: "OpenSpec" },
-    ]);
+    const body = composeAdoptTaskBody([{ format: "openspec", files: 2, origin: "OpenSpec" }]);
     // The generic fingerprint primer is gone.
     expect(body).not.toContain("Spec corpus (if the repo has one)");
     expect(body).not.toContain("No corpus: skip this section.");
@@ -442,7 +467,9 @@ describe("composeAdoptTaskBody (task-adopt-corpus-body-injection)", () => {
     expect(body).toContain("arggon spec analyze");
     expect(body).toContain("Consolidar antes de reescribir");
     // The non-corpus parts are untouched.
-    expect(body.startsWith(ADOPT_TASK_BODY.slice(0, ADOPT_TASK_BODY.indexOf("## Spec corpus")))).toBe(true);
+    expect(
+      body.startsWith(ADOPT_TASK_BODY.slice(0, ADOPT_TASK_BODY.indexOf("## Spec corpus"))),
+    ).toBe(true);
   });
 
   it("multiple corpora: each format and count appears, in detection order", () => {
@@ -538,7 +565,10 @@ describe("adopt via the CLI (--json)", () => {
       storyCreated: boolean;
       taskCreated: boolean;
       dryRun: boolean;
-      inventory: { docs: { path: string; exists: boolean; bytes: number; managed: boolean }[]; stackHints: string[] };
+      inventory: {
+        docs: { path: string; exists: boolean; bytes: number; managed: boolean }[];
+        stackHints: string[];
+      };
     };
     expect(body.ok).toBe(true);
     expect(body.schemaVersion).toBe(1);
@@ -561,7 +591,9 @@ describe("adopt via the CLI (--json)", () => {
     expect(body.ok).toBe(true);
     expect(body.taskCreated).toBe(false);
     expect(body.dryRun).toBe(true);
-    expect(loadItems(join(dir, "ArggonManager")).some((item) => item.id === ADOPT_TASK_ID)).toBe(false);
+    expect(loadItems(join(dir, "ArggonManager")).some((item) => item.id === ADOPT_TASK_ID)).toBe(
+      false,
+    );
   });
 
   it("fails with ADOPT_FAILED on a non-initialized tree", () => {
@@ -586,7 +618,11 @@ describe("runAdoptAck: x-generated baseline refresh (task-adopt-checksum-refresh
     // The sanctioned sweep edits (step 3 of the checklist).
     writeFileSync(join(dir, "AGENTS.md"), "SWEEP: project description\n", "utf8");
     writeFileSync(join(dir, "CONTRIBUTING.md"), "SWEEP: setup + build commands\n", "utf8");
-    expect(runDoctor({ cwd: dir }).docs).toMatchObject({ managed: GENERATED_DOC_COUNT, modified: 2, untouched: GENERATED_DOC_COUNT - 2 });
+    expect(runDoctor({ cwd: dir }).docs).toMatchObject({
+      managed: GENERATED_DOC_COUNT,
+      modified: 2,
+      untouched: GENERATED_DOC_COUNT - 2,
+    });
 
     const now = new Date("2026-09-13T10:00:00Z");
     const result = runAdoptAck({ cwd: dir, now });
@@ -624,9 +660,7 @@ describe("runAdoptAck: x-generated baseline refresh (task-adopt-checksum-refresh
     // the sanctioned sweep content must survive every re-run.
     expect(result.updated).not.toContain("AGENTS.md");
     expect(result.skipped).toContain("AGENTS.md");
-    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(
-      "SWEEP: project description\n",
-    );
+    expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe("SWEEP: project description\n");
     // The entry keeps its acknowledged flag after the skip.
     expect(readConventionConfig(dir).generated["AGENTS.md"]!.acknowledged).toBe(true);
   });

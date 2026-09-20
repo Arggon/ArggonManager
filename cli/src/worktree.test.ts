@@ -4,19 +4,27 @@
  * (sync-smoke pattern); only push/PR are stubbed so no remote is needed.
  */
 import { spawnSync } from "node:child_process";
-import { appendFileSync, chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, readlinkSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  readlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { defaultCleanupGit, runCleanup } from "./cleanup.js";
-import { runCreate } from "./create.js";
-import { parseFrontmatter } from "./frontmatter.js";
+import { parseFrontmatter, runCreate, runUpdate, runValidate } from "@arggon/lib";
+
 import { runInit } from "./init.js";
 import { defaultStartGit, runStart } from "./start.js";
 import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
-import { runUpdate } from "./update.js";
-import { runValidate } from "./validate.js";
 
 // bug-tmp-fixture-leak + bug-tracker-commit-enotempty-flake +
 // bug-ci-enotempty-rmretry: track mkdtemp dirs (plus any `arggon start
@@ -55,7 +63,11 @@ function git(args: string[], cwd: string): string {
 
 /** Git runner with real worktree support but no push/PR (no remote in temp repos). */
 function localGit() {
-  return { ...defaultStartGit(), pushBranch: () => {}, createDraftPr: () => "https://github.com/o/r/pull/1" };
+  return {
+    ...defaultStartGit(),
+    pushBranch: () => {},
+    createDraftPr: () => "https://github.com/o/r/pull/1",
+  };
 }
 
 function commitAllIfDirty(dir: string, message: string): void {
@@ -101,7 +113,10 @@ function refExists(dir: string, ref: string): boolean {
  */
 function setPostStart(dir: string, command: string | null): void {
   if (command === null) return;
-  appendFileSync(join(dir, "ArggonManager/.convention.yml"), `x-worktree:\n  post-start: "${command}"\n`);
+  appendFileSync(
+    join(dir, "ArggonManager/.convention.yml"),
+    `x-worktree:\n  post-start: "${command}"\n`,
+  );
   git(["add", "ArggonManager/.convention.yml"], dir);
   git(["commit", "--quiet", "-m", "config: x-worktree.post-start"], dir);
 }
@@ -189,7 +204,15 @@ describe("start --worktree", () => {
     const dir = initRepo();
     // runCreate auto-commits its own file now (task-auto-commit-tracker),
     // so the tree stays clean for start --worktree.
-    runCreate({ cwd: dir, type: "task", title: "Linked", parent: "login", id: "linked", issue: 9, now: NOW });
+    runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Linked",
+      parent: "login",
+      id: "linked",
+      issue: 9,
+      now: NOW,
+    });
     expect(git(["status", "--porcelain"], dir)).toBe("");
 
     const prBodies: string[] = [];
@@ -213,7 +236,8 @@ describe("start --worktree", () => {
     ]);
   });
 
-  it("attaches on re-run instead of failing or duplicating the worktree", () => {    const dir = initRepo();
+  it("attaches on re-run instead of failing or duplicating the worktree", () => {
+    const dir = initRepo();
     const first = runStart(
       { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
       { git: localGit() },
@@ -234,7 +258,10 @@ describe("start --worktree", () => {
     const blocker = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
     mkdirSync(blocker, { recursive: true });
     expect(() =>
-      runStart({ cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW }, { git: localGit() }),
+      runStart(
+        { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+        { git: localGit() },
+      ),
     ).toThrow(/not a git worktree/);
     expect(worktreeCount(dir)).toBe(1);
   });
@@ -272,7 +299,7 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     // checkout before the fix. The marker proves the gate really ran.
     setPreCommitHook(
       dir,
-      '#!/bin/sh\nnode -e "require(\'fake-gate-dep\')" || exit 1\ntouch .gate-ran\n',
+      "#!/bin/sh\nnode -e \"require('fake-gate-dep')\" || exit 1\ntouch .gate-ran\n",
     );
     const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
 
@@ -316,7 +343,10 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     expect(worktreeCount(dir)).toBe(2);
     expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(true);
     expect(
-      git(["status", "--porcelain", "--", "ArggonManager/launch/auth/login/task-alpha.md"], expectedPath),
+      git(
+        ["status", "--porcelain", "--", "ArggonManager/launch/auth/login/task-alpha.md"],
+        expectedPath,
+      ),
     ).not.toBe("");
 
     // The remediation is real: fix the gate and re-run — it attaches and lands
@@ -382,7 +412,7 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     addFakeDependency(dir, "fake-gate-dep");
     // The gate needs the primary install: it proves the link exists BEFORE the
     // hook and is only removed for the hook itself.
-    setPreCommitHook(dir, '#!/bin/sh\nnode -e "require(\'fake-gate-dep\')" || exit 1\n');
+    setPreCommitHook(dir, "#!/bin/sh\nnode -e \"require('fake-gate-dep')\" || exit 1\n");
     // The hook records what node_modules is when it runs, then reifies over it
     // exactly like npm ci's clean step would (a shell glob through a symlink
     // deletes the PRIMARY's entries) and installs its own.
@@ -558,10 +588,7 @@ describe("post-start shell variant (task-post-start-env)", () => {
    */
   function fakeLoginShell(dir: string, log: string): string {
     const path = join(dir, "fakeshell");
-    writeFileSync(
-      path,
-      `#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\nexec /bin/sh "$@"\n`,
-    );
+    writeFileSync(path, `#!/bin/sh\nprintf '%s\\n' "$*" >> "${log}"\nexec /bin/sh "$@"\n`);
     chmodSync(path, 0o755);
     return path;
   }
@@ -597,7 +624,10 @@ describe("post-start shell variant (task-post-start-env)", () => {
     const fake = fakeLoginShell(dir, log);
 
     const result = withShell(fake, () =>
-      runStart({ cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW }, { git: localGit() }),
+      runStart(
+        { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+        { git: localGit() },
+      ),
     );
 
     expect(result.postStart).toEqual({ command: "pwd > .post-start-cwd", ok: true });
@@ -615,7 +645,10 @@ describe("post-start shell variant (task-post-start-env)", () => {
     setPostStartWithShell(dir, "pwd > .post-start-cwd", null);
 
     const result = withShell(undefined, () =>
-      runStart({ cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW }, { git: localGit() }),
+      runStart(
+        { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+        { git: localGit() },
+      ),
     );
 
     expect(result.postStart).toEqual({ command: "pwd > .post-start-cwd", ok: true });
@@ -634,7 +667,14 @@ describe("post-start shell variant (task-post-start-env)", () => {
     // Flag "login" over inherit config: hook goes through the login shell.
     withShell(fake, () =>
       runStart(
-        { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, postStartShell: "login", now: NOW },
+        {
+          cwd: dir,
+          id: "task-alpha",
+          assignee: "arggon",
+          worktree: true,
+          postStartShell: "login",
+          now: NOW,
+        },
         { git: localGit() },
       ),
     );
@@ -647,7 +687,14 @@ describe("post-start shell variant (task-post-start-env)", () => {
     const fake2 = fakeLoginShell(dir2, log2);
     const inherit = withShell(fake2, () =>
       runStart(
-        { cwd: dir2, id: "task-alpha", assignee: "arggon", worktree: true, postStartShell: "inherit", now: NOW },
+        {
+          cwd: dir2,
+          id: "task-alpha",
+          assignee: "arggon",
+          worktree: true,
+          postStartShell: "inherit",
+          now: NOW,
+        },
         { git: localGit() },
       ),
     );
@@ -848,9 +895,7 @@ describe("arggon cleanup", () => {
     expect(envelope.schemaVersion).toBe(1);
     expect(envelope.base).toBe("main");
     expect(envelope.candidates).toHaveLength(3);
-    expect(envelope.candidates.filter((c) => c.removable).map((c) => c.id)).toEqual([
-      "task-alpha",
-    ]);
+    expect(envelope.candidates.filter((c) => c.removable).map((c) => c.id)).toEqual(["task-alpha"]);
     expect(envelope.pruned).toEqual([]);
   });
 
@@ -977,7 +1022,10 @@ describe("arggon cleanup", () => {
   });
 
   /** Fake gh executor returning a merged PR list (task-cleanup-squash-merge). */
-  function fakeGh(result: unknown, calls: string[][] = []): (file: string, args: string[]) => string {
+  function fakeGh(
+    result: unknown,
+    calls: string[][] = [],
+  ): (file: string, args: string[]) => string {
     return (file, args) => {
       calls.push([file, ...args]);
       if (result === undefined) throw new Error("gh exploded");
@@ -992,15 +1040,31 @@ describe("arggon cleanup", () => {
     const { dir, paths } = initCleanupRepo();
     const calls: string[][] = [];
 
-    const result = runCleanup({ cwd: dir, prune: true }, { gh: fakeGh([{ number: 12, url: "https://github.com/o/r/pull/12", mergedAt: "2026-09-13T00:00:00Z" }], calls) });
+    const result = runCleanup(
+      { cwd: dir, prune: true },
+      {
+        gh: fakeGh(
+          [{ number: 12, url: "https://github.com/o/r/pull/12", mergedAt: "2026-09-13T00:00:00Z" }],
+          calls,
+        ),
+      },
+    );
 
     const entry = result.entries.find((e) => e.id === "task-charlie")!;
     expect(entry.removable).toBe(true);
     expect(entry.via).toBe("squash-merged PR #12");
     expect(result.failures).toEqual([]);
     expect(result.pruned.filter((a) => a.id === "task-charlie")).toEqual([
-      { id: "task-charlie", action: `removed worktree ${paths["task-charlie"]}`, via: "squash-merged PR #12" },
-      { id: "task-charlie", action: "deleted branch feat/task-charlie", via: "squash-merged PR #12" },
+      {
+        id: "task-charlie",
+        action: `removed worktree ${paths["task-charlie"]}`,
+        via: "squash-merged PR #12",
+      },
+      {
+        id: "task-charlie",
+        action: "deleted branch feat/task-charlie",
+        via: "squash-merged PR #12",
+      },
       { id: "task-charlie", action: "cleared worktree_path" },
     ]);
     expect(existsSync(paths["task-charlie"])).toBe(false);
@@ -1048,7 +1112,10 @@ describe("arggon cleanup", () => {
     const { dir } = initCleanupRepo();
     const calls: string[][] = [];
 
-    const result = runCleanup({ cwd: dir, noGh: true }, { gh: fakeGh([{ number: 12, url: "u", mergedAt: null }], calls) });
+    const result = runCleanup(
+      { cwd: dir, noGh: true },
+      { gh: fakeGh([{ number: 12, url: "u", mergedAt: null }], calls) },
+    );
 
     const entry = result.entries.find((e) => e.id === "task-charlie")!;
     expect(entry.removable).toBe(false);

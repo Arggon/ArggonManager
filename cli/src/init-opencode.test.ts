@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 import { findOpenCodeConfig, generatedYamlMarker, stampGeneratedContent } from "./docs.js";
 import { runInit } from "./init.js";
-import { readConventionConfig } from "./convention.js";
+import { readConventionConfig } from "@arggon/lib";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -85,11 +85,15 @@ describe("opencode seam: fresh init", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
     const worker = readFileSync(join(dir, ".opencode/agents/arggon-worker.md"), "utf8");
-    expect(worker.startsWith("---\n# arggon:generated template=\"opencode/agents/arggon-worker.md\"\n")).toBe(true);
+    expect(
+      worker.startsWith('---\n# arggon:generated template="opencode/agents/arggon-worker.md"\n'),
+    ).toBe(true);
     expect(worker).not.toContain("<!-- arggon:generated");
     expect(worker).toContain("mode: subagent");
     const review = readFileSync(join(dir, ".opencode/commands/arggon-review.md"), "utf8");
-    expect(review.startsWith("---\n# arggon:generated template=\"opencode/commands/arggon-review.md\"\n")).toBe(true);
+    expect(
+      review.startsWith('---\n# arggon:generated template="opencode/commands/arggon-review.md"\n'),
+    ).toBe(true);
     expect(review).toContain("agent: arggon-reviewer");
     expect(review).toContain("subagent: true");
   });
@@ -113,14 +117,20 @@ describe("opencode seam: fresh init", () => {
     // Probe-verified on a real V2 session: an MCP tool action is the
     // normalized `<server>_<tool>` (server `arggon`, tools `arggon_*`).
     expect(worker).toMatch(/action: arggon_arggon_create\s+resource: "\*"\s+effect: deny/);
-    for (const action of ["arggon_arggon_create", "arggon_arggon_update", "arggon_arggon_handoff"]) {
+    for (const action of [
+      "arggon_arggon_create",
+      "arggon_arggon_update",
+      "arggon_arggon_handoff",
+    ]) {
       expect(reviewer, action).toMatch(
         new RegExp(`action: ${action}\\s+resource: "\\*"\\s+effect: deny`),
       );
     }
     // arggon_comment is the reviewer's one tracker write: never denied.
     expect(reviewer).not.toMatch(/action: arggon_arggon_comment/);
-    expect(worker).not.toMatch(/action: arggon_arggon_comment|action: arggon_arggon_update|action: arggon_arggon_handoff/);
+    expect(worker).not.toMatch(
+      /action: arggon_arggon_comment|action: arggon_arggon_update|action: arggon_arggon_handoff/,
+    );
   });
 
   it("records x-generated provenance for every seam file", () => {
@@ -442,10 +452,9 @@ describe("opencode seam: methodology commands and skill references (W5)", () => 
     const config = readConventionConfig(dir);
     for (const rel of METHODOLOGY_COMMANDS) {
       const raw = readFileSync(join(dir, ...rel.split("/")), "utf8");
-      expect(
-        raw.startsWith(`---\n# arggon:generated template="${markerOf(rel)}"\n`),
-        rel,
-      ).toBe(true);
+      expect(raw.startsWith(`---\n# arggon:generated template="${markerOf(rel)}"\n`), rel).toBe(
+        true,
+      );
       // Prompt templates only: no shell-substitution blocks with argument
       // placeholders — the agent runs the CLI through its shell tool under
       // permissions.

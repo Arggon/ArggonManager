@@ -17,10 +17,14 @@
  * caller-agent refusal shared with MCP (rules.ts) — so kernel-level tests and
  * the MCP layer are unchanged by this gate.
  */
-import { readConventionConfig } from "./convention.js";
-import { findTasksDir, repoRootFromTasks } from "./paths.js";
-import { tryLoadItem, walkTasksTree } from "./items.js";
-import type { Status } from "./status.js";
+import {
+  findTasksDir,
+  readConventionConfig,
+  repoRootFromTasks,
+  tryLoadItem,
+  walkTasksTree,
+  type Status,
+} from "@arggon/lib";
 
 /** Refusal when the repo has not armed claim-steal (the default). */
 export const STEAL_DISABLED_MESSAGE =

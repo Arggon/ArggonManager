@@ -1,9 +1,10 @@
 /**
- * Kernel library entry (ADR 0011 §4: one logic path, one library).
+ * Kernel library entry (`@arggon/lib`, ADR 0011 §4 / ADR 0013: one logic path,
+ * one library, shipped as its own package).
  *
- * The CLI, the stdio MCP adapter and (from W2/W3) the native plugin tools all
- * consume the kernel through this module. It exposes, as one importable and
- * typed surface:
+ * The CLI (`arggon-manager`), the stdio MCP adapter and the native plugin
+ * tools all consume the kernel through this module. It exposes, as one
+ * importable and typed surface:
  *
  * - **items** — the tracker model: load/parse/walk (`loadItems`, `itemsById`,
  *   `tryLoadItem`), frontmatter round-tripping and the stable JSON contract
@@ -19,13 +20,20 @@
  *   `compactWorkItem`, and one `*Operation` per command returning the exact
  *   documented envelope plus the CLI exit-code semantics.
  *
- * Publishing the package (npm) and bundling this entry into the vendored
- * single-file plugin are packaging decisions of the native waves (W2/W3); this
- * module is the boundary they consume. No commander dependency and no
- * printing: argv parsing, TTY gates and stdout formatting live in `cli.ts`.
+ * The package ships no assets and no printing: argv parsing, TTY gates and
+ * stdout formatting live in the root CLI; the bundled templates dir is
+ * injected by the root adapter (`templatesDir` on create/import options).
+ *
+ * Surface discipline (task-native-kernel-lib-polish finding 5 / ADR 0013):
+ * the **stable subset** the machine surfaces rely on is items + rules + paths
+ * + envelopes/operations; everything else re-exported here (frontmatter/id
+ * primitives, `run*` command kernels, human formatters, tracker-commit and
+ * config helpers the root adapter uses) is deliberately public for the root
+ * adapter but is **not** part of the stable contract — see `lib/README.md`.
+ * No commander dependency.
  */
 export type { Issue, ItemType, Status, WorkItem as ContractWorkItem } from "./types.js";
-export type { SoftIssue, SoftLoadResult, WorkItem as KernelWorkItem } from "./items.js";
+export type { SoftIssue, SoftLoadResult, WorkItem, WorkItem as KernelWorkItem } from "./items.js";
 export type { Frontmatter } from "./frontmatter.js";
 
 // --- Items -----------------------------------------------------------------
@@ -105,9 +113,12 @@ export {
   CONVENTION_VERSION,
   CONVENTION_VERSION_DEFAULT,
   DEFAULT_BRANCH_PATTERNS,
+  parseConventionConfig,
   readConventionConfig,
   readConventionVersion,
+  resolveBranchName,
 } from "./convention.js";
+export type { ConventionConfig, PlaybooksConfig, TrackerConfig } from "./convention.js";
 export {
   FILTER_FIELDS,
   buildAncestorIndex,
@@ -124,6 +135,9 @@ export type {
 } from "./filter.js";
 export { downstreamWeight, isReady, openDependencies, runNext } from "./next.js";
 export type { NextOptions, NextResult, NextSuggestion } from "./next.js";
+export { formatDate, formatDateTime } from "./dates.js";
+export { lockFilePathFor, withItemLock } from "./lock.js";
+export type { LockOptions } from "./lock.js";
 export {
   PRIORITIES,
   PRIORITY_LABEL_PATTERN,
@@ -132,7 +146,12 @@ export {
   priorityRank,
   runPriorityMigrate,
 } from "./priority.js";
-export type { Priority, PriorityMigrateEntry, PriorityMigrateResult } from "./priority.js";
+export type {
+  Priority,
+  PriorityMigrateEntry,
+  PriorityMigrateOptions,
+  PriorityMigrateResult,
+} from "./priority.js";
 
 // --- Envelopes (the `--json` contract) --------------------------------------
 
@@ -140,6 +159,7 @@ export { JSON_SCHEMA_VERSION, compactWorkItem, failEnvelope, successEnvelope } f
 export type { JsonEnvelopeBase, JsonError } from "./json.js";
 export { commitPayload } from "./tracker-commit.js";
 export type { CommitPayload, TrackerCommitResult } from "./tracker-commit.js";
+export type { SyncFilled } from "./sync-types.js";
 
 // --- Command kernels (raw results; operations assemble the envelopes) -------
 
@@ -159,18 +179,28 @@ export type {
 } from "./report.js";
 export { runTrend } from "./trend.js";
 export type { RunTrendOptions, TrendCycleTime, TrendResult, TrendWeek } from "./trend.js";
+export { isoWeekKey, parseLog, parseSince } from "./trend.js";
+export type { ParsedLog } from "./trend.js";
+export { parseOlderThan } from "./list.js";
 export { runValidate } from "./validate.js";
 export type { ValidateOptions, ValidateResult } from "./validate.js";
-export { runUpdate } from "./update.js";
+export { runUpdate, maybeCommitUpdate, parseCsvList } from "./update.js";
 export type { UpdateOptions, UpdateResult } from "./update.js";
 export { runComment } from "./comment.js";
 export type { CommentOptions, CommentResult } from "./comment.js";
-export { runHandoff } from "./handoff.js";
+export { HANDOFF_FIELD_CAP, HANDOFF_SESSION_CAP, runHandoff } from "./handoff.js";
 export type { HandoffOptions, HandoffResult } from "./handoff.js";
 export { runSync } from "./sync-command.js";
 export type { SyncResult } from "./sync-types.js";
 export { runImportIssues } from "./import-issues.js";
-export type { ImportIssuesOptions, ImportIssuesResult } from "./import-issues.js";
+export type { GhExecutor, ImportIssuesOptions, ImportIssuesResult } from "./import-issues.js";
+export {
+  ghIssueListJson,
+  importedBody,
+  mapIssueState,
+  normalizeGhLabels,
+  resolveImportType,
+} from "./import-issues.js";
 
 // --- Operations (one per tool command; return the `--json` envelope) --------
 
@@ -212,3 +242,42 @@ export type {
   UpdatePayload,
   ValidatePayload,
 } from "./operations.js";
+
+// --- Adapter helpers (public for the root package; not the stable subset) ---
+
+export { writeFileAtomic } from "./atomic.js";
+export {
+  MAX_HUMAN_ERROR_CHARS,
+  MAX_HUMAN_VALUE_CHARS,
+  sanitizeHumanError,
+  sanitizeHumanText,
+  sanitizeHumanTextUncapped,
+  sanitizeHumanValue,
+} from "./sanitize.js";
+export {
+  parseGeneratedProjectName,
+  readGeneratedProjectName,
+  readGeneratedState,
+  serializeGeneratedSection,
+  updateGeneratedSection,
+} from "./convention.js";
+export type { GeneratedEntry } from "./convention.js";
+export {
+  commitTrackerMutation,
+  formatCommitLine,
+  readAutoCommitConfig,
+  resolveAutoCommit,
+  resolveCommonGitDir,
+  trackerCommitMessage,
+  trackerGitLockKey,
+  updateCommitMessage,
+} from "./tracker-commit.js";
+export { formatListTable, resolveCurrentLogin } from "./list.js";
+export { DEFAULT_TAIL_COMMENTS, renderShowText } from "./show.js";
+export { formatReportMarkdown, formatReportTable } from "./report.js";
+export { formatTrendMarkdown, formatTrendTable } from "./trend.js";
+export { formatValidateHuman } from "./validate.js";
+export { ghPrListJson } from "./get-open-prs.js";
+export type { GhPrListOptions } from "./get-open-prs.js";
+export { bindJsonProgram, emitJson, failJson, jsonEnabled, successJson } from "./json.js";
+export type { FailJsonOptions } from "./json.js";

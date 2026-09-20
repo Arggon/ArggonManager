@@ -10,17 +10,17 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
-import { writeFileAtomic } from "./atomic.js";
-import { readConventionVersion } from "./convention.js";
 import {
-  bundledTemplatesDir,
+  TRACKER_DIR_NAME,
   docsDirForRoot,
   findTasksDir,
+  readConventionVersion,
   repoRootFromTasks,
-  TRACKER_DIR_NAME,
-} from "./paths.js";
-import { sanitizeHumanError } from "./sanitize.js";
-import type { Issue } from "./types.js";
+  sanitizeHumanError,
+  writeFileAtomic,
+  type Issue,
+} from "@arggon/lib";
+import { bundledTemplatesDir } from "./package-assets.js";
 
 export type SpecValidateOptions = {
   cwd: string;

@@ -12,12 +12,15 @@
  * (shared data path). `runTuiBoard` only wires raw mode, keypress events and
  * resize to the pure pieces; it performs no writes anywhere.
  */
-import { toContractWorkItem } from "./contract.js";
-import { loadItems } from "./items.js";
-import { findTasksDir, repoRootFromTasks } from "./paths.js";
-import { sanitizeHumanTextUncapped } from "./sanitize.js";
-import { STATUSES } from "./status.js";
-import type { WorkItem } from "./types.js";
+import {
+  STATUSES,
+  findTasksDir,
+  loadItems,
+  repoRootFromTasks,
+  sanitizeHumanTextUncapped,
+  toContractWorkItem,
+  type ContractWorkItem as WorkItem,
+} from "@arggon/lib";
 
 /** Default geometry when the terminal size cannot be queried. */
 export const TUI_DEFAULT_WIDTH = 80;

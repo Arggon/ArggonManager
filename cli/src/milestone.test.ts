@@ -11,12 +11,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runBoard, renderBoardHtml } from "./board.js";
-import { toContractWorkItem } from "./contract.js";
-import { runCreate } from "./create.js";
-import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
+import {
+  parseFrontmatter,
+  runCreate,
+  runValidate,
+  softTryLoadItem,
+  stringifyFrontmatter,
+  toContractWorkItem,
+} from "@arggon/lib";
+
 import { runInit } from "./init.js";
-import { softTryLoadItem } from "./items.js";
-import { runValidate } from "./validate.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -40,10 +44,34 @@ function primedTree(): {
   runInit({ dir, force: false });
   runCreate({ cwd: dir, type: "initiative", title: "Launch MVP" });
   runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp" });
-  const story = runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "story-login" });
-  const taskA = runCreate({ cwd: dir, type: "task", title: "First", parent: "story-login", id: "task-a" });
-  const taskB = runCreate({ cwd: dir, type: "task", title: "Second", parent: "story-login", id: "task-b" });
-  const taskC = runCreate({ cwd: dir, type: "task", title: "Third", parent: "story-login", id: "task-c" });
+  const story = runCreate({
+    cwd: dir,
+    type: "story",
+    title: "Login",
+    parent: "auth",
+    id: "story-login",
+  });
+  const taskA = runCreate({
+    cwd: dir,
+    type: "task",
+    title: "First",
+    parent: "story-login",
+    id: "task-a",
+  });
+  const taskB = runCreate({
+    cwd: dir,
+    type: "task",
+    title: "Second",
+    parent: "story-login",
+    id: "task-b",
+  });
+  const taskC = runCreate({
+    cwd: dir,
+    type: "task",
+    title: "Third",
+    parent: "story-login",
+    id: "task-c",
+  });
   return {
     dir,
     taskPaths: { a: taskA.path, b: taskB.path, c: taskC.path },
@@ -128,8 +156,13 @@ describe("board milestone grouping", () => {
       ],
       { generatedAt: GENERATED_AT, groupBy: "milestone" },
     );
-    const todoColumn = html.slice(html.indexOf('data-status="todo"'), html.indexOf('data-status="in_progress"'));
-    const order = ["task-soon", "task-mid", "task-late", "task-bare"].map((id) => todoColumn.indexOf(id));
+    const todoColumn = html.slice(
+      html.indexOf('data-status="todo"'),
+      html.indexOf('data-status="in_progress"'),
+    );
+    const order = ["task-soon", "task-mid", "task-late", "task-bare"].map((id) =>
+      todoColumn.indexOf(id),
+    );
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(order.every((index) => index >= 0)).toBe(true);
     expect(todoColumn).toContain("no milestone");
@@ -186,6 +219,6 @@ describe("runBoard --group-by", () => {
     expect(html).toContain('<div class="mgroup-head');
     expect(html).toContain("<!doctype html>");
     expect(html).not.toContain("src=");
-    expect(html).not.toContain("href=\"http");
+    expect(html).not.toContain('href="http');
   });
 });

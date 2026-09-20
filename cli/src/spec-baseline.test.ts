@@ -1,5 +1,12 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -60,7 +67,13 @@ type Snapshot = {
   schemaVersion: number;
   conventionVersion: number;
   count: number;
-  findings: { file: string; kind: string; line?: number; severity: "info" | "warn"; message: string }[];
+  findings: {
+    file: string;
+    kind: string;
+    line?: number;
+    severity: "info" | "warn";
+    message: string;
+  }[];
 };
 
 describe("spec baseline: snapshot format", () => {
@@ -77,7 +90,12 @@ describe("spec baseline: snapshot format", () => {
     expect(snap.count).toBe(snap.findings.length);
     expect(snap.findings).toEqual(sortSpecFindings(snap.findings));
     // no volatile fields: only the four documented keys
-    expect(Object.keys(snap).sort()).toEqual(["conventionVersion", "count", "findings", "schemaVersion"]);
+    expect(Object.keys(snap).sort()).toEqual([
+      "conventionVersion",
+      "count",
+      "findings",
+      "schemaVersion",
+    ]);
     // pretty-printed so committed baselines diff cleanly
     expect(before).toContain('  "findings": [');
     expect(serializeSpecBaseline(first.snapshot)).toBe(before);
@@ -146,15 +164,17 @@ describe("spec baseline: comparison semantics", () => {
   it("throws (SPEC_FAILED in the CLI) on a missing or invalid baseline file", () => {
     const dir = makeRepo();
     writeSpec(dir, "spec-b-001.md", "b-001", CLEAN_BODY);
-    expect(() => runSpecAnalyzeCompareBaseline({ cwd: dir, file: join(dir, "missing.json") })).toThrow(
-      /cannot read baseline/,
-    );
+    expect(() =>
+      runSpecAnalyzeCompareBaseline({ cwd: dir, file: join(dir, "missing.json") }),
+    ).toThrow(/cannot read baseline/);
     const bad = join(dir, "bad.json");
     writeFileSync(bad, "not json", "utf8");
     expect(() => runSpecAnalyzeCompareBaseline({ cwd: dir, file: bad })).toThrow(/not valid JSON/);
     const wrong = join(dir, "wrong.json");
     writeFileSync(wrong, JSON.stringify({ hello: true }), "utf8");
-    expect(() => runSpecAnalyzeCompareBaseline({ cwd: dir, file: wrong })).toThrow(/not a spec analyze baseline/);
+    expect(() => runSpecAnalyzeCompareBaseline({ cwd: dir, file: wrong })).toThrow(
+      /not a spec analyze baseline/,
+    );
     const malformed = join(dir, "malformed.json");
     writeFileSync(
       malformed,
@@ -175,7 +195,11 @@ describe("spec baseline: CLI contract (e2e)", () => {
     const run = runCli(["spec", "analyze", "--save-baseline", file, "--json"], dir);
     expect(run.status).toBe(0);
     expect(existsSync(file)).toBe(true);
-    const payload = JSON.parse(run.stdout) as { ok: boolean; command: string; baseline: { file: string; written: boolean } };
+    const payload = JSON.parse(run.stdout) as {
+      ok: boolean;
+      command: string;
+      baseline: { file: string; written: boolean };
+    };
     expect(payload.ok).toBe(true);
     expect(payload.command).toBe("spec");
     expect(payload.baseline.written).toBe(true);
@@ -192,7 +216,13 @@ describe("spec baseline: CLI contract (e2e)", () => {
     // gate failure still emits a success envelope with the additive payload
     const payload = JSON.parse(run.stdout) as {
       ok: boolean;
-      baseline: { failed: boolean; added: unknown[]; total: number; unchanged: number; resolved: unknown[] };
+      baseline: {
+        failed: boolean;
+        added: unknown[];
+        total: number;
+        unchanged: number;
+        resolved: unknown[];
+      };
     };
     expect(payload.ok).toBe(true);
     expect(payload.baseline.failed).toBe(true);
@@ -261,7 +291,14 @@ describe("spec baseline: CLI contract (e2e)", () => {
   it("refuses --baseline + --save-baseline in one run", () => {
     const dir = makeRepo();
     const run = runCli(
-      ["spec", "analyze", "--baseline", join(dir, "a.json"), "--save-baseline", join(dir, "b.json")],
+      [
+        "spec",
+        "analyze",
+        "--baseline",
+        join(dir, "a.json"),
+        "--save-baseline",
+        join(dir, "b.json"),
+      ],
       dir,
     );
     expect(run.status).toBe(1);

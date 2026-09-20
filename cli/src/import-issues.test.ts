@@ -9,21 +9,22 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseFrontmatter } from "./frontmatter.js";
 import {
-  type GhExecutor,
   ghIssueListJson,
   importedBody,
   mapIssueState,
   normalizeGhLabels,
+  parseFrontmatter,
   resolveImportType,
+  runCreate,
   runImportIssues,
-} from "./import-issues.js";
-import { runCreate } from "./create.js";
+  runList,
+  runValidate,
+  toContractWorkItem,
+  type GhExecutor,
+} from "@arggon/lib";
+
 import { runInit } from "./init.js";
-import { runList } from "./list.js";
-import { toContractWorkItem } from "./contract.js";
-import { runValidate } from "./validate.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];

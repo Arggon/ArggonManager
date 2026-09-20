@@ -1,15 +1,27 @@
 import { spawnSync } from "node:child_process";
-import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCreate } from "./create.js";
-import { readConventionVersion } from "./convention.js";
+import {
+  JSON_SCHEMA_VERSION,
+  readConventionVersion,
+  runCreate,
+  runNext,
+  runUpdate,
+} from "@arggon/lib";
+
 import { runInit } from "./init.js";
-import { JSON_SCHEMA_VERSION } from "./json.js";
-import { runNext } from "./next.js";
-import { runUpdate } from "./update.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -749,7 +761,10 @@ describe("CLI --json", () => {
     expect(runCli(["create", "task", "Hooked", "--parent", "login"], dir).status).toBe(0);
     // Configure x-worktree.post-start (task-start-post-hook), then commit
     // items + config in one go: start refuses dirty trees.
-    appendFileSync(join(dir, "ArggonManager/.convention.yml"), 'x-worktree:\n  post-start: "echo hooked > .hook-ran"\n');
+    appendFileSync(
+      join(dir, "ArggonManager/.convention.yml"),
+      'x-worktree:\n  post-start: "echo hooked > .hook-ran"\n',
+    );
     runGit(["add", "-A"], dir); // init/creates auto-commit; staging is a harmless no-op
     expect(
       runGit(["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "config"], dir).status,
@@ -784,7 +799,7 @@ describe("CLI --json", () => {
     writeFileSync(join(dep, "index.js"), "module.exports = true;\n");
     const hook = join(dir, ".git", "hooks", "pre-commit");
     mkdirSync(dirname(hook), { recursive: true });
-    writeFileSync(hook, '#!/bin/sh\nnode -e "require(\'fake-gate-dep\')" || exit 1\n');
+    writeFileSync(hook, "#!/bin/sh\nnode -e \"require('fake-gate-dep')\" || exit 1\n");
     chmodSync(hook, 0o755);
 
     const result = runCli(

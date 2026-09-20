@@ -8,22 +8,19 @@ import {
 } from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { writeFileAtomic } from "./atomic.js";
 import {
-  bundledTemplatesDir,
-  conventionPathForLayout,
-  packageRoot,
-  trackerAt,
   TRACKER_DIR_NAME,
-  type TrackerLayout,
-} from "./paths.js";
-import {
+  conventionPathForLayout,
   parseGeneratedProjectName,
   readGeneratedProjectName,
   readGeneratedState,
+  trackerAt,
   updateGeneratedSection,
+  writeFileAtomic,
   type GeneratedEntry,
-} from "./convention.js";
+  type TrackerLayout,
+} from "@arggon/lib";
+import { bundledTemplatesDir, packageRoot } from "./package-assets.js";
 
 /**
  * Governing-document generator: renders master templates from `templates/docs/`

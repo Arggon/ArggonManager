@@ -1,11 +1,18 @@
 import { PassThrough } from "node:stream";
-import { mkdtempSync as _mkdtempSync, readFileSync, rmSync } from "node:fs";
+import {
+  chmodSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { runCreate } from "./create.js";
+import { HANDOFF_SESSION_CAP, conventionPathForRoot, runCreate } from "@arggon/lib";
 import { arggonVersion } from "./docs.js";
-import { HANDOFF_SESSION_CAP } from "./handoff.js";
+
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
 
@@ -48,7 +55,9 @@ class McpTestClient {
           const resolve = this.pending.get(message.id)!;
           this.pending.delete(message.id);
           // JSON-RPC error responses carry `error` instead of `result`.
-          resolve("error" in message ? message : (message.result as Record<string, unknown>) ?? {});
+          resolve(
+            "error" in message ? message : ((message.result as Record<string, unknown>) ?? {}),
+          );
           continue;
         }
         if (this.waiters.length > 0) {
@@ -284,7 +293,8 @@ describe("mcp server", () => {
     });
   });
 
-  it("answers ping, rejects unknown methods, and reports parse errors", async () => {    expect(await client.request("ping")).toEqual({});
+  it("answers ping, rejects unknown methods, and reports parse errors", async () => {
+    expect(await client.request("ping")).toEqual({});
 
     const unknown = await client.request("resources/list");
     expect(unknown).toMatchObject({ error: { code: -32601 } });
@@ -317,7 +327,10 @@ describe("mcp server arggon_update parent (task-list-parent-flag)", () => {
       clientInfo: { name: "client-a", version: "1.0" },
     });
     const tools = await client.request("tools/list");
-    const toolsList = tools.tools as Array<{ name: string; inputSchema: { properties: Record<string, unknown> } }>;
+    const toolsList = tools.tools as Array<{
+      name: string;
+      inputSchema: { properties: Record<string, unknown> };
+    }>;
     const update = toolsList.find((tool) => tool.name === "arggon_update");
     expect(update).toBeDefined();
     expect(update!.inputSchema.properties).toHaveProperty("parent");
@@ -330,7 +343,13 @@ describe("mcp server arggon_update parent (task-list-parent-flag)", () => {
       clientInfo: { name: "client-a", version: "1.0" },
     });
     // Valid edge: story-login (story) reparents under billing (epic).
-    runCreate({ cwd: repoDir, type: "epic", title: "Billing", parent: "launch-mvp", id: "billing" });
+    runCreate({
+      cwd: repoDir,
+      type: "epic",
+      title: "Billing",
+      parent: "launch-mvp",
+      id: "billing",
+    });
     const result = await client.request("tools/call", {
       name: "arggon_update",
       arguments: { id: "story-login", parent: "billing" },
@@ -374,7 +393,12 @@ describe("mcp server next/report/validate (task-mcp-parity-full)", () => {
   it("arggon_next suggests the created task with reason, blockedBy and unblocks", async () => {
     const created = await client.request("tools/call", {
       name: "arggon_create",
-      arguments: { type: "task", title: "Add rate limiting", parent: "story-login", id: "rate-limit" },
+      arguments: {
+        type: "task",
+        title: "Add rate limiting",
+        parent: "story-login",
+        id: "rate-limit",
+      },
     });
     expect(created.isError).toBeUndefined();
 
@@ -407,7 +431,10 @@ describe("mcp server next/report/validate (task-mcp-parity-full)", () => {
       name: "arggon_update",
       arguments: { id: "task-rate-limit", status: "in_progress", assignee: "agent-x" },
     });
-    const empty = await client.request("tools/call", { name: "arggon_next", arguments: { ready: true } });
+    const empty = await client.request("tools/call", {
+      name: "arggon_next",
+      arguments: { ready: true },
+    });
     expect(empty.isError).toBeUndefined();
     expect((textContent(empty) as Record<string, unknown>).suggestion).toBeNull();
   });
@@ -450,7 +477,14 @@ describe("mcp server next/report/validate (task-mcp-parity-full)", () => {
     });
     expect(created.isError).toBeUndefined();
     const { readFileSync, writeFileSync } = await import("node:fs");
-    const file = join(repoDir, "ArggonManager", "launch-mvp", "auth", "story-login", "task-rate-limit.md");
+    const file = join(
+      repoDir,
+      "ArggonManager",
+      "launch-mvp",
+      "auth",
+      "story-login",
+      "task-rate-limit.md",
+    );
     writeFileSync(file, readFileSync(file, "utf8").replace("status: todo", "status: blocked"));
 
     const broken = await client.request("tools/call", { name: "arggon_validate", arguments: {} });
@@ -474,7 +508,12 @@ describe("mcp server _meta.sessionID attribution (task-opencode-v2-mcp-meta)", (
   async function seedTask(): Promise<void> {
     const created = await client.request("tools/call", {
       name: "arggon_create",
-      arguments: { type: "task", title: "Add rate limiting", parent: "story-login", id: "rate-limit" },
+      arguments: {
+        type: "task",
+        title: "Add rate limiting",
+        parent: "story-login",
+        id: "rate-limit",
+      },
     });
     expect(created.isError).toBeUndefined();
   }
@@ -573,7 +612,13 @@ describe("mcp server _meta.sessionID attribution (task-opencode-v2-mcp-meta)", (
 
     const handoff = await client.request("tools/call", {
       name: "arggon_handoff",
-      arguments: { id: "task-rate-limit", next: "resume", branch: "feat/x", session: "  ", author: "\t" },
+      arguments: {
+        id: "task-rate-limit",
+        next: "resume",
+        branch: "feat/x",
+        session: "  ",
+        author: "\t",
+      },
       _meta: { sessionID: "ses_meta_empty_explicit" },
     });
     expect(handoff.isError).toBeUndefined();
@@ -649,7 +694,7 @@ describe("mcp server _meta.sessionID attribution (task-opencode-v2-mcp-meta)", (
     });
     const envelope = textContent(handoff) as Record<string, unknown>;
     expect(envelope).toMatchObject({ comment: { author: "fallback-user" } });
-    expect((envelope.handoff as Record<string, unknown>)).not.toHaveProperty("session");
+    expect(envelope.handoff as Record<string, unknown>).not.toHaveProperty("session");
   });
 
   it("normalizes control characters to a single-line token (no heading injection)", async () => {
@@ -839,5 +884,77 @@ describe("mcp server _meta.sessionID attribution (task-opencode-v2-mcp-meta)", (
     });
     const shownEnvelope = textContent(shown) as Record<string, unknown>;
     expect((shownEnvelope.item as Record<string, unknown>).status).toBe("todo");
+  });
+});
+
+describe("mcp server additive update contract (task-native-kernel-lib-polish finding 1)", () => {
+  let client: McpTestClient;
+  let repoDir: string;
+  let shimDir: string;
+  let pathBefore: string | undefined;
+
+  beforeEach(() => {
+    repoDir = mkdtempSync(join(tmpdir(), "arggon-mcp-additive-"));
+    runInit({ dir: repoDir, force: false });
+    runCreate({ cwd: repoDir, type: "initiative", title: "Launch MVP" });
+    runCreate({ cwd: repoDir, type: "epic", title: "Auth", parent: "launch-mvp" });
+    runCreate({ cwd: repoDir, type: "story", title: "Login", parent: "auth", id: "story-login" });
+    // `issue: 12` is what import-issues writes; the done flip must round-trip it.
+    runCreate({
+      cwd: repoDir,
+      type: "task",
+      title: "Add rate limiting",
+      parent: "story-login",
+      id: "rate-limit",
+      issue: 12,
+    });
+    execFileSync("git", ["init", "-q"], { cwd: repoDir });
+    execFileSync("git", ["remote", "add", "origin", "https://github.com/octocat/hello-world.git"], {
+      cwd: repoDir,
+    });
+    // Opt the tree into the issue round-trip (default OFF, x-github section).
+    const convention = conventionPathForRoot(repoDir);
+    writeFileSync(
+      convention,
+      `${readFileSync(convention, "utf8")}x-github:\n  issue-roundtrip: true\n`,
+    );
+    // Deterministic `gh` on PATH: the close succeeds without any GitHub traffic.
+    shimDir = mkdtempSync(join(tmpdir(), "arggon-gh-shim-"));
+    const gh = join(shimDir, "gh");
+    writeFileSync(gh, "#!/bin/sh\nexit 0\n");
+    chmodSync(gh, 0o755);
+    pathBefore = process.env.PATH;
+    process.env.PATH = `${shimDir}${pathBefore ? `:${pathBefore}` : ""}`;
+
+    client = new McpTestClient();
+    client.cwd = repoDir;
+    client.start();
+  });
+
+  afterEach(() => {
+    if (pathBefore !== undefined) process.env.PATH = pathBefore;
+  });
+
+  it("update carries the detected conventionVersion and the additive issueRoundtrip", async () => {
+    const claim = await client.request("tools/call", {
+      name: "arggon_update",
+      arguments: { id: "task-rate-limit", status: "in_progress", assignee: "agent-x" },
+    });
+    expect(claim.isError).toBeUndefined();
+
+    const done = await client.request("tools/call", {
+      name: "arggon_update",
+      arguments: { id: "task-rate-limit", status: "done" },
+    });
+    expect(done.isError).toBeUndefined();
+    const envelope = textContent(done) as Record<string, unknown>;
+    expect(envelope).toMatchObject({
+      ok: true,
+      schemaVersion: 1,
+      command: "update",
+      conventionVersion: 5,
+      issueRoundtrip: { closed: true, issue: 12, repo: "octocat/hello-world" },
+    });
+    expect((envelope.item as Record<string, unknown>).status).toBe("done");
   });
 });

@@ -297,7 +297,7 @@ arggon show task-rate-limit --tail-comments 10
 arggon show task-rate-limit --body
 ```
 
-Shared kernel: `cli/src/paths.ts`, `frontmatter.ts`, `ids.ts`, `status.ts`, `items.ts`, `relations.ts`, `dates.ts`.
+Shared kernel: `lib/src/paths.ts`, `frontmatter.ts`, `ids.ts`, `status.ts`, `items.ts`, `relations.ts`, `dates.ts`.
 
 ### `arggon validate`
 

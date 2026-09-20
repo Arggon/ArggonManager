@@ -9,22 +9,27 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { writeFileAtomic } from "./atomic.js";
-import {
-  bundledTemplatesDir,
-  conventionPathForLayout,
-  LEGACY_TRACKER_DIR_NAME,
-  TRACKER_DIR_NAME,
-  trackerAt,
-  type TrackerLayout,
-} from "./paths.js";
 import {
   CONVENTION_VERSION,
   DEFAULT_BRANCH_PATTERNS,
+  LEGACY_TRACKER_DIR_NAME,
+  TRACKER_DIR_NAME,
+  commitTrackerMutation,
+  conventionPathForLayout,
+  readAutoCommitConfig,
   readGeneratedProjectName,
   readGeneratedState,
+  resolveAutoCommit,
+  trackerAt,
+  trackerCommitMessage,
   updateGeneratedSection,
-} from "./convention.js";
+  writeFileAtomic,
+  type ItemType,
+  type TrackerCommitResult,
+  type TrackerLayout,
+} from "@arggon/lib";
+import { bundledTemplatesDir } from "./package-assets.js";
+
 import {
   applyDocsPlan,
   arggonVersion,
@@ -36,14 +41,6 @@ import {
   TIER2_DESTS,
   type DocsPlan,
 } from "./docs.js";
-import type { ItemType } from "./ids.js";
-import {
-  commitTrackerMutation,
-  readAutoCommitConfig,
-  resolveAutoCommit,
-  trackerCommitMessage,
-  type TrackerCommitResult,
-} from "./tracker-commit.js";
 
 const CONVENTION_YML =
   `version: ${CONVENTION_VERSION}\n` +

@@ -65,7 +65,9 @@ export function extractCliCommands(source: string): CliCommandInfo[] {
         ? undefined
         : [...infos].reverse().find((info) => info.path.length === 1 && info.path[0] === owner);
     if (owner !== "program" && !parentInfo) {
-      throw new Error(`skill-commands: cannot resolve parent group "${owner}" for .command("${name}")`);
+      throw new Error(
+        `skill-commands: cannot resolve parent group "${owner}" for .command("${name}")`,
+      );
     }
     const path = parentInfo ? [...parentInfo.path, name] : [name];
 
@@ -148,7 +150,10 @@ export function renderRegion(infos: CliCommandInfo[], filter: string): string {
   // Filter keys are command paths ("spec new"), not usage strings — the
   // rendered line still carries the full usage with .argument() specs.
   const byPath = new Map(infos.map((info) => [info.path.join(" "), info]));
-  const keys = filter.split(",").map((k) => k.trim()).filter(Boolean);
+  const keys = filter
+    .split(",")
+    .map((k) => k.trim())
+    .filter(Boolean);
   if (keys.length === 0) throw new Error("skill-commands: empty generated-commands filter");
   return (
     keys

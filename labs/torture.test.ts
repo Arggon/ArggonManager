@@ -77,15 +77,22 @@
  * trees under os.tmpdir().
  */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { runCreate } from "../cli/src/create.js";
+import { runCreate, runUpdate } from "@arggon/lib";
 import { runInit } from "../cli/src/init.js";
 import { removeFixtureTree } from "../cli/src/test-tmp.js";
-import { runUpdate } from "../cli/src/update.js";
+
 import { GENERATED_DOC_COUNT } from "../cli/src/docs.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -151,10 +158,7 @@ function freshGitTree(prefix: string, tracker: string): string {
 type SpawnResult = { body: Json | null; stderr: string };
 
 /** Spawn N CLI processes at once (real concurrency) and collect their JSON envelopes. */
-function spawnAll(
-  cwd: string,
-  commands: Array<{ args: string[] }>,
-): Promise<SpawnResult[]> {
+function spawnAll(cwd: string, commands: Array<{ args: string[] }>): Promise<SpawnResult[]> {
   const children = commands.map(({ args }) =>
     spawn(process.execPath, [tsx, cli, ...args], {
       cwd,
@@ -172,7 +176,9 @@ function spawnAll(
           child.stderr.on("data", (chunk: string) => (err += chunk));
           child.on("close", () => {
             const trimmed = out.trim();
-            const body = trimmed ? (JSON.parse(trimmed.split("\n").pop() ?? trimmed) as Json) : null;
+            const body = trimmed
+              ? (JSON.parse(trimmed.split("\n").pop() ?? trimmed) as Json)
+              : null;
             resolvePromise({ body, stderr: err });
           });
         }),
@@ -196,78 +202,93 @@ function frontmatter(dir: string, ...segments: string[]): Record<string, string>
 // ---------------------------------------------------------------------------
 
 describe("lab: mixed concurrent operations on one item family (suizo / bug-claim-race-no-lock)", () => {
-  it(
-    "N=8 processes (claims, sibling-done cascade pressure, comments): one claimant, deterministic losers, validate ok",
-    async () => {
-      const dir = freshTree("mixed");
-      runCreate({ cwd: dir, type: "task", title: "Race target", parent: "story-login", id: "task-target" });
-      runCreate({ cwd: dir, type: "task", title: "Sibling", parent: "story-login", id: "task-sibling" });
-      // v0 transitions: todo -> done is illegal, so prime the sibling to
-      // in_progress up front; the spawned processes then close it (cascade
-      // pressure on the shared containers).
-      runUpdate({ cwd: dir, id: "task-sibling", status: "in_progress", assignee: "worker" });
+  it("N=8 processes (claims, sibling-done cascade pressure, comments): one claimant, deterministic losers, validate ok", async () => {
+    const dir = freshTree("mixed");
+    runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Race target",
+      parent: "story-login",
+      id: "task-target",
+    });
+    runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Sibling",
+      parent: "story-login",
+      id: "task-sibling",
+    });
+    // v0 transitions: todo -> done is illegal, so prime the sibling to
+    // in_progress up front; the spawned processes then close it (cascade
+    // pressure on the shared containers).
+    runUpdate({ cwd: dir, id: "task-sibling", status: "in_progress", assignee: "worker" });
 
-      const results = await spawnAll(dir, [
-        // Claim contention on task-target: three different assignees + a same-assignee duplicate.
-        { args: ["update", "task-target", "--status", "in_progress", "--assignee", "alice", "--json"] },
-        { args: ["update", "task-target", "--status", "in_progress", "--assignee", "bob", "--json"] },
-        { args: ["update", "task-target", "--status", "in_progress", "--assignee", "carol", "--json"] },
-        { args: ["update", "task-target", "--status", "in_progress", "--assignee", "alice", "--json"] },
-        // Cascade pressure: closing the sibling writes the story/epic/initiative
-        // files too; a title bump races the same file from another process.
-        { args: ["update", "task-sibling", "--status", "done", "--json"] },
-        { args: ["update", "task-sibling", "--title", "Sibling v2", "--json"] },
-        // Comments racing the claims. NOTE: they target DIFFERENT items —
-        // same-item concurrent comments are covered by the test below
-        // (bug-comment-race-no-lock, now fixed with withItemLock).
-        { args: ["comment", "task-target", "observer one", "--author", "alice", "--json"] },
-        { args: ["comment", "task-sibling", "observer two", "--author", "bob", "--json"] },
-      ]);
+    const results = await spawnAll(dir, [
+      // Claim contention on task-target: three different assignees + a same-assignee duplicate.
+      {
+        args: ["update", "task-target", "--status", "in_progress", "--assignee", "alice", "--json"],
+      },
+      { args: ["update", "task-target", "--status", "in_progress", "--assignee", "bob", "--json"] },
+      {
+        args: ["update", "task-target", "--status", "in_progress", "--assignee", "carol", "--json"],
+      },
+      {
+        args: ["update", "task-target", "--status", "in_progress", "--assignee", "alice", "--json"],
+      },
+      // Cascade pressure: closing the sibling writes the story/epic/initiative
+      // files too; a title bump races the same file from another process.
+      { args: ["update", "task-sibling", "--status", "done", "--json"] },
+      { args: ["update", "task-sibling", "--title", "Sibling v2", "--json"] },
+      // Comments racing the claims. NOTE: they target DIFFERENT items —
+      // same-item concurrent comments are covered by the test below
+      // (bug-comment-race-no-lock, now fixed with withItemLock).
+      { args: ["comment", "task-target", "observer one", "--author", "alice", "--json"] },
+      { args: ["comment", "task-sibling", "observer two", "--author", "bob", "--json"] },
+    ]);
 
-      const claimResults = results.slice(0, 4);
-      const okClaims = claimResults.filter((r) => r.body?.ok === true);
-      const failedClaims = claimResults.filter((r) => r.body?.ok !== true);
+    const claimResults = results.slice(0, 4);
+    const okClaims = claimResults.filter((r) => r.body?.ok === true);
+    const failedClaims = claimResults.filter((r) => r.body?.ok !== true);
 
-      // Exactly one assignee survives across every successful claim.
-      const assignees = new Set(
-        okClaims.map((r) => (r.body!.item as Json).assignee as string),
-      );
-      expect(assignees.size).toBe(1);
-      const winner = [...assignees][0]!;
-      const final = frontmatter(dir, "launch", "auth", "story-login", "task-target.md");
-      expect(final.assignee).toBe(winner);
-      expect(final.status).toBe("in_progress");
+    // Exactly one assignee survives across every successful claim.
+    const assignees = new Set(okClaims.map((r) => (r.body!.item as Json).assignee as string));
+    expect(assignees.size).toBe(1);
+    const winner = [...assignees][0]!;
+    const final = frontmatter(dir, "launch", "auth", "story-login", "task-target.md");
+    expect(final.assignee).toBe(winner);
+    expect(final.status).toBe("in_progress");
 
-      // Every loser was refused deterministically: a claim conflict against
-      // the surviving claim, or a lock timeout — never a silent overwrite
-      // (that would be last-write-wins, the original bug).
-      expect(failedClaims.length).toBeGreaterThanOrEqual(2);
-      for (const r of failedClaims) {
-        const error = r.body!.error as Json;
-        expect(error.code).toBe("UPDATE_FAILED");
-        const message = error.message as string;
-        expect(/claim conflict|failed to acquire lock/.test(message)).toBe(true);
-        if (/claim conflict/.test(message)) {
-          expect(message).toContain(`claimed by '${winner}'`);
-        }
+    // Every loser was refused deterministically: a claim conflict against
+    // the surviving claim, or a lock timeout — never a silent overwrite
+    // (that would be last-write-wins, the original bug).
+    expect(failedClaims.length).toBeGreaterThanOrEqual(2);
+    for (const r of failedClaims) {
+      const error = r.body!.error as Json;
+      expect(error.code).toBe("UPDATE_FAILED");
+      const message = error.message as string;
+      expect(/claim conflict|failed to acquire lock/.test(message)).toBe(true);
+      if (/claim conflict/.test(message)) {
+        expect(message).toContain(`claimed by '${winner}'`);
       }
+    }
 
-      // Cascade pressure + comments all landed without corrupting anything.
-      const sibling = frontmatter(dir, "launch", "auth", "story-login", "task-sibling.md");
-      expect(sibling.status).toBe("done");
-      const target = readFileSync(join(dir, "ArggonManager/launch/auth/story-login/task-target.md"), "utf8");
-      expect(target).toContain("observer one");
-      expect(
-        readFileSync(join(dir, "ArggonManager/launch/auth/story-login/task-sibling.md"), "utf8"),
-      ).toContain("observer two");
+    // Cascade pressure + comments all landed without corrupting anything.
+    const sibling = frontmatter(dir, "launch", "auth", "story-login", "task-sibling.md");
+    expect(sibling.status).toBe("done");
+    const target = readFileSync(
+      join(dir, "ArggonManager/launch/auth/story-login/task-target.md"),
+      "utf8",
+    );
+    expect(target).toContain("observer one");
+    expect(
+      readFileSync(join(dir, "ArggonManager/launch/auth/story-login/task-sibling.md"), "utf8"),
+    ).toContain("observer two");
 
-      // The tree is structurally sound after the storm.
-      expect(runCli(["validate", "--json"], dir).body).toMatchObject({ ok: true });
+    // The tree is structurally sound after the storm.
+    expect(runCli(["validate", "--json"], dir).body).toMatchObject({ ok: true });
 
-      removeFixtureTree(dir);
-    },
-    90_000, // 8 concurrent tsx processes; generous wall-clock budget
-  );
+    removeFixtureTree(dir);
+  }, 90_000); // 8 concurrent tsx processes; generous wall-clock budget
 });
 
 // ---------------------------------------------------------------------------
@@ -275,129 +296,135 @@ describe("lab: mixed concurrent operations on one item family (suizo / bug-claim
 // ---------------------------------------------------------------------------
 
 describe("lab: concurrent tracker auto-commit contention (suizo lock-transitorio)", () => {
-  it(
-    "N=6 commenting processes with x-tracker.auto-commit: all mutations committed, no index.lock debris",
-    async () => {
-      const dir = freshGitTree("autocommit", "x-tracker:\n  auto-commit: true\n");
-      const ids = ["task-a", "task-b", "task-c", "task-d", "task-e", "task-f"];
-      for (const id of ids) {
-        runCreate({ cwd: dir, type: "task", title: id, parent: "story-login", id });
+  it("N=6 commenting processes with x-tracker.auto-commit: all mutations committed, no index.lock debris", async () => {
+    const dir = freshGitTree("autocommit", "x-tracker:\n  auto-commit: true\n");
+    const ids = ["task-a", "task-b", "task-c", "task-d", "task-e", "task-f"];
+    for (const id of ids) {
+      runCreate({ cwd: dir, type: "task", title: id, parent: "story-login", id });
+    }
+    gitCommitIfDirty(dir, "seed tasks");
+
+    // Six processes comment on six different items simultaneously — every
+    // mutation ends in its own git commit, so git's index.lock is contended.
+    // (The same-item variant is asserted by the test below — see
+    // bug-comment-race-no-lock.)
+    const commands = ids.map((id) => ({
+      args: ["comment", id, `note on ${id}`, "--author", "agent", "--json"],
+    }));
+    const results = await spawnAll(dir, commands);
+
+    // Either the mutation + commit succeeded, or the process reported a
+    // clean failure — never a crash, never ok:false with the file mutated
+    // but uncommitted and unexplained.
+    const cleanSkips: string[] = [];
+    results.forEach((r, i) => {
+      expect(r.body).not.toBeNull();
+      if (r.body!.ok !== true) {
+        const message = (r.body!.error as Json).message as string;
+        expect(/lock|index/i.test(message)).toBe(true);
+        cleanSkips.push(ids[i]!);
+        return;
       }
-      gitCommitIfDirty(dir, "seed tasks");
+      // bug-torture-contention-flake2: a CONTENTION skip can also arrive as
+      // ok:true with a `commit.skipped` payload. Under concurrent commits,
+      // one process's `git commit` rewrites the index between another
+      // process's `git add` and its `git commit`, clobbering the loser's
+      // staged entry — its commit then reports "nothing to commit"
+      // (reported in the JSON payload, quiet on stderr, well inside the 10s
+      // retry budget) while its mutation sits written but uncommitted.
+      const commit = r.body!.commit as Json | undefined;
+      if (commit !== undefined && commit.skipped !== undefined) cleanSkips.push(ids[i]!);
+    });
 
-      // Six processes comment on six different items simultaneously — every
-      // mutation ends in its own git commit, so git's index.lock is contended.
-      // (The same-item variant is asserted by the test below — see
-      // bug-comment-race-no-lock.)
-      const commands = ids.map((id) => ({
-        args: ["comment", id, `note on ${id}`, "--author", "agent", "--json"],
-      }));
-      const results = await spawnAll(dir, commands);
+    // A cleanly reported skip is retried sequentially, like a real caller
+    // would (comment-race.test.ts pattern): the retry re-appends the comment
+    // and its commit picks up the uncommitted mutation too. This keeps the
+    // contract below intact under scheduler starvation and the index-clobber
+    // race without weakening the clean-tree assertion.
+    // bug-torture-contention-flake3: the RETRY's own commit used to be
+    // unchecked — under CI load it could re-enter contention and skip again
+    // (ok:true, commit.skipped), leaving its mutation dirty with no
+    // explanation and tripping the clean-tree assert below. With the
+    // repo-level git-mutation lock a retry cannot re-enter contention, so a
+    // skipped retry commit is itself a failure now, not a tolerated state.
+    for (const id of cleanSkips) {
+      const retry = runCli(["comment", id, `note on ${id}`, "--author", "agent", "--json"], dir);
+      expect(retry.body, retry.stderr).toMatchObject({ ok: true });
+      const retryCommit = retry.body!.commit as Json | undefined;
+      expect(
+        retryCommit,
+        `retry commit for ${id} skipped: ${JSON.stringify(retryCommit)}`,
+      ).toMatchObject({ hash: expect.any(String) });
+    }
 
-      // Either the mutation + commit succeeded, or the process reported a
-      // clean failure — never a crash, never ok:false with the file mutated
-      // but uncommitted and unexplained.
-      const cleanSkips: string[] = [];
-      results.forEach((r, i) => {
-        expect(r.body).not.toBeNull();
-        if (r.body!.ok !== true) {
-          const message = (r.body!.error as Json).message as string;
-          expect(/lock|index/i.test(message)).toBe(true);
-          cleanSkips.push(ids[i]!);
-          return;
-        }
-        // bug-torture-contention-flake2: a CONTENTION skip can also arrive as
-        // ok:true with a `commit.skipped` payload. Under concurrent commits,
-        // one process's `git commit` rewrites the index between another
-        // process's `git add` and its `git commit`, clobbering the loser's
-        // staged entry — its commit then reports "nothing to commit"
-        // (reported in the JSON payload, quiet on stderr, well inside the 10s
-        // retry budget) while its mutation sits written but uncommitted.
-        const commit = r.body!.commit as Json | undefined;
-        if (commit !== undefined && commit.skipped !== undefined) cleanSkips.push(ids[i]!);
-      });
+    // Every comment actually landed in its item file.
+    for (const id of ids) {
+      const body = readFileSync(
+        join(dir, "ArggonManager/launch/auth/story-login", `${id}.md`),
+        "utf8",
+      );
+      expect(body).toContain(`note on ${id}`);
+    }
 
-      // A cleanly reported skip is retried sequentially, like a real caller
-      // would (comment-race.test.ts pattern): the retry re-appends the comment
-      // and its commit picks up the uncommitted mutation too. This keeps the
-      // contract below intact under scheduler starvation and the index-clobber
-      // race without weakening the clean-tree assertion.
-      // bug-torture-contention-flake3: the RETRY's own commit used to be
-      // unchecked — under CI load it could re-enter contention and skip again
-      // (ok:true, commit.skipped), leaving its mutation dirty with no
-      // explanation and tripping the clean-tree assert below. With the
-      // repo-level git-mutation lock a retry cannot re-enter contention, so a
-      // skipped retry commit is itself a failure now, not a tolerated state.
-      for (const id of cleanSkips) {
-        const retry = runCli(["comment", id, `note on ${id}`, "--author", "agent", "--json"], dir);
-        expect(retry.body, retry.stderr).toMatchObject({ ok: true });
-        const retryCommit = retry.body!.commit as Json | undefined;
-        expect(retryCommit, `retry commit for ${id} skipped: ${JSON.stringify(retryCommit)}`)
-          .toMatchObject({ hash: expect.any(String) });
-      }
+    // No git index.lock left behind and the tree is fully clean: with the
+    // commitTrackerMutation retry (bug-autocommit-silent-skip fix) plus the
+    // sequential retries above, every index.lock race and every reported
+    // skip resolves as a landed commit — an UNREPORTED skip would still
+    // leave the mutated item file dirty here, and that stays a failure.
+    expect(existsSync(join(dir, ".git/index.lock"))).toBe(false);
+    expect(git(["status", "--porcelain"], dir)).toBe("");
 
-      // Every comment actually landed in its item file.
-      for (const id of ids) {
-        const body = readFileSync(join(dir, "ArggonManager/launch/auth/story-login", `${id}.md`), "utf8");
-        expect(body).toContain(`note on ${id}`);
-      }
+    expect(runCli(["validate", "--json"], dir).body).toMatchObject({ ok: true });
 
-      // No git index.lock left behind and the tree is fully clean: with the
-      // commitTrackerMutation retry (bug-autocommit-silent-skip fix) plus the
-      // sequential retries above, every index.lock race and every reported
-      // skip resolves as a landed commit — an UNREPORTED skip would still
-      // leave the mutated item file dirty here, and that stays a failure.
-      expect(existsSync(join(dir, ".git/index.lock"))).toBe(false);
-      expect(git(["status", "--porcelain"], dir)).toBe("");
-
-      expect(runCli(["validate", "--json"], dir).body).toMatchObject({ ok: true });
-
-      removeFixtureTree(dir);
-    },
-    90_000, // 6 concurrent tsx processes + real git commits
-  );
+    removeFixtureTree(dir);
+  }, 90_000); // 6 concurrent tsx processes + real git commits
 
   // Exposed by this lab while building scenario 2: two concurrent comments on
   // the SAME item used to lose one silently (runComment did an unlocked
   // read-modify-write). Fixed in bug-comment-race-no-lock: runComment now
   // serializes its read-modify-write with withItemLock, so both comments land.
-  it(
-    "two concurrent comments on the same item both land (bug-comment-race-no-lock)",
-    async () => {
-      const dir = freshGitTree("comment-race", "x-tracker:\n  auto-commit: true\n");
-      try {
-        runCreate({ cwd: dir, type: "task", title: "Race target", parent: "story-login", id: "task-a" });
-        gitCommitIfDirty(dir, "seed race target");
+  it("two concurrent comments on the same item both land (bug-comment-race-no-lock)", async () => {
+    const dir = freshGitTree("comment-race", "x-tracker:\n  auto-commit: true\n");
+    try {
+      runCreate({
+        cwd: dir,
+        type: "task",
+        title: "Race target",
+        parent: "story-login",
+        id: "task-a",
+      });
+      gitCommitIfDirty(dir, "seed race target");
 
-        // Two processes comment on the SAME item simultaneously.
-        const results = await spawnAll(dir, [
-          { args: ["comment", "task-a", "first concurrent comment", "--author", "agent", "--json"] },
-          { args: ["comment", "task-a", "second concurrent comment", "--author", "agent", "--json"] },
-        ]);
+      // Two processes comment on the SAME item simultaneously.
+      const results = await spawnAll(dir, [
+        { args: ["comment", "task-a", "first concurrent comment", "--author", "agent", "--json"] },
+        { args: ["comment", "task-a", "second concurrent comment", "--author", "agent", "--json"] },
+      ]);
 
-        // Both processes succeed (or report a clean contention failure — the
-        // item lock timeout, or git's index.lock, the known separate
-        // bug-autocommit-silent-skip family). With the fix both should be ok.
-        for (const r of results) {
-          expect(r.body).not.toBeNull();
-          if (r.body!.ok !== true) {
-            const message = (r.body!.error as Json).message as string;
-            expect(/failed to acquire lock|index/i.test(message)).toBe(true);
-          }
+      // Both processes succeed (or report a clean contention failure — the
+      // item lock timeout, or git's index.lock, the known separate
+      // bug-autocommit-silent-skip family). With the fix both should be ok.
+      for (const r of results) {
+        expect(r.body).not.toBeNull();
+        if (r.body!.ok !== true) {
+          const message = (r.body!.error as Json).message as string;
+          expect(/failed to acquire lock|index/i.test(message)).toBe(true);
         }
-
-        // The invariant this bug was filed for: NEITHER comment is lost.
-        const body = readFileSync(join(dir, "ArggonManager/launch/auth/story-login/task-a.md"), "utf8");
-        expect(body).toContain("first concurrent comment");
-        expect(body).toContain("second concurrent comment");
-
-        expect(runCli(["validate", "--json"], dir).body).toMatchObject({ ok: true });
-      } finally {
-        removeFixtureTree(dir);
       }
-    },
-    90_000,
-  );
+
+      // The invariant this bug was filed for: NEITHER comment is lost.
+      const body = readFileSync(
+        join(dir, "ArggonManager/launch/auth/story-login/task-a.md"),
+        "utf8",
+      );
+      expect(body).toContain("first concurrent comment");
+      expect(body).toContain("second concurrent comment");
+
+      expect(runCli(["validate", "--json"], dir).body).toMatchObject({ ok: true });
+    } finally {
+      removeFixtureTree(dir);
+    }
+  }, 90_000);
 });
 
 // ---------------------------------------------------------------------------
@@ -435,7 +462,10 @@ describe("lab: synthetic legacy tree, full adoption flow (guardian/cuentas/suizo
       taskCreated: true,
     });
     const taskFile = readFileSync(
-      join(dir, "ArggonManager/arggon-adoption/epic-arggon-adoption/story-arggon-adoption/task-adopt-arggon.md"),
+      join(
+        dir,
+        "ArggonManager/arggon-adoption/epic-arggon-adoption/story-arggon-adoption/task-adopt-arggon.md",
+      ),
       "utf8",
     );
     expect(taskFile.match(/^- \[ \] /gm)).toHaveLength(14);
@@ -539,7 +569,10 @@ type McpServer = {
 };
 
 function startServer(cwd: string): McpServer {
-  const child = spawn(process.execPath, [tsx, cli, "mcp"], { cwd, stdio: ["pipe", "pipe", "pipe"] });
+  const child = spawn(process.execPath, [tsx, cli, "mcp"], {
+    cwd,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
   const waiters: Array<(message: Json) => void> = [];
   let buffer = "";
   child.stdout.setEncoding("utf8");
@@ -565,7 +598,12 @@ function startServer(cwd: string): McpServer {
 
 type ToolOutcome = { isError: boolean; text: string };
 
-async function callTool(server: McpServer, id: number, name: string, args: Json): Promise<ToolOutcome> {
+async function callTool(
+  server: McpServer,
+  id: number,
+  name: string,
+  args: Json,
+): Promise<ToolOutcome> {
   const response = await server.request(id, "tools/call", { name, arguments: args });
   const result = response.result as { content: Array<{ text: string }>; isError?: boolean };
   return { isError: result.isError === true, text: result.content[0]!.text };
@@ -574,8 +612,20 @@ async function callTool(server: McpServer, id: number, name: string, args: Json)
 describe("lab: gate probes from every entry point (guardian/suizo)", () => {
   function primed(): { dir: string; doneId: string } {
     const dir = freshTree("gates");
-    runCreate({ cwd: dir, type: "task", title: "Claimed", parent: "story-login", id: "task-claimed" });
-    runCreate({ cwd: dir, type: "task", title: "Finished", parent: "story-login", id: "task-finished" });
+    runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Claimed",
+      parent: "story-login",
+      id: "task-claimed",
+    });
+    runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Finished",
+      parent: "story-login",
+      id: "task-finished",
+    });
     // v0 transitions: todo -> done goes through in_progress.
     runUpdate({ cwd: dir, id: "task-claimed", status: "in_progress", assignee: "alice" });
     runUpdate({ cwd: dir, id: "task-finished", status: "in_progress", assignee: "worker" });
@@ -591,7 +641,9 @@ describe("lab: gate probes from every entry point (guardian/suizo)", () => {
         capabilities: {},
         clientInfo: { name: "lab-gate-probe", version: "1.0" },
       });
-      server.child.stdin!.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
+      server.child.stdin!.write(
+        `${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`,
+      );
       return await callTool(server, 2, "arggon_update", { id, ...args });
     } finally {
       server.child.kill("SIGTERM");
@@ -627,7 +679,9 @@ describe("lab: gate probes from every entry point (guardian/suizo)", () => {
       runUpdate({ cwd: dir, id: claimedId, status: "in_progress", assignee: "bob" }),
     ).toThrow(/claim conflict/);
     // alice's claim survived every probe.
-    expect(frontmatter(dir, "launch", "auth", "story-login", "task-claimed.md").assignee).toBe("alice");
+    expect(frontmatter(dir, "launch", "auth", "story-login", "task-claimed.md").assignee).toBe(
+      "alice",
+    );
 
     removeFixtureTree(dir);
   }, 60_000);
@@ -640,7 +694,9 @@ describe("lab: gate probes from every entry point (guardian/suizo)", () => {
     expect(cliProbe.body!.ok).toBe(false);
     const cliMessage = (cliProbe.body!.error as Json).message as string;
     expect(/TTY|non-interactive|reopen/i.test(cliMessage)).toBe(true);
-    expect(frontmatter(dir, "launch", "auth", "story-login", "task-finished.md").status).toBe("done");
+    expect(frontmatter(dir, "launch", "auth", "story-login", "task-finished.md").status).toBe(
+      "done",
+    );
 
     // (b) MCP arggon_update: agent rules refuse with the documented message.
     const mcp = await mcpUpdate(dir, doneId, { status: "todo" });
@@ -674,7 +730,9 @@ describe("lab: long MCP session (estanteria 53-call session)", () => {
         clientInfo: { name: "lab-session-client", version: "1.0" },
       });
       expect(initialized.result).toMatchObject({ serverInfo: { name: "arggon" } });
-      server.child.stdin!.write(`${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`);
+      server.child.stdin!.write(
+        `${JSON.stringify({ jsonrpc: "2.0", method: "notifications/initialized" })}\n`,
+      );
 
       // 10 creates under the seeded story.
       for (let i = 0; i < 10; i++) {
@@ -724,9 +782,9 @@ describe("lab: long MCP session (estanteria 53-call session)", () => {
       // Every mutation really landed on disk (the session mutated, not just replied).
       const task = frontmatter(dir, "launch", "auth", "story-login", "task-session-7.md");
       expect(task.assignee).toBe("agent-7");
-      expect(readFileSync(join(dir, "ArggonManager/launch/auth/story-login/task-session-7.md"), "utf8")).toContain(
-        "handoff note 7",
-      );
+      expect(
+        readFileSync(join(dir, "ArggonManager/launch/auth/story-login/task-session-7.md"), "utf8"),
+      ).toContain("handoff note 7");
     } finally {
       server.child.kill("SIGTERM");
     }

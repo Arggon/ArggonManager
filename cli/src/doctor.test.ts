@@ -13,7 +13,12 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { readConventionConfig, updateGeneratedSection, type GeneratedEntry } from "./convention.js";
+import {
+  readConventionConfig,
+  runCreate,
+  updateGeneratedSection,
+  type GeneratedEntry,
+} from "@arggon/lib";
 import { GENERATED_DOC_COUNT, OPENCODE_CONFIG_CANDIDATES } from "./docs.js";
 import {
   formatDoctorReport,
@@ -24,7 +29,7 @@ import {
   runDoctor,
 } from "./doctor.js";
 import { runAdoptAck } from "./adopt.js";
-import { runCreate } from "./create.js";
+
 import { runInit } from "./init.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.

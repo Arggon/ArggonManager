@@ -4,9 +4,8 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { runCreate } from "./create.js";
-import { toContractWorkItem } from "./contract.js";
-import { parseFrontmatter } from "./frontmatter.js";
+import { parseFrontmatter, runCreate, toContractWorkItem } from "@arggon/lib";
+
 import { runInit } from "./init.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
@@ -88,7 +87,9 @@ describe("create", () => {
       now: NOW,
     });
     expect(task.id).toBe("task-rate-limit");
-    expect(task.path).toBe(join(dir, "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md"));
+    expect(task.path).toBe(
+      join(dir, "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md"),
+    );
     expect(fm(task.path)).toMatchObject({
       type: "task",
       id: "task-rate-limit",
@@ -192,9 +193,13 @@ describe("create", () => {
   it("rejects duplicate ids against an existing tree", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-create-sample-"));
     runInit({ dir, force: false });
-    cpSync(join(process.cwd(), "fixtures/tasks-valid/tasks/launch-mvp"), join(dir, "ArggonManager/launch-mvp"), {
-      recursive: true,
-    });
+    cpSync(
+      join(process.cwd(), "fixtures/tasks-valid/tasks/launch-mvp"),
+      join(dir, "ArggonManager/launch-mvp"),
+      {
+        recursive: true,
+      },
+    );
     expect(() => runCreate({ cwd: dir, type: "initiative", title: "Launch MVP" })).toThrow(
       /already exists/,
     );
@@ -233,9 +238,18 @@ describe("create", () => {
 describe("create --help parent-type mapping", () => {
   it("documents the expected parent type per item type", () => {
     const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-    const proc = spawnSync(process.execPath, [resolve(root, "node_modules/tsx/dist/cli.mjs"), resolve(root, "cli/src/cli.ts"), "create", "--help"], {
-      encoding: "utf8",
-    });
+    const proc = spawnSync(
+      process.execPath,
+      [
+        resolve(root, "node_modules/tsx/dist/cli.mjs"),
+        resolve(root, "cli/src/cli.ts"),
+        "create",
+        "--help",
+      ],
+      {
+        encoding: "utf8",
+      },
+    );
     expect(proc.status).toBe(0);
     // Commander wraps long option descriptions; compare with normalized whitespace.
     const normalized = proc.stdout.replace(/\s+/g, " ");
@@ -249,7 +263,14 @@ describe("create --labels", () => {
     const dir = primed();
     runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
     runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", now: NOW });
-    runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "story-login", now: NOW });
+    runCreate({
+      cwd: dir,
+      type: "story",
+      title: "Login",
+      parent: "auth",
+      id: "story-login",
+      now: NOW,
+    });
     const task = runCreate({
       cwd: dir,
       type: "task",
@@ -276,7 +297,14 @@ describe("create --labels", () => {
     const dir = primed();
     runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
     runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", now: NOW });
-    runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "story-login", now: NOW });
+    runCreate({
+      cwd: dir,
+      type: "story",
+      title: "Login",
+      parent: "auth",
+      id: "story-login",
+      now: NOW,
+    });
     expect(() =>
       runCreate({
         cwd: dir,
@@ -306,7 +334,14 @@ describe("create --issue", () => {
     const dir = primed();
     runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
     runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", now: NOW });
-    runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "story-login", now: NOW });
+    runCreate({
+      cwd: dir,
+      type: "story",
+      title: "Login",
+      parent: "auth",
+      id: "story-login",
+      now: NOW,
+    });
     const task = runCreate({
       cwd: dir,
       type: "task",
@@ -324,7 +359,14 @@ describe("create --issue", () => {
     const dir = primed();
     runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
     runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", now: NOW });
-    runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "story-login", now: NOW });
+    runCreate({
+      cwd: dir,
+      type: "story",
+      title: "Login",
+      parent: "auth",
+      id: "story-login",
+      now: NOW,
+    });
     expect(() =>
       runCreate({
         cwd: dir,

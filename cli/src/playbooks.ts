@@ -12,14 +12,22 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { writeFileAtomic } from "./atomic.js";
-import { readConventionConfig, readConventionVersion, type PlaybooksConfig } from "./convention.js";
-import { formatDate } from "./dates.js";
-import { itemsById, loadItems } from "./items.js";
-import { slugify } from "./ids.js";
-import { bundledTemplatesDir, docsDirForRoot, findTasksDir, repoRootFromTasks } from "./paths.js";
-import { runCreate } from "./create.js";
-import { sanitizeHumanTextUncapped } from "./sanitize.js";
+import {
+  docsDirForRoot,
+  findTasksDir,
+  formatDate,
+  itemsById,
+  loadItems,
+  readConventionConfig,
+  readConventionVersion,
+  repoRootFromTasks,
+  runCreate,
+  sanitizeHumanTextUncapped,
+  slugify,
+  writeFileAtomic,
+  type PlaybooksConfig,
+} from "@arggon/lib";
+import { bundledTemplatesDir } from "./package-assets.js";
 
 /** Default stale threshold for `arggon playbook status` (docs/convention.md x-playbooks). */
 export const PLAYBOOK_MAX_AGE_DAYS_DEFAULT = 90;
@@ -416,6 +424,7 @@ export function runPlaybookStatus(opts: PlaybookStatusOptions): PlaybookStatusRe
         // Keeps its historic no-commit behavior (out of the tracker
         // auto-commit surface, task-auto-commit-tracker).
         commit: false,
+        templatesDir: bundledTemplatesDir(),
         now: opts.now,
       });
       result.created.push(`task-${stem}`);

@@ -16,7 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startBoardServer, type BoardServeHandle } from "./board-serve.js";
 import type { BoardGithub, PrInfo } from "./board.js";
 import { runInit } from "./init.js";
-import { runCreate } from "./create.js";
+import { runCreate } from "@arggon/lib";
 import { removeFixtureTree } from "./test-tmp.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test
@@ -270,7 +270,13 @@ describe("arggon board --serve (CLI)", () => {
           }
         });
       });
-      const envelope = JSON.parse(line) as { ok: boolean; command: string; serving: boolean; url: string; port: number };
+      const envelope = JSON.parse(line) as {
+        ok: boolean;
+        command: string;
+        serving: boolean;
+        url: string;
+        port: number;
+      };
       expect(envelope).toMatchObject({ ok: true, command: "board", serving: true });
       expect(envelope.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+$/);
     } finally {
@@ -290,10 +296,14 @@ describe("arggon board --serve (CLI)", () => {
   });
 
   it("rejects invalid --port values", () => {
-    const proc = spawnSync(process.execPath, [tsx, cli, "--json", "board", "--serve", "--port", "99999"], {
-      encoding: "utf8",
-      cwd: dir,
-    });
+    const proc = spawnSync(
+      process.execPath,
+      [tsx, cli, "--json", "board", "--serve", "--port", "99999"],
+      {
+        encoding: "utf8",
+        cwd: dir,
+      },
+    );
     expect(proc.status).not.toBe(0);
     const envelope = JSON.parse(proc.stdout) as { ok: boolean; error: { message: string } };
     expect(envelope.error.message).toMatch(/invalid --port '99999'/);

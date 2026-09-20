@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";
 import { resolve } from "node:path";
 import { arggonVersion } from "./docs.js";
-import { packageRoot } from "./paths.js";
+import { packageRoot } from "./package-assets.js";
 
 /**
  * Build identification for `arggon --version` (task-npm-packaging). The

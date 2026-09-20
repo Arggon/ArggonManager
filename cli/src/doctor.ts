@@ -9,7 +9,16 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, type Dirent } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { readConventionConfig, readConventionVersion } from "./convention.js";
+import {
+  findTrackerLocation,
+  loadItems,
+  readConventionConfig,
+  readConventionVersion,
+  sanitizeHumanText,
+  sanitizeHumanValue,
+  type TrackerLayout,
+} from "@arggon/lib";
+import { bundledTemplatesDir } from "./package-assets.js";
 import {
   checksumMatches,
   currentGeneratedTemplatesFrom,
@@ -18,14 +27,12 @@ import {
   renderGeneratedDoc,
   resolveProjectName,
 } from "./docs.js";
-import { loadItems } from "./items.js";
+
 import { measureBudget, formatBudgetLines, type BudgetResult } from "./measure.js";
-import { findTrackerLocation, bundledTemplatesDir, type TrackerLayout } from "./paths.js";
-import { sanitizeHumanText, sanitizeHumanValue } from "./sanitize.js";
 
 // The sanitizer implementation moved to sanitize.ts (bug-cli-error-output-injection
 // F1) so the CLI error channel shares it; re-exported for existing consumers.
-export { MAX_HUMAN_VALUE_CHARS } from "./sanitize.js";
+export { MAX_HUMAN_VALUE_CHARS } from "@arggon/lib";
 
 export type DoctorDocs = {
   /** Total x-generated provenance entries. */

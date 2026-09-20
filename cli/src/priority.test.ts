@@ -1,9 +1,15 @@
-import { existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseConventionConfig } from "./convention.js";
-import { runPriorityMigrate } from "./priority.js";
+import { parseConventionConfig, runPriorityMigrate } from "@arggon/lib";
 
 // bug-…/task-priority-field-schema: `arggon priority migrate` moves the legacy
 // pN LABEL convention into the v4 `priority` field (highest priority = lowest
@@ -118,6 +124,8 @@ describe("arggon priority migrate (task-priority-field-schema)", () => {
     // it writes bytes and reports; repo-level git state stays untouched.
     runPriorityMigrate({ cwd: dir });
     expect(existsSync(join(dir, ".git"))).toBe(false);
-    expect(parseConventionConfig(readFileSync(join(dir, "tasks/.convention.yml"), "utf8")).version).toBe(3);
+    expect(
+      parseConventionConfig(readFileSync(join(dir, "tasks/.convention.yml"), "utf8")).version,
+    ).toBe(3);
   });
 });

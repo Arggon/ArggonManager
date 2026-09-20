@@ -1,16 +1,14 @@
 import { watch, type FSWatcher } from "node:fs";
-import {
-  createServer,
-  type IncomingMessage,
-  type Server,
-  type ServerResponse,
-} from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { renderBoardHtml, defaultBoardGithub, type BoardGithub, type PrInfo } from "./board.js";
-import { toContractWorkItem } from "./contract.js";
-import { loadItems } from "./items.js";
-import { findTasksDir, repoRootFromTasks } from "./paths.js";
-import { runUpdate } from "./update.js";
+import {
+  findTasksDir,
+  loadItems,
+  repoRootFromTasks,
+  runUpdate,
+  toContractWorkItem,
+} from "@arggon/lib";
 
 /**
  * `arggon board --serve` (task-board-serve): serve the static board locally
@@ -60,9 +58,7 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
   let groupBy: "milestone" | "story" | undefined;
   if (opts.groupBy !== undefined) {
     if (opts.groupBy !== "milestone" && opts.groupBy !== "story") {
-      throw new Error(
-        `unknown --group-by field '${opts.groupBy}' (supported: milestone, story)`,
-      );
+      throw new Error(`unknown --group-by field '${opts.groupBy}' (supported: milestone, story)`);
     }
     groupBy = opts.groupBy;
   }

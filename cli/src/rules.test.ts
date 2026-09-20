@@ -2,10 +2,8 @@ import { mkdtempSync as _mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCreate } from "./create.js";
+import { assertUpdateRules, runCreate, runUpdate } from "@arggon/lib";
 import { runInit } from "./init.js";
-import { assertUpdateRules } from "./rules.js";
-import { runUpdate } from "./update.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -25,7 +23,14 @@ function primedTask(): { dir: string; id: string } {
   runInit({ dir, force: false });
   runCreate({ cwd: dir, type: "initiative", title: "Launch MVP", now: NOW });
   runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch-mvp", now: NOW });
-  runCreate({ cwd: dir, type: "story", title: "Login", parent: "auth", id: "story-login", now: NOW });
+  runCreate({
+    cwd: dir,
+    type: "story",
+    title: "Login",
+    parent: "auth",
+    id: "story-login",
+    now: NOW,
+  });
   const task = runCreate({
     cwd: dir,
     type: "task",

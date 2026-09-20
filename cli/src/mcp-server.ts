@@ -1,27 +1,28 @@
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 import { arggonVersion } from "./docs.js";
-import { HANDOFF_SESSION_CAP } from "./handoff.js";
-import { ITEM_TYPES } from "./ids.js";
+import { bundledTemplatesDir } from "./package-assets.js";
 import {
+  HANDOFF_SESSION_CAP,
+  ITEM_TYPES,
+  STATUSES,
   commentOperation,
   createOperation,
   handoffOperation,
   listOperation,
   nextOperation,
+  parseCsvList,
   reportOperation,
   showOperation,
   updateOperation,
   validateOperation,
   type CommandOutcome,
-} from "./lib.js";
-import { STATUSES } from "./status.js";
-import { parseCsvList } from "./update.js";
+} from "@arggon/lib";
 
 /**
  * Stdio MCP server exposing the shared kernel (list/create/update/comment) as
  * MCP tools. No new schema logic: tool handlers call the shared kernel
- * operations (`cli/src/operations.ts`, exported by the `arggon-manager/lib`
+ * operations (`lib/src/operations.ts`, exported by the `@arggon/lib`
  * entry) — the same path the CLI uses — and return the documented `--json`
  * envelope objects as tool text.
  * Agent playbook rules are enforced by passing `agent: true` to runUpdate —
@@ -446,6 +447,7 @@ export function runMcpServer(opts: McpServerOptions): void {
           status: str(args.status),
           blockedReason: str(args.blocked_reason),
           issue: typeof args.issue === "number" ? args.issue : undefined,
+          templatesDir: bundledTemplatesDir(),
           full: args.full === true,
           // Tracker auto-commit resolves like the CLI (`x-tracker.auto-commit`,
           // default ON) so both entry points stay envelope-identical.

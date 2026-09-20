@@ -18,8 +18,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runLayoutMigrate } from "./layout-migrate.js";
-import { findTrackerLocation, trackerAt } from "./paths.js";
-import { runValidate } from "./validate.js";
+import { findTrackerLocation, runValidate, trackerAt } from "@arggon/lib";
 
 const tmpDirs: string[] = [];
 afterEach(() => {

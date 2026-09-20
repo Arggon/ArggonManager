@@ -1,8 +1,19 @@
+import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  resolve: {
+    // Root adapters (CLI, MCP, tests) consume the kernel through its public
+    // package entry (@arggon/lib, ADR 0013). Tests resolve it to the source
+    // entry so a run never depends on a previous `npm run build`; the built
+    // artifact is exercised for real in cli/src/lib-build.test.ts.
+    alias: {
+      "@arggon/lib": fileURLToPath(new URL("./lib/src/index.ts", import.meta.url)),
+    },
+  },
   test: {
     include: [
+      "lib/**/*.test.ts",
       "cli/**/*.test.ts",
       "labs/**/*.test.ts",
       "opencode/**/*.test.ts",
