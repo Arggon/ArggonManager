@@ -90,6 +90,19 @@ namespace:
   Push and the `gh` PR step stay explicit agent steps; the CLI
   (`arggon start --worktree`, `arggon cleanup --prune`) is the documented
   fallback when the domain is unavailable.
+
+  Payload contract (documented here; the output schemas stay loose to respect
+  the ADR 0006 budget and the contract tests assert the envelopes):
+
+  | Tool | Payload fields (beyond `ok`/`schemaVersion`/`conventionVersion`/`command`) |
+  | --- | --- |
+  | `start` | `id`, `branch`, `worktreePath` (`null` with `worktree: false`), `worktreeCreated`, `branchCreated`, `pushed`, `item` (the claimed contract item), `commit?` (tracker auto-commit) |
+  | `branch` | `id`, `branch`, `item`, `commit?` |
+  | `cleanup` | `base`, `candidates[]` (`id`, `status`, `branch`, `path`, `removable`, `reason`, `action`, `via?`), `pruned[]` (`id`, `action`, `error?`, `leftoverBranch?`, `via?`), `failures[]`, `commit?` |
+
+  Failures are typed tool errors carrying the code + envelope: `START_FAILED`,
+  `BRANCH_FAILED` and `CLEANUP_FAILED` (per-candidate prune failures stay in
+  `pruned`/`failures`, like the CLI).
 - **Permissions (W4)** — the generated seam adds minimal shell gates (deny
   `git commit --no-verify*`, `git push --force*`, `git push -f*`) that
   complement — never replace — the kernel invariants; the shipped agents add

@@ -12,8 +12,10 @@ permissions:
   # task-native-permissions-worktrees): a native tool action normalizes to
   # `<namespace>_<tool>` = arggon_<tool>, an MCP tool to
   # `<server>_<tool>` = arggon_arggon_<tool>. Both spellings are denied so the
-  # rule holds whichever surface the adopter runs; the reviewer reads with
-  # `show` and posts its verdict with `comment`.
+  # rule holds whichever surface the adopter runs. EVERY mutating tracker tool
+  # is denied — including the W4 worktree lifecycle (start/branch/cleanup) and
+  # the maintenance writes (priority/sync/import_issues); the reviewer reads
+  # with `show` and posts its verdict with `comment`.
   - action: arggon_create
     resource: "*"
     effect: deny
@@ -21,6 +23,24 @@ permissions:
     resource: "*"
     effect: deny
   - action: arggon_handoff
+    resource: "*"
+    effect: deny
+  - action: arggon_start
+    resource: "*"
+    effect: deny
+  - action: arggon_branch
+    resource: "*"
+    effect: deny
+  - action: arggon_cleanup
+    resource: "*"
+    effect: deny
+  - action: arggon_priority
+    resource: "*"
+    effect: deny
+  - action: arggon_sync
+    resource: "*"
+    effect: deny
+  - action: arggon_import_issues
     resource: "*"
     effect: deny
   - action: arggon_arggon_create

@@ -220,6 +220,12 @@ docs or the V1 schema for V2 work.
   - `ctx.permission.rules` (the documented session-scoped rule setter) is
     **absent on 2.0.10** — `ctx.permission.list/get/reply` exist. Do not build
     on it; feature-detect if a 2.x adds it back.
+  - attach safety (W4 review): both attach paths (the recorded `worktree_path`
+    and the deterministic `../<repo>-<id>` default) require the directory to be
+    a worktree registered with THIS repo — a foreign repository at that path is
+    refused before any branch is created/switched; a rollback removes only the
+    worktree the run created and deletes only a branch the run created, so a
+    pre-existing (unmerged) branch survives a refused claim.
   - the native `start` tool is a deliberate subset of `arggon start --worktree`:
     it does not link the primary checkout's `node_modules` and does not run the
     `x-worktree.post-start` hook (the domain creates a plain worktree from the

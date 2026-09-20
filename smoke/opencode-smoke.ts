@@ -1527,6 +1527,8 @@ function scenarioPermissions(): void {
       "const out = {};",
       `out.show = await tools.arggon.show({ id: "${item.id}" });`,
       `try { out.update = await tools.arggon.update({ id: "${item.id}", status: "todo" }); } catch (error) { out.updateError = String((error && error.message) || error); }`,
+      `try { out.cleanup = await tools.arggon.cleanup({}); } catch (error) { out.cleanupError = String((error && error.message) || error); }`,
+      `try { out.start = await tools.arggon.start({ id: "${item.id}", assignee: "reviewer" }); } catch (error) { out.startError = String((error && error.message) || error); }`,
       "return out;",
       "Then run these two shell commands in order: `git push origin main` and `git status`.",
       "If the tool is not found, run the same code once more (the tool catalog can lag server startup).",
@@ -1553,6 +1555,14 @@ function scenarioPermissions(): void {
       result.update === undefined &&
         /Unknown tool|Permission denied/.test(String(result.updateError ?? "")),
       String(result.updateError ?? "").slice(0, 200),
+    );
+    check(
+      "the reviewer cannot run the worktree lifecycle (arggon.start/cleanup denied, W4 review)",
+      result.start === undefined &&
+        result.cleanup === undefined &&
+        /Unknown tool|Permission denied/.test(String(result.startError ?? "")) &&
+        /Unknown tool|Permission denied/.test(String(result.cleanupError ?? "")),
+      `${String(result.startError ?? "")} | ${String(result.cleanupError ?? "")}`.slice(0, 220),
     );
   }
   check(

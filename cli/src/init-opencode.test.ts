@@ -138,6 +138,12 @@ describe("opencode seam: fresh init", () => {
       "arggon_create",
       "arggon_update",
       "arggon_handoff",
+      "arggon_start",
+      "arggon_branch",
+      "arggon_cleanup",
+      "arggon_priority",
+      "arggon_sync",
+      "arggon_import_issues",
       "arggon_arggon_create",
       "arggon_arggon_update",
       "arggon_arggon_handoff",
@@ -151,6 +157,8 @@ describe("opencode seam: fresh init", () => {
     expect(worker).not.toMatch(
       /action: arggon_comment|action: arggon_update|action: arggon_handoff|action: arggon_arggon_comment|action: arggon_arggon_update|action: arggon_arggon_handoff/,
     );
+    // W4 review: the reviewer cannot run the worktree lifecycle either.
+    expect(reviewer).not.toMatch(/action: arggon_comment|action: arggon_arggon_comment/);
   });
 
   it("the reviewer never mutates history: minimal shell gates (W4)", () => {
