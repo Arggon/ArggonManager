@@ -11,7 +11,6 @@ priority: p0
 created: "2026-09-19"
 updated: "2026-09-20"
 depends_on: [task-native-layout-decision]
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-layout-rename
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-layout-rename.md
