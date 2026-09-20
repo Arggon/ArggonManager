@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-19"
 updated: "2026-09-20"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-playbook-opencode-2-0-10
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/story-tech-playbooks/task-playbook-opencode-2-0-10.md
