@@ -35,12 +35,12 @@ the guarded dynamic import) on 2.0.10; note any behavior change.
 
 ## Acceptance
 
-- [ ] `docs/playbooks/opencode.md` version/pin and research record updated to
+- [x] `docs/playbooks/opencode.md` version/pin and research record updated to
       2.0.10 with the probe date.
-- [ ] A/B probe result recorded (static import failure mode re-confirmed or
+- [x] A/B probe result recorded (static import failure mode re-confirmed or
       changed; guarded import still loads).
-- [ ] Any new gotcha folded into the playbook's Conventions/Troubleshooting.
-- [ ] `arggon validate` green; docs-only diff.
+- [x] Any new gotcha folded into the playbook's Conventions/Troubleshooting.
+- [x] `arggon validate` green; docs-only diff.
 
 ## Notes
 
