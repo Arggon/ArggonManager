@@ -1938,9 +1938,15 @@ const TOOL_SPECS: ArgonToolSpec[] = [
  *
  * Fallback: when the domain (or the project id) is unavailable the tools fail
  * with a typed error naming the CLI path that predates the domain
- * (`arggon start --worktree`, `arggon cleanup --prune`). A worktree this run
- * created is removed again when the kernel refuses the claim (a lost race
- * leaves nothing behind); a pre-existing worktree is never touched.
+ * (`arggon start --worktree`, `arggon cleanup --prune`).
+ *
+ * Ownership rules (W4 review): an attach — the recorded `worktree_path` or the
+ * deterministic default — only ever adopts a directory registered as a
+ * worktree of THIS repo (a foreign repository at that path is refused before
+ * any branch is created or switched); a rollback removes only the worktree
+ * this run created and deletes only the branch this run created (a
+ * pre-existing branch survives a refused claim); `cleanup` unlinks a
+ * start-created `node_modules` link before removing, like the CLI.
  */
 
 /** Worktree wiring resolved from the plugin context at setup. */
@@ -2079,9 +2085,10 @@ async function createItemWorktree(
 
 /**
  * Remove a worktree this run created (claim refused / branch setup failed) and
- * — when this run also created the branch — delete it, so a lost race leaves
- * nothing behind. Best-effort by design: a rollback failure is logged, never
- * thrown, and never hides the original error.
+ * — only when this run also created the branch — delete it, so a lost race
+ * leaves nothing behind without ever destroying a pre-existing branch.
+ * Best-effort by design: a rollback failure is logged, never thrown, and never
+ * hides the original error.
  */
 async function discardWorktree(
   options: ArgonToolOptions,
@@ -2221,53 +2228,61 @@ async function nativeStart(
   let worktreeCreated = false
   let branchCreated = false
   if (wantWorktree) {
+    const canonical = canonicalRoot(options, root)
     if (worktreePath === undefined) {
       // Deterministic attach (CLI parity): a previous start's records live on
       // its feature branch, so the canonical copy cannot see them — the fixed
       // `../<repo>-<id>` path is what makes a second start attach to the
       // existing worktree instead of claiming a fresh one.
-      const canonical = canonicalRoot(options, root)
       const defaultPath = join(resolve(canonical, ".."), `${basename(canonical)}-${id}`)
-      if (existsSync(defaultPath)) {
-        if (!(await isRegisteredWorktree(canonical, defaultPath))) {
-          return worktreeFail(
-            kernel,
-            "start",
-            "START_FAILED",
-            `${defaultPath} already exists and is not a git worktree of this repo ` +
-              "(move or remove the path first, or use the CLI fallback `arggon start --worktree`)",
-            version,
-          )
-        }
-        worktreePath = defaultPath
-      } else {
-        const created = await createItemWorktree(options, root, id)
-        if (created.directory === undefined) {
-          return worktreeFail(kernel, "start", "START_FAILED", created.error ?? "worktree creation failed", version)
-        }
-        worktreePath = created.directory
-        worktreeCreated = true
-        // The fresh worktree reflects HEAD; the canonical working tree may be
-        // ahead (an uncommitted claim would be invisible here and the kernel
-        // would re-claim a stale copy). Refuse instead of guessing.
-        const stale = await staleClaimFields(kernel, options.cwd, worktreePath, id)
-        if (stale !== undefined) {
-          await discardWorktree(options, worktreePath, branch)
-          return worktreeFail(
-            kernel,
-            "start",
-            "START_FAILED",
-            `the canonical checkout has uncommitted tracker changes for '${id}' (${stale}); ` +
-              "commit or discard them, or use the CLI fallback `arggon start --worktree` " +
-              "(the worktree created by this run was removed again)",
-            version,
-          )
-        }
+      if (existsSync(defaultPath)) worktreePath = defaultPath
+    }
+    if (worktreePath !== undefined) {
+      // Attach guard for BOTH paths (recorded `worktree_path` and the
+      // deterministic default): a directory that is not a worktree of THIS
+      // repo is never adopted — otherwise `start` would create/switch branches
+      // inside a foreign repository that happens to sit at that path.
+      if (!(await isRegisteredWorktree(canonical, worktreePath))) {
+        return worktreeFail(
+          kernel,
+          "start",
+          "START_FAILED",
+          `${worktreePath} exists but is not a git worktree of this repo ` +
+            "(move or remove the path first, or use the CLI fallback `arggon start --worktree`)",
+          version,
+        )
+      }
+    } else {
+      const created = await createItemWorktree(options, root, id)
+      if (created.directory === undefined) {
+        return worktreeFail(kernel, "start", "START_FAILED", created.error ?? "worktree creation failed", version)
+      }
+      worktreePath = created.directory
+      worktreeCreated = true
+      // The fresh worktree reflects HEAD; the canonical working tree may be
+      // ahead (an uncommitted claim would be invisible here and the kernel
+      // would re-claim a stale copy). Refuse instead of guessing.
+      const stale = await staleClaimFields(kernel, options.cwd, worktreePath, id)
+      if (stale !== undefined) {
+        // The branch was not created yet (no `ensureWorktreeBranch`): the
+        // rollback removes only the worktree this run created.
+        await discardWorktree(options, worktreePath)
+        return worktreeFail(
+          kernel,
+          "start",
+          "START_FAILED",
+          `the canonical checkout has uncommitted tracker changes for '${id}' (${stale}); ` +
+            "commit or discard them, or use the CLI fallback `arggon start --worktree` " +
+            "(the worktree created by this run was removed again)",
+          version,
+        )
       }
     }
     const ensured = await ensureWorktreeBranch(worktreePath, branch)
     if (!ensured.ok) {
-      if (worktreeCreated) await discardWorktree(options, worktreePath, branch)
+      // `ensured.created` is false whenever setup failed, so this run never
+      // created the branch: never delete it on rollback.
+      if (worktreeCreated) await discardWorktree(options, worktreePath)
       return worktreeFail(
         kernel,
         "start",
@@ -2291,9 +2306,10 @@ async function nativeStart(
   })
   if (!update.ok) {
     // A lost race must not leave the worktree this run created behind: the
-    // native domain has no item record to reap it from later.
+    // native domain has no item record to reap it from later. Only a branch
+    // THIS run created is deleted — a pre-existing branch (an attach) survives.
     if (worktreeCreated && worktreePath !== undefined) {
-      await discardWorktree(options, worktreePath, branch)
+      await discardWorktree(options, worktreePath, branchCreated ? branch : undefined)
     }
     const failure = remapFailure(update.envelope, "start", "START_FAILED")
     if (worktreeCreated && worktreePath !== undefined) {
@@ -2467,6 +2483,15 @@ async function nativeCleanup(
     for (const entry of entries.filter((candidate) => candidate.removable)) {
       try {
         if (entry.action?.startsWith("remove worktree")) {
+          // CLI parity: a start-created `node_modules` link is untracked and
+          // git refuses to remove a worktree that carries it, so unlink it
+          // first — the kernel helper only removes a symlink pointing at the
+          // canonical (or current) checkout's install, never a real directory.
+          const canonical = canonicalRoot(options, root)
+          kernel.unlinkNodeModulesLink(canonical, entry.path)
+          if (resolve(canonical) !== resolve(root)) {
+            kernel.unlinkNodeModulesLink(root, entry.path)
+          }
           await removeWorktree(kernel, options, root, entry.path)
           pruned.push({
             id: entry.id,

@@ -199,6 +199,7 @@ export {
   findMergedPr,
 } from "./cleanup.js";
 export type { ClassifyCleanupDeps, CleanupEntry, CleanupGit, MergedPr } from "./cleanup.js";
+export { linkNodeModules, unlinkNodeModulesLink } from "./worktree.js";
 export { runImportIssues } from "./import-issues.js";
 export type { GhExecutor, ImportIssuesOptions, ImportIssuesResult } from "./import-issues.js";
 export {

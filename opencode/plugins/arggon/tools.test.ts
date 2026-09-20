@@ -32,6 +32,7 @@ import {
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -933,6 +934,129 @@ describe("worktree domain tools (W4)", () => {
     });
   });
 
+  it("start refuses a stale canonical copy WITHOUT deleting a pre-existing branch (W4 review S1)", async () => {
+    const dir = seedGitTree();
+    // A pre-existing, unmerged branch the run did not create.
+    git(dir, ["branch", "feat/task-rate-limit"]);
+    // Uncommitted claim in the canonical tree: the fresh worktree (HEAD) would
+    // not see it, so the kernel would validate a stale claim state.
+    runUpdate({ cwd: dir, id: "task-rate-limit", status: "in_progress", assignee: "someone" });
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    expect(String((typed.envelope.error as { message?: unknown }).message)).toContain(
+      "uncommitted tracker changes",
+    );
+    // The worktree this run created is gone; the branch it did NOT create stays.
+    expect(calls.remove).toHaveLength(1);
+    expect(existsSync(join(dirname(dir), `${basename(dir)}-task-rate-limit`))).toBe(false);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toContain(
+      "feat/task-rate-limit",
+    );
+  });
+
+  it("start refuses a claim steal WITHOUT deleting a pre-existing branch (W4 review S1)", async () => {
+    const dir = seedGitTree();
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    // Claim through the tool so the claim commit lands (realistic setup), then
+    // create the item branch at that claim commit: the run only switches to it.
+    await tool(defs, "update").execute({
+      id: "task-rate-limit",
+      status: "in_progress",
+      assignee: "someone",
+    });
+    git(dir, ["branch", "feat/task-rate-limit"]);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "intruder" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    expect((caught as ArgonToolError).code).toBe("START_FAILED");
+    // The worktree (checked out on the pre-existing branch) is removed; the
+    // branch survives because this run only switched to it.
+    expect(calls.remove).toHaveLength(1);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toContain(
+      "feat/task-rate-limit",
+    );
+    expect(itemData(dir, "task-rate-limit")).toMatchObject({
+      status: "in_progress",
+      assignee: "someone",
+    });
+  });
+
+  it("start refuses a recorded worktree_path that is not a worktree of this repo (W4 review S2)", async () => {
+    const dir = seedGitTree();
+    // A foreign git repository at the recorded path (not a worktree of `dir`).
+    const foreign = join(dirname(dir), `${basename(dir)}-foreign`);
+    mkdirSync(foreign, { recursive: true });
+    git(foreign, ["init", "-q"]);
+    git(foreign, ["config", "user.email", "foreign@example.com"]);
+    git(foreign, ["config", "user.name", "foreign"]);
+    writeFileSync(join(foreign, "README.md"), "foreign\n", "utf8");
+    git(foreign, ["add", "-A"]);
+    git(foreign, ["commit", "-qm", "foreign"]);
+    runUpdate({ cwd: dir, id: "task-rate-limit", worktreePath: foreign });
+
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    expect(String((typed.envelope.error as { message?: unknown }).message)).toContain(
+      "not a git worktree",
+    );
+    // Nothing was created or switched in the foreign repository.
+    expect(calls.create).toHaveLength(0);
+    expect(gitOut(foreign, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
+    expect(gitOut(foreign, ["branch", "--show-current"])).toBe("master");
+  });
+
+  it("start refuses a foreign repo at the deterministic default path (W4 review S2)", async () => {
+    const dir = seedGitTree();
+    const foreign = join(dirname(dir), `${basename(dir)}-task-rate-limit`);
+    mkdirSync(foreign, { recursive: true });
+    git(foreign, ["init", "-q"]);
+    git(foreign, ["config", "user.email", "foreign@example.com"]);
+    git(foreign, ["config", "user.name", "foreign"]);
+    writeFileSync(join(foreign, "README.md"), "foreign\n", "utf8");
+    git(foreign, ["add", "-A"]);
+    git(foreign, ["commit", "-qm", "foreign"]);
+
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    expect(String(((caught as ArgonToolError).envelope.error as { message?: unknown }).message)).toContain(
+      "not a git worktree",
+    );
+    expect(calls.create).toHaveLength(0);
+    expect(gitOut(foreign, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
+  });
+
   it("start attaches to an existing deterministic worktree instead of claiming a fresh copy", async () => {
     const dir = seedGitTree();
     const { domain, calls } = fakeDomain(dir);
@@ -1031,6 +1155,28 @@ describe("worktree domain tools (W4)", () => {
     expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
     expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
     expect(itemData(dir, "task-rate-limit").status).toBe("done");
+  });
+
+  it("cleanup unlinks a start-created node_modules link before removing (CLI parity, W4 review)", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await completedWorktree(dir);
+    // The CLI links the primary checkout's install into fresh worktrees; git
+    // refuses to remove a worktree carrying that untracked symlink, so cleanup
+    // must unlink it first (only a symlink pointing at the canonical install).
+    mkdirSync(join(dir, "node_modules"), { recursive: true });
+    writeFileSync(join(dir, "node_modules", "marker.txt"), "install\n", "utf8");
+    symlinkSync(join(dir, "node_modules"), join(worktreePath, "node_modules"), "dir");
+
+    const output = await tool(defs, "cleanup").execute({ prune: true });
+    const envelope = output.output as Record<string, unknown>;
+    expect(envelope.failures).toEqual([]);
+    expect(JSON.stringify(envelope.pruned)).toContain(`removed worktree ${worktreePath}`);
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: false },
+    ]);
+    expect(existsSync(worktreePath)).toBe(false);
+    // The canonical install is untouched (the link is removed, never followed).
+    expect(existsSync(join(dir, "node_modules", "marker.txt"))).toBe(true);
   });
 
   it("cleanup without prune lists only and never touches the worktree", async () => {

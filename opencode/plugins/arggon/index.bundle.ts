@@ -70,6 +70,7 @@ __arggonEdges.set("lib/src/index.ts\u0000./tracker-commit.js", "lib/src/tracker-
 __arggonEdges.set("lib/src/index.ts\u0000./trend.js", "lib/src/trend.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./update.js", "lib/src/update.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./validate.js", "lib/src/validate.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./worktree.js", "lib/src/worktree.ts")
 __arggonEdges.set("lib/src/issue-roundtrip.ts\u0000./detect-repo.js", "lib/src/detect-repo.ts")
 __arggonEdges.set("lib/src/items.ts\u0000./frontmatter.js", "lib/src/frontmatter.ts")
 __arggonEdges.set("lib/src/items.ts\u0000./ids.js", "lib/src/ids.ts")
@@ -2182,8 +2183,8 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
 exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.runSync = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = void 0;
+exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.unlinkNodeModulesLink = exports.linkNodeModules = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.runSync = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2318,6 +2319,9 @@ Object.defineProperty(exports, "CLEANUP_TERMINAL_STATUSES", { enumerable: true, 
 Object.defineProperty(exports, "classifyCleanupEntry", { enumerable: true, get: function () { return cleanup_js_1.classifyCleanupEntry; } });
 Object.defineProperty(exports, "defaultCleanupGit", { enumerable: true, get: function () { return cleanup_js_1.defaultCleanupGit; } });
 Object.defineProperty(exports, "findMergedPr", { enumerable: true, get: function () { return cleanup_js_1.findMergedPr; } });
+var worktree_js_1 = require("./worktree.js");
+Object.defineProperty(exports, "linkNodeModules", { enumerable: true, get: function () { return worktree_js_1.linkNodeModules; } });
+Object.defineProperty(exports, "unlinkNodeModulesLink", { enumerable: true, get: function () { return worktree_js_1.unlinkNodeModulesLink; } });
 var import_issues_js_1 = require("./import-issues.js");
 Object.defineProperty(exports, "runImportIssues", { enumerable: true, get: function () { return import_issues_js_1.runImportIssues; } });
 var import_issues_js_2 = require("./import-issues.js");
@@ -5513,6 +5517,54 @@ function formatValidateHuman(result) {
 }
 })
 
+__arggonModules.set("lib/src/worktree.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.linkNodeModules = linkNodeModules;
+exports.unlinkNodeModulesLink = unlinkNodeModulesLink;
+const node_fs_1 = require("node:fs");
+const node_path_1 = require("node:path");
+function linkNodeModules(primaryRoot, worktreePath) {
+    const target = (0, node_path_1.join)(primaryRoot, "node_modules");
+    const link = (0, node_path_1.join)(worktreePath, "node_modules");
+    if (!(0, node_fs_1.existsSync)(target) || (0, node_fs_1.existsSync)(link))
+        return false;
+    try {
+        (0, node_fs_1.symlinkSync)(target, link, process.platform === "win32" ? "junction" : "dir");
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
+function unlinkNodeModulesLink(primaryRoot, worktreePath) {
+    const target = (0, node_path_1.resolve)((0, node_path_1.join)(primaryRoot, "node_modules"));
+    const link = (0, node_path_1.join)(worktreePath, "node_modules");
+    try {
+        if (!(0, node_fs_1.lstatSync)(link).isSymbolicLink())
+            return false;
+        if ((0, node_path_1.resolve)((0, node_path_1.dirname)(link), (0, node_fs_1.readlinkSync)(link)) !== target)
+            return false;
+    }
+    catch {
+        return false;
+    }
+    try {
+        (0, node_fs_1.unlinkSync)(link);
+        return true;
+    }
+    catch {
+        try {
+            (0, node_fs_1.rmdirSync)(link);
+            return true;
+        }
+        catch {
+            return false;
+        }
+    }
+}
+})
+
 __arggonModules.set("opencode/plugins/arggon/index.ts", (exports, require, module) => {
 "use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -7058,36 +7110,37 @@ async function nativeStart(kernel, input, options) {
     let worktreeCreated = false;
     let branchCreated = false;
     if (wantWorktree) {
+        const canonical = canonicalRoot(options, root);
         if (worktreePath === undefined) {
-            const canonical = canonicalRoot(options, root);
             const defaultPath = (0, node_path_1.join)((0, node_path_1.resolve)(canonical, ".."), `${(0, node_path_1.basename)(canonical)}-${id}`);
-            if ((0, node_fs_1.existsSync)(defaultPath)) {
-                if (!(await isRegisteredWorktree(canonical, defaultPath))) {
-                    return worktreeFail(kernel, "start", "START_FAILED", `${defaultPath} already exists and is not a git worktree of this repo ` +
-                        "(move or remove the path first, or use the CLI fallback `arggon start --worktree`)", version);
-                }
+            if ((0, node_fs_1.existsSync)(defaultPath))
                 worktreePath = defaultPath;
+        }
+        if (worktreePath !== undefined) {
+            if (!(await isRegisteredWorktree(canonical, worktreePath))) {
+                return worktreeFail(kernel, "start", "START_FAILED", `${worktreePath} exists but is not a git worktree of this repo ` +
+                    "(move or remove the path first, or use the CLI fallback `arggon start --worktree`)", version);
             }
-            else {
-                const created = await createItemWorktree(options, root, id);
-                if (created.directory === undefined) {
-                    return worktreeFail(kernel, "start", "START_FAILED", created.error ?? "worktree creation failed", version);
-                }
-                worktreePath = created.directory;
-                worktreeCreated = true;
-                const stale = await staleClaimFields(kernel, options.cwd, worktreePath, id);
-                if (stale !== undefined) {
-                    await discardWorktree(options, worktreePath, branch);
-                    return worktreeFail(kernel, "start", "START_FAILED", `the canonical checkout has uncommitted tracker changes for '${id}' (${stale}); ` +
-                        "commit or discard them, or use the CLI fallback `arggon start --worktree` " +
-                        "(the worktree created by this run was removed again)", version);
-                }
+        }
+        else {
+            const created = await createItemWorktree(options, root, id);
+            if (created.directory === undefined) {
+                return worktreeFail(kernel, "start", "START_FAILED", created.error ?? "worktree creation failed", version);
+            }
+            worktreePath = created.directory;
+            worktreeCreated = true;
+            const stale = await staleClaimFields(kernel, options.cwd, worktreePath, id);
+            if (stale !== undefined) {
+                await discardWorktree(options, worktreePath);
+                return worktreeFail(kernel, "start", "START_FAILED", `the canonical checkout has uncommitted tracker changes for '${id}' (${stale}); ` +
+                    "commit or discard them, or use the CLI fallback `arggon start --worktree` " +
+                    "(the worktree created by this run was removed again)", version);
             }
         }
         const ensured = await ensureWorktreeBranch(worktreePath, branch);
         if (!ensured.ok) {
             if (worktreeCreated)
-                await discardWorktree(options, worktreePath, branch);
+                await discardWorktree(options, worktreePath);
             return worktreeFail(kernel, "start", "START_FAILED", `branch setup failed in ${worktreePath}: ${ensured.error ?? "unknown git error"}`, version);
         }
         branchCreated = ensured.created;
@@ -7104,7 +7157,7 @@ async function nativeStart(kernel, input, options) {
     });
     if (!update.ok) {
         if (worktreeCreated && worktreePath !== undefined) {
-            await discardWorktree(options, worktreePath, branch);
+            await discardWorktree(options, worktreePath, branchCreated ? branch : undefined);
         }
         const failure = remapFailure(update.envelope, "start", "START_FAILED");
         if (worktreeCreated && worktreePath !== undefined) {
@@ -7237,6 +7290,11 @@ async function nativeCleanup(kernel, input, options) {
         for (const entry of entries.filter((candidate) => candidate.removable)) {
             try {
                 if (entry.action?.startsWith("remove worktree")) {
+                    const canonical = canonicalRoot(options, root);
+                    kernel.unlinkNodeModulesLink(canonical, entry.path);
+                    if ((0, node_path_1.resolve)(canonical) !== (0, node_path_1.resolve)(root)) {
+                        kernel.unlinkNodeModulesLink(root, entry.path);
+                    }
                     await removeWorktree(kernel, options, root, entry.path);
                     pruned.push({
                         id: entry.id,
