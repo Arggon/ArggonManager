@@ -220,6 +220,13 @@ docs or the V1 schema for V2 work.
   - `ctx.permission.rules` (the documented session-scoped rule setter) is
     **absent on 2.0.10** — `ctx.permission.list/get/reply` exist. Do not build
     on it; feature-detect if a 2.x adds it back.
+  - the native `start` tool is a deliberate subset of `arggon start --worktree`:
+    it does not link the primary checkout's `node_modules` and does not run the
+    `x-worktree.post-start` hook (the domain creates a plain worktree from the
+    canonical HEAD). The agent bootstraps the worktree explicitly when the
+    project gates need it (`npm ci`, `uv sync`, …); the CLI remains the
+    full-featured fallback. A domain-native bootstrap hook is a candidate
+    follow-up (W5/W7).
 - **Permission action names (W4 probes).** A native plugin tool is gated as
   `<namespace>_<tool>` (`arggon_update`, probe: a `deny` removes
   `tools.arggon.update` from the Code Mode catalog — the model gets
