@@ -81,3 +81,7 @@ Open questions / follow-ups
 - This repo's own tracked `.opencode/commands/*.md` (dogfood seam) still carries the W2 templates; W7 migrates the repo's own seam per the plan.
 - `npm run smoke:opencode:wave` was not updated/run for W3 (it drives the CLI/MCP wave; W4/W7 territory).
 - MCP auto-registration removal means an adopter who wants the stdio server must configure `mcp.servers.arggon` explicitly (doctor reports it as optional) — intended per ADR 0011 §5.
+
+### handoff 2026-09-20 @Arggon — next: Coordinator review of draft PR #376: verify the W3 evidence (smoke 23/0, context:report --strict) and merge with a merge commit (tracker auto-commits live on this branch, never squash).
+- branch: feat/task-native-commands-seam
+- open questions: options.pinned is an undocumented 2.0.10 option (feature-detected; core 8 pinned, all 12 still search-reachable); this repo's own tracked .opencode/commands dogfood still carries the W2 templates (W7…
