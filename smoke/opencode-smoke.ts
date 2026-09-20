@@ -21,6 +21,15 @@
  *   5. plugin absent   — the CLI and the config-registered MCP server are
  *                        unaffected without the plugin.
  *
+ *   Native-first W2 — the `arggon` tool namespace (task-native-tools):
+ *   6. native tools    — with the workspace kernel linked, the plugin registers
+ *                        the twelve `arggon` Code Mode tools and one headless
+ *                        session calls every one of them (contract-shaped
+ *                        envelopes, create→update round-trip, the two
+ *                        GitHub-dependent tools failing as typed errors while
+ *                        the session continues) and finds the namespace in the
+ *                        Code Mode catalog via `search`.
+ *
  *   W3 — session context:
  *   6. branch          — a claimed item on `feat/<id>` resolves, injects the
  *                        bounded item block (the smoke measures the logged
@@ -61,6 +70,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -181,6 +191,18 @@ class Fixture {
     this.write(PLUGIN_DEST, readFileSync(PLUGIN_SOURCE, "utf8"));
   }
 
+  /**
+   * Link this checkout's kernel package into the fixture so the plugin's
+   * guarded `@arggon/lib` import resolves (ADR 0013: W2 consumes the workspace
+   * package; W3 vendors the dependency-free bundle instead).
+   */
+  linkKernel(): void {
+    const scope = this.path("node_modules/@arggon");
+    mkdirSync(scope, { recursive: true });
+    const link = join(scope, "lib");
+    if (!existsSync(link)) symlinkSync(join(repoRoot, "lib"), link, "junction");
+  }
+
   private json(result: RunResult): Record<string, unknown> | undefined {
     try {
       return JSON.parse(result.stdout) as Record<string, unknown>;
@@ -195,8 +217,8 @@ class Fixture {
     return typeof id === "string" ? id : undefined;
   }
 
-  /** initiative → epic → story → task; returns the task id and its directory. */
-  createTaskChain(): { id: string; directory: string } | undefined {
+  /** initiative → epic → story → task; returns the task id, story id and directory. */
+  createTaskChain(): { id: string; story: string; directory: string } | undefined {
     const initiative = this.itemId(this.cli(["create", "initiative", "Smoke Initiative", "--json"]));
     if (initiative === undefined) return undefined;
     const epic = this.itemId(this.cli(["create", "epic", "Smoke Epic", "--parent", initiative, "--json"]));
@@ -207,7 +229,7 @@ class Fixture {
     const item = task?.item as { id?: unknown; path?: unknown } | undefined;
     if (typeof item?.id !== "string" || typeof item.path !== "string") return undefined;
     const directory = item.path.split("/").slice(0, -1).join("/");
-    return { id: item.id, directory };
+    return { id: item.id, story, directory };
   }
 
   claim(id: string): RunResult {
@@ -403,6 +425,11 @@ function scenarioFreshInit(): void {
   check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
   check("arggon MCP server registered", mcpConnected(session), runTail(session));
   check("model executed arggon_next successfully", successfulArggonNext(session.stdout), runTail(session));
+  check(
+    "no native tools registered without @arggon/lib (dependency-less adopter shape)",
+    !session.stderr.includes("[arggon] tools: registered"),
+    runTail(session),
+  );
 }
 
 function scenarioAdopterConfig(): void {
@@ -490,6 +517,225 @@ function scenarioPluginAbsent(): void {
   check("config-registered MCP server still connects", mcpConnected(session), runTail(session));
   const next = f.cli(["next", "--json"]);
   check("CLI unaffected without the plugin", next.status === 0 && next.stdout.includes('"ok":true'), runTail(next));
+}
+
+// ---------------------------------------------------------------------------
+// Native-first W2 — the `arggon` tool namespace (task-native-tools)
+// ---------------------------------------------------------------------------
+
+/** The twelve native tools (spec-native-first-011 §Tools). */
+const NATIVE_TOOL_NAMES = [
+  "list",
+  "create",
+  "update",
+  "show",
+  "next",
+  "report",
+  "validate",
+  "comment",
+  "handoff",
+  "priority",
+  "sync",
+  "import_issues",
+] as const;
+
+/** Contract commands the script must return `ok: true` for, keyed by tool. */
+const NATIVE_TOOLS_OK: ReadonlyArray<readonly [string, string]> = [
+  ["list", "list"],
+  ["show", "show"],
+  ["next", "next"],
+  ["report", "report"],
+  ["validate", "validate"],
+  ["create", "create"],
+  ["update", "update"],
+  ["comment", "comment"],
+  ["handoff", "handoff"],
+  ["priority", "priority"],
+];
+
+/**
+ * One Code Mode script calling every native tool: the ten environment-
+ * independent ones for their envelopes, the two GitHub-dependent ones
+ * (sync/import_issues) through try/catch to observe the typed tool error, plus
+ * the namespace slice of the Code Mode catalog via `search`.
+ */
+function nativeToolsScript(story: string, task: string): string {
+  return [
+    "const out = {};",
+    `out.list = await tools.arggon.list({});`,
+    `out.show = await tools.arggon.show({ id: "${task}" });`,
+    "out.next = await tools.arggon.next({});",
+    "out.report = await tools.arggon.report({});",
+    "out.validate = await tools.arggon.validate({});",
+    `out.create = await tools.arggon.create({ type: "task", title: "Native smoke task", parent: "${story}" });`,
+    "const created = out.create.item.id;",
+    'out.update = await tools.arggon.update({ id: created, status: "in_progress", assignee: "smoke" });',
+    'out.comment = await tools.arggon.comment({ id: created, text: "native smoke comment" });',
+    'out.handoff = await tools.arggon.handoff({ id: created, next: "continue native smoke" });',
+    "out.priority = await tools.arggon.priority({ dry_run: true });",
+    'let syncError = "";',
+    "try { out.sync = await tools.arggon.sync({}); } catch (error) { syncError = String((error && error.message) || error); }",
+    'let importError = "";',
+    "try { out.import_issues = await tools.arggon.import_issues({ dry_run: true }); } catch (error) { importError = String((error && error.message) || error); }",
+    'const found = await search({ namespace: "arggon", limit: 20 });',
+    "return { out, syncError, importError, search: found };",
+  ].join("\n");
+}
+
+/**
+ * Completed `execute` result whose code contains `needle`, parsed back to the
+ * object the script returned. The Code Mode tool's transcript `output` is the
+ * pretty-printed JSON of that value.
+ */
+function executeJson(stdout: string, needle: string): Record<string, unknown> | undefined {
+  for (const event of parseTranscript(stdout)) {
+    if (event.type !== "tool_use" || event.part?.tool !== "execute") continue;
+    const state = event.part.state;
+    if (state?.status !== "completed") continue;
+    if (!(state.input?.code ?? "").includes(needle)) continue;
+    try {
+      return JSON.parse(state.output ?? "") as Record<string, unknown>;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
+/** Build `@arggon/lib` when the checkout has no dist/ (the smoke needs the artifact). */
+function ensureKernelBuilt(): void {
+  if (existsSync(join(repoRoot, "lib/dist/index.js"))) return;
+  console.log("  building @arggon/lib (missing lib/dist)…");
+  const execpath = process.env.npm_execpath;
+  const command = execpath ? process.execPath : "npm";
+  const argv = execpath
+    ? [execpath, "run", "build", "--workspace", "@arggon/lib"]
+    : ["run", "build", "--workspace", "@arggon/lib"];
+  const proc = spawnSync(command, argv, { cwd: repoRoot, encoding: "utf8", timeout: 180_000 });
+  if (proc.status !== 0) {
+    throw new Error(`@arggon/lib build failed: ${proc.stderr?.slice(-500) ?? ""}`);
+  }
+}
+
+function scenarioNativeTools(): void {
+  scenario("native tools (W2): every arggon tool runs in Code Mode with contract-shaped results");
+  try {
+    ensureKernelBuilt();
+  } catch (error) {
+    check("@arggon/lib builds (needed by the native tools)", false, String(error));
+    return;
+  }
+  const f = new Fixture("native-tools");
+  f.bootstrap();
+  const init = f.init();
+  check("init exits 0", init.status === 0, runTail(init));
+  check("init bundles the plugin", existsSync(f.path(PLUGIN_DEST)));
+  const item = f.createTaskChain();
+  if (item === undefined) {
+    check("fixture item created", false, "create chain failed");
+    return;
+  }
+  f.linkKernel();
+  check(
+    "workspace kernel linked into the fixture",
+    existsSync(f.path("node_modules/@arggon/lib/package.json")),
+  );
+
+  const prompt = [
+    "Use the execute tool with exactly this code:",
+    nativeToolsScript(item.story, item.id),
+    "If the tool is not found, run the same code once more (the tool catalog can lag server startup).",
+    "Reply with only the raw JSON result.",
+  ].join("\n");
+  const session = f.opencode(prompt);
+  f.saveTranscript("native-tools", session);
+  check("session succeeds", session.status === 0, runTail(session));
+  check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
+  check(
+    "plugin logs the 12-tool registration with the namespace description",
+    session.stderr.includes(
+      '[arggon] tools: registered 12 native arggon tools (namespace="arggon":',
+    ),
+    runTail(session),
+  );
+
+  const result = executeJson(session.stdout, "tools.arggon.list");
+  check("model executed the native tool script", result !== undefined, runTail(session));
+  if (result === undefined) return;
+  const out = (result.out ?? {}) as Record<string, Record<string, unknown>>;
+
+  const contractFailures = NATIVE_TOOLS_OK.filter(([key, command]) => {
+    const envelope = out[key];
+    return (
+      envelope?.ok !== true ||
+      envelope.command !== command ||
+      envelope.schemaVersion !== 1 ||
+      typeof envelope.conventionVersion !== "number"
+    );
+  }).map(([key]) => key);
+  check(
+    "every tool returned its contract envelope (ok/schemaVersion/conventionVersion/command)",
+    contractFailures.length === 0,
+    `non-conforming: ${contractFailures.join(", ") || "none"}`,
+  );
+
+  const created = (out.create?.item ?? {}) as Record<string, unknown>;
+  const updated = (out.update?.item ?? {}) as Record<string, unknown>;
+  check(
+    "create → update round-trip through the tools",
+    created.id === "task-native-smoke-task" && updated.status === "in_progress",
+    `created=${String(created.id)} status=${String(updated.status)}`,
+  );
+  const comment = (out.comment?.comment ?? {}) as Record<string, unknown>;
+  const handoff = (out.handoff?.handoff ?? {}) as Record<string, unknown>;
+  check(
+    "comment/handoff default their author to the calling session id",
+    typeof comment.author === "string" &&
+      comment.author.startsWith("ses_") &&
+      handoff.next === "continue native smoke",
+    `author=${String(comment.author)} next=${String(handoff.next)}`,
+  );
+
+  const syncError = String(result.syncError ?? "");
+  const importError = String(result.importError ?? "");
+  check(
+    "sync/import_issues surface as typed tool errors (code + envelope), not a broken session",
+    syncError.startsWith("SYNC_FAILED: ") &&
+      syncError.includes('"command":"sync"') &&
+      importError.startsWith("IMPORT_FAILED: ") &&
+      importError.includes('"command":"import-issues"'),
+    `${syncError.slice(0, 120)}\n${importError.slice(0, 120)}`,
+  );
+
+  const search = (result.search ?? {}) as {
+    items?: Array<{ path?: unknown }>;
+    remaining?: unknown;
+  };
+  const paths = (search.items ?? []).map((entry) => entry.path).sort();
+  const expectedPaths = NATIVE_TOOL_NAMES.map((name) => `tools.arggon.${name}`).sort();
+  check(
+    "the namespace appears in the Code Mode catalog with all twelve tools (search)",
+    JSON.stringify(paths) === JSON.stringify(expectedPaths) && search.remaining === 0,
+    JSON.stringify(paths),
+  );
+
+  // The writes landed in the tracker: the session's own tool calls are
+  // observable through the CLI (same kernel, same tree).
+  const shown = f.cli(["show", "task-native-smoke-task", "--body", "--json"]);
+  const body = (() => {
+    try {
+      return String((JSON.parse(shown.stdout) as { body?: unknown }).body ?? "");
+    } catch {
+      return "";
+    }
+  })();
+  check(
+    "tool writes persist in the tracker (comment + handoff in the item body)",
+    shown.status === 0 &&
+      body.includes("native smoke comment") &&
+      body.includes("continue native smoke"),
+    runTail(shown),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -682,6 +928,7 @@ function main(): void {
   scenarioNeverClobber();
   scenarioFailureIsolation();
   scenarioPluginAbsent();
+  scenarioNativeTools();
   scenarioContextBranch();
   scenarioContextStorage();
   scenarioContextEnv();

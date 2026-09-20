@@ -59,10 +59,27 @@ import {
   MCP_TOOLS_BUDGET_BYTES,
   type BudgetResult,
 } from "../cli/src/measure.js";
-import { ITEM_BLOCK_MAX_BYTES, buildItemBlock } from "../opencode/plugins/arggon/index.js";
+import {
+  ARGON_TOOL_NAMESPACE,
+  ITEM_BLOCK_MAX_BYTES,
+  buildItemBlock,
+  nativeToolsCatalogBytes,
+  nativeToolSchemas,
+} from "../opencode/plugins/arggon/index.js";
 
 /** W3 measured injected-block range (task-opencode-v2-plugin, 2026-09-18). */
 export const W3_ITEM_BLOCK_RANGE_BYTES = { min: 181, max: 204 } as const;
+
+/**
+ * Native tool-schema advisory bound (native-first W2, task-native-tools): the
+ * same 12,288 B advisory the MCP `tools/list` surface uses (task-schema-budget),
+ * applied to the tool-definition payload the Code Mode catalog is built from —
+ * namespace description plus one definition per tool. The runtime renders it as
+ * a one-line-per-tool catalog and caps the whole catalog at its own ~2000-token
+ * budget (omitted tools stay reachable through `search`), so this payload is the
+ * stable, runtime-free measure of what the wave adds.
+ */
+export const NATIVE_TOOLS_BUDGET_BYTES = 12_288;
 
 /** Compaction retention the generated config ships (V2 default, see template). */
 export const GENERATED_KEEP_TOKENS = 15_000;
@@ -334,6 +351,13 @@ type Measurement = {
     pass: boolean;
     largestTools: BudgetResult["mcp"]["largestTools"];
   };
+  nativeTools: {
+    namespace: string;
+    toolCount: number;
+    bytes: number;
+    budget: number;
+    pass: boolean;
+  };
   itemBlock: {
     boundBytes: number;
     measuredBytes: number[];
@@ -442,6 +466,16 @@ function measure(): Measurement {
       );
     }
 
+    // Native tool namespace (native-first W2): the definitions payload the
+    // Code Mode catalog is built from, straight from the shipped definitions.
+    const nativeToolsBytes = nativeToolsCatalogBytes();
+    const nativeToolsPass = nativeToolsBytes <= NATIVE_TOOLS_BUDGET_BYTES;
+    if (!nativeToolsPass) {
+      regressions.push(
+        `native ${ARGON_TOOL_NAMESPACE} tools ${fmt(nativeToolsBytes)} B > advisory ${fmt(NATIVE_TOOLS_BUDGET_BYTES)} B`,
+      );
+    }
+
     const beforeAfter = reconstructBeforeAfter();
 
     return {
@@ -475,12 +509,20 @@ function measure(): Measurement {
         },
         pass: itemBlockPass,
       },
+      nativeTools: {
+        namespace: ARGON_TOOL_NAMESPACE,
+        toolCount: nativeToolSchemas().length,
+        bytes: nativeToolsBytes,
+        budget: NATIVE_TOOLS_BUDGET_BYTES,
+        pass: nativeToolsPass,
+      },
       compaction: { keepTokens, v2Default: GENERATED_KEEP_TOKENS },
       fixedTotalBytes:
         agentsMdBytes +
         skills.reduce((sum, skill) => sum + skill.descriptionBytes, 0) +
         agents.reduce((sum, agent) => sum + agent.descriptionBytes, 0) +
-        doctor.budget.mcp.totalBytes,
+        doctor.budget.mcp.totalBytes +
+        nativeToolsBytes,
       skillBeforeAfter: beforeAfter.available ? beforeAfter.beforeAfter : null,
       skillBeforeAfterUnavailable: beforeAfter.available ? null : beforeAfter.reason,
       doctor: doctor.budget,
@@ -547,6 +589,13 @@ function printReport(m: Measurement): void {
     `<=${fmt(m.mcp.budget)} B adv.`,
     m.mcp.pass ? `pass (${growthSign}${fmt(mcpGrowth)} B (${growthSign}${mcpGrowthPct}%) vs baseline)` : "FAIL",
   );
+  push(
+    `native ${m.nativeTools.namespace} tools (${m.nativeTools.toolCount})`,
+    fmt(m.nativeTools.bytes),
+    String(tokens(m.nativeTools.bytes)),
+    `<=${fmt(m.nativeTools.budget)} B adv.`,
+    m.nativeTools.pass ? "pass" : "FAIL",
+  );
   const measuredBlock = Math.max(...m.itemBlock.measuredBytes);
   push(
     "injected item block (measured max)",
@@ -580,6 +629,11 @@ function printReport(m: Measurement): void {
           `  ${pad(surface, surfaceWidth)}${pad(size, 11)}${pad(tok, 8)}${pad(bound, 18)}${status}`,
       )
       .join("\n"),
+  );
+  console.log(
+    `  native ${m.nativeTools.namespace} tools: ${m.nativeTools.toolCount} definitions, ${fmt(m.nativeTools.bytes)} B ` +
+      `(definitions payload the Code Mode catalog is built from, reused from the plugin helper; the runtime renders ` +
+      `one catalog line per tool under its own ~2000-token catalog budget — omitted tools stay reachable via search)`,
   );
   console.log(
     `  item block: bound ${fmt(m.itemBlock.boundBytes)} B = ITEM_BLOCK_MAX_BYTES reused from the plugin helper ` +
