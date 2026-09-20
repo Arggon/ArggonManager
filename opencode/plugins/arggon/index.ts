@@ -6,9 +6,9 @@
  * this source into `.opencode/plugins/arggon/index.ts`, where OpenCode V2
  * discovers it with zero configuration (ADR 0011 §5/§6, ADR 0013; the bundle
  * inlines `@arggon/lib`, so the adopter tree needs no `node_modules`). This
- * file stays the single source: `npm run build:plugin` and the parity test
- * (`opencode/plugins/arggon/bundle.test.ts`) regenerate the bundle
- * deterministically. Ambient behavior and the native tool namespace only,
+ * file stays the single source: `npm run build:plugin` regenerates the bundle
+ * deterministically and `cli/src/plugin-copy.test.ts` drift-gates the committed
+ * bytes (assert-before-write; `npm run check:plugin` in CI). Ambient behavior and the native tool namespace only,
  * never rule logic:
  *
  *   1. MCP is **out of the default path** (ADR 0011 §5/§6): W3 drops the

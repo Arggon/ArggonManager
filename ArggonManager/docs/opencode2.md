@@ -56,7 +56,7 @@ The day-to-day loop is unchanged and documented in
 | `opencode.jsonc` | Project config: formatter, compaction retention (no MCP stanza since W3) | Generated **only when the repo has no OpenCode config** (root or `.opencode/`); otherwise reported in `skipped[]` |
 | `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` | The repo's orchestration model as V2 agents | Coordinator allow-list; worker nesting denied; reviewer `edit` denied |
 | `.opencode/commands/arggon-*.md` | Eleven native commands (`/arggon-next`, `-start`, `-done`, `-handoff`, `-review`, `-status`, `-spec`, `-adr`, `-explore`, `-playbook`, `-adopt`) | Prompt templates driving the native tools (Code Mode `tools.arggon.*`); no CLI-driving prose, no shell blocks |
-| `.opencode/plugins/arggon/` | Vendored **single-file** plugin bundle (kernel inlined; ambient behavior + the native `arggon` tool namespace) | Built from the in-repo source by `npm run build:plugin`; loads with no `node_modules`, byte-parity test |
+| `.opencode/plugins/arggon/` | Vendored **single-file** plugin bundle (kernel inlined; ambient behavior + the native `arggon` tool namespace) | Built from the in-repo source by `npm run build:plugin`; loads with no `node_modules`; drift-gated by `npm run check:plugin` |
 | `.agents/skills/arggon-cli/` | Umbrella skill + `references/` (json-contract, methodology, orchestration, pitfalls) | Progressive disclosure: detail loads on demand |
 | `AGENTS.md` | Slim router | V2 reads `AGENTS.md` only (no `CLAUDE.md` fallback) |
 
@@ -228,8 +228,9 @@ oc2 checkout). Two fixes:
 - `.opencode/plugins/arggon/index.ts` and `.agents/skills/*` are gitignored
   generated copies of committed sources; a fresh dev checkout — and every new
   worktree — has none. `arggon init` regenerates them (never overwriting
-  modified files), and the parity tests regenerate a missing or stale copy
-  (`cli/src/plugin-copy.test.ts`, `cli/src/skill-copy.test.ts`). Until then
+  modified files), and the copy tests regenerate a missing or stale derived
+  copy (`cli/src/plugin-copy.test.ts` — which also drift-gates the committed
+  artifact — and `cli/src/skill-copy.test.ts`). Until then
   `Ctrl+P → Plugins` will not list `arggon`.
 
 ### Verify the side-by-side setup

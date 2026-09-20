@@ -21,9 +21,10 @@
  *
  * The artifact (`opencode/plugins/arggon/index.bundle.ts`) is committed because
  * `init` must work from a source checkout without a build; `npm run
- * build:plugin` and `opencode/plugins/arggon/bundle.test.ts` regenerate it and
- * pin the bytes. The buffer above `MAX_BUNDLE_BYTES` guards accidental
- * dependency creep (an unmapped bare import would only fail at load time in a
+ * build:plugin` regenerates it; `cli/src/plugin-copy.test.ts` drift-gates the
+ * committed bytes (assert-before-write) and `npm run check:plugin` enforces the
+ * gate in CI. The buffer above `MAX_BUNDLE_BYTES` guards accidental dependency
+ * creep (an unmapped bare import would only fail at load time in a
  * dependency-less tree).
  */
 import { existsSync, readFileSync } from "node:fs";

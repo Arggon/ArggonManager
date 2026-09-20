@@ -42,8 +42,9 @@ docs or the V1 schema for V2 work.
 - `arggon init` vendors the plugin at `.opencode/plugins/arggon/index.ts`
   (auto-discovered, zero config). Since W3 it is the **single-file,
   dependency-free bundle** built from `opencode/plugins/arggon/index.ts` with
-  `@arggon/lib` inlined (`npm run build:plugin`; artifact committed and pinned
-  byte-for-byte), so a fresh adopter tree needs no `node_modules`. It is
+  `@arggon/lib` inlined (`npm run build:plugin`; the artifact is committed and
+  drift-gated by `npm run check:plugin` in CI), so a fresh adopter tree needs
+  no `node_modules`. It is
   failure-isolated (every path logs once and no-ops, never breaking a
   session/CLI/MCP). Ambient behavior plus the native tool namespace, never rule
   logic:
@@ -156,9 +157,12 @@ docs or the V1 schema for V2 work.
   export is a valid V2 definition; `Plugin.define` is not imported at all (the
   guarded sugar needed a top-level await the bundle cannot carry). The artifact
   is committed because `init` must work from a source checkout without a build;
-  `cli/src/plugin-copy.test.ts` and `opencode/plugins/arggon/bundle.test.ts`
-  regenerate it and pin the bytes, and the bundle test loads it from a temp dir
-  with no `node_modules` and calls every tool. Evidence: the PR #325 probe
+  `cli/src/plugin-copy.test.ts` **drift-gates** it (asserts the committed bytes
+  equal the deterministic build *before* touching anything, so a source change
+  without `npm run build:plugin` fails the suite) and `npm run check:plugin`
+  enforces the same gate in CI; `opencode/plugins/arggon/bundle.test.ts` loads
+  the committed artifact from a temp dir with no `node_modules` and calls every
+  tool. Evidence: the PR #325 probe
   (2.0.7: static import fails, plain object loads),
   task-opencode-v2-plugin-import-gotcha (2.0.8 re-probe, same shape),
   task-playbook-opencode-2-0-10 (2.0.10 re-probe, same shape) and

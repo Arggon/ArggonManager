@@ -211,8 +211,9 @@ export const BUNDLED_SKILLS = [
  * `.opencode/plugins/arggon/index.ts`, where V2 discovers it automatically and
  * loads it in a dependency-less adopter tree (ADR 0011 §5/§6, ADR 0013). Like
  * the skills, the copy carries a generated marker (a `//` line for TypeScript
- * destinations) and flows through the provenance decision table; parity with
- * the committed artifact is pinned by `cli/src/plugin-copy.test.ts`.
+ * destinations) and flows through the provenance decision table; the committed
+ * artifact is drift-gated by `cli/src/plugin-copy.test.ts` (assert-before-write)
+ * and `npm run check:plugin` in CI — never auto-healed by the suite.
  */
 const BUNDLED_PLUGINS = [
   { source: "opencode/plugins/arggon/index.bundle.ts", dest: ".opencode/plugins/arggon/index.ts" },
