@@ -137,3 +137,7 @@ ok; `arggon validate` ok (0 warnings); `arggon spec validate` ok (18 docs);
 
 Deferred findings untouched as instructed: correlation `tools.arggon.<name>(…)`,
 `gh` cwd for import_issues, kernel import cache, `options.pinned`.
+
+### handoff 2026-09-20 @Arggon — next: Coordinator re-review of PR #375 (F1/F2/F3 addressed on 4ecae7d); merge with a merge commit (tracker commits live on the branch, never squash). No further worker action pending.
+- branch: feat/task-native-tools
+- open questions: options.pinned subset for the catalog budget (W3/W7 decision); no blocking questions left.
