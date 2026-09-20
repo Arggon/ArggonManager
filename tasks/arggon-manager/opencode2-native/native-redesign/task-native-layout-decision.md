@@ -47,3 +47,31 @@ files the migration wave.
 
 - The migration itself (kernel, convention, this repo's dogfood rename) is
   `task-native-layout-rename`, not this item.
+
+### 2026-09-20 @Arggon
+## Review PR #370 — head 5203ef2 (task-native-layout-decision)
+
+**Veredicto: MERGE (merge commit, nunca squash).** Docs-only, sin hallazgos bloqueantes; 5 observaciones menores, ninguna exige re-trabajo antes del merge.
+
+### Verificado
+- **Alcance docs-only:** 8 archivos (ADR 0011/0012, README, spec, plan y 3 items). `git diff opencode2...HEAD --stat -- cli templates skills opencode smoke test` vacío → sin cambios de código; smoke gate exento (engineering.md §Smoke test: docs-only exempt).
+- **Formato ADR (engineering.md):** 0012 con Status/Date/Deciders, Context/Decision/Consequences/Alternatives, nombre 4-dígitos kebab y número monotónico tras 0011. 0011 → Accepted; encabezado "Supersedes (partially) ADR 0010" coherente.
+- **Coherencia README:** 0011 Accepted, 0012 Accepted, 0010 "Partially superseded by 0011"; sin contradicciones de estado.
+- **Decisión completa vs directiva:** root (D1), docs (D2), compat/migración sin hard break (D3), bump de convención (D4), dogfood (D5) + alternativas razonadas (mantener tasks/, hard break, solo tracker).
+- **Spec/plan:** invariante git-native y Data contract apuntan a `ArggonManager/`; sección Layout con auto-detección + migración; acceptance con bullet legacy; el plan gana W0 (T0) antes de W1.
+- **Cadena serial (probada en copia temporal de `tasks/`):** con layout-decision en done, `next --ready --json` sugiere `task-native-layout-rename` (p0, unblocks 7, blockedBy []), `validate` verde en ese árbol. W1 `task-native-kernel-lib.depends_on: [task-native-layout-rename]`; resto de la cadena W1→W7 intacta. Mientras decision siga in_progress, W0/W1 quedan correctamente fuera de `--ready`.
+- **Gates (worktree):** `arggon validate --json` ok, 0 errores/0 warnings; `arggon spec validate --json` ok; `npx prettier --check` sobre los 8 archivos del diff limpio (el repo-wide reporta 406 archivos preexistentes ajenos a este diff); `npm test` 79 files / **1311 passed**; CI `cli` SUCCESS en 5203ef2 (run 35477569132).
+- `task-native-layout-rename` bien filed: parent native-redesign, depends_on decision, p0, acceptance con kernel/convención, migración idempotente, dogfood, bump de convención y no-hard-break.
+
+### Observaciones (ninguna bloqueante)
+1. **Coherencia interna de 0011 (menor):** `docs/adr/0011-native-first-architecture.md:60-61` (decisión #8: "the tracker convention and data are untouched") y `:79-80` (Neutral: "methodology docs are unchanged") chocan con 0012 §4 (bump de convención) y con el movimiento de docs. D1 y decisión #2 ya llevan cross-ref; sugiero añadirlo también en #8/Neutral (una línea), o dejarlo asentado en W0.
+2. **Número de versión de convención (menor):** 0012 §4 dice "bumps the convention version" sin número; `docs/convention.md:360` ya usa "v4" para priority y `.convention.yml` sigue en `version: 3`. W0 pide "convention version bumped" sin desambiguar. Sugerencia: nombrar la versión objetivo (o "siguiente versión" con la colisión v4 documentada) en 0012 o en la acceptance de W0.
+3. **Alcance de la migración de docs (menor):** 0012 §2 enumera adr/specs/plans/explorations/playbooks/convention/engineering/agents/json-output + generados por init, pero `docs/` también contiene `assets/`, `labs/`, `runbooks/`, `opencode2.md`, `claim.md`, `viewer-spike.md` y los meta-docs raíz (README/ARCHITECTURE/CONTRIBUTING/...); y `templates/docs/**` son assets del paquete que no deben moverse. La dogfood bullet de W0 ("`docs/` → `ArggonManager/docs/` con links internos actualizados") resuelve el caso general, pero conviene fijar la regla para assets/labs/runbooks en la acceptance de W0 (mover + actualizar links, o excluir).
+4. **Estado objetivo vs actual (nit):** la spec (Data contract/Layout, líneas 118-129) y el plan presentan `ArggonManager/...` como contrato vigente mientras los archivos siguen en `docs/` hasta W0; el plan lo cubre (T0) y 0012 Context lo reconoce ("Today…"), pero un "target state, W0 lo migra" en la sección Layout eliminaría la duda. Nota: `plan-native-first-011.md:4` (`spec: docs/specs/...`) debe actualizarse en la migración de W0.
+5. **Nit README/0010:** el decision #1 de ADR 0010 también fija `tasks/` como core portable; la fila "Partially superseded by 0011" sigue siendo correcta, pero podría mencionarse 0012 en la relación/supersede de 0010.
+
+### No verificado / fuera de alcance
+- Comportamiento real de auto-detección de `tasks/` legacy y del comando de migración: se decide aquí y se implementa en `task-native-layout-rename` (W0); no hay código que probar en este PR.
+- No ejecuté `npm run lint` por separado (sin código cambiado; el check `cli` de CI incluye build+test+lint y pasó).
+
+**Recomendación:** aprobar y mergear con merge commit (no squash) cuando el coordinador saque el PR de draft. Las observaciones 1–3 pueden resolverse como one-liner antes del merge o, a más tardar, dentro de W0; ninguna cambia la decisión ni contradice la directiva del PO. El ítem permanece `in_progress` (no lo marco done).
