@@ -105,3 +105,35 @@ Findings (reported, not fixed here):
 **Decisión crítica / recomendación**
 
 **No-merge** hasta: (1) F1 (una línea), y (2) F2 resuelto en la misma pasada (preferido: 2 casos de paridad con shim `gh`) o fileteado + wording del playbook/acceptance corregido. Antes del merge, filetear F3 en `task-native-commands-seam` y F4 como bug de kernel. Después: merge con **merge commit, nunca squash**. No marcar `done` aquí; el flip es del coordinador.
+
+### 2026-09-20 @Arggon
+Review follow-up (verdict NO-MERGE on PR #375) — addressed on the branch.
+
+F1 (blocking, TS2304) — `ToolEditorLike` is now declared next to `ToolContext`
+(structural: namespace + add). New gate `opencode/plugins/arggon/typecheck.test.ts`
+runs the reviewer's exact command (`tsc --noEmit --target ES2022 --module NodeNext
+--moduleResolution NodeNext --strict --skipLibCheck`) over
+`opencode/plugins/arggon/index.ts` inside `npm test`; verified the pre-fix file fails
+it (TS2304, reproduced before the fix) and the fixed file passes.
+
+F2 (medium, parity 10/12) — closed at 12/12 in `tools.test.ts`, no network/gh auth:
+- `sync`: twin git fixtures with origin `github.com/acme/demo` + a fake `gh` shim on
+  PATH printing `gh pr list --json` → tool envelope byte-equal to
+  `arggon sync --write --json`, and the filled `branch` field leaves identical tracker
+  snapshots.
+- `import_issues`: same shim printing `gh issue list --json` (open bug #11 + closed
+  enhancement #12) → tool envelope byte-equal to `arggon import-issues --dry-run --json`,
+  nothing written on either side.
+Playbook testing wording corrected (it claimed all tools without noting the
+GitHub-dependent two; it now documents the fake-gh cases and the plugin type gate).
+
+F3 (nits) — the native smoke scenario has 13 `ok` checks; the previous evidence said
+"14/14" and is corrected here. `docs/opencode2.md` test count 1293+ → 1385+.
+
+Gates on `4ecae7d`: `npm test` 85 files / 1385 tests; `npm run lint` clean; `npm run build`
+ok; `arggon validate` ok (0 warnings); `arggon spec validate` ok (18 docs);
+`npm run smoke:opencode` 12 scenarios / 0 failures (native scenario 13/13);
+`context:report --strict` all bounds pass (native tools 10,925 B ≤ 12,288 B advisory).
+
+Deferred findings untouched as instructed: correlation `tools.arggon.<name>(…)`,
+`gh` cwd for import_issues, kernel import cache, `options.pinned`.
