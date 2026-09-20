@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-native-commands-seam
 title: Native commands + seam without MCP
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p0
 created: "2026-09-19"
 updated: "2026-09-20"
-claimed_at: "2026-09-20T13:01:35.069Z"
 depends_on: [task-native-tools]
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-commands-seam
 ---
