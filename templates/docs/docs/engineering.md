@@ -10,9 +10,9 @@ A PR is reviewable when:
 
 - [ ] It does one thing (small, focused diff).
 - [ ] Tests cover the behavior change (new tests for new behavior, updated tests for changed behavior).
-- [ ] Docs affected by the change are updated **in the same PR** (README, `docs/`, ADRs).
-- [ ] The work item id from `tasks/` is referenced in the PR.
-- [ ] `arggon validate` passes (if the change touches `tasks/` or templates).
+- [ ] Docs affected by the change are updated **in the same PR** (README, `ArggonManager/docs/`, ADRs).
+- [ ] The work item id from the tracker (`ArggonManager/`) is referenced in the PR.
+- [ ] `arggon validate` passes (if the change touches `ArggonManager/` or templates).
 
 A change is acceptable when it satisfies the bar above and a reviewer can answer:
 
@@ -44,7 +44,7 @@ A change is acceptable when it satisfies the bar above and a reviewer can answer
 
 ## ADRs
 
-Cross-cutting decisions (stack, schema, new top-level package) get an ADR under `docs/adr/`: numbered, `Proposed` in the PR, `Accepted` on merge, superseded instead of rewritten.
+Cross-cutting decisions (stack, schema, new top-level package) get an ADR under `ArggonManager/docs/adr/`: numbered, `Proposed` in the PR, `Accepted` on merge, superseded instead of rewritten.
 
 ---
 

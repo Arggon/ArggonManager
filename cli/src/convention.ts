@@ -1,20 +1,28 @@
 import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import { isItemType, type ItemType } from "./ids.js";
+import { conventionPathForRoot, TRACKER_DIR_NAME } from "./paths.js";
 
-/** Latest task-tree convention version written by `arggon init` (docs/convention.md). */
-export const CONVENTION_VERSION = 4;
+/**
+ * Latest task-tree convention version written by `arggon init`
+ * (docs/convention.md). v4 = priority field; v5 = tracker root rename
+ * (`ArggonManager/` + docs under the tracker, ADR 0012). v3/v4 trees on the
+ * legacy `tasks/` layout stay valid (auto-detected; `validate` reports the
+ * legacy location and `arggon migrate --layout` is the supported move).
+ */
+export const CONVENTION_VERSION = 5;
 
-/** Version assumed when `tasks/.convention.yml` is missing or unparseable (omit file = 0). */
+/** Version assumed when `.convention.yml` is missing or unparseable (omit file = 0). */
 export const CONVENTION_VERSION_DEFAULT = 0;
 
 /**
- * Read the tree convention version from `<dir>/tasks/.convention.yml`.
- * Returns CONVENTION_VERSION_DEFAULT when the file is missing or has no
- * parseable `version: N` line (per docs/json-output.md: omit file = 0).
+ * Read the tree convention version from the tracker's `.convention.yml`
+ * (`<dir>/ArggonManager/.convention.yml`, or `<dir>/tasks/.convention.yml` on
+ * the legacy layout). Returns CONVENTION_VERSION_DEFAULT when the file is
+ * missing or has no parseable `version: N` line (per docs/json-output.md:
+ * omit file = 0).
  */
 export function readConventionVersion(dir: string): number {
-  const path = join(dir, "tasks/.convention.yml");
+  const path = conventionPathForRoot(dir);
   if (!existsSync(path)) return CONVENTION_VERSION_DEFAULT;
   try {
     const raw = readFileSync(path, "utf8");
@@ -251,7 +259,7 @@ function stripQuotes(value: string): string {
 }
 
 /**
- * Parse `tasks/.convention.yml` (line-oriented, no YAML dependency).
+ * Parse the tracker's `.convention.yml` (line-oriented, no YAML dependency).
  * Unknown top-level keys are ignored for forward compatibility;
  * `x-views` (saved views), `x-playbooks` (playbook staleness options),
  * `x-tracker` (tracker-hygiene options), `x-import` (issue-import options),
@@ -264,7 +272,7 @@ function stripQuotes(value: string): string {
  */
 export function parseConventionConfig(
   raw: string,
-  sourcePath = "tasks/.convention.yml",
+  sourcePath = `${TRACKER_DIR_NAME}/.convention.yml`,
 ): ConventionConfig {
   const branchPatterns: Record<ItemType, string> = { ...DEFAULT_BRANCH_PATTERNS };
   const views: Record<string, string> = {};
@@ -534,9 +542,9 @@ export function parseConventionConfig(
   };
 }
 
-/** Read and parse `<dir>/tasks/.convention.yml`. Missing file yields version 0 + defaults. */
+/** Read and parse the tracker's `.convention.yml`. Missing file yields version 0 + defaults. */
 export function readConventionConfig(dir: string): ConventionConfig {
-  const path = join(dir, "tasks/.convention.yml");
+  const path = conventionPathForRoot(dir);
   if (!existsSync(path)) {
     return {
       version: CONVENTION_VERSION_DEFAULT,
@@ -561,7 +569,7 @@ export function readConventionConfig(dir: string): ConventionConfig {
  * adopter-modified — the conservative default).
  */
 export function readGeneratedState(dir: string): Record<string, GeneratedEntry> {
-  const path = join(dir, "tasks/.convention.yml");
+  const path = conventionPathForRoot(dir);
   if (!existsSync(path)) return {};
   try {
     return parseConventionConfig(readFileSync(path, "utf8"), path).generated;
@@ -577,7 +585,7 @@ export function readGeneratedState(dir: string): Record<string, GeneratedEntry> 
  * back to content-based recovery).
  */
 export function readGeneratedProjectName(dir: string): string | null {
-  const path = join(dir, "tasks/.convention.yml");
+  const path = conventionPathForRoot(dir);
   if (!existsSync(path)) return null;
   try {
     return parseConventionConfig(readFileSync(path, "utf8"), path).generatedProjectName;

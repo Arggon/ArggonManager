@@ -245,7 +245,7 @@ describe("runList", () => {
 
   it("errors when tasks/ is missing", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-list-empty-"));
-    expect(() => runList({ cwd: dir })).toThrow(/No tasks\/ convention/);
+    expect(() => runList({ cwd: dir })).toThrow(/No ArggonManager\/ convention/);
   });
 
   it("errors on invalid enum values", () => {
@@ -416,7 +416,7 @@ branch: feat/a
     it("fails on any view name when no views are defined", () => {
       const dir = makeTree();
       expect(() => runList({ cwd: dir, view: "nope" })).toThrow(
-        /no saved views defined in tasks\/\.convention\.yml x-views/,
+        /no saved views defined in the tracker .convention.yml x-views/,
       );
     });
 
@@ -564,7 +564,7 @@ describe("runList --parent flag", () => {
 
   it("unknown parent id fails with an actionable error", () => {
     expect(() => runList({ cwd: makeTree(), parent: "nope" })).toThrowError(
-      'unknown parent "nope" (no work item with that id under tasks/)',
+      'unknown parent "nope" (no work item with that id in the tracker)',
     );
   });
 });

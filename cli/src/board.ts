@@ -524,7 +524,7 @@ header .meta { color: #59636e; font-size: 13px; }
 <body>
 <header>
   <h1>arggon board${repo}</h1>
-  <div class="meta">generated ${esc(opts.generatedAt)} · ${sorted.length} item(s) · <span id="status-counts">${counts}</span> · git files under tasks/ remain the source of truth; drops persist only against a live server (arggon board --serve)${live}</div>
+  <div class="meta">generated ${esc(opts.generatedAt)} · ${sorted.length} item(s) · <span id="status-counts">${counts}</span> · tracker files remain the source of truth; drops persist only against a live server (arggon board --serve)${live}</div>
 </header>
 <main class="board">
 ${columns}

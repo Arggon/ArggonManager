@@ -4,7 +4,7 @@ import { CONVENTION_VERSION, readConventionConfig, readConventionVersion } from 
 import { assertValidId, BRANCH_PATTERN } from "./ids.js";
 import { isPriority } from "./priority.js";
 import { softTryLoadItem, walkTasksTree, type WorkItem } from "./items.js";
-import { findTasksDir, newItemPath, repoRootFromTasks } from "./paths.js";
+import { findTrackerLocation, newItemPath, type TrackerLayout } from "./paths.js";
 import { assertParentEdge, expectedParentType } from "./relations.js";
 import { sanitizeHumanError } from "./sanitize.js";
 import { ASSIGNEE_PATTERN, assertClaimAndBlocked } from "./status.js";
@@ -17,6 +17,8 @@ export type ValidateOptions = {
 export type ValidateResult = {
   root: string;
   conventionVersion: number;
+  /** Detected tracker layout (ADR 0012, additive): v5 or legacy `tasks/`. */
+  layout: TrackerLayout;
   errors: Issue[];
   warnings: Issue[];
 };
@@ -204,20 +206,33 @@ function checkDependencies(items: SoftItem[], byId: Map<string, SoftItem>, error
 }
 
 export function runValidate(opts: ValidateOptions): ValidateResult {
-  const tasksDir = findTasksDir(opts.cwd);
-  const root = repoRootFromTasks(tasksDir);
+  const location = findTrackerLocation(opts.cwd);
+  const tasksDir = location.dir;
+  const root = location.repoRoot;
   const conventionVersion = readConventionVersion(root);
   const errors: Issue[] = [];
   const warnings: Issue[] = [];
+  const conventionRel = posixRel(root, location.conventionPath);
+
+  if (location.legacy) {
+    // ADR 0012 §3: legacy trees keep working, but the location is reported so
+    // adopters know the supported migration path exists.
+    push(
+      warnings,
+      location.name,
+      "tracker uses the legacy tasks/ layout — run `arggon migrate --layout` to move it to ArggonManager/ (docs included)",
+      "LEGACY_LAYOUT",
+    );
+  }
 
   if (conventionVersion > CONVENTION_VERSION) {
     push(
       errors,
-      "tasks/.convention.yml",
+      conventionRel,
       `convention version ${conventionVersion} is newer than supported ${CONVENTION_VERSION}`,
       "CONVENTION_VERSION",
     );
-    return { root, conventionVersion, errors, warnings };
+    return { root, conventionVersion, layout: location.layout, errors, warnings };
   }
 
   try {
@@ -225,7 +240,7 @@ export function runValidate(opts: ValidateOptions): ValidateResult {
   } catch (err) {
     push(
       errors,
-      "tasks/.convention.yml",
+      conventionRel,
       err instanceof Error ? err.message : String(err),
       "INVALID_BRANCH_PATTERN",
     );
@@ -381,7 +396,7 @@ export function runValidate(opts: ValidateOptions): ValidateResult {
 
   errors.sort((a, b) => a.path.localeCompare(b.path) || a.code.localeCompare(b.code));
   warnings.sort((a, b) => a.path.localeCompare(b.path) || a.code.localeCompare(b.code));
-  return { root, conventionVersion, errors, warnings };
+  return { root, conventionVersion, layout: location.layout, errors, warnings };
 }
 
 /**

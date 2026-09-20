@@ -107,7 +107,7 @@ function hostileTree(): string {
   // exercised) while the ordinary frontmatter id is the lookup key —
   // loadItems does not require stem == id.
   writeFileSync(
-    join(dir, "tasks", "launch-mvp", "auth", "story-login", `task-${HOSTILE}.md`),
+    join(dir, "ArggonManager", "launch-mvp", "auth", "story-login", `task-${HOSTILE}.md`),
     "---\n" +
       "type: task\n" +
       "status: todo\n" +
@@ -125,7 +125,7 @@ function hostileTree(): string {
   // Report fixture: hostile epic title (table + markdown) and a blocked leaf
   // with a hostile blocked_reason (markdown blocked section).
   writeFileSync(
-    join(dir, "tasks", "launch-mvp", "auth", "auth.md"),
+    join(dir, "ArggonManager", "launch-mvp", "auth", "auth.md"),
     "---\n" +
       "type: epic\n" +
       "status: in_progress\n" +
@@ -139,7 +139,7 @@ function hostileTree(): string {
     "utf8",
   );
   writeFileSync(
-    join(dir, "tasks", "launch-mvp", "auth", "story-login", "bug-blocked.md"),
+    join(dir, "ArggonManager", "launch-mvp", "auth", "story-login", "bug-blocked.md"),
     "---\n" +
       "type: bug\n" +
       "status: blocked\n" +
@@ -155,9 +155,9 @@ function hostileTree(): string {
   );
 
   // Playbook fixture: id/version from frontmatter.
-  mkdirSync(join(dir, "docs", "playbooks"), { recursive: true });
+  mkdirSync(join(dir, "ArggonManager", "docs", "playbooks"), { recursive: true });
   writeFileSync(
-    join(dir, "docs", "playbooks", "weird.md"),
+    join(dir, "ArggonManager", "docs", "playbooks", "weird.md"),
     "---\n" +
       `playbook_id: tech${HOSTILE}\n` +
       `version: v1${HOSTILE}\n` +
@@ -169,7 +169,7 @@ function hostileTree(): string {
 
   // Spec-audit fixture: identical docs -> DUPLICATE, one shared requirement
   // title with hostile bytes and one hostile filename.
-  mkdirSync(join(dir, "docs", "specs"), { recursive: true });
+  mkdirSync(join(dir, "ArggonManager", "docs", "specs"), { recursive: true });
   const specBody =
     "---\nspec_id: dup\ntitle: T\nstatus: proposed\ncreated: 2026-09-18\n---\n\n" +
     "# Spec: t\n\n## Purpose\n\nWhy it exists.\n\n" +
@@ -177,8 +177,12 @@ function hostileTree(): string {
     "## Acceptance\n\n" +
     `### Requirement: Do ${HOSTILE_INLINE} thing\n\n` +
     "#### Scenario: it works\n\n- [x] works\n";
-  writeFileSync(join(dir, "docs", "specs", "spec-dup-a.md"), specBody, "utf8");
-  writeFileSync(join(dir, "docs", "specs", `spec-dup-b-${HOSTILE}.md`), specBody, "utf8");
+  writeFileSync(join(dir, "ArggonManager", "docs", "specs", "spec-dup-a.md"), specBody, "utf8");
+  writeFileSync(
+    join(dir, "ArggonManager", "docs", "specs", `spec-dup-b-${HOSTILE}.md`),
+    specBody,
+    "utf8",
+  );
 
   sharedTree = dir;
   return dir;
@@ -254,7 +258,7 @@ describe("row/table stdout: show", () => {
     expect(proc.stdout).toContain(
       `  path: ${join(
         hostileTree(),
-        "tasks",
+        "ArggonManager",
         "launch-mvp",
         "auth",
         "story-login",
@@ -275,7 +279,14 @@ describe("row/table stdout: show", () => {
     expect(body.item.assignee).toBe(`alice${HOSTILE}`);
     expect(body.item.branch).toBe(`feat/${HOSTILE}`);
     expect(body.path).toBe(
-      join(hostileTree(), "tasks", "launch-mvp", "auth", "story-login", `task-${HOSTILE}.md`),
+      join(
+        hostileTree(),
+        "ArggonManager",
+        "launch-mvp",
+        "auth",
+        "story-login",
+        `task-${HOSTILE}.md`,
+      ),
     );
   });
 
@@ -286,7 +297,7 @@ describe("row/table stdout: show", () => {
     expect(proc.stdout).toBe(
       `arggon show: story-login — Login\n` +
         `  type: story · status: todo · parent: auth\n` +
-        `  path: ${join(dir, "tasks", "launch-mvp", "auth", "story-login", "story-login.md")}\n`,
+        `  path: ${join(dir, "ArggonManager", "launch-mvp", "auth", "story-login", "story-login.md")}\n`,
     );
     expect(proc.stderr).toBe("");
   });
@@ -403,8 +414,8 @@ describe("row/table stdout: adopt skip path", () => {
     expect(runGit(["config", "user.email", "t@t"], dir).status).toBe(0);
     expect(runGit(["config", "user.name", "t"], dir).status).toBe(0);
     expect(runCli(["init", dir], dir).status).toBe(0);
-    const storyPath = join(dir, "tasks", "adoption", "story-arggon-adoption.md");
-    const taskPath = join(dir, "tasks", "adoption", "task-adopt-arggon.md");
+    const storyPath = join(dir, "ArggonManager", "adoption", "story-arggon-adoption.md");
+    const taskPath = join(dir, "ArggonManager", "adoption", "task-adopt-arggon.md");
     mkdirSync(dirname(storyPath), { recursive: true });
     writeFileSync(
       storyPath,
@@ -455,7 +466,7 @@ describe("row/table stdout: adopt --ack", () => {
     expect(runCli(["init", dir], dir).status).toBe(0);
     const hostilePath = `${HOSTILE}.md`;
     writeFileSync(join(dir, hostilePath), "hostile doc\n", "utf8");
-    const conventionPath = join(dir, "tasks", ".convention.yml");
+    const conventionPath = join(dir, "ArggonManager", ".convention.yml");
     writeFileSync(
       conventionPath,
       updateGeneratedSection(

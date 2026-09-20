@@ -11,7 +11,7 @@
  * must carry the complete frontmatter. Before the fix the in-place
  * `writeFileSync` (open+truncate, then write) let readers observe an empty or
  * partial file, and the initial loadItems could skip the file entirely
- * (COMMENT_FAILED "not found under tasks/"). The pre-fix harness (widened body,
+ * (COMMENT_FAILED "not found under the tracker"). The pre-fix harness (widened body,
  * same shape as below) observed 100+ torn reads per run; with the atomic write
  * (temp file + rename) it observes zero.
  *
@@ -144,7 +144,7 @@ describe("concurrent comments on one item (bug-comment-race-no-lock)", () => {
     async () => {
       const dir = initRepo("same-item");
       try {
-        const file = join(dir, "tasks/launch/auth/login/task-race.md");
+        const file = join(dir, "ArggonManager/launch/auth/login/task-race.md");
         // Widen the body so a truncate->write window is actually observable:
         // the pre-fix bug wrote this ~1.5MB file in place (truncate, then
         // write), and the readers below observed 0-length and partial files
@@ -170,7 +170,7 @@ describe("concurrent comments on one item (bug-comment-race-no-lock)", () => {
         // error path, never a crash or a silent loss. A clean lock failure is
         // retried sequentially below, so EVERY comment must still land.
         //
-        // bug-comment-torn-read: the transient "not found under tasks/" retry
+        // bug-comment-torn-read: the transient "not found under the tracker" retry
         // that used to live here is GONE. It papered over the pre-fix in-place
         // writeFileSync (open+truncate) race, where a contender scanned the
         // item inside the truncate window and saw an empty file. The write is

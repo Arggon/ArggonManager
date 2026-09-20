@@ -158,17 +158,17 @@ describe("tracker-commit helpers", () => {
     runInit({ dir, force: false });
     expect(readAutoCommitConfig(dir)).toBeNull();
     writeFileSync(
-      join(dir, "tasks/.convention.yml"),
+      join(dir, "ArggonManager/.convention.yml"),
       "version: 3\nx-tracker:\n  auto-commit: false\n",
       "utf8",
     );
     expect(readAutoCommitConfig(dir)).toBe(false);
     // Malformed config never fails a mutation — falls back to the default.
-    writeFileSync(join(dir, "tasks/.convention.yml"), "x-tracker:\n  auto-commit: maybe\n");
+    writeFileSync(join(dir, "ArggonManager/.convention.yml"), "x-tracker:\n  auto-commit: maybe\n");
     expect(readAutoCommitConfig(dir)).toBeNull();
     // allow-steal (bug-cli-steal-not-gated) shares the x-tracker namespace.
     writeFileSync(
-      join(dir, "tasks/.convention.yml"),
+      join(dir, "ArggonManager/.convention.yml"),
       "x-tracker:\n  allow-steal: true\n",
       "utf8",
     );
@@ -183,7 +183,7 @@ describe("tracker-commit helpers", () => {
     );
     const ok = commitTrackerMutation("/nonexistent", [], { message: "m", commit: false });
     expect(commitPayload(ok)).toEqual({ skipped: "auto-commit disabled" });
-    expect(formatCommitLine(ok)).toBe("no-commit: tasks dirty state kept");
+    expect(formatCommitLine(ok)).toBe("no-commit: tracker dirty state kept");
     expect(formatCommitLine(undefined)).toBeNull();
     expect(formatCommitLine({ committed: true, hash: "abc1234", message: "m" })).toBe(
       "committed: abc1234 m",
@@ -472,7 +472,7 @@ describe("tracker auto-commit on create", () => {
       message: "chore(tasks): created task-fresh",
     });
     expect(git(["log", "--format=%s", "-1"], dir)).toBe("chore(tasks): created task-fresh");
-    expect(committedPaths(dir)).toEqual(["tasks/launch/auth/login/task-fresh.md"]);
+    expect(committedPaths(dir)).toEqual(["ArggonManager/launch/auth/login/task-fresh.md"]);
     expect(status(dir)).toBe("");
     const hash = result.commit?.hash ?? "";
     expect(hash).toMatch(/^[0-9a-f]+$/);
@@ -493,7 +493,7 @@ describe("tracker auto-commit on create", () => {
     });
 
     expect(result.commit).toEqual({ committed: false, skipReason: "auto-commit disabled" });
-    expect(status(dir)).toContain("tasks/launch/auth/login/task-dirty.md");
+    expect(status(dir)).toContain("ArggonManager/launch/auth/login/task-dirty.md");
     // Scaffold commits are auto-created now (init + creates, tracker hygiene).
     expect(git(["log", "--format=%s", "-1"], dir)).toBe("chore(tasks): created task-rate-limit");
   });
@@ -501,7 +501,7 @@ describe("tracker auto-commit on create", () => {
   it("honors x-tracker.auto-commit: false from the config", () => {
     const dir = initRepo();
     writeFileSync(
-      join(dir, "tasks/.convention.yml"),
+      join(dir, "ArggonManager/.convention.yml"),
       "version: 3\nx-tracker:\n  auto-commit: false\n",
       "utf8",
     );
@@ -516,13 +516,13 @@ describe("tracker auto-commit on create", () => {
     });
 
     expect(result.commit).toEqual({ committed: false, skipReason: "auto-commit disabled" });
-    expect(status(dir)).toContain("tasks/launch/auth/login/task-configured.md");
+    expect(status(dir)).toContain("ArggonManager/launch/auth/login/task-configured.md");
   });
 
   it("lets an explicit opt-in override a disabled config", () => {
     const dir = initRepo();
     writeFileSync(
-      join(dir, "tasks/.convention.yml"),
+      join(dir, "ArggonManager/.convention.yml"),
       "version: 3\nx-tracker:\n  auto-commit: false\n",
       "utf8",
     );
@@ -538,7 +538,7 @@ describe("tracker auto-commit on create", () => {
     });
 
     expect(result.commit?.committed).toBe(true);
-    expect(committedPaths(dir)).toEqual(["tasks/launch/auth/login/task-override.md"]);
+    expect(committedPaths(dir)).toEqual(["ArggonManager/launch/auth/login/task-override.md"]);
   });
 
   it("skips silently on a non-git tree", () => {
@@ -561,7 +561,7 @@ describe("tracker auto-commit on create", () => {
   it("never sweeps unrelated dirty files into the commit", () => {
     const dir = initRepo();
     // The user's own pre-existing dirty state, inside and outside tasks/.
-    writeFileSync(join(dir, "tasks/scratch.txt"), "wip");
+    writeFileSync(join(dir, "ArggonManager/scratch.txt"), "wip");
     writeFileSync(join(dir, "notes.txt"), "wip");
 
     const result = runCreate({
@@ -574,9 +574,9 @@ describe("tracker auto-commit on create", () => {
     });
 
     expect(result.commit?.committed).toBe(true);
-    expect(committedPaths(dir)).toEqual(["tasks/launch/auth/login/task-surgical.md"]);
+    expect(committedPaths(dir)).toEqual(["ArggonManager/launch/auth/login/task-surgical.md"]);
     // The user's dirty files remain dirty (staged only the tool's path).
-    expect(status(dir)).toContain("?? tasks/scratch.txt");
+    expect(status(dir)).toContain("?? ArggonManager/scratch.txt");
     expect(status(dir)).toContain("?? notes.txt");
     expect(status(dir)).not.toMatch(/task-surgical/);
   });
@@ -598,7 +598,7 @@ describe("tracker auto-commit on comment", () => {
       committed: true,
       message: "chore(tasks): commented task-rate-limit",
     });
-    expect(committedPaths(dir)).toEqual(["tasks/launch/auth/login/task-rate-limit.md"]);
+    expect(committedPaths(dir)).toEqual(["ArggonManager/launch/auth/login/task-rate-limit.md"]);
     expect(status(dir)).toBe("");
     const raw = readFileSync(result.path, "utf8");
     expect(raw).toContain("handing off to the next agent");
@@ -617,7 +617,7 @@ describe("tracker auto-commit on comment", () => {
     });
 
     expect(result.commit).toEqual({ committed: false, skipReason: "auto-commit disabled" });
-    expect(status(dir)).toContain("tasks/launch/auth/login/task-rate-limit.md");
+    expect(status(dir)).toContain("ArggonManager/launch/auth/login/task-rate-limit.md");
   });
 });
 
@@ -634,8 +634,8 @@ describe("tracker auto-commit on adopt", () => {
       message: "chore(tasks): adopted task-adopt-arggon",
     });
     expect(committedPaths(dir)).toEqual([
-      "tasks/launch/auth/story-arggon-adoption/story-arggon-adoption.md",
-      "tasks/launch/auth/story-arggon-adoption/task-adopt-arggon.md",
+      "ArggonManager/launch/auth/story-arggon-adoption/story-arggon-adoption.md",
+      "ArggonManager/launch/auth/story-arggon-adoption/task-adopt-arggon.md",
     ]);
     expect(status(dir)).toBe("");
   });
@@ -648,7 +648,7 @@ describe("tracker auto-commit on adopt", () => {
     expect(result.taskCreated).toBe(true);
     expect(result.commit).toEqual({ committed: false, skipReason: "auto-commit disabled" });
     // Both new files stay untracked (git collapses the fresh directory).
-    expect(status(dir)).toContain("tasks/launch/auth/story-arggon-adoption/");
+    expect(status(dir)).toContain("ArggonManager/launch/auth/story-arggon-adoption/");
   });
 });
 
@@ -662,7 +662,7 @@ describe("tracker auto-commit on cleanup --prune", () => {
     );
     const wt = started.worktreePath!;
     runUpdate({ cwd: wt, id: "task-rate-limit", status: "done", now: NOW });
-    git(["add", "tasks"], wt);
+    git(["add", "ArggonManager"], wt);
     git(["commit", "--quiet", "-m", "close task-rate-limit"], wt);
     // Fast-forward main: brings the worktree_path record (and done status)
     // into the main checkout with a clean tree.
@@ -681,10 +681,10 @@ describe("tracker auto-commit on cleanup --prune", () => {
       committed: true,
       message: "chore(tasks): pruned task-rate-limit",
     });
-    expect(committedPaths(dir)).toEqual(["tasks/launch/auth/login/task-rate-limit.md"]);
+    expect(committedPaths(dir)).toEqual(["ArggonManager/launch/auth/login/task-rate-limit.md"]);
     expect(status(dir)).toBe("");
     const data = parseFrontmatter(
-      readFileSync(join(dir, "tasks/launch/auth/login/task-rate-limit.md"), "utf8"),
+      readFileSync(join(dir, "ArggonManager/launch/auth/login/task-rate-limit.md"), "utf8"),
     ).data;
     expect(data.worktree_path).toBeUndefined();
   });
@@ -696,7 +696,7 @@ describe("tracker auto-commit on cleanup --prune", () => {
 
     expect(result.failures).toEqual([]);
     expect(result.commit).toEqual({ committed: false, skipReason: "auto-commit disabled" });
-    expect(status(dir)).toContain("tasks/launch/auth/login/task-rate-limit.md");
+    expect(status(dir)).toContain("ArggonManager/launch/auth/login/task-rate-limit.md");
   });
 
   it("reports no commit when nothing was pruned", () => {
@@ -714,16 +714,16 @@ describe("tracker auto-commit on update", () => {
   /** Tick every acceptance checkbox so the done-flip cascade can complete the whole chain. */
   function acceptanceOpen(dir: string): void {
     for (const rel of [
-      "tasks/launch/launch.md",
-      "tasks/launch/auth/auth.md",
-      "tasks/launch/auth/login/login.md",
+      "ArggonManager/launch/launch.md",
+      "ArggonManager/launch/auth/auth.md",
+      "ArggonManager/launch/auth/login/login.md",
     ]) {
       const full = join(dir, rel);
       writeFileSync(full, readFileSync(full, "utf8").replaceAll("- [ ] ", "- [x] ticked\n"), "utf8");
     }
     // Legal kernel path to done: claim first (todo -> done is illegal).
     runUpdate({ cwd: dir, id: "task-rate-limit", status: "in_progress", assignee: "arggon", now: NOW });
-    git(["add", "tasks"], dir);
+    git(["add", "ArggonManager"], dir);
     git(["commit", "--quiet", "-m", "tick acceptance"], dir);
   }
 
@@ -740,10 +740,10 @@ describe("tracker auto-commit on update", () => {
       message: "chore(tasks): done task-rate-limit (cascade: login, auth, launch)",
     });
     expect(committedPaths(dir)).toEqual([
-      "tasks/launch/auth/auth.md",
-      "tasks/launch/auth/login/login.md",
-      "tasks/launch/auth/login/task-rate-limit.md",
-      "tasks/launch/launch.md",
+      "ArggonManager/launch/auth/auth.md",
+      "ArggonManager/launch/auth/login/login.md",
+      "ArggonManager/launch/auth/login/task-rate-limit.md",
+      "ArggonManager/launch/launch.md",
     ]);
     expect(status(dir)).toBe("");
   });
@@ -756,21 +756,21 @@ describe("tracker auto-commit on update", () => {
     const commit = maybeCommitUpdate(result, false);
 
     expect(commit).toEqual({ committed: false, skipReason: "auto-commit disabled" });
-    expect(status(dir)).toContain("tasks/launch/launch.md");
-    expect(status(dir)).toContain("tasks/launch/auth/login/task-rate-limit.md");
+    expect(status(dir)).toContain("ArggonManager/launch/launch.md");
+    expect(status(dir)).toContain("ArggonManager/launch/auth/login/task-rate-limit.md");
     expect(git(["log", "--format=%s", "-1"], dir)).toBe("tick acceptance");
   });
 
   it("honors x-tracker.auto-commit: false from the config", () => {
     const dir = initRepo();
     acceptanceOpen(dir);
-    writeFileSync(join(dir, "tasks/.convention.yml"), "version: 3\nx-tracker:\n  auto-commit: false\n", "utf8");
+    writeFileSync(join(dir, "ArggonManager/.convention.yml"), "version: 3\nx-tracker:\n  auto-commit: false\n", "utf8");
 
     const result = runUpdate({ cwd: dir, id: "task-rate-limit", status: "done", now: NOW });
     const commit = maybeCommitUpdate(result, undefined);
 
     expect(commit).toEqual({ committed: false, skipReason: "auto-commit disabled" });
-    expect(status(dir)).toContain("tasks/launch/launch.md");
+    expect(status(dir)).toContain("ArggonManager/launch/launch.md");
   });
 
   it("skips the commit on a no-op update (nothing requested changed)", () => {
@@ -829,9 +829,9 @@ describe("tracker auto-commit on import-issues", () => {
       message: "chore(tasks): imported 2 issues",
     });
     expect(committedPaths(dir)).toEqual([
-      "tasks/launch/backlog/story-imported-issues/story-imported-issues.md",
-      "tasks/launch/backlog/story-imported-issues/task-issue-1.md",
-      "tasks/launch/backlog/story-imported-issues/task-issue-2.md",
+      "ArggonManager/launch/backlog/story-imported-issues/story-imported-issues.md",
+      "ArggonManager/launch/backlog/story-imported-issues/task-issue-1.md",
+      "ArggonManager/launch/backlog/story-imported-issues/task-issue-2.md",
     ]);
     expect(status(dir)).toBe("");
   });
@@ -847,7 +847,7 @@ describe("tracker auto-commit on import-issues", () => {
     });
 
     expect(result.commit).toEqual({ committed: false, skipReason: "auto-commit disabled" });
-    expect(status(dir)).toContain("tasks/launch/backlog/story-imported-issues/");
+    expect(status(dir)).toContain("ArggonManager/launch/backlog/story-imported-issues/");
     // Scaffold commits are auto-created now (init + creates, tracker hygiene).
     expect(git(["log", "--format=%s", "-1"], dir)).toBe("chore(tasks): created backlog");
   });
@@ -863,7 +863,7 @@ describe("tracker auto-commit on import-issues", () => {
       "valid issue number",
     );
     // The first issue and its story were written but never committed.
-    expect(status(dir)).toContain("tasks/launch/backlog/story-imported-issues/");
+    expect(status(dir)).toContain("ArggonManager/launch/backlog/story-imported-issues/");
     // Scaffold commits are auto-created now (init + creates, tracker hygiene).
     expect(git(["log", "--format=%s", "-1"], dir)).toBe("chore(tasks): created backlog");
   });
@@ -872,7 +872,7 @@ describe("tracker auto-commit on import-issues", () => {
 describe("commitTrackerMutation edge cases", () => {
   it("reports nothing-to-commit when the paths carry no changes", () => {
     const dir = initRepo();
-    const itemPath = resolve(dir, "tasks/launch/auth/login/task-rate-limit.md");
+    const itemPath = resolve(dir, "ArggonManager/launch/auth/login/task-rate-limit.md");
 
     const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     try {
@@ -898,7 +898,7 @@ describe("commitTrackerMutation edge cases", () => {
   // every other git call (status probe included) runs for real.
   it("reports a lost staged entry as a warned skip, not a quiet one", async () => {
     const dir = initRepo();
-    const itemPath = join(dir, "tasks/launch/auth/login/task-rate-limit.md");
+    const itemPath = join(dir, "ArggonManager/launch/auth/login/task-rate-limit.md");
     writeFileSync(
       itemPath,
       `${readFileSync(itemPath, "utf8")}\n- uncommitted mutation\n`,
@@ -943,7 +943,7 @@ describe("commitTrackerMutation edge cases", () => {
       );
       // The mutation sits written-but-uncommitted, exactly as in the race.
       expect(readFileSync(itemPath, "utf8")).toContain("uncommitted mutation");
-      expect(status(dir)).toContain("tasks/launch/auth/login/task-rate-limit.md");
+      expect(status(dir)).toContain("ArggonManager/launch/auth/login/task-rate-limit.md");
     } finally {
       vi.doUnmock("node:child_process");
       stderr.mockRestore();
@@ -955,7 +955,7 @@ describe("commitTrackerMutation edge cases", () => {
   // no-commit line must render it inert; the payload keeps the raw text.
   it("renders hostile git failure output inert in the warned skip and human line", async () => {
     const dir = initRepo();
-    const itemPath = join(dir, "tasks/launch/auth/login/task-rate-limit.md");
+    const itemPath = join(dir, "ArggonManager/launch/auth/login/task-rate-limit.md");
     writeFileSync(itemPath, `${readFileSync(itemPath, "utf8")}\n- uncommitted mutation\n`, "utf8");
     const hostile = "fatal: bad path \u001b[31m\u0085\u007f\u2028\u2029 end";
     const rawReason = `git commit failed: error: ${hostile}`;
@@ -999,7 +999,7 @@ describe("commitTrackerMutation edge cases", () => {
 describe("commitTrackerMutation index.lock contention (bug-autocommit-silent-skip)", () => {
   /** Mutate the item on disk so the next commit has something to stage. */
   function dirtyItem(dir: string): string {
-    const itemPath = join(dir, "tasks/launch/auth/login/task-rate-limit.md");
+    const itemPath = join(dir, "ArggonManager/launch/auth/login/task-rate-limit.md");
     const raw = readFileSync(itemPath, "utf8");
     writeFileSync(itemPath, `${raw}\n- contention note\n`, "utf8");
     return itemPath;
@@ -1050,7 +1050,7 @@ describe("commitTrackerMutation index.lock contention (bug-autocommit-silent-ski
       );
       // ...and the file state is consistent: mutation written, still dirty.
       expect(readFileSync(itemPath, "utf8")).toContain("contention note");
-      expect(status(dir)).toContain("tasks/launch/auth/login/task-rate-limit.md");
+      expect(status(dir)).toContain("ArggonManager/launch/auth/login/task-rate-limit.md");
     } finally {
       stderr.mockRestore();
     }
@@ -1085,7 +1085,7 @@ describe("repo-level git-mutation lock (bug-torture-contention-flake3)", () => {
 
   it("keeps the surgical staging contract: unstaged dirty files stay out of the commit", () => {
     const dir = initRepo();
-    const itemPath = join(dir, "tasks/launch/auth/login/task-rate-limit.md");
+    const itemPath = join(dir, "ArggonManager/launch/auth/login/task-rate-limit.md");
     writeFileSync(itemPath, `${readFileSync(itemPath, "utf8")}\n- only note\n`, "utf8");
     writeFileSync(join(dir, "user-file.txt"), "user content\n", "utf8");
 
@@ -1095,13 +1095,13 @@ describe("repo-level git-mutation lock (bug-torture-contention-flake3)", () => {
 
     expect(result).toMatchObject({ committed: true });
     // Our commit contains ONLY the mutated tracker path...
-    expect(committedPaths(dir)).toEqual(["tasks/launch/auth/login/task-rate-limit.md"]);
+    expect(committedPaths(dir)).toEqual(["ArggonManager/launch/auth/login/task-rate-limit.md"]);
     // ...and the user's dirty (unstaged) file stays out of it, still dirty.
     expect(status(dir)).toBe("?? user-file.txt");
   });
   it("waits for another arggon process holding the repo lock and commits after release", () => {
     const dir = initRepo();
-    const itemPath = join(dir, "tasks/launch/auth/login/task-rate-limit.md");
+    const itemPath = join(dir, "ArggonManager/launch/auth/login/task-rate-limit.md");
     writeFileSync(itemPath, `${readFileSync(itemPath, "utf8")}\n- lock-wait note\n`, "utf8");
     holdRepoLock(dir);
     // Release from a detached child (the mutation is synchronous).
@@ -1118,7 +1118,7 @@ describe("repo-level git-mutation lock (bug-torture-contention-flake3)", () => {
 
   it("reports a warned skip when another arggon process holds the repo lock past the budget", () => {
     const dir = initRepo();
-    const itemPath = join(dir, "tasks/launch/auth/login/task-rate-limit.md");
+    const itemPath = join(dir, "ArggonManager/launch/auth/login/task-rate-limit.md");
     writeFileSync(itemPath, `${readFileSync(itemPath, "utf8")}\n- repo-lock note\n`, "utf8");
     holdRepoLock(dir);
     const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
@@ -1151,10 +1151,10 @@ describe("repo-level git-mutation lock (bug-torture-contention-flake3)", () => {
   // the mutations serialize.
   it("N=4 concurrent processes commit distinct mutations with a clean tree", async () => {
     const dir = initRepo();
-    const itemPath = join(dir, "tasks/launch/auth/login/task-rate-limit.md");
+    const itemPath = join(dir, "ArggonManager/launch/auth/login/task-rate-limit.md");
     // Four extra items to mutate, seeded in one commit.
     const ids = ["task-c1", "task-c2", "task-c3", "task-c4"];
-    const paths = [itemPath, ...ids.map((id) => join(dir, `tasks/launch/auth/login/${id}.md`))];
+    const paths = [itemPath, ...ids.map((id) => join(dir, `ArggonManager/launch/auth/login/${id}.md`))];
     for (const p of paths.slice(1)) writeFileSync(p, "---\nseed\n---\n", "utf8");
     commitAllIfDirty(dir, "seed concurrency items");
 

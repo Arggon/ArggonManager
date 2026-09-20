@@ -45,7 +45,7 @@ const FIXED_NOW = new Date("2026-09-17T12:00:00.000Z");
 
 /** Rewrite every managed doc's bytes (state checksums stay as recorded). */
 function rewriteManagedDocs(dir: string, transform: (content: string) => string): void {
-  const config = parseConventionConfig(readFileSync(join(dir, "tasks/.convention.yml"), "utf8"));
+  const config = parseConventionConfig(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8"));
   for (const dest of Object.keys(config.generated)) {
     const abs = join(dir, dest);
     if (!existsSync(abs)) continue;
@@ -65,7 +65,7 @@ function copyFixture(from: string, prefix: string): string {
 
 /** Re-record every state checksum over the file's CURRENT bytes (ack-style). */
 function restampStateChecksums(dir: string): void {
-  const path = join(dir, "tasks/.convention.yml");
+  const path = join(dir, "ArggonManager/.convention.yml");
   const raw = readFileSync(path, "utf8");
   const config = parseConventionConfig(raw);
   for (const [dest, entry] of Object.entries(config.generated)) {
@@ -78,7 +78,7 @@ function restampStateChecksums(dir: string): void {
 
 /** Strip the x-generated.projectName line, simulating a legacy tree. */
 function stripRecordedName(dir: string): void {
-  const path = join(dir, "tasks/.convention.yml");
+  const path = join(dir, "ArggonManager/.convention.yml");
   writeFileSync(
     path,
     readFileSync(path, "utf8")
@@ -264,7 +264,7 @@ describe("bug-crlf-provenance-breakage: adopt --ack cross-EOL equivalence", () =
     const ack = runAdoptAck({ cwd: crlfAcked });
     expect(ack.count).toBe(GENERATED_DOC_COUNT);
     const ackedState = parseConventionConfig(
-      readFileSync(join(crlfAcked, "tasks/.convention.yml"), "utf8"),
+      readFileSync(join(crlfAcked, "ArggonManager/.convention.yml"), "utf8"),
     );
     expect(ackedState.generated["AGENTS.md"]!.acknowledged).toBe(true);
     expect(ackedState.generated["AGENTS.md"]!.checksum).toBe(
@@ -317,7 +317,7 @@ describe("bug-crlf-provenance-breakage: regeneration writes LF, never re-breaks 
     // The refreshed state matches the fresh LF disk EXACTLY (clause 1), so
     // the next compare — including after another git smudge (clause 2) —
     // stays clean. Nothing re-breaks.
-    const config = parseConventionConfig(readFileSync(join(crlf, "tasks/.convention.yml"), "utf8"));
+    const config = parseConventionConfig(readFileSync(join(crlf, "ArggonManager/.convention.yml"), "utf8"));
     for (const [dest, entry] of Object.entries(config.generated)) {
       expect(entry.checksum).toBe(checksumOf(readFileSync(join(crlf, dest), "utf8")));
     }

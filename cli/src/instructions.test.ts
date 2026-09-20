@@ -80,7 +80,7 @@ Paste into AGENTS.md:
 describe("runInstructions", () => {
   it("extracts install, pre-commit, CI and agent snippets from the real playbook", () => {
     const result = runInstructions({ cwd: repoRoot });
-    expect(result.source).toBe("docs/agents.md");
+    expect(result.source.endsWith("docs/agents.md")).toBe(true);
     expect(result.snippets.install).toEqual({
       language: "sh",
       body: "npm install\nnpm run arggon -- <command>",
@@ -95,8 +95,8 @@ describe("runInstructions", () => {
 
   it("extracts the same snippets from a custom fixture tree", () => {
     const dir = primedTree();
-    mkdirSync(join(dir, "docs"), { recursive: true });
-    writeFileSync(join(dir, "docs/agents.md"), FIXTURE, "utf8");
+    mkdirSync(join(dir, "ArggonManager", "docs"), { recursive: true });
+    writeFileSync(join(dir, "ArggonManager", "docs", "agents.md"), FIXTURE, "utf8");
     const result = runInstructions({ cwd: dir });
     expect(result.snippets.install.body).toBe("npm install\nnpm run arggon -- next");
     expect(result.snippets.precommit.body).toContain("#!/bin/sh");
@@ -106,12 +106,12 @@ describe("runInstructions", () => {
 
   it("does not leak past a section into fenced YAML comments or later sections", () => {
     const dir = primedTree();
-    mkdirSync(join(dir, "docs"), { recursive: true });
+    mkdirSync(join(dir, "ArggonManager", "docs"), { recursive: true });
     const tricky = FIXTURE.replace(
       "tasks-validate:\n  runs-on: ubuntu-latest",
       "tasks-validate:\n  # not a heading\n  runs-on: ubuntu-latest",
     );
-    writeFileSync(join(dir, "docs/agents.md"), tricky, "utf8");
+    writeFileSync(join(dir, "ArggonManager", "docs", "agents.md"), tricky, "utf8");
     const result = runInstructions({ cwd: dir });
     expect(result.snippets.ci.body).toContain("# not a heading");
     expect(result.snippets.agent.body).toContain("## Task workflow (ArggonManager)");
@@ -120,7 +120,7 @@ describe("runInstructions", () => {
   it("fails with an actionable error when the playbook is missing", () => {
     const dir = primedTree();
     expect(() => runInstructions({ cwd: dir })).toThrow(
-      /playbook not found at docs\/agents\.md/,
+      /playbook not found at ArggonManager\/docs\/agents\.md/,
     );
   });
 });
@@ -140,7 +140,7 @@ describe("arggon instructions CLI", () => {
       snippets: Record<string, { language: string; body: string }>;
     };
     expect(envelope).toMatchObject({ ok: true, command: "instructions", schemaVersion: 1 });
-    expect(envelope.source).toBe("docs/agents.md");
+    expect(envelope.source.endsWith("docs/agents.md")).toBe(true);
     expect(Object.keys(envelope.snippets).sort()).toEqual(["agent", "ci", "install", "precommit"]);
     expect(envelope.snippets.precommit.body).toContain("npm run arggon -- validate");
   });
@@ -151,7 +151,12 @@ describe("arggon instructions CLI", () => {
       cwd: repoRoot,
     });
     expect(human.status).toBe(0);
-    for (const marker of ["## install", "## pre-commit gate", "## CI gate", "## agent instructions snippet"]) {
+    for (const marker of [
+      "## install",
+      "## pre-commit gate",
+      "## CI gate",
+      "## agent instructions snippet",
+    ]) {
       expect(human.stdout).toContain(marker);
     }
     expect(human.stdout).toContain("```sh");

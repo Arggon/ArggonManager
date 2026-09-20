@@ -13,7 +13,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { writeFileAtomic } from "./atomic.js";
-import { findTasksDir, repoRootFromTasks } from "./paths.js";
+import { docsDirForRoot, findTasksDir, repoRootFromTasks } from "./paths.js";
 
 // ---------------------------------------------------------------------------
 // Shared corpus-adapter extension point
@@ -362,7 +362,7 @@ export class SpecImportError extends Error {
 
 function nextDocNumber(root: string): number {
   let max = 0;
-  for (const dir of [join(root, "docs", "specs"), join(root, "docs", "plans")]) {
+  for (const dir of [join(docsDirForRoot(root), "specs"), join(docsDirForRoot(root), "plans")]) {
     if (!existsSync(dir)) continue;
     for (const name of readdirSync(dir)) {
       const match = name.match(/-(\d{3,})\.md$/);
@@ -492,7 +492,7 @@ export function runSpecImport(opts: SpecImportOptions): SpecImportResult {
   }
 
   // Phase 2: write everything (only reached when every file asserted clean).
-  mkdirSync(join(root, "docs", "specs"), { recursive: true });
+  mkdirSync(join(docsDirForRoot(root), "specs"), { recursive: true });
   for (const doc of mappedDocs) {
     writeFileAtomic(join(root, doc.entry.file), doc.content);
   }

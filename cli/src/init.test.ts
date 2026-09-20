@@ -1,4 +1,13 @@
-import { existsSync, mkdirSync, mkdtempSync as _mkdtempSync, readdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
@@ -51,10 +60,10 @@ const TIER1_DOCS = [
   // plan-opencode2-009 W2: the bundled OpenCode plugin is a tier-1 destination.
   ".opencode/plugins/arggon/index.ts",
   "AGENTS.md",
+  "ArggonManager/docs/tracking.md",
   "CLAUDE.md",
   "CONTRIBUTING.md",
   "SECURITY.md",
-  "docs/tracking.md",
   "opencode.jsonc",
 ];
 
@@ -62,23 +71,29 @@ const TIER2_DOCS = [
   "ARCHITECTURE.md",
   "CHANGELOG.md",
   "SUPPORT.md",
-  "docs/convention.md",
-  "docs/deploy.md",
-  "docs/engineering.md",
-  "docs/runbooks/README.md",
+  "ArggonManager/docs/convention.md",
+  "ArggonManager/docs/deploy.md",
+  "ArggonManager/docs/engineering.md",
+  "ArggonManager/docs/runbooks/README.md",
 ];
 
 describe("init", () => {
   it("scaffolds tasks/.convention.yml and templates", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-"));
     const result = runInit({ dir, force: false });
-    expect(readFileSync(join(dir, "tasks/.convention.yml"), "utf8")).toContain("version: 4");
-    expect(readFileSync(join(dir, "tasks/.convention.yml"), "utf8")).toContain("branch_patterns:");
-    expect(readFileSync(join(dir, "tasks/.convention.yml"), "utf8")).toContain('bug: "fix/{id}"');
+    expect(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8")).toContain(
+      "version: 5",
+    );
+    expect(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8")).toContain(
+      "branch_patterns:",
+    );
+    expect(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8")).toContain(
+      'bug: "fix/{id}"',
+    );
     expect(existsSync(join(dir, "templates/task.md"))).toBe(true);
     expect(existsSync(join(dir, "templates/initiative.md"))).toBe(true);
     expect(result.alreadyInitialized).toBe(false);
-    expect(result.created).toContain("tasks/.convention.yml");
+    expect(result.created).toContain("ArggonManager/.convention.yml");
     expect(result.restored).toEqual([]);
   });
 
@@ -109,7 +124,7 @@ describe("init", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-"));
     runInit({ dir, force: false });
     runInit({ dir, force: false });
-    expect(existsSync(join(dir, "tasks/.convention.yml"))).toBe(true);
+    expect(existsSync(join(dir, "ArggonManager/.convention.yml"))).toBe(true);
   });
 
   it("second run regenerates every untouched doc (updated[]) and creates nothing", () => {
@@ -134,8 +149,8 @@ describe("init", () => {
 
   it("generates missing docs on an already-initialized tree (restore-on-rerun)", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-"));
-    mkdirSync(join(dir, "tasks"));
-    writeFileSync(join(dir, "tasks/.convention.yml"), "version: 3\n", "utf8");
+    mkdirSync(join(dir, "ArggonManager"));
+    writeFileSync(join(dir, "ArggonManager/.convention.yml"), "version: 5\n", "utf8");
     const result = runInit({ dir, force: false });
     expect(result.alreadyInitialized).toBe(true);
     expect(result.created).toEqual(TIER1_DOCS);
@@ -151,7 +166,7 @@ describe("init", () => {
     expect(result.skipped).toContain("AGENTS.md");
   });
 
-  it("errors when tasks/ exists without convention unless --force", () => {
+  it("errors when legacy tasks/ exists without convention unless --force", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-"));
     mkdirSync(join(dir, "tasks"));
     writeFileSync(join(dir, "tasks/note.txt"), "x");
@@ -172,7 +187,7 @@ describe("init", () => {
     expect(status).toBe("");
     // HEAD carries the generated docs, the tasks/ tree AND the provenance state.
     const tracked = git(dir, ["ls-files"]);
-    for (const doc of [...TIER1_DOCS, "tasks/.convention.yml", "templates/task.md"]) {
+    for (const doc of [...TIER1_DOCS, "ArggonManager/.convention.yml", "templates/task.md"]) {
       expect(tracked).toContain(doc);
     }
   });
@@ -213,7 +228,7 @@ describe("init", () => {
     const committed = git(dir, ["show", "--name-only", "--format=", "HEAD"])
       .split("\n")
       .filter((line) => line.length > 0);
-    expect(committed).toContain("tasks/.convention.yml");
+    expect(committed).toContain("ArggonManager/.convention.yml");
     expect(committed).not.toContain(".agents/skills/arggon-cli/SKILL.md");
     expect(git(dir, ["ls-files", "--", ".agents/skills"]).trim()).toBe("");
 
@@ -292,14 +307,14 @@ describe("init --dry-run", () => {
     const before = snapshot(dir);
     const result = dryRunInit({ dir, force: false, full: true });
     const byDest = new Map(result.plan.map((e) => [e.dest, e]));
-    expect(byDest.get("tasks/.convention.yml")?.decision).toBe("created");
+    expect(byDest.get("ArggonManager/.convention.yml")?.decision).toBe("created");
     expect(byDest.get("AGENTS.md")?.decision).toBe("created");
     expect(byDest.get("AGENTS.md")?.reason).toMatch(/missing on disk/);
     expect(byDest.get("ARCHITECTURE.md")?.decision).toBe("created"); // --full tier-2
     expect(result.created).toContain("AGENTS.md");
     expect(result.restored).toEqual([]);
     // Nothing on disk: no scaffold, no docs, no backup dir.
-    expect(existsSync(join(dir, "tasks"))).toBe(false);
+    expect(existsSync(join(dir, "ArggonManager"))).toBe(false);
     expect(existsSync(join(dir, "AGENTS.md"))).toBe(false);
     expect(existsSync(join(dir, "templates"))).toBe(false);
     expect(snapshot(dir)).toEqual(before);
@@ -320,7 +335,7 @@ describe("init --dry-run", () => {
     // Untouched since last generation → regenerated from the current template.
     expect(byDest.get(".editorconfig")?.decision).toBe("updated");
     expect(dry.updated).toEqual(
-      expect.arrayContaining([".editorconfig", "docs/tracking.md", ".mcp.json"]),
+      expect.arrayContaining([".editorconfig", "ArggonManager/docs/tracking.md", ".mcp.json"]),
     );
     expect(byDest.get("AGENTS.md")?.decision).toBe("modified-skip");
     expect(byDest.get("AGENTS.md")?.reason).toMatch(/--backup/);
@@ -351,7 +366,14 @@ describe("init --dry-run", () => {
       backup: true,
       now: new Date("2026-09-14T12:00:00Z"),
     });
-    for (const key of ["created", "updated", "modified", "backedUp", "skipped", "restored"] as const) {
+    for (const key of [
+      "created",
+      "updated",
+      "modified",
+      "backedUp",
+      "skipped",
+      "restored",
+    ] as const) {
       expect(real[key]).toEqual(dry[key]);
     }
     expect(real.backedUp).toEqual(["AGENTS.md"]);
@@ -363,10 +385,14 @@ describe("init --dry-run", () => {
   it("e2e: init --dry-run --json is additive to the envelope and writes nothing; human output carries the plan + footer", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-dry-"));
     gitInit(dir);
-    const proc = spawnSync(process.execPath, [tsx, cli, "init", "--dry-run", "--full", "--json", dir], {
-      encoding: "utf8",
-      cwd: dir,
-    });
+    const proc = spawnSync(
+      process.execPath,
+      [tsx, cli, "init", "--dry-run", "--full", "--json", dir],
+      {
+        encoding: "utf8",
+        cwd: dir,
+      },
+    );
     expect(proc.status).toBe(0);
     const body = JSON.parse(proc.stdout) as {
       ok: boolean;
@@ -380,7 +406,7 @@ describe("init --dry-run", () => {
     expect(body.dryRun).toBe(true);
     expect(body.plan?.map((e) => e.dest)).toContain("AGENTS.md");
     expect(body.commit).toBeUndefined();
-    expect(existsSync(join(dir, "tasks"))).toBe(false);
+    expect(existsSync(join(dir, "ArggonManager"))).toBe(false);
     expect(git(dir, ["status", "--porcelain"])).toBe("");
 
     const human = spawnSync(process.execPath, [tsx, cli, "init", "--dry-run", dir], {
@@ -393,7 +419,7 @@ describe("init --dry-run", () => {
     expect(existsSync(join(dir, "AGENTS.md"))).toBe(false);
   });
 
-  it("surfaces the tasks-exists precondition error like a real run", () => {
+  it("surfaces the legacy tasks-exists precondition error like a real run", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-dry-"));
     mkdirSync(join(dir, "tasks"));
     writeFileSync(join(dir, "tasks/note.txt"), "x", "utf8");
@@ -403,7 +429,7 @@ describe("init --dry-run", () => {
 
 /** Acknowledge one generated doc as the sanctioned baseline (adopt --ack effect). */
 function ackDoc(dir: string, dest: string): void {
-  const statePath = join(dir, "tasks", ".convention.yml");
+  const statePath = join(dir, "ArggonManager", ".convention.yml");
   const state = readGeneratedState(dir);
   state[dest] = { ...state[dest]!, acknowledged: true };
   writeFileSync(statePath, updateGeneratedSection(readFileSync(statePath, "utf8"), state), "utf8");
@@ -583,7 +609,9 @@ describe("init --propose", () => {
     const content = readFileSync(proposalFile, "utf8");
     // Distinguishing header ABOVE the standard generated marker.
     expect(content).toContain(`arggon:proposed-update dest="AGENTS.md" version="${version}"`);
-    expect(content.indexOf("arggon:proposed-update")).toBeLessThan(content.indexOf("arggon:generated"));
+    expect(content.indexOf("arggon:proposed-update")).toBeLessThan(
+      content.indexOf("arggon:generated"),
+    );
     expect(content).toContain("arggon adopt --ack");
     expect(p.removed).toBeGreaterThan(0);
     expect(p.added).toBeGreaterThanOrEqual(0);
@@ -591,7 +619,9 @@ describe("init --propose", () => {
     expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(`${original}\nadopter edit\n`);
     // x-generated state NOT mutated, and only the side file changed on disk.
     const after = snapshot(dir);
-    expect(after.files["tasks/.convention.yml"]).toBe(before.files["tasks/.convention.yml"]);
+    expect(after.files["ArggonManager/.convention.yml"]).toBe(
+      before.files["ArggonManager/.convention.yml"],
+    );
     const proposalKey = `AGENTS.md.proposed-${version}`;
     expect(Object.keys(after.files)).toContain(proposalKey);
     delete (after.files as Record<string, string>)[proposalKey];
@@ -611,7 +641,11 @@ describe("init --propose", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-propose-"));
     runInit({ dir, force: false, full: true, now: NOW });
     writeFileSync(join(dir, "ARCHITECTURE.md"), "CUSTOM\n", "utf8");
-    writeFileSync(join(dir, "CLAUDE.md"), `${readFileSync(join(dir, "CLAUDE.md"), "utf8")}\nx\n`, "utf8");
+    writeFileSync(
+      join(dir, "CLAUDE.md"),
+      `${readFileSync(join(dir, "CLAUDE.md"), "utf8")}\nx\n`,
+      "utf8",
+    );
 
     const tier1 = runInit({ dir, force: false, propose: true, now: NOW });
     expect((tier1.proposals ?? []).map((p) => p.dest)).toContain("CLAUDE.md");
@@ -662,10 +696,14 @@ describe("init --propose", () => {
     const result = runInit({ dir, force: false, propose: true, now: NOW });
     const stale = (result.proposals ?? []).filter((p) => p.decision === "stale");
     expect(stale.map((p) => p.proposalPath)).toContain("AGENTS.md.proposed-0.1.0");
-    expect(stale.find((p) => p.proposalPath === "AGENTS.md.proposed-0.1.0")?.basedOnVersion).toBe("0.1.0");
+    expect(stale.find((p) => p.proposalPath === "AGENTS.md.proposed-0.1.0")?.basedOnVersion).toBe(
+      "0.1.0",
+    );
     expect(readFileSync(join(dir, "AGENTS.md.proposed-0.1.0"), "utf8")).toBe("OLD PROPOSAL\n");
     // And the current-version proposal is still written alongside.
-    expect((result.proposals ?? []).some((p) => p.decision === "proposed" && p.dest === "AGENTS.md")).toBe(true);
+    expect(
+      (result.proposals ?? []).some((p) => p.decision === "proposed" && p.dest === "AGENTS.md"),
+    ).toBe(true);
   });
 
   it("dry-run + propose lists would-write/would-remove and writes NOTHING", () => {
@@ -686,7 +724,9 @@ describe("init --propose", () => {
     expect(() => runInit({ dir, force: false, propose: true, backup: true })).toThrow(/--backup/);
     expect(() => runInit({ dir, force: true, propose: true })).toThrow(/--force/);
     expect(() => runInit({ dir, force: false, propose: true })).toThrow(/arggon init` first/);
-    expect(() => dryRunInit({ dir, force: false, propose: true, backup: true })).toThrow(/--backup/);
+    expect(() => dryRunInit({ dir, force: false, propose: true, backup: true })).toThrow(
+      /--backup/,
+    );
   });
 
   it("e2e: init --propose --json carries the additive proposals[] shape; human output lists proposals; --propose --backup fails", () => {
@@ -731,10 +771,14 @@ describe("init --propose", () => {
     expect(human.stdout).toMatch(/proposed/);
     expect(human.stdout).toMatch(/adopt --ack/);
 
-    const combo = spawnSync(process.execPath, [tsx, cli, "init", "--propose", "--backup", "--json", dir], {
-      encoding: "utf8",
-      cwd: dir,
-    });
+    const combo = spawnSync(
+      process.execPath,
+      [tsx, cli, "init", "--propose", "--backup", "--json", dir],
+      {
+        encoding: "utf8",
+        cwd: dir,
+      },
+    );
     expect(combo.status).not.toBe(0);
     const comboBody = JSON.parse(combo.stdout) as { ok: boolean; error?: { message?: string } };
     expect(comboBody.ok).toBe(false);
@@ -766,7 +810,9 @@ function snapshot(dir: string): { head: string | null; files: Record<string, str
   return { head, files };
 }
 
-/** Minimal git repo with a committer identity so auto-commits can land. */function gitInit(dir: string): void {
+/** Minimal git repo with a committer identity so auto-commits can land. */ function gitInit(
+  dir: string,
+): void {
   execFileSync("git", ["init", "-q"], { cwd: dir, stdio: "pipe" });
   execFileSync("git", ["config", "user.email", "test@example.com"], { cwd: dir, stdio: "pipe" });
   execFileSync("git", ["config", "user.name", "Test"], { cwd: dir, stdio: "pipe" });

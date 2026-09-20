@@ -1,9 +1,24 @@
-import { existsSync, mkdtempSync as _mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { parseFrontmatter } from "./frontmatter.js";
-import { type GhExecutor, ghIssueListJson, importedBody, mapIssueState, normalizeGhLabels, resolveImportType, runImportIssues } from "./import-issues.js";
+import {
+  type GhExecutor,
+  ghIssueListJson,
+  importedBody,
+  mapIssueState,
+  normalizeGhLabels,
+  resolveImportType,
+  runImportIssues,
+} from "./import-issues.js";
 import { runCreate } from "./create.js";
 import { runInit } from "./init.js";
 import { runList } from "./list.js";
@@ -80,7 +95,7 @@ function treeFiles(dir: string): string[] {
       out.push(full);
     }
   };
-  walk(join(dir, "tasks"));
+  walk(join(dir, "ArggonManager"));
   return out.sort();
 }
 
@@ -115,12 +130,22 @@ describe("runImportIssues", () => {
       },
     ]);
 
-    const storyPath = join(dir, "tasks/launch-mvp/backlog/story-imported-issues/story-imported-issues.md");
-    expect(fm(storyPath)).toMatchObject({ type: "story", id: "story-imported-issues", parent: "backlog" });
+    const storyPath = join(
+      dir,
+      "ArggonManager/launch-mvp/backlog/story-imported-issues/story-imported-issues.md",
+    );
+    expect(fm(storyPath)).toMatchObject({
+      type: "story",
+      id: "story-imported-issues",
+      parent: "backlog",
+    });
 
     // Issue 1 carries the `bug` label: built-in default mapping imports it
     // as a bug leaf, still under the same parent story.
-    const openPath = join(dir, "tasks/launch-mvp/backlog/story-imported-issues/bug-issue-1.md");
+    const openPath = join(
+      dir,
+      "ArggonManager/launch-mvp/backlog/story-imported-issues/bug-issue-1.md",
+    );
     expect(fm(openPath)).toMatchObject({
       type: "bug",
       id: "bug-issue-1",
@@ -129,7 +154,10 @@ describe("runImportIssues", () => {
       title: "issue #1: Fix login",
     });
 
-    const closedPath = join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-2.md");
+    const closedPath = join(
+      dir,
+      "ArggonManager/launch-mvp/backlog/story-imported-issues/task-issue-2.md",
+    );
     expect(fm(closedPath)).toMatchObject({ type: "task", id: "task-issue-2", status: "done" });
     // The temporary import claimant never persists on the closed item.
     expect(fm(closedPath).assignee).toBeUndefined();
@@ -147,9 +175,15 @@ describe("runImportIssues", () => {
 
     // The number lands in the additive `issue` frontmatter field, open and
     // closed issues alike, so `start --open-pr` can emit `Closes #N`.
-    const openPath = join(dir, "tasks/launch-mvp/backlog/story-imported-issues/bug-issue-1.md");
+    const openPath = join(
+      dir,
+      "ArggonManager/launch-mvp/backlog/story-imported-issues/bug-issue-1.md",
+    );
     expect(fm(openPath).issue).toBe(1);
-    const closedPath = join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-2.md");
+    const closedPath = join(
+      dir,
+      "ArggonManager/launch-mvp/backlog/story-imported-issues/task-issue-2.md",
+    );
     expect(fm(closedPath).issue).toBe(2);
 
     // The field is contract-visible and convention-clean (no UNKNOWN_KEY warning).
@@ -167,14 +201,14 @@ describe("runImportIssues", () => {
     runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW });
 
     const raw = readFileSync(
-      join(dir, "tasks/launch-mvp/backlog/story-imported-issues/bug-issue-1.md"),
+      join(dir, "ArggonManager/launch-mvp/backlog/story-imported-issues/bug-issue-1.md"),
       "utf8",
     );
     expect(raw).toContain("Login fails on empty password.");
     expect(raw).toContain("> imported from issue #1");
 
     const closed = readFileSync(
-      join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-2.md"),
+      join(dir, "ArggonManager/launch-mvp/backlog/story-imported-issues/task-issue-2.md"),
       "utf8",
     );
     expect(closed).toContain("> imported from issue #2");
@@ -201,26 +235,47 @@ describe("runImportIssues", () => {
     const execGh = ghIssueListMock(JSON.stringify(FIXTURE_ISSUES));
     const before = treeFiles(dir);
 
-    const result = runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, dryRun: true, now: NOW });
+    const result = runImportIssues({
+      cwd: dir,
+      execGh: execGh as unknown as GhExecutor,
+      dryRun: true,
+      now: NOW,
+    });
 
     expect(result.dryRun).toBe(true);
     expect(result.created).toBe(2);
     expect(result.entries.map((e) => e.action)).toEqual(["would-create", "would-create"]);
     expect(result.story).toEqual({ id: "story-imported-issues", created: false });
-    expect(existsSync(join(dir, "tasks/launch-mvp/backlog/story-imported-issues"))).toBe(false);
+    expect(existsSync(join(dir, "ArggonManager/launch-mvp/backlog/story-imported-issues"))).toBe(
+      false,
+    );
     expect(treeFiles(dir)).toEqual(before);
   });
 
   it("honors --parent instead of creating the default story", () => {
     const dir = primed();
-    runCreate({ cwd: dir, type: "story", title: "Import", parent: "backlog", id: "story-import", now: NOW });
+    runCreate({
+      cwd: dir,
+      type: "story",
+      title: "Import",
+      parent: "backlog",
+      id: "story-import",
+      now: NOW,
+    });
     const execGh = ghIssueListMock(JSON.stringify(FIXTURE_ISSUES));
 
-    const result = runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, parent: "story-import", now: NOW });
+    const result = runImportIssues({
+      cwd: dir,
+      execGh: execGh as unknown as GhExecutor,
+      parent: "story-import",
+      now: NOW,
+    });
 
     expect(result.story).toEqual({ id: "story-import", created: false });
-    expect(existsSync(join(dir, "tasks/launch-mvp/backlog/story-imported-issues"))).toBe(false);
-    const taskPath = join(dir, "tasks/launch-mvp/backlog/story-import/bug-issue-1.md");
+    expect(existsSync(join(dir, "ArggonManager/launch-mvp/backlog/story-imported-issues"))).toBe(
+      false,
+    );
+    const taskPath = join(dir, "ArggonManager/launch-mvp/backlog/story-import/bug-issue-1.md");
     expect(fm(taskPath)).toMatchObject({ id: "bug-issue-1", parent: "story-import" });
   });
 
@@ -242,7 +297,8 @@ describe("runImportIssues", () => {
     expect(result.labelsMapped).toBe(1);
     expect(result.labelsSkipped).toBe(2);
     expect(
-      fm(join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-7.md")).labels,
+      fm(join(dir, "ArggonManager/launch-mvp/backlog/story-imported-issues/task-issue-7.md"))
+        .labels,
     ).toEqual(["bug-report"]);
   });
 
@@ -250,30 +306,40 @@ describe("runImportIssues", () => {
     const dir = primed(false); // initiative only
     const execGh = ghIssueListMock(JSON.stringify(FIXTURE_ISSUES));
 
-    expect(() => runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW })).toThrow(
-      /no epic found under tasks\/.*--parent <story-id>/s,
-    );
+    expect(() =>
+      runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW }),
+    ).toThrow(/no epic found in the tracker.*--parent <story-id>/s);
   });
 
   it("rejects a --parent that does not resolve or is not a story", () => {
     const dir = primed();
     const execGh = ghIssueListMock(JSON.stringify(FIXTURE_ISSUES));
 
-    expect(() => runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, parent: "story-nope", now: NOW })).toThrow(
-      /--parent 'story-nope' does not resolve/,
-    );
-    expect(() => runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, parent: "backlog", now: NOW })).toThrow(
-      /is a epic, not a story/,
-    );
+    expect(() =>
+      runImportIssues({
+        cwd: dir,
+        execGh: execGh as unknown as GhExecutor,
+        parent: "story-nope",
+        now: NOW,
+      }),
+    ).toThrow(/--parent 'story-nope' does not resolve/);
+    expect(() =>
+      runImportIssues({
+        cwd: dir,
+        execGh: execGh as unknown as GhExecutor,
+        parent: "backlog",
+        now: NOW,
+      }),
+    ).toThrow(/is a epic, not a story/);
   });
 
   it("rejects a malformed --repo slug before calling gh", () => {
     const dir = primed();
     const execGh = ghIssueListMock(JSON.stringify(FIXTURE_ISSUES));
 
-    expect(() => runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, repo: "foo", now: NOW })).toThrow(
-      /Invalid --repo "foo": expected "owner\/name"/,
-    );
+    expect(() =>
+      runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, repo: "foo", now: NOW }),
+    ).toThrow(/Invalid --repo "foo": expected "owner\/name"/);
     expect(execGh).not.toHaveBeenCalled();
   });
 
@@ -281,9 +347,9 @@ describe("runImportIssues", () => {
     const dir = primed();
     const execGh = ghIssueListMock(null);
 
-    expect(() => runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW })).toThrow(
-      /gh issue list failed \(gh auth expired; check `gh auth status`\)/,
-    );
+    expect(() =>
+      runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW }),
+    ).toThrow(/gh issue list failed \(gh auth expired; check `gh auth status`\)/);
   });
 });
 
@@ -293,7 +359,7 @@ describe("import type mapping (task-import-type-mapping)", () => {
   }
 
   function writeConvention(dir: string, content: string): void {
-    writeFileSync(join(dir, "tasks/.convention.yml"), content, "utf8");
+    writeFileSync(join(dir, "ArggonManager/.convention.yml"), content, "utf8");
   }
 
   it("imports the bug label as a bug under the same story (built-in default)", () => {
@@ -303,7 +369,7 @@ describe("import type mapping (task-import-type-mapping)", () => {
     const result = runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW });
 
     expect(result.entries[0]!.id).toBe("bug-issue-5");
-    const path = join(dir, "tasks/launch-mvp/backlog/story-imported-issues/bug-issue-5.md");
+    const path = join(dir, "ArggonManager/launch-mvp/backlog/story-imported-issues/bug-issue-5.md");
     expect(fm(path)).toMatchObject({
       type: "bug",
       id: "bug-issue-5",
@@ -325,24 +391,27 @@ describe("import type mapping (task-import-type-mapping)", () => {
 
     expect(result.entries.map((e) => e.id)).toEqual(["task-issue-6", "task-issue-7"]);
     expect(
-      fm(join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-6.md")).type,
+      fm(join(dir, "ArggonManager/launch-mvp/backlog/story-imported-issues/task-issue-6.md")).type,
     ).toBe("task");
     expect(
-      fm(join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-7.md")).type,
+      fm(join(dir, "ArggonManager/launch-mvp/backlog/story-imported-issues/task-issue-7.md")).type,
     ).toBe("task");
   });
 
   it("first mapped label in issue order wins (bug + documentation -> bug)", () => {
     const dir = primed();
     const execGh = ghIssueListMock(
-      JSON.stringify([issueWithLabels(8, ["documentation", "bug"]), issueWithLabels(9, ["bug", "enhancement"])]),
+      JSON.stringify([
+        issueWithLabels(8, ["documentation", "bug"]),
+        issueWithLabels(9, ["bug", "enhancement"]),
+      ]),
     );
 
     const result = runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW });
 
     expect(result.entries.map((e) => e.id)).toEqual(["bug-issue-8", "bug-issue-9"]);
     expect(
-      fm(join(dir, "tasks/launch-mvp/backlog/story-imported-issues/bug-issue-8.md")).type,
+      fm(join(dir, "ArggonManager/launch-mvp/backlog/story-imported-issues/bug-issue-8.md")).type,
     ).toBe("bug");
   });
 
@@ -354,7 +423,7 @@ describe("import type mapping (task-import-type-mapping)", () => {
 
     expect(result.entries[0]!.id).toBe("task-issue-10");
     expect(
-      fm(join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-10.md")).type,
+      fm(join(dir, "ArggonManager/launch-mvp/backlog/story-imported-issues/task-issue-10.md")).type,
     ).toBe("task");
   });
 
@@ -367,7 +436,7 @@ describe("import type mapping (task-import-type-mapping)", () => {
 
     expect(result.entries[0]!.id).toBe("task-issue-11");
     expect(
-      fm(join(dir, "tasks/launch-mvp/backlog/story-imported-issues/task-issue-11.md")).type,
+      fm(join(dir, "ArggonManager/launch-mvp/backlog/story-imported-issues/task-issue-11.md")).type,
     ).toBe("task");
   });
 
@@ -378,9 +447,9 @@ describe("import type mapping (task-import-type-mapping)", () => {
 
     // Config errors precede any gh call (IMPORT_FAILED with the explanation
     // that stories are containers and imports are leaves under one story).
-    expect(() => runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW })).toThrow(
-      /x-import\.label-types maps 'feature' to 'story'.*'task' or 'bug'/s,
-    );
+    expect(() =>
+      runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW }),
+    ).toThrow(/x-import\.label-types maps 'feature' to 'story'.*'task' or 'bug'/s);
     expect(execGh).not.toHaveBeenCalled();
   });
 
@@ -389,9 +458,9 @@ describe("import type mapping (task-import-type-mapping)", () => {
     writeConvention(dir, "x-import: 42\n");
     const execGh = ghIssueListMock(JSON.stringify([issueWithLabels(13, [])]));
 
-    expect(() => runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW })).toThrow(
-      /'x-import' must be a mapping/,
-    );
+    expect(() =>
+      runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW }),
+    ).toThrow(/'x-import' must be a mapping/);
   });
 
   it("rejects label-types values that are not work-item types", () => {
@@ -399,16 +468,18 @@ describe("import type mapping (task-import-type-mapping)", () => {
     writeConvention(dir, "x-import:\n  label-types:\n    bug: canoe\n");
     const execGh = ghIssueListMock(JSON.stringify([issueWithLabels(14, ["bug"])]));
 
-    expect(() => runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW })).toThrow(
-      /'label-types' values must be work-item types/,
-    );
+    expect(() =>
+      runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW }),
+    ).toThrow(/'label-types' values must be work-item types/);
   });
 });
 
 describe("resolveImportType", () => {
   it("first mapping hit in label order wins; unmapped labels default to task", () => {
     expect(resolveImportType(["documentation", "bug"], { bug: "bug" })).toBe("bug");
-    expect(resolveImportType(["bug", "enhancement"], { bug: "bug", enhancement: "task" })).toBe("bug");
+    expect(resolveImportType(["bug", "enhancement"], { bug: "bug", enhancement: "task" })).toBe(
+      "bug",
+    );
     expect(resolveImportType(["enhancement"], { bug: "bug" })).toBe("task");
     expect(resolveImportType([], {})).toBe("task");
   });
@@ -475,9 +546,9 @@ describe("mapIssueState", () => {
 
 describe("importedBody", () => {
   it("keeps the issue body and appends the provenance line", () => {
-    expect(importedBody({ number: 3, title: "T", state: "OPEN", body: "Line one.\r\nLine two." })).toBe(
-      "Line one.\nLine two.\n> imported from issue #3\n",
-    );
+    expect(
+      importedBody({ number: 3, title: "T", state: "OPEN", body: "Line one.\r\nLine two." }),
+    ).toBe("Line one.\nLine two.\n> imported from issue #3\n");
     expect(importedBody({ number: 4, title: "T", state: "OPEN", body: null })).toBe(
       "> imported from issue #4\n",
     );

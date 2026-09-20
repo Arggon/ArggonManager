@@ -143,7 +143,7 @@ describe("runNext", () => {
 
   it("throws outside a tasks/ tree", () => {
     const root = mkdtempSync(join(tmpdir(), "arggon-next-naked-"));
-    expect(() => runNext({ cwd: root })).toThrow(/No tasks\/ convention/);
+    expect(() => runNext({ cwd: root })).toThrow(/No ArggonManager\/ convention/);
   });
 
   it("returns null when only unclaimed stories are ready (default pool)", () => {

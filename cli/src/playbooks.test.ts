@@ -115,7 +115,7 @@ describe("stack explore", () => {
   it("fails on a non-repo with an actionable error", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-explore-bare-"));
     expect(() => runStackExplore({ cwd: dir, topic: "anything" })).toThrow(
-      /No tasks\/ convention found\. Run `arggon init` first\./,
+      /No ArggonManager\/ convention found.*Run `arggon init` first/,
     );
   });
 });
@@ -287,7 +287,7 @@ describe("playbook status", () => {
     const dir = makeRepo();
     writePlaybook(dir, "stale-tech", { playbook_id: "stale-tech", version: "2.1", researched: "2026-06-01" });
     expect(() => runPlaybookStatus({ cwd: dir, fileTask: "story-nope", now: NOW })).toThrow(
-      /parent 'story-nope' not found under tasks\//,
+      /parent 'story-nope' not found under the tracker/,
     );
   });
 });

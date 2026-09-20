@@ -113,7 +113,7 @@ describe("runReport", () => {
 
   it("throws outside a tasks/ tree", () => {
     const root = mkdtempSync(join(tmpdir(), "arggon-report-naked-"));
-    expect(() => runReport({ cwd: root })).toThrow(/No tasks\/ convention/);
+    expect(() => runReport({ cwd: root })).toThrow(/No ArggonManager\/ convention/);
   });
 });
 

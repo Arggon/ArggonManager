@@ -105,7 +105,7 @@ function initSyncTree(): { dir: string; env: Record<string, string>; setPrs: (pr
 
 /** Path of <id>.md under tasks/ (leaves sit directly in their story's directory). */
 function itemPath(dir: string, id: string): string {
-  return join(dir, "tasks", "init1", "epic1", "story1", `${id}.md`);
+  return join(dir, "ArggonManager", "init1", "epic1", "story1", `${id}.md`);
 }
 
 function frontmatter(dir: string, id: string): Record<string, unknown> {

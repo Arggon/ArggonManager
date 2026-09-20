@@ -13,11 +13,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  readConventionConfig,
-  updateGeneratedSection,
-  type GeneratedEntry,
-} from "./convention.js";
+import { readConventionConfig, updateGeneratedSection, type GeneratedEntry } from "./convention.js";
 import { GENERATED_DOC_COUNT, OPENCODE_CONFIG_CANDIDATES } from "./docs.js";
 import {
   formatDoctorReport,
@@ -61,8 +57,18 @@ describe("doctor: non-initialized repos", () => {
     expect(result.initialized).toBe(false);
     expect(result.root).toBeNull();
     expect(result.conventionVersion).toBe(0);
-    expect(result.docs).toEqual({ managed: 0, untouched: 0, modified: 0, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0, outdated: 0, outdatedDocs: [] });
-    expect(result.tracker).toEqual({ items: 0, todo: 0 });
+    expect(result.docs).toEqual({
+      managed: 0,
+      untouched: 0,
+      modified: 0,
+      acknowledged: 0,
+      acknowledgedDrifted: 0,
+      stale: 0,
+      missing: 0,
+      outdated: 0,
+      outdatedDocs: [],
+    });
+    expect(result.tracker).toEqual({ dir: null, layout: null, items: 0, todo: 0 });
     expect(formatDoctorReport(result)).toContain("not initialized");
   });
 
@@ -92,9 +98,24 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     const result = runDoctor({ cwd: dir });
     expect(result.initialized).toBe(true);
     expect(result.root).toBe(dir);
-    expect(result.conventionVersion).toBe(4);
-    expect(result.docs).toEqual({ managed: GENERATED_DOC_COUNT, untouched: GENERATED_DOC_COUNT, modified: 0, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0, outdated: 0, outdatedDocs: [] });
-    expect(result.tracker).toEqual({ items: 0, todo: 0 });
+    expect(result.conventionVersion).toBe(5);
+    expect(result.docs).toEqual({
+      managed: GENERATED_DOC_COUNT,
+      untouched: GENERATED_DOC_COUNT,
+      modified: 0,
+      acknowledged: 0,
+      acknowledgedDrifted: 0,
+      stale: 0,
+      missing: 0,
+      outdated: 0,
+      outdatedDocs: [],
+    });
+    expect(result.tracker).toEqual({
+      dir: "ArggonManager",
+      layout: "arggon-manager",
+      items: 0,
+      todo: 0,
+    });
   });
 
   it("counts an adopter-edited doc as modified", () => {
@@ -116,7 +137,17 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     runInit({ dir, force: false, full: true, backup: true });
     expect(existsSync(join(dir, "backup"))).toBe(true);
     const result = runDoctor({ cwd: dir });
-    expect(result.docs).toEqual({ managed: GENERATED_DOC_COUNT, untouched: GENERATED_DOC_COUNT, modified: 0, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0, outdated: 0, outdatedDocs: [] });
+    expect(result.docs).toEqual({
+      managed: GENERATED_DOC_COUNT,
+      untouched: GENERATED_DOC_COUNT,
+      modified: 0,
+      acknowledged: 0,
+      acknowledgedDrifted: 0,
+      stale: 0,
+      missing: 0,
+      outdated: 0,
+      outdatedDocs: [],
+    });
   });
 
   it("counts a deleted managed doc as missing", () => {
@@ -131,7 +162,7 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
   it("counts state entries whose template no longer exists as stale", () => {
     const dir = tempDir();
     runInit({ dir, force: false, full: true });
-    const yml = join(dir, "tasks/.convention.yml");
+    const yml = join(dir, "ArggonManager/.convention.yml");
     const stale: GeneratedEntry = {
       template: "docs/gone.md",
       checksum: "sha256:deadbeef",
@@ -142,12 +173,12 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
       yml,
       updateGeneratedSection(readFileSync(yml, "utf8"), {
         ...readConventionConfig(dir).generated,
-        "docs/legacy.md": stale,
+        "ArggonManager/docs/legacy.md": stale,
       }),
       "utf8",
     );
     // The orphaned file still exists on disk — only its template is gone.
-    writeFileSync(join(dir, "docs/legacy.md"), "old generated content\n", "utf8");
+    writeFileSync(join(dir, "ArggonManager/docs/legacy.md"), "old generated content\n", "utf8");
     const result = runDoctor({ cwd: dir });
     expect(result.docs.managed).toBe(GENERATED_DOC_COUNT + 1); // current + 1 stale legacy entry
     expect(result.docs.stale).toBe(1);
@@ -229,7 +260,9 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
     expect(report).not.toContain("\nspoof");
     expect(report).not.toContain("\u0085");
     expect(report).not.toContain("\u2028");
-    expect(report).toContain(`at ${join(tmpdir(), "arggon-doctor-evil\\u001b\\nspoof\\u0085\\u2028-")}`);
+    expect(report).toContain(
+      `at ${join(tmpdir(), "arggon-doctor-evil\\u001b\\nspoof\\u0085\\u2028-")}`,
+    );
   });
 
   it("exposes the initialized payload via the CLI --json (exit 0, report-only)", () => {
@@ -245,25 +278,46 @@ describe("doctor: initialized repos (task-doctor-command)", () => {
       command: string;
       initialized: boolean;
       root: string;
-      docs: { managed: number; untouched: number; modified: number; stale: number; missing: number };
+      docs: {
+        managed: number;
+        untouched: number;
+        modified: number;
+        stale: number;
+        missing: number;
+      };
       tracker: { items: number; todo: number };
     };
     expect(body.ok).toBe(true);
     expect(body.schemaVersion).toBe(1);
-    expect(body.conventionVersion).toBe(4);
+    expect(body.conventionVersion).toBe(5);
     expect(body.command).toBe("doctor");
     expect(body.initialized).toBe(true);
     expect(body.root).toBe(dir);
-    expect(body.docs).toEqual({ managed: GENERATED_DOC_COUNT, untouched: GENERATED_DOC_COUNT - 1, modified: 1, acknowledged: 0, acknowledgedDrifted: 0, stale: 0, missing: 0, outdated: 1, outdatedDocs: ["CONTRIBUTING.md"] });
-    expect(body.tracker).toEqual({ items: 0, todo: 0 });
+    expect(body.docs).toEqual({
+      managed: GENERATED_DOC_COUNT,
+      untouched: GENERATED_DOC_COUNT - 1,
+      modified: 1,
+      acknowledged: 0,
+      acknowledgedDrifted: 0,
+      stale: 0,
+      missing: 0,
+      outdated: 1,
+      outdatedDocs: ["CONTRIBUTING.md"],
+    });
+    expect(body.tracker).toEqual({
+      dir: "ArggonManager",
+      layout: "arggon-manager",
+      items: 0,
+      todo: 0,
+    });
   });
 
   it("never writes anything (report-only)", () => {
     const dir = tempDir();
     runInit({ dir, force: false, full: true });
-    const before = readFileSync(join(dir, "tasks/.convention.yml"), "utf8");
+    const before = readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8");
     runDoctor({ cwd: dir });
-    expect(readFileSync(join(dir, "tasks/.convention.yml"), "utf8")).toBe(before);
+    expect(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8")).toBe(before);
   });
 });
 
@@ -292,7 +346,9 @@ describe("doctor: git section (bug-init-git-doctor-blindspot)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
     execFileSync("git", ["init", "-q"], { cwd: dir });
-    execFileSync("git", ["remote", "add", "origin", "git@github.com:example/example.git"], { cwd: dir });
+    execFileSync("git", ["remote", "add", "origin", "git@github.com:example/example.git"], {
+      cwd: dir,
+    });
     const result = runDoctor({ cwd: dir });
     expect(result.git.remote).toBe("git@github.com:example/example.git");
   });
@@ -343,7 +399,9 @@ describe("doctor: git section (bug-init-git-doctor-blindspot)", () => {
     runInit({ dir, force: false });
     execFileSync("git", ["init", "-q"], { cwd: dir });
     execFileSync("git", ["add", "--", "."], { cwd: dir });
-    execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init"], { cwd: dir });
+    execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init"], {
+      cwd: dir,
+    });
     const result = runDoctor({ cwd: dir });
     expect(result.git).toEqual({ isRepo: true, dirty: false, remote: null });
   });
@@ -553,10 +611,10 @@ describe("doctor: outdated bucket (task-doctor-outdated-bucket)", () => {
     runInit({ dir, force: false, full: true });
     const templates = fixtureTemplates();
     writeFileSync(join(templates, "docs/AGENTS.md"), "UPSTREAM IMPROVEMENT\n", "utf8");
-    const before = readFileSync(join(dir, "tasks/.convention.yml"), "utf8");
+    const before = readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8");
     const agentsBefore = readFileSync(join(dir, "AGENTS.md"), "utf8");
     runDoctor({ cwd: dir, templatesRoot: templates });
-    expect(readFileSync(join(dir, "tasks/.convention.yml"), "utf8")).toBe(before);
+    expect(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8")).toBe(before);
     expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(agentsBefore);
   });
 });
@@ -603,8 +661,8 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
    * assuming a fresh init leaves it empty.
    */
   function bareTree(dir: string): void {
-    mkdirSync(join(dir, "tasks"), { recursive: true });
-    writeFileSync(join(dir, "tasks/.convention.yml"), "version: 4\n", "utf8");
+    mkdirSync(join(dir, "ArggonManager"), { recursive: true });
+    writeFileSync(join(dir, "ArggonManager/.convention.yml"), "version: 5\n", "utf8");
   }
 
   /** Adopter-owned config: drop any generated seam config first so `configs` is exact. */
@@ -624,7 +682,18 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     expect(result.opencode.artifacts).toEqual({
       config: true,
       agents: ["arggon-coordinator", "arggon-reviewer", "arggon-worker"],
-      commands: ["arggon-adr", "arggon-done", "arggon-explore", "arggon-handoff", "arggon-next", "arggon-playbook", "arggon-review", "arggon-spec", "arggon-start", "arggon-status"],
+      commands: [
+        "arggon-adr",
+        "arggon-done",
+        "arggon-explore",
+        "arggon-handoff",
+        "arggon-next",
+        "arggon-playbook",
+        "arggon-review",
+        "arggon-spec",
+        "arggon-start",
+        "arggon-status",
+      ],
       skills: ["arggon-cli", "arggon-upgrade"],
       truncated: false,
     });
@@ -854,7 +923,13 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     const result = runDoctor({ cwd: dir });
     expect(result.initialized).toBe(true);
     expect(result.opencode.configs).toEqual([]);
-    expect(result.opencode.artifacts).toEqual({ config: false, agents: [], commands: [], skills: [], truncated: false });
+    expect(result.opencode.artifacts).toEqual({
+      config: false,
+      agents: [],
+      commands: [],
+      skills: [],
+      truncated: false,
+    });
     expect(result.opencode.mcp).toEqual({ native: false, mcpJson: false, hint: null });
     const report = formatDoctorReport(result);
     expect(report).toContain("MCP not registered");
@@ -866,7 +941,11 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     runInit({ dir, force: false });
     mkdirSync(join(dir, ".opencode", "agents"), { recursive: true });
     for (let i = 0; i < MAX_OPENCODE_NAMES + 3; i++) {
-      writeFileSync(join(dir, ".opencode", "agents", `agent-${String(i).padStart(3, "0")}.md`), "", "utf8");
+      writeFileSync(
+        join(dir, ".opencode", "agents", `agent-${String(i).padStart(3, "0")}.md`),
+        "",
+        "utf8",
+      );
     }
     const manyServers: Record<string, unknown> = {};
     for (let i = 0; i < MAX_OPENCODE_V1_KEYS_PER_FILE + 4; i++) {
@@ -899,7 +978,9 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     mkdirSync(join(dir, ".opencode"), { recursive: true });
     writeFileSync(
       join(dir, ".opencode", "opencode.json"),
-      JSON.stringify({ mcp: { servers: { arggon: { type: "local", command: ["arggon", "mcp"] } } } }),
+      JSON.stringify({
+        mcp: { servers: { arggon: { type: "local", command: ["arggon", "mcp"] } } },
+      }),
       "utf8",
     );
     const result = runDoctor({ cwd: dir });
@@ -924,11 +1005,17 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
 
   it("probes the cwd on non-initialized trees (block still additive)", () => {
     const dir = tempDir();
-    writeFileSync(join(dir, "opencode.json"), JSON.stringify({ mcp: { legacy: {} }, tools: {} }), "utf8");
+    writeFileSync(
+      join(dir, "opencode.json"),
+      JSON.stringify({ mcp: { legacy: {} }, tools: {} }),
+      "utf8",
+    );
     const result = runDoctor({ cwd: dir });
     expect(result.initialized).toBe(false);
     expect(result.opencode.configs).toEqual(["opencode.json"]);
-    expect(result.opencode.v1.findings).toEqual([{ file: "opencode.json", keys: ["mcp.legacy", "tools"] }]);
+    expect(result.opencode.v1.findings).toEqual([
+      { file: "opencode.json", keys: ["mcp.legacy", "tools"] },
+    ]);
     const report = formatDoctorReport(result);
     expect(report).toContain("not initialized");
     expect(report).toContain("opencode: config opencode.json");
@@ -947,7 +1034,13 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
       opencode: {
         configs: string[];
         v1: { findings: unknown[]; truncated: boolean };
-        artifacts: { config: boolean; agents: string[]; commands: string[]; skills: string[]; truncated: boolean };
+        artifacts: {
+          config: boolean;
+          agents: string[];
+          commands: string[];
+          skills: string[];
+          truncated: boolean;
+        };
         mcp: { native: boolean; mcpJson: boolean; hint: string | null };
       };
     };

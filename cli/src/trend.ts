@@ -62,22 +62,14 @@ export function runTrend(opts: RunTrendOptions): TrendResult {
   const sinceMs = parseSince(opts.since);
   const tasksDir = findTasksDir(opts.cwd);
   const root = repoRootFromTasks(tasksDir);
-  const relTasks = "tasks";
+  const relTasks = relative(root, tasksDir).split(sep).join("/");
 
   const execGit = opts.execGit ?? defaultExecGit;
   let out: string;
   try {
     out = execGit(
       "git",
-      [
-        "log",
-        "-p",
-        "--no-color",
-        "--no-ext-diff",
-        "--format=%x1e%H%x1f%cI",
-        "--",
-        relTasks,
-      ],
+      ["log", "-p", "--no-color", "--no-ext-diff", "--format=%x1e%H%x1f%cI", "--", relTasks],
       { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
     );
   } catch (err) {

@@ -120,7 +120,7 @@ export function runCreate(opts: CreateOptions): CreateResult {
   if (opts.parent) {
     parentItem = byId.get(opts.parent);
     if (!parentItem) {
-      throw new Error(`parent '${opts.parent}' not found under tasks/`);
+      throw new Error(`parent '${opts.parent}' not found under the tracker`);
     }
     assertParentEdge(type, parentItem.type);
   }

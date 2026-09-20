@@ -140,7 +140,7 @@ describe("update", () => {
     );
     // unchanged on disk
     expect(
-      fm(join(dir, "tasks/launch-mvp/auth/story-login/task-rate-limit.md")).data.assignee,
+      fm(join(dir, "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md")).data.assignee,
     ).toBe("alice");
   });
 

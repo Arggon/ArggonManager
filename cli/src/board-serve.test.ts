@@ -128,7 +128,7 @@ describe("board --serve", () => {
     })();
 
     // Touch a work item file: the watcher must notice and broadcast.
-    const bugPath = join(dir, "tasks/launch-mvp/auth/story-login/task-bug-b.md");
+    const bugPath = join(dir, "ArggonManager/launch-mvp/auth/story-login/task-bug-b.md");
     mkdirSync(join(bugPath, ".."), { recursive: true });
     writeFileSync(
       bugPath,
@@ -163,7 +163,7 @@ describe("board --serve review surface (task-board-review-surface)", () => {
   }
 
   function writeBranchedTask(dir: string): void {
-    const taskMd = join(dir, "tasks/launch-mvp/auth/story-login/task-br.md");
+    const taskMd = join(dir, "ArggonManager/launch-mvp/auth/story-login/task-br.md");
     mkdirSync(join(taskMd, ".."), { recursive: true });
     writeFileSync(
       taskMd,

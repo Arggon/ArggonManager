@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { runCreate } from "./create.js";
 import { parseFrontmatter, stringifyFrontmatter } from "./frontmatter.js";
 import { runInit } from "./init.js";
+import { conventionPathForRoot } from "./paths.js";
 import { runUpdate } from "./update.js";
 
 // task-issue-roundtrip: done flips close the linked GitHub issue — opt-in via
@@ -82,9 +83,8 @@ function withGithubOrigin(dir: string, slug = "octocat/hello-world"): void {
 }
 
 function enableRoundtrip(dir: string, enabled: boolean): void {
-  const tasksDir = join(dir, "tasks");
-  mkdirSync(tasksDir, { recursive: true });
-  const path = join(tasksDir, ".convention.yml");
+  const path = conventionPathForRoot(dir);
+  mkdirSync(dirname(path), { recursive: true });
   let raw = "";
   try {
     raw = readFileSync(path, "utf8");

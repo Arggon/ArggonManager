@@ -1,6 +1,6 @@
 ---
 name: arggon-upgrade
-description: Update the ArggonManager-generated docs and bundled skills in this repo when ArggonManager ships a new version. Use when `arggon doctor` reports `outdated` docs, when ArggonManager's CHANGELOG shows a release newer than the version in `tasks/.convention.yml`, or when the user asks to update/upgrade/sync ArggonManager here.
+description: Update the ArggonManager-generated docs and bundled skills in this repo when ArggonManager ships a new version. Use when `arggon doctor` reports `outdated` docs, when ArggonManager's CHANGELOG shows a release newer than the version in `ArggonManager/.convention.yml`, or when the user asks to update/upgrade/sync ArggonManager here.
 version: 1.0.0
 author: Arggon (Arggon), Hermes Agent
 license: MIT
@@ -11,7 +11,7 @@ platforms: [linux, macos, windows]
 
 This repo was initialized by `arggon init`: its governing docs and bundled
 skills are **generated artifacts with provenance** (checksums recorded in
-`tasks/.convention.yml` under `x-generated:`). When ArggonManager releases a
+`ArggonManager/.convention.yml` under `x-generated:`). When ArggonManager releases a
 new version, its templates and this bundled skill move ahead of your copies.
 This skill is the safe update flow — mechanical steps plus explicit judgment
 calls. It was proven on the first real adopter upgrade (ArggonStores-am,
@@ -19,7 +19,7 @@ calls. It was proven on the first real adopter upgrade (ArggonStores-am,
 
 ## What you are updating
 
-Generated docs (AGENTS.md, docs/convention.md, docs/engineering.md, …), the
+Generated docs (AGENTS.md, ArggonManager/docs/convention.md, ArggonManager/docs/engineering.md, …), the
 bundled skills under `.agents/skills/`, and tracked templates. **Never** your
 own curated content: docs you completed and acked (`arggon adopt --ack`) are
 yours — updates arrive as *proposals you judge*, not overwrites.

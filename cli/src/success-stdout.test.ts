@@ -107,13 +107,13 @@ function initTree(): string {
 }
 
 function taskPath(dir: string): string {
-  return join(dir, "tasks", "launch-mvp", "auth", "story-login", "task-rate-limit.md");
+  return join(dir, "ArggonManager", "launch-mvp", "auth", "story-login", "task-rate-limit.md");
 }
 
 describe("success stdout: update", () => {
   it("renders a hostile movedFrom path inert on the reparent line", () => {
     const dir = initTree();
-    const hostilePath = join(dir, "tasks", "launch-mvp", "auth", "story-login", `${HOSTILE}.md`);
+    const hostilePath = join(dir, "ArggonManager", "launch-mvp", "auth", "story-login", `${HOSTILE}.md`);
     renameSync(taskPath(dir), hostilePath);
 
     const proc = runCli(
@@ -129,7 +129,7 @@ describe("success stdout: update", () => {
 
     const newPath = join(
       dir,
-      "tasks",
+      "ArggonManager",
       "launch-mvp",
       "onboarding",
       "story-handbook",
@@ -139,15 +139,15 @@ describe("success stdout: update", () => {
     expect(lines[0]).toBe("arggon update: task task-rate-limit (parent)");
     expect(lines[1]).toBe(`  ${newPath}`);
     expect(lines[2]).toBe(
-      `  moved from: ${join(dir, "tasks", "launch-mvp", "auth", "story-login", `${HOSTILE_ESCAPED}.md`)}`,
+      `  moved from: ${join(dir, "ArggonManager", "launch-mvp", "auth", "story-login", `${HOSTILE_ESCAPED}.md`)}`,
     );
-    expect(lines[3]).toBe("  no-commit: tasks dirty state kept");
+    expect(lines[3]).toBe("  no-commit: tracker dirty state kept");
     expect(lines[4]).toBe("");
   });
 
   it("keeps movedFrom raw in the --json envelope", () => {
     const dir = initTree();
-    const hostilePath = join(dir, "tasks", "launch-mvp", "auth", "story-login", `${HOSTILE}.md`);
+    const hostilePath = join(dir, "ArggonManager", "launch-mvp", "auth", "story-login", `${HOSTILE}.md`);
     renameSync(taskPath(dir), hostilePath);
 
     const proc = runCli(
@@ -185,7 +185,7 @@ describe("success stdout: update", () => {
     expect(proc.stdout).not.toContain("\nspoof");
 
     const newId = `story-${HOSTILE_SCALAR}`;
-    const newPath = join(dir, "tasks", "launch-mvp", "auth", newId, `${newId}.md`);
+    const newPath = join(dir, "ArggonManager", "launch-mvp", "auth", newId, `${newId}.md`);
     const lines = proc.stdout.split("\n");
     expect(lines[0]).toBe(
       `arggon update: story ${newId.replace(HOSTILE_SCALAR, HOSTILE_SCALAR_ESCAPED)} (type, parent, id)`,
@@ -197,7 +197,7 @@ describe("success stdout: update", () => {
     expect(lines[3]).toBe(
       `  renamed from id: ${hostileId.replace(HOSTILE_SCALAR, HOSTILE_SCALAR_ESCAPED)}`,
     );
-    expect(lines[4]).toBe("  no-commit: tasks dirty state kept");
+    expect(lines[4]).toBe("  no-commit: tracker dirty state kept");
     expect(lines[5]).toBe("");
   });
 
@@ -233,7 +233,7 @@ describe("success stdout: update", () => {
     expect(proc.status).toBe(0);
     const newPath = join(
       dir,
-      "tasks",
+      "ArggonManager",
       "launch-mvp",
       "onboarding",
       "story-handbook",
@@ -243,7 +243,7 @@ describe("success stdout: update", () => {
       "arggon update: task task-rate-limit (parent)\n" +
         `  ${newPath}\n` +
         `  moved from: ${taskPath(dir)}\n` +
-        "  no-commit: tasks dirty state kept\n",
+        "  no-commit: tracker dirty state kept\n",
     );
     expect(proc.stderr).toBe("");
   });
@@ -256,7 +256,7 @@ describe("success stdout: other commands keep repo values inert", () => {
     // line-oriented) must not leak controls through the next suggestion.
     const title = `Fake title ${HOSTILE_SCALAR}`;
     writeFileSync(
-      join(dir, "tasks", "launch-mvp", "auth", "story-login", "task-evil.md"),
+      join(dir, "ArggonManager", "launch-mvp", "auth", "story-login", "task-evil.md"),
       "---\n" +
         "type: task\n" +
         "status: todo\n" +
@@ -290,7 +290,7 @@ describe("success stdout: other commands keep repo values inert", () => {
     const dir = initTree();
     const title = 'Fix "quoted" \\ thing';
     writeFileSync(
-      join(dir, "tasks", "launch-mvp", "auth", "story-login", "task-quotes.md"),
+      join(dir, "ArggonManager", "launch-mvp", "auth", "story-login", "task-quotes.md"),
       "---\n" +
         "type: task\n" +
         "status: todo\n" +
@@ -333,11 +333,11 @@ describe("success stdout: other commands keep repo values inert", () => {
       dir,
     );
     expect(proc.status).toBe(0);
-    const path = join(dir, "tasks", "launch-mvp", "auth", "story-login", "task-plain-work.md");
+    const path = join(dir, "ArggonManager", "launch-mvp", "auth", "story-login", "task-plain-work.md");
     expect(proc.stdout).toBe(
       "arggon create: task task-plain-work\n" +
         `  ${path}\n` +
-        "  no-commit: tasks dirty state kept\n",
+        "  no-commit: tracker dirty state kept\n",
     );
   });
 });

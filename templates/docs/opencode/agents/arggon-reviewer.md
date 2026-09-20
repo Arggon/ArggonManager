@@ -28,7 +28,7 @@ files; read, run tests and inspect freely.
 
 - Read the item first (`arggon_show`), including its acceptance checklist and the
   comments the worker left; then the diff and the affected code.
-- Judge against `docs/engineering.md`: architecture and boundaries, project
+- Judge against `ArggonManager/docs/engineering.md`: architecture and boundaries, project
   conventions, tests that travel with behavior, docs that travel with code,
   scope stays on the item, and the **blocking smoke test** — probe evidence for
   CLI changes, real-browser drive for UI changes. Green CI is necessary, not

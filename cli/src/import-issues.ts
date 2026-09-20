@@ -253,7 +253,7 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
         throw new Error(
           `x-import.label-types maps '${label}' to '${mapped}' — imported issues are leaves ` +
             "under the target story, so mapped types may only be 'task' or 'bug' " +
-            "(stories are containers); fix tasks/.convention.yml",
+            "(stories are containers); fix the tracker .convention.yml",
         );
       }
       labelTypes[label] = mapped;
@@ -276,7 +276,7 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
     const parent = byId.get(opts.parent);
     if (!parent) {
       throw new Error(
-        `--parent '${opts.parent}' does not resolve to an existing item under tasks/`,
+        `--parent '${opts.parent}' does not resolve to an existing item in the tracker`,
       );
     }
     if (parent.type !== "story") {
@@ -299,7 +299,7 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
     if (epics.length === 0) {
       throw new Error(
-        "no epic found under tasks/ — imported tasks need a parent story (stories live under an epic). " +
+        "no epic found in the tracker — imported tasks need a parent story (stories live under an epic). " +
           "Create one with `arggon create epic <title> --parent <initiative-id>` or pass --parent <story-id>",
       );
     }

@@ -8,7 +8,7 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, type Dirent } from "node:fs";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { readConventionConfig, readConventionVersion } from "./convention.js";
 import {
   checksumMatches,
@@ -20,7 +20,7 @@ import {
 } from "./docs.js";
 import { loadItems } from "./items.js";
 import { measureBudget, formatBudgetLines, type BudgetResult } from "./measure.js";
-import { findTasksDir, repoRootFromTasks, bundledTemplatesDir } from "./paths.js";
+import { findTrackerLocation, bundledTemplatesDir, type TrackerLayout } from "./paths.js";
 import { sanitizeHumanText, sanitizeHumanValue } from "./sanitize.js";
 
 // The sanitizer implementation moved to sanitize.ts (bug-cli-error-output-injection
@@ -272,7 +272,10 @@ function listMarkdownNames(absDir: string): NameList {
     .filter((entry) => entry.isFile() && entry.name.endsWith(".md"))
     .map((entry) => entry.name.slice(0, -".md".length))
     .sort();
-  return { names: names.slice(0, MAX_OPENCODE_NAMES), truncated: names.length > MAX_OPENCODE_NAMES };
+  return {
+    names: names.slice(0, MAX_OPENCODE_NAMES),
+    truncated: names.length > MAX_OPENCODE_NAMES,
+  };
 }
 
 /** Sorted directory names in a fixed directory, capped. Never recurses, never throws. */
@@ -287,7 +290,10 @@ function listDirNames(absDir: string): NameList {
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
     .sort();
-  return { names: names.slice(0, MAX_OPENCODE_NAMES), truncated: names.length > MAX_OPENCODE_NAMES };
+  return {
+    names: names.slice(0, MAX_OPENCODE_NAMES),
+    truncated: names.length > MAX_OPENCODE_NAMES,
+  };
 }
 
 /**
@@ -328,8 +334,11 @@ export function detectOpenCode(root: string): DoctorOpenCode {
   const skills = listDirNames(join(root, ".agents", "skills"));
   const mcpJsonConfig = readJsonObject(join(root, ".mcp.json"));
   const mcpServers =
-    mcpJsonConfig && isJsonObject(mcpJsonConfig["mcpServers"]) ? mcpJsonConfig["mcpServers"] : undefined;
-  const mcpJson = mcpServers !== undefined && Object.prototype.hasOwnProperty.call(mcpServers, "arggon");
+    mcpJsonConfig && isJsonObject(mcpJsonConfig["mcpServers"])
+      ? mcpJsonConfig["mcpServers"]
+      : undefined;
+  const mcpJson =
+    mcpServers !== undefined && Object.prototype.hasOwnProperty.call(mcpServers, "arggon");
 
   return {
     configs,
@@ -366,7 +375,11 @@ export type DoctorResult = {
   projectName: string | null;
   docs: DoctorDocs;
   tracker: {
-    /** Total work items under tasks/. */
+    /** Tracker dir relative to the repo root: `ArggonManager` (v5) or `tasks` (legacy); null when not initialized. */
+    dir: string | null;
+    /** Detected tracker layout (ADR 0012, additive); null when not initialized. */
+    layout: TrackerLayout | null;
+    /** Total work items under the tracker root. */
     items: number;
     /** Items with status todo. */
     todo: number;
@@ -408,7 +421,10 @@ function gitProbe(args: string[], cwd: string): { ok: boolean; out: string } {
   try {
     return {
       ok: true,
-      out: String(execFileSync("git", args, { cwd, stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" }) ?? ""),
+      out: String(
+        execFileSync("git", args, { cwd, stdio: ["ignore", "pipe", "pipe"], encoding: "utf8" }) ??
+          "",
+      ),
     };
   } catch {
     return { ok: false, out: "" };
@@ -420,7 +436,10 @@ export function gitState(cwd: string): DoctorGit {
   if (!gitProbe(["rev-parse", "--git-dir"], cwd).ok) return { ...NOT_A_REPO };
   const dirty = gitProbe(["status", "--porcelain"], cwd).out.trim().length > 0;
   let remote: string | null = null;
-  const remotes = gitProbe(["remote"], cwd).out.split("\n").map((l) => l.trim()).filter(Boolean);
+  const remotes = gitProbe(["remote"], cwd)
+    .out.split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
   const pick = remotes.includes("origin") ? "origin" : remotes[0];
   if (pick) {
     const url = gitProbe(["remote", "get-url", pick], cwd).out.trim();
@@ -436,7 +455,10 @@ export function gitState(cwd: string): DoctorGit {
  * (cli.ts doctor action) attaches the result to the DoctorResult before
  * formatting, so runDoctor itself stays synchronous for its other callers.
  */
-export async function measureBudgetForDoctor(): Promise<{ budget?: BudgetResult; budgetError?: string }> {
+export async function measureBudgetForDoctor(): Promise<{
+  budget?: BudgetResult;
+  budgetError?: string;
+}> {
   try {
     return { budget: await measureBudget() };
   } catch (err) {
@@ -456,9 +478,12 @@ export function runDoctor(opts: {
 }): DoctorResult {
   let tasksDir: string;
   let root: string;
+  let layout: TrackerLayout;
   try {
-    tasksDir = findTasksDir(opts.cwd);
-    root = repoRootFromTasks(tasksDir);
+    const location = findTrackerLocation(opts.cwd);
+    tasksDir = location.dir;
+    root = location.repoRoot;
+    layout = location.layout;
   } catch {
     // Missing tree: a normal report, not a failure (task-doctor-command).
     // Budget, when requested, is attached by the caller (measureBudgetForDoctor).
@@ -468,7 +493,7 @@ export function runDoctor(opts: {
       conventionVersion: 0,
       projectName: null,
       docs: { ...ZERO_DOCS },
-      tracker: { items: 0, todo: 0 },
+      tracker: { dir: null, layout: null, items: 0, todo: 0 },
       git: gitState(opts.cwd),
       // No tasks/ tree, so cwd is the best root for the OpenCode probe — the
       // same directory gitState probes (task-opencode-v2-doctor).
@@ -485,7 +510,9 @@ export function runDoctor(opts: {
     recorded: config.generatedProjectName,
   });
   const templatesDir = opts.templatesRoot ?? bundledTemplatesDir();
-  const currentTemplates = new Set(currentGeneratedTemplatesFrom(templatesDir).map((t) => t.template));
+  const currentTemplates = new Set(
+    currentGeneratedTemplatesFrom(templatesDir).map((t) => t.template),
+  );
 
   let untouched = 0;
   let modified = 0;
@@ -580,6 +607,8 @@ export function runDoctor(opts: {
       outdatedDocs: outdatedDocs.sort(),
     },
     tracker: {
+      dir: relative(root, tasksDir).split(sep).join("/"),
+      layout,
       items: items.length,
       todo: items.filter((item) => item.status === "todo").length,
     },
@@ -618,14 +647,20 @@ function hasOpenCodeSignal(opencode: DoctorOpenCode): boolean {
  */
 function formatOpenCodeLines(opencode: DoctorOpenCode): string[] {
   const seam =
-    (opencode.artifacts.config ? 1 : 0) + opencode.artifacts.agents.length + opencode.artifacts.commands.length;
+    (opencode.artifacts.config ? 1 : 0) +
+    opencode.artifacts.agents.length +
+    opencode.artifacts.commands.length;
   const parts = [
     opencode.configs.length > 0 ? `config ${opencode.configs.join(", ")}` : "no config",
     seam > 0 ? `seam ${seam} artifact(s)` : "no seam artifacts",
     opencode.artifacts.skills.length > 0
       ? `${opencode.artifacts.skills.length} bundled skill(s)`
       : "no bundled skills",
-    opencode.mcp.native ? "MCP native" : opencode.mcp.mcpJson ? "MCP only in .mcp.json" : "MCP not registered",
+    opencode.mcp.native
+      ? "MCP native"
+      : opencode.mcp.mcpJson
+        ? "MCP only in .mcp.json"
+        : "MCP not registered",
   ];
   const lines = [`  opencode: ${parts.join(", ")}`];
   if (opencode.v1.findings.length > 0) {
@@ -644,7 +679,9 @@ function formatOpenCodeLines(opencode: DoctorOpenCode): string[] {
 /** Human-readable report (never writes; pairs with the doctor --json payload). */
 export function formatDoctorReport(result: DoctorResult): string {
   if (!result.initialized) {
-    const lines = ["arggon doctor: not initialized (no tasks/.convention.yml found) — run `arggon init`"];
+    const lines = [
+      "arggon doctor: not initialized (no tracker .convention.yml found — ArggonManager/ or legacy tasks/) — run `arggon init`",
+    ];
     if (hasOpenCodeSignal(result.opencode)) lines.push(...formatOpenCodeLines(result.opencode));
     if (result.budget) lines.push(...formatBudgetLines(result.budget));
     return `${lines.join("\n")}\n`;
@@ -656,7 +693,12 @@ export function formatDoctorReport(result: DoctorResult): string {
       `${result.docs.acknowledgedDrifted} acknowledgedDrifted, ` +
       `${result.docs.stale} stale, ${result.docs.missing} missing, ` +
       `${result.docs.outdated} outdated`,
-    `  tracker: ${result.tracker.items} item(s), ${result.tracker.todo} todo`,
+    `  tracker: ${result.tracker.items} item(s), ${result.tracker.todo} todo (layout: ${result.tracker.dir ?? "none"})`,
+    ...(result.tracker.layout === "legacy"
+      ? [
+          "  hint: legacy tasks/ layout detected — run `arggon migrate --layout` to move the tracker (and docs) to ArggonManager/",
+        ]
+      : []),
     `  git: ${formatGitLine(result.git)}`,
     ...formatOpenCodeLines(result.opencode),
   ];

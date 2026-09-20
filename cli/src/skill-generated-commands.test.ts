@@ -91,7 +91,7 @@ describe("generated SKILL command reference (task-skill-generated-command-refere
 
   it("renders region lines from the live .description() strings (sanity on the generator itself)", () => {
     const rendered = renderRegion(loadCliCommands(), "list,next");
-    expect(rendered).toContain("arggon list  # List work items under tasks/");
+    expect(rendered).toContain("arggon list  # List work items under the tracker root");
     expect(rendered).toMatch(/arggon next  # Suggest the next claimable leaf item/);
   });
 });

@@ -1,8 +1,22 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
 import { createHash } from "node:crypto";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { writeFileAtomic } from "./atomic.js";
-import { bundledTemplatesDir, packageRoot } from "./paths.js";
+import {
+  bundledTemplatesDir,
+  conventionPathForLayout,
+  packageRoot,
+  trackerAt,
+  TRACKER_DIR_NAME,
+  type TrackerLayout,
+} from "./paths.js";
 import {
   parseGeneratedProjectName,
   readGeneratedProjectName,
@@ -71,6 +85,13 @@ export type GenerateDocsOptions = {
   backup?: boolean;
   /** Injection point for tests: generation timestamp (defaults to now). */
   now?: Date;
+  /**
+   * Tracker layout the docs are generated for (ADR 0012): v5 trees get the
+   * docs under `ArggonManager/docs/`, legacy `tasks/` trees keep them at
+   * `<root>/docs/`. Defaults to the layout detected at `root` (v5 when the
+   * tree is not initialized yet — a fresh init scaffolds the v5 layout).
+   */
+  layout?: TrackerLayout;
   /**
    * Provenance-state override (task-init-dry-run-plan): what init's forced
    * re-scaffold would carry over into tasks/.convention.yml. When set, the
@@ -210,13 +231,18 @@ function bundledSourcePath(templatesDir: string, source: string): string {
   return resolve(templatesDir, "..", ...source.split("/"));
 }
 
-/** Template-relative path → destination-relative path. Unlisted paths map 1:1. */
+/**
+ * Template-relative path → destination-relative path, CANONICAL v5 form
+ * (ADR 0012: product docs live under `<tracker>/docs/`). Unlisted paths map
+ * 1:1; `mapTemplateDest` remaps the `ArggonManager/docs/...` destinations back
+ * to `<root>/docs/...` for legacy trees.
+ */
 const DOC_PATH_MAP: Record<string, string> = {
   editorconfig: ".editorconfig",
   "github/copilot-instructions.md": ".github/copilot-instructions.md",
   "github/CODEOWNERS": ".github/CODEOWNERS",
   "github/PULL_REQUEST_TEMPLATE.md": ".github/PULL_REQUEST_TEMPLATE.md",
-  "tracking.md": "docs/tracking.md",
+  "tracking.md": `${TRACKER_DIR_NAME}/docs/tracking.md`,
   "mcp-json": ".mcp.json",
 };
 
@@ -229,14 +255,29 @@ const DOC_PREFIX_MAP: { prefix: string; dest: string }[] = [
   { prefix: "opencode/", dest: ".opencode/" },
 ];
 
-/** Resolve a template-relative path to its destination (explicit map, then prefix map, then 1:1). */
-function mapTemplateDest(rel: string): string {
+/** Canonical (v5) destination of a template-relative path. */
+function canonicalTemplateDest(rel: string): string {
   const explicit = DOC_PATH_MAP[rel];
   if (explicit !== undefined) return explicit;
   for (const { prefix, dest } of DOC_PREFIX_MAP) {
     if (rel.startsWith(prefix)) return `${dest}${rel.slice(prefix.length)}`;
   }
+  // `templates/docs/docs/**` mirrors the product-docs tree: the canonical
+  // destination nests it under the tracker root (`ArggonManager/docs/**`).
+  if (rel.startsWith("docs/")) return `${TRACKER_DIR_NAME}/${rel}`;
   return rel;
+}
+
+/** Legacy-layout destination of a canonical destination (`ArggonManager/docs/x` → `docs/x`). */
+function legacyTemplateDest(dest: string): string {
+  const prefix = `${TRACKER_DIR_NAME}/`;
+  return dest.startsWith(prefix) ? dest.slice(prefix.length) : dest;
+}
+
+/** Resolve a template-relative path to its layout-specific destination. */
+function mapTemplateDest(rel: string, layout: TrackerLayout): string {
+  const canonical = canonicalTemplateDest(rel);
+  return layout === "legacy" ? legacyTemplateDest(canonical) : canonical;
 }
 
 /** Destination of the generated OpenCode config seam (conditional generation). */
@@ -271,7 +312,11 @@ function isFrontmatterDestination(dest: string): boolean {
  * Markdown artifacts, `//` line comment for TypeScript destinations, nothing
  * for JSON/JSONC destinations.
  */
-export function stampGeneratedContent(dest: string, markerTemplate: string, content: string): string {
+export function stampGeneratedContent(
+  dest: string,
+  markerTemplate: string,
+  content: string,
+): string {
   if (isJsonDestination(dest)) return content;
   if (isTypeScriptDestination(dest)) {
     return `// arggon:generated template="${markerTemplate}"\n${content}`;
@@ -309,9 +354,7 @@ function isArggonGeneratedConfig(root: string, rel: string): boolean {
   if (rel !== OPENCODE_CONFIG_DEST) return false;
   try {
     const content = readFileSync(join(root, ...rel.split("/")), "utf8");
-    const leadingComment = content
-      .split(/\r?\n/)
-      .find((line) => line.trimStart().startsWith("//"));
+    const leadingComment = content.split(/\r?\n/).find((line) => line.trimStart().startsWith("//"));
     return leadingComment !== undefined && leadingComment.includes(OPENCODE_CONFIG_SIGNATURE);
   } catch {
     return false;
@@ -356,15 +399,15 @@ export function findOpenCodeConfig(root: string): string | null {
   return null;
 }
 
-/** Destination-relative paths of the tier-2 set (generated only with `full`). */
+/** Canonical (v5) destination-relative paths of the tier-2 set (generated only with `full`). */
 export const TIER2_DESTS = new Set([
   "ARCHITECTURE.md",
   "CHANGELOG.md",
   "SUPPORT.md",
-  "docs/convention.md",
-  "docs/engineering.md",
-  "docs/runbooks/README.md",
-  "docs/deploy.md",
+  `${TRACKER_DIR_NAME}/docs/convention.md`,
+  `${TRACKER_DIR_NAME}/docs/engineering.md`,
+  `${TRACKER_DIR_NAME}/docs/runbooks/README.md`,
+  `${TRACKER_DIR_NAME}/docs/deploy.md`,
 ]);
 
 /** Visible provenance marker written as the first line of every generated file. */
@@ -417,17 +460,15 @@ export function normalizeEol(text: string): string {
 export function checksumMatches(checksum: string, content: string): boolean {
   if (checksum === checksumOf(content)) return true;
   const lf = normalizeEol(content);
-  return (
-    checksum === checksumOf(lf) || checksum === checksumOf(lf.replaceAll("\n", "\r\n"))
-  );
+  return checksum === checksumOf(lf) || checksum === checksumOf(lf.replaceAll("\n", "\r\n"));
 }
 
 /** ArggonManager version recorded in `x-generated` entries (package.json). */
 export function arggonVersion(): string {
   try {
-    const pkg = JSON.parse(
-      readFileSync(resolve(packageRoot(), "package.json"), "utf8"),
-    ) as { version?: unknown };
+    const pkg = JSON.parse(readFileSync(resolve(packageRoot(), "package.json"), "utf8")) as {
+      version?: unknown;
+    };
     return typeof pkg.version === "string" && pkg.version !== "" ? pkg.version : "0.0.0";
   } catch {
     return "0.0.0";
@@ -478,10 +519,7 @@ export function renderDocPlaceholders(
  * normalization, projectName recovery (and with it propose/doctor's
  * name-bearing comparisons) goes inert on those trees.
  */
-export function extractProjectNameFromContent(
-  rawTemplate: string,
-  rawDisk: string,
-): string | null {
+export function extractProjectNameFromContent(rawTemplate: string, rawDisk: string): string | null {
   const templateRaw = normalizeEol(rawTemplate);
   const disk = normalizeEol(rawDisk);
   const placeholder = "{{PROJECT_NAME}}";
@@ -540,6 +578,9 @@ export function resolveProjectName(
   },
 ): ProjectNameResolution {
   if (opts.recorded) return { name: opts.recorded, source: "recorded" };
+  // Layout (ADR 0012): current-template destinations follow the tree's tracker
+  // layout so the on-disk probes below hit the right docs dir.
+  const layout = trackerAt(root)?.layout ?? "arggon-manager";
   // Marker prefix of any arggon-generated doc: content WITHOUT it is
   // adopter-owned, never generated — it must not count as prior generation
   // (a fresh scaffold may legitimately have an adopter AGENTS.md on disk).
@@ -551,12 +592,12 @@ export function resolveProjectName(
   // hand-migrated and marker-bearing docs with no state entry).
   const dests = new Set<string>([
     ...Object.keys(opts.entries),
-    ...currentGeneratedTemplates().map((t) => t.dest),
+    ...currentGeneratedTemplates({ layout }).map((t) => t.dest),
   ]);
   for (const dest of [...dests].sort()) {
     const templateRel =
       opts.entries[dest]?.template ??
-      currentGeneratedTemplates().find((t) => t.dest === dest)?.template;
+      currentGeneratedTemplates({ layout }).find((t) => t.dest === dest)?.template;
     if (templateRel === undefined) continue;
     try {
       const templatePath = isBundledSource(templateRel)
@@ -589,8 +630,10 @@ export function resolveProjectName(
  * destination path → source template (package-root relative). Doctor uses the
  * template ids to flag stale `x-generated` entries.
  */
-export function currentGeneratedTemplates(): { dest: string; template: string }[] {
-  return currentGeneratedTemplatesFrom(bundledTemplatesDir());
+export function currentGeneratedTemplates(opts?: {
+  layout?: TrackerLayout;
+}): { dest: string; template: string }[] {
+  return currentGeneratedTemplatesFrom(bundledTemplatesDir(), opts?.layout);
 }
 
 /**
@@ -599,13 +642,18 @@ export function currentGeneratedTemplates(): { dest: string; template: string }[
  * copy of `templates/` to simulate upstream template movement). The layout
  * must mirror the package root: `<templatesDir>/docs/**` plus the bundled
  * sources at `<templatesDir>/../skills/...` and `<templatesDir>/../opencode/...`.
+ * `layout` selects the destination form (canonical v5 by default, legacy
+ * `<root>/docs/...` when explicitly requested).
  */
-export function currentGeneratedTemplatesFrom(templatesDir: string): { dest: string; template: string }[] {
+export function currentGeneratedTemplatesFrom(
+  templatesDir: string,
+  layout: TrackerLayout = "arggon-manager",
+): { dest: string; template: string }[] {
   const docsSrc = resolve(templatesDir, "docs");
   const found: { dest: string; template: string }[] = [];
   if (existsSync(docsSrc)) {
     for (const rel of walkTemplates(docsSrc)) {
-      found.push({ dest: mapTemplateDest(rel), template: `docs/${rel}` });
+      found.push({ dest: mapTemplateDest(rel, layout), template: `docs/${rel}` });
     }
   }
   // Bundled sources are current destinations even when the render source is
@@ -708,7 +756,10 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
   const now = opts.now ?? new Date();
   const version = arggonVersion();
   const generatedAt = now.toISOString();
-  const statePath = join(opts.root, "tasks", ".convention.yml");
+  // Layout (ADR 0012): explicit caller choice (init picks the tree's layout),
+  // else detected at root, else the v5 default for fresh scaffolds.
+  const layout: TrackerLayout = opts.layout ?? trackerAt(opts.root)?.layout ?? "arggon-manager";
+  const statePath = conventionPathForLayout(opts.root, layout);
   const hasStateFile = opts.rawState !== undefined || existsSync(statePath);
   const prevState = opts.prev ?? (hasStateFile ? readGeneratedState(opts.root) : {});
   const nextState: Record<string, GeneratedEntry> = { ...prevState };
@@ -842,8 +893,10 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
   };
 
   for (const rel of walkTemplates(docsSrc)) {
-    const dest = mapTemplateDest(rel);
-    if (!opts.full && TIER2_DESTS.has(dest)) continue;
+    // Tier membership is checked on the canonical destination so legacy trees
+    // gate the same set; the written destination follows the tree's layout.
+    if (!opts.full && TIER2_DESTS.has(canonicalTemplateDest(rel))) continue;
+    const dest = mapTemplateDest(rel, layout);
     // Conditional config seam (opencode-seam-010): never write an OpenCode
     // config over an adopter's existing one — report the skip with the path
     // that was detected so `init` stays transparent. findOpenCodeConfig
@@ -866,8 +919,13 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
     }
     const raw = readFileSync(join(docsSrc, ...rel.split("/")), "utf8");
     entries.push(
-      decide(dest, rel, `docs/${rel}`, () => renderDocPlaceholders(raw, vars),
-        raw.includes("{{PROJECT_NAME}}")),
+      decide(
+        dest,
+        rel,
+        `docs/${rel}`,
+        () => renderDocPlaceholders(raw, vars),
+        raw.includes("{{PROJECT_NAME}}"),
+      ),
     );
   }
 
@@ -878,8 +936,13 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
     if (!existsSync(bundled.src)) continue;
     const bundledRaw = readFileSync(bundled.src, "utf8");
     entries.push(
-      decide(bundled.dest, bundled.source, bundled.source, () => bundledRaw,
-        bundledRaw.includes("{{PROJECT_NAME}}")),
+      decide(
+        bundled.dest,
+        bundled.source,
+        bundled.source,
+        () => bundledRaw,
+        bundledRaw.includes("{{PROJECT_NAME}}"),
+      ),
     );
   }
   // Missing bundle source (e.g. stripped packaging): skip silently — docs
@@ -888,7 +951,7 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
   // Template removed from the bundle: the `x-generated` entry is orphaned
   // (doctor reports the same destinations as `stale`). Informational only —
   // a real run leaves the entry exactly as it is.
-  const generatedDests = new Set(currentGeneratedTemplates().map((t) => t.dest));
+  const generatedDests = new Set(currentGeneratedTemplates({ layout }).map((t) => t.dest));
   for (const dest of Object.keys(prevState)) {
     if (!generatedDests.has(dest)) {
       entries.push({
@@ -903,13 +966,22 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
   for (const e of applied) nextState[e.dest] = e.entry!;
   const plan: DocsPlan = {
     entries: entries.sort((a, b) => a.dest.localeCompare(b.dest)),
-    created: applied.filter((e) => e.decision === "created").map((e) => e.dest).sort(),
-    updated: applied.filter((e) => e.decision === "updated").map((e) => e.dest).sort(),
+    created: applied
+      .filter((e) => e.decision === "created")
+      .map((e) => e.dest)
+      .sort(),
+    updated: applied
+      .filter((e) => e.decision === "updated")
+      .map((e) => e.dest)
+      .sort(),
     modified: entries
       .filter((e) => e.decision === "modified-skip" || e.decision === "modified-backup")
       .map((e) => e.dest)
       .sort(),
-    backedUp: applied.filter((e) => e.decision === "modified-backup").map((e) => e.dest).sort(),
+    backedUp: applied
+      .filter((e) => e.decision === "modified-backup")
+      .map((e) => e.dest)
+      .sort(),
     skipped: entries
       .filter(
         (e) =>

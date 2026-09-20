@@ -9,14 +9,14 @@ or building filters.
 - Failure (with `--json`): `{ok: false, error: {message, code}}` + non-zero exit.
 - Human output (no `--json`) is for eyes only — never parse it; re-run with `--json`.
 - Error codes: `INIT_FAILED, CREATE_FAILED, LIST_FAILED, UPDATE_FAILED, VALIDATE_FAILED,
-  BRANCH_FAILED, START_FAILED, BOARD_FAILED, SYNC_FAILED, NEXT_FAILED, REPORT_FAILED,
-  TREND_FAILED, DOCTOR_FAILED, ADOPT_FAILED, SPEC_FAILED, INSTRUCTIONS_FAILED,
-  EXPLORE_FAILED, PLAYBOOK_FAILED, COMMENT_FAILED, IMPORT_FAILED, CLEANUP_FAILED,
-  PRIORITY_FAILED`.
+BRANCH_FAILED, START_FAILED, BOARD_FAILED, SYNC_FAILED, NEXT_FAILED, REPORT_FAILED,
+TREND_FAILED, DOCTOR_FAILED, ADOPT_FAILED, SPEC_FAILED, INSTRUCTIONS_FAILED,
+EXPLORE_FAILED, PLAYBOOK_FAILED, COMMENT_FAILED, IMPORT_FAILED, CLEANUP_FAILED,
+PRIORITY_FAILED`.
 - `WorkItem.path` is posix relative to the repo root. Run inside the repo tree —
   outside it every command fails fast (`LIST_FAILED` etc.).
 - `conventionVersion` rides every envelope (v4 current; v0–v3 rules live in
-  `docs/convention.md`).
+  `ArggonManager/docs/convention.md`).
 
 ## Filters and queries
 
@@ -35,7 +35,7 @@ or building filters.
 
 ## Views and reports
 
-- `board` without `--out` writes `board.html` at the repo root (where `tasks/`
+- `board` without `--out` writes `board.html` at the repo root (where the tracker
   lives). `--tui` needs an interactive terminal; `--serve` binds 127.0.0.1 only
   and is incompatible with `--github`/`--tui`. `--serve --json` emits the standard
   envelope once (`serving: true` plus `url` and `port`) and then keeps serving.

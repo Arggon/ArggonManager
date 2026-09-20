@@ -1,6 +1,6 @@
 # AGENTS.md
 
-For humans and AI agents working on **{{PROJECT_NAME}}**. Work items live in-tree under `tasks/`, managed by `arggon`; GitHub is for PRs only — never open GitHub issues.
+For humans and AI agents working on **{{PROJECT_NAME}}**. Work items live in-tree under `ArggonManager/`, managed by `arggon`; GitHub is for PRs only — never open GitHub issues.
 
 > **Use the `arggon-cli` skill by default** (`.agents/skills/arggon-cli/SKILL.md`) before any `arggon` call: `--json` contract, claim rules, pitfalls. MCP server: `.mcp.json`.
 
@@ -18,4 +18,4 @@ Delegated by default: a coordinator assigns each item to a subagent (one per wor
 
 ## Docs & gates
 
-Read before non-trivial changes: [`docs/convention.md`](docs/convention.md), [`docs/engineering.md`](docs/engineering.md), [`docs/deploy.md`](docs/deploy.md), `docs/playbooks/` (`arggon playbook status`), [`CONTRIBUTING.md`](CONTRIBUTING.md). Keep `arggon validate` green before every commit and in CI.
+Read before non-trivial changes: [`ArggonManager/docs/convention.md`](ArggonManager/docs/convention.md), [`ArggonManager/docs/engineering.md`](ArggonManager/docs/engineering.md), [`ArggonManager/docs/deploy.md`](ArggonManager/docs/deploy.md), `ArggonManager/docs/playbooks/` (`arggon playbook status`), [`CONTRIBUTING.md`](CONTRIBUTING.md). Keep `arggon validate` green before every commit and in CI.

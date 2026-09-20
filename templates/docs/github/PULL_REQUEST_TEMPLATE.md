@@ -1,6 +1,6 @@
 <!--
   Pull request template for {{PROJECT_NAME}}.
-  Work items live under tasks/ — reference the item id (e.g. task-<slug>) below.
+  Work items live under ArggonManager/ — reference the item id (e.g. task-<slug>) below.
 -->
 
 ## Summary

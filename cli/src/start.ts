@@ -1,18 +1,16 @@
 import { execFileSync, spawnSync } from "node:child_process";
-import {
-  existsSync,
-  lstatSync,
-  readlinkSync,
-  rmdirSync,
-  symlinkSync,
-  unlinkSync,
-} from "node:fs";
+import { existsSync, lstatSync, readlinkSync, rmdirSync, symlinkSync, unlinkSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { readConventionConfig, resolveBranchName } from "./convention.js";
 import { runBranch, type GitRunner } from "./branch.js";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
 import { resolveCurrentLogin } from "./list.js";
-import { findTasksDir, repoRootFromTasks } from "./paths.js";
+import {
+  findTasksDir,
+  LEGACY_TRACKER_DIR_NAME,
+  repoRootFromTasks,
+  TRACKER_DIR_NAME,
+} from "./paths.js";
 import { withItemLock } from "./lock.js";
 import { runUpdate } from "./update.js";
 
@@ -132,7 +130,8 @@ function git(args: string[], cwd: string): string {
   }
 }
 
-function gh(args: string[], cwd: string): string {  try {
+function gh(args: string[], cwd: string): string {
+  try {
     return execFileSync("gh", args, {
       encoding: "utf8",
       cwd,
@@ -272,7 +271,7 @@ function outputTail(output: string): string {
  * interactive shell.
  */
 const POST_START_FAILURE_HINT =
-  '(hint: hooks inherit the environment of the process that ran arggon — ' +
+  "(hint: hooks inherit the environment of the process that ran arggon — " +
   'use absolute paths, or set x-worktree.post-start-shell: "login")';
 
 /**
@@ -320,22 +319,29 @@ export function runPostStart(
  * the start flow's claim commit stages ONLY the item file (tracker-commit
  * surgical staging), so unrelated untracked files can never land in it — git
  * does not commit untracked files unless they are added. Therefore:
- *  - untracked paths (`?? `) OUTSIDE `tasks/` do NOT block start (agent
- *    environment dirs like `.v2c/` are harmless);
- *  - untracked paths INSIDE `tasks/` still block (they would pollute the
- *    tracker and `arggon validate`);
+ *  - untracked paths (`?? `) OUTSIDE the tracker dir do NOT block start
+ *    (agent environment dirs like `.v2c/` are harmless);
+ *  - untracked paths INSIDE the tracker dir still block (they would pollute
+ *    the tracker and `arggon validate`);
  *  - modified or staged TRACKED paths always block (they could be swept into
  *    the claim commit's index state and branch checks).
  */
 export type DirtyBlockers = {
   /** Modified/staged tracked porcelain lines (excluding the status code). */
   tracked: string[];
-  /** Untracked paths under tasks/ (or the tasks/ tree itself). */
+  /** Untracked paths under the tracker dir (or the tracker tree itself). */
   untrackedInTasks: string[];
 };
 
-/** Classify `git status --porcelain` output into the two blocker groups. */
-export function dirtyBlockers(porcelain: string): DirtyBlockers {
+/**
+ * Classify `git status --porcelain` output into the two blocker groups.
+ * `trackerDirNames` is the active tracker dir name (v5 `ArggonManager` by
+ * default; both known names when no tracker context is available).
+ */
+export function dirtyBlockers(
+  porcelain: string,
+  trackerDirNames: string[] = [TRACKER_DIR_NAME, LEGACY_TRACKER_DIR_NAME],
+): DirtyBlockers {
   const tracked: string[] = [];
   const untrackedInTasks: string[] = [];
   for (const line of porcelain.split("\n")) {
@@ -344,7 +350,9 @@ export function dirtyBlockers(porcelain: string): DirtyBlockers {
     const path = line.slice(3).trim().replace(/^"|"$/g, "");
     if (code === "??") {
       const normalized = path.replace(/\/+$/, "");
-      if (normalized === "tasks" || normalized.startsWith("tasks/")) {
+      if (
+        trackerDirNames.some((name) => normalized === name || normalized.startsWith(`${name}/`))
+      ) {
         untrackedInTasks.push(path);
       }
     } else if (code.trim().length > 0) {
@@ -358,13 +366,16 @@ export function dirtyBlockers(porcelain: string): DirtyBlockers {
  * Assert the tree is startable under the scoped clean-tree rule; throws an
  * actionable error listing exactly what blocks when it is not.
  */
-export function assertStartableTree(porcelain: string): void {
-  const { tracked, untrackedInTasks } = dirtyBlockers(porcelain);
+export function assertStartableTree(
+  porcelain: string,
+  trackerDirNames: string[] = [TRACKER_DIR_NAME, LEGACY_TRACKER_DIR_NAME],
+): void {
+  const { tracked, untrackedInTasks } = dirtyBlockers(porcelain, trackerDirNames);
   if (tracked.length === 0 && untrackedInTasks.length === 0) return;
   const parts: string[] = [];
   if (untrackedInTasks.length > 0) {
     parts.push(
-      `untracked files under tasks/ (they would pollute the tracker):\n  ` +
+      `untracked files under ${trackerDirNames.join(" or ")}/ (they would pollute the tracker):\n  ` +
         untrackedInTasks.slice(0, 10).join("\n  "),
     );
   }
@@ -374,7 +385,9 @@ export function assertStartableTree(porcelain: string): void {
         tracked.slice(0, 10).join("\n  "),
     );
   }
-  throw new Error(`working tree has changes that block start (commit or stash first):\n${parts.join("\n")}`);
+  throw new Error(
+    `working tree has changes that block start (commit or stash first):\n${parts.join("\n")}`,
+  );
 }
 
 /**
@@ -399,13 +412,16 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
   }
 
   // Scoped clean-tree check (task-start-dirty-scope-adopt-hierarchy): only
-  // tracked modifications and untracked files under tasks/ block. Raw output
-  // (not trimmed): the leading X status column matters to the parser.
-  assertStartableTree(gitRunner.fileStatus(root, "."));
+  // tracked modifications and untracked files under the ACTIVE tracker dir
+  // block. Raw output (not trimmed): the leading X status column matters to
+  // the parser.
+  assertStartableTree(gitRunner.fileStatus(root, "."), [
+    relative(root, tasksDir).split(sep).join("/"),
+  ]);
 
   const item = itemsById(loadItems(tasksDir)).get(id);
   if (!item) {
-    throw new Error(`id '${id}' not found under tasks/`);
+    throw new Error(`id '${id}' not found under the tracker`);
   }
 
   const providedResolveMe = deps.git?.resolveMe;
@@ -426,7 +442,7 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
     return withItemLock(item.filePath, () => {
       // Re-read under the lock: the claim state may have changed while we waited.
       const fresh = itemsById(loadItems(tasksDir)).get(id);
-      if (!fresh) throw new Error(`id '${id}' not found under tasks/`);
+      if (!fresh) throw new Error(`id '${id}' not found under the tracker`);
       return startInWorktree({ id, item: fresh, assignee, root, gitRunner, opts });
     });
   }
@@ -443,26 +459,26 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
     });
     const branch = runBranch({ cwd: opts.cwd, id, now: opts.now }, { git: gitRunner });
 
-  let committed = false;
-  if (gitRunner.fileStatus(root, branch.path).trim()) {
-    gitRunner.commitFile(root, branch.path, `claim: ${id}`);
-    committed = true;
-  }
+    let committed = false;
+    if (gitRunner.fileStatus(root, branch.path).trim()) {
+      gitRunner.commitFile(root, branch.path, `claim: ${id}`);
+      committed = true;
+    }
 
-  let pushed = false;
-  if (committed || branch.created) {
-    gitRunner.pushBranch(root, branch.branch);
-    pushed = true;
-  }
+    let pushed = false;
+    if (committed || branch.created) {
+      gitRunner.pushBranch(root, branch.branch);
+      pushed = true;
+    }
 
-  let prUrl: string | null = null;
-  if (opts.openPr && pushed) {
-    const rel = relative(root, branch.path).split(sep).join("/");
-    prUrl = gitRunner.createDraftPr(root, {
-      title: branch.item.title ?? id,
-      body: draftPrBody(id, rel, branch.item, false),
-    });
-  }
+    let prUrl: string | null = null;
+    if (opts.openPr && pushed) {
+      const rel = relative(root, branch.path).split(sep).join("/");
+      prUrl = gitRunner.createDraftPr(root, {
+        title: branch.item.title ?? id,
+        body: draftPrBody(id, rel, branch.item, false),
+      });
+    }
 
     return {
       id,
@@ -552,8 +568,7 @@ export function unlinkNodeModulesLink(primaryRoot: string, worktreePath: string)
  * pushed manually there.
  */
 function worktreeRemediation(input: { step: string; id: string; branch: string }): string {
-  const attach =
-    `re-run \`arggon start ${input.id} --worktree\` — it attaches to the existing worktree`;
+  const attach = `re-run \`arggon start ${input.id} --worktree\` — it attaches to the existing worktree`;
   if (input.step.startsWith("committing the claim")) {
     return (
       "The pre-commit gate (or the git commit itself) failed inside the worktree — fix the " +
@@ -651,7 +666,13 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
   const defaultPath = resolve(root, "..", `${basename(root)}-${id}`);
   const worktreePath = item.worktreePath ? resolve(item.worktreePath) : defaultPath;
   const pathTaken = existsSync(worktreePath);
-  if (pathTaken && !gitRunner.worktreeList(root).map((p) => resolve(p)).includes(worktreePath)) {
+  if (
+    pathTaken &&
+    !gitRunner
+      .worktreeList(root)
+      .map((p) => resolve(p))
+      .includes(worktreePath)
+  ) {
     throw new Error(
       `${worktreePath} already exists and is not a git worktree of this repo ` +
         `(\`arggon start --worktree\` only attaches to registered worktrees; move or remove the path first)`,
@@ -676,7 +697,7 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     step = "loading the item in the worktree";
     const wtTasksDir = findTasksDir(worktreePath);
     const existing = itemsById(loadItems(wtTasksDir)).get(id);
-    if (!existing) throw new Error(`id '${id}' not found under tasks/`);
+    if (!existing) throw new Error(`id '${id}' not found under the tracker`);
     if (existing.branch !== undefined && existing.branch !== null && existing.branch !== name) {
       throw new Error(
         `branch '${name}' already exists and does not match item '${id}' ('${existing.branch}'; ` +
@@ -699,7 +720,7 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
 
     step = "reading back the claim";
     const itemInWorktree = itemsById(loadItems(wtTasksDir)).get(id);
-    if (!itemInWorktree) throw new Error(`id '${id}' not found under tasks/`);
+    if (!itemInWorktree) throw new Error(`id '${id}' not found under the tracker`);
 
     step = "committing the claim (pre-commit gate)";
     let committed = false;
@@ -727,7 +748,7 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
 
     step = "reading back the item";
     const finalItem = itemsById(loadItems(wtTasksDir)).get(id);
-    if (!finalItem) throw new Error(`id '${id}' not found under tasks/`);
+    if (!finalItem) throw new Error(`id '${id}' not found under the tracker`);
 
     // Post-start bootstrap hook (task-start-post-hook): only on new-worktree
     // creation, never on attach re-runs. Failure is reported, not fatal — the

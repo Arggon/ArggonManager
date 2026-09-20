@@ -8,7 +8,7 @@ created: {{DATE}}
 # Exploration: {{TITLE}} ({{ID}})
 
 Spike record: compare the candidates below, cite dated sources, and record a
-recommendation. The decision itself lands in an ADR (`docs/adr/`) — link it
+recommendation. The decision itself lands in an ADR (`ArggonManager/docs/adr/`) — link it
 under Decision. A technology playbook (`arggon playbook new`) is generated
 after the decision.
 
@@ -32,4 +32,4 @@ after the decision.
 
 ## Decision
 
-<!-- ADR reference placeholder: docs/adr/0000-<slug>.md once the ADR lands. -->
+<!-- ADR reference placeholder: ArggonManager/docs/adr/0000-<slug>.md once the ADR lands. -->

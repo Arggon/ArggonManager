@@ -100,7 +100,7 @@ export function runBranch(opts: BranchOptions, deps: BranchDeps = {}): BranchRes
   const config = readConventionConfig(root);
   const item = itemsById(loadItems(tasksDir)).get(id);
   if (!item) {
-    throw new Error(`id '${id}' not found under tasks/`);
+    throw new Error(`id '${id}' not found under the tracker`);
   }
 
   const pattern = config.branchPatterns[item.type];
@@ -125,7 +125,7 @@ export function runBranch(opts: BranchOptions, deps: BranchDeps = {}): BranchRes
   gitRunner.checkoutNew(root, name);
   if (item.branch === name) {
     const reloaded = itemsById(loadItems(tasksDir)).get(id);
-    if (!reloaded) throw new Error(`id '${id}' not found under tasks/`);
+    if (!reloaded) throw new Error(`id '${id}' not found under the tracker`);
     return { id, path: item.filePath, root, branch: name, created: true, item: reloaded };
   }
   const updated = runUpdate({ cwd: opts.cwd, id, branch: name, now: opts.now });

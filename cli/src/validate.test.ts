@@ -151,7 +151,8 @@ describe("validate human output sanitization (bug-validate-stdout-injection)", (
     expect(proc.status).toBe(1);
     expect(proc.stdout).toBe(
       "error tasks/x/x.md: unknown status 'shipping' [UNKNOWN_STATUS]\n" +
-        "arggon validate: failed with 1 error(s), 0 warning(s)\n",
+        "warning tasks: tracker uses the legacy tasks/ layout — run `arggon migrate --layout` to move it to ArggonManager/ (docs included) [LEGACY_LAYOUT]\n" +
+        "arggon validate: failed with 1 error(s), 1 warning(s)\n",
     );
   });
 });

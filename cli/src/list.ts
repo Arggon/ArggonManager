@@ -154,7 +154,7 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
       const known = Object.keys(views);
       throw new Error(
         known.length === 0
-          ? `unknown view "${opts.view}" (no saved views defined in tasks/.convention.yml x-views)`
+          ? `unknown view "${opts.view}" (no saved views defined in the tracker .convention.yml x-views)`
           : `unknown view "${opts.view}". Known views: ${known.join(", ")}`,
       );
     }
@@ -171,7 +171,7 @@ export function runList(opts: ListOptions, deps: ListDeps = {}): ListResult {
   // predicate it validates that the referenced item exists so typos fail
   // loudly instead of returning an empty list.
   if (opts.parent !== undefined && !allItems.some((item) => item.id === opts.parent)) {
-    throw new Error(`unknown parent "${opts.parent}" (no work item with that id under tasks/)`);
+    throw new Error(`unknown parent "${opts.parent}" (no work item with that id in the tracker)`);
   }
   const blockedByIndex = buildBlockedByIndex(allItems);
   const ancestorIndex = buildAncestorIndex(allItems);

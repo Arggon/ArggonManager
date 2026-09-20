@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import {
   parseFrontmatter,
   numberField,
@@ -8,6 +8,7 @@ import {
   type Frontmatter,
 } from "./frontmatter.js";
 import { isItemType, type ItemType } from "./ids.js";
+import { trackerNonItemDirs } from "./paths.js";
 import { isStatus, type Status } from "./status.js";
 
 export type WorkItem = {
@@ -83,13 +84,7 @@ const OFFICIAL_KEYS = new Set([
  * parsing is additive, so v0-v2 trees keep loading (and validating) unchanged.
  * (priority became OFFICIAL in convention v4 — spec-priority-field-008.)
  */
-const PROTOTYPE_KEYS = new Set([
-  "milestone",
-  "depends_on",
-  "claimed_at",
-  "worktree_path",
-  "issue",
-]);
+const PROTOTYPE_KEYS = new Set(["milestone", "depends_on", "claimed_at", "worktree_path", "issue"]);
 
 /** One soft-load finding (path added by caller). */
 export type SoftIssue = {
@@ -110,16 +105,21 @@ export type SoftLoadResult =
     };
 
 /** Collect every file and directory under tasks/ (skipping dotfiles). Shared by validate. */
-export function walkTasksTree(dir: string): { files: string[]; dirs: string[] } {
+export function walkTasksTree(
+  dir: string,
+  opts?: { skipDirs?: string[] },
+): { files: string[]; dirs: string[] } {
   const files: string[] = [];
   const dirs: string[] = [];
   if (!existsSync(dir)) return { files, dirs };
+  const skip = new Set((opts?.skipDirs ?? trackerNonItemDirs(dir)).map((d) => resolve(d)));
   const stack = [dir];
   while (stack.length > 0) {
     const cur = stack.pop()!;
     for (const name of readdirSync(cur)) {
       if (name.startsWith(".")) continue;
       const full = join(cur, name);
+      if (skip.has(resolve(full))) continue;
       const st = statSync(full);
       if (st.isDirectory()) {
         dirs.push(full);
@@ -254,20 +254,25 @@ export function softTryLoadItem(filePath: string): SoftLoadResult {
   return { kind: "item", item, issues, unknownKeys };
 }
 
-export function loadItems(tasksDir: string): WorkItem[] {
+export function loadItems(tasksDir: string, opts?: { skipDirs?: string[] }): WorkItem[] {
   const items: WorkItem[] = [];
-  walk(tasksDir, items);
+  walk(
+    tasksDir,
+    items,
+    new Set((opts?.skipDirs ?? trackerNonItemDirs(tasksDir)).map((d) => resolve(d))),
+  );
   return items;
 }
 
-function walk(dir: string, items: WorkItem[]): void {
+function walk(dir: string, items: WorkItem[], skip: Set<string>): void {
   if (!existsSync(dir)) return;
   for (const name of readdirSync(dir)) {
     if (name.startsWith(".")) continue;
     const full = join(dir, name);
+    if (skip.has(resolve(full))) continue;
     const st = statSync(full);
     if (st.isDirectory()) {
-      walk(full, items);
+      walk(full, items, skip);
       continue;
     }
     if (!name.endsWith(".md")) continue;
@@ -299,7 +304,7 @@ export function itemsById(items: WorkItem[]): Map<string, WorkItem> {
     const prev = map.get(item.id);
     if (prev) {
       throw new Error(
-        `Duplicate id '${item.id}' under tasks/ (${prev.filePath} and ${item.filePath})`,
+        `Duplicate id '${item.id}' under the tracker (${prev.filePath} and ${item.filePath})`,
       );
     }
     map.set(item.id, item);

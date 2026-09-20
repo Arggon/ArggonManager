@@ -90,9 +90,9 @@ describe("init docs: tier-1 content", () => {
     expect(agents).toContain("arggon branch <id>");
     expect(agents).toContain("arggon create task|bug");
     expect(agents).toContain("Never reopen");
-    expect(agents).toContain("docs/convention.md");
-    expect(agents).toContain("docs/engineering.md");
-    expect(agents).toContain("docs/playbooks/");
+    expect(agents).toContain("ArggonManager/docs/convention.md");
+    expect(agents).toContain("ArggonManager/docs/engineering.md");
+    expect(agents).toContain("ArggonManager/docs/playbooks/");
     expect(agents).toContain("arggon playbook status");
     expect(agents).toContain("arggon validate");
     expect(agents).toMatch(/arggon comment <item-id>[^\n]*never as GitHub PR comments/);
@@ -124,20 +124,20 @@ describe("init docs: tier-1 content", () => {
   });
 
   it("docs/tracking.md replaces GitHub issue templates", () => {
-    const tracking = readFileSync(join(dir, "docs/tracking.md"), "utf8");
-    expect(tracking).toContain("tasks/");
+    const tracking = readFileSync(join(dir, "ArggonManager/docs/tracking.md"), "utf8");
+    expect(tracking).toContain("ArggonManager/");
     expect(tracking).toContain("PRs only");
     expect(existsSync(join(dir, ".github/ISSUE_TEMPLATE"))).toBe(false);
   });
 
   it("does not generate any tier-2 file", () => {
     expect(existsSync(join(dir, "ARCHITECTURE.md"))).toBe(false);
-    expect(existsSync(join(dir, "docs/convention.md"))).toBe(false);
-    expect(existsSync(join(dir, "docs/engineering.md"))).toBe(false);
+    expect(existsSync(join(dir, "ArggonManager/docs/convention.md"))).toBe(false);
+    expect(existsSync(join(dir, "ArggonManager/docs/engineering.md"))).toBe(false);
     expect(existsSync(join(dir, "CHANGELOG.md"))).toBe(false);
     expect(existsSync(join(dir, "SUPPORT.md"))).toBe(false);
-    expect(existsSync(join(dir, "docs/runbooks/README.md"))).toBe(false);
-    expect(existsSync(join(dir, "docs/deploy.md"))).toBe(false);
+    expect(existsSync(join(dir, "ArggonManager/docs/runbooks/README.md"))).toBe(false);
+    expect(existsSync(join(dir, "ArggonManager/docs/deploy.md"))).toBe(false);
   });
 });
 
@@ -153,11 +153,11 @@ describe("init docs: tier-2 content (--full)", () => {
   });
 
   it("docs/convention.md and docs/engineering.md are adopter-owned templates, not ArggonManager's", () => {
-    const convention = readFileSync(join(dir, "docs/convention.md"), "utf8");
+    const convention = readFileSync(join(dir, "ArggonManager/docs/convention.md"), "utf8");
     expect(convention).toContain("# Convention");
     expect(convention).not.toContain("ArggonManager stores work");
     expect(convention).toContain("frontmatter");
-    const engineering = readFileSync(join(dir, "docs/engineering.md"), "utf8");
+    const engineering = readFileSync(join(dir, "ArggonManager/docs/engineering.md"), "utf8");
     expect(engineering).toContain("## Review bar");
     expect(engineering).toContain("## Definition of done");
     // Adopter-owned: the generated docs must not leak this repo's own doc text.
@@ -172,7 +172,7 @@ describe("init docs: tier-2 content (--full)", () => {
 
   it("SUPPORT.md and docs/runbooks/README.md exist", () => {
     expect(readFileSync(join(dir, "SUPPORT.md"), "utf8")).toContain("# Support");
-    expect(readFileSync(join(dir, "docs/runbooks/README.md"), "utf8")).toContain("# Runbooks");
+    expect(readFileSync(join(dir, "ArggonManager/docs/runbooks/README.md"), "utf8")).toContain("# Runbooks");
   });
 });
 
@@ -180,18 +180,18 @@ describe("init docs: no-overwrite guarantee", () => {
   it("pre-existing docs keep their exact content and land in skipped[] + modified[]", () => {
     const dir = tempDir();
     writeFileSync(join(dir, "AGENTS.md"), "MY OWN RULES v1", "utf8");
-    mkdirSync(join(dir, "docs"), { recursive: true });
-    writeFileSync(join(dir, "docs/engineering.md"), "MY REVIEW BAR", "utf8");
+    mkdirSync(join(dir, "ArggonManager/docs"), { recursive: true });
+    writeFileSync(join(dir, "ArggonManager/docs/engineering.md"), "MY REVIEW BAR", "utf8");
     const result = runInit({ dir, force: false, full: true });
     expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe("MY OWN RULES v1");
-    expect(readFileSync(join(dir, "docs/engineering.md"), "utf8")).toBe("MY REVIEW BAR");
+    expect(readFileSync(join(dir, "ArggonManager/docs/engineering.md"), "utf8")).toBe("MY REVIEW BAR");
     expect(result.created).not.toContain("AGENTS.md");
-    expect(result.created).not.toContain("docs/engineering.md");
+    expect(result.created).not.toContain("ArggonManager/docs/engineering.md");
     expect(result.skipped).toContain("AGENTS.md");
-    expect(result.skipped).toContain("docs/engineering.md");
+    expect(result.skipped).toContain("ArggonManager/docs/engineering.md");
     // No provenance state existed for these files: they count as adopter-modified.
     expect(result.modified).toContain("AGENTS.md");
-    expect(result.modified).toContain("docs/engineering.md");
+    expect(result.modified).toContain("ArggonManager/docs/engineering.md");
   });
 
   it("generateDocs creates on the first run and treats stateless files as modified on the second", () => {
@@ -230,7 +230,7 @@ describe("init docs: --json payload", () => {
     expect(body.ok).toBe(true);
     expect(body.command).toBe("init");
     expect(body.created).toContain("AGENTS.md");
-    expect(body.created).toContain("docs/tracking.md");
+    expect(body.created).toContain("ArggonManager/docs/tracking.md");
     expect(body.skipped).toEqual([]);
     expect(body.updated).toEqual([]);
     expect(body.modified).toEqual([]);
@@ -264,7 +264,7 @@ describe("init docs: --json payload", () => {
     expect(proc.status).toBe(0);
     const body = JSON.parse(proc.stdout) as { created: string[]; updated: string[]; skipped: string[] };
     expect(body.created).toEqual(
-      ["ARCHITECTURE.md", "CHANGELOG.md", "SUPPORT.md", "docs/convention.md", "docs/deploy.md", "docs/engineering.md", "docs/runbooks/README.md"].sort(),
+      ["ARCHITECTURE.md", "CHANGELOG.md", "SUPPORT.md", "ArggonManager/docs/convention.md", "ArggonManager/docs/deploy.md", "ArggonManager/docs/engineering.md", "ArggonManager/docs/runbooks/README.md"].sort(),
     );
     expect(body.updated.length).toBe(GENERATED_DOC_COUNT - TIER2_DESTS.size); // tier-1 docs (incl. .mcp.json) + bundled skills
     expect(body.updated).toContain("AGENTS.md");
@@ -278,9 +278,9 @@ describe("init docs: --json payload", () => {
     expect(proc.status).toBe(0);
     const body = JSON.parse(proc.stdout) as { created: string[] };
     expect(body.created).toContain("ARCHITECTURE.md");
-    expect(body.created).toContain("docs/convention.md");
-    expect(body.created).toContain("docs/runbooks/README.md");
-    expect(existsSync(join(dir, "docs/engineering.md"))).toBe(true);
+    expect(body.created).toContain("ArggonManager/docs/convention.md");
+    expect(body.created).toContain("ArggonManager/docs/runbooks/README.md");
+    expect(existsSync(join(dir, "ArggonManager/docs/engineering.md"))).toBe(true);
   });
 });
 
@@ -402,8 +402,8 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
     expect(result.skipped).toEqual([]);
     // Content is byte-identical (same template, same placeholders).
     expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(before);
-    const raw = readFileSync(join(dir, "tasks/.convention.yml"), "utf8");
-    expect(raw).toContain("version: 4");
+    const raw = readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8");
+    expect(raw).toContain("version: 5");
     expect(raw).toContain('bug: "fix/{id}"');
     const config = parseConventionConfig(raw);
     expect(config.generated["AGENTS.md"]!.checksum).toBe(checksumOf(before));
@@ -463,7 +463,7 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
   it("keeps a stale entry for a template that no longer exists (via updateGeneratedSection)", () => {
     const dir = tempDir();
     runInit({ dir, force: false, full: true });
-    const raw = readFileSync(join(dir, "tasks/.convention.yml"), "utf8");
+    const raw = readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8");
     const stale: GeneratedEntry = {
       template: "docs/gone.md",
       checksum: "sha256:deadbeef",
@@ -474,7 +474,7 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
       ...readConventionConfig(dir).generated,
       "docs/legacy.md": stale,
     });
-    writeFileSync(join(dir, "tasks/.convention.yml"), next, "utf8");
+    writeFileSync(join(dir, "ArggonManager/.convention.yml"), next, "utf8");
     const config = readConventionConfig(dir);
     expect(config.generated["docs/legacy.md"]!.template).toBe("docs/gone.md");
     expect(config.generated["AGENTS.md"]).toBeDefined();
@@ -499,7 +499,7 @@ describe("init docs: acknowledged baselines are never regenerated (bug-ack-basel
     runInit({ dir, force: false, full: true });
     // Sanctioned sweep edit + ack on one doc (simulating adopt --ack's flag;
     // the runAdoptAck tests in adopt.test.ts cover the command wiring).
-    const yml = join(dir, "tasks/.convention.yml");
+    const yml = join(dir, "ArggonManager/.convention.yml");
     const state = readConventionConfig(dir).generated;
     writeFileSync(join(dir, "AGENTS.md"), "SWEEP: sanctioned content\n", "utf8");
     const acked = updateGeneratedSection(readFileSync(yml, "utf8"), {
@@ -525,7 +525,7 @@ describe("init docs: acknowledged baselines are never regenerated (bug-ack-basel
   it("a hand edit to an acked doc is still skipped (acknowledged wins over any hash)", () => {
     const dir = tempDir();
     runInit({ dir, force: false, full: true });
-    const yml = join(dir, "tasks/.convention.yml");
+    const yml = join(dir, "ArggonManager/.convention.yml");
     const state = readConventionConfig(dir).generated;
     writeFileSync(yml, updateGeneratedSection(readFileSync(yml, "utf8"), {
       ...state,
@@ -559,7 +559,7 @@ describe("init docs: generated convention.md documents the x-* namespaced extens
   it("init --full generates a convention.md with a Namespaced extensions section listing each x-* key", () => {
     const dir = tempDir();
     runInit({ dir, force: false, full: true });
-    const generated = readFileSync(join(dir, "docs/convention.md"), "utf8");
+    const generated = readFileSync(join(dir, "ArggonManager/docs/convention.md"), "utf8");
     expect(generated).toMatch(/Namespaced extensions/);
     for (const ext of ["x-views", "x-playbooks", "x-tracker", "x-import", "x-worktree", "x-github", "x-generated"]) {
       expect(generated).toContain(ext);
@@ -571,8 +571,8 @@ describe("init docs: deploy defaults (task-adr0005-deploy-defaults)", () => {
   it("--full generates docs/deploy.md with the per-shape ADR 0005 defaults, dated pricing, and exit notes", () => {
     const dir = tempDir();
     const result = runInit({ dir, force: false, full: true });
-    expect(result.created).toContain("docs/deploy.md");
-    const deploy = readFileSync(join(dir, "docs/deploy.md"), "utf8");
+    expect(result.created).toContain("ArggonManager/docs/deploy.md");
+    const deploy = readFileSync(join(dir, "ArggonManager/docs/deploy.md"), "utf8");
     // All four project shapes (ADR 0005 defaults) are keyed in the table.
     expect(deploy).toContain("Static site");
     expect(deploy).toContain("SPA + small API");
@@ -590,21 +590,21 @@ describe("init docs: deploy defaults (task-adr0005-deploy-defaults)", () => {
   it("tier-1 (no --full) does not generate docs/deploy.md, and generated AGENTS.md carries one pointer line", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
-    expect(existsSync(join(dir, "docs/deploy.md"))).toBe(false);
+    expect(existsSync(join(dir, "ArggonManager/docs/deploy.md"))).toBe(false);
     const full = tempDir();
     runInit({ dir: full, force: false, full: true });
     const agents = readFileSync(join(full, "AGENTS.md"), "utf8");
-    expect(agents).toContain("docs/deploy.md");
+    expect(agents).toContain("ArggonManager/docs/deploy.md");
   });
 
   it("a second --full run regenerates the untouched deploy.md and refreshes its x-generated state", () => {
     const dir = tempDir();
     runInit({ dir, force: false, full: true });
-    const first = readFileSync(join(dir, "docs/deploy.md"), "utf8");
+    const first = readFileSync(join(dir, "ArggonManager/docs/deploy.md"), "utf8");
     expect(first.startsWith(generatedMarker("docs/deploy.md"))).toBe(true);
     const second = runInit({ dir, force: false, full: true });
-    expect(second.updated).toContain("docs/deploy.md");
-    expect(readFileSync(join(dir, "docs/deploy.md"), "utf8")).toBe(first);
-    expect(readConventionConfig(dir).generated["docs/deploy.md"]!.template).toBe("docs/docs/deploy.md");
+    expect(second.updated).toContain("ArggonManager/docs/deploy.md");
+    expect(readFileSync(join(dir, "ArggonManager/docs/deploy.md"), "utf8")).toBe(first);
+    expect(readConventionConfig(dir).generated["ArggonManager/docs/deploy.md"]!.template).toBe("docs/docs/deploy.md");
   });
 });

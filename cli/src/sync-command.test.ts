@@ -46,7 +46,7 @@ function filePath(dir: string, id: string): string {
       else if (entry === `${id}.md`) found.push(full);
     }
   };
-  walk(join(dir, "tasks"));
+  walk(join(dir, "ArggonManager"));
   if (found.length !== 1) throw new Error(`expected one ${id}.md, found ${found.length}`);
   return found[0]!;
 }
@@ -109,7 +109,7 @@ describe("sync command", () => {
     const result = runSync({ check: true, cwd: dir }, execGh as unknown as typeof execFileSync);
 
     expect(result.exit_code).toBe(1);
-    expect(result.errors[0]).toMatch(/No tasks\/ convention found/);
+    expect(result.errors[0]).toMatch(/No ArggonManager\/ convention found/);
     expect(execGh).not.toHaveBeenCalled();
   });
 

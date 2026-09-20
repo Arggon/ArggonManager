@@ -17,7 +17,7 @@ import { readConventionConfig, readConventionVersion, type PlaybooksConfig } fro
 import { formatDate } from "./dates.js";
 import { itemsById, loadItems } from "./items.js";
 import { slugify } from "./ids.js";
-import { bundledTemplatesDir, findTasksDir, repoRootFromTasks } from "./paths.js";
+import { bundledTemplatesDir, docsDirForRoot, findTasksDir, repoRootFromTasks } from "./paths.js";
 import { runCreate } from "./create.js";
 import { sanitizeHumanTextUncapped } from "./sanitize.js";
 
@@ -157,7 +157,7 @@ function renderExplorationTemplate(vars: Record<string, string>): string {
 
 /** Max existing NNN across docs/explorations (any exploration-<slug>-NNN.md counts). */
 function nextExplorationNumber(root: string): number {
-  const dir = join(root, "docs", "explorations");
+  const dir = join(docsDirForRoot(root), "explorations");
   if (!existsSync(dir)) return 1;
   let max = 0;
   for (const name of readdirSync(dir)) {
@@ -177,7 +177,7 @@ export function runStackExplore(opts: StackExploreOptions): StackExploreResult {
   const padded = String(nnn).padStart(3, "0");
   const title = opts.title && opts.title.trim() !== "" ? opts.title.trim() : topic;
 
-  const dir = join(root, "docs", "explorations");
+  const dir = join(docsDirForRoot(root), "explorations");
   const path = join(dir, `exploration-${slug}-${padded}.md`);
   if (existsSync(path)) {
     throw new Error(`refusing to overwrite existing file ${posixRel(root, path)}`);
@@ -218,7 +218,7 @@ export type PlaybookNewResult = {
 };
 
 function playbookPath(root: string, tech: string): string {
-  return join(root, "docs", "playbooks", `${tech}.md`);
+  return join(docsDirForRoot(root), "playbooks", `${tech}.md`);
 }
 
 function renderPlaybook(tech: string, title: string, version: string, researched: string): string {
@@ -286,7 +286,7 @@ export function runPlaybookNew(opts: PlaybookNewOptions): PlaybookNewResult {
     opts.title && opts.title.trim() !== "" ? opts.title.trim() : tech.replace(/-/g, " ");
   const researched = todayUtc(opts.now);
 
-  mkdirSync(join(root, "docs", "playbooks"), { recursive: true });
+  mkdirSync(join(docsDirForRoot(root), "playbooks"), { recursive: true });
   writeFileAtomic(path, renderPlaybook(tech, title, version, researched));
   return { root, files: [posixRel(root, path)] };
 }
@@ -332,7 +332,7 @@ export type PlaybookStatusResult = {
 };
 
 function listPlaybooks(root: string): string[] {
-  const dir = join(root, "docs", "playbooks");
+  const dir = join(docsDirForRoot(root), "playbooks");
   if (!existsSync(dir)) return [];
   return readdirSync(dir)
     .filter((name) => name.endsWith(".md"))

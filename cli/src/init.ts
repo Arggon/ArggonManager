@@ -10,7 +10,14 @@ import {
 } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { writeFileAtomic } from "./atomic.js";
-import { bundledTemplatesDir } from "./paths.js";
+import {
+  bundledTemplatesDir,
+  conventionPathForLayout,
+  LEGACY_TRACKER_DIR_NAME,
+  TRACKER_DIR_NAME,
+  trackerAt,
+  type TrackerLayout,
+} from "./paths.js";
 import {
   CONVENTION_VERSION,
   DEFAULT_BRANCH_PATTERNS,
@@ -114,7 +121,8 @@ export type InitResult = {
   warning?: string;
 };
 
-function ensureTemplates(root: string, force: boolean): string[] {  const templatesDest = join(root, "templates");
+function ensureTemplates(root: string, force: boolean): string[] {
+  const templatesDest = join(root, "templates");
   const templatesSrc = bundledTemplatesDir();
   if (!existsSync(templatesSrc)) {
     throw new Error(`Bundled templates not found at ${templatesSrc}`);
@@ -196,7 +204,11 @@ export type InitPlan = {
   force: boolean;
   full: boolean;
   backup: boolean;
-  /** tasks/.convention.yml + templates/ decisions (doc dests live in `docs`). */
+  /** Tracker layout this run scaffolds/upgrades (ADR 0012). */
+  layout: TrackerLayout;
+  /** Absolute `.convention.yml` path this run writes (layout-aware). */
+  conventionPath: string;
+  /** `<tracker>/.convention.yml` + templates/ decisions (doc dests live in `docs`). */
   scaffold: InitPlanEntry[];
   /** Per-destination doc plan (pure; includes bytes a real run would write). */
   docs: DocsPlan;
@@ -211,8 +223,13 @@ export type InitPlan = {
  */
 export function planInit(opts: InitOptions): InitPlan {
   const root = resolve(opts.dir);
-  const tasksDir = join(root, "tasks");
-  const conventionPath = join(tasksDir, ".convention.yml");
+  // Layout detection (ADR 0012 §3): an existing tracker keeps ITS layout
+  // (legacy `tasks/` trees are upgraded in place, docs included, never
+  // silently moved); a fresh tree scaffolds the v5 `ArggonManager/` layout.
+  const existing = trackerAt(root);
+  const layout: TrackerLayout = existing?.layout ?? "arggon-manager";
+  const trackerName = layout === "legacy" ? LEGACY_TRACKER_DIR_NAME : TRACKER_DIR_NAME;
+  const conventionPath = conventionPathForLayout(root, layout);
   const alreadyInitialized = existsSync(conventionPath);
   const base = {
     root,
@@ -220,6 +237,8 @@ export function planInit(opts: InitOptions): InitPlan {
     force: opts.force,
     full: Boolean(opts.full),
     backup: Boolean(opts.backup),
+    layout,
+    conventionPath,
   };
 
   if (alreadyInitialized && !opts.force) {
@@ -234,16 +253,31 @@ export function planInit(opts: InitOptions): InitPlan {
     return {
       ...base,
       scaffold,
-      docs: planGenerateDocs({ root, full: Boolean(opts.full), backup: opts.backup, now: opts.now }),
+      docs: planGenerateDocs({
+        root,
+        full: Boolean(opts.full),
+        backup: opts.backup,
+        now: opts.now,
+        layout,
+      }),
     };
   }
 
-  if (existsSync(tasksDir) && !alreadyInitialized && !opts.force) {
+  // A legacy `tasks/` dir exists without its `.convention.yml`: refuse to
+  // guess — same precondition as before. `ArggonManager/` without a
+  // convention is NOT an error: on the v5 layout that directory is also the
+  // home of the product docs, which may legitimately pre-date `init`
+  // (existing files are never overwritten by the doc plan).
+  const strayTracker =
+    !alreadyInitialized && existsSync(join(root, LEGACY_TRACKER_DIR_NAME))
+      ? LEGACY_TRACKER_DIR_NAME
+      : undefined;
+  if (strayTracker !== undefined && !opts.force) {
     return {
       ...base,
       scaffold: [],
-      docs: { entries: [], created: [], updated: [], modified: [], backedUp: [], skipped: [] },
-      error: `tasks/ exists but is missing .convention.yml. Re-run with --force to scaffold, or fix manually.`,
+      docs: { entries: [], created: [], updated: [], backedUp: [], modified: [], skipped: [] },
+      error: `${strayTracker}/ exists but is missing .convention.yml. Re-run with --force to scaffold, or fix manually.`,
     };
   }
 
@@ -258,11 +292,15 @@ export function planInit(opts: InitOptions): InitPlan {
   const scaffold: InitPlanEntry[] = [
     alreadyInitialized
       ? {
-          dest: "tasks/.convention.yml",
+          dest: `${trackerName}/.convention.yml`,
           decision: "overwritten",
           reason: "force re-scaffold — x-generated provenance carried over",
         }
-      : { dest: "tasks/.convention.yml", decision: "created", reason: "convention scaffold" },
+      : {
+          dest: `${trackerName}/.convention.yml`,
+          decision: "created",
+          reason: "convention scaffold",
+        },
   ];
   for (const name of listBundledTemplates()) {
     scaffold.push(
@@ -272,7 +310,11 @@ export function planInit(opts: InitOptions): InitPlan {
             decision: "overwritten",
             reason: "exists — --force recopies it from the bundle",
           }
-        : { dest: `templates/${name}`, decision: "created", reason: "copied from the bundled templates" },
+        : {
+            dest: `templates/${name}`,
+            decision: "created",
+            reason: "copied from the bundled templates",
+          },
     );
   }
   return {
@@ -285,6 +327,7 @@ export function planInit(opts: InitOptions): InitPlan {
       now: opts.now,
       prev: carried,
       prevProjectName: carriedName,
+      layout,
       // The scaffold write (above, in runInit) lands before docs are applied,
       // so the plan sees the convention file it will exist by then and plans
       // the pending x-generated rewrite against the scaffolded content.
@@ -374,12 +417,7 @@ export type ProposalEntry = {
  * JSON destinations stay header-less (and marker-less, like normal generation)
  * so the proposal remains parseable.
  */
-export function proposalContent(
-  dest: string,
-  version: string,
-  render: string,
-  now?: Date,
-): string {
+export function proposalContent(dest: string, version: string, render: string, now?: Date): string {
   // JSONC destinations take the same path as JSON (MINOR-4, PR #322 review):
   // an HTML proposal header would make the proposed config invalid JSONC.
   if (dest.endsWith(".json") || dest.endsWith(".jsonc")) return render;
@@ -419,7 +457,8 @@ function diffRegions(before: string, after: string): ProposalRegionDetail[] {
   );
   for (let i = a.length - 1; i >= 0; i--) {
     for (let j = b.length - 1; j >= 0; j--) {
-      lcs[i]![j] = a[i] === b[j] ? lcs[i + 1]![j + 1]! + 1 : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
+      lcs[i]![j] =
+        a[i] === b[j] ? lcs[i + 1]![j + 1]! + 1 : Math.max(lcs[i + 1]![j]!, lcs[i]![j + 1]!);
     }
   }
   const regions: ProposalRegionDetail[] = [];
@@ -433,10 +472,7 @@ function diffRegions(before: string, after: string): ProposalRegionDetail[] {
     }
     const startI = i;
     const addedLines: string[] = [];
-    while (
-      (i < a.length || j < b.length) &&
-      !(i < a.length && j < b.length && a[i] === b[j])
-    ) {
+    while ((i < a.length || j < b.length) && !(i < a.length && j < b.length && a[i] === b[j])) {
       if (i < a.length && (j >= b.length || lcs[i + 1]![j]! >= lcs[i]![j + 1]!)) {
         i++; // baseline line consumed (removed or replaced)
       } else {
@@ -444,8 +480,7 @@ function diffRegions(before: string, after: string): ProposalRegionDetail[] {
         j++;
       }
     }
-    const anchor = (from: number, to: number): string =>
-      a.slice(Math.max(0, from), to).join("\n");
+    const anchor = (from: number, to: number): string => a.slice(Math.max(0, from), to).join("\n");
     regions.push({
       kind: startI === i ? "added" : "changed",
       added: addedLines.length,
@@ -474,11 +509,11 @@ function gitFirstCommittedContent(root: string, destAbs: string): string | null 
     }).trim();
     const rel = relative(toplevel, destAbs).split(sep).join("/");
     if (rel.startsWith("..")) return null; // dest outside the repo: no history
-    const hash = execFileSync(
-      "git",
-      ["log", "--diff-filter=A", "-n1", "--format=%H", "--", rel],
-      { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] },
-    ).trim();
+    const hash = execFileSync("git", ["log", "--diff-filter=A", "-n1", "--format=%H", "--", rel], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
     if (hash === "") return null;
     return execFileSync("git", ["show", `${hash}:${rel}`], {
       cwd: root,
@@ -514,11 +549,17 @@ export function sectionProposalContent(
       `## region ${idx + 1} of ${regions.length} — ${r.kind} (+${r.added}/-${r.removed})`,
     ];
     if (r.anchorBefore) {
-      parts.push("anchor-before (insert after the matching text in YOUR file):", indent(r.anchorBefore));
+      parts.push(
+        "anchor-before (insert after the matching text in YOUR file):",
+        indent(r.anchorBefore),
+      );
     }
     parts.push("insert:", indent(r.content));
     if (r.anchorAfter) {
-      parts.push("anchor-after (insert before the matching text in YOUR file):", indent(r.anchorAfter));
+      parts.push(
+        "anchor-after (insert before the matching text in YOUR file):",
+        indent(r.anchorAfter),
+      );
     }
     return parts.join("\n\n");
   });
@@ -731,8 +772,10 @@ export function applyProposals(root: string, proposals: ProposalEntry[], now?: D
 
 /** Preconditions shared by the propose paths of runInit and dryRunInit. */
 function proposePreconditions(opts: InitOptions): string | undefined {
-  if (opts.force) return "init --propose does not combine with --force (proposals never touch originals; drop --force)";
-  if (opts.backup) return "init --propose does not combine with --backup (proposals never regenerate; drop --backup)";
+  if (opts.force)
+    return "init --propose does not combine with --force (proposals never touch originals; drop --force)";
+  if (opts.backup)
+    return "init --propose does not combine with --backup (proposals never regenerate; drop --backup)";
   return undefined;
 }
 
@@ -773,7 +816,7 @@ export function dryRunInit(opts: InitOptions): InitDryRunResult {
   const plan = planInit(opts);
   if (plan.error) throw new Error(plan.error);
   const root = plan.root;
-  const conventionPath = join(root, "tasks", ".convention.yml");
+  const conventionPath = plan.conventionPath;
   const warning = isGitRepo(root) ? undefined : NOT_A_REPO_WARNING;
 
   // Propose dry run: list the proposal writes/removals, write nothing.
@@ -862,7 +905,8 @@ export function runInit(opts: InitOptions): InitResult {
     const proposeError = proposePreconditions(opts);
     if (proposeError) throw new Error(proposeError);
     const root = resolve(opts.dir);
-    const conventionPath = join(root, "tasks", ".convention.yml");
+    const conventionPath =
+      trackerAt(root)?.conventionPath ?? conventionPathForLayout(root, "arggon-manager");
     if (!existsSync(conventionPath)) throw new Error(NOT_INITIALIZED_PROPOSE_ERROR);
     const proposals = planProposals(root, Boolean(opts.full), opts.now, opts.proposeWholeFile);
     applyProposals(root, proposals, opts.now);
@@ -887,8 +931,9 @@ export function runInit(opts: InitOptions): InitResult {
   const plan = planInit(opts);
   if (plan.error) throw new Error(plan.error);
   const root = plan.root;
-  const tasksDir = join(root, "tasks");
-  const conventionPath = join(tasksDir, ".convention.yml");
+  const conventionPath = plan.conventionPath;
+  const trackerName = relative(root, dirname(conventionPath)).split(sep).join("/");
+  const tasksDir = dirname(conventionPath);
   // Compute once up front; attached to every result shape below.
   const gitWarning = isGitRepo(root) ? undefined : NOT_A_REPO_WARNING;
 
@@ -897,7 +942,12 @@ export function runInit(opts: InitOptions): InitResult {
       .map((name) => `templates/${name}`)
       .sort();
     const docs = applyDocsPlan(root, plan.docs);
-    const written = [...restored, ...docs.created, ...docs.updated, "tasks/.convention.yml"];
+    const written = [
+      ...restored,
+      ...docs.created,
+      ...docs.updated,
+      `${trackerName}/.convention.yml`,
+    ];
     return {
       root,
       alreadyInitialized: true,
@@ -925,7 +975,7 @@ export function runInit(opts: InitOptions): InitResult {
   writeFileAtomic(conventionPath, updateGeneratedSection(CONVENTION_YML, carried, carriedName));
   const copiedTemplates = ensureTemplates(root, opts.force).map((name) => `templates/${name}`);
   const docs = applyDocsPlan(root, plan.docs);
-  const created = ["tasks/.convention.yml", ...copiedTemplates, ...docs.created].sort();
+  const created = [`${trackerName}/.convention.yml`, ...copiedTemplates, ...docs.created].sort();
   const written = [...created, ...docs.updated];
 
   return {

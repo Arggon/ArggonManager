@@ -25,9 +25,8 @@ TODO: end-to-end walkthrough of one representative operation.
 
 ```text
 {{PROJECT_NAME}}/
-  tasks/        # TODO: purpose
-  docs/         # TODO: purpose
-  src/          # TODO: purpose
+  ArggonManager/  # tracker root: work items + product docs (ArggonManager/docs/)
+  src/            # TODO: purpose
 ```
 
 ## Boundaries and layering rules
