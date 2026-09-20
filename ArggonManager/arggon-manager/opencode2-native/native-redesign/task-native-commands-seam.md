@@ -85,3 +85,41 @@ Open questions / follow-ups
 ### handoff 2026-09-20 @Arggon — next: Coordinator review of draft PR #376: verify the W3 evidence (smoke 23/0, context:report --strict) and merge with a merge commit (tracker auto-commits live on this branch, never squash).
 - branch: feat/task-native-commands-seam
 - open questions: options.pinned is an undocumented 2.0.10 option (feature-detected; core 8 pinned, all 12 still search-reachable); this repo's own tracked .opencode/commands dogfood still carries the W2 templates (W7…
+
+### 2026-09-20 @Arggon
+### 2026-09-20 @Arggon — revisión (PR #376, `feat/task-native-commands-seam@082802b`, base `opencode2@8049a4d`; draft, CI `cli` pass)
+
+**Veredicto: no-merge** — 1 hallazgo bloqueante (gate anti-drift del artefacto). Todo lo demás verificado en verde y el artefacto actual es correcto; el fix es chico y acotado a tests/CI.
+
+**Verificado por mí (reproducido en el worktree salvo lo indicado)**
+
+- **Artefacto == regenerado**: `buildPluginBundle()` en memoria → md5 `92fc312c77ae9d50aa216dea9e55c600`, 282.381 B, 36 módulos, 145 edges; `npm run build` (postbuild → `build:plugin`) reporta 36 módulos / 282.381 B y el md5 no cambia. Único import estático `node:module`; los `require` residuales son builtins `node:*`; sin `@opencode/plugin` ni `ctx.mcp` en el bundle. Determinismo byte-idéntico bajo C/en_US/tr_TR.
+- **Gates**: `npm test` 86 archivos / **1393 tests** verdes; `npm run lint` limpio; `arggon validate` ok (0 warnings); `arggon spec validate` ok; `context:report --strict` → todos los bounds pasan (AGENTS 1.959 ≤ 2.048; native 12 tools / 8 pinned 11.097 ≤ 12.288 adv.; item block 252 ≤ 1.024; fijo 24.505).
+- **Smoke bloqueante**: `npm run smoke:opencode` reproducido → **23 escenarios / 0 fallos (104 checks), exit 0**: seam fresh sin stanza MCP + bundle dependency-less con los 12 tools; **una sesión headless por comando (11/11)** con sus artefactos/efectos (start/done por update, handoff, review-comment, adopt-create, spec/adr/explore/playbook escriben el artefacto); correlación desde un `tools.arggon.show` observado; never-clobber, failure isolation, plugin ausente e higiene.
+- **`options.pinned`**: opción real de 2.0.10 (el runtime registra su `session_move` con `options:{...,pinned:!0}`); el plugin pinea exactamente los 8 core y los 4 de mantenimiento siguen en `search`. Si un 2.x futuro la ignora, no hay crash (opciones desconocidas se ignoran; cada `add` está aislado).
+- **Upgrade W2→W3 de `init`** (probe base→branch, 2 fixtures): plugin intacto → `updated` al bundle y `opencode.jsonc` → `updated` sin stanza; plugin editado por el adoptante → `modified`+`skipped` con su edit preservado. Idempotencia/provenance OK.
+- **Base**: el PR está 1 commit detrás (8049a4d: solo tracker de task-native-tools), MERGEABLE/CLEAN.
+
+**BLOQUEANTE — los tests auto-reparan el artefacto commiteado: nunca fallan por drift**
+
+- `cli/src/plugin-copy.test.ts:22-29` (`regenerateBundle`) **reescribe** `opencode/plugins/arggon/index.bundle.ts` cuando difiere y recién después hace `expect(bundleOnDisk()).toBe(code)` (línea 45). `opencode/plugins/arggon/bundle.test.ts:54-58` hace lo mismo y además importa la copia ya reescrita. Validan el builder, nunca los bytes commiteados.
+- Repro (copia limpia de HEAD en `/tmp`, sin tocar el worktree): cambié una descripción en `opencode/plugins/arggon/index.ts` sin regenerar y corrí los dos archivos → **7/7 pass** y `index.bundle.ts` quedó silenciosamente reescrito con el cambio.
+- CI no lo atrapa: `prepare`/`npm ci` y `npm run build` (postbuild → `build:plugin`) regeneran el artefacto en el runner **antes** de `npm test`, y no hay `git diff --exit-code`. Un PR con el artefacto stale queda verde y se mergea: la copia que `init` vendoriza a los adoptantes queda vieja. Con "stage explicit paths only" del worker template, es un escenario probable, no teórico.
+- Contradice el claim del PR ("regenerate it and pin the bytes"), el del comentario del worker ("pins the bytes") y docs que dicen "byte parity pinned by tests" (`ArggonManager/docs/agents.md`, `docs/opencode2.md`, playbook). El precedente `skill-copy.test.ts` auto-repara una copia **gitignoreada**; acá el artefacto es commiteado y es el entregable central de W3.
+- Fix sugerido: comparar **antes** de escribir y fallar si el artefacto commiteado difiere (auto-sanar solo la copia derivada `.opencode/...`), o un `check:plugin`/`git diff --exit-code` en CI. Con eso el resto queda mergeable.
+
+**Menores (no bloquean solos)**
+
+- El smoke corre el *cuerpo* de cada comando como prompt: no pasa por el loader V2 de comandos, así que frontmatter (`agent:`, `subagent: true`) y descubrimiento de `/arggon-*` no quedan cubiertos end-to-end. El schema del runtime sí acepta `subagent` (`subtask` como alias); un check barato de frontmatter cerraría el flanco.
+- `templates/docs/opencode/commands/arggon-status.md` usa sintaxis CLI de filtros (`status:blocked`) en un ejemplo de `tools.arggon.list` (input nativo: `status` / `filter`); mejor `{ status: "blocked", stale: true }`.
+- Nit: el docstring de `opencode/plugins/arggon/typecheck.test.ts` sigue mencionando el import computado de `@opencode/plugin`, eliminado en este PR.
+
+**Decisión crítica que señalo explícitamente — retirada del auto-registro MCP**
+
+El plugin ya no toca `ctx.mcp` y la stanza sale del seam: consistente con ADR 0011 §5/§6 ("MCP fuera del default path") y con el alcance; `arggon mcp` y `.mcp.json` quedan intactos para otros clientes y `doctor` reporta la stanza presente como opcional (semántica nueva cubierta por tests). Consecuencia visible e intencional: en un adoptante existente, el re-run de `init` (provenance untouched) reemplaza el plugin W2 por el bundle y **pierde el auto-registro MCP** salvo que configure la stanza explícitamente; está documentado en README/docs/agents/opencode2/playbook y merece nota de release en W7. Sin objeción de arquitectura.
+
+**Fuera de alcance, OK**: el dogfood propio (`.opencode/commands` trackeados) sigue W2 y `smoke:opencode:wave` no se tocó; ambos W4/W7 y declarados.
+
+**No verificado**: `smoke:opencode:wave` (W4/W7) y `/arggon-*` a través del loader real de comandos V2 (limitación M1).
+
+**Recomendación: no-merge** hasta cerrar el gate anti-drift. Con ese fix, y con los gates ya reproducidos arriba, la recomendación pasa a **merge con merge commit** (nunca squash). No marcar `done` todavía.
