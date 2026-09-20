@@ -53,8 +53,8 @@ The day-to-day loop is unchanged and documented in
 
 | Artifact | What it is | Notes |
 | --- | --- | --- |
-| `opencode.jsonc` | Project config: formatter, compaction retention (no MCP stanza since W3) | Generated **only when the repo has no OpenCode config** (root or `.opencode/`); otherwise reported in `skipped[]` |
-| `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` | The repo's orchestration model as V2 agents | Coordinator allow-list; worker nesting denied; reviewer `edit` denied |
+| `opencode.jsonc` | Project config: formatter, compaction retention (no MCP stanza since W3) and the minimal shell gates (W4: no `--no-verify`, no force-push) | Generated **only when the repo has no OpenCode config** (root or `.opencode/`); otherwise reported in `skipped[]` |
+| `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` | The repo's orchestration model as V2 agents | Coordinator subagent allow-list; worker nesting + `arggon.create` denied; reviewer `edit` denied and read-only shell gates (W4) |
 | `.opencode/commands/arggon-*.md` | Eleven native commands (`/arggon-next`, `-start`, `-done`, `-handoff`, `-review`, `-status`, `-spec`, `-adr`, `-explore`, `-playbook`, `-adopt`) | Prompt templates driving the native tools (Code Mode `tools.arggon.*`); no CLI-driving prose, no shell blocks |
 | `.opencode/plugins/arggon/` | Vendored **single-file** plugin bundle (kernel inlined; ambient behavior + the native `arggon` tool namespace) | Built from the in-repo source by `npm run build:plugin`; loads with no `node_modules`; drift-gated by `npm run check:plugin` |
 | `.agents/skills/arggon-cli/` | Umbrella skill + `references/` (json-contract, methodology, orchestration, pitfalls) | Progressive disclosure: detail loads on demand |
@@ -77,6 +77,28 @@ namespace:
   runtime keeps them in its Code Mode catalog; a kernel failure becomes a typed
   tool error (`ArgonToolError`: kernel code + envelope) and the session
   continues.
+- **Worktree lifecycle tools (W4)** — `tools.arggon.start`, `branch` and
+  `cleanup` own the item worktree through the V2 worktree domain
+  (`ctx.worktree.create/list/remove`). `start` claims the item (kernel rules:
+  never steal) and creates `../<repo>-<id>` (name `<repo>-<id>`), creates the
+  convention branch inside it and records `branch` + `worktree_path` **in the
+  worktree copy**, so the claim commit lands on the feature branch and the
+  canonical checkout stays untouched — exactly like `arggon start --worktree`.
+  `cleanup` classifies with the **shared kernel rule** (the same
+  `classifyCleanupEntry` the CLI uses), removes merged worktrees through the
+  domain, deletes their branches and clears the records in one tracker commit.
+  Push and the `gh` PR step stay explicit agent steps; the CLI
+  (`arggon start --worktree`, `arggon cleanup --prune`) is the documented
+  fallback when the domain is unavailable.
+- **Permissions (W4)** — the generated seam adds minimal shell gates (deny
+  `git commit --no-verify*`, `git push --force*`, `git push -f*`) that
+  complement — never replace — the kernel invariants; the shipped agents add
+  role gates (reviewer `edit`/subagent denied plus read-only shell gates;
+  worker `arggon.create` denied; coordinator subagent allow-list). Native tool
+  actions normalize to `<namespace>_<tool>` (`arggon_update`), MCP tools to
+  `<server>_<tool>` (`arggon_arggon_update`): a `deny` removes the tool from
+  the Code Mode catalog. The base policy stays allow-all, so ordinary and
+  headless sessions are never blocked.
 - **MCP is out of the default path (W3)** — the plugin no longer registers
   `mcp.servers.arggon` and never touches `ctx.mcp`; the generated config carries
   no MCP stanza. `arggon mcp` and `.mcp.json` remain for non-OpenCode clients
@@ -109,8 +131,8 @@ working with the plugin broken or absent.
 ## Verify it works
 
 ```bash
-npm test                      # 1393+ tests
-npm run smoke:opencode        # headless scenarios on a real OpenCode runtime: dependency-less bundle, one session per native command
+npm test                      # 1406+ tests
+npm run smoke:opencode        # headless scenarios on a real OpenCode runtime: dependency-less bundle, one session per native command, the W4 worktree lifecycle + invariants + permissions
 npm run smoke:opencode:wave   # scripted coordinator/worker/reviewer wave (2 fixtures)
 npm run context:report --strict   # context budgets: AGENTS.md, MCP schemas, item block, keep.tokens
 ```

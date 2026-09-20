@@ -20,7 +20,7 @@ the npm workspace (`"workspaces": ["lib"]`).
 ## Stable export subset
 
 The machine surfaces (CLI, MCP adapter, and the native plugin tools of
-W2/W3) rely on this subset — it is the contract:
+W2/W3/W4) rely on this subset — it is the contract:
 
 | Area           | Exports                                                                                                                                                                                                                                |
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -44,6 +44,10 @@ imports, but is **not** frozen for native consumers:
   `formatTrendTable`, `formatValidateHuman`) — the CLI's eyes-only surface;
 - tracker-commit/config helpers (`commitTrackerMutation`, `resolveAutoCommit`,
   `updateGeneratedSection`, …) the root adapter wires;
+- worktree-cleanup classification and git plumbing (`classifyCleanupEntry`,
+  `defaultCleanupGit`, `findMergedPr`, `CLEANUP_TERMINAL_STATUSES`) — shared by
+  the CLI's `cleanup` and the native `cleanup` tool so the merge criterion
+  never forks (W4); the native tool injects a domain-backed `worktreeList`;
 - `sanitizeHuman*` helpers for the CLI error channel.
 
 Adding names is fine; removing or changing the stable subset (or the

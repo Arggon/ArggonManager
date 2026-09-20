@@ -1974,6 +1974,25 @@ function worktreeFail(
   }
 }
 
+/**
+ * Run a worktree tool body with the plugin's failure-isolation contract: an
+ * unexpected exception (a kernel throw, a broken domain promise) becomes a
+ * typed failure envelope instead of a raw throw through the tool boundary.
+ */
+async function guarded(
+  kernel: ArgonKernel,
+  command: string,
+  code: string,
+  body: () => Promise<{ ok: boolean; envelope: Record<string, unknown> }>,
+): Promise<{ ok: boolean; envelope: Record<string, unknown> }> {
+  try {
+    return await body()
+  } catch (error) {
+    logOnce(`worktree-${command}`, `${command} failed unexpectedly`, error)
+    return worktreeFail(kernel, command, code, detail(error))
+  }
+}
+
 /** Re-label a kernel failure envelope for the calling tool (command + code). */
 function remapFailure(
   envelope: Record<string, unknown>,
@@ -2561,7 +2580,8 @@ const WORKTREE_TOOL_SPECS: ArgonToolSpec[] = [
     // documented in ArggonManager/docs/opencode2.md and asserted by the
     // contract tests; the loose envelope never rejects a valid payload.
     output: OBJECT,
-    run: (kernel, input, options) => nativeStart(kernel, input, options),
+    run: (kernel, input, options) =>
+      guarded(kernel, "start", "START_FAILED", () => nativeStart(kernel, input, options)),
   },
   {
     name: "branch",
@@ -2574,7 +2594,8 @@ const WORKTREE_TOOL_SPECS: ArgonToolSpec[] = [
       additionalProperties: false,
     },
     output: OBJECT,
-    run: (kernel, input, options) => nativeBranch(kernel, input, options),
+    run: (kernel, input, options) =>
+      guarded(kernel, "branch", "BRANCH_FAILED", async () => nativeBranch(kernel, input, options)),
   },
   {
     name: "cleanup",
@@ -2593,7 +2614,8 @@ const WORKTREE_TOOL_SPECS: ArgonToolSpec[] = [
       additionalProperties: false,
     },
     output: OBJECT,
-    run: (kernel, input, options) => nativeCleanup(kernel, input, options),
+    run: (kernel, input, options) =>
+      guarded(kernel, "cleanup", "CLEANUP_FAILED", () => nativeCleanup(kernel, input, options)),
   },
 ]
 

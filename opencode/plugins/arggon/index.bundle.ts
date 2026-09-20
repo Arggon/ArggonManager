@@ -6909,6 +6909,15 @@ function worktreeFail(kernel, command, code, message, conventionVersion) {
         }),
     };
 }
+async function guarded(kernel, command, code, body) {
+    try {
+        return await body();
+    }
+    catch (error) {
+        logOnce(`worktree-${command}`, `${command} failed unexpectedly`, error);
+        return worktreeFail(kernel, command, code, detail(error));
+    }
+}
 function remapFailure(envelope, command, code) {
     const error = envelope.error !== null && typeof envelope.error === "object"
         ? envelope.error
@@ -7317,7 +7326,7 @@ const WORKTREE_TOOL_SPECS = [
             additionalProperties: false,
         },
         output: OBJECT,
-        run: (kernel, input, options) => nativeStart(kernel, input, options),
+        run: (kernel, input, options) => guarded(kernel, "start", "START_FAILED", () => nativeStart(kernel, input, options)),
     },
     {
         name: "branch",
@@ -7329,7 +7338,7 @@ const WORKTREE_TOOL_SPECS = [
             additionalProperties: false,
         },
         output: OBJECT,
-        run: (kernel, input, options) => nativeBranch(kernel, input, options),
+        run: (kernel, input, options) => guarded(kernel, "branch", "BRANCH_FAILED", async () => nativeBranch(kernel, input, options)),
     },
     {
         name: "cleanup",
@@ -7347,7 +7356,7 @@ const WORKTREE_TOOL_SPECS = [
             additionalProperties: false,
         },
         output: OBJECT,
-        run: (kernel, input, options) => nativeCleanup(kernel, input, options),
+        run: (kernel, input, options) => guarded(kernel, "cleanup", "CLEANUP_FAILED", () => nativeCleanup(kernel, input, options)),
     },
 ];
 const ALL_TOOL_SPECS = [...TOOL_SPECS, ...WORKTREE_TOOL_SPECS];

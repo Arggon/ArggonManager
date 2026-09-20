@@ -48,9 +48,11 @@ docs or the V1 schema for V2 work.
   failure-isolated (every path logs once and no-ops, never breaking a
   session/CLI/MCP). Ambient behavior plus the native tool namespace, never rule
   logic:
-  - **Native tools W2/W3 (ADR 0011, `task-native-tools`)** — registers the
-    twelve `arggon` tools (`list`, `create`, `update`, `show`, `next`, `report`,
-    `validate`, `comment`, `handoff`, `priority`, `sync`, `import_issues`) with
+  - **Native tools W2/W3/W4 (ADR 0011, `task-native-tools`,
+    `task-native-permissions-worktrees`)** — registers the fifteen `arggon`
+    tools (`list`, `create`, `update`, `show`, `next`, `report`, `validate`,
+    `comment`, `handoff`, `priority`, `sync`, `import_issues`, plus the
+    worktree lifecycle `start`, `branch`, `cleanup`) with
     `ctx.tool.transform`, `options.namespace: "arggon"` + `options.codemode:
     true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
     namespace. Each tool calls the kernel **in-process** (the bundle's inlined
@@ -166,18 +168,23 @@ docs or the V1 schema for V2 work.
   (2.0.7: static import fails, plain object loads),
   task-opencode-v2-plugin-import-gotcha (2.0.8 re-probe, same shape),
   task-playbook-opencode-2-0-10 (2.0.10 re-probe, same shape) and
-  task-native-commands-seam (W3: dependency-less bundle load + 12 native tools).
+  task-native-commands-seam (W3: dependency-less bundle load + 12 native tools)
+  and task-native-permissions-worktrees (W4: 15 tools, worktree domain
+  lifecycle + permission defaults).
 - **`options.pinned` (W3 catalog lever).** The runtime draws a subset of the
   Code Mode catalog under its own ~2000-token budget; 2.0.10 registers its own
   `session_move` tool with `options.pinned: true` (undocumented in the plugin
-  docs, probe 2026-09-20). The plugin pins the **core eight** workflow tools
-  (`list`, `create`, `update`, `show`, `next`, `validate`, `comment`, `handoff`)
-  and leaves the maintenance four (`report`, `priority`, `sync`,
-  `import_issues`) unpinned — still reachable through `search`. Pinning all
-  twelve would add ~52 B to the definitions payload but force more entries into
-  a budget the runtime cannot render alongside other plugins' tools, so the core
-  subset is the measured compromise; `context:report` prints the pinned count
-  and `tools.test.ts` pins the exact subset. Treat the option as
+  docs, probe 2026-09-20). The plugin pins the **core nine** workflow tools
+  (`list`, `create`, `update`, `show`, `next`, `validate`, `comment`, `handoff`,
+  plus W4's `start`, the claim → worktree entry `/arggon-start` drives) and
+  leaves the maintenance tools (`report`, `priority`, `sync`, `import_issues`,
+  `branch`, `cleanup`) unpinned — still reachable through `search`. Pinning
+  everything would force entries out of a budget the runtime cannot render
+  alongside other plugins' tools, so the core subset is the measured
+  compromise; `context:report` prints the pinned count and `tools.test.ts` pins
+  the exact subset. W4 keeps the definitions payload within the ADR 0006
+  advisory by shipping the three worktree tools with lean schemas (bare output
+  schema; the payload is at 12,182 B ≤ 12,288 B). Treat the option as
   feature-detected: unknown options are ignored, never fatal.
 - **Code Mode batching.** V2 Code Mode exposes the native namespace as
   `tools.arggon.*` (W3 default: `tools.arggon.next({})`, `tools.arggon.show`,
@@ -191,6 +198,37 @@ docs or the V1 schema for V2 work.
   2.0.10 re-probe got `Unknown tool 'arggon.arggon_next'` once and success on
   the immediate retry (smoke prompts have carried a one-retry line since W2 for
   this reason).
+- **Worktree domain (W4, task-native-permissions-worktrees).** `ctx.worktree`
+  exposes `create/list/refresh/remove/transform` on 2.0.10; probes recorded
+  (fixture repo, `opencode run --standalone`):
+  - every operation requires `projectID` (`ctx.location.project.id`) and loads
+    configuration from the project's saved `canonical` checkout; the plugin
+    context has `ctx.location.project.{id,directory,canonical}`.
+  - `create({ projectID, name, directory })` treats `directory` as the PARENT
+    (relative paths resolve against the canonical checkout, absolute paths as
+    given) and returns the actual directory; the name is collision-suffixed
+    (`collide` → `collide-2`). Without `worktree.directory` config the default
+    is the server data dir (`~/.local/share/opencode/worktree/<first-6-of-project-id>/`).
+  - the built-in Git strategy checks out a DETACHED worktree at the start ref
+    (`branch` is a start ref, not `-b`: an unknown ref fails with
+    `fatal: invalid reference`), so creating/switching the item branch is the
+    caller's job (`git switch -c <branch>` inside the worktree is the
+    equivalent of the CLI's `git worktree add -b`).
+  - `list` reads SAVED inventory only (a `git worktree add` directory is
+    invisible until `refresh`); `remove` works for any worktree of the project
+    (including git-created ones), `force` is required for dirty trees.
+  - `ctx.permission.rules` (the documented session-scoped rule setter) is
+    **absent on 2.0.10** — `ctx.permission.list/get/reply` exist. Do not build
+    on it; feature-detect if a 2.x adds it back.
+- **Permission action names (W4 probes).** A native plugin tool is gated as
+  `<namespace>_<tool>` (`arggon_update`, probe: a `deny` removes
+  `tools.arggon.update` from the Code Mode catalog — the model gets
+  `Unknown tool 'arggon.update'`); an MCP tool as `<server>_<tool>`
+  (`arggon_arggon_update`). `shell` rules match the scanner's command string
+  (`git push *` denies `git push origin main` with `Permission denied: shell`
+  while `git status` still runs). The shipped defaults are deliberately
+  non-breaking: no global `ask` (headless clients would stall), only narrow
+  `deny`s (force-push, `--no-verify`, reviewer mutations).
 - **Transforms replay asynchronously (2.0.10).** `await ctx.tool.transform(cb)`
   resolves before `cb` runs: the runtime replays the registered callbacks when
   it rebuilds the registry (observed on 2.0.10 while registering the native
@@ -223,12 +261,11 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   injected item block ≤ 1024 B (`ITEM_BLOCK_MAX_BYTES`, per-field clipping),
   MCP `tools/list` ≤ 12,288 B advisory (`task-schema-budget`). The report
   flags crossings inline like `doctor --budget` does.
-- Snapshot (2026-09-20, W3 `task-native-commands-seam` — values move when the
-  skills or tool schemas do, so re-run the report before relying on them):
-  fixed per-session surface ~24.5 KB (~6.1k tokens) — MCP `tools/list`
-  10,507 B and the native `arggon` definitions 11,097 B (12 tools, 8 pinned)
-  are the dominant costs, AGENTS.md 1,959 B, advertised descriptions 942 B
-  total. The W5 skill split cut the on-load skill from 21,955 B (single file) to
+- Snapshot (2026-09-20, W4 `task-native-permissions-worktrees` — values move
+  when the skills or tool schemas do, so re-run the report before relying on
+  them): MCP `tools/list` 10,507 B and the native `arggon` definitions
+  12,182 B (15 tools, 9 pinned) are the dominant costs, generated AGENTS.md
+  ~2.0 KB, advertised descriptions ~0.9 KB total. The W5 skill split cut the on-load skill from 21,955 B (single file) to
   an 11,942 B fixture umbrella, with the 18,100 B of references paid only when
   a task needs them. Those skill numbers are **source bytes** (this repo's
   `skills/arggon-cli/`, before marker stamping); the report's on-demand table
@@ -250,13 +287,18 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   commands are listed, and `tools.arggon.next` resolves the next claimable item.
   Transcripts are the review evidence (ADR 0008 spirit); `npm run smoke:opencode`
   scripts it headless on temp fixtures (plugin load, no MCP stanza in the fresh
-  seam, dependency-less bundle registering the twelve native tools, never-clobber,
+  seam, dependency-less bundle registering the fifteen native tools, never-clobber,
   failure isolation, plugin-absent CLI, **one bounded headless session per native
   command** (eleven: next/start/done/handoff/review/status/spec/adr/explore/
   playbook/adopt), item-block injection bounded to 1024 B from a `feat/<id>`
   branch, correlation from an observed native `tools.arggon.show` call, the
   `ARGON_ITEM` override, silence when nothing resolves or there is no `tasks/`,
-  session rename, and the failing-`validate` commit warning) and exits 0 with
+  session rename, the failing-`validate` commit warning, and the W4 scenarios:
+  the full claim → worktree → commit → stubbed-PR → done → cleanup round-trip
+  through the native tools, the never-steal/no-reopen invariants with the
+  generated permissions active (a real `arggon-worker` session) and the
+  reviewer gates (tool denied, `git push` denied, inspection still working))
+  and exits 0 with
   `skipped: opencode not installed` when the binary is absent. The plugin's pure parsers/block builder are unit-tested without
   OpenCode next to the source (`opencode/plugins/arggon/index.test.ts`, run by
   the suite via the `opencode/**/*.test.ts` vitest include); the native tool
@@ -273,7 +315,7 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   runs `setup()` and calls tools end to end (the deterministic proof of the
   dependency-less adopter shape). The headless native-tools scenario stays
   dependency-less (the kernel is inlined in the vendored bundle) and runs one
-  Code Mode script that calls all twelve tools: contract envelopes, create→update
+  Code Mode script that calls all twelve kernel tools: contract envelopes, create→update
   round-trip, the typed `SYNC_FAILED`/`IMPORT_FAILED` tool errors while the
   session continues, and the namespace listed by
   `search({namespace:"arggon"})`. Compaction cannot be forced deterministically
@@ -285,7 +327,7 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   static import, failed to load with `Cannot find package '@opencode/plugin'`
   and never wrote its setup marker; plugin B loaded and executed a real session;
   the session still exited 0). W3 (`task-native-commands-seam`) re-ran the whole
-  harness against the generated bundle: fresh-init seam without MCP, twelve
+  harness against the generated bundle: fresh-init seam without MCP, fifteen
   native tools registered in a dependency-less fixture, one bounded headless
   session per native command, and native `tools.arggon.show` correlation.
 

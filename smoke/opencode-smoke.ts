@@ -9,7 +9,7 @@
  *   W3 — seam without MCP + the vendored bundle (task-native-commands-seam):
  *   1. fresh init      — the generated seam carries NO MCP stanza and the
  *                        vendored single-file plugin loads in a dependency-less
- *                        fixture (no `node_modules`), registering the twelve
+ *                        fixture (no `node_modules`), registering the fifteen
  *                        native tools with the kernel inlined; the model
  *                        executes `tools.arggon.next({})` in Code Mode.
  *   2. adopter config  — init writes no `opencode.jsonc`; the plugin alone
@@ -22,11 +22,30 @@
  *                        keep working.
  *   5. plugin absent   — the CLI is unaffected without the plugin (and no MCP
  *                        server is configured by default anymore).
- *   6. native tools    — one headless session calls all twelve native tools
+ *   6. native tools    — one headless session calls all twelve kernel tools
  *                        (contract envelopes, create→update round-trip, the two
  *                        GitHub-dependent tools failing as typed errors while
  *                        the session continues) and finds the namespace in the
- *                        Code Mode catalog via `search`.
+ *                        Code Mode catalog via `search` (all fifteen tools).
+ *
+ *   W4 — permissions, worktrees and lifecycle (task-native-permissions-worktrees):
+ *  14. worktree lifecycle — a headless claim → worktree → commit → (stubbed) PR
+ *                        → done → cleanup round-trip through the native tools:
+ *                        `tools.arggon.start` creates `../<repo>-<id>` through
+ *                        the OpenCode worktree domain and records branch +
+ *                        worktree_path inside the worktree (the canonical
+ *                        checkout stays untouched), the harness commits and
+ *                        merges (the `gh` PR step is stubbed), then
+ *                        `tools.arggon.cleanup({ prune: true })` removes the
+ *                        worktree through the domain, deletes the merged branch
+ *                        and clears the record in one tracker commit.
+ *  15. invariants       — never-steal and no-reopen hold with the generated
+ *                        permissions active (a real `arggon-worker` session):
+ *                        the kernel refuses both through the native tools and
+ *                        the session continues.
+ *  16. permissions      — the shipped agent permissions load and stay
+ *                        effective (reviewer: `arggon.update` hidden, `git push`
+ *                        denied) without breaking ordinary sessions.
  *   7. commands        — one bounded headless session PER native command
  *                        (eleven), each expanded from the shipped
  *                        `.opencode/commands/arggon-*.md` body: the command
@@ -83,7 +102,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -226,7 +245,7 @@ class Fixture {
     }
   }
 
-  private itemId(result: RunResult): string | undefined {
+  itemId(result: RunResult): string | undefined {
     const item = this.json(result)?.item;
     const id = item !== null && typeof item === "object" ? (item as { id?: unknown }).id : undefined;
     return typeof id === "string" ? id : undefined;
@@ -251,7 +270,12 @@ class Fixture {
     return this.cli(["update", id, "--status", "in_progress", "--assignee", "smoke"]);
   }
 
-  opencode(message: string, overrides?: NodeJS.ProcessEnv, timeoutMs?: number): RunResult {
+  opencode(
+    message: string,
+    overrides?: NodeJS.ProcessEnv,
+    timeoutMs?: number,
+    agent?: string,
+  ): RunResult {
     return this.run(
       "opencode",
       [
@@ -264,6 +288,7 @@ class Fixture {
         MODEL,
         "--format",
         "json",
+        ...(agent === undefined ? [] : ["--agent", agent]),
         message,
       ],
       overrides,
@@ -291,6 +316,21 @@ class Fixture {
 
   path(rel: string): string {
     return join(this.dir, ...rel.split("/"));
+  }
+
+  /** Deterministic item worktree path (`../<repo>-<id>`, the start convention). */
+  worktreePath(id: string): string {
+    return join(dirname(this.dir), `${basename(this.dir)}-${id}`);
+  }
+
+  /** Frontmatter status of an item in this fixture (or a worktree copy). */
+  itemStatus(directory: string, id: string, root = this.dir): string | undefined {
+    try {
+      const raw = readFileSync(join(root, ...directory.split("/"), `${id}.md`), "utf8");
+      return /^status:\s*(\S+)\s*$/m.exec(raw)?.[1];
+    } catch {
+      return undefined;
+    }
   }
 
   read(rel: string): string {
@@ -512,7 +552,7 @@ function scenarioFreshInit(): void {
   check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
   check(
     "native tools register from the inlined kernel (12)",
-    session.stderr.includes('[arggon] tools: registered 12 native arggon tools (namespace="arggon":'),
+    session.stderr.includes('[arggon] tools: registered 15 native arggon tools (namespace="arggon":'),
     runTail(session),
   );
   check("no MCP server is registered by default", !mcpConnected(session), runTail(session));
@@ -530,8 +570,8 @@ function scenarioAdopterConfig(): void {
   f.saveTranscript("adopter-config", session);
   check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
   check(
-    "plugin registers the twelve native tools with no config entry",
-    session.stderr.includes('[arggon] tools: registered 12 native arggon tools (namespace="arggon":'),
+    "plugin registers the fifteen native tools with no config entry",
+    session.stderr.includes('[arggon] tools: registered 15 native arggon tools (namespace="arggon":'),
     runTail(session),
   );
   check("model executed the native next tool successfully", successfulArggonNext(session.stdout), runTail(session));
@@ -566,7 +606,7 @@ function scenarioNeverClobber(): void {
   check("adopter config bytes untouched", f.read("opencode.json") === config);
   check(
     "native tools still register alongside the adopter MCP server",
-    session.stderr.includes('[arggon] tools: registered 12 native arggon tools (namespace="arggon":'),
+    session.stderr.includes('[arggon] tools: registered 15 native arggon tools (namespace="arggon":'),
     runTail(session),
   );
 }
@@ -594,7 +634,7 @@ function scenarioFailureIsolation(): void {
   );
   check(
     "healthy arggon plugin still registers the native tools",
-    session.stderr.includes('[arggon] tools: registered 12 native arggon tools (namespace="arggon":'),
+    session.stderr.includes('[arggon] tools: registered 15 native arggon tools (namespace="arggon":'),
     runTail(session),
   );
   const next = f.cli(["next", "--json"]);
@@ -623,7 +663,7 @@ function scenarioPluginAbsent(): void {
 // Native-first W2 — the `arggon` tool namespace (task-native-tools)
 // ---------------------------------------------------------------------------
 
-/** The twelve native tools (spec-native-first-011 §Tools). */
+/** The fifteen native tools (spec-native-first-011 §Tools + W4 worktree domain). */
 const NATIVE_TOOL_NAMES = [
   "list",
   "create",
@@ -637,6 +677,9 @@ const NATIVE_TOOL_NAMES = [
   "priority",
   "sync",
   "import_issues",
+  "start",
+  "branch",
+  "cleanup",
 ] as const;
 
 /** Contract commands the script must return `ok: true` for, keyed by tool. */
@@ -732,7 +775,7 @@ function scenarioNativeTools(): void {
   check(
     "plugin logs the 12-tool registration with the namespace description",
     session.stderr.includes(
-      '[arggon] tools: registered 12 native arggon tools (namespace="arggon":',
+      '[arggon] tools: registered 15 native arggon tools (namespace="arggon":',
     ),
     runTail(session),
   );
@@ -792,7 +835,7 @@ function scenarioNativeTools(): void {
   const paths = (search.items ?? []).map((entry) => entry.path).sort();
   const expectedPaths = NATIVE_TOOL_NAMES.map((name) => `tools.arggon.${name}`).sort();
   check(
-    "the namespace appears in the Code Mode catalog with all twelve tools (search)",
+    "the namespace appears in the Code Mode catalog with all fifteen tools (search)",
     JSON.stringify(paths) === JSON.stringify(expectedPaths) && search.remaining === 0,
     JSON.stringify(paths),
   );
@@ -1048,7 +1091,7 @@ function commandCase(name: string, itemId: string): { args: string; tail: string
     case "start":
       return {
         args: itemId,
-        tail: `Claim ${itemId} and record the branch "feat/${itemId}" on it; skip the skill load and the session move. Do NOT create a git worktree, do not push and do not open a PR.`,
+        tail: `Claim ${itemId} and create its worktree with tools.arggon.start({ id: "${itemId}", assignee: "smoke" }); skip the skill load, the session move, the push and the PR steps.`,
       };
     case "done":
       return {
@@ -1109,9 +1152,10 @@ function itemBody(result: RunResult): string {
   return typeof body === "string" ? body : "";
 }
 
-function scenarioCommands(): void {
+function scenarioCommands(only?: string): void {
   scenario("commands (W3): one bounded headless session per native command");
-  for (const name of COMMAND_NAMES) {
+  const names = only === undefined ? COMMAND_NAMES : COMMAND_NAMES.filter((name) => name === only);
+  for (const name of names) {
     const f = new Fixture(`cmd-${name}`);
     f.bootstrap();
     const init = f.init();
@@ -1150,11 +1194,16 @@ function scenarioCommands(): void {
         `files: ${files.join(", ") || "none"}`,
       );
     } else if (name === "start") {
-      const shown = f.cli(["show", item.id, "--meta", "--json"]);
+      // W4: /arggon-start drives the native start tool — claim + branch +
+      // worktree are recorded inside the worktree copy; the canonical checkout
+      // stays untouched.
+      const worktree = f.worktreePath(item.id);
       check(
-        `${label}: claims the item through the native update tool`,
-        itemStatus(shown) === "in_progress" && executedTool(session.stdout, "update"),
-        `status=${itemStatus(shown) ?? "?"}`,
+        `${label}: claims and creates the worktree through the native start tool`,
+        executedTool(session.stdout, "start") &&
+          existsSync(worktree) &&
+          f.itemStatus(item.directory, item.id, worktree) === "in_progress",
+        `worktree=${worktree} status=${f.itemStatus(item.directory, item.id, worktree) ?? "?"}`,
       );
     } else if (name === "done") {
       const shown = f.cli(["show", item.id, "--meta", "--json"]);
@@ -1195,6 +1244,316 @@ function scenarioCommands(): void {
   }
 }
 
+
+// ---------------------------------------------------------------------------
+// W4 — worktree lifecycle, invariants and permissions
+// ---------------------------------------------------------------------------
+
+/** True when a completed shell call for `needle` failed with a permission denial. */
+function shellDenied(stdout: string, needle: string): boolean {
+  return parseTranscript(stdout).some((event) => {
+    if (event.type !== "tool_use" || event.part?.tool !== "shell") return false;
+    const state = event.part.state;
+    const input = state?.input as { command?: unknown } | undefined;
+    if (state?.status !== "error") return false;
+    if (typeof input?.command !== "string" || !input.command.includes(needle)) return false;
+    return (state.output ?? "").includes("Permission denied");
+  });
+}
+
+/** True when a completed shell call for `needle` succeeded. */
+function shellCompleted(stdout: string, needle: string): boolean {
+  return parseTranscript(stdout).some((event) => {
+    if (event.type !== "tool_use" || event.part?.tool !== "shell") return false;
+    const state = event.part.state;
+    const input = state?.input as { command?: unknown } | undefined;
+    return (
+      state?.status === "completed" &&
+      typeof input?.command === "string" &&
+      input.command.includes(needle)
+    );
+  });
+}
+
+/**
+ * W4 acceptance 1: headless claim → worktree → commit → (stubbed) PR → done →
+ * cleanup through the native tools. The worktree is created by the OpenCode
+ * worktree domain (`ctx.worktree.create`, name `<repo>-<id>`, parent
+ * `../<repo>-<id>`), the harness performs the git commit and the merge that
+ * stands in for the `gh` PR step, and `tools.arggon.cleanup({ prune: true })`
+ * reaps the merged worktree through the domain.
+ */
+function scenarioWorktreeLifecycle(): void {
+  scenario("worktree lifecycle (W4): claim → worktree → commit → stubbed PR → done → cleanup");
+  const f = new Fixture("lifecycle");
+  f.bootstrap();
+  const init = f.init();
+  check("init exits 0", init.status === 0, runTail(init));
+  const item = f.createTaskChain();
+  if (item === undefined) {
+    check("fixture item created", false, "create chain failed");
+    return;
+  }
+  check(
+    "generated seam carries the W4 permission gates (permissions active)",
+    f.read("opencode.jsonc").includes('"git push --force*"'),
+  );
+
+  const startSession = f.opencode(
+    [
+      "Use the execute tool with exactly this code:",
+      `return await tools.arggon.start({ id: "${item.id}", assignee: "smoke" })`,
+      "If the tool is not found, run the same code once more (the tool catalog can lag server startup).",
+      "Reply with only the raw JSON result.",
+    ].join("\n"),
+  );
+  f.saveTranscript("worktree-lifecycle-start", startSession);
+  check("start session succeeds", startSession.status === 0, runTail(startSession));
+  check("plugin loads in the runtime", pluginLoaded(startSession), runTail(startSession));
+  const started = executeJson(startSession.stdout, "tools.arggon.start");
+  check("model executed the native start tool", started !== undefined, runTail(startSession));
+  if (started === undefined) return;
+  const worktreePath = String(started.worktreePath ?? "");
+  check(
+    "start envelope carries the claim, branch and worktree",
+    started.ok === true &&
+      started.command === "start" &&
+      started.branch === `feat/${item.id}` &&
+      worktreePath.length > 0,
+    JSON.stringify(started).slice(0, 400),
+  );
+  check(
+    "worktree created at ../<repo>-<id> through the domain",
+    worktreePath === f.worktreePath(item.id) && existsSync(worktreePath),
+    `path=${worktreePath}`,
+  );
+  check(
+    "branch checked out inside the worktree",
+    f.git(["-C", worktreePath, "branch", "--show-current"]).stdout.trim() === `feat/${item.id}`,
+    f.git(["-C", worktreePath, "branch", "--show-current"]).stdout.trim(),
+  );
+  check(
+    "claim commit landed on the feature branch",
+    f.git(["-C", worktreePath, "log", "-1", "--pretty=%s"]).stdout.trim() ===
+      `chore(tasks): claimed ${item.id}`,
+    f.git(["-C", worktreePath, "log", "-1", "--pretty=%s"]).stdout.trim(),
+  );
+  check(
+    "claim + records live in the worktree copy",
+    f.itemStatus(item.directory, item.id, worktreePath) === "in_progress" &&
+      f.read(`${item.directory}/${item.id}.md`).length > 0,
+    `worktree status=${f.itemStatus(item.directory, item.id, worktreePath) ?? "?"}`,
+  );
+  check(
+    "canonical checkout stays untouched (still todo, no records)",
+    f.itemStatus(item.directory, item.id) === "todo" &&
+      !readFileSync(join(f.dir, item.directory, `${item.id}.md`), "utf8").includes("worktree_path"),
+    `canonical status=${f.itemStatus(item.directory, item.id) ?? "?"}`,
+  );
+
+  // The agent's work commit + the merge that stands in for the `gh` PR step.
+  writeFileSync(join(worktreePath, "work.txt"), "work\n", "utf8");
+  f.git(["-C", worktreePath, "add", "work.txt"]);
+  f.git(["-C", worktreePath, "commit", "-qm", "feat: lifecycle work"]);
+  f.git(["merge", "--no-ff", `feat/${item.id}`, "-m", "Merge PR (stubbed)"]);
+  check(
+    "stubbed PR merge brings the records to the canonical copy",
+    f.itemStatus(item.directory, item.id) === "in_progress" &&
+      readFileSync(join(f.dir, item.directory, `${item.id}.md`), "utf8").includes("worktree_path"),
+    `canonical status=${f.itemStatus(item.directory, item.id) ?? "?"}`,
+  );
+
+  const closeSession = f.opencode(
+    [
+      "Use the execute tool with exactly this code:",
+      `const done = await tools.arggon.update({ id: "${item.id}", status: "done" });`,
+      "const cleanup = await tools.arggon.cleanup({ prune: true });",
+      "return { done, cleanup };",
+      "If the tool is not found, run the same code once more (the tool catalog can lag server startup).",
+      "Reply with only the raw JSON result.",
+    ].join("\n"),
+  );
+  f.saveTranscript("worktree-lifecycle-close", closeSession);
+  check("close session succeeds", closeSession.status === 0, runTail(closeSession));
+  const closed = executeJson(closeSession.stdout, "tools.arggon.cleanup");
+  check("model executed the native cleanup tool", closed !== undefined, runTail(closeSession));
+  if (closed === undefined) return;
+  const cleanup = (closed.cleanup ?? {}) as Record<string, unknown>;
+  check(
+    "cleanup reports the removable candidate and the three prune actions",
+    cleanup.ok === true &&
+      cleanup.command === "cleanup" &&
+      Array.isArray(cleanup.candidates) &&
+      (cleanup.candidates as Array<Record<string, unknown>>)[0]?.removable === true &&
+      JSON.stringify(cleanup.pruned).includes(`removed worktree ${worktreePath}`) &&
+      JSON.stringify(cleanup.pruned).includes(`deleted branch feat/${item.id}`) &&
+      JSON.stringify(cleanup.pruned).includes("cleared worktree_path"),
+    JSON.stringify(cleanup).slice(0, 500),
+  );
+  check(
+    "cleanup committed the cleared record",
+    JSON.stringify(cleanup.commit ?? {}).includes(`chore(tasks): pruned ${item.id}`),
+    JSON.stringify(cleanup.commit ?? {}),
+  );
+  check(
+    "worktree removed through the domain and gone from disk",
+    !existsSync(worktreePath) && !f.git(["worktree", "list"]).stdout.includes(worktreePath),
+  );
+  check(
+    "merged branch deleted",
+    f.git(["branch", "--list", `feat/${item.id}`]).stdout.trim() === "",
+  );
+  check(
+    "item is done with worktree_path cleared",
+    f.itemStatus(item.directory, item.id) === "done" &&
+      !readFileSync(join(f.dir, item.directory, `${item.id}.md`), "utf8").includes("worktree_path"),
+    `status=${f.itemStatus(item.directory, item.id) ?? "?"}`,
+  );
+}
+
+/**
+ * W4 acceptance 2: never-steal and no-reopen hold with the generated
+ * permissions active. The session runs as the shipped `arggon-worker` agent
+ * (its frontmatter permissions are loaded) and the kernel — not the
+ * permissions — is what refuses both invariants.
+ */
+function scenarioInvariants(): void {
+  scenario("invariants (W4): never-steal and no-reopen hold with permissions active (worker agent)");
+  const f = new Fixture("invariants");
+  f.bootstrap();
+  const init = f.init();
+  check("init exits 0", init.status === 0, runTail(init));
+  const item = f.createTaskChain();
+  if (item === undefined) {
+    check("fixture item created", false, "create chain failed");
+    return;
+  }
+  check("fixture item claimed by smoke", f.claim(item.id).status === 0);
+  const other = f.itemId(f.cli(["create", "task", "Second item", "--parent", item.story, "--json"]));
+  check("second item created", other !== undefined);
+  if (other === undefined) return;
+  f.claim(other);
+  check("second item done", f.cli(["update", other, "--status", "done"]).status === 0);
+  check(
+    "generated seam + shipped worker agent carry the permissions (active)",
+    f.read("opencode.jsonc").includes('"permissions"') &&
+      existsSync(f.path(".opencode/agents/arggon-worker.md")),
+  );
+
+  const session = f.opencode(
+    [
+      "Use the execute tool with exactly this code:",
+      "const out = {};",
+      `try { out.steal = await tools.arggon.update({ id: "${item.id}", status: "in_progress", assignee: "intruder" }); } catch (error) { out.stealError = String((error && error.message) || error); }`,
+      `try { out.startSteal = await tools.arggon.start({ id: "${item.id}", assignee: "intruder" }); } catch (error) { out.startError = String((error && error.message) || error); }`,
+      `try { out.reopen = await tools.arggon.update({ id: "${other}", status: "todo" }); } catch (error) { out.reopenError = String((error && error.message) || error); }`,
+      "return out;",
+      "If the tool is not found, run the same code once more (the tool catalog can lag server startup).",
+      "Reply with only the raw JSON result.",
+    ].join("\n"),
+    undefined,
+    undefined,
+    "arggon-worker",
+  );
+  f.saveTranscript("invariants", session);
+  check("session succeeds as the worker agent", session.status === 0, runTail(session));
+  check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
+  const result = executeJson(session.stdout, "tools.arggon.update");
+  check("model executed the invariants script", result !== undefined, runTail(session));
+  if (result === undefined) return;
+  const stealError = String(result.stealError ?? "");
+  const startError = String(result.startError ?? "");
+  const reopenError = String(result.reopenError ?? "");
+  check(
+    "kernel refuses the claim steal through update (never steal)",
+    stealError.includes("claim conflict") && stealError.includes("UPDATE_FAILED"),
+    stealError.slice(0, 200),
+  );
+  check(
+    "kernel refuses the claim steal through start (never steal)",
+    startError.includes("claim conflict") && startError.includes("START_FAILED"),
+    startError.slice(0, 200),
+  );
+  check(
+    "kernel refuses the reopen of a done item (no reopen)",
+    reopenError.includes("must not reopen") && reopenError.includes("UPDATE_FAILED"),
+    reopenError.slice(0, 200),
+  );
+  check(
+    "both invariants hold: the item states are unchanged",
+    f.itemStatus(item.directory, item.id) === "in_progress" &&
+      f.itemStatus(item.directory, other) === "done" &&
+      !existsSync(f.worktreePath(item.id)),
+    `claimed=${f.itemStatus(item.directory, item.id) ?? "?"} done=${f.itemStatus(item.directory, other) ?? "?"}`,
+  );
+}
+
+/**
+ * W4 acceptance 4: the shipped permission defaults load without breaking
+ * ordinary sessions — and stay effective. A reviewer session reads the item
+ * and runs git inspection, while `arggon.update` (denied by the reviewer's
+ * frontmatter) and `git push` (denied by the reviewer's shell gates) are
+ * blocked.
+ */
+function scenarioPermissions(): void {
+  scenario("permissions (W4): the reviewer gates load and stay effective without breaking the session");
+  const f = new Fixture("permissions");
+  f.bootstrap();
+  const init = f.init();
+  check("init exits 0", init.status === 0, runTail(init));
+  const item = f.createTaskChain();
+  if (item === undefined) {
+    check("fixture item created", false, "create chain failed");
+    return;
+  }
+  f.claim(item.id);
+
+  const session = f.opencode(
+    [
+      "Use the execute tool with exactly this code:",
+      "const out = {};",
+      `out.show = await tools.arggon.show({ id: "${item.id}" });`,
+      `try { out.update = await tools.arggon.update({ id: "${item.id}", status: "todo" }); } catch (error) { out.updateError = String((error && error.message) || error); }`,
+      "return out;",
+      "Then run these two shell commands in order: `git push origin main` and `git status`.",
+      "If the tool is not found, run the same code once more (the tool catalog can lag server startup).",
+      "Reply with only the raw JSON result and what each shell command returned.",
+    ].join("\n"),
+    undefined,
+    undefined,
+    "arggon-reviewer",
+  );
+  f.saveTranscript("permissions", session);
+  check("session succeeds as the reviewer agent", session.status === 0, runTail(session));
+  check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
+  const result = executeJson(session.stdout, "tools.arggon.show");
+  check("model executed the reviewer script", result !== undefined, runTail(session));
+  if (result !== undefined) {
+    const show = (result.show ?? {}) as Record<string, unknown>;
+    check(
+      "the reviewer reads the item (show allowed)",
+      show.ok === true && show.command === "show",
+      JSON.stringify(show).slice(0, 200),
+    );
+    check(
+      "the reviewer cannot mutate the tracker (arggon.update denied)",
+      result.update === undefined &&
+        /Unknown tool|Permission denied/.test(String(result.updateError ?? "")),
+      String(result.updateError ?? "").slice(0, 200),
+    );
+  }
+  check(
+    "the reviewer's shell gate denies git push (permission denied)",
+    shellDenied(session.stdout, "git push") || textContains(session.stdout, "Permission denied"),
+    runTail(session),
+  );
+  check(
+    "ordinary shell inspection still runs (session not broken)",
+    shellCompleted(session.stdout, "git status"),
+    runTail(session),
+  );
+}
+
 function main(): void {
   console.log("smoke:opencode — OpenCode V2 plugin harness (W2 + W3)");
   if (!opencodeAvailable()) {
@@ -1206,6 +1565,13 @@ function main(): void {
   // (the full harness runs every scenario by default).
   if (process.env.OPENCODE_SMOKE_ONLY === "commands") {
     scenarioCommands();
+  } else if (process.env.OPENCODE_SMOKE_ONLY?.startsWith("command:")) {
+    // Dev aid: re-run one command scenario, e.g. OPENCODE_SMOKE_ONLY=command:adr.
+    scenarioCommands(process.env.OPENCODE_SMOKE_ONLY.slice("command:".length));
+  } else if (process.env.OPENCODE_SMOKE_ONLY === "w4") {
+    scenarioWorktreeLifecycle();
+    scenarioInvariants();
+    scenarioPermissions();
   } else {
     scenarioFreshInit();
     scenarioAdopterConfig();
@@ -1220,6 +1586,9 @@ function main(): void {
     scenarioContextSilent();
     scenarioContextOutside();
     scenarioHygiene();
+    scenarioWorktreeLifecycle();
+    scenarioInvariants();
+    scenarioPermissions();
   }
 
   if (failures.length > 0) {

@@ -57,7 +57,11 @@ PRIORITY_FAILED`.
 
 The vendored plugin registers the same operations as native `arggon` tools in
 Code Mode (`tools.arggon.list`, `create`, `update`, `show`, `next`, `report`,
-`validate`, `comment`, `handoff`, `priority`, `sync`, `import_issues`). Tool
+`validate`, `comment`, `handoff`, `priority`, `sync`, `import_issues`) plus the
+worktree lifecycle tools (`tools.arggon.start`, `branch`, `cleanup`; W4: the
+worktree domain owns the item worktree, the kernel keeps the claim/branch/
+`worktree_path` records, and `cleanup` classifies with the same kernel rule as
+the CLI). Tool
 outputs are the documented `--json` envelopes verbatim (byte parity pinned by
 the plugin contract tests); a kernel failure throws a typed tool error carrying
 the failure code and the `ok:false` envelope instead of exiting the process.
