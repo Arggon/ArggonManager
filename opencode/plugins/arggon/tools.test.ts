@@ -24,7 +24,15 @@
  * the fixture is a git repo without a GitHub remote — instead of here.
  */
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import {
+  chmodSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -130,11 +138,12 @@ function legacyPriorityLabel(dir: string): void {
   runUpdate({ cwd: dir, id: "task-rate-limit", labels: "p1,backend" });
 }
 
-function runCli(args: string[], cwd: string) {
+function runCli(args: string[], cwd: string, env?: NodeJS.ProcessEnv) {
   const proc = spawnSync(process.execPath, [tsx, cli, "--json", ...args], {
     encoding: "utf8",
     cwd,
     timeout: 60_000,
+    ...(env === undefined ? {} : { env }),
   });
   return { status: proc.status, stdout: proc.stdout ?? "", stderr: proc.stderr ?? "" };
 }
@@ -166,6 +175,95 @@ function trackerSnapshot(dir: string): Record<string, string> {
   walk(join(dir, "ArggonManager"));
   return out;
 }
+
+/** `git` in a fixture (bootstrap for the sync twin: origin remote required). */
+function git(dir: string, args: string[]): void {
+  const proc = spawnSync("git", args, { cwd: dir, encoding: "utf8", timeout: 30_000 });
+  expect(proc.status, proc.stderr).toBe(0);
+}
+
+/**
+ * Git twin fixture for `sync`: same layout as {@link seedTwin} plus a git repo
+ * whose origin is a GitHub remote, so the kernel detects `acme/demo` and only
+ * the `gh pr list` call needs a fake.
+ */
+function seedGitTwin(): string {
+  const dir = join(mkdtemp("arggon-w2-sync-"), "arggon-parity");
+  mkdirSync(dir);
+  seedInto(dir);
+  git(dir, ["init", "-q"]);
+  git(dir, ["config", "user.email", "parity@example.com"]);
+  git(dir, ["config", "user.name", "parity"]);
+  git(dir, ["remote", "add", "origin", "https://github.com/acme/demo.git"]);
+  return dir;
+}
+
+/**
+ * A fake `gh` on PATH (review F2): prints the canned JSON for `gh pr list` /
+ * `gh issue list` and fails loudly for anything else. Both surfaces under test
+ * (`sync`, `import_issues`) shell out to `gh`; PATH is how the CLI subprocess
+ * and the in-process tool both pick it up.
+ */
+function fakeGh(dir: string, responses: { prList?: string; issueList?: string }): string {
+  const binDir = join(dir, "bin");
+  mkdirSync(binDir, { recursive: true });
+  const shim = join(binDir, "gh");
+  const script = [
+    "#!/bin/sh",
+    'case "$1 $2" in',
+    '  "pr list")',
+    `    printf '%s' '${responses.prList ?? "[]"}'`,
+    "    ;;",
+    '  "issue list")',
+    `    printf '%s' '${responses.issueList ?? "[]"}'`,
+    "    ;;",
+    '  *) echo "fake gh: unsupported: $*" >&2; exit 1 ;;',
+    "esac",
+    "",
+  ].join("\n");
+  writeFileSync(shim, script, "utf8");
+  chmodSync(shim, 0o755);
+  return binDir;
+}
+
+/** Run `fn` with `binDir` prepended to PATH (in-process fake `gh`). */
+async function withFakeGh<T>(binDir: string, fn: () => Promise<T>): Promise<T> {
+  const original = process.env.PATH;
+  process.env.PATH = `${binDir}:${original ?? ""}`;
+  try {
+    return await fn();
+  } finally {
+    process.env.PATH = original;
+  }
+}
+
+/** One open PR matching `task-rate-limit`, as `gh pr list --json` returns it. */
+const FAKE_PR_LIST = JSON.stringify([
+  {
+    number: 7,
+    title: "Add rate limiting",
+    headRefName: "feat/task-rate-limit",
+    url: "https://github.com/acme/demo/pull/7",
+  },
+]);
+
+/** Two issues (bug + task, open + closed), as `gh issue list --json` returns them. */
+const FAKE_ISSUE_LIST = JSON.stringify([
+  {
+    number: 11,
+    title: "Login 500 on empty password",
+    state: "OPEN",
+    body: "Repro: submit an empty password.",
+    labels: [{ name: "bug" }],
+  },
+  {
+    number: 12,
+    title: "Add rate limiting",
+    state: "CLOSED",
+    body: "",
+    labels: [{ name: "enhancement" }],
+  },
+]);
 
 let kernel: ArgonKernel;
 
@@ -513,5 +611,47 @@ describe("kernel failures are typed tool errors and the session continues", () =
     const dir = seedTree();
     const ok = await tool(definitions(dir), "list").execute({});
     expect(ok.output.ok).toBe(true);
+  });
+});
+
+describe("GitHub-dependent tools mirror the CLI --json envelopes (fake gh)", () => {
+  it("sync write-mode matches `sync --write --json` and the tracker files", async () => {
+    const cliDir = seedGitTwin();
+    const toolDir = seedGitTwin();
+    const binDir = fakeGh(mkdtemp("arggon-w2-gh-"), { prList: FAKE_PR_LIST });
+
+    const expected = runCli(["sync", "--write"], cliDir, {
+      ...process.env,
+      PATH: `${binDir}:${process.env.PATH ?? ""}`,
+    });
+    expect(expected.status, expected.stderr).toBe(0);
+    const output = await withFakeGh(binDir, () =>
+      tool(definitions(toolDir), "sync").execute({ write: true }),
+    );
+    expect(normalize(`${JSON.stringify(output.output)}\n`, toolDir)).toBe(
+      normalize(expected.stdout, cliDir),
+    );
+    // The filled branch field is identical on both sides, not just the envelope.
+    expect(trackerSnapshot(toolDir)).toEqual(trackerSnapshot(cliDir));
+  });
+
+  it("import_issues dry-run matches `import-issues --dry-run --json`", async () => {
+    const cliDir = seedTwin();
+    const toolDir = seedTwin();
+    const binDir = fakeGh(mkdtemp("arggon-w2-gh-"), { issueList: FAKE_ISSUE_LIST });
+
+    const expected = runCli(["import-issues", "--dry-run"], cliDir, {
+      ...process.env,
+      PATH: `${binDir}:${process.env.PATH ?? ""}`,
+    });
+    expect(expected.status, expected.stderr).toBe(0);
+    const output = await withFakeGh(binDir, () =>
+      tool(definitions(toolDir), "import_issues").execute({ dry_run: true }),
+    );
+    expect(normalize(`${JSON.stringify(output.output)}\n`, toolDir)).toBe(
+      normalize(expected.stdout, cliDir),
+    );
+    // Dry run writes nothing on either side.
+    expect(trackerSnapshot(toolDir)).toEqual(trackerSnapshot(cliDir));
   });
 });
