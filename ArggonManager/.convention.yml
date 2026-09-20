@@ -137,7 +137,7 @@ x-generated:
     generatedAt: "2026-09-20T05:09:49.165Z"
   .opencode/plugins/arggon/index.ts:
     template: "opencode/plugins/arggon/index.ts"
-    checksum: "sha256:c61472e33b44a5784a7745fb0759b974fb6b7d438845414cf5f911f14bdc3416"
+    checksum: "sha256:811cbfb8b7d1732ada93510d747ae47f9a8d60e62706ca762e02a48291516bd3"
     arggonVersion: "0.3.0"
     generatedAt: "2026-09-20T05:09:49.165Z"
   ARCHITECTURE.md:
