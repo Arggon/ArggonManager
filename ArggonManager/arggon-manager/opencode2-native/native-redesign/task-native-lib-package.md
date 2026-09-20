@@ -49,7 +49,7 @@ package and absorbs the W1 review polish (`task-native-kernel-lib-polish`).
       comment/handoff); re-exports (`PriorityMigrateOptions`, `SyncFilled`) with
       no deep imports left in `mcp-server.ts`; clean-build test deletes `dist`
       first; stable export subset documented.
-- [ ] Full suite + lint + build + `arggon validate` + `arggon spec validate`
+- [x] Full suite + lint + build + `arggon validate` + `arggon spec validate`
       green; CI green.
 
 ## Notes
