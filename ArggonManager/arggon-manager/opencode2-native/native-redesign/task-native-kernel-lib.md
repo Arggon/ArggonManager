@@ -61,3 +61,33 @@ DECISIÓN REPORTADA (no tomada): bundling del plugin vendored single-file de W3 
 
 ### 2026-09-20 @Arggon
 CI `cli` pass en el head de PR #372 (`cba43a9`, run 35493791725, 2m55s). Gates locales del head: npm test 1350 passed (83 files) · lint · build · validate v5 · spec validate 18 docs.
+
+### 2026-09-20 @Arggon
+### 2026-09-20 @Arggon — Revisión W1 (PR #372, head `b823c34`)
+
+**Veredicto: MERGE (sin bloqueantes).** Merge commit (nunca squash; la rama lleva auto-commits del tracker). No marco done.
+
+#### Verificado (evidencia reproducida, no solo reportada)
+- Worktree `.../ArggonManager-opencode2-task-native-kernel-lib` en `b823c34`; PR #372 draft base `opencode2`, MERGEABLE. CI `cli`: success en `b823c34` (run 35493928181) y en `cba43a9` (35493791725).
+- Gates reproducidos: `npm test` **1350 passed (83 files)** · `npm run lint` limpio · `npm run build` limpio · `arggon validate` v5 (0 errores/0 warnings) · `arggon spec validate` (18 docs, ok). Delta de tests: 19 nuevos = 8 (`lib.test.ts`) + 11 (`lib-build.test.ts`).
+- Librería desde build limpio: `rm -rf dist && npm run build`; `import("arggon-manager/lib")` por self-reference del `exports` (artefacto real, no file path) → 100 exports con los entrypoints de items/rules/paths/envelopes y las 12 operaciones; `dist/lib.d.ts` presente; 0 bytes en stdout al importar; sin import runtime de `commander` (solo `dist/cli.js` lo importa). Identidad de reglas: `lib.assertUpdateRules === rules.assertUpdateRules` (+ `canTransition`, `isClaimed`, `assertParentEdge`, `runNext`).
+- Operaciones desde el artefacto compilado (no source): create/update/comment/handoff/done/reopen-refused/report → envelope y exit codes correctos; `agent:true` no reabre done (`UPDATE_FAILED`).
+- **Paridad byte a byte independiente**: base `fc68ccc` en worktree propio vs head, árboles gemelos, normalizando solo la ruta raíz y `claimed_at`. **66 comparaciones, 0 diferencias**: lecturas JSON y humanas (`list` ±`--full`/`--filter`/`--type`, `show` ±`--body`/`--meta`/`--tail-comments`, `next` ±`--ready`/`--include-stories`, `report`, `validate`), fallos (`show`/`comment`/`update` inexistente, filtro inválido, `report --format`/`--since`, `handoff` sin `--next`), `validate` con errores (envelope `ok:false` + `error`, exit 1), escrituras JSON y humanas (`create` con labels+priority, claim con lease, `--add-depends-on`, comment, handoff, done con **cascade real**: `autoCompleted:["story-login"]`, `cascadeLevels:["story"]`, `cascadeSkipped:[{auth, acceptance-incomplete}]`, `priority migrate` dry-run y real).
+- Alcance: diff solo en `ARCHITECTURE.md`, `engineering.md`, `json-output.md`, `cli.ts`, `mcp-server.ts`, `lib.ts`, `operations.ts`, 2 tests, `package.json` (+ item del tracker). `rules.ts` intacto, plugin/seam/templates sin tocar, sin dependencias nuevas (package.json solo `+exports`), sin reformateo masivo.
+
+#### No verificado / límites
+- `sync`/`import-issues`: paridad no reproducida (requiere `gh`); por revisión de código payload y `exit_code` idénticos, y la suite con `gh` mockeada pasa.
+- `issueRoundtrip` en MCP: verificado solo por lectura del diff; la prueba viva requiere `gh` + `x-github.issue-roundtrip: true` y no hay test que lo cubra.
+- El script externo de paridad del worker (33 casos) no está commiteado; reproduje un set independiente equivalente, no el mismo script.
+
+#### Hallazgos (por severidad; ninguno bloquea)
+1. **[media-baja] Cambio de comportamiento en el adapter MCP** (`cli/src/mcp-server.ts:457`, `cli/src/operations.ts:337`): `arggon_update` gana `issueRoundtrip` (antes lo omitía) y el `conventionVersion` de éxito se resuelve contra el tracker detectado. Es alineación con lo ya documentado en `ArggonManager/docs/json-output.md` §update ("aplica a todo caller del kernel, CLI y arggon_update por igual") y el worker lo declaró; la aceptación "sin cambio de comportamiento" se cumple para el CLI. Acción: test que congele el envelope MCP con `issueRoundtrip` (o nota explícita en el PR) antes de que W3/W7 lo hereden.
+2. **[baja] La paridad commiteada solo cubre lecturas** (`cli/src/lib-build.test.ts:57-66`, 8 casos); las escrituras solo se validaron con script externo. Añadir 2–3 casos de escritura al gate (`create`, `update` con cascade, comment/handoff): son los envelopes de mayor riesgo (`autoCompleted`/`cascadeSkipped`/`commit`) y hoy un refactor futuro podría romperlos con la suite en verde.
+3. **[baja] Superficie para W2/W3 incompleta en tipos/constantes**: `PriorityMigrateOptions` y `SyncFilled` se usan en firmas exportadas pero no se re-exportan (`cli/src/lib.ts:135,171`); y `mcp-server.ts` sigue importando `HANDOFF_SESSION_CAP` de `handoff.js` (`:4`) y `parseCsvList` de `update.js` (`:19`) en vez de la entrada de librería. W2 puede hacer deep-import, pero es el acoplamiento que W1 busca eliminar (el schema nativo de handoff necesita el cap).
+4. **[baja] El gate "clean build" no limpia `dist`** (`cli/src/lib-build.test.ts:121`): corre `npm run build` sobre el dist existente. Un `rm -rf dist` previo hace real la premisa de aceptación (verifiqué el build limpio + import manualmente: ok).
+5. **[informativo] Superficie amplia**: `lib.ts` re-exporta ~100 nombres, incluidas primitivas de frontmatter/ids y los `run*` de comando. Lo que W2/W3 necesitan es items/rules/paths/operations; conviene documentar qué es estable o marcar el resto como interno para no congelar internals en la API.
+
+#### Decisión de producto a confirmar (crítica, no tomada)
+Forma del paquete: W1 expone `arggon-manager/lib` como subpath export del paquete raíz existente (`package.json:7`; `private: true`, sin entry `"."` ni condición `require`/CJS). Consistente con ADR 0011 §5 ("un solo npm package = kernel + plugin + bin"), pero W3 (bundle de `dist/lib.js` en el plugin vendored single-file vs dependencia npm) y W7 (publicar, quitar `private`) heredan esta forma. Confirmar antes de W3 el nombre del subpath, la ausencia de CJS y la estrategia de bundling.
+
+**Recomendación: merge con merge commit**, con los puntos 1–5 como follow-ups de W2/W3 (no bloquean W1). Tras mergear: flip done de `task-native-kernel-lib` y desbloquear W2.
