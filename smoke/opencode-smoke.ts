@@ -363,13 +363,23 @@ function parseTranscript(stdout: string): TranscriptEvent[] {
   return events;
 }
 
+/**
+ * Normalize the Code Mode namespace spellings a model produces:
+ * `tools["arggon"].x` / `tools['arggon']['x']` → `tools.arggon.x`, so the
+ * transcript checks accept every valid form (observed in the bounded command
+ * sessions, W4).
+ */
+function normalizeNamespace(code: string): string {
+  return code.replace(/tools\s*\[\s*["']arggon["']\s*\]/g, "tools.arggon");
+}
+
 /** Completed Code Mode calls that ran the native `next` tool successfully. */
 function successfulArggonNext(stdout: string): boolean {
   return parseTranscript(stdout).some((event) => {
     if (event.type !== "tool_use" || event.part?.tool !== "execute") return false;
     const state = event.part.state;
     if (state?.status !== "completed") return false;
-    if (!(state.input?.code ?? "").includes("tools.arggon.next")) return false;
+    if (!normalizeNamespace(state.input?.code ?? "").includes("tools.arggon.next")) return false;
     const output = state.output ?? "";
     return output.includes('"ok": true') && output.includes('"command": "next"');
   });
@@ -380,7 +390,10 @@ function executedCode(stdout: string, needle: string): boolean {
   return parseTranscript(stdout).some((event) => {
     if (event.type !== "tool_use" || event.part?.tool !== "execute") return false;
     const state = event.part.state;
-    return state?.status === "completed" && (state.input?.code ?? "").includes(needle);
+    return (
+      state?.status === "completed" &&
+      normalizeNamespace(state.input?.code ?? "").includes(needle)
+    );
   });
 }
 
@@ -395,7 +408,7 @@ function executedTool(stdout: string, name: string): boolean {
     if (event.type !== "tool_use" || event.part?.tool !== "execute") return false;
     const state = event.part.state;
     if (state?.status !== "completed") return false;
-    const code = state.input?.code ?? "";
+    const code = normalizeNamespace(state.input?.code ?? "");
     return patterns.some((pattern) => code.includes(pattern));
   });
 }
@@ -735,7 +748,7 @@ function executeJson(stdout: string, needle: string): Record<string, unknown> | 
     if (event.type !== "tool_use" || event.part?.tool !== "execute") continue;
     const state = event.part.state;
     if (state?.status !== "completed") continue;
-    if (!(state.input?.code ?? "").includes(needle)) continue;
+    if (!normalizeNamespace(state.input?.code ?? "").includes(needle)) continue;
     try {
       return JSON.parse(state.output ?? "") as Record<string, unknown>;
     } catch {
