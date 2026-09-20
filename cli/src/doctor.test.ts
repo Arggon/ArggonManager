@@ -676,18 +676,20 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     writeFileSync(join(dir, name), `${JSON.stringify(config, null, 2)}\n`, "utf8");
   }
 
-  it("reports a clean seam (no adopter config, artifacts present, native registration, no hints)", () => {
+  it("reports a clean seam (no adopter config, artifacts present, no MCP stanza, no hints)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
     const result = runDoctor({ cwd: dir });
-    // Post-opencode-seam init generates the seam itself: opencode.jsonc is the
-    // only config, V2-shaped, and registers the arggon MCP server natively.
+    // Post-W3 init generates the seam itself: opencode.jsonc is the only
+    // config and carries NO MCP stanza (the vendored plugin registers the
+    // native tools); `.mcp.json` still ships for non-OpenCode clients.
     expect(result.opencode.configs).toEqual(["opencode.jsonc"]);
     expect(result.opencode.v1).toEqual({ findings: [], truncated: false });
     expect(result.opencode.artifacts).toEqual({
       config: true,
       agents: ["arggon-coordinator", "arggon-reviewer", "arggon-worker"],
       commands: [
+        "arggon-adopt",
         "arggon-adr",
         "arggon-done",
         "arggon-explore",
@@ -702,26 +704,26 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
       skills: ["arggon-cli", "arggon-upgrade"],
       truncated: false,
     });
-    // init also writes the project-scoped `.mcp.json`; the native config wins.
-    expect(result.opencode.mcp).toEqual({ native: true, mcpJson: true, hint: null });
+    // W3: the generated config has no MCP stanza; `.mcp.json` still ships.
+    expect(result.opencode.mcp).toEqual({ native: false, mcpJson: true, hint: null });
     const report = formatDoctorReport(result);
     expect(report).toContain("opencode: config opencode.jsonc");
-    expect(report).toContain("seam 14 artifact(s)"); // 1 config + 3 agents + 10 commands
+    expect(report).toContain("seam 15 artifact(s)"); // 1 config + 3 agents + 11 commands
     expect(report).toContain("2 bundled skill(s)");
-    expect(report).toContain("MCP native");
+    expect(report).toContain("MCP only in .mcp.json (other clients)");
     // Genuinely clean: every generated doc is untouched, so no hint line at all
     // (a fresh init must not trip its own "newer templates"/"--backup" hints).
     expect(report).not.toContain("hint:");
   });
 
-  it("reads a hand-edited JSONC seam config (comments + trailing commas) without false hints", () => {
+  it("reads a hand-edited JSONC seam config (comments + trailing commas) and flags the optional MCP stanza", () => {
     const dir = tempDir();
     bareTree(dir);
     plantSeam(dir);
     const result = runDoctor({ cwd: dir });
     // The planted SEAM_CONFIG is JSONC with a `//` comment and trailing commas:
-    // plain JSON.parse would reject it, so detecting native registration proves
-    // the tolerant parse — and the provenance-free fixture stays hint-free.
+    // plain JSON.parse would reject it, so detecting the stanza proves the
+    // tolerant parse; the stanza itself is now reported as optional (W3).
     expect(result.opencode.configs).toEqual(["opencode.jsonc"]);
     expect(result.opencode.v1).toEqual({ findings: [], truncated: false });
     expect(result.opencode.artifacts).toEqual({
@@ -731,10 +733,14 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
       skills: [],
       truncated: false,
     });
-    expect(result.opencode.mcp).toEqual({ native: true, mcpJson: false, hint: null });
+    expect(result.opencode.mcp).toEqual({
+      native: true,
+      mcpJson: false,
+      hint: OPENCODE_MCP_HINT,
+    });
     const report = formatDoctorReport(result);
-    expect(report).toContain("MCP native");
-    expect(report).not.toContain("hint:");
+    expect(report).toContain("MCP native (optional)");
+    expect(report).toContain("hint: optional: the native arggon tools do not need MCP");
   });
 
   it("parses a block comment (/* */) outside strings (MINOR-2)", () => {
@@ -795,12 +801,12 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
       ],
       truncated: false,
     });
-    // V1-shaped `mcp.arggon` is not native V2 registration, so the `.mcp.json`
-    // fallback (written by init) still triggers the actionable hint.
-    expect(result.opencode.mcp).toEqual({ native: false, mcpJson: true, hint: OPENCODE_MCP_HINT });
+    // V1-shaped `mcp.arggon` is not V2 registration; `.mcp.json` alone is the
+    // W3 default shape and no longer triggers an MCP hint.
+    expect(result.opencode.mcp).toEqual({ native: false, mcpJson: true, hint: null });
     const report = formatDoctorReport(result);
     expect(report).toContain("hint: V1-shaped OpenCode config opencode.json");
-    expect(report).toContain("V2 does not read .mcp.json");
+    expect(report).toContain("V2 expects MCP servers under mcp.servers");
   });
 
   it("does not flag the documented V2-valid mcp.timeout key (MINOR-2)", () => {
@@ -891,7 +897,7 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     expect(report).not.toContain(rawKey);
   });
 
-  it("adopter config with native mcp.servers.arggon registration: no hint", () => {
+  it("adopter config with an mcp.servers.arggon stanza: optional removal hint (W3)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
     writeAdopterConfig(dir, {
@@ -901,22 +907,25 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     const result = runDoctor({ cwd: dir });
     expect(result.opencode.configs).toEqual(["opencode.json"]);
     expect(result.opencode.v1).toEqual({ findings: [], truncated: false });
-    expect(result.opencode.mcp).toEqual({ native: true, mcpJson: true, hint: null });
+    expect(result.opencode.mcp).toEqual({
+      native: true,
+      mcpJson: true,
+      hint: OPENCODE_MCP_HINT,
+    });
     const report = formatDoctorReport(result);
-    expect(report).toContain("MCP native");
-    expect(report).not.toContain("hint:");
+    expect(report).toContain("MCP native (optional)");
+    expect(report).toContain("hint: optional: the native arggon tools do not need MCP");
   });
 
-  it("reports only in .mcp.json with the exact stanza hint", () => {
+  it("reports .mcp.json-only registration as the expected W3 shape (no hint)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
     writeAdopterConfig(dir, { formatter: true }); // adopter config without any MCP server
     const result = runDoctor({ cwd: dir });
-    expect(result.opencode.mcp).toEqual({ native: false, mcpJson: true, hint: OPENCODE_MCP_HINT });
-    expect(result.opencode.mcp.hint).toContain('"mcp": {"servers": {"arggon"');
+    expect(result.opencode.mcp).toEqual({ native: false, mcpJson: true, hint: null });
     const report = formatDoctorReport(result);
-    expect(report).toContain("MCP only in .mcp.json");
-    expect(report).toContain("mcp.servers");
+    expect(report).toContain("MCP only in .mcp.json (other clients)");
+    expect(report).not.toContain("hint:");
   });
 
   it("emits no hint when nothing is wired at all (report-only, no nagging)", () => {
@@ -1057,6 +1066,7 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     expect(body.opencode.v1.findings).toEqual([]);
     expect(body.opencode.mcp.native).toBe(false);
     expect(body.opencode.mcp.mcpJson).toBe(true);
-    expect(body.opencode.mcp.hint).toContain("mcp.servers");
+    // W3: no MCP stanza in the generated config and no registration nagging.
+    expect(body.opencode.mcp.hint).toBeNull();
   });
 });
