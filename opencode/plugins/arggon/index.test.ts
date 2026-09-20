@@ -18,6 +18,7 @@ import {
   parseArggonItemFromTool,
   parseValidateFailure,
   setBounded,
+  worktreeOptions,
 } from "./index.js";
 
 // plan-opencode2-009 W3 (T9-T10): the plugin's correlation/formatting logic is
@@ -589,5 +590,26 @@ describe("plugin-context: storage guard order", () => {
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
+  });
+});
+
+describe("plugin-context: worktree wiring (W4)", () => {
+  it("resolves the project id, canonical checkout and domain from the context", () => {
+    const domain = { create: async () => ({ directory: "/tmp/wt" }) };
+    expect(
+      worktreeOptions({
+        location: { project: { id: "project-id", canonical: "/repo" } },
+        worktree: domain,
+      }),
+    ).toEqual({ projectID: "project-id", canonical: "/repo", domain });
+  });
+
+  it("stays empty without the V2 surfaces (the worktree tools fail typed)", () => {
+    expect(worktreeOptions({})).toEqual({});
+    expect(worktreeOptions({ location: { project: { id: "  ", canonical: null } } })).toEqual({});
+    // A domain without a project id is not usable: every domain op requires it.
+    expect(worktreeOptions({ worktree: { create: async () => ({}) } })).toEqual({
+      domain: { create: expect.any(Function) },
+    });
   });
 });
