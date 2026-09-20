@@ -39,9 +39,10 @@ Keeping `main` installed side-by-side (so bare `arggon` stays on `main`)? See
 
 Within the session you get: the `arggon-cli` skill (umbrella + on-demand
 `references/`), the `/arggon-*` commands, the coordinator/worker/reviewer
-agents, the `arggon` MCP server (registered by the plugin when unset), and —
-when your branch maps to a work item — a bounded item-context block on every
-model call.
+agents, the `arggon` MCP server (registered by the plugin when unset), the
+native `arggon` Code Mode tools (registered by the plugin, calling the kernel
+in-process), and — when your branch maps to a work item — a bounded
+item-context block on every model call.
 
 The day-to-day loop is unchanged and documented in
 [`ArggonManager/docs/agents.md`](agents.md): find → claim → worktree → work → review → merge
@@ -54,7 +55,7 @@ The day-to-day loop is unchanged and documented in
 | `opencode.jsonc` | Project config: `mcp.servers.arggon`, formatter, compaction retention | Generated **only when the repo has no OpenCode config** (root or `.opencode/`); otherwise reported in `skipped[]` |
 | `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` | The repo's orchestration model as V2 agents | Coordinator allow-list; worker nesting denied; reviewer `edit` denied |
 | `.opencode/commands/arggon-*.md` | Ten workflow commands (`/arggon-next`, `-start`, `-done`, `-handoff`, `-review`, `-status`, `-spec`, `-adr`, `-explore`, `-playbook`) | Prompt templates driving the CLI/MCP; no shell blocks with arguments |
-| `.opencode/plugins/arggon/` | Vendored plugin (ambient behavior only) | Bundled from the in-repo source with a byte-parity test |
+| `.opencode/plugins/arggon/` | Vendored plugin (ambient behavior + the native `arggon` tool namespace) | Bundled from the in-repo source with a byte-parity test |
 | `.agents/skills/arggon-cli/` | Umbrella skill + `references/` (json-contract, methodology, orchestration, pitfalls) | Progressive disclosure: detail loads on demand |
 | `AGENTS.md` | Slim router | V2 reads `AGENTS.md` only (no `CLAUDE.md` fallback) |
 
@@ -64,10 +65,20 @@ skipped (or archived with `init --backup`), and nothing is ever clobbered.
 
 ## The plugin (optional, failure-isolated)
 
-`.opencode/plugins/arggon/` contributes **ambient behavior only**:
+`.opencode/plugins/arggon/` contributes ambient behavior plus the native tool
+namespace:
 
+- **Native `arggon` tools (ADR 0011, W2)** — registers twelve Code Mode tools
+  (`tools.arggon.list`, `create`, `update`, `show`, `next`, `report`,
+  `validate`, `comment`, `handoff`, `priority`, `sync`, `import_issues`) that
+  call the kernel **in-process** through `@arggon/lib` and return the documented
+  `--json` envelopes. A kernel failure becomes a typed tool error
+  (`ArgonToolError`: kernel code + envelope) and the session continues. The
+  kernel import is guarded: in a dependency-less adopter tree the namespace is
+  simply absent until the vendored bundle lands (W3).
 - **MCP auto-registration** — registers the `arggon` server only when no
-  server is configured (never clobbers yours).
+  server is configured (never clobbers yours). The MCP stanza stays until W3
+  drops it from the default path.
 - **Session ↔ item correlation** — `ARGON_ITEM` env → observed `arggon` calls →
   `feat/<id>` / `fix/<id>` branch.
 - **Bounded context** — injects an `arggon show --json`-shaped item block
@@ -95,8 +106,8 @@ working with the plugin broken or absent.
 ## Verify it works
 
 ```bash
-npm test                      # 1293+ tests
-npm run smoke:opencode        # 11 headless scenarios on a real OpenCode runtime
+npm test                      # 1385+ tests
+npm run smoke:opencode        # 12 headless scenarios on a real OpenCode runtime (incl. native tools)
 npm run smoke:opencode:wave   # scripted coordinator/worker/reviewer wave (2 fixtures)
 npm run context:report --strict   # context budgets: AGENTS.md, MCP schemas, item block, keep.tokens
 ```

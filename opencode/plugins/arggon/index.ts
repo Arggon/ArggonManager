@@ -1,39 +1,55 @@
 /**
- * ArggonManager OpenCode V2 plugin — W2 MCP auto-registration + W3 session context.
+ * ArggonManager OpenCode V2 plugin — W2 MCP auto-registration + W3 session
+ * context + native-first W2 `arggon` tools.
  *
  * `arggon init` bundles this file to `.opencode/plugins/arggon/index.ts`, where
- * OpenCode V2 discovers it with zero configuration. Ambient behavior only
- * (ADR 0010), never rule logic:
+ * OpenCode V2 discovers it with zero configuration. Ambient behavior and the
+ * native tool namespace only, never rule logic:
  *
- *   1. MCP auto-registration (W2): when no MCP server named `arggon` is
- *      configured, register `{ type: "local", command: ["arggon", "mcp"] }`
+ *   1. MCP auto-registration (ADR 0010 W2): when no MCP server named `arggon`
+ *      is configured, register `{ type: "local", command: ["arggon", "mcp"] }`
  *      through `ctx.mcp.transform`. A server already configured by the adopter
- *      (or by the generated `opencode.jsonc` seam) is never touched.
- *   2. Session ↔ work-item correlation (W3): remember the item id of every
- *      observed `arggon` invocation per session (`ctx.storage`), fall back to
- *      the VCS branch (`feat/<id>` / `fix/<id>`), and honor the explicit
- *      `ARGON_ITEM` environment override. Nothing resolves → no-op.
- *   3. Bounded context injection (W3): `ctx.session.hook("context")` appends a
- *      small advisory system part built from `arggon show <id> --meta --json`,
- *      cached for a few seconds. Per-call injection means the block is present
- *      again after compaction. Hard bound: ITEM_BLOCK_MAX_BYTES (1 KiB).
- *   4. Session ergonomics + hygiene (W3): rename the session to a claimed item
- *      id (`ctx.session.rename`, or `ctx.session.update` on 2.0.7 where rename
- *      is absent); after a shell `git commit`, run `arggon validate --json` and
- *      log a warning when it fails. The warning never blocks anything —
- *      pre-commit and CI stay authoritative.
+ *      (or by the generated `opencode.jsonc` seam) is never touched. (The
+ *      native-first rebuild drops this from the default path in W3.)
+ *   2. Native `arggon` tool namespace (ADR 0011 §1, plan-native-first-011 W2):
+ *      register list/create/update/show/next/report/validate/comment/handoff/
+ *      priority/sync/import_issues with `ctx.tool.transform`, namespaced
+ *      `arggon` and `options.codemode: true` (Code Mode: `tools.arggon.<name>`).
+ *      Every tool calls the kernel **in-process** through `@arggon/lib` — the
+ *      same `*Operation` the CLI's `--json` path uses — and returns the
+ *      documented envelope. Kernel failures throw `ArgonToolError` (a typed
+ *      tool error carrying the failure code and envelope), never a throw
+ *      through a hook; the session continues.
+ *   3. Session ↔ work-item correlation (ADR 0010 W3): remember the item id of
+ *      every observed `arggon` invocation per session (`ctx.storage`), fall
+ *      back to the VCS branch (`feat/<id>` / `fix/<id>`), and honor the
+ *      explicit `ARGON_ITEM` environment override. Nothing resolves → no-op.
+ *   4. Bounded context injection (ADR 0010 W3): `ctx.session.hook("context")`
+ *      appends a small advisory system part built from
+ *      `arggon show <id> --meta --json`, cached for a few seconds. Per-call
+ *      injection means the block is present again after compaction. Hard bound:
+ *      ITEM_BLOCK_MAX_BYTES (1 KiB).
+ *   5. Session ergonomics + hygiene (ADR 0010 W3): rename the session to a
+ *      claimed item id (`ctx.session.rename`, or `ctx.session.update` on 2.0.7
+ *      where rename is absent); after a shell `git commit`, run
+ *      `arggon validate --json` and log a warning when it fails. The warning
+ *      never blocks anything — pre-commit and CI stay authoritative.
  *
- * Contract (ADR 0010, plan-opencode2-009 T6–T10):
+ * Contract (ADR 0010, ADR 0011, plan-native-first-011):
  * - Optional and failure-isolated: every path is feature-detected and wrapped,
  *   a failure logs once and no-ops; the plugin must never break a session, the
- *   CLI or the MCP server.
- * - Thin: no rules, no native tools, no commands. State transitions go through
- *   the CLI (`execFile` with argument arrays) or the MCP server.
+ *   CLI or the MCP server. The kernel import is guarded and cached: a tree
+ *   without `@arggon/lib` (the ADR 0013 dependency-less adopter shape until
+ *   W3 vendors the single-file bundle) simply registers no tools.
+ * - Thin: no rules. State transitions go through the kernel
+ *   (`@arggon/lib` in-process), the CLI (`execFile` with argument arrays) or
+ *   the MCP server.
  * - Dependency-free: only Node builtins (`node:child_process`, `node:fs`,
- *   `node:path`); `Plugin.define` from `@opencode/plugin` is optional sugar and
- *   is resolved with a guarded dynamic import. The documented static import
- *   still fails to load an auto-discovered plugin in a dependency-less tree on
- *   2.0.8, exactly as on 2.0.7 (A/B re-probe 2026-09-18,
+ *   `node:path`, `node:url`); `@arggon/lib` and `Plugin.define` from
+ *   `@opencode/plugin` are resolved with guarded dynamic imports. The
+ *   documented static `@opencode/plugin` import still fails to load an
+ *   auto-discovered plugin in a dependency-less tree on 2.0.7, 2.0.8 and
+ *   2.0.10 (A/B re-probe 2026-09-18,
  *   task-opencode-v2-plugin-import-gotcha; details in docs/playbooks/opencode.md),
  *   so the import stays dynamic, non-fatal and computed (editors/tsc must not
  *   flag a package that is deliberately absent from adopter trees). The plain
@@ -48,7 +64,8 @@
 
 import { execFile } from "node:child_process"
 import { existsSync } from "node:fs"
-import { join } from "node:path"
+import { dirname, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 /** Minimal structural typing: the generated file must not import plugin types. */
 type McpLocalServer = { type: "local"; command: string[] }
@@ -75,8 +92,21 @@ type SessionContext = {
   hook?(name: string, callback: (event: unknown) => unknown): Promise<unknown>
 }
 
+/**
+ * Structural shape of the V2 `ctx.tool` editor (Build a plugin → Tools): the
+ * namespace description plus `add` for one tool definition. Deliberately
+ * structural, like every other context type here — the vendored file must not
+ * import plugin types (`@opencode/plugin` is deliberately absent from adopter
+ * trees, see Conventions "Vendored plugin imports").
+ */
+type ToolEditorLike = {
+  namespace?(input: { name: string; description: string }): void
+  add?(tool: ArgonToolRegistration): void
+}
+
 type ToolContext = {
   hook?(name: string, callback: (event: unknown) => unknown): Promise<unknown>
+  transform?(callback: (editor: ToolEditorLike) => void): Promise<unknown>
 }
 
 type PluginContext = {
@@ -1141,6 +1171,798 @@ async function onContext(ctx: PluginContext, event: ContextEvent): Promise<void>
 }
 
 // ---------------------------------------------------------------------------
+// Native arggon tool namespace (W2, plan-native-first-011)
+// ---------------------------------------------------------------------------
+
+/** Code Mode namespace the native kernel tools register under (ADR 0011 §1). */
+export const ARGON_TOOL_NAMESPACE = "arggon"
+
+/**
+ * Namespace description shown in the Code Mode catalog. Keep it one short line:
+ * the catalog pays for it on every model request (ADR 0006).
+ */
+export const ARGON_TOOL_NAMESPACE_DESCRIPTION =
+  "ArggonManager tracker tools, in-process — each returns its documented `--json` envelope; kernel failures are typed tool errors."
+
+/** Package the native tools import the kernel from (ADR 0013). */
+const ARGON_LIB_PACKAGE = "@arggon/lib"
+
+/** Bound of the envelope JSON appended to a typed tool error (see ArgonToolError). */
+const TOOL_ERROR_DETAIL_MAX_BYTES = 8192
+
+/** Bound of a runtime-provided session id used as the default author/session. */
+const SESSION_TOKEN_MAX_CHARS = 64
+
+/** Kernel surface the native tools consume (the `@arggon/lib` stable subset). */
+export type ArgonKernel = typeof import("@arggon/lib")
+
+/** Second `execute` argument V2 passes to a tool (session correlation only). */
+export type ArgonToolCallContext = { sessionID?: unknown }
+
+export type ArgonToolResult = { output: Record<string, unknown> }
+
+/** One tool definition as the editor receives it, minus `options`. */
+export type ArgonToolDefinition = {
+  name: string
+  description: string
+  input: Record<string, unknown>
+  output: Record<string, unknown>
+  execute: (
+    input: Record<string, unknown>,
+    tool?: ArgonToolCallContext,
+  ) => Promise<ArgonToolResult>
+}
+
+/** What `editor.add` receives (definitions + the namespace/codemode options). */
+export type ArgonToolRegistration = ArgonToolDefinition & {
+  options: { namespace: string; codemode: boolean }
+}
+
+export type ArgonToolOptions = {
+  /** Session/project directory every kernel call runs against. */
+  cwd: string
+  /**
+   * Fallback item-templates dir for `create`/`import-issues` (ADR 0013: the
+   * kernel embeds no templates). The repo's own `templates/` always wins.
+   */
+  templatesDir?: string
+}
+
+/**
+ * Typed tool error for a kernel failure (ADR 0011: kernel failures surface as
+ * tool errors, never as throws through hooks).
+ *
+ * The V2 tool boundary carries only an error message to the model — the
+ * runtime wraps any thrown error into its own `Tool.Error` — so the kernel's
+ * `error.code` is prefixed to the message and the complete `ok: false`
+ * envelope rides behind it on the next line (bounded): a Code Mode script that
+ * catches the error still sees the documented payload. The typed fields
+ * (`code`, `command`, `envelope`) are what the unit contract tests assert on.
+ */
+export class ArgonToolError extends Error {
+  readonly code: string
+  readonly command: string
+  readonly envelope: Record<string, unknown>
+
+  constructor(envelope: Record<string, unknown>) {
+    const error =
+      envelope.error !== null && typeof envelope.error === "object"
+        ? (envelope.error as { message?: unknown; code?: unknown })
+        : undefined
+    const code =
+      typeof error?.code === "string" && error.code !== "" ? error.code : "ARGON_TOOL_FAILED"
+    const message =
+      typeof error?.message === "string" && error.message !== ""
+        ? error.message
+        : "unknown kernel failure"
+    super(`${code}: ${message}\n${boundedEnvelopeJson(envelope)}`)
+    this.name = "ArgonToolError"
+    this.code = code
+    this.command = asString(envelope.command) ?? ""
+    this.envelope = envelope
+  }
+}
+
+/** Envelope JSON for the error message, bounded so a huge payload stays sane. */
+function boundedEnvelopeJson(envelope: Record<string, unknown>): string {
+  let json: string
+  try {
+    json = JSON.stringify(envelope) ?? ""
+  } catch {
+    return "<unserializable envelope>"
+  }
+  return json.length <= TOOL_ERROR_DETAIL_MAX_BYTES
+    ? json
+    : `${json.slice(0, TOOL_ERROR_DETAIL_MAX_BYTES)}… (envelope truncated)`
+}
+
+/** Shared envelope fields every kernel operation emits (json-output.md). */
+const ENVELOPE_SCHEMA_PROPERTIES: Record<string, unknown> = {
+  ok: { type: "boolean" },
+  schemaVersion: { type: "number" },
+  conventionVersion: { type: "number" },
+  command: { type: "string" },
+}
+
+/**
+ * Loose output schema for one tool: the shared envelope fields are required,
+ * command-specific payload fields are declared for the model's benefit and
+ * `additionalProperties: true` keeps every additive field legal — the kernel
+ * envelope is the contract, this schema never rejects a valid envelope.
+ */
+function envelopeSchema(extra: Record<string, unknown> = {}): Record<string, unknown> {
+  return {
+    type: "object",
+    properties: { ...ENVELOPE_SCHEMA_PROPERTIES, ...extra },
+    required: ["ok", "schemaVersion", "conventionVersion", "command"],
+    additionalProperties: true,
+  }
+}
+
+/** One CSV field from an array input (`update` labels/depends_on take CSV). */
+export function csvList(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return undefined
+  const parts = value.filter((entry): entry is string => typeof entry === "string")
+  return parts.join(",")
+}
+
+/** Copy of a string-array tool input (undefined when absent or not an array). */
+function arrayOfStrings(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return value.filter((entry): entry is string => typeof entry === "string")
+}
+
+/**
+ * Runtime-provided session id usable as the default comment author / handoff
+ * session: a conservative single-line token (no whitespace, no control
+ * characters) of at most SESSION_TOKEN_MAX_CHARS. Anything else is dropped so
+ * the plugin never feeds an odd runtime value into a body heading — the
+ * explicit tool arguments keep their kernel semantics either way.
+ */
+export function sessionToken(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined
+  const token = value.trim()
+  if (token === "" || token.length > SESSION_TOKEN_MAX_CHARS) return undefined
+  return /^[A-Za-z0-9._:-]+$/.test(token) ? token : undefined
+}
+
+type ArgonToolSpec = {
+  name: string
+  description: string
+  input: Record<string, unknown>
+  output: Record<string, unknown>
+  run: (
+    kernel: ArgonKernel,
+    input: Record<string, unknown>,
+    options: ArgonToolOptions,
+    tool?: ArgonToolCallContext,
+  ) => { ok: boolean; envelope: Record<string, unknown> }
+}
+
+const ID = { type: "string" }
+const STRINGS = { type: "array", items: { type: "string" } }
+const OBJECT = { type: "object" }
+const BOOLEAN = { type: "boolean" }
+const NUMBER = { type: "number" }
+
+/**
+ * The twelve native tools (spec-native-first-011 §Tools), each one a thin
+ * adapter over its kernel operation. Inputs mirror the CLI/MCP option surface
+ * (arrays where the kernel takes lists); outputs are the documented envelopes.
+ *
+ * Schemas stay deliberately lean: the Code Mode catalog renders each tool
+ * signature (descriptions become comments) and the runtime caps the whole
+ * catalog at its own ~2000-token budget, dropping entries past it — so
+ * property descriptions are kept only where the name is not self-evident.
+ * `nativeToolsCatalogBytes()` keeps the payload measurable (ADR 0006).
+ */
+const TOOL_SPECS: ArgonToolSpec[] = [
+  {
+    name: "list",
+    description:
+      "List tracker work items (filters compose with AND). Returns the `list --json` envelope (compact WorkItems, ADR 0006).",
+    input: {
+      type: "object",
+      properties: {
+        status: { type: "string" },
+        type: { type: "string" },
+        assignee: {
+          type: "string",
+          description: "Login; @me resolves via env/gh.",
+        },
+        parent: { type: "string" },
+        filter: {
+          type: "string",
+          description: 'e.g. "status:todo !label:security".',
+        },
+        view: {
+          type: "string",
+          description: "Saved view name (x-views in the tracker config).",
+        },
+        stale: { type: "boolean" },
+        older_than: {
+          type: "string",
+          description: "Stale threshold <number><d|h|m>, e.g. 7d.",
+        },
+        full: BOOLEAN,
+      },
+      additionalProperties: false,
+    },
+    output: envelopeSchema({ items: { type: "array" } }),
+    run: (kernel, input, options) =>
+      kernel.listOperation({
+        cwd: options.cwd,
+        status: asString(input.status),
+        type: asString(input.type),
+        assignee: asString(input.assignee),
+        parent: asString(input.parent),
+        filter: asString(input.filter),
+        view: asString(input.view),
+        stale: input.stale === true,
+        olderThan: asString(input.older_than),
+        full: input.full === true,
+      }),
+  },
+  {
+    name: "create",
+    description:
+      "Create a work item under a parent container. Returns the `create --json` envelope (path, item).",
+    input: {
+      type: "object",
+      properties: {
+        type: {
+          type: "string",
+          description: "initiative|epic|story|task|bug.",
+        },
+        title: { type: "string" },
+        parent: {
+          type: "string",
+          description: "Required except for initiatives.",
+        },
+        id: { type: "string", description: "Optional explicit id stem." },
+        assignee: { type: "string" },
+        labels: STRINGS,
+        status: {
+          type: "string",
+          description: "todo|in_progress|blocked|cancelled.",
+        },
+        blocked_reason: {
+          type: "string",
+          description: "Required with status blocked.",
+        },
+        priority: { type: "string", description: "p0|p1|p2|p3." },
+        issue: { type: "number", description: "Linked GitHub issue number." },
+        full: BOOLEAN,
+      },
+      required: ["type", "title"],
+      additionalProperties: false,
+    },
+    output: envelopeSchema({
+      path: { type: "string" },
+      item: OBJECT,
+      commit: OBJECT,
+    }),
+    run: (kernel, input, options) =>
+      kernel.createOperation({
+        cwd: options.cwd,
+        type: asString(input.type) ?? "",
+        title: asString(input.title) ?? "",
+        parent: asString(input.parent),
+        id: asString(input.id),
+        assignee: asString(input.assignee),
+        labels: arrayOfStrings(input.labels),
+        status: asString(input.status),
+        blockedReason: asString(input.blocked_reason),
+        priority: asString(input.priority),
+        issue: typeof input.issue === "number" ? input.issue : undefined,
+        templatesDir: options.templatesDir,
+        full: input.full === true,
+      }),
+  },
+  {
+    name: "update",
+    description:
+      "Update one item's frontmatter (status, claim, parent, labels, priority, depends_on). Agent rules: done/cancelled never reopen, claims are never stolen.",
+    input: {
+      type: "object",
+      properties: {
+        id: ID,
+        title: { type: "string" },
+        status: { type: "string" },
+        assignee: {
+          type: "string",
+          description: "Required when the new status is in_progress.",
+        },
+        unassign: { type: "boolean" },
+        branch: { type: "string", description: "Empty string clears." },
+        parent: {
+          type: "string",
+          description: "Reparent (same edge validation as the CLI).",
+        },
+        type: {
+          type: "string",
+          description: "Only 'story': promote a task to a story.",
+        },
+        labels: STRINGS,
+        priority: {
+          type: "string",
+          description: "p0|p1|p2|p3; empty string clears.",
+        },
+        depends_on: STRINGS,
+        add_depends_on: { type: "string" },
+        issue: { type: "number", description: "0 clears." },
+        blocked_reason: {
+          type: "string",
+          description: "Required with, and only with, status blocked.",
+        },
+        no_cascade: {
+          type: "boolean",
+          description: "Skip automatic container completion.",
+        },
+        full: BOOLEAN,
+      },
+      required: ["id"],
+      additionalProperties: false,
+    },
+    output: envelopeSchema({
+      item: OBJECT,
+      autoCompleted: { type: "array" },
+      cascadeLevels: { type: "array" },
+      cascadeSkipped: { type: "array" },
+    }),
+    run: (kernel, input, options) =>
+      kernel.updateOperation({
+        cwd: options.cwd,
+        id: asString(input.id) ?? "",
+        title: asString(input.title),
+        status: asString(input.status),
+        assignee: asString(input.assignee),
+        branch: asString(input.branch),
+        parent: asString(input.parent),
+        type: asString(input.type),
+        unassign: input.unassign === true,
+        labels: csvList(input.labels),
+        priority: asString(input.priority),
+        dependsOn: csvList(input.depends_on),
+        addDependsOn: asString(input.add_depends_on),
+        issue: typeof input.issue === "number" ? input.issue : undefined,
+        blockedReason: asString(input.blocked_reason),
+        cascade: input.no_cascade !== true,
+        full: input.full === true,
+        // Native tools act for an agent: the playbook invariants apply (no
+        // reopen, no steal) exactly as they do through the MCP server.
+        agent: true,
+      }),
+  },
+  {
+    name: "show",
+    description:
+      "Read one work item bounded (ADR 0006): frontmatter plus the last comments; `body: true` is the unbounded opt-in. Pure read.",
+    input: {
+      type: "object",
+      properties: {
+        id: ID,
+        meta: {
+          type: "boolean",
+          description: "Frontmatter only (no body, no comments).",
+        },
+        body: {
+          type: "boolean",
+          description: "Full body including ALL comments.",
+        },
+        tail_comments: {
+          type: "number",
+          description: "Compact view tail size.",
+        },
+      },
+      required: ["id"],
+      additionalProperties: false,
+    },
+    output: envelopeSchema({
+      item: OBJECT,
+      path: { type: "string" },
+      comments: { type: "array" },
+      body: { type: "string" },
+    }),
+    run: (kernel, input, options) =>
+      kernel.showOperation({
+        cwd: options.cwd,
+        id: asString(input.id) ?? "",
+        meta: input.meta === true,
+        body: input.body === true,
+        tailComments: typeof input.tail_comments === "number" ? input.tail_comments : undefined,
+      }),
+  },
+  {
+    name: "next",
+    description:
+      "Suggest the next claimable item (next-first, priority-major). Pure read; `suggestion` is null when the pool is empty.",
+    input: {
+      type: "object",
+      properties: {
+        ready: {
+          type: "boolean",
+          description: "Only ready items (all depends_on terminal).",
+        },
+        include_stories: {
+          type: "boolean",
+          description: "Include unclaimed stories in the pool.",
+        },
+      },
+      additionalProperties: false,
+    },
+    output: envelopeSchema({ suggestion: { type: ["object", "null"] } }),
+    run: (kernel, input, options) =>
+      kernel.nextOperation({
+        cwd: options.cwd,
+        ready: input.ready === true,
+        includeStories: input.include_stories === true,
+      }),
+  },
+  {
+    name: "report",
+    description:
+      "Aggregate leaf statuses per story, grouped by epic; `trend: true` mines git history. Pure read — never writes.",
+    input: {
+      type: "object",
+      properties: {
+        trend: { type: "boolean" },
+        since: { type: "string", description: "YYYY-MM-DD; requires trend." },
+      },
+      additionalProperties: false,
+    },
+    output: envelopeSchema({ groups: { type: "array" }, trend: OBJECT }),
+    run: (kernel, input, options) =>
+      kernel.reportOperation({
+        cwd: options.cwd,
+        trend: input.trend === true,
+        since: asString(input.since),
+      }),
+  },
+  {
+    name: "validate",
+    description:
+      "Validate tracker frontmatter and tree integrity. Pure read; a tree with errors raises a typed tool error carrying the envelope.",
+    input: { type: "object", properties: {}, additionalProperties: false },
+    output: envelopeSchema({
+      layout: { type: "string" },
+      errors: { type: "array" },
+      warnings: { type: "array" },
+    }),
+    run: (kernel, _input, options) => kernel.validateOperation({ cwd: options.cwd }),
+  },
+  {
+    name: "comment",
+    description:
+      "Append a comment to an item body (history, not a reopen: frontmatter and `updated` are untouched).",
+    input: {
+      type: "object",
+      properties: {
+        id: ID,
+        text: {
+          type: "string",
+          description: "Multiline supported; non-empty.",
+        },
+        author: {
+          type: "string",
+          description: "Defaults to the calling session id.",
+        },
+      },
+      required: ["id", "text"],
+      additionalProperties: false,
+    },
+    output: envelopeSchema({
+      id: { type: "string" },
+      path: { type: "string" },
+      comment: OBJECT,
+      commit: OBJECT,
+    }),
+    run: (kernel, input, options, tool) =>
+      kernel.commentOperation({
+        cwd: options.cwd,
+        id: asString(input.id) ?? "",
+        text: asString(input.text) ?? "",
+        author: asString(input.author) ?? sessionToken(tool?.sessionID),
+      }),
+  },
+  {
+    name: "handoff",
+    description:
+      "Append a structured, bounded session-end handoff (branch, next step, open questions) to an item body.",
+    input: {
+      type: "object",
+      properties: {
+        id: ID,
+        next: {
+          type: "string",
+          description: "First step for the resuming agent (capped at 200 chars).",
+        },
+        branch: {
+          type: "string",
+          description: "Auto-detected from git when omitted.",
+        },
+        open_questions: {
+          type: "string",
+          description: "Semicolon-separated (capped at 200 chars).",
+        },
+        session: {
+          type: "string",
+          description: "Defaults to the calling session id.",
+        },
+        author: {
+          type: "string",
+          description: "Defaults to the calling session id.",
+        },
+      },
+      required: ["id", "next"],
+      additionalProperties: false,
+    },
+    output: envelopeSchema({
+      id: { type: "string" },
+      path: { type: "string" },
+      comment: OBJECT,
+      handoff: OBJECT,
+      commit: OBJECT,
+    }),
+    run: (kernel, input, options, tool) => {
+      const fallback = sessionToken(tool?.sessionID)
+      return kernel.handoffOperation({
+        cwd: options.cwd,
+        id: asString(input.id) ?? "",
+        next: asString(input.next) ?? "",
+        branch: asString(input.branch),
+        openQuestions: asString(input.open_questions),
+        session: asString(input.session) ?? fallback,
+        author: asString(input.author) ?? fallback,
+      })
+    },
+  },
+  {
+    name: "priority",
+    description:
+      "Move legacy pN labels into the priority field (highest label wins, idempotent, never auto-commits).",
+    input: {
+      type: "object",
+      properties: {
+        dry_run: {
+          type: "boolean",
+          description: "Report the changes and write NOTHING.",
+        },
+      },
+      additionalProperties: false,
+    },
+    output: envelopeSchema({
+      dryRun: BOOLEAN,
+      scanned: NUMBER,
+      changed: NUMBER,
+      entries: { type: "array" },
+    }),
+    run: (kernel, input, options) =>
+      kernel.priorityOperation({
+        cwd: options.cwd,
+        dryRun: input.dry_run === true,
+      }),
+  },
+  {
+    name: "sync",
+    description:
+      "Reconcile item branch fields with open GitHub PRs; check by default, `write: true` fills empty branches.",
+    input: {
+      type: "object",
+      properties: {
+        check: {
+          type: "boolean",
+          description: "Report matches without modifying (default).",
+        },
+        write: {
+          type: "boolean",
+          description: "Fill empty branch fields from PRs.",
+        },
+        repo: {
+          type: "string",
+          description: "owner/name; default from origin.",
+        },
+      },
+      additionalProperties: false,
+    },
+    output: envelopeSchema({
+      mode: { type: "string" },
+      matched: { type: "array" },
+      unmatched: { type: "array" },
+      pending: { type: "array" },
+      errors: { type: "array" },
+    }),
+    run: (kernel, input, options) =>
+      kernel.syncOperation({
+        cwd: options.cwd,
+        check: input.check === true,
+        write: input.write === true,
+        repo: asString(input.repo),
+      }),
+  },
+  {
+    name: "import_issues",
+    description:
+      "Import GitHub issues into the tracker as task/bug items (idempotent; `dry_run: true` plans without writing).",
+    input: {
+      type: "object",
+      properties: {
+        repo: { type: "string", description: "owner/name; default from gh." },
+        parent: {
+          type: "string",
+          description: "Target story (default story-imported-issues).",
+        },
+        dry_run: { type: "boolean" },
+        no_commit: {
+          type: "boolean",
+          description: "Skip the tracker auto-commit.",
+        },
+      },
+      additionalProperties: false,
+    },
+    output: envelopeSchema({
+      dryRun: BOOLEAN,
+      story: OBJECT,
+      entries: { type: "array" },
+      created: NUMBER,
+      skipped: NUMBER,
+      commit: OBJECT,
+    }),
+    run: (kernel, input, options) =>
+      kernel.importIssuesOperation({
+        cwd: options.cwd,
+        repo: asString(input.repo),
+        parent: asString(input.parent),
+        dryRun: input.dry_run === true,
+        commit: input.no_commit === true ? false : undefined,
+        templatesDir: options.templatesDir,
+      }),
+  },
+]
+
+/** Name/description/schemas of every native tool (kernel-free; measurement/tests). */
+export function nativeToolSchemas(): Array<{
+  name: string
+  description: string
+  input: Record<string, unknown>
+  output: Record<string, unknown>
+}> {
+  return TOOL_SPECS.map((spec) => ({
+    name: spec.name,
+    description: spec.description,
+    input: spec.input,
+    output: spec.output,
+  }))
+}
+
+/**
+ * Tool-definition payload the Code Mode catalog is built from, as JSON bytes:
+ * the namespace entry plus one definition per tool. `smoke/context-report.ts`
+ * re-measures the ADR 0006 tool-schema surface with it — the runtime renders
+ * these definitions as catalog lines (one per tool, description clipped to its
+ * first 120 characters), so this is the stable, runtime-free measurement.
+ */
+export function nativeToolsCatalogBytes(): number {
+  return byteLength(
+    JSON.stringify({
+      namespace: { name: ARGON_TOOL_NAMESPACE, description: ARGON_TOOL_NAMESPACE_DESCRIPTION },
+      tools: nativeToolSchemas(),
+    }),
+  )
+}
+
+/**
+ * Build the executable tool definitions over one loaded kernel. Failure
+ * mapping lives here, once: a kernel `ok: false` becomes an `ArgonToolError`
+ * (typed tool error) and a success returns the envelope as the tool output so
+ * a Code Mode script receives the contract object.
+ */
+export function argonToolDefinitions(
+  kernel: ArgonKernel,
+  options: ArgonToolOptions,
+): ArgonToolDefinition[] {
+  return TOOL_SPECS.map((spec) => ({
+    name: spec.name,
+    description: spec.description,
+    input: spec.input,
+    output: spec.output,
+    execute: async (input, tool) => {
+      const outcome = spec.run(kernel, input ?? {}, options, tool)
+      const envelope = outcome.envelope as Record<string, unknown>
+      if (!outcome.ok) throw new ArgonToolError(envelope)
+      return { output: envelope }
+    },
+  }))
+}
+
+/**
+ * Fallback item-templates dir for `create`/`import-issues` (ADR 0013),
+ * resolved from the plugin file itself: `opencode/plugins/arggon/index.ts` in
+ * this repo and `.opencode/plugins/arggon/index.ts` in an adopter tree both
+ * walk up three levels to the package/repo root, where `templates/` lives. The
+ * W3 single-file bundle keeps the same layout. A missing dir is harmless — the
+ * kernel prefers the repo's own `templates/` first.
+ */
+export function pluginTemplatesDir(moduleUrl: string = import.meta.url): string {
+  return resolve(dirname(fileURLToPath(moduleUrl)), "..", "..", "..", "templates")
+}
+
+let kernelPromise: Promise<ArgonKernel | undefined> | undefined
+
+/** Registration log dedupe: the editor callback replays on every rebuild. */
+let toolsRegistrationLogged = false
+
+/**
+ * Guarded, cached kernel import (ADR 0013). Resolves `@arggon/lib` when the
+ * tree has it (this repo, or W3's vendored bundle); in the dependency-less
+ * adopter shape it logs once and returns undefined, so the plugin still loads
+ * and the ambient paths keep working. Never cached on rejection.
+ */
+export function loadArgonKernel(): Promise<ArgonKernel | undefined> {
+  kernelPromise ??= import(ARGON_LIB_PACKAGE).then(
+    (module) => module as ArgonKernel,
+    (error: unknown) => {
+      logOnce("kernel-import", `${ARGON_LIB_PACKAGE} unavailable (native tools idle)`, error)
+      return undefined
+    },
+  )
+  return kernelPromise
+}
+
+/**
+ * Register the native namespace with `ctx.tool.transform` (feature-detected,
+ * failure-isolated). Returns the number of definitions submitted, or 0 when
+ * the kernel or the transform surface is unavailable.
+ *
+ * The editor callback is replayed by the runtime on every registry rebuild
+ * (observed on 2.0.10: `await transform(...)` resolves before the callback
+ * runs), so per-add success is only known when it runs — failures are logged
+ * once and never propagate, and the one-time registration log fires on the
+ * first successful replay.
+ */
+export async function registerArgonTools(
+  ctx: PluginContext,
+  options: ArgonToolOptions,
+): Promise<number> {
+  const kernel = await loadArgonKernel()
+  if (kernel === undefined) return 0
+  const transform = ctx?.tool?.transform
+  if (typeof transform !== "function") return 0
+  const definitions = argonToolDefinitions(kernel, options)
+  await transform((editor) => {
+    if (typeof editor.namespace !== "function" || typeof editor.add !== "function") return
+    try {
+      editor.namespace({
+        name: ARGON_TOOL_NAMESPACE,
+        description: ARGON_TOOL_NAMESPACE_DESCRIPTION,
+      })
+    } catch (error) {
+      logOnce("tools-namespace", "native namespace registration failed", error)
+    }
+    let added = 0
+    for (const definition of definitions) {
+      try {
+        editor.add({
+          ...definition,
+          options: { namespace: ARGON_TOOL_NAMESPACE, codemode: true },
+        })
+        added += 1
+      } catch (error) {
+        logOnce("tools-add", `native tool registration failed (${definition.name})`, error)
+      }
+    }
+    if (added > 0 && !toolsRegistrationLogged) {
+      toolsRegistrationLogged = true
+      console.error(
+        `[arggon] tools: registered ${added} native ${ARGON_TOOL_NAMESPACE} tools ` +
+          `(namespace="${ARGON_TOOL_NAMESPACE}": ${ARGON_TOOL_NAMESPACE_DESCRIPTION})`,
+      )
+    }
+  })
+  return definitions.length
+}
+
+// ---------------------------------------------------------------------------
 // V2 plugin definition
 // ---------------------------------------------------------------------------
 
@@ -1163,6 +1985,16 @@ const definition: PluginDefinition = {
       }
     } catch (error) {
       logOnce("mcp", "MCP auto-registration unavailable", error)
+    }
+    try {
+      // Native tools (W2): the namespace is registered per plugin instance,
+      // bound to this instance's location directory.
+      const directory = locationDirectory(ctx)
+      if (directory !== undefined) {
+        await registerArgonTools(ctx, { cwd: directory, templatesDir: pluginTemplatesDir() })
+      }
+    } catch (error) {
+      logOnce("tools", "native tool registration unavailable", error)
     }
     try {
       const hook = ctx?.session?.hook
