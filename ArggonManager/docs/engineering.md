@@ -25,7 +25,9 @@ ArggonManager/          # git-native work tree + product docs (see `ArggonManage
   docs/                 # product docs: convention, engineering, agents, adr/, specs/, plans/
 cli/                    # CLI package: TypeScript sources (cli/src), one module per command
   src/                  # kernel (items/status/update/rules), commands, tests co-located
-dist/                   # compiled bin (gitignored; npm run build)
+  src/lib.ts            # kernel library entry (`arggon-manager/lib`); ADR 0011 §4
+  src/operations.ts     # in-process operations: --json envelope + exit codes per command
+dist/                   # compiled bin + library (gitignored; npm run build)
 templates/              # scaffolded by arggon init
 skills/arggon-cli/      # agent skill for the CLI (keep in sync with `ArggonManager/docs/json-output.md`)
 fixtures/               # golden trees for validate + integration tests

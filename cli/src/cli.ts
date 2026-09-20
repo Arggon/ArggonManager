@@ -12,6 +12,20 @@ import { runCleanup } from "./cleanup.js";
 import { readConventionVersion } from "./convention.js";
 import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
+import {
+  commentOperation,
+  createOperation,
+  handoffOperation,
+  importIssuesOperation,
+  listOperation,
+  nextOperation,
+  priorityOperation,
+  reportOperation,
+  showOperation,
+  syncOperation,
+  updateOperation,
+  validateOperation,
+} from "./lib.js";
 import { runDoctor, formatDoctorReport, measureBudgetForDoctor } from "./doctor.js";
 import { sanitizeHumanError } from "./sanitize.js";
 import {
@@ -485,6 +499,28 @@ program
     ) => {
       const json = jsonEnabled(opts);
       try {
+        if (json) {
+          // The kernel operation assembles the documented envelope; the CLI
+          // only emits it (ADR 0011 §4: one logic path, one library).
+          const outcome = createOperation({
+            cwd: process.cwd(),
+            type,
+            title,
+            parent: opts.parent,
+            id: opts.id,
+            assignee: opts.assignee,
+            labels: opts.labels !== undefined ? parseCsvList(opts.labels) : undefined,
+            priority: opts.priority,
+            status: opts.status,
+            blockedReason: opts.blockedReason,
+            issue: opts.issue !== undefined ? Number(opts.issue) : undefined,
+            commit: opts.commit === false ? false : undefined,
+            full: opts.full === true,
+          });
+          emitJson(outcome.envelope);
+          if (!outcome.ok) process.exitCode = 1;
+          return;
+        }
         const result = runCreate({
           cwd: process.cwd(),
           type,
@@ -499,18 +535,6 @@ program
           issue: opts.issue !== undefined ? Number(opts.issue) : undefined,
           commit: opts.commit === false ? false : undefined,
         });
-        if (json) {
-          successJson(
-            "create",
-            {
-              path: relative(result.root, result.path).split(sep).join("/"),
-              item: toContractWorkItem(result.item, result.root, { full: opts.full === true }),
-              commit: commitPayload(result.commit),
-            },
-            readConventionVersion(result.root),
-          );
-          return;
-        }
         console.log(`arggon create: ${result.item.type} ${sanitizeHumanError(result.id)}`);
         console.log(`  ${sanitizeHumanError(result.path)}`);
         const commitLine = formatCommitLine(result.commit);
@@ -583,6 +607,23 @@ program
     }) => {
       const json = jsonEnabled(opts);
       try {
+        if (json) {
+          const outcome = listOperation({
+            cwd: process.cwd(),
+            status: opts.status,
+            type: opts.type,
+            parent: opts.parent,
+            assignee: opts.assignee,
+            filter: opts.filter,
+            view: opts.view,
+            stale: opts.stale,
+            olderThan: opts.olderThan,
+            full: opts.full === true,
+          });
+          emitJson(outcome.envelope);
+          if (!outcome.ok) process.exitCode = 1;
+          return;
+        }
         const result = runList({
           cwd: process.cwd(),
           status: opts.status,
@@ -594,19 +635,6 @@ program
           stale: opts.stale,
           olderThan: opts.olderThan,
         });
-        if (json) {
-          successJson(
-            "list",
-            {
-              items: result.items.map((item) =>
-                toContractWorkItem(item, result.root, { full: opts.full === true }),
-              ),
-            },
-
-            readConventionVersion(result.root),
-          );
-          return;
-        }
         process.stdout.write(formatListTable(result.items));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -644,24 +672,21 @@ program
   .action((opts: { ready?: boolean; includeStories?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
+      if (json) {
+        const outcome = nextOperation({
+          cwd: process.cwd(),
+          ready: Boolean(opts.ready),
+          includeStories: Boolean(opts.includeStories),
+        });
+        emitJson(outcome.envelope);
+        if (!outcome.ok) process.exitCode = 1;
+        return;
+      }
       const result = runNext({
         cwd: process.cwd(),
         ready: Boolean(opts.ready),
         includeStories: Boolean(opts.includeStories),
       });
-      const suggestion = result.suggestion
-        ? {
-            item: toContractWorkItem(result.suggestion.item, result.root),
-            parentChain: result.suggestion.parentChain,
-            reason: result.suggestion.reason,
-            blockedBy: result.suggestion.blockedBy,
-            unblocks: result.suggestion.unblocks,
-          }
-        : null;
-      if (json) {
-        successJson("next", { suggestion }, readConventionVersion(result.root));
-        return;
-      }
       if (!result.suggestion) {
         // Default pool excludes stories; distinguish "only stories remain"
         // from a fully empty pool so the message points at the right flag.
@@ -732,6 +757,18 @@ program
             `--tail-comments must be a non-negative integer (got '${opts.tailComments}')`,
           );
         }
+        if (json) {
+          const outcome = showOperation({
+            cwd: process.cwd(),
+            id,
+            meta: opts.meta,
+            body: opts.body,
+            tailComments: opts.tailComments,
+          });
+          emitJson(outcome.envelope);
+          if (!outcome.ok) process.exitCode = 1;
+          return;
+        }
         const result = runShow({
           cwd: process.cwd(),
           id,
@@ -739,21 +776,6 @@ program
           body: opts.body,
           tailComments: opts.tailComments,
         });
-        const comments = result.comments.map((comment) => ({ ...comment }));
-        if (json) {
-          successJson(
-            "show",
-            {
-              item: toContractWorkItem(result.item, result.root),
-              path: result.path,
-              ...(opts.body === true
-                ? { body: result.item.body, comments: result.allComments.map((c) => ({ ...c })) }
-                : { comments }),
-            },
-            readConventionVersion(result.root),
-          );
-          return;
-        }
         console.log(renderShowText(result).join("\n"));
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
@@ -816,16 +838,17 @@ program
       process.exitCode = 1;
       return;
     }
-    const fail = (message: string, code: "REPORT_FAILED" | "TREND_FAILED"): void => {
-      if (json) {
-        failJson({
-          command: "report",
-          message,
-          code,
-          conventionVersion: readConventionVersion(process.cwd()),
-        });
-        return;
-      }
+    if (json) {
+      const outcome = reportOperation({
+        cwd: process.cwd(),
+        trend: opts.trend,
+        since: opts.since,
+      });
+      emitJson(outcome.envelope);
+      if (!outcome.ok) process.exitCode = 1;
+      return;
+    }
+    const fail = (message: string): void => {
       printHumanError("arggon report", message);
       process.exitCode = 1;
     };
@@ -834,18 +857,12 @@ program
       try {
         trend = runTrend({ cwd: process.cwd(), since: opts.since });
       } catch (err) {
-        fail(err instanceof Error ? err.message : String(err), "TREND_FAILED");
+        fail(err instanceof Error ? err.message : String(err));
         return;
       }
     }
     try {
       const result = runReport({ cwd: process.cwd() });
-      if (json) {
-        const payload: Record<string, unknown> = { groups: result.groups };
-        if (trend) payload.trend = trend;
-        successJson("report", payload, readConventionVersion(result.root));
-        return;
-      }
       if (format === "markdown") {
         const md = trend
           ? `${formatReportMarkdown(result)}${formatTrendMarkdown(trend)}`
@@ -856,17 +873,7 @@ program
       process.stdout.write(formatReportTable(result.groups));
       if (trend) process.stdout.write(formatTrendTable(trend));
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (json) {
-        failJson({
-          command: "report",
-          message,
-          code: "REPORT_FAILED",
-          conventionVersion: readConventionVersion(process.cwd()),
-        });
-        return;
-      }
-      printHumanError("arggon report", message);
+      printHumanError("arggon report", err instanceof Error ? err.message : String(err));
       process.exitCode = 1;
     }
   });
@@ -973,6 +980,34 @@ program
               await gateReopen({ id, from: current, to: "todo" });
             }
           }
+          if (json) {
+            const outcome = updateOperation({
+              cwd: process.cwd(),
+              id,
+              title: opts.title,
+              status: opts.status,
+              assignee: opts.assignee,
+              branch: opts.branch,
+              parent: opts.parent,
+              type: opts.type,
+              unassign: opts.unassign,
+              labels: opts.labels,
+              priority: opts.priority,
+              dependsOn: opts.dependsOn,
+              addDependsOn: opts.addDependsOn,
+              issue: opts.issue !== undefined ? Number(opts.issue) : undefined,
+              blockedReason: opts.blockedReason,
+              force: Boolean(opts.force),
+              steal: Boolean(opts.steal),
+              reason: opts.reason,
+              cascade: opts.cascade !== false,
+              full: opts.full === true,
+              commit: opts.commit,
+            });
+            emitJson(outcome.envelope);
+            if (!outcome.ok) process.exitCode = 1;
+            return;
+          }
           const result = runUpdate({
             cwd: process.cwd(),
             id,
@@ -1001,23 +1036,6 @@ program
           // fields commits; a no-op write (nothing requested changed) keeps
           // the previous no-commit behavior.
           const commit = maybeCommitUpdate(result, opts.commit);
-          if (json) {
-            successJson(
-              "update",
-              {
-                item: toContractWorkItem(result.item, result.root, { full: opts.full === true }),
-                autoCompleted: result.autoCompleted,
-                cascadeLevels: result.cascadeLevels,
-                ...(result.movedFrom ? { movedFrom: result.movedFrom } : {}),
-                ...(result.renamedFrom ? { renamedFrom: result.renamedFrom } : {}),
-                cascadeSkipped: result.cascadeSkipped,
-                ...(result.issueRoundtrip ? { issueRoundtrip: result.issueRoundtrip } : {}),
-                ...(commit ? { commit: commitPayload(commit) } : {}),
-              },
-              readConventionVersion(result.root),
-            );
-            return;
-          }
           const what = result.changed.length > 0 ? ` (${result.changed.join(", ")})` : "";
           console.log(`arggon update: ${result.item.type} ${sanitizeHumanError(result.id)}${what}`);
           console.log(`  ${sanitizeHumanError(result.path)}`);
@@ -1095,20 +1113,13 @@ priority
   .action((opts: { dryRun?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
-      const result = runPriorityMigrate({ cwd: process.cwd(), dryRun: Boolean(opts.dryRun) });
       if (json) {
-        successJson(
-          "priority",
-          {
-            dryRun: result.dryRun,
-            scanned: result.scanned,
-            changed: result.changed,
-            entries: result.entries,
-          },
-          readConventionVersion(result.root),
-        );
+        const outcome = priorityOperation({ cwd: process.cwd(), dryRun: Boolean(opts.dryRun) });
+        emitJson(outcome.envelope);
+        if (!outcome.ok) process.exitCode = 1;
         return;
       }
+      const result = runPriorityMigrate({ cwd: process.cwd(), dryRun: Boolean(opts.dryRun) });
       console.log(
         `arggon priority migrate${result.dryRun ? " (dry run)" : ""}: scanned ${result.scanned} item(s), ${result.changed} change(s)`,
       );
@@ -1231,6 +1242,19 @@ program
             "--file -: stdin is a terminal (pipe the comment text in, or pass a --file <path>)",
           );
         }
+        if (json) {
+          const outcome = commentOperation({
+            cwd: process.cwd(),
+            id,
+            text: text ?? "",
+            file: opts.file,
+            author: opts.author,
+            commit: opts.commit === false ? false : undefined,
+          });
+          emitJson(outcome.envelope);
+          if (!outcome.ok) process.exitCode = 1;
+          return;
+        }
         const result = runComment({
           cwd: process.cwd(),
           id,
@@ -1239,19 +1263,6 @@ program
           author: opts.author,
           commit: opts.commit === false ? false : undefined,
         });
-        if (json) {
-          successJson(
-            "comment",
-            {
-              id: result.id,
-              path: result.path,
-              comment: result.comment,
-              commit: commitPayload(result.commit),
-            },
-            readConventionVersion(result.root),
-          );
-          return;
-        }
         console.log(
           `arggon comment: ${sanitizeHumanError(result.id)} (${result.comment.date} @${sanitizeHumanError(result.comment.author)})`,
         );
@@ -1323,6 +1334,21 @@ program
             'handoff requires --next "<next step>" (the first thing the resuming agent should do)',
           );
         }
+        if (json) {
+          const outcome = handoffOperation({
+            cwd: process.cwd(),
+            id,
+            next: opts.next,
+            branch: opts.branch,
+            openQuestions: opts.openQuestions,
+            session: opts.session,
+            author: opts.author,
+            commit: opts.commit === false ? false : undefined,
+          });
+          emitJson(outcome.envelope);
+          if (!outcome.ok) process.exitCode = 1;
+          return;
+        }
         const result = runHandoff({
           cwd: process.cwd(),
           id,
@@ -1333,20 +1359,6 @@ program
           author: opts.author,
           commit: opts.commit === false ? false : undefined,
         });
-        if (json) {
-          successJson(
-            "handoff",
-            {
-              id: result.id,
-              path: result.path,
-              comment: result.comment,
-              handoff: result.handoff,
-              commit: commitPayload(result.commit),
-            },
-            readConventionVersion(result.root),
-          );
-          return;
-        }
         console.log(
           `arggon handoff: ${sanitizeHumanError(result.id)} (${result.comment.date} @${sanitizeHumanError(result.comment.author)} — next: ${sanitizeHumanError(result.handoff.next)})`,
         );
@@ -1398,6 +1410,18 @@ program
     }) => {
       const json = jsonEnabled(opts);
       try {
+        if (json) {
+          const outcome = importIssuesOperation({
+            cwd: process.cwd(),
+            repo: opts.repo,
+            parent: opts.parent,
+            dryRun: Boolean(opts.dryRun),
+            commit: opts.commit === false ? false : undefined,
+          });
+          emitJson(outcome.envelope);
+          if (!outcome.ok) process.exitCode = 1;
+          return;
+        }
         const result = runImportIssues({
           cwd: process.cwd(),
           repo: opts.repo,
@@ -1405,22 +1429,6 @@ program
           dryRun: Boolean(opts.dryRun),
           commit: opts.commit === false ? false : undefined,
         });
-        if (json) {
-          successJson(
-            "import-issues",
-            {
-              dryRun: result.dryRun,
-              story: result.story,
-              entries: result.entries,
-              created: result.created,
-              skipped: result.skipped,
-              labels: { mapped: result.labelsMapped, skipped: result.labelsSkipped },
-              ...(result.commit ? { commit: commitPayload(result.commit) } : {}),
-            },
-            readConventionVersion(result.root),
-          );
-          return;
-        }
         console.log(
           `arggon import-issues${result.dryRun ? " (dry run)" : ""}: ${result.entries.length} issue(s), ${result.created} created, ${result.skipped} skipped`,
         );
@@ -1461,31 +1469,13 @@ program
   .action((opts: { json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
-      const result = runValidate({ cwd: process.cwd() });
       if (json) {
-        const payload = {
-          ok: result.errors.length === 0,
-          schemaVersion: JSON_SCHEMA_VERSION,
-          conventionVersion: result.conventionVersion,
-          command: "validate",
-          layout: result.layout,
-          errors: result.errors,
-          warnings: result.warnings,
-        };
-        if (result.errors.length > 0) {
-          emitJson({
-            ...payload,
-            error: {
-              message: `validate failed with ${result.errors.length} error(s)`,
-              code: "VALIDATE_FAILED",
-            },
-          });
-          process.exitCode = 1;
-          return;
-        }
-        emitJson(payload);
+        const outcome = validateOperation({ cwd: process.cwd() });
+        emitJson(outcome.envelope);
+        process.exitCode = outcome.exitCode;
         return;
       }
+      const result = runValidate({ cwd: process.cwd() });
       process.stdout.write(formatValidateHuman(result));
       if (result.errors.length > 0) process.exitCode = 1;
     } catch (err) {
@@ -2705,69 +2695,56 @@ program
   .action((opts: { check?: boolean; write?: boolean; json?: boolean; repo?: string }) => {
     const json = jsonEnabled(opts);
     try {
+      if (json) {
+        const outcome = syncOperation({
+          cwd: process.cwd(),
+          check: opts.check,
+          write: opts.write,
+          repo: opts.repo,
+        });
+        emitJson(outcome.envelope);
+        process.exitCode = outcome.exitCode;
+        return;
+      }
       const result = runSync({
         check: opts.check,
         write: opts.write,
         repo: opts.repo,
       });
-      const payload = {
-        mode: result.mode,
-        matched: result.matched,
-        unmatched: result.unmatched,
-        pending: result.pending,
-        ambiguous: result.ambiguous,
-        suggestions: result.suggestions,
-        filled: result.filled,
-        errors: result.errors,
-        exit_code: result.exit_code,
-      };
-      if (json) {
-        if (result.errors.length > 0) {
-          failJson({
-            command: "sync",
-            message: result.errors.join("; "),
-            code: "SYNC_FAILED",
-            conventionVersion: readConventionVersion(process.cwd()),
-          });
-        } else {
-          successJson("sync", payload, readConventionVersion(process.cwd()));
-        }
-      } else {
+      console.log(
+        `arggon sync (${result.mode}): ${result.exit_code === 0 ? "in sync" : "sync needed"}`,
+      );
+      for (const id of result.matched) {
+        console.log(`  matched:   ${sanitizeHumanError(id)}`);
+      }
+      for (const s of result.suggestions) {
         console.log(
-          `arggon sync (${result.mode}): ${result.exit_code === 0 ? "in sync" : "sync needed"}`,
+          `  fillable:  ${sanitizeHumanError(s.id)} <- ${sanitizeHumanError(s.branch)} (#${s.pr})`,
         );
-        for (const id of result.matched) {
-          console.log(`  matched:   ${sanitizeHumanError(id)}`);
-        }
-        for (const s of result.suggestions) {
+      }
+      for (const id of result.pending) {
+        if (!result.suggestions.some((s) => s.id === id)) {
           console.log(
-            `  fillable:  ${sanitizeHumanError(s.id)} <- ${sanitizeHumanError(s.branch)} (#${s.pr})`,
+            `  pending:   ${sanitizeHumanError(id)} (candidates disagree; pick a branch manually)`,
           );
         }
-        for (const id of result.pending) {
-          if (!result.suggestions.some((s) => s.id === id)) {
-            console.log(
-              `  pending:   ${sanitizeHumanError(id)} (candidates disagree; pick a branch manually)`,
-            );
-          }
-        }
-        for (const id of result.unmatched) {
-          console.log(`  unmatched: ${sanitizeHumanError(id)} (no open PR)`);
-        }
-        for (const amb of result.ambiguous) {
-          console.log(`  ambiguous: ${sanitizeHumanError(amb.id)} (PRs ${amb.prs.join(", ")})`);
-        }
-        for (const [id, branch] of Object.entries(result.filled ?? {})) {
-          console.log(`  filled:    ${sanitizeHumanError(id)} -> ${sanitizeHumanError(branch)}`);
-        }
-        if (result.suggestions.length > 0 && result.mode === "check") {
-          console.log(
-            `next: arggon sync --write fills ${result.suggestions.length} empty branch field(s)`,
-          );
-        }
-        if (result.errors.length > 0) {
-          console.error(sanitizeHumanError(`  errors: ${result.errors.join("; ")}`));
-        }
+      }
+      for (const id of result.unmatched) {
+        console.log(`  unmatched: ${sanitizeHumanError(id)} (no open PR)`);
+      }
+      for (const amb of result.ambiguous) {
+        console.log(`  ambiguous: ${sanitizeHumanError(amb.id)} (PRs ${amb.prs.join(", ")})`);
+      }
+      for (const [id, branch] of Object.entries(result.filled ?? {})) {
+        console.log(`  filled:    ${sanitizeHumanError(id)} -> ${sanitizeHumanError(branch)}`);
+      }
+      if (result.suggestions.length > 0 && result.mode === "check") {
+        console.log(
+          `next: arggon sync --write fills ${result.suggestions.length} empty branch field(s)`,
+        );
+      }
+      if (result.errors.length > 0) {
+        console.error(sanitizeHumanError(`  errors: ${result.errors.join("; ")}`));
       }
       // CI gate: non-zero when sync is needed (--check) or sync could not finish.
       process.exitCode = result.exit_code;

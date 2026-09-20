@@ -1,0 +1,214 @@
+/**
+ * Kernel library entry (ADR 0011 §4: one logic path, one library).
+ *
+ * The CLI, the stdio MCP adapter and (from W2/W3) the native plugin tools all
+ * consume the kernel through this module. It exposes, as one importable and
+ * typed surface:
+ *
+ * - **items** — the tracker model: load/parse/walk (`loadItems`, `itemsById`,
+ *   `tryLoadItem`), frontmatter round-tripping and the stable JSON contract
+ *   shape (`toContractWorkItem`) plus its types.
+ * - **rules** — the playbook and tree invariants that must hold no matter how
+ *   a caller reaches the kernel: `rules.ts` is the single source
+ *   (`assertUpdateRules`), over the status/transition, parent-edge and id
+ *   primitives it builds on.
+ * - **paths** — tracker detection (v5 `ArggonManager/` and legacy `tasks/`),
+ *   repo-root derivation and new-item placement.
+ * - **envelopes** — the `--json` contract builders
+ *   (`ArggonManager/docs/json-output.md`): `successEnvelope`, `failEnvelope`,
+ *   `compactWorkItem`, and one `*Operation` per command returning the exact
+ *   documented envelope plus the CLI exit-code semantics.
+ *
+ * Publishing the package (npm) and bundling this entry into the vendored
+ * single-file plugin are packaging decisions of the native waves (W2/W3); this
+ * module is the boundary they consume. No commander dependency and no
+ * printing: argv parsing, TTY gates and stdout formatting live in `cli.ts`.
+ */
+export type { Issue, ItemType, Status, WorkItem as ContractWorkItem } from "./types.js";
+export type { SoftIssue, SoftLoadResult, WorkItem as KernelWorkItem } from "./items.js";
+export type { Frontmatter } from "./frontmatter.js";
+
+// --- Items -----------------------------------------------------------------
+
+export {
+  acceptanceComplete,
+  itemsById,
+  loadItems,
+  softTryLoadItem,
+  tryLoadItem,
+  walkTasksTree,
+} from "./items.js";
+export {
+  numberField,
+  parseFrontmatter,
+  stringArrayField,
+  stringField,
+  stringifyFrontmatter,
+} from "./frontmatter.js";
+export { toContractWorkItem } from "./contract.js";
+
+// --- Rules (single source: rules.ts) ---------------------------------------
+
+export { assertUpdateRules } from "./rules.js";
+export type { CallerKind, UpdateIntent } from "./rules.js";
+export {
+  ASSIGNEE_PATTERN,
+  CLAIMABLE_TYPES,
+  CREATE_STATUSES,
+  STATUSES,
+  TRANSITIONS,
+  assertAssignee,
+  assertClaimAndBlocked,
+  assertCreatableStatus,
+  assertStatus,
+  canTransition,
+  isClaimable,
+  isClaimed,
+  unclaim,
+} from "./status.js";
+export { PARENT_TYPE, assertParentEdge, expectedParentType } from "./relations.js";
+export {
+  BRANCH_PATTERN,
+  ITEM_TYPES,
+  MAX_ID_LENGTH,
+  assertBranchName,
+  assertLabels,
+  assertValidId,
+  firstDuplicateId,
+  innerSlug,
+  isItemType,
+  itemId,
+  slugify,
+} from "./ids.js";
+
+// --- Paths -----------------------------------------------------------------
+
+export {
+  CONVENTION_FILE_NAME,
+  LEGACY_TRACKER_DIR_NAME,
+  TRACKER_DIR_NAME,
+  conventionPathForLayout,
+  conventionPathForRoot,
+  docsDirForRoot,
+  findTasksDir,
+  findTrackerLocation,
+  newItemPath,
+  repoRootFromTasks,
+  trackerAt,
+  trackerNonItemDirs,
+} from "./paths.js";
+export type { TrackerLayout, TrackerLocation } from "./paths.js";
+
+// --- Convention, filtering and ranking -------------------------------------
+
+export {
+  CONVENTION_VERSION,
+  CONVENTION_VERSION_DEFAULT,
+  DEFAULT_BRANCH_PATTERNS,
+  readConventionConfig,
+  readConventionVersion,
+} from "./convention.js";
+export {
+  FILTER_FIELDS,
+  buildAncestorIndex,
+  buildBlockedByIndex,
+  matchesPredicate,
+  parseFilter,
+} from "./filter.js";
+export type {
+  AncestorIndex,
+  BlockedByIndex,
+  FilterField,
+  FilterPredicate,
+  FilterableItem,
+} from "./filter.js";
+export { downstreamWeight, isReady, openDependencies, runNext } from "./next.js";
+export type { NextOptions, NextResult, NextSuggestion } from "./next.js";
+export {
+  PRIORITIES,
+  PRIORITY_LABEL_PATTERN,
+  assertPriority,
+  isPriority,
+  priorityRank,
+  runPriorityMigrate,
+} from "./priority.js";
+export type { Priority, PriorityMigrateEntry, PriorityMigrateResult } from "./priority.js";
+
+// --- Envelopes (the `--json` contract) --------------------------------------
+
+export { JSON_SCHEMA_VERSION, compactWorkItem, failEnvelope, successEnvelope } from "./json.js";
+export type { JsonEnvelopeBase, JsonError } from "./json.js";
+export { commitPayload } from "./tracker-commit.js";
+export type { CommitPayload, TrackerCommitResult } from "./tracker-commit.js";
+
+// --- Command kernels (raw results; operations assemble the envelopes) -------
+
+export { runCreate } from "./create.js";
+export type { CreateOptions, CreateResult } from "./create.js";
+export { runList } from "./list.js";
+export type { ListOptions, ListResult } from "./list.js";
+export { runShow } from "./show.js";
+export type { ShowComment, ShowOptions, ShowResult } from "./show.js";
+export { runReport } from "./report.js";
+export type {
+  ReportBlocked,
+  ReportContainer,
+  ReportGroup,
+  ReportResult,
+  StatusCounts,
+} from "./report.js";
+export { runTrend } from "./trend.js";
+export type { RunTrendOptions, TrendCycleTime, TrendResult, TrendWeek } from "./trend.js";
+export { runValidate } from "./validate.js";
+export type { ValidateOptions, ValidateResult } from "./validate.js";
+export { runUpdate } from "./update.js";
+export type { UpdateOptions, UpdateResult } from "./update.js";
+export { runComment } from "./comment.js";
+export type { CommentOptions, CommentResult } from "./comment.js";
+export { runHandoff } from "./handoff.js";
+export type { HandoffOptions, HandoffResult } from "./handoff.js";
+export { runSync } from "./sync-command.js";
+export type { SyncResult } from "./sync-types.js";
+export { runImportIssues } from "./import-issues.js";
+export type { ImportIssuesOptions, ImportIssuesResult } from "./import-issues.js";
+
+// --- Operations (one per tool command; return the `--json` envelope) --------
+
+export {
+  commentOperation,
+  createOperation,
+  handoffOperation,
+  importIssuesOperation,
+  listOperation,
+  nextOperation,
+  priorityOperation,
+  reportOperation,
+  showOperation,
+  syncOperation,
+  updateOperation,
+  validateOperation,
+} from "./operations.js";
+export type {
+  CommandOutcome,
+  CommentPayload,
+  CreateOperationOptions,
+  CreatePayload,
+  EnvelopePayload,
+  HandoffPayload,
+  ImportIssuesOperationOptions,
+  ImportIssuesPayload,
+  KernelFailureEnvelope,
+  KernelSuccessEnvelope,
+  ListOperationOptions,
+  ListPayload,
+  NextPayload,
+  PriorityPayload,
+  ReportOperationOptions,
+  ReportPayload,
+  ShowPayload,
+  SyncOperationOptions,
+  SyncPayload,
+  UpdateOperationOptions,
+  UpdatePayload,
+  ValidatePayload,
+} from "./operations.js";
