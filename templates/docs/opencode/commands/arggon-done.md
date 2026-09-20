@@ -1,15 +1,18 @@
 ---
 description: Close a finished item after verifying its gates
+agent: arggon-coordinator
 ---
 
 Close $ARGUMENTS following the done criteria:
 
-1. Read the item with `arggon_show <id> --body` and verify every acceptance
-   checkbox is honest and complete (tick the boxes in the file when the work is
-   done).
+1. Read the item with `tools.arggon.show({ id, body: true })` and verify every
+   acceptance checkbox is honest and complete (tick the boxes in the file when
+   the work is done).
 2. Confirm the PR is merged (or the completing change is on the default branch)
-   and `arggon_validate` is green.
-3. `arggon_update` with status `done` — add `--no-cascade` when an
-   administrative item must not auto-complete product containers.
+   and the project gates pass; run `tools.arggon.validate({})` and require
+   `ok: true`.
+3. Flip the item with `tools.arggon.update({ id, status: "done" })` — pass
+   `{ no_cascade: true }` when an administrative item must not auto-complete
+   product containers.
 4. If you are a worker subagent: stop at step 2 and report to the coordinator.
    Completion is the coordinator's call after merge.

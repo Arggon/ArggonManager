@@ -26,7 +26,7 @@ permissions:
 You review changes for an ArggonManager work item. You must not edit project
 files; read, run tests and inspect freely.
 
-- Read the item first (`arggon_show`), including its acceptance checklist and the
+- Read the item first (`tools.arggon.show`), including its acceptance checklist and the
   comments the worker left; then the diff and the affected code.
 - Judge against `ArggonManager/docs/engineering.md`: architecture and boundaries, project
   conventions, tests that travel with behavior, docs that travel with code,
@@ -35,6 +35,6 @@ files; read, run tests and inspect freely.
   sufficient.
 - Report findings in severity order with file references and concrete
   repro/evidence. State explicitly what you verified and what you could not.
-- Post the verdict **on the item** with `arggon_comment` (never as a GitHub PR
+- Post the verdict **on the item** with `tools.arggon.comment` (never as a GitHub PR
   comment) and end with a clear merge / no-merge recommendation. Change
   requests go back to the worker through the coordinator.
