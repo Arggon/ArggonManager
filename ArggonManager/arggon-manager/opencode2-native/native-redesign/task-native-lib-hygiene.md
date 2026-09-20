@@ -46,6 +46,9 @@ Findings from the PR #374 review (`task-native-lib-package`, ADR 0013):
 - [ ] `rules.ts` identity test asserts something non-tautological.
 - [ ] Docs drift fixed (`CONTRIBUTING`/README about `lib/`).
 - [ ] `lib/dist` excludes `*.test.*` (or the pack exclusion is documented).
+- [ ] `lib/src/import-issues.ts` forwards `cwd` to `ghIssueListJson` (native
+      calls currently resolve the repo from the server process cwd; `sync`
+      already does it right).
 - [ ] `arggon validate` green; CI green.
 
 ## Notes

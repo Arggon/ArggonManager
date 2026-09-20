@@ -31,7 +31,15 @@ adoption); regenerate the config seam without the MCP stanza; ship the vendored 
 - [ ] `init` stays idempotent with provenance and never overwrites adopter files.
 - [ ] The vendored plugin is single-file and loads in a dependency-less fixture.
 - [ ] AGENTS.md router and skill describe the native surface (no CLI-driving prose).
+- [ ] Session↔item correlation recognizes Code Mode `tools.arggon.<name>(…)`
+      calls, not only MCP `arggon_*` names (plugin regex at `index.ts:703`);
+      otherwise correlation regresses when MCP is dropped.
+- [ ] Catalog budget: evaluate `options.pinned` on core tools as the W3 lever
+      (pinning all 12 may exceed the ADR 0006 budget).
 
 ## Notes
+
+- The W2 `loadArgonKernel()` failure-cache becomes moot if W3 ships a
+  bundled single-file plugin (verify).
 
 - Depends on W2; supersedes the ADR 0010 seam incrementally.
