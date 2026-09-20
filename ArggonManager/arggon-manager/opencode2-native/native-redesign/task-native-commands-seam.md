@@ -136,3 +136,7 @@ Docs: agents.md, opencode2.md, playbooks/opencode.md, cli/src/docs.ts, plugin-bu
 Minors: /arggon-status uses the native list input ({ status: 'blocked' } / { stale: true }; filter DSL noted); typecheck.test.ts docstring drops the removed @opencode/plugin mention; init-opencode.test.ts validates every generated command's frontmatter (description, agent in coordinator/reviewer, subagent boolean; done/adopt -> coordinator, review -> reviewer + subagent:true) and the smoke header documents that it runs bodies, not the V2 command loader.
 
 Gates on 609383b: npm test 86 files / 1394 tests green; lint clean; build ok; check:plugin exit 0; argpon validate ok (0 warnings); spec validate ok (18 docs); smoke:opencode 23 scenarios / 0 failures (104 checks); context:report --strict all bounds pass (AGENTS 1,959<=2,048; native 12/8 pinned 11,097<=12,288; item block 252<=1,024; fixed 24,505); CI cli pass (run 35520486608).
+
+### handoff 2026-09-20 @Arggon — next: Coordinator re-review of draft PR #376 on 609383b: F1 fixed (assert-before-write drift gate + check:plugin in CI), minors closed; verify the repro and merge with a merge commit (never squash).
+- branch: feat/task-native-commands-seam
+- open questions: options.pinned is undocumented (feature-detected; core 8 pinned, all 12 search-reachable); repo dogfood .opencode/commands still W2 (W7); smoke:opencode:wave not updated (W4/W7); context:report --str…
