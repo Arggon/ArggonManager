@@ -225,8 +225,14 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   OpenCode next to the source (`opencode/plugins/arggon/index.test.ts`, run by
   the suite via the `opencode/**/*.test.ts` vitest include); the native tool
   namespace adds a contract suite (`opencode/plugins/arggon/tools.test.ts`)
-  pinning each tool's output byte-for-byte against the CLI `--json` envelope
-  (twin fixtures), the typed-error path and the ADR 0006 schema budget. The
+  pinning every tool's output byte-for-byte against the CLI `--json` envelope
+  (twin fixtures; the GitHub-dependent `sync`/`import_issues` cases run a fake
+  `gh` shim on PATH, so no network or gh auth is involved), the typed-error
+  path and the ADR 0006 schema budget. `typecheck.test.ts` closes the gap the
+  root tsconfig leaves (it includes `cli/src` only) by running strict
+  `tsc --noEmit` over the vendored plugin source — the file `arggon init`
+  copies into every adopter tree — because vitest transpiles without
+  type-checking and eslint is not type-aware. The
   headless native-tools scenario links the workspace `@arggon/lib` into the
   fixture (building it when `lib/dist` is missing) and runs one Code Mode
   script that calls all twelve tools: contract envelopes, create→update

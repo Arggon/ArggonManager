@@ -106,7 +106,7 @@ working with the plugin broken or absent.
 ## Verify it works
 
 ```bash
-npm test                      # 1293+ tests
+npm test                      # 1385+ tests
 npm run smoke:opencode        # 12 headless scenarios on a real OpenCode runtime (incl. native tools)
 npm run smoke:opencode:wave   # scripted coordinator/worker/reviewer wave (2 fixtures)
 npm run context:report --strict   # context budgets: AGENTS.md, MCP schemas, item block, keep.tokens
