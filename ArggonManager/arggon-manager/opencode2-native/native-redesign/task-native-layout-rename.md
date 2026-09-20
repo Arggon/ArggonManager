@@ -85,3 +85,7 @@ GATES en 3103a44: npm test 1331 passed (+2 tests de regresion) · lint limpio ·
 INTERPRETACIONES DE PRODUCTO (documentadas en ArggonManager/docs/convention.md, seccion Tracker layout v5): (1) `migrate --layout` mueve TODO <root>/docs/ al tracker root, convergente y sin preguntar por archivo; un repo con docs/ ajeno debe reconciliarlo antes/despues (los estados ambiguos — dos trackers, dos docs trees, destino existente — se rechazan, nunca se fusionan en silencio). (2) Root meta-docs (README/AGENTS/CLAUDE/CONTRIBUTING/SECURITY/SUPPORT/ARCHITECTURE/CHANGELOG) se quedan en la raiz; .github/**, .opencode/**, .agents/**, templates/** (scaffolds empaquetados), fixtures/** y labs/** tampoco son docs de producto y no se mueven.
 
 Sigo in_progress: no marco done; pendiente re-review y merge con merge commit.
+
+### handoff 2026-09-20 @Arggon — next: Re-review PR #371 at head d6d0761 (fixes F1/F2 + F3/F4 in commits ff1b09b, 4e52dd5, 45e198a, 3103a44); if the verdict passes, merge with a MERGE commit (tracker auto-commits on the branch) and flip t…
+- branch: feat/task-native-layout-rename
+- open questions: Product interpretations confirmed and documented in convention.md + item comment: (1) migrate moves all of <root>/docs/; (2) root meta-docs stay at the repo root. No unresolved critical decisions.
