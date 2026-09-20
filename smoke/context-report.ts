@@ -14,7 +14,9 @@
  *   3. agent descriptions + full prompt bytes (READ-only assessment: the agent
  *      templates are owned by another worker, never edited here);
  *   4. the live MCP `tools/list` payload (reused from `doctor --budget --json`,
- *      advisory budget <=12,288 B, task-schema-budget);
+ *      advisory budget <=12,288 B, task-schema-budget) and the native `arggon`
+ *      tool-definition payload (W2/W3), including the `options.pinned` core
+ *      subset the Code Mode catalog lever pins (W3, task-native-commands-seam);
  *   5. the injected item block: the plugin's own `ITEM_BLOCK_MAX_BYTES` bound
  *      and `buildItemBlock()` reused from `opencode/plugins/arggon/index.ts`
  *      (so the number cannot drift from the shipped helper), measured on the
@@ -354,6 +356,8 @@ type Measurement = {
   nativeTools: {
     namespace: string;
     toolCount: number;
+    /** Core tools pinned into the Code Mode catalog (W3 `options.pinned`). */
+    pinnedCount: number;
     bytes: number;
     budget: number;
     pass: boolean;
@@ -512,6 +516,7 @@ function measure(): Measurement {
       nativeTools: {
         namespace: ARGON_TOOL_NAMESPACE,
         toolCount: nativeToolSchemas().length,
+        pinnedCount: nativeToolSchemas().filter((schema) => schema.pinned).length,
         bytes: nativeToolsBytes,
         budget: NATIVE_TOOLS_BUDGET_BYTES,
         pass: nativeToolsPass,
@@ -590,7 +595,7 @@ function printReport(m: Measurement): void {
     m.mcp.pass ? `pass (${growthSign}${fmt(mcpGrowth)} B (${growthSign}${mcpGrowthPct}%) vs baseline)` : "FAIL",
   );
   push(
-    `native ${m.nativeTools.namespace} tools (${m.nativeTools.toolCount})`,
+    `native ${m.nativeTools.namespace} tools (${m.nativeTools.toolCount}, ${m.nativeTools.pinnedCount} pinned)`,
     fmt(m.nativeTools.bytes),
     String(tokens(m.nativeTools.bytes)),
     `<=${fmt(m.nativeTools.budget)} B adv.`,
@@ -631,7 +636,8 @@ function printReport(m: Measurement): void {
       .join("\n"),
   );
   console.log(
-    `  native ${m.nativeTools.namespace} tools: ${m.nativeTools.toolCount} definitions, ${fmt(m.nativeTools.bytes)} B ` +
+    `  native ${m.nativeTools.namespace} tools: ${m.nativeTools.toolCount} definitions ` +
+      `(${m.nativeTools.pinnedCount} pinned via options.pinned), ${fmt(m.nativeTools.bytes)} B ` +
       `(definitions payload the Code Mode catalog is built from, reused from the plugin helper; the runtime renders ` +
       `one catalog line per tool under its own ~2000-token catalog budget — omitted tools stay reachable via search)`,
   );
