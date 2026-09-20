@@ -88,7 +88,7 @@ working with the plugin broken or absent.
 - **Cross-agent:** CLI + MCP are first-class without OpenCode; ACP clients
   (Zed etc.) inherit the surface automatically.
 - **Version discipline:** the playbook pins the tested OpenCode version
-  (`ArggonManager/docs/playbooks/opencode.md`, currently 2.0.8) and records the known
+  (`ArggonManager/docs/playbooks/opencode.md`, currently 2.0.10) and records the known
   gotchas (e.g. the static `@opencode/plugin` import needs `node_modules`; the
   bundled plugin uses the guarded pattern).
 

@@ -1,7 +1,7 @@
 ---
 playbook_id: opencode
-version: 2.0.8
-researched: 2026-09-18
+version: 2.0.10
+researched: 2026-09-20
 status: current
 ---
 
@@ -10,18 +10,20 @@ status: current
 Technology playbook: the chosen version and the current best practices for
 OpenCode **V2** in this repo.
 
-**Research record (2026-09-18):** local `opencode v2.0.8` (original research
-2026-09-17 on v2.0.7; the plugin-import A/B was re-probed on 2.0.8). Sources are
-the **V2** docs only — https://opencode.ai/v2/docs/ (**accessed 2026-09-18**) —
-plus the [exploration](../explorations/exploration-opencode-v2-native-009.md) and
-[ADR 0010](../adr/0010-opencode2-native-architecture.md). Do not consult V1 docs
-or the V1 schema for V2 work.
+**Research record (2026-09-20):** local `opencode v2.0.10` (original research
+2026-09-17 on v2.0.7; the plugin-import A/B was re-probed on 2.0.8 and again on
+2.0.10 — 2026-09-20). Sources are the **V2** docs only —
+https://opencode.ai/v2/docs/ (**accessed 2026-09-20**) — plus the
+[exploration-opencode-v2-native-009](../explorations/exploration-opencode-v2-native-009.md),
+the [native-redesign audit](../explorations/exploration-opencode2-native-010.md)
+and [ADR 0010](../adr/0010-opencode2-native-architecture.md). Do not consult V1
+docs or the V1 schema for V2 work.
 
 ## Setup
 
-- Install per https://opencode.ai/v2/docs/ (accessed 2026-09-18); verified local
-  version: `opencode --version` → `v2.0.8` (2026-09-18; the previous pin was
-  2.0.7).
+- Install per https://opencode.ai/v2/docs/ (accessed 2026-09-20); verified local
+  version: `opencode --version` → `v2.0.10` (2026-09-20; previous pins 2.0.7 →
+  2.0.8).
 - Running this branch beside `main`: give the oc2 build a named shim and a
   per-project PATH — see
   [Side-by-side installs](../opencode2.md#side-by-side-installs). Note the MCP
@@ -119,24 +121,30 @@ or the V1 schema for V2 work.
 - **Vendored plugin imports stay guarded.** The V2 plugin docs show a static
   `import { Plugin } from "@opencode/plugin"`; in a dependency-less tree (no
   `node_modules` — the `arggon init` adopter shape) an auto-discovered plugin
-  using it fails to load on **2.0.7 and 2.0.8** (`WARN failed to load plugin …
-  Cannot find package '@opencode/plugin'`; `setup` never runs; the session still
-  exits 0). The bundled plugin therefore exports a plain `{ id, setup }` object
-  (a valid V2 definition) and resolves `Plugin.define` behind a guarded,
+  using it fails to load on **2.0.7, 2.0.8 and 2.0.10** (`WARN failed to load
+  plugin … Cannot find package '@opencode/plugin'`; `setup` never runs; the
+  session still exits 0). The bundled plugin therefore exports a plain
+  `{ id, setup }` object (a valid V2 definition) and resolves `Plugin.define`
+  behind a guarded,
   computed dynamic import (computed so editors/`tsc` do not flag the
   deliberately absent package). Condition to simplify: only when the runtime
   resolves `@opencode/plugin` without a local `node_modules` (or the docs drop
   it) — re-run the A/B probe on the new 2.x first. Evidence: the PR #325 probe
-  (2.0.7: static import fails, plain object loads) and
-  task-opencode-v2-plugin-import-gotcha (2.0.8 re-probe, same shape: the docs
-  plugin failed to load, the bundled plugin loaded, registered `arggon` MCP and
-  a real session executed `arggon_next`).
+  (2.0.7: static import fails, plain object loads),
+  task-opencode-v2-plugin-import-gotcha (2.0.8 re-probe, same shape) and
+  task-playbook-opencode-2-0-10 (2.0.10 re-probe, 2026-09-20, same shape: the
+  docs plugin failed to load — `setup` marker absent — the bundled plugin
+  loaded, registered `arggon` MCP and a real session executed `arggon_next`).
 - **Code Mode batching.** V2 Code Mode exposes the MCP server as
   `tools.arggon.*` (probe: `tools.arggon.arggon_next({})`); batch read-only
   calls in ONE `execute` script (`arggon_next` + `arggon_show` +
   `arggon_report` + `arggon_validate`) instead of one model step per call.
   The schemas are advertised once per session and only the composed result
-  enters the transcript — the ADR 0006 spirit applied to coordinators.
+  enters the transcript — the ADR 0006 spirit applied to coordinators. The MCP
+  tool catalog can lag server startup on a session's first model call: the
+  2.0.10 re-probe got `Unknown tool 'arggon.arggon_next'` once and success on
+  the immediate retry (smoke prompts have carried a one-retry line since W2 for
+  this reason).
 
 ## Context budgets
 
@@ -198,11 +206,14 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   be forced deterministically headless; the closest evidence is that the
   injection fires per model call (a later call in the same session gets the
   block again).
-- Re-verified on 2.0.8 (2026-09-18, `opencode v2.0.8`): the 11 scenarios above
+- Re-verified on 2.0.10 (2026-09-20, `opencode v2.0.10`): the 11 scenarios above
   pass unchanged, and the plugin-import A/B re-probe recorded in
-  task-opencode-v2-plugin-import-gotcha (dependency-less fixture: the docs
-  static import fails to load, the bundled guarded plugin loads and executes
-  `arggon_next`).
+  task-playbook-opencode-2-0-10 (dependency-less fixture — no `node_modules` in
+  the fixture or any ancestor: plugin A, the docs static import, failed to load
+  with `Cannot find package '@opencode/plugin'` and never wrote its setup
+  marker; plugin B, the bundled guarded source, loaded, registered `arggon` MCP
+  (`tools=9`; the fixture config registers no server) and executed
+  `arggon_next` in a real session; the session still exited 0).
 
 ## Security
 

@@ -18,8 +18,9 @@ owner delegated **D1** (source of truth) and **D2** (methodology contract) to
 this audit.
 
 **Sources:** `https://opencode.ai/v2/llms.txt` and the linked V2 docs (accessed
-2026-09-19), local runtime `opencode v2.0.10` (2026-09-19; the playbook still
-pins 2.0.8 — drift recorded in F1.16), [ADR 0010](../adr/0010-opencode2-native-architecture.md),
+2026-09-19), local runtime `opencode v2.0.10` (2026-09-19; the playbook then
+pinned 2.0.8 — drift recorded in F1.16, refreshed 2026-09-20),
+[ADR 0010](../adr/0010-opencode2-native-architecture.md),
 [exploration-opencode-v2-native-009](exploration-opencode-v2-native-009.md),
 `docs/playbooks/opencode.md`, and the current code (`cli/src/`,
 `opencode/plugins/arggon/`).
@@ -133,8 +134,11 @@ pins 2.0.8 — drift recorded in F1.16), [ADR 0010](../adr/0010-opencode2-native
     <https://opencode.ai/v2/docs/build/sdk/>,
     <https://opencode.ai/v2/docs/build/plugins/cli/>, 2026-09-19).
 16. **Runtime drift.** Local runtime is **v2.0.10**; `docs/playbooks/opencode.md`
-    still records 2.0.8 and its A/B plugin-import probe. The playbook pin
-    refresh + A/B re-probe is filed as `task-playbook-opencode-2-0-10`.
+    recorded 2.0.8 and its A/B plugin-import probe at audit time. The playbook
+    pin refresh + A/B re-probe is filed as `task-playbook-opencode-2-0-10`
+    (landed 2026-09-20: pin refreshed to 2.0.10, re-probe same shape — the docs
+    static import still fails to load dependency-less, the guarded plugin
+    loads).
 
 ### F2 — ArggonManager capability map
 
