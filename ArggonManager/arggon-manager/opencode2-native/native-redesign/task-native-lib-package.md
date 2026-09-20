@@ -13,6 +13,7 @@ updated: "2026-09-20"
 claimed_at: "2026-09-20T10:45:12.790Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-lib-package
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-native-lib-package.md
   Leaves live only under a story. id is the filename stem: task-native-lib-package.
@@ -35,15 +36,15 @@ package and absorbs the W1 review polish (`task-native-kernel-lib-polish`).
 
 ## Acceptance
 
-- [ ] `@arggon/lib` package (workspace layout, own package.json/build/exports)
+- [x] `@arggon/lib` package (workspace layout, own package.json/build/exports)
       containing the kernel surface (items, rules, paths, envelopes); the root
       package depends on it via the workspace; no behavior change.
-- [ ] Root bin/plugin build still green; CLI human/`--json` byte parity
+- [x] Root bin/plugin build still green; CLI human/`--json` byte parity
       preserved by the existing parity tests.
-- [ ] ADR 0013 merged (Accepted) amending ADR 0011 §5; `spec-native-first-011`
+- [x] ADR 0013 merged (Accepted) amending ADR 0011 §5; `spec-native-first-011`
       Distribution updated (two packages; the vendored plugin stays a
       single-file, dependency-free bundle built from `@arggon/lib`); plan note.
-- [ ] W1 polish absorbed: MCP `issueRoundtrip`/`conventionVersion` test or
+- [x] W1 polish absorbed: MCP `issueRoundtrip`/`conventionVersion` test or
       documented contract; write-parity cases (create, cascade update,
       comment/handoff); re-exports (`PriorityMigrateOptions`, `SyncFilled`) with
       no deep imports left in `mcp-server.ts`; clean-build test deletes `dist`
