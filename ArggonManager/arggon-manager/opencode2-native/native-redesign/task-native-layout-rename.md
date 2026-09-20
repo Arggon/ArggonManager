@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-native-layout-rename
 title: "Layout rename: ArggonManager/ root + docs"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p0
 created: "2026-09-19"
 updated: "2026-09-20"
-claimed_at: "2026-09-20T00:12:33.377Z"
 depends_on: [task-native-layout-decision]
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-layout-rename
 ---
