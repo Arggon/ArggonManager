@@ -1,16 +1,21 @@
 /**
- * ArggonManager OpenCode V2 plugin — W2 MCP auto-registration + W3 session
- * context + native-first W2 `arggon` tools.
+ * ArggonManager OpenCode V2 plugin — native-first surface: `arggon` tools,
+ * session context, correlation and hygiene.
  *
- * `arggon init` bundles this file to `.opencode/plugins/arggon/index.ts`, where
- * OpenCode V2 discovers it with zero configuration. Ambient behavior and the
- * native tool namespace only, never rule logic:
+ * `arggon init` vendors the **single-file, dependency-free bundle** built from
+ * this source into `.opencode/plugins/arggon/index.ts`, where OpenCode V2
+ * discovers it with zero configuration (ADR 0011 §5/§6, ADR 0013; the bundle
+ * inlines `@arggon/lib`, so the adopter tree needs no `node_modules`). This
+ * file stays the single source: `npm run build:plugin` regenerates the bundle
+ * deterministically and `cli/src/plugin-copy.test.ts` drift-gates the committed
+ * bytes (assert-before-write; `npm run check:plugin` in CI). Ambient behavior and the native tool namespace only,
+ * never rule logic:
  *
- *   1. MCP auto-registration (ADR 0010 W2): when no MCP server named `arggon`
- *      is configured, register `{ type: "local", command: ["arggon", "mcp"] }`
- *      through `ctx.mcp.transform`. A server already configured by the adopter
- *      (or by the generated `opencode.jsonc` seam) is never touched. (The
- *      native-first rebuild drops this from the default path in W3.)
+ *   1. MCP is **out of the default path** (ADR 0011 §5/§6): W3 drops the
+ *      `mcp.servers.arggon` stanza from the generated config, so the plugin no
+ *      longer auto-registers the server either. `arggon mcp` and the generated
+ *      `.mcp.json` stay for non-OpenCode clients that configure it
+ *      explicitly; the plugin never touches `ctx.mcp`.
  *   2. Native `arggon` tool namespace (ADR 0011 §1, plan-native-first-011 W2):
  *      register list/create/update/show/next/report/validate/comment/handoff/
  *      priority/sync/import_issues with `ctx.tool.transform`, namespaced
@@ -24,6 +29,9 @@
  *      every observed `arggon` invocation per session (`ctx.storage`), fall
  *      back to the VCS branch (`feat/<id>` / `fix/<id>`), and honor the
  *      explicit `ARGON_ITEM` environment override. Nothing resolves → no-op.
+ *      Observed calls cover shell invocations of the CLI **and** Code Mode
+ *      native tool calls (`tools.arggon.<name>(…)`), so correlation survives
+ *      MCP leaving the default path (W3).
  *   4. Bounded context injection (ADR 0010 W3): `ctx.session.hook("context")`
  *      appends a small advisory system part built from
  *      `arggon show <id> --meta --json`, cached for a few seconds. Per-call
@@ -35,26 +43,26 @@
  *      `arggon validate --json` and log a warning when it fails. The warning
  *      never blocks anything — pre-commit and CI stay authoritative.
  *
- * Contract (ADR 0010, ADR 0011, plan-native-first-011):
+ * Contract (ADR 0010, ADR 0011, ADR 0013, plan-native-first-011):
  * - Optional and failure-isolated: every path is feature-detected and wrapped,
  *   a failure logs once and no-ops; the plugin must never break a session, the
- *   CLI or the MCP server. The kernel import is guarded and cached: a tree
- *   without `@arggon/lib` (the ADR 0013 dependency-less adopter shape until
- *   W3 vendors the single-file bundle) simply registers no tools.
+ *   CLI or the MCP server. The kernel import is guarded and cached: the source
+ *   loaded directly in a tree without `@arggon/lib` registers no tools, while
+ *   the vendored **bundle** inlines the kernel and always registers.
  * - Thin: no rules. State transitions go through the kernel
  *   (`@arggon/lib` in-process), the CLI (`execFile` with argument arrays) or
  *   the MCP server.
  * - Dependency-free: only Node builtins (`node:child_process`, `node:fs`,
- *   `node:path`, `node:url`); `@arggon/lib` and `Plugin.define` from
- *   `@opencode/plugin` are resolved with guarded dynamic imports. The
- *   documented static `@opencode/plugin` import still fails to load an
+ *   `node:path`, `node:url`). `@arggon/lib` is resolved with a guarded,
+ *   **literal** dynamic import: the bundle rewrites it to the inlined kernel,
+ *   and this repo resolves the workspace package. `@opencode/plugin` is not
+ *   imported at all: the documented static import fails to load an
  *   auto-discovered plugin in a dependency-less tree on 2.0.7, 2.0.8 and
  *   2.0.10 (A/B re-probe 2026-09-18,
  *   task-opencode-v2-plugin-import-gotcha; details in docs/playbooks/opencode.md),
- *   so the import stays dynamic, non-fatal and computed (editors/tsc must not
- *   flag a package that is deliberately absent from adopter trees). The plain
- *   default export below is a valid V2 plugin definition and loads on 2.0.x
- *   without it.
+ *   and the optional `Plugin.define` sugar is not worth a top-level await in
+ *   the bundle. The plain default export below is a valid V2 plugin definition
+ *   and loads on 2.0.x without it.
  *
  * Pure helpers are exported for unit tests
  * (opencode/plugins/arggon/index.test.ts); `onToolAfter` is exported so its
@@ -68,13 +76,6 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 /** Minimal structural typing: the generated file must not import plugin types. */
-type McpLocalServer = { type: "local"; command: string[] }
-
-type McpEditor = {
-  get(name: string): unknown
-  set(name: string, config: McpLocalServer): void
-}
-
 type StorageContext = {
   get?(key: string): Promise<unknown>
   set?(key: string, value: unknown): Promise<unknown>
@@ -115,7 +116,6 @@ type PluginContext = {
   vcs?: VcsContext
   session?: SessionContext
   tool?: ToolContext
-  mcp?: { transform?: (callback: (editor: McpEditor) => void) => Promise<unknown> }
 }
 
 type PluginDefinition = {
@@ -140,7 +140,6 @@ type ToolEvent = {
 // ---------------------------------------------------------------------------
 
 const ARGGON_SERVER = "arggon"
-const ARGGON_MCP: McpLocalServer = { type: "local", command: ["arggon", "mcp"] }
 
 /** Explicit override read per resolution: wins over storage and branch. */
 export const ITEM_ENV = "ARGON_ITEM"
@@ -699,9 +698,32 @@ export function parseArggonItemFromCommand(command: unknown): string | undefined
 const COMMAND_ARG_PATTERN = /\bcommand\s*:\s*(["'`])((?:\\.|(?!\1)[\s\S])*?)\1/
 
 /**
- * Extract the item id from Code Mode source calling an arggon MCP tool
- * (`tools.arggon.arggon_update({ id: "task-x" })`) or embedding a shell
- * invocation of the CLI (command-position parsing only).
+ * Tool names whose `id` argument may correlate the session: all the
+ * item-scoped mutations/reads (both MCP `arggon_<name>` and native
+ * `tools.arggon.<name>` spellings).
+ */
+const CORRELATION_CALL_PATTERNS = [
+  /arggon_(update|show|comment|handoff|start)\s*\(([\s\S]*?)\)/g,
+  /tools\.arggon\.(update|show|comment|handoff|start)\s*\(([\s\S]*?)\)/g,
+] as const
+
+/** Item id from the argument text of one observed call. */
+function itemIdFromCallArgs(args: string): string | undefined {
+  const named = /\bid\s*:\s*["'`]([^"'`]+)["'`]/.exec(args)
+  if (named !== null && isArggonItemId(named[1])) return named[1]
+  // Positional form only for bare args: object args must carry an explicit `id`.
+  if (!/[:=]/.test(args)) {
+    const positional = /["'`]([^"'`]+)["'`]/.exec(args)
+    if (positional !== null && isArggonItemId(positional[1])) return positional[1]
+  }
+  return undefined
+}
+
+/**
+ * Extract the item id from Code Mode source calling an arggon tool — MCP
+ * (`tools.arggon.arggon_update({ id: "task-x" })`) or the native namespace
+ * (`tools.arggon.update({ id: "task-x" })`) — or embedding a shell invocation
+ * of the CLI (command-position parsing only).
  *
  * Best effort: the call regex scans raw source text, so an `arggon_*` call
  * written inside a string literal or comment can still correlate an id. That
@@ -712,16 +734,14 @@ const COMMAND_ARG_PATTERN = /\bcommand\s*:\s*(["'`])((?:\\.|(?!\1)[\s\S])*?)\1/
  */
 export function parseArggonItemFromCode(code: unknown): string | undefined {
   if (typeof code !== "string" || code === "") return undefined
-  const callPattern = /arggon_(update|show|comment|handoff|start)\s*\(([\s\S]*?)\)/g
-  let match: RegExpExecArray | null
-  while ((match = callPattern.exec(code)) !== null) {
-    const args = match[2] ?? ""
-    const named = /\bid\s*:\s*["'`]([^"'`]+)["'`]/.exec(args)
-    if (named !== null && isArggonItemId(named[1])) return named[1]
-    // Positional form only for bare args: object args must carry an explicit `id`.
-    if (!/[:=]/.test(args)) {
-      const positional = /["'`]([^"'`]+)["'`]/.exec(args)
-      if (positional !== null && isArggonItemId(positional[1])) return positional[1]
+  for (const callPattern of CORRELATION_CALL_PATTERNS) {
+    // Module-level global regexes: reset the cursor so an early return in a
+    // previous call can never skip a match on the next one.
+    callPattern.lastIndex = 0
+    let match: RegExpExecArray | null
+    while ((match = callPattern.exec(code)) !== null) {
+      const id = itemIdFromCallArgs(match[2] ?? "")
+      if (id !== undefined) return id
     }
   }
   // A Code Mode shell call carries its command as a string argument
@@ -740,7 +760,10 @@ export function parseArggonItemFromCode(code: unknown): string | undefined {
 export function parseArggonItemFromTool(tool: unknown, input: unknown): string | undefined {
   if (typeof tool !== "string") return undefined
   const record = input !== null && typeof input === "object" ? (input as Record<string, unknown>) : undefined
-  if (/arggon_(update|show|comment|handoff|start)$/.test(tool)) {
+  if (
+    /arggon_(update|show|comment|handoff|start)$/.test(tool) ||
+    /^(?:tools\.)?arggon[._](update|show|comment|handoff|start)$/.test(tool)
+  ) {
     return isArggonItemId(record?.id) ? (record?.id as string) : undefined
   }
   if (tool === "shell" || tool.endsWith(".shell") || tool.endsWith("_shell")) {
@@ -1184,8 +1207,25 @@ export const ARGON_TOOL_NAMESPACE = "arggon"
 export const ARGON_TOOL_NAMESPACE_DESCRIPTION =
   "ArggonManager tracker tools, in-process — each returns its documented `--json` envelope; kernel failures are typed tool errors."
 
-/** Package the native tools import the kernel from (ADR 0013). */
-const ARGON_LIB_PACKAGE = "@arggon/lib"
+/**
+ * Core workflow tools pinned into the Code Mode catalog (W3, `options.pinned`,
+ * an undocumented 2.0.10 runtime option — see the playbook). The runtime draws
+ * a subset of the catalog under its own ~2000-token budget; pinning keeps the
+ * tools the native commands depend on always rendered. The maintenance tools
+ * (`report`, `priority`, `sync`, `import_issues`) stay unpinned and reachable
+ * through `search`. Measured by `nativeToolsCatalogBytes` and
+ * `smoke/context-report.ts`.
+ */
+export const PINNED_TOOL_NAMES: readonly string[] = [
+  "list",
+  "create",
+  "update",
+  "show",
+  "next",
+  "validate",
+  "comment",
+  "handoff",
+]
 
 /** Bound of the envelope JSON appended to a typed tool error (see ArgonToolError). */
 const TOOL_ERROR_DETAIL_MAX_BYTES = 8192
@@ -1826,12 +1866,14 @@ export function nativeToolSchemas(): Array<{
   description: string
   input: Record<string, unknown>
   output: Record<string, unknown>
+  pinned: boolean
 }> {
   return TOOL_SPECS.map((spec) => ({
     name: spec.name,
     description: spec.description,
     input: spec.input,
     output: spec.output,
+    pinned: PINNED_TOOL_NAMES.includes(spec.name),
   }))
 }
 
@@ -1893,16 +1935,18 @@ let kernelPromise: Promise<ArgonKernel | undefined> | undefined
 let toolsRegistrationLogged = false
 
 /**
- * Guarded, cached kernel import (ADR 0013). Resolves `@arggon/lib` when the
- * tree has it (this repo, or W3's vendored bundle); in the dependency-less
- * adopter shape it logs once and returns undefined, so the plugin still loads
- * and the ambient paths keep working. Never cached on rejection.
+ * Guarded, cached kernel import (ADR 0013). The specifier is literal on
+ * purpose: the W3 bundle build rewrites it to the **inlined** kernel module
+ * (`cli/src/plugin-bundle.ts`), so the vendored single file needs no
+ * `node_modules`; loading this source directly from this repo resolves the
+ * workspace package. Without either, it logs once, returns undefined and the
+ * ambient paths keep working. Never cached on rejection.
  */
 export function loadArgonKernel(): Promise<ArgonKernel | undefined> {
-  kernelPromise ??= import(ARGON_LIB_PACKAGE).then(
+  kernelPromise ??= import("@arggon/lib").then(
     (module) => module as ArgonKernel,
     (error: unknown) => {
-      logOnce("kernel-import", `${ARGON_LIB_PACKAGE} unavailable (native tools idle)`, error)
+      logOnce("kernel-import", "@arggon/lib unavailable (native tools idle)", error)
       return undefined
     },
   )
@@ -1944,7 +1988,11 @@ export async function registerArgonTools(
       try {
         editor.add({
           ...definition,
-          options: { namespace: ARGON_TOOL_NAMESPACE, codemode: true },
+          options: {
+            namespace: ARGON_TOOL_NAMESPACE,
+            codemode: true,
+            ...(PINNED_TOOL_NAMES.includes(definition.name) ? { pinned: true } : {}),
+          },
         })
         added += 1
       } catch (error) {
@@ -1970,22 +2018,6 @@ const definition: PluginDefinition = {
   id: "arggon",
   async setup(ctx) {
     const disposers: Array<() => void> = []
-    try {
-      const transform = ctx?.mcp?.transform
-      if (typeof transform === "function") {
-        await transform((editor) => {
-          try {
-            if (typeof editor?.get !== "function" || typeof editor?.set !== "function") return
-            if (editor.get(ARGGON_SERVER) !== undefined) return // never clobber
-            editor.set(ARGGON_SERVER, ARGGON_MCP)
-          } catch (error) {
-            logOnce("mcp-register", "MCP registration failed", error)
-          }
-        })
-      }
-    } catch (error) {
-      logOnce("mcp", "MCP auto-registration unavailable", error)
-    }
     try {
       // Native tools (W2): the namespace is registered per plugin instance,
       // bound to this instance's location directory.
@@ -2033,30 +2065,10 @@ function dispose(registration: unknown): void {
   }
 }
 
-// Optional `Plugin.define` sugar, resolved defensively: a missing
-// `@opencode/plugin` (no local node_modules) or a throwing runtime falls back
-// to the plain definition object, which OpenCode V2 loads identically.
-// Computed specifier: the package is deliberately absent from adopter trees
-// (and from this repo's dependency graph), so a literal specifier makes
-// editors/tsc flag the guarded, always-caught import.
-const OPENCODE_PLUGIN_PACKAGE = "@opencode/plugin"
-let define: ((input: PluginDefinition) => PluginDefinition) | undefined
-try {
-  const mod = (await import(OPENCODE_PLUGIN_PACKAGE)) as {
-    Plugin?: { define?: (input: PluginDefinition) => PluginDefinition }
-  }
-  define = typeof mod?.Plugin?.define === "function" ? mod.Plugin.define : undefined
-} catch {
-  define = undefined
-}
-
-function exportDefinition(): PluginDefinition {
-  if (define === undefined) return definition
-  try {
-    return define(definition)
-  } catch {
-    return definition
-  }
-}
-
-export default exportDefinition()
+// `Plugin.define` from `@opencode/plugin` is deliberately not imported: a
+// static import fails to load an auto-discovered plugin in a dependency-less
+// adopter tree (probes on 2.0.7/2.0.8/2.0.10, docs/playbooks/opencode.md), and
+// the guarded sugar needed a top-level await the single-file bundle cannot
+// carry. The plain definition object is a valid V2 plugin definition and loads
+// identically.
+export default definition

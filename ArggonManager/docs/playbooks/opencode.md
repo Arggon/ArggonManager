@@ -31,43 +31,53 @@ docs or the V1 schema for V2 work.
   project's.
 - `arggon init` generates the tier-1 seam: `opencode.jsonc` **only when the repo
   has no OpenCode config of its own** (`opencode.json(c)` at the root or
-  `.opencode/opencode.json(c)`), plus `.opencode/agents/arggon-{coordinator,worker,reviewer}.md`
-  and `.opencode/commands/arggon-{next,start,done,handoff,review,status,spec,adr,explore,playbook}.md` —
-  never overwriting modified files (contract:
-  [spec-opencode-seam-010](../specs/spec-opencode-seam-010.md)).
-- `arggon init` also bundles the optional plugin at
-  `.opencode/plugins/arggon/index.ts` (auto-discovered, zero config). It is
+  `.opencode/opencode.json(c)`) — formatter + compaction retention and **no MCP
+  stanza** (W3, `task-native-commands-seam`; ADR 0011 §5/§6) — plus
+  `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` and the eleven
+  native `.opencode/commands/arggon-{next,start,done,handoff,review,status,spec,adr,explore,playbook,adopt}.md`
+  — never overwriting modified files (contract:
+  [spec-opencode-seam-010](../specs/spec-opencode-seam-010.md)). The commands are
+  prompt templates that drive the native tools and write the methodology
+  artifacts directly; they carry no CLI-driving prose and no shell blocks.
+- `arggon init` vendors the plugin at `.opencode/plugins/arggon/index.ts`
+  (auto-discovered, zero config). Since W3 it is the **single-file,
+  dependency-free bundle** built from `opencode/plugins/arggon/index.ts` with
+  `@arggon/lib` inlined (`npm run build:plugin`; the artifact is committed and
+  drift-gated by `npm run check:plugin` in CI), so a fresh adopter tree needs
+  no `node_modules`. It is
   failure-isolated (every path logs once and no-ops, never breaking a
-  session/CLI/MCP); `Plugin.define` is optional sugar behind a guarded import —
-  see Conventions, "Vendored plugin imports". Ambient behavior plus the native
-  tool namespace, never rule logic:
-  - **W2 (ADR 0010)** — registers `mcp.servers.arggon`
-    (`{type:"local",command:["arggon","mcp"]}`) **only when no `arggon` server
-    is configured** and never clobbers one.
-  - **Native tools W2 (ADR 0011, `task-native-tools`)** — registers the twelve
-    `arggon` tools (`list`, `create`, `update`, `show`, `next`, `report`,
+  session/CLI/MCP). Ambient behavior plus the native tool namespace, never rule
+  logic:
+  - **Native tools W2/W3 (ADR 0011, `task-native-tools`)** — registers the
+    twelve `arggon` tools (`list`, `create`, `update`, `show`, `next`, `report`,
     `validate`, `comment`, `handoff`, `priority`, `sync`, `import_issues`) with
     `ctx.tool.transform`, `options.namespace: "arggon"` + `options.codemode:
     true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
-    namespace. Each tool calls the kernel **in-process** through `@arggon/lib`
-    (the same `*Operation` the CLI's `--json` path uses) and returns the
-    documented envelope; a kernel failure becomes an `ArgonToolError` (typed
-    tool error carrying `code` + envelope) instead of a throw through a hook —
-    the session continues (failure isolation). `@arggon/lib` is resolved with a
-    guarded, cached dynamic import: the dependency-less adopter tree registers
-    no tools until W3 vendors the single-file bundle. `create`/`import_issues`
-    receive the `templatesDir` fallback resolved from the plugin location.
+    namespace. Each tool calls the kernel **in-process** (the bundle's inlined
+    `@arggon/lib`; the same `*Operation` the CLI's `--json` path uses) and
+    returns the documented envelope; a kernel failure becomes an `ArgonToolError`
+    (typed tool error carrying `code` + envelope) instead of a throw through a
+    hook — the session continues (failure isolation). The core eight
+    (`list`, `create`, `update`, `show`, `next`, `validate`, `comment`,
+    `handoff`) also set `options.pinned: true` (W3 catalog lever, see
+    Conventions); `create`/`import_issues` receive the `templatesDir` fallback
+    resolved from the plugin location (ADR 0013).
+  - **MCP is out of the default path (W3)** — the plugin no longer registers
+    `mcp.servers.arggon` and never touches `ctx.mcp`; `arggon mcp` and the
+    generated `.mcp.json` stay for non-OpenCode clients that configure it
+    explicitly. `doctor` reports a present stanza as optional.
   - **W3 session context** — resolves the session's active item in this order:
     `ARGON_ITEM` env override → item ids observed from `arggon` invocations
-    (shell commands, `arggon_*` MCP calls, Code Mode code) stored per session
-    via `ctx.storage` → VCS branch (`feat/<id>` / `fix/<id>`). Observed shell
+    (shell commands, Code Mode `tools.arggon.<name>(…)` native calls — W3 — and
+    the transitional `arggon_*` MCP spelling) stored per session via
+    `ctx.storage` → VCS branch (`feat/<id>` / `fix/<id>`). Observed shell
     invocations are anchored to command position: quoted mentions (`grep -rn
     "arggon show task-x"`, `echo "arggon update task-fake"`), quoted separators
     and single-quoted `$()` never correlate, while wrapper prefixes
     (`npx`/`bunx`/`sudo`/`env`/`command`/`time`), `$(…)`/subshell forms and
-    newline-separated commands do; the Code Mode `arggon_*` regex stays a
-    raw-source best effort (a call inside a string literal can correlate, then
-    self-heals when `arggon show` disagrees). The branch read uses
+    newline-separated commands do; the Code Mode call regexes stay a raw-source
+    best effort (a call inside a string literal can correlate, then self-heals
+    when `arggon show` disagrees). The branch read uses
     `ctx.vcs.get()` first and falls back to `git rev-parse --abbrev-ref HEAD`
     (probe: on 2.0.7 `vcs.get()` returns an empty `data.branch`), both
     `execFile` argument arrays. On every agent-loop model call it appends a
@@ -87,10 +97,11 @@ docs or the V1 schema for V2 work.
     injected text as `block=<json>` and measures those bytes independently
     (reported = measured, ≤ 1024) instead of trusting the reported count; exits
     0 with `skipped: opencode not installed` when absent.
-- MCP (https://opencode.ai/v2/docs/mcp-servers/): V2 does not use `.mcp.json`
-  as a registration mechanism — register the server under `mcp.servers` as
+- MCP (https://opencode.ai/v2/docs/mcp-servers/) is **optional** in V2 and not
+  part of the default seam (W3): the native tools replace it. To use the stdio
+  server with another client, register it under `mcp.servers` as
   `{ "type": "local", "command": ["arggon", "mcp"] }`; the generated
-  `.mcp.json` still serves other clients (e.g. Claude Code). Check with
+  `.mcp.json` serves non-OpenCode clients (e.g. Claude Code). Check with
   `opencode mcp list` / `/mcps`.
 - Skills (https://opencode.ai/v2/docs/skills/): `.agents/skills` is auto-discovered,
   so the bundled `arggon-cli` (an umbrella `SKILL.md` plus `references/` read on
@@ -131,27 +142,49 @@ docs or the V1 schema for V2 work.
   (`CACHE_MAX_ENTRIES = 256`, oldest-first) and the item cache is keyed by
   project directory + item id. The tracker, pre-commit and CI remain the only
   authority; a missing surface degrades to a no-op.
-- **Vendored plugin imports stay guarded.** The V2 plugin docs show a static
-  `import { Plugin } from "@opencode/plugin"`; in a dependency-less tree (no
-  `node_modules` — the `arggon init` adopter shape) an auto-discovered plugin
-  using it fails to load on **2.0.7, 2.0.8 and 2.0.10** (`WARN failed to load
-  plugin … Cannot find package '@opencode/plugin'`; `setup` never runs; the
-  session still exits 0). The bundled plugin therefore exports a plain
-  `{ id, setup }` object (a valid V2 definition) and resolves `Plugin.define`
-  behind a guarded,
-  computed dynamic import (computed so editors/`tsc` do not flag the
-  deliberately absent package). Condition to simplify: only when the runtime
-  resolves `@opencode/plugin` without a local `node_modules` (or the docs drop
-  it) — re-run the A/B probe on the new 2.x first. Evidence: the PR #325 probe
+- **Vendored plugin imports stay guarded, and W3 ships a bundle.** The V2
+  plugin docs show a static `import { Plugin } from "@opencode/plugin"`; in a
+  dependency-less tree (no `node_modules` — the `arggon init` adopter shape) an
+  auto-discovered plugin using it fails to load on **2.0.7, 2.0.8 and 2.0.10**
+  (`WARN failed to load plugin … Cannot find package '@opencode/plugin'`;
+  `setup` never runs; the session still exits 0). Since W3 the vendored artifact
+  is the **generated single-file bundle**
+  (`opencode/plugins/arggon/index.bundle.ts` → `.opencode/plugins/arggon/index.ts`),
+  built by `npm run build:plugin` from the source with `@arggon/lib` inlined:
+  every reachable module is transpiled to CommonJS with the TypeScript compiler
+  API (no bundler dependency) and wrapped in a tiny ESM module registry, so the
+  only bare import left is `node:module`. The plain `{ id, setup }` default
+  export is a valid V2 definition; `Plugin.define` is not imported at all (the
+  guarded sugar needed a top-level await the bundle cannot carry). The artifact
+  is committed because `init` must work from a source checkout without a build;
+  `cli/src/plugin-copy.test.ts` **drift-gates** it (asserts the committed bytes
+  equal the deterministic build *before* touching anything, so a source change
+  without `npm run build:plugin` fails the suite) and `npm run check:plugin`
+  enforces the same gate in CI; `opencode/plugins/arggon/bundle.test.ts` loads
+  the committed artifact from a temp dir with no `node_modules` and calls every
+  tool. Evidence: the PR #325 probe
   (2.0.7: static import fails, plain object loads),
-  task-opencode-v2-plugin-import-gotcha (2.0.8 re-probe, same shape) and
-  task-playbook-opencode-2-0-10 (2.0.10 re-probe, 2026-09-20, same shape: the
-  docs plugin failed to load — `setup` marker absent — the bundled plugin
-  loaded, registered `arggon` MCP and a real session executed `arggon_next`).
-- **Code Mode batching.** V2 Code Mode exposes the MCP server as
-  `tools.arggon.*` (probe: `tools.arggon.arggon_next({})`); batch read-only
-  calls in ONE `execute` script (`arggon_next` + `arggon_show` +
-  `arggon_report` + `arggon_validate`) instead of one model step per call.
+  task-opencode-v2-plugin-import-gotcha (2.0.8 re-probe, same shape),
+  task-playbook-opencode-2-0-10 (2.0.10 re-probe, same shape) and
+  task-native-commands-seam (W3: dependency-less bundle load + 12 native tools).
+- **`options.pinned` (W3 catalog lever).** The runtime draws a subset of the
+  Code Mode catalog under its own ~2000-token budget; 2.0.10 registers its own
+  `session_move` tool with `options.pinned: true` (undocumented in the plugin
+  docs, probe 2026-09-20). The plugin pins the **core eight** workflow tools
+  (`list`, `create`, `update`, `show`, `next`, `validate`, `comment`, `handoff`)
+  and leaves the maintenance four (`report`, `priority`, `sync`,
+  `import_issues`) unpinned — still reachable through `search`. Pinning all
+  twelve would add ~52 B to the definitions payload but force more entries into
+  a budget the runtime cannot render alongside other plugins' tools, so the core
+  subset is the measured compromise; `context:report` prints the pinned count
+  and `tools.test.ts` pins the exact subset. Treat the option as
+  feature-detected: unknown options are ignored, never fatal.
+- **Code Mode batching.** V2 Code Mode exposes the native namespace as
+  `tools.arggon.*` (W3 default: `tools.arggon.next({})`, `tools.arggon.show`,
+  `tools.arggon.report`, `tools.arggon.validate`); batch read-only calls in ONE
+  `execute` script instead of one model step per call. While an adopter still
+  registers the MCP server, its tools appear alongside as
+  `tools.arggon.arggon_*` (probe: `tools.arggon.arggon_next({})`).
   The schemas are advertised once per session and only the composed result
   enters the transcript — the ADR 0006 spirit applied to coordinators. The MCP
   tool catalog can lag server startup on a session's first model call: the
@@ -190,19 +223,21 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   injected item block ≤ 1024 B (`ITEM_BLOCK_MAX_BYTES`, per-field clipping),
   MCP `tools/list` ≤ 12,288 B advisory (`task-schema-budget`). The report
   flags crossings inline like `doctor --budget` does.
-- Snapshot (2026-09-18, W6 report refreshed at merge — values move when the
+- Snapshot (2026-09-20, W3 `task-native-commands-seam` — values move when the
   skills or tool schemas do, so re-run the report before relying on them):
-  fixed per-session surface ~13.2 KB (~3.3k tokens) — MCP `tools/list`
-  10,450 B is the dominant cost, AGENTS.md 1,863 B, advertised descriptions
-  893 B total. The W5 skill split cut the on-load skill from 21,955 B (single
-  file) to a 9,978 B umbrella, with the 17,208 B of references paid only when
+  fixed per-session surface ~24.5 KB (~6.1k tokens) — MCP `tools/list`
+  10,507 B and the native `arggon` definitions 11,097 B (12 tools, 8 pinned)
+  are the dominant costs, AGENTS.md 1,959 B, advertised descriptions 942 B
+  total. The W5 skill split cut the on-load skill from 21,955 B (single file) to
+  an 11,942 B fixture umbrella, with the 18,100 B of references paid only when
   a task needs them. Those skill numbers are **source bytes** (this repo's
   `skills/arggon-cli/`, before marker stamping); the report's on-demand table
-  prints **fixture bytes** after `arggon init` stamping (10,042 B umbrella,
-  17,533 B references). Compare within one basis, never sum source and
-  fixture numbers. `keep.tokens: 15000` matches the V2 default: retention is
-  ~4.5x the fixed surface, so keep it unless exact recent detail matters more
-  than new-work headroom.
+  prints **fixture bytes** after `arggon init` stamping. Compare within one
+  basis, never sum source and fixture numbers. The MCP surface still exists for
+  other clients, so the report keeps measuring it; on the W3 default path it is
+  not registered, so a real adopter session does not pay it. `keep.tokens:
+  15000` matches the V2 default: retention is ~2.5x the fixed surface, so keep
+  it unless exact recent detail matters more than new-work headroom.
 
 ## Testing
 
@@ -211,17 +246,18 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
 - Fixture smoke: `arggon init` in a temp tree creates the seam; a second run
   leaves an edited `opencode.jsonc` byte-identical (adopter-owned); a tree with
   its own `opencode.json` reports the config skip and writes no `opencode.jsonc`.
-- V2 session smoke: `opencode mcp list` shows `arggon` connected, the
-  `arggon-cli` skill is discoverable and the `/arggon-*` commands are listed,
-  and `arggon_next` resolves the next claimable item. Transcripts are the review
-  evidence (ADR 0008 spirit); `npm run smoke:opencode` scripts it headless on
-  temp fixtures (plugin load, MCP auto-registration + usability, never-clobber,
-  failure isolation, plugin-absent CLI/MCP, and — W3 — item-block injection
-  bounded to 1024 B from a `feat/<id>` branch, correlation from an observed
-  `arggon_show` call, the `ARGON_ITEM` override, silence when nothing resolves
-  or there is no `tasks/`, session rename, and the failing-`validate` commit
-  warning) and exits 0 with `skipped: opencode not installed` when the binary
-  is absent. The plugin's pure parsers/block builder are unit-tested without
+- V2 session smoke: the `arggon-cli` skill is discoverable, the `/arggon-*`
+  commands are listed, and `tools.arggon.next` resolves the next claimable item.
+  Transcripts are the review evidence (ADR 0008 spirit); `npm run smoke:opencode`
+  scripts it headless on temp fixtures (plugin load, no MCP stanza in the fresh
+  seam, dependency-less bundle registering the twelve native tools, never-clobber,
+  failure isolation, plugin-absent CLI, **one bounded headless session per native
+  command** (eleven: next/start/done/handoff/review/status/spec/adr/explore/
+  playbook/adopt), item-block injection bounded to 1024 B from a `feat/<id>`
+  branch, correlation from an observed native `tools.arggon.show` call, the
+  `ARGON_ITEM` override, silence when nothing resolves or there is no `tasks/`,
+  session rename, and the failing-`validate` commit warning) and exits 0 with
+  `skipped: opencode not installed` when the binary is absent. The plugin's pure parsers/block builder are unit-tested without
   OpenCode next to the source (`opencode/plugins/arggon/index.test.ts`, run by
   the suite via the `opencode/**/*.test.ts` vitest include); the native tool
   namespace adds a contract suite (`opencode/plugins/arggon/tools.test.ts`)
@@ -232,23 +268,26 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   root tsconfig leaves (it includes `cli/src` only) by running strict
   `tsc --noEmit` over the vendored plugin source — the file `arggon init`
   copies into every adopter tree — because vitest transpiles without
-  type-checking and eslint is not type-aware. The
-  headless native-tools scenario links the workspace `@arggon/lib` into the
-  fixture (building it when `lib/dist` is missing) and runs one Code Mode
-  script that calls all twelve tools: contract envelopes, create→update
+  type-checking and eslint is not type-aware. `opencode/plugins/arggon/bundle.test.ts`
+  regenerates the bundle and loads it from a temp dir with no `node_modules`,
+  runs `setup()` and calls tools end to end (the deterministic proof of the
+  dependency-less adopter shape). The headless native-tools scenario stays
+  dependency-less (the kernel is inlined in the vendored bundle) and runs one
+  Code Mode script that calls all twelve tools: contract envelopes, create→update
   round-trip, the typed `SYNC_FAILED`/`IMPORT_FAILED` tool errors while the
   session continues, and the namespace listed by
   `search({namespace:"arggon"})`. Compaction cannot be forced deterministically
   headless; the closest evidence is that the injection fires per model call (a
   later call in the same session gets the block again).
-- Re-verified on 2.0.10 (2026-09-20, `opencode v2.0.10`): the 11 scenarios above
-  pass unchanged, and the plugin-import A/B re-probe recorded in
-  task-playbook-opencode-2-0-10 (dependency-less fixture — no `node_modules` in
-  the fixture or any ancestor: plugin A, the docs static import, failed to load
-  with `Cannot find package '@opencode/plugin'` and never wrote its setup
-  marker; plugin B, the bundled guarded source, loaded, registered `arggon` MCP
-  (`tools=9`; the fixture config registers no server) and executed
-  `arggon_next` in a real session; the session still exited 0).
+- Re-verified on 2.0.10 (2026-09-20, `opencode v2.0.10`): the plugin-import
+  A/B re-probe recorded in task-playbook-opencode-2-0-10 (dependency-less
+  fixture — no `node_modules` in the fixture or any ancestor: plugin A, the docs
+  static import, failed to load with `Cannot find package '@opencode/plugin'`
+  and never wrote its setup marker; plugin B loaded and executed a real session;
+  the session still exited 0). W3 (`task-native-commands-seam`) re-ran the whole
+  harness against the generated bundle: fresh-init seam without MCP, twelve
+  native tools registered in a dependency-less fixture, one bounded headless
+  session per native command, and native `tools.arggon.show` correlation.
 
 ## Security
 

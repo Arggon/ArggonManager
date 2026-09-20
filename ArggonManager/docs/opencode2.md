@@ -39,10 +39,11 @@ Keeping `main` installed side-by-side (so bare `arggon` stays on `main`)? See
 
 Within the session you get: the `arggon-cli` skill (umbrella + on-demand
 `references/`), the `/arggon-*` commands, the coordinator/worker/reviewer
-agents, the `arggon` MCP server (registered by the plugin when unset), the
-native `arggon` Code Mode tools (registered by the plugin, calling the kernel
-in-process), and — when your branch maps to a work item — a bounded
-item-context block on every model call.
+agents, the native `arggon` Code Mode tools (registered by the vendored
+single-file plugin, calling the inlined kernel in-process), and — when your
+branch maps to a work item — a bounded item-context block on every model call.
+MCP is optional and off the default path: `arggon mcp` and the generated
+`.mcp.json` still serve other clients that configure it.
 
 The day-to-day loop is unchanged and documented in
 [`ArggonManager/docs/agents.md`](agents.md): find → claim → worktree → work → review → merge
@@ -52,10 +53,10 @@ The day-to-day loop is unchanged and documented in
 
 | Artifact | What it is | Notes |
 | --- | --- | --- |
-| `opencode.jsonc` | Project config: `mcp.servers.arggon`, formatter, compaction retention | Generated **only when the repo has no OpenCode config** (root or `.opencode/`); otherwise reported in `skipped[]` |
+| `opencode.jsonc` | Project config: formatter, compaction retention (no MCP stanza since W3) | Generated **only when the repo has no OpenCode config** (root or `.opencode/`); otherwise reported in `skipped[]` |
 | `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` | The repo's orchestration model as V2 agents | Coordinator allow-list; worker nesting denied; reviewer `edit` denied |
-| `.opencode/commands/arggon-*.md` | Ten workflow commands (`/arggon-next`, `-start`, `-done`, `-handoff`, `-review`, `-status`, `-spec`, `-adr`, `-explore`, `-playbook`) | Prompt templates driving the CLI/MCP; no shell blocks with arguments |
-| `.opencode/plugins/arggon/` | Vendored plugin (ambient behavior + the native `arggon` tool namespace) | Bundled from the in-repo source with a byte-parity test |
+| `.opencode/commands/arggon-*.md` | Eleven native commands (`/arggon-next`, `-start`, `-done`, `-handoff`, `-review`, `-status`, `-spec`, `-adr`, `-explore`, `-playbook`, `-adopt`) | Prompt templates driving the native tools (Code Mode `tools.arggon.*`); no CLI-driving prose, no shell blocks |
+| `.opencode/plugins/arggon/` | Vendored **single-file** plugin bundle (kernel inlined; ambient behavior + the native `arggon` tool namespace) | Built from the in-repo source by `npm run build:plugin`; loads with no `node_modules`; drift-gated by `npm run check:plugin` |
 | `.agents/skills/arggon-cli/` | Umbrella skill + `references/` (json-contract, methodology, orchestration, pitfalls) | Progressive disclosure: detail loads on demand |
 | `AGENTS.md` | Slim router | V2 reads `AGENTS.md` only (no `CLAUDE.md` fallback) |
 
@@ -68,18 +69,20 @@ skipped (or archived with `init --backup`), and nothing is ever clobbered.
 `.opencode/plugins/arggon/` contributes ambient behavior plus the native tool
 namespace:
 
-- **Native `arggon` tools (ADR 0011, W2)** — registers twelve Code Mode tools
+- **Native `arggon` tools (ADR 0011, W2/W3)** — registers twelve Code Mode tools
   (`tools.arggon.list`, `create`, `update`, `show`, `next`, `report`,
   `validate`, `comment`, `handoff`, `priority`, `sync`, `import_issues`) that
-  call the kernel **in-process** through `@arggon/lib` and return the documented
-  `--json` envelopes. A kernel failure becomes a typed tool error
-  (`ArgonToolError`: kernel code + envelope) and the session continues. The
-  kernel import is guarded: in a dependency-less adopter tree the namespace is
-  simply absent until the vendored bundle lands (W3).
-- **MCP auto-registration** — registers the `arggon` server only when no
-  server is configured (never clobbers yours). The MCP stanza stays until W3
-  drops it from the default path.
-- **Session ↔ item correlation** — `ARGON_ITEM` env → observed `arggon` calls →
+  call the kernel **in-process** (the bundle inlines `@arggon/lib`) and return
+  the documented `--json` envelopes. The core eight are `options.pinned` so the
+  runtime keeps them in its Code Mode catalog; a kernel failure becomes a typed
+  tool error (`ArgonToolError`: kernel code + envelope) and the session
+  continues.
+- **MCP is out of the default path (W3)** — the plugin no longer registers
+  `mcp.servers.arggon` and never touches `ctx.mcp`; the generated config carries
+  no MCP stanza. `arggon mcp` and `.mcp.json` remain for non-OpenCode clients
+  that configure it explicitly (`doctor` reports a present stanza as optional).
+- **Session ↔ item correlation** — `ARGON_ITEM` env → observed `arggon` calls
+  (shell invocations and Code Mode `tools.arggon.<name>(…)` calls) →
   `feat/<id>` / `fix/<id>` branch.
 - **Bounded context** — injects an `arggon show --json`-shaped item block
   (≤ 1024 B) per model call, so it is present after compaction by construction.
@@ -106,8 +109,8 @@ working with the plugin broken or absent.
 ## Verify it works
 
 ```bash
-npm test                      # 1385+ tests
-npm run smoke:opencode        # 12 headless scenarios on a real OpenCode runtime (incl. native tools)
+npm test                      # 1393+ tests
+npm run smoke:opencode        # headless scenarios on a real OpenCode runtime: dependency-less bundle, one session per native command
 npm run smoke:opencode:wave   # scripted coordinator/worker/reviewer wave (2 fixtures)
 npm run context:report --strict   # context budgets: AGENTS.md, MCP schemas, item block, keep.tokens
 ```
@@ -195,11 +198,11 @@ where sessions and workers run, bare `arggon` would fall back to `main`. Keep
 
 ### Why bare `arggon` must resolve per project
 
-The generated seam calls bare `arggon` everywhere: the `arggon` MCP stanza in
-`opencode.jsonc` (`{ "type": "local", "command": ["arggon", "mcp"] }`), the
-plugin's MCP auto-registration when no server is configured, and the generated
-agents/commands/skills that drive the CLI. If an oc2 project resolves it to
-`main`, the session drives the wrong build.
+The generated seam used to call bare `arggon` everywhere; W3 removed the MCP
+stanza and the plugin's MCP auto-registration from the default path, so the
+remaining runtime uses are the plugin's `arggon show` / `arggon validate`
+fallbacks and the headless bootstrap/CI commands. If an oc2 project resolves
+`arggon` to `main`, those fallbacks drive the wrong build.
 
 The sharper caveat: **the OpenCode server spawns `arggon` with the PATH of the
 shell that launched it**, not the project shell's. A background server started
@@ -225,8 +228,9 @@ oc2 checkout). Two fixes:
 - `.opencode/plugins/arggon/index.ts` and `.agents/skills/*` are gitignored
   generated copies of committed sources; a fresh dev checkout — and every new
   worktree — has none. `arggon init` regenerates them (never overwriting
-  modified files), and the parity tests regenerate a missing or stale copy
-  (`cli/src/plugin-copy.test.ts`, `cli/src/skill-copy.test.ts`). Until then
+  modified files), and the copy tests regenerate a missing or stale derived
+  copy (`cli/src/plugin-copy.test.ts` — which also drift-gates the committed
+  artifact — and `cli/src/skill-copy.test.ts`). Until then
   `Ctrl+P → Plugins` will not list `arggon`.
 
 ### Verify the side-by-side setup
@@ -271,9 +275,10 @@ run it twice, or start a session in the project first.
 **Do I need OpenCode to use ArggonManager?** No. The CLI and MCP are portable;
 the surface is additive.
 
-**I already have an OpenCode config.** The config seam is skipped and
-`arggon doctor` reports the exact MCP stanza to add if you want it. Your file
-is never touched.
+**I already have an OpenCode config.** The config seam is skipped and your file
+is never touched; the vendored plugin still delivers the native `arggon` tools.
+If your config carries an `arggon` MCP stanza, `arggon doctor` reports it as
+optional (the native tools do not need it; keep it only for other clients).
 
 **Why is `main` untouched?** Product decision: this integration ships from
 `opencode2`, which receives `main` merges as needed.

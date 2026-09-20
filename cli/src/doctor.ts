@@ -139,7 +139,10 @@ export type DoctorOpenCode = {
     native: boolean;
     /** `.mcp.json` registers the `arggon` server under `mcpServers`. */
     mcpJson: boolean;
-    /** Actionable stanza/path hint when only `.mcp.json` exists; `null` otherwise. */
+    /**
+     * Removal guidance when an OpenCode config carries an `arggon` MCP stanza
+     * (optional since W3); `null` otherwise.
+     */
     hint: string | null;
   };
 };
@@ -157,12 +160,14 @@ export const MAX_OPENCODE_NAMES = 50;
 export const MAX_OPENCODE_V1_KEYS_PER_FILE = 20;
 
 /**
- * Actionable hint when the arggon MCP server exists only in `.mcp.json`
- * (which OpenCode V2 does not read): the exact stanza and path to add.
+ * Report-only guidance when an OpenCode config still carries an `arggon` MCP
+ * stanza. W3 drops MCP from the default path (ADR 0011 §5/§6): the vendored
+ * plugin registers the native tools, so the stanza is optional and only needed
+ * by non-OpenCode clients that use `arggon mcp`.
  */
 export const OPENCODE_MCP_HINT =
-  'OpenCode V2 does not read .mcp.json — add "mcp.servers.arggon" in opencode.json(c): ' +
-  '"mcp": {"servers": {"arggon": {"type": "local", "command": ["arggon", "mcp"]}}}';
+  'optional: the native arggon tools do not need MCP — keep "mcp.servers.arggon" only for ' +
+  "non-OpenCode clients that use `arggon mcp`";
 
 function isJsonObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -360,7 +365,9 @@ export function detectOpenCode(root: string): DoctorOpenCode {
     mcp: {
       native,
       mcpJson,
-      hint: !native && mcpJson ? OPENCODE_MCP_HINT : null,
+      // W3: the default seam writes no MCP stanza, so a present one is
+      // reported as optional (removal guidance), never as a missing step.
+      hint: native ? OPENCODE_MCP_HINT : null,
     },
   };
 }
@@ -664,9 +671,9 @@ function formatOpenCodeLines(opencode: DoctorOpenCode): string[] {
       ? `${opencode.artifacts.skills.length} bundled skill(s)`
       : "no bundled skills",
     opencode.mcp.native
-      ? "MCP native"
+      ? "MCP native (optional)"
       : opencode.mcp.mcpJson
-        ? "MCP only in .mcp.json"
+        ? "MCP only in .mcp.json (other clients)"
         : "MCP not registered",
   ];
   const lines = [`  opencode: ${parts.join(", ")}`];

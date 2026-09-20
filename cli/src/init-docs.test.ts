@@ -93,19 +93,20 @@ describe("init docs: tier-1 content", () => {
   const dir = tempDir();
   runInit({ dir, force: false });
 
-  it("AGENTS.md contains the arggon workflow loop lines", () => {
+  it("AGENTS.md routes to the native surface (W3)", () => {
     const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
-    expect(agents).toContain("arggon list --status todo --json");
-    expect(agents).toContain("arggon update <id> --status in_progress --assignee <your-login>");
-    expect(agents).toContain("arggon branch <id>");
-    expect(agents).toContain("arggon create task|bug");
+    expect(agents).toContain("tools.arggon.next");
+    expect(agents).toContain("tools.arggon.update");
+    expect(agents).toContain("tools.arggon.create");
+    expect(agents).toContain("tools.arggon.comment");
+    expect(agents).toContain("/arggon-start");
     expect(agents).toContain("Never reopen");
     expect(agents).toContain("ArggonManager/docs/convention.md");
     expect(agents).toContain("ArggonManager/docs/engineering.md");
     expect(agents).toContain("ArggonManager/docs/playbooks/");
     expect(agents).toContain("arggon playbook status");
     expect(agents).toContain("arggon validate");
-    expect(agents).toMatch(/arggon comment <item-id>[^\n]*never as GitHub PR comments/);
+    expect(agents).toContain("never as GitHub PR comments");
   });
 
   it("CLAUDE.md is the @AGENTS.md shim under the provenance marker", () => {
@@ -387,12 +388,15 @@ describe("init generates .mcp.json (task-init-mcp-config)", () => {
     expect(readConventionConfig(dir).generated[".mcp.json"]).toBeUndefined();
   });
 
-  it("generated AGENTS.md mentions the registered MCP server", () => {
+  it("generated AGENTS.md routes to the native surface, not the MCP default", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
     const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
-    expect(agents).toContain(".mcp.json");
-    expect(agents).toContain("MCP");
+    expect(agents).toContain("tools.arggon.");
+    expect(agents).toContain(".agents/skills/arggon-cli/SKILL.md");
+    // The optional stdio MCP server still ships (`.mcp.json`) for other
+    // clients, but the router no longer sends agents down the MCP path.
+    expect(agents).not.toContain(".mcp.json");
   });
 });
 

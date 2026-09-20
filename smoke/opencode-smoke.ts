@@ -6,42 +6,51 @@
  * (standalone server, JSON transcript + runtime logs) and asserts the bundled
  * plugin behavior end to end:
  *
- *   W2 — MCP auto-registration:
- *   1. fresh init      — plugin bundled with its `//` marker, loads, and the
- *                        arggon MCP server is registered and usable (the model
- *                        executes `tools.arggon.arggon_next`).
+ *   W3 — seam without MCP + the vendored bundle (task-native-commands-seam):
+ *   1. fresh init      — the generated seam carries NO MCP stanza and the
+ *                        vendored single-file plugin loads in a dependency-less
+ *                        fixture (no `node_modules`), registering the twelve
+ *                        native tools with the kernel inlined; the model
+ *                        executes `tools.arggon.next({})` in Code Mode.
  *   2. adopter config  — init writes no `opencode.jsonc`; the plugin alone
- *                        registers arggon and the model uses it.
- *   3. never clobber   — a pre-existing `arggon` server configured by the
+ *                        registers the native tools and the model uses them.
+ *   3. never clobber   — a pre-existing `arggon` MCP server configured by the
  *                        adopter keeps running (sentinel marker) and the config
  *                        bytes are untouched.
  *   4. failure isolation — a broken sibling plugin is logged and ignored: the
  *                        session, the healthy arggon plugin and the CLI all
  *                        keep working.
- *   5. plugin absent   — the CLI and the config-registered MCP server are
- *                        unaffected without the plugin.
- *
- *   Native-first W2 — the `arggon` tool namespace (task-native-tools):
- *   6. native tools    — with the workspace kernel linked, the plugin registers
- *                        the twelve `arggon` Code Mode tools and one headless
- *                        session calls every one of them (contract-shaped
- *                        envelopes, create→update round-trip, the two
+ *   5. plugin absent   — the CLI is unaffected without the plugin (and no MCP
+ *                        server is configured by default anymore).
+ *   6. native tools    — one headless session calls all twelve native tools
+ *                        (contract envelopes, create→update round-trip, the two
  *                        GitHub-dependent tools failing as typed errors while
  *                        the session continues) and finds the namespace in the
  *                        Code Mode catalog via `search`.
+ *   7. commands        — one bounded headless session PER native command
+ *                        (eleven), each expanded from the shipped
+ *                        `.opencode/commands/arggon-*.md` body: the command
+ *                        drives the native tools / writes the methodology
+ *                        artifact and never shells out to the adapter. The
+ *                        harness submits the BODY as a prompt, so the V2
+ *                        command loader (discovery, frontmatter `agent:` /
+ *                        `subagent:` selection) is not exercised here; the
+ *                        generated frontmatter is validated by
+ *                        `cli/src/init-opencode.test.ts`.
  *
  *   W3 — session context:
- *   6. branch          — a claimed item on `feat/<id>` resolves, injects the
+ *   8. branch          — a claimed item on `feat/<id>` resolves, injects the
  *                        bounded item block (the smoke measures the logged
  *                        block text itself, not the reported count) and
  *                        renames the session.
- *   7. storage map     — an observed `arggon_show` call on a non-matching
- *                        branch correlates the item for the next model call.
- *   8. env override    — `ARGON_ITEM` resolves with no branch match.
- *   9. nothing resolves — tracker present, no claim/branch/env/observed call:
+ *   9. storage map     — an observed native `tools.arggon.show` call on a
+ *                        non-matching branch correlates the item for the next
+ *                        model call (W3 correlation without MCP).
+ *  10. env override    — `ARGON_ITEM` resolves with no branch match.
+ *  11. nothing resolves — tracker present, no claim/branch/env/observed call:
  *                        the hook is silent.
- *  10. outside trees   — no tracker root: silent, session unaffected.
- *  11. hygiene         — a shell `git commit` with a broken tracker item logs
+ *  12. outside trees   — no tracker root: silent, session unaffected.
+ *  13. hygiene         — a shell `git commit` with a broken tracker item logs
  *                        the `arggon validate` warning; the commit is not
  *                        blocked.
  *
@@ -69,8 +78,8 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readdirSync,
   rmSync,
-  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -80,20 +89,26 @@ import { fileURLToPath } from "node:url";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(repoRoot, "cli/src/cli.ts");
 const tsx = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
-const PLUGIN_SOURCE = join(repoRoot, "opencode/plugins/arggon/index.ts");
+// W3: init vendors the committed single-file bundle (plugin + @arggon/lib
+// inlined), not the source; the fixture needs no `node_modules`.
+const PLUGIN_SOURCE = join(repoRoot, "opencode/plugins/arggon/index.bundle.ts");
 const PLUGIN_DEST = ".opencode/plugins/arggon/index.ts";
-const PLUGIN_MARKER = `// arggon:generated template="opencode/plugins/arggon/index.ts"`;
-const MCP_TOOL_CODE = "return await tools.arggon.arggon_next({})";
+const PLUGIN_MARKER = `// arggon:generated template="opencode/plugins/arggon/index.bundle.ts"`;
+const NATIVE_TOOL_CODE = "return await tools.arggon.next({})";
 const MODEL = process.env.OPENCODE_SMOKE_MODEL ?? "opencode-go/deepseek-v4-flash";
 const TIMEOUT_MS = Number(process.env.OPENCODE_SMOKE_TIMEOUT_MS ?? 240_000);
 // Mirrors ITEM_BLOCK_MAX_BYTES in the plugin source; asserted in unit tests.
 // The smoke measures the logged block text itself instead of trusting the
 // byte count the plugin reports (F8).
 const CONTEXT_BLOCK_MAX_BYTES = 1024;
+// Command sessions run a full command body; the default 240 s budget proved
+// tight for the methodology commands (a timeout kills the session mid-flight
+// even after the artifact is written).
+const COMMAND_TIMEOUT_MS = Number(process.env.OPENCODE_SMOKE_COMMAND_TIMEOUT_MS ?? 420_000);
 
 const TOOL_PROMPT = [
   "Use the execute tool with exactly this code:",
-  MCP_TOOL_CODE,
+  NATIVE_TOOL_CODE,
   "If the tool is not found, run the same code once more (the tool catalog can lag server startup).",
   "Reply with only the raw JSON result.",
 ].join("\n");
@@ -156,12 +171,17 @@ class Fixture {
     };
   }
 
-  private run(command: string, args: string[], overrides?: NodeJS.ProcessEnv): RunResult {
+  private run(
+    command: string,
+    args: string[],
+    overrides?: NodeJS.ProcessEnv,
+    timeoutMs: number = TIMEOUT_MS,
+  ): RunResult {
     const proc = spawnSync(command, args, {
       cwd: this.dir,
       env: this.env(overrides),
       encoding: "utf8",
-      timeout: TIMEOUT_MS,
+      timeout: timeoutMs,
       maxBuffer: 64 * 1024 * 1024,
     });
     return { status: proc.status, signal: proc.signal, stdout: proc.stdout ?? "", stderr: proc.stderr ?? "" };
@@ -186,21 +206,16 @@ class Fixture {
     return this.cli(["init", this.dir, "--json"]);
   }
 
-  /** Copy the committed plugin source into the fixture (no `arggon init`). */
+  /** Copy the committed single-file plugin bundle into the fixture (no init). */
   copyPlugin(): void {
     this.write(PLUGIN_DEST, readFileSync(PLUGIN_SOURCE, "utf8"));
   }
 
-  /**
-   * Link this checkout's kernel package into the fixture so the plugin's
-   * guarded `@arggon/lib` import resolves (ADR 0013: W2 consumes the workspace
-   * package; W3 vendors the dependency-free bundle instead).
-   */
-  linkKernel(): void {
-    const scope = this.path("node_modules/@arggon");
-    mkdirSync(scope, { recursive: true });
-    const link = join(scope, "lib");
-    if (!existsSync(link)) symlinkSync(join(repoRoot, "lib"), link, "junction");
+  /** The shipped command body with `$ARGUMENTS` expanded (headless run). */
+  commandPrompt(name: string, args: string, tail: string): string {
+    const raw = this.read(`.opencode/commands/arggon-${name}.md`);
+    const body = raw.replace(/^---[\s\S]*?\n---\n/, "").trim();
+    return `${body.replaceAll("$ARGUMENTS", args).trim()}\n\n${tail}`;
   }
 
   private json(result: RunResult): Record<string, unknown> | undefined {
@@ -236,7 +251,7 @@ class Fixture {
     return this.cli(["update", id, "--status", "in_progress", "--assignee", "smoke"]);
   }
 
-  opencode(message: string, overrides?: NodeJS.ProcessEnv): RunResult {
+  opencode(message: string, overrides?: NodeJS.ProcessEnv, timeoutMs?: number): RunResult {
     return this.run(
       "opencode",
       [
@@ -252,6 +267,7 @@ class Fixture {
         message,
       ],
       overrides,
+      timeoutMs,
     );
   }
 
@@ -307,16 +323,71 @@ function parseTranscript(stdout: string): TranscriptEvent[] {
   return events;
 }
 
-/** Completed Code Mode calls that ran `arggon_next` and returned the next envelope. */
+/** Completed Code Mode calls that ran the native `next` tool successfully. */
 function successfulArggonNext(stdout: string): boolean {
   return parseTranscript(stdout).some((event) => {
     if (event.type !== "tool_use" || event.part?.tool !== "execute") return false;
     const state = event.part.state;
     if (state?.status !== "completed") return false;
-    if (!(state.input?.code ?? "").includes("arggon_next")) return false;
+    if (!(state.input?.code ?? "").includes("tools.arggon.next")) return false;
     const output = state.output ?? "";
     return output.includes('"ok": true') && output.includes('"command": "next"');
   });
+}
+
+/** True when a completed Code Mode call's code contains `needle`. */
+function executedCode(stdout: string, needle: string): boolean {
+  return parseTranscript(stdout).some((event) => {
+    if (event.type !== "tool_use" || event.part?.tool !== "execute") return false;
+    const state = event.part.state;
+    return state?.status === "completed" && (state.input?.code ?? "").includes(needle);
+  });
+}
+
+/**
+ * True when a completed Code Mode call invokes one native tool, accepting both
+ * spellings a model produces: `tools.arggon.<name>(…)` and
+ * `tools.arggon["<name>"](…)` (observed in the bounded command sessions).
+ */
+function executedTool(stdout: string, name: string): boolean {
+  const patterns = [`tools.arggon.${name}`, `tools.arggon["${name}"]`, `tools.arggon['${name}']`];
+  return parseTranscript(stdout).some((event) => {
+    if (event.type !== "tool_use" || event.part?.tool !== "execute") return false;
+    const state = event.part.state;
+    if (state?.status !== "completed") return false;
+    const code = state.input?.code ?? "";
+    return patterns.some((pattern) => code.includes(pattern));
+  });
+}
+
+/**
+ * Command sessions normally exit 0. On 2.0.10 the runtime can log
+ * `InterruptError: All fibers interrupted without error` during shutdown and
+ * exit non-zero AFTER the model finished (observed once on /explore, after the
+ * artifact was written and the end marker emitted); accept that shape so a
+ * runtime shutdown artifact is not reported as a command failure.
+ */
+function sessionCompleted(result: RunResult, name: string): boolean {
+  return result.status === 0 || textContains(result.stdout, `CMD_${name.toUpperCase()}_OK`);
+}
+
+/** True when the transcript carries at least one assistant text/tool event. */
+function hasModelOutput(stdout: string): boolean {
+  return parseTranscript(stdout).some((event) => event.type === "text" || event.type === "tool_use");
+}
+
+/**
+ * Run one bounded command session, retrying ONCE when the standalone runtime
+ * aborted the session before any model output (`InterruptError: All fibers
+ * interrupted without error` right after `step_start`, observed sporadically
+ * on 2.0.10 while many short standalone servers run back to back). A session
+ * with real output is never retried.
+ */
+function runCommandSession(f: Fixture, prompt: string, label: string): RunResult {
+  const first = f.opencode(prompt, undefined, COMMAND_TIMEOUT_MS);
+  if (hasModelOutput(first.stdout)) return first;
+  console.log(`  retry ${label}: the runtime aborted the session before any model output`);
+  return f.opencode(prompt, undefined, COMMAND_TIMEOUT_MS);
 }
 
 function textContains(stdout: string, needle: string): boolean {
@@ -411,29 +482,45 @@ function claimedItemFixture(name: string): { fixture: Fixture; item: { id: strin
 }
 
 function scenarioFreshInit(): void {
-  scenario("fresh init: bundled plugin loads and registers MCP");
+  scenario("fresh init: seam without MCP + dependency-less bundle registers the native tools");
   const f = new Fixture("fresh");
   const init = f.init();
   check("init exits 0", init.status === 0, runTail(init));
-  check("init bundles the plugin", existsSync(f.path(PLUGIN_DEST)));
+  check("init vendors the plugin", existsSync(f.path(PLUGIN_DEST)));
   if (existsSync(f.path(PLUGIN_DEST))) {
-    check("bundled plugin starts with the // provenance marker", f.read(PLUGIN_DEST).startsWith(`${PLUGIN_MARKER}\n`));
+    check(
+      "vendored plugin starts with the // provenance marker",
+      f.read(PLUGIN_DEST).startsWith(`${PLUGIN_MARKER}\n`),
+    );
+    check(
+      "vendored plugin is the single-file bundle with the kernel inlined",
+      f.read(PLUGIN_DEST).includes('__arggonModules.set("lib/src/index.ts"'),
+    );
   }
+  const config = f.read("opencode.jsonc");
+  check(
+    "generated config has no MCP stanza (W3 seam)",
+    !config.includes('"mcp"') && !config.includes('"arggon", "mcp"'),
+  );
+  check(
+    "fixture has no node_modules (dependency-less adopter shape)",
+    !existsSync(f.path("node_modules")),
+  );
   const session = f.opencode(TOOL_PROMPT);
   f.saveTranscript("fresh-init", session);
   check("session runs in the fixture project", session.stderr.includes(`directory=${f.dir}`), runTail(session));
   check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
-  check("arggon MCP server registered", mcpConnected(session), runTail(session));
-  check("model executed arggon_next successfully", successfulArggonNext(session.stdout), runTail(session));
   check(
-    "no native tools registered without @arggon/lib (dependency-less adopter shape)",
-    !session.stderr.includes("[arggon] tools: registered"),
+    "native tools register from the inlined kernel (12)",
+    session.stderr.includes('[arggon] tools: registered 12 native arggon tools (namespace="arggon":'),
     runTail(session),
   );
+  check("no MCP server is registered by default", !mcpConnected(session), runTail(session));
+  check("model executed the native next tool successfully", successfulArggonNext(session.stdout), runTail(session));
 }
 
 function scenarioAdopterConfig(): void {
-  scenario("adopter config: plugin registers MCP without opencode.jsonc");
+  scenario("adopter config: plugin registers the native tools without opencode.jsonc");
   const f = new Fixture("adopter");
   f.write("opencode.json", '{\n  "$schema": "https://opencode.ai/config.json"\n}\n');
   const init = f.init();
@@ -442,8 +529,12 @@ function scenarioAdopterConfig(): void {
   const session = f.opencode(TOOL_PROMPT);
   f.saveTranscript("adopter-config", session);
   check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
-  check("plugin registers arggon MCP (no config entry exists)", mcpConnected(session), runTail(session));
-  check("model executed arggon_next successfully", successfulArggonNext(session.stdout), runTail(session));
+  check(
+    "plugin registers the twelve native tools with no config entry",
+    session.stderr.includes('[arggon] tools: registered 12 native arggon tools (namespace="arggon":'),
+    runTail(session),
+  );
+  check("model executed the native next tool successfully", successfulArggonNext(session.stdout), runTail(session));
 }
 
 function scenarioNeverClobber(): void {
@@ -473,6 +564,11 @@ function scenarioNeverClobber(): void {
   check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
   check("adopter command ran (server was not replaced)", existsSync(sentinel));
   check("adopter config bytes untouched", f.read("opencode.json") === config);
+  check(
+    "native tools still register alongside the adopter MCP server",
+    session.stderr.includes('[arggon] tools: registered 12 native arggon tools (namespace="arggon":'),
+    runTail(session),
+  );
 }
 
 function scenarioFailureIsolation(): void {
@@ -496,13 +592,17 @@ function scenarioFailureIsolation(): void {
     session.stderr.includes("failed to load plugin") && session.stderr.includes("synthetic smoke failure"),
     runTail(session),
   );
-  check("healthy arggon plugin still registers MCP", mcpConnected(session), runTail(session));
+  check(
+    "healthy arggon plugin still registers the native tools",
+    session.stderr.includes('[arggon] tools: registered 12 native arggon tools (namespace="arggon":'),
+    runTail(session),
+  );
   const next = f.cli(["next", "--json"]);
   check("CLI unaffected", next.status === 0 && next.stdout.includes('"ok":true'), runTail(next));
 }
 
 function scenarioPluginAbsent(): void {
-  scenario("plugin absent: CLI and configured MCP keep working");
+  scenario("plugin absent: the CLI keeps working (no MCP configured by default)");
   const f = new Fixture("absent");
   f.init();
   rmSync(f.path(".opencode/plugins"), { recursive: true, force: true });
@@ -514,7 +614,7 @@ function scenarioPluginAbsent(): void {
     session.status === 0 && textContains(session.stdout, "PLUGIN_ABSENT"),
     runTail(session),
   );
-  check("config-registered MCP server still connects", mcpConnected(session), runTail(session));
+  check("no MCP server connects without the plugin (W3 default)", !mcpConnected(session), runTail(session));
   const next = f.cli(["next", "--json"]);
   check("CLI unaffected without the plugin", next.status === 0 && next.stdout.includes('"ok":true'), runTail(next));
 }
@@ -602,29 +702,8 @@ function executeJson(stdout: string, needle: string): Record<string, unknown> | 
   return undefined;
 }
 
-/** Build `@arggon/lib` when the checkout has no dist/ (the smoke needs the artifact). */
-function ensureKernelBuilt(): void {
-  if (existsSync(join(repoRoot, "lib/dist/index.js"))) return;
-  console.log("  building @arggon/lib (missing lib/dist)…");
-  const execpath = process.env.npm_execpath;
-  const command = execpath ? process.execPath : "npm";
-  const argv = execpath
-    ? [execpath, "run", "build", "--workspace", "@arggon/lib"]
-    : ["run", "build", "--workspace", "@arggon/lib"];
-  const proc = spawnSync(command, argv, { cwd: repoRoot, encoding: "utf8", timeout: 180_000 });
-  if (proc.status !== 0) {
-    throw new Error(`@arggon/lib build failed: ${proc.stderr?.slice(-500) ?? ""}`);
-  }
-}
-
 function scenarioNativeTools(): void {
-  scenario("native tools (W2): every arggon tool runs in Code Mode with contract-shaped results");
-  try {
-    ensureKernelBuilt();
-  } catch (error) {
-    check("@arggon/lib builds (needed by the native tools)", false, String(error));
-    return;
-  }
+  scenario("native tools (W3): every arggon tool runs in Code Mode from the dependency-less bundle");
   const f = new Fixture("native-tools");
   f.bootstrap();
   const init = f.init();
@@ -635,10 +714,9 @@ function scenarioNativeTools(): void {
     check("fixture item created", false, "create chain failed");
     return;
   }
-  f.linkKernel();
   check(
-    "workspace kernel linked into the fixture",
-    existsSync(f.path("node_modules/@arggon/lib/package.json")),
+    "fixture stays dependency-less (kernel inlined in the bundle)",
+    !existsSync(f.path("node_modules")),
   );
 
   const prompt = [
@@ -778,7 +856,7 @@ function scenarioContextBranch(): void {
 }
 
 function scenarioContextStorage(): void {
-  scenario("context: observed arggon_show call correlates the item on a non-matching branch");
+  scenario("context: observed native show call correlates the item on a non-matching branch (W3)");
   const { fixture: f, item } = claimedItemFixture("context-storage");
   if (item === undefined) {
     check("fixture item created", false, "create chain failed");
@@ -788,7 +866,7 @@ function scenarioContextStorage(): void {
   const session = f.opencode(
     [
       "Use the execute tool with exactly this code:",
-      `return await tools.arggon.arggon_show({ id: "${item.id}" })`,
+      `return await tools.arggon.show({ id: "${item.id}" })`,
       "If the tool is not found, run the same code once more (the tool catalog can lag server startup).",
       "Then reply with only the work item id that appears in your system context.",
     ].join("\n"),
@@ -916,6 +994,207 @@ function scenarioHygiene(): void {
   );
 }
 
+// ---------------------------------------------------------------------------
+// W3 — one bounded headless scenario per native command
+// ---------------------------------------------------------------------------
+
+/** The eleven native commands (spec-native-first-011 §Commands). */
+const COMMAND_NAMES = [
+  "next",
+  "start",
+  "done",
+  "handoff",
+  "review",
+  "status",
+  "spec",
+  "adr",
+  "explore",
+  "playbook",
+  "adopt",
+] as const;
+
+/** Methodology artifacts a command must write (no native scaffold tool). */
+function methodologyDir(name: string): string | undefined {
+  switch (name) {
+    case "spec":
+      return "ArggonManager/docs/specs";
+    case "adr":
+      return "ArggonManager/docs/adr";
+    case "explore":
+      return "ArggonManager/docs/explorations";
+    case "playbook":
+      return "ArggonManager/docs/playbooks";
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Bounded harness note: the smoke runs the shipped command body but keeps the
+ * session deterministic — no skill loads, no repo exploration, no project test
+ * suites — and asks for a visible end marker the checks assert on.
+ */
+const HARNESS_NOTE =
+  "Harness note: this is a bounded smoke session — do not load the skill, do not " +
+  "explore the repository and do not run unrelated shell commands; use the native " +
+  "`tools.arggon.*` tools (git only where a step requires it), do exactly the " +
+  "step(s) above, then reply with exactly:";
+
+/** $ARGUMENTS value + bounded tail per command (the shipped body is what runs). */
+function commandCase(name: string, itemId: string): { args: string; tail: string } {
+  switch (name) {
+    case "next":
+      return { args: "", tail: "Report the item id only." };
+    case "start":
+      return {
+        args: itemId,
+        tail: `Claim ${itemId} and record the branch "feat/${itemId}" on it; skip the skill load and the session move. Do NOT create a git worktree, do not push and do not open a PR.`,
+      };
+    case "done":
+      return {
+        args: itemId,
+        tail: "Assume the PR is merged and the gates pass; flip the item to done. Do not run the project test suite.",
+      };
+    case "handoff":
+      return { args: itemId, tail: 'Use next "continue the smoke run"; skip everything else.' };
+    case "review":
+      return {
+        args: `the changes of ${itemId} in the working tree`,
+        tail: "Post a one-line verdict comment on the item (state merge or no-merge). Do not run the project test suite.",
+      };
+    case "status":
+      return { args: "", tail: "Report the counts only." };
+    case "spec":
+      return {
+        args: "smoke command coverage",
+        tail: "Write the spec file and stop before any plan.",
+      };
+    case "adr":
+      return { args: "smoke command coverage", tail: "Write the ADR file as Proposed and stop." };
+    case "explore":
+      return {
+        args: "smoke command coverage",
+        tail: "Write the exploration file and stop; do NOT create or update any tracker item.",
+      };
+    case "playbook":
+      return {
+        args: "smoke",
+        tail: "Write the playbook file (structure only, no web research) with a pinned version and stop.",
+      };
+    case "adopt":
+      return {
+        args: "",
+        tail: "The bootstrap init has already run: skip step 1 and file the adoption task only. Do not run npx.",
+      };
+    default:
+      return { args: "", tail: "" };
+  }
+}
+
+function envelopeOf(result: RunResult): Record<string, unknown> | undefined {
+  try {
+    return JSON.parse(result.stdout) as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+}
+
+function itemStatus(result: RunResult): string | undefined {
+  const item = envelopeOf(result)?.item as { status?: unknown } | undefined;
+  return typeof item?.status === "string" ? item.status : undefined;
+}
+
+function itemBody(result: RunResult): string {
+  const body = envelopeOf(result)?.body;
+  return typeof body === "string" ? body : "";
+}
+
+function scenarioCommands(): void {
+  scenario("commands (W3): one bounded headless session per native command");
+  for (const name of COMMAND_NAMES) {
+    const f = new Fixture(`cmd-${name}`);
+    f.bootstrap();
+    const init = f.init();
+    if (init.status !== 0) {
+      check(`/${name}: init exits 0`, false, runTail(init));
+      continue;
+    }
+    const item = f.createTaskChain();
+    if (item === undefined) {
+      check(`/${name}: fixture item created`, false, "create chain failed");
+      continue;
+    }
+    // Claimed item for the lifecycle commands (done needs a legal transition).
+    if (name === "done" || name === "handoff" || name === "review") {
+      f.claim(item.id);
+    }
+    const c = commandCase(name, item.id);
+    const session = runCommandSession(
+      f,
+      f.commandPrompt(name, c.args, `${c.tail} ${HARNESS_NOTE} CMD_${name.toUpperCase()}_OK`),
+      `/${name}`,
+    );
+    f.saveTranscript(`command-${name}`, session);
+    const label = `/${name}`;
+    check(`${label}: session completes`, sessionCompleted(session, name), runTail(session));
+    check(`${label}: plugin loads in the runtime`, pluginLoaded(session), runTail(session));
+    const dir = methodologyDir(name);
+    if (dir !== undefined) {
+      const abs = f.path(dir);
+      const files = existsSync(abs)
+        ? readdirSync(abs).filter((entry) => entry.endsWith(".md"))
+        : [];
+      check(
+        `${label}: writes a methodology artifact under ${dir}/`,
+        files.length > 0,
+        `files: ${files.join(", ") || "none"}`,
+      );
+    } else if (name === "start") {
+      const shown = f.cli(["show", item.id, "--meta", "--json"]);
+      check(
+        `${label}: claims the item through the native update tool`,
+        itemStatus(shown) === "in_progress" && executedTool(session.stdout, "update"),
+        `status=${itemStatus(shown) ?? "?"}`,
+      );
+    } else if (name === "done") {
+      const shown = f.cli(["show", item.id, "--meta", "--json"]);
+      check(
+        `${label}: flips the item to done through the native update tool`,
+        itemStatus(shown) === "done" && executedTool(session.stdout, "update"),
+        `status=${itemStatus(shown) ?? "?"}`,
+      );
+    } else if (name === "handoff") {
+      const shown = f.cli(["show", item.id, "--body", "--json"]);
+      check(
+        `${label}: appends the handoff through the native tool`,
+        itemBody(shown).includes("continue the smoke run") &&
+          executedTool(session.stdout, "handoff"),
+        runTail(session),
+      );
+    } else if (name === "review") {
+      const shown = f.cli(["show", item.id, "--body", "--json"]);
+      check(
+        `${label}: posts the verdict on the item`,
+        executedTool(session.stdout, "comment") && itemBody(shown).includes("###"),
+        runTail(session),
+      );
+    } else if (name === "adopt") {
+      const listed = f.cli(["list", "--json"]);
+      check(
+        `${label}: files the tracked adoption task through the native tool`,
+        listed.stdout.includes("Adopt ArggonManager") && executedTool(session.stdout, "create"),
+        runTail(session),
+      );
+    } else {
+      check(
+        `${label}: drives the native tools`,
+        executedCode(session.stdout, "tools.arggon."),
+        runTail(session),
+      );
+    }
+  }
+}
+
 function main(): void {
   console.log("smoke:opencode — OpenCode V2 plugin harness (W2 + W3)");
   if (!opencodeAvailable()) {
@@ -923,18 +1202,25 @@ function main(): void {
     return;
   }
   console.log(`model: ${MODEL}`);
-  scenarioFreshInit();
-  scenarioAdopterConfig();
-  scenarioNeverClobber();
-  scenarioFailureIsolation();
-  scenarioPluginAbsent();
-  scenarioNativeTools();
-  scenarioContextBranch();
-  scenarioContextStorage();
-  scenarioContextEnv();
-  scenarioContextSilent();
-  scenarioContextOutside();
-  scenarioHygiene();
+  // Dev aid: OPENCODE_SMOKE_ONLY=commands re-runs just the per-command group
+  // (the full harness runs every scenario by default).
+  if (process.env.OPENCODE_SMOKE_ONLY === "commands") {
+    scenarioCommands();
+  } else {
+    scenarioFreshInit();
+    scenarioAdopterConfig();
+    scenarioNeverClobber();
+    scenarioFailureIsolation();
+    scenarioPluginAbsent();
+    scenarioNativeTools();
+    scenarioCommands();
+    scenarioContextBranch();
+    scenarioContextStorage();
+    scenarioContextEnv();
+    scenarioContextSilent();
+    scenarioContextOutside();
+    scenarioHygiene();
+  }
 
   if (failures.length > 0) {
     console.error(`\nsmoke:opencode FAILED — ${failures.length} check(s):\n${failures.map((f) => `- ${f}`).join("\n")}`);

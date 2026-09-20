@@ -47,6 +47,7 @@ const TIER1_DOCS = [
   ".opencode/agents/arggon-coordinator.md",
   ".opencode/agents/arggon-reviewer.md",
   ".opencode/agents/arggon-worker.md",
+  ".opencode/commands/arggon-adopt.md",
   ".opencode/commands/arggon-adr.md",
   ".opencode/commands/arggon-done.md",
   ".opencode/commands/arggon-explore.md",

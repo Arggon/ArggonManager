@@ -1,6 +1,6 @@
 ---
 name: arggon-cli
-description: Work in an ArggonManager repo — run the find → claim → work → PR loop and follow the engineering methodology (specs, ADRs, explorations, playbooks) with the arggon CLI.
+description: Work in an ArggonManager repo — run the find → claim → work → PR loop and follow the engineering methodology (specs, ADRs, explorations, playbooks) with the native arggon tools (OpenCode V2) or the arggon CLI.
 version: 0.4.0
 author: Arggon (Arggon), Hermes Agent
 license: MIT
@@ -23,13 +23,30 @@ file — read the one that matches the task **before** acting:
 
 | Reference                     | Read it for                                                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `references/json-contract.md` | **JSON contract**: `--json` envelopes, error codes, filters, output surfaces, MCP                            |
+| `references/json-contract.md` | **JSON contract**: `--json` envelopes, error codes, filters, output surfaces, native tools, MCP              |
 | `references/methodology.md`   | **Methodology**: what the work needs — spec, plan, ADR, exploration, playbook, runbook — and the quality bar |
 | `references/orchestration.md` | **Orchestration**: coordinator/subagent waves, review bar, smoke gate, worktrees                             |
 | `references/pitfalls.md`      | **Pitfalls**: claim, cascade, tracker-merge and commit-staging traps                                         |
 
 The full workflow rules are `ArggonManager/docs/agents.md`; the review bar is
 `ArggonManager/docs/engineering.md`.
+
+## Native surface (OpenCode V2)
+
+Inside OpenCode V2 the same rules run through native primitives — use them
+first, and treat the CLI below as the headless adapter for bootstrap, gates and
+CI:
+
+- **Tools** (Code Mode, namespace `arggon`): `tools.arggon.list`, `create`,
+  `update`, `show`, `next`, `report`, `validate`, `comment`, `handoff`,
+  `priority`, `sync`, `import_issues`. Each returns exactly its documented
+  `--json` envelope; kernel failures are typed tool errors and never kill the
+  session.
+- **Commands**: `/arggon-{next,start,done,handoff,review,status,spec,adr,explore,playbook,adopt}`.
+- **Plugin**: vendored single-file at `.opencode/plugins/arggon/index.ts` (no
+  `node_modules` needed); `arggon init` refreshes it with provenance.
+- The CLI (`npm run arggon -- …`) stays for `init`/`validate`/`doctor` and
+  model-less CI; there is no MCP stanza in the generated config by default.
 
 ## When to Use
 
