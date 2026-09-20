@@ -14,6 +14,7 @@ claimed_at: "2026-09-20T00:12:33.377Z"
 depends_on: [task-native-layout-decision]
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-layout-rename
 ---
+
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-layout-rename.md
   Leaves live only under a story. id is the filename stem: task-native-layout-rename.
@@ -31,20 +32,20 @@ auto-detection + migration, no hard break.
 
 ## Acceptance
 
-- [ ] Kernel/convention: root constant and detection (`paths.ts`), convention
+- [x] Kernel/convention: root constant and detection (`paths.ts`), convention
       docs, templates, init seam, doctor/board/CLI/MCP messages updated.
-- [ ] Legacy `tasks/` auto-detected; the migration command moves the tree and
+- [x] Legacy `tasks/` auto-detected; the migration command moves the tree and
       docs (idempotent, provenance-safe) and `validate` reports the legacy
       location.
-- [ ] This repo dogfoods the rename (`tasks/` → `ArggonManager/`, `docs/` →
+- [x] This repo dogfoods the rename (`tasks/` → `ArggonManager/`, `docs/` →
       `ArggonManager/docs/`) with internal links updated.
-- [ ] Full suite + lint + `validate` green; convention version bumped with
-      migration notes.
-- [ ] No hard break: an existing `tasks/` tree still works until migrated.
-- [ ] Docs-migration scope pinned before the sweep: `docs/assets`, labs/runbooks,
+- [x] Full suite + lint + `validate` green; convention version bumped with
+      migration notes. (CI on PR #371: `cli` pass.)
+- [x] No hard break: an existing `tasks/` tree still works until migrated.
+- [x] Docs-migration scope pinned before the sweep: `docs/assets`, labs/runbooks,
       root meta-docs, and package `templates/docs/**` are each classified
       (move vs stay).
-- [ ] Plan frontmatter `spec:` pointer and internal links updated after the
+- [x] Plan frontmatter `spec:` pointer and internal links updated after the
       move.
 
 ## Notes
