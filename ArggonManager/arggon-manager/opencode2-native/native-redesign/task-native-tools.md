@@ -1,16 +1,19 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-native-tools
 title: Native arggon tool namespace
+assignee: Arggon
+branch: feat/task-native-tools
 parent: native-redesign
-depends_on: [task-native-lib-package]
 labels: []
 priority: p0
 created: "2026-09-19"
-updated: "2026-09-19"
+updated: "2026-09-20"
+claimed_at: "2026-09-20T11:38:53.308Z"
+depends_on: [task-native-lib-package]
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-tools
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-tools.md
   Leaves live only under a story. id is the filename stem: task-native-tools.
