@@ -123,3 +123,16 @@ El plugin ya no toca `ctx.mcp` y la stanza sale del seam: consistente con ADR 00
 **No verificado**: `smoke:opencode:wave` (W4/W7) y `/arggon-*` a través del loader real de comandos V2 (limitación M1).
 
 **Recomendación: no-merge** hasta cerrar el gate anti-drift. Con ese fix, y con los gates ya reproducidos arriba, la recomendación pasa a **merge con merge commit** (nunca squash). No marcar `done` todavía.
+
+### 2026-09-20 @Arggon
+Review F1 (blocking) — fixed on 609383b; PR #376 rework evidence.
+
+Drift gate: cli/src/plugin-copy.test.ts now builds in memory and asserts the committed artifact bytes equal the build BEFORE any write (fails with 'opencode/plugins/arggon/index.bundle.ts is stale — run npm run build:plugin and commit the artifact'); bundle.test.ts is read-only. Reviewer repro reproduced: shortening a tool description in the plugin source without rebuild → drift test FAILS (1 failed | 3 passed) and npm run check:plugin exits 1 with the artifact diff; revert → green. Auto-heal remains only for the derived gitignored .opencode copy (skill-copy precedent).
+
+CI gate: new npm run check:plugin (build:plugin + git diff --exit-code on the artifact) wired into the cli workflow after npm run build; npm run build:plugin stays the explicit sync.
+
+Docs: agents.md, opencode2.md, playbooks/opencode.md, cli/src/docs.ts, plugin-bundle.ts, build-plugin.ts and the plugin header now describe the assert-before-write test + CI gate instead of 'pinned by tests'.
+
+Minors: /arggon-status uses the native list input ({ status: 'blocked' } / { stale: true }; filter DSL noted); typecheck.test.ts docstring drops the removed @opencode/plugin mention; init-opencode.test.ts validates every generated command's frontmatter (description, agent in coordinator/reviewer, subagent boolean; done/adopt -> coordinator, review -> reviewer + subagent:true) and the smoke header documents that it runs bodies, not the V2 command loader.
+
+Gates on 609383b: npm test 86 files / 1394 tests green; lint clean; build ok; check:plugin exit 0; argpon validate ok (0 warnings); spec validate ok (18 docs); smoke:opencode 23 scenarios / 0 failures (104 checks); context:report --strict all bounds pass (AGENTS 1,959<=2,048; native 12/8 pinned 11,097<=12,288; item block 252<=1,024; fixed 24,505); CI cli pass (run 35520486608).
