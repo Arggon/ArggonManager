@@ -58,7 +58,8 @@ and the **one logic path** rule remain.
    every path failure-isolated, and re-measure ADR 0006 budgets as the gate of
    the native-tools wave.
 8. **Migration.** `init` provenance semantics upgrade existing adopters; the
-   tracker convention and data are untouched.
+   tracker convention and data are untouched by the native rebuild itself
+   (the layout move and convention bump are [ADR 0012](0012-tracker-root-layout.md)).
 
 **Bootstrap tension (resolved for now).** A plugin cannot create the repo it
 lives in, and CI has no model: candidate B keeps a thin headless artifact for
@@ -76,8 +77,9 @@ that is the explicit revisit trigger.
   CI burden, and a testing program that must grow headless coverage for native
   tools, commands and permissions. Non-OpenCode clients lose first-class
   support by decision.
-- **Neutral**: the tracker format and methodology docs are unchanged; ADR 0010
-  remains valid where it is not superseded.
+- **Neutral**: the tracker format and methodology docs are unchanged except
+  the layout move and convention bump ([ADR 0012](0012-tracker-root-layout.md));
+  ADR 0010 remains valid where it is not superseded.
 
 ## Alternatives considered
 

@@ -38,6 +38,11 @@ auto-detection + migration, no hard break.
 - [ ] Full suite + lint + `validate` green; convention version bumped with
       migration notes.
 - [ ] No hard break: an existing `tasks/` tree still works until migrated.
+- [ ] Docs-migration scope pinned before the sweep: `docs/assets`, labs/runbooks,
+      root meta-docs, and package `templates/docs/**` are each classified
+      (move vs stay).
+- [ ] Plan frontmatter `spec:` pointer and internal links updated after the
+      move.
 
 ## Notes
 

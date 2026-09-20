@@ -34,8 +34,10 @@ repository and makes the "what is ArggonManager" boundary explicit.
    operates on it (read paths) or migrates it to `ArggonManager/` through the
    convention migration command; `validate` reports the legacy location. No
    hard break for existing adopters.
-4. **Convention version**: the layout change bumps the convention version; the
-   migration is the supported path.
+4. **Convention version**: the layout change bumps the convention version. The
+   current `.convention.yml` stays at its numeric version, and `v4` is already
+   taken by the priority schema, so W0 must disambiguate the numbering and
+   record the bump; the migration is the supported path.
 5. **Dogfood**: this repository migrates its own tree and docs as the first
    adopter (tracked by `task-native-layout-rename`).
 
