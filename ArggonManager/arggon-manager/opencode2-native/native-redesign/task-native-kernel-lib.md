@@ -58,3 +58,6 @@ DECISIÓN REPORTADA (no tomada): bundling del plugin vendored single-file de W3 
 ### handoff 2026-09-20 @Arggon — next: Revisar PR #372 (head 5217233) contra ADR 0011 §4: lib.ts entry + operations compartidas por CLI/MCP; merge con MERGE commit (la rama lleva auto-commits del tracker); luego flip done.
 - branch: feat/task-native-kernel-lib
 - open questions: W3/W7 sin resolver (no bloquean W1): bundle de dist/lib.js en el plugin vendored single-file vs dependencia npm; publicar el paquete (private:true hoy). El MCP gana issueRoundtrip en update, alineado…
+
+### 2026-09-20 @Arggon
+CI `cli` pass en el head de PR #372 (`cba43a9`, run 35493791725, 2m55s). Gates locales del head: npm test 1350 passed (83 files) · lint · build · validate v5 · spec validate 18 docs.
