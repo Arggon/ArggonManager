@@ -1,16 +1,19 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-native-layout-rename
 title: "Layout rename: ArggonManager/ root + docs"
+assignee: Arggon
+branch: feat/task-native-layout-rename
 parent: native-redesign
-depends_on: [task-native-layout-decision]
 labels: []
 priority: p0
 created: "2026-09-19"
-updated: "2026-09-19"
+updated: "2026-09-20"
+claimed_at: "2026-09-20T00:12:33.377Z"
+depends_on: [task-native-layout-decision]
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-layout-rename
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-layout-rename.md
   Leaves live only under a story. id is the filename stem: task-native-layout-rename.
