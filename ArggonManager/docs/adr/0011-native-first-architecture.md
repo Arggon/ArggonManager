@@ -51,6 +51,11 @@ and the **one logic path** rule remain.
    headless bin. `init` remains the seam generator; the headless surface keeps
    `--json` for CI. MCP is dropped from the default path (a conditional adapter
    only if non-OpenCode clients return).
+   _Amended by [ADR 0013](0013-lib-package-split.md) (2026-09-20): the kernel
+   ships as the separate package `@arggon/lib`; the root package
+   (`arggon-manager`) ships the plugin + headless bin and depends on it. The
+   vendored plugin stays a single-file, dependency-free bundle built from
+   `@arggon/lib`._
 6. **Config seam.** The generated `opencode.jsonc` stops writing the MCP
    stanza; it keeps formatter/compaction and, if needed, permission defaults.
 7. **Version policy.** Pin OpenCode 2.0.10 (playbook refresh filed as
