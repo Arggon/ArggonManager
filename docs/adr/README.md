@@ -11,4 +11,5 @@ Files: `NNNN-short-title.md` (four-digit number, kebab title).
 | [0003](./0003-milestone-field.md)               | Milestone field (folded into v3)                                             | Proposed                        |
 | [0004](./0004-milestone-deps-v3.md)             | Convention v3: milestone + dependency graph                                  | Proposed                        |
 | [0010](./0010-opencode2-native-architecture.md) | OpenCode2 native architecture: portable kernel, native V2 surface            | Partially superseded by 0011    |
-| [0011](./0011-native-first-architecture.md)     | Native-first architecture: OpenCode-native surface over a git-native tracker | Proposed                        |
+| [0011](./0011-native-first-architecture.md)     | Native-first architecture: OpenCode-native surface over a git-native tracker | Accepted                        |
+| [0012](./0012-tracker-root-layout.md)           | Tracker root and product docs layout: `ArggonManager/`                       | Accepted                        |

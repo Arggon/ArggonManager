@@ -1,14 +1,19 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-native-layout-decision
 title: "Layout decision: ArggonManager/ root + docs inside"
+assignee: Arggon
+branch: feat/task-native-layout-decision
 parent: native-redesign
 labels: []
 priority: p0
 created: "2026-09-19"
 updated: "2026-09-19"
+claimed_at: "2026-09-19T23:55:07.852Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-layout-decision
 ---
+
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-layout-decision.md
   Leaves live only under a story. id is the filename stem: task-native-layout-decision.
@@ -34,14 +39,14 @@ files the migration wave.
 
 ## Acceptance
 
-- [ ] `docs/adr/0012-*.md` merged (Accepted) recording the layout, docs
+- [x] `docs/adr/0012-*.md` merged (Accepted) recording the layout, docs
       placement, and legacy auto-detection + migration.
-- [ ] ADR 0011 flipped to Accepted and cross-referencing 0012.
-- [ ] `spec-native-first-011` and `plan-native-first-011` updated to
+- [x] ADR 0011 flipped to Accepted and cross-referencing 0012.
+- [x] `spec-native-first-011` and `plan-native-first-011` updated to
       `ArggonManager/` + `ArggonManager/docs/` with the migration requirement.
-- [ ] `task-native-layout-rename` filed and W1 (`task-native-kernel-lib`)
+- [x] `task-native-layout-rename` filed and W1 (`task-native-kernel-lib`)
       depends on it.
-- [ ] `arggon validate` and `arggon spec validate` green; docs-only diff.
+- [x] `arggon validate` and `arggon spec validate` green; docs-only diff.
 
 ## Notes
 
