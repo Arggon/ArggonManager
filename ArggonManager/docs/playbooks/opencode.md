@@ -37,13 +37,26 @@ docs or the V1 schema for V2 work.
   [spec-opencode-seam-010](../specs/spec-opencode-seam-010.md)).
 - `arggon init` also bundles the optional plugin at
   `.opencode/plugins/arggon/index.ts` (auto-discovered, zero config). It is
-  dependency-free (no local `node_modules`) and failure-isolated (every path
-  logs once and no-ops, never breaking a session/CLI/MCP); `Plugin.define` is
-  optional sugar behind a guarded import — see Conventions, "Vendored plugin
-  imports". Ambient behavior only — no rule logic, no native tools:
-  - **W2** — registers `mcp.servers.arggon`
+  failure-isolated (every path logs once and no-ops, never breaking a
+  session/CLI/MCP); `Plugin.define` is optional sugar behind a guarded import —
+  see Conventions, "Vendored plugin imports". Ambient behavior plus the native
+  tool namespace, never rule logic:
+  - **W2 (ADR 0010)** — registers `mcp.servers.arggon`
     (`{type:"local",command:["arggon","mcp"]}`) **only when no `arggon` server
     is configured** and never clobbers one.
+  - **Native tools W2 (ADR 0011, `task-native-tools`)** — registers the twelve
+    `arggon` tools (`list`, `create`, `update`, `show`, `next`, `report`,
+    `validate`, `comment`, `handoff`, `priority`, `sync`, `import_issues`) with
+    `ctx.tool.transform`, `options.namespace: "arggon"` + `options.codemode:
+    true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
+    namespace. Each tool calls the kernel **in-process** through `@arggon/lib`
+    (the same `*Operation` the CLI's `--json` path uses) and returns the
+    documented envelope; a kernel failure becomes an `ArgonToolError` (typed
+    tool error carrying `code` + envelope) instead of a throw through a hook —
+    the session continues (failure isolation). `@arggon/lib` is resolved with a
+    guarded, cached dynamic import: the dependency-less adopter tree registers
+    no tools until W3 vendors the single-file bundle. `create`/`import_issues`
+    receive the `templatesDir` fallback resolved from the plugin location.
   - **W3 session context** — resolves the session's active item in this order:
     `ARGON_ITEM` env override → item ids observed from `arggon` invocations
     (shell commands, `arggon_*` MCP calls, Code Mode code) stored per session
@@ -145,6 +158,14 @@ docs or the V1 schema for V2 work.
   2.0.10 re-probe got `Unknown tool 'arggon.arggon_next'` once and success on
   the immediate retry (smoke prompts have carried a one-retry line since W2 for
   this reason).
+- **Transforms replay asynchronously (2.0.10).** `await ctx.tool.transform(cb)`
+  resolves before `cb` runs: the runtime replays the registered callbacks when
+  it rebuilds the registry (observed on 2.0.10 while registering the native
+  tools — the editor callback ran on the next rebuild, after `setup` returned).
+  Load external data before registering (the docs' rule), keep the callback
+  cheap and repeatable, and never rely on a value the callback computed being
+  available at `await` time; the plugin's registration log is therefore emitted
+  from inside the first callback replay (deduped), not after `await`.
 
 ## Context budgets
 
@@ -202,10 +223,18 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   warning) and exits 0 with `skipped: opencode not installed` when the binary
   is absent. The plugin's pure parsers/block builder are unit-tested without
   OpenCode next to the source (`opencode/plugins/arggon/index.test.ts`, run by
-  the suite via the `opencode/**/*.test.ts` vitest include). Compaction cannot
-  be forced deterministically headless; the closest evidence is that the
-  injection fires per model call (a later call in the same session gets the
-  block again).
+  the suite via the `opencode/**/*.test.ts` vitest include); the native tool
+  namespace adds a contract suite (`opencode/plugins/arggon/tools.test.ts`)
+  pinning each tool's output byte-for-byte against the CLI `--json` envelope
+  (twin fixtures), the typed-error path and the ADR 0006 schema budget. The
+  headless native-tools scenario links the workspace `@arggon/lib` into the
+  fixture (building it when `lib/dist` is missing) and runs one Code Mode
+  script that calls all twelve tools: contract envelopes, create→update
+  round-trip, the typed `SYNC_FAILED`/`IMPORT_FAILED` tool errors while the
+  session continues, and the namespace listed by
+  `search({namespace:"arggon"})`. Compaction cannot be forced deterministically
+  headless; the closest evidence is that the injection fires per model call (a
+  later call in the same session gets the block again).
 - Re-verified on 2.0.10 (2026-09-20, `opencode v2.0.10`): the 11 scenarios above
   pass unchanged, and the plugin-import A/B re-probe recorded in
   task-playbook-opencode-2-0-10 (dependency-less fixture — no `node_modules` in
