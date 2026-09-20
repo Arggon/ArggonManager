@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-native-tools
 title: Native arggon tool namespace
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p0
 created: "2026-09-19"
 updated: "2026-09-20"
-claimed_at: "2026-09-20T11:38:53.308Z"
 depends_on: [task-native-lib-package]
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-tools
 ---
