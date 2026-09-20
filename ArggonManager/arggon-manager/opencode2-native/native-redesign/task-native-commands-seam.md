@@ -153,3 +153,6 @@ Gates on 609383b: npm test 86 files / 1394 tests green; lint clean; build ok; ch
 **Único hallazgo restante (higiene/scope — debe salir antes de mergear):** el commit `cef5d4e` ("chore(tasks): created repro") agregó `ArggonManager/repro/repro.md`, una iniciativa vacía (id `repro`, sin contexto, sin acceptance, 0 comentarios) que sigue en HEAD y forma parte del diff del PR (`A ArggonManager/repro/repro.md`). Es claramente un artefacto accidental de prueba; `validate` no lo detecta (0 warnings) y al mergear entraría al tracker como iniciativa huérfana. Fix: `git rm -r ArggonManager/repro/` (+ re-validar) y push.
 
 **Recomendación: no-merge** por ese único cleanup (el resto está verificado y F1 cerrado). Con el archivo eliminado y los gates ya verdes, la recomendación pasa a **merge con merge commit** (nunca squash). No marcar `done` hasta entonces.
+
+### 2026-09-20 @Arggon
+Coordinator note: drift-gate fix verified by the reviewer (mutation → test fails + check:plugin exit 1; CI step wired) and the stray ArggonManager/repro tracker removed (7762c31). Gates 1394 tests, lint/build/check:plugin/validate/spec, smoke 23/0, budget within ADR 0006. Merged with merge commit; item flipped to done.
