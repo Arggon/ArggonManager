@@ -75,3 +75,7 @@ The only log-shape difference from 2.0.8 is the failure wrapper (`Cause([Die(Res
 **Smoke (same runtime):** `ARGON_SMOKE_KEEP=1 npm run smoke:opencode` → **11 scenarios, 0 failures** (fixtures kept for inspection).
 
 **Gates:** `npm test` 83 files / 1350 tests passed · `npm run lint` clean · `npm run build` clean · `arggon validate` ok 0 errors/0 warnings · `arggon spec validate` ok 0/0 · diff docs-only (no `opencode/plugins/**` or source changes).
+
+### handoff 2026-09-20 @Arggon — next: Coordinator review of the draft PR; the work is complete and docs-only (no follow-up code expected). Merge with a merge commit (tracker auto-commits on this branch).
+- branch: feat/task-playbook-opencode-2-0-10
+- open questions: Probe transcripts live only in the temp fixture /tmp/opencode/opencode-plugin-import-probe-210/.smoke-evidence (key lines quoted in the item comment and PR body); exploration-010 F1.16 + its 'Open te…
