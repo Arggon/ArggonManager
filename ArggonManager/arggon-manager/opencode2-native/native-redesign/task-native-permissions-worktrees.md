@@ -72,3 +72,7 @@ Decisions / follow-ups
 - ADR 0006: the three new tools ship lean schemas (bare output schema, terse descriptions) so the definitions payload stays within the advisory (12,182 B, 106 B headroom); `start` joins the pinned set (9).
 - Finding (reported, not fixed — W3 scope): the plugin's session↔item correlation regex does not recognize the bracket namespace spelling `tools["arggon"].update(...)` (observed in a real session); `CORRELATION_CALL_PATTERNS` matches `tools.arggon.<name>(...)` only, so correlation falls back to branch/env/storage.
 - Not in scope: `smoke:opencode:wave` (flagged W4/W7 in W3) and the repo's tracked `.opencode` dogfood seam (W7).
+
+### handoff 2026-09-20 @Arggon — next: Coordinator review of the draft PR: verify the W4 smoke evidence and gates, then merge with a MERGE commit (tracker auto-commits live on this branch, never squash). No worker action pending.
+- branch: feat/task-native-permissions-worktrees
+- open questions: Native definitions payload at 12,182 B (106 B headroom under the ADR 0006 advisory): richer schemas for the worktree tools need a deliberate budget decision; native start is a subset of the CLI (no n…
