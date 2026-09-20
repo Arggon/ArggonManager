@@ -13,7 +13,7 @@ Example: `arggon --json hello`.
 
 The MCP server (`arggon mcp`) returns these same envelope objects as tool-result text content for its `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`, `arggon_handoff`, `arggon_show`, `arggon_next`, `arggon_report`, and `arggon_validate` tools; kernel failures become tool errors carrying the same `ok: false` shape (see [`ArggonManager/docs/agents.md`](./agents.md) §MCP server). When `arggon_comment`/`arggon_handoff` take their default `author`/`session` from `CallToolRequest.params._meta.sessionID`, the value is normalized before it reaches the envelope or the item body (task-opencode-v2-mcp-meta-hardening): a single-line token cut at the first whitespace, control, format or lone-surrogate character, capped at 64 characters with `…`, with a value that normalizes to empty treated as absent (see §MCP server in `docs/agents.md`). The tool input schemas are parity-tested against the CLI option surface (`cli/src/mcp-parity.test.ts`): the two surfaces stay in sync by test, not by convention — schema changes are **additive only**; a breaking change bumps `schemaVersion`.
 
-This flag is a formatter only. It does not walk the tracker tree or parse frontmatter. Commands that load domain objects pass those objects to the formatter. Human vs JSON printing lives in the CLI entrypoint.
+This flag is a formatter only. It does not walk the tracker tree or parse frontmatter. Commands that load domain objects pass those objects to the kernel operation that assembles the envelope (`cli/src/operations.ts`, exported by the library entry `arggon-manager/lib`); human vs JSON printing lives in the CLI entrypoint, so a machine surface never re-assembles an envelope on its own.
 
 ---
 
@@ -103,7 +103,7 @@ Enums match [`ArggonManager/docs/convention.md`](./convention.md) v0.
 
 ## Command payloads
 
-Every command that loads domain objects emits this envelope; `--json` is a formatter, human output lives in the CLI entrypoint.
+Every command that loads domain objects emits this envelope; the envelope is assembled once by the kernel operation (`cli/src/operations.ts`, exported by `arggon-manager/lib`) and every surface shares it; `--json` is a formatter and human output lives in the CLI entrypoint.
 
 ### `instructions`
 

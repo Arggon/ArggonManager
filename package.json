@@ -4,6 +4,13 @@
   "private": true,
   "description": "Git-native project management CLI (ArggonManager)",
   "type": "module",
+  "exports": {
+    "./lib": {
+      "types": "./dist/lib.d.ts",
+      "import": "./dist/lib.js"
+    },
+    "./package.json": "./package.json"
+  },
   "bin": {
     "arggon": "./dist/cli.js"
   },

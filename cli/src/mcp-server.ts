@@ -1,28 +1,29 @@
 import { createInterface } from "node:readline";
-import { relative, sep } from "node:path";
 import type { Readable, Writable } from "node:stream";
-import { readConventionVersion } from "./convention.js";
-import { failEnvelope, successEnvelope } from "./json.js";
-import { ITEM_TYPES } from "./ids.js";
-import { runCreate } from "./create.js";
-import { runComment } from "./comment.js";
-import { HANDOFF_SESSION_CAP, runHandoff } from "./handoff.js";
-import { runList } from "./list.js";
-import { runNext } from "./next.js";
-import { runReport } from "./report.js";
-import { runShow } from "./show.js";
-import { runTrend, type TrendResult } from "./trend.js";
-import { maybeCommitUpdate, parseCsvList, runUpdate } from "./update.js";
-import { runValidate } from "./validate.js";
-import { STATUSES } from "./status.js";
-import { toContractWorkItem } from "./contract.js";
-import { commitPayload } from "./tracker-commit.js";
 import { arggonVersion } from "./docs.js";
+import { HANDOFF_SESSION_CAP } from "./handoff.js";
+import { ITEM_TYPES } from "./ids.js";
+import {
+  commentOperation,
+  createOperation,
+  handoffOperation,
+  listOperation,
+  nextOperation,
+  reportOperation,
+  showOperation,
+  updateOperation,
+  validateOperation,
+  type CommandOutcome,
+} from "./lib.js";
+import { STATUSES } from "./status.js";
+import { parseCsvList } from "./update.js";
 
 /**
  * Stdio MCP server exposing the shared kernel (list/create/update/comment) as
- * MCP tools. No new schema logic: tool handlers call the same run* functions
- * as the CLI and return the documented `--json` envelope objects as tool text.
+ * MCP tools. No new schema logic: tool handlers call the shared kernel
+ * operations (`cli/src/operations.ts`, exported by the `arggon-manager/lib`
+ * entry) — the same path the CLI uses — and return the documented `--json`
+ * envelope objects as tool text.
  * Agent playbook rules are enforced by passing `agent: true` to runUpdate —
  * the MCP layer cannot reopen done/cancelled items or steal claims.
  *
@@ -45,15 +46,6 @@ const SUPPORTED_PROTOCOL_VERSIONS = ["2024-11-05", "2025-03-26", "2025-06-18"] a
 const DEFAULT_PROTOCOL_VERSION = "2025-06-18";
 
 const SERVER_INFO = { name: "arggon", version: arggonVersion() };
-
-const LIST_FAILED = "LIST_FAILED";
-const CREATE_FAILED = "CREATE_FAILED";
-const UPDATE_FAILED = "UPDATE_FAILED";
-const COMMENT_FAILED = "COMMENT_FAILED";
-const SHOW_FAILED = "SHOW_FAILED";
-const NEXT_FAILED = "NEXT_FAILED";
-const REPORT_FAILED = "REPORT_FAILED";
-const VALIDATE_FAILED = "VALIDATE_FAILED";
 
 type JsonRpcRequest = {
   jsonrpc: "2.0";
@@ -408,49 +400,16 @@ export function runMcpServer(opts: McpServerOptions): void {
     };
   };
 
-  const toolEnvelope = (
-    tool: string,
-    body: () => Record<string, unknown>,
-  ): Record<string, unknown> => {
-    const command = tool.replace(/^arggon_/, "");
-    let envelope: Record<string, unknown>;
-    try {
-      envelope = body();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      // Bodies may pin a specific failure code (e.g. report trend mining
-      // throws TREND_FAILED while the command stays "report"); otherwise the
-      // code falls back to the per-command default.
-      const thrown = err as { code?: unknown };
-      const fallback =
-        command === "list"
-          ? LIST_FAILED
-          : command === "create"
-            ? CREATE_FAILED
-            : command === "comment" || command === "handoff"
-              ? COMMENT_FAILED
-              : command === "show"
-                ? SHOW_FAILED
-                : command === "next"
-                  ? NEXT_FAILED
-                  : command === "report"
-                    ? REPORT_FAILED
-                    : command === "validate"
-                      ? VALIDATE_FAILED
-                      : UPDATE_FAILED;
-      const code = typeof thrown.code === "string" ? thrown.code : fallback;
-      envelope = failEnvelope({ command, message, code, conventionVersion: conventionVersion() });
-      return { content: [{ type: "text", text: JSON.stringify(envelope) }], isError: true };
-    }
-    // Pure reads like validate succeed with ok:false in the envelope when
-    // errors were found (the CLI exits 1) — surface that as a tool error.
-    return {
-      content: [{ type: "text", text: JSON.stringify(envelope) }],
-      ...(envelope.ok === false ? { isError: true } : {}),
-    };
-  };
-
-  const conventionVersion = (): number => readConventionVersion(opts.cwd);
+  /**
+   * One tool result: the kernel operation's documented `--json` envelope as
+   * JSON text. `ok: false` (a kernel failure, or a pure read like validate
+   * that found problems) surfaces as a tool error without throwing through the
+   * session; the session continues (failure isolation, ADR 0011).
+   */
+  const toolResult = (outcome: CommandOutcome): Record<string, unknown> => ({
+    content: [{ type: "text", text: JSON.stringify(outcome.envelope) }],
+    ...(outcome.ok ? {} : { isError: true }),
+  });
 
   const callTool = (params: Record<string, unknown>): Record<string, unknown> => {
     const name = params.name;
@@ -459,8 +418,8 @@ export function runMcpServer(opts: McpServerOptions): void {
     // only as the default attribution below, never for any decision.
     const metaSession = sessionIDFromMeta(params);
     if (name === "arggon_list") {
-      return toolEnvelope("arggon_list", () => {
-        const result = runList({
+      return toolResult(
+        listOperation({
           cwd: opts.cwd,
           status: str(args.status),
           type: str(args.type),
@@ -470,21 +429,13 @@ export function runMcpServer(opts: McpServerOptions): void {
           view: str(args.view),
           stale: args.stale === true,
           olderThan: str(args.older_than),
-        });
-        return successEnvelope(
-          "list",
-          {
-            items: result.items.map((item) =>
-              toContractWorkItem(item, result.root, { full: args.full === true }),
-            ),
-          },
-          conventionVersion(),
-        );
-      });
+          full: args.full === true,
+        }),
+      );
     }
     if (name === "arggon_create") {
-      return toolEnvelope("arggon_create", () => {
-        const result = runCreate({
+      return toolResult(
+        createOperation({
           cwd: opts.cwd,
           type: str(args.type) ?? "",
           title: str(args.title) ?? "",
@@ -495,23 +446,15 @@ export function runMcpServer(opts: McpServerOptions): void {
           status: str(args.status),
           blockedReason: str(args.blocked_reason),
           issue: typeof args.issue === "number" ? args.issue : undefined,
+          full: args.full === true,
           // Tracker auto-commit resolves like the CLI (`x-tracker.auto-commit`,
           // default ON) so both entry points stay envelope-identical.
-        });
-        return successEnvelope(
-          "create",
-          {
-            path: relative(result.root, result.path).split(sep).join("/"),
-            item: toContractWorkItem(result.item, result.root, { full: args.full === true }),
-            commit: commitPayload(result.commit),
-          },
-          conventionVersion(),
-        );
-      });
+        }),
+      );
     }
     if (name === "arggon_update") {
-      return toolEnvelope("arggon_update", () => {
-        const result = runUpdate({
+      return toolResult(
+        updateOperation({
           cwd: opts.cwd,
           id: str(args.id) ?? "",
           title: str(args.title),
@@ -527,52 +470,26 @@ export function runMcpServer(opts: McpServerOptions): void {
           issue: typeof args.issue === "number" ? args.issue : undefined,
           blockedReason: str(args.blocked_reason),
           cascade: args.no_cascade !== true,
+          full: args.full === true,
           agent: true,
-        });
-        // Tracker auto-commit resolves like the CLI (`--no-commit` has no MCP
-        // equivalent; `x-tracker.auto-commit` governs) so both entry points
-        // stay envelope-identical (task-autocommit-update-import).
-        const commit = maybeCommitUpdate(result, undefined);
-        return successEnvelope(
-          "update",
-          {
-            item: toContractWorkItem(result.item, result.root, { full: args.full === true }),
-            autoCompleted: result.autoCompleted,
-            cascadeLevels: result.cascadeLevels,
-            cascadeSkipped: result.cascadeSkipped,
-            ...(result.movedFrom ? { movedFrom: result.movedFrom } : {}),
-            ...(result.renamedFrom ? { renamedFrom: result.renamedFrom } : {}),
-            ...(commit ? { commit: commitPayload(commit) } : {}),
-          },
-          conventionVersion(),
-        );
-      });
+        }),
+      );
     }
     if (name === "arggon_comment") {
-      return toolEnvelope("arggon_comment", () => {
-        const result = runComment({
+      return toolResult(
+        commentOperation({
           cwd: opts.cwd,
           id: str(args.id) ?? "",
           text: str(args.text) ?? "",
           // Explicit author wins; otherwise the V2 session ID is the default.
           author: explicitOrMeta(str(args.author), metaSession),
           // Tracker auto-commit resolves like the CLI.
-        });
-        return successEnvelope(
-          "comment",
-          {
-            id: result.id,
-            path: result.path,
-            comment: result.comment,
-            commit: commitPayload(result.commit),
-          },
-          conventionVersion(),
-        );
-      });
+        }),
+      );
     }
     if (name === "arggon_handoff") {
-      return toolEnvelope("arggon_handoff", () => {
-        const result = runHandoff({
+      return toolResult(
+        handoffOperation({
           cwd: opts.cwd,
           id: str(args.id) ?? "",
           next: str(args.next) ?? "",
@@ -583,104 +500,34 @@ export function runMcpServer(opts: McpServerOptions): void {
           session: explicitOrMeta(str(args.session), metaSession),
           author: explicitOrMeta(str(args.author), metaSession),
           // Tracker auto-commit resolves like the CLI.
-        });
-        return successEnvelope(
-          "handoff",
-          {
-            id: result.id,
-            path: result.path,
-            comment: result.comment,
-            handoff: result.handoff,
-            commit: commitPayload(result.commit),
-          },
-          conventionVersion(),
-        );
-      });
+        }),
+      );
     }
     if (name === "arggon_show") {
-      return toolEnvelope("arggon_show", () => {
-        const result = runShow({
+      return toolResult(
+        showOperation({
           cwd: opts.cwd,
           id: str(args.id) ?? "",
           meta: args.meta === true,
           body: args.body === true,
           tailComments: typeof args.tail_comments === "number" ? args.tail_comments : undefined,
-        });
-        return successEnvelope(
-          "show",
-          {
-            item: toContractWorkItem(result.item, result.root),
-            path: result.path,
-            ...(args.body === true
-              ? { body: result.item.body, comments: result.allComments }
-              : { comments: result.comments }),
-          },
-          conventionVersion(),
-        );
-      });
+        }),
+      );
     }
     if (name === "arggon_next") {
-      return toolEnvelope("arggon_next", () => {
-        const result = runNext({ cwd: opts.cwd, ready: args.ready === true });
-        const suggestion = result.suggestion
-          ? {
-              item: toContractWorkItem(result.suggestion.item, result.root),
-              parentChain: result.suggestion.parentChain,
-              reason: result.suggestion.reason,
-              blockedBy: result.suggestion.blockedBy,
-              unblocks: result.suggestion.unblocks,
-            }
-          : null;
-        return successEnvelope("next", { suggestion }, conventionVersion());
-      });
+      return toolResult(nextOperation({ cwd: opts.cwd, ready: args.ready === true }));
     }
     if (name === "arggon_report") {
-      return toolEnvelope("arggon_report", () => {
-        if (args.since !== undefined && args.trend !== true) {
-          // Same guard and message text as the CLI.
-          throw new Error("--since requires --trend");
-        }
-        let trend: TrendResult | null = null;
-        if (args.trend === true) {
-          try {
-            trend = runTrend({ cwd: opts.cwd, since: str(args.since) });
-          } catch (err) {
-            throw Object.assign(err instanceof Error ? err : new Error(String(err)), {
-              code: "TREND_FAILED",
-            });
-          }
-        }
-        const result = runReport({ cwd: opts.cwd });
-        const payload: Record<string, unknown> = { groups: result.groups };
-        if (trend) payload.trend = trend;
-        return successEnvelope("report", payload, conventionVersion());
-      });
+      return toolResult(
+        reportOperation({
+          cwd: opts.cwd,
+          trend: args.trend === true,
+          since: str(args.since),
+        }),
+      );
     }
     if (name === "arggon_validate") {
-      return toolEnvelope("arggon_validate", () => {
-        const result = runValidate({ cwd: opts.cwd });
-        // Same envelope shape as the CLI: the payload carries ok, errors and
-        // warnings; with errors present the envelope flips to ok:false and
-        // carries the VALIDATE_FAILED error (tool-level isError above).
-        return successEnvelope(
-          "validate",
-          {
-            ok: result.errors.length === 0,
-            layout: result.layout,
-            errors: result.errors,
-            warnings: result.warnings,
-            ...(result.errors.length > 0
-              ? {
-                  error: {
-                    message: `validate failed with ${result.errors.length} error(s)`,
-                    code: VALIDATE_FAILED,
-                  },
-                }
-              : {}),
-          },
-          result.conventionVersion,
-        );
-      });
+      return toolResult(validateOperation({ cwd: opts.cwd }));
     }
     throw new Error(`unknown tool "${String(name)}"`);
   };
