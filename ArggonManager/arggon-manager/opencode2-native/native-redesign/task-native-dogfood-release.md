@@ -29,6 +29,10 @@ W7 of `plan-native-first-011`. Migrate this repo's own `.opencode` seam to the n
 - [ ] ADR 0006 budgets re-measured and within limits; item block ≤ 1024 B.
 - [ ] Dogfood scenarios green on this repo's own tracker.
 - [ ] Packaging/release docs updated; release checklist executed.
+- [ ] Release notes cover the W3 default-path change: the plugin no longer
+      auto-registers the MCP server; an adopter re-running `init` loses
+      auto-registration unless they configure the stanza (`doctor` reports it
+      as optional).
 - [ ] `arggon validate` and `spec validate` green.
 
 ## Notes
