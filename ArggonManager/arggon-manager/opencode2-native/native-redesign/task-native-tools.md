@@ -66,3 +66,7 @@ Findings (reported, not fixed here):
 1. Session correlation does not see native tool calls: `parseArggonItemFromTool`/`parseArggonItemFromCode` match the MCP names (`arggon_show`) but a Code Mode native call is `tools.arggon.show(...)`. When W3 makes the native tools the default surface, the observed-call correlation silently regresses unless the parser learns the `arggon.<name>(` form.
 2. `import_issues`/`sync` shell out to `gh`, which resolves the repository from the *process* cwd — the kernel's `ghIssueListJson` does not forward the operation's `cwd`, so a native tool call can target the OpenCode server's cwd instead of the session directory (kernel scope, out of this item).
 3. `loadArgonKernel()` caches the import result for the process lifetime: a long-lived `opencode serve` started before `lib/dist` exists keeps the namespace absent until restart.
+
+### handoff 2026-09-20 @Arggon — next: Coordinator review (PR #375); then W3 replaces the CLI-driving commands and drops the MCP stanza — extend parseArggonItemFromCode to correlate tools.arggon.<name>(...) calls or the session-item corre…
+- branch: feat/task-native-tools
+- open questions: Pin the 12 catalog entries (options.pinned) so all render under the runtime's ~2000-token catalog budget?; import_issues/sync gh repo resolution uses the process cwd (kernel ghIssueListJson does not …
