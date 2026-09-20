@@ -94,7 +94,7 @@ function chainTree(): { dir: string; tasks: string[]; bug: string } {
  * the no-checklist behavior, so their bodies must be checklist-free.
  */
 function stripChecklist(dir: string, id: string): void {
-  const tasksDir = join(dir, "tasks");
+  const tasksDir = join(dir, "ArggonManager");
   const walk = (current: string): string[] =>
     readdirSync(current, { withFileTypes: true }).flatMap((entry) => {
       const full = join(current, entry.name);
@@ -115,7 +115,7 @@ function claimAndDone(dir: string, id: string): void {
 }
 
 function statusOf(dir: string, id: string): string {
-  return loadItems(join(dir, "tasks")).find((i) => i.id === id)!.status;
+  return loadItems(join(dir, "ArggonManager")).find((i) => i.id === id)!.status;
 }
 
 describe("automatic container completion", () => {
@@ -277,7 +277,7 @@ describe("automatic container completion", () => {
     runUpdate({ cwd: dir, id: bug, status: "in_progress", assignee: "worker", now: NOW });
     runUpdate({ cwd: dir, id: bug, status: "done", now: NOW });
     const fm = parseFrontmatter(
-      readFileSync(join(dir, "tasks/launch/epic-a/story-a/story-a.md"), "utf8"),
+      readFileSync(join(dir, "ArggonManager/launch/epic-a/story-a/story-a.md"), "utf8"),
     );
     expect(fm.data.status).toBe("done");
     expect(fm.data.updated).toBe("2026-09-11");
@@ -399,7 +399,7 @@ describe("cascade notice in human output", () => {
 describe("acceptance-aware cascade", () => {
   /** story-a gets an acceptance contract (its body gains a checklist). */
   function storyWithChecklist(dir: string, box: "[ ]" | "[x]"): void {
-    const path = join(dir, "tasks/launch/epic-a/story-a/story-a.md");
+    const path = join(dir, "ArggonManager/launch/epic-a/story-a/story-a.md");
     const raw = readFileSync(path, "utf8");
     const section = `## Acceptance\n\n- ${box} tie-breakers resolved\n`;
     const withSection = raw.includes("## Acceptance")
@@ -536,7 +536,7 @@ describe("cascade ancestor-write guard (bug-cascade-lost-update)", () => {
     claimAndDone(dir, "task-one");
     claimAndDone(dir, "task-two");
     runUpdate({ cwd: dir, id: bug, status: "in_progress", assignee: "worker", now: NOW });
-    return { dir, bug, storyPath: join(dir, "tasks/launch/epic-a/story-a/story-a.md") };
+    return { dir, bug, storyPath: join(dir, "ArggonManager/launch/epic-a/story-a/story-a.md") };
   }
 
   /** Hold the story's item lock from THIS test process (same lock family/format as lock.ts). */

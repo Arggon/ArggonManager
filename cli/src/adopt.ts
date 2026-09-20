@@ -1,5 +1,5 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative, sep } from "node:path";
 import { writeFileAtomic } from "./atomic.js";
 import {
   readGeneratedProjectName,
@@ -13,7 +13,7 @@ import { runDoctor } from "./doctor.js";
 import { itemId } from "./ids.js";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
 import { parseFrontmatter, stringField } from "./frontmatter.js";
-import { findTasksDir } from "./paths.js";
+import { conventionPathForRoot, docsDirForRoot, findTasksDir, TRACKER_DIR_NAME } from "./paths.js";
 import { sanitizeHumanTextUncapped } from "./sanitize.js";
 import {
   commitTrackerMutation,
@@ -157,7 +157,7 @@ export function detectSpecCorpora(root: string): DetectedCorpus[] {
     corpora.push({ format: "openspec", files, origin: "OpenSpec" });
   }
   // Already-migrated arggon specs: spec-*.md with a `spec_id` frontmatter field.
-  const arggonSpecsDir = join(root, "docs", "specs");
+  const arggonSpecsDir = join(docsDirForRoot(root), "specs");
   if (existsSync(arggonSpecsDir)) {
     let files = 0;
     let entries: string[] = [];
@@ -180,7 +180,7 @@ export function detectSpecCorpora(root: string): DetectedCorpus[] {
     }
   }
   // ADR directory.
-  const adrDir = join(root, "docs", "adr");
+  const adrDir = join(docsDirForRoot(root), "adr");
   if (existsSync(adrDir)) {
     const files = countMd(adrDir);
     if (files > 0) {
@@ -188,7 +188,8 @@ export function detectSpecCorpora(root: string): DetectedCorpus[] {
     }
   }
   // RFC markdown (docs/rfc/ preferred, plain rfc/ as the alternate).
-  for (const rfcRel of ["docs/rfc", "rfc"]) {
+  const docsRel = relative(root, docsDirForRoot(root)).split(sep).join("/");
+  for (const rfcRel of [`${docsRel}/rfc`, "rfc"]) {
     const abs = join(root, ...rfcRel.split("/"));
     if (!existsSync(abs)) continue;
     const files = countMd(abs);
@@ -233,20 +234,28 @@ export type Inventory = {
 
 /**
  * Pure inventory logic: no writes, no tracker access, no CLI wiring.
- * `root` is the repo root (parent of tasks/).
+ * `root` is the repo root (parent of the tracker dir).
  */
 export function buildInventory(root: string): Inventory {
   const state = readGeneratedState(root);
+  const docsRel = relative(root, docsDirForRoot(root)).split(sep).join("/");
   const docs: InventoryDoc[] = ADOPT_SCAN_PATHS.map((path) => {
-    const abs = join(root, ...path.split("/"));
+    // Layout-aware scan (ADR 0012): `docs/...` scan paths resolve under the
+    // product-docs dir — `ArggonManager/docs/...` on v5 trees, unchanged on
+    // legacy trees. The x-generated state keys use the same resolved path.
+    const resolved =
+      docsRel !== "docs" && path.startsWith("docs/")
+        ? `${docsRel}/${path.slice("docs/".length)}`
+        : path;
+    const abs = join(root, ...resolved.split("/"));
     if (!existsSync(abs)) {
-      return { path, exists: false, bytes: 0, managed: state[path] !== undefined };
+      return { path: resolved, exists: false, bytes: 0, managed: state[resolved] !== undefined };
     }
     return {
-      path,
+      path: resolved,
       exists: true,
       bytes: statSync(abs).size,
-      managed: state[path] !== undefined,
+      managed: state[resolved] !== undefined,
     };
   }).sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
   const stackHints = STACK_MANIFESTS.filter((manifest) => existsSync(join(root, manifest)));
@@ -262,7 +271,7 @@ const ADOPT_CORPUS_SECTION_GENERIC = `## Spec corpus (if the repo has one)
 
 Detection fingerprints (run before the prose sweep above):
 - \`openspec/config.yaml\` + \`specs/*/spec.md\` = OpenSpec corpus.
-- \`docs/specs/spec-*.md\` with arggon frontmatter = already migrated (skip).
+- \`ArggonManager/docs/specs/spec-*.md\` with arggon frontmatter = already migrated (skip).
 - ADR directories, RFC markdown = other formats (map conservatively into the same phases).
 No corpus: skip this section.
 
@@ -288,7 +297,7 @@ arggon adopt --dry-run --json
 
 ## Checklist
 
-- [ ] 1. Read the arggon-generated governing docs first: AGENTS.md, docs/convention.md, docs/engineering.md, docs/playbooks/ (if present). Follow them for the rest of this migration.
+- [ ] 1. Read the arggon-generated governing docs first: AGENTS.md, \`ArggonManager/docs/convention.md\`, \`ArggonManager/docs/engineering.md\`, \`ArggonManager/docs/playbooks/\` (if present). Follow them for the rest of this migration.
 - [ ] 2. Sweep the existing repo docs (list them from the inventory above): extract the project description, conventions, workflows, and stack info. Extract, don't wholesale-copy — rewrite into the target doc's structure and drop duplicated or outdated material.
 - [ ] 3. Complete the arggon-generated docs with the extracted content — fill the TODO placeholders: project description in AGENTS.md; CONTRIBUTING.md specifics (environment setup, build/test commands); ARCHITECTURE.md problem statement. The SECURITY.md contact is human input — leave it flagged for a human, never invent it.
 - [ ] 4. Archive replaced originals to backup/<YYYY-MM-DD>/ preserving their relative paths (use today's date). Only docs you REPLACED get archived; never archive README.md — merge into it instead.
@@ -313,9 +322,20 @@ ${ADOPT_CORPUS_SECTION_GENERIC}- [ ] 9. Fase 0 — Mapeo: build the format->temp
  * order) and the executing agent is pointed at the phased checklist below —
  * the detection already ran, so the section is no longer conditional.
  * Deterministic: corpora appear in the order detection reports them.
+ *
+ * `docsRel` is the product-docs dir relative to the repo root
+ * (`ArggonManager/docs` on v5 trees — the default — or `docs` on legacy
+ * trees); the body's doc references are remapped accordingly.
  */
-export function composeAdoptTaskBody(corpora: DetectedCorpus[]): string {
-  if (corpora.length === 0) return ADOPT_TASK_BODY;
+export function composeAdoptTaskBody(
+  corpora: DetectedCorpus[],
+  docsRel: string = `${TRACKER_DIR_NAME}/docs`,
+): string {
+  const base =
+    docsRel === `${TRACKER_DIR_NAME}/docs`
+      ? ADOPT_TASK_BODY
+      : ADOPT_TASK_BODY.replaceAll(`${TRACKER_DIR_NAME}/docs`, docsRel);
+  if (corpora.length === 0) return base;
   const list = corpora
     .map((corpus) => `- \`${corpus.format}\` — ${corpus.files} file(s), origin: ${corpus.origin}.`)
     .join("\n");
@@ -326,7 +346,7 @@ export function composeAdoptTaskBody(corpora: DetectedCorpus[]): string {
     `${list}\n\n` +
     `Follow the phased checklist below (Fase 0–4 + gates) for THIS corpus, in the order listed. ` +
     `OpenSpec corpora map per the Fase 0 table; other formats map conservatively into the same phases.\n\n`;
-  return ADOPT_TASK_BODY.replace(ADOPT_CORPUS_SECTION_GENERIC, concrete);
+  return base.replace(ADOPT_CORPUS_SECTION_GENERIC, concrete);
 }
 
 export type AdoptOptions = {
@@ -346,7 +366,7 @@ export type AdoptOptions = {
 };
 
 export type AdoptResult = {
-  /** Repo root (parent of tasks/). */
+  /** Repo root (parent of the tracker dir). */
   root: string;
   dryRun: boolean;
   inventory: Inventory;
@@ -430,7 +450,7 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
   if (opts.story !== undefined) {
     const parent = byId.get(opts.story);
     if (!parent) {
-      throw new Error(`--story '${opts.story}' does not resolve to an existing item under tasks/`);
+      throw new Error(`--story '${opts.story}' does not resolve to an existing item in the tracker`);
     }
     if (parent.type !== "story") {
       throw new Error(
@@ -532,7 +552,10 @@ export function runAdopt(opts: AdoptOptions): AdoptResult {
       title: ADOPT_TASK_TITLE,
       parent: storyId,
       id: ADOPT_TASK_STEM,
-      body: composeAdoptTaskBody(inventory.corpora),
+      body: composeAdoptTaskBody(
+        inventory.corpora,
+        relative(root, docsDirForRoot(root)).split(sep).join("/"),
+      ),
       commit: false,
       now: opts.now,
     });
@@ -644,7 +667,7 @@ export type AdoptAckOptions = {
 };
 
 export type AdoptAckResult = {
-  /** Repo root (parent of tasks/). */
+  /** Repo root (parent of the tracker dir). */
   root: string;
   /** Acknowledged docs, sorted by path. */
   acked: AckedDoc[];
@@ -682,7 +705,7 @@ export function runAdoptAck(opts: AdoptAckOptions): AdoptAckResult {
     throw new Error("not an arggon-managed tree — run `arggon init` first");
   }
   const root = doctor.root;
-  const statePath = join(root, "tasks", ".convention.yml");
+  const statePath = conventionPathForRoot(root);
   const prevState = readGeneratedState(root);
   const generatedAt = (opts.now ?? new Date()).toISOString();
   const version = arggonVersion();

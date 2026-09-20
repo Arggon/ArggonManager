@@ -5,7 +5,7 @@ description: Run an exploration spike before a stack or design decision
 Explore $ARGUMENTS as a recorded spike — not a chat summary.
 
 1. Scaffold with the CLI: `arggon stack explore <topic>` →
-   `docs/explorations/exploration-<slug>-NNN.md` (never hand-create it).
+   `ArggonManager/docs/explorations/exploration-<slug>-NNN.md` (never hand-create it).
 2. Research the candidates yourself: current versions and best practices with
    dated sources, recorded under the template's candidates / criteria /
    findings / recommendation sections.

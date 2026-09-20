@@ -193,16 +193,16 @@ describe("comment", () => {
 
   it("rejects empty comment text", () => {
     const { dir, id } = primedTask();
-    expect(() =>
-      runComment({ cwd: dir, id, text: "   \n  ", author: "a", now: NOW }),
-    ).toThrow(/comment text must not be empty/);
+    expect(() => runComment({ cwd: dir, id, text: "   \n  ", author: "a", now: NOW })).toThrow(
+      /comment text must not be empty/,
+    );
   });
 
   it("fails clearly on unknown id", () => {
     const { dir } = primedTask();
-    expect(() =>
-      runComment({ cwd: dir, id: "nope", text: "x", author: "a", now: NOW }),
-    ).toThrow(/id 'nope' not found under tasks/);
+    expect(() => runComment({ cwd: dir, id: "nope", text: "x", author: "a", now: NOW })).toThrow(
+      /id 'nope' not found under the tracker/,
+    );
   });
 
   it("leaves the tree valid (validate passes on a commented tree)", () => {
@@ -253,9 +253,9 @@ describe("comment --file/stdin (task-comment-stdin-file)", () => {
     expect(envelope).toMatchObject({ ok: true, command: "comment", id: "task-rate-limit" });
     // Top-level path: the absolute path of the commented item file (bug-create-path-envelope).
     expect(envelope.path).toBe(path);
-    expect(
-      raw(join(dir, "tasks/launch-mvp/auth/story-login/task-rate-limit.md")),
-    ).toContain(`@arggon\n${piped}\n`);
+    expect(raw(join(dir, "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md"))).toContain(
+      `@arggon\n${piped}\n`,
+    );
   });
 
   it("rejects passing both positional text and --file", () => {
@@ -292,26 +292,53 @@ describe("comment --file/stdin (task-comment-stdin-file)", () => {
     const { dir } = primedTask();
     const both = spawnSync(
       process.execPath,
-      [tsx, cli, "--json", "comment", "task-rate-limit", "positional", "--file", "-", "--author", "a"],
+      [
+        tsx,
+        cli,
+        "--json",
+        "comment",
+        "task-rate-limit",
+        "positional",
+        "--file",
+        "-",
+        "--author",
+        "a",
+      ],
       { encoding: "utf8", cwd: dir },
     );
     expect(both.status).not.toBe(0);
     expect(JSON.parse(both.stdout)).toMatchObject({
       ok: false,
       command: "comment",
-      error: { code: "COMMENT_FAILED", message: expect.stringMatching(/pass either the comment text or --file/) },
+      error: {
+        code: "COMMENT_FAILED",
+        message: expect.stringMatching(/pass either the comment text or --file/),
+      },
     });
 
     const missing = spawnSync(
       process.execPath,
-      [tsx, cli, "--json", "comment", "task-rate-limit", "--file", "no-such-file.md", "--author", "a"],
+      [
+        tsx,
+        cli,
+        "--json",
+        "comment",
+        "task-rate-limit",
+        "--file",
+        "no-such-file.md",
+        "--author",
+        "a",
+      ],
       { encoding: "utf8", cwd: dir },
     );
     expect(missing.status).not.toBe(0);
     expect(JSON.parse(missing.stdout)).toMatchObject({
       ok: false,
       command: "comment",
-      error: { code: "COMMENT_FAILED", message: expect.stringMatching(/no-such-file\.md.*file not found/) },
+      error: {
+        code: "COMMENT_FAILED",
+        message: expect.stringMatching(/no-such-file\.md.*file not found/),
+      },
     });
   });
 });
@@ -375,7 +402,7 @@ describe("mcp arggon_comment tool", () => {
       comment: { author: "agent-x", date: expect.any(String), lines: ["handoff note"] },
     });
     expect(
-      readFileSync(join(dir, "tasks/launch-mvp/auth/story-login/task-rate-limit.md"), "utf8"),
+      readFileSync(join(dir, "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md"), "utf8"),
     ).toContain("@agent-x\nhandoff note\n");
   });
 
@@ -388,7 +415,7 @@ describe("mcp arggon_comment tool", () => {
       ok: false,
       schemaVersion: 1,
       command: "comment",
-      error: { message: "id 'nope' not found under tasks/", code: "COMMENT_FAILED" },
+      error: { message: "id 'nope' not found under the tracker", code: "COMMENT_FAILED" },
     });
   });
 

@@ -24,11 +24,11 @@ import type { Status } from "./status.js";
 
 /** Refusal when the repo has not armed claim-steal (the default). */
 export const STEAL_DISABLED_MESSAGE =
-  "steal is disabled in this repo (x-tracker.allow-steal: true in tasks/.convention.yml arms it)";
+  "steal is disabled in this repo (x-tracker.allow-steal: true in the tracker .convention.yml arms it)";
 
 /** Refusal when stdin is not the human's interactive terminal. */
 export const STEAL_NON_TTY_MESSAGE =
-  "--steal requires an interactive terminal (agents must not steal claims — docs/agents.md)";
+  "--steal requires an interactive terminal (agents must not steal claims — ArggonManager/docs/agents.md)";
 
 /** Refusal when the interactive confirmation is declined or unrecognized. */
 export const STEAL_DECLINED_MESSAGE = "--steal aborted (confirmation declined)";
@@ -78,7 +78,7 @@ export async function gateSteal(opts: StealGateOptions): Promise<void> {
  * every non-interactive caller, so agents are always refused here.
  */
 export const REOPEN_NON_TTY_MESSAGE =
-  "--status todo on a done/cancelled item requires an interactive terminal (agents must not reopen — docs/agents.md)";
+  "--status todo on a done/cancelled item requires an interactive terminal (agents must not reopen — ArggonManager/docs/agents.md)";
 
 /** Refusal when the interactive reopen confirmation is declined or unrecognized. */
 export const REOPEN_DECLINED_MESSAGE = "reopen aborted (confirmation declined)";

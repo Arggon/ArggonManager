@@ -9,7 +9,7 @@ updated: "YYYY-MM-DD"
 ---
 
 <!--
-  Placement (v0): tasks/<initiative-id>/<id>/<id>.md (epic index; required).
+  Placement (v0): ArggonManager/<initiative-id>/<id>/<id>.md (epic index; required).
   parent MUST be the initiative id. Container ids must not start with task-/bug-.
 -->
 

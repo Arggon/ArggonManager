@@ -457,7 +457,7 @@ export function formatCommitLine(result: TrackerCommitResult | undefined): strin
     return sanitizeHumanError(`committed: ${result.hash} ${result.message}${suffix}`);
   }
   if (result.skipReason === "auto-commit disabled") {
-    return sanitizeHumanError(`no-commit: tasks dirty state kept${suffix}`);
+    return sanitizeHumanError(`no-commit: tracker dirty state kept${suffix}`);
   }
   return sanitizeHumanError(`no-commit: ${result.skipReason}${suffix}`);
 }

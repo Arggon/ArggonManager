@@ -22,7 +22,7 @@ export type IssueRoundtripResult =
 
 /** Annotation posted on the closed issue: names the tracker item that resolved it. */
 export function roundtripComment(itemId: string): string {
-  return `Resolved via tracker item \`${itemId}\` (arggon tasks/ tracker; item flipped to done).`;
+  return `Resolved via tracker item \`${itemId}\` (arggon tracker; item flipped to done).`;
 }
 
 /**

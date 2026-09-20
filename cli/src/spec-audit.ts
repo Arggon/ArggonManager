@@ -12,7 +12,7 @@
 
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { findTasksDir, repoRootFromTasks } from "./paths.js";
+import { docsDirForRoot, findTasksDir, repoRootFromTasks } from "./paths.js";
 import { sanitizeHumanTextUncapped } from "./sanitize.js";
 
 // ---------------------------------------------------------------------------
@@ -185,7 +185,7 @@ export function runSpecAudit(opts: SpecAuditOptions): SpecAuditResult {
   const thresholds = resolveSpecAuditThresholds(opts.thresholds);
   const tasksDir = findTasksDir(opts.cwd);
   const root = repoRootFromTasks(tasksDir);
-  const specsDir = join(root, "docs", "specs");
+  const specsDir = join(docsDirForRoot(root), "specs");
   if (!existsSync(specsDir)) {
     throw new Error(`no docs/specs directory under ${root} — nothing to audit`);
   }

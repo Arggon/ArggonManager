@@ -64,7 +64,7 @@ function primedTree(): { dir: string; tasks: string } {
     id: "rate-limit",
     now: NOW,
   });
-  return { dir, tasks: join(dir, "tasks") };
+  return { dir, tasks: join(dir, "ArggonManager") };
 }
 
 function fm(path: string) {
@@ -250,9 +250,9 @@ describe("update --type story (task promotion)", () => {
     const { data, body } = parseFrontmatter(raw);
     writeFileSync(task.path, stringifyFrontmatter({ ...data, issue: 12 }, body), "utf8");
     runUpdate({ cwd: dir, id: "task-rate-limit", status: "in_progress", assignee: "arggon", now: NOW });
-    mkdirSync(join(dir, "tasks"), { recursive: true });
+    mkdirSync(join(dir, "ArggonManager"), { recursive: true });
     writeFileSync(
-      join(dir, "tasks", ".convention.yml"),
+      join(dir, "ArggonManager", ".convention.yml"),
       "x-github:\n  issue-roundtrip: true\n",
       "utf8",
     );

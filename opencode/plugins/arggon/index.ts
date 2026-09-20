@@ -877,10 +877,10 @@ function locationDirectory(ctx: PluginContext): string | undefined {
   return asString(ctx.location?.directory)
 }
 
-/** No-op outside ArggonManager trees: no `tasks/` directory, nothing to do. */
+/** No-op outside ArggonManager trees: no tracker root, nothing to do. */
 function hasTasksTree(directory: string): boolean {
   try {
-    return existsSync(join(directory, "tasks"))
+    return existsSync(join(directory, "ArggonManager")) || existsSync(join(directory, "tasks"))
   } catch {
     return false
   }

@@ -72,7 +72,7 @@ const TOOLS: ToolDefinition[] = [
   {
     name: "arggon_list",
     description:
-      "List work items under tasks/ with optional filters. Returns the arggon `list --json` envelope: {ok, schemaVersion, conventionVersion, command, items}.",
+      "List work items under the tracker root (ArggonManager/, legacy tasks/) with optional filters. Returns the arggon `list --json` envelope: {ok, schemaVersion, conventionVersion, command, items}.",
     inputSchema: {
       type: "object",
       properties: {
@@ -102,7 +102,7 @@ const TOOLS: ToolDefinition[] = [
         },
         view: {
           type: "string",
-          description: "saved view name from tasks/.convention.yml x-views",
+          description: "saved view name from the tracker .convention.yml x-views",
         },
         stale: {
           type: "boolean",
@@ -133,12 +133,19 @@ const TOOLS: ToolDefinition[] = [
       properties: {
         type: { type: "string", enum: [...ITEM_TYPES], description: "item type to create" },
         title: { type: "string", description: "human title (non-empty)" },
-        parent: { type: "string", description: "parent container id (required for non-initiatives)" },
-        id: { type: "string", description: "optional explicit id stem (leaves get task-/bug- prefix)" },
+        parent: {
+          type: "string",
+          description: "parent container id (required for non-initiatives)",
+        },
+        id: {
+          type: "string",
+          description: "optional explicit id stem (leaves get task-/bug- prefix)",
+        },
         assignee: { type: "string", description: "optional assignee login" },
         labels: {
           type: "string",
-          description: "label the new item at creation (comma-separated; same rules as update --labels)",
+          description:
+            "label the new item at creation (comma-separated; same rules as update --labels)",
         },
         status: {
           type: "string",
@@ -263,7 +270,8 @@ const TOOLS: ToolDefinition[] = [
         id: { type: "string", description: "work item id" },
         next: {
           type: "string",
-          description: "the first thing the resuming agent should do (required; capped at 200 chars)",
+          description:
+            "the first thing the resuming agent should do (required; capped at 200 chars)",
         },
         branch: {
           type: "string",
@@ -271,7 +279,8 @@ const TOOLS: ToolDefinition[] = [
         },
         open_questions: {
           type: "string",
-          description: "open questions, semicolon-separated by convention (optional; capped at 200 chars)",
+          description:
+            "open questions, semicolon-separated by convention (optional; capped at 200 chars)",
         },
         session: {
           type: "string",
@@ -355,7 +364,7 @@ const TOOLS: ToolDefinition[] = [
   {
     name: "arggon_validate",
     description:
-      "Validate tasks/ frontmatter and tree integrity (parent edges, statuses, claim/blocked invariants, depends_on). Pure read — never writes. Returns the arggon `validate --json` envelope: {ok, schemaVersion, conventionVersion, command, errors, warnings}; ok is false and the result is a tool error when there is at least one error.",
+      "Validate tracker frontmatter and tree integrity (parent edges, statuses, claim/blocked invariants, depends_on). Pure read — never writes. Returns the arggon `validate --json` envelope: {ok, schemaVersion, conventionVersion, command, layout, errors, warnings}; ok is false and the result is a tool error when there is at least one error.",
     inputSchema: {
       type: "object",
       properties: {},
@@ -366,7 +375,7 @@ const TOOLS: ToolDefinition[] = [
 
 /** One MCP server session bound to fixed streams and a fixed repo root. */
 export type McpServerOptions = {
-  /** Repo root (parent of tasks/); all tool calls run against this tree. */
+  /** Repo root (parent of the tracker dir); all tool calls run against this tree. */
   cwd: string;
   input: Readable;
   output: Writable;
@@ -383,11 +392,7 @@ export function runMcpServer(opts: McpServerOptions): void {
     write({ jsonrpc: "2.0", id, result });
   };
 
-  const respondError = (
-    id: string | number | null,
-    code: number,
-    message: string,
-  ): void => {
+  const respondError = (id: string | number | null, code: number, message: string): void => {
     write({ jsonrpc: "2.0", id, error: { code, message } });
   };
 
@@ -661,6 +666,7 @@ export function runMcpServer(opts: McpServerOptions): void {
           "validate",
           {
             ok: result.errors.length === 0,
+            layout: result.layout,
             errors: result.errors,
             warnings: result.warnings,
             ...(result.errors.length > 0

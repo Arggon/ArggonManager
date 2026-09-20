@@ -114,7 +114,7 @@ function git(args: string[], cwd: string): string {
 
 /** Commit the tracker only when something is actually staged (create/update already auto-commit in git repos). */
 function gitCommitIfDirty(cwd: string, message: string): void {
-  git(["add", "tasks"], cwd);
+  git(["add", "ArggonManager"], cwd);
   const staged = spawnSync("git", ["diff", "--cached", "--quiet"], { encoding: "utf8", cwd });
   if (staged.status !== 0) git(["commit", "--quiet", "-m", message], cwd);
 }
@@ -136,7 +136,7 @@ function freshGitTree(prefix: string, tracker: string): string {
   git(["config", "user.email", "test@example.com"], dir);
   git(["config", "user.name", "Test"], dir);
   runInit({ dir, force: false });
-  const yml = join(dir, "tasks/.convention.yml");
+  const yml = join(dir, "ArggonManager/.convention.yml");
   writeFileSync(yml, `${readFileSync(yml, "utf8")}${tracker}`, "utf8");
   runCreate({ cwd: dir, type: "initiative", title: "Launch", id: "launch" });
   runCreate({ cwd: dir, type: "epic", title: "Auth", parent: "launch", id: "auth" });
@@ -181,7 +181,7 @@ function spawnAll(
 }
 
 function frontmatter(dir: string, ...segments: string[]): Record<string, string> {
-  const raw = readFileSync(join(dir, "tasks", ...segments), "utf8");
+  const raw = readFileSync(join(dir, "ArggonManager", ...segments), "utf8");
   const match = /^---\n([\s\S]*?)\n---/.exec(raw);
   const data: Record<string, string> = {};
   for (const line of (match?.[1] ?? "").split("\n")) {
@@ -255,10 +255,10 @@ describe("lab: mixed concurrent operations on one item family (suizo / bug-claim
       // Cascade pressure + comments all landed without corrupting anything.
       const sibling = frontmatter(dir, "launch", "auth", "story-login", "task-sibling.md");
       expect(sibling.status).toBe("done");
-      const target = readFileSync(join(dir, "tasks/launch/auth/story-login/task-target.md"), "utf8");
+      const target = readFileSync(join(dir, "ArggonManager/launch/auth/story-login/task-target.md"), "utf8");
       expect(target).toContain("observer one");
       expect(
-        readFileSync(join(dir, "tasks/launch/auth/story-login/task-sibling.md"), "utf8"),
+        readFileSync(join(dir, "ArggonManager/launch/auth/story-login/task-sibling.md"), "utf8"),
       ).toContain("observer two");
 
       // The tree is structurally sound after the storm.
@@ -338,7 +338,7 @@ describe("lab: concurrent tracker auto-commit contention (suizo lock-transitorio
 
       // Every comment actually landed in its item file.
       for (const id of ids) {
-        const body = readFileSync(join(dir, "tasks/launch/auth/story-login", `${id}.md`), "utf8");
+        const body = readFileSync(join(dir, "ArggonManager/launch/auth/story-login", `${id}.md`), "utf8");
         expect(body).toContain(`note on ${id}`);
       }
 
@@ -387,7 +387,7 @@ describe("lab: concurrent tracker auto-commit contention (suizo lock-transitorio
         }
 
         // The invariant this bug was filed for: NEITHER comment is lost.
-        const body = readFileSync(join(dir, "tasks/launch/auth/story-login/task-a.md"), "utf8");
+        const body = readFileSync(join(dir, "ArggonManager/launch/auth/story-login/task-a.md"), "utf8");
         expect(body).toContain("first concurrent comment");
         expect(body).toContain("second concurrent comment");
 
@@ -435,7 +435,7 @@ describe("lab: synthetic legacy tree, full adoption flow (guardian/cuentas/suizo
       taskCreated: true,
     });
     const taskFile = readFileSync(
-      join(dir, "tasks/arggon-adoption/epic-arggon-adoption/story-arggon-adoption/task-adopt-arggon.md"),
+      join(dir, "ArggonManager/arggon-adoption/epic-arggon-adoption/story-arggon-adoption/task-adopt-arggon.md"),
       "utf8",
     );
     expect(taskFile.match(/^- \[ \] /gm)).toHaveLength(14);
@@ -724,7 +724,7 @@ describe("lab: long MCP session (estanteria 53-call session)", () => {
       // Every mutation really landed on disk (the session mutated, not just replied).
       const task = frontmatter(dir, "launch", "auth", "story-login", "task-session-7.md");
       expect(task.assignee).toBe("agent-7");
-      expect(readFileSync(join(dir, "tasks/launch/auth/story-login/task-session-7.md"), "utf8")).toContain(
+      expect(readFileSync(join(dir, "ArggonManager/launch/auth/story-login/task-session-7.md"), "utf8")).toContain(
         "handoff note 7",
       );
     } finally {

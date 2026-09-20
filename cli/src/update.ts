@@ -128,7 +128,7 @@ export type UpdateOptions = {
 export type UpdateResult = {
   id: string;
   path: string;
-  /** Repo root (parent of tasks/). */
+  /** Repo root (parent of the tracker dir). */
   root: string;
   /** The updated item, reloaded from disk. */
   item: WorkItem;
@@ -307,7 +307,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   const peekTasksDir = findTasksDir(opts.cwd);
   const peekItem = itemsById(loadItems(peekTasksDir)).get(id);
   if (!peekItem) {
-    throw new Error(`id '${id}' not found under tasks/`);
+    throw new Error(`id '${id}' not found under the tracker`);
   }
 
   const apply = (): UpdateResult => {
@@ -315,7 +315,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   const byId = itemsById(loadItems(tasksDir));
   const item = byId.get(id);
   if (!item) {
-    throw new Error(`id '${id}' not found under tasks/`);
+    throw new Error(`id '${id}' not found under the tracker`);
   }
 
   // Reparent validation (task-update-reparent): every refusal happens BEFORE
@@ -328,7 +328,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     }
     const parentItem = byId.get(parentRequest);
     if (!parentItem) {
-      throw new Error(`parent '${parentRequest}' not found under tasks/`);
+      throw new Error(`parent '${parentRequest}' not found under the tracker`);
     }
     // Cycle guard BEFORE the edge-type check so reparenting under one's own
     // descendant always reports the cycle, never a confusing type mismatch.

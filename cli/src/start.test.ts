@@ -121,15 +121,15 @@ describe("start", () => {
     expect(git.calls).toEqual([]);
   });
 
-  it("refuses untracked files inside tasks/ without touching anything", () => {
+  it("refuses untracked files inside the tracker dir without touching anything", () => {
     const { dir, id } = primedTask();
-    writeFileSync(join(dir, "tasks/scratch.txt"), "x");
-    const git = fakeGit({ fileStatus: () => "?? tasks/scratch.txt\n" });
+    writeFileSync(join(dir, "ArggonManager/scratch.txt"), "x");
+    const git = fakeGit({ fileStatus: () => "?? ArggonManager/scratch.txt\n" });
     expect(() => runStart({ cwd: dir, id, assignee: "arggon", now: NOW }, { git })).toThrow(
-      /working tree has changes that block start[\s\S]*tasks\/scratch\.txt/,
+      /working tree has changes that block start[\s\S]*ArggonManager\/scratch\.txt/,
     );
     expect(git.calls).toEqual([]);
-    expect(readFileSync(join(dir, "tasks/scratch.txt"), "utf8")).toBe("x");
+    expect(readFileSync(join(dir, "ArggonManager/scratch.txt"), "utf8")).toBe("x");
   });
 
   it("refuses modified tracked files", () => {
@@ -141,7 +141,7 @@ describe("start", () => {
     expect(git.calls).toEqual([]);
   });
 
-  it("ignores untracked files outside tasks/ (scoped clean-tree check)", () => {
+  it("ignores untracked files outside the tracker dir (scoped clean-tree check)", () => {
     const { dir, id } = primedTask();
     mkdirSync(join(dir, ".v2c"), { recursive: true });
     writeFileSync(join(dir, ".v2c", "state.json"), "{}");
@@ -205,7 +205,7 @@ describe("start --open-pr closes the linked GitHub issue (task-closes-issue-link
     expect(result.prUrl).not.toBeNull();
     const pr = git.calls.find((c) => c.op === "pr");
     expect(pr?.body).toBe(
-      `Work item: ${item.id}\n\nPath: tasks/launch-mvp/auth/story-login/${item.id}.md\n\n` +
+      `Work item: ${item.id}\n\nPath: ArggonManager/launch-mvp/auth/story-login/${item.id}.md\n\n` +
         "Draft opened by `arggon start`.\n\nCloses #12",
     );
   });
@@ -216,7 +216,7 @@ describe("start --open-pr closes the linked GitHub issue (task-closes-issue-link
     runStart({ cwd: dir, id, assignee: "arggon", openPr: true, now: NOW }, { git });
     const pr = git.calls.find((c) => c.op === "pr");
     expect(pr?.body).toBe(
-      `Work item: ${id}\n\nPath: tasks/launch-mvp/auth/story-login/${id}.md\n\n` +
+      `Work item: ${id}\n\nPath: ArggonManager/launch-mvp/auth/story-login/${id}.md\n\n` +
         "Draft opened by `arggon start`.",
     );
     expect(pr?.body).not.toContain("Closes");

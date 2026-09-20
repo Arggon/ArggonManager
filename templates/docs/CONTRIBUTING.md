@@ -1,6 +1,6 @@
 # Contributing to {{PROJECT_NAME}}
 
-Thanks for helping. Work is tracked in-tree under `tasks/` (Markdown work items managed by `arggon`) — GitHub is used for PRs only.
+Thanks for helping. Work is tracked in-tree under `ArggonManager/` (Markdown work items managed by `arggon`) — GitHub is used for PRs only.
 
 ## Getting started
 
@@ -12,7 +12,7 @@ Thanks for helping. Work is tracked in-tree under `tasks/` (Markdown work items 
 
 One branch per work item, generated from the item id:
 
-- `arggon branch <id>` — follows the configured patterns in `tasks/.convention.yml`.
+- `arggon branch <id>` — follows the configured patterns in `ArggonManager/.convention.yml`.
 - Defaults: `feat/<id>`, `fix/<id>`, `docs/<id>`, `chore/<id>`.
 - Keep PRs small and focused; one concern per PR when possible.
 
@@ -28,14 +28,14 @@ One branch per work item, generated from the item id:
 
 ### PR checklist
 
-- [ ] Linked work item from `tasks/` (or a clear docs-only / chore reason)
+- [ ] Linked work item from `ArggonManager/` (or a clear docs-only / chore reason)
 - [ ] Tests pass locally (`npm test` or the project equivalent)
 - [ ] Docs updated in the same PR when behavior changed
 - [ ] PR references the work item id
 
 ## Reporting bugs and filing work
 
-File work items in the tree, not on GitHub: `arggon create bug "<title>" --parent <story-id>`. See [`docs/tracking.md`](docs/tracking.md) for how tracking works in this repo.
+File work items in the tree, not on GitHub: `arggon create bug "<title>" --parent <story-id>`. See [`ArggonManager/docs/tracking.md`](ArggonManager/docs/tracking.md) for how tracking works in this repo.
 
 <!--
 Copyright {{YEAR}} {{PROJECT_NAME}} contributors

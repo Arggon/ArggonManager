@@ -11,9 +11,9 @@
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { writeFileAtomic } from "./atomic.js";
-import { findTasksDir, repoRootFromTasks } from "./paths.js";
+import { docsDirForRoot, findTasksDir, repoRootFromTasks } from "./paths.js";
 
 // ---------------------------------------------------------------------------
 // Shared corpus-adapter extension point
@@ -362,7 +362,7 @@ export class SpecImportError extends Error {
 
 function nextDocNumber(root: string): number {
   let max = 0;
-  for (const dir of [join(root, "docs", "specs"), join(root, "docs", "plans")]) {
+  for (const dir of [join(docsDirForRoot(root), "specs"), join(docsDirForRoot(root), "plans")]) {
     if (!existsSync(dir)) continue;
     for (const name of readdirSync(dir)) {
       const match = name.match(/-(\d{3,})\.md$/);
@@ -378,6 +378,9 @@ export function runSpecImport(opts: SpecImportOptions): SpecImportResult {
   const root = repoRootFromTasks(tasksDir);
   const corpusRoot = isAbsolute(opts.path) ? opts.path : resolve(opts.cwd, opts.path);
   const date = opts.today ?? new Date().toISOString().slice(0, 10);
+  // Layout-aware destination dir (ADR 0012): ArggonManager/docs/specs on v5,
+  // docs/specs on legacy trees.
+  const docsRel = relative(root, docsDirForRoot(root)).split(sep).join("/");
 
   // Phase 1: discover, parse, map, assert — write nothing.
   const files = adapter.discover(corpusRoot);
@@ -390,7 +393,7 @@ export function runSpecImport(opts: SpecImportOptions): SpecImportResult {
     const nnn = String(nextNumber + index).padStart(3, "0");
     const entry: SpecImportEntry = {
       capability: file.capability,
-      file: `docs/specs/spec-${file.capability}-${nnn}.md`,
+      file: `${docsRel}/specs/spec-${file.capability}-${nnn}.md`,
       specId: `${file.capability}-${nnn}`,
       source: file.sourceRel,
     };
@@ -492,7 +495,7 @@ export function runSpecImport(opts: SpecImportOptions): SpecImportResult {
   }
 
   // Phase 2: write everything (only reached when every file asserted clean).
-  mkdirSync(join(root, "docs", "specs"), { recursive: true });
+  mkdirSync(join(docsDirForRoot(root), "specs"), { recursive: true });
   for (const doc of mappedDocs) {
     writeFileAtomic(join(root, doc.entry.file), doc.content);
   }

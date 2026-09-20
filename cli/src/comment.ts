@@ -53,7 +53,7 @@ export type CommentResult = {
   id: string;
   /** Absolute path of the commented item file. */
   path: string;
-  /** Repo root (parent of tasks/). */
+  /** Repo root (parent of the tracker dir). */
   root: string;
   /** The comment as appended to the body. */
   comment: {
@@ -121,7 +121,7 @@ export function runComment(opts: CommentOptions): CommentResult {
   withItemLock(item.filePath, () => {
     const fresh: WorkItem | undefined = itemsById(loadItems(tasksDir)).get(id);
     if (!fresh) {
-      throw new Error(`id '${id}' not found under tasks/`);
+      throw new Error(`id '${id}' not found under the tracker`);
     }
     filePath = fresh.filePath;
     const base =
@@ -158,7 +158,7 @@ export function runComment(opts: CommentOptions): CommentResult {
  * `loadItems` ran while a contender was inside its in-place `writeFileSync`
  * truncate->write window: the scan read an empty file, `softTryLoadItem`
  * skipped it, and the live item looked absent — the process then failed with
- * `id '<id>' not found under tasks/` (COMMENT_FAILED) while the file existed
+ * `id '<id>' not found under the tracker` (COMMENT_FAILED) while the file existed
  * the whole time. The write is atomic now (`writeFileAtomic`), so a same-path
  * rewrite can never transiently hide the item; the bounded retry is the
  * belt-and-braces guard for any residual rename window (the lookup happens
@@ -174,7 +174,7 @@ function locateItem(tasksDir: string, id: string): WorkItem {
     const item = itemsById(loadItems(tasksDir)).get(id);
     if (item) return item;
     if (attempt >= LOCATE_ATTEMPTS) {
-      throw new Error(`id '${id}' not found under tasks/`);
+      throw new Error(`id '${id}' not found under the tracker`);
     }
     sleepSync(LOCATE_RETRY_MS);
   }

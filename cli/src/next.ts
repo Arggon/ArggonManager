@@ -10,7 +10,7 @@ export type NextOptions = {
   ready?: boolean;
   /**
    * Include unclaimed stories in the suggestion pool. Default `next`
-   * suggests leaf work (tasks/bugs) only — "what do I implement next";
+   * (suggests leaf work (task/bug leaves) only) — "what do I implement next";
    * claiming a story is a planning act done explicitly via `update`/`start`.
    */
   includeStories?: boolean;

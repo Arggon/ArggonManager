@@ -12,7 +12,13 @@ import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { writeFileAtomic } from "./atomic.js";
 import { readConventionVersion } from "./convention.js";
-import { bundledTemplatesDir, findTasksDir, repoRootFromTasks } from "./paths.js";
+import {
+  bundledTemplatesDir,
+  docsDirForRoot,
+  findTasksDir,
+  repoRootFromTasks,
+  TRACKER_DIR_NAME,
+} from "./paths.js";
 import { sanitizeHumanError } from "./sanitize.js";
 import type { Issue } from "./types.js";
 
@@ -162,12 +168,7 @@ function checkSpecSections(rel: string, body: string, errors: Issue[]): void {
     push(errors, rel, "missing a Purpose section (or a non-empty intro)", "SPEC_MISSING_SECTION");
   }
   if (!sawSynopsis) {
-    push(
-      errors,
-      rel,
-      "missing a Synopsis/Design/'Model of data' section",
-      "SPEC_MISSING_SECTION",
-    );
+    push(errors, rel, "missing a Synopsis/Design/'Model of data' section", "SPEC_MISSING_SECTION");
   }
   if (!sawAcceptance) {
     push(errors, rel, "missing an Acceptance criteria section", "SPEC_MISSING_SECTION");
@@ -193,7 +194,12 @@ function checkDoc(root: string, abs: string, kind: DocKind, errors: Issue[]): Do
   }
   const data = parseDocFrontmatter(raw);
   if (data === null) {
-    push(errors, rel, "missing YAML frontmatter (expected file to start with ---)", `${prefix}_MISSING_FRONTMATTER`);
+    push(
+      errors,
+      rel,
+      "missing YAML frontmatter (expected file to start with ---)",
+      `${prefix}_MISSING_FRONTMATTER`,
+    );
     return { kind, rel };
   }
 
@@ -290,7 +296,11 @@ function checkUniqueness(infos: DocInfo[], errors: Issue[]): void {
   }
 }
 
-function resolveSingleFile(cwd: string, root: string, file: string): { abs: string; kind: DocKind } {
+function resolveSingleFile(
+  cwd: string,
+  root: string,
+  file: string,
+): { abs: string; kind: DocKind } {
   const abs = isAbsolute(file) ? file : resolve(cwd, file);
   const base = basename(abs);
   const kind: DocKind =
@@ -310,10 +320,10 @@ export function runSpecValidate(opts: SpecValidateOptions): SpecValidateResult {
     const { abs, kind } = resolveSingleFile(opts.cwd, root, opts.file);
     infos.push(checkDoc(root, abs, kind, errors));
   } else {
-    for (const abs of listMarkdownDocs(join(root, "docs", "specs"))) {
+    for (const abs of listMarkdownDocs(join(docsDirForRoot(root), "specs"))) {
       infos.push(checkDoc(root, abs, "spec", errors));
     }
-    for (const abs of listMarkdownDocs(join(root, "docs", "plans"))) {
+    for (const abs of listMarkdownDocs(join(docsDirForRoot(root), "plans"))) {
       infos.push(checkDoc(root, abs, "plan", errors));
     }
   }
@@ -334,9 +344,7 @@ export function runSpecValidate(opts: SpecValidateOptions): SpecValidateResult {
 export function formatSpecValidateHuman(result: SpecValidateResult): string {
   const lines: string[] = [];
   for (const e of result.errors) {
-    lines.push(
-      `error ${sanitizeHumanError(e.path)}: ${sanitizeHumanError(e.message)} [${e.code}]`,
-    );
+    lines.push(`error ${sanitizeHumanError(e.path)}: ${sanitizeHumanError(e.message)} [${e.code}]`);
   }
   for (const w of result.warnings) {
     lines.push(
@@ -344,9 +352,7 @@ export function formatSpecValidateHuman(result: SpecValidateResult): string {
     );
   }
   if (result.errors.length === 0) {
-    lines.push(
-      `arggon spec: ok (${result.checked} doc(s), ${result.warnings.length} warning(s))`,
-    );
+    lines.push(`arggon spec: ok (${result.checked} doc(s), ${result.warnings.length} warning(s))`);
   } else {
     lines.push(
       `arggon spec: failed with ${result.errors.length} error(s), ${result.warnings.length} warning(s)`,
@@ -415,7 +421,9 @@ function finding(
   message: string,
   line?: number,
 ): SpecFinding {
-  return line === undefined ? { file, kind, severity, message } : { file, kind, line, severity, message };
+  return line === undefined
+    ? { file, kind, severity, message }
+    : { file, kind, line, severity, message };
 }
 
 function bodyWithoutFrontmatter(raw: string): string {
@@ -477,7 +485,12 @@ function ambiguityFindings(rel: string, raw: string): SpecFinding[] {
     const hasChecklist = section.split(/\r?\n/).some((l) => CHECKBOX_PATTERN.test(l));
     if (!hasChecklist) {
       findings.push(
-        finding(rel, "untestable-acceptance", "warn", "Acceptance section has no checklist items to verify"),
+        finding(
+          rel,
+          "untestable-acceptance",
+          "warn",
+          "Acceptance section has no checklist items to verify",
+        ),
       );
     }
   }
@@ -489,7 +502,9 @@ function walkMarkdownFiles(dir: string): string[] {
   if (!existsSync(dir)) return [];
   const out: string[] = [];
   const visit = (current: string): void => {
-    for (const entry of readdirSync(current, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    for (const entry of readdirSync(current, { withFileTypes: true }).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    )) {
       const full = join(current, entry.name);
       if (entry.isDirectory()) visit(full);
       else if (entry.isFile() && entry.name.endsWith(".md")) out.push(full);
@@ -508,7 +523,7 @@ function consistencyFindings(root: string): SpecFinding[] {
 
   type SpecEntry = { rel: string; specId?: string; status?: string };
   const specs: SpecEntry[] = [];
-  for (const abs of listMarkdownDocs(join(root, "docs", "specs"))) {
+  for (const abs of listMarkdownDocs(join(docsDirForRoot(root), "specs"))) {
     const rel = posixRel(root, abs);
     let raw: string;
     try {
@@ -517,11 +532,15 @@ function consistencyFindings(root: string): SpecFinding[] {
       continue; // structural read failures surface via the ambiguity pass
     }
     const data = parseDocFrontmatter(raw) ?? {};
-    specs.push({ rel, specId: isTruthyFrontmatter(data.spec_id), status: isTruthyFrontmatter(data.status) });
+    specs.push({
+      rel,
+      specId: isTruthyFrontmatter(data.spec_id),
+      status: isTruthyFrontmatter(data.status),
+    });
   }
 
   const citedIds = new Set<string>();
-  for (const abs of walkMarkdownFiles(join(root, "tasks"))) {
+  for (const abs of walkMarkdownFiles(findTasksDir(root))) {
     let raw: string;
     try {
       raw = readFileSync(abs, "utf8");
@@ -532,7 +551,7 @@ function consistencyFindings(root: string): SpecFinding[] {
   }
 
   const planReferencedSpecIds = new Set<string>();
-  for (const abs of listMarkdownDocs(join(root, "docs", "plans"))) {
+  for (const abs of listMarkdownDocs(join(docsDirForRoot(root), "plans"))) {
     const rel = posixRel(root, abs);
     let raw: string;
     try {
@@ -545,7 +564,12 @@ function consistencyFindings(root: string): SpecFinding[] {
     if (specPath === undefined) continue;
     if (!existsSync(resolve(root, specPath))) {
       findings.push(
-        finding(rel, "plan-spec-missing", "warn", `spec file '${specPath}' does not exist (relative to the repo root)`),
+        finding(
+          rel,
+          "plan-spec-missing",
+          "warn",
+          `spec file '${specPath}' does not exist (relative to the repo root)`,
+        ),
       );
       continue;
     }
@@ -565,7 +589,7 @@ function consistencyFindings(root: string): SpecFinding[] {
         spec.rel,
         "spec-orphaned",
         "warn",
-        `spec '${spec.specId}' is marked implemented but no item under tasks/ and no plan cites it`,
+        `spec '${spec.specId}' is marked implemented but no tracker item and no plan cites it`,
       ),
     );
   }
@@ -592,7 +616,7 @@ export function runSpecAnalyze(opts: SpecAnalyzeOptions): SpecAnalyzeResult {
     scanned = 1;
     ambiguity.push(...ambiguityFindings(rel, raw));
   } else {
-    for (const abs of listMarkdownDocs(join(root, "docs", "specs"))) {
+    for (const abs of listMarkdownDocs(join(docsDirForRoot(root), "specs"))) {
       let raw: string;
       try {
         raw = readFileSync(abs, "utf8");
@@ -732,13 +756,17 @@ function readBaselineSnapshot(file: string): SpecBaselineSnapshot {
   try {
     raw = readFileSync(file, "utf8");
   } catch (err) {
-    throw new Error(`cannot read baseline ${file}: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(
+      `cannot read baseline ${file}: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
   let data: unknown;
   try {
     data = JSON.parse(raw);
   } catch (err) {
-    throw new Error(`baseline ${file} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(
+      `baseline ${file} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+    );
   }
   const snap = data as Partial<SpecBaselineSnapshot> | null;
   if (
@@ -795,7 +823,9 @@ export type SpecBaselineComparison = {
 };
 
 /** `spec analyze --baseline <file>`: scan, then compare against the snapshot. */
-export function runSpecAnalyzeCompareBaseline(opts: SpecBaselineSaveOptions): SpecBaselineComparison {
+export function runSpecAnalyzeCompareBaseline(
+  opts: SpecBaselineSaveOptions,
+): SpecBaselineComparison {
   const baseline = readBaselineSnapshot(opts.file);
   const result = runSpecAnalyze({ cwd: opts.cwd, spec: opts.spec });
   const baselineKeys = new Set(baseline.findings.map(findingKey));
@@ -889,7 +919,7 @@ arggon <command> [flags]
 const PLAN_TEMPLATE_FALLBACK = `---
 plan_id: {{ID}}
 title: Plan for {{TITLE}}
-spec: docs/specs/spec-{{SLUG}}-{{NNN}}.md
+spec: ArggonManager/docs/specs/spec-{{SLUG}}-{{NNN}}.md
 status: proposed
 created: {{DATE}}
 ---
@@ -921,7 +951,7 @@ function renderTemplate(kind: "spec" | "plan", vars: Record<string, string>): st
 
 function nextDocNumber(root: string): number {
   let max = 0;
-  for (const dir of [join(root, "docs", "specs"), join(root, "docs", "plans")]) {
+  for (const dir of [join(docsDirForRoot(root), "specs"), join(docsDirForRoot(root), "plans")]) {
     if (!existsSync(dir)) continue;
     for (const name of readdirSync(dir)) {
       const match = name.match(/-(\d{3,})\.md$/);
@@ -943,9 +973,10 @@ export function runSpecNew(opts: SpecNewOptions): SpecNewResult {
   const padded = String(nnn).padStart(3, "0");
   const docId = `${opts.slug}-${padded}`;
   const date = new Date().toISOString().slice(0, 10);
-  const title = opts.title && opts.title.trim() !== "" ? opts.title.trim() : opts.slug.replace(/-/g, " ");
+  const title =
+    opts.title && opts.title.trim() !== "" ? opts.title.trim() : opts.slug.replace(/-/g, " ");
 
-  const specDir = join(root, "docs", "specs");
+  const specDir = join(docsDirForRoot(root), "specs");
   const specPath = join(specDir, `spec-${opts.slug}-${padded}.md`);
   if (existsSync(specPath)) {
     throw new Error(`refusing to overwrite existing file ${posixRel(root, specPath)}`);
@@ -960,18 +991,28 @@ export function runSpecNew(opts: SpecNewOptions): SpecNewResult {
   };
 
   const files: string[] = [];
+  // Layout-aware spec pointers (ADR 0012): the templates carry the canonical
+  // `ArggonManager/docs/...` paths; legacy trees keep their `<root>/docs/...`
+  // form so the scaffolded plan's `spec:` pointer resolves under validate.
+  const docsRel = relative(root, docsDirForRoot(root)).split(sep).join("/");
+  const renderForTree = (kind: "spec" | "plan"): string => {
+    const rendered = renderTemplate(kind, vars);
+    return docsRel === `${TRACKER_DIR_NAME}/docs`
+      ? rendered
+      : rendered.replaceAll(`${TRACKER_DIR_NAME}/docs`, docsRel);
+  };
   mkdirSync(specDir, { recursive: true });
-  writeFileAtomic(specPath, renderTemplate("spec", vars));
+  writeFileAtomic(specPath, renderForTree("spec"));
   files.push(posixRel(root, specPath));
 
   if (opts.plan) {
-    const planDir = join(root, "docs", "plans");
+    const planDir = join(docsDirForRoot(root), "plans");
     const planPath = join(planDir, `plan-${opts.slug}-${padded}.md`);
     if (existsSync(planPath)) {
       throw new Error(`refusing to overwrite existing file ${posixRel(root, planPath)}`);
     }
     mkdirSync(planDir, { recursive: true });
-    writeFileAtomic(planPath, renderTemplate("plan", vars));
+    writeFileAtomic(planPath, renderForTree("plan"));
     files.push(posixRel(root, planPath));
   }
 

@@ -116,7 +116,7 @@ export function defaultBoardGithub(): BoardGithub {
 /**
  * Load items from the shared kernel (same read path as `list`) and write a
  * static, self-contained HTML board. Read-only: nothing is read back from the
- * file, and no item in tasks/ is modified. With `github`, live PR state is
+ * file, and no item in the tracker is modified. With `github`, live PR state is
  * overlaid on cards with a `branch` (matched by head ref name); the overlay
  * never writes either.
  */
@@ -524,7 +524,7 @@ header .meta { color: #59636e; font-size: 13px; }
 <body>
 <header>
   <h1>arggon board${repo}</h1>
-  <div class="meta">generated ${esc(opts.generatedAt)} · ${sorted.length} item(s) · <span id="status-counts">${counts}</span> · git files under tasks/ remain the source of truth; drops persist only against a live server (arggon board --serve)${live}</div>
+  <div class="meta">generated ${esc(opts.generatedAt)} · ${sorted.length} item(s) · <span id="status-counts">${counts}</span> · tracker files remain the source of truth; drops persist only against a live server (arggon board --serve)${live}</div>
 </header>
 <main class="board">
 ${columns}

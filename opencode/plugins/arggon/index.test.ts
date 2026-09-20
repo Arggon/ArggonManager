@@ -514,7 +514,7 @@ describe("plugin-context: storage guard order", () => {
     return { writes, ctx };
   }
 
-  it("writes nothing when the tree has no tasks/ directory (F4)", async () => {
+  it("writes nothing when the tree has no tracker root (F4)", async () => {
     const directory = mkdtempSync(join(tmpdir(), "arggon-guard-outside-"));
     try {
       const { writes, ctx } = fakeContext(directory);
@@ -530,8 +530,25 @@ describe("plugin-context: storage guard order", () => {
     }
   });
 
-  it("correlates an observed invocation once tasks/ exists (F4)", async () => {
-    const directory = mkdtempSync(join(tmpdir(), "arggon-guard-inside-"));
+  it("correlates an observed invocation once the v5 ArggonManager/ root exists (F4)", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "arggon-guard-inside-v5-"));
+    try {
+      mkdirSync(join(directory, "ArggonManager"));
+      const { writes, ctx } = fakeContext(directory);
+      await onToolAfter(ctx, {
+        status: "completed",
+        sessionID: "ses-guard",
+        tool: "shell",
+        input: { command: "arggon show task-x" },
+      });
+      expect(writes).toEqual([["arggon/session/ses-guard", "task-x"]]);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("correlates an observed invocation on a legacy tasks/ tree too (F4)", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "arggon-guard-inside-legacy-"));
     try {
       mkdirSync(join(directory, "tasks"));
       const { writes, ctx } = fakeContext(directory);

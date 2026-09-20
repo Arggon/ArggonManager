@@ -513,7 +513,7 @@ x-generated:
     // file stays byte-identical only when the clock stands still.
     const now = new Date("2026-09-18T12:00:00Z");
     runInit({ dir, force: false, commit: false, now });
-    const path = join(dir, "tasks/.convention.yml");
+    const path = join(dir, "ArggonManager/.convention.yml");
     // Hand-write the escaped form of two literal backslashes (four raw bytes).
     writeFileSync(
       path,

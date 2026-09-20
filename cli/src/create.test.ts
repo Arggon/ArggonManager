@@ -42,7 +42,7 @@ describe("create", () => {
       now: NOW,
     });
     expect(initiative.id).toBe("launch-mvp");
-    expect(initiative.path).toBe(join(dir, "tasks/launch-mvp/launch-mvp.md"));
+    expect(initiative.path).toBe(join(dir, "ArggonManager/launch-mvp/launch-mvp.md"));
     expect(fm(initiative.path)).toMatchObject({
       type: "initiative",
       status: "todo",
@@ -61,7 +61,7 @@ describe("create", () => {
       parent: "launch-mvp",
       now: NOW,
     });
-    expect(epic.path).toBe(join(dir, "tasks/launch-mvp/auth/auth.md"));
+    expect(epic.path).toBe(join(dir, "ArggonManager/launch-mvp/auth/auth.md"));
     expect(fm(epic.path)).toMatchObject({
       type: "epic",
       id: "auth",
@@ -77,7 +77,7 @@ describe("create", () => {
       now: NOW,
     });
     expect(story.id).toBe("story-login");
-    expect(story.path).toBe(join(dir, "tasks/launch-mvp/auth/story-login/story-login.md"));
+    expect(story.path).toBe(join(dir, "ArggonManager/launch-mvp/auth/story-login/story-login.md"));
 
     const task = runCreate({
       cwd: dir,
@@ -88,7 +88,7 @@ describe("create", () => {
       now: NOW,
     });
     expect(task.id).toBe("task-rate-limit");
-    expect(task.path).toBe(join(dir, "tasks/launch-mvp/auth/story-login/task-rate-limit.md"));
+    expect(task.path).toBe(join(dir, "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md"));
     expect(fm(task.path)).toMatchObject({
       type: "task",
       id: "task-rate-limit",
@@ -192,7 +192,7 @@ describe("create", () => {
   it("rejects duplicate ids against an existing tree", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-create-sample-"));
     runInit({ dir, force: false });
-    cpSync(join(process.cwd(), "fixtures/tasks-valid/tasks/launch-mvp"), join(dir, "tasks/launch-mvp"), {
+    cpSync(join(process.cwd(), "fixtures/tasks-valid/tasks/launch-mvp"), join(dir, "ArggonManager/launch-mvp"), {
       recursive: true,
     });
     expect(() => runCreate({ cwd: dir, type: "initiative", title: "Launch MVP" })).toThrow(

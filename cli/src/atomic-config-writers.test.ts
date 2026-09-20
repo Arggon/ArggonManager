@@ -66,7 +66,7 @@ function resetSpies(): void {
   spies.atomicWrites.length = 0;
 }
 function conventionPath(dir: string): string {
-  return join(dir, "tasks", ".convention.yml");
+  return join(dir, "ArggonManager", ".convention.yml");
 }
 function atomicConventionWrites(dir: string): Array<{ path: string; content: string }> {
   return spies.atomicWrites.filter((call) => call.path === conventionPath(dir));

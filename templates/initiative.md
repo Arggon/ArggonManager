@@ -8,7 +8,7 @@ updated: "YYYY-MM-DD"
 ---
 
 <!--
-  Placement (v0): tasks/<id>/<id>.md (initiative index; required).
+  Placement (v0): ArggonManager/<id>/<id>.md (initiative index; required).
   No parent. Omit assignee when unassigned.
 -->
 

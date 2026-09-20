@@ -3,7 +3,7 @@
 Part of the `arggon-cli` skill (`SKILL.md`). Non-trivial items are **orchestrated
 by default**: a coordinator delegates them to subagents instead of working them
 inline. Trivial items (one-line fixes, doc tweaks) stay inline. Full rules:
-`docs/agents.md` §Orchestration.
+`ArggonManager/docs/agents.md` §Orchestration.
 
 ## Coordinator duties
 
@@ -13,7 +13,7 @@ inline. Trivial items (one-line fixes, doc tweaks) stay inline. Full rules:
 - **Per-item worktrees:** one subagent per item, each in its own worktree
   (`../<repo>-<item-id>`); no two subagents share a working tree.
 - **Code review (lead architect):** review **every** subagent PR before merge
-  against the review bar in `docs/engineering.md` (architecture-first,
+  against the review bar in `ArggonManager/docs/engineering.md` (architecture-first,
   conventions first, quality/security bar, tests travel with behavior, docs
   travel with code, scope stays on the item, **blocking smoke test**) plus the
   coordination specifics: surgical staging, no cross-item files, no unrelated

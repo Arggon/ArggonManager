@@ -39,7 +39,7 @@ function mkdtempSync(prefix: string): string {
 
 /** Strip the x-generated.projectName line, simulating a pre-fix (legacy) tree. */
 function stripRecordedName(dir: string): void {
-  const path = join(dir, "tasks/.convention.yml");
+  const path = join(dir, "ArggonManager/.convention.yml");
   writeFileSync(
     path,
     readFileSync(path, "utf8")
@@ -115,7 +115,7 @@ describe("bug-project-name-dir-derived: project-name recovery", () => {
     const recorded = readGeneratedProjectName(dir);
     expect(recorded).toBeTruthy();
     expect(recorded).toBe(dir.split("/").pop()); // fresh scaffold: dir basename
-    expect(parseGeneratedProjectName(readFileSync(join(dir, "tasks/.convention.yml"), "utf8"))).toBe(
+    expect(parseGeneratedProjectName(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8"))).toBe(
       recorded,
     );
     // The generated docs carry that name, not the placeholder.
@@ -123,7 +123,7 @@ describe("bug-project-name-dir-derived: project-name recovery", () => {
     expect(editorconfig).toContain(recorded);
     expect(editorconfig).not.toContain("{{PROJECT_NAME}}");
     // Additive + namespaced: the full parser accepts the new key (ignore-unknown).
-    const config = parseConventionConfig(readFileSync(join(dir, "tasks/.convention.yml"), "utf8"));
+    const config = parseConventionConfig(readFileSync(join(dir, "ArggonManager/.convention.yml"), "utf8"));
     expect(config.generatedProjectName).toBe(recorded);
     expect(Object.keys(config.generated).length).toBeGreaterThan(0);
   });
@@ -202,7 +202,7 @@ describe("bug-project-name-dir-derived: project-name recovery", () => {
     // Corrupt every managed doc so content extraction fails, then re-stamp
     // the state checksums so the docs still count as "untouched" — the worst
     // case: untouched name-bearing docs whose name cannot be recovered.
-    const statePath = join(dir, "tasks/.convention.yml");
+    const statePath = join(dir, "ArggonManager/.convention.yml");
     const state = parseConventionConfig(readFileSync(statePath, "utf8"));
     const originalName = readGeneratedProjectName(dir)!;
     for (const [dest, entry] of Object.entries(state.generated)) {

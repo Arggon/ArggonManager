@@ -123,7 +123,7 @@ describe("validate dependency rules", () => {
     expect(result.errors).toHaveLength(1);
     const issue = result.errors[0]!;
     expect(issue.code).toBe("UNKNOWN_DEPENDENCY");
-    expect(issue.path).toBe("tasks/launch-mvp/auth/story-login/task-a.md");
+    expect(issue.path).toBe("ArggonManager/launch-mvp/auth/story-login/task-a.md");
     expect(issue.message).toContain("task-nope");
   });
 
@@ -159,7 +159,7 @@ describe("validate dependency rules", () => {
 
   it("keeps v0-v2 trees valid when they use depends_on (unconditional parsing)", () => {
     const { dir, paths } = primedTree();
-    writeFileSync(join(dir, "tasks/.convention.yml"), "version: 0\n", "utf8");
+    writeFileSync(join(dir, "ArggonManager/.convention.yml"), "version: 0\n", "utf8");
     setFrontmatter(paths["task-a"], { depends_on: ["task-b"] });
     const result = runValidate({ cwd: dir });
     expect(result.conventionVersion).toBe(0);
@@ -169,10 +169,10 @@ describe("validate dependency rules", () => {
 
   it("accepts a v3 tree and still rejects a newer one", () => {
     const { dir, paths } = primedTree();
-    writeFileSync(join(dir, "tasks/.convention.yml"), "version: 3\n", "utf8");
+    writeFileSync(join(dir, "ArggonManager/.convention.yml"), "version: 3\n", "utf8");
     setFrontmatter(paths["task-a"], { depends_on: ["task-b"] });
     expect(runValidate({ cwd: dir }).errors).toEqual([]);
-    writeFileSync(join(dir, "tasks/.convention.yml"), "version: 5\n", "utf8");
+    writeFileSync(join(dir, "ArggonManager/.convention.yml"), "version: 6\n", "utf8");
     const newer = runValidate({ cwd: dir });
     expect(codes(newer)).toContain("CONVENTION_VERSION");
   });

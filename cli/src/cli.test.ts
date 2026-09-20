@@ -153,8 +153,8 @@ describe("CLI --json", () => {
     expect(body.alreadyInitialized).toBe(false);
     expect(body.force).toBe(false);
     expect(Array.isArray(body.created)).toBe(true);
-    expect((body.created as string[]).includes("tasks/.convention.yml")).toBe(true);
-    expect(existsSync(join(dir, "tasks/.convention.yml"))).toBe(true);
+    expect((body.created as string[]).includes("ArggonManager/.convention.yml")).toBe(true);
+    expect(existsSync(join(dir, "ArggonManager/.convention.yml"))).toBe(true);
     expect(existsSync(join(dir, "templates/task.md"))).toBe(true);
   });
 
@@ -180,9 +180,9 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 4,
+      conventionVersion: 5,
       command: "create",
-      path: "tasks/launch-mvp/launch-mvp.md",
+      path: "ArggonManager/launch-mvp/launch-mvp.md",
     });
     expect(body.item).toMatchObject({
       id: "launch-mvp",
@@ -190,11 +190,11 @@ describe("CLI --json", () => {
       status: "todo",
       title: "Launch MVP",
       parent: null,
-      path: "tasks/launch-mvp/launch-mvp.md",
+      path: "ArggonManager/launch-mvp/launch-mvp.md",
     });
     const item = body.item as Record<string, unknown>;
     expect(body.path).toBe(item.path);
-    expect(existsSync(join(dir, "tasks/launch-mvp/launch-mvp.md"))).toBe(true);
+    expect(existsSync(join(dir, "ArggonManager/launch-mvp/launch-mvp.md"))).toBe(true);
   });
 
   it("arggon create --json errors with CREATE_FAILED on unknown parent", () => {
@@ -229,7 +229,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 4,
+      conventionVersion: 5,
       command: "list",
     });
     expect(Array.isArray(body.items)).toBe(true);
@@ -246,7 +246,7 @@ describe("CLI --json", () => {
       parent: "launch-mvp",
       created: expect.any(String),
       updated: expect.any(String),
-      path: "tasks/launch-mvp/auth/auth.md",
+      path: "ArggonManager/launch-mvp/auth/auth.md",
       claimed_at: null,
     });
   });
@@ -320,14 +320,14 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 4,
+      conventionVersion: 5,
       command: "update",
     });
     expect(body.item).toMatchObject({
       id: "launch-mvp",
       type: "initiative",
       title: "Launch MVP v2",
-      path: "tasks/launch-mvp/launch-mvp.md",
+      path: "ArggonManager/launch-mvp/launch-mvp.md",
     });
   });
 
@@ -373,7 +373,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 4,
+      conventionVersion: 5,
       command: "board",
       path: "board.html",
       itemCount: 2,
@@ -659,7 +659,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 4,
+      conventionVersion: 5,
       command: "branch",
       branch: "feat/launch-mvp",
       created: false,
@@ -690,7 +690,7 @@ describe("CLI --json", () => {
     expect(body).toMatchObject({
       ok: true,
       schemaVersion: JSON_SCHEMA_VERSION,
-      conventionVersion: 4,
+      conventionVersion: 5,
       command: "start",
       branch: "feat/launch-mvp",
       created: true,
@@ -749,7 +749,7 @@ describe("CLI --json", () => {
     expect(runCli(["create", "task", "Hooked", "--parent", "login"], dir).status).toBe(0);
     // Configure x-worktree.post-start (task-start-post-hook), then commit
     // items + config in one go: start refuses dirty trees.
-    appendFileSync(join(dir, "tasks/.convention.yml"), 'x-worktree:\n  post-start: "echo hooked > .hook-ran"\n');
+    appendFileSync(join(dir, "ArggonManager/.convention.yml"), 'x-worktree:\n  post-start: "echo hooked > .hook-ran"\n');
     runGit(["add", "-A"], dir); // init/creates auto-commit; staging is a harmless no-op
     expect(
       runGit(["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-m", "config"], dir).status,

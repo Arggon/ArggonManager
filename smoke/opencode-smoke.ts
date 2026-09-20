@@ -29,9 +29,9 @@
  *   7. storage map     — an observed `arggon_show` call on a non-matching
  *                        branch correlates the item for the next model call.
  *   8. env override    — `ARGON_ITEM` resolves with no branch match.
- *   9. nothing resolves — tasks/ present, no claim/branch/env/observed call:
+ *   9. nothing resolves — tracker present, no claim/branch/env/observed call:
  *                        the hook is silent.
- *  10. outside trees   — no tasks/: silent, session unaffected.
+ *  10. outside trees   — no tracker root: silent, session unaffected.
  *  11. hygiene         — a shell `git commit` with a broken tracker item logs
  *                        the `arggon validate` warning; the commit is not
  *                        blocked.
@@ -604,7 +604,7 @@ function scenarioContextEnv(): void {
 }
 
 function scenarioContextSilent(): void {
-  scenario("context: nothing resolves (tasks/ present, no claim/branch/env/observed call) is silent");
+  scenario("context: nothing resolves (tracker present, no claim/branch/env/observed call) is silent");
   const f = new Fixture("context-silent");
   f.bootstrap();
   f.init();
@@ -623,7 +623,7 @@ function scenarioContextSilent(): void {
 }
 
 function scenarioContextOutside(): void {
-  scenario("context: outside ArggonManager trees (no tasks/) the session context is silent");
+  scenario("context: outside ArggonManager trees (no tracker root) the session context is silent");
   const f = new Fixture("context-outside");
   f.bootstrap();
   f.copyPlugin();

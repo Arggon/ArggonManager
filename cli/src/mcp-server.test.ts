@@ -246,7 +246,7 @@ describe("mcp server", () => {
       ok: false,
       schemaVersion: 1,
       command: "update",
-      error: { message: "id 'nope' not found under tasks/", code: "UPDATE_FAILED" },
+      error: { message: "id 'nope' not found under the tracker", code: "UPDATE_FAILED" },
     });
   });
 
@@ -450,7 +450,7 @@ describe("mcp server next/report/validate (task-mcp-parity-full)", () => {
     });
     expect(created.isError).toBeUndefined();
     const { readFileSync, writeFileSync } = await import("node:fs");
-    const file = join(repoDir, "tasks", "launch-mvp", "auth", "story-login", "task-rate-limit.md");
+    const file = join(repoDir, "ArggonManager", "launch-mvp", "auth", "story-login", "task-rate-limit.md");
     writeFileSync(file, readFileSync(file, "utf8").replace("status: todo", "status: blocked"));
 
     const broken = await client.request("tools/call", { name: "arggon_validate", arguments: {} });
@@ -469,7 +469,7 @@ describe("mcp server _meta.sessionID attribution (task-opencode-v2-mcp-meta)", (
   let previousUser: string | undefined;
 
   const taskPath = (): string =>
-    join(repoDir, "tasks", "launch-mvp", "auth", "story-login", "task-rate-limit.md");
+    join(repoDir, "ArggonManager", "launch-mvp", "auth", "story-login", "task-rate-limit.md");
 
   async function seedTask(): Promise<void> {
     const created = await client.request("tools/call", {

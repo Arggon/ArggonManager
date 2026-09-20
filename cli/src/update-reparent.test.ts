@@ -63,7 +63,7 @@ function primedTree(): { dir: string; tasks: string } {
     id: "rate-limit",
     now: NOW,
   });
-  return { dir, tasks: join(dir, "tasks") };
+  return { dir, tasks: join(dir, "ArggonManager") };
 }
 
 function fm(path: string) {
@@ -161,7 +161,7 @@ describe("update --parent (reparent)", () => {
     const oldPath = join(tasks, "launch-mvp", "auth", "story-login", "task-rate-limit.md");
     expect(() =>
       runUpdate({ cwd: dir, id: "task-rate-limit", parent: "story-nope", now: LATER }),
-    ).toThrow(/parent 'story-nope' not found under tasks\//);
+    ).toThrow(/parent 'story-nope' not found under the tracker/);
     expect(existsSync(oldPath)).toBe(true);
     expect(fm(oldPath).data.parent).toBe("story-login");
   });

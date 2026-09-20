@@ -54,7 +54,7 @@ function seed(prefix: string): string {
   const dir = mkdtempSync(join(tmpdir(), `arggon-config-race-${prefix}-`));
   dirs.push(dir);
   runInit({ dir, force: false, full: true });
-  const yml = join(dir, "tasks", ".convention.yml");
+  const yml = join(dir, "ArggonManager", ".convention.yml");
   const raw = readFileSync(yml, "utf8");
   const start = raw.indexOf("x-generated:");
   expect(start).toBeGreaterThanOrEqual(0);
@@ -146,7 +146,7 @@ function startReaders(target: string, stopFile: string, n: number): Array<Promis
 }
 
 async function probe(dir: string, driver: string, label: string, keepPad: boolean): Promise<void> {
-  const yml = join(dir, "tasks", ".convention.yml");
+  const yml = join(dir, "ArggonManager", ".convention.yml");
   const stopFile = join(dir, `STOP-${label}`);
   const readers = startReaders(yml, stopFile, READERS);
   const results = await Promise.all(

@@ -41,7 +41,7 @@ export type ShowResult = {
   id: string;
   /** Absolute path of the item file. */
   path: string;
-  /** Repo root (parent of tasks/). */
+  /** Repo root (parent of the tracker dir). */
   root: string;
   item: WorkItem;
   /** Prose body (everything before the first comment heading). */
@@ -93,7 +93,7 @@ export function runShow(opts: ShowOptions): ShowResult {
   const tasksDir = findTasksDir(opts.cwd);
   const item = itemsById(loadItems(tasksDir)).get(id);
   if (!item) {
-    throw new Error(`id '${id}' not found under tasks/`);
+    throw new Error(`id '${id}' not found under the tracker`);
   }
 
   const { prose, comments } = parseComments(item.body);

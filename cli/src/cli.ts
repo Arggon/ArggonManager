@@ -14,7 +14,13 @@ import { toContractWorkItem } from "./contract.js";
 import { runCreate } from "./create.js";
 import { runDoctor, formatDoctorReport, measureBudgetForDoctor } from "./doctor.js";
 import { sanitizeHumanError } from "./sanitize.js";
-import { runInit, dryRunInit, type InitResult, type InitDryRunResult, type ProposalEntry } from "./init.js";
+import {
+  runInit,
+  dryRunInit,
+  type InitResult,
+  type InitDryRunResult,
+  type ProposalEntry,
+} from "./init.js";
 import {
   bindJsonProgram,
   emitJson,
@@ -28,16 +34,12 @@ import {
 import { formatListTable, runList } from "./list.js";
 import { runImportIssues } from "./import-issues.js";
 import { runInstructions } from "./instructions.js";
+import { formatLayoutMigrateHuman, runLayoutMigrate } from "./layout-migrate.js";
 import { runMcpServer } from "./mcp-server.js";
 import { runNext } from "./next.js";
 import { runPriorityMigrate } from "./priority.js";
 import { formatReportMarkdown, formatReportTable, runReport } from "./report.js";
-import {
-  formatTrendMarkdown,
-  formatTrendTable,
-  runTrend,
-  type TrendResult,
-} from "./trend.js";
+import { formatTrendMarkdown, formatTrendTable, runTrend, type TrendResult } from "./trend.js";
 import {
   formatPlaybookStatusTable,
   runPlaybookNew,
@@ -135,10 +137,20 @@ program
 
 program
   .command("init")
-  .description("Scaffold tasks/ convention (+ templates + governing docs) in a repo")
+  .description(
+    "Scaffold the tracker convention (+ templates + governing docs) in a repo (ArggonManager/; legacy tasks/ trees upgrade in place)",
+  )
   .argument("[dir]", "target directory", ".")
-  .option("-f, --force", "overwrite existing convention/templates (docs are never overwritten)", false)
-  .option("--full", "also generate the tier-2 doc set (ARCHITECTURE.md, docs/convention.md, ...)", false)
+  .option(
+    "-f, --force",
+    "overwrite existing convention/templates (docs are never overwritten)",
+    false,
+  )
+  .option(
+    "--full",
+    "also generate the tier-2 doc set (ARCHITECTURE.md, ArggonManager/docs/convention.md, ...)",
+    false,
+  )
   .option(
     "--backup",
     "archive adopter-modified docs to backup/<date>/<dest> before regenerating them (default: skip modified docs)",
@@ -344,7 +356,7 @@ program
   )
   .option(
     "--no-commit",
-    "keep tasks/ dirty: skip the tracker auto-commit of the adoption task + story (default: on; x-tracker.auto-commit: false opts out tree-wide)",
+    "keep the tracker dirty: skip the tracker auto-commit of the adoption task + story (default: on; x-tracker.auto-commit: false opts out tree-wide)",
   )
   .option(
     "--ack",
@@ -352,63 +364,75 @@ program
     false,
   )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { dryRun?: boolean; story?: string; commit?: boolean; ack?: boolean; json?: boolean }) => {
-    const json = jsonEnabled(opts);
-    try {
-      if (opts.ack) {
-        const result = runAdoptAck({ cwd: process.cwd() });
-        if (json) {
-          successJson("adopt", { acked: result.acked, count: result.count }, readConventionVersion(result.root));
+  .action(
+    (opts: {
+      dryRun?: boolean;
+      story?: string;
+      commit?: boolean;
+      ack?: boolean;
+      json?: boolean;
+    }) => {
+      const json = jsonEnabled(opts);
+      try {
+        if (opts.ack) {
+          const result = runAdoptAck({ cwd: process.cwd() });
+          if (json) {
+            successJson(
+              "adopt",
+              { acked: result.acked, count: result.count },
+              readConventionVersion(result.root),
+            );
+            return;
+          }
+          process.stdout.write(formatAdoptAckReport(result));
           return;
         }
-        process.stdout.write(formatAdoptAckReport(result));
-        return;
-      }
-      const result = runAdopt({
-        cwd: process.cwd(),
-        story: opts.story,
-        dryRun: Boolean(opts.dryRun),
-        commit: opts.commit === false ? false : undefined,
-      });
-      if (json) {
-        successJson(
-          "adopt",
-          {
-            taskId: result.taskId,
-            storyId: result.storyId,
-            storyCreated: result.storyCreated,
-            createdContainers: result.createdContainers,
-            taskCreated: result.taskCreated,
-            skipped: result.skipped,
-            taskPath: result.taskPath,
-            inventory: result.inventory,
-            dryRun: result.dryRun,
-            commit: commitPayload(result.commit),
-          },
-          readConventionVersion(result.root),
-        );
-        return;
-      }
-      process.stdout.write(formatAdoptReport(result));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (json) {
-        failJson({
-          command: "adopt",
-          message,
-          code: "ADOPT_FAILED",
-          conventionVersion: readConventionVersion(process.cwd()),
+        const result = runAdopt({
+          cwd: process.cwd(),
+          story: opts.story,
+          dryRun: Boolean(opts.dryRun),
+          commit: opts.commit === false ? false : undefined,
         });
-        return;
+        if (json) {
+          successJson(
+            "adopt",
+            {
+              taskId: result.taskId,
+              storyId: result.storyId,
+              storyCreated: result.storyCreated,
+              createdContainers: result.createdContainers,
+              taskCreated: result.taskCreated,
+              skipped: result.skipped,
+              taskPath: result.taskPath,
+              inventory: result.inventory,
+              dryRun: result.dryRun,
+              commit: commitPayload(result.commit),
+            },
+            readConventionVersion(result.root),
+          );
+          return;
+        }
+        process.stdout.write(formatAdoptReport(result));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (json) {
+          failJson({
+            command: "adopt",
+            message,
+            code: "ADOPT_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
+        printHumanError("arggon adopt", message);
+        process.exitCode = 1;
       }
-      printHumanError("arggon adopt", message);
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 program
   .command("create")
-  .description("Create a work item under tasks/ (label at creation with --labels <csv>)")
+  .description("Create a work item under the tracker root (label at creation with --labels <csv>)")
   .argument("<type>", "initiative | epic | story | task | bug")
   .argument("<title>", "title (id is slugified; override with --id)")
   .option(
@@ -417,7 +441,10 @@ program
   )
   .option("--id <id>", "override id stem (CLI still adds task-/bug- for leaves)")
   .option("--assignee <login>", "assignee (omit when unassigned)")
-  .option("--labels <csv>", "label the new item at creation (comma-separated; same kebab-case rules as update --labels)")
+  .option(
+    "--labels <csv>",
+    "label the new item at creation (comma-separated; same kebab-case rules as update --labels)",
+  )
   .option(
     "--priority <p>",
     "set the priority field at creation (convention v4): p0 | p1 | p2 | p3 (optional; absent = unprioritized)",
@@ -430,9 +457,13 @@ program
   )
   .option(
     "--no-commit",
-    "keep tasks/ dirty: skip the tracker auto-commit of the created item (default: on; x-tracker.auto-commit: false opts out tree-wide)",
+    "keep the tracker dirty: skip the tracker auto-commit of the created item (default: on; x-tracker.auto-commit: false opts out tree-wide)",
   )
-  .option("--full", "emit complete WorkItem shapes (default: compact per ADR 0006 — null/empty optional fields omitted)", false)
+  .option(
+    "--full",
+    "emit complete WorkItem shapes (default: compact per ADR 0006 — null/empty optional fields omitted)",
+    false,
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (
@@ -503,7 +534,7 @@ program
 
 program
   .command("list")
-  .description("List work items under tasks/ with optional filters")
+  .description("List work items under the tracker root with optional filters")
   .option("--status <status>", "exact v0 status (todo | in_progress | blocked | done | cancelled)")
   .option("--type <type>", "exact v0 type (initiative | epic | story | task | bug)")
   .option(
@@ -520,7 +551,7 @@ program
   )
   .option(
     "--view <name>",
-    'saved view name from tasks/.convention.yml x-views; ANDed with the flags and --filter',
+    "saved view name from the tracker .convention.yml x-views; ANDed with the flags and --filter",
   )
   .option(
     "--stale",
@@ -529,9 +560,13 @@ program
   )
   .option(
     "--older-than <duration>",
-    'stale threshold for --stale: <number><d|h|m> (e.g. 7d, 12h, 30m)',
+    "stale threshold for --stale: <number><d|h|m> (e.g. 7d, 12h, 30m)",
   )
-  .option("--full", "emit complete WorkItem shapes (default: compact per ADR 0006 — null/empty optional fields omitted)", false)
+  .option(
+    "--full",
+    "emit complete WorkItem shapes (default: compact per ADR 0006 — null/empty optional fields omitted)",
+    false,
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (opts: {
@@ -562,8 +597,12 @@ program
         if (json) {
           successJson(
             "list",
-            { items: result.items.map((item) => toContractWorkItem(item, result.root, { full: opts.full === true })) },
-          
+            {
+              items: result.items.map((item) =>
+                toContractWorkItem(item, result.root, { full: opts.full === true }),
+              ),
+            },
+
             readConventionVersion(result.root),
           );
           return;
@@ -589,7 +628,7 @@ program
 program
   .command("next")
   .description(
-    "Suggest the next claimable leaf item (tasks/bugs; ready items rank first, by downstream weight — unblocks count; lexicographic id on ties; --include-stories opts stories back in)",
+    "Suggest the next claimable leaf item (task/bug leaves; ready items rank first, by downstream weight — unblocks count; lexicographic id on ties; --include-stories opts stories back in)",
   )
   .option(
     "--ready",
@@ -678,55 +717,69 @@ program
     Number.parseInt,
   )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((id: string, opts: { meta?: boolean; body?: boolean; tailComments?: number; json?: boolean }) => {
-    const json = jsonEnabled(opts);
-    try {
-      if (opts.tailComments !== undefined && (!Number.isInteger(opts.tailComments) || opts.tailComments < 0)) {
-        throw new Error(`--tail-comments must be a non-negative integer (got '${opts.tailComments}')`);
-      }
-      const result = runShow({
-        cwd: process.cwd(),
-        id,
-        meta: opts.meta,
-        body: opts.body,
-        tailComments: opts.tailComments,
-      });
-      const comments = result.comments.map((comment) => ({ ...comment }));
-      if (json) {
-        successJson(
-          "show",
-          {
-            item: toContractWorkItem(result.item, result.root),
-            path: result.path,
-            ...(opts.body === true
-              ? { body: result.item.body, comments: result.allComments.map((c) => ({ ...c })) }
-              : { comments }),
-          },
-          readConventionVersion(result.root),
-        );
-        return;
-      }
-      console.log(renderShowText(result).join("\n"));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (json) {
-        failJson({
-          command: "show",
-          message,
-          code: "SHOW_FAILED",
-          conventionVersion: readConventionVersion(process.cwd()),
+  .action(
+    (
+      id: string,
+      opts: { meta?: boolean; body?: boolean; tailComments?: number; json?: boolean },
+    ) => {
+      const json = jsonEnabled(opts);
+      try {
+        if (
+          opts.tailComments !== undefined &&
+          (!Number.isInteger(opts.tailComments) || opts.tailComments < 0)
+        ) {
+          throw new Error(
+            `--tail-comments must be a non-negative integer (got '${opts.tailComments}')`,
+          );
+        }
+        const result = runShow({
+          cwd: process.cwd(),
+          id,
+          meta: opts.meta,
+          body: opts.body,
+          tailComments: opts.tailComments,
         });
-        return;
+        const comments = result.comments.map((comment) => ({ ...comment }));
+        if (json) {
+          successJson(
+            "show",
+            {
+              item: toContractWorkItem(result.item, result.root),
+              path: result.path,
+              ...(opts.body === true
+                ? { body: result.item.body, comments: result.allComments.map((c) => ({ ...c })) }
+                : { comments }),
+            },
+            readConventionVersion(result.root),
+          );
+          return;
+        }
+        console.log(renderShowText(result).join("\n"));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (json) {
+          failJson({
+            command: "show",
+            message,
+            code: "SHOW_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
+        printHumanError("arggon show", message);
+        process.exitCode = 1;
       }
-      printHumanError("arggon show", message);
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 program
   .command("report")
   .description("Aggregate leaf statuses per container, grouped by epic (display only)")
-  .option("--format <format>", "output format: table (default) or markdown (standup summary)", "table")
+  .option(
+    "--format <format>",
+    "output format: table (default) or markdown (standup summary)",
+    "table",
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .option("--trend", "mine git history: weekly completions and cycle time (pure read)", false)
   .option("--since <date>", "trend window start, YYYY-MM-DD (requires --trend)")
@@ -863,9 +916,13 @@ program
   )
   .option(
     "--no-commit",
-    "keep tasks/ dirty: skip the tracker auto-commit of the mutated item files, cascade included (default: on; x-tracker.auto-commit: false opts out tree-wide)",
+    "keep the tracker dirty: skip the tracker auto-commit of the mutated item files, cascade included (default: on; x-tracker.auto-commit: false opts out tree-wide)",
   )
-  .option("--full", "emit complete WorkItem shapes (default: compact per ADR 0006 — null/empty optional fields omitted)", false)
+  .option(
+    "--full",
+    "emit complete WorkItem shapes (default: compact per ADR 0006 — null/empty optional fields omitted)",
+    false,
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (
@@ -896,128 +953,129 @@ program
       const json = jsonEnabled(opts);
       const main = async (): Promise<void> => {
         try {
-        // Claim-steal gate (bug-cli-steal-not-gated): human-only, enforced at
-        // the CLI entry point BEFORE the kernel — repo opt-in via
-        // x-tracker.allow-steal, then an interactive TTY confirmation.
-        // runUpdate keeps its kernel steal semantics (agents refused via the
-        // rules layer, shared with MCP).
-        if (opts.steal) {
-          await gateSteal({ cwd: process.cwd(), id });
-        }
-        // Reopen gate (bug-reopen-ungated-cli): done/cancelled -> todo is a
-        // legal transition (humans reopen legitimately), but the playbook
-        // forbids agents from reopening and the CLI has no caller identity —
-        // so, like the steal gate, it requires an interactive terminal with a
-        // y/N confirmation. Never config-armed; the kernel (rules.ts) keeps
-        // refusing agents via the MCP path unchanged.
-        if (opts.status === "todo") {
-          const current = findItemStatus(process.cwd(), id);
-          if (current === "done" || current === "cancelled") {
-            await gateReopen({ id, from: current, to: "todo" });
+          // Claim-steal gate (bug-cli-steal-not-gated): human-only, enforced at
+          // the CLI entry point BEFORE the kernel — repo opt-in via
+          // x-tracker.allow-steal, then an interactive TTY confirmation.
+          // runUpdate keeps its kernel steal semantics (agents refused via the
+          // rules layer, shared with MCP).
+          if (opts.steal) {
+            await gateSteal({ cwd: process.cwd(), id });
           }
-        }
-        const result = runUpdate({
-          cwd: process.cwd(),
-          id,
-          title: opts.title,
-          status: opts.status,
-          assignee: opts.assignee,
-          branch: opts.branch,
-          parent: opts.parent,
-          type: opts.type,
-          unassign: opts.unassign,
-          labels: opts.labels,
-          priority: opts.priority,
-          dependsOn: opts.dependsOn,
-          addDependsOn: opts.addDependsOn,
-          issue: opts.issue !== undefined ? Number(opts.issue) : undefined,
-          blockedReason: opts.blockedReason,
-          force: Boolean(opts.force),
-          steal: Boolean(opts.steal),
-          reason: opts.reason,
-          cascade: opts.cascade !== false,
-        });
-        // Tracker hygiene (task-autocommit-update-import): auto-commit ALL
-        // item files written this run (the updated item + cascade-completed
-        // ancestors) AFTER the mutation — a refused update (reopen/steal
-        // gates above) never commits. Only a run that actually changed
-        // fields commits; a no-op write (nothing requested changed) keeps
-        // the previous no-commit behavior.
-        const commit = maybeCommitUpdate(result, opts.commit);
-        if (json) {
-          successJson(
-            "update",
-            {
-              item: toContractWorkItem(result.item, result.root, { full: opts.full === true }),
-              autoCompleted: result.autoCompleted,
-              cascadeLevels: result.cascadeLevels,
-              ...(result.movedFrom ? { movedFrom: result.movedFrom } : {}),
-              ...(result.renamedFrom ? { renamedFrom: result.renamedFrom } : {}),
-              cascadeSkipped: result.cascadeSkipped,
-              ...(result.issueRoundtrip ? { issueRoundtrip: result.issueRoundtrip } : {}),
-              ...(commit ? { commit: commitPayload(commit) } : {}),
-            },
-            readConventionVersion(result.root),
-          );
-          return;
-        }
-        const what = result.changed.length > 0 ? ` (${result.changed.join(", ")})` : "";
-        console.log(`arggon update: ${result.item.type} ${sanitizeHumanError(result.id)}${what}`);
-        console.log(`  ${sanitizeHumanError(result.path)}`);
-        if (result.movedFrom) console.log(`  moved from: ${sanitizeHumanError(result.movedFrom)}`);
-        if (result.renamedFrom)
-          console.log(`  renamed from id: ${sanitizeHumanError(result.renamedFrom)}`);
-        for (const skipped of result.cascadeSkipped) {
-          const why =
-            skipped.reason === "subtree-open"
-              ? `subtree still open${"sibling" in skipped && skipped.sibling ? ` (sibling '${sanitizeHumanError(skipped.sibling)}')` : ""}`
-              : skipped.reason === "lock-timeout"
-                ? "another arggon process holds its lock (re-run any terminal update to retrigger the cascade)"
-                : "acceptance checklist incomplete";
-          console.log(
-            `  cascade skipped: ${skipped.type} '${sanitizeHumanError(skipped.id)}' — ${why}`,
-          );
-        }
-        if (result.autoCompleted.length > 0) {
-          console.log(`  auto-completed: ${sanitizeHumanError(result.autoCompleted.join(", "))}`);
-          const high = result.autoCompleted
-            .map((cid, index) => ({ id: cid, level: result.cascadeLevels[index] }))
-            .filter((c) => c.level === "epic" || c.level === "initiative");
-          if (high.length > 0) {
-            const more = high.length - 1;
-            const suffix = more > 0 ? ` (and ${more} more ancestor${more === 1 ? "" : "s"})` : "";
-            console.log(
-              `⚠ cascade: auto-completed ${high[0].level} '${sanitizeHumanError(high[0].id)}'${suffix}` +
-                ` — use --no-cascade to keep containers open`,
-            );
+          // Reopen gate (bug-reopen-ungated-cli): done/cancelled -> todo is a
+          // legal transition (humans reopen legitimately), but the playbook
+          // forbids agents from reopening and the CLI has no caller identity —
+          // so, like the steal gate, it requires an interactive terminal with a
+          // y/N confirmation. Never config-armed; the kernel (rules.ts) keeps
+          // refusing agents via the MCP path unchanged.
+          if (opts.status === "todo") {
+            const current = findItemStatus(process.cwd(), id);
+            if (current === "done" || current === "cancelled") {
+              await gateReopen({ id, from: current, to: "todo" });
+            }
           }
-        }
-        const commitLine = formatCommitLine(commit);
-        if (commitLine) console.log(`  ${commitLine}`);
-        if (result.issueRoundtrip) {
-          const rt = result.issueRoundtrip;
-          if (rt.closed) {
-            console.log(
-              `  issue round-trip: closed #${rt.issue} in ${sanitizeHumanError(rt.repo)}`,
-            );
-          } else {
-            console.log(`  issue round-trip skipped: ${sanitizeHumanError(rt.skipped)}`);
-          }
-        }
-      } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        if (json) {
-          failJson({
-            command: "update",
-            message,
-            code: "UPDATE_FAILED",
-            conventionVersion: readConventionVersion(process.cwd()),
+          const result = runUpdate({
+            cwd: process.cwd(),
+            id,
+            title: opts.title,
+            status: opts.status,
+            assignee: opts.assignee,
+            branch: opts.branch,
+            parent: opts.parent,
+            type: opts.type,
+            unassign: opts.unassign,
+            labels: opts.labels,
+            priority: opts.priority,
+            dependsOn: opts.dependsOn,
+            addDependsOn: opts.addDependsOn,
+            issue: opts.issue !== undefined ? Number(opts.issue) : undefined,
+            blockedReason: opts.blockedReason,
+            force: Boolean(opts.force),
+            steal: Boolean(opts.steal),
+            reason: opts.reason,
+            cascade: opts.cascade !== false,
           });
-          return;
+          // Tracker hygiene (task-autocommit-update-import): auto-commit ALL
+          // item files written this run (the updated item + cascade-completed
+          // ancestors) AFTER the mutation — a refused update (reopen/steal
+          // gates above) never commits. Only a run that actually changed
+          // fields commits; a no-op write (nothing requested changed) keeps
+          // the previous no-commit behavior.
+          const commit = maybeCommitUpdate(result, opts.commit);
+          if (json) {
+            successJson(
+              "update",
+              {
+                item: toContractWorkItem(result.item, result.root, { full: opts.full === true }),
+                autoCompleted: result.autoCompleted,
+                cascadeLevels: result.cascadeLevels,
+                ...(result.movedFrom ? { movedFrom: result.movedFrom } : {}),
+                ...(result.renamedFrom ? { renamedFrom: result.renamedFrom } : {}),
+                cascadeSkipped: result.cascadeSkipped,
+                ...(result.issueRoundtrip ? { issueRoundtrip: result.issueRoundtrip } : {}),
+                ...(commit ? { commit: commitPayload(commit) } : {}),
+              },
+              readConventionVersion(result.root),
+            );
+            return;
+          }
+          const what = result.changed.length > 0 ? ` (${result.changed.join(", ")})` : "";
+          console.log(`arggon update: ${result.item.type} ${sanitizeHumanError(result.id)}${what}`);
+          console.log(`  ${sanitizeHumanError(result.path)}`);
+          if (result.movedFrom)
+            console.log(`  moved from: ${sanitizeHumanError(result.movedFrom)}`);
+          if (result.renamedFrom)
+            console.log(`  renamed from id: ${sanitizeHumanError(result.renamedFrom)}`);
+          for (const skipped of result.cascadeSkipped) {
+            const why =
+              skipped.reason === "subtree-open"
+                ? `subtree still open${"sibling" in skipped && skipped.sibling ? ` (sibling '${sanitizeHumanError(skipped.sibling)}')` : ""}`
+                : skipped.reason === "lock-timeout"
+                  ? "another arggon process holds its lock (re-run any terminal update to retrigger the cascade)"
+                  : "acceptance checklist incomplete";
+            console.log(
+              `  cascade skipped: ${skipped.type} '${sanitizeHumanError(skipped.id)}' — ${why}`,
+            );
+          }
+          if (result.autoCompleted.length > 0) {
+            console.log(`  auto-completed: ${sanitizeHumanError(result.autoCompleted.join(", "))}`);
+            const high = result.autoCompleted
+              .map((cid, index) => ({ id: cid, level: result.cascadeLevels[index] }))
+              .filter((c) => c.level === "epic" || c.level === "initiative");
+            if (high.length > 0) {
+              const more = high.length - 1;
+              const suffix = more > 0 ? ` (and ${more} more ancestor${more === 1 ? "" : "s"})` : "";
+              console.log(
+                `⚠ cascade: auto-completed ${high[0].level} '${sanitizeHumanError(high[0].id)}'${suffix}` +
+                  ` — use --no-cascade to keep containers open`,
+              );
+            }
+          }
+          const commitLine = formatCommitLine(commit);
+          if (commitLine) console.log(`  ${commitLine}`);
+          if (result.issueRoundtrip) {
+            const rt = result.issueRoundtrip;
+            if (rt.closed) {
+              console.log(
+                `  issue round-trip: closed #${rt.issue} in ${sanitizeHumanError(rt.repo)}`,
+              );
+            } else {
+              console.log(`  issue round-trip skipped: ${sanitizeHumanError(rt.skipped)}`);
+            }
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          if (json) {
+            failJson({
+              command: "update",
+              message,
+              code: "UPDATE_FAILED",
+              conventionVersion: readConventionVersion(process.cwd()),
+            });
+            return;
+          }
+          printHumanError("arggon update", message);
+          process.exitCode = 1;
         }
-        printHumanError("arggon update", message);
-        process.exitCode = 1;
-      }
       };
       void main();
     },
@@ -1067,7 +1125,7 @@ priority
         console.log("nothing was written (dry run)");
       } else if (result.changed > 0) {
         console.log(
-          "migrate never auto-commits — review `git diff tasks/` and commit the migration as one change.",
+          "migrate never auto-commits — review the tracker diff (`git diff`) and commit the migration as one change.",
         );
       }
     } catch (err) {
@@ -1087,6 +1145,62 @@ priority
   });
 
 program
+  .command("migrate")
+  .description(
+    "Move a legacy tasks/ tracker (and its product docs) to the ArggonManager/ layout (ADR 0012, convention v5; idempotent, never auto-commits)",
+  )
+  .option(
+    "--layout",
+    "migrate the tracker layout: tasks/ → ArggonManager/, docs/ → ArggonManager/docs/ (required)",
+    false,
+  )
+  .option("--dry-run", "plan only: print the actions and write NOTHING", false)
+  .option("--json", "emit one JSON object on stdout (agent contract)", false)
+  .action((opts: { layout?: boolean; dryRun?: boolean; json?: boolean }) => {
+    const json = jsonEnabled(opts);
+    try {
+      if (!opts.layout) {
+        throw new Error(
+          "arggon migrate requires a migration target — pass --layout (the only supported target today)",
+        );
+      }
+      const result = runLayoutMigrate({ cwd: process.cwd(), dryRun: Boolean(opts.dryRun) });
+      if (json) {
+        successJson(
+          "migrate",
+          {
+            dryRun: result.dryRun,
+            alreadyMigrated: result.alreadyMigrated,
+            trackerMove: result.trackerMove,
+            docsMove: result.docsMove,
+            versionBump: result.versionBump,
+            rewrittenGeneratedPaths: result.rewrittenGeneratedPaths,
+            changed: result.changed,
+            trackerDir: result.trackerDir,
+            docsDir: result.docsDir,
+          },
+          readConventionVersion(result.root),
+        );
+        return;
+      }
+      console.log(formatLayoutMigrateHuman(result));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (json) {
+        failJson({
+          command: "migrate",
+          message,
+          code: "MIGRATE_FAILED",
+          conventionVersion: readConventionVersion(process.cwd()),
+        });
+        return;
+      }
+      printHumanError("arggon migrate --layout", message);
+      process.exitCode = 1;
+    }
+  });
+
+program
   .command("comment")
   .description("Append a timestamped, author-attributed comment section to an item's body")
   .argument("<id>", "work item id")
@@ -1101,7 +1215,7 @@ program
   )
   .option(
     "--no-commit",
-    "keep tasks/ dirty: skip the tracker auto-commit of the commented item (default: on; x-tracker.auto-commit: false opts out tree-wide)",
+    "keep the tracker dirty: skip the tracker auto-commit of the commented item (default: on; x-tracker.auto-commit: false opts out tree-wide)",
   )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
@@ -1168,11 +1282,11 @@ program
   )
   .argument("<id>", "work item id")
   .option("--next <text>", "the first thing the resuming agent should do (required)")
-  .option("--branch <name>", "working branch (default: auto-detected from git; 'unknown' outside git)")
   .option(
-    "--open-questions <text>",
-    "open questions, semicolon-separated by convention (optional)",
+    "--branch <name>",
+    "working branch (default: auto-detected from git; 'unknown' outside git)",
   )
+  .option("--open-questions <text>", "open questions, semicolon-separated by convention (optional)")
   .option(
     "--session <id>",
     "session identifier for provenance, rendered in the heading (optional; capped at 64 chars)",
@@ -1183,7 +1297,7 @@ program
   )
   .option(
     "--no-commit",
-    "keep tasks/ dirty: skip the tracker auto-commit of the item (default: on; x-tracker.auto-commit: false opts out tree-wide)",
+    "keep the tracker dirty: skip the tracker auto-commit of the item (default: on; x-tracker.auto-commit: false opts out tree-wide)",
   )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
@@ -1260,7 +1374,9 @@ program
 
 program
   .command("import-issues")
-  .description("One-shot import of GitHub issues into tasks/ as tasks/bugs (idempotent; x-import maps labels to types)")
+  .description(
+    "One-shot import of GitHub issues into the tracker as task/bug items (idempotent; x-import maps labels to types)",
+  )
   .option("--repo <owner/repo>", "GitHub repository (default: gh's own resolution from cwd)")
   .option(
     "--parent <story-id>",
@@ -1269,11 +1385,17 @@ program
   .option("--dry-run", "print the mapping plan (would-create / would-skip) without writing", false)
   .option(
     "--no-commit",
-    "keep tasks/ dirty: skip the tracker auto-commit of the imported items (default: on; x-tracker.auto-commit: false opts out tree-wide)",
+    "keep the tracker dirty: skip the tracker auto-commit of the imported items (default: on; x-tracker.auto-commit: false opts out tree-wide)",
   )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
-    (opts: { repo?: string; parent?: string; dryRun?: boolean; commit?: boolean; json?: boolean }) => {
+    (opts: {
+      repo?: string;
+      parent?: string;
+      dryRun?: boolean;
+      commit?: boolean;
+      json?: boolean;
+    }) => {
       const json = jsonEnabled(opts);
       try {
         const result = runImportIssues({
@@ -1334,7 +1456,7 @@ program
 
 program
   .command("validate")
-  .description("Validate tasks/ frontmatter and tree integrity")
+  .description("Validate tracker frontmatter and tree integrity")
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action((opts: { json?: boolean }) => {
     const json = jsonEnabled(opts);
@@ -1346,6 +1468,7 @@ program
           schemaVersion: JSON_SCHEMA_VERSION,
           conventionVersion: result.conventionVersion,
           command: "validate",
+          layout: result.layout,
           errors: result.errors,
           warnings: result.warnings,
         };
@@ -1383,12 +1506,17 @@ program
 
 const spec = program
   .command("spec")
-  .description("Validate and scaffold feature specs and plans (docs/specs, docs/plans)");
+  .description(
+    "Validate and scaffold feature specs and plans (ArggonManager/docs/specs, ArggonManager/docs/plans; legacy: docs/)",
+  );
 
 spec
   .command("validate")
   .description("Validate spec/plan frontmatter and section structure (pure read)")
-  .option("--file <path>", "validate a single file (also outside docs/specs / docs/plans)")
+  .option(
+    "--file <path>",
+    "validate a single file (also outside the product-docs specs/plans dirs)",
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action((opts: { file?: string; json?: boolean }) => {
     const json = jsonEnabled(opts);
@@ -1440,104 +1568,126 @@ spec
   .description(
     "Checklist-driven ambiguity scan + spec/task consistency report (report-only, never edits; exit 0 with findings)",
   )
-  .option("--spec <path>", "scan a single spec file (also outside docs/specs)")
+  .option("--spec <path>", "scan a single spec file (also outside the product-docs specs dir)")
   .option(
     "--save-baseline <file>",
     "write the findings snapshot to <file> (deterministic, committable JSON), then report as usual",
   )
-  .option("--baseline <file>", "compare against a saved snapshot; report only new/resolved findings")
+  .option(
+    "--baseline <file>",
+    "compare against a saved snapshot; report only new/resolved findings",
+  )
   .option(
     "--no-fail-on-new",
     "with --baseline: report-only — do not exit 1 when new findings exist",
   )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { spec?: string; saveBaseline?: string; baseline?: string; failOnNew?: boolean; json?: boolean }) => {
-    const json = jsonEnabled(opts);
-    try {
-      if (opts.saveBaseline && opts.baseline) {
-        throw new Error(
-          "--baseline and --save-baseline are mutually exclusive — a run either compares against a snapshot or writes one",
-        );
-      }
-      if (opts.saveBaseline) {
-        const saved = runSpecAnalyzeSaveBaseline({ cwd: process.cwd(), spec: opts.spec, file: opts.saveBaseline });
-        if (json) {
-          emitJson({
-            ok: true,
-            schemaVersion: JSON_SCHEMA_VERSION,
-            conventionVersion: saved.result.conventionVersion,
-            command: "spec",
-            scanned: saved.result.scanned,
-            findings: { ambiguity: saved.result.ambiguity, consistency: saved.result.consistency },
-            baseline: { file: saved.file, written: true, count: saved.snapshot.count },
+  .action(
+    (opts: {
+      spec?: string;
+      saveBaseline?: string;
+      baseline?: string;
+      failOnNew?: boolean;
+      json?: boolean;
+    }) => {
+      const json = jsonEnabled(opts);
+      try {
+        if (opts.saveBaseline && opts.baseline) {
+          throw new Error(
+            "--baseline and --save-baseline are mutually exclusive — a run either compares against a snapshot or writes one",
+          );
+        }
+        if (opts.saveBaseline) {
+          const saved = runSpecAnalyzeSaveBaseline({
+            cwd: process.cwd(),
+            spec: opts.spec,
+            file: opts.saveBaseline,
           });
+          if (json) {
+            emitJson({
+              ok: true,
+              schemaVersion: JSON_SCHEMA_VERSION,
+              conventionVersion: saved.result.conventionVersion,
+              command: "spec",
+              scanned: saved.result.scanned,
+              findings: {
+                ambiguity: saved.result.ambiguity,
+                consistency: saved.result.consistency,
+              },
+              baseline: { file: saved.file, written: true, count: saved.snapshot.count },
+            });
+            return;
+          }
+          process.stdout.write(formatSpecBaselineSaveHuman(saved));
           return;
         }
-        process.stdout.write(formatSpecBaselineSaveHuman(saved));
-        return;
-      }
-      if (opts.baseline) {
-        const cmp = runSpecAnalyzeCompareBaseline({ cwd: process.cwd(), spec: opts.spec, file: opts.baseline });
-        const failed = cmp.added.length > 0;
-        if (json) {
-          // The gate rides on the exit code: a failing gate still emits a
-          // success envelope (ok: true) with the additive baseline payload.
-          emitJson({
-            ok: true,
-            schemaVersion: JSON_SCHEMA_VERSION,
-            conventionVersion: cmp.result.conventionVersion,
-            command: "spec",
-            scanned: cmp.result.scanned,
-            findings: { ambiguity: cmp.result.ambiguity, consistency: cmp.result.consistency },
-            baseline: {
-              file: cmp.file,
-              total: cmp.total,
-              unchanged: cmp.unchanged.length,
-              added: cmp.added,
-              resolved: cmp.resolved,
-              failed,
-            },
+        if (opts.baseline) {
+          const cmp = runSpecAnalyzeCompareBaseline({
+            cwd: process.cwd(),
+            spec: opts.spec,
+            file: opts.baseline,
           });
+          const failed = cmp.added.length > 0;
+          if (json) {
+            // The gate rides on the exit code: a failing gate still emits a
+            // success envelope (ok: true) with the additive baseline payload.
+            emitJson({
+              ok: true,
+              schemaVersion: JSON_SCHEMA_VERSION,
+              conventionVersion: cmp.result.conventionVersion,
+              command: "spec",
+              scanned: cmp.result.scanned,
+              findings: { ambiguity: cmp.result.ambiguity, consistency: cmp.result.consistency },
+              baseline: {
+                file: cmp.file,
+                total: cmp.total,
+                unchanged: cmp.unchanged.length,
+                added: cmp.added,
+                resolved: cmp.resolved,
+                failed,
+              },
+            });
+            if (failed && opts.failOnNew !== false) process.exitCode = 1;
+            return;
+          }
+          process.stdout.write(formatSpecBaselineCompareHuman(cmp));
           if (failed && opts.failOnNew !== false) process.exitCode = 1;
           return;
         }
-        process.stdout.write(formatSpecBaselineCompareHuman(cmp));
-        if (failed && opts.failOnNew !== false) process.exitCode = 1;
-        return;
+        const result = runSpecAnalyze({ cwd: process.cwd(), spec: opts.spec });
+        if (json) {
+          emitJson({
+            ok: true,
+            schemaVersion: JSON_SCHEMA_VERSION,
+            conventionVersion: result.conventionVersion,
+            command: "spec",
+            scanned: result.scanned,
+            findings: { ambiguity: result.ambiguity, consistency: result.consistency },
+          });
+          return;
+        }
+        process.stdout.write(formatSpecAnalyzeHuman(result));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (json) {
+          failJson({
+            command: "spec",
+            message,
+            code: "SPEC_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
+        printHumanError("arggon spec analyze", message);
+        process.exitCode = 1;
       }
-      const result = runSpecAnalyze({ cwd: process.cwd(), spec: opts.spec });
-      if (json) {
-        emitJson({
-          ok: true,
-          schemaVersion: JSON_SCHEMA_VERSION,
-          conventionVersion: result.conventionVersion,
-          command: "spec",
-          scanned: result.scanned,
-          findings: { ambiguity: result.ambiguity, consistency: result.consistency },
-        });
-        return;
-      }
-      process.stdout.write(formatSpecAnalyzeHuman(result));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (json) {
-        failJson({
-          command: "spec",
-          message,
-          code: "SPEC_FAILED",
-          conventionVersion: readConventionVersion(process.cwd()),
-        });
-        return;
-      }
-      printHumanError("arggon spec analyze", message);
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 spec
   .command("audit")
   .description(
-    "Pairwise duplication detection over docs/specs/*.md (Jaccard + shared titles) — report only, never edits",
+    "Pairwise duplication detection over the product-docs specs/*.md (Jaccard + shared titles) — report only, never edits",
   )
   .option(
     "--duplicate-threshold <n>",
@@ -1621,7 +1771,7 @@ spec
 spec
   .command("new")
   .description(
-    "Scaffold docs/specs/spec-<slug>-NNN.md (and docs/plans/plan-<slug>-NNN.md with --plan); never overwrites",
+    "Scaffold ArggonManager/docs/specs/spec-<slug>-NNN.md (and ArggonManager/docs/plans/plan-<slug>-NNN.md with --plan); never overwrites",
   )
   .argument("<slug>", "kebab-case slug (^[a-z0-9]+(-[a-z0-9]+)*$)")
   .option("--title <title>", "spec title (defaults to the slug, hyphens as spaces)")
@@ -1667,7 +1817,11 @@ spec
   )
   .argument("<format>", "corpus format (currently: openspec)")
   .argument("<path>", "corpus root (openspec: contains specs/<capability>/spec.md)")
-  .option("--dry-run", "inventory only: discover files and preview the mapping without writing", false)
+  .option(
+    "--dry-run",
+    "inventory only: discover files and preview the mapping without writing",
+    false,
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action((format: string, path: string, opts: { dryRun?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
@@ -1738,12 +1892,14 @@ spec
 
 const stack = program
   .command("stack")
-  .description("Exploration records preceding stack decisions (docs/explorations)");
+  .description(
+    "Exploration records preceding stack decisions (product docs: ArggonManager/docs/explorations)",
+  );
 
 stack
   .command("explore")
   .description(
-    "Scaffold docs/explorations/exploration-<slug>-NNN.md (candidates, criteria, findings, recommendation); never overwrites",
+    "Scaffold ArggonManager/docs/explorations/exploration-<slug>-NNN.md (candidates, criteria, findings, recommendation); never overwrites",
   )
   .argument("<topic>", "topic to explore (slugified for the filename)")
   .option("--title <title>", "exploration title (defaults to the topic as given)")
@@ -1782,12 +1938,14 @@ stack
 
 const playbook = program
   .command("playbook")
-  .description("Per-tech playbooks with version-freshness tracking (docs/playbooks)");
+  .description(
+    "Per-tech playbooks with version-freshness tracking (product docs: ArggonManager/docs/playbooks)",
+  );
 
 playbook
   .command("new")
   .description(
-    "Scaffold docs/playbooks/<tech>.md pinning the chosen version; never overwrites (research is the caller's job)",
+    "Scaffold ArggonManager/docs/playbooks/<tech>.md pinning the chosen version; never overwrites (research is the caller's job)",
   )
   .argument("<tech>", "technology slug (kebab-case)")
   .option("--version <version>", "chosen version to pin (default: unpinned)")
@@ -1836,7 +1994,10 @@ playbook
     "--file-task <story-id>",
     "file one re-research task per stale playbook into the tracker (errors when the story does not exist)",
   )
-  .option("--now <iso-date>", "determinism hook: evaluate ages as of this date instead of now (test/determinism hook)")
+  .option(
+    "--now <iso-date>",
+    "determinism hook: evaluate ages as of this date instead of now (test/determinism hook)",
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action((opts: { maxAgeDays?: string; fileTask?: string; now?: string; json?: boolean }) => {
     const json = jsonEnabled(opts);
@@ -2039,10 +2200,19 @@ program
       },
     ) => {
       const json = jsonEnabled(opts);
-      if (opts.postStartShell !== undefined && opts.postStartShell !== "inherit" && opts.postStartShell !== "login") {
+      if (
+        opts.postStartShell !== undefined &&
+        opts.postStartShell !== "inherit" &&
+        opts.postStartShell !== "login"
+      ) {
         const message = `--post-start-shell must be "inherit" or "login" (got ${JSON.stringify(opts.postStartShell)})`;
         if (json) {
-          failJson({ command: "start", message, code: "START_FAILED", conventionVersion: readConventionVersion(process.cwd()) });
+          failJson({
+            command: "start",
+            message,
+            code: "START_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
           return;
         }
         printHumanError("arggon start", message);
@@ -2132,7 +2302,7 @@ program
   )
   .option(
     "--no-commit",
-    "keep tasks/ dirty: skip the tracker auto-commit of the cleared worktree_path records (default: on with --prune; x-tracker.auto-commit: false opts out tree-wide)",
+    "keep the tracker dirty: skip the tracker auto-commit of the cleared worktree_path records (default: on with --prune; x-tracker.auto-commit: false opts out tree-wide)",
   )
   .option(
     "--no-gh",
@@ -2184,8 +2354,12 @@ program
       }
       for (const action of result.pruned) {
         if (action.action === "failed") {
-          const leftover = action.leftoverBranch ? ` (leftover branch: ${action.leftoverBranch})` : "";
-          console.error(sanitizeHumanError(`  failed:    ${action.id}: ${action.error}${leftover}`));
+          const leftover = action.leftoverBranch
+            ? ` (leftover branch: ${action.leftoverBranch})`
+            : "";
+          console.error(
+            sanitizeHumanError(`  failed:    ${action.id}: ${action.error}${leftover}`),
+          );
         } else {
           console.log(`  pruned:    ${sanitizeHumanError(action.id)}: ${action.action}`);
         }
@@ -2218,7 +2392,7 @@ program
 program
   .command("board")
   .description(
-    "Write a static read-only HTML board from tasks/ (git files stay the source of truth)",
+    "Write a static read-only HTML board from the tracker (git files stay the source of truth)",
   )
   .option(
     "--out <file>",
@@ -2229,121 +2403,141 @@ program
     "--group-by <field>",
     "group cards within each column by milestone (ADR 0003) or parent story (story)",
   )
-  .option("--serve", "serve the board locally (127.0.0.1) with live reload; edits go through the update path", false)
+  .option(
+    "--serve",
+    "serve the board locally (127.0.0.1) with live reload; edits go through the update path",
+    false,
+  )
   .option("--port <port>", "port for --serve (default: a free ephemeral port)")
-  .option("--tui", "interactive read-only terminal kanban (raw ANSI, q quits; not combinable with --json)", false)
+  .option(
+    "--tui",
+    "interactive read-only terminal kanban (raw ANSI, q quits; not combinable with --json)",
+    false,
+  )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { out?: string; github?: boolean; groupBy?: string; serve?: boolean; port?: string; tui?: boolean; json?: boolean }) => {
-    const json = jsonEnabled(opts);
-    const jsonFailed = (message: string) => {
-      if (json) {
-        failJson({
-          command: "board",
-          message,
-          code: "BOARD_FAILED",
-          conventionVersion: readConventionVersion(process.cwd()),
-        });
-        return;
-      }
-      printHumanError("arggon board", message);
-      process.exitCode = 1;
-    };
-    if (opts.tui) {
-      if (opts.serve) {
-        jsonFailed("cannot combine --tui with --serve (both are interactive modes)");
-        return;
-      }
-      if (opts.groupBy !== undefined) {
-        jsonFailed(
-          "cannot combine --tui with --group-by (the TUI groups by status column only; use the HTML board for --group-by)",
-        );
-        return;
-      }
-      if (json) {
-        jsonFailed(
-          "--tui is an interactive view and cannot be combined with --json (use plain `arggon list --json` for data)",
-        );
-        return;
-      }
-      runTuiBoard({ cwd: process.cwd() }).catch((err: unknown) => {
-        jsonFailed(err instanceof Error ? err.message : String(err));
-      });
-      return;
-    }
-    if (opts.serve) {
-      if (opts.github) {
-        jsonFailed("cannot combine --serve with --github (the served board renders fresh per request)");
-        return;
-      }
-      let port: number | undefined;
-      if (opts.port !== undefined) {
-        port = Number.parseInt(opts.port, 10);
-        if (!Number.isInteger(port) || port < 0 || port > 65535) {
-          jsonFailed(`invalid --port '${opts.port}' (expected 0-65535)`);
+  .action(
+    (opts: {
+      out?: string;
+      github?: boolean;
+      groupBy?: string;
+      serve?: boolean;
+      port?: string;
+      tui?: boolean;
+      json?: boolean;
+    }) => {
+      const json = jsonEnabled(opts);
+      const jsonFailed = (message: string) => {
+        if (json) {
+          failJson({
+            command: "board",
+            message,
+            code: "BOARD_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
           return;
         }
+        printHumanError("arggon board", message);
+        process.exitCode = 1;
+      };
+      if (opts.tui) {
+        if (opts.serve) {
+          jsonFailed("cannot combine --tui with --serve (both are interactive modes)");
+          return;
+        }
+        if (opts.groupBy !== undefined) {
+          jsonFailed(
+            "cannot combine --tui with --group-by (the TUI groups by status column only; use the HTML board for --group-by)",
+          );
+          return;
+        }
+        if (json) {
+          jsonFailed(
+            "--tui is an interactive view and cannot be combined with --json (use plain `arggon list --json` for data)",
+          );
+          return;
+        }
+        runTuiBoard({ cwd: process.cwd() }).catch((err: unknown) => {
+          jsonFailed(err instanceof Error ? err.message : String(err));
+        });
+        return;
       }
-      try {
-        const handle = startBoardServer({ cwd: process.cwd(), port, groupBy: opts.groupBy });
-        void handle.ready.then(() => {
-          if (json) {
-            successJson(
-              "board",
-              { serving: true, url: handle.url, port: handle.port },
-              readConventionVersion(handle.root),
-            );
+      if (opts.serve) {
+        if (opts.github) {
+          jsonFailed(
+            "cannot combine --serve with --github (the served board renders fresh per request)",
+          );
+          return;
+        }
+        let port: number | undefined;
+        if (opts.port !== undefined) {
+          port = Number.parseInt(opts.port, 10);
+          if (!Number.isInteger(port) || port < 0 || port > 65535) {
+            jsonFailed(`invalid --port '${opts.port}' (expected 0-65535)`);
             return;
           }
-          console.log(
-            `arggon board: serving ${sanitizeHumanError(displayPath(handle.root, process.cwd()))} on ${sanitizeHumanError(handle.url)} (binds 127.0.0.1 only, Ctrl-C to stop)`,
+        }
+        try {
+          const handle = startBoardServer({ cwd: process.cwd(), port, groupBy: opts.groupBy });
+          void handle.ready.then(() => {
+            if (json) {
+              successJson(
+                "board",
+                { serving: true, url: handle.url, port: handle.port },
+                readConventionVersion(handle.root),
+              );
+              return;
+            }
+            console.log(
+              `arggon board: serving ${sanitizeHumanError(displayPath(handle.root, process.cwd()))} on ${sanitizeHumanError(handle.url)} (binds 127.0.0.1 only, Ctrl-C to stop)`,
+            );
+          });
+        } catch (err) {
+          jsonFailed(err instanceof Error ? err.message : String(err));
+        }
+        return;
+      }
+      try {
+        const result = runBoard({
+          cwd: process.cwd(),
+          out: opts.out,
+          github: opts.github,
+          groupBy: opts.groupBy,
+        });
+        if (json) {
+          successJson(
+            "board",
+            {
+              path: displayPath(result.outPath, process.cwd()),
+              itemCount: result.itemCount,
+              ...(result.groupBy ? { groupBy: result.groupBy } : {}),
+              ...(opts.github ? { github: true, prCount: result.prCount } : {}),
+            },
+            readConventionVersion(result.root),
           );
-        });
-      } catch (err) {
-        jsonFailed(err instanceof Error ? err.message : String(err));
-      }
-      return;
-    }
-    try {
-      const result = runBoard({
-        cwd: process.cwd(),
-        out: opts.out,
-        github: opts.github,
-        groupBy: opts.groupBy,
-      });
-      if (json) {
-        successJson(
-          "board",
-          {
-            path: displayPath(result.outPath, process.cwd()),
-            itemCount: result.itemCount,
-            ...(result.groupBy ? { groupBy: result.groupBy } : {}),
-            ...(opts.github ? { github: true, prCount: result.prCount } : {}),
-          },
-          readConventionVersion(result.root),
+          return;
+        }
+        console.log(
+          `arggon board: wrote ${sanitizeHumanError(displayPath(result.outPath, process.cwd()))} (${result.itemCount} item(s)${result.groupBy ? `, grouped by ${result.groupBy}` : ""}${opts.github ? `, ${result.prCount} PR(s) linked` : ""})`,
         );
-        return;
+        console.log(
+          "  Open it in a browser. Re-run after tree changes — the tracker remains the source of truth.",
+        );
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (json) {
+          failJson({
+            command: "board",
+            message,
+            code: "BOARD_FAILED",
+            conventionVersion: readConventionVersion(process.cwd()),
+          });
+          return;
+        }
+        printHumanError("arggon board", message);
+        process.exitCode = 1;
       }
-      console.log(
-        `arggon board: wrote ${sanitizeHumanError(displayPath(result.outPath, process.cwd()))} (${result.itemCount} item(s)${result.groupBy ? `, grouped by ${result.groupBy}` : ""}${opts.github ? `, ${result.prCount} PR(s) linked` : ""})`,
-      );
-      console.log(
-        "  Open it in a browser. Re-run after tree changes — tasks/ remains the source of truth.",
-      );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (json) {
-        failJson({
-          command: "board",
-          message,
-          code: "BOARD_FAILED",
-          conventionVersion: readConventionVersion(process.cwd()),
-        });
-        return;
-      }
-      printHumanError("arggon board", message);
-      process.exitCode = 1;
-    }
-  });
+    },
+  );
 
 /** JSON shape of the additive `proposals[]` payload (task-init-propose-acked-updates). */
 function proposalPayload(proposals: ProposalEntry[]): unknown[] {
@@ -2409,7 +2603,8 @@ function printInitProposeHuman(result: InitResult): void {
   );
 }
 
-function printInitDryRun(result: InitDryRunResult): void {  // bug-init-git-doctor-blindspot: same warning surface as a real run.
+function printInitDryRun(result: InitDryRunResult): void {
+  // bug-init-git-doctor-blindspot: same warning surface as a real run.
   if (result.warning) {
     console.error(`arggon: warning: ${result.warning}`);
   }
@@ -2451,9 +2646,7 @@ function printInitHuman(result: InitResult): void {
       );
     }
     if (result.updated.length > 0) {
-      console.log(
-        `arggon init: regenerated untouched docs: ${result.updated.length} file(s)`,
-      );
+      console.log(`arggon init: regenerated untouched docs: ${result.updated.length} file(s)`);
     }
     if (result.backedUp.length > 0) {
       console.log(
@@ -2474,10 +2667,14 @@ function printInitHuman(result: InitResult): void {
   const commitLine = formatCommitLine(result.commit);
   if (commitLine) console.log(`arggon init: ${commitLine}`);
   console.log(`arggon init: ready in ${sanitizeHumanError(result.root)}`);
-  console.log("  - tasks/.convention.yml (version: 0)");
+  const conventionRel = relative(result.root, result.conventionPath).split(sep).join("/");
+  const trackerName = conventionRel.split("/")[0] ?? conventionRel;
+  console.log(
+    `  - ${sanitizeHumanError(conventionRel)} (version: ${readConventionVersion(result.root)})`,
+  );
   console.log("  - templates/ (initiative, epic, story, task, bug)");
   if (result.created.some((p) => !p.startsWith("templates/"))) {
-    const docs = result.created.filter((p) => p !== "tasks/.convention.yml" && !p.startsWith("templates/"));
+    const docs = result.created.filter((p) => p !== conventionRel && !p.startsWith("templates/"));
     console.log(`  - governing docs (${docs.length}): ${sanitizeHumanError(docs.join(", "))}`);
   }
   if (result.updated.length > 0) {
@@ -2492,7 +2689,9 @@ function printInitHuman(result: InitResult): void {
     );
   }
   console.log("Next:");
-  console.log("  1. Add an initiative under tasks/<slug>/<slug>.md (see docs/convention.md)");
+  console.log(
+    `  1. Add an initiative under ${trackerName}/<slug>/<slug>.md (see ${trackerName}/docs/convention.md)`,
+  );
   console.log("  2. Or use templates/ as stubs until `arggon create` lands");
 }
 
@@ -2590,7 +2789,7 @@ program
 
 program
   .command("instructions")
-  .description("Print the agent wiring (install, pre-commit, CI) extracted from docs/agents.md")
+  .description("Print the agent wiring (install, pre-commit, CI) extracted from the agent playbook")
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action((opts: { json?: boolean }) => {
     const json = jsonEnabled(opts);
@@ -2638,7 +2837,9 @@ program
 
 program
   .command("mcp")
-  .description("Start the stdio MCP server exposing list/create/update with agent rules (JSON-RPC on stdin/stdout)")
+  .description(
+    "Start the stdio MCP server exposing list/create/update with agent rules (JSON-RPC on stdin/stdout)",
+  )
   .action(() => {
     runMcpServer({ cwd: process.cwd(), input: process.stdin, output: process.stdout });
   });

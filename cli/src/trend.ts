@@ -1,6 +1,6 @@
 /**
  * Git-history trend mining (story-report-trend): every status transition of a
- * work item is a frontmatter diff in some commit under `tasks/`, so a single
+ * work item is a frontmatter diff in some commit under the tracker, so a single
  * `git log -p` pass over the tree is a free analytics database.
  *
  * Pure read — `git log` only, never writes, never touches the tree.
@@ -10,7 +10,7 @@
 import { execFileSync, ExecFileSyncOptions } from "node:child_process";
 import { relative, sep } from "node:path";
 import { loadItems } from "./items.js";
-import { findTasksDir, repoRootFromTasks } from "./paths.js";
+import { findTrackerLocation, LEGACY_TRACKER_DIR_NAME } from "./paths.js";
 
 /** Signature for git executors used in trend mining (injectable for tests). */
 export type GitExecutor = (file: string, args: string[], options?: ExecFileSyncOptions) => string;
@@ -51,7 +51,7 @@ export type RunTrendOptions = {
 };
 
 /**
- * Mine `git log -p` over `tasks/` for status transitions and aggregate:
+ * Mine `git log -p` over the tracker for status transitions and aggregate:
  * weekly completions of ALL item types (ISO week of the first terminal
  * transition — story-driven projects get non-empty trends) and average cycle
  * time per leaf type (first claim → terminal, in days; leaves are
@@ -60,29 +60,37 @@ export type RunTrendOptions = {
  */
 export function runTrend(opts: RunTrendOptions): TrendResult {
   const sinceMs = parseSince(opts.since);
-  const tasksDir = findTasksDir(opts.cwd);
-  const root = repoRootFromTasks(tasksDir);
-  const relTasks = "tasks";
+  const location = findTrackerLocation(opts.cwd);
+  const tasksDir = location.dir;
+  const root = location.repoRoot;
+  const relTasks = relative(root, tasksDir).split(sep).join("/");
+  // History through the ADR 0012 move: on the v5 layout the tracker dir was
+  // renamed from `tasks/`, so the legacy path is added to the pathspec. Git
+  // then includes the pre-move commits AND detects the `rename from tasks/...`
+  // records of the move commit; without it, the move commit renders every item
+  // as a new file (all `+status:` lines attributed to the migration date) and
+  // the pre-move transitions are never read (bug-trend-root-rename).
+  //
+  // The in-tracker product docs are excluded: they are not items, and their
+  // example frontmatter blocks (`type: bug` / `status: done` in fenced YAML)
+  // would otherwise be mined as status transitions (bug-trend-docs-examples).
+  const pathspec = [relTasks, LEGACY_TRACKER_DIR_NAME];
+  const docsRel = relative(root, location.docsDir).split(sep).join("/");
+  if (docsRel.startsWith(`${relTasks}/`)) {
+    pathspec.push(`:(exclude)${docsRel}`);
+  }
 
   const execGit = opts.execGit ?? defaultExecGit;
   let out: string;
   try {
     out = execGit(
       "git",
-      [
-        "log",
-        "-p",
-        "--no-color",
-        "--no-ext-diff",
-        "--format=%x1e%H%x1f%cI",
-        "--",
-        relTasks,
-      ],
+      ["log", "-p", "--no-color", "--no-ext-diff", "--format=%x1e%H%x1f%cI", "--", ...pathspec],
       { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
     );
   } catch (err) {
     const stderr = err instanceof Error && "stderr" in err ? String(err.stderr) : "";
-    // A repo where tasks/ was never committed has no history to mine — not a failure.
+    // A repo where the tracker was never committed has no history to mine — not a failure.
     if (stderr.includes("does not have any commits yet")) {
       return { weeks: [], cycleTime: [] };
     }

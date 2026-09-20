@@ -7,14 +7,14 @@ How to get help with {{PROJECT_NAME}}.
 <!-- Fill in the real channels and delete the rest. -->
 
 - Questions / usage help: <!-- e.g. Discussions tab, Discord, mailing list -->
-- Bug reports: this project tracks work in-tree under `tasks/` — see [`docs/tracking.md`](docs/tracking.md). Do not open GitHub issues unless the link above says otherwise.
+- Bug reports: this project tracks work in-tree under `ArggonManager/` — see [`ArggonManager/docs/tracking.md`](ArggonManager/docs/tracking.md). Do not open GitHub issues unless the link above says otherwise.
 - Security issues: follow [`SECURITY.md`](../SECURITY.md) — never report vulnerabilities through public channels.
 
 ## Before opening a bug report
 
 1. Reproduce on the latest release.
 2. Collect the exact command and output (and version: `arggon --version` or the project equivalent).
-3. Check existing work items: `arggon list --status todo --json`, or search `tasks/`.
+3. Check existing work items: `arggon list --status todo --json`, or search `ArggonManager/`.
 
 ## Commercial / long-term support
 

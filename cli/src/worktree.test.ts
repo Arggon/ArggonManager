@@ -101,8 +101,8 @@ function refExists(dir: string, ref: string): boolean {
  */
 function setPostStart(dir: string, command: string | null): void {
   if (command === null) return;
-  appendFileSync(join(dir, "tasks/.convention.yml"), `x-worktree:\n  post-start: "${command}"\n`);
-  git(["add", "tasks/.convention.yml"], dir);
+  appendFileSync(join(dir, "ArggonManager/.convention.yml"), `x-worktree:\n  post-start: "${command}"\n`);
+  git(["add", "ArggonManager/.convention.yml"], dir);
   git(["commit", "--quiet", "-m", "config: x-worktree.post-start"], dir);
 }
 
@@ -162,7 +162,7 @@ describe("start --worktree", () => {
     expect(existsSync(expectedPath)).toBe(true);
 
     // The item in the worktree carries branch + worktree_path; the claim is committed there.
-    const wtFile = join(expectedPath, "tasks/launch/auth/login/task-alpha.md");
+    const wtFile = join(expectedPath, "ArggonManager/launch/auth/login/task-alpha.md");
     const data = parseFrontmatter(readFileSync(wtFile, "utf8")).data;
     expect(data.branch).toBe("feat/task-alpha");
     expect(data.worktree_path).toBe(expectedPath);
@@ -174,7 +174,7 @@ describe("start --worktree", () => {
     expect(git(["symbolic-ref", "--short", "HEAD"], dir)).toBe("main");
     expect(git(["status", "--porcelain"], dir)).toBe("");
     const rootData = parseFrontmatter(
-      readFileSync(join(dir, "tasks/launch/auth/login/task-alpha.md"), "utf8"),
+      readFileSync(join(dir, "ArggonManager/launch/auth/login/task-alpha.md"), "utf8"),
     ).data;
     expect(rootData.status).toBe("todo");
     expect(rootData.worktree_path).toBeUndefined();
@@ -208,7 +208,7 @@ describe("start --worktree", () => {
 
     expect(result.prUrl).toBe("https://github.com/o/r/pull/2");
     expect(prBodies).toEqual([
-      "Work item: task-linked\n\nPath: tasks/launch/auth/login/task-linked.md\n\n" +
+      "Work item: task-linked\n\nPath: ArggonManager/launch/auth/login/task-linked.md\n\n" +
         "Draft opened by `arggon start --worktree`.\n\nCloses #9",
     ]);
   });
@@ -244,7 +244,7 @@ describe("start --worktree", () => {
     // Claim the item on main first; the worktree copy still says todo, so the
     // claim conflict only surfaces once updates run inside the worktree.
     runUpdate({ cwd: dir, id: "task-alpha", status: "in_progress", assignee: "alice", now: NOW });
-    git(["add", "tasks"], dir);
+    git(["add", "ArggonManager"], dir);
     git(["commit", "--quiet", "-m", "claim task-alpha"], dir);
     const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
 
@@ -293,7 +293,7 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     // link (not ignored — `node_modules/` matches directories only) is absent.
     expect(git(["log", "--format=%s"], expectedPath)).toContain("claim: task-alpha");
     expect(git(["show", "--name-only", "--format=", "HEAD"], expectedPath).trim()).toBe(
-      "tasks/launch/auth/login/task-alpha.md",
+      "ArggonManager/launch/auth/login/task-alpha.md",
     );
   });
 
@@ -316,7 +316,7 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     expect(worktreeCount(dir)).toBe(2);
     expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(true);
     expect(
-      git(["status", "--porcelain", "--", "tasks/launch/auth/login/task-alpha.md"], expectedPath),
+      git(["status", "--porcelain", "--", "ArggonManager/launch/auth/login/task-alpha.md"], expectedPath),
     ).not.toBe("");
 
     // The remediation is real: fix the gate and re-run — it attaches and lands
@@ -363,7 +363,7 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
       worktreePath: expectedPath,
       now: NOW,
     });
-    git(["add", "tasks"], dir);
+    git(["add", "ArggonManager"], dir);
     git(["commit", "--quiet", "-m", "pre-created worktree"], dir);
 
     const result = runStart(
@@ -583,10 +583,10 @@ describe("post-start shell variant (task-post-start-env)", () => {
   function setPostStartWithShell(dir: string, command: string, shell: string | null): void {
     const shellLine = shell ? `\n  post-start-shell: "${shell}"` : "";
     appendFileSync(
-      join(dir, "tasks/.convention.yml"),
+      join(dir, "ArggonManager/.convention.yml"),
       `x-worktree:\n  post-start: "${command}"${shellLine}\n`,
     );
-    git(["add", "tasks/.convention.yml"], dir);
+    git(["add", "ArggonManager/.convention.yml"], dir);
     git(["commit", "--quiet", "-m", "config: x-worktree.post-start-shell"], dir);
   }
 
@@ -687,7 +687,7 @@ describe("arggon cleanup", () => {
     );
     paths["task-alpha"] = alpha.worktreePath!;
     runUpdate({ cwd: alpha.worktreePath!, id: "task-alpha", status: "done", now: NOW });
-    git(["add", "tasks"], alpha.worktreePath!);
+    git(["add", "ArggonManager"], alpha.worktreePath!);
     git(["commit", "--quiet", "-m", "close task-alpha"], alpha.worktreePath!);
     git(["merge", "--quiet", "feat/task-alpha"], dir);
 
@@ -715,7 +715,7 @@ describe("arggon cleanup", () => {
     runUpdate({ cwd: dir, id: "task-charlie", status: "done", now: NOW });
 
     // Commit the crafted main-copy records so the tree is clean.
-    git(["add", "tasks"], dir);
+    git(["add", "ArggonManager"], dir);
     git(["commit", "--quiet", "-m", "records"], dir);
     return { dir, paths };
   }
@@ -755,7 +755,7 @@ describe("arggon cleanup", () => {
     expect(existsSync(paths["task-alpha"])).toBe(false);
     expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(false);
     // The record is cleared on the item.
-    const raw = readFileSync(join(dir, "tasks/launch/auth/login/task-alpha.md"), "utf8");
+    const raw = readFileSync(join(dir, "ArggonManager/launch/auth/login/task-alpha.md"), "utf8");
     expect(parseFrontmatter(raw).data.worktree_path).toBeUndefined();
     // Skipped entries survive untouched.
     expect(existsSync(paths["task-bravo"])).toBe(true);
@@ -775,7 +775,7 @@ describe("arggon cleanup", () => {
     // so plain `git worktree remove` refuses the worktree without the fix.
     expect(git(["status", "--porcelain"], wt)).toContain("?? node_modules");
     runUpdate({ cwd: wt, id: "task-alpha", status: "done", now: NOW });
-    git(["add", "tasks"], wt);
+    git(["add", "ArggonManager"], wt);
     git(["commit", "--quiet", "-m", "close task-alpha"], wt);
     git(["merge", "--quiet", "feat/task-alpha"], dir);
 
@@ -804,7 +804,7 @@ describe("arggon cleanup", () => {
     const wt = alpha.worktreePath!;
     expect(readlinkSync(join(wt, "node_modules"))).toBe(join(dir, "node_modules"));
     runUpdate({ cwd: wt, id: "task-alpha", status: "done", now: NOW });
-    git(["add", "tasks"], wt);
+    git(["add", "ArggonManager"], wt);
     git(["commit", "--quiet", "-m", "close task-alpha"], wt);
     git(["merge", "--quiet", "feat/task-alpha"], dir);
 
@@ -890,7 +890,7 @@ describe("arggon cleanup", () => {
       git(["commit", "--quiet", "--amend", "--no-edit"], wt);
     }
     runUpdate({ cwd: wt, id: "task-alpha", status: "done", now: NOW });
-    git(["add", "tasks"], wt);
+    git(["add", "ArggonManager"], wt);
     git(["commit", "--quiet", "-m", "close task-alpha"], wt);
     // Fast-forward main so the closed record and the branch commits land.
     git(["merge", "--quiet", "--ff-only", "feat/task-alpha"], dir);
@@ -912,7 +912,7 @@ describe("arggon cleanup", () => {
     // Nothing was touched: worktree and branch survive, the record stays.
     expect(existsSync(paths["task-alpha"])).toBe(true);
     expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(true);
-    const raw = readFileSync(join(dir, "tasks/launch/auth/login/task-alpha.md"), "utf8");
+    const raw = readFileSync(join(dir, "ArggonManager/launch/auth/login/task-alpha.md"), "utf8");
     expect(parseFrontmatter(raw).data.worktree_path).toBe(paths["task-alpha"]);
   });
 
@@ -947,7 +947,7 @@ describe("arggon cleanup", () => {
     // Per-candidate failure: the run stays green and continues.
     expect(result.failures).toEqual([]);
     expect(existsSync(paths["task-alpha"])).toBe(false);
-    const raw = readFileSync(join(dir, "tasks/launch/auth/login/task-alpha.md"), "utf8");
+    const raw = readFileSync(join(dir, "ArggonManager/launch/auth/login/task-alpha.md"), "utf8");
     expect(parseFrontmatter(raw).data.worktree_path).toBeUndefined();
     const failed = result.pruned.find((a) => a.action === "failed")!;
     expect(failed).toMatchObject({ id: "task-alpha", leftoverBranch: "feat/task-alpha" });
@@ -1005,7 +1005,7 @@ describe("arggon cleanup", () => {
     ]);
     expect(existsSync(paths["task-charlie"])).toBe(false);
     expect(refExists(dir, "refs/heads/feat/task-charlie")).toBe(false);
-    const raw = readFileSync(join(dir, "tasks/launch/auth/login/task-charlie.md"), "utf8");
+    const raw = readFileSync(join(dir, "ArggonManager/launch/auth/login/task-charlie.md"), "utf8");
     expect(parseFrontmatter(raw).data.worktree_path).toBeUndefined();
     // The gh query targets the branch with the merged-PR contract.
     expect(calls).toHaveLength(1);

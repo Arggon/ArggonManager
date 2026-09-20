@@ -6,7 +6,7 @@ Handle the technology playbook for $ARGUMENTS (pipeline: explore → ADR →
 playbook, details in `references/methodology.md` in the `arggon-cli` skill).
 
 1. Scaffold with the CLI: `arggon playbook new <tech> --version <v>` →
-   `docs/playbooks/<tech>.md` (never hand-create it). Research is your job:
+   `ArggonManager/docs/playbooks/<tech>.md` (never hand-create it). Research is your job:
    current version and best practices with dated sources.
 2. Fill the template sections: Setup, Conventions, Testing, Security, Upgrade
    policy.

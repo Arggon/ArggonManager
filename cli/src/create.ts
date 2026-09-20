@@ -64,7 +64,7 @@ export type CreateOptions = {
 export type CreateResult = {
   id: string;
   path: string;
-  /** Repo root (parent of tasks/). */
+  /** Repo root (parent of the tracker dir). */
   root: string;
   /** The created item, reloaded from disk. */
   item: WorkItem;
@@ -120,7 +120,7 @@ export function runCreate(opts: CreateOptions): CreateResult {
   if (opts.parent) {
     parentItem = byId.get(opts.parent);
     if (!parentItem) {
-      throw new Error(`parent '${opts.parent}' not found under tasks/`);
+      throw new Error(`parent '${opts.parent}' not found under the tracker`);
     }
     assertParentEdge(type, parentItem.type);
   }

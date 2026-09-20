@@ -111,7 +111,7 @@ function startConcurrently(dir: string, id: string, assignees: string[]): Promis
 }
 
 function itemData(repoDir: string, id: string): Record<string, unknown> {
-  const file = join(repoDir, "tasks/launch/auth/login", `${id}.md`);
+  const file = join(repoDir, "ArggonManager/launch/auth/login", `${id}.md`);
   return parseFrontmatter(readFileSync(file, "utf8")).data as Record<string, unknown>;
 }
 

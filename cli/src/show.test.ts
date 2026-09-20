@@ -111,7 +111,9 @@ describe("show (ADR 0006 progressive disclosure)", () => {
       expect(proc.stdout).toContain(`comment number ${i}`);
     }
     expect(proc.stdout).not.toContain("omitted");
-    const body = readFileSync(path, "utf8").slice(readFileSync(path, "utf8").indexOf("\n---\n") + 5);
+    const body = readFileSync(path, "utf8").slice(
+      readFileSync(path, "utf8").indexOf("\n---\n") + 5,
+    );
     expect(proc.stdout).toContain(body.trim());
   });
 
@@ -149,7 +151,13 @@ describe("show (ADR 0006 progressive disclosure)", () => {
     const proc = runCli(["show", id, "--body", "--json"], dir);
     expect(proc.status).toBe(0);
     const envelope = JSON.parse(proc.stdout) as Record<string, unknown>;
-    expect(envelope.body).toBe(readFileSync(path, "utf8").split(/\n---\n/).slice(1).join("\n---\n").replace(/^\n/, ""));
+    expect(envelope.body).toBe(
+      readFileSync(path, "utf8")
+        .split(/\n---\n/)
+        .slice(1)
+        .join("\n---\n")
+        .replace(/^\n/, ""),
+    );
     expect(envelope.comments as unknown[]).toHaveLength(5);
   });
 
@@ -164,6 +172,6 @@ describe("show (ADR 0006 progressive disclosure)", () => {
 
   it("runShow surfaces a clean error for unknown ids", () => {
     const { dir } = primedTask(1);
-    expect(() => runShow({ cwd: dir, id: "nope" })).toThrow(/not found under tasks\//);
+    expect(() => runShow({ cwd: dir, id: "nope" })).toThrow(/not found under the tracker/);
   });
 });

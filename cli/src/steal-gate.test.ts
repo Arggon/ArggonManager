@@ -70,7 +70,7 @@ function primedTree(): { dir: string; id: string } {
 }
 
 function arm(dir: string): void {
-  const path = join(dir, "tasks/.convention.yml");
+  const path = join(dir, "ArggonManager/.convention.yml");
   writeFileSync(path, `${readFileSync(path, "utf8")}\nx-tracker:\n  allow-steal: true\n`, "utf8");
 }
 

@@ -56,7 +56,7 @@ export function innerSlug(id: string): string {
   return id.replace(/^(?:task|bug)-/, "");
 }
 
-/** First repeated id in a list, if any. Ids must be globally unique under tasks/. */
+/** First repeated id in a list, if any. Ids must be globally unique under the tracker root. */
 export function firstDuplicateId(ids: readonly string[]): string | undefined {
   const seen = new Set<string>();
   for (const id of ids) {
