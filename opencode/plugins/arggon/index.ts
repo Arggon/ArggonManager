@@ -92,6 +92,18 @@ type SessionContext = {
   hook?(name: string, callback: (event: unknown) => unknown): Promise<unknown>
 }
 
+/**
+ * Structural shape of the V2 `ctx.tool` editor (Build a plugin → Tools): the
+ * namespace description plus `add` for one tool definition. Deliberately
+ * structural, like every other context type here — the vendored file must not
+ * import plugin types (`@opencode/plugin` is deliberately absent from adopter
+ * trees, see Conventions "Vendored plugin imports").
+ */
+type ToolEditorLike = {
+  namespace?(input: { name: string; description: string }): void
+  add?(tool: ArgonToolRegistration): void
+}
+
 type ToolContext = {
   hook?(name: string, callback: (event: unknown) => unknown): Promise<unknown>
   transform?(callback: (editor: ToolEditorLike) => void): Promise<unknown>
