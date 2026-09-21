@@ -214,9 +214,17 @@ export const BUNDLED_SKILLS = [
  * destinations) and flows through the provenance decision table; the committed
  * artifact is drift-gated by `cli/src/plugin-copy.test.ts` (assert-before-write)
  * and `npm run check:plugin` in CI — never auto-healed by the suite.
+ *
+ * W5 (`task-native-tui`) adds the **TUI entry** beside the server entry: V2
+ * discovers `.opencode/plugins/arggon/tui.tsx` next to `index.ts`, and the
+ * runtime resolves `solid-js` itself for discovered plugins (probe on 2.0.12,
+ * docs/playbooks/opencode.md) — so the file is vendored verbatim (no bundle)
+ * and imports the board surface from the vendored bundle (`./index.ts`), still
+ * with no `node_modules` in the adopter tree.
  */
 const BUNDLED_PLUGINS = [
   { source: "opencode/plugins/arggon/index.bundle.ts", dest: ".opencode/plugins/arggon/index.ts" },
+  { source: "opencode/plugins/arggon/tui.tsx", dest: ".opencode/plugins/arggon/tui.tsx" },
 ];
 
 /** Everything init bundles from a package-root source into an adopter destination. */

@@ -2857,6 +2857,32 @@ function dispose(registration: unknown): void {
   }
 }
 
+// W5 (task-native-tui): the board/status surface is kernel-backed display data
+// (`board.ts`, inlined into this bundle like the rest of the kernel) and the
+// TUI entry (`tui.tsx`) consumes it through these named exports. The TUI loads
+// the VENDORED copy of this file (`./index.ts` in `.opencode/plugins/arggon/`),
+// so the bundle must re-export the board surface — see `tui.tsx` and
+// `cli/src/plugin-bundle.ts` (the emitted wrapper forwards every named export).
+export {
+  ARGON_BOARD_PANEL,
+  BOARD_STATUS_MARKS,
+  BOARD_STATUS_ORDER,
+  BOARD_TYPE_BADGES,
+  activeBoardId,
+  boardCountsLine,
+  boardHeaderLine,
+  boardItemLine,
+  boardRoot,
+  boardSnapshot,
+  boardTreeEntries,
+  boardTreeLines,
+  clipBoardLine,
+  countBoardStatuses,
+  emptyBoardSnapshot,
+  sidebarStatusLine,
+} from "./board.js"
+export type { BoardActiveInput, BoardItem, BoardSnapshot, BoardTreeEntry } from "./board.js"
+
 // `Plugin.define` from `@opencode/plugin` is deliberately not imported: a
 // static import fails to load an auto-discovered plugin in a dependency-less
 // adopter tree (probes on 2.0.7/2.0.8/2.0.10, docs/playbooks/opencode.md), and

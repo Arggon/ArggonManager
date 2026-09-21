@@ -137,7 +137,7 @@ arggon --version
 
 The tarball ships production `dist/`, the `templates/`, `skills/` and `opencode/` assets `arggon init` reads, README and LICENSE. Installing it needs no scripts; npm may still warn that the tarball's blocked `prepare` was skipped — benign, the build is already inside the tarball.
 
-A checkout installs directly in this order: `npm install` first (its root `prepare` builds `dist/`), then `npm link` or `npm install -g .`. With npm 12 install scripts run only when approved, so linking an *unbuilt* checkout exits 0 without a `dist/` or a bin — build first, or approve the script by its resolved identity (`npm install -g . --allow-scripts=file:$PWD`).
+A checkout installs directly in this order: `npm install` first (its root `prepare` builds `dist/`), then `npm link` or `npm install -g .`. With npm 12 install scripts run only when approved, so linking an _unbuilt_ checkout exits 0 without a `dist/` or a bin — build first, or approve the script by its resolved identity (`npm install -g . --allow-scripts=file:$PWD`).
 
 The bin is `dist/cli.js` and the build sets its executable bit, so a plain `ln -s <checkout>/dist/cli.js ~/.local/bin/arggon` also works (a manual symlink used to fail with `Permission denied`).
 
@@ -169,7 +169,7 @@ After a fresh clone, `.agents/skills/arggon-cli/SKILL.md` is absent (it is gener
 
 Generated docs (placeholders `{{YEAR}}` and `{{PROJECT_NAME}}` are rendered at write time; `{{PROJECT_NAME}}` comes from the target dir name on a **fresh scaffold**, and on every re-run it is **recovered** — first from `x-generated.projectName` in `ArggonManager/.convention.yml`, then from the existing generated docs' content — so worktrees and renamed clones render identically to the primary checkout; when the name cannot be recovered, name-bearing writes/comparisons are skipped with a `project-name-unrecoverable` reason instead of guessing):
 
-- **Default (tier-1):** `AGENTS.md` (spec-compliant agent workflow; mandates the bundled **arggon-cli skill** by default), `CLAUDE.md` (one-line `@AGENTS.md` shim), `.github/copilot-instructions.md` (pointer), `CONTRIBUTING.md`, `SECURITY.md`, `.editorconfig`, `.mcp.json` (registers the arggon MCP server so MCP clients pick it up), the **OpenCode V2 seam** — `opencode.jsonc` (generated only when the repo has no OpenCode config of its own; formatter + compaction, no MCP stanza, minimal W4 shell gates: no force-push, no `--no-verify`), `.opencode/agents/arggon-coordinator.md` + `arggon-worker.md` + `arggon-reviewer.md`, `.opencode/commands/arggon-next|start|done|handoff|review|status|spec|adr|explore|playbook|adopt.md` (native prompt templates driving `tools.arggon.*`), and the vendored **single-file** `.opencode/plugins/arggon/index.ts` (auto-discovered; kernel inlined, no `node_modules`; native tools + session item context) — `.github/CODEOWNERS` (placeholder), `.github/PULL_REQUEST_TEMPLATE.md`, `ArggonManager/docs/tracking.md` (work tracking in the tracker, not GitHub issues), and the **arggon-cli skill** bundle at `.agents/skills/arggon-cli/` (umbrella `SKILL.md` + `references/{json-contract,methodology,orchestration,pitfalls}.md`, read on demand; copied from this repo's `skills/arggon-cli/` — single source, never a duplicate).
+- **Default (tier-1):** `AGENTS.md` (spec-compliant agent workflow; mandates the bundled **arggon-cli skill** by default), `CLAUDE.md` (one-line `@AGENTS.md` shim), `.github/copilot-instructions.md` (pointer), `CONTRIBUTING.md`, `SECURITY.md`, `.editorconfig`, `.mcp.json` (registers the arggon MCP server so MCP clients pick it up), the **OpenCode V2 seam** — `opencode.jsonc` (generated only when the repo has no OpenCode config of its own; formatter + compaction, no MCP stanza, minimal W4 shell gates: no force-push, no `--no-verify`), `.opencode/agents/arggon-coordinator.md` + `arggon-worker.md` + `arggon-reviewer.md`, `.opencode/commands/arggon-next|start|done|handoff|review|status|spec|adr|explore|playbook|adopt.md` (native prompt templates driving `tools.arggon.*`), and the vendored **single-file** `.opencode/plugins/arggon/index.ts` (auto-discovered; kernel inlined, no `node_modules`; native tools + session item context) with the vendored TUI entry `.opencode/plugins/arggon/tui.tsx` beside it (board/status panel: `/arggon-board`; runtime-resolved `solid-js`) — `.github/CODEOWNERS` (placeholder), `.github/PULL_REQUEST_TEMPLATE.md`, `ArggonManager/docs/tracking.md` (work tracking in the tracker, not GitHub issues), and the **arggon-cli skill** bundle at `.agents/skills/arggon-cli/` (umbrella `SKILL.md` + `references/{json-contract,methodology,orchestration,pitfalls}.md`, read on demand; copied from this repo's `skills/arggon-cli/` — single source, never a duplicate).
 - **`--full` adds (tier-2):** `ARCHITECTURE.md`, `ArggonManager/docs/convention.md` + `ArggonManager/docs/engineering.md` (adopter-owned project templates), `CHANGELOG.md`, `SUPPORT.md`, `ArggonManager/docs/runbooks/README.md`, `ArggonManager/docs/deploy.md` (per-shape deployment defaults from ADR 0005: target, dated cost, config-in-repo sketch, exit note).
 
 Everything created is listed in `created[]`; files left untouched land in `skipped[]` (see [`docs/json-output.md`](ArggonManager/docs/json-output.md)). JSON/JSONC destinations (`.mcp.json`, `opencode.jsonc`) ship as pure JSON without the `arggon:generated` HTML comment — MCP clients and OpenCode parse them directly — and OpenCode Markdown artifacts (`.opencode/**/*.md`) carry it as a `#` YAML comment inside their frontmatter so the file stays frontmatter-first. Provenance is tracked either way via the `x-generated` checksum.
@@ -338,14 +338,14 @@ arggon board --tui            # interactive read-only terminal kanban (raw ANSI,
 - `--serve`: serves the board locally, **bound to 127.0.0.1 only**, and reloads the page whenever any file under the tracker root (`ArggonManager/`) changes; drag-and-drop posts to the update endpoint, which runs the same kernel update rules as the CLI. `--serve` is combinable with `--json` (the envelope is emitted once, then the server keeps running); see `ArggonManager/docs/json-output.md` for the payload fields. The served board is also the **review surface** (serve-only, not in the static export or `--tui`): cards with a `branch` carry a live PR strip — state (`draft/open/merged/closed`) + checks summary + a `diff` link to the PR's files view — polled from the shared `gh pr list` read path on a fixed interval (60s); a changed snapshot pushes an SSE reload. gh missing or unauthenticated, or a failed poll, degrades cleanly: cards fall back to the neutral `○ no PR` badge and the server keeps serving with the last good snapshot
 - `--tui`: interactive, read-only terminal kanban over the same kernel read path — five v0 status columns, dependency-light (raw ANSI escapes, no TUI framework, zero new dependencies). Re-reads the tree after every keypress, so it always shows the current tree. Requires an interactive terminal (piped stdout fails with `BOARD_FAILED`); **not combinable with `--json`** (it is a view, not a data format) or `--serve`. Keybindings:
 
-| Key | Action |
-| --- | --- |
-| `←` / `→` | move the selected column (v0 status order) |
-| `↑` / `↓` | move the selected card within the column |
-| `/` | open the search prompt (substring on id/title); `enter` applies, `esc` cancels |
-| `esc` | clear the active filter |
-| `enter` | print the selected item's file path (does not open an editor) |
-| `q` / `Ctrl-C` | quit, restoring the screen |
+| Key            | Action                                                                         |
+| -------------- | ------------------------------------------------------------------------------ |
+| `←` / `→`      | move the selected column (v0 status order)                                     |
+| `↑` / `↓`      | move the selected card within the column                                       |
+| `/`            | open the search prompt (substring on id/title); `enter` applies, `esc` cancels |
+| `esc`          | clear the active filter                                                        |
+| `enter`        | print the selected item's file path (does not open an editor)                  |
+| `q` / `Ctrl-C` | quit, restoring the screen                                                     |
 
 The static export is a snapshot: re-run after tree changes to refresh (or use `--serve`). The generated file is a build artifact — safe to gitignore; deleting it loses nothing.
 
@@ -458,6 +458,7 @@ Appends a timestamped, author-attributed comment section to an item's body — t
 
 ```markdown
 ### 2026-09-11 @<author>
+
 <text>
 ```
 
@@ -486,6 +487,7 @@ Appends a structured, bounded session-end handoff section to an item's body — 
 
 ```markdown
 ### handoff 2026-09-15 @<author>[ (session: <id>)] — next: <step>
+
 - branch: <branch>
 - open questions: <q1; q2>
 ```

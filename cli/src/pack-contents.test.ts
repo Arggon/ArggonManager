@@ -191,6 +191,8 @@ describe("npm pack contents", () => {
       "skills/arggon-cli/SKILL.md",
       "opencode/plugins/arggon/index.ts",
       "opencode/plugins/arggon/index.bundle.ts",
+      // W5 task-native-tui: the TUI entry vendored beside the server bundle.
+      "opencode/plugins/arggon/tui.tsx",
       "README.md",
       "LICENSE",
       "package.json",

@@ -40,7 +40,8 @@ Keeping `main` installed side-by-side (so bare `arggon` stays on `main`)? See
 Within the session you get: the `arggon-cli` skill (umbrella + on-demand
 `references/`), the `/arggon-*` commands, the coordinator/worker/reviewer
 agents, the native `arggon` Code Mode tools (registered by the vendored
-single-file plugin, calling the inlined kernel in-process), and — when your
+single-file plugin, calling the inlined kernel in-process), the **TUI board
+panel** (`/arggon-board` or Ctrl+P → _Open Arggon board_), and — when your
 branch maps to a work item — a bounded item-context block on every model call.
 MCP is optional and off the default path: `arggon mcp` and the generated
 `.mcp.json` still serve other clients that configure it.
@@ -51,14 +52,14 @@ The day-to-day loop is unchanged and documented in
 
 ## What `arggon init` generates
 
-| Artifact | What it is | Notes |
-| --- | --- | --- |
-| `opencode.jsonc` | Project config: formatter, compaction retention (no MCP stanza since W3) and the minimal shell gates (W4: no `--no-verify`, no force-push) | Generated **only when the repo has no OpenCode config** (root or `.opencode/`); otherwise reported in `skipped[]` |
-| `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` | The repo's orchestration model as V2 agents | Coordinator subagent allow-list; worker nesting + `arggon.create` denied; reviewer `edit` denied and read-only shell gates (W4) |
-| `.opencode/commands/arggon-*.md` | Eleven native commands (`/arggon-next`, `-start`, `-done`, `-handoff`, `-review`, `-status`, `-spec`, `-adr`, `-explore`, `-playbook`, `-adopt`) | Prompt templates driving the native tools (Code Mode `tools.arggon.*`); no CLI-driving prose, no shell blocks |
-| `.opencode/plugins/arggon/` | Vendored **single-file** plugin bundle (kernel inlined; ambient behavior + the native `arggon` tool namespace) | Built from the in-repo source by `npm run build:plugin`; loads with no `node_modules`; drift-gated by `npm run check:plugin` |
-| `.agents/skills/arggon-cli/` | Umbrella skill + `references/` (json-contract, methodology, orchestration, pitfalls) | Progressive disclosure: detail loads on demand |
-| `AGENTS.md` | Slim router | V2 reads `AGENTS.md` only (no `CLAUDE.md` fallback) |
+| Artifact                                                   | What it is                                                                                                                                                                    | Notes                                                                                                                           |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `opencode.jsonc`                                           | Project config: formatter, compaction retention (no MCP stanza since W3) and the minimal shell gates (W4: no `--no-verify`, no force-push)                                    | Generated **only when the repo has no OpenCode config** (root or `.opencode/`); otherwise reported in `skipped[]`               |
+| `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` | The repo's orchestration model as V2 agents                                                                                                                                   | Coordinator subagent allow-list; worker nesting + `arggon.create` denied; reviewer `edit` denied and read-only shell gates (W4) |
+| `.opencode/commands/arggon-*.md`                           | Eleven native commands (`/arggon-next`, `-start`, `-done`, `-handoff`, `-review`, `-status`, `-spec`, `-adr`, `-explore`, `-playbook`, `-adopt`)                              | Prompt templates driving the native tools (Code Mode `tools.arggon.*`); no CLI-driving prose, no shell blocks                   |
+| `.opencode/plugins/arggon/`                                | Vendored **single-file** plugin bundle (kernel inlined; ambient behavior + the native `arggon` tool namespace) plus the vendored **TUI entry** `tui.tsx` (board/status panel) | Built from the in-repo source by `npm run build:plugin`; loads with no `node_modules`; drift-gated by `npm run check:plugin`    |
+| `.agents/skills/arggon-cli/`                               | Umbrella skill + `references/` (json-contract, methodology, orchestration, pitfalls)                                                                                          | Progressive disclosure: detail loads on demand                                                                                  |
+| `AGENTS.md`                                                | Slim router                                                                                                                                                                   | V2 reads `AGENTS.md` only (no `CLAUDE.md` fallback)                                                                             |
 
 Everything generated flows through the repo's never-overwrite +
 `x-generated` provenance machinery: untouched files refresh, modified files are
@@ -94,15 +95,16 @@ namespace:
   Payload contract (documented here; the output schemas stay loose to respect
   the ADR 0006 budget and the contract tests assert the envelopes):
 
-  | Tool | Payload fields (beyond `ok`/`schemaVersion`/`conventionVersion`/`command`) |
-  | --- | --- |
-  | `start` | `id`, `branch`, `worktreePath` (`null` with `worktree: false`), `worktreeCreated`, `branchCreated`, `pushed`, `item` (the claimed contract item), `commit?` (tracker auto-commit) |
-  | `branch` | `id`, `branch`, `item`, `commit?` |
+  | Tool      | Payload fields (beyond `ok`/`schemaVersion`/`conventionVersion`/`command`)                                                                                                                    |
+  | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `start`   | `id`, `branch`, `worktreePath` (`null` with `worktree: false`), `worktreeCreated`, `branchCreated`, `pushed`, `item` (the claimed contract item), `commit?` (tracker auto-commit)             |
+  | `branch`  | `id`, `branch`, `item`, `commit?`                                                                                                                                                             |
   | `cleanup` | `base`, `candidates[]` (`id`, `status`, `branch`, `path`, `removable`, `reason`, `action`, `via?`), `pruned[]` (`id`, `action`, `error?`, `leftoverBranch?`, `via?`), `failures[]`, `commit?` |
 
   Failures are typed tool errors carrying the code + envelope: `START_FAILED`,
   `BRANCH_FAILED` and `CLEANUP_FAILED` (per-candidate prune failures stay in
   `pruned`/`failures`, like the CLI).
+
 - **Permissions (W4)** — the generated seam adds minimal shell gates (deny
   `git commit --no-verify*`, `git push --force*`, `git push -f*`) that
   complement — never replace — the kernel invariants; the shipped agents add
@@ -116,6 +118,17 @@ namespace:
   `mcp.servers.arggon` and never touches `ctx.mcp`; the generated config carries
   no MCP stanza. `arggon mcp` and `.mcp.json` remain for non-OpenCode clients
   that configure it explicitly (`doctor` reports a present stanza as optional).
+- **TUI board and status (W5)** — `.opencode/plugins/arggon/tui.tsx` (the
+  vendored TUI entry: OpenCode discovers it beside the server bundle) registers
+  a `session.panel` contribution named `arggon.board` and a one-line
+  `sidebar.content` status. The panel renders the current tree
+  (initiative → epic → story → leaf) with per-item status glyphs, the
+  dependency mark (`⌫deps`), the session's active item (`ARGON_ITEM` or the
+  `feat/<id>`/`fix/<id>` branch) and the kernel `next` suggestion. `r` re-reads
+  the tree, `f` toggles full-screen, `esc` closes. The data path is
+  `board.ts` → the inlined kernel (no rule fork, no writes); the vendored TUI
+  entry imports the board surface from the bundle relatively and lets the
+  runtime resolve `solid-js`, so the adopter tree still needs no `node_modules`.
 - **Session ↔ item correlation** — `ARGON_ITEM` env → observed `arggon` calls
   (shell invocations and Code Mode `tools.arggon.<name>(…)` calls) →
   `feat/<id>` / `fix/<id>` branch.
@@ -128,6 +141,34 @@ namespace:
 
 Every path is wrapped: a plugin failure logs and no-ops. The CLI and MCP keep
 working with the plugin broken or absent.
+
+## TUI board and status (W5)
+
+The board/status surface is a TUI plugin contribution, not a CLI screen: open a
+session and run `/arggon-board` (Ctrl+P → _Open Arggon board_, or `ctrl+g`, also
+work; outside a session the command toasts "open a session first"). The host
+owns sizing/focus/full-screen; the plugin owns the content. The sidebar line
+shows the active item (`arggon ▶ <id> <status>`) or `arggon · N ready · next
+<id>`, where _ready_ follows the kernel definition (`isClaimable` + unclaimed
+`todo` + all dependencies terminal). Without a tracker
+the panel shows `no ArggonManager tracker found here`, and a corrupt tracker
+(duplicate ids) shows `tracker unreadable: …` instead of crashing the slot —
+the session keeps working in both cases.
+
+**Manual checklist** (no interactive driver in CI — the automated evidence is
+`npm run smoke:tui`, which drives exactly this flow in a PTY: init → tree →
+`/arggon-board` → panel captured):
+
+| Step                                                     | Expected                                                                                                                                                   |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Open a session, run `/arggon-board`                      | Panel opens, header `arggon board · N item(s) · next: <id>`, counters line, indented tree (I/E/S/T/B badge + status glyph + id + title)                    |
+| `esc`                                                    | Panel closes; the session view returns; nothing else changes                                                                                               |
+| `f`                                                      | Presentation toggles to full-screen and back (host no-op on a narrow terminal — it is already full-screen)                                                 |
+| `r`                                                      | Tree is re-read from disk (edits to items appear)                                                                                                          |
+| Resize to a narrow terminal (< ~70 cols)                 | Panel stays full-screen, each line clips with `…`, no wrap/ghost                                                                                           |
+| Sidebar (wide terminal, ~160 cols)                       | `arggon ▶ <active item> <status>` when the session resolves an item, else `arggon · N ready · next <id>`; the host hides the sidebar on narrower terminals |
+| Open the TUI outside a tracker                           | `arggon board · no ArggonManager tracker found here`; session unaffected                                                                                   |
+| Open the TUI with a corrupt tracker (duplicate item ids) | `arggon board · tracker unreadable: Duplicate id '…'`; no "crashed in slot" overlay, session unaffected                                                    |
 
 ## Guarantees
 
@@ -144,9 +185,10 @@ working with the plugin broken or absent.
 ## Verify it works
 
 ```bash
-npm test                      # 1406+ tests
+npm test                      # 1438+ tests
 npm run smoke:opencode        # headless scenarios on a real OpenCode runtime: dependency-less bundle, one session per native command, the W4 worktree lifecycle + invariants + permissions
 npm run smoke:opencode:wave   # scripted coordinator/worker/reviewer wave (2 fixtures)
+npm run smoke:tui             # TUI evidence on a real runtime: init seam, plugin discovery, PTY run, /arggon-board opens and renders the tree
 npm run context:report --strict   # context budgets: AGENTS.md, MCP schemas, item block, keep.tokens
 ```
 
@@ -219,12 +261,12 @@ an `arggon` shim in `~/.local/share/arggon-oc2/bin`.
 
 ### `mise.toml` (tracked) vs `mise.local.toml` (machine-local)
 
-| | `mise.toml` | `mise.local.toml` |
-| --- | --- | --- |
-| Committed | yes | no — keep it out of git |
-| Fresh clone | inherits the PATH | does not inherit |
-| New worktree | inherits the PATH | does not inherit |
-| Collaborators | inert path entry until they build their own shim | unaffected |
+|               | `mise.toml`                                      | `mise.local.toml`       |
+| ------------- | ------------------------------------------------ | ----------------------- |
+| Committed     | yes                                              | no — keep it out of git |
+| Fresh clone   | inherits the PATH                                | does not inherit        |
+| New worktree  | inherits the PATH                                | does not inherit        |
+| Collaborators | inert path entry until they build their own shim | unaffected              |
 
 Use the tracked `mise.toml` for oc2 projects: work happens in worktrees, and an
 untracked `mise.local.toml` silently disappears in every one of them — exactly
@@ -297,13 +339,13 @@ run it twice, or start a session in the project first.
 
 ## Where the program lives
 
-| Document | Content |
-| --- | --- |
-| [`ArggonManager/docs/adr/0010-opencode2-native-architecture.md`](adr/0010-opencode2-native-architecture.md) | The architecture decision (two layers, one logic path, vendored-plugin policy) |
-| [`ArggonManager/docs/specs/spec-opencode2-009.md`](specs/spec-opencode2-009.md) + [`ArggonManager/docs/plans/plan-opencode2-009.md`](plans/plan-opencode2-009.md) | Program contract and wave plan (implemented) |
-| [`ArggonManager/docs/explorations/exploration-opencode-v2-native-009.md`](explorations/exploration-opencode-v2-native-009.md) | The research: V2 capability map, inert surfaces, candidates |
-| [`ArggonManager/docs/playbooks/opencode.md`](playbooks/opencode.md) | Pinned version, conventions, testing, upgrade policy |
-| `ArggonManager/arggon-manager/opencode2/` | Every work item with evidence, review verdicts and handoffs |
+| Document                                                                                                                                                          | Content                                                                        |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [`ArggonManager/docs/adr/0010-opencode2-native-architecture.md`](adr/0010-opencode2-native-architecture.md)                                                       | The architecture decision (two layers, one logic path, vendored-plugin policy) |
+| [`ArggonManager/docs/specs/spec-opencode2-009.md`](specs/spec-opencode2-009.md) + [`ArggonManager/docs/plans/plan-opencode2-009.md`](plans/plan-opencode2-009.md) | Program contract and wave plan (implemented)                                   |
+| [`ArggonManager/docs/explorations/exploration-opencode-v2-native-009.md`](explorations/exploration-opencode-v2-native-009.md)                                     | The research: V2 capability map, inert surfaces, candidates                    |
+| [`ArggonManager/docs/playbooks/opencode.md`](playbooks/opencode.md)                                                                                               | Pinned version, conventions, testing, upgrade policy                           |
+| `ArggonManager/arggon-manager/opencode2/`                                                                                                                         | Every work item with evidence, review verdicts and handoffs                    |
 
 ## FAQ
 

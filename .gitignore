@@ -15,6 +15,11 @@ coverage/
 # `arggon init` or the byte-parity test (cli/src/plugin-copy.test.ts).
 .opencode/plugins/arggon/index.ts
 
+# task-native-tui (W5): the TUI entry is vendored verbatim from
+# opencode/plugins/arggon/tui.tsx (single committed source); `arggon init`
+# recreates the copy. The board surface itself is inlined in the bundle above.
+.opencode/plugins/arggon/tui.tsx
+
 # Tooling artifacts (video2code / video-agent sessions)
 .v2c/
 .video_agent/

@@ -1,5 +1,5 @@
 // ArggonManager plugin bundle — GENERATED, do not edit, do not vendor by hand.
-// Build: npm run build:plugin (opencode/plugins/arggon/index.ts + @arggon/lib inlined).
+// Build: npm run build:plugin (opencode/plugins/arggon/index.ts graph + @arggon/lib inlined).
 // OpenCode V2 loads the vendored copy at .opencode/plugins/arggon/index.ts.
 import { createRequire as __arggonCreateRequire } from "node:module"
 
@@ -153,6 +153,8 @@ __arggonEdges.set("lib/src/validate.ts\u0000./priority.js", "lib/src/priority.ts
 __arggonEdges.set("lib/src/validate.ts\u0000./relations.js", "lib/src/relations.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./sanitize.js", "lib/src/sanitize.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./status.js", "lib/src/status.ts")
+__arggonEdges.set("opencode/plugins/arggon/board.ts\u0000@arggon/lib", "lib/src/index.ts")
+__arggonEdges.set("opencode/plugins/arggon/index.ts\u0000./board.js", "opencode/plugins/arggon/board.ts")
 __arggonEdges.set("opencode/plugins/arggon/index.ts\u0000@arggon/lib", "lib/src/index.ts")
 
 function __arggonRequire(id, from) {
@@ -5565,6 +5567,236 @@ function unlinkNodeModulesLink(primaryRoot, worktreePath) {
 }
 })
 
+__arggonModules.set("opencode/plugins/arggon/board.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_TYPE_BADGES = exports.ARGON_BOARD_PANEL = void 0;
+exports.boardRoot = boardRoot;
+exports.emptyBoardSnapshot = emptyBoardSnapshot;
+exports.activeBoardId = activeBoardId;
+exports.boardSnapshot = boardSnapshot;
+exports.countBoardStatuses = countBoardStatuses;
+exports.boardTreeEntries = boardTreeEntries;
+exports.clipBoardLine = clipBoardLine;
+exports.boardHeaderLine = boardHeaderLine;
+exports.boardCountsLine = boardCountsLine;
+exports.boardItemLine = boardItemLine;
+exports.boardTreeLines = boardTreeLines;
+exports.sidebarStatusLine = sidebarStatusLine;
+const lib_1 = require("@arggon/lib");
+exports.ARGON_BOARD_PANEL = "arggon.board";
+exports.BOARD_TYPE_BADGES = {
+    initiative: "I",
+    epic: "E",
+    story: "S",
+    task: "T",
+    bug: "B",
+};
+exports.BOARD_STATUS_MARKS = {
+    todo: "·",
+    in_progress: "▸",
+    blocked: "!",
+    done: "✓",
+    cancelled: "✗",
+};
+exports.BOARD_STATUS_ORDER = [
+    "todo",
+    "in_progress",
+    "blocked",
+    "done",
+    "cancelled",
+];
+function boardRoot(cwd) {
+    try {
+        return (0, lib_1.repoRootFromTasks)((0, lib_1.findTasksDir)(cwd));
+    }
+    catch {
+        return null;
+    }
+}
+function emptyBoardSnapshot(reason) {
+    return {
+        root: null,
+        items: [],
+        counts: emptyCounts(),
+        activeId: null,
+        nextId: null,
+        error: reason,
+    };
+}
+function detail(error) {
+    return error instanceof Error ? error.message : String(error);
+}
+function activeBoardId(items, input = {}) {
+    const known = new Set(items.map((item) => item.id));
+    const env = (input.envItem ?? "").trim();
+    if (env !== "" && known.has(env))
+        return env;
+    const branch = (input.branch ?? "").trim();
+    const match = /^(?:feat|fix)\/(.+)$/.exec(branch);
+    const candidate = match?.[1] ?? "";
+    return candidate !== "" && known.has(candidate) ? candidate : null;
+}
+function boardSnapshot(cwd, input = {}) {
+    let tasksDir;
+    try {
+        tasksDir = (0, lib_1.findTasksDir)(cwd);
+    }
+    catch {
+        return emptyBoardSnapshot("no ArggonManager tracker found here");
+    }
+    try {
+        const root = (0, lib_1.repoRootFromTasks)(tasksDir);
+        const kernelItems = (0, lib_1.loadItems)(tasksDir);
+        const byId = (0, lib_1.itemsById)(kernelItems);
+        const items = kernelItems
+            .map((item) => ({
+            id: item.id,
+            type: item.type,
+            title: (0, lib_1.sanitizeHumanTextUncapped)(item.title ?? item.id),
+            status: item.status,
+            parent: item.parent ?? null,
+            assignee: item.assignee ?? null,
+            priority: item.priority ?? null,
+            blockedReason: item.blockedReason ?? null,
+            dependsOn: [...item.dependsOn],
+            openDeps: (0, lib_1.openDependencies)(item, byId),
+            active: false,
+        }))
+            .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+        const activeId = activeBoardId(items, input);
+        for (const item of items)
+            item.active = item.id === activeId;
+        let nextId = null;
+        try {
+            nextId = (0, lib_1.runNext)({ cwd }).suggestion?.item.id ?? null;
+        }
+        catch {
+            nextId = null;
+        }
+        return {
+            root,
+            items,
+            counts: countBoardStatuses(items),
+            activeId,
+            nextId,
+            error: null,
+        };
+    }
+    catch (error) {
+        return emptyBoardSnapshot((0, lib_1.sanitizeHumanError)(`tracker unreadable: ${detail(error)}`));
+    }
+}
+function emptyCounts() {
+    return { todo: 0, in_progress: 0, blocked: 0, done: 0, cancelled: 0 };
+}
+function countBoardStatuses(items) {
+    const counts = emptyCounts();
+    for (const item of items)
+        counts[item.status] += 1;
+    return counts;
+}
+function boardTreeEntries(items) {
+    const known = new Set(items.map((item) => item.id));
+    const children = new Map();
+    const roots = [];
+    for (const item of items) {
+        const parent = item.parent;
+        if (parent === null || parent === "" || !known.has(parent)) {
+            roots.push(item);
+            continue;
+        }
+        const bucket = children.get(parent) ?? [];
+        bucket.push(item);
+        children.set(parent, bucket);
+    }
+    const byId = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    roots.sort(byId);
+    for (const bucket of children.values())
+        bucket.sort(byId);
+    const entries = [];
+    const visited = new Set();
+    const walk = (item, depth) => {
+        if (visited.has(item.id))
+            return;
+        visited.add(item.id);
+        entries.push({ item, depth });
+        for (const child of children.get(item.id) ?? [])
+            walk(child, depth + 1);
+    };
+    for (const root of roots)
+        walk(root, 0);
+    for (const item of [...items].sort(byId)) {
+        if (!visited.has(item.id))
+            walk(item, 0);
+    }
+    return entries;
+}
+function clipBoardLine(text, width) {
+    if (width <= 0)
+        return "";
+    if (text.length <= width)
+        return text;
+    return text.slice(0, Math.max(width - 1, 0)) + "…";
+}
+function boardHeaderLine(snapshot) {
+    if (snapshot.error !== null)
+        return `arggon board · ${snapshot.error}`;
+    const total = snapshot.items.length;
+    const next = snapshot.nextId !== null ? ` · next: ${(0, lib_1.sanitizeHumanTextUncapped)(snapshot.nextId)}` : "";
+    return `arggon board · ${total} item(s)${next}`;
+}
+function boardCountsLine(snapshot) {
+    return exports.BOARD_STATUS_ORDER.map((status) => `${status} ${snapshot.counts[status]}`).join(" · ");
+}
+function boardItemLine(entry) {
+    const { item, depth } = entry;
+    const indent = "  ".repeat(Math.min(depth, 8));
+    const active = item.active ? "▶" : " ";
+    const mark = exports.BOARD_STATUS_MARKS[item.status];
+    const badge = exports.BOARD_TYPE_BADGES[item.type];
+    const blocked = item.openDeps.length > 0 ? ` ⌫${(0, lib_1.sanitizeHumanTextUncapped)(item.openDeps.join(","))}` : "";
+    const assignee = item.assignee !== null ? ` @${(0, lib_1.sanitizeHumanTextUncapped)(item.assignee)}` : "";
+    const reason = item.blockedReason !== null && item.blockedReason !== ""
+        ? ` · blocked: ${(0, lib_1.sanitizeHumanTextUncapped)(item.blockedReason)}`
+        : "";
+    return (`${indent}${active}${mark} ${badge} ${(0, lib_1.sanitizeHumanTextUncapped)(item.id)}${blocked}${assignee}` +
+        ` — ${(0, lib_1.sanitizeHumanTextUncapped)(item.title)}${reason}`);
+}
+function boardTreeLines(snapshot, options = {}) {
+    const width = options.width ?? 0;
+    const limit = options.limit ?? 200;
+    const clip = (line) => (width > 0 ? clipBoardLine(line, width) : line);
+    const lines = [clip(boardHeaderLine(snapshot))];
+    if (snapshot.error !== null)
+        return lines;
+    lines.push(clip(boardCountsLine(snapshot)));
+    const entries = boardTreeEntries(snapshot.items);
+    for (const entry of entries.slice(0, Math.max(limit, 0)))
+        lines.push(clip(boardItemLine(entry)));
+    const hidden = entries.length - Math.min(entries.length, Math.max(limit, 0));
+    if (hidden > 0)
+        lines.push(clip(`… ${hidden} more item(s)`));
+    return lines;
+}
+function sidebarStatusLine(snapshot, width = 0) {
+    const clip = (line) => (width > 0 ? clipBoardLine(line, width) : line);
+    if (snapshot.error !== null)
+        return clip("arggon · no tracker");
+    const active = snapshot.items.find((item) => item.id === snapshot.activeId);
+    if (active !== undefined) {
+        return clip(`arggon ▶ ${(0, lib_1.sanitizeHumanTextUncapped)(active.id)} ${active.status}`);
+    }
+    const byId = new Map(snapshot.items.map((item) => [item.id, { status: item.status }]));
+    const ready = snapshot.items.filter((item) => (0, lib_1.isClaimable)(item.type) &&
+        item.status === "todo" &&
+        item.assignee === null &&
+        (0, lib_1.isReady)(item, byId)).length;
+    const next = snapshot.nextId !== null ? ` · next ${(0, lib_1.sanitizeHumanTextUncapped)(snapshot.nextId)}` : "";
+    return clip(`arggon · ${ready} ready${next}`);
+}
+})
+
 __arggonModules.set("opencode/plugins/arggon/index.ts", (exports, require, module) => {
 "use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
@@ -5601,7 +5833,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
+exports.sidebarStatusLine = exports.emptyBoardSnapshot = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardHeaderLine = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.ARGON_BOARD_PANEL = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
 exports.isArggonItemId = isArggonItemId;
 exports.parseArggonItemFromCommand = parseArggonItemFromCommand;
 exports.parseArggonItemFromCode = parseArggonItemFromCode;
@@ -7560,8 +7792,30 @@ function dispose(registration) {
         void Promise.resolve(candidate.dispose.call(candidate)).catch(() => { });
     }
 }
+var board_js_1 = require("./board.js");
+Object.defineProperty(exports, "ARGON_BOARD_PANEL", { enumerable: true, get: function () { return board_js_1.ARGON_BOARD_PANEL; } });
+Object.defineProperty(exports, "BOARD_STATUS_MARKS", { enumerable: true, get: function () { return board_js_1.BOARD_STATUS_MARKS; } });
+Object.defineProperty(exports, "BOARD_STATUS_ORDER", { enumerable: true, get: function () { return board_js_1.BOARD_STATUS_ORDER; } });
+Object.defineProperty(exports, "BOARD_TYPE_BADGES", { enumerable: true, get: function () { return board_js_1.BOARD_TYPE_BADGES; } });
+Object.defineProperty(exports, "activeBoardId", { enumerable: true, get: function () { return board_js_1.activeBoardId; } });
+Object.defineProperty(exports, "boardCountsLine", { enumerable: true, get: function () { return board_js_1.boardCountsLine; } });
+Object.defineProperty(exports, "boardHeaderLine", { enumerable: true, get: function () { return board_js_1.boardHeaderLine; } });
+Object.defineProperty(exports, "boardItemLine", { enumerable: true, get: function () { return board_js_1.boardItemLine; } });
+Object.defineProperty(exports, "boardRoot", { enumerable: true, get: function () { return board_js_1.boardRoot; } });
+Object.defineProperty(exports, "boardSnapshot", { enumerable: true, get: function () { return board_js_1.boardSnapshot; } });
+Object.defineProperty(exports, "boardTreeEntries", { enumerable: true, get: function () { return board_js_1.boardTreeEntries; } });
+Object.defineProperty(exports, "boardTreeLines", { enumerable: true, get: function () { return board_js_1.boardTreeLines; } });
+Object.defineProperty(exports, "clipBoardLine", { enumerable: true, get: function () { return board_js_1.clipBoardLine; } });
+Object.defineProperty(exports, "countBoardStatuses", { enumerable: true, get: function () { return board_js_1.countBoardStatuses; } });
+Object.defineProperty(exports, "emptyBoardSnapshot", { enumerable: true, get: function () { return board_js_1.emptyBoardSnapshot; } });
+Object.defineProperty(exports, "sidebarStatusLine", { enumerable: true, get: function () { return board_js_1.sidebarStatusLine; } });
 exports.default = definition;
 })
 
 const __arggonEntry = __arggonRequire("opencode/plugins/arggon/index.ts", undefined)
 export default __arggonEntry.default
+export const ARGON_BOARD_PANEL = __arggonEntry.ARGON_BOARD_PANEL
+export const boardSnapshot = __arggonEntry.boardSnapshot
+export const boardTreeLines = __arggonEntry.boardTreeLines
+export const emptyBoardSnapshot = __arggonEntry.emptyBoardSnapshot
+export const sidebarStatusLine = __arggonEntry.sidebarStatusLine

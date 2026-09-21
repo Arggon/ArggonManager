@@ -59,13 +59,16 @@ const SEAM_COMMANDS = [
 const SEAM_PLUGIN = ".opencode/plugins/arggon/index.ts";
 /** W3 single-file bundle vendored by init (kernel inlined, no node_modules). */
 const SEAM_PLUGIN_SOURCE = "opencode/plugins/arggon/index.bundle.ts";
+/** W5 TUI entry vendored verbatim beside the server entry (task-native-tui). */
+const SEAM_TUI = ".opencode/plugins/arggon/tui.tsx";
+const SEAM_TUI_SOURCE = "opencode/plugins/arggon/tui.tsx";
 
 describe("opencode seam: fresh init", () => {
   it("creates the config, agents and commands (tier-1, plain init)", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
     expect(existsSync(join(dir, "opencode.jsonc"))).toBe(true);
-    for (const rel of [...SEAM_AGENTS, ...SEAM_COMMANDS, SEAM_PLUGIN]) {
+    for (const rel of [...SEAM_AGENTS, ...SEAM_COMMANDS, SEAM_PLUGIN, SEAM_TUI]) {
       expect(existsSync(join(dir, ...rel.split("/"))), rel).toBe(true);
     }
   });
@@ -126,10 +129,7 @@ describe("opencode seam: fresh init", () => {
     // Probe-verified on real V2 sessions: a native tool action is the
     // normalized `<namespace>_<tool>` (namespace `arggon`), an MCP tool action
     // the normalized `<server>_<tool>` (server `arggon`, tools `arggon_*`).
-    for (const action of [
-      "arggon_create",
-      "arggon_arggon_create",
-    ]) {
+    for (const action of ["arggon_create", "arggon_arggon_create"]) {
       expect(worker, action).toMatch(
         new RegExp(`action: ${action}\\s+resource: "\\*"\\s+effect: deny`),
       );
@@ -463,6 +463,37 @@ describe("opencode seam: bundled plugin (W2/W3)", () => {
     const date = new Date().toISOString().slice(0, 10);
     expect(readFileSync(join(dir, "backup", date, ...SEAM_PLUGIN.split("/")), "utf8")).toBe(edited);
     expect(readFileSync(dest, "utf8")).toBe(original);
+  });
+});
+
+describe("opencode seam: vendored TUI entry (W5)", () => {
+  it("vendors tui.tsx verbatim with provenance and no package import", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const raw = readFileSync(join(dir, ...SEAM_TUI.split("/")), "utf8");
+    expect(raw.startsWith(`// arggon:generated template="${SEAM_TUI_SOURCE}"\n`)).toBe(true);
+    // The runtime resolves solid-js itself; the board surface comes from the
+    // vendored bundle through a relative import (dependency-less adopter tree).
+    expect(raw).toContain('from "solid-js"');
+    expect(raw).toContain('from "./index.ts"');
+    expect(raw).not.toContain('from "@opencode/plugin');
+    expect(raw).not.toContain('from "@arggon/lib');
+    expect(raw).toContain('append: "session.panel"');
+    const config = readConventionConfig(dir);
+    expect(config.generated[SEAM_TUI]?.template).toBe(SEAM_TUI_SOURCE);
+  });
+
+  it("stays in byte parity with its source and refreshes on re-run", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const source = readFileSync(join(repoRoot, SEAM_TUI_SOURCE), "utf8");
+    expect(readFileSync(join(dir, ...SEAM_TUI.split("/")), "utf8")).toBe(
+      stampGeneratedContent(SEAM_TUI, SEAM_TUI_SOURCE, source),
+    );
+    const second = runCli(["init", dir, "--json"]);
+    const secondBody = JSON.parse(second.stdout) as { updated: string[]; modified: string[] };
+    expect(secondBody.updated).toContain(SEAM_TUI);
+    expect(secondBody.modified).toEqual([]);
   });
 });
 

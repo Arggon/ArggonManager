@@ -1,15 +1,17 @@
 /**
  * Type gate for the vendored plugin source (review F1, task-native-tools).
  *
- * The root tsconfig includes `cli/src` only, vitest transpiles with esbuild (no
- * type-checking) and eslint is not type-aware — so
- * `opencode/plugins/arggon/index.ts`, the single source `arggon init` builds
- * the vendored bundle from, could ship a TypeScript error unnoticed (the review
+ * The root tsconfig includes `cli/src` only, vitest transpiles with oxc (no
+ * type-checking) and eslint is not type-aware — so the plugin sources
+ * `arggon init` vendors could ship a TypeScript error unnoticed (the review
  * caught exactly that: an undefined `ToolEditorLike` → TS2304). This gate runs
- * the same strict `tsc --noEmit` the reviewer ran. Scope is the plugin source
- * alone: it has no static package imports (Node builtins only; `@arggon/lib`
- * stays behind a guarded dynamic import and `@opencode/plugin` is not imported
- * at all since W3), so the check needs no build.
+ * a strict `tsc --noEmit` over the plugin sources through
+ * `cli/tsconfig.plugin.json`: the server entry, the board surface (`board.ts`,
+ * a static `@arggon/lib` import mapped to `lib/src/index.ts` so the check needs
+ * no prior build) and the TUI entry `tui.tsx` (W5 review P3: it used to be
+ * gated only by eslint + smoke). `solid-js`/JSX resolve to the repo-only
+ * `cli/types/tui-runtime.d.ts` shim — the runtime provides them at load time
+ * and the repo deliberately has no `solid-js` dependency.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -19,28 +21,16 @@ import { describe, expect, it } from "vitest";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const tsc = join(root, "node_modules/typescript/bin/tsc");
-const PLUGIN = "opencode/plugins/arggon/index.ts";
+const TSCONFIG = "cli/tsconfig.plugin.json";
 
 describe("vendored plugin type gate", () => {
-  it(`type-checks ${PLUGIN} with --strict`, () => {
+  it(`type-checks the plugin source with --strict (${TSCONFIG})`, () => {
     expect(existsSync(tsc), `typescript is not installed at ${tsc}`).toBe(true);
-    const proc = spawnSync(
-      process.execPath,
-      [
-        tsc,
-        "--noEmit",
-        "--target",
-        "ES2022",
-        "--module",
-        "NodeNext",
-        "--moduleResolution",
-        "NodeNext",
-        "--strict",
-        "--skipLibCheck",
-        PLUGIN,
-      ],
-      { cwd: root, encoding: "utf8", timeout: 120_000 },
-    );
+    const proc = spawnSync(process.execPath, [tsc, "-p", TSCONFIG], {
+      cwd: root,
+      encoding: "utf8",
+      timeout: 120_000,
+    });
     expect(proc.status, `${proc.stdout ?? ""}${proc.stderr ?? ""}`).toBe(0);
   });
 });
