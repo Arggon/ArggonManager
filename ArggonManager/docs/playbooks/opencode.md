@@ -392,7 +392,8 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   the full claim → worktree → commit → stubbed-PR → done → cleanup round-trip
   through the native tools, the never-steal/no-reopen invariants with the
   generated permissions active (a real `arggon-worker` session) and the
-  reviewer gates (tool denied, `git push` denied, inspection still working))
+  reviewer gates (every mutating native tool absent from the Code Mode catalog,
+  `git push` denied against a planted local `origin`, inspection still working))
   and exits 0 with
   `skipped: opencode not installed` when the binary is absent. Both this
   harness and the orchestration wave (`npm run smoke:opencode:wave`,
