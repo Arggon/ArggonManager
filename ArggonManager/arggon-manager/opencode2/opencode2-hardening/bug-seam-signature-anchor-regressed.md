@@ -59,7 +59,7 @@ be closed as superseded once this port lands.
 - [x] Negative test: signature in a comment after JSON content → `present-skip`
       (adopter config respected), plus the existing NIT-12 string-value case
       stays green.
-- [ ] `arggon validate` green; CI green.
+- [x] `arggon validate` green; CI green (PR #380: run 35639670554, `cli` job pass, 3m30s).
 - [ ] PR #346 closed as superseded with a comment pointing here; its stale
       worktree/branch cleaned.
 
