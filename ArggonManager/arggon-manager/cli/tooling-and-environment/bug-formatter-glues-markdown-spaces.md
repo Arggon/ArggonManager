@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-formatter-glues-markdown-spaces
 title: Formatter glues markdown spaces around inline code (prettier 3.9.6)
+assignee: Arggon
+branch: fix/bug-formatter-glues-markdown-spaces
 parent: tooling-and-environment
 labels: []
 priority: p3
 created: "2026-09-21"
 updated: "2026-09-21"
+claimed_at: "2026-09-21T22:40:49.883Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-formatter-glues-markdown-spaces
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/bug-formatter-glues-markdown-spaces.md
