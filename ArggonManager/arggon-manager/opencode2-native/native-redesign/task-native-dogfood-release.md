@@ -1,16 +1,19 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-native-dogfood-release
 title: "Dogfood, ADR 0006 measurement and release"
+assignee: Arggon
+branch: feat/task-native-dogfood-release
 parent: native-redesign
-depends_on: [task-native-headless-ci]
 labels: []
 priority: p0
 created: "2026-09-19"
-updated: "2026-09-19"
+updated: "2026-09-21"
+claimed_at: "2026-09-21T19:10:15.951Z"
+depends_on: [task-native-headless-ci]
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-dogfood-release
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-dogfood-release.md
   Leaves live only under a story. id is the filename stem: task-native-dogfood-release.
