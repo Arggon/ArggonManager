@@ -121,3 +121,10 @@ CI on PR #385: cli pass (4m4s), tasks-validate pass (35s). Acceptance verified: 
 
 ### 2026-09-21 @Arggon
 Coordinator note: reviewer session could not post (its background suite kept ending turns), so the coordinator verified the diff (plantOrigin bare repo + push main so the reviewer can attempt the push; deterministic catalog/permission asserts via shellDenied on the 2.0.12 message; 13 new unit tests) against the strong evidence: two full harness runs 26/0 (966s, 747s), 1470 tests, lint/build/check:plugin/validate/spec, CI pass. Merged with merge commit; item flipped to done.
+
+### 2026-09-21 @Arggon
+### Verdict addendum — isolated full suite green
+
+Follow-up to the verdict above: `TMPDIR=/tmp/opencode/vitest-tmp npm test` (a private TMPDIR, so the global `/tmp` hygiene assertions cannot see the parallel sessions running on this box) → **90 files / 1470 tests passed**, exit 0, 54.8 s. This closes the only non-green local signal: the earlier 1469/1470 run failed `cli/src/measure.test.ts > always deletes the measurement temp tree (/tmp hygiene)` because another session's `/tmp/arggon-budget-*` dir existed during the global scan — environmental, now reproduced clean in isolation and consistent with the worker's 90/1470 and CI's `cli` job on b08afbd.
+
+Verdict unchanged: **merge PR #385 with a merge commit (never squash)**, then flip `task-w4-smoke-origin-remote` to done. No change requests.
