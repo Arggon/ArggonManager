@@ -80,3 +80,7 @@ W6 of `plan-native-first-011`. Keep `init`/`validate`/`doctor`/`--json` in the p
 
 - The vendored workflow's pre-release install clones `opencode2` and runs `npm ci` on every adopter push (~1–2 min). Acceptable pre-release; the released one-liner replaces it. Pin a tag after W7.
 - `/arggon-*` command bodies through the V2 loader, `smoke:opencode:wave` and the dogfood seam remain W7 (as W3/W4 declared).
+
+### handoff 2026-09-21 @Arggon — next: Coordinator review of draft PR #379 (head 39ccee9 after tracker commits): verify the W6 acceptance evidence (fixture test, packed-install parity, smoke 26/0, docs/ci.md recipe) and the 4 flagged deci…
+- branch: feat/task-native-headless-ci
+- open questions: init now vendors a GitHub Actions workflow into adopter repos (tier-1, never overwrites): keep, tier-2, or docs-only?; YAML destinations use a new '#' provenance marker (required for Actions to parse…
