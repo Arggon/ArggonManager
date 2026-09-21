@@ -163,3 +163,73 @@ The playbook frontmatter still pins `version: 2.0.10`; all W5 probes, `smoke:tui
 Request changes for P1 (one-line guard + regression test). After that, W5 is mergeable: merge commit (never squash), then the coordinator flips `task-native-tui` to done — I did not.
 
 *Note: the MCP `arggon_*` tools are unusable in this environment (global `arggon` 0.3.0 does not resolve the v5 tracker: `No tasks/ convention found`); this verdict was posted with the repo's local CLI, auto-committed on `feat/task-native-tui`.*
+
+### 2026-09-21 @Arggon
+W5 review-fix pass (task-native-tui) — commit `c6f2701`, PR #378 updated.
+
+## P1 (blocking) — FIXED: `boardSnapshot()` no longer throws on a corrupt tracker
+
+`itemsById` (and the whole snapshot assembly) now runs inside the guard; tracker
+detection keeps its own reason, and any read failure degrades to an escaped,
+bounded `tracker unreadable: …` snapshot. `tui.tsx` adds a per-surface guard as
+belt-and-braces (a future regression must not reach the host overlay).
+
+Repro before/after (same duplicate-id fixture, `/tmp/opencode/w5-fix/dupe-fixture`):
+
+- before, direct (vendored `board.ts`):
+  `THREW: Duplicate id 'dup' under the tracker (…/one.md and …/two.md)`
+- before, PTY 2.0.12 (`/arggon-board`): host overlay
+  `arggon.tui crashed in slot session.panel: Duplicate id 'dup' under the tracker …`,
+  no panel.
+- after, direct:
+  `SNAPSHOT OK {"error":"tracker unreadable: Duplicate id 'dup' under the tracker (…/one.md and …/two.md)","items":0}`
+- after, PTY (same fixture/session): panel shows
+  `arggon board · tracker unreadable: Duplicate id 'dup' under…`; the capture
+  contains **no** `crashed in slot`.
+
+Regression coverage: `board.test.ts` (duplicate-id fixture: no throw, empty
+snapshot/counts, sanitized reason, active-id resolution skipped),
+`tui.test.ts` (panel + sidebar render on the corrupt fixture),
+`smoke:tui` (new PTY scenario: duplicate the created task id → panel must show
+the unreadable header and no slot crash).
+
+## P3 notes — all addressed
+
+| Note                                                                | Fix                                                                                                                                                                                                                                                                                     |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sidebarStatusLine` reimplemented the ready predicate               | Kernel `isClaimable(type)` + `isReady(item, byId)` (+ `todo`, unclaimed). Ready follows the kernel definition, so an unclaimed story counts too — the count can exceed `/arggon-next` (leaf pool); documented in the code and in `opencode2.md`. Tests updated (fixture now `2 ready`). |
+| `tui.tsx` outside the strict type gate                              | Added to `cli/tsconfig.plugin.json` with the repo-only `cli/types/tui-runtime.d.ts` shim (`solid-js` + JSX namespace). Verified the gate catches an injected type error in `tui.tsx`.                                                                                                   |
+| Derived `.opencode/plugins/arggon/tui.tsx` not regenerated/verified | `plugin-copy.test.ts`: stamps/self-heals the derived copy (marker-pinned) and pins the vendored import allowlist (`solid-js`, `./index.ts` only). The worktree copy is now stamped.                                                                                                     |
+| Wrapper re-exported all 46 entry exports                            | `BUNDLE_EXPORTS` allowlist (`ARGON_BOARD_PANEL`, `boardSnapshot`, `boardTreeLines`, `emptyBoardSnapshot`, `sidebarStatusLine`); pinned in both directions (entry exports each name; wrapper forwards nothing else; list ≡ `tui.tsx` import block). Bundle shrank 326,046 → 324,325 B.   |
+| `blockedReason` never rendered                                      | Renders ` · blocked: <reason>` (escaped; empty reason omitted) with unit coverage incl. hostile bytes.                                                                                                                                                                                  |
+| Prettier churn                                                      | Surgical: `index.ts` is a **+1 line** diff; docs carry only W5 content + one checklist row (tables kept prettier-clean).                                                                                                                                                                |
+
+## Gates (after the fix)
+
+- `npm test` → **1444 passed** / 88 files
+- `npm run lint` → clean
+- `npm run build` → clean
+- `npm run check:plugin` → clean (staged bundle; rebuild byte-identical)
+- `npm run arggon -- validate` → ok (v5, 0 warnings)
+- `npm run arggon -- spec validate` → ok (18 docs)
+- `npm run smoke:tui` → **13/13** (includes the new corrupt-tracker check)
+- `npm run context:report -- --strict` → all bounds pass (prompt-side bytes
+  unchanged: AGENTS 2,005 B; native 12,182 B; MCP 10,507 B; item block ≤1,024 B)
+
+## `smoke:opencode` (full) — 3 FAILs in the W4 permissions scenario, model variance
+
+Full run: 141 ok / 3 FAIL, all three in `permissions (W4)`
+(`arggon.update denied`, `arggon.start/cleanup denied`, `reviewer shell gate
+denies git push`). The saved transcript
+(`/tmp/arggon-smoke-permissions-A30okl/.smoke-evidence/permissions.stdout.jsonl`)
+shows the reviewer ran a **reduced script** (only `tools.arggon.show`) and
+declined the push — no `Unknown tool`/`Permission denied` was ever emitted, so
+the checks' regexes could not match. Immediate rerun with
+`OPENCODE_SMOKE_ONLY=w4` on the same tree: **40 ok / 0 FAIL**, including all
+three checks. No permission/agent/config change in this PR; the scenario is
+model-behaviour-dependent (same class as the earlier git-push-only flake).
+Follow-up candidate: plant an `origin` remote and/or assert the attempted tool
+calls instead of the model's prose.
+
+Runtime drift (2.0.12 vs pin 2.0.10) is already filed as
+`task-playbook-opencode-2-0-12`; untouched here.
