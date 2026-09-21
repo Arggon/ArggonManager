@@ -1,0 +1,69 @@
+# ArggonManager tracker CI — headless: no model, no MCP client, no OpenCode.
+#
+# The packaged `arggon` bin does all of it: `init` bootstraps/upgrades the
+# generated docs idempotently (never overwriting adopter files), `validate`
+# gates the tracker, `doctor`/`list --json` print diagnostics. The full recipe
+# (install variants, released one-liner, local reproduction) lives in
+# ArggonManager/docs/ci.md.
+name: arggon
+
+on:
+  push:
+  pull_request:
+
+env:
+  # While `arggon-manager` and `@arggon/lib` stay `private` (no npm release
+  # yet), the bin is packed from this pinned checkout — BOTH packages, because
+  # the root tarball alone cannot resolve the private kernel dependency.
+  # After release, replace the install step with the one-liner
+  # `npm install -g arggon-manager` and drop these two variables.
+  ARGGON_REPO: https://github.com/Arggon/ArggonManager.git
+  ARGGON_REF: opencode2
+
+jobs:
+  tasks-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install the headless arggon bin (no model, no MCP)
+        run: |
+          git clone --depth 1 --branch "$ARGGON_REF" "$ARGGON_REPO" "$RUNNER_TEMP/arggon-manager"
+          cd "$RUNNER_TEMP/arggon-manager"
+          npm ci
+          npm pack --workspace @arggon/lib --pack-destination "$RUNNER_TEMP/arggon-packs"
+          npm pack --pack-destination "$RUNNER_TEMP/arggon-packs"
+          npm install -g "$RUNNER_TEMP/arggon-packs"/arggon-lib-*.tgz \
+                         "$RUNNER_TEMP/arggon-packs"/arggon-manager-*.tgz
+
+      - name: Bootstrap the tracker (idempotent; never overwrites adopter files)
+        run: arggon init --no-commit
+
+      - name: Committed seam is current (drift gate; no-op until initialized)
+        run: |
+          # A fresh, uninitialized repo has nothing committed to compare with.
+          if ! git ls-files --error-unmatch ArggonManager/.convention.yml >/dev/null 2>&1 &&
+             ! git ls-files --error-unmatch tasks/.convention.yml >/dev/null 2>&1; then
+            echo "tracker not committed yet — run 'arggon init' locally and commit the generated docs"
+            exit 0
+          fi
+          # `init` refreshes the per-doc generatedAt bookkeeping on every run,
+          # so the state file is excluded; every other generated file must be
+          # byte-identical to what the pinned ref generates.
+          dirty=$(git status --porcelain -- . ':(exclude)ArggonManager/.convention.yml' ':(exclude)tasks/.convention.yml')
+          if [ -n "$dirty" ]; then
+            echo "the committed arggon seam predates the pinned ref — run 'arggon init' and commit:"
+            echo "$dirty"
+            exit 1
+          fi
+
+      - name: Validate the tracker
+        run: arggon validate --json
+
+      - name: Diagnostics (report-only)
+        run: |
+          arggon doctor --json
+          arggon list --json
