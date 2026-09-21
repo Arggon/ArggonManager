@@ -38,3 +38,17 @@ the `gh` fallback; the flag does not change the classification.
 ## Notes
 
 - Pre-existing, not a W4 regression; filed per the review-findings rule.
+
+### 2026-09-21 @Arggon
+Evidence (worker, branch fix/bug-cleanup-no-gh-ignored @ b5852e9, draft PR #382):
+
+ROOT CAUSE: commander names a --no-gh option `gh` (default true, false when passed); the cleanup action read `opts.noGh` (always undefined), so `noGh: opts.noGh === false` was always false and the squash-merge gh fallback always ran.
+
+REPRO (fixture from cli/src/worktree.test.ts, task-charlie = done + unmerged branch, gh shim on PATH logging invocations):
+- before fix, `cleanup --json --no-gh`: task-charlie {removable:true, reason:null, via:"squash-merged PR #12"}; gh shim invoked 1x.
+- after fix, `cleanup --json --no-gh`: task-charlie {removable:false, reason:"branch 'feat/task-charlie' is not fully merged into 'main'"}; gh shim invoked 0x.
+- after fix, default `cleanup --json`: gh shim invoked 1x, charlie removable via "squash-merged PR #12" (fallback kept).
+
+GATES (all green): npm test (89 files / 1455 tests), npm run lint, npm run build, npm run check:plugin (bundle unchanged), npm run arggon -- validate (ok, convention v5), npm run arggon -- spec validate (ok, 18 docs).
+
+Acceptance checkboxes left unticked for the coordinator: local verification covers all three except the not-yet-run CI and the merge itself. Only touched cli/src/cli.ts and cli/src/worktree.test.ts.
