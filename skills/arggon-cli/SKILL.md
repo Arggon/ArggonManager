@@ -133,10 +133,14 @@ arggon validate  # Validate tracker frontmatter and tree integrity
    commit (links the primary checkout's `node_modules` when the worktree lacks
    one — reported as `linkedNodeModules`; the link is untracked, never committed
    by start, and is removed before a configured `x-worktree.post-start` hook so
-   `npm ci` cannot empty the primary install) and never rolls the worktree back
-   on failure: fix the reported cause and re-run `start --worktree` to attach. Claim
-   taken (`START_FAILED`) → pick another item; never
-   `--force`, never steal. Manual fallback:
+   `npm ci` cannot empty the primary install). That install is the primary's, so
+   workspace packages the worktree also carries (e.g. `@arggon/lib`) resolve into
+   the **primary** copy — reported as `linkedWorkspaces` (re-read after the hook,
+   so a hook that installs locally reports `[]`): build where they resolve, or
+   give the worktree its own install (`npm ci`, e.g. `x-worktree.post-start: npm ci`).
+   A failure never rolls the worktree back: fix the reported cause and re-run
+   `start --worktree` to attach. Claim taken (`START_FAILED`) → pick another item;
+   never `--force`, never steal. Manual fallback:
    `update <id> --status in_progress --assignee <login>` + `branch <id>`.
 3. **Record findings:** `create task|bug "<title>" --parent <story-id>` — file new
    work instead of growing the PR.
