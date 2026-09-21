@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-seam-signature-anchor-regressed
 title: "Seam signature anchor regressed: below-JSON comment is claimed again"
+assignee: Arggon
+branch: fix/bug-seam-signature-anchor-regressed
 parent: opencode2-hardening
 labels: []
 priority: p2
 created: "2026-09-21"
 updated: "2026-09-21"
+claimed_at: "2026-09-21T18:25:13.347Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-seam-signature-anchor-regressed
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2/opencode2-hardening/bug-seam-signature-anchor-regressed.md
