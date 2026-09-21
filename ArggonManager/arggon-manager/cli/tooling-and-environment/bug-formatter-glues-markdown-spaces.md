@@ -101,3 +101,30 @@ Each repair needs its code span restructured, not just the whitespace restored (
 ### handoff 2026-09-21 @Arggon — next: Review PR #387 (guard test + 4 span repairs + pitfalls restructure); merge with a merge commit (tracker-carrying branch); then decide the follow-up for the indentation-variant docs listed in the comm…
 - branch: fix/bug-formatter-glues-markdown-spaces
 - open questions: File the follow-up item for the 8 docs with the indent variant (2 playbooks in flight)? Extend the guard with an indentation rule once they are repaired?
+
+### 2026-09-21 @Arggon
+**Review verdict — PR #387 @ `c3a2561` (draft, base `opencode2`): NO-MERGE as-is — one minor change request (2 spans); everything else verified merge-ready.**
+
+### Verified (evidence)
+
+- **Root cause confirmed.** `prettier --check` on `origin/opencode2:ArggonManager/docs/json-output.md` fails; `--write` on it produces exactly the 4 glues (`null`otherwise, and`.mcp.json`, `v1.findings`entries, as`{`) plus a table re-pad. `diff(prettier(base), head)` is exactly the 4 span lines, so the `start`-table reflow in the head is canonical padding only, not a prose change. The previous claim that the file could not be prose-correct and prettier-clean at once is false.
+- **Repairs parse correctly.** prettier `__debug.parse` over the head: each of the 4 spans is one `inlineCode`. The outdated-docs hint (72 chars) and the doctor sample JSON (178 chars) match the CLI strings exactly; the other two are off by a trailing space (finding 1).
+- **`pitfalls.md` repair is value-preserving.** The base span's parsed value is `update --steal --reason\n"<why>" --assignee <you>` (line-break form, rendered as a space) and the head's is the same on one line; only the source wrap/indent is restored. Both head files are `prettier --check` clean and `prettier --write` byte-identical no-ops.
+- **Guard mutation-tested.** Replacing `json-output.md` with base → fails naming exactly the 4 glues (matches the worker's evidence); reverting only the `opencode.mcp.hint` span → fails naming that glue; guard passes on the head tree.
+- **Gates.** `npm run lint`, `build`, `check:plugin` (bundle unchanged), `arggon validate` (ok, 0 warnings, convention v5), `arggon spec validate` (ok, 18 docs, 0 warnings) all green locally. `npm test`: 1466/1467 twice — the only failure is `cli/src/measure.test.ts` "always deletes the measurement temp tree (/tmp hygiene)", environmental: a concurrent test run in a parallel worktree leaves `/tmp/arggon-budget-*` dirs (later mtimes, gone afterwards); the file passes 11/11 standalone. CI `cli` + `tasks-validate` green at head `c3a2561` (verified `headSha`).
+- **Scope clean.** Exactly 4 changed files: the item + `docs/json-output.md` + `skills/arggon-cli/references/pitfalls.md` + `cli/src/prose-format.test.ts`. No `start.ts` / `lib/README` / `smoke/**` (parallel workers) touched. Item stays `in_progress`, assignee Arggon, not marked done.
+- **Smoke bar:** docs + test-only, no CLI/UI behavior change → exempt per `engineering.md`.
+
+### Findings (severity order)
+
+1. **Minor (change request) — 2 of the 4 repaired spans do not carry the CLI string exactly: a trailing space leaks into the span.** `ArggonManager/docs/json-output.md:140` (init git warning) and `:184` (`opencode.mcp.hint`). The closing ` `` ` needs a separator because the content ends with a backtick, and only the trailing side is padded; CommonMark strips one space from each end only when BOTH ends have one, so the parsed values are `… run `git init` ` (131 chars vs `NOT_A_REPO_WARNING`'s 130) and `… use `arggon mcp` ` (130 vs `OPENCODE_MCP_HINT`'s 129). Rendered: "run `git init` ." / "use `arggon mcp` );", and the item/PR claim "each now parses as one code span whose value is the CLI's actual string" is false for these two. **Fix verified locally:** pad the opening side too (`` `` not a git repository … `` ``), run `prettier --write` (re-pads the table); result: parsed values exact, `prettier --check` clean, `--write` byte-identical, guard green.
+2. **Info — the guard does not cover the `pitfalls.md` repair.** Reverting `pitfalls.md` to base still passes the guard (verified): the indent loss is a whitespace replacement, invisible to a token diff. The item lists the indentation rule as an open question, but the test header comment ("The repairs … live in those files; this guard keeps them honest") reads as if it did — worth tightening the wording.
+3. **Info — heuristic limits, no false positive observed.** The rule requires the merged token to be absent from the source and to sit between the same neighbours; a legitimate normalization inside an embedded code fence can merge tokens unnoticed (observed: a ```js `foo (bar)` → `foo(bar);` is not flagged). The 272 covered files (61 tracker docs + 211 outside the tracker) pass today.
+
+### Out of scope
+
+- The deferred indentation sweep is filed as `task-code-span-repair-sweep` (`0f39ab1` on `opencode2`), so the "follow-ups filed as tracker items" bar is met.
+
+### Recommendation
+
+Merge with a **merge commit** (never squash) once finding 1 is fixed — or, if the trailing space is deliberately accepted, correct the exactness claim in the item/PR body and record the decision. Everything else is verified merge-ready.
