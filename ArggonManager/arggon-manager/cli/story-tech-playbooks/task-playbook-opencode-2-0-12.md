@@ -34,13 +34,14 @@ re-run the plugin-import A/B probe on 2.0.12.
 - [x] Playbook version/pin + research record updated to 2.0.12 with the probe date.
 - [x] A/B result recorded (static import vs guarded) and any new gotcha folded into Conventions/Troubleshooting.
 - [x] Pin references refreshed (README, docs/agents.md, docs/opencode2.md, ADR 0010 trigger) and exploration-010 F1.16 note updated.
-- [ ] `arggon validate` green; docs-only diff; CI green.
+- [x] `arggon validate` green; docs-only diff; CI green.
 
 ## Notes
 
 - Mirrors the 2.0.10 refresh (`task-playbook-opencode-2-0-10`, PR #373).
 
 ### 2026-09-21 @Arggon
+
 Pin refresh 2.0.10 → 2.0.12 + plugin-import A/B re-probe on `opencode v2.0.12` (probe date 2026-09-21) — evidence for the reviewer. Draft PR #386.
 
 **Fixture** `/tmp/opencode/opencode-plugin-import-probe-212`: fresh git repo + `arggon init` tracker, **no `node_modules` in the fixture or any ancestor** (asserted), project `opencode.jsonc` with **no MCP stanza**. Plugins:
@@ -77,5 +78,9 @@ Capability snapshot (plugin C, `c-capability.json`): `app.version` 2.0.12; `perm
 - `opencode mcp list` inside the /tmp fixture printed `No MCP servers configured` on a first run and listed the machine's global servers later, while the session connects them; recorded as a probe note in Testing so the next probe does not over-trust it as negative evidence.
 
 ### handoff 2026-09-21 @Arggon — next: Coordinator review of draft PR #386 (docs-only pin refresh + A/B re-probe); no follow-up code expected. Merge with a merge commit (tracker auto-commits on this branch).
+
 - branch: feat/task-playbook-opencode-2-0-12
 - open questions: Transcripts are fixture-local (/tmp/opencode/opencode-plugin-import-probe-212/.smoke-evidence); stale pin refs (ADR 0011, spec/plan 011) and Context-budgets numbers flagged in my comment.
+
+### 2026-09-21 @Arggon
+CI green on head 7f386e3: cli pass (run 35664747593, 4m22s) + tasks-validate pass (run 35664747536, 35s). Acceptance 4/4 ticked.
