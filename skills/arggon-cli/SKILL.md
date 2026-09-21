@@ -39,10 +39,19 @@ CI:
 
 - **Tools** (Code Mode, namespace `arggon`): `tools.arggon.list`, `create`,
   `update`, `show`, `next`, `report`, `validate`, `comment`, `handoff`,
-  `priority`, `sync`, `import_issues`. Each returns exactly its documented
-  `--json` envelope; kernel failures are typed tool errors and never kill the
-  session.
+  `priority`, `sync`, `import_issues`, plus the worktree lifecycle
+  `tools.arggon.start` (claim + branch + `../<repo>-<id>` worktree through the
+  OpenCode worktree domain; push and the `gh` PR step stay explicit),
+  `tools.arggon.branch` (branch bookkeeping) and `tools.arggon.cleanup`
+  (list/`prune: true` reaps merged worktrees and clears `worktree_path`). Each
+  returns exactly its documented `--json` envelope; kernel failures are typed
+  tool errors and never kill the session.
 - **Commands**: `/arggon-{next,start,done,handoff,review,status,spec,adr,explore,playbook,adopt}`.
+- **Permissions**: the generated seam + shipped agents add minimal gates
+  (force-push and `--no-verify` denied; the reviewer cannot edit or push) that
+  complement — never replace — the kernel invariants. Never steal a claim,
+  never reopen `done`/`cancelled`: the kernel refuses both whatever the
+  permissions say.
 - **Plugin**: vendored single-file at `.opencode/plugins/arggon/index.ts` (no
   `node_modules` needed); `arggon init` refreshes it with provenance.
 - The CLI (`npm run arggon -- …`) stays for `init`/`validate`/`doctor` and

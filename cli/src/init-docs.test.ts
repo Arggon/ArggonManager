@@ -93,12 +93,13 @@ describe("init docs: tier-1 content", () => {
   const dir = tempDir();
   runInit({ dir, force: false });
 
-  it("AGENTS.md routes to the native surface (W3)", () => {
+  it("AGENTS.md routes to the native surface (W3/W4)", () => {
     const agents = readFileSync(join(dir, "AGENTS.md"), "utf8");
     expect(agents).toContain("tools.arggon.next");
-    expect(agents).toContain("tools.arggon.update");
+    expect(agents).toContain("tools.arggon.start");
     expect(agents).toContain("tools.arggon.create");
     expect(agents).toContain("tools.arggon.comment");
+    expect(agents).toContain("tools.arggon.cleanup");
     expect(agents).toContain("/arggon-start");
     expect(agents).toContain("Never reopen");
     expect(agents).toContain("ArggonManager/docs/convention.md");

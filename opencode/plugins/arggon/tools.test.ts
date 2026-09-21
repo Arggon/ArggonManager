@@ -1,12 +1,12 @@
 /**
  * Native `arggon` tool namespace contract tests (W2, task-native-tools).
  *
- * The plugin registers twelve in-process kernel tools (namespace `arggon`,
+ * The plugin registers fifteen in-process tools (namespace `arggon`,
  * `options.codemode: true`) whose outputs are the documented `--json`
  * envelopes. These tests pin that contract without an OpenCode runtime:
  *
  *   1. **registration** — the transform receives the `arggon` namespace with
- *      the expected description and the twelve definitions, each with
+ *      the expected description and the fifteen definitions, each with
  *      `options.namespace: "arggon"` + `options.codemode: true` (the Code Mode
  *      catalog surface).
  *   2. **contract** — for every tool, the envelope it returns is byte-identical
@@ -26,18 +26,20 @@
 import { spawnSync } from "node:child_process";
 import {
   chmodSync,
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { runCreate, runUpdate } from "@arggon/lib";
+import { parseFrontmatter, runCreate, runUpdate } from "@arggon/lib";
 import { runInit } from "../../../cli/src/init.js";
 import {
   ARGON_TOOL_NAMESPACE,
@@ -60,7 +62,11 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const tsx = join(root, "node_modules/tsx/dist/cli.mjs");
 const cli = join(root, "cli/src/cli.ts");
 
-/** The twelve tools the spec lists (spec-native-first-011 §Tools). */
+/**
+ * The twelve spec tools (spec-native-first-011 §Tools) plus the three W4
+ * worktree-domain tools (`start`/`branch`/`cleanup`,
+ * task-native-permissions-worktrees).
+ */
 const EXPECTED_TOOLS = [
   "list",
   "create",
@@ -74,6 +80,9 @@ const EXPECTED_TOOLS = [
   "priority",
   "sync",
   "import_issues",
+  "start",
+  "branch",
+  "cleanup",
 ] as const;
 
 /** ADR 0006 advisory tool-schema bound (the MCP `tools/list` cap, task-schema-budget). */
@@ -677,5 +686,560 @@ describe("GitHub-dependent tools mirror the CLI --json envelopes (fake gh)", () 
     );
     // Dry run writes nothing on either side.
     expect(trackerSnapshot(toolDir)).toEqual(trackerSnapshot(cliDir));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// W4 — worktree domain tools (task-native-permissions-worktrees)
+// ---------------------------------------------------------------------------
+
+/** `git` in a fixture returning stdout (the W2 `git` helper discards it). */
+function gitOut(dir: string, args: string[]): string {
+  const proc = spawnSync("git", args, { cwd: dir, encoding: "utf8", timeout: 30_000 });
+  expect(proc.status, proc.stderr).toBe(0);
+  return (proc.stdout ?? "").trim();
+}
+
+/** Initialized tracker inside a git repo (the worktree tools need both). */
+function seedGitTree(prefix = "arggon-w4-"): string {
+  const dir = mkdtemp(prefix);
+  seedInto(dir);
+  git(dir, ["init", "-q"]);
+  git(dir, ["config", "user.email", "w4@example.com"]);
+  git(dir, ["config", "user.name", "w4"]);
+  git(dir, ["add", "-A"]);
+  git(dir, ["commit", "-qm", "fixture"]);
+  return dir;
+}
+
+/**
+ * Fake `ctx.worktree` domain backed by real git: the same observable contract
+ * as the 2.0.10 Git strategy probed for W4 (detached worktree at the start
+ * ref, `directory` is the parent, `list` reports saved inventory, `remove`
+ * needs force for dirty trees). Calls are recorded so the tests can assert the
+ * plugin went through the domain, never `git worktree` directly.
+ */
+function fakeDomain(dir: string): {
+  domain: {
+    create(input: { projectID: string; name: string; directory?: string }): Promise<unknown>;
+    list(input: { projectID: string }): Promise<unknown>;
+    refresh(input: { projectID: string }): Promise<unknown>;
+    remove(input: { projectID: string; directory: string; force?: boolean }): Promise<unknown>;
+  };
+  calls: { create: Array<Record<string, unknown>>; remove: Array<Record<string, unknown>>; refresh: number; list: number };
+} {
+  const calls = {
+    create: [] as Array<Record<string, unknown>>,
+    remove: [] as Array<Record<string, unknown>>,
+    refresh: 0,
+    list: 0,
+  };
+  return {
+    calls,
+    domain: {
+      async create(input) {
+        calls.create.push(input);
+        const target = join(String(input.directory ?? dir), input.name);
+        git(dir, ["worktree", "add", "--detach", target]);
+        return { directory: target };
+      },
+      async list() {
+        calls.list += 1;
+        return gitOut(dir, ["worktree", "list", "--porcelain"])
+          .split("\n")
+          .filter((line) => line.startsWith("worktree "))
+          .map((line) => ({ directory: line.slice("worktree ".length).trim() }));
+      },
+      async refresh() {
+        calls.refresh += 1;
+      },
+      async remove(input) {
+        calls.remove.push(input);
+        git(dir, [
+          "worktree",
+          "remove",
+          ...(input.force === true ? ["--force"] : []),
+          input.directory,
+        ]);
+      },
+    },
+  };
+}
+
+/** Definitions wired to the fake domain (canonical = the fixture itself). */
+function worktreeDefinitions(
+  dir: string,
+  domain: ReturnType<typeof fakeDomain>["domain"],
+): ArgonToolDefinition[] {
+  return argonToolDefinitions(kernel, {
+    cwd: dir,
+    templatesDir: pluginTemplatesDir(),
+    worktree: { projectID: "project-id", canonical: dir, domain },
+  });
+}
+
+/** Item frontmatter as the worktree copy records it. */
+function itemData(dir: string, id: string, root = dir): Record<string, unknown> {
+  const path = join(root, "ArggonManager", "launch-mvp", "auth", "story-login", `${id}.md`);
+  return parseFrontmatter(readFileSync(path, "utf8")).data as Record<string, unknown>;
+}
+
+/** Claim → worktree → commit → merge (stub PR) → done; returns the worktree path. */
+async function completedWorktree(
+  dir: string,
+  id = "task-rate-limit",
+): Promise<{ worktreePath: string; defs: ArgonToolDefinition[]; calls: ReturnType<typeof fakeDomain>["calls"] }> {
+  const { domain, calls } = fakeDomain(dir);
+  const defs = worktreeDefinitions(dir, domain);
+  const started = await tool(defs, "start").execute({ id, assignee: "smoke" });
+  const worktreePath = String((started.output as { worktreePath?: unknown }).worktreePath);
+  writeFileSync(join(worktreePath, "work.txt"), "work\n", "utf8");
+  git(worktreePath, ["add", "work.txt"]);
+  git(worktreePath, ["commit", "-qm", "feat: work"]);
+  const branch = String((started.output as { branch?: unknown }).branch);
+  git(dir, ["merge", "--no-ff", branch, "-m", "Merge PR (stubbed)"]);
+  await tool(defs, "update").execute({ id, status: "done" });
+  return { worktreePath, defs, calls };
+}
+
+describe("worktree domain tools (W4)", () => {
+  it("start claims, creates the worktree through the domain and records branch + worktree_path in the worktree copy", async () => {
+    const dir = seedGitTree();
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+
+    const started = await tool(defs, "start").execute({
+      id: "task-rate-limit",
+      assignee: "smoke",
+    });
+    const output = started.output as Record<string, unknown>;
+    const worktreePath = String(output.worktreePath);
+
+    expect(output.ok).toBe(true);
+    expect(output.command).toBe("start");
+    expect(output.branch).toBe("feat/task-rate-limit");
+    expect(output.worktreeCreated).toBe(true);
+    expect(output.branchCreated).toBe(true);
+    expect(output.pushed).toBe(false);
+
+    // The domain was used (parent = the checkout's parent, name <repo>-<id>).
+    expect(calls.create).toHaveLength(1);
+    expect(calls.create[0]).toEqual({
+      projectID: "project-id",
+      name: `${basename(dir)}-task-rate-limit`,
+      directory: dirname(dir),
+    });
+    expect(worktreePath).toBe(join(dirname(dir), `${basename(dir)}-task-rate-limit`));
+    expect(existsSync(worktreePath)).toBe(true);
+
+    // Branch created + checked out in the worktree (the domain creates detached).
+    expect(gitOut(worktreePath, ["branch", "--show-current"])).toBe("feat/task-rate-limit");
+    // The claim commit landed on the feature branch inside the worktree.
+    expect(gitOut(worktreePath, ["log", "-1", "--pretty=%s"])).toBe(
+      "chore(tasks): claimed task-rate-limit",
+    );
+
+    // Claim + records live in the worktree copy; the canonical checkout stays clean.
+    expect(itemData(dir, "task-rate-limit", worktreePath)).toMatchObject({
+      status: "in_progress",
+      assignee: "smoke",
+      branch: "feat/task-rate-limit",
+      worktree_path: worktreePath,
+    });
+    expect(itemData(dir, "task-rate-limit")).toMatchObject({ status: "todo" });
+    expect(itemData(dir, "task-rate-limit").branch).toBeUndefined();
+  });
+
+  it("start refuses to steal a claim and removes the worktree it just created", async () => {
+    const dir = seedGitTree();
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    // Claim through the tool so the claim commit lands (realistic setup).
+    await tool(defs, "update").execute({
+      id: "task-rate-limit",
+      status: "in_progress",
+      assignee: "someone",
+    });
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "intruder" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    expect(String((typed.envelope.error as { message?: unknown }).message)).toContain(
+      "claim conflict",
+    );
+    expect(String((typed.envelope.error as { message?: unknown }).message)).toContain(
+      "removed again",
+    );
+
+    // Nothing left behind: no orphan worktree, no branch, claim untouched.
+    expect(calls.create).toHaveLength(1);
+    expect(calls.remove).toHaveLength(1);
+    expect(existsSync(join(dirname(dir), `${basename(dir)}-task-rate-limit`))).toBe(false);
+    expect(gitOut(dir, ["worktree", "list"]).includes("task-rate-limit")).toBe(false);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
+    expect(itemData(dir, "task-rate-limit")).toMatchObject({
+      status: "in_progress",
+      assignee: "someone",
+    });
+  });
+
+  it("start re-run attaches to the recorded worktree (no second domain create)", async () => {
+    const dir = seedGitTree();
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+
+    const first = await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    const second = await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    expect(calls.create).toHaveLength(1);
+    expect((second.output as { worktreeCreated?: unknown }).worktreeCreated).toBe(false);
+    expect((second.output as { worktreePath?: unknown }).worktreePath).toBe(
+      (first.output as { worktreePath?: unknown }).worktreePath,
+    );
+    expect(itemData(dir, "task-rate-limit", String((first.output as { worktreePath?: unknown }).worktreePath)))
+      .toMatchObject({ status: "in_progress", assignee: "smoke" });
+  });
+
+
+  it("start refuses a stale canonical copy (uncommitted claim) and removes the worktree", async () => {
+    const dir = seedGitTree();
+    // Uncommitted claim in the canonical tree: the fresh worktree (HEAD) would
+    // not see it, so the kernel would validate a stale claim state.
+    runUpdate({ cwd: dir, id: "task-rate-limit", status: "in_progress", assignee: "someone" });
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    expect(String((typed.envelope.error as { message?: unknown }).message)).toContain(
+      "uncommitted tracker changes",
+    );
+    expect(calls.remove).toHaveLength(1);
+    expect(existsSync(join(dirname(dir), `${basename(dir)}-task-rate-limit`))).toBe(false);
+    expect(itemData(dir, "task-rate-limit")).toMatchObject({
+      status: "in_progress",
+      assignee: "someone",
+    });
+  });
+
+  it("start refuses a stale canonical copy WITHOUT deleting a pre-existing branch (W4 review S1)", async () => {
+    const dir = seedGitTree();
+    // A pre-existing, unmerged branch the run did not create.
+    git(dir, ["branch", "feat/task-rate-limit"]);
+    // Uncommitted claim in the canonical tree: the fresh worktree (HEAD) would
+    // not see it, so the kernel would validate a stale claim state.
+    runUpdate({ cwd: dir, id: "task-rate-limit", status: "in_progress", assignee: "someone" });
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    expect(String((typed.envelope.error as { message?: unknown }).message)).toContain(
+      "uncommitted tracker changes",
+    );
+    // The worktree this run created is gone; the branch it did NOT create stays.
+    expect(calls.remove).toHaveLength(1);
+    expect(existsSync(join(dirname(dir), `${basename(dir)}-task-rate-limit`))).toBe(false);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toContain(
+      "feat/task-rate-limit",
+    );
+  });
+
+  it("start refuses a claim steal WITHOUT deleting a pre-existing branch (W4 review S1)", async () => {
+    const dir = seedGitTree();
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    // Claim through the tool so the claim commit lands (realistic setup), then
+    // create the item branch at that claim commit: the run only switches to it.
+    await tool(defs, "update").execute({
+      id: "task-rate-limit",
+      status: "in_progress",
+      assignee: "someone",
+    });
+    git(dir, ["branch", "feat/task-rate-limit"]);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "intruder" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    expect((caught as ArgonToolError).code).toBe("START_FAILED");
+    // The worktree (checked out on the pre-existing branch) is removed; the
+    // branch survives because this run only switched to it.
+    expect(calls.remove).toHaveLength(1);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toContain(
+      "feat/task-rate-limit",
+    );
+    expect(itemData(dir, "task-rate-limit")).toMatchObject({
+      status: "in_progress",
+      assignee: "someone",
+    });
+  });
+
+  it("start refuses a recorded worktree_path that is not a worktree of this repo (W4 review S2)", async () => {
+    const dir = seedGitTree();
+    // A foreign git repository at the recorded path (not a worktree of `dir`).
+    const foreign = join(dirname(dir), `${basename(dir)}-foreign`);
+    mkdirSync(foreign, { recursive: true });
+    git(foreign, ["init", "-q"]);
+    git(foreign, ["config", "user.email", "foreign@example.com"]);
+    git(foreign, ["config", "user.name", "foreign"]);
+    writeFileSync(join(foreign, "README.md"), "foreign\n", "utf8");
+    git(foreign, ["add", "-A"]);
+    git(foreign, ["commit", "-qm", "foreign"]);
+    runUpdate({ cwd: dir, id: "task-rate-limit", worktreePath: foreign });
+
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    expect(String((typed.envelope.error as { message?: unknown }).message)).toContain(
+      "not a git worktree",
+    );
+    // Nothing was created or switched in the foreign repository.
+    expect(calls.create).toHaveLength(0);
+    expect(gitOut(foreign, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
+    expect(gitOut(foreign, ["branch", "--show-current"])).toBe("master");
+  });
+
+  it("start refuses a foreign repo at the deterministic default path (W4 review S2)", async () => {
+    const dir = seedGitTree();
+    const foreign = join(dirname(dir), `${basename(dir)}-task-rate-limit`);
+    mkdirSync(foreign, { recursive: true });
+    git(foreign, ["init", "-q"]);
+    git(foreign, ["config", "user.email", "foreign@example.com"]);
+    git(foreign, ["config", "user.name", "foreign"]);
+    writeFileSync(join(foreign, "README.md"), "foreign\n", "utf8");
+    git(foreign, ["add", "-A"]);
+    git(foreign, ["commit", "-qm", "foreign"]);
+
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    expect(String(((caught as ArgonToolError).envelope.error as { message?: unknown }).message)).toContain(
+      "not a git worktree",
+    );
+    expect(calls.create).toHaveLength(0);
+    expect(gitOut(foreign, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
+  });
+
+  it("start attaches to an existing deterministic worktree instead of claiming a fresh copy", async () => {
+    const dir = seedGitTree();
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const first = await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    const worktreePath = String((first.output as { worktreePath?: unknown }).worktreePath);
+
+    // The canonical copy never sees the claim (records live on the feature
+    // branch): a second start attaches to the fixed path and the worktree
+    // copy's claim rule refuses the steal.
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "intruder" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    expect((caught as ArgonToolError).code).toBe("START_FAILED");
+    expect(calls.create).toHaveLength(1);
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(itemData(dir, "task-rate-limit", worktreePath)).toMatchObject({
+      status: "in_progress",
+      assignee: "smoke",
+    });
+  });
+
+  it("start without the domain fails typed and names the CLI fallback", async () => {
+    const dir = seedGitTree();
+    const defs = definitions(dir); // no worktree wiring
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    expect(String((typed.envelope.error as { message?: unknown }).message)).toContain(
+      "arggon start --worktree",
+    );
+  });
+
+  it("branch records the convention branch name without touching git", async () => {
+    const dir = seedGitTree();
+    const defs = definitions(dir);
+    const output = await tool(defs, "branch").execute({ id: "task-rate-limit" });
+    expect(output.output.ok).toBe(true);
+    expect(output.output.command).toBe("branch");
+    expect(output.output.branch).toBe("feat/task-rate-limit");
+    expect(itemData(dir, "task-rate-limit")).toMatchObject({ branch: "feat/task-rate-limit" });
+  });
+
+  it("cleanup classification is byte-identical to `cleanup --json --no-gh` (list mode)", async () => {
+    const dir = seedGitTree();
+    const { defs } = await completedWorktree(dir);
+
+    const expected = runCli(["cleanup", "--no-gh"], dir);
+    expect(expected.status, expected.stderr).toBe(0);
+    const output = await tool(defs, "cleanup").execute({ no_gh: true });
+    expect(`${JSON.stringify(output.output)}\n`).toBe(expected.stdout);
+  });
+
+  it("cleanup prune removes through the domain, deletes the merged branch and clears worktree_path in one commit", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await completedWorktree(dir);
+
+    const output = await tool(defs, "cleanup").execute({ prune: true });
+    const envelope = output.output as Record<string, unknown>;
+    expect(envelope.ok).toBe(true);
+    expect(envelope.command).toBe("cleanup");
+    expect(envelope.failures).toEqual([]);
+
+    const candidates = envelope.candidates as Array<Record<string, unknown>>;
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]).toMatchObject({
+      id: "task-rate-limit",
+      status: "done",
+      branch: "feat/task-rate-limit",
+      removable: true,
+      reason: null,
+    });
+    expect(envelope.pruned).toEqual([
+      { id: "task-rate-limit", action: `removed worktree ${worktreePath}` },
+      { id: "task-rate-limit", action: "deleted branch feat/task-rate-limit" },
+      { id: "task-rate-limit", action: "cleared worktree_path" },
+    ]);
+    expect(envelope.commit).toMatchObject({ message: "chore(tasks): pruned task-rate-limit" });
+
+    // Domain removal (never a direct git worktree remove in the plugin path).
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: false },
+    ]);
+    expect(existsSync(worktreePath)).toBe(false);
+    expect(gitOut(dir, ["worktree", "list"]).includes("task-rate-limit")).toBe(false);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+    expect(itemData(dir, "task-rate-limit").status).toBe("done");
+  });
+
+  it("cleanup unlinks a start-created node_modules link before removing (CLI parity, W4 review)", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await completedWorktree(dir);
+    // The CLI links the primary checkout's install into fresh worktrees; git
+    // refuses to remove a worktree carrying that untracked symlink, so cleanup
+    // must unlink it first (only a symlink pointing at the canonical install).
+    mkdirSync(join(dir, "node_modules"), { recursive: true });
+    writeFileSync(join(dir, "node_modules", "marker.txt"), "install\n", "utf8");
+    symlinkSync(join(dir, "node_modules"), join(worktreePath, "node_modules"), "dir");
+
+    const output = await tool(defs, "cleanup").execute({ prune: true });
+    const envelope = output.output as Record<string, unknown>;
+    expect(envelope.failures).toEqual([]);
+    expect(JSON.stringify(envelope.pruned)).toContain(`removed worktree ${worktreePath}`);
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: false },
+    ]);
+    expect(existsSync(worktreePath)).toBe(false);
+    // The canonical install is untouched (the link is removed, never followed).
+    expect(existsSync(join(dir, "node_modules", "marker.txt"))).toBe(true);
+  });
+
+  it("cleanup without prune lists only and never touches the worktree", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await completedWorktree(dir);
+
+    const output = await tool(defs, "cleanup").execute({ no_gh: true });
+    const envelope = output.output as Record<string, unknown>;
+    expect((envelope.candidates as unknown[]).length).toBe(1);
+    expect(envelope.pruned).toEqual([]);
+    expect(envelope.commit).toBeUndefined();
+    expect(calls.remove).toEqual([]);
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBe(worktreePath);
+  });
+
+  it("cleanup skips non-terminal items and unmerged branches with a reason", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const started = await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    const worktreePath = String((started.output as { worktreePath?: unknown }).worktreePath);
+    // Merge the claim so the canonical copy carries the records; keep the item
+    // in_progress: only terminal items are pruned.
+    git(dir, ["merge", "--no-ff", "feat/task-rate-limit", "-m", "Merge claim (stubbed)"]);
+
+    const claimed = await tool(defs, "cleanup").execute({ no_gh: true });
+    const claimedCandidate = (claimed.output.candidates as Array<Record<string, unknown>>)[0];
+    expect(claimedCandidate.removable).toBe(false);
+    expect(String(claimedCandidate.reason)).toContain("item is in_progress");
+
+    // Done but unmerged (ancestry-only classification): skipped with a reason.
+    const otherPath = join(dirname(dir), `${basename(dir)}-task-other`);
+    git(dir, ["worktree", "add", "--detach", otherPath]);
+    writeFileSync(join(otherPath, "other.txt"), "other\n", "utf8");
+    git(otherPath, ["add", "other.txt"]);
+    git(otherPath, ["commit", "-qm", "other work"]);
+    git(otherPath, ["branch", "feat/task-other"]);
+    runUpdate({
+      cwd: dir,
+      id: "task-rate-limit",
+      status: "done",
+      branch: "feat/task-other",
+      worktreePath: otherPath,
+    });
+    const unmerged = await tool(defs, "cleanup").execute({ no_gh: true });
+    const unmergedCandidate = (unmerged.output.candidates as Array<Record<string, unknown>>)[0];
+    expect(unmergedCandidate.removable).toBe(false);
+    expect(String(unmergedCandidate.reason)).toContain("not fully merged");
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(existsSync(otherPath)).toBe(true);
+  });
+
+  it("cleanup fails typed outside a git repository", async () => {
+    const dir = seedTree(); // tracker, no git
+    const defs = definitions(dir);
+    let caught: unknown;
+    try {
+      await tool(defs, "cleanup").execute({});
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    expect((caught as ArgonToolError).code).toBe("CLEANUP_FAILED");
   });
 });

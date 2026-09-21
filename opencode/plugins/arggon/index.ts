@@ -25,6 +25,15 @@
  *      documented envelope. Kernel failures throw `ArgonToolError` (a typed
  *      tool error carrying the failure code and envelope), never a throw
  *      through a hook; the session continues.
+ *   2b. Worktree domain tools (W4, task-native-permissions-worktrees): `start`
+ *      (claim + branch record + item worktree through `ctx.worktree.create`,
+ *      `worktree_path` recorded in the worktree copy so the claim commit lands
+ *      on the feature branch), `branch` (convention branch bookkeeping) and
+ *      `cleanup` (kernel classification + `ctx.worktree.remove` + one tracker
+ *      commit). The kernel stays the authority (claim rules, records,
+ *      classification); the `gh` PR step and push stay explicit agent steps,
+ *      and the CLI (`arggon start --worktree` / `arggon cleanup --prune`) is
+ *      the documented fallback when the domain is unavailable.
  *   3. Session ↔ work-item correlation (ADR 0010 W3): remember the item id of
  *      every observed `arggon` invocation per session (`ctx.storage`), fall
  *      back to the VCS branch (`feat/<id>` / `fix/<id>`), and honor the
@@ -72,7 +81,7 @@
 
 import { execFile } from "node:child_process"
 import { existsSync } from "node:fs"
-import { dirname, join, resolve } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 /** Minimal structural typing: the generated file must not import plugin types. */
@@ -85,6 +94,28 @@ type StorageContext = {
 type VcsContext = {
   get?(input?: unknown): Promise<unknown>
 }
+
+/**
+ * Structural shape of the V2 worktree domain (`ctx.worktree`): every operation
+ * requires the project id, `create` loads the canonical checkout's
+ * configuration and returns the actual directory, `list` reads saved inventory
+ * (call `refresh` first to discover worktrees created outside the domain).
+ * Deliberately structural — the vendored file must not import plugin types.
+ */
+type WorktreeDomainLike = {
+  create?(input: {
+    projectID: string
+    name: string
+    directory?: string
+    branch?: string
+  }): Promise<unknown>
+  list?(input: { projectID: string }): Promise<unknown>
+  refresh?(input: { projectID: string }): Promise<unknown>
+  remove?(input: { projectID: string; directory: string; force?: boolean }): Promise<unknown>
+}
+
+/** `ctx.location.project` (id + canonical checkout) as the domain requires it. */
+type ProjectLike = { id?: unknown; canonical?: unknown; directory?: unknown }
 
 type SessionContext = {
   get?(input: { sessionID: string }): Promise<unknown>
@@ -111,11 +142,12 @@ type ToolContext = {
 }
 
 type PluginContext = {
-  location?: { directory?: unknown }
+  location?: { directory?: unknown; project?: ProjectLike }
   storage?: StorageContext
   vcs?: VcsContext
   session?: SessionContext
   tool?: ToolContext
+  worktree?: WorktreeDomainLike
 }
 
 type PluginDefinition = {
@@ -1211,10 +1243,11 @@ export const ARGON_TOOL_NAMESPACE_DESCRIPTION =
  * Core workflow tools pinned into the Code Mode catalog (W3, `options.pinned`,
  * an undocumented 2.0.10 runtime option — see the playbook). The runtime draws
  * a subset of the catalog under its own ~2000-token budget; pinning keeps the
- * tools the native commands depend on always rendered. The maintenance tools
- * (`report`, `priority`, `sync`, `import_issues`) stay unpinned and reachable
- * through `search`. Measured by `nativeToolsCatalogBytes` and
- * `smoke/context-report.ts`.
+ * tools the native commands depend on always rendered. W4 adds `start` (the
+ * claim → worktree entry point `/arggon-start` drives); the maintenance tools
+ * (`report`, `priority`, `sync`, `import_issues`, `branch`, `cleanup`) stay
+ * unpinned and reachable through `search`. Measured by
+ * `nativeToolsCatalogBytes` and `smoke/context-report.ts`.
  */
 export const PINNED_TOOL_NAMES: readonly string[] = [
   "list",
@@ -1225,6 +1258,7 @@ export const PINNED_TOOL_NAMES: readonly string[] = [
   "validate",
   "comment",
   "handoff",
+  "start",
 ]
 
 /** Bound of the envelope JSON appended to a typed tool error (see ArgonToolError). */
@@ -1266,6 +1300,23 @@ export type ArgonToolOptions = {
    * kernel embeds no templates). The repo's own `templates/` always wins.
    */
   templatesDir?: string
+  /**
+   * Worktree-domain wiring for `start`/`branch`/`cleanup` (W4): the V2
+   * `ctx.worktree` domain plus the project id/canonical checkout every domain
+   * operation requires (`ctx.location.project`). Feature-detected at setup:
+   * when absent, the worktree tools fail with a typed error and the CLI
+   * (`arggon start --worktree` / `arggon cleanup --prune`) stays the fallback.
+   */
+  worktree?: ArgonWorktreeOptions
+}
+
+export type ArgonWorktreeOptions = {
+  /** `ctx.location.project.id` — required by every domain operation. */
+  projectID?: string
+  /** `ctx.location.project.canonical` — the domain's configuration root. */
+  canonical?: string
+  /** The V2 worktree domain (`create`/`list`/`refresh`/`remove`). */
+  domain?: WorktreeDomainLike
 }
 
 /**
@@ -1376,7 +1427,7 @@ type ArgonToolSpec = {
     input: Record<string, unknown>,
     options: ArgonToolOptions,
     tool?: ArgonToolCallContext,
-  ) => { ok: boolean; envelope: Record<string, unknown> }
+  ) => { ok: boolean; envelope: Record<string, unknown> } | Promise<{ ok: boolean; envelope: Record<string, unknown> }>
 }
 
 const ID = { type: "string" }
@@ -1386,7 +1437,7 @@ const BOOLEAN = { type: "boolean" }
 const NUMBER = { type: "number" }
 
 /**
- * The twelve native tools (spec-native-first-011 §Tools), each one a thin
+ * The twelve kernel tools (spec-native-first-011 §Tools), each one a thin
  * adapter over its kernel operation. Inputs mirror the CLI/MCP option surface
  * (arrays where the kernel takes lists); outputs are the documented envelopes.
  *
@@ -1502,7 +1553,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
   {
     name: "update",
     description:
-      "Update one item's frontmatter (status, claim, parent, labels, priority, depends_on). Agent rules: done/cancelled never reopen, claims are never stolen.",
+      "Update one item's frontmatter (status, claim, parent, labels, priority, depends_on); agents never reopen or steal.",
     input: {
       type: "object",
       properties: {
@@ -1577,7 +1628,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
   {
     name: "show",
     description:
-      "Read one work item bounded (ADR 0006): frontmatter plus the last comments; `body: true` is the unbounded opt-in. Pure read.",
+      "Read one work item bounded (ADR 0006): frontmatter plus the last comments; `body: true` is the opt-in. Pure read.",
     input: {
       type: "object",
       properties: {
@@ -1662,7 +1713,7 @@ const TOOL_SPECS: ArgonToolSpec[] = [
   {
     name: "validate",
     description:
-      "Validate tracker frontmatter and tree integrity. Pure read; a tree with errors raises a typed tool error carrying the envelope.",
+      "Validate tracker frontmatter and tree integrity. Pure read; errors raise a typed tool error carrying the envelope.",
     input: { type: "object", properties: {}, additionalProperties: false },
     output: envelopeSchema({
       layout: { type: "string" },
@@ -1860,6 +1911,742 @@ const TOOL_SPECS: ArgonToolSpec[] = [
   },
 ]
 
+// ---------------------------------------------------------------------------
+// Worktree domain (W4, task-native-permissions-worktrees)
+// ---------------------------------------------------------------------------
+
+/**
+ * The worktree lifecycle tools (`start`, `branch`, `cleanup`) use the V2
+ * worktree domain (`ctx.worktree.create/list/remove`) instead of shelling out
+ * `git worktree`: item worktrees are named `<repo>-<id>`, created next to the
+ * canonical checkout (`../<repo>-<id>`, the `arggon start --worktree`
+ * convention) and removed through the domain on cleanup. The kernel stays the
+ * authority for everything it owns — claim rules, the branch and
+ * `worktree_path` records, cleanup classification — and the `gh` PR step stays
+ * an explicit agent tool call, never part of `start`.
+ *
+ * Probes on 2.0.10 (docs/playbooks/opencode.md):
+ * - every domain operation requires `projectID` (`ctx.location.project.id`)
+ *   and loads configuration from the project's saved `canonical` checkout
+ * - `create({ projectID, name, directory })` treats `directory` as the parent
+ *   and returns the actual directory; the Git strategy checks out a DETACHED
+ *   worktree at the start ref, so creating/switching the item branch is ours
+ *   (`git switch -c`, exactly what `git worktree add -b` does for the CLI)
+ * - `list` reads saved inventory only — `refresh` first discovers worktrees
+ *   created outside the domain; `remove` works for any worktree of the project
+ *   (force required for dirty ones).
+ *
+ * Fallback: when the domain (or the project id) is unavailable the tools fail
+ * with a typed error naming the CLI path that predates the domain
+ * (`arggon start --worktree`, `arggon cleanup --prune`).
+ *
+ * Ownership rules (W4 review): an attach — the recorded `worktree_path` or the
+ * deterministic default — only ever adopts a directory registered as a
+ * worktree of THIS repo (a foreign repository at that path is refused before
+ * any branch is created or switched); a rollback removes only the worktree
+ * this run created and deletes only the branch this run created (a
+ * pre-existing branch survives a refused claim); `cleanup` unlinks a
+ * start-created `node_modules` link before removing, like the CLI.
+ */
+
+/** Worktree wiring resolved from the plugin context at setup. */
+export function worktreeOptions(ctx: PluginContext): ArgonWorktreeOptions {
+  const project = ctx.location?.project
+  const projectID = asString(project?.id)
+  const canonical = asString(project?.canonical)
+  return {
+    ...(projectID !== undefined ? { projectID } : {}),
+    ...(canonical !== undefined ? { canonical } : {}),
+    ...(ctx.worktree !== undefined ? { domain: ctx.worktree } : {}),
+  }
+}
+
+/** Typed failure envelope for a worktree tool (never a throw through hooks). */
+function worktreeFail(
+  kernel: ArgonKernel,
+  command: string,
+  code: string,
+  message: string,
+  conventionVersion?: number,
+): { ok: false; envelope: Record<string, unknown> } {
+  return {
+    ok: false,
+    envelope: kernel.failEnvelope({
+      command,
+      code,
+      message,
+      ...(conventionVersion !== undefined ? { conventionVersion } : {}),
+    }),
+  }
+}
+
+/**
+ * Run a worktree tool body with the plugin's failure-isolation contract: an
+ * unexpected exception (a kernel throw, a broken domain promise) becomes a
+ * typed failure envelope instead of a raw throw through the tool boundary.
+ */
+async function guarded(
+  kernel: ArgonKernel,
+  command: string,
+  code: string,
+  body: () => Promise<{ ok: boolean; envelope: Record<string, unknown> }>,
+): Promise<{ ok: boolean; envelope: Record<string, unknown> }> {
+  try {
+    return await body()
+  } catch (error) {
+    logOnce(`worktree-${command}`, `${command} failed unexpectedly`, error)
+    return worktreeFail(kernel, command, code, detail(error))
+  }
+}
+
+/** Re-label a kernel failure envelope for the calling tool (command + code). */
+function remapFailure(
+  envelope: Record<string, unknown>,
+  command: string,
+  code: string,
+): { ok: false; envelope: Record<string, unknown> } {
+  const error =
+    envelope.error !== null && typeof envelope.error === "object"
+      ? (envelope.error as Record<string, unknown>)
+      : {}
+  return { ok: false, envelope: { ...envelope, command, error: { ...error, code } } }
+}
+
+/** Repo root for a session directory (throws outside a tracker tree). */
+function sessionRoot(kernel: ArgonKernel, cwd: string): string {
+  return kernel.repoRootFromTasks(kernel.findTasksDir(cwd))
+}
+
+/**
+ * Branch name for an item: explicit input > recorded `branch` field > the
+ * convention's `branch_patterns` pattern for its type.
+ */
+function itemBranch(
+  kernel: ArgonKernel,
+  root: string,
+  item: Record<string, unknown>,
+  explicit: unknown,
+): string {
+  const requested = asString(explicit) ?? asString(item.branch)
+  if (requested !== undefined) return requested
+  const type = asString(item.type) as keyof typeof kernel.DEFAULT_BRANCH_PATTERNS | undefined
+  const config = kernel.readConventionConfig(root)
+  const pattern =
+    (type !== undefined ? config.branchPatterns[type] : undefined) ??
+    (type !== undefined ? kernel.DEFAULT_BRANCH_PATTERNS[type] : undefined) ??
+    "feat/{id}"
+  return kernel.resolveBranchName(pattern, {
+    id: asString(item.id) ?? "",
+    type: (type ?? "task") as (typeof kernel.ITEM_TYPES)[number],
+  })
+}
+
+/** Canonical checkout root: `ctx.location.project.canonical`, else the repo root. */
+function canonicalRoot(options: ArgonToolOptions, fallback: string): string {
+  return asString(options.worktree?.canonical) ?? fallback
+}
+
+/**
+ * Create the item worktree through the domain: parent `../<repo>-<id>` next to
+ * the canonical checkout, name `<repo>-<id>`. Returns the actual directory or
+ * an actionable error (the CLI fallback when the domain is unavailable).
+ */
+async function createItemWorktree(
+  options: ArgonToolOptions,
+  repoRoot: string,
+  id: string,
+): Promise<{ directory?: string; error?: string }> {
+  const domain = options.worktree?.domain
+  const projectID = asString(options.worktree?.projectID)
+  if (domain?.create === undefined || projectID === undefined) {
+    return {
+      error:
+        "the OpenCode worktree domain is unavailable (ctx.worktree.create/project id missing); " +
+        "use the CLI fallback `arggon start --worktree`",
+    }
+  }
+  const canonical = canonicalRoot(options, repoRoot)
+  const name = `${basename(canonical)}-${id}`
+  try {
+    const created = (await domain.create({
+      projectID,
+      name,
+      directory: resolve(canonical, ".."),
+    })) as { directory?: unknown } | undefined
+    const directory = asString(created?.directory)
+    if (directory === undefined) {
+      return { error: "the worktree domain returned no directory for " + name }
+    }
+    return { directory }
+  } catch (error) {
+    return { error: `worktree domain create failed for '${name}': ${detail(error)}` }
+  }
+}
+
+/**
+ * Remove a worktree this run created (claim refused / branch setup failed) and
+ * — only when this run also created the branch — delete it, so a lost race
+ * leaves nothing behind without ever destroying a pre-existing branch.
+ * Best-effort by design: a rollback failure is logged, never thrown, and never
+ * hides the original error.
+ */
+async function discardWorktree(
+  options: ArgonToolOptions,
+  directory: string,
+  branch?: string,
+): Promise<void> {
+  const domain = options.worktree?.domain
+  const projectID = asString(options.worktree?.projectID)
+  if (domain?.remove !== undefined && projectID !== undefined) {
+    try {
+      await domain.remove({ projectID, directory, force: true })
+    } catch (error) {
+      logOnce("worktree-rollback", "worktree domain rollback failed", error)
+    }
+  } else {
+    await run("git", ["worktree", "remove", "--force", directory], options.cwd, 30_000)
+  }
+  if (branch !== undefined) {
+    await run("git", ["branch", "-D", branch], options.cwd, 10_000)
+  }
+}
+
+/**
+ * Check out the item branch inside a fresh worktree. The domain creates a
+ * DETACHED worktree, so a new branch is created from its HEAD (`switch -c`)
+ * an existing branch is switched to. Never force: a branch checked out in
+ * another worktree fails with git's own message.
+ */
+async function ensureWorktreeBranch(
+  worktreePath: string,
+  branch: string,
+): Promise<{ ok: boolean; created: boolean; error?: string }> {
+  const exists = await run(
+    "git",
+    ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`],
+    worktreePath,
+    10_000,
+  )
+  if (exists.code === 0) {
+    const switched = await run("git", ["switch", branch], worktreePath, 10_000)
+    return switched.code === 0
+      ? { ok: true, created: false }
+      : { ok: false, created: false, error: switched.stderr.trim() || `git switch ${branch} failed` }
+  }
+  const created = await run("git", ["switch", "-c", branch], worktreePath, 10_000)
+  return created.code === 0
+    ? { ok: true, created: true }
+    : { ok: false, created: false, error: created.stderr.trim() || `git switch -c ${branch} failed` }
+}
+
+/**
+ * True when `path` is a worktree registered with the repo at `canonical`
+ * (the deterministic-attach guard: an existing directory that is NOT a
+ * worktree of this repo is never adopted).
+ */
+async function isRegisteredWorktree(canonical: string, path: string): Promise<boolean> {
+  const listed = await run("git", ["worktree", "list", "--porcelain"], canonical, 10_000)
+  if (listed.code !== 0) return false
+  const target = resolve(path)
+  return listed.stdout
+    .split("\n")
+    .filter((line) => line.startsWith("worktree "))
+    .map((line) => resolve(line.slice("worktree ".length).trim()))
+    .includes(target)
+}
+
+/**
+ * Claim-relevant fields that differ between the canonical working tree and the
+ * fresh worktree copy (HEAD). A non-undefined result means the canonical copy
+ * carries uncommitted tracker changes the worktree cannot see, so the kernel
+ * would validate a stale claim state — the native `start` refuses instead.
+ */
+async function staleClaimFields(
+  kernel: ArgonKernel,
+  canonicalCwd: string,
+  worktreePath: string,
+  id: string,
+): Promise<string | undefined> {
+  const fields = ["status", "assignee", "branch", "worktree_path"] as const
+  const read = (cwd: string): Record<string, unknown> | undefined => {
+    const shown = kernel.showOperation({ cwd, id, meta: true })
+    return shown.ok ? ((shown.envelope.item ?? {}) as Record<string, unknown>) : undefined
+  }
+  const canonical = read(canonicalCwd)
+  const worktree = read(worktreePath)
+  if (canonical === undefined || worktree === undefined) return undefined
+  const differing = fields.filter((field) => {
+    const left = canonical[field] ?? null
+    const right = worktree[field] ?? null
+    return left !== right
+  })
+  return differing.length === 0 ? undefined : differing.join(", ")
+}
+
+/**
+ * `start` (native): claim + branch record + worktree through the domain, with
+ * every rule enforced by the kernel (`updateOperation` with `agent: true` —
+ * never steal a claim, never reopen). The claim/`branch`/`worktree_path`
+ * records are written INSIDE the worktree so the claim commit lands on the
+ * feature branch and the canonical checkout stays untouched, exactly like
+ * `arggon start --worktree`. The PR step (`gh`) is deliberately not part of
+ * the tool.
+ */
+async function nativeStart(
+  kernel: ArgonKernel,
+  input: Record<string, unknown>,
+  options: ArgonToolOptions,
+): Promise<{ ok: boolean; envelope: Record<string, unknown> }> {
+  const id = asString(input.id)
+  if (id === undefined) return worktreeFail(kernel, "start", "START_FAILED", "id is required")
+  let root: string
+  try {
+    root = sessionRoot(kernel, options.cwd)
+  } catch (error) {
+    return worktreeFail(kernel, "start", "START_FAILED", detail(error))
+  }
+  const version = kernel.readConventionVersion(root)
+  const show = kernel.showOperation({ cwd: options.cwd, id, meta: true })
+  if (!show.ok) return remapFailure(show.envelope, "start", "START_FAILED")
+  const item = (show.envelope.item ?? {}) as Record<string, unknown>
+  const assignee =
+    asString(input.assignee) ?? asString(kernel.resolveCurrentLogin()) ?? undefined
+  if (assignee === undefined) {
+    return worktreeFail(
+      kernel,
+      "start",
+      "START_FAILED",
+      "could not resolve assignee (pass assignee, or set GITHUB_USER/GITHUB_ACTOR, or authenticate gh)",
+      version,
+    )
+  }
+  const branch = itemBranch(kernel, root, item, input.branch)
+
+  const wantWorktree = input.worktree !== false
+  let worktreePath = asString(item.worktree_path)
+  if (worktreePath !== undefined && !existsSync(worktreePath)) worktreePath = undefined
+  let worktreeCreated = false
+  let branchCreated = false
+  if (wantWorktree) {
+    const canonical = canonicalRoot(options, root)
+    if (worktreePath === undefined) {
+      // Deterministic attach (CLI parity): a previous start's records live on
+      // its feature branch, so the canonical copy cannot see them — the fixed
+      // `../<repo>-<id>` path is what makes a second start attach to the
+      // existing worktree instead of claiming a fresh one.
+      const defaultPath = join(resolve(canonical, ".."), `${basename(canonical)}-${id}`)
+      if (existsSync(defaultPath)) worktreePath = defaultPath
+    }
+    if (worktreePath !== undefined) {
+      // Attach guard for BOTH paths (recorded `worktree_path` and the
+      // deterministic default): a directory that is not a worktree of THIS
+      // repo is never adopted — otherwise `start` would create/switch branches
+      // inside a foreign repository that happens to sit at that path.
+      if (!(await isRegisteredWorktree(canonical, worktreePath))) {
+        return worktreeFail(
+          kernel,
+          "start",
+          "START_FAILED",
+          `${worktreePath} exists but is not a git worktree of this repo ` +
+            "(move or remove the path first, or use the CLI fallback `arggon start --worktree`)",
+          version,
+        )
+      }
+    } else {
+      const created = await createItemWorktree(options, root, id)
+      if (created.directory === undefined) {
+        return worktreeFail(kernel, "start", "START_FAILED", created.error ?? "worktree creation failed", version)
+      }
+      worktreePath = created.directory
+      worktreeCreated = true
+      // The fresh worktree reflects HEAD; the canonical working tree may be
+      // ahead (an uncommitted claim would be invisible here and the kernel
+      // would re-claim a stale copy). Refuse instead of guessing.
+      const stale = await staleClaimFields(kernel, options.cwd, worktreePath, id)
+      if (stale !== undefined) {
+        // The branch was not created yet (no `ensureWorktreeBranch`): the
+        // rollback removes only the worktree this run created.
+        await discardWorktree(options, worktreePath)
+        return worktreeFail(
+          kernel,
+          "start",
+          "START_FAILED",
+          `the canonical checkout has uncommitted tracker changes for '${id}' (${stale}); ` +
+            "commit or discard them, or use the CLI fallback `arggon start --worktree` " +
+            "(the worktree created by this run was removed again)",
+          version,
+        )
+      }
+    }
+    const ensured = await ensureWorktreeBranch(worktreePath, branch)
+    if (!ensured.ok) {
+      // `ensured.created` is false whenever setup failed, so this run never
+      // created the branch: never delete it on rollback.
+      if (worktreeCreated) await discardWorktree(options, worktreePath)
+      return worktreeFail(
+        kernel,
+        "start",
+        "START_FAILED",
+        `branch setup failed in ${worktreePath}: ${ensured.error ?? "unknown git error"}`,
+        version,
+      )
+    }
+    branchCreated = ensured.created
+  }
+
+  const target = worktreePath ?? options.cwd
+  const update = kernel.updateOperation({
+    cwd: target,
+    id,
+    status: "in_progress",
+    assignee,
+    branch,
+    ...(worktreePath !== undefined ? { worktreePath } : {}),
+    agent: true,
+  })
+  if (!update.ok) {
+    // A lost race must not leave the worktree this run created behind: the
+    // native domain has no item record to reap it from later. Only a branch
+    // THIS run created is deleted — a pre-existing branch (an attach) survives.
+    if (worktreeCreated && worktreePath !== undefined) {
+      await discardWorktree(options, worktreePath, branchCreated ? branch : undefined)
+    }
+    const failure = remapFailure(update.envelope, "start", "START_FAILED")
+    if (worktreeCreated && worktreePath !== undefined) {
+      const error = failure.envelope.error as Record<string, unknown>
+      error.message = `${String(error.message)} (the worktree created by this run was removed again)`
+    }
+    return failure
+  }
+
+  let pushed = false
+  if (input.push === true && worktreePath !== undefined) {
+    const push = await run("git", ["push", "-u", "origin", branch], worktreePath, 60_000)
+    if (push.code !== 0) {
+      return worktreeFail(
+        kernel,
+        "start",
+        "START_FAILED",
+        `push failed (${push.stderr.trim() || `git push exit ${push.code}`}); the worktree was kept at ${worktreePath}`,
+        version,
+      )
+    }
+    pushed = true
+  }
+
+  return {
+    ok: true,
+    envelope: kernel.successEnvelope(
+      "start",
+      {
+        id,
+        branch,
+        worktreePath: worktreePath ?? null,
+        worktreeCreated,
+        branchCreated,
+        pushed,
+        item: update.envelope.item,
+        ...(update.envelope.commit !== undefined ? { commit: update.envelope.commit } : {}),
+      },
+      version,
+    ),
+  }
+}
+
+/** `branch` (native): record the convention branch name on an item (kernel bookkeeping; the worktree owns the git branch). */
+function nativeBranch(
+  kernel: ArgonKernel,
+  input: Record<string, unknown>,
+  options: ArgonToolOptions,
+): { ok: boolean; envelope: Record<string, unknown> } {
+  const id = asString(input.id)
+  if (id === undefined) return worktreeFail(kernel, "branch", "BRANCH_FAILED", "id is required")
+  let root: string
+  try {
+    root = sessionRoot(kernel, options.cwd)
+  } catch (error) {
+    return worktreeFail(kernel, "branch", "BRANCH_FAILED", detail(error))
+  }
+  const version = kernel.readConventionVersion(root)
+  const show = kernel.showOperation({ cwd: options.cwd, id, meta: true })
+  if (!show.ok) return remapFailure(show.envelope, "branch", "BRANCH_FAILED")
+  const branch = itemBranch(kernel, root, (show.envelope.item ?? {}) as Record<string, unknown>, input.branch)
+  const update = kernel.updateOperation({ cwd: options.cwd, id, branch, agent: true })
+  if (!update.ok) return remapFailure(update.envelope, "branch", "BRANCH_FAILED")
+  return {
+    ok: true,
+    envelope: kernel.successEnvelope(
+      "branch",
+      {
+        id,
+        branch,
+        item: update.envelope.item,
+        ...(update.envelope.commit !== undefined ? { commit: update.envelope.commit } : {}),
+      },
+      version,
+    ),
+  }
+}
+
+/** Domain-backed worktree inventory (refresh first: `list` reads saved state only). */
+async function domainWorktrees(options: ArgonToolOptions): Promise<string[]> {
+  const domain = options.worktree?.domain
+  const projectID = asString(options.worktree?.projectID)
+  if (domain?.list === undefined || projectID === undefined) return []
+  try {
+    if (domain.refresh !== undefined) await domain.refresh({ projectID })
+    const entries = await domain.list({ projectID })
+    if (!Array.isArray(entries)) return []
+    return entries
+      .map((entry) => asString((entry as { directory?: unknown } | undefined)?.directory))
+      .filter((directory): directory is string => directory !== undefined)
+  } catch (error) {
+    logOnce("worktree-list", "worktree domain inventory failed", error)
+    return []
+  }
+}
+
+/** Remove one worktree: the domain when available, `git worktree remove` as the compatibility fallback. */
+async function removeWorktree(
+  kernel: ArgonKernel,
+  options: ArgonToolOptions,
+  root: string,
+  directory: string,
+): Promise<void> {
+  const domain = options.worktree?.domain
+  const projectID = asString(options.worktree?.projectID)
+  if (domain?.remove !== undefined && projectID !== undefined) {
+    try {
+      await domain.remove({ projectID, directory, force: false })
+      return
+    } catch (error) {
+      logOnce("worktree-remove", "worktree domain remove failed; falling back to git", error)
+    }
+  }
+  kernel.defaultCleanupGit().removeWorktree(root, directory)
+}
+
+/**
+ * `cleanup` (native): classify every item with a `worktree_path` record with
+ * the shared kernel rule (`classifyCleanupEntry`, the same one the CLI uses)
+ * and, with `prune: true`, remove removable worktrees through the domain,
+ * delete their merged branches and clear the records in ONE tracker commit.
+ * Skips (non-terminal item, unmerged branch, missing/foreign path) are
+ * reported, never touched.
+ */
+async function nativeCleanup(
+  kernel: ArgonKernel,
+  input: Record<string, unknown>,
+  options: ArgonToolOptions,
+): Promise<{ ok: boolean; envelope: Record<string, unknown> }> {
+  let root: string
+  try {
+    root = sessionRoot(kernel, options.cwd)
+  } catch (error) {
+    return worktreeFail(kernel, "cleanup", "CLEANUP_FAILED", detail(error))
+  }
+  const version = kernel.readConventionVersion(root)
+  const git = kernel.defaultCleanupGit()
+  if (!git.isRepo(root)) {
+    return worktreeFail(kernel, "cleanup", "CLEANUP_FAILED", `not a git repository (${root}); cleanup needs git`, version)
+  }
+  let base: string
+  try {
+    base = git.defaultBranch(root)
+  } catch (error) {
+    return worktreeFail(kernel, "cleanup", "CLEANUP_FAILED", detail(error), version)
+  }
+
+  const tasksDir = kernel.findTasksDir(options.cwd)
+  const byId = kernel.itemsById(kernel.loadItems(tasksDir))
+  const tracked = [...byId.values()]
+    .filter((item) => (item.worktreePath ?? null) !== null)
+    .sort((a, b) => a.id.localeCompare(b.id))
+
+  const inventory = await domainWorktrees(options)
+  const runner = {
+    ...git,
+    // The domain inventory is the native source; git's list is the fallback
+    // (e.g. a worktree the domain has not refreshed yet).
+    worktreeList: (cwd: string): string[] =>
+      inventory.length > 0 ? inventory : git.worktreeList(cwd),
+  }
+  const entries = tracked.map((item) =>
+    kernel.classifyCleanupEntry(item, root, base, runner, { noGh: input.no_gh === true }),
+  )
+
+  const pruned: Array<Record<string, unknown>> = []
+  const failures: string[] = []
+  const clearedPaths: string[] = []
+  const clearedIds: string[] = []
+  if (input.prune === true) {
+    for (const entry of entries.filter((candidate) => candidate.removable)) {
+      try {
+        if (entry.action?.startsWith("remove worktree")) {
+          // CLI parity: a start-created `node_modules` link is untracked and
+          // git refuses to remove a worktree that carries it, so unlink it
+          // first — the kernel helper only removes a symlink pointing at the
+          // canonical (or current) checkout's install, never a real directory.
+          const canonical = canonicalRoot(options, root)
+          kernel.unlinkNodeModulesLink(canonical, entry.path)
+          if (resolve(canonical) !== resolve(root)) {
+            kernel.unlinkNodeModulesLink(root, entry.path)
+          }
+          await removeWorktree(kernel, options, root, entry.path)
+          pruned.push({
+            id: entry.id,
+            action: `removed worktree ${entry.path}`,
+            ...(entry.via !== undefined ? { via: entry.via } : {}),
+          })
+        }
+        if (entry.branch !== null && git.branchExists(root, entry.branch)) {
+          try {
+            // Squash-merged entries need -D: their tip is not an ancestor of
+            // base (that is why the PR lookup ran).
+            if (entry.via !== undefined) git.deleteBranchForce(root, entry.branch)
+            else git.deleteBranch(root, entry.branch)
+            pruned.push({
+              id: entry.id,
+              action: `deleted branch ${entry.branch}`,
+              ...(entry.via !== undefined ? { via: entry.via } : {}),
+            })
+          } catch (error) {
+            pruned.push({
+              id: entry.id,
+              action: "failed",
+              error: detail(error),
+              leftoverBranch: entry.branch,
+            })
+          }
+        }
+        const cleared = kernel.updateOperation({
+          cwd: root,
+          id: entry.id,
+          worktreePath: "",
+          commit: false,
+          agent: true,
+        })
+        if (!cleared.ok) throw new Error(kernelError(cleared.envelope))
+        pruned.push({ id: entry.id, action: "cleared worktree_path" })
+        clearedPaths.push(byId.get(entry.id)!.filePath)
+        clearedIds.push(entry.id)
+      } catch (error) {
+        const message = detail(error)
+        failures.push(`${entry.id}: ${message}`)
+        pruned.push({ id: entry.id, action: "failed", error: message })
+      }
+    }
+  }
+
+  // One tracker commit for every cleared record (surgical staging; the kernel
+  // resolves `x-tracker.auto-commit`), exactly like `cleanup --prune`.
+  let commit: unknown
+  if (clearedPaths.length > 0) {
+    commit = kernel.commitTrackerMutation(root, clearedPaths, {
+      message: kernel.trackerCommitMessage("pruned", clearedIds),
+      commit: kernel.resolveAutoCommit(
+        input.no_commit === true ? false : undefined,
+        kernel.readAutoCommitConfig(root),
+      ),
+    })
+  }
+
+  return {
+    ok: true,
+    envelope: kernel.successEnvelope(
+      "cleanup",
+      {
+        base,
+        candidates: entries,
+        pruned,
+        failures,
+        ...(commit !== undefined ? { commit: kernel.commitPayload(commit as never) } : {}),
+      },
+      version,
+    ),
+  }
+}
+
+/** Error message of a kernel failure envelope (for the cleanup failure list). */
+function kernelError(envelope: Record<string, unknown>): string {
+  const error =
+    envelope.error !== null && typeof envelope.error === "object"
+      ? (envelope.error as { message?: unknown })
+      : undefined
+  return asString(error?.message) ?? "unknown kernel failure"
+}
+
+/**
+ * Worktree-domain tools (W4): `start`, `branch`, `cleanup`. Inputs mirror the
+ * CLI surface where the native path supports it; outputs are `--json`-shaped
+ * envelopes with the native fields documented in `ArggonManager/docs/opencode2.md`.
+ */
+const WORKTREE_TOOL_SPECS: ArgonToolSpec[] = [
+  {
+    name: "start",
+    description:
+      "Claim an item and create its worktree through the worktree domain, recording branch + worktree_path. Never steals a claim.",
+    input: {
+      type: "object",
+      properties: {
+        id: ID,
+        assignee: { type: "string" },
+        branch: { type: "string" },
+        worktree: BOOLEAN,
+        push: BOOLEAN,
+      },
+      required: ["id"],
+      additionalProperties: false,
+    },
+    // Bare output schema on purpose: the definitions payload sits at the
+    // ADR 0006 advisory bound (`context:report --strict`) and the runtime drops
+    // catalog entries past its own ~2000-token budget, so the three worktree
+    // tools stay as lean as their contract allows. Their payload fields are
+    // documented in ArggonManager/docs/opencode2.md and asserted by the
+    // contract tests; the loose envelope never rejects a valid payload.
+    output: OBJECT,
+    run: (kernel, input, options) =>
+      guarded(kernel, "start", "START_FAILED", () => nativeStart(kernel, input, options)),
+  },
+  {
+    name: "branch",
+    description:
+      "Record the convention branch name (branch_patterns) on an item; the item worktree owns the git branch.",
+    input: {
+      type: "object",
+      properties: { id: ID, branch: { type: "string" } },
+      required: ["id"],
+      additionalProperties: false,
+    },
+    output: OBJECT,
+    run: (kernel, input, options) =>
+      guarded(kernel, "branch", "BRANCH_FAILED", async () => nativeBranch(kernel, input, options)),
+  },
+  {
+    name: "cleanup",
+    description:
+      "List (prune: true removes) worktrees of done/cancelled items whose branches are merged; clears worktree_path.",
+    input: {
+      type: "object",
+      properties: {
+        prune: BOOLEAN,
+        no_gh: {
+          type: "boolean",
+          description: "Ancestry-only (skip the squash-merged PR lookup).",
+        },
+        no_commit: BOOLEAN,
+      },
+      additionalProperties: false,
+    },
+    output: OBJECT,
+    run: (kernel, input, options) =>
+      guarded(kernel, "cleanup", "CLEANUP_FAILED", () => nativeCleanup(kernel, input, options)),
+  },
+]
+
+/** Kernel tools + worktree-domain tools (the complete `arggon` namespace). */
+const ALL_TOOL_SPECS: ArgonToolSpec[] = [...TOOL_SPECS, ...WORKTREE_TOOL_SPECS]
+
 /** Name/description/schemas of every native tool (kernel-free; measurement/tests). */
 export function nativeToolSchemas(): Array<{
   name: string
@@ -1868,7 +2655,7 @@ export function nativeToolSchemas(): Array<{
   output: Record<string, unknown>
   pinned: boolean
 }> {
-  return TOOL_SPECS.map((spec) => ({
+  return ALL_TOOL_SPECS.map((spec) => ({
     name: spec.name,
     description: spec.description,
     input: spec.input,
@@ -1903,13 +2690,13 @@ export function argonToolDefinitions(
   kernel: ArgonKernel,
   options: ArgonToolOptions,
 ): ArgonToolDefinition[] {
-  return TOOL_SPECS.map((spec) => ({
+  return ALL_TOOL_SPECS.map((spec) => ({
     name: spec.name,
     description: spec.description,
     input: spec.input,
     output: spec.output,
     execute: async (input, tool) => {
-      const outcome = spec.run(kernel, input ?? {}, options, tool)
+      const outcome = await spec.run(kernel, input ?? {}, options, tool)
       const envelope = outcome.envelope as Record<string, unknown>
       if (!outcome.ok) throw new ArgonToolError(envelope)
       return { output: envelope }
@@ -2019,11 +2806,16 @@ const definition: PluginDefinition = {
   async setup(ctx) {
     const disposers: Array<() => void> = []
     try {
-      // Native tools (W2): the namespace is registered per plugin instance,
-      // bound to this instance's location directory.
+      // Native tools (W2) + worktree domain tools (W4): the namespace is
+      // registered per plugin instance, bound to this instance's location
+      // directory and (feature-detected) its worktree domain + project id.
       const directory = locationDirectory(ctx)
       if (directory !== undefined) {
-        await registerArgonTools(ctx, { cwd: directory, templatesDir: pluginTemplatesDir() })
+        await registerArgonTools(ctx, {
+          cwd: directory,
+          templatesDir: pluginTemplatesDir(),
+          worktree: worktreeOptions(ctx),
+        })
       }
     } catch (error) {
       logOnce("tools", "native tool registration unavailable", error)

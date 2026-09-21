@@ -8,10 +8,41 @@ permissions:
   - action: subagent
     resource: "*"
     effect: deny
-  # Tool-level least privilege (NIT-14, probe-verified on a real V2 session):
-  # MCP tool actions normalize to `<server>_<tool>` = arggon_arggon_<tool>.
-  # The reviewer reads and posts its verdict with arggon_comment; tracker
-  # mutations beyond that are denied.
+  # Tool-level least privilege (NIT-14; native names re-probed in W4,
+  # task-native-permissions-worktrees): a native tool action normalizes to
+  # `<namespace>_<tool>` = arggon_<tool>, an MCP tool to
+  # `<server>_<tool>` = arggon_arggon_<tool>. Both spellings are denied so the
+  # rule holds whichever surface the adopter runs. EVERY mutating tracker tool
+  # is denied — including the W4 worktree lifecycle (start/branch/cleanup) and
+  # the maintenance writes (priority/sync/import_issues); the reviewer reads
+  # with `show` and posts its verdict with `comment`.
+  - action: arggon_create
+    resource: "*"
+    effect: deny
+  - action: arggon_update
+    resource: "*"
+    effect: deny
+  - action: arggon_handoff
+    resource: "*"
+    effect: deny
+  - action: arggon_start
+    resource: "*"
+    effect: deny
+  - action: arggon_branch
+    resource: "*"
+    effect: deny
+  - action: arggon_cleanup
+    resource: "*"
+    effect: deny
+  - action: arggon_priority
+    resource: "*"
+    effect: deny
+  - action: arggon_sync
+    resource: "*"
+    effect: deny
+  - action: arggon_import_issues
+    resource: "*"
+    effect: deny
   - action: arggon_arggon_create
     resource: "*"
     effect: deny
@@ -20,6 +51,20 @@ permissions:
     effect: deny
   - action: arggon_arggon_handoff
     resource: "*"
+    effect: deny
+  # Minimal shell gates (W4): the reviewer inspects, runs tests and reads
+  # history — it never mutates the tree or the history it reviews.
+  - action: shell
+    resource: "git commit*"
+    effect: deny
+  - action: shell
+    resource: "git push*"
+    effect: deny
+  - action: shell
+    resource: "git merge*"
+    effect: deny
+  - action: shell
+    resource: "git rebase*"
     effect: deny
 ---
 

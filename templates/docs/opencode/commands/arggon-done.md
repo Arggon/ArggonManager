@@ -14,5 +14,9 @@ Close $ARGUMENTS following the done criteria:
 3. Flip the item with `tools.arggon.update({ id, status: "done" })` — pass
    `{ no_cascade: true }` when an administrative item must not auto-complete
    product containers.
-4. If you are a worker subagent: stop at step 2 and report to the coordinator.
+4. Reap the merged worktree with `tools.arggon.cleanup({ prune: true })`: it
+   removes the worktree through the OpenCode worktree domain, deletes the
+   merged branch and clears the item's `worktree_path` record. Run it without
+   `prune` first to inspect the candidates; skipped entries name their reason.
+5. If you are a worker subagent: stop at step 2 and report to the coordinator.
    Completion is the coordinator's call after merge.

@@ -7,9 +7,9 @@ For humans and AI agents working on **{{PROJECT_NAME}}**. Work items live in-tre
 ## Task workflow
 
 1. **Find work:** `/arggon-next` (`tools.arggon.next`); `arggon list --status todo --json` for a full scan.
-2. **Claim before starting:** `tools.arggon.update({ id, status: "in_progress", assignee })` or `/arggon-start <id>`. Never steal a claim.
-3. **One branch per item:** `feat/<id>` / `fix/<id>` in a git worktree, not the primary checkout.
-4. Open a small PR referencing the item id.
+2. **Claim before starting:** `/arggon-start <id>` or `tools.arggon.start({ id, assignee })`; never steal a claim.
+3. **One branch per item:** `feat/<id>` / `fix/<id>` in `../<repo>-<id>`, not the primary checkout.
+4. Open a small PR referencing the item id; reap merged worktrees with `tools.arggon.cleanup({ prune: true })`.
 5. **Done** = acceptance checklist complete + item `done` + PR merged. **Never reopen** `done`/`cancelled`; file follow-ups with `tools.arggon.create`.
 
 ### Orchestration

@@ -192,6 +192,14 @@ export { HANDOFF_FIELD_CAP, HANDOFF_SESSION_CAP, runHandoff } from "./handoff.js
 export type { HandoffOptions, HandoffResult } from "./handoff.js";
 export { runSync } from "./sync-command.js";
 export type { SyncResult } from "./sync-types.js";
+export {
+  CLEANUP_TERMINAL_STATUSES,
+  classifyCleanupEntry,
+  defaultCleanupGit,
+  findMergedPr,
+} from "./cleanup.js";
+export type { ClassifyCleanupDeps, CleanupEntry, CleanupGit, MergedPr } from "./cleanup.js";
+export { linkNodeModules, unlinkNodeModulesLink } from "./worktree.js";
 export { runImportIssues } from "./import-issues.js";
 export type { GhExecutor, ImportIssuesOptions, ImportIssuesResult } from "./import-issues.js";
 export {

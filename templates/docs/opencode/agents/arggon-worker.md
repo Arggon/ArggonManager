@@ -5,10 +5,15 @@ permissions:
   - action: subagent
     resource: "*"
     effect: deny
-  # Tool-level least privilege (NIT-14, probe-verified on a real V2 session):
-  # MCP tool actions normalize to `<server>_<tool>` = arggon_arggon_<tool>.
-  # The worker reports findings to the coordinator instead of filing tracker
-  # items itself, so arggon_create is denied.
+  # Tool-level least privilege (NIT-14; native names re-probed in W4,
+  # task-native-permissions-worktrees): a native tool action normalizes to
+  # `<namespace>_<tool>` = arggon_create, an MCP tool to
+  # `<server>_<tool>` = arggon_arggon_create. The worker reports findings to
+  # the coordinator instead of filing tracker items itself, so both spellings
+  # of `create` are denied.
+  - action: arggon_create
+    resource: "*"
+    effect: deny
   - action: arggon_arggon_create
     resource: "*"
     effect: deny
