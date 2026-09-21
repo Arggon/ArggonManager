@@ -14,7 +14,13 @@ import { join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCreate, runUpdate } from "@arggon/lib";
 import { runInit } from "./init.js";
-import { linkNodeModules, runStart, unlinkNodeModulesLink, type StartGit } from "./start.js";
+import {
+  linkNodeModules,
+  linkedWorkspacePackages,
+  runStart,
+  unlinkNodeModulesLink,
+  type StartGit,
+} from "./start.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -323,5 +329,63 @@ describe("unlinkNodeModulesLink (review F1/F2)", () => {
     expect(unlinkNodeModulesLink(primary, foreignWt)).toBe(false);
     expect(lstatSync(join(foreignWt, "node_modules")).isSymbolicLink()).toBe(true);
     expect(existsSync(join(other, "node_modules"))).toBe(true);
+  });
+});
+
+describe("linkedWorkspacePackages (W6/PR-374 review finding 2)", () => {
+  it("reports workspace packages the linked install resolves into the primary", () => {
+    const primary = mkdtempSync(join(tmpdir(), "arggon-linked-ws-primary-"));
+    const wt = mkdtempSync(join(tmpdir(), "arggon-linked-ws-wt-"));
+    // The repo's shape: a scoped workspace link in the primary install...
+    mkdirSync(join(primary, "node_modules", "@arggon"), { recursive: true });
+    mkdirSync(join(primary, "lib"), { recursive: true });
+    symlinkSync("../../lib", join(primary, "node_modules", "@arggon", "lib"), "dir");
+    // ...and the worktree's own copy of the same package.
+    mkdirSync(join(wt, "lib"), { recursive: true });
+
+    // The exact start shape: the whole primary install linked into the worktree.
+    expect(linkNodeModules(primary, wt)).toBe(true);
+    expect(linkedWorkspacePackages(primary, wt)).toEqual(["@arggon/lib"]);
+  });
+
+  it("stays silent once the worktree install resolves locally (npm ci shape)", () => {
+    const primary = mkdtempSync(join(tmpdir(), "arggon-linked-local-primary-"));
+    const wt = mkdtempSync(join(tmpdir(), "arggon-linked-local-wt-"));
+    mkdirSync(join(primary, "node_modules", "@arggon"), { recursive: true });
+    mkdirSync(join(primary, "lib"), { recursive: true });
+    symlinkSync("../../lib", join(primary, "node_modules", "@arggon", "lib"), "dir");
+    // npm reified the worktree's own workspace link to the worktree's copy.
+    mkdirSync(join(wt, "node_modules", "@arggon"), { recursive: true });
+    mkdirSync(join(wt, "lib"), { recursive: true });
+    symlinkSync("../../lib", join(wt, "node_modules", "@arggon", "lib"), "dir");
+
+    expect(linkedWorkspacePackages(primary, wt)).toEqual([]);
+  });
+
+  it("only reports links whose target also exists in the worktree, and only workspace ones", () => {
+    const primary = mkdtempSync(join(tmpdir(), "arggon-linked-scope-primary-"));
+    const wt = mkdtempSync(join(tmpdir(), "arggon-linked-scope-wt-"));
+    const nm = join(primary, "node_modules");
+    mkdirSync(nm, { recursive: true });
+    // A workspace package with no worktree copy: nothing is shadowed.
+    mkdirSync(join(primary, "packages", "only-here"), { recursive: true });
+    symlinkSync("../packages/only-here", join(nm, "only-here"), "dir");
+    // An unscoped workspace link whose copy DOES exist in the worktree.
+    mkdirSync(join(primary, "packages", "ws"), { recursive: true });
+    symlinkSync("../packages/ws", join(nm, "ws"), "dir");
+    mkdirSync(join(wt, "packages", "ws"), { recursive: true });
+    // An install-internal relative link: not a workspace copy.
+    mkdirSync(join(nm, "real-dep"), { recursive: true });
+    symlinkSync("./real-dep", join(nm, "alias"), "dir");
+    // An ordinary dependency (real directory) is never a link.
+    mkdirSync(join(nm, "typescript"), { recursive: true });
+
+    linkNodeModules(primary, wt);
+    expect(linkedWorkspacePackages(primary, wt)).toEqual(["ws"]);
+
+    // No install to inspect: silent, never throwing.
+    const bareWt = mkdtempSync(join(tmpdir(), "arggon-linked-bare-"));
+    expect(linkedWorkspacePackages(primary, bareWt)).toEqual([]);
+    expect(linkedWorkspacePackages(join(primary, "missing"), wt)).toEqual([]);
   });
 });

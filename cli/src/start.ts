@@ -7,6 +7,7 @@ import {
   findTasksDir,
   itemsById,
   linkNodeModules,
+  linkedWorkspacePackages,
   loadItems,
   readConventionConfig,
   repoRootFromTasks,
@@ -24,7 +25,7 @@ import {
  * share the ownership rule. Re-exported here for the CLI surface (and its
  * tests), which keeps importing them from `./start.js`.
  */
-export { linkNodeModules, unlinkNodeModulesLink } from "@arggon/lib";
+export { linkNodeModules, linkedWorkspacePackages, unlinkNodeModulesLink } from "@arggon/lib";
 import { runBranch, type GitRunner } from "./branch.js";
 
 export type StartOptions = {
@@ -81,6 +82,22 @@ export type StartResult = {
    * created, or the start ran without `--worktree`.
    */
   linkedNodeModules: boolean;
+  /**
+   * Workspace packages the worktree's install resolves into the **primary**
+   * checkout (W6/PR-374 review finding 2), e.g. `["@arggon/lib"]` in this repo:
+   * the worktree's spawned CLI/tests then run the primary's kernel build even
+   * though the worktree carries its own copy. Reported so the requirement is
+   * visible — build where the imports resolve, or give the worktree its own
+   * install (`npm ci`, e.g. via `x-worktree.post-start: npm ci`).
+   *
+   * Describes the state the worktree is LEFT in: recomputed after a configured
+   * `x-worktree.post-start` hook, so a hook that reifies a local install
+   * reports `[]` (the pre-hook link only ever existed for the claim-commit
+   * gate window — PR #384 review F2). Empty when the worktree has no install,
+   * resolves locally, or has no shadowed workspace package; set on attach runs
+   * too (the link may predate this run).
+   */
+  linkedWorkspaces: string[];
   /**
    * `x-worktree.post-start` outcome (task-start-post-hook): set only when a
    * new worktree was created, a hook is configured, and `--no-hook` was not
@@ -505,6 +522,7 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
       worktreePath: null,
       worktreeCreated: false,
       linkedNodeModules: false,
+      linkedWorkspaces: [],
       item: branch.item,
     };
   });
@@ -640,8 +658,12 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
   // and reports exactly where the flow stopped (bug-start-worktree-node-modules).
   let step = "preparing the worktree";
   let linkedNodeModules = false;
+  let linkedWorkspaces: string[] = [];
   try {
     linkedNodeModules = linkNodeModules(root, worktreePath);
+    // Reported regardless of who created the link: on attach runs the install
+    // (and its resolution) is still the primary's.
+    linkedWorkspaces = linkedWorkspacePackages(root, worktreePath);
 
     // All item writes and git steps run from the worktree from here on.
     step = "loading the item in the worktree";
@@ -724,6 +746,14 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       }
     }
 
+    // The post-start hook owns the worktree's install once it runs: the
+    // documented remediation for the linked install (`npm ci`) reifies a real
+    // local one, which flips the resolution to the worktree's own copies.
+    // Recompute, so the returned field describes the state the worktree is LEFT
+    // in — the pre-hook value only ever described the claim-commit gate window
+    // (PR #384 review F2).
+    linkedWorkspaces = linkedWorkspacePackages(root, worktreePath);
+
     return {
       id,
       path: itemInWorktree.filePath,
@@ -736,6 +766,7 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       worktreePath,
       worktreeCreated,
       linkedNodeModules,
+      linkedWorkspaces,
       postStart,
       item: finalItem,
     };

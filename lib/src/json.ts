@@ -1,4 +1,3 @@
-import type { Command } from "commander";
 import { CONVENTION_VERSION_DEFAULT } from "./convention.js";
 
 export type { Issue, ItemType, Status, WorkItem } from "./types.js";
@@ -18,10 +17,21 @@ export type JsonEnvelopeBase = {
   command: string;
 };
 
-let boundProgram: Command | undefined;
+/**
+ * The program view `jsonEnabled()` reads: the parsed global options. Structural
+ * on purpose (ADR 0013, W6/PR-374 review finding 1): importing commander's
+ * `Command` here would put `import type { Command } from "commander"` into the
+ * package's public `.d.ts`, and a consumer type-check would fail with TS2307
+ * because the kernel declares no commander dependency — the runtime is
+ * dependency-free and the types must not leak one. A real commander `Command`
+ * satisfies this shape, so the root adapter still binds its own program.
+ */
+export type JsonProgram = { opts(): { json?: unknown } };
 
-/** Bind the root commander program so `jsonEnabled()` can read global opts. */
-export function bindJsonProgram(program: Command): void {
+let boundProgram: JsonProgram | undefined;
+
+/** Bind the root program so `jsonEnabled()` can read global opts. */
+export function bindJsonProgram(program: JsonProgram): void {
   boundProgram = program;
 }
 
@@ -31,7 +41,7 @@ export function bindJsonProgram(program: Command): void {
  */
 export function jsonEnabled(cmdOpts?: { json?: unknown }): boolean {
   if (cmdOpts && cmdOpts.json) return true;
-  return Boolean(boundProgram?.opts<{ json?: boolean }>().json);
+  return Boolean(boundProgram?.opts().json);
 }
 
 /**

@@ -136,10 +136,18 @@ export type ImportIssuesOptions = {
 /**
  * Shared `gh issue list` invocation — the one place that owns the JSON
  * contract for the import. `--state all` so closed issues import too
- * (they map to `done`). Throws a plain technical error; runImportIssues
+ * (they map to `done`). `cwd` is threaded to the executor so gh resolves the
+ * repository from the operation's directory — not the process cwd of a
+ * long-lived server hosting many projects (same contract as `ghPrListJson`,
+ * which `sync` already honors). Throws a plain technical error; runImportIssues
  * adds the IMPORT_FAILED context.
  */
-export function ghIssueListJson(opts: { repo?: string; execGh?: GhExecutor }): GhIssue[] {
+export function ghIssueListJson(opts: {
+  repo?: string;
+  /** Working directory for gh; omit to inherit the process cwd. */
+  cwd?: string;
+  execGh?: GhExecutor;
+}): GhIssue[] {
   const execGh = opts.execGh ?? defaultExecGh;
   const args = [
     "issue",
@@ -154,11 +162,18 @@ export function ghIssueListJson(opts: { repo?: string; execGh?: GhExecutor }): G
   if (opts.repo) args.push("--repo", opts.repo);
   let out: string;
   try {
-    out = execGh("gh", args, {
+    const runOpts: {
+      encoding: "utf8";
+      stdio: ["ignore", "pipe", "ignore"];
+      timeout: number;
+      cwd?: string;
+    } = {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
       timeout: 30_000,
-    }) as string;
+    };
+    if (opts.cwd !== undefined) runOpts.cwd = opts.cwd;
+    out = execGh("gh", args, runOpts) as string;
   } catch (err) {
     if (
       err !== null &&
@@ -267,7 +282,9 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
     }
   }
   const tasksDir = findTasksDir(opts.cwd);
-  const issues = ghIssueListJson({ repo: opts.repo, execGh: opts.execGh });
+  // Repo resolution must follow the operation's cwd (native surfaces run inside
+  // a long-lived, multi-project server process): pass it to gh explicitly.
+  const issues = ghIssueListJson({ repo: opts.repo, cwd: opts.cwd, execGh: opts.execGh });
   const dryRun = Boolean(opts.dryRun);
   const now = opts.now ?? new Date();
 

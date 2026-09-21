@@ -1977,11 +1977,14 @@ function ghIssueListJson(opts) {
         args.push("--repo", opts.repo);
     let out;
     try {
-        out = execGh("gh", args, {
+        const runOpts = {
             encoding: "utf8",
             stdio: ["ignore", "pipe", "ignore"],
             timeout: 30_000,
-        });
+        };
+        if (opts.cwd !== undefined)
+            runOpts.cwd = opts.cwd;
+        out = execGh("gh", args, runOpts);
     }
     catch (err) {
         if (err !== null &&
@@ -2053,7 +2056,7 @@ function runImportIssues(opts) {
         }
     }
     const tasksDir = (0, paths_js_1.findTasksDir)(opts.cwd);
-    const issues = ghIssueListJson({ repo: opts.repo, execGh: opts.execGh });
+    const issues = ghIssueListJson({ repo: opts.repo, cwd: opts.cwd, execGh: opts.execGh });
     const dryRun = Boolean(opts.dryRun);
     const now = opts.now ?? new Date();
     const byId = (0, items_js_1.itemsById)((0, items_js_1.loadItems)(tasksDir));
@@ -2185,8 +2188,8 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
 exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.unlinkNodeModulesLink = exports.linkNodeModules = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.runSync = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = void 0;
+exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.unlinkNodeModulesLink = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.runSync = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2323,6 +2326,7 @@ Object.defineProperty(exports, "defaultCleanupGit", { enumerable: true, get: fun
 Object.defineProperty(exports, "findMergedPr", { enumerable: true, get: function () { return cleanup_js_1.findMergedPr; } });
 var worktree_js_1 = require("./worktree.js");
 Object.defineProperty(exports, "linkNodeModules", { enumerable: true, get: function () { return worktree_js_1.linkNodeModules; } });
+Object.defineProperty(exports, "linkedWorkspacePackages", { enumerable: true, get: function () { return worktree_js_1.linkedWorkspacePackages; } });
 Object.defineProperty(exports, "unlinkNodeModulesLink", { enumerable: true, get: function () { return worktree_js_1.unlinkNodeModulesLink; } });
 var import_issues_js_1 = require("./import-issues.js");
 Object.defineProperty(exports, "runImportIssues", { enumerable: true, get: function () { return import_issues_js_1.runImportIssues; } });
@@ -5536,6 +5540,7 @@ __arggonModules.set("lib/src/worktree.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.linkNodeModules = linkNodeModules;
 exports.unlinkNodeModulesLink = unlinkNodeModulesLink;
+exports.linkedWorkspacePackages = linkedWorkspacePackages;
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
 function linkNodeModules(primaryRoot, worktreePath) {
@@ -5576,6 +5581,65 @@ function unlinkNodeModulesLink(primaryRoot, worktreePath) {
             return false;
         }
     }
+}
+function isInside(parent, child) {
+    return child === parent || child.startsWith(`${parent}${node_path_1.sep}`);
+}
+function linkedWorkspacePackages(primaryRoot, worktreePath) {
+    const names = [];
+    const worktreeModules = (0, node_path_1.join)(worktreePath, "node_modules");
+    let primary;
+    try {
+        primary = (0, node_fs_1.realpathSync)(primaryRoot);
+    }
+    catch {
+        return names;
+    }
+    const primaryModules = (0, node_path_1.join)(primary, "node_modules");
+    const inspect = (name, link) => {
+        try {
+            if (!(0, node_fs_1.lstatSync)(link).isSymbolicLink())
+                return;
+            const target = (0, node_path_1.resolve)((0, node_fs_1.realpathSync)((0, node_path_1.dirname)(link)), (0, node_fs_1.readlinkSync)(link));
+            if (!isInside(primary, target) || isInside(primaryModules, target))
+                return;
+            const rel = (0, node_path_1.relative)(primary, target);
+            if (rel === "" || !(0, node_fs_1.existsSync)((0, node_path_1.join)(worktreePath, rel)))
+                return;
+            names.push(name);
+        }
+        catch {
+        }
+    };
+    let entries;
+    try {
+        entries = (0, node_fs_1.readdirSync)(worktreeModules, { withFileTypes: true });
+    }
+    catch {
+        return names;
+    }
+    for (const entry of entries) {
+        if (entry.name.startsWith("."))
+            continue;
+        const path = (0, node_path_1.join)(worktreeModules, entry.name);
+        if (entry.isDirectory() && entry.name.startsWith("@")) {
+            let scoped;
+            try {
+                scoped = (0, node_fs_1.readdirSync)(path, { withFileTypes: true });
+            }
+            catch {
+                continue;
+            }
+            for (const pkg of scoped) {
+                if (pkg.name.startsWith("."))
+                    continue;
+                inspect(`${entry.name}/${pkg.name}`, (0, node_path_1.join)(path, pkg.name));
+            }
+            continue;
+        }
+        inspect(entry.name, path);
+    }
+    return names.sort();
 }
 })
 

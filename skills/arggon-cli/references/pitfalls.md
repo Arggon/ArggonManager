@@ -13,7 +13,7 @@ agents in this codebase — read before mutating the tracker or merging.
   initiatives/epics may be `in_progress` unassigned.
 - Claims carry a soft lease (`claimed_at`, ISO date-time) — reporting only.
   `list --stale --older-than 7d` reports stale claims. `update --steal --reason
-  "<why>" --assignee <you>` is **HUMAN-only** (agents refused behave like
+"<why>" --assignee <you>` is **HUMAN-only** (agents refused behave like
   `--force`), double-gated: the repo must arm `x-tracker.allow-steal: true` and it
   must run at an interactive terminal with a y/N confirmation. Agents coordinate
   instead of stealing.
@@ -67,6 +67,17 @@ agents in this codebase — read before mutating the tracker or merging.
   error says). Hooks are never bypassed. Discard an unwanted worktree with
   the command the error prints (`git worktree remove --force <path>`, plus
   `git branch -D <branch>` when start created the branch).
+- **A linked worktree resolves workspace packages into the PRIMARY checkout.**
+  The linked `node_modules` is the primary's whole install, so npm/workspace
+  links inside it (`node_modules/@arggon/lib -> ../../lib`) resolve to the
+  primary's copy even though the worktree carries its own: the spawned CLI and
+  tests run the primary's build (stale when the worktree's copy differs,
+  `ERR_MODULE_NOT_FOUND` when the primary was never built). `start --worktree`
+  reports the shadowed packages as `linkedWorkspaces` in `--json` (plus a stdout
+  note) — re-read after the `x-worktree.post-start` hook, so a hook that installs
+  locally (the recommended `npm ci`) reports `[]`. To work against the worktree's
+  own copy, give it a real local install (`npm ci`) instead of relying on the
+  link; otherwise build where the imports resolve.
 - **Stage explicit paths — never `git add -A` / `git add .`.** Directory patterns
   like `node_modules/` match directories only, so in worktrees where `node_modules`
   is a SYMLINK to a shared install it is untracked-but-not-ignored and `-A`

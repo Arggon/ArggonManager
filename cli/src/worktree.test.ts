@@ -13,6 +13,7 @@ import {
   mkdtempSync as _mkdtempSync,
   readFileSync,
   readlinkSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -134,6 +135,29 @@ function addFakeDependency(dir: string, name: string): void {
     JSON.stringify({ name, version: "1.0.0", main: "index.js" }),
   );
   writeFileSync(join(dep, "index.js"), "module.exports = true;\n");
+}
+
+/**
+ * npm workspace link in the install — the repo's own `@arggon/lib` shape:
+ * `node_modules/<scope>/<name> -> ../../<target>` (a relative link to the
+ * checkout's own package directory).
+ */
+function addWorkspaceLink(dir: string, scope: string, name: string, target: string): void {
+  mkdirSync(join(dir, "node_modules", scope), { recursive: true });
+  symlinkSync(`../../${target}`, join(dir, "node_modules", scope, name), "dir");
+}
+
+/**
+ * The repo's own layout: a workspace package `lib/` committed in the primary
+ * checkout plus its npm link in the install, so a fresh worktree carries the
+ * package copy the linked install shadows.
+ */
+function addWorkspacePackage(dir: string): void {
+  addWorkspaceLink(dir, "@arggon", "lib", "lib");
+  mkdirSync(join(dir, "lib"), { recursive: true });
+  writeFileSync(join(dir, "lib", "package.json"), JSON.stringify({ name: "@arggon/lib" }));
+  git(["add", "lib"], dir);
+  git(["commit", "--quiet", "-m", "workspace package"], dir);
 }
 
 /**
@@ -322,6 +346,65 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     expect(git(["show", "--name-only", "--format=", "HEAD"], expectedPath).trim()).toBe(
       "ArggonManager/launch/auth/login/task-alpha.md",
     );
+  });
+
+  it("reports workspace packages the linked install resolves into the primary (PR #374 finding 2)", () => {
+    const dir = initRepo();
+    addWorkspacePackage(dir);
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    expect(result.linkedNodeModules).toBe(true);
+    // Resolution goes into the primary checkout: the worktree's spawned CLI and
+    // tests would run the primary's kernel build, not the worktree's own copy.
+    expect(result.linkedWorkspaces).toEqual(["@arggon/lib"]);
+    // A worktree without its own copy has nothing to shadow: the fresh worktree
+    // of a repo that does not track `lib/` stays silent.
+    const plain = initRepo();
+    addWorkspaceLink(plain, "@arggon", "lib", "lib");
+    const plainResult = runStart(
+      { cwd: plain, id: "task-bravo", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    expect(plainResult.linkedWorkspaces).toEqual([]);
+  });
+
+  it("reports the post-hook resolution state (PR #384 review F2)", () => {
+    const dir = initRepo();
+    addWorkspacePackage(dir);
+    // The remediation the docs recommend, run as the post-start hook: it
+    // reifies a real local install whose workspace link points at the
+    // worktree's own copy.
+    setPostStart(dir, "mkdir -p node_modules/@arggon && ln -s ../../lib node_modules/@arggon/lib");
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    expect(result.postStart?.ok).toBe(true);
+    // start linked the primary install for the claim-commit gate...
+    expect(result.linkedNodeModules).toBe(true);
+    // ...but the report describes the state the worktree is LEFT in: the hook
+    // installed locally, so nothing resolves into the primary any more. The
+    // pre-hook value would have claimed the opposite (PR #384 review F2).
+    expect(result.linkedWorkspaces).toEqual([]);
+
+    // A hook that leaves no install at all is re-linked by start, and the
+    // report names the shadowed package again.
+    const relaxed = initRepo();
+    addWorkspacePackage(relaxed);
+    setPostStart(relaxed, "true");
+    const relinked = runStart(
+      { cwd: relaxed, id: "task-bravo", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    expect(relinked.postStart?.ok).toBe(true);
+    expect(relinked.linkedNodeModules).toBe(true);
+    expect(relinked.linkedWorkspaces).toEqual(["@arggon/lib"]);
   });
 
   it("keeps the worktree, reports the failing step + remediation, and a re-run attaches", () => {

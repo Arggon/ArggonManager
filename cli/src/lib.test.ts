@@ -7,7 +7,10 @@
  *
  * The clean-build import and the CLI byte parity of those envelopes are pinned
  * in lib-build.test.ts; this file drives the entry in process (vitest resolves
- * `@arggon/lib` to the source entry, so no build is required).
+ * `@arggon/lib` to the source entry, so no build is required). The entry's
+ * re-export-by-identity contract is pinned where the modules live
+ * (`lib/src/index.test.ts` — comparing the entry against itself here could
+ * never fail; W6/PR-374 review finding 3).
  */
 import { mkdtempSync as _mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -16,10 +19,6 @@ import { afterEach, describe, expect, it } from "vitest";
 import { runCreate } from "@arggon/lib";
 import { runInit } from "./init.js";
 import * as lib from "@arggon/lib";
-import * as nextModule from "@arggon/lib";
-import * as relationsModule from "@arggon/lib";
-import * as rulesModule from "@arggon/lib";
-import * as statusModule from "@arggon/lib";
 import { removeFixtureTree } from "./test-tmp.js";
 
 /**
@@ -141,15 +140,6 @@ describe("kernel library entry", () => {
     expect(typeof lib.assertUpdateRules).toBe("function");
     expect(typeof lib.toContractWorkItem).toBe("function");
     expect(typeof lib.successEnvelope).toBe("function");
-  });
-
-  it("re-exports the kernel functions themselves (rules.ts stays the single source)", () => {
-    // Identity, not a wrapper: the library cannot drift from the kernel module.
-    expect(lib.assertUpdateRules).toBe(rulesModule.assertUpdateRules);
-    expect(lib.canTransition).toBe(statusModule.canTransition);
-    expect(lib.isClaimed).toBe(statusModule.isClaimed);
-    expect(lib.assertParentEdge).toBe(relationsModule.assertParentEdge);
-    expect(lib.runNext).toBe(nextModule.runNext);
   });
 });
 
