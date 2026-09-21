@@ -97,3 +97,7 @@ Same defect class in files outside this item's scope. Token-diff over all 552 tr
 - **Indentation variant** (code span spanning a line break: prettier joins it and drops the continuation line's indent — renders identically, cosmetic): `docs/explorations/exploration-adopter-upgrade-experience-007.md`, `docs/explorations/exploration-priority-model-008.md`, `docs/explorations/exploration-torture-contention-005.md`, `docs/plans/plan-spec-pipeline-002.md`, `docs/specs/spec-priority-field-008.md`, `docs/specs/spec-spec-pipeline-002.md`, plus `docs/playbooks/node.md` and `docs/playbooks/vitest.md` (in flight in the playbook work item) and 3 tracker items.
 
 Each repair needs its code span restructured, not just the whitespace restored (prettier re-removes it — verified on `pitfalls.md`), so they belong in a follow-up item rather than in this diff. Repro for the whole list: `prettier --write` a copy of each file with the repo config and compare the whitespace run before/after each token.
+
+### handoff 2026-09-21 @Arggon — next: Review PR #387 (guard test + 4 span repairs + pitfalls restructure); merge with a merge commit (tracker-carrying branch); then decide the follow-up for the indentation-variant docs listed in the comm…
+- branch: fix/bug-formatter-glues-markdown-spaces
+- open questions: File the follow-up item for the 8 docs with the indent variant (2 playbooks in flight)? Extend the guard with an indentation rule once they are repaired?
