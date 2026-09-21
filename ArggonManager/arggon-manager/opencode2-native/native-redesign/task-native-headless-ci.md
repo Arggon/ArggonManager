@@ -87,3 +87,75 @@ W6 of `plan-native-first-011`. Keep `init`/`validate`/`doctor`/`--json` in the p
 
 ### 2026-09-21 @Arggon
 Head note (append): the two tracker commits (`39ccee9` comment, `6eca46d` handoff) moved the PR head to **`6eca46d`**; CI `cli` re-ran and is **pass** (run 35626382846, 3m48s). Same tree as the reviewed `2a491bd` plus tracker markdown only. Item left `in_progress` — done flip is the coordinator's after merge (merge commit, never squash).
+
+### 2026-09-21 @Arggon
+### Review verdict — PR #379 (W6 headless bootstrap + CI) · head `8c6940c` · base `opencode2`
+
+**Recomendación: NO MERGE (cambios requeridos) — 1 hallazgo bloqueante (B1).** Todo lo demás del alcance está verificado verde. No marco `done`; el merge, cuando toque, con **merge commit, nunca squash**.
+
+---
+
+## B1 (bloqueante, Critical) — el paso `install` del workflow vendoreado falla siempre: `--pack-destination` apunta a un directorio que nadie crea
+
+`templates/docs/github/workflows/arggon.yml:37-40` (y `README.md:134-136`, `ArggonManager/docs/ci.md:33-35` + receta repo-local `:52`, `ArggonManager/docs/agents.md:267-269` — el snippet que `arggon instructions` imprime verbatim) ejecutan `npm pack --pack-destination "$RUNNER_TEMP/arggon-packs"` / `/tmp/arggon-packs` **sin crear el directorio**. npm no lo crea: falla con `ENOENT` y exit 254.
+
+Repro (step body del workflow ejecutado verbatim con `bash -e`, solo cambié el remoto del clone por un `file://` local y usé un `RUNNER_TEMP` limpio):
+
+```text
+$ RUNNER_TEMP=/tmp/opencode/w6-runner-temp \
+  ARGGON_REPO=file:///home/arggon/Projects/ArggonManager-opencode2 \
+  ARGGON_REF=feat/task-native-headless-ci \
+  bash -e -c "$(step install del template)"
+... npm ci OK (prepara dist) ...
+npm error code ENOENT
+npm error syscall open
+npm error path /tmp/opencode/w6-runner-temp/arggon-packs/arggon-lib-0.3.0.tgz
+EXIT=254
+```
+
+B1 es reproducible con el npm del runner y contra el workspace real:
+- `npx npm@10.9.4 pack --workspace @arggon/lib --pack-destination <dir inexistente>` → `ENOENT`, exit 254 (npm 10.9.4 es el de Node 22 en `ubuntu-latest`, el mismo que corre el workflow).
+- npm 12.0.2, mismo comando sobre este workspace → `ENOENT`.
+- Paquete mínimo con npm 10.9.4 → `ENOENT` (no es nada del monorepo).
+
+Con `mkdir -p "$RUNNER_TEMP/arggon-packs"` delante, **el mismo step body verbatim** termina `EXIT=0` y produce los dos tarballs (`arggon-lib-0.3.0.tgz`, `arggon-manager-0.3.0.tgz`) y un install global funcional: causa raíz única, el resto del paso está bien.
+
+Por qué CI y el fixture están verdes: `cli/src/headless-ci.test.ts:166` crea el destino con `mkdtemp` y **el paso install nunca se ejecuta** — solo se assertan substrings (`:271-277`). Es decir, la aceptación 1 y 3 ("fresh clone → `init` → CI green" y "receta usada por un fixture adopter-shaped") no está demostrada para el artefacto real: el workflow que reparte `init` deja el CI del adoptante en rojo en su primer push, y la receta de instalación del README falla igual en local.
+
+**Fix pedido**
+1. `mkdir -p "$RUNNER_TEMP/arggon-packs"` (y el equivalente `/tmp/arggon-packs` en README/ci.md/agents.md), o `--pack-destination "$(mktemp -d)"`.
+2. Endurecer el fixture para que esta clase de fallo no pueda pasar: no pre-crear el destino (o mejor, ejecutar el step body real — ya está parametrizado por `ARGGON_REPO`/`ARGGON_REF`, se puede apuntar a un clone local) y assertar que el directorio lo crea la propia receta.
+3. Re-correr el fixture afectado y las cuatro ubicaciones de la receta.
+
+---
+
+## No bloqueantes
+
+- **N1 — doc imprecisa (ci.md:61-62):** "never overwriting an existing file; it is adopter-owned the moment it exists" contradice la semántica real de re-run. Verifiqué: (a) un `.github/workflows/arggon.yml` preexistente del adoptante → `skipped[]` y bytes intactos (correcto); (b) un edit sobre el fichero generado → `modified[]`+`skipped[]` y el edit sobrevive (correcto); (c) pero un fichero generado **sin modificar** sí se refresca (`updated[]` lo incluye) — lo cual además es lo que el drift gate necesita. Reformular al contrato de checksum ("los edits del adoptante están protegidos; las copias sin modificar se refrescan").
+- **N2 — fidelidad del fixture (menor):** el install de reemplazo pre-crea el directorio y el `npm install -g` sigue resolviendo `commander` contra el registry (con `--offline` solo pasa porque esta máquina lo tiene en caché; en frío necesita red). El doc es literal ("the test does not clone over the network"), pero conviene decir que el install no es hermético; el fix de B1 con el paso real eliminaría esta ambigüedad.
+- **N3 — drift gate (low):** el atajo "tracker no commiteado" mira solo `*.convention.yml` (`git ls-files --error-unmatch`). Un repo que commitee los docs generados pero no el estado del tracker se quedaría con gate no-op permanente. Endurecimiento opcional (probar también p.ej. `AGENTS.md`/el workflow).
+- **N4 — informativo:** `ADOPT_SCAN_PATHS` (`cli/src/adopt.ts:81-101`) no incluye el nuevo workflow generado, así que `arggon adopt` no lo lista en su preview. La lista es curada (ya omite `.mcp.json`, `.opencode/**`…), así que no pido acción; solo que sea decisión consciente.
+
+## Riesgos de las decisiones ya aprobadas (sin acción en esta review)
+
+- **`ARGGON_REF: opencode2` es una ref móvil:** el drift gate del adoptante se pondrá rojo cada vez que el repo producto mueva el seam generado (comportamiento documentado en ci.md; pinchar tag tras W7). Aprobado el tier-1: los edits del adoptante quedan protegidos por checksum y las copias sin modificar se refrescan (verificado); en repos no-GitHub el `.github/workflows/arggon.yml` queda inerte. El workflow activo corre en cada push desde el primer commit (en repo sin tracker el gate hace no-op y `validate` pasa, verificado en el fixture).
+- **Marker `#`:** necesario y correcto. `init` escribe `# arggon:generated template="github/workflows/arggon.yml"` como primera línea; PyYAML parsea el workflow vendoreado; el HTML comment como primera línea falla el parseo YAML (lo comprobé), así que la rama nueva de `stampGeneratedContent` está justificada.
+
+## Verificado
+
+- **CI** `35626836465` @ `8c6940c`: pass; job `cli` = `npm ci` (con `prepare`/build), `npm run build`, `npm run lint`, `npm run test` (89 files / **1450 tests**). `gh pr diff --name-only` = diff local (13 ficheros); los commits de tracker `2a491bd/39ccee9/6eca46d/8c6940c` tocan solo el md del item.
+- **Gates locales @ `8c6940c`:** `npm test` 89/1450 verde · lint clean · build clean · `check:plugin` exit 0 (39 módulos / 324.325 B) · `arggon validate` ok (0 warnings, v5) · `spec validate` ok (18 docs) · `context:report -- --strict` pass (native 12.182 ≤ 12.288 advisory, headroom 106 B).
+- **Fixture (leído + ejecutado):** asserta ausencia de `dist/`/`lib/dist` antes de `prepare` (`:163-164`); empaqueta ambos tarballs; instala en prefix temporal; corre 4 de 5 step bodies verbatim vía `bash -e` con `PATH` al bin empaquetado; drift gate en ambos sentidos (limpio pasa, `AGENTS.md` mutado falla y restaura); corre verde tras borrar `.mcp.json/opencode.jsonc/.opencode/.agents` con `doctor.opencode.mcp = {native:false, mcpJson:false}`; envelopes byte-idénticos bin empaquetado vs checkout para `init --no-commit`, `init` (auto-commit), `validate`, `doctor`, `list`, `list --full`, `show`, `show --body`, `next`, `report`.
+- **Tier-1/never-overwrite:** fichero preexistente del adoptante → `skipped[]`, bytes preservados; edit del generado → `modified[]`+`skipped[]`, preservado; re-run sin modificar → `updated[]`. Estado `x-generated` con checksum correcto.
+- **Docs:** `@arggon/lib` no publicado (404 real) y el root declara `^0.3.0` → el fix del README (dos tarballs) apunta al problema correcto, aunque la receta sigue rota por B1. `arggon instructions` imprime exactamente el snippet de agents.md.
+- **Scope:** sin cambios en kernel/plugin (`lib/**`, `opencode/**` intactos); en `package.json` solo la exclusión del helper de test (`!dist/pack-fixtures.*`), y el pack test asserta que no viaja en el tarball.
+
+## No verificado
+
+- Smoke `26/0` (requiere modelo/OpenCode; por indicación no computa contra W6 y está en `task-w4-smoke-origin-remote`).
+- Comportamiento en Windows (fixture `skipIf(win32)` por diseño).
+- Runs de CI históricos `35625870481`/`35626382846` (solo comprobé el final `35626836465`).
+
+**Tras el fix de B1 + endurecimiento del fixture, la re-review se limita a esas cuatro ubicaciones de la receta.** Mientras tanto: no merge.
+
+*Publicado con el CLI local porque los MCP `arggon_*` no resuelven el tracker v5 en este entorno (mismo motivo que el veredicto de W5); comentario auto-commiteado en `feat/task-native-headless-ci`.*
