@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-20"
 updated: "2026-09-21"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-cleanup-no-gh-ignored
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-cleanup-no-gh-ignored.md
