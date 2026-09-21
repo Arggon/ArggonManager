@@ -11,7 +11,6 @@ priority: p0
 created: "2026-09-19"
 updated: "2026-09-21"
 depends_on: [task-native-headless-ci]
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-dogfood-release
 ---
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-dogfood-release.md
