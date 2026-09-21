@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-w4-smoke-origin-remote
 title: "W4 smoke: reviewer shell gate never exercised (no origin remote)"
+assignee: Arggon
+branch: feat/task-w4-smoke-origin-remote
 parent: native-redesign
 labels: []
 priority: p3
 created: "2026-09-21"
 updated: "2026-09-21"
+claimed_at: "2026-09-21T22:12:54.341Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-w4-smoke-origin-remote
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-w4-smoke-origin-remote.md
