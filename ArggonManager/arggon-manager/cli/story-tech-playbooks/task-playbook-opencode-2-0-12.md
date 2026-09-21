@@ -114,3 +114,6 @@ CI green on head 7f386e3: cli pass (run 35664747593, 4m22s) + tasks-validate pas
 - El exit code de la sesión original del worker (no está en el transcript; lo reproduje yo: exit 0).
 
 **Recomendación: MERGE con merge commit (nunca squash).** Los findings 1-3 son de bajo impacto y pueden plegarse en `task-playbook-2-0-10-nits` (o corregirse en un commit tracker-only antes del merge).
+
+### 2026-09-21 @Arggon
+Coordinator note: reviewer reproduced the 2.0.12 A/B (A fails, B loads 15 tools, catalog lag not reproduced) and verified the pins/refs. Byte-claim correction: the W6/W7 harness ran on 324,325/324,264 B bundles; the current bundle is 327,157 B after PR #384 — the A/B probe is this item's current-byte evidence. LOWs folded into task-playbook-2-0-10-nits (F4.1 pin, prettier de-indent). Gates 1466 tests, lint/build/check:plugin/validate/spec; CI pass. Merged with merge commit; item flipped to done.
