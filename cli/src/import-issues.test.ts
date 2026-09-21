@@ -105,6 +105,22 @@ function fm(path: string) {
 }
 
 describe("runImportIssues", () => {
+  it("resolves the repo from the operation's cwd, not the process cwd", () => {
+    const dir = primed();
+    const execGh = ghIssueListMock(JSON.stringify(FIXTURE_ISSUES));
+
+    runImportIssues({ cwd: dir, execGh: execGh as unknown as GhExecutor, now: NOW });
+
+    // gh must run inside the operation's tree: native surfaces run in a
+    // long-lived, multi-project server process, so gh's own repo resolution
+    // from the process cwd would target the wrong repository.
+    expect(execGh).toHaveBeenCalledWith(
+      "gh",
+      expect.arrayContaining(["issue", "list"]),
+      expect.objectContaining({ cwd: dir }),
+    );
+  });
+
   it("maps open issues to todo and closed issues to done under an auto-created story", () => {
     const dir = primed();
     const execGh = ghIssueListMock(JSON.stringify(FIXTURE_ISSUES));
@@ -506,6 +522,33 @@ describe("ghIssueListJson", () => {
       ],
       expect.any(Object),
     );
+  });
+
+  it("forwards cwd so gh resolves the repo from the caller's directory", () => {
+    const execGh = ghIssueListMock(JSON.stringify(FIXTURE_ISSUES));
+    ghIssueListJson({ cwd: "/work/tree", execGh: execGh as unknown as GhExecutor });
+    expect(execGh).toHaveBeenCalledWith(
+      "gh",
+      [
+        "issue",
+        "list",
+        "--state",
+        "all",
+        "--limit",
+        "200",
+        "--json",
+        "number,title,state,body,labels",
+      ],
+      expect.objectContaining({ cwd: "/work/tree" }),
+    );
+  });
+
+  it("omits cwd when the caller did not pass one (process cwd inherited)", () => {
+    const execGh = ghIssueListMock(JSON.stringify(FIXTURE_ISSUES));
+    ghIssueListJson({ execGh: execGh as unknown as GhExecutor });
+    const options = execGh.mock.calls[0]?.[2] as Record<string, unknown> | undefined;
+    expect(options).toBeDefined();
+    expect(options).not.toHaveProperty("cwd");
   });
 
   it("maps ENOENT to an install hint", () => {
