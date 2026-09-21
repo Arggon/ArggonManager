@@ -2252,6 +2252,7 @@ program
               prUrl: result.prUrl,
               worktreePath: result.worktreePath,
               linkedNodeModules: result.linkedNodeModules,
+              linkedWorkspaces: result.linkedWorkspaces,
               postStart: result.postStart,
             },
             readConventionVersion(result.root),
@@ -2268,6 +2269,13 @@ program
           if (result.linkedNodeModules) {
             console.log(
               `  node_modules: linked from the primary checkout (the project gate can run in the worktree)`,
+            );
+          }
+          if (result.linkedWorkspaces.length > 0) {
+            console.log(
+              `  note: ${result.linkedWorkspaces.map((name) => sanitizeHumanError(name)).join(", ")} ` +
+                `resolve(s) into the primary checkout through the linked install — build there, or run ` +
+                `\`npm ci\` in the worktree (e.g. \`x-worktree.post-start: npm ci\`) for worktree-local resolution`,
             );
           }
         }

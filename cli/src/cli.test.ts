@@ -711,6 +711,9 @@ describe("CLI --json", () => {
       // Additive JSON field (bug-start-worktree-node-modules): always present,
       // false when no node_modules link happened (no --worktree here).
       linkedNodeModules: false,
+      // Additive JSON field (W6/PR-374 review finding 2): workspace packages
+      // the install resolves into the primary — none without a worktree link.
+      linkedWorkspaces: [],
     });
     expect(body.item).toMatchObject({
       id: "launch-mvp",
@@ -813,6 +816,10 @@ describe("CLI --json", () => {
     expect(body.ok).toBe(true);
     expect(body.command).toBe("start");
     expect(body.linkedNodeModules).toBe(true);
+    // The fixture has no workspace link in its install, so the resolution
+    // report is empty (W6/PR-374 review finding 2) — the field is additive and
+    // always present.
+    expect(body.linkedWorkspaces).toEqual([]);
     const wt = join(dirname(dir), "work-task-prepared");
     expect(body.worktreePath).toBe(wt);
     expect(body.pushed).toBe(true);

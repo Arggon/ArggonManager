@@ -1,5 +1,15 @@
-import { lstatSync, readlinkSync, rmdirSync, symlinkSync, unlinkSync, existsSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import {
+  existsSync,
+  lstatSync,
+  readdirSync,
+  readlinkSync,
+  realpathSync,
+  rmdirSync,
+  symlinkSync,
+  unlinkSync,
+  type Dirent,
+} from "node:fs";
+import { dirname, join, relative, resolve, sep } from "node:path";
 
 /**
  * Worktree dependency-link helpers, shared by every surface (W4,
@@ -77,4 +87,85 @@ export function unlinkNodeModulesLink(primaryRoot: string, worktreePath: string)
       return false;
     }
   }
+}
+
+/** True when `child` is `parent` itself or lives under it (physical paths). */
+function isInside(parent: string, child: string): boolean {
+  return child === parent || child.startsWith(`${parent}${sep}`);
+}
+
+/**
+ * Workspace packages the worktree's install resolves into the **primary**
+ * checkout (W6/PR-374 review finding 2).
+ *
+ * `linkNodeModules` links the primary checkout's whole `node_modules` into the
+ * worktree, and npm/workspace links inside it (`node_modules/@arggon/lib ->
+ * ../../lib`) therefore resolve to the PRIMARY's copy even though the worktree
+ * carries its own `lib/`. For this repo that means the worktree's spawned CLI
+ * and child processes run the primary's kernel build: stale whenever the
+ * worktree's `lib/` differs, `ERR_MODULE_NOT_FOUND` when the primary was never
+ * built. Resolution is a property of the install, so start cannot fix it by
+ * fiat — it can only make the requirement visible; these names are reported so
+ * the worktree user knows to build where the imports actually resolve, or to
+ * give the worktree its own install (`npm ci`, e.g. via
+ * `x-worktree.post-start: npm ci`, which npm reifies locally and `prepare`
+ * builds).
+ *
+ * Detection is physical, not textual: symlinks are resolved through their real
+ * parent (`node_modules` is itself often a symlink here), and a package only
+ * counts when the worktree has the same relative path — a package that exists
+ * only in the primary has no worktree copy to shadow. Best-effort by design:
+ * never throws, returns `[]` when there is nothing to report.
+ */
+export function linkedWorkspacePackages(primaryRoot: string, worktreePath: string): string[] {
+  const names: string[] = [];
+  const worktreeModules = join(worktreePath, "node_modules");
+  let primary: string;
+  try {
+    primary = realpathSync(primaryRoot);
+  } catch {
+    return names;
+  }
+  const primaryModules = join(primary, "node_modules");
+
+  const inspect = (name: string, link: string): void => {
+    try {
+      if (!lstatSync(link).isSymbolicLink()) return;
+      const target = resolve(realpathSync(dirname(link)), readlinkSync(link));
+      // Inside the primary checkout but not merely inside its install: a real
+      // workspace/file link, not an ordinary dependency.
+      if (!isInside(primary, target) || isInside(primaryModules, target)) return;
+      const rel = relative(primary, target);
+      if (rel === "" || !existsSync(join(worktreePath, rel))) return;
+      names.push(name);
+    } catch {
+      // Raced or unreadable entry: nothing to report.
+    }
+  };
+
+  let entries: Dirent[];
+  try {
+    entries = readdirSync(worktreeModules, { withFileTypes: true });
+  } catch {
+    return names; // no install to inspect
+  }
+  for (const entry of entries) {
+    if (entry.name.startsWith(".")) continue; // .bin, .package-lock.json, ...
+    const path = join(worktreeModules, entry.name);
+    if (entry.isDirectory() && entry.name.startsWith("@")) {
+      let scoped: Dirent[];
+      try {
+        scoped = readdirSync(path, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const pkg of scoped) {
+        if (pkg.name.startsWith(".")) continue;
+        inspect(`${entry.name}/${pkg.name}`, join(path, pkg.name));
+      }
+      continue;
+    }
+    inspect(entry.name, path);
+  }
+  return names.sort();
 }

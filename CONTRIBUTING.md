@@ -27,14 +27,39 @@ Thanks for helping with ArggonManager. Work is **convention-first**: the repo (t
 
 Requires **Node.js 22.12+** (needed by vitest 5 in the dev toolchain; `engines` enforces it). From the repo root:
 
-- `npm install`
+- `npm install` (its `prepare` builds both packages)
 - `npm run arggon -- hello`
 - `npm run arggon -- init /path/to/empty-repo`
 - `npm run build`
 - `npm test`
 - `npm run lint`
 
-The package manifests at the **repo root**; TypeScript sources live under `cli/`.
+Two npm packages make up this repo:
+
+- **`arggon-manager`** — the manifest at the **repo root**: the CLI/headless bin
+  (`cli/src/` → `dist/`), the vendored plugin and the runtime assets
+  (`templates/`, `skills/`, `opencode/`).
+- **`@arggon/lib`** (`lib/`, ADR [`0013`](ArggonManager/docs/adr/0013-lib-package-split.md)) —
+  the kernel library (`lib/src/` → `lib/dist/`) that the CLI and the native
+  tools consume through the workspace; every `@arggon/lib` import in `cli/`
+  resolves through `node_modules` to `lib/dist`.
+
+`npm run build` builds the kernel first, then the root. **Build before running
+the suite** (and after any `lib/**` change): the tests that drive surfaces in
+process do not need the build (vitest resolves `@arggon/lib` to the kernel
+source), but the tests that spawn the real CLI resolve it through
+`node_modules` → `lib/dist`, so without a build they fail with
+`ERR_MODULE_NOT_FOUND`. CI runs `npm ci` → `npm run build` → `npm test`
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+
+`arggon start <id> --worktree` links the primary checkout's `node_modules` into
+the worktree, so inside a worktree `@arggon/lib` (and every other workspace
+package) resolves to the **primary** checkout's build: work that changes `lib/`
+must either build where the imports resolve, or give the worktree its own
+install — `x-worktree.post-start: npm ci` in `ArggonManager/.convention.yml`
+reifies the workspace links locally (and its `prepare` builds them). `arggon
+start --worktree` reports the shadowed packages in `linkedWorkspaces` (`--json`,
+see [`ArggonManager/docs/json-output.md`](ArggonManager/docs/json-output.md)) and on stdout.
 
 ## Propose schema / convention changes
 
