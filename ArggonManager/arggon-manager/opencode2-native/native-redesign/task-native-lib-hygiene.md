@@ -189,3 +189,7 @@ Review-round fixes for the F1–F4 verdict (`git range 5590acb..11be0c4`, pushed
 **F4 (INFO).** `11be0c4` fixes this item's own comment: 14 test files in the `lib/tsconfig.typecheck.json` program (re-counted with the reviewer's command), and the `npm test` line no longer claims an unmeasured "before: same counts".
 
 **Gates after the fixes:** `npm run build` ✅ · `npm test` ✅ **1463 passed / 90 files** · `lint` ✅ · `check:plugin` ✅ · `arggon validate` ✅ v5 · `spec validate` ✅ 18 · prettier ✅ except the `json-output.md` exception above. CI: pending on `11be0c4` (link in the next comment).
+
+### handoff 2026-09-21 @Arggon — next: Re-review the F1-F4 round on PR #384 (commits f56674b, abdb28f, 8c98b03, 11be0c4): confirm the json-output.md prose is restored and CI green on the final tip, then merge (merge commit; tracker-carryi…
+- branch: feat/task-native-lib-hygiene
+- open questions: F1 root cause is prettier 3.9.6 + opencode formatter:true, not a hand edit — do you want a follow-up item for a markdown formatter guard (npm run format corrupts json-output.md and tracker comments)?…
