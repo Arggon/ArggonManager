@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-start-worktree-lib-resolution
 title: "Worktree resolution: flip @arggon/lib to the worktree copy"
+assignee: Arggon
+branch: feat/task-start-worktree-lib-resolution
 parent: native-redesign
 labels: []
 priority: p3
 created: "2026-09-21"
 updated: "2026-09-21"
+claimed_at: "2026-09-21T23:15:13.852Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-start-worktree-lib-resolution
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-start-worktree-lib-resolution.md
