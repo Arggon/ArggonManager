@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-layout-trend-pathspec
 title: "report --trend: legacy tasks pathspec can mine an unrelated tasks/ dir"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-20"
 updated: "2026-09-21"
-claimed_at: "2026-09-21T21:38:54.449Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-layout-trend-pathspec
 ---
 <!--
