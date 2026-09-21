@@ -122,3 +122,6 @@ Diff = 4 ficheros: `lib/src/trend.ts`, `cli/src/trend.test.ts`, `opencode/plugin
 
 ## Cobertura de la verificacion
 Verificado: repro RED->GREEN, positivo de migracion real, smoke CLI en las 3 direcciones, probe pathspec/errores, los 6 gates + CI, scope. No pude verificar: nada bloqueante; el checklist del body queda sin marcar para que el coordinador lo cierre post-merge. Recomendacion: **merge con merge commit (nunca squash)** una vez marcado ready.
+
+### 2026-09-21 @Arggon
+Coordinator note: reviewer reproduced RED→GREEN (base [W37:1,W38:1] → fix [W37:1]; migrated fixture still crosses the move) and verified the probe keeps error semantics. Gates 1456 tests, lint/build/check:plugin/validate/spec; CI pass. Merged with merge commit; item flipped to done.
