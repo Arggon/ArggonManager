@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-20"
 updated: "2026-09-21"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-lib-hygiene
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-native-lib-hygiene.md
