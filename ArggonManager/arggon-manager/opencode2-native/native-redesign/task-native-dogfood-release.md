@@ -68,3 +68,8 @@ Revisión del cierre W7 `task-native-dogfood-release`: 5 commits de trabajo (`b9
 - `arggon_comment` (MCP) no funciona en esta sesión: el bin global `/home/arggon/.local/bin/arggon` apunta a otro checkout (`/home/arggon/Projects/ArggonManager/dist/cli.js`, layout viejo) y no encuentra el tracker v5. Publiqué este veredicto con `npm run arggon -- comment` desde el repo primario (misma operación y auto-commit del tracker). Es ruido de entorno, no un defecto del PR.
 
 **Veredicto: MERGE (merge commit, nunca squash).** Sin bloqueantes; el hallazgo 1 conviene resolverlo en el mismo cierre (2 líneas de status) y 2/3/4 son follow-ups opcionales. No marco `done` — la completitud es del coordinador tras el merge. La decisión de bump/tag/publish queda en el product owner, como indica el item.
+
+### 2026-09-21 @Arggon
+### 2026-09-21 @reviewer — Addendum: wave smoke reproducido
+
+El `smoke:opencode:wave` terminó después de publicar el veredicto: **2 fixtures / 0 failures, exit 0**, con todos los checks verdes (permisos allow/deny, fase 1 plan, fase 2 dos workers foreground con worktrees disjuntos, verdicts de reviewer, fase 4 merge + done + `arggon validate` green + push). Queda como reproducido por el reviewer; el `smoke:opencode` completo (26/0) sigue sin re-correr por mí — evidencia del worker con el flake de `/adopt` re-corrido limpio. El veredicto previo (**MERGE**, merge commit) no cambia.
