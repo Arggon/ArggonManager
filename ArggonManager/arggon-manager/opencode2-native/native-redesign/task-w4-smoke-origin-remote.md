@@ -78,3 +78,7 @@ Run 2 result (follow-up to the evidence comment): `npm run smoke:opencode` — 2
 Post-commit confirmation on the exact committed bytes (72f7c37): `OPENCODE_SMOKE_ONLY=w4 npm run smoke:opencode` — 3 scenarios / 0 failures.
 
 Stability evidence total: full harness 2/2 green (966s, 747s), W4 group 4/4 green.
+
+### handoff 2026-09-21 @Arggon — next: Review PR #385 (draft, base opencode2), confirm CI green, merge with a merge commit (branch carries chore(tasks) auto-commits), then flip the item done.
+- branch: feat/task-w4-smoke-origin-remote
+- open questions: CI lacks opencode, so smoke:opencode is a local gate (2 full runs + 4 W4 runs green on 2.0.12); playbook pins 2.0.10 — re-probe on runtime bumps.
