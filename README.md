@@ -140,7 +140,7 @@ arggon --version
 
 Node projects that prefer no global install can do `npm install --no-save /tmp/arggon-packs/*.tgz` and run `npx arggon`. The tarball ships production `dist/`, the `templates/`, `skills/` and `opencode/` assets `arggon init` reads, README and LICENSE. Installing it needs no scripts; npm may still warn that the tarball's blocked `prepare` was skipped — benign, the build is already inside the tarball.
 
-The headless bin is what CI and bootstrap use (no model, no MCP): see [Headless bootstrap and CI](ArggonManager/docs/ci.md) for the adopter recipe — the job `arggon init` writes to `.github/workflows/arggon.yml` and the packed-install variants.
+The headless bin is what CI and bootstrap use (no model, no MCP): see [Headless bootstrap and CI](ArggonManager/docs/ci.md) for the adopter recipe — the job `arggon init` writes to `.github/workflows/arggon.yml` and the packed-install variants. After the release wave — both packages published — the same bin installs in one line, `npm install -g arggon-manager`; the exact bump/tag/publish steps live in [`ArggonManager/docs/runbooks/release.md`](ArggonManager/docs/runbooks/release.md).
 
 A checkout installs directly in this order: `npm install` first (its root `prepare` builds `dist/`), then `npm link` or `npm install -g .`. With npm 12 install scripts run only when approved, so linking an _unbuilt_ checkout exits 0 without a `dist/` or a bin — build first, or approve the script by its resolved identity (`npm install -g . --allow-scripts=file:$PWD`).
 

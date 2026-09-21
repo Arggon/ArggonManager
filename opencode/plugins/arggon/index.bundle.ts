@@ -6649,7 +6649,7 @@ async function onContext(ctx, event) {
     }
 }
 exports.ARGON_TOOL_NAMESPACE = "arggon";
-exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = "ArggonManager tracker tools, in-process — each returns its documented `--json` envelope; kernel failures are typed tool errors.";
+exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = "ArggonManager tracker tools (in-process): documented `--json` envelopes; failures are typed tool errors.";
 exports.PINNED_TOOL_NAMES = [
     "list",
     "create",
@@ -6706,7 +6706,6 @@ function envelopeSchema(extra = {}) {
         type: "object",
         properties: { ...ENVELOPE_SCHEMA_PROPERTIES, ...extra },
         required: ["ok", "schemaVersion", "conventionVersion", "command"],
-        additionalProperties: true,
     };
 }
 function csvList(value) {

@@ -33,12 +33,12 @@ files are the audit trail and must remain verbatim on disk.
 Adopt four directions, all landing via follow-up items (no product change in
 the research item itself):
 
-| # | Direction | Change | Expected saving | Risk |
-| --- | --- | --- | --- | --- |
-| 1 | **Compact envelopes by default** | `list`/`create`/`update`/`comment` JSON omits null/empty optional fields unless `--full`; `ok`, `schemaVersion`, `conventionVersion`, `command`, `id`, `path` always present; policy documented in docs/json-output.md | ~15–20% of every envelope (~2.3–3k tokens per `list --json` at 136 items) | LOW-MEDIUM: JSON consumers must tolerate missing keys; MitM mitigated by always-present core keys |
-| 2 | **`next`-first agent guidance** | SKILL.md / generated AGENTS.md copy instructs agents to use `next --json` unless they need the full board | up to ~15k tokens per work-cycle | LOW: guidance only |
-| 3 | **`show <id>` progressive disclosure** | New CLI command + MCP tool returning frontmatter and/or body; `--tail-comments N` bounds comment cost; disk storage stays verbatim | bounded reads (~0.5 KB instead of unbounded file); one round-trip instead of list+fs-read | MEDIUM: new surface, CLI/MCP parity tests required |
-| 4 | **Generated-docs context budget** | Generated AGENTS.md target ≤2 KB with pointers into docs/; SKILL.md de-duplicated to one canonical copy; budget enforced by `validate` | ~400+ tokens/session for every adopter; ~4k tokens for dual-path skill resolution | MEDIUM: copy change with adoption implications |
+| #   | Direction                              | Change                                                                                                                                                                                                                 | Expected saving                                                                           | Risk                                                                                              |
+| --- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| 1   | **Compact envelopes by default**       | `list`/`create`/`update`/`comment` JSON omits null/empty optional fields unless `--full`; `ok`, `schemaVersion`, `conventionVersion`, `command`, `id`, `path` always present; policy documented in docs/json-output.md | ~15–20% of every envelope (~2.3–3k tokens per `list --json` at 136 items)                 | LOW-MEDIUM: JSON consumers must tolerate missing keys; MitM mitigated by always-present core keys |
+| 2   | **`next`-first agent guidance**        | SKILL.md / generated AGENTS.md copy instructs agents to use `next --json` unless they need the full board                                                                                                              | up to ~15k tokens per work-cycle                                                          | LOW: guidance only                                                                                |
+| 3   | **`show <id>` progressive disclosure** | New CLI command + MCP tool returning frontmatter and/or body; `--tail-comments N` bounds comment cost; disk storage stays verbatim                                                                                     | bounded reads (~0.5 KB instead of unbounded file); one round-trip instead of list+fs-read | MEDIUM: new surface, CLI/MCP parity tests required                                                |
+| 4   | **Generated-docs context budget**      | Generated AGENTS.md target ≤2 KB with pointers into docs/; SKILL.md de-duplicated to one canonical copy; budget enforced by `validate`                                                                                 | ~400+ tokens/session for every adopter; ~4k tokens for dual-path skill resolution         | MEDIUM: copy change with adoption implications                                                    |
 
 Explicitly **rejected/deferred**:
 
@@ -64,3 +64,17 @@ Explicitly **rejected/deferred**:
   baseline in the linked exploration, §Re-measurement. Generated AGENTS.md
   2,043 B (budget pass); compact `list --json` saves ~24% vs `--full` on the
   measurement fixture.
+- Re-measured 2026-09-21 (task-native-dogfood-release, the closing W7 of
+  plan-native-first-011) via `npm run context:report -- --strict`: the native
+  `arggon` tool-schema payload — the surface this program added to the default
+  path — is **11,821 B ≤ 12,288 B** (467 B headroom) for 15 definitions, nine
+  pinned. The 106 B headroom left by W4 was recovered by trimming, not by
+  moving the bound: the twelve kernel output schemas dropped the redundant
+  `additionalProperties: true` (JSON Schema already defaults it to true, so the
+  keyword carried no contract) for 336 B, and the namespace line was tightened.
+  Nothing descriptive, required, or pinned changed; `options.pinned` stays the
+  W3/W4 nine-tool subset (pinning selects what the runtime renders first, it
+  does not shrink this payload). The other surfaces re-measured in the same
+  run: generated AGENTS.md 2,005 B ≤ 2,048 B, item block max 252 B ≤ 1,024 B,
+  MCP `tools/list` 10,507 B ≤ 12,288 B (MCP left the default path in W3 and is
+  now a compatibility surface, so its advisory stays as a regression tripwire).

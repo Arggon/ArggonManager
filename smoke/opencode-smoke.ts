@@ -89,6 +89,13 @@
  * Deliberately NOT part of `npm test`: CI has no `opencode` binary. Run with
  * `npm run smoke:opencode`; set `ARGON_SMOKE_KEEP=1` to keep fixtures even on
  * success, `OPENCODE_SMOKE_TIMEOUT_MS` to change the per-command timeout.
+ *
+ * Model-driven and timing sensitive: run it ALONE. A concurrent test suite or
+ * another headless harness can stall a provider call past the per-command
+ * timeout and leave a scenario half-done (the deterministic gates — `npm test`,
+ * lint/build, `validate` — are safe to run in parallel; `smoke:tui` is
+ * model-free). The harness already retries a session that aborted before any
+ * model output, so a clean run is the honest signal.
  */
 import { spawnSync } from "node:child_process";
 import {

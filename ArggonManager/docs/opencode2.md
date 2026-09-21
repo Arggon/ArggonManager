@@ -74,10 +74,12 @@ namespace:
   tools (`tools.arggon.list`, `create`, `update`, `show`, `next`, `report`,
   `validate`, `comment`, `handoff`, `priority`, `sync`, `import_issues`) that
   call the kernel **in-process** (the bundle inlines `@arggon/lib`) and return
-  the documented `--json` envelopes. The core eight are `options.pinned`
-  (W4 adds `start`: nine) so the runtime keeps them in its Code Mode catalog; a
-  kernel failure becomes a typed tool error (`ArgonToolError`: kernel code +
-  envelope) and the session continues.
+  the documented `--json` envelopes. The core tools are `options.pinned` (the
+  W3 eight plus `start` from W4: nine) so the runtime keeps them in its Code
+  Mode catalog; a kernel failure becomes a typed tool error (`ArgonToolError`:
+  kernel code + envelope) and the session continues. The whole 15-definition
+  payload measures 11,821 B ≤ 12,288 B advisory (ADR 0006; W7 re-measure,
+  trimmed from the W4-era 12,182 B).
 - **Worktree lifecycle tools (W4)** — `tools.arggon.start`, `branch` and
   `cleanup` own the item worktree through the V2 worktree domain
   (`ctx.worktree.create/list/remove`). `start` claims the item (kernel rules:
@@ -191,6 +193,13 @@ npm run smoke:opencode:wave   # scripted coordinator/worker/reviewer wave (2 fix
 npm run smoke:tui             # TUI evidence on a real runtime: init seam, plugin discovery, PTY run, /arggon-board opens and renders the tree
 npm run context:report --strict   # context budgets: AGENTS.md, MCP schemas, item block, keep.tokens
 ```
+
+`smoke:opencode` and `smoke:opencode:wave` are **model-driven and timing
+sensitive**: run them on their own, without a concurrent test suite or another
+headless harness (a loaded machine can stall a provider call past the per-command
+timeout and leave a scenario half-done). The deterministic gates (`npm test`,
+lint/build/`check:plugin`, `validate`) are safe to run in parallel; `smoke:tui`
+is model-free and cheap.
 
 ## Side-by-side installs
 

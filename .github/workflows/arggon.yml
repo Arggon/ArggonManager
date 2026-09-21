@@ -1,3 +1,4 @@
+# arggon:generated template="github/workflows/arggon.yml"
 # ArggonManager tracker CI — headless: no model, no MCP client, no OpenCode.
 #
 # The packaged `arggon` bin does all of it: `init` bootstraps/upgrades the

@@ -1,7 +1,7 @@
 ---
 spec_id: native-first-011
 title: Native-first ArggonManager surface
-status: proposed
+status: implemented
 created: "2026-09-19"
 ---
 
