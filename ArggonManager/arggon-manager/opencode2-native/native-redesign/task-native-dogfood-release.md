@@ -37,4 +37,8 @@ W7 of `plan-native-first-011`. Migrate this repo's own `.opencode` seam to the n
 
 ## Notes
 
+- Watch the ADR 0006 native-tools headroom: after W4/W5 the advisory bound is
+  at 12,182 B ≤ 12,288 B (~106 B). Re-measure and either trim schemas, decide
+  `options.pinned`, or raise the bound deliberately in this wave.
+
 - Depends on W3–W6; this is the program's closing gate.
