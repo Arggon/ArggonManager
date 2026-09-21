@@ -132,3 +132,47 @@ Fake `gh` logging `$PWD`, probe run from `/tmp/opencode` (the "server" cwd) with
 
 ### 2026-09-21 @Arggon
 CI green on PR #384 @ eb6073d+tracker commits: `cli` pass (4m14s, run 35659513657) and `tasks-validate` pass (34s, run 35659513816). All seven acceptance boxes are now ticked; the coordinator still owns the done flip after merge.
+
+### 2026-09-21 @Arggon
+Review de PR #384 (`feat/task-native-lib-hygiene` @ `394f555`, base `opencode2`) — subagente revisor, DeepSeek V4.1 Flash. Evidencia abajo; no marqué done.
+
+## Veredicto: **NO MERGE todavía** — 1 pedido de cambio acotado (F1)
+
+El paquete verifica de punta a punta (los 7 boxes, con mutación/smoke independientes). El único defecto real es una regresión de texto en `ArggonManager/docs/json-output.md` introducida por el propio PR; se arregla con 3 espacios en 2 líneas.
+
+## Findings (por severidad)
+
+**F1 · MEDIA · `ArggonManager/docs/json-output.md:184` y `:659` — espacios comidos en el doc del contrato JSON (regresión de `eb6073d`)**
+- `:184`: `...\`); \`null\`otherwise (the default seam writes no stanza, and\`.mcp.json\` alone...` → faltan dos espacios (`null` otherwise · and `.mcp.json`).
+- `:659`: `... adds \`v1.findings\`entries such as\`{ "file": ... }\`` → faltan espacios antes de `entries` y de `{`.
+- Base (`origin/opencode2`) tiene el texto correcto en ambos casos; `git show origin/opencode2:ArggonManager/docs/json-output.md | grep -n 'null.otherwise'` no matchea.
+- No es prettier: probe con prettier 3.9.6 (el del repo) sobre un snippet con esos textos → los preserva y solo alinea la tabla. Es edición manual/script.
+- `prettier --check` pasa (los espacios no son formato) y `spec validate` no lo cubre (valida `docs/specs`/`docs/plans`, no `docs/json-output.md`) — nada lo detecta.
+- Pedido: restaurar los espacios en un commit del worker; con eso el PR queda mergeable.
+
+**F2 · BAJA · `cli/src/start.ts:662` (cálculo) vs `:735` (hook) vs `:757` (return) — `linkedWorkspaces` reporta el estado pre-hook**
+- `linkedWorkspaces` se computa antes de `x-worktree.post-start`. Con `x-worktree.post-start: npm ci` (la remediación que el propio doc recomienda), el hook reifica un install local pero el envelope y stdout siguen diciendo `["@arggon/lib"]` / "resolve(s) into the primary".
+- Repro real (CLI `dist/cli.js`, fixture git con `node_modules/@arggon/lib -> ../../lib` y hook que reifica): `start --json` → `{'ok': True, 'linkedNodeModules': True, 'linkedWorkspaces': ['@arggon/lib'], 'postStart': {'ok': True}}`; tras el hook el worktree resuelve local. Es advisory (no rompe), pero contradice la definición del campo ("the worktree's install resolves into the primary"). Sugerencia: recalcular tras el hook antes del return, o documentar que reporta el estado pre-hook (la ventana del gate).
+
+**F3 · BAJA · `skills/arggon-cli/SKILL.md:132-136` y `references/pitfalls.md:54-62` sin sincronizar**
+- `ArggonManager/docs/engineering.md:35` exige `skills/arggon-cli/` "keep in sync with `ArggonManager/docs/json-output.md`" y el PR añadió campo + caveat al doc JSON sin tocar el skill (que sí documenta `linkedNodeModules` y los worktree starts). Fix barato en el mismo PR o follow-up. Nota: `.agents/skills/arggon-cli/` es copia generada (gitignored); el source commiteado es `skills/arggon-cli/`.
+
+**F4 · INFO** — el comment del worker dice "13 test files" en el typecheck de `lib`; el conteo real es 14 (`tsc -p lib/tsconfig.typecheck.json --listFiles | grep 'lib/src.*\.test\.ts'`). Sin impacto en código.
+
+## Verificado (independiente, sin tocar archivos del repo)
+
+- **Acceptance 1 (commander):** `lib/dist/*.d.ts` no tiene imports reales salvo `node:child_process` + relativos; consumer tsc (copia real de `dist`+`package.json`, sin commander) exit 0; mutación en `/tmp` re-añadiendo `import type { Command } from "commander"` al `json.d.ts` copiado → `error TS2307 ... json.d.ts(1,30)` exacto. Gate en `cli/src/lib-build.test.ts:415` con copia física (no symlink, para que TS no escape al `node_modules` del repo).
+- **Acceptance 2 (worktree):** documentado+enforced, alternativa sancionada por el item. Smoke real: `start --worktree` sobre fixture con workspace link imprimió la nota documentada y `--json` devolvió el campo; `linkedWorkspacePackages` con 3 casos unit + fixture `runStart` (`cli/src/worktree.test.ts`). **El flip real merece item aparte**: el razonamiento del worker es correcto — un link farm al worktree necesita `<worktree>/lib/dist` antes del gate del claim y regresaría `bug-start-worktree-node-modules`; `linkedWorkspaces` + docs (`CONTRIBUTING`, README, json-output) cumple el item.
+- **Acceptance 3 (identidad):** `lib/src/index.test.ts:22-28` es falsable — mutación en copia `/tmp` envolviendo `assertUpdateRules` → el test falla (no tautológico). TS6059 reproducido con `rootDir: cli/src` + import estático de `../../lib/src/rules.js`, así que el traslado está justificado.
+- **Acceptance 4/5 (docs/dist):** `lib/dist` con 0 artefactos `*.test.*`; emit program 0 tests vs typecheck 14 (`lib/tsconfig.json:15` exclude + `lib/tsconfig.typecheck.json:8` encadenado en el `build` de `lib/package.json`). `check:plugin` exit 0, bundle sin drift.
+- **Acceptance 6 (`gh` cwd):** smoke real con un `gh` falso en PATH, proceso corriendo en `/tmp/opencode` y tracker en otro dir: `runImportIssues({cwd})` ejecutó gh en el dir de la operación; `ghIssueListJson({})` (sin cwd) en el cwd del proceso (documentado). Tests pinnean helper y operación.
+- **Acceptance 7 (gates):** `npm test` 1462/90 ✅ · `npm run build` ✅ · `check:plugin` ✅ · `lint` ✅ · `validate` ok v5 ✅ · `spec validate` ok 18 ✅ · prettier en todos los archivos tocados ✅. CI en `394f555`: `cli` + `tasks-validate` pass (runs 35659979955 / 35659980003). API: `mergeable: true`, `merge_state: clean`.
+- **Scope:** bundle regenerado sin drift; commits de tracker tocan solo el item; `dist/`/`lib/dist` no trackeados; ADR index 0005-0009 intactos (fuera de alcance declarado); las 7 cajas del item tildadas y status `in_progress` (correcto hasta el merge).
+
+## Notas para el coordinator
+
+- PR en **draft**: marcar ready antes del merge.
+- La rama está **19 commits detrás** de `opencode2` (le faltan `b5852e9` fix `--no-gh` y `45056fd` fix trend). No es un revert de la rama: el diff 3-puntos solo muestra sus cambios; el test-merge de GitHub es limpio y conservará ambos fixes. Verificar `git log`/tests tras el merge, o rebasar antes si se prefiere. Merge commit, nunca squash.
+- No pude correr `git merge-tree` (el gate de shell deniega el comando); la limpieza del merge se verificó vía API de GitHub + hunks disjuntos.
+- Este verdict se publicó con `npm run arggon -- comment` (auto-commit `chore(tasks): commented ...`) porque los tools MCP `arggon_*` de esta sesión apuntan a otro checkout (`/home/arggon/Projects/ArggonManager`) y fallan con `SHOW_FAILED` en este workspace. Ese commit tracker-only mueve el tip: re-chequear CI tras el commit.
+- Cierre: **NO MERGE hasta F1**. F2/F3 pueden ir en el mismo commit o a follow-up, a criterio del coordinator. Yo no marco done.
