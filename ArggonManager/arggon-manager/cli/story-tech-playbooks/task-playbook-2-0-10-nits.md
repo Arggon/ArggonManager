@@ -32,6 +32,12 @@ Non-blocking nits from the PR #373 review (`task-playbook-opencode-2-0-10`):
 
 ## Acceptance
 
+- [ ] Pin statements refreshed outside the accepted set: `docs/adr/0011` §7,
+      `ArggonManager/docs/specs/spec-native-first-011.md` ("Pinned runtime
+      2.0.10") and `ArggonManager/docs/plans/plan-native-first-011.md`.
+- [ ] The playbook's Context budgets snapshot matches `context:report --json`
+      after the W7 trim + PR #384 skill sync (11.821 / 25.275 / 12.885+19.604).
+
 - [ ] Exploration 010 "Open tensions" marks the pin refresh as landed.
 - [ ] The plugin header references the 2.0.10 re-probe date (or points to the
       playbook's research record).
