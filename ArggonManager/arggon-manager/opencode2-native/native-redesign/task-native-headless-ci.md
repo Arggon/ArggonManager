@@ -84,3 +84,6 @@ W6 of `plan-native-first-011`. Keep `init`/`validate`/`doctor`/`--json` in the p
 ### handoff 2026-09-21 @Arggon — next: Coordinator review of draft PR #379 (head 39ccee9 after tracker commits): verify the W6 acceptance evidence (fixture test, packed-install parity, smoke 26/0, docs/ci.md recipe) and the 4 flagged deci…
 - branch: feat/task-native-headless-ci
 - open questions: init now vendors a GitHub Actions workflow into adopter repos (tier-1, never overwrites): keep, tier-2, or docs-only?; YAML destinations use a new '#' provenance marker (required for Actions to parse…
+
+### 2026-09-21 @Arggon
+Head note (append): the two tracker commits (`39ccee9` comment, `6eca46d` handoff) moved the PR head to **`6eca46d`**; CI `cli` re-ran and is **pass** (run 35626382846, 3m48s). Same tree as the reviewed `2a491bd` plus tracker markdown only. Item left `in_progress` — done flip is the coordinator's after merge (merge commit, never squash).
