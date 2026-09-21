@@ -1237,7 +1237,7 @@ export const ARGON_TOOL_NAMESPACE = "arggon"
  * the catalog pays for it on every model request (ADR 0006).
  */
 export const ARGON_TOOL_NAMESPACE_DESCRIPTION =
-  "ArggonManager tracker tools, in-process — each returns its documented `--json` envelope; kernel failures are typed tool errors."
+  "ArggonManager tracker tools (in-process): documented `--json` envelopes; failures are typed tool errors."
 
 /**
  * Core workflow tools pinned into the Code Mode catalog (W3, `options.pinned`,
@@ -1376,17 +1376,19 @@ const ENVELOPE_SCHEMA_PROPERTIES: Record<string, unknown> = {
 }
 
 /**
- * Loose output schema for one tool: the shared envelope fields are required,
- * command-specific payload fields are declared for the model's benefit and
- * `additionalProperties: true` keeps every additive field legal — the kernel
- * envelope is the contract, this schema never rejects a valid envelope.
+ * Loose output schema for one tool: the shared envelope fields are required and
+ * command-specific payload fields are declared for the model's benefit — the
+ * kernel envelope is the contract, this schema never rejects a valid envelope.
+ * An absent `additionalProperties` already means `true` in JSON Schema, so the
+ * keyword is omitted deliberately: the definitions payload sits at the ADR 0006
+ * advisory bound and the redundant text costs 336 B across the twelve kernel
+ * tools (W7 task-native-dogfood-release).
  */
 function envelopeSchema(extra: Record<string, unknown> = {}): Record<string, unknown> {
   return {
     type: "object",
     properties: { ...ENVELOPE_SCHEMA_PROPERTIES, ...extra },
     required: ["ok", "schemaVersion", "conventionVersion", "command"],
-    additionalProperties: true,
   }
 }
 
