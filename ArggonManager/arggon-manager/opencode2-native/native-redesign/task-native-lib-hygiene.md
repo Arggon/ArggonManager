@@ -81,7 +81,7 @@ Environment note: this worktree was started with `--worktree` (linked `node_modu
 ## Gates (all run in the worktree, after the final content commit)
 
 - `npm run build` ✅ (kernel emit + kernel test typecheck + root tsc + `build:plugin` regenerated)
-- `npm test` ✅ **1462 passed / 90 files** (before: same counts; +5 tests net: consumer type-check, dist-no-tests pin, entry identity, 3 `linkedWorkspacePackages` unit cases, `import-issues` cwd cases, `start --worktree` fixture, CLI envelope assertions)
+- `npm test` ✅ **1462 passed / 90 files** at the time of writing (net additions from this PR: consumer type-check, dist-no-tests pin, entry identity, 3 `linkedWorkspacePackages` unit cases, `import-issues` cwd cases, `start --worktree` fixtures, CLI envelope assertions; the one tautological test was removed). The F2/F3 follow-up round moved it to 1463 — see the review-fix comment.
 - `npm run lint` ✅ exit 0 · `npx prettier --check` on every touched file ✅
 - `npm run check:plugin` ✅ exit 0 (bundle regenerated and committed)
 - `npm run arggon -- validate` ✅ ok, convention v5 · `npm run arggon -- spec validate` ✅ 18 docs
@@ -109,7 +109,7 @@ Consumer fixture: real copy of `lib/dist` (+`@types/node`, **no commander**) und
 
 ## Finding 5 — dist test artifacts
 
-`ls lib/dist | grep '\.test\.'` → 0 (was 26 artifacts in the primary's build). The typecheck pass still includes 13 test files (`tsc -p lib/tsconfig.typecheck.json --listFiles`), and a mutation (`const x: number = "s"` in a lib test) fails the build.
+`ls lib/dist | grep '\.test\.'` → 0 (was 26 artifacts in the primary's build). The typecheck pass still includes 14 test files (`tsc -p lib/tsconfig.typecheck.json --listFiles`), and a mutation (`const x: number = "s"` in a lib test) fails the build.
 
 ## Finding 6 — `import-issues` cwd (smoke)
 
