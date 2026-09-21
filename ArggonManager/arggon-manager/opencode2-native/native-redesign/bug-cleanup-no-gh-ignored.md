@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-cleanup-no-gh-ignored
 title: cleanup --no-gh ignores the flag (pre-existing)
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-20"
 updated: "2026-09-21"
-claimed_at: "2026-09-21T21:39:11.767Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-cleanup-no-gh-ignored
 ---
 <!--
