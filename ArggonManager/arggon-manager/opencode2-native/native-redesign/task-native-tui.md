@@ -1,16 +1,19 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-native-tui
 title: TUI board and status panels
+assignee: Arggon
+branch: feat/task-native-tui
 parent: native-redesign
-depends_on: [task-native-permissions-worktrees]
 labels: []
 priority: p0
 created: "2026-09-19"
-updated: "2026-09-19"
+updated: "2026-09-21"
+claimed_at: "2026-09-21T13:00:37.264Z"
+depends_on: [task-native-permissions-worktrees]
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-tui
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-tui.md
   Leaves live only under a story. id is the filename stem: task-native-tui.
