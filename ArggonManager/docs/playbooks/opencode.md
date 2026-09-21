@@ -178,8 +178,8 @@ true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
   task-playbook-opencode-2-0-12 (2.0.12 re-probe, 2026-09-21, same shape: the
   docs plugin fails to load with the same resolution error and no setup marker;
   the bundled plugin registers the fifteen native tools and a real session
-  executes `arggon_next` — exit 0; the 2.0.10 Code Mode catalog lag was not
-  reproduced, see below),
+  executes `tools.arggon.next({})` — exit 0; the 2.0.10 Code Mode catalog lag
+  was not reproduced, see below),
   task-native-commands-seam (W3: dependency-less bundle load + 12 native tools)
   and task-native-permissions-worktrees (W4: 15 tools, worktree domain
   lifecycle + permission defaults).
