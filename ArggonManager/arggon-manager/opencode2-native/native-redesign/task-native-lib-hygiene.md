@@ -13,6 +13,7 @@ updated: "2026-09-21"
 claimed_at: "2026-09-21T21:30:09.094Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-lib-hygiene
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-native-lib-hygiene.md
   Leaves live only under a story. id is the filename stem: task-native-lib-hygiene.
@@ -42,18 +43,29 @@ Findings from the PR #374 review (`task-native-lib-package`, ADR 0013):
 
 ## Acceptance
 
-- [ ] `commander` is either declared for types or removed from the public
+- [x] `commander` is either declared for types or removed from the public
       `.d.ts` surface; consumer type-check passes without undeclared imports.
-- [ ] Worktree resolution: tests/CLI work in a linked worktree without
+      (Removed: `JsonProgram` is structural; the consumer type-check is pinned
+      in `cli/src/lib-build.test.ts` and mutation-verified.)
+- [x] Worktree resolution: tests/CLI work in a linked worktree without
       resolving `@arggon/lib` to the primary (or the requirement is documented
       and enforced in `start`).
-- [ ] `rules.ts` identity test asserts something non-tautological.
-- [ ] Docs drift fixed (`CONTRIBUTING`/README about `lib/`).
-- [ ] `lib/dist` excludes `*.test.*` (or the pack exclusion is documented).
-- [ ] `lib/src/import-issues.ts` forwards `cwd` to `ghIssueListJson` (native
+      (Documented in `CONTRIBUTING.md`/`lib/README.md`/`README.md` and reported
+      by `start --worktree` as `linkedWorkspaces` + stdout note; the full
+      resolution fix needs the worktree built before the claim commit's gate —
+      see the PR notes.)
+- [x] `rules.ts` identity test asserts something non-tautological.
+      (Moved to `lib/src/index.test.ts`; the in-place static deep import is not
+      possible — it breaks `npm run build` with TS6059.)
+- [x] Docs drift fixed (`CONTRIBUTING`/README about `lib/`).
+- [x] `lib/dist` excludes `*.test.*` (or the pack exclusion is documented).
+      (Emit pass excludes them; `tsconfig.typecheck.json` keeps them
+      type-checked; asserted in `cli/src/lib-build.test.ts`.)
+- [x] `lib/src/import-issues.ts` forwards `cwd` to `ghIssueListJson` (native
       calls currently resolve the repo from the server process cwd; `sync`
       already does it right).
 - [ ] `arggon validate` green; CI green.
+      (`arggon validate` ok locally, convention v5 — CI runs on PR #384.)
 
 ## Notes
 
