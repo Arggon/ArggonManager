@@ -84,3 +84,41 @@ Left unchecked in the body so the coordinator closes it after CI/merge.
 
 ### 2026-09-21 @Arggon
 CI green on PR #383: `cli` pass (2m26s), `tasks-validate` pass (34s) — https://github.com/Arggon/ArggonManager/actions/runs/35658926382 . All acceptance criteria now evidenced: history-proof pathspec gate, regression test vs baseline, migrated-repo parity (F1), `arggon validate`/CI green. Item left in `in_progress` for the coordinator to complete after merge.
+
+### 2026-09-21 @Arggon
+### 2026-09-21 @Arggon — Review PR #383 (head aea3f57, base opencode2 dc686d6) — VEREDICTO: merge (merge commit, nunca squash)
+
+Sin hallazgos bloqueantes. Repro, smoke y gates verificados de forma independiente por el revisor.
+
+## 1. RED -> GREEN (repro exacto)
+- RED: copia scratch del head con `lib/src/trend.ts` de `origin/opencode2` -> `cli/src/trend.test.ts` 1 failed / 24 passed. El fallo es exactamente "ignores an unrelated tasks/ dir with item-like frontmatter" (`cli/src/trend.test.ts:367-384`): esperado weeks `[W37:1]`, recibido `[W37:1, W38:1]` + cycleTime `task 3.5 x2`.
+- GREEN: 25/25 en el worktree, incluidos el positivo "still mines a proven legacy tasks/ tracker" (`cli/src/trend.test.ts:386-409`) y el test F1 real con `runLayoutMigrate` (`cli/src/trend.test.ts:321-365`).
+
+## 2. Smoke CLI real (ADR 0008; comando cambiado `report --trend`; fixtures propias en /tmp/opencode/rv)
+| fixture | base (origin/opencode2) | head (fix) |
+| --- | --- | --- |
+| v5 + tasks/notes/task-fake.md ajeno (in_progress -> done W38) | weeks `[W37:1, W38:1]`, task 3.5 x2 | weeks `[W37:1]`, task 6.1 x1 |
+| v5 puro (sin `tasks/`) | `[W37:1]`, task 6.1 x1 | identico |
+| legacy migrado por rename (`tasks/` -> `ArggonManager/`) | `[W36:1]`, task 1d x1 | identico (el move se sigue cruzando) |
+Comando: `node <tsx> <tree>/cli/src/cli.ts report --trend --json` con cwd en cada fixture.
+
+## 3. Probe: semantica y no-regresion (`lib/src/trend.ts:80-83`, `lib/src/trend.ts:194-217`)
+- Con `execGit` inyectado: v5 puro -> mining pathspec `["ArggonManager", ":(exclude)ArggonManager/docs"]` (sin `tasks`); migrado -> `["ArggonManager", "tasks", ...]`. Probe que lanza -> tragado y el mining sigue con el comportamiento canonico.
+- CLI v5 non-git -> `TREND_FAILED` "git log over ArggonManager/ failed (is ... a git repository?)" (el probe no contamina el error).
+- CLI v5 con HEAD sin commits -> `ok:true` y trend vacio.
+- Layout legacy: sin cambio (el probe se salta; `tasks` es el propio tracker).
+
+## 4. Gates
+`npm test` 89 files / 1456 tests ok; `npm run lint` ok; `npm run build` ok; `npm run check:plugin` exit 0 y bundle byte-identico (sha256 949718f2...); `arggon validate` ok (v5, 0 warnings); `arggon spec validate` ok (18 docs). CI `cli` + `tasks-validate` success sobre aea3f57 (runs 35659182878 / 35659182901). GitHub mergeable=true, mergeable_state=clean (la base avanzo a dc686d6 con el PR #382; sin conflictos).
+
+## 5. Scope / hygiene
+Diff = 4 ficheros: `lib/src/trend.ts`, `cli/src/trend.test.ts`, `opencode/plugins/arggon/index.bundle.ts` regenerado, item del tracker. Sin ficheros de workers paralelos (lib hygiene correcta).
+
+## Residuales / notas (no bloqueantes)
+- Residual aceptado por el item: historia de migracion real + un `tasks/.convention.yml` ajeno commiteado despues seguiria minandose. Es la heuristica prescrita en el acceptance; lo confirmo como aceptado, no bloqueante.
+- `docs/json-output.md:489` ("a single `git log -p` pass") sigue siendo cierto: el mining es un unico `git log -p`; el probe es un `git log -1` aparte. Docs de otro worker; no requiere cambio en este PR.
+- Caveat de entorno (no defecto del PR): en este worktree `node_modules` es un symlink al checkout primario, asi que `tsx` / `npm run arggon --` resuelven `@arggon/lib` al `lib/dist` VIEJO del primario (sin fix). Por esa via el "after (worktree CLI)" registrado no se reproduce (devuelve el output pre-fix); el smoke correcto exige resolver el source del branch (lo hice con `--tsconfig` paths / copia scratch). CI no se ve afectada (`npm ci` real). A tener en cuenta en futuros smokes de lib desde worktrees.
+- Nit: el `execGit` inyectado recibe ahora 2 llamadas (probe + mining); solo afecta a dobles de test.
+
+## Cobertura de la verificacion
+Verificado: repro RED->GREEN, positivo de migracion real, smoke CLI en las 3 direcciones, probe pathspec/errores, los 6 gates + CI, scope. No pude verificar: nada bloqueante; el checklist del body queda sin marcar para que el coordinador lo cierre post-merge. Recomendacion: **merge con merge commit (nunca squash)** una vez marcado ready.
