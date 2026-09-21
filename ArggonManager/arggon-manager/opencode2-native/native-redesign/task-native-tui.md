@@ -237,3 +237,45 @@ Runtime drift (2.0.12 vs pin 2.0.10) is already filed as
 ### handoff 2026-09-21 @Arggon — next: Re-review PR #378 at commit c6f2701 (fix pass): verify the P1 repro is fixed (direct: boardSnapshot on a duplicate-id fixture returns an error snapshot; PTY: /arggon-board shows 'tracker unreadable' …
 - branch: feat/task-native-tui
 - open questions: smoke:opencode permissions (W4) scenario is model-behaviour-dependent: the reviewer sometimes runs a reduced script / declines the push, so its three checks fail on the model's prose — file a follow-…
+
+### 2026-09-21 @Arggon
+**Reviewer final verdict — re-review after `c6f2701`.** Reviewed head `06d7fff` (worktree `ArggonManager-opencode2-task-native-tui`), base `opencode2`. CI run `35616807586` on that head = **success**; PR is `MERGEABLE`/CLEAN.
+
+**Verdict: MERGE.** P1 is fixed and independently reproduced; all P3s are addressed; every gate is green. Merge with a **merge commit (never squash)**, then flip `task-native-tui` to done. No blocking findings remain.
+
+## P1 — FIXED (reproduced with my own probes, not just the worker's)
+
+- `board.ts`: tracker detection keeps its own reason; `loadItems` + `itemsById` now run inside the assemble guard; any failure returns `emptyBoardSnapshot(sanitizeHumanError("tracker unreadable: …"))`; `tui.tsx` adds a per-surface try/catch as belt-and-braces.
+- Direct repro through the vendored bundle (my script `/tmp/opencode/tui-probe/dup-probe.ts`, duplicate-id fixture): `RESULT: no throw; error = tracker unreadable: Duplicate id 'dup-id' … items = 0` (before: threw).
+- PTY repro (my harness, opencode 2.0.12, own duplicate-id fixture + session): rendered screen shows `arggon board · tracker unreadable: Duplicate id 'dup' under…`; raw capture contains **no** `crashed in slot`; session survives (before: host overlay, no panel).
+- Regression coverage confirmed: `board.test.ts` (duplicate fixture → no throw, empty counts, sanitized reason), `tui.test.ts` (panel + sidebar on the corrupt fixture), `smoke:tui` new check — I re-ran the smoke: **13/13**.
+
+## P3 — all verified
+
+- **Ready predicate**: `sidebarStatusLine` now uses kernel `isClaimable` + `isReady` (plus `todo`/unclaimed). Unit expectation updated to `2 ready`; my real-TUI probe on a non-active fixture shows `arggon · 2 ready · next task-probe-task` (kernel-ready includes the unclaimed story; `next` stays leaf — documented in code and opencode2.md).
+- **Typed TUI gate**: `tui.tsx` is in `cli/tsconfig.plugin.json` via the repo-only `cli/types/tui-runtime.d.ts` shim; the gate test passes and I verified it catches an injected error (`const x: number = "str"` in a tui.tsx copy under the same compiler options → TS2322 reported by tsc).
+- **Derived `tui.tsx`**: `plugin-copy.test.ts` stamps/self-heals the gitignored copy (worktree copy now starts with `// arggon:generated template="opencode/plugins/arggon/tui.tsx"`) and pins the vendored import allowlist (`solid-js`, `./index.ts` only).
+- **Bundle surface**: `BUNDLE_EXPORTS` (5 names) pinned in both directions; wrapper forwards exactly those (verified by grep: 5 `export const … = __arggonEntry.…`); `bundle.test.ts` asserts the module keys ≡ allowlist; bundle shrank 326,046 → 324,325 B; `check:plugin` rebuild is byte-identical.
+- **`blockedReason`**: rendered as ` · blocked: <reason>` (escaped, empty omitted) with hostile-byte coverage.
+- **Churn**: the fix commit is surgical; docs carry W5 content only.
+
+## Gates at head `06d7fff` (all re-run by me)
+
+- `npm test` → **1444 passed / 88 files** (solo run). Note: a first run under concurrent local load showed the known `/tmp/arggon-budget-*` hygiene race in `cli/src/measure.test.ts` — the file is untouched by this PR, the isolated rerun is green, and the solo full suite is green.
+- `npm run lint`, `npm run build`, `npm run check:plugin` → clean.
+- `npm run arggon -- validate` → ok (v5, 0 warnings); `spec validate` → ok (18 docs).
+- `npm run context:report -- --strict` → all bounds pass (AGENTS 2,005 B; native 12,182 B; MCP 10,507 B; item block 252 B).
+- `npm run smoke:tui` → 13/13.
+- CI `35616807586` (head `06d7fff`) → success.
+
+## Non-blocking observations
+
+- On a corrupt tracker the sidebar prints the generic `arggon · no tracker` while the panel prints `tracker unreadable: …`; cosmetic only.
+- Runtime drift: all evidence is on 2.0.12 while the playbook pin stays 2.0.10 — now tracked in `task-playbook-opencode-2-0-12` (todo); this merge does not change the pin.
+- W4 full-smoke variance (3 FAIL: model ran a reduced script / declined the push; W4-only rerun 40/0) — tracked in `task-w4-smoke-origin-remote` (todo); not W5.
+
+## Recommendation
+
+**MERGE** with a merge commit (never squash); the coordinator then flips `task-native-tui` to done. I did not mark it done.
+
+*Posted with the repo's local CLI because the MCP `arggon_*` tools cannot resolve the v5 tracker in this environment (global `arggon` 0.3.0); auto-committed on `feat/task-native-tui`.*
