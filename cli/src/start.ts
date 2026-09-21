@@ -84,12 +84,16 @@ export type StartResult = {
   linkedNodeModules: boolean;
   /**
    * Workspace packages the worktree's install resolves into the **primary**
-   * checkout through the start-created link (W6/PR-374 review finding 2), e.g.
-   * `["@arggon/lib"]` in this repo: the worktree's spawned CLI/tests then run
-   * the primary's kernel build even though the worktree carries its own copy.
-   * Reported so the requirement is visible — build where the imports resolve,
-   * or give the worktree its own install (`npm ci`, e.g. via
-   * `x-worktree.post-start: npm ci`). Empty when the worktree has no install,
+   * checkout (W6/PR-374 review finding 2), e.g. `["@arggon/lib"]` in this repo:
+   * the worktree's spawned CLI/tests then run the primary's kernel build even
+   * though the worktree carries its own copy. Reported so the requirement is
+   * visible — build where the imports resolve, or give the worktree its own
+   * install (`npm ci`, e.g. via `x-worktree.post-start: npm ci`).
+   *
+   * Describes the state the worktree is LEFT in: recomputed after a configured
+   * `x-worktree.post-start` hook, so a hook that reifies a local install
+   * reports `[]` (the pre-hook link only ever existed for the claim-commit
+   * gate window — PR #384 review F2). Empty when the worktree has no install,
    * resolves locally, or has no shadowed workspace package; set on attach runs
    * too (the link may predate this run).
    */
@@ -741,6 +745,14 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
         }
       }
     }
+
+    // The post-start hook owns the worktree's install once it runs: the
+    // documented remediation for the linked install (`npm ci`) reifies a real
+    // local one, which flips the resolution to the worktree's own copies.
+    // Recompute, so the returned field describes the state the worktree is LEFT
+    // in — the pre-hook value only ever described the claim-commit gate window
+    // (PR #384 review F2).
+    linkedWorkspaces = linkedWorkspacePackages(root, worktreePath);
 
     return {
       id,

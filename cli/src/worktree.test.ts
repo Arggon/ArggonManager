@@ -148,6 +148,19 @@ function addWorkspaceLink(dir: string, scope: string, name: string, target: stri
 }
 
 /**
+ * The repo's own layout: a workspace package `lib/` committed in the primary
+ * checkout plus its npm link in the install, so a fresh worktree carries the
+ * package copy the linked install shadows.
+ */
+function addWorkspacePackage(dir: string): void {
+  addWorkspaceLink(dir, "@arggon", "lib", "lib");
+  mkdirSync(join(dir, "lib"), { recursive: true });
+  writeFileSync(join(dir, "lib", "package.json"), JSON.stringify({ name: "@arggon/lib" }));
+  git(["add", "lib"], dir);
+  git(["commit", "--quiet", "-m", "workspace package"], dir);
+}
+
+/**
  * Install a repo-wide pre-commit hook (worktrees share the common .git/hooks)
  * and make it executable — the stand-in for the documented
  * `npm run arggon -- validate` gate.
@@ -337,14 +350,7 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
 
   it("reports workspace packages the linked install resolves into the primary (PR #374 finding 2)", () => {
     const dir = initRepo();
-    // The repo's own shape: a workspace package in the primary checkout and its
-    // npm link in the install (`node_modules/@arggon/lib -> ../../lib`). The
-    // worktree gets its own copy from the committed tree.
-    addWorkspaceLink(dir, "@arggon", "lib", "lib");
-    mkdirSync(join(dir, "lib"), { recursive: true });
-    writeFileSync(join(dir, "lib", "package.json"), JSON.stringify({ name: "@arggon/lib" }));
-    git(["add", "lib"], dir);
-    git(["commit", "--quiet", "-m", "workspace package"], dir);
+    addWorkspacePackage(dir);
 
     const result = runStart(
       { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
@@ -364,6 +370,41 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
       { git: localGit() },
     );
     expect(plainResult.linkedWorkspaces).toEqual([]);
+  });
+
+  it("reports the post-hook resolution state (PR #384 review F2)", () => {
+    const dir = initRepo();
+    addWorkspacePackage(dir);
+    // The remediation the docs recommend, run as the post-start hook: it
+    // reifies a real local install whose workspace link points at the
+    // worktree's own copy.
+    setPostStart(dir, "mkdir -p node_modules/@arggon && ln -s ../../lib node_modules/@arggon/lib");
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    expect(result.postStart?.ok).toBe(true);
+    // start linked the primary install for the claim-commit gate...
+    expect(result.linkedNodeModules).toBe(true);
+    // ...but the report describes the state the worktree is LEFT in: the hook
+    // installed locally, so nothing resolves into the primary any more. The
+    // pre-hook value would have claimed the opposite (PR #384 review F2).
+    expect(result.linkedWorkspaces).toEqual([]);
+
+    // A hook that leaves no install at all is re-linked by start, and the
+    // report names the shadowed package again.
+    const relaxed = initRepo();
+    addWorkspacePackage(relaxed);
+    setPostStart(relaxed, "true");
+    const relinked = runStart(
+      { cwd: relaxed, id: "task-bravo", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    expect(relinked.postStart?.ok).toBe(true);
+    expect(relinked.linkedNodeModules).toBe(true);
+    expect(relinked.linkedWorkspaces).toEqual(["@arggon/lib"]);
   });
 
   it("keeps the worktree, reports the failing step + remediation, and a re-run attaches", () => {
