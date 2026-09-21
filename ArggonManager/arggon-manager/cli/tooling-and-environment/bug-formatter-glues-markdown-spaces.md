@@ -128,3 +128,45 @@ Each repair needs its code span restructured, not just the whitespace restored (
 ### Recommendation
 
 Merge with a **merge commit** (never squash) once finding 1 is fixed — or, if the trailing space is deliberately accepted, correct the exactness claim in the item/PR body and record the decision. Everything else is verified merge-ready.
+
+### 2026-09-21 @Arggon
+**Review follow-up — both findings addressed** (`a633352`, branch `fix/bug-formatter-glues-markdown-spaces`, PR #387).
+
+### Finding 1 (change request) — FIXED
+
+The two spans now pad **both** ends, so CommonMark's strip rule fires and the parsed values are byte-exact against the CLI constants:
+
+```
+EXACT   init warning (:140): parsed 130 chars, CLI 130 chars   (NOT_A_REPO_WARNING)
+EXACT   opencode.mcp.hint (:184): parsed 129 chars, CLI 129 chars   (OPENCODE_MCP_HINT)
+OK      outdated-docs hint (:164): 72 chars  ("N doc(s) have newer templates — run `arggon init --dry-run` for the plan")
+OK      doctor sample JSON (:659): 178 chars ('{ "native": true, "mcpJson": true, "hint": "…use `arggon mcp`" }')
+```
+
+- Measured with `prettier.__debug.parse` (inlineCode node values), with `NOT_A_REPO_WARNING` rebuilt from `cli/src/init.ts`'s own expression and `OPENCODE_MCP_HINT` imported from `cli/src/doctor.ts` — not hand-typed. Script: `/tmp/opencode/verify-spans.mts` (reproducible: `npx tsx` over the two constants).
+- Source diff: ` ` not a git repository … ` ` and ` (` optional: … ` ` — exactly the fix you verified locally.
+- `prettier --check` clean on both repaired files and on the test; `prettier --write` on copies is **byte-identical** (no table re-pad was needed — the committed file was already canonical).
+
+### Finding 2 (info) — documented limit + guard extended where it can be
+
+- Test header now states the coverage limit explicitly: the token diff pins **token merges** only, so it cannot see the `pitfalls.md` repair (a whitespace-run replacement, not a merge).
+- Added the companion **stability test**: the two files repaired here must stay byte-stable under `prettier --write`. It catches a _newly introduced_ multi-line code span (prettier drops the continuation indent → bytes move), but **not** a revert to the committed `pitfalls.md` base — that base is already the stable-but-damaged output prettier itself produced. A corpus-wide indentation rule must wait for `task-code-span-repair-sweep` (it fails today on docs outside this item's scope). Both limits are written in the header comment.
+
+Mutation evidence (guard is not vacuous):
+
+| Mutation                                                        | Observed                                                                                                                                                                                                                          |
+| --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `docs/json-output.md` ← `origin/opencode2`                      | **both tests fail**: token test names the 4 glues (`null` otherwise → `null`otherwise; and `.mcp.json` → and`.mcp.json`; `v1.findings` entries → `v1.findings`entries; as `{ → as`{`); stability test: "no longer prettier-clean" |
+| `skills/arggon-cli/references/pitfalls.md` ← `origin/opencode2` | **both pass** — the documented limit, now stated instead of implied                                                                                                                                                               |
+
+### Gates (all re-run at `a633352`)
+
+| Gate                   | Result                                                                                       |
+| ---------------------- | -------------------------------------------------------------------------------------------- |
+| `npm test`             | 91 files / **1468 tests** pass (was 1467; +1 stability test)                                 |
+| `npm run lint`         | clean                                                                                        |
+| `npm run build`        | ok                                                                                           |
+| `npm run check:plugin` | ok (bundle unchanged)                                                                        |
+| `arggon validate`      | ok, 0 warnings, convention v5                                                                |
+| `arggon spec validate` | ok, 18 docs, 0 warnings                                                                      |
+| PR #387 CI             | running at `a633352` (previous head was green; results reported in the handoff/next session) |
