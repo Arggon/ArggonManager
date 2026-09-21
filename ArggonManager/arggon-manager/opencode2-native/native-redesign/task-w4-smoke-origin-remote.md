@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-21"
 updated: "2026-09-21"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-w4-smoke-origin-remote
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-w4-smoke-origin-remote.md
