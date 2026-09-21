@@ -30,10 +30,10 @@ the `gh` fallback; the flag does not change the classification.
 
 ## Acceptance
 
-- [ ] `cleanup --no-gh` skips the `gh` fallback entirely (offline/CI
+- [x] `cleanup --no-gh` skips the `gh` fallback entirely (offline/CI
       semantics) and the behavior is covered by a test.
-- [ ] Default `cleanup` keeps the gh fallback.
-- [ ] `arggon validate` green; CI green.
+- [x] Default `cleanup` keeps the gh fallback.
+- [x] `arggon validate` green; CI green.
 
 ## Notes
 
@@ -85,3 +85,6 @@ NOT VERIFIED / NOTES:
 - Acceptance boxes left unticked for the coordinator (not marked done here).
 
 RECOMMENDATION: merge as a merge commit. No change requests.
+
+### 2026-09-21 @Arggon
+Coordinator note: reviewer verified the repro before/after with a gh shim (0 invocations with --no-gh; fallback kept by default; --prune+--no-gh prunes only ancestry-merged), the regression test fails at base and passes at head, and no other --no-* misreads. Gates 1455 tests, lint/build/check:plugin/validate/spec; CI pass. Merged with merge commit; item flipped to done.
