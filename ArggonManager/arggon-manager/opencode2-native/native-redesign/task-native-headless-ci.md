@@ -205,3 +205,7 @@ Mutation check (verified): removing the `mkdir -p` from the template → `before
 
 - Re-review is scoped to the four recipe locations + the fixture hardening (per the verdict). Everything else is unchanged from `8c6940c` apart from N1–N4.
 - Merge with a **merge commit** (tracker auto-commits live on this branch); item stays `in_progress` until you flip it.
+
+### handoff 2026-09-21 @Arggon — next: Coordinator re-review of draft PR #379 (head after tracker commits): B1 fixed in the four recipe locations + fixture now executes the shipped install step verbatim from an empty RUNNER_TEMP (mutation…
+- branch: feat/task-native-headless-ci
+- open questions: Smoke W4 reviewer scenario flakes when the model refuses to attempt the tools its catalog hides (byte-identical plugin/agent/command code vs base; final full run 26/0) - possible smoke follow-up, not…
