@@ -258,6 +258,27 @@ describe("TUI entry wiring (registerArgonTui)", () => {
     expect(() => disposeBare()).not.toThrow();
   });
 
+  it("degrades the panel instead of crashing on a corrupt tracker (P1)", () => {
+    const root = mkdtempSync(join(tmpdir(), "arggon-tui-dupe-"));
+    tmpDirs.push(root);
+    write(root, "ArggonManager/.convention.yml", "version: 5\n");
+    const base = "ArggonManager/arggon-manager/story-x";
+    const dupe = `---\ntype: task\nstatus: todo\nid: dup\ntitle: Duplicate\n---\n\n# Duplicate\n`;
+    write(root, `${base}/one.md`, dupe);
+    write(root, `${base}/two.md`, dupe);
+
+    const { context, slots } = fakeContext(root);
+    expect(() => registerArgonTui(context, { cwd: root })).not.toThrow();
+    const panel = slots.find((entry) => entry.slot.append === "session.panel")!;
+    // The host would otherwise show "Plugin arggon.tui crashed in slot
+    // session.panel: Duplicate id 'dup' …"; the panel renders the reason.
+    const text = render(panel.render({ name: "arggon.board" }));
+    expect(text).toContain("arggon board · tracker unreadable");
+    expect(text).toContain("Duplicate id 'dup'");
+    const sidebar = slots.find((entry) => entry.slot.append === "sidebar.content")!;
+    expect(render(sidebar.render()).trim()).toBe("arggon · no tracker");
+  });
+
   it("keeps the vendored source dependency-less and runtime-resolved", () => {
     const source = readFileSync(join(here, "tui.tsx"), "utf8");
     const imports = [...source.matchAll(/^import\s[\s\S]*?from\s+"([^"]+)"/gm)].map(

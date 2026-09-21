@@ -28,7 +28,7 @@
  * `ARGON_TUI_SMOKE_TIMEOUT_MS` changes the TUI run budget (default 30000 ms).
  */
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -219,7 +219,37 @@ function main(): void {
         !/failed to load plugin[^\n]*arggon/i.test(capture),
         capture,
       );
-      finish(fixture);
+
+      // 5. Corrupt tracker (W5 review P1): a duplicate id used to crash the
+      //    slot with "Plugin arggon.tui crashed in slot session.panel:
+      //    Duplicate id '…'". The board must degrade to the unreadable header.
+      const listed = JSON.parse(run(["list", "--full", "--json"]).stdout ?? "{}") as {
+        items?: Array<{ id?: string; path?: string }>;
+      };
+      const taskPath = listed.items?.find((item) => item.id === "task-board-task")?.path;
+      check(
+        "the created task resolves to a tracker path",
+        typeof taskPath === "string",
+        JSON.stringify(listed).slice(0, 200),
+      );
+      if (typeof taskPath !== "string") {
+        finish(fixture);
+        return;
+      }
+      writeFileSync(
+        join(fixture, ...dirname(taskPath).split("/"), "dupe.md"),
+        "---\ntype: task\nstatus: todo\nid: task-board-task\ntitle: Duplicate\n---\n\n# Duplicate\n",
+        "utf8",
+      );
+      return runTui(fixture, env, sessionID).then((dupeCapture) => {
+        check(
+          "a corrupt tracker degrades the panel to the unreadable header (P1)",
+          dupeCapture.includes("arggon board · tracker unreadable") &&
+            !dupeCapture.includes("crashed in slot"),
+          dupeCapture,
+        );
+        finish(fixture);
+      });
     });
   }
   finish(fixture);

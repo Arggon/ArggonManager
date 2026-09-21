@@ -2878,6 +2878,7 @@ export {
   boardTreeLines,
   clipBoardLine,
   countBoardStatuses,
+  emptyBoardSnapshot,
   sidebarStatusLine,
 } from "./board.js"
 export type { BoardActiveInput, BoardItem, BoardSnapshot, BoardTreeEntry } from "./board.js"

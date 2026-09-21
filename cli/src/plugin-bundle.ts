@@ -43,6 +43,22 @@ export const KERNEL_ENTRY = "lib/src/index.ts";
 /** Bare specifier the plugin imports the kernel with (mapped to KERNEL_ENTRY). */
 export const KERNEL_PACKAGE = "@arggon/lib";
 
+/**
+ * Named exports the vendored bundle forwards (W5 `task-native-tui`). The
+ * emitted wrapper re-exports ONLY this board surface — everything else the
+ * entry module exports stays internal to the bundle (review P3: the forwarding
+ * used to leak all ~46 server-plugin internals). The list is exactly what
+ * `tui.tsx` imports from `./index.ts`; the parity test pins both directions
+ * (every name exists in the entry, and the bundle forwards nothing else).
+ */
+export const BUNDLE_EXPORTS = [
+  "ARGON_BOARD_PANEL",
+  "boardSnapshot",
+  "boardTreeLines",
+  "emptyBoardSnapshot",
+  "sidebarStatusLine",
+] as const;
+
 /** Generous upper bound: the inlined kernel plus the plugin source. */
 export const MAX_BUNDLE_BYTES = 512 * 1024;
 
@@ -174,9 +190,8 @@ export function transpileModule(source: string, fileName: string): string {
 /**
  * Build the bundle (pure: no writes). Walks the graph from `entry` with a
  * queue, transpiles every reachable module and records the resolution edges.
- * The entry module's named VALUE exports are forwarded by the emitted wrapper
- * (`moduleValueExports`), so the vendored bundle exposes the board surface the
- * TUI entry imports (W5) in addition to the default plugin definition.
+ * The emitted wrapper forwards the entry's `BUNDLE_EXPORTS` names (the board
+ * surface `tui.tsx` imports, W5) in addition to the default plugin definition.
  */
 export function buildPluginBundle(root: string, entry: string = PLUGIN_SOURCE): PluginBundle {
   const sources = new Map<string, string>();
@@ -197,7 +212,11 @@ export function buildPluginBundle(root: string, entry: string = PLUGIN_SOURCE): 
     }
   }
   const modules = [...sources.keys()].sort();
-  const entryExports = moduleValueExports(root, entry);
+  // Forward the entry's board surface only (BUNDLE_EXPORTS allowlist): the
+  // wrapper is the vendored module's public API, not a dump of every helper.
+  const entryExports = moduleValueExports(root, entry).filter((name) =>
+    (BUNDLE_EXPORTS as readonly string[]).includes(name),
+  );
   const code = emitBundle(modules, sources, edges, entry, entryExports);
   if (Buffer.byteLength(code, "utf8") > MAX_BUNDLE_BYTES) {
     throw new Error(

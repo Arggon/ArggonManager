@@ -28,6 +28,7 @@ import {
   ARGON_BOARD_PANEL,
   boardSnapshot,
   boardTreeLines,
+  emptyBoardSnapshot,
   sidebarStatusLine,
   type BoardSnapshot,
 } from "./index.ts";
@@ -126,12 +127,24 @@ export function registerArgonTui(
     }
   };
 
-  const readSnapshot = (): BoardSnapshot =>
-    boardSnapshot(cwd(), {
-      branch: readBranch(),
-      // An explicit `null` disables the env override (tests / embedders).
-      envItem: options.envItem === undefined ? (process.env.ARGON_ITEM ?? null) : options.envItem,
-    });
+  /**
+   * Read the snapshot for one render. `boardSnapshot` is contractually total
+   * (no tracker and corrupt tracker both degrade to an error snapshot); this
+   * per-surface guard is the belt-and-braces: a slot crash would otherwise take
+   * the whole panel down with a host overlay (W5 review P1).
+   */
+  const readSnapshot = (): BoardSnapshot => {
+    try {
+      return boardSnapshot(cwd(), {
+        branch: readBranch(),
+        // An explicit `null` disables the env override (tests / embedders).
+        envItem: options.envItem === undefined ? (process.env.ARGON_ITEM ?? null) : options.envItem,
+      });
+    } catch (error) {
+      logTui("snapshot", "board read failed", error);
+      return emptyBoardSnapshot("board read failed");
+    }
+  };
 
   const toast = (message: string): void => {
     try {

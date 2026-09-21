@@ -3,7 +3,13 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { stampGeneratedContent } from "./docs.js";
-import { PLUGIN_BUNDLE, buildPluginBundle } from "./plugin-bundle.js";
+import {
+  BUNDLE_EXPORTS,
+  PLUGIN_BUNDLE,
+  PLUGIN_SOURCE,
+  buildPluginBundle,
+  moduleValueExports,
+} from "./plugin-bundle.js";
 
 // W3 task-native-commands-seam: the vendored plugin is a single-file,
 // dependency-free bundle built from opencode/plugins/arggon/index.ts with
@@ -22,6 +28,9 @@ import { PLUGIN_BUNDLE, buildPluginBundle } from "./plugin-bundle.js";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const DEST = ".opencode/plugins/arggon/index.ts";
 const BUNDLE_PATH = join(repoRoot, ...PLUGIN_BUNDLE.split("/"));
+/** W5 TUI entry: vendored verbatim (not bundled), same parity contract. */
+const TUI_SOURCE = "opencode/plugins/arggon/tui.tsx";
+const TUI_DEST = ".opencode/plugins/arggon/tui.tsx";
 
 /** Committed artifact bytes, read-only: this suite never rewrites it. */
 function bundleOnDisk(): string {
@@ -73,5 +82,52 @@ describe("vendored plugin bundle parity (W3)", () => {
       writeFileSync(copyPath, expected);
     }
     expect(readFileSync(copyPath, "utf8")).toBe(expected);
+  });
+
+  it("forwards exactly the board surface the TUI entry imports (W5)", () => {
+    // Both directions: every allowlisted name exists in the entry module...
+    const entryExports = moduleValueExports(repoRoot, PLUGIN_SOURCE);
+    for (const name of BUNDLE_EXPORTS) {
+      expect(entryExports, `entry exports ${name}`).toContain(name);
+    }
+    // ...and the emitted wrapper forwards nothing else.
+    const forwarded = [...bundleOnDisk().matchAll(/^export const (\w+) = __arggonEntry\./gm)].map(
+      (match) => match[1],
+    );
+    expect(forwarded.sort()).toEqual([...BUNDLE_EXPORTS].sort());
+    // The allowlist IS the TUI import surface (no more, no less): a new import
+    // in `tui.tsx` without a `BUNDLE_EXPORTS` entry fails here, not at load.
+    const source = readFileSync(join(repoRoot, ...TUI_SOURCE.split("/")), "utf8");
+    const block = /import\s*\{([^}]*)\}\s*from\s*"\.\/index\.ts"/.exec(source)?.[1] ?? "";
+    const imported = block
+      .split(",")
+      .map((name) => name.trim())
+      .filter((name) => name !== "" && !name.startsWith("type "));
+    expect(imported.sort()).toEqual([...BUNDLE_EXPORTS].sort());
+  });
+});
+
+describe("vendored TUI entry parity (W5)", () => {
+  it("regenerates the derived, gitignored tui.tsx copy from the committed source", () => {
+    const source = readFileSync(join(repoRoot, ...TUI_SOURCE.split("/")), "utf8");
+    const expected = stampGeneratedContent(TUI_DEST, TUI_SOURCE, source);
+    // Pin the marker contract independently of the stamp implementation.
+    expect(expected.startsWith(`// arggon:generated template="${TUI_SOURCE}"\n`)).toBe(true);
+    const copyPath = join(repoRoot, TUI_DEST);
+    // Derived copy (gitignored, also rewritten by `arggon init`): auto-heal is
+    // safe — the committed source is what must never drift.
+    if (!existsSync(copyPath) || readFileSync(copyPath, "utf8") !== expected) {
+      mkdirSync(dirname(copyPath), { recursive: true });
+      writeFileSync(copyPath, expected);
+    }
+    expect(readFileSync(copyPath, "utf8")).toBe(expected);
+  });
+
+  it("keeps the vendored TUI entry dependency-less (runtime-resolved imports only)", () => {
+    const source = readFileSync(join(repoRoot, ...TUI_SOURCE.split("/")), "utf8");
+    const imports = [...source.matchAll(/^import\s[\s\S]*?from\s+"([^"]+)"/gm)].map(
+      (match) => match[1],
+    );
+    expect(imports).toEqual(["solid-js", "./index.ts"]);
   });
 });

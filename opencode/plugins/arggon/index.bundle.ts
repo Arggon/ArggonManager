@@ -5572,6 +5572,7 @@ __arggonModules.set("opencode/plugins/arggon/board.ts", (exports, require, modul
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_TYPE_BADGES = exports.ARGON_BOARD_PANEL = void 0;
 exports.boardRoot = boardRoot;
+exports.emptyBoardSnapshot = emptyBoardSnapshot;
 exports.activeBoardId = activeBoardId;
 exports.boardSnapshot = boardSnapshot;
 exports.countBoardStatuses = countBoardStatuses;
@@ -5613,6 +5614,19 @@ function boardRoot(cwd) {
         return null;
     }
 }
+function emptyBoardSnapshot(reason) {
+    return {
+        root: null,
+        items: [],
+        counts: emptyCounts(),
+        activeId: null,
+        nextId: null,
+        error: reason,
+    };
+}
+function detail(error) {
+    return error instanceof Error ? error.message : String(error);
+}
 function activeBoardId(items, input = {}) {
     const known = new Set(items.map((item) => item.id));
     const env = (input.envItem ?? "").trim();
@@ -5624,57 +5638,54 @@ function activeBoardId(items, input = {}) {
     return candidate !== "" && known.has(candidate) ? candidate : null;
 }
 function boardSnapshot(cwd, input = {}) {
-    let root = null;
-    let kernelItems = [];
+    let tasksDir;
     try {
-        const tasksDir = (0, lib_1.findTasksDir)(cwd);
-        root = (0, lib_1.repoRootFromTasks)(tasksDir);
-        kernelItems = (0, lib_1.loadItems)(tasksDir);
+        tasksDir = (0, lib_1.findTasksDir)(cwd);
     }
     catch {
+        return emptyBoardSnapshot("no ArggonManager tracker found here");
+    }
+    try {
+        const root = (0, lib_1.repoRootFromTasks)(tasksDir);
+        const kernelItems = (0, lib_1.loadItems)(tasksDir);
+        const byId = (0, lib_1.itemsById)(kernelItems);
+        const items = kernelItems
+            .map((item) => ({
+            id: item.id,
+            type: item.type,
+            title: (0, lib_1.sanitizeHumanTextUncapped)(item.title ?? item.id),
+            status: item.status,
+            parent: item.parent ?? null,
+            assignee: item.assignee ?? null,
+            priority: item.priority ?? null,
+            blockedReason: item.blockedReason ?? null,
+            dependsOn: [...item.dependsOn],
+            openDeps: (0, lib_1.openDependencies)(item, byId),
+            active: false,
+        }))
+            .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+        const activeId = activeBoardId(items, input);
+        for (const item of items)
+            item.active = item.id === activeId;
+        let nextId = null;
+        try {
+            nextId = (0, lib_1.runNext)({ cwd }).suggestion?.item.id ?? null;
+        }
+        catch {
+            nextId = null;
+        }
         return {
-            root: null,
-            items: [],
-            counts: emptyCounts(),
-            activeId: null,
-            nextId: null,
-            error: "no ArggonManager tracker found here",
+            root,
+            items,
+            counts: countBoardStatuses(items),
+            activeId,
+            nextId,
+            error: null,
         };
     }
-    const byId = (0, lib_1.itemsById)(kernelItems);
-    const items = kernelItems
-        .map((item) => ({
-        id: item.id,
-        type: item.type,
-        title: (0, lib_1.sanitizeHumanTextUncapped)(item.title ?? item.id),
-        status: item.status,
-        parent: item.parent ?? null,
-        assignee: item.assignee ?? null,
-        priority: item.priority ?? null,
-        blockedReason: item.blockedReason ?? null,
-        dependsOn: [...item.dependsOn],
-        openDeps: (0, lib_1.openDependencies)(item, byId),
-        active: false,
-    }))
-        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-    const activeId = activeBoardId(items, input);
-    for (const item of items)
-        item.active = item.id === activeId;
-    let nextId = null;
-    try {
-        nextId = (0, lib_1.runNext)({ cwd }).suggestion?.item.id ?? null;
+    catch (error) {
+        return emptyBoardSnapshot((0, lib_1.sanitizeHumanError)(`tracker unreadable: ${detail(error)}`));
     }
-    catch {
-        nextId = null;
-    }
-    return {
-        root,
-        items,
-        counts: countBoardStatuses(items),
-        activeId,
-        nextId,
-        error: null,
-    };
 }
 function emptyCounts() {
     return { todo: 0, in_progress: 0, blocked: 0, done: 0, cancelled: 0 };
@@ -5746,8 +5757,11 @@ function boardItemLine(entry) {
     const badge = exports.BOARD_TYPE_BADGES[item.type];
     const blocked = item.openDeps.length > 0 ? ` ⌫${(0, lib_1.sanitizeHumanTextUncapped)(item.openDeps.join(","))}` : "";
     const assignee = item.assignee !== null ? ` @${(0, lib_1.sanitizeHumanTextUncapped)(item.assignee)}` : "";
+    const reason = item.blockedReason !== null && item.blockedReason !== ""
+        ? ` · blocked: ${(0, lib_1.sanitizeHumanTextUncapped)(item.blockedReason)}`
+        : "";
     return (`${indent}${active}${mark} ${badge} ${(0, lib_1.sanitizeHumanTextUncapped)(item.id)}${blocked}${assignee}` +
-        ` — ${(0, lib_1.sanitizeHumanTextUncapped)(item.title)}`);
+        ` — ${(0, lib_1.sanitizeHumanTextUncapped)(item.title)}${reason}`);
 }
 function boardTreeLines(snapshot, options = {}) {
     const width = options.width ?? 0;
@@ -5773,10 +5787,11 @@ function sidebarStatusLine(snapshot, width = 0) {
     if (active !== undefined) {
         return clip(`arggon ▶ ${(0, lib_1.sanitizeHumanTextUncapped)(active.id)} ${active.status}`);
     }
-    const ready = snapshot.items.filter((item) => item.status === "todo" &&
+    const byId = new Map(snapshot.items.map((item) => [item.id, { status: item.status }]));
+    const ready = snapshot.items.filter((item) => (0, lib_1.isClaimable)(item.type) &&
+        item.status === "todo" &&
         item.assignee === null &&
-        (item.type === "task" || item.type === "bug") &&
-        item.openDeps.length === 0).length;
+        (0, lib_1.isReady)(item, byId)).length;
     const next = snapshot.nextId !== null ? ` · next ${(0, lib_1.sanitizeHumanTextUncapped)(snapshot.nextId)}` : "";
     return clip(`arggon · ${ready} ready${next}`);
 }
@@ -5818,7 +5833,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sidebarStatusLine = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardHeaderLine = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.ARGON_BOARD_PANEL = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
+exports.sidebarStatusLine = exports.emptyBoardSnapshot = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardHeaderLine = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.ARGON_BOARD_PANEL = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
 exports.isArggonItemId = isArggonItemId;
 exports.parseArggonItemFromCommand = parseArggonItemFromCommand;
 exports.parseArggonItemFromCode = parseArggonItemFromCode;
@@ -7792,6 +7807,7 @@ Object.defineProperty(exports, "boardTreeEntries", { enumerable: true, get: func
 Object.defineProperty(exports, "boardTreeLines", { enumerable: true, get: function () { return board_js_1.boardTreeLines; } });
 Object.defineProperty(exports, "clipBoardLine", { enumerable: true, get: function () { return board_js_1.clipBoardLine; } });
 Object.defineProperty(exports, "countBoardStatuses", { enumerable: true, get: function () { return board_js_1.countBoardStatuses; } });
+Object.defineProperty(exports, "emptyBoardSnapshot", { enumerable: true, get: function () { return board_js_1.emptyBoardSnapshot; } });
 Object.defineProperty(exports, "sidebarStatusLine", { enumerable: true, get: function () { return board_js_1.sidebarStatusLine; } });
 exports.default = definition;
 })
@@ -7799,48 +7815,7 @@ exports.default = definition;
 const __arggonEntry = __arggonRequire("opencode/plugins/arggon/index.ts", undefined)
 export default __arggonEntry.default
 export const ARGON_BOARD_PANEL = __arggonEntry.ARGON_BOARD_PANEL
-export const ARGON_TOOL_NAMESPACE = __arggonEntry.ARGON_TOOL_NAMESPACE
-export const ARGON_TOOL_NAMESPACE_DESCRIPTION = __arggonEntry.ARGON_TOOL_NAMESPACE_DESCRIPTION
-export const ArgonToolError = __arggonEntry.ArgonToolError
-export const BOARD_STATUS_MARKS = __arggonEntry.BOARD_STATUS_MARKS
-export const BOARD_STATUS_ORDER = __arggonEntry.BOARD_STATUS_ORDER
-export const BOARD_TYPE_BADGES = __arggonEntry.BOARD_TYPE_BADGES
-export const BRANCH_PREFIXES = __arggonEntry.BRANCH_PREFIXES
-export const CACHE_MAX_ENTRIES = __arggonEntry.CACHE_MAX_ENTRIES
-export const CACHE_TTL_MS = __arggonEntry.CACHE_TTL_MS
-export const ITEM_BLOCK_MAX_BYTES = __arggonEntry.ITEM_BLOCK_MAX_BYTES
-export const ITEM_ENV = __arggonEntry.ITEM_ENV
-export const MAX_SUBSTITUTION_DEPTH = __arggonEntry.MAX_SUBSTITUTION_DEPTH
-export const PINNED_TOOL_NAMES = __arggonEntry.PINNED_TOOL_NAMES
-export const activeBoardId = __arggonEntry.activeBoardId
-export const argonToolDefinitions = __arggonEntry.argonToolDefinitions
-export const boardCountsLine = __arggonEntry.boardCountsLine
-export const boardHeaderLine = __arggonEntry.boardHeaderLine
-export const boardItemLine = __arggonEntry.boardItemLine
-export const boardRoot = __arggonEntry.boardRoot
 export const boardSnapshot = __arggonEntry.boardSnapshot
-export const boardTreeEntries = __arggonEntry.boardTreeEntries
 export const boardTreeLines = __arggonEntry.boardTreeLines
-export const boundText = __arggonEntry.boundText
-export const buildItemBlock = __arggonEntry.buildItemBlock
-export const clipBoardLine = __arggonEntry.clipBoardLine
-export const countBoardStatuses = __arggonEntry.countBoardStatuses
-export const csvList = __arggonEntry.csvList
-export const isArggonItemId = __arggonEntry.isArggonItemId
-export const itemCacheKey = __arggonEntry.itemCacheKey
-export const itemIdFromBranch = __arggonEntry.itemIdFromBranch
-export const loadArgonKernel = __arggonEntry.loadArgonKernel
-export const looksLikeCommitCommand = __arggonEntry.looksLikeCommitCommand
-export const nativeToolSchemas = __arggonEntry.nativeToolSchemas
-export const nativeToolsCatalogBytes = __arggonEntry.nativeToolsCatalogBytes
-export const onToolAfter = __arggonEntry.onToolAfter
-export const parseArggonItemFromCode = __arggonEntry.parseArggonItemFromCode
-export const parseArggonItemFromCommand = __arggonEntry.parseArggonItemFromCommand
-export const parseArggonItemFromTool = __arggonEntry.parseArggonItemFromTool
-export const parseValidateFailure = __arggonEntry.parseValidateFailure
-export const pluginTemplatesDir = __arggonEntry.pluginTemplatesDir
-export const registerArgonTools = __arggonEntry.registerArgonTools
-export const sessionToken = __arggonEntry.sessionToken
-export const setBounded = __arggonEntry.setBounded
+export const emptyBoardSnapshot = __arggonEntry.emptyBoardSnapshot
 export const sidebarStatusLine = __arggonEntry.sidebarStatusLine
-export const worktreeOptions = __arggonEntry.worktreeOptions

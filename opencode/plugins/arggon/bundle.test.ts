@@ -17,7 +17,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
-import { PLUGIN_BUNDLE } from "../../../cli/src/plugin-bundle.js";
+import { BUNDLE_EXPORTS, PLUGIN_BUNDLE } from "../../../cli/src/plugin-bundle.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
@@ -136,10 +136,15 @@ describe("vendored plugin bundle: dependency-less load (W3)", () => {
     const lines = (mod.boardTreeLines as (s: unknown) => string[])(snapshot);
     expect(lines[0]).toContain("arggon board");
     expect(lines.length).toBeGreaterThan(2);
-    const headers = (mod.boardHeaderLine as (s: unknown) => string)(snapshot);
-    expect(headers.length).toBeGreaterThan(0);
     const sidebar = (mod.sidebarStatusLine as (s: unknown) => string)(snapshot);
     expect(sidebar).toContain("arggon");
+    // W5 review P3: the wrapper forwards the board surface ONLY (the 46
+    // server-plugin internals stay internal to the bundle).
+    expect(
+      Object.keys(mod)
+        .filter((name) => name !== "default")
+        .sort(),
+    ).toEqual([...BUNDLE_EXPORTS].sort());
   });
 
   it("registers the fifteen native tools and exercises them against a real tracker", async () => {

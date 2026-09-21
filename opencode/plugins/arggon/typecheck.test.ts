@@ -2,20 +2,16 @@
  * Type gate for the vendored plugin source (review F1, task-native-tools).
  *
  * The root tsconfig includes `cli/src` only, vitest transpiles with oxc (no
- * type-checking) and eslint is not type-aware — so
- * `opencode/plugins/arggon/index.ts`, the single source `arggon init` builds
- * the vendored bundle from, could ship a TypeScript error unnoticed (the review
+ * type-checking) and eslint is not type-aware — so the plugin sources
+ * `arggon init` vendors could ship a TypeScript error unnoticed (the review
  * caught exactly that: an undefined `ToolEditorLike` → TS2304). This gate runs
- * a strict `tsc --noEmit` over the plugin source.
- *
- * Since W5 (`task-native-tui`) the plugin source statically imports the kernel
- * (`board.ts` → `@arggon/lib`, inlined by the bundle build), so the gate uses
- * `cli/tsconfig.plugin.json` — the same strict options plus a `paths` mapping
- * of `@arggon/lib` to `lib/src/index.ts`, which keeps the check independent of
- * a previous `npm run build` (a fresh clone has no `lib/dist`). The TUI entry
- * is deliberately out of scope: it imports `solid-js`, which is resolved by the
- * OpenCode TUI runtime and is not a repo dependency (its wiring is covered by
- * `tui.test.ts` and its real load by `npm run smoke:tui`).
+ * a strict `tsc --noEmit` over the plugin sources through
+ * `cli/tsconfig.plugin.json`: the server entry, the board surface (`board.ts`,
+ * a static `@arggon/lib` import mapped to `lib/src/index.ts` so the check needs
+ * no prior build) and the TUI entry `tui.tsx` (W5 review P3: it used to be
+ * gated only by eslint + smoke). `solid-js`/JSX resolve to the repo-only
+ * `cli/types/tui-runtime.d.ts` shim — the runtime provides them at load time
+ * and the repo deliberately has no `solid-js` dependency.
  */
 import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";

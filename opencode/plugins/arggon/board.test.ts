@@ -99,6 +99,17 @@ function fixture(): string {
   return root;
 }
 
+/** Fixture with two items sharing an id (corrupt tracker, review P1). */
+function corruptFixture(): string {
+  const root = mkdtempSync(join(tmpdir(), "arggon-board-dupe-"));
+  tmpDirs.push(root);
+  write(root, "ArggonManager/.convention.yml", "version: 5\n");
+  const base = "ArggonManager/arggon-manager/story-x";
+  write(root, `${base}/one.md`, item("dup", { parent: "story-x" }, "First duplicate"));
+  write(root, `${base}/two.md`, item("dup", { parent: "story-x" }, "Second duplicate"));
+  return root;
+}
+
 describe("board snapshot (kernel-backed, display-only)", () => {
   it("reads the tree, counts, readiness and the kernel next suggestion", () => {
     const root = fixture();
@@ -153,6 +164,33 @@ describe("board snapshot (kernel-backed, display-only)", () => {
       "arggon board · no ArggonManager tracker found here",
     ]);
     expect(sidebarStatusLine(snapshot)).toBe("arggon · no tracker");
+  });
+
+  it("degrades instead of throwing on a corrupt tracker with duplicate ids (P1)", () => {
+    const root = corruptFixture();
+    // The kernel throws `Duplicate id 'dup' …` from itemsById; the panel
+    // contract is "never throws", so the snapshot must carry the reason.
+    let snapshot: BoardSnapshot | undefined;
+    expect(() => {
+      snapshot = boardSnapshot(root);
+    }).not.toThrow();
+    expect(snapshot?.root).toBeNull();
+    expect(snapshot?.items).toEqual([]);
+    expect(snapshot?.counts).toEqual({
+      todo: 0,
+      in_progress: 0,
+      blocked: 0,
+      done: 0,
+      cancelled: 0,
+    });
+    expect(snapshot?.error).toContain("tracker unreadable");
+    expect(snapshot?.error).toContain("Duplicate id 'dup'");
+    // The reason is a single sanitized line the panel can render.
+    expect(boardTreeLines(snapshot!).length).toBe(1);
+    expect(boardTreeLines(snapshot!)[0]).toContain("tracker unreadable");
+    expect(sidebarStatusLine(snapshot!)).toBe("arggon · no tracker");
+    // Same with an active-item query: resolution never runs on an error snapshot.
+    expect(boardSnapshot(root, { branch: "feat/dup" }).activeId).toBeNull();
   });
 
   it("never writes to the tracker (pure read)", () => {
@@ -249,6 +287,27 @@ describe("board text renderers", () => {
     expect(clipBoardLine("abc", 0)).toBe("");
   });
 
+  it("renders the blocked reason on blocked items (escaped)", () => {
+    const blocked = boardItem("task-blocked", {
+      status: "blocked",
+      blockedReason: "waiting on review",
+    });
+    const line = boardItemLine({ item: blocked, depth: 1 });
+    expect(line).toContain("! T task-blocked");
+    expect(line).toContain("— Title task-blocked · blocked: waiting on review");
+
+    const empty = boardItem("task-no-reason", { status: "blocked", blockedReason: "" });
+    expect(boardItemLine({ item: empty, depth: 0 })).not.toContain("blocked:");
+
+    const hostile = boardItem("task-hostile", {
+      status: "blocked",
+      blockedReason: "why\u001b]0;pwn\u0007",
+    });
+    const hostileLine = boardItemLine({ item: hostile, depth: 0 });
+    expect(hostileLine).not.toContain("\u001b");
+    expect(hostileLine).toContain("blocked: why\\u001b]0;pwn\\u0007");
+  });
+
   it("escapes repo-controlled bytes on every line", () => {
     const hostile = boardItem("task-\u001b[31mred\nnext", {
       title: "boom\u001b]0;pwn\u0007",
@@ -275,7 +334,9 @@ describe("board text renderers", () => {
 
   it("summarizes the sidebar from the active item or the ready count", () => {
     const root = fixture();
-    expect(sidebarStatusLine(boardSnapshot(root))).toBe("arggon · 1 ready · next task-one");
+    // Kernel-ready: isClaimable + todo + unclaimed + deps met — story-a and
+    // task-one are ready; task-two waits on task-one (next stays task-one).
+    expect(sidebarStatusLine(boardSnapshot(root))).toBe("arggon · 2 ready · next task-one");
     expect(sidebarStatusLine(boardSnapshot(root, { branch: "feat/bug-three" }))).toBe(
       "arggon ▶ bug-three in_progress",
     );

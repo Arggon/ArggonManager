@@ -6,10 +6,17 @@
     "strict": true,
     "noEmit": true,
     "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "jsx": "preserve",
     "baseUrl": "..",
     "paths": {
-      "@arggon/lib": ["lib/src/index.ts"]
+      "@arggon/lib": ["lib/src/index.ts"],
+      "solid-js": ["cli/types/tui-runtime.d.ts"]
     }
   },
-  "include": ["../opencode/plugins/arggon/index.ts", "../opencode/plugins/arggon/board.ts"]
+  "include": [
+    "../opencode/plugins/arggon/index.ts",
+    "../opencode/plugins/arggon/board.ts",
+    "../opencode/plugins/arggon/tui.tsx"
+  ]
 }

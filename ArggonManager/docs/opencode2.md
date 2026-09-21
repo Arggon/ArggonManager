@@ -147,23 +147,28 @@ working with the plugin broken or absent.
 The board/status surface is a TUI plugin contribution, not a CLI screen: open a
 session and run `/arggon-board` (Ctrl+P → _Open Arggon board_, or `ctrl+g`, also
 work; outside a session the command toasts "open a session first"). The host
-owns sizing/focus/full-screen; the plugin owns the content. Without a tracker
-the panel shows `no ArggonManager tracker found here` and the session keeps
-working.
+owns sizing/focus/full-screen; the plugin owns the content. The sidebar line
+shows the active item (`arggon ▶ <id> <status>`) or `arggon · N ready · next
+<id>`, where _ready_ follows the kernel definition (`isClaimable` + unclaimed
+`todo` + all dependencies terminal). Without a tracker
+the panel shows `no ArggonManager tracker found here`, and a corrupt tracker
+(duplicate ids) shows `tracker unreadable: …` instead of crashing the slot —
+the session keeps working in both cases.
 
 **Manual checklist** (no interactive driver in CI — the automated evidence is
 `npm run smoke:tui`, which drives exactly this flow in a PTY: init → tree →
 `/arggon-board` → panel captured):
 
-| Step                                     | Expected                                                                                                                                                   |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Open a session, run `/arggon-board`      | Panel opens, header `arggon board · N item(s) · next: <id>`, counters line, indented tree (I/E/S/T/B badge + status glyph + id + title)                    |
-| `esc`                                    | Panel closes; the session view returns; nothing else changes                                                                                               |
-| `f`                                      | Presentation toggles to full-screen and back (host no-op on a narrow terminal — it is already full-screen)                                                 |
-| `r`                                      | Tree is re-read from disk (edits to items appear)                                                                                                          |
-| Resize to a narrow terminal (< ~70 cols) | Panel stays full-screen, each line clips with `…`, no wrap/ghost                                                                                           |
-| Sidebar (wide terminal, ~160 cols)       | `arggon ▶ <active item> <status>` when the session resolves an item, else `arggon · N ready · next <id>`; the host hides the sidebar on narrower terminals |
-| Open the TUI outside a tracker           | `arggon board · no ArggonManager tracker found here`; session unaffected                                                                                   |
+| Step                                                     | Expected                                                                                                                                                   |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Open a session, run `/arggon-board`                      | Panel opens, header `arggon board · N item(s) · next: <id>`, counters line, indented tree (I/E/S/T/B badge + status glyph + id + title)                    |
+| `esc`                                                    | Panel closes; the session view returns; nothing else changes                                                                                               |
+| `f`                                                      | Presentation toggles to full-screen and back (host no-op on a narrow terminal — it is already full-screen)                                                 |
+| `r`                                                      | Tree is re-read from disk (edits to items appear)                                                                                                          |
+| Resize to a narrow terminal (< ~70 cols)                 | Panel stays full-screen, each line clips with `…`, no wrap/ghost                                                                                           |
+| Sidebar (wide terminal, ~160 cols)                       | `arggon ▶ <active item> <status>` when the session resolves an item, else `arggon · N ready · next <id>`; the host hides the sidebar on narrower terminals |
+| Open the TUI outside a tracker                           | `arggon board · no ArggonManager tracker found here`; session unaffected                                                                                   |
+| Open the TUI with a corrupt tracker (duplicate item ids) | `arggon board · tracker unreadable: Duplicate id '…'`; no "crashed in slot" overlay, session unaffected                                                    |
 
 ## Guarantees
 

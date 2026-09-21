@@ -215,6 +215,13 @@ focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
     directly in `setup` throws `Keymap.Provider is missing`. Register the
     global command layer inside a slot render (the `app` slot is the documented
     host); panel-scoped bindings belong to the panel component.
+  - The board read is **total**: `boardSnapshot` degrades to an error snapshot
+    for both a missing tracker (`no ArggonManager tracker found here`) and a
+    corrupt one (`tracker unreadable: Duplicate id '…'` — `itemsById` throws
+    there, and the guard is what keeps the host from showing
+    `Plugin arggon.tui crashed in slot session.panel`), with a per-surface
+    try/catch as belt-and-braces. Unit tests cover both, and `smoke:tui`
+    reproduces the duplicate-id case end-to-end in the PTY.
   - Dispatch (verified with the shipped plugin on 2.0.12): inside a session the
     panel opens from the slash command `/arggon-board`, from the palette entry
     (Ctrl+P → _Open Arggon board_) **and** from the `ctrl+g` binding registered
@@ -229,10 +236,14 @@ focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
     needs no server round-trip and stays display-only.
   - Evidence: `npm run smoke:tui` (PTY via util-linux `script`: init fixture →
     4-item tree → `opencode plugin list` → API-created empty session → TUI run
-    → types `/arggon-board` → asserts the captured panel header + tree, and no
-    plugin load failure). Unit wiring: `opencode/plugins/arggon/tui.test.ts` +
-    `board.test.ts` with the runtime stubs in `test/tui-runtime-stub.ts`
-    (vitest aliases `solid-js`/`@opentui/solid/jsx-runtime`, oxc `jsx` config).
+    → types `/arggon-board` → asserts the captured panel header + tree, no
+    plugin load failure, and that a duplicate-id tracker renders the unreadable
+    header instead of a slot crash). Unit wiring:
+    `opencode/plugins/arggon/tui.test.ts` + `board.test.ts` with the runtime
+    stubs in `test/tui-runtime-stub.ts` (vitest aliases
+    `solid-js`/`@opentui/solid/jsx-runtime`, oxc `jsx` config); the strict type
+    gate (`cli/tsconfig.plugin.json` + `cli/types/tui-runtime.d.ts`) now covers
+    `tui.tsx` too.
   - Version note: the W5 probes ran on the local **2.0.12** while this playbook
     pins 2.0.10 and the W5 surfaces were not re-probed on 2.0.10 (they use only
     documented 2.0.x APIs, feature-detected). A pin refresh on the installed 2.x
@@ -354,12 +365,16 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
 - Repo gates: `npm test` covers seam generation, never-overwrite/skip, JSONC
   validity and skill bundling parity; `arggon validate` covers tracker state.
   W5 adds the TUI board/status surface: `opencode/plugins/arggon/board.test.ts`
-  (kernel-backed snapshot/tree/line renderers on a fixture tracker, purity, and
-  hostile-byte escaping), `tui.test.ts` (slot/command/panel wiring against the
-  runtime stubs, plus the vendored-source import allowlist) and the extended
-  `bundle.test.ts` (the dependency-less bundle serves the board surface from the
-  inlined kernel). `npm run smoke:tui` is the PTY end-to-end evidence (init →
-  tree → plugin discovery → session → `/arggon-board` → captured panel).
+  (kernel-backed snapshot/tree/line renderers on a fixture tracker, purity,
+  hostile-byte escaping and the duplicate-id degradation), `tui.test.ts`
+  (slot/command/panel wiring against the runtime stubs, the corrupt-tracker
+  panel render, plus the vendored-source import allowlist),
+  `cli/src/plugin-copy.test.ts` (bundle drift gate, the `BUNDLE_EXPORTS`
+  allowlist ⇄ `tui.tsx` imports parity, and the self-healing derived copies of
+  both vendored files) and the extended `bundle.test.ts` (the dependency-less
+  bundle serves the board surface from the inlined kernel). `npm run smoke:tui`
+  is the PTY end-to-end evidence (init → tree → plugin discovery → session →
+  `/arggon-board` → captured panel → duplicate-id degradation).
 - Fixture smoke: `arggon init` in a temp tree creates the seam; a second run
   leaves an edited `opencode.jsonc` byte-identical (adopter-owned); a tree with
   its own `opencode.json` reports the config skip and writes no `opencode.jsonc`.

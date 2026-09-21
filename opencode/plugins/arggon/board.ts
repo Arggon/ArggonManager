@@ -17,11 +17,14 @@
  */
 import {
   findTasksDir,
+  isClaimable,
+  isReady,
   itemsById,
   loadItems,
   openDependencies,
   repoRootFromTasks,
   runNext,
+  sanitizeHumanError,
   sanitizeHumanTextUncapped,
   type ItemType,
   type Status,
@@ -104,6 +107,22 @@ export function boardRoot(cwd: string): string | null {
   }
 }
 
+/** Empty snapshot carrying a human reason the panel renders. */
+export function emptyBoardSnapshot(reason: string): BoardSnapshot {
+  return {
+    root: null,
+    items: [],
+    counts: emptyCounts(),
+    activeId: null,
+    nextId: null,
+    error: reason,
+  };
+}
+
+function detail(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 /**
  * Resolve the session's active item id: `ARGON_ITEM` override first, then the
  * convention branch (`feat/<id>` / `fix/<id>`), exactly like the server
@@ -123,62 +142,64 @@ export function activeBoardId(
 }
 
 /**
- * Read the tracker into a display snapshot. Never throws and never writes:
- * every failure becomes `error` (the panel shows it and stays alive).
+ * Read the tracker into a display snapshot. **Never throws and never writes**:
+ * the tracker detection has its own reason ("no tracker"), and any read failure
+ * — including a corrupt tracker whose duplicate ids make `itemsById` throw
+ * (`Duplicate id '…'`) — degrades to an empty snapshot carrying a sanitized
+ * human reason, so the panel keeps rendering (P1 review fix).
  */
 export function boardSnapshot(cwd: string, input: BoardActiveInput = {}): BoardSnapshot {
-  let root: string | null = null;
-  let kernelItems: ReturnType<typeof loadItems> = [];
+  let tasksDir: string;
   try {
-    const tasksDir = findTasksDir(cwd);
-    root = repoRootFromTasks(tasksDir);
-    kernelItems = loadItems(tasksDir);
+    tasksDir = findTasksDir(cwd);
   } catch {
+    return emptyBoardSnapshot("no ArggonManager tracker found here");
+  }
+  try {
+    const root = repoRootFromTasks(tasksDir);
+    const kernelItems = loadItems(tasksDir);
+    // Duplicate ids throw here; the guard above turns that into an error
+    // snapshot instead of a plugin-slot crash.
+    const byId = itemsById(kernelItems) as Map<string, { status: Status }>;
+    const items: BoardItem[] = kernelItems
+      .map((item) => ({
+        id: item.id,
+        type: item.type,
+        title: sanitizeHumanTextUncapped(item.title ?? item.id),
+        status: item.status,
+        parent: item.parent ?? null,
+        assignee: item.assignee ?? null,
+        priority: item.priority ?? null,
+        blockedReason: item.blockedReason ?? null,
+        dependsOn: [...item.dependsOn],
+        openDeps: openDependencies(item, byId),
+        active: false,
+      }))
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+    const activeId = activeBoardId(items, input);
+    for (const item of items) item.active = item.id === activeId;
+
+    let nextId: string | null = null;
+    try {
+      nextId = runNext({ cwd }).suggestion?.item.id ?? null;
+    } catch {
+      nextId = null;
+    }
+
     return {
-      root: null,
-      items: [],
-      counts: emptyCounts(),
-      activeId: null,
-      nextId: null,
-      error: "no ArggonManager tracker found here",
+      root,
+      items,
+      counts: countBoardStatuses(items),
+      activeId,
+      nextId,
+      error: null,
     };
+  } catch (error) {
+    // Repo-controlled bytes (ids/paths) land in the message: escape them the
+    // same way the CLI's human error channel does, and keep it one bounded line.
+    return emptyBoardSnapshot(sanitizeHumanError(`tracker unreadable: ${detail(error)}`));
   }
-
-  const byId = itemsById(kernelItems) as Map<string, { status: Status }>;
-  const items: BoardItem[] = kernelItems
-    .map((item) => ({
-      id: item.id,
-      type: item.type,
-      title: sanitizeHumanTextUncapped(item.title ?? item.id),
-      status: item.status,
-      parent: item.parent ?? null,
-      assignee: item.assignee ?? null,
-      priority: item.priority ?? null,
-      blockedReason: item.blockedReason ?? null,
-      dependsOn: [...item.dependsOn],
-      openDeps: openDependencies(item, byId),
-      active: false,
-    }))
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-
-  const activeId = activeBoardId(items, input);
-  for (const item of items) item.active = item.id === activeId;
-
-  let nextId: string | null = null;
-  try {
-    nextId = runNext({ cwd }).suggestion?.item.id ?? null;
-  } catch {
-    nextId = null;
-  }
-
-  return {
-    root,
-    items,
-    counts: countBoardStatuses(items),
-    activeId,
-    nextId,
-    error: null,
-  };
 }
 
 function emptyCounts(): Record<Status, number> {
@@ -263,14 +284,19 @@ export function boardItemLine(entry: BoardTreeEntry): string {
   const active = item.active ? "▶" : " ";
   const mark = BOARD_STATUS_MARKS[item.status];
   const badge = BOARD_TYPE_BADGES[item.type];
-  // Ids/assignees are repo-controlled frontmatter bytes: escape them before
-  // rendering so a hostile item cannot emit ANSI/OSC through the panel.
+  // Ids/assignees/blocked reasons are repo-controlled frontmatter bytes: escape
+  // them before rendering so a hostile item cannot emit ANSI/OSC through the
+  // panel.
   const blocked =
     item.openDeps.length > 0 ? ` ⌫${sanitizeHumanTextUncapped(item.openDeps.join(","))}` : "";
   const assignee = item.assignee !== null ? ` @${sanitizeHumanTextUncapped(item.assignee)}` : "";
+  const reason =
+    item.blockedReason !== null && item.blockedReason !== ""
+      ? ` · blocked: ${sanitizeHumanTextUncapped(item.blockedReason)}`
+      : "";
   return (
     `${indent}${active}${mark} ${badge} ${sanitizeHumanTextUncapped(item.id)}${blocked}${assignee}` +
-    ` — ${sanitizeHumanTextUncapped(item.title)}`
+    ` — ${sanitizeHumanTextUncapped(item.title)}${reason}`
   );
 }
 
@@ -295,6 +321,11 @@ export function boardTreeLines(
 /**
  * Short status line for the sidebar contribution: the active item when the
  * session resolves one, else the tracker's ready signal. Pure.
+ *
+ * The ready count uses the kernel's own definition — `isClaimable(type)` +
+ * `todo` + unclaimed + `isReady` (deps terminal) — instead of a copied
+ * predicate, so it cannot drift from the kernel. `next` narrows the pool to
+ * leaf work, so the count can exceed what `/arggon-next` would suggest.
  */
 export function sidebarStatusLine(snapshot: BoardSnapshot, width = 0): string {
   const clip = (line: string): string => (width > 0 ? clipBoardLine(line, width) : line);
@@ -303,12 +334,13 @@ export function sidebarStatusLine(snapshot: BoardSnapshot, width = 0): string {
   if (active !== undefined) {
     return clip(`arggon ▶ ${sanitizeHumanTextUncapped(active.id)} ${active.status}`);
   }
+  const byId = new Map(snapshot.items.map((item) => [item.id, { status: item.status }] as const));
   const ready = snapshot.items.filter(
     (item) =>
+      isClaimable(item.type) &&
       item.status === "todo" &&
       item.assignee === null &&
-      (item.type === "task" || item.type === "bug") &&
-      item.openDeps.length === 0,
+      isReady(item, byId),
   ).length;
   const next =
     snapshot.nextId !== null ? ` · next ${sanitizeHumanTextUncapped(snapshot.nextId)}` : "";
