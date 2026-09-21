@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-native-lib-hygiene
 title: "lib hygiene: commander types, workspace resolution, test/docs nits"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-20"
 updated: "2026-09-21"
-claimed_at: "2026-09-21T21:30:09.094Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-lib-hygiene
 ---
 <!--
