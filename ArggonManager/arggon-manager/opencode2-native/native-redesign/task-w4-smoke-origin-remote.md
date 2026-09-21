@@ -71,3 +71,10 @@ Tests/gates:
 - `npm run smoke:opencode` (full, opencode 2.0.12): 26 scenarios / 0 failures, 966s (run 1). Run 2 was still executing while the deterministic gates ran; its result will be added in a follow-up comment.
 
 Remaining limit (documented in the scenario docstring): the shell probe still needs the model to issue the command; the planted origin + explicit instruction + one bounded retry keep it deterministic in practice, and a session that never attempts it fails loudly instead of passing silently.
+
+### 2026-09-21 @Arggon
+Run 2 result (follow-up to the evidence comment): `npm run smoke:opencode` — 26 scenarios / 0 failures, 747s, exit 0 (opencode 2.0.12). It ran concurrently with `npm test`/`npm run lint`/`npm run build` in the middle of the command group and still passed.
+
+Post-commit confirmation on the exact committed bytes (72f7c37): `OPENCODE_SMOKE_ONLY=w4 npm run smoke:opencode` — 3 scenarios / 0 failures.
+
+Stability evidence total: full harness 2/2 green (966s, 747s), W4 group 4/4 green.
