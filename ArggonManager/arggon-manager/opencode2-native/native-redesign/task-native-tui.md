@@ -233,3 +233,7 @@ calls instead of the model's prose.
 
 Runtime drift (2.0.12 vs pin 2.0.10) is already filed as
 `task-playbook-opencode-2-0-12`; untouched here.
+
+### handoff 2026-09-21 @Arggon — next: Re-review PR #378 at commit c6f2701 (fix pass): verify the P1 repro is fixed (direct: boardSnapshot on a duplicate-id fixture returns an error snapshot; PTY: /arggon-board shows 'tracker unreadable' …
+- branch: feat/task-native-tui
+- open questions: smoke:opencode permissions (W4) scenario is model-behaviour-dependent: the reviewer sometimes runs a reduced script / declines the push, so its three checks fail on the model's prose — file a follow-…
