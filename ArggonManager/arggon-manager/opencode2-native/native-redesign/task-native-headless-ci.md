@@ -1,16 +1,19 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-native-headless-ci
 title: Headless bootstrap + CI adapter
+assignee: Arggon
+branch: feat/task-native-headless-ci
 parent: native-redesign
-depends_on: [task-native-tui]
 labels: []
 priority: p0
 created: "2026-09-19"
-updated: "2026-09-19"
+updated: "2026-09-21"
+claimed_at: "2026-09-21T15:19:06.646Z"
+depends_on: [task-native-tui]
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-headless-ci
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/task-native-headless-ci.md
   Leaves live only under a story. id is the filename stem: task-native-headless-ci.
