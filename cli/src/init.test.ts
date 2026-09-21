@@ -43,6 +43,8 @@ const TIER1_DOCS = [
   ".github/CODEOWNERS",
   ".github/PULL_REQUEST_TEMPLATE.md",
   ".github/copilot-instructions.md",
+  // W6 task-native-headless-ci: the headless CI recipe ships with init.
+  ".github/workflows/arggon.yml",
   ".mcp.json",
   ".opencode/agents/arggon-coordinator.md",
   ".opencode/agents/arggon-reviewer.md",

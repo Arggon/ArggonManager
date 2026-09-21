@@ -104,6 +104,7 @@ Exact v0 fields are documented in [`ArggonManager/docs/convention.md`](ArggonMan
 - [Agent playbook](ArggonManager/docs/agents.md) — find, claim, create, PR loop for humans and agents
 - [OpenCode V2 playbook](ArggonManager/docs/playbooks/opencode.md) — V2 setup, conventions, testing and upgrade policy (pinned 2.0.10)
 - [OpenCode2 native integration](ArggonManager/docs/opencode2.md) — what the `opencode2` branch adds, how to adopt it, and the guarantees
+- [Headless bootstrap and CI](ArggonManager/docs/ci.md) — the packaged `arggon` bin for bootstrap + CI (no model, no MCP), and the adopter workflow `init` vendors
 - [Claim / concurrency](ArggonManager/docs/claim.md) — claim definition, conflict/`--force`, unclaim recovery
 - [Engineering conventions](ArggonManager/docs/engineering.md) — repo structure, review bar, testing, ADRs (Phase 1)
 - [Phase 2 viewer spike](ArggonManager/docs/viewer-spike.md) — proposed constraints for board/viewer over the tracker (towards #19; not an ADR)
@@ -124,18 +125,22 @@ Copy a stub into the tracker root (`ArggonManager/`) per [`ArggonManager/docs/co
 
 ## Install
 
-Requires **Node.js 22.12+** (`engines` enforces it). The package is not published to npm; build it from a checkout and install the tarball — no pre-build step needed:
+Requires **Node.js 22.12+** (`engines` enforces it). The packages are not published to npm yet (both stay `private` until the release wave): build them from a checkout and install **both** tarballs together — no pre-build step needed. `arggon-manager` (bin + `templates/`, `skills/`, `opencode/`) declares the kernel package `@arggon/lib`, which is not on the registry, so installing the root tarball alone fails with `404 @arggon/lib`; installing both in one command resolves the dependency from the tarball:
 
 ```bash
 git clone https://github.com/Arggon/ArggonManager
 cd ArggonManager
-npm install                                   # deps; prepare builds dist/
-npm pack                                      # -> arggon-manager-<version>.tgz
-npm install -g ./arggon-manager-<version>.tgz
+npm install                                                            # deps; prepare builds lib/dist + dist/
+mkdir -p /tmp/arggon-packs                                             # `npm pack --pack-destination` does not create it
+npm pack --workspace @arggon/lib --pack-destination /tmp/arggon-packs
+npm pack --pack-destination /tmp/arggon-packs
+npm install -g /tmp/arggon-packs/arggon-lib-<version>.tgz /tmp/arggon-packs/arggon-manager-<version>.tgz
 arggon --version
 ```
 
-The tarball ships production `dist/`, the `templates/`, `skills/` and `opencode/` assets `arggon init` reads, README and LICENSE. Installing it needs no scripts; npm may still warn that the tarball's blocked `prepare` was skipped — benign, the build is already inside the tarball.
+Node projects that prefer no global install can do `npm install --no-save /tmp/arggon-packs/*.tgz` and run `npx arggon`. The tarball ships production `dist/`, the `templates/`, `skills/` and `opencode/` assets `arggon init` reads, README and LICENSE. Installing it needs no scripts; npm may still warn that the tarball's blocked `prepare` was skipped — benign, the build is already inside the tarball.
+
+The headless bin is what CI and bootstrap use (no model, no MCP): see [Headless bootstrap and CI](ArggonManager/docs/ci.md) for the adopter recipe — the job `arggon init` writes to `.github/workflows/arggon.yml` and the packed-install variants.
 
 A checkout installs directly in this order: `npm install` first (its root `prepare` builds `dist/`), then `npm link` or `npm install -g .`. With npm 12 install scripts run only when approved, so linking an _unbuilt_ checkout exits 0 without a `dist/` or a bin — build first, or approve the script by its resolved identity (`npm install -g . --allow-scripts=file:$PWD`).
 
@@ -169,7 +174,7 @@ After a fresh clone, `.agents/skills/arggon-cli/SKILL.md` is absent (it is gener
 
 Generated docs (placeholders `{{YEAR}}` and `{{PROJECT_NAME}}` are rendered at write time; `{{PROJECT_NAME}}` comes from the target dir name on a **fresh scaffold**, and on every re-run it is **recovered** — first from `x-generated.projectName` in `ArggonManager/.convention.yml`, then from the existing generated docs' content — so worktrees and renamed clones render identically to the primary checkout; when the name cannot be recovered, name-bearing writes/comparisons are skipped with a `project-name-unrecoverable` reason instead of guessing):
 
-- **Default (tier-1):** `AGENTS.md` (spec-compliant agent workflow; mandates the bundled **arggon-cli skill** by default), `CLAUDE.md` (one-line `@AGENTS.md` shim), `.github/copilot-instructions.md` (pointer), `CONTRIBUTING.md`, `SECURITY.md`, `.editorconfig`, `.mcp.json` (registers the arggon MCP server so MCP clients pick it up), the **OpenCode V2 seam** — `opencode.jsonc` (generated only when the repo has no OpenCode config of its own; formatter + compaction, no MCP stanza, minimal W4 shell gates: no force-push, no `--no-verify`), `.opencode/agents/arggon-coordinator.md` + `arggon-worker.md` + `arggon-reviewer.md`, `.opencode/commands/arggon-next|start|done|handoff|review|status|spec|adr|explore|playbook|adopt.md` (native prompt templates driving `tools.arggon.*`), and the vendored **single-file** `.opencode/plugins/arggon/index.ts` (auto-discovered; kernel inlined, no `node_modules`; native tools + session item context) with the vendored TUI entry `.opencode/plugins/arggon/tui.tsx` beside it (board/status panel: `/arggon-board`; runtime-resolved `solid-js`) — `.github/CODEOWNERS` (placeholder), `.github/PULL_REQUEST_TEMPLATE.md`, `ArggonManager/docs/tracking.md` (work tracking in the tracker, not GitHub issues), and the **arggon-cli skill** bundle at `.agents/skills/arggon-cli/` (umbrella `SKILL.md` + `references/{json-contract,methodology,orchestration,pitfalls}.md`, read on demand; copied from this repo's `skills/arggon-cli/` — single source, never a duplicate).
+- **Default (tier-1):** `AGENTS.md` (spec-compliant agent workflow; mandates the bundled **arggon-cli skill** by default), `CLAUDE.md` (one-line `@AGENTS.md` shim), `.github/copilot-instructions.md` (pointer), `CONTRIBUTING.md`, `SECURITY.md`, `.editorconfig`, `.mcp.json` (registers the arggon MCP server so MCP clients pick it up), the **OpenCode V2 seam** — `opencode.jsonc` (generated only when the repo has no OpenCode config of its own; formatter + compaction, no MCP stanza, minimal W4 shell gates: no force-push, no `--no-verify`), `.opencode/agents/arggon-coordinator.md` + `arggon-worker.md` + `arggon-reviewer.md`, `.opencode/commands/arggon-next|start|done|handoff|review|status|spec|adr|explore|playbook|adopt.md` (native prompt templates driving `tools.arggon.*`), and the vendored **single-file** `.opencode/plugins/arggon/index.ts` (auto-discovered; kernel inlined, no `node_modules`; native tools + session item context) with the vendored TUI entry `.opencode/plugins/arggon/tui.tsx` beside it (board/status panel: `/arggon-board`; runtime-resolved `solid-js`) — `.github/CODEOWNERS` (placeholder), `.github/PULL_REQUEST_TEMPLATE.md`, `.github/workflows/arggon.yml` (headless CI recipe: `init` + `validate`, no model/MCP — see [Headless bootstrap and CI](ArggonManager/docs/ci.md)), `ArggonManager/docs/tracking.md` (work tracking in the tracker, not GitHub issues), and the **arggon-cli skill** bundle at `.agents/skills/arggon-cli/` (umbrella `SKILL.md` + `references/{json-contract,methodology,orchestration,pitfalls}.md`, read on demand; copied from this repo's `skills/arggon-cli/` — single source, never a duplicate).
 - **`--full` adds (tier-2):** `ARCHITECTURE.md`, `ArggonManager/docs/convention.md` + `ArggonManager/docs/engineering.md` (adopter-owned project templates), `CHANGELOG.md`, `SUPPORT.md`, `ArggonManager/docs/runbooks/README.md`, `ArggonManager/docs/deploy.md` (per-shape deployment defaults from ADR 0005: target, dated cost, config-in-repo sketch, exit note).
 
 Everything created is listed in `created[]`; files left untouched land in `skipped[]` (see [`docs/json-output.md`](ArggonManager/docs/json-output.md)). JSON/JSONC destinations (`.mcp.json`, `opencode.jsonc`) ship as pure JSON without the `arggon:generated` HTML comment — MCP clients and OpenCode parse them directly — and OpenCode Markdown artifacts (`.opencode/**/*.md`) carry it as a `#` YAML comment inside their frontmatter so the file stays frontmatter-first. Provenance is tracked either way via the `x-generated` checksum.

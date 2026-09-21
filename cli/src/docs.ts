@@ -251,6 +251,8 @@ const DOC_PATH_MAP: Record<string, string> = {
   "github/copilot-instructions.md": ".github/copilot-instructions.md",
   "github/CODEOWNERS": ".github/CODEOWNERS",
   "github/PULL_REQUEST_TEMPLATE.md": ".github/PULL_REQUEST_TEMPLATE.md",
+  // W6 task-native-headless-ci: the adopter CI recipe ships with init.
+  "github/workflows/arggon.yml": ".github/workflows/arggon.yml",
   "tracking.md": `${TRACKER_DIR_NAME}/docs/tracking.md`,
   "mcp-json": ".mcp.json",
 };
@@ -307,6 +309,15 @@ function isTypeScriptDestination(dest: string): boolean {
 }
 
 /**
+ * YAML destinations (the generated CI workflow) take a `#` comment as their
+ * visible provenance marker: an HTML comment as line one is not YAML (GitHub
+ * Actions would reject the workflow), while `#` is a valid comment anywhere.
+ */
+function isYamlDestination(dest: string): boolean {
+  return dest.endsWith(".yml") || dest.endsWith(".yaml");
+}
+
+/**
  * Markdown artifacts whose syntax requires YAML frontmatter on the first line
  * (OpenCode agents/commands): their visible marker is a `#` comment INSIDE the
  * frontmatter instead of a leading HTML comment.
@@ -318,8 +329,9 @@ function isFrontmatterDestination(dest: string): boolean {
 /**
  * Visible provenance marker for a generated file (opencode-seam-010): HTML
  * comment first line by default, YAML comment inside frontmatter for OpenCode
- * Markdown artifacts, `//` line comment for TypeScript destinations, nothing
- * for JSON/JSONC destinations.
+ * Markdown artifacts, `//` line comment for TypeScript destinations, `#` line
+ * comment for YAML destinations (the CI workflow), nothing for JSON/JSONC
+ * destinations.
  */
 export function stampGeneratedContent(
   dest: string,
@@ -329,6 +341,9 @@ export function stampGeneratedContent(
   if (isJsonDestination(dest)) return content;
   if (isTypeScriptDestination(dest)) {
     return `// arggon:generated template="${markerTemplate}"\n${content}`;
+  }
+  if (isYamlDestination(dest)) {
+    return `${generatedYamlMarker(markerTemplate)}\n${content}`;
   }
   // NIT-9 (PR #322 review): tolerate a CRLF frontmatter opener so a CRLF
   // template still gets a valid frontmatter-first file; the marker line

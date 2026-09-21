@@ -18,7 +18,8 @@
     "README.md",
     "LICENSE",
     "!**/*.test.*",
-    "!dist/test-tmp.*"
+    "!dist/test-tmp.*",
+    "!dist/pack-fixtures.*"
   ],
   "scripts": {
     "build": "npm run build --workspace @arggon/lib && tsc -p tsconfig.json",

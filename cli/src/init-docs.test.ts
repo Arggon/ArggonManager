@@ -17,6 +17,7 @@ import {
   GENERATED_DOC_COUNT,
   generateDocs,
   generatedMarker,
+  generatedYamlMarker,
   renderDocPlaceholders,
   TIER2_DESTS,
 } from "./docs.js";
@@ -409,6 +410,12 @@ describe("init docs: x-generated provenance (story-adoption-state)", () => {
     expect(agents.startsWith(`${generatedMarker("AGENTS.md")}\n`)).toBe(true);
     const skill = readFileSync(join(dir, ".agents/skills/arggon-cli/SKILL.md"), "utf8");
     expect(skill.startsWith(`${generatedMarker("skills/arggon-cli/SKILL.md")}\n`)).toBe(true);
+    // W6 task-native-headless-ci: YAML destinations take a `#` comment marker —
+    // an HTML comment as line one would not parse as a GitHub Actions workflow.
+    const workflow = readFileSync(join(dir, ".github/workflows/arggon.yml"), "utf8");
+    expect(workflow.startsWith(`${generatedYamlMarker("github/workflows/arggon.yml")}\n`)).toBe(
+      true,
+    );
 
     const config = readConventionConfig(dir);
     expect(Object.keys(config.generated).length).toBe(GENERATED_DOC_COUNT);

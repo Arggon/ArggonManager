@@ -16,105 +16,42 @@
  *      fails with "Permission denied" as observed on 2026-09-18.
  *
  * Baseline before the allowlist: 977 files / 8.4 MB, 225 test artifacts.
+ * W6 task-native-headless-ci: the packed-install + headless CI gate lives in
+ * cli/src/headless-ci.test.ts; both share `./pack-fixtures.js`.
  */
-import { spawnSync } from "node:child_process";
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync as _mkdtempSync,
-  readFileSync,
-  symlinkSync,
-} from "node:fs";
+import { existsSync, mkdtempSync as _mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import {
+  freshCloneCopy,
+  npm,
+  parsePackResult,
+  type PackedFile,
+  type PackResult,
+} from "./pack-fixtures.js";
 import { removeFixtureTree } from "./test-tmp.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-
-interface PackedFile {
-  path: string;
-  size: number;
-  mode: number;
-}
-interface PackResult {
-  name: string;
-  version: string;
-  size: number;
-  unpackedSize: number;
-  files: PackedFile[];
-}
 
 const tmpDirs: string[] = [];
 afterEach(() => {
   for (const dir of tmpDirs.splice(0)) removeFixtureTree(dir);
 });
 
-function npm(args: string[], cwd: string) {
-  // npm_execpath points at npm's own JS entry point when the suite runs under
-  // `npm test` (and avoids npm.cmd resolution on Windows).
-  const execpath = process.env.npm_execpath;
-  const command = execpath ? process.execPath : "npm";
-  const argv = execpath ? [execpath, ...args] : args;
-  return spawnSync(command, argv, { cwd, encoding: "utf8" });
-}
-
-/**
- * `npm pack --json` shape differs by npm major: npm >= 12 prints one object
- * keyed by package name, npm 10 prints a single-element array. Lifecycle
- * script output (`prepare` banners) can precede the payload on stdout, so
- * parse from the FIRST `[`/`{` — anchoring on `{` alone would truncate npm
- * 10's array to `{...}]` (the JSON syntax error that went red in CI on npm
- * 10.9.4). Exported for the shape fixtures below, so the suite does not depend
- * on which npm the developer happens to run.
- */
-export function parsePackResult(stdout: string): PackResult {
-  const payload = /[\[{]/.exec(stdout);
-  if (!payload) {
-    throw new Error(`no JSON payload in npm pack --json output: ${stdout.slice(0, 200)}`);
-  }
-  const raw = JSON.parse(stdout.slice(payload.index)) as unknown;
-  const entry = Array.isArray(raw) ? raw[0] : Object.values(raw as Record<string, PackResult>)[0];
-  if (!entry || typeof entry !== "object" || !Array.isArray(entry.files)) {
-    throw new Error(`unexpected npm pack --json payload: ${stdout.slice(0, 200)}`);
-  }
-  return entry;
-}
-
-/**
- * Fresh-clone stand-in: the working tree's non-ignored file set (tracked +
- * untracked-but-uncommitted, so the test also works before the change is
- * committed) plus a node_modules symlink (the same trick `arggon start
- * --worktree` uses), so `prepare` can run tsc while `dist/` stays absent.
- * Ignored paths (`dist/`, generated bundles) never exist in a clone either.
- */
-function freshCloneCopy(): string {
+/** Fresh-clone stand-in created in a tracked temp dir (see {@link freshCloneCopy}). */
+function freshClone(): string {
   const dir = _mkdtempSync(join(tmpdir(), "arggon-pack-"));
   tmpDirs.push(dir);
-  const listed = spawnSync(
-    "git",
-    ["ls-files", "--cached", "--others", "--exclude-standard", "-z"],
-    { cwd: root, encoding: "utf8" },
-  );
-  expect(listed.status, listed.stderr).toBe(0);
-  for (const rel of listed.stdout.split("\0")) {
-    if (rel === "") continue;
-    // The worktree's node_modules is a symlink and (directory-only ignore
-    // pattern) not ignored: it is linked in below instead of copied.
-    if (rel === "node_modules" || rel.startsWith("node_modules/")) continue;
-    const dest = join(dir, rel);
-    mkdirSync(dirname(dest), { recursive: true });
-    cpSync(join(root, rel), dest);
-  }
-  symlinkSync(join(root, "node_modules"), join(dir, "node_modules"), "junction");
+  freshCloneCopy(root, dir);
   return dir;
 }
 
 describe("parsePackResult (npm 10 array vs npm 12 keyed payloads)", () => {
   const file: PackedFile = { path: "dist/cli.js", size: 10, mode: 0o755 };
   const result: PackResult = {
+    filename: "arggon-manager-0.3.0.tgz",
     name: "arggon-manager",
     version: "0.3.0",
     size: 1,
@@ -153,7 +90,7 @@ describe("npm pack contents", () => {
   });
 
   it("ships the allowlist only, built from a fresh clone without pre-build", () => {
-    const clone = freshCloneCopy();
+    const clone = freshClone();
     // The precondition that makes the prepare assertion meaningful.
     expect(existsSync(join(clone, "dist"))).toBe(false);
 
@@ -181,13 +118,16 @@ describe("npm pack contents", () => {
     ]);
     expect(paths.filter((p) => !allowedTopLevel.has(p.split("/")[0]))).toEqual([]);
     // 2. No test artifact anywhere: neither compiled `*.test.*` sources nor the
-    //    test-only `test-tmp` teardown helper (the 2026-09-18 bug bundled 225).
-    expect(paths.filter((p) => /\.test\.|(^|\/)test-tmp\./.test(p))).toEqual([]);
+    //    test-only `test-tmp` teardown / `pack-fixtures` helpers (the
+    //    2026-09-18 bug bundled 225 test artifacts).
+    expect(paths.filter((p) => /\.test\.|(^|\/)(test-tmp|pack-fixtures)\./.test(p))).toEqual([]);
     // 3. Runtime assets `arggon init` reads from the package + the bin.
     for (const required of [
       "dist/cli.js",
       "dist/build-info.json",
       "templates/task.md",
+      // W6 task-native-headless-ci: the adopter CI recipe ships with the pack.
+      "templates/docs/github/workflows/arggon.yml",
       "skills/arggon-cli/SKILL.md",
       "opencode/plugins/arggon/index.ts",
       "opencode/plugins/arggon/index.bundle.ts",

@@ -311,6 +311,11 @@ describe("buildInventory", () => {
       managed: true,
     });
     expect(byPath.get(".github/CODEOWNERS")).toMatchObject({ exists: true, managed: true });
+    // W6 task-native-headless-ci: the generated CI workflow is a scanned doc.
+    expect(byPath.get(".github/workflows/arggon.yml")).toMatchObject({
+      exists: true,
+      managed: true,
+    });
     // Absent: nothing on disk, nothing managed.
     expect(byPath.get("ArggonManager/docs/index.md")).toMatchObject({
       exists: false,

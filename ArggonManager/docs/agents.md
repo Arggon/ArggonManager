@@ -245,7 +245,10 @@ npm run arggon -- validate
 
 ### CI gate
 
-Add a job to your workflow (mirrors this repo's `.github/workflows/ci.yml`):
+Add a job to your workflow (mirrors the workflow `arggon init` writes to
+`.github/workflows/arggon.yml`; full recipe and install variants in
+[`ArggonManager/docs/ci.md`](./ci.md)). The bin is the packaged `arggon`
+headless CLI — no model, no MCP, no OpenCode session:
 
 ```yaml
 tasks-validate:
@@ -255,9 +258,18 @@ tasks-validate:
     - uses: actions/setup-node@v4
       with:
         node-version: 22
-        cache: npm
-    - run: npm ci
-    - run: npm run arggon -- validate
+    # Pre-release (packages still private): pack BOTH tarballs from a pinned
+    # checkout. After release this line is `npm install -g arggon-manager`.
+    - name: Install arggon
+      run: |
+        git clone --depth 1 --branch opencode2 https://github.com/Arggon/ArggonManager /tmp/arggon-src
+        cd /tmp/arggon-src && npm ci
+        mkdir -p /tmp/arggon-packs
+        npm pack --workspace @arggon/lib --pack-destination /tmp/arggon-packs
+        npm pack --pack-destination /tmp/arggon-packs
+        npm install -g /tmp/arggon-packs/arggon-lib-*.tgz /tmp/arggon-packs/arggon-manager-*.tgz
+    - run: arggon init --no-commit
+    - run: arggon validate --json
 ```
 
 ### Agent instructions snippet

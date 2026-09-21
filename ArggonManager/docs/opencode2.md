@@ -330,6 +330,18 @@ opencode api mcp.list --param "location[directory]=$PWD"
 The first `plugin.list` call may boot the location and race the plugin load —
 run it twice, or start a session in the project first.
 
+## Headless bootstrap and CI (no model, no MCP)
+
+The packaged `arggon` bin keeps `init` / `validate` / `doctor` / `--json` for
+bootstrap and model-less CI (ADR 0011: a plugin cannot create the repo it lives
+in and CI has no model). `arggon init` vendors the adopter workflow to
+`.github/workflows/arggon.yml` — install the bin, then
+`arggon init --no-commit` → `arggon validate --json` (plus `doctor`/`list`
+diagnostics), with an optional drift gate on the committed seam. Nothing in
+that flow touches OpenCode, a model or MCP: the tracker and the bin are enough.
+Full recipe, install variants (the two packages are still `private`) and the
+fixture that exercises it: [`ArggonManager/docs/ci.md`](ci.md).
+
 ## Upgrading
 
 - **The surface:** re-run `arggon init` — untouched artifacts refresh, modified
@@ -339,13 +351,14 @@ run it twice, or start a session in the project first.
 
 ## Where the program lives
 
-| Document                                                                                                                                                          | Content                                                                        |
-| ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| [`ArggonManager/docs/adr/0010-opencode2-native-architecture.md`](adr/0010-opencode2-native-architecture.md)                                                       | The architecture decision (two layers, one logic path, vendored-plugin policy) |
-| [`ArggonManager/docs/specs/spec-opencode2-009.md`](specs/spec-opencode2-009.md) + [`ArggonManager/docs/plans/plan-opencode2-009.md`](plans/plan-opencode2-009.md) | Program contract and wave plan (implemented)                                   |
-| [`ArggonManager/docs/explorations/exploration-opencode-v2-native-009.md`](explorations/exploration-opencode-v2-native-009.md)                                     | The research: V2 capability map, inert surfaces, candidates                    |
-| [`ArggonManager/docs/playbooks/opencode.md`](playbooks/opencode.md)                                                                                               | Pinned version, conventions, testing, upgrade policy                           |
-| `ArggonManager/arggon-manager/opencode2/`                                                                                                                         | Every work item with evidence, review verdicts and handoffs                    |
+| Document                                                                                                                                                          | Content                                                                                   |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| [`ArggonManager/docs/adr/0010-opencode2-native-architecture.md`](adr/0010-opencode2-native-architecture.md)                                                       | The architecture decision (two layers, one logic path, vendored-plugin policy)            |
+| [`ArggonManager/docs/specs/spec-opencode2-009.md`](specs/spec-opencode2-009.md) + [`ArggonManager/docs/plans/plan-opencode2-009.md`](plans/plan-opencode2-009.md) | Program contract and wave plan (implemented)                                              |
+| [`ArggonManager/docs/explorations/exploration-opencode-v2-native-009.md`](explorations/exploration-opencode-v2-native-009.md)                                     | The research: V2 capability map, inert surfaces, candidates                               |
+| [`ArggonManager/docs/playbooks/opencode.md`](playbooks/opencode.md)                                                                                               | Pinned version, conventions, testing, upgrade policy                                      |
+| [`ArggonManager/docs/ci.md`](ci.md)                                                                                                                               | Headless bootstrap and CI: the packaged bin, the adopter workflow, the model-less fixture |
+| `ArggonManager/arggon-manager/opencode2/`                                                                                                                         | Every work item with evidence, review verdicts and handoffs                               |
 
 ## FAQ
 
