@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-playbook-opencode-2-0-12
 title: Refresh OpenCode playbook pin to 2.0.12 + A/B re-probe
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-21"
 updated: "2026-09-21"
-claimed_at: "2026-09-21T22:39:08.443Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-playbook-opencode-2-0-12
 ---
 <!--
