@@ -48,7 +48,6 @@ not force the actions the checks assert.
 - Filed per the review-findings rule; W6/W7 territory (smoke stability).
 
 ### 2026-09-21 @Arggon
-<<<<<<< HEAD
 ### Verdict: MERGE — PR #385 `feat/task-w4-smoke-origin-remote` @ b08afbd (base `opencode2`, draft)
 
 Reviewer: DeepSeek V4.1 Flash (review session ses_f39a6b85bffe8EK356848vxrlR). Scope audited: `smoke/opencode-smoke.ts` (+197/−49), `smoke/opencode-smoke.test.ts` (new, 13 tests), one playbook line, item comments — 4 files, no parallel-worker files touched (`docs/json-output.md`, `skills/`, `start.ts`, `lib/README` clean).
@@ -80,7 +79,7 @@ Recommendation: **merge with a merge commit (never squash)**. No blocking findin
 - The `leaked` check duplicates part of the exact-set catalog assertion (only improves the failure message). Harmless.
 
 Change requests: none.
-=======
+
 Evidence (branch feat/task-w4-smoke-origin-remote, PR #385)
 
 Root causes (all three made the W4 check pass/fail for reasons unrelated to the gates):
@@ -117,7 +116,6 @@ Stability evidence total: full harness 2/2 green (966s, 747s), W4 group 4/4 gree
 
 ### 2026-09-21 @Arggon
 CI on PR #385: cli pass (4m4s), tasks-validate pass (35s). Acceptance verified: (1) fixture plants a real origin + catalog-level denial assertions; (2) smoke stable — full harness 2/2 (966s, 747s) + W4 4/4; (3) validate/spec validate green and CI green. Checklist left for the coordinator's completion call.
->>>>>>> feat/task-w4-smoke-origin-remote
 
 ### 2026-09-21 @Arggon
 Coordinator note: reviewer session could not post (its background suite kept ending turns), so the coordinator verified the diff (plantOrigin bare repo + push main so the reviewer can attempt the push; deterministic catalog/permission asserts via shellDenied on the 2.0.12 message; 13 new unit tests) against the strong evidence: two full harness runs 26/0 (966s, 747s), 1470 tests, lint/build/check:plugin/validate/spec, CI pass. Merged with merge commit; item flipped to done.
