@@ -108,3 +108,7 @@ denies git push` in two independent runs: the reviewer model _declines_ to
 2. Runtime drift: probes ran on the local OpenCode **2.0.12** while the playbook
    pins 2.0.10. The W5 surfaces are documented 2.0.x and feature-detected; the
    pin/A-B re-probe refresh is a coordinator call (noted in the playbook).
+
+### handoff 2026-09-21 @Arggon — next: Review PR #378 (draft) against the W5 acceptance and gates; if green, merge with a MERGE commit (the branch carries tracker auto-commits) and flip task-native-tui to done. Evidence to re-check: npm r…
+- branch: feat/task-native-tui
+- open questions: smoke:opencode W4 'reviewer shell gate denies git push' flaked twice because the model declines the push (fixture has no origin remote) — file a W6/W7 follow-up to plant an origin or relax the check?…
