@@ -102,7 +102,7 @@ Exact v0 fields are documented in [`ArggonManager/docs/convention.md`](ArggonMan
 
 - [Task convention](ArggonManager/docs/convention.md) — folder layout, frontmatter schema, statuses (v0 locked)
 - [Agent playbook](ArggonManager/docs/agents.md) — find, claim, create, PR loop for humans and agents
-- [OpenCode V2 playbook](ArggonManager/docs/playbooks/opencode.md) — V2 setup, conventions, testing and upgrade policy (pinned 2.0.10)
+- [OpenCode V2 playbook](ArggonManager/docs/playbooks/opencode.md) — V2 setup, conventions, testing and upgrade policy (pinned 2.0.12)
 - [OpenCode2 native integration](ArggonManager/docs/opencode2.md) — what the `opencode2` branch adds, how to adopt it, and the guarantees
 - [Headless bootstrap and CI](ArggonManager/docs/ci.md) — the packaged `arggon` bin for bootstrap + CI (no model, no MCP), and the adopter workflow `init` vendors
 - [Claim / concurrency](ArggonManager/docs/claim.md) — claim definition, conflict/`--force`, unclaim recovery

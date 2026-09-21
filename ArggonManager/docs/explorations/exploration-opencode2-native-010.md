@@ -138,7 +138,10 @@ pinned 2.0.8 — drift recorded in F1.16, refreshed 2026-09-20),
     pin refresh + A/B re-probe is filed as `task-playbook-opencode-2-0-10`
     (landed 2026-09-20: pin refreshed to 2.0.10, re-probe same shape — the docs
     static import still fails to load dependency-less, the guarded plugin
-    loads).
+    loads). Re-drift 2026-09-21: the local runtime is **v2.0.12**; refresh filed
+    as `task-playbook-opencode-2-0-12` (landed 2026-09-21: pin refreshed to
+    2.0.12, A/B re-probe same shape; the 2.0.10 Code Mode catalog lag did not
+    reproduce).
 
 ### F2 — ArggonManager capability map
 

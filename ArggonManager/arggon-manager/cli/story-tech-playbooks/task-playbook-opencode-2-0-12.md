@@ -13,6 +13,7 @@ updated: "2026-09-21"
 claimed_at: "2026-09-21T22:39:08.443Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-playbook-opencode-2-0-12
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tech-playbooks/task-playbook-opencode-2-0-12.md
   Leaves live only under a story. id is the filename stem: task-playbook-opencode-2-0-12.
@@ -31,9 +32,9 @@ re-run the plugin-import A/B probe on 2.0.12.
 
 ## Acceptance
 
-- [ ] Playbook version/pin + research record updated to 2.0.12 with the probe date.
-- [ ] A/B result recorded (static import vs guarded) and any new gotcha folded into Conventions/Troubleshooting.
-- [ ] Pin references refreshed (README, docs/agents.md, docs/opencode2.md, ADR 0010 trigger) and exploration-010 F1.16 note updated.
+- [x] Playbook version/pin + research record updated to 2.0.12 with the probe date.
+- [x] A/B result recorded (static import vs guarded) and any new gotcha folded into Conventions/Troubleshooting.
+- [x] Pin references refreshed (README, docs/agents.md, docs/opencode2.md, ADR 0010 trigger) and exploration-010 F1.16 note updated.
 - [ ] `arggon validate` green; docs-only diff; CI green.
 
 ## Notes

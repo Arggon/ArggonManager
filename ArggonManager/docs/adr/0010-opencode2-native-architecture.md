@@ -96,8 +96,9 @@ travel with code; smoke evidence gates behavior changes.
 - **Negative / accepted risks**: a second surface to maintain (mitigated by
   generation + parity tests + provenance, not by hand-copying); V2 API churn at
   2.0.x (mitigated by pinning, feature detection, graceful degradation, and a
-  recorded revisit trigger — `task-opencode-v2-plugin-import-gotcha` and
-  `task-playbook-opencode-2-0-10`: re-probed on 2.0.8 and 2.0.10, the documented
+  recorded revisit trigger — `task-opencode-v2-plugin-import-gotcha`,
+  `task-playbook-opencode-2-0-10` and `task-playbook-opencode-2-0-12`: re-probed
+  on 2.0.8, 2.0.10 and 2.0.12, the documented
   static `@opencode/plugin` import still fails to load
   in dependency-less trees, so the guarded dynamic import stays; see the
   [OpenCode playbook](../playbooks/opencode.md)); vendored copies in adopters
