@@ -27,6 +27,13 @@ permission denial is emitted. Two independent runs showed the same shape
 (transcripts in `/tmp/arggon-smoke-permissions-*`). Pre-existing, not a W5
 regression.
 
+Extended (W5 review-fix run, 2026-09-21): the full `smoke:opencode` also failed
+`arggon.update` and `arggon.start/cleanup` in the same W4 permissions scenario
+because the reviewer ran a reduced script (only `show`) and declined the push,
+so the expected `Unknown tool`/`Permission denied` texts never appeared; an
+immediate `OPENCODE_SMOKE_ONLY=w4` rerun was 40/0. Same class: the fixture does
+not force the actions the checks assert.
+
 ## Acceptance
 
 - [ ] The permissions fixture plants an `origin` remote (or the check is rewritten) so the reviewer shell gate is actually exercised and the denial is asserted deterministically.
