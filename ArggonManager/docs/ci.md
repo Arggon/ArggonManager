@@ -24,12 +24,15 @@ until the release wave, so there is no npm one-liner yet.
 alone is **not installable**: it declares `@arggon/lib: ^0.3.0` and that package
 is not on the registry (a lone `npm install -g arggon-manager-<v>.tgz` fails
 with `404 @arggon/lib@^0.3.0`). Pack and install **both** tarballs in one
-command so npm resolves the kernel dependency locally:
+command so npm resolves the kernel dependency locally. `npm pack
+--pack-destination` does **not** create the destination directory (npm 10 and 12
+both exit 254 with `ENOENT`), so create it first:
 
 ```bash
 git clone --depth 1 --branch opencode2 https://github.com/Arggon/ArggonManager /tmp/arggon-src
 cd /tmp/arggon-src
 npm ci                                                        # prepare builds lib/dist + dist
+mkdir -p /tmp/arggon-packs                                    # npm pack does not create it
 npm pack --workspace @arggon/lib --pack-destination /tmp/arggon-packs
 npm pack --pack-destination /tmp/arggon-packs
 npm install -g /tmp/arggon-packs/arggon-lib-*.tgz /tmp/arggon-packs/arggon-manager-*.tgz
@@ -46,9 +49,12 @@ installing it needs no scripts. npm may warn that the tarball's blocked
 npm install -g arggon-manager      # both packages from the registry
 ```
 
-**Repo-local, no global install** (Node projects; keeps `PATH` untouched):
+**Repo-local, no global install** (Node projects; keeps `PATH` untouched) —
+reuses the tarballs packed above, or pack them into any directory you created
+first:
 
 ```bash
+mkdir -p /tmp/arggon-packs      # `npm pack --pack-destination` does not create it
 npm install --no-save /tmp/arggon-packs/arggon-lib-*.tgz /tmp/arggon-packs/arggon-manager-*.tgz
 npx arggon validate --json         # or: node_modules/.bin/arggon
 ```
@@ -58,26 +64,34 @@ sources directly; `npm run build` produces the packaged `dist/cli.js`.
 
 ## The CI recipe
 
-`arggon init` writes `.github/workflows/arggon.yml` (never overwriting an
-existing file; it is adopter-owned the moment it exists). That file is the
-runnable recipe; the job-level snippet to embed into an existing workflow —
-the same one `arggon instructions` prints — lives in
+`arggon init` writes `.github/workflows/arggon.yml` under the provenance
+contract of every generated file: a **pre-existing adopter file is never
+overwritten** (`skipped[]`), a hand-edited generated file is protected
+(`modified[]` + `skipped[]`, its bytes survive), and an untouched generated
+file from an older arggon ref is **refreshed** (`updated[]`) — that refresh is
+exactly what the drift gate below checks. That file is the runnable recipe; the
+job-level snippet to embed into an existing workflow — the same one `arggon
+instructions` prints — lives in
 [`docs/agents.md` §CI gate](./agents.md#ci-gate).
 
 Steps, and what each one is for:
 
-| Step                      | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| install                   | Headless bin from the packed (or published) tarballs; no model, no MCP.                                                                                                                                                                                                                                                                                                                                                                             |
-| `arggon init --no-commit` | Idempotent bootstrap/upgrade: creates the tracker on a fresh clone, restores missing templates, refreshes untouched generated docs (`updated[]`), never touches adopter-modified ones. `--no-commit` keeps CI from writing history (the default auto-commit is for local runs).                                                                                                                                                                     |
-| drift gate                | Runs after the bootstrap step: once the tracker is committed, `git status --porcelain` must be empty — a dirty tree means the committed seam predates the pinned arggon ref (re-run `arggon init` locally and commit). No-ops on a fresh clone, and excludes the tracker state file (`ArggonManager/.convention.yml`; `tasks/.convention.yml` on legacy trees) because init refreshes its per-doc `generatedAt` bookkeeping on every run by design. |
-| `arggon validate --json`  | The hard gate: frontmatter, tree integrity, claim/blocked invariants. Non-zero exit on a broken tracker.                                                                                                                                                                                                                                                                                                                                            |
-| `arggon doctor --json`    | Report-only installation shape (convention version, provenance buckets, OpenCode seam state, tracker counts); always exit 0.                                                                                                                                                                                                                                                                                                                        |
-| `arggon list --json`      | Report-only tracker scan for the log.                                                                                                                                                                                                                                                                                                                                                                                                               |
+| Step                      | Why                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| install                   | Headless bin from the packed (or published) tarballs; no model, no MCP.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `arggon init --no-commit` | Idempotent bootstrap/upgrade: creates the tracker on a fresh clone, restores missing templates, refreshes untouched generated docs (`updated[]`), never touches adopter-modified ones. `--no-commit` keeps CI from writing history (the default auto-commit is for local runs).                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| drift gate                | Runs after the bootstrap step: once an arggon-managed tree is committed, `git status --porcelain` must be empty — a dirty tree means the committed seam predates the pinned arggon ref (re-run `arggon init` locally and commit). It activates on the presence of a **committed provenance marker** in any generated file (not just the state file), so a repo that commits the generated docs without committing `*.convention.yml` still gets checked; a fresh clone has no committed marker and no-ops. The state file itself is excused from the check (`ArggonManager/.convention.yml`, or `tasks/.convention.yml` on legacy trees): init refreshes its per-doc `generatedAt` bookkeeping on every run by design. |
+| `arggon validate --json`  | The hard gate: frontmatter, tree integrity, claim/blocked invariants. Non-zero exit on a broken tracker.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `arggon doctor --json`    | Report-only installation shape (convention version, provenance buckets, OpenCode seam state, tracker counts); always exit 0.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| `arggon list --json`      | Report-only tracker scan for the log.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 Notes:
 
 - The gate is the **exit code**; `--json` is for logs and downstream tooling.
+- `npm pack --pack-destination` does **not** create the destination directory
+  (npm 10 and 12 exit 254 with `ENOENT`): the install step creates it with
+  `mkdir -p` — the fixture exercises that exact step on an empty
+  `$RUNNER_TEMP`, so dropping the `mkdir` fails the test suite.
 - CI does **not** need `.mcp.json`, `opencode.jsonc`, the `.opencode/` seam or
   any other OpenCode artifact — only the bin and the tracker. Deleting
   `.mcp.json` is safe: the native tools do not read it; `arggon mcp` and the
@@ -85,28 +99,41 @@ Notes:
 - The pre-commit gate for local work stays
   [`docs/agents.md` §Pre-commit gate](./agents.md#pre-commit-gate):
   `arggon validate` (or `npm run arggon -- validate` in a checkout).
+- The recipe is **not offline-hermetic**: the install step clones the pinned
+  ref, runs `npm ci` there (devDependencies) and installs the two tarballs,
+  whose only runtime dependency is `commander`. CI runners have the registry;
+  the fixture test documents and depends on that too.
 
 ## Fixture and evidence
 
 `cli/src/headless-ci.test.ts` exercises exactly this recipe end to end:
 
-1. builds and `npm pack`s **both** tarballs from a fresh-clone copy (no
-   pre-built `dist/`, so `prepare` is part of the gate);
-2. installs them into a temp prefix and runs the **adopter-shaped fixture**
-   (git repo with a `package.json`, sources and README, no tracker);
-3. executes the step bodies extracted from the shipped workflow, with `PATH`
-   pointing at the packed bin: bootstrap → drift gate → validate → diagnostics
-   (the drift gate is also driven both ways: clean tree passes, a mutated
-   generated file fails). The install step is replaced by the same pack+install
-   it documents (the test does not clone over the network);
-4. re-runs the recipe after committing the generated tree (drift gate active)
-   and once more after deleting `.mcp.json` and the whole `.opencode/` +
-   `.agents/` seam — green both times, proving no MCP, OpenCode or model is
-   required;
-5. compares the `--json` envelopes of the packed bin against the checkout CLI
-   on the same/twin fixtures (`init --no-commit`, `init`, `validate`, `doctor`,
-   `list`, `show`, `next`, `report`) and the generated bytes of `init` — they
-   must be identical.
+1. commits the working tree's tracked files into a throwaway local **product
+   repo** (no `dist/`, no `lib/dist/`) so the recipe's `git clone` runs against
+   a local `file://` remote instead of the network;
+2. runs the shipped **install step verbatim** (`bash -e`; `ARGGON_REPO`,
+   `ARGGON_REF`, `RUNNER_TEMP` set; `npm_config_prefix` redirected to a temp
+   prefix) from an **empty** temp root: the step itself must create
+   `$RUNNER_TEMP/arggon-packs` — removing its `mkdir -p` fails with `ENOENT`,
+   exit 254 — and must build `dist/` + `lib/dist/` through `npm ci`/`prepare`;
+3. runs the remaining step bodies on the **adopter-shaped fixture** (git repo
+   with a `package.json`, sources and README, no tracker) with `PATH` pointing
+   at the bin installed by step 2: bootstrap → drift gate → validate →
+   diagnostics;
+4. drives the drift gate both ways (clean tree passes; a mutated generated file
+   fails) including the state-file-untracked case — activation keys off the
+   committed provenance marker, not `*.convention.yml` — and re-runs the recipe
+   after deleting `.mcp.json` and the whole `.opencode/` + `.agents/` seam:
+   green, proving no MCP, OpenCode or model is required;
+5. compares the `--json` envelopes of the recipe-installed bin against the
+   checkout CLI on the same/twin fixtures (`init --no-commit`, `init`,
+   `validate`, `doctor`, `list`, `show`, `next`, `report`) and the generated
+   bytes of `init` — they must be identical.
+
+The fixture's `npm ci` (devDependencies) and the tarballs' `commander`
+dependency resolve from the npm registry: the test is network-dependent by
+design — exactly like the CI job it mirrors — but never dependent on the
+product repo's git state or on a pre-created pack directory.
 
 Reproduce locally:
 

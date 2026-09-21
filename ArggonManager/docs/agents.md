@@ -264,6 +264,7 @@ tasks-validate:
       run: |
         git clone --depth 1 --branch opencode2 https://github.com/Arggon/ArggonManager /tmp/arggon-src
         cd /tmp/arggon-src && npm ci
+        mkdir -p /tmp/arggon-packs
         npm pack --workspace @arggon/lib --pack-destination /tmp/arggon-packs
         npm pack --pack-destination /tmp/arggon-packs
         npm install -g /tmp/arggon-packs/arggon-lib-*.tgz /tmp/arggon-packs/arggon-manager-*.tgz

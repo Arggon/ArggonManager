@@ -34,6 +34,9 @@ jobs:
           git clone --depth 1 --branch "$ARGGON_REF" "$ARGGON_REPO" "$RUNNER_TEMP/arggon-manager"
           cd "$RUNNER_TEMP/arggon-manager"
           npm ci
+          # `npm pack --pack-destination` does not create the destination
+          # directory (ENOENT, exit 254 on npm 10 and 12): create it first.
+          mkdir -p "$RUNNER_TEMP/arggon-packs"
           npm pack --workspace @arggon/lib --pack-destination "$RUNNER_TEMP/arggon-packs"
           npm pack --pack-destination "$RUNNER_TEMP/arggon-packs"
           npm install -g "$RUNNER_TEMP/arggon-packs"/arggon-lib-*.tgz \
@@ -44,10 +47,14 @@ jobs:
 
       - name: Committed seam is current (drift gate; no-op until initialized)
         run: |
-          # A fresh, uninitialized repo has nothing committed to compare with.
-          if ! git ls-files --error-unmatch ArggonManager/.convention.yml >/dev/null 2>&1 &&
-             ! git ls-files --error-unmatch tasks/.convention.yml >/dev/null 2>&1; then
-            echo "tracker not committed yet — run 'arggon init' locally and commit the generated docs"
+          # The gate applies once an arggon-managed tree is committed: it keys
+          # off a committed provenance marker (any generated file), not the
+          # state file alone — so a repo that commits the generated docs
+          # without committing `*.convention.yml` still gets the check. A fresh
+          # clone has no committed marker, and this run's own untracked output
+          # must not fail CI.
+          if ! git grep -q --fixed-strings "arggon:generated" -- . 2>/dev/null; then
+            echo "no committed arggon seam yet — run 'arggon init' locally and commit the generated docs"
             exit 0
           fi
           # `init` refreshes the per-doc generatedAt bookkeeping on every run,

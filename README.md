@@ -131,6 +131,7 @@ Requires **Node.js 22.12+** (`engines` enforces it). The packages are not publis
 git clone https://github.com/Arggon/ArggonManager
 cd ArggonManager
 npm install                                                            # deps; prepare builds lib/dist + dist/
+mkdir -p /tmp/arggon-packs                                             # `npm pack --pack-destination` does not create it
 npm pack --workspace @arggon/lib --pack-destination /tmp/arggon-packs
 npm pack --pack-destination /tmp/arggon-packs
 npm install -g /tmp/arggon-packs/arggon-lib-<version>.tgz /tmp/arggon-packs/arggon-manager-<version>.tgz

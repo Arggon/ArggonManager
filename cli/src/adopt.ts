@@ -88,6 +88,8 @@ export const ADOPT_SCAN_PATHS: string[] = [
   ".github/copilot-instructions.md",
   ".github/CODEOWNERS",
   ".github/PULL_REQUEST_TEMPLATE.md",
+  // W6 task-native-headless-ci: the generated adopter CI workflow.
+  ".github/workflows/arggon.yml",
   "docs/convention.md",
   "docs/engineering.md",
   "docs/deploy.md",

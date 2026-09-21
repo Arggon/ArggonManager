@@ -3,11 +3,13 @@
  *
  * Acceptance, mapped to the tests below:
  *
- *   1. **fresh clone → `init` → CI green without a model** — the tarballs are
- *      packed from a fresh-clone copy (no pre-built `dist/`), installed into a
- *      temp prefix and the recipe extracted from the shipped workflow runs on
- *      an adopter-shaped fixture (git repo, no tracker) without any model.
- *   2. **`npm pack` install test** — the bin runs from the packed install and
+ *   1. **fresh clone → `init` → CI green without a model** — the shipped
+ *      install step runs verbatim against a throwaway local product repo (no
+ *      pre-built `dist/`) and an empty `$RUNNER_TEMP`: it clones, builds
+ *      through `npm ci`/`prepare`, creates the pack destination and installs
+ *      the bin; the rest of the recipe then runs on an adopter-shaped fixture
+ *      (git repo, no tracker) without any model.
+ *   2. **`npm pack` install test** — the bin installed by that step runs and
  *      the `--json` envelopes are byte-identical to the checkout CLI (`init`,
  *      `validate`, `doctor`, `list`, `show`, `next`, `report`).
  *   3. **the CI recipe is documented and used by an adopter-shaped fixture** —
@@ -22,10 +24,16 @@
  * mechanism (ArggonManager/docs/ci.md) packs both packages from a pinned
  * checkout and installs them in one command; this test does exactly that.
  *
- * The install step of the workflow clones the product repo over the network,
- * so the test replaces it with that same local pack+install (asserted to be
- * the same mechanism) and runs every other step body as-is. `bash` semantics
- * match the workflow runner (`bash -e`).
+ * The install step of the workflow clones the product repo, so the test points
+ * `ARGGON_REPO`/`ARGGON_REF` at a throwaway local git repo built from a
+ * fresh-clone copy and executes the step body **verbatim** from an empty
+ * `$RUNNER_TEMP`: the step itself must create `$RUNNER_TEMP/arggon-packs`
+ * (`npm pack --pack-destination` does not create it — ENOENT, exit 254 on npm
+ * 10 and 12) and build both packages through `npm ci`/`prepare`. The clone's
+ * `npm ci` and the tarballs' `commander` dependency resolve from the npm
+ * registry (network-dependent by design, like the CI job it mirrors).
+ * `npm_config_prefix` redirects the step's `npm install -g` into a temp prefix.
+ * Every other step body runs as-is with `bash -e`.
  */
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import {
@@ -42,7 +50,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CONVENTION_VERSION } from "@arggon/lib";
-import { freshCloneCopy, npm, parsePackResult, type PackResult } from "./pack-fixtures.js";
+import { freshCloneCopy } from "./pack-fixtures.js";
 import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -141,11 +149,13 @@ function normalize(raw: string, dir: string): string {
 const describePacked = describe.skipIf(process.platform === "win32");
 
 describePacked("headless bootstrap + CI (packed install)", () => {
-  /** The packed tarballs and the prefix the bin was installed into. */
-  let packs = "";
+  /** Empty temp root the install step runs against (it creates `arggon-packs`). */
+  let runnerTemp = "";
+  /** Temp npm prefix the step's `npm install -g` is redirected into. */
+  let prefix = "";
   let bin = "";
-  let rootPack: PackResult;
-  let libPack: PackResult;
+  /** Throwaway local git repo the recipe's `git clone` fetches (no dist). */
+  let productRepo = "";
   /** Adopter-shaped fixture (git repo without a tracker). */
   let fixture = "";
   /** The shipped workflow's step bodies, by name. */
@@ -156,30 +166,59 @@ describePacked("headless bootstrap + CI (packed install)", () => {
   }
 
   beforeAll(() => {
-    // 1. Fresh-clone copy (no dist/, no lib/dist/) -> `npm pack` runs `prepare`
-    //    and builds both packages, exactly like an adopter's first install.
-    const clone = mkdtemp("arggon-headless-clone-");
-    freshCloneCopy(root, clone);
-    expect(existsSync(join(clone, "dist"))).toBe(false);
-    expect(existsSync(join(clone, "lib/dist"))).toBe(false);
+    // 1. The shipped recipe, parsed once (step names are asserted, so a
+    //    restructure fails loudly).
+    steps = workflowRunSteps(readFileSync(WORKFLOW_TEMPLATE, "utf8"));
+    for (const name of [
+      INSTALL_STEP,
+      BOOTSTRAP_STEP,
+      DRIFT_STEP,
+      VALIDATE_STEP,
+      DIAGNOSTICS_STEP,
+    ]) {
+      expect(steps.has(name), `workflow step '${name}' missing`).toBe(true);
+    }
 
-    packs = mkdtemp("arggon-headless-packs-");
-    // Root first: its `prepare` builds lib/dist + dist, so the kernel tarball
-    // below is complete (lib has no prepare of its own).
-    const rootPackRun = npm(["pack", "--json", "--pack-destination", packs], clone, 600_000);
-    expect(rootPackRun.status, `${rootPackRun.stdout}\n${rootPackRun.stderr}`).toBe(0);
-    rootPack = parsePackResult(rootPackRun.stdout);
-    const libPackRun = npm(
-      ["pack", "--json", "--workspace", "@arggon/lib", "--pack-destination", packs],
-      clone,
-      300_000,
-    );
-    expect(libPackRun.status, `${libPackRun.stdout}\n${libPackRun.stderr}`).toBe(0);
-    libPack = parsePackResult(libPackRun.stdout);
-    expect([libPack.name, rootPack.name]).toEqual(["@arggon/lib", "arggon-manager"]);
-    expect(existsSync(join(clone, "dist", "cli.js"))).toBe(true); // prepare built it
+    // 2. Local "product repo" for the recipe's `git clone`: the working tree's
+    //    tracked files (no dist/, no lib/dist/) committed to a throwaway git
+    //    repo. The fresh-clone copy's node_modules symlink is dropped so the
+    //    clone builds its own install through `npm ci`.
+    productRepo = mkdtemp("arggon-headless-product-");
+    freshCloneCopy(root, productRepo);
+    expect(existsSync(join(productRepo, "dist"))).toBe(false);
+    expect(existsSync(join(productRepo, "lib/dist"))).toBe(false);
+    rmSync(join(productRepo, "node_modules"), { force: true });
+    initFixtureRepo(productRepo);
+    const addProduct = git(["add", "--", "."], productRepo);
+    expect(addProduct.status, addProduct.stderr).toBe(0);
+    const commitProduct = git(["commit", "-m", "initial"], productRepo);
+    expect(commitProduct.status, commitProduct.stderr).toBe(0);
 
-    // 2. Adopter-shaped fixture: a small git repo with no tracker at all.
+    // 3. Execute the install step VERBATIM from an EMPTY temp root: the step
+    //    must create `$RUNNER_TEMP/arggon-packs` itself and build both
+    //    packages (`npm ci` -> prepare, then `npm pack`). Without the mkdir
+    //    this fails with ENOENT, exit 254.
+    runnerTemp = mkdtemp("arggon-headless-runner-");
+    prefix = mkdtemp("arggon-headless-prefix-");
+    const install = runStep(INSTALL_STEP, runnerTemp, {
+      RUNNER_TEMP: runnerTemp,
+      ARGGON_REPO: `file://${productRepo}`,
+      ARGGON_REF: "main",
+      npm_config_prefix: prefix,
+    });
+    expect(install.status, `${install.stdout}\n${install.stderr}`).toBe(0);
+    // The recipe created the pack destination and put both tarballs in it.
+    const packs = readdirSync(join(runnerTemp, "arggon-packs")).sort();
+    expect(packs.filter((name) => /^arggon-lib-.*\.tgz$/.test(name))).toHaveLength(1);
+    expect(packs.filter((name) => /^arggon-manager-.*\.tgz$/.test(name))).toHaveLength(1);
+    // `npm ci` + `prepare` built both packages inside the clone.
+    expect(existsSync(join(runnerTemp, "arggon-manager", "dist", "cli.js"))).toBe(true);
+    expect(existsSync(join(runnerTemp, "arggon-manager", "lib", "dist", "index.js"))).toBe(true);
+    // The globally-installed bin (redirected into the temp prefix) resolves.
+    bin = join(prefix, "bin", "arggon");
+    expect(existsSync(bin)).toBe(true);
+
+    // 4. Adopter-shaped fixture: a small git repo with no tracker at all.
     fixture = mkdtemp("arggon-headless-fixture-");
     writeFileSync(
       join(fixture, "package.json"),
@@ -194,47 +233,22 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     expect(first.status, first.stderr).toBe(0);
     const commit = git(["commit", "-m", "initial"], fixture);
     expect(commit.status, commit.stderr).toBe(0);
-
-    // 3. Install both tarballs in one command (the documented mechanism).
-    const prefix = mkdtemp("arggon-headless-prefix-");
-    const install = npm(
-      [
-        "install",
-        "-g",
-        "--prefix",
-        prefix,
-        join(packs, libPack.filename!),
-        join(packs, rootPack.filename!),
-      ],
-      fixture,
-      300_000,
-    );
-    expect(install.status, `${install.stdout}\n${install.stderr}`).toBe(0);
-    bin = join(prefix, "bin", "arggon");
-    expect(existsSync(bin)).toBe(true);
-
-    // 4. The shipped recipe, parsed once.
-    steps = workflowRunSteps(readFileSync(WORKFLOW_TEMPLATE, "utf8"));
-    for (const name of [
-      INSTALL_STEP,
-      BOOTSTRAP_STEP,
-      DRIFT_STEP,
-      VALIDATE_STEP,
-      DIAGNOSTICS_STEP,
-    ]) {
-      expect(steps.has(name), `workflow step '${name}' missing`).toBe(true);
-    }
-  }, 600_000);
+  }, 900_000);
 
   /** Run one workflow step body the way the runner does (`bash -e`). */
-  function runStep(name: string, cwd: string): SpawnSyncReturns<string> {
+  function runStep(
+    name: string,
+    cwd: string,
+    extraEnv: Record<string, string> = {},
+  ): SpawnSyncReturns<string> {
     const body = steps.get(name);
     expect(body, `workflow step '${name}' missing`).toBeDefined();
+    const path = bin === "" ? process.env.PATH : `${dirname(bin)}:${process.env.PATH ?? ""}`;
     return spawnSync("bash", ["-e", "-c", body!], {
       cwd,
       encoding: "utf8",
       timeout: 120_000,
-      env: { ...process.env, PATH: `${dirname(bin)}:${process.env.PATH ?? ""}` },
+      env: { ...process.env, PATH: path, ...extraEnv },
     });
   }
 
@@ -264,28 +278,48 @@ describePacked("headless bootstrap + CI (packed install)", () => {
   });
 
   it("ships the recipe in the tarball and documents it (no model, no MCP)", () => {
-    // The recipe is an init-vendored artifact, so it must be in the pack.
-    expect(rootPack.files.map((f) => f.path)).toContain(
-      "templates/docs/github/workflows/arggon.yml",
-    );
+    // B1 regression: `npm pack --pack-destination` does not create the
+    // destination directory (ENOENT, exit 254 on npm 10 and 12), so the
+    // install step must `mkdir -p` BEFORE packing. The step ran above from an
+    // empty $RUNNER_TEMP: without the mkdir it fails, and this pins the order.
     const install = steps.get(INSTALL_STEP)!;
-    // The install step the fixture cannot run (network clone) uses exactly the
-    // pack+install mechanism the fixture is installed with.
+    // Executable lines only: the step's own explanatory comment mentions
+    // `npm pack` too.
+    const executable = install
+      .split("\n")
+      .filter((line) => !line.trimStart().startsWith("#"))
+      .join("\n");
+    const mkdirAt = executable.indexOf("mkdir -p");
+    expect(mkdirAt, "install step must create the pack destination").toBeGreaterThanOrEqual(0);
+    expect(mkdirAt, "mkdir must come before the first pack").toBeLessThan(
+      executable.indexOf("npm pack"),
+    );
+    expect(install).toContain('mkdir -p "$RUNNER_TEMP/arggon-packs"');
     expect(install).toContain("npm pack --workspace @arggon/lib");
-    expect(install).toContain("npm pack --pack-destination");
     expect(install).toContain("npm install -g");
-    expect(install).toContain("@arggon/lib");
+    // The recipe is an init-vendored artifact: it must ship in the tarball
+    // (the installed package is what `init` reads its templates from) and be
+    // in the source the install step cloned.
+    const recipe = "templates/docs/github/workflows/arggon.yml";
+    expect(existsSync(join(prefix, "lib/node_modules/arggon-manager", recipe))).toBe(true);
+    expect(existsSync(join(runnerTemp, "arggon-manager", recipe))).toBe(true);
     // No executed step may reference a model, OpenCode or MCP.
     for (const [name, body] of steps) {
       expect(body, `step '${name}' mentions MCP/OpenCode/a model`).not.toMatch(
         /mcp|opencode|model/i,
       );
     }
-    // The recipe is documented, including the two-tarball mechanism.
+    // The recipe is documented in every place B1 touched, mkdir included.
     const doc = readFileSync(CI_DOC, "utf8");
     expect(doc).toContain("npm pack --workspace @arggon/lib");
+    expect(doc).toContain("mkdir -p /tmp/arggon-packs");
     expect(doc).toMatch(/no model, no MCP/i);
     expect(doc).toContain("headless-ci.test.ts");
+    // `arggon instructions` prints this snippet, so the fix must be in it.
+    expect(readFileSync(join(root, "ArggonManager/docs/agents.md"), "utf8")).toContain(
+      "mkdir -p /tmp/arggon-packs",
+    );
+    expect(readFileSync(join(root, "README.md"), "utf8")).toContain("mkdir -p /tmp/arggon-packs");
   });
 
   it("runs the shipped recipe on the adopter fixture: fresh init -> validate/doctor/list green", () => {
@@ -295,7 +329,7 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     // must no-op (the recipe is green on a first clone).
     const freshDrift = runStep(DRIFT_STEP, fixture);
     expect(freshDrift.status, freshDrift.stderr).toBe(0);
-    expect(freshDrift.stdout).toContain("tracker not committed yet");
+    expect(freshDrift.stdout).toContain("no committed arggon seam yet");
     // init created the tracker and vendored the very workflow it came from.
     expect(existsSync(join(fixture, "ArggonManager/.convention.yml"))).toBe(true);
     const vendored = readFileSync(join(fixture, WORKFLOW_DEST), "utf8");
@@ -348,6 +382,18 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     expect(stale.stdout).toContain("AGENTS.md");
     const restore = git(["checkout", "--", "AGENTS.md"], fixture);
     expect(restore.status, restore.stderr).toBe(0);
+    expect(runStep(DRIFT_STEP, fixture).status).toBe(0);
+
+    // N3 hardening: the gate activates on any committed provenance marker, not
+    // on the state file alone — untrack the state file and it must still fire.
+    const untrack = git(["rm", "--cached", "ArggonManager/.convention.yml"], fixture);
+    expect(untrack.status, untrack.stderr).toBe(0);
+    const commit2 = git(["commit", "-m", "untrack state file"], fixture);
+    expect(commit2.status, commit2.stderr).toBe(0);
+    writeFileSync(agents, `${readFileSync(agents, "utf8")}\nstale edit 2\n`);
+    expect(runStep(DRIFT_STEP, fixture).status).not.toBe(0);
+    const restore2 = git(["checkout", "--", "AGENTS.md"], fixture);
+    expect(restore2.status, restore2.stderr).toBe(0);
     expect(runStep(DRIFT_STEP, fixture).status).toBe(0);
 
     const validate = runStep(VALIDATE_STEP, fixture);
