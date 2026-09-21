@@ -4,7 +4,7 @@
  * (deterministic fixtures), plus parseLog/isoWeekKey unit tests.
  */
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync as _mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync as _mkdtempSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -102,6 +102,12 @@ function commit(dir: string, message: string, date: string): void {
   git(["commit", "--quiet", "-m", message], dir, date);
 }
 
+/** Stage the whole tree (v5 fixtures live outside `tasks/`). */
+function commitAll(dir: string, message: string, date: string): void {
+  git(["add", "-A"], dir);
+  git(["commit", "--quiet", "-m", message], dir, date);
+}
+
 /**
  * Golden fixture: fixed dates, several leaves with evolving frontmatter.
  * 2026-08-31 is the Monday of ISO week 36; 2026-09-07/09 fall in week 37.
@@ -188,6 +194,31 @@ function initStoryRepo(): string {
   )(dir);
   write("tasks/launch/epic-a/epic-a.md", EPIC.replace("status: todo", "status: done"))(dir);
   commit(dir, "c3: stories terminal, epic done", "2026-09-07T12:00:00+00:00");
+  return dir;
+}
+
+/**
+ * v5 (ADR 0012) fixture: tracker under `ArggonManager/`, one leaf claimed
+ * 2026-09-01 (week 36) and completed 2026-09-07 (week 37).
+ */
+function initV5Repo(): string {
+  const dir = mkdtempSync(join(tmpdir(), "arggon-trend-v5-"));
+  gitInit(dir);
+  write("ArggonManager/.convention.yml", "version: 5\n")(dir);
+  write("ArggonManager/launch/launch.md", LAUNCH)(dir);
+  write("ArggonManager/launch/epic-a/epic-a.md", EPIC)(dir);
+  write("ArggonManager/launch/epic-a/story-a/story-a.md", STORY("todo"))(dir);
+  write("ArggonManager/launch/epic-a/story-a/task-one.md", LEAF("task", "task-one", "todo"))(dir);
+  commitAll(dir, "c1: create v5 tree", "2026-08-31T10:00:00+00:00");
+
+  write(
+    "ArggonManager/launch/epic-a/story-a/task-one.md",
+    LEAF("task", "task-one", "in_progress"),
+  )(dir);
+  commitAll(dir, "c2: claim task-one", "2026-09-01T10:00:00+00:00");
+
+  write("ArggonManager/launch/epic-a/story-a/task-one.md", LEAF("task", "task-one", "done"))(dir);
+  commitAll(dir, "c3: task-one done", "2026-09-07T12:00:00+00:00");
   return dir;
 }
 
@@ -331,6 +362,50 @@ describe("runTrend (golden temp repo)", () => {
     git(["add", "-A"], dir);
     git(["commit", "--quiet", "-m", "c5: docs example"], dir, "2026-10-08T09:00:00+00:00");
     expect(runTrend({ cwd: dir })).toEqual(before);
+  });
+
+  it("ignores an unrelated tasks/ dir with item-like frontmatter (bug-layout-trend-pathspec)", () => {
+    const dir = initV5Repo();
+    const baseline = runTrend({ cwd: dir });
+    // Sanity: the v5 tracker itself contributes exactly one completion.
+    expect(baseline.weeks).toEqual([{ week: "2026-W37", completions: 1 }]);
+
+    // An unrelated (non-tracker) directory squatting the legacy name, holding
+    // item-like frontmatter. Mining it would add a false W38 completion (the
+    // reviewer repro: `{W38:1}`) — it never carried `tasks/.convention.yml`.
+    write("tasks/notes/task-fake.md", LEAF("task", "task-fake", "in_progress"))(dir);
+    commitAll(dir, "c4: unrelated tasks/ dir", "2026-09-14T09:00:00+00:00");
+    write("tasks/notes/task-fake.md", LEAF("task", "task-fake", "done"))(dir);
+    commitAll(dir, "c5: unrelated item-like file done", "2026-09-15T09:00:00+00:00");
+
+    const after = runTrend({ cwd: dir });
+    expect(after).toEqual(baseline);
+    expect(after.weeks).not.toContainEqual({ week: "2026-W38", completions: 1 });
+  });
+
+  it("still mines a proven legacy tasks/ tracker (convention file in history)", () => {
+    // A tracker that really lived at `tasks/` (its `.convention.yml` is in
+    // history) is still mined across the move: the pre-move completion must be
+    // read, not the move commit's re-added `+status: done` lines.
+    const dir = mkdtempSync(join(tmpdir(), "arggon-trend-proven-"));
+    gitInit(dir);
+    write("tasks/.convention.yml", "version: 3\n")(dir);
+    write("tasks/task-one.md", LEAF("task", "task-one", "todo"))(dir);
+    commitAll(dir, "c1: create", "2026-08-30T10:00:00+00:00");
+
+    write("tasks/task-one.md", LEAF("task", "task-one", "in_progress"))(dir);
+    commitAll(dir, "c2: claim", "2026-08-31T10:00:00+00:00");
+
+    write("tasks/task-one.md", LEAF("task", "task-one", "done"))(dir);
+    commitAll(dir, "c3: done", "2026-09-01T10:00:00+00:00");
+
+    renameSync(join(dir, "tasks"), join(dir, "ArggonManager"));
+    commitAll(dir, "c4: migrate layout", "2026-09-07T10:00:00+00:00");
+
+    expect(runTrend({ cwd: dir })).toEqual({
+      weeks: [{ week: "2026-W36", completions: 1 }],
+      cycleTime: [{ type: "task", avgDays: 1, count: 1 }],
+    });
   });
 
   it("fails with an actionable error on a non-git tree", () => {

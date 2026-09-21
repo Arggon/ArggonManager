@@ -10,7 +10,7 @@
 import { execFileSync, ExecFileSyncOptions } from "node:child_process";
 import { relative, sep } from "node:path";
 import { loadItems } from "./items.js";
-import { findTrackerLocation, LEGACY_TRACKER_DIR_NAME } from "./paths.js";
+import { CONVENTION_FILE_NAME, findTrackerLocation, LEGACY_TRACKER_DIR_NAME } from "./paths.js";
 
 /** Signature for git executors used in trend mining (injectable for tests). */
 export type GitExecutor = (file: string, args: string[], options?: ExecFileSyncOptions) => string;
@@ -64,6 +64,7 @@ export function runTrend(opts: RunTrendOptions): TrendResult {
   const tasksDir = location.dir;
   const root = location.repoRoot;
   const relTasks = relative(root, tasksDir).split(sep).join("/");
+  const execGit = opts.execGit ?? defaultExecGit;
   // History through the ADR 0012 move: on the v5 layout the tracker dir was
   // renamed from `tasks/`, so the legacy path is added to the pathspec. Git
   // then includes the pre-move commits AND detects the `rename from tasks/...`
@@ -71,16 +72,23 @@ export function runTrend(opts: RunTrendOptions): TrendResult {
   // as a new file (all `+status:` lines attributed to the migration date) and
   // the pre-move transitions are never read (bug-trend-root-rename).
   //
+  // Only a PROVEN legacy tracker is added (bug-layout-trend-pathspec): an
+  // unrelated `tasks/` directory that happens to hold item-like frontmatter
+  // would otherwise contribute false completions. Proof is the legacy
+  // convention file in HEAD's history — every migrated tracker renamed it, so
+  // a `tasks/` that never carried it was never the pre-move tracker.
+  const pathspec = [relTasks];
+  if (location.layout !== "legacy" && hasLegacyTrackerHistory(execGit, root)) {
+    pathspec.push(LEGACY_TRACKER_DIR_NAME);
+  }
   // The in-tracker product docs are excluded: they are not items, and their
   // example frontmatter blocks (`type: bug` / `status: done` in fenced YAML)
   // would otherwise be mined as status transitions (bug-trend-docs-examples).
-  const pathspec = [relTasks, LEGACY_TRACKER_DIR_NAME];
   const docsRel = relative(root, location.docsDir).split(sep).join("/");
   if (docsRel.startsWith(`${relTasks}/`)) {
     pathspec.push(`:(exclude)${docsRel}`);
   }
 
-  const execGit = opts.execGit ?? defaultExecGit;
   let out: string;
   try {
     out = execGit(
@@ -181,6 +189,31 @@ export function runTrend(opts: RunTrendOptions): TrendResult {
     .sort((a, b) => (a.type < b.type ? -1 : a.type > b.type ? 1 : 0));
 
   return { weeks, cycleTime };
+}
+
+/**
+ * True when HEAD's history records the pre-v5 tracker convention file at
+ * `tasks/.convention.yml` — the one mark every `arggon migrate --layout` tree
+ * carries (the move commit renames it to `ArggonManager/.convention.yml`, and
+ * `git log -- tasks/.convention.yml` still reaches the pre-move commits). An
+ * unrelated `tasks/` dir never had that file, so it is not mined
+ * (bug-layout-trend-pathspec).
+ *
+ * Failures are deliberately swallowed: proving the legacy tracker is optional,
+ * and the mining `git log` below reports git problems (non-git tree, unborn
+ * HEAD) with the canonical error.
+ */
+function hasLegacyTrackerHistory(execGit: GitExecutor, root: string): boolean {
+  try {
+    const out = execGit(
+      "git",
+      ["log", "--format=%H", "-1", "--", `${LEGACY_TRACKER_DIR_NAME}/${CONVENTION_FILE_NAME}`],
+      { cwd: root, encoding: "utf8", maxBuffer: 1024 * 1024 },
+    );
+    return out.trim().length > 0;
+  } catch {
+    return false;
+  }
 }
 
 /** Validate `--since` ("YYYY-MM-DD") and return its UTC start in epoch ms. */
