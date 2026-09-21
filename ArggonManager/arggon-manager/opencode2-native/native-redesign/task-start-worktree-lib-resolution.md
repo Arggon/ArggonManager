@@ -150,3 +150,7 @@ by the parallel suite on shared `/tmp` (passes alone and in the final full run;
 the flake's own item documents the repro at base).
 CI on `58bfe82`: `cli` pass (4m20s, run 35668758947) + `tasks-validate` pass
 (35s, run 35668758951).
+
+### handoff 2026-09-21 @Arggon — next: Review draft PR #388 (link farm + pre-claim build; 1475 tests, CI green). Coordinate the json-output.md/skill sync with the formatter worker, then merge (merge commit) and flip done.
+- branch: feat/task-start-worktree-lib-resolution
+- open questions: json-output.md + skills/arggon-cli/** still describe the whole-install link (formatter worker's scope) — sync after their PR lands, or authorize me to update them?; start pre-builds every shadowed wo…
