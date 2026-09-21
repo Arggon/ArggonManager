@@ -121,3 +121,79 @@ to exact merged semantics if you prefer that.
 ### handoff 2026-09-21 @Arggon — next: Review PR #380 (draft, base opencode2): confirm the generated-opener guard decision and merge with a MERGE commit (tracker-carrying branch). Then tick the remaining acceptance boxes, close PR #346 as…
 - branch: fix/bug-seam-signature-anchor-regressed
 - open questions: Keep the 4-line generated-opener guard or revert to the exact merged two-line window (fixture A then stays modified-skip)?; CI on PR #380 had not finished at handoff time.
+
+### 2026-09-21 @Arggon
+### 2026-09-21 @Arggon — REVISIÓN PR #380 (draft, base `opencode2` @ 5c2cd50)
+
+**Veredicto: MERGE (sin hallazgos bloqueantes).** Usar merge commit, nunca squash.
+La caja #4 queda para el coordinador tras el merge (cerrar #346 como superseded + limpiar su worktree/branch); no la toco.
+
+**Qué verifiqué (evidencia)**
+
+- **Scope**: diff contra `origin/opencode2` = solo `cli/src/docs.ts`, `cli/src/init-opencode.test.ts`,
+  `ArggonManager/docs/json-output.md` + item. W6 intacto. Único call-site de
+  `isArggonGeneratedConfig` (`cli/src/docs.ts:426`) y único escritor de `opencode.jsonc`
+  (pipeline de templates); `doctor` lista los cuatro shapes sin provenance (no afectado).
+- **Gates (worktree @ cd5978f, 2026-09-21)**: `npm test` 88 files / **1448 tests green**;
+  `npm run lint`, `npm run build`, `npm run check:plugin` green (árbol limpio tras build:
+  solo `?? node_modules`); `arggon validate` ok (0 warnings, v5); `arggon spec validate`
+  ok (18 docs). CI: runs **35639670554** y **35640355207** (head cd5978f) success; job `cli`
+  pass; `mergeStateStatus: CLEAN` contra el base remoto real (`origin/opencode2` = 5c2cd50).
+- **Smoke (dist construido desde cd5978f, fixtures en `/tmp/opencode/probe-seam`, dry-run +
+  real `init --json`)** — `plan[opencode.jsonc].decision` / bytes:
+
+  | fixture | antes (`opencode2`) | F1 exacto (solo ventana) | PR #380 | real: bytes intactos |
+  | --- | --- | --- | --- | --- |
+  | A literal `{ "formatter": true }` + firma línea 2 | `modified-skip` | `modified-skip` | **`present-skip`** | sí |
+  | B firma en comentario bajo JSON (línea 3) | `modified-skip` | `present-skip` | **`present-skip`** | sí |
+  | C generado LF | `updated` | `updated` | **`updated`** (`updated[]`) | (regenerado) |
+  | D generado CRLF | `updated` | `updated` | **`updated`** | (regenerado a LF, preexistente) |
+  | E BOM + forma generada | — | — | **reclamado** → `modified-skip` | sí |
+  | F NIT-12 valor string | `present-skip` | `present-skip` | `present-skip` | sí |
+  | G `// firma` línea 1 + `{` línea 2 | `modified-skip` | `modified-skip` | `modified-skip` (reclamado) | sí |
+  | H `{}` línea 1 + firma línea 2 | `modified-skip` | `modified-skip` | `present-skip` (no reclamado) | sí |
+
+  Reproduje la tabla del worker en un worktree scratch: base = A/B `modified-skip`; F1 exacto =
+  A `modified-skip`, B `present-skip`. Los dos tests negativos nuevos fallan contra la base
+  (2 fallos) y el repro literal falla contra F1 exacto (1 fallo) — la afirmación del worker es
+  exacta: **la ventana de dos líneas sola no arregla el repro del item**.
+
+- **Guard de opener (decisión de producto) — auditado, seguro, recomiendo mantenerlo**:
+  (a) ninguna forma generada histórica se pierde: `templates/docs/opencode.jsonc` empieza en `{`
+  desde 38f5561 (2026-09-17) y en sus 3 revisiones posteriores; (b) el único camino de escritura
+  es esa plantilla, así que no puede dejar de reclamar un config generado legítimo;
+  (c) el fallback es `present-skip` = conservado, nunca clobbered (misma dirección de seguridad
+  que el residual anterior); (d) el test positivo LF/CRLF *ancla la invariante*: si la plantilla
+  cambiara la forma, ese test rompe y obliga a actualizar el guard; (e) docstring re-decidido y
+  actualizado (cubre ventana, forma generada, BOM/CRLF y el motivo del guard).
+- **F2**: la frase nueva del row `plan` coincide con el código — `dryRunInit` en modo propose
+  mapea `proposals.map(p => ({dest, decision, reason}))` y `planProposals` solo emite
+  `proposed`/`absorbed`/`stale`/`informational`. Probe real `init --dry-run --propose --json`:
+  `plan[]` con `{dest, decision, reason}` (sin `backupDest`) y decisiones `stale` +
+  `informational`; `proposed`/`absorbed` cubiertos por `cli/src/init.test.ts`. Tabla markdown
+  sigue con 5 columnas.
+
+**Hallazgos (ninguno bloqueante)**
+
+1. NIT (tracker): el commit `9966a81` ("tick acceptance") deformó el párrafo de Context del item:
+   perdió espacios junto a backticks y unió líneas ("`...`signature", "a`//`comment",
+   "is`done`(coordinator..."). Significado intacto; conviene repararlo al tildar la caja #4
+   (mismo artefacto copiado al cuerpo del PR).
+2. NIT (test): la tolerancia a BOM está afirmada en docstring/PR pero solo CRLF queda fijado por
+   test; no hay test que escriba BOM. La verifiqué a mano (fixture E → reclamado, `modified-skip`).
+3. Nota (riesgo residual, **sin cambio respecto de base/F1**): un config escrito a mano cuya
+   línea 2 contenga la frase firma exacta sigue reclamándose (`modified-skip`, conservado —
+   dirección segura). Solo una copia byte-idéntica a la generada pasa a `updated`.
+4. Nota (micro-nits): `first.replace(/^\uFEFF/, "").trim() === "{"` — `trim()` ya elimina U+FEFF
+   en ECMAScript, el replace es redundante pero consistente con los otros readers.
+
+**No pude verificar / límites**
+
+- Las herramientas MCP `tools.arggon.*` fallan en esta sesión ("No tasks/ convention found");
+  publiqué este veredicto con `arggon comment --file` en el worktree del item (mismo camino
+  body-only). Nada material del diff queda sin cubrir.
+- Que #346 se cierre/limpie y la caja #4: trabajo del coordinador post-merge (lo dejo pendiente
+  a propósito, no marco done).
+
+**Recomendación: MERGE con merge commit** (rama tracker-carrying). Tras el merge: tildar #4,
+cerrar #346 como superseded apuntando acá y borrar su worktree/branch.
