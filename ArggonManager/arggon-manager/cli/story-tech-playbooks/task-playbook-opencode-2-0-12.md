@@ -84,3 +84,33 @@ Capability snapshot (plugin C, `c-capability.json`): `app.version` 2.0.12; `perm
 
 ### 2026-09-21 @Arggon
 CI green on head 7f386e3: cli pass (run 35664747593, 4m22s) + tasks-validate pass (run 35664747536, 35s). Acceptance 4/4 ticked.
+
+### 2026-09-21 @Arggon
+### 2026-09-21 @Arggon — Review PR #386 (head `05e7ee3`, base `opencode2`, draft) — subagente revisor DeepSeek V4.1 Flash
+
+**Veredicto: MERGE (merge commit, nunca squash).** Sin findings bloqueantes. No marco done.
+
+## Verificado por mí (independiente)
+
+- **Diff docs-only, 7 ficheros** (`git diff --name-status origin/opencode2...HEAD`): playbook + README + docs/agents + docs/opencode2 + ADR 0010 + exploration-010 F1.16 + item. Cero solape con formatter (`docs/json-output.md`/`skills/**`) ni w4-smoke (`smoke/**`); sin `opencode/plugins/**` ni `cli/src/**`.
+- **Probe A/B reproducido en 2.0.12** (no solo inspeccionado): re-corrí la misma invocación del fixture (`opencode run --standalone --print-logs --log-level info --model opencode-go/deepseek-v4-flash --format json`, PATH con el shim del worktree) → **exit 0**; A: `WARN failed to load plugin … Cannot find package '@opencode/plugin'` y marcador `a-setup-marker.txt` **ausente**; B: `loading plugin …/arggon` → `[arggon] tools: registered 15 native arggon tools`; **un solo** `execute`, `state.status: completed`, output `{"ok":true,…,"command":"next"}` → el catalog lag de 2.0.10 **no** se reproduce. `opencode --version` = v2.0.12; sin `node_modules` en fixture ni ancestros; `opencode.jsonc` sin stanza MCP.
+- **Bytes del plugin B**: bundle del worktree `sha256 911f1b7d…` = `bundle-nomarker.ts` = `vendored-nomarker.ts`; el vendored del fixture menos la línea `// arggon:generated` es byte-idéntico al bundle del repo (verificado con `tail -n +2 | sha256sum` y `cmp`).
+- **Capability snapshot** (`c-capability.json`, contenido idéntico tras mi re-run): `permission.rules`/`session.rename`/`vcs.branches` undefined, `vcs.get() {}`, `callbackRanAtAwait:false`; `strings` del binario 2.0.12 muestra 1× `namespace:"opencode",codemode:!0,pinned:!0`. Docs V2 live (fetch 2026-09-21) siguen documentando el import estático.
+- **Acceptance 4/4**: pin/research record con fecha (`version: 2.0.12`, `researched: 2026-09-21`; `arggon playbook status` → 2.0.12/current), A/B + gotchas plegadas (Conventions/Testing), refs refrescadas (README, agents, opencode2, ADR 0010 trigger, exploration-010 F1.16), validate/docs-only/CI.
+- **Gates locales en `05e7ee3`**: `npm test` **90/1466** ✅ · `lint` ✅ · `build` ✅ · `check:plugin` exit 0 sin drift · `arggon validate` ok 0/0 · `spec validate` 18 docs 0/0 · `context:report --strict` all bounds pass.
+- **CI**: `cli` pass + `tasks-validate` pass en `05e7ee3` (runs 35665159464 / 35665159466); PR `MERGEABLE` / `CLEAN`.
+- **Observaciones del worker ya plegadas** por el coordinator en `task-playbook-2-0-10-nits` (`3d34c3b`, ya en `opencode2`): pins stale ADR 0011 §7 / spec-011 / plan-011 + budgets.
+
+## Findings (todos LOW/nit, no bloquean)
+
+1. **LOW — el comment del item sobrestata la evidencia de bytes.** `task-playbook-opencode-2-0-12.md:72` dice que el harness completo se re-corrió "on the same plugin bytes". No es exacto: W6/W7 corrieron con bundles de **324.325 B** (`2a491bd`) y **324.264 B** (`7d33b5b`), y el bundle actual es **327.157 B** tras `b384fe8` (el merge #384 cambió el kernel inlineado). El texto del playbook (Testing, ~455-461) **no** hace esa afirmación y es correcto; la evidencia en bytes actuales es el probe A/B de este item (verificado). Sugerencia: corregir la redacción del comment (tracker-only) o anotar que el harness post-#384 queda pendiente; el scope del item no lo exige (docs-only exento).
+2. **LOW — `prettier --check` falla en el playbook** en 2 líneas del bullet nuevo (`opencode.md:451,458`, continuación de lista des-indentada por prettier); el base era prettier-clean. CI no corre prettier; misma familia que `bug-formatter-glues-markdown-spaces`. Nit.
+3. **LOW — exploration-010 F4.1** (`:244`) sigue diciendo "pin 2.0.10 in the playbook" y la tensión (`:305`) sigue abierta (esta última ya cubierta por la acceptance #1 de `task-playbook-2-0-10-nits`; F4.1 no está listada). Sugerencia: añadir F4.1 al fold.
+
+## No pude verificar
+
+- El "primer run" de `opencode mcp list` → `No MCP servers configured` (solo está archivado el run posterior con los servers globales).
+- Los 26/144/0 del harness completo (no los re-corrí; corroborados en los items W6/W7, no en transcripts crudos).
+- El exit code de la sesión original del worker (no está en el transcript; lo reproduje yo: exit 0).
+
+**Recomendación: MERGE con merge commit (nunca squash).** Los findings 1-3 son de bajo impacto y pueden plegarse en `task-playbook-2-0-10-nits` (o corregirse en un commit tracker-only antes del merge).
