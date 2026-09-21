@@ -60,6 +60,8 @@ const TIER1_DOCS = [
   ".opencode/commands/arggon-status.md",
   // plan-opencode2-009 W2: the bundled OpenCode plugin is a tier-1 destination.
   ".opencode/plugins/arggon/index.ts",
+  // W5 task-native-tui: the TUI board/status entry is vendored beside it.
+  ".opencode/plugins/arggon/tui.tsx",
   "AGENTS.md",
   "ArggonManager/docs/tracking.md",
   "CLAUDE.md",

@@ -50,7 +50,7 @@ export const MAX_BUNDLE_BYTES = 512 * 1024;
 export const BUNDLE_BANNER =
   `// ArggonManager plugin bundle — GENERATED, do not edit, do not vendor by hand.` +
   `\n// Build: npm run build:plugin (` +
-  `${PLUGIN_SOURCE} + ${KERNEL_PACKAGE} inlined).` +
+  `${PLUGIN_SOURCE} graph + ${KERNEL_PACKAGE} inlined).` +
   `\n// OpenCode V2 loads the vendored copy at .opencode/plugins/arggon/index.ts.`;
 
 export type PluginBundle = {
@@ -109,6 +109,50 @@ function requiredSpecifiers(code: string): string[] {
   return found;
 }
 
+/**
+ * Named VALUE exports of one module, in a deterministic order. Type-only
+ * exports (`export type …`, `export { type X }`) erase in the CommonJS
+ * transpile and are skipped — the emitted wrapper re-exports real bindings
+ * only, so the TUI entry can `import { boardSnapshot } from "./index.ts"` in a
+ * dependency-less adopter tree.
+ */
+export function moduleValueExports(root: string, id: string): string[] {
+  const abs = join(root, ...id.split("/"));
+  const source = readFileSync(abs, "utf8");
+  const file = ts.createSourceFile(
+    abs,
+    source,
+    ts.ScriptTarget.ES2022,
+    true,
+    id.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
+  );
+  const names = new Set<string>();
+  const exported = (node: ts.Node): boolean =>
+    ts.canHaveModifiers(node) &&
+    (ts.getModifiers(node) ?? []).some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword);
+  for (const statement of file.statements) {
+    if (ts.isVariableStatement(statement) && exported(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (ts.isIdentifier(declaration.name)) names.add(declaration.name.text);
+      }
+    } else if (ts.isFunctionDeclaration(statement) && exported(statement) && statement.name) {
+      names.add(statement.name.text);
+    } else if (ts.isClassDeclaration(statement) && exported(statement) && statement.name) {
+      names.add(statement.name.text);
+    } else if (
+      ts.isExportDeclaration(statement) &&
+      statement.exportClause !== undefined &&
+      ts.isNamedExports(statement.exportClause)
+    ) {
+      if (statement.isTypeOnly) continue; // `export type { … }` erases entirely
+      for (const element of statement.exportClause.elements) {
+        if (!element.isTypeOnly) names.add(element.name.text);
+      }
+    }
+  }
+  return [...names].sort();
+}
+
 const TRANSPILE_OPTIONS: ts.CompilerOptions = {
   module: ts.ModuleKind.CommonJS,
   target: ts.ScriptTarget.ES2022,
@@ -130,6 +174,9 @@ export function transpileModule(source: string, fileName: string): string {
 /**
  * Build the bundle (pure: no writes). Walks the graph from `entry` with a
  * queue, transpiles every reachable module and records the resolution edges.
+ * The entry module's named VALUE exports are forwarded by the emitted wrapper
+ * (`moduleValueExports`), so the vendored bundle exposes the board surface the
+ * TUI entry imports (W5) in addition to the default plugin definition.
  */
 export function buildPluginBundle(root: string, entry: string = PLUGIN_SOURCE): PluginBundle {
   const sources = new Map<string, string>();
@@ -150,7 +197,8 @@ export function buildPluginBundle(root: string, entry: string = PLUGIN_SOURCE): 
     }
   }
   const modules = [...sources.keys()].sort();
-  const code = emitBundle(modules, sources, edges);
+  const entryExports = moduleValueExports(root, entry);
+  const code = emitBundle(modules, sources, edges, entry, entryExports);
   if (Buffer.byteLength(code, "utf8") > MAX_BUNDLE_BYTES) {
     throw new Error(
       `plugin bundle: ${Buffer.byteLength(code, "utf8")} bytes > ${MAX_BUNDLE_BYTES} bound`,
@@ -163,6 +211,8 @@ function emitBundle(
   modules: string[],
   sources: Map<string, string>,
   edges: Map<string, string>,
+  entry: string,
+  entryExports: string[],
 ): string {
   const edgeLines = [...edges.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
@@ -197,8 +247,9 @@ function emitBundle(
     ``,
     moduleLines,
     ``,
-    `const __arggonEntry = __arggonRequire(${JSON.stringify(PLUGIN_SOURCE)}, undefined)`,
+    `const __arggonEntry = __arggonRequire(${JSON.stringify(entry)}, undefined)`,
     `export default __arggonEntry.default`,
+    ...entryExports.map((name) => `export const ${name} = __arggonEntry.${name}`),
     ``,
   ].join("\n");
 }

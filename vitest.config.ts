@@ -7,8 +7,36 @@ export default defineConfig({
     // package entry (@arggon/lib, ADR 0013). Tests resolve it to the source
     // entry so a run never depends on a previous `npm run build`; the built
     // artifact is exercised for real in cli/src/lib-build.test.ts.
-    alias: {
-      "@arggon/lib": fileURLToPath(new URL("./lib/src/index.ts", import.meta.url)),
+    alias: [
+      {
+        find: /^@arggon\/lib$/,
+        replacement: fileURLToPath(new URL("./lib/src/index.ts", import.meta.url)),
+      },
+      // W5 task-native-tui: `tui.tsx` is vendored verbatim and OpenCode
+      // resolves `solid-js` / transpiles its JSX at load time. The repo has no
+      // `solid-js` dependency (the vendored file must stay dependency-less), so
+      // the unit tests alias the runtime specifiers to a test double.
+      {
+        find: /^solid-js$/,
+        replacement: fileURLToPath(new URL("./test/tui-runtime-stub.ts", import.meta.url)),
+      },
+      {
+        find: /^@opentui\/solid\/jsx-runtime$/,
+        replacement: fileURLToPath(new URL("./test/tui-runtime-stub.ts", import.meta.url)),
+      },
+      {
+        find: /^@opentui\/solid\/jsx-dev-runtime$/,
+        replacement: fileURLToPath(new URL("./test/tui-runtime-stub.ts", import.meta.url)),
+      },
+    ],
+  },
+  // The runtime transpiles the vendored TUI entry with the Solid automatic JSX
+  // runtime; mirror that here so the test file graph matches the runtime shape
+  // (Vite 8 transforms with oxc, not esbuild).
+  oxc: {
+    jsx: {
+      runtime: "automatic",
+      importSource: "@opentui/solid",
     },
   },
   test: {

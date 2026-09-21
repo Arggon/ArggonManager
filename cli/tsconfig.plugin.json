@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "baseUrl": "..",
+    "paths": {
+      "@arggon/lib": ["lib/src/index.ts"]
+    }
+  },
+  "include": ["../opencode/plugins/arggon/index.ts", "../opencode/plugins/arggon/board.ts"]
+}

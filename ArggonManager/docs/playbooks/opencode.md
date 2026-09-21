@@ -44,7 +44,11 @@ docs or the V1 schema for V2 work.
   dependency-free bundle** built from `opencode/plugins/arggon/index.ts` with
   `@arggon/lib` inlined (`npm run build:plugin`; the artifact is committed and
   drift-gated by `npm run check:plugin` in CI), so a fresh adopter tree needs
-  no `node_modules`. It is
+  no `node_modules`. Since W5 (`task-native-tui`) it also vendors the **TUI
+  entry** `.opencode/plugins/arggon/tui.tsx` beside it (OpenCode discovers the
+  TUI entry from the same plugin directory; the runtime resolves `solid-js` and
+  the board surface arrives through a relative `./index.ts` import — still no
+  `node_modules`). It is
   failure-isolated (every path logs once and no-ops, never breaking a
   session/CLI/MCP). Ambient behavior plus the native tool namespace, never rule
   logic:
@@ -54,7 +58,7 @@ docs or the V1 schema for V2 work.
     `comment`, `handoff`, `priority`, `sync`, `import_issues`, plus the
     worktree lifecycle `start`, `branch`, `cleanup`) with
     `ctx.tool.transform`, `options.namespace: "arggon"` + `options.codemode:
-    true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
+true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
     namespace. Each tool calls the kernel **in-process** (the bundle's inlined
     `@arggon/lib`; the same `*Operation` the CLI's `--json` path uses) and
     returns the documented envelope; a kernel failure becomes an `ArgonToolError`
@@ -74,7 +78,7 @@ docs or the V1 schema for V2 work.
     the transitional `arggon_*` MCP spelling) stored per session via
     `ctx.storage` → VCS branch (`feat/<id>` / `fix/<id>`). Observed shell
     invocations are anchored to command position: quoted mentions (`grep -rn
-    "arggon show task-x"`, `echo "arggon update task-fake"`), quoted separators
+"arggon show task-x"`, `echo "arggon update task-fake"`), quoted separators
     and single-quoted `$()` never correlate, while wrapper prefixes
     (`npx`/`bunx`/`sudo`/`env`/`command`/`time`), `$(…)`/subshell forms and
     newline-separated commands do; the Code Mode call regexes stay a raw-source
@@ -160,7 +164,7 @@ docs or the V1 schema for V2 work.
   guarded sugar needed a top-level await the bundle cannot carry). The artifact
   is committed because `init` must work from a source checkout without a build;
   `cli/src/plugin-copy.test.ts` **drift-gates** it (asserts the committed bytes
-  equal the deterministic build *before* touching anything, so a source change
+  equal the deterministic build _before_ touching anything, so a source change
   without `npm run build:plugin` fails the suite) and `npm run check:plugin`
   enforces the same gate in CI; `opencode/plugins/arggon/bundle.test.ts` loads
   the committed artifact from a temp dir with no `node_modules` and calls every
@@ -186,6 +190,53 @@ docs or the V1 schema for V2 work.
   advisory by shipping the three worktree tools with lean schemas (bare output
   schema; the payload is at 12,182 B ≤ 12,288 B). Treat the option as
   feature-detected: unknown options are ignored, never fatal.
+- **TUI plugins (W5 `task-native-tui` — probes 2026-09-21 on the local
+  2.0.12).** The TUI entry point lives beside the server entry in the plugin
+  directory (`<project>/.opencode/plugins/<name>/tui.tsx` next to `index.ts`)
+  and is discovered automatically (a published package exports `./tui`
+  instead). The runtime transpiles TSX and resolves the runtime packages
+  itself: a dependency-less fixture loaded a `tui.tsx` importing `solid-js`
+  with no `node_modules` (the runtime's internal mapping covers
+  `@opencode/plugin/tui`, `@opentui/solid*` and `solid-js`), and relative
+  imports between the plugin's files work — the vendored TUI entry imports the
+  server bundle `./index.ts` including its `createRequire(import.meta.url)`
+  wrapper. Probes:
+  - `setup(context)` receives `options, location, app, renderer, client, data,
+attention, theme, themeMode, markdown, keymap, storage, ui`; returning a
+    disposer unregisters the slot contributions.
+  - `context.ui.slot({ append: "session.panel", render })` registers the panel
+    contribution; the host passes `{name, sessionID, width, presentation,
+focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
+    opens the panel **inside a session** and returns `false` outside one (branch
+    on the return value instead of assuming success). Names are shared
+    selection values: prefix them (`arggon.board`) to avoid collisions, and
+    guard the render with `Show when={panel.name === …}` as documented.
+  - `context.keymap.layer(…)` requires a mounted keymap provider: calling it
+    directly in `setup` throws `Keymap.Provider is missing`. Register the
+    global command layer inside a slot render (the `app` slot is the documented
+    host); panel-scoped bindings belong to the panel component.
+  - Dispatch (verified with the shipped plugin on 2.0.12): inside a session the
+    panel opens from the slash command `/arggon-board`, from the palette entry
+    (Ctrl+P → _Open Arggon board_) **and** from the `ctrl+g` binding registered
+    in the `app` slot; on the home screen the binding runs the command but
+    `panel.open` returns `false`, which the plugin turns into the toast
+    "arggon board: open a session first" (documented fallback, not a crash).
+  - Narrow terminals stay full-screen (the host decides); `toggleFullscreen` is
+    a no-op until there is room for a side panel. Size the panel lines from
+    `panel.width` and clip them yourself.
+  - The TUI runs locally in the terminal process with filesystem access (the
+    W5 board surface reads the tracker through the inlined kernel), so the panel
+    needs no server round-trip and stays display-only.
+  - Evidence: `npm run smoke:tui` (PTY via util-linux `script`: init fixture →
+    4-item tree → `opencode plugin list` → API-created empty session → TUI run
+    → types `/arggon-board` → asserts the captured panel header + tree, and no
+    plugin load failure). Unit wiring: `opencode/plugins/arggon/tui.test.ts` +
+    `board.test.ts` with the runtime stubs in `test/tui-runtime-stub.ts`
+    (vitest aliases `solid-js`/`@opentui/solid/jsx-runtime`, oxc `jsx` config).
+  - Version note: the W5 probes ran on the local **2.0.12** while this playbook
+    pins 2.0.10 and the W5 surfaces were not re-probed on 2.0.10 (they use only
+    documented 2.0.x APIs, feature-detected). A pin refresh on the installed 2.x
+    is a coordinator call (pin + A/B re-probe per the upgrade policy).
 - **Code Mode batching.** V2 Code Mode exposes the native namespace as
   `tools.arggon.*` (W3 default: `tools.arggon.next({})`, `tools.arggon.show`,
   `tools.arggon.report`, `tools.arggon.validate`); batch read-only calls in ONE
@@ -286,13 +337,29 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   basis, never sum source and fixture numbers. The MCP surface still exists for
   other clients, so the report keeps measuring it; on the W3 default path it is
   not registered, so a real adopter session does not pay it. `keep.tokens:
-  15000` matches the V2 default: retention is ~2.5x the fixed surface, so keep
+15000` matches the V2 default: retention is ~2.5x the fixed surface, so keep
   it unless exact recent detail matters more than new-work headroom.
+- **W5 (`task-native-tui`) adds no prompt-side surface.** The TUI panel/sidebar
+  registration contributes no tool schema and no instruction or skill bytes, so
+  the measured ADR 0006 surfaces are byte-identical before/after: `AGENTS.md`
+  2,005 B, native `arggon` definitions 12,182 B (15 tools, 9 pinned), MCP
+  `tools/list` 10,507 B, `fixedTotalBytes` 25,636 B, item block ≤ 1,024 B
+  (measured 2026-09-21, `context:report` before/after). The only number that
+  moves is `doctor.initTreeBytes` (411,370 → 434,227 B): the on-disk size of the
+  vendored seam — the bundle now inlines the board surface and the TUI entry is
+  vendored beside it — not a model-context surface.
 
 ## Testing
 
 - Repo gates: `npm test` covers seam generation, never-overwrite/skip, JSONC
   validity and skill bundling parity; `arggon validate` covers tracker state.
+  W5 adds the TUI board/status surface: `opencode/plugins/arggon/board.test.ts`
+  (kernel-backed snapshot/tree/line renderers on a fixture tracker, purity, and
+  hostile-byte escaping), `tui.test.ts` (slot/command/panel wiring against the
+  runtime stubs, plus the vendored-source import allowlist) and the extended
+  `bundle.test.ts` (the dependency-less bundle serves the board surface from the
+  inlined kernel). `npm run smoke:tui` is the PTY end-to-end evidence (init →
+  tree → plugin discovery → session → `/arggon-board` → captured panel).
 - Fixture smoke: `arggon init` in a temp tree creates the seam; a second run
   leaves an edited `opencode.jsonc` byte-identical (adopter-owned); a tree with
   its own `opencode.json` reports the config skip and writes no `opencode.jsonc`.

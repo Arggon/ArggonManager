@@ -44,7 +44,17 @@ const TOOL_NAMES = [
 ];
 
 /** Core tools pinned into the Code Mode catalog (W3 lever + W4 `start`). */
-const PINNED = ["list", "create", "update", "show", "next", "validate", "comment", "handoff", "start"];
+const PINNED = [
+  "list",
+  "create",
+  "update",
+  "show",
+  "next",
+  "validate",
+  "comment",
+  "handoff",
+  "start",
+];
 
 const tempDirs: string[] = [];
 afterAll(() => {
@@ -106,10 +116,30 @@ function fakeContext(directory: string): { ctx: Record<string, unknown>; tools: 
 describe("vendored plugin bundle: dependency-less load (W3)", () => {
   it("loads from a temp dir with no node_modules and exports the plugin definition", async () => {
     const mod = await importDependencyLess();
-    expect(Object.keys(mod)).toEqual(["default"]);
+    expect(Object.keys(mod)).toContain("default");
     const definition = mod.default as ArgonPlugin;
     expect(definition.id).toBe("arggon");
     expect(typeof definition.setup).toBe("function");
+    // W5 task-native-tui: the wrapper forwards the entry's named value exports
+    // so the TUI entry can import the board surface from `./index.ts`.
+    expect(mod.ARGON_BOARD_PANEL).toBe("arggon.board");
+    expect(typeof mod.boardSnapshot).toBe("function");
+    expect(typeof mod.sidebarStatusLine).toBe("function");
+  });
+
+  it("serves the board snapshot from the inlined kernel (no node_modules)", async () => {
+    const mod = await importDependencyLess();
+    const snapshot = (mod.boardSnapshot as (cwd: string) => Record<string, unknown>)(repoRoot);
+    expect(snapshot.error).toBeNull();
+    expect(snapshot.root).toBe(repoRoot);
+    expect((snapshot.items as unknown[]).length).toBeGreaterThan(0);
+    const lines = (mod.boardTreeLines as (s: unknown) => string[])(snapshot);
+    expect(lines[0]).toContain("arggon board");
+    expect(lines.length).toBeGreaterThan(2);
+    const headers = (mod.boardHeaderLine as (s: unknown) => string)(snapshot);
+    expect(headers.length).toBeGreaterThan(0);
+    const sidebar = (mod.sidebarStatusLine as (s: unknown) => string)(snapshot);
+    expect(sidebar).toContain("arggon");
   });
 
   it("registers the fifteen native tools and exercises them against a real tracker", async () => {
