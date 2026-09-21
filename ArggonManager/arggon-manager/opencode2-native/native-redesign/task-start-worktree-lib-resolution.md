@@ -154,3 +154,10 @@ CI on `58bfe82`: `cli` pass (4m20s, run 35668758947) + `tasks-validate` pass
 ### handoff 2026-09-21 @Arggon — next: Review draft PR #388 (link farm + pre-claim build; 1475 tests, CI green). Coordinate the json-output.md/skill sync with the formatter worker, then merge (merge commit) and flip done.
 - branch: feat/task-start-worktree-lib-resolution
 - open questions: json-output.md + skills/arggon-cli/** still describe the whole-install link (formatter worker's scope) — sync after their PR lands, or authorize me to update them?; start pre-builds every shadowed wo…
+
+### 2026-09-21 @Arggon
+CI follow-up: the code tip `58bfe82` was already green, and the tracker tip
+`d604631` (this comment's parent: the two `chore(tasks)` commits) is green too —
+`cli` pass (4m9s, run 35669216643) + `tasks-validate` pass (37s, run 35669216660).
+No further commits are planned from this worker; the next tip move is the
+coordinator's review/merge.
