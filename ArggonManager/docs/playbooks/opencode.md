@@ -1,7 +1,7 @@
 ---
 playbook_id: opencode
-version: 2.0.10
-researched: 2026-09-20
+version: 2.0.12
+researched: 2026-09-21
 status: current
 ---
 
@@ -10,10 +10,10 @@ status: current
 Technology playbook: the chosen version and the current best practices for
 OpenCode **V2** in this repo.
 
-**Research record (2026-09-20):** local `opencode v2.0.10` (original research
-2026-09-17 on v2.0.7; the plugin-import A/B was re-probed on 2.0.8 and again on
-2.0.10 — 2026-09-20). Sources are the **V2** docs only —
-https://opencode.ai/v2/docs/ (**accessed 2026-09-20**) — plus the
+**Research record (2026-09-21):** local `opencode v2.0.12` (original research
+2026-09-17 on v2.0.7; the plugin-import A/B was re-probed on 2.0.8, on 2.0.10 and
+again on 2.0.12 — 2026-09-21). Sources are the **V2** docs only —
+https://opencode.ai/v2/docs/ (**accessed 2026-09-21**) — plus the
 [exploration-opencode-v2-native-009](../explorations/exploration-opencode-v2-native-009.md),
 the [native-redesign audit](../explorations/exploration-opencode2-native-010.md)
 and [ADR 0010](../adr/0010-opencode2-native-architecture.md). Do not consult V1
@@ -21,9 +21,9 @@ docs or the V1 schema for V2 work.
 
 ## Setup
 
-- Install per https://opencode.ai/v2/docs/ (accessed 2026-09-20); verified local
-  version: `opencode --version` → `v2.0.10` (2026-09-20; previous pins 2.0.7 →
-  2.0.8).
+- Install per https://opencode.ai/v2/docs/ (accessed 2026-09-21); verified local
+  version: `opencode --version` → `v2.0.12` (2026-09-21; previous pins 2.0.7 →
+  2.0.8 → 2.0.10).
 - Running this branch beside `main`: give the oc2 build a named shim and a
   per-project PATH — see
   [Side-by-side installs](../opencode2.md#side-by-side-installs). Note the MCP
@@ -143,15 +143,18 @@ true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
   ≤ 1024-byte item block per model call (never the comment tail), `ARGON_ITEM`
   is read per call, and every surface is feature-detected — on 2.0.7
   `ctx.session.rename` and `ctx.vcs.branches` are absent, so the plugin uses
-  `ctx.session.update` and `git` respectively. Correlation is anchored to
+  `ctx.session.update` and `git` respectively (re-checked on 2.0.12 with a
+  capability snapshot: both still absent and `ctx.vcs.get()` returns `{}`, so
+  the fallbacks stay). Correlation is anchored to
   command position and quoted text is inert; its caches are bounded
   (`CACHE_MAX_ENTRIES = 256`, oldest-first) and the item cache is keyed by
   project directory + item id. The tracker, pre-commit and CI remain the only
   authority; a missing surface degrades to a no-op.
 - **Vendored plugin imports stay guarded, and W3 ships a bundle.** The V2
-  plugin docs show a static `import { Plugin } from "@opencode/plugin"`; in a
-  dependency-less tree (no `node_modules` — the `arggon init` adopter shape) an
-  auto-discovered plugin using it fails to load on **2.0.7, 2.0.8 and 2.0.10**
+  plugin docs show a static `import { Plugin } from "@opencode/plugin"` (still
+  the documented shape, accessed 2026-09-21); in a dependency-less tree (no
+  `node_modules` — the `arggon init` adopter shape) an auto-discovered plugin
+  using it fails to load on **2.0.7, 2.0.8, 2.0.10 and 2.0.12**
   (`WARN failed to load plugin … Cannot find package '@opencode/plugin'`;
   `setup` never runs; the session still exits 0). Since W3 the vendored artifact
   is the **generated single-file bundle**
@@ -171,14 +174,20 @@ true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
   tool. Evidence: the PR #325 probe
   (2.0.7: static import fails, plain object loads),
   task-opencode-v2-plugin-import-gotcha (2.0.8 re-probe, same shape),
-  task-playbook-opencode-2-0-10 (2.0.10 re-probe, same shape) and
+  task-playbook-opencode-2-0-10 (2.0.10 re-probe, same shape),
+  task-playbook-opencode-2-0-12 (2.0.12 re-probe, 2026-09-21, same shape: the
+  docs plugin fails to load with the same resolution error and no setup marker;
+  the bundled plugin registers the fifteen native tools and a real session
+  executes `tools.arggon.next({})` — exit 0; the 2.0.10 Code Mode catalog lag
+  was not reproduced, see below),
   task-native-commands-seam (W3: dependency-less bundle load + 12 native tools)
   and task-native-permissions-worktrees (W4: 15 tools, worktree domain
   lifecycle + permission defaults).
 - **`options.pinned` (W3 catalog lever).** The runtime draws a subset of the
-  Code Mode catalog under its own ~2000-token budget; 2.0.10 registers its own
-  `session_move` tool with `options.pinned: true` (undocumented in the plugin
-  docs, probe 2026-09-20). The plugin pins the **core nine** workflow tools
+  Code Mode catalog under its own ~2000-token budget; 2.0.10 and 2.0.12
+  register their own `session_move` tool with `options.pinned: true`
+  (undocumented in the plugin docs, probes 2026-09-20 and 2026-09-21). The
+  plugin pins the **core nine** workflow tools
   (`list`, `create`, `update`, `show`, `next`, `validate`, `comment`, `handoff`,
   plus W4's `start`, the claim → worktree entry `/arggon-start` drives) and
   leaves the maintenance tools (`report`, `priority`, `sync`, `import_issues`,
@@ -244,10 +253,11 @@ focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
     `solid-js`/`@opentui/solid/jsx-runtime`, oxc `jsx` config); the strict type
     gate (`cli/tsconfig.plugin.json` + `cli/types/tui-runtime.d.ts`) now covers
     `tui.tsx` too.
-  - Version note: the W5 probes ran on the local **2.0.12** while this playbook
-    pins 2.0.10 and the W5 surfaces were not re-probed on 2.0.10 (they use only
-    documented 2.0.x APIs, feature-detected). A pin refresh on the installed 2.x
-    is a coordinator call (pin + A/B re-probe per the upgrade policy).
+  - Version note: the W5 probes ran on the local **2.0.12** — the pinned version
+    since the 2026-09-21 refresh (`task-playbook-opencode-2-0-12`: pin + A/B
+    re-probe per the upgrade policy) — so the W5 surfaces are probed on the
+    pinned runtime (they use only documented 2.0.x APIs, feature-detected); the
+    pre-refresh playbook pinned 2.0.10.
 - **Code Mode batching.** V2 Code Mode exposes the native namespace as
   `tools.arggon.*` (W3 default: `tools.arggon.next({})`, `tools.arggon.show`,
   `tools.arggon.report`, `tools.arggon.validate`); batch read-only calls in ONE
@@ -258,8 +268,9 @@ focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
   enters the transcript — the ADR 0006 spirit applied to coordinators. The MCP
   tool catalog can lag server startup on a session's first model call: the
   2.0.10 re-probe got `Unknown tool 'arggon.arggon_next'` once and success on
-  the immediate retry (smoke prompts have carried a one-retry line since W2 for
-  this reason).
+  the immediate retry; the 2.0.12 re-probe did not reproduce it (the first
+  `execute` of `tools.arggon.next({})` completed). Keep the one-retry line as a
+  cheap mitigation (smoke prompts have carried one since W2).
 - **Worktree domain (W4, task-native-permissions-worktrees).** `ctx.worktree`
   exposes `create/list/refresh/remove/transform` on 2.0.10; probes recorded
   (fixture repo, `opencode run --standalone`):
@@ -280,8 +291,9 @@ focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
     invisible until `refresh`); `remove` works for any worktree of the project
     (including git-created ones), `force` is required for dirty trees.
   - `ctx.permission.rules` (the documented session-scoped rule setter) is
-    **absent on 2.0.10** — `ctx.permission.list/get/reply` exist. Do not build
-    on it; feature-detect if a 2.x adds it back.
+    **absent on 2.0.10 and still absent on 2.0.12** —
+    `ctx.permission.list/get/reply` exist. Do not build on it; feature-detect if
+    a 2.x adds it back.
   - attach safety (W4 review): both attach paths (the recorded `worktree_path`
     and the deterministic `../<repo>-<id>` default) require the directory to be
     a worktree registered with THIS repo — a foreign repository at that path is
@@ -304,10 +316,12 @@ focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
   while `git status` still runs). The shipped defaults are deliberately
   non-breaking: no global `ask` (headless clients would stall), only narrow
   `deny`s (force-push, `--no-verify`, reviewer mutations).
-- **Transforms replay asynchronously (2.0.10).** `await ctx.tool.transform(cb)`
-  resolves before `cb` runs: the runtime replays the registered callbacks when
-  it rebuilds the registry (observed on 2.0.10 while registering the native
-  tools — the editor callback ran on the next rebuild, after `setup` returned).
+- **Transforms replay asynchronously (2.0.10; re-confirmed on 2.0.12).**
+  `await ctx.tool.transform(cb)` resolves before `cb` runs: the runtime replays
+  the registered callbacks when it rebuilds the registry (observed on 2.0.10
+  while registering the native tools — the editor callback ran on the next
+  rebuild, after `setup` returned; the 2.0.12 capability snapshot records
+  `callbackRanAtAwait: false` for the same check).
   Load external data before registering (the docs' rule), keep the callback
   cheap and repeatable, and never rely on a value the callback computed being
   available at `await` time; the plugin's registration log is therefore emitted
@@ -430,6 +444,20 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   harness against the generated bundle: fresh-init seam without MCP, fifteen
   native tools registered in a dependency-less fixture, one bounded headless
   session per native command, and native `tools.arggon.show` correlation.
+- Re-verified on 2.0.12 (2026-09-21, `opencode v2.0.12`): the plugin-import
+  A/B re-probe recorded in task-playbook-opencode-2-0-12 (same dependency-less
+  fixture shape — no `node_modules` in the fixture or any ancestor: plugin A,
+  the docs static import, failed to load with `Cannot find package
+  '@opencode/plugin'` and never wrote its setup marker; plugin B, the vendored
+  bundle, loaded, registered the fifteen native tools and executed
+  `tools.arggon.next({})` in a real session; exit 0; the first `execute`
+  completed, so the 2.0.10 catalog lag was not reproduced). The full harness was
+  re-run on 2.0.12 by W6/W7 (`task-native-headless-ci`,
+  `task-native-dogfood-release`): 26 scenarios / 144 checks / 0 failures. Probe
+  note: `opencode mcp list` in the dependency-less fixture printed `No MCP
+  servers configured` on a first run and listed the machine's global servers
+  later — assert the absence of an `arggon` MCP server from the config files
+  plus the plugin's registration log, not from `mcp list` alone.
 
 ## Security
 
