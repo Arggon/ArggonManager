@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-native-dogfood-release
 title: "Dogfood, ADR 0006 measurement and release"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p0
 created: "2026-09-19"
 updated: "2026-09-21"
-claimed_at: "2026-09-21T19:10:15.951Z"
 depends_on: [task-native-headless-ci]
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-dogfood-release
 ---
