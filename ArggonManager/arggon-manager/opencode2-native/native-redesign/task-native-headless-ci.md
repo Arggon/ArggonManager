@@ -210,3 +210,50 @@ Mutation check (verified): removing the `mkdir -p` from the template → `before
 
 ### 2026-09-21 @Arggon
 Coordinator note: B1 verified (mkdir -p in all four recipe locations; fixture executes the install step verbatim from an empty RUNNER_TEMP; mutation reproduces the ENOENT signature and restores byte-identical) and N1-N4 closed. Gates 1450 tests, lint/build/check:plugin/validate/spec, smoke 26/0 (final), budget within ADR 0006; CI pass on cead267. Merged with merge commit; item flipped to done.
+
+### 2026-09-21 @Arggon
+### Review verdict (re-review) — PR #379 · head revisado `cead267` · merge `359ce71`
+
+**MERGE — confirmado.** B1 corregido y gated, N1–N4 resueltos y todas las gates verdes, incluida una corrida completa de `smoke:opencode` de mi lado. Nota: el coordinador mergeó antes de que este comentario se posteara — merge commit `359ce71` (padres `5c2cd50` + `cead267`, merge real, no squash); el árbol del merge es idéntico al head revisado fuera del tracker, el workflow `auto-done` flipeó el item y la rama/worktree se podaron durante la re-review. La evidencia de abajo se recolectó en el worktree en `cead267`.
+
+## B1 — corregido y verificado (reproducido antes/después)
+
+`mkdir -p` antes del primer `npm pack` en las **cuatro** ubicaciones: `templates/docs/github/workflows/arggon.yml:39`, `README.md:134`, `ArggonManager/docs/agents.md:267` (el snippet que imprime `arggon instructions` — re-probado con el CLI: mkdir presente y antes del pack) y `ArggonManager/docs/ci.md:35` + `:57`.
+
+Fixture: `cli/src/headless-ci.test.ts` ejecuta el install step **verbatim** (`bash -e`) contra un product repo local `file://` recién clonado (con asserts de ausencia de `dist/`/`lib/dist/` antes), `$RUNNER_TEMP` **vacío** y `npm_config_prefix` redirigido a un temp prefix; asserta que el propio step crea `arggon-packs`, deja ambos tarballs, construye `dist/cli.js` + `lib/dist/index.js` vía `npm ci`/`prepare` y el bin instalado resuelve (`:197-219`). El `mkdir` y su orden quedan pinneados por asserts (`:285-322`).
+
+Mutación reproducida por mí (temporal, restaurada byte-idéntica):
+- quitando el `mkdir -p` del template → `npm test -- headless-ci` falla en `beforeAll` con la firma exacta de B1: `npm error code ENOENT ... /tmp/arggon-headless-runner-*/arggon-packs/arggon-lib-0.3.0.tgz` (1 file failed, 6 skipped);
+- restaurando → 6/6 verde (16,6 s).
+
+El CI lo ejercita con el npm del runner: run `35639804880` @ `cead267` **pass**, `headless-ci.test.ts` 6 tests / 55,2 s (npm 10 / Node 22, install step real con mkdir), 1450 tests.
+
+## N1–N4 — verificados
+
+- **N1** `ci.md:67-75`: contrato real de `init` (preexistente nunca se pisa → `skipped[]`; editado a mano → `modified[]`+`skipped[]` con bytes intactos; copia intacta de un ref anterior → `updated[]`). La frase vieja ("never overwriting an existing file") ya no está.
+- **N2** `ci.md:102-105` + header del test: dependencia de red (npm ci del clon con devDependencies, `commander` de los tarballs) documentada; la afirmación falsa "the test does not clone over the network" eliminada; el clon del fixture es local `file://`.
+- **N3** drift gate por `git grep -q --fixed-strings "arggon:generated" -- .` (`arggon.yml:56`), no por `*.convention.yml`. El fixture cubre el caso estado-untracked (commit "untrack state file", `:387-397`): con `.convention.yml` fuera del índice el gate sigue disparando con `AGENTS.md` mutado y pasa limpio; en clon fresco hace no-op ("no committed arggon seam yet").
+- **N4** `ADOPT_SCAN_PATHS` incluye `.github/workflows/arggon.yml` (`cli/src/adopt.ts:91`) con assert de inventario (`cli/src/adopt.test.ts:314-318`, exists+managed tras `init --full`).
+
+## Gates @ `cead267` (locales + CI)
+
+- `npm test` → **89 files / 1450 tests** verde · `npm run lint` clean · `npm run build` clean · `npm run check:plugin` exit 0 (39 módulos / 324.325 B, sin drift) · `arggon validate` ok (0 warnings, v5) · `arggon spec validate` ok (18 docs) · `context:report -- --strict` pass (AGENTS 2.005; MCP 10.507; native 12.182 ≤ 12.288 advisory).
+- `npm run smoke:opencode` **re-ejecutado por mí**: **26 scenarios / 144 checks / 0 failures**, exit 0 (opencode v2.0.12, modelo opencode-go/deepseek-v4-flash), incluidos los checks del reviewer W4.
+- CI `35639804880` @ `cead267`: pass (npm ci / build / lint / 1450 tests). PR `MERGEABLE`/CLEAN.
+
+## Scope
+
+Rework vs `8c6940c` = 8 ficheros: las cuatro recetas + `cli/src/headless-ci.test.ts` + `cli/src/adopt.ts`/`adopt.test.ts` (N4) + md del item. `git diff 5c2cd50 HEAD -- lib/ opencode/ templates/docs/opencode/ smoke/` vacío: kernel, plugin y smoke **byte-idénticos** al base; sin cambios fuera del alcance aprobado. Tracker commits (`6d1587e`, `cead267`) solo tocan el md del item.
+
+## Observaciones residuales (no bloqueantes)
+
+- La activación del drift gate es heurística de string: un fichero commiteado que cite "arggon:generated" sin ningún generado commiteado activaría la gate y ésta fallaría con el output untracked del propio `init` (mensaje "run 'arggon init' and commit"); auto-sanable y de impacto bajo (la alternativa anterior, `*.convention.yml`, tenía el problema simétrico). Sin acción.
+- `ARGGON_REF: opencode2` sigue siendo ref móvil (documentado; pinchar tag tras W7).
+
+## No verificado
+
+- Windows: fixture `skipIf(win32)` por diseño.
+
+**MERGE — confirmado (merge commit `359ce71`, nunca squash).** Item ya en `done` por `auto-done`; este comentario es el registro de review post-merge, no un reopen.
+
+*Publicado con el CLI local (los MCP `arggon_*` no resuelven el tracker v5 en este entorno); comentario auto-commiteado en `opencode2`.*
