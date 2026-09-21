@@ -47,3 +47,27 @@ not force the actions the checks assert.
 ## Notes
 
 - Filed per the review-findings rule; W6/W7 territory (smoke stability).
+
+### 2026-09-21 @Arggon
+Evidence (branch feat/task-w4-smoke-origin-remote, PR #385)
+
+Root causes (all three made the W4 check pass/fail for reasons unrelated to the gates):
+1. The permissions fixture had no `origin` remote and a `master` default branch (`git init -q`), so `git push origin main` was meaningless and the reviewer declined to run it.
+2. shellDenied() read the denial from `state.output`, but opencode 2.0.12 records gate refusals in `state.error` ("Permission denied: shell") with no output — the helper could never match; the check only passed through a model-narrative fallback (textContains "Permission denied").
+3. The arggon.update/start/cleanup denials required the model to attempt deliberately hidden tools inside the script; a reduced script (observed: `show` only) failed them.
+
+Fix (smoke/opencode-smoke.ts):
+- Fixture: `bootstrap()` pins `-b main`; `plantOrigin()` creates a local bare `origin` (`<fixture>-remote.git`); the scenario pushes `main` before the probe so `git push origin main` is a valid up-to-date command; `dispose()` removes both dirs.
+- Catalog-layer assertion: the reviewer script returns `{ out, catalog }` with `search({ namespace: "arggon", limit: 20 })`; the check asserts exactly the six allowed tools (comment/list/next/report/show/validate), `remaining: 0`, and no mutating tool present — no model attempt needed.
+- shellDenied() reads `state.error` (`state.output` kept as legacy fallback); the model-narrative fallback is gone.
+- One bounded retry when a reviewer probe is missing evidence (the probe is read-only, so re-running is safe).
+- `main()` behind an `isDirectRun()` guard; transcript parsers exported for unit tests.
+- Docs: playbook line updated to the catalog-level evidence.
+
+Tests/gates:
+- `npm test`: 90 files / 1470 tests green (new `smoke/opencode-smoke.test.ts`: 13 tests — refusal shapes, shellAttempted/Completed, executeJson, namespace normalization, reviewer catalog partition of the fifteen native tools).
+- `npm run lint`, `npm run build` (plugin bundle byte-identical), `arggon validate`, `arggon spec validate`: green.
+- `OPENCODE_SMOKE_ONLY=w4 npm run smoke:opencode`: 3 scenarios / 0 failures, 3 consecutive runs (86s, 74s, and the first post-fix run).
+- `npm run smoke:opencode` (full, opencode 2.0.12): 26 scenarios / 0 failures, 966s (run 1). Run 2 was still executing while the deterministic gates ran; its result will be added in a follow-up comment.
+
+Remaining limit (documented in the scenario docstring): the shell probe still needs the model to issue the command; the planted origin + explicit instruction + one bounded retry keep it deterministic in practice, and a session that never attempts it fails loudly instead of passing silently.
