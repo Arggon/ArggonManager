@@ -82,3 +82,6 @@ Stability evidence total: full harness 2/2 green (966s, 747s), W4 group 4/4 gree
 ### handoff 2026-09-21 @Arggon — next: Review PR #385 (draft, base opencode2), confirm CI green, merge with a merge commit (branch carries chore(tasks) auto-commits), then flip the item done.
 - branch: feat/task-w4-smoke-origin-remote
 - open questions: CI lacks opencode, so smoke:opencode is a local gate (2 full runs + 4 W4 runs green on 2.0.12); playbook pins 2.0.10 — re-probe on runtime bumps.
+
+### 2026-09-21 @Arggon
+CI on PR #385: cli pass (4m4s), tasks-validate pass (35s). Acceptance verified: (1) fixture plants a real origin + catalog-level denial assertions; (2) smoke stable — full harness 2/2 (966s, 747s) + W4 4/4; (3) validate/spec validate green and CI green. Checklist left for the coordinator's completion call.
