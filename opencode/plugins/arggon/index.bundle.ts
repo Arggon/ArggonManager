@@ -5821,17 +5821,28 @@ function pointWorkspaceAtLocal(primaryRoot, worktreePath, name) {
     if (!local)
         return false;
     const entry = (0, node_path_1.join)(link, ...name.split("/"));
+    const staged = `${entry}.arggon-new`;
     try {
-        (0, node_fs_1.unlinkSync)(entry);
+        (0, node_fs_1.unlinkSync)(staged);
+    }
+    catch {
+    }
+    try {
+        linkEntry(local.path, staged);
     }
     catch {
         return false;
     }
     try {
-        linkEntry(local.path, entry);
+        (0, node_fs_1.renameSync)(staged, entry);
         return true;
     }
     catch {
+        try {
+            (0, node_fs_1.unlinkSync)(staged);
+        }
+        catch {
+        }
         return false;
     }
 }

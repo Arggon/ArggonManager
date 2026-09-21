@@ -7,6 +7,7 @@ import {
   readFileSync,
   readlinkSync,
   realpathSync,
+  renameSync,
   rmdirSync,
   rmSync,
   statSync,
@@ -416,15 +417,28 @@ export function pointWorkspaceAtLocal(
   const local = localWorkspacePackages(primaryRoot, worktreePath).find((pkg) => pkg.name === name);
   if (!local) return false;
   const entry = join(link, ...name.split("/"));
+  // Swap through a staged link: the entry keeps resolving into the primary
+  // until the new link exists, so a failure never leaves a hole in the install.
+  const staged = `${entry}.arggon-new`;
   try {
-    unlinkSync(entry);
+    unlinkSync(staged); // a leftover from an interrupted run
+  } catch {
+    // Nothing staged: expected.
+  }
+  try {
+    linkEntry(local.path, staged);
   } catch {
     return false;
   }
   try {
-    linkEntry(local.path, entry);
+    renameSync(staged, entry);
     return true;
   } catch {
+    try {
+      unlinkSync(staged);
+    } catch {
+      // Best-effort: the entry still resolves into the primary.
+    }
     return false;
   }
 }
