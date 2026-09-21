@@ -1,0 +1,48 @@
+---
+type: task
+status: blocked
+id: task-release-0-4-0
+title: "Release 0.4.0: kernel-first publish + tag"
+parent: native-redesign
+labels: []
+priority: p1
+created: "2026-09-21"
+updated: "2026-09-21"
+blocked_reason: product-owner approval for publish/tag 0.4.0
+---
+<!--
+  Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-release-0-4-0.md
+  Leaves live only under a story. id is the filename stem: task-release-0-4-0.
+  CLI `arggon create task release-0-4-0` adds the task- prefix (do not pass it twice).
+  parent MUST be the story id. Omit assignee when unassigned. Omit blocked_reason unless status is blocked.
+-->
+
+# Release 0.4.0: kernel-first publish + tag
+
+## Context
+
+Prepared by W7 (`task-native-dogfood-release`): the release runbook
+(`ArggonManager/docs/runbooks/release.md`) and the CHANGELOG `[Unreleased]`
+section are ready. Publishing/tagging is a **product-owner decision** — this
+item is blocked on it.
+
+Steps (from the runbook):
+
+1. Bump `0.3.0` → `0.4.0`; rename `[Unreleased]` → `## 0.4.0 (date)`.
+2. Remove `private: true` from `package.json` and `lib/package.json`.
+3. Merge `opencode2` → `main`; `git tag v0.4.0 && git push origin v0.4.0`.
+4. `npm publish --workspace @arggon/lib`, then `npm publish` (kernel first).
+5. Verify with `npm view` + a clean global install.
+6. Follow-up: pin `ARGGON_REF: v0.4.0` in the workflow template, re-run `init`,
+   move README/`ci.md` to the one-liner install.
+
+## Acceptance
+
+- [ ] Product-owner approval recorded.
+- [ ] Version bump + `private` removed merged to `main`.
+- [ ] `v0.4.0` tag pushed; both packages published and verified.
+- [ ] Workflow template pinned to `v0.4.0`; `init` re-run; docs updated.
+
+## Notes
+
+- Blocked on the PO release decision (2026-09-21).

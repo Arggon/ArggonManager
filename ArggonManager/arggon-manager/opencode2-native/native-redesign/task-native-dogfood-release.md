@@ -29,16 +29,22 @@ W7 of `plan-native-first-011`. Migrate this repo's own `.opencode` seam to the n
 
 ## Acceptance
 
-- [ ] ADR 0006 budgets re-measured and within limits; item block ≤ 1024 B.
-- [ ] Dogfood scenarios green on this repo's own tracker.
-- [ ] Packaging/release docs updated; release checklist executed.
-- [ ] Release notes cover the W3 default-path change: the plugin no longer
+- [x] ADR 0006 budgets re-measured and within limits; item block ≤ 1024 B
+      (native 11.821 ≤ 12.288; block 252; AGENTS 2.005; MCP 10.507).
+- [x] Dogfood scenarios green on this repo's own tracker (provenance
+      no-clobber, tools, `/arggon-status` via the V2 loader, panel smoke).
+- [x] Packaging/release docs updated; release checklist executed up to the
+      owner gate (publish/tag pending product-owner approval — `task-release-0-4-0`).
+- [x] Release notes cover the W3 default-path change: the plugin no longer
       auto-registers the MCP server; an adopter re-running `init` loses
       auto-registration unless they configure the stanza (`doctor` reports it
       as optional).
-- [ ] `arggon validate` and `spec validate` green.
+- [x] `arggon validate` and `spec validate` green.
 
 ## Notes
+
+- Release prep only: bump/tag/publish is `task-release-0-4-0`, blocked on the
+  product-owner decision.
 
 - Watch the ADR 0006 native-tools headroom: after W4/W5 the advisory bound is
   at 12,182 B ≤ 12,288 B (~106 B). Re-measure and either trim schemas, decide
