@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-layout-trend-pathspec
 title: "report --trend: legacy tasks pathspec can mine an unrelated tasks/ dir"
+assignee: Arggon
+branch: fix/bug-layout-trend-pathspec
 parent: native-redesign
 labels: []
 priority: p3
 created: "2026-09-20"
-updated: "2026-09-20"
+updated: "2026-09-21"
+claimed_at: "2026-09-21T21:38:54.449Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-layout-trend-pathspec
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-layout-trend-pathspec.md
