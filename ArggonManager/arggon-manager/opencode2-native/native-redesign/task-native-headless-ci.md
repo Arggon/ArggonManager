@@ -209,3 +209,6 @@ Mutation check (verified): removing the `mkdir -p` from the template → `before
 ### handoff 2026-09-21 @Arggon — next: Coordinator re-review of draft PR #379 (head after tracker commits): B1 fixed in the four recipe locations + fixture now executes the shipped install step verbatim from an empty RUNNER_TEMP (mutation…
 - branch: feat/task-native-headless-ci
 - open questions: Smoke W4 reviewer scenario flakes when the model refuses to attempt the tools its catalog hides (byte-identical plugin/agent/command code vs base; final full run 26/0) - possible smoke follow-up, not…
+
+### 2026-09-21 @Arggon
+Coordinator note: B1 verified (mkdir -p in all four recipe locations; fixture executes the install step verbatim from an empty RUNNER_TEMP; mutation reproduces the ENOENT signature and restores byte-identical) and N1-N4 closed. Gates 1450 tests, lint/build/check:plugin/validate/spec, smoke 26/0 (final), budget within ADR 0006; CI pass on cead267. Merged with merge commit; item flipped to done.
