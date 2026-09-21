@@ -193,3 +193,6 @@ Review-round fixes for the F1–F4 verdict (`git range 5590acb..11be0c4`, pushed
 ### handoff 2026-09-21 @Arggon — next: Re-review the F1-F4 round on PR #384 (commits f56674b, abdb28f, 8c98b03, 11be0c4): confirm the json-output.md prose is restored and CI green on the final tip, then merge (merge commit; tracker-carryi…
 - branch: feat/task-native-lib-hygiene
 - open questions: F1 root cause is prettier 3.9.6 + opencode formatter:true, not a hand edit — do you want a follow-up item for a markdown formatter guard (npm run format corrupts json-output.md and tracker comments)?…
+
+### 2026-09-21 @Arggon
+CI green on the final tip of the review-fix round (`11be0c4`, PR #384): `cli` pass (4m22s, run 35662349327) and `tasks-validate` pass (28s, run 35662349313). All four review findings are addressed; the item stays `in_progress` for the coordinator's done flip after merge.
