@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-21"
 updated: "2026-09-21"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-seam-signature-anchor-regressed
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2/opencode2-hardening/bug-seam-signature-anchor-regressed.md
