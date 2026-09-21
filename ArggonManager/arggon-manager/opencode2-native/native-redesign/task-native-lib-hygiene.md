@@ -196,3 +196,41 @@ Review-round fixes for the F1–F4 verdict (`git range 5590acb..11be0c4`, pushed
 
 ### 2026-09-21 @Arggon
 CI green on the final tip of the review-fix round (`11be0c4`, PR #384): `cli` pass (4m22s, run 35662349327) and `tasks-validate` pass (28s, run 35662349313). All four review findings are addressed; the item stays `in_progress` for the coordinator's done flip after merge.
+
+### 2026-09-21 @Arggon
+Re-review final de PR #384 (`feat/task-native-lib-hygiene` @ `219195e`, base `opencode2`) — subagente revisor, DeepSeek V4.1 Flash.
+
+## Veredicto: **MERGE** (merge commit, nunca squash)
+
+F1–F4 cerrados con evidencia independiente; gates y CI verdes. El único trade-off que queda (prose vs prettier en `json-output.md`) está asumido, documentado y fileteado aparte por el coordinator.
+
+## Cierre de findings
+
+**F1 — RESUELTO.** `abdb28f` restaura los 4 espacios (eran 4, no 3: `:184` dos, `:659` dos). Token-diff alineado por contenido sin espacios contra `origin/opencode2` en todo el archivo: **0 glues** (611 líneas emparejadas, todas padding de tabla; los únicos cambios de contenido son la fila nueva de `linkedWorkspaces`, la prosa reflowada del `start` y 2 separadores de tabla re-paddeados).
+- **Corrección de mi veredicto anterior:** yo dije "no es prettier"; es prettier. Con el config del repo, `prettier --write` sobre el **base intacto** `origin/opencode2:docs/json-output.md` produce exactamente esos 4 glues, y `prettier --check` ya falla en el base (exit 1). La causa raíz y el trade-off que reportó el worker son correctos.
+- Un cambio extra de la misma clase del formatter: `skills/arggon-cli/references/pitfalls.md:16` pierde la indentación de continuación del bullet (2 espacios). Reproducido: `prettier --write` sobre la copia del base lo hace igual; no cambia texto, solo el render del bullet. Va al mismo follow-up.
+- Follow-up ya fileteado en base: `bug-formatter-glues-markdown-spaces` (`22e0f6d`), con repro sobre el base. Ningún CI corre prettier, así que el warning de `json-output.md` no bloquea.
+
+**F2 — RESUELTO.** `f56674b` recalcula `linkedWorkspaces` tras el `x-worktree.post-start` antes del return, y el doc/JSON contract dicen que describe el estado en que queda el worktree. Smoke real con el CLI `dist` sobre fixtures git:
+- Caso A (hook que reifica local, forma `npm ci`): human **sin** nota; `--json` → `{'ok': True, 'linkedNodeModules': True, 'linkedWorkspaces': [], 'postStart': True}`; el worktree queda con `node_modules/@arggon/lib -> ../../lib` local.
+- Caso B (hook `true`, deja sin install): start re-linkea y reporta `{'linkedNodeModules': True, 'linkedWorkspaces': ['@arggon/lib'], 'postStart': True}` + nota stdout.
+- Test nuevo mutation-verified en copia `/tmp`: quitando el recompute falla con `expected [ '@arggon/lib' ] to deeply equal []`.
+
+**F3 — RESUELTO.** `8c98b03` sincroniza `skills/arggon-cli/SKILL.md`, `references/pitfalls.md` y `references/orchestration.md` con `docs/json-output.md` (los 3 documentan `linkedWorkspaces`, post-hook y remediación). `cli/src/skill-copy.test.ts` 7/7 ✅; `npm run skills:sync` idempotente y sin drift (`git status` limpio).
+
+**F4 — RESUELTO.** `11be0c4` corrige el comment: **14** test files en el programa de `lib/tsconfig.typecheck.json` (recontado con el comando del review) y quita el "before: same counts" no medido.
+
+## Gates y CI (en `219195e`)
+
+- `npm run build` ✅ · `npm test` ✅ **1463 / 90** · `lint` ✅ · `check:plugin` ✅ sin drift (bundle 326695 B) · `arggon validate` ✅ ok v5 · `spec validate` ✅ 18 · prettier ✅ en todos los archivos tocados **excepto** `json-output.md` (trade-off F1, base ya fallaba).
+- CI: `cli` pass (3m57s, run 35662775507) + `tasks-validate` pass (30s, run 35662775333) — verificado en el tip `219195e`.
+- API GitHub: `mergeable: true`, `mergeable_state: clean`. Base actual `22e0f6d`: sus 22 commits sobre la rama son tracker-only (sin solape de archivos), incluidos los dos follow-ups (`task-start-worktree-lib-resolution` `9095eaa`, `bug-formatter-glues-markdown-spaces` `22e0f6d`).
+- Scope: el round de fixes toca solo `ArggonManager/docs/json-output.md`, `cli/src/start.ts`, `cli/src/worktree.test.ts`, `skills/arggon-cli/**` y el item (tracker). Cero ficheros de workers paralelos: `smoke/opencode-smoke.ts` intacto.
+
+## Acciones del coordinator
+
+1. Marcar el PR **ready** (sigue draft) y mergear con **merge commit, nunca squash**.
+2. Este comment auto-commitea tracker-only sobre `219195e`; re-chequear CI del nuevo tip antes del merge (o aceptar tracker-only, `tasks-validate` correrá de nuevo).
+3. No marco done — el flip queda para después del merge.
+
+Sin bloqueos. Cierre: **MERGE**.
