@@ -159,3 +159,49 @@ Por qué CI y el fixture están verdes: `cli/src/headless-ci.test.ts:166` crea e
 **Tras el fix de B1 + endurecimiento del fixture, la re-review se limita a esas cuatro ubicaciones de la receta.** Mientras tanto: no merge.
 
 *Publicado con el CLI local porque los MCP `arggon_*` no resuelven el tracker v5 en este entorno (mismo motivo que el veredicto de W5); comentario auto-commiteado en `feat/task-native-headless-ci`.*
+
+### 2026-09-21 @Arggon
+### B1 rework — pack destination + fixture hardening (head `192548a`)
+
+**PR [#379](https://github.com/Arggon/ArggonManager/pull/379)** (still draft, base `opencode2`) · commit `192548a` · CI `cli` **pass** (run 35637672771, 3m57s) · PR body updated with the repro below.
+
+**B1 fixed in the four locations** (`mkdir -p` before the first `npm pack`): `templates/docs/github/workflows/arggon.yml` (install step), `ArggonManager/docs/agents.md` (the snippet `arggon instructions` prints), `README.md` (install block) and `ArggonManager/docs/ci.md` (pre-release pack block + repo-local snippet).
+
+Repro (before/after with the runner's npm):
+
+```text
+# BEFORE — npm 10.9.4, destination missing
+$ npx --yes npm@10.9.4 pack --workspace @arggon/lib --pack-destination /tmp/opencode/w6-b1/arggon-packs
+npm error path /tmp/opencode/w6-b1/arggon-packs/arggon-lib-0.3.0.tgz
+npm error errno -2
+npm error enoent ENOENT: no such file or directory, open '.../arggon-packs/arggon-lib-0.3.0.tgz'
+EXIT=254
+
+# BEFORE — npm 12.0.2 (local), same command
+npm error enoent ... EXIT=254
+
+# AFTER — mkdir -p first, same npm 10.9.4, same command
+$ mkdir -p /tmp/opencode/w6-b1/arggon-packs
+$ npx --yes npm@10.9.4 pack --workspace @arggon/lib --pack-destination /tmp/opencode/w6-b1/arggon-packs
+EXIT=0  →  arggon-lib-0.3.0.tgz
+```
+
+**Fixture hardened (the class can no longer pass).** `cli/src/headless-ci.test.ts` no longer pre-creates the pack directory nor just substrings the step: it commits a throwaway **local product repo** from a fresh-clone copy (no `dist/`) and executes the shipped **install step verbatim** (`bash -e`; `ARGGON_REPO`/`ARGGON_REF` = that repo over `file://`, **empty** `$RUNNER_TEMP`, `npm_config_prefix` redirecting `npm install -g` into a temp prefix). Asserted: the step creates `$RUNNER_TEMP/arggon-packs` itself, both tarballs land there, `npm ci`/`prepare` built `dist/` + `lib/dist/` inside the clone, and the installed bin resolves. The recipe/parity tests reuse that bin.
+
+Mutation check (verified): removing the `mkdir -p` from the template → `beforeAll` fails with `ENOENT ... /arggon-packs/arggon-lib-0.3.0.tgz`, 6 tests reported failed; restored → 6/6 green.
+
+**Non-blocking items, same pass**
+
+- **N1** `ci.md` now states the real `init` provenance contract (pre-existing adopter file never overwritten; hand-edited generated file protected; untouched generated copy refreshed in `updated[]`) — no more "never overwriting an existing file".
+- **N2** the fixture's network dependency (clone's `npm ci` devDependencies + the tarballs' `commander`) is documented in `ci.md` and the test header; the incorrect "the test does not clone over the network" claim is gone.
+- **N3** the drift gate activates on any committed provenance marker (`git grep -q --fixed-strings "arggon:generated"`), not on `*.convention.yml` alone; the fixture covers the untracked-state-file case (gate still fires on a mutated `AGENTS.md`, and passes clean).
+- **N4** `ADOPT_SCAN_PATHS` includes `.github/workflows/arggon.yml` (with an `arggon adopt` inventory assertion).
+
+**Gates (head `192548a`, local)** — `npm test` 89 files / **1450 tests green** · `npm run lint` clean · `npm run build` clean · `npm run check:plugin` exit 0 · `arggon validate` ok (0 warnings, v5) · `arggon spec validate` ok · `npm run smoke:opencode` **26 scenarios / 144 checks / 0 failures** (opencode v2.0.12) · `npm run context:report -- --strict` all bounds pass.
+
+**Smoke flake evidence (W4 reviewer scenario, not this PR):** during the rework the scenario failed twice (`the reviewer's shell gate denies git push` once; then 4 reviewer checks in a `w4`-only run) because the model _refuses_ to attempt the tools its Code Mode catalog hides, so the "denied" checks find no attempted call — transcript: _"the runtime exposes `update`/`start`/`cleanup` as properties, but they are not in the sanctioned Code Mode catalog … Let me confirm the authoritative surface via `search`"_ → the provided try/catch script never ran. `opencode/`, `templates/docs/opencode/` and `smoke/` are **byte-identical** to the base checkout (`git diff 5c2cd50 HEAD --stat -- opencode/ templates/docs/opencode/ smoke/` → empty), the same scenario passed earlier on this branch and on the base, and the final full run is 26/0. Flagging the smoke's own fragility (checks that require the model to attempt a deliberately hidden tool) as a possible follow-up — not filed, W4/W7 territory.
+
+**Open questions for the re-review**
+
+- Re-review is scoped to the four recipe locations + the fixture hardening (per the verdict). Everything else is unchanged from `8c6940c` apart from N1–N4.
+- Merge with a **merge commit** (tracker auto-commits live on this branch); item stays `in_progress` until you flip it.
