@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-playbook-opencode-2-0-12
 title: Refresh OpenCode playbook pin to 2.0.12 + A/B re-probe
+assignee: Arggon
+branch: feat/task-playbook-opencode-2-0-12
 parent: story-tech-playbooks
 labels: []
 priority: p3
 created: "2026-09-21"
 updated: "2026-09-21"
+claimed_at: "2026-09-21T22:39:08.443Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-playbook-opencode-2-0-12
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tech-playbooks/task-playbook-opencode-2-0-12.md
