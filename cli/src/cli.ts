@@ -2322,14 +2322,17 @@ program
     true,
   )
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
-  .action((opts: { prune?: boolean; commit?: boolean; noGh?: boolean; json?: boolean }) => {
+  .action((opts: { prune?: boolean; commit?: boolean; gh?: boolean; json?: boolean }) => {
     const json = jsonEnabled(opts);
     try {
       const result = runCleanup({
         cwd: process.cwd(),
         prune: Boolean(opts.prune),
         commit: opts.commit === false ? false : undefined,
-        noGh: opts.noGh === false,
+        // Commander names a `--no-gh` option `gh` (default true, false when
+        // the flag is passed); reading `noGh` made the flag a silent no-op
+        // (bug-cleanup-no-gh-ignored).
+        noGh: opts.gh === false,
       });
       if (json) {
         // Per-candidate prune failures are reported in the payload (each

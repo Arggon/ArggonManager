@@ -1123,4 +1123,71 @@ describe("arggon cleanup", () => {
     expect(calls).toEqual([]);
     expect(result.pruned).toEqual([]);
   });
+
+  /**
+   * Real `gh` shim on PATH that logs every invocation and answers `gh pr list`
+   * with one merged PR (the squash-merge shape). The CLI spawn path resolves
+   * gh through PATH, so this is the only way to prove the flag reached the
+   * classifier (bug-cleanup-no-gh-ignored: commander names `--no-gh` `gh`,
+   * and reading `opts.noGh` made the flag a silent no-op).
+   */
+  function fakeGhOnPath(): { bin: string; calls: () => string[] } {
+    const bin = mkdtempSync(join(tmpdir(), "arggon-cleanup-gh-"));
+    const log = join(bin, "gh-calls.log");
+    const ghPath = join(bin, "gh");
+    writeFileSync(
+      ghPath,
+      `#!/bin/sh\nprintf '%s\\n' "$*" >> '${log}'\n` +
+        `echo '[{"number":12,"url":"https://github.com/o/r/pull/12","mergedAt":"2026-09-13T00:00:00Z"}]'\n`,
+      "utf8",
+    );
+    chmodSync(ghPath, 0o755);
+    return {
+      bin,
+      calls: () =>
+        existsSync(log) ? readFileSync(log, "utf8").trim().split("\n").filter(Boolean) : [],
+    };
+  }
+
+  it("--no-gh skips the gh fallback through the CLI; the default keeps it", () => {
+    const { dir } = initCleanupRepo();
+    const { bin, calls } = fakeGhOnPath();
+    const env = { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}` };
+
+    // Default: task-charlie (done + unmerged branch) is proven integrated by
+    // the merged-PR fallback, so the shim is invoked exactly once.
+    const fallback = spawnSync(process.execPath, [tsx, cli, "cleanup", "--json"], {
+      encoding: "utf8",
+      cwd: dir,
+      env,
+    });
+    expect(fallback.status, fallback.stderr).toBe(0);
+    const withGh = JSON.parse(fallback.stdout) as {
+      candidates: Array<{ id: string; removable: boolean; via?: string }>;
+    };
+    expect(withGh.candidates.find((c) => c.id === "task-charlie")).toMatchObject({
+      removable: true,
+      via: "squash-merged PR #12",
+    });
+    expect(calls()).toHaveLength(1);
+    expect(calls()[0]).toContain("--head feat/task-charlie");
+
+    // --no-gh: ancestry-only. The second run must not spawn gh at all, and
+    // charlie falls back to the plain ancestry skip.
+    const offline = spawnSync(process.execPath, [tsx, cli, "cleanup", "--json", "--no-gh"], {
+      encoding: "utf8",
+      cwd: dir,
+      env,
+    });
+    expect(offline.status, offline.stderr).toBe(0);
+    const noGh = JSON.parse(offline.stdout) as {
+      candidates: Array<{ id: string; removable: boolean; reason: string | null }>;
+    };
+    expect(noGh.candidates.find((c) => c.id === "task-charlie")).toMatchObject({
+      removable: false,
+      reason: "branch 'feat/task-charlie' is not fully merged into 'main'",
+    });
+    // Still one call in total: the --no-gh run never reached gh.
+    expect(calls()).toHaveLength(1);
+  });
 });
