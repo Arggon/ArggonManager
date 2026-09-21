@@ -13,7 +13,6 @@ updated: "2026-09-21"
 claimed_at: "2026-09-21T21:30:09.094Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-lib-hygiene
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-native-lib-hygiene.md
   Leaves live only under a story. id is the filename stem: task-native-lib-hygiene.
@@ -130,3 +129,6 @@ Fake `gh` logging `$PWD`, probe run from `/tmp/opencode` (the "server" cwd) with
 
 - branch: feat/task-native-lib-hygiene
 - open questions: Finding 2: resolution itself unchanged (documented + reported as linkedWorkspaces) — is that acceptable, or do you want a follow-up item for the link-farm/build-before-gate design?; Linked-worktree d…
+
+### 2026-09-21 @Arggon
+CI green on PR #384 @ eb6073d+tracker commits: `cli` pass (4m14s, run 35659513657) and `tasks-validate` pass (34s, run 35659513816). All seven acceptance boxes are now ticked; the coordinator still owns the done flip after merge.
