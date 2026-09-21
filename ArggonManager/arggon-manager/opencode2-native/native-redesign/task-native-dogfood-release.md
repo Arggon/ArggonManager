@@ -183,3 +183,7 @@ The reviewer verdict was **MERGE** with non-blocking findings; all four are addr
 
 - The exclusion only removes the self-referential case: a PR that changes _command/agent/config_ templates is still red against the pinned moving `opencode2` ref until the change lands there — inherent to the ref-based gate; the post-release step pins `ARGGON_REF` to the tag (release runbook step 6).
 - Owner decisions unchanged and still pending: bump `0.3.0` → `0.4.0`, remove `private`, tag `v0.4.0`, `npm publish` both packages (kernel first), pin `ARGGON_REF`.
+
+### handoff 2026-09-21 @Arggon — next: Coordinator: re-review the review-fix commits (1831820 F1, 84617f7 F2+F4, 3476686 F3) plus the origin/opencode2 merge (604eb6d) in PR #381 — CI green (cli pass, tasks-validate pass), mergeState CLEAN…
+- branch: feat/task-native-dogfood-release
+- open questions: The workflow self-exclusion only removes the self-referential red: a PR that changes command/agent/config templates still fails the drift gate against the moving opencode2 ref until the change lands …
