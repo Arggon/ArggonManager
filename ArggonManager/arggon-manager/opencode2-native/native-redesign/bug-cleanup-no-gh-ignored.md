@@ -52,3 +52,7 @@ REPRO (fixture from cli/src/worktree.test.ts, task-charlie = done + unmerged bra
 GATES (all green): npm test (89 files / 1455 tests), npm run lint, npm run build, npm run check:plugin (bundle unchanged), npm run arggon -- validate (ok, convention v5), npm run arggon -- spec validate (ok, 18 docs).
 
 Acceptance checkboxes left unticked for the coordinator: local verification covers all three except the not-yet-run CI and the merge itself. Only touched cli/src/cli.ts and cli/src/worktree.test.ts.
+
+### handoff 2026-09-21 @Arggon — next: Review draft PR #382 (fix/bug-cleanup-no-gh-ignored @ b5852e9): confirm CI green, then tick the three acceptance boxes and mark done after merge (coordinator).
+- branch: fix/bug-cleanup-no-gh-ignored
+- open questions: CI result not observed by the worker; plugin-parity test opencode/plugins/arggon/tools.test.ts:1113 compares CLI --no-gh with plugin no_gh but its fixture is ancestry-merged, so the CLI wiring is now…
