@@ -9,10 +9,17 @@ the npm workspace (`"workspaces": ["lib"]`).
 - **Entry:** `lib/src/index.ts` → `dist/index.js` + `dist/index.d.ts`, exposed
   through the package `exports` map (ESM only).
 - **Build:** `npm run build` at the repo root builds this package first
-  (`npm run build --workspace @arggon/lib`), then the root `tsc`.
+  (`npm run build --workspace @arggon/lib`), then the root `tsc`. The kernel
+  build runs two `tsc` passes: the emit pass (`tsconfig.json`) excludes
+  `src/**/*.test.ts`, so `dist/` ships no test artifacts, and a `--noEmit`
+  pass (`tsconfig.typecheck.json`) still type-checks the test files.
 - **Dependencies:** none at runtime (Node builtins only). No commander, no
   printing, no argv parsing, no bundled assets — the CLI entrypoint and the
-  seam generation live in the root package.
+  seam generation live in the root package. The public `.d.ts` is held to the
+  same rule: nothing it imports may be undeclared, so a consumer type-check
+  never fails on a missing package (the entry's program view is a structural
+  `JsonProgram`, not commander's `Command`; gate: the consumer type-check in
+  `cli/src/lib-build.test.ts`).
 - **Assets:** item creation reads the repo's own `templates/<type>.md` first and
   otherwise the `templatesDir` the root adapter injects
   (`create`/`import-issues` options). The library itself ships no templates.
@@ -31,7 +38,7 @@ W2/W3/W4) rely on this subset — it is the contract:
 | **operations** | `listOperation`, `createOperation`, `updateOperation`, `showOperation`, `nextOperation`, `reportOperation`, `validateOperation`, `commentOperation`, `handoffOperation`, `priorityOperation`, `syncOperation`, `importIssuesOperation` |
 
 `rules.ts` stays the single source of the claim/reopen invariants: the entry
-re-exports it by identity (pinned in `cli/src/lib.test.ts`), never as a wrapper.
+re-exports it by identity (pinned in `lib/src/index.test.ts`), never as a wrapper.
 
 ## Public for the root adapter (not the stable subset)
 
@@ -57,7 +64,9 @@ the JSON `schemaVersion` / ship an ADR.
 ## Tests
 
 The kernel contract is covered by the root suite: `cli/src/lib.test.ts` (entry
-surface, in-process), `cli/src/lib-build.test.ts` (clean build in a fresh clone,
-real-Node import of the built artifact, read **and** write byte parity against
+surface, in-process), `lib/src/index.test.ts` (the entry re-exports the kernel
+modules by identity — `rules.ts` stays the single source), `cli/src/lib-build.test.ts`
+(clean build in a fresh clone, real-Node import of the built artifact, a consumer
+type-check with no undeclared imports, read **and** write byte parity against
 the CLI), plus the moved kernel unit tests under `lib/src/*.test.ts`
 (`vitest.config.ts` includes `lib/**/*.test.ts`).

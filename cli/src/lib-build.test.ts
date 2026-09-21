@@ -24,6 +24,7 @@ import {
   readdirSync,
   readFileSync,
   symlinkSync,
+  writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
@@ -396,6 +397,10 @@ describe("kernel package from a clean build", () => {
     // The kernel stays dependency-free (W3 bundles it into the vendored
     // single-file plugin; ADR 0011 §5 as amended by ADR 0013).
     expect(pkg.dependencies).toBeUndefined();
+    // W6/PR-374 review finding 5: the emit pass excludes `src/**/*.test.ts`,
+    // so dist carries no test artifact (the pack excludes `*.test.*` too — the
+    // build no longer relies on that alone).
+    expect(readdirSync(join(copy, "lib/dist")).filter((f) => f.includes(".test."))).toEqual([]);
   });
 
   it("the root package consumes the kernel through the workspace", () => {
@@ -406,6 +411,59 @@ describe("kernel package from a clean build", () => {
     expect(pkg.workspaces).toEqual(["lib"]);
     expect(pkg.dependencies?.["@arggon/lib"]).toBeTruthy();
   });
+
+  it("type-checks from a consumer that has no undeclared kernel imports", () => {
+    // W6/PR-374 review finding 1: the kernel's public `.d.ts` must not import
+    // packages the kernel does not declare. `bindJsonProgram` used to type its
+    // parameter as commander's `Command`, so the emitted declaration carried
+    // `import type { Command } from "commander"` — a consumer type-check failed
+    // with `dist/json.d.ts(1,30): error TS2307: Cannot find module 'commander'`
+    // because the kernel (runtime- and declaration-dependency-free, ADR 0013)
+    // never installs commander. This consumer deliberately has only a REAL
+    // copy of the built package (+ node types) and no commander: the
+    // type-check must pass. The copy is real (not a symlink) on purpose —
+    // TypeScript resolves a symlink to its physical path, where the repo's own
+    // `node_modules` would satisfy the undeclared import and hide the leak.
+    const consumer = mkdtemp("arggon-lib-consumer-");
+    const nm = join(consumer, "node_modules");
+    const installed = join(nm, "@arggon", "lib");
+    mkdirSync(installed, { recursive: true });
+    cpSync(join(copy, "lib", "dist"), join(installed, "dist"), { recursive: true });
+    cpSync(join(copy, "lib", "package.json"), join(installed, "package.json"));
+    mkdirSync(join(nm, "@types"), { recursive: true });
+    symlinkSync(join(root, "node_modules", "@types/node"), join(nm, "@types", "node"), "junction");
+    writeFileSync(
+      join(consumer, "consumer.ts"),
+      [
+        'import { JSON_SCHEMA_VERSION, listOperation, type WorkItem } from "@arggon/lib";',
+        "",
+        "export function probe(cwd: string) {",
+        "  const item: WorkItem | null = null;",
+        "  const version: number = JSON_SCHEMA_VERSION;",
+        "  return { item, version, listOperation, cwd };",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    expect(existsSync(join(installed, "dist/index.d.ts"))).toBe(true);
+
+    const checked = spawnSync(
+      process.execPath,
+      [
+        join(root, "node_modules/typescript/bin/tsc"),
+        "--noEmit",
+        "--strict",
+        "--module",
+        "nodenext",
+        "--target",
+        "es2022",
+        "consumer.ts",
+      ],
+      { cwd: consumer, encoding: "utf8" },
+    );
+    expect(checked.status, `${checked.stdout}\n${checked.stderr}`).toBe(0);
+    expect(`${checked.stdout}${checked.stderr}`).not.toContain("TS2307");
+  }, 60_000);
 
   it("imports in a real Node process and exposes the kernel entrypoints", () => {
     for (const name of REQUIRED_BUILT_EXPORTS) {
