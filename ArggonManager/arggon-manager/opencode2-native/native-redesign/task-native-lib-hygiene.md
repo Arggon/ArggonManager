@@ -13,6 +13,7 @@ updated: "2026-09-21"
 claimed_at: "2026-09-21T21:30:09.094Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-native-lib-hygiene
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-native-lib-hygiene.md
   Leaves live only under a story. id is the filename stem: task-native-lib-hygiene.
@@ -63,8 +64,9 @@ Findings from the PR #374 review (`task-native-lib-package`, ADR 0013):
 - [x] `lib/src/import-issues.ts` forwards `cwd` to `ghIssueListJson` (native
       calls currently resolve the repo from the server process cwd; `sync`
       already does it right).
-- [ ] `arggon validate` green; CI green.
-      (`arggon validate` ok locally, convention v5 — CI runs on PR #384.)
+- [x] `arggon validate` green; CI green.
+      (`arggon validate` ok locally, convention v5; CI green on PR #384 — cli
+      run 35659513657, tasks-validate run 35659513816.)
 
 ## Notes
 
@@ -72,6 +74,7 @@ Findings from the PR #374 review (`task-native-lib-package`, ADR 0013):
   until W6/W7) and the W2/W3 `templatesDir` injection requirement.
 
 ### 2026-09-21 @Arggon
+
 Worker evidence for PR #384 (branch `feat/task-native-lib-hygiene`, 5 commits: ae158d3, f99ae70, a65d4ad, eb6073d, 9f2c058).
 
 Environment note: this worktree was started with `--worktree` (linked `node_modules` → primary) and then given a **local `npm ci`** install, because finding 2's linked shape would make every spawned CLI test run the _primary's_ `lib/dist` instead of this branch's kernel. That local install is itself the documented remediation.
@@ -124,5 +127,6 @@ Fake `gh` logging `$PWD`, probe run from `/tmp/opencode` (the "server" cwd) with
 - PO decisions in Notes (publishing/versioning of `@arggon/lib`, W2/W3 `templatesDir` injection) untouched.
 
 ### handoff 2026-09-21 @Arggon — next: Review PR #384 (5 commits + tracker ticks): confirm CI green, then merge (tracker-carrying branch: merge commit, not squash) and flip the item to done.
+
 - branch: feat/task-native-lib-hygiene
 - open questions: Finding 2: resolution itself unchanged (documented + reported as linkedWorkspaces) — is that acceptable, or do you want a follow-up item for the link-farm/build-before-gate design?; Linked-worktree d…
