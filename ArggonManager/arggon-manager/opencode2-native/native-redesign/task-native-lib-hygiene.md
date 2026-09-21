@@ -176,3 +176,16 @@ El paquete verifica de punta a punta (los 7 boxes, con mutación/smoke independi
 - No pude correr `git merge-tree` (el gate de shell deniega el comando); la limpieza del merge se verificó vía API de GitHub + hunks disjuntos.
 - Este verdict se publicó con `npm run arggon -- comment` (auto-commit `chore(tasks): commented ...`) porque los tools MCP `arggon_*` de esta sesión apuntan a otro checkout (`/home/arggon/Projects/ArggonManager`) y fallan con `SHOW_FAILED` en este workspace. Ese commit tracker-only mueve el tip: re-chequear CI tras el commit.
 - Cierre: **NO MERGE hasta F1**. F2/F3 pueden ir en el mismo commit o a follow-up, a criterio del coordinator. Yo no marco done.
+
+### 2026-09-21 @Arggon
+Review-round fixes for the F1–F4 verdict (`git range 5590acb..11be0c4`, pushed; PR #384).
+
+**F1 (MEDIA) — restored + root cause.** `abdb28f` restores all **four** glued spaces in `ArggonManager/docs/json-output.md` (verdict said 3; `:184` had two — `` `null` otherwise `` and `and `.mcp.json``— and `:659` two:`` `v1.findings` entries `` and `such as `{`). Token-set comparison vs `origin/opencode2`now finds zero glued tokens. Cause is *not* a hand edit:`opencode.jsonc`has`"formatter": true`, so editing the file ran prettier, and **prettier 3.9.6 glues those four spaces itself** — repro on the untouched base: `git show origin/opencode2:... > /tmp/base.md && npx prettier --write /tmp/base.md`→ the same glues (and`prettier --check`already warns on the base). The file therefore cannot be prose-correct and prettier-clean at once; the restore leaves`prettier --check`warning on that one file only (no CI job runs prettier). Reported for a possible follow-up (markdown formatter guard):`npm run format` would corrupt the reviewer-quoted text in this very item body too. Every other touched file is prettier-clean.
+
+**F2 (BAJA) — fixed at the source.** `f56674b` recomputes `linkedWorkspaces` after `x-worktree.post-start` (before the return) and docs now state it describes the state the worktree is _left in_; the pre-hook link only covered the claim-commit gate window. Real-CLI smoke (fixture with `node_modules/@arggon/lib -> ../../lib` + a `npm ci`-shaped reify hook): reified → `{"linkedNodeModules":true,"linkedWorkspaces":[],"postStart":true}` (was `["@arggon/lib"]`) and the stdout note is gone; control hook that leaves no install → start re-links and reports `["@arggon/lib"]`. Test mutation-verified (removing the recompute → `expected [ '@arggon/lib' ] to deeply equal []`).
+
+**F3 (BAJA).** `8c98b03` syncs the committed source `skills/arggon-cli/` (SKILL.md claim step, `references/pitfalls.md`, `references/orchestration.md`) with `docs/json-output.md`; `npm run skills:sync` regenerated the gitignored `.agents/skills/arggon-cli/**`; `skill-copy.test.ts` green.
+
+**F4 (INFO).** `11be0c4` fixes this item's own comment: 14 test files in the `lib/tsconfig.typecheck.json` program (re-counted with the reviewer's command), and the `npm test` line no longer claims an unmeasured "before: same counts".
+
+**Gates after the fixes:** `npm run build` ✅ · `npm test` ✅ **1463 passed / 90 files** · `lint` ✅ · `check:plugin` ✅ · `arggon validate` ✅ v5 · `spec validate` ✅ 18 · prettier ✅ except the `json-output.md` exception above. CI: pending on `11be0c4` (link in the next comment).
