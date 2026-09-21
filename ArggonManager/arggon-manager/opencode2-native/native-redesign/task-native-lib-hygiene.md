@@ -122,3 +122,7 @@ Fake `gh` logging `$PWD`, probe run from `/tmp/opencode` (the "server" cwd) with
 - ADR index rows 0005–0009: flagged as pre-existing in the item context, outside its acceptance — untouched.
 - `ArggonManager/docs/agents.md` (generated, drift-gated against `templates/`) does not mention `linkedWorkspaces`; the adopter template was not changed.
 - PO decisions in Notes (publishing/versioning of `@arggon/lib`, W2/W3 `templatesDir` injection) untouched.
+
+### handoff 2026-09-21 @Arggon — next: Review PR #384 (5 commits + tracker ticks): confirm CI green, then merge (tracker-carrying branch: merge commit, not squash) and flip the item to done.
+- branch: feat/task-native-lib-hygiene
+- open questions: Finding 2: resolution itself unchanged (documented + reported as linkedWorkspaces) — is that acceptable, or do you want a follow-up item for the link-farm/build-before-gate design?; Linked-worktree d…
