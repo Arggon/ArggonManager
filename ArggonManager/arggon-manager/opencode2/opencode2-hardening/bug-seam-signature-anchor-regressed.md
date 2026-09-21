@@ -117,3 +117,7 @@ restored it AND added the opener guard because the literal repro otherwise stays
 `modified-skip` (the residual the merged item's verification note called
 "safe-by-default, optional future nit"). The guard is 4 lines; dropping it reverts
 to exact merged semantics if you prefer that.
+
+### handoff 2026-09-21 @Arggon — next: Review PR #380 (draft, base opencode2): confirm the generated-opener guard decision and merge with a MERGE commit (tracker-carrying branch). Then tick the remaining acceptance boxes, close PR #346 as…
+- branch: fix/bug-seam-signature-anchor-regressed
+- open questions: Keep the 4-line generated-opener guard or revert to the exact merged two-line window (fixture A then stays modified-skip)?; CI on PR #380 had not finished at handoff time.
