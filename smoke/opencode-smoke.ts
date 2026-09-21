@@ -44,8 +44,12 @@
  *                        the kernel refuses both through the native tools and
  *                        the session continues.
  *  16. permissions      — the shipped agent permissions load and stay
- *                        effective (reviewer: `arggon.update` hidden, `git push`
- *                        denied) without breaking ordinary sessions.
+ *                        effective (reviewer: every mutating native tool is
+ *                        absent from the Code Mode catalog, `git push` denied)
+ *                        without breaking ordinary sessions. The fixture plants
+ *                        a local bare `origin` and pushes `main` first, so the
+ *                        push probe is a real up-to-date command and the gate —
+ *                        not a missing remote — is what the check observes.
  *   7. commands        — one bounded headless session PER native command
  *                        (eleven), each expanded from the shipped
  *                        `.opencode/commands/arggon-*.md` body: the command
@@ -105,6 +109,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -144,7 +149,7 @@ type RunResult = { status: number | null; signal: NodeJS.Signals | null; stdout:
 type TranscriptPart = {
   type?: string;
   tool?: string;
-  state?: { status?: string; input?: { code?: string }; output?: string };
+  state?: { status?: string; input?: { code?: string }; output?: string; error?: string };
 };
 type TranscriptEvent = { type?: string; part?: TranscriptPart };
 
@@ -168,10 +173,13 @@ function opencodeAvailable(): boolean {
 
 class Fixture {
   readonly dir: string;
+  /** Local bare `origin` (sibling dir, no GitHub); created by `plantOrigin()`. */
+  readonly remoteDir: string;
   private readonly binDir: string;
 
   constructor(name: string) {
     this.dir = mkdtempSync(join(tmpdir(), `arggon-smoke-${name}-`));
+    this.remoteDir = `${this.dir}-remote.git`;
     fixtures.push(this);
     this.binDir = join(this.dir, ".smoke-bin");
     mkdirSync(this.binDir, { recursive: true });
@@ -223,9 +231,37 @@ class Fixture {
 
   /** git repo + identity so the tracker's auto-commits and shell commits work. */
   bootstrap(): void {
-    this.git(["init", "-q"]);
+    this.git(["init", "-q", "-b", "main"]);
     this.git(["config", "user.email", "smoke@example.com"]);
     this.git(["config", "user.name", "smoke-smoke"]);
+  }
+
+  /**
+   * Local bare `origin` (no GitHub): the reviewer's push probe targets a real
+   * remote, so "there is nothing to push" is never a legitimate reason to skip
+   * the command. Push `main` afterwards to make `git push origin main` a valid
+   * up-to-date command.
+   */
+  plantOrigin(): RunResult {
+    const bare = spawnSync("git", ["init", "-q", "--bare", "-b", "main", this.remoteDir], {
+      encoding: "utf8",
+      timeout: 30_000,
+    });
+    if (bare.status !== 0) {
+      return {
+        status: bare.status,
+        signal: bare.signal,
+        stdout: bare.stdout ?? "",
+        stderr: bare.stderr ?? "",
+      };
+    }
+    return this.git(["remote", "add", "origin", this.remoteDir]);
+  }
+
+  /** Remove the fixture and its sibling bare remote. */
+  dispose(): void {
+    rmSync(this.dir, { recursive: true, force: true });
+    rmSync(this.remoteDir, { recursive: true, force: true });
   }
 
   init(): RunResult {
@@ -357,7 +393,7 @@ class Fixture {
   }
 }
 
-function parseTranscript(stdout: string): TranscriptEvent[] {
+export function parseTranscript(stdout: string): TranscriptEvent[] {
   const events: TranscriptEvent[] = [];
   for (const line of stdout.split("\n")) {
     if (!line.trim().startsWith("{")) continue;
@@ -376,7 +412,7 @@ function parseTranscript(stdout: string): TranscriptEvent[] {
  * transcript checks accept every valid form (observed in the bounded command
  * sessions, W4).
  */
-function normalizeNamespace(code: string): string {
+export function normalizeNamespace(code: string): string {
   return code.replace(/tools\s*\[\s*["']arggon["']\s*\]/g, "tools.arggon");
 }
 
@@ -684,7 +720,7 @@ function scenarioPluginAbsent(): void {
 // ---------------------------------------------------------------------------
 
 /** The fifteen native tools (spec-native-first-011 §Tools + W4 worktree domain). */
-const NATIVE_TOOL_NAMES = [
+export const NATIVE_TOOL_NAMES = [
   "list",
   "create",
   "update",
@@ -750,7 +786,7 @@ function nativeToolsScript(story: string, task: string): string {
  * object the script returned. The Code Mode tool's transcript `output` is the
  * pretty-printed JSON of that value.
  */
-function executeJson(stdout: string, needle: string): Record<string, unknown> | undefined {
+export function executeJson(stdout: string, needle: string): Record<string, unknown> | undefined {
   for (const event of parseTranscript(stdout)) {
     if (event.type !== "tool_use" || event.part?.tool !== "execute") continue;
     const state = event.part.state;
@@ -1269,20 +1305,34 @@ function scenarioCommands(only?: string): void {
 // W4 — worktree lifecycle, invariants and permissions
 // ---------------------------------------------------------------------------
 
-/** True when a completed shell call for `needle` failed with a permission denial. */
-function shellDenied(stdout: string, needle: string): boolean {
+/**
+ * True when a shell call for `needle` failed with a permission denial. The
+ * 2.0.12 runtime carries the gate message in `state.error` ("Permission denied:
+ * shell") with no output; older shapes may put it in `state.output` — accept
+ * both. Never match on the model's narrative: only a real refused call counts.
+ */
+export function shellDenied(stdout: string, needle: string): boolean {
   return parseTranscript(stdout).some((event) => {
     if (event.type !== "tool_use" || event.part?.tool !== "shell") return false;
     const state = event.part.state;
     const input = state?.input as { command?: unknown } | undefined;
     if (state?.status !== "error") return false;
     if (typeof input?.command !== "string" || !input.command.includes(needle)) return false;
-    return (state.output ?? "").includes("Permission denied");
+    return /Permission denied/.test(`${state.error ?? ""} ${state.output ?? ""}`);
+  });
+}
+
+/** True when any shell call (denied or completed) carries `needle`. */
+export function shellAttempted(stdout: string, needle: string): boolean {
+  return parseTranscript(stdout).some((event) => {
+    if (event.type !== "tool_use" || event.part?.tool !== "shell") return false;
+    const input = event.part.state?.input as { command?: unknown } | undefined;
+    return typeof input?.command === "string" && input.command.includes(needle);
   });
 }
 
 /** True when a completed shell call for `needle` succeeded. */
-function shellCompleted(stdout: string, needle: string): boolean {
+export function shellCompleted(stdout: string, needle: string): boolean {
   return parseTranscript(stdout).some((event) => {
     if (event.type !== "tool_use" || event.part?.tool !== "shell") return false;
     const state = event.part.state;
@@ -1509,16 +1559,83 @@ function scenarioInvariants(): void {
 }
 
 /**
+ * The reviewer's read-only native catalog: `comment` is the verdict channel
+ * (body-only write), the rest are reads. Every other native tool is denied in
+ * the shipped frontmatter, so the runtime removes it from the Code Mode catalog.
+ */
+export const REVIEWER_CATALOG_TOOLS = [
+  "comment",
+  "list",
+  "next",
+  "report",
+  "show",
+  "validate",
+] as const;
+
+/** Mutating/maintenance native tools the reviewer frontmatter denies. */
+export const REVIEWER_DENIED_TOOLS = [
+  "create",
+  "update",
+  "handoff",
+  "start",
+  "branch",
+  "cleanup",
+  "priority",
+  "sync",
+  "import_issues",
+] as const;
+
+/**
+ * Reviewer probe session with a bounded retry: models occasionally answer with
+ * a reduced script or skip an instructed shell command, which used to fail the
+ * W4 permission checks for reasons that say nothing about the gates. Retry ONCE
+ * when the required evidence is missing; the probe is read-only, so re-running
+ * it is safe. The assertions stay on the permission layer (the Code Mode
+ * catalog and the refusal recorded in the tool state), never on the model's
+ * narrative.
+ */
+function reviewerProbe(
+  f: Fixture,
+  prompt: string,
+  label: string,
+  ready: (stdout: string) => boolean,
+): RunResult {
+  const first = f.opencode(prompt, undefined, undefined, "arggon-reviewer");
+  f.saveTranscript(label, first);
+  if (ready(first.stdout)) return first;
+  console.log(`  retry ${label}: the transcript is missing the probe evidence`);
+  const retry = f.opencode(prompt, undefined, undefined, "arggon-reviewer");
+  f.saveTranscript(`${label}-retry`, retry);
+  return retry;
+}
+
+/**
  * W4 acceptance 4: the shipped permission defaults load without breaking
- * ordinary sessions — and stay effective. A reviewer session reads the item
- * and runs git inspection, while `arggon.update` (denied by the reviewer's
- * frontmatter) and `git push` (denied by the reviewer's shell gates) are
- * blocked.
+ * ordinary sessions — and stay effective.
+ *
+ * The fixture plants a local bare `origin` and pushes `main`, so
+ * `git push origin main` is a real, up-to-date command: the reviewer's shell
+ * gate — not a missing remote or branch — is what the check observes. The
+ * mutating-tool denial is asserted on the **catalog layer**: the reviewer's
+ * `search` returns the callable tools, so `update`/`start`/`cleanup` being
+ * absent is the runtime's permission filtering, not a model's choice to skip
+ * them. Remaining limit: the shell check still needs the model to issue the
+ * command; the planted origin + explicit instruction + one bounded retry keep
+ * that deterministic in practice (a session that never attempts it is a
+ * harness failure, not a silent pass).
  */
 function scenarioPermissions(): void {
-  scenario("permissions (W4): the reviewer gates load and stay effective without breaking the session");
+  scenario(
+    "permissions (W4): the reviewer gates load and stay effective without breaking the session",
+  );
   const f = new Fixture("permissions");
   f.bootstrap();
+  const origin = f.plantOrigin();
+  check(
+    "fixture origin remote planted (local bare repo, no GitHub)",
+    origin.status === 0,
+    runTail(origin),
+  );
   const init = f.init();
   check("init exits 0", init.status === 0, runTail(init));
   const item = f.createTaskChain();
@@ -1527,54 +1644,70 @@ function scenarioPermissions(): void {
     return;
   }
   f.claim(item.id);
-
-  const session = f.opencode(
-    [
-      "Use the execute tool with exactly this code:",
-      "const out = {};",
-      `out.show = await tools.arggon.show({ id: "${item.id}" });`,
-      `try { out.update = await tools.arggon.update({ id: "${item.id}", status: "todo" }); } catch (error) { out.updateError = String((error && error.message) || error); }`,
-      `try { out.cleanup = await tools.arggon.cleanup({}); } catch (error) { out.cleanupError = String((error && error.message) || error); }`,
-      `try { out.start = await tools.arggon.start({ id: "${item.id}", assignee: "reviewer" }); } catch (error) { out.startError = String((error && error.message) || error); }`,
-      "return out;",
-      "Then run these two shell commands in order: `git push origin main` and `git status`.",
-      "If the tool is not found, run the same code once more (the tool catalog can lag server startup).",
-      "Reply with only the raw JSON result and what each shell command returned.",
-    ].join("\n"),
-    undefined,
-    undefined,
-    "arggon-reviewer",
+  // Push `main` first: if the gate ever stopped denying, the probe push would
+  // succeed ("Everything up-to-date") instead of failing for an unrelated
+  // reason — the check below then fails on the completed call.
+  const push = f.git(["push", "-q", "-u", "origin", "main"]);
+  check(
+    "fixture main pushed to origin (the probe push is a no-op)",
+    push.status === 0,
+    runTail(push),
   );
-  f.saveTranscript("permissions", session);
+
+  const prompt = [
+    "Use the execute tool with exactly this code:",
+    "const out = {};",
+    `out.show = await tools.arggon.show({ id: "${item.id}" });`,
+    'const catalog = await search({ namespace: "arggon", limit: 20 });',
+    "return { out, catalog };",
+    "Then run these two shell commands with the shell tool, exactly as written and in order (run both, do not skip either): `git push origin main` and `git status`.",
+    "If the tool is not found, run the same code once more (the tool catalog can lag server startup).",
+    "Reply with only the raw JSON result and what each shell command returned.",
+  ].join("\n");
+  const session = reviewerProbe(f, prompt, "permissions", (stdout) => {
+    const probe = executeJson(stdout, "tools.arggon.show");
+    const out = (probe?.out ?? {}) as Record<string, unknown>;
+    const show = (out.show ?? {}) as Record<string, unknown>;
+    return (
+      probe !== undefined &&
+      probe.catalog !== undefined &&
+      show.command === "show" &&
+      shellAttempted(stdout, "git push")
+    );
+  });
   check("session succeeds as the reviewer agent", session.status === 0, runTail(session));
   check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
   const result = executeJson(session.stdout, "tools.arggon.show");
   check("model executed the reviewer script", result !== undefined, runTail(session));
   if (result !== undefined) {
-    const show = (result.show ?? {}) as Record<string, unknown>;
+    const out = (result.out ?? {}) as Record<string, unknown>;
+    const show = (out.show ?? {}) as Record<string, unknown>;
     check(
       "the reviewer reads the item (show allowed)",
       show.ok === true && show.command === "show",
       JSON.stringify(show).slice(0, 200),
     );
+    const catalog = (result.catalog ?? {}) as {
+      items?: Array<{ path?: unknown }>;
+      remaining?: unknown;
+    };
+    const paths = (catalog.items ?? []).map((entry) => entry.path).sort();
+    const expected = REVIEWER_CATALOG_TOOLS.map((name) => `tools.arggon.${name}`).sort();
     check(
-      "the reviewer cannot mutate the tracker (arggon.update denied)",
-      result.update === undefined &&
-        /Unknown tool|Permission denied/.test(String(result.updateError ?? "")),
-      String(result.updateError ?? "").slice(0, 200),
+      "the reviewer's Code Mode catalog is the read-only set (permission filtering, not model choice)",
+      JSON.stringify(paths) === JSON.stringify(expected) && catalog.remaining === 0,
+      JSON.stringify(paths),
     );
+    const leaked = REVIEWER_DENIED_TOOLS.filter((name) => paths.includes(`tools.arggon.${name}`));
     check(
-      "the reviewer cannot run the worktree lifecycle (arggon.start/cleanup denied, W4 review)",
-      result.start === undefined &&
-        result.cleanup === undefined &&
-        /Unknown tool|Permission denied/.test(String(result.startError ?? "")) &&
-        /Unknown tool|Permission denied/.test(String(result.cleanupError ?? "")),
-      `${String(result.startError ?? "")} | ${String(result.cleanupError ?? "")}`.slice(0, 220),
+      "every mutating native tool is absent from the reviewer catalog",
+      leaked.length === 0,
+      `present: ${leaked.join(", ") || "none"}`,
     );
   }
   check(
     "the reviewer's shell gate denies git push (permission denied)",
-    shellDenied(session.stdout, "git push") || textContains(session.stdout, "Permission denied"),
+    shellDenied(session.stdout, "git push"),
     runTail(session),
   );
   check(
@@ -1628,8 +1761,23 @@ function main(): void {
   }
   console.log(`\nsmoke:opencode passed — ${fixtures.length} scenarios, 0 failures`);
   if (process.env.ARGON_SMOKE_KEEP !== "1") {
-    for (const f of fixtures) rmSync(f.dir, { recursive: true, force: true });
+    for (const f of fixtures) f.dispose();
   }
 }
 
-main();
+/**
+ * True when this module is the process entrypoint. The unit tests import the
+ * transcript parsers; without the guard that import would run the whole harness
+ * (spawning opencode, the CLI and fixtures) as a side effect.
+ */
+function isDirectRun(): boolean {
+  const entry = process.argv[1];
+  if (entry === undefined) return false;
+  try {
+    return realpathSync(entry) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isDirectRun()) main();
