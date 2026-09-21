@@ -2,7 +2,7 @@
 plan_id: native-first-011
 title: Plan for the native-first ArggonManager rebuild
 spec: ArggonManager/docs/specs/spec-native-first-011.md
-status: proposed
+status: implemented
 created: "2026-09-19"
 ---
 
@@ -85,6 +85,23 @@ ADR 0006 surfaces it touches.
   `context:report --strict`; finish packaging/release docs; tag.
 - **Acceptance:** ADR 0006 budgets within limits; dogfood scenarios green;
   release checklist executed.
+- **Recorded evidence (2026-09-21, `task-native-dogfood-release` / PR #381):**
+  this repo's tracked `.opencode` seam migrated with `arggon init` under the
+  provenance contract (created 10 / updated 15; `AGENTS.md` and
+  `CONTRIBUTING.md` stayed adopter-modified and untouched; a second run left
+  every content file byte-identical). Dogfood in real sessions over this repo:
+  Code Mode `tools.arggon.*` (14 visible to a worker session — `create` hidden
+  by the W4 deny), a headless tools session, `/arggon-status` expanded by the
+  V2 command loader, and the TUI board panel rendering the 277-item tree.
+  ADR 0006 re-measured with `context:report --strict` (exit 0): native tools
+  **11,821 B ≤ 12,288 B** (15 definitions, 9 pinned; the W4-era 106 B headroom
+  recovered by trimming redundant schema bytes, bound unchanged), item block
+  252 B ≤ 1,024 B, generated AGENTS.md 2,005 B ≤ 2,048 B, MCP `tools/list`
+  10,507 B. Gates: `npm test` 1,454 tests, lint/build/`check:plugin`,
+  `validate`/`spec validate`, `smoke:opencode` 26 scenarios / 0 failures,
+  `smoke:tui` 13/13, `smoke:opencode:wave` 0 failures. Release prep (notes +
+  runbook + checklist) is in the same PR; the version bump, tag and npm
+  publication stay with the product owner (`ArggonManager/docs/runbooks/release.md`).
 
 ## Risks and rollback
 
