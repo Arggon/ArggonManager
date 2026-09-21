@@ -144,3 +144,42 @@ Revisión del cierre W7 `task-native-dogfood-release`: 5 commits de trabajo (`b9
 ### 2026-09-21 @reviewer — Addendum: wave smoke reproducido
 
 El `smoke:opencode:wave` terminó después de publicar el veredicto: **2 fixtures / 0 failures, exit 0**, con todos los checks verdes (permisos allow/deny, fase 1 plan, fase 2 dos workers foreground con worktrees disjuntos, verdicts de reviewer, fase 4 merge + done + `arggon validate` green + push). Queda como reproducido por el reviewer; el `smoke:opencode` completo (26/0) sigue sin re-correr por mí — evidencia del worker con el flake de `/adopt` re-corrido limpio. El veredicto previo (**MERGE**, merge commit) no cambia.
+
+### 2026-09-21 @Arggon
+### Review findings closed (worker, 2026-09-21) — PR #381, head `604eb6d`
+
+The reviewer verdict was **MERGE** with non-blocking findings; all four are addressed in the PR (plus a merge of `origin/opencode2` that brings the verdict itself into this item copy — the tracker union keeps both comment sets and the claimed frontmatter).
+
+**F1 (media) — spec/plan status** (`1831820`)
+
+- `spec-native-first-011`: `proposed` → `implemented`; `plan-native-first-011`: `proposed` → `implemented`, plus the recorded W7 evidence block (task-opencode2-009 precedent style).
+- Rule: `ArggonManager/docs/agents.md` §Specs and plans — "when the feature lands, flip both statuses in the same PR as the implementation (never leave a shipped feature `proposed`)"; precedent `4c97ed3` (task-opencode2-009 closing).
+- Expected/observed: `arggon spec validate` ok; `arggon spec analyze` reports **0 findings for native-first-011** (it stays cited by the plan, so no "implemented spec nobody cites"; the 5 remaining ambiguity warnings are pre-existing in other specs).
+
+**F2 (low) — CHANGELOG wording** (`84617f7`)
+
+- Expected: the W3 "no shell blocks" claim matches the shipped commands. Observed: `/arggon-adopt` carries the sanctioned headless bootstrap (`npx arggon-manager init`, `adopt --ack`) and `/arggon-start` the explicit publish steps (`git push`, `gh pr create --draft`). The entry now names them instead of denying them.
+
+**F3 (low, reviewer decision: keep the workflow) — scoped events + self-bootstrap exclusion** (`3476686`)
+
+- `templates/docs/github/workflows/arggon.yml`: `on.push.branches: [main, opencode2]` + `pull_request` (comment tells adopters to adjust the list to their default branch(es)); the drift gate now excludes `.github/workflows/arggon.yml` from its comparison — a self-bootstrapping runner cannot be gated against its own pinned ref (its trigger/template change reaches that ref only after merge), which is exactly what made a template-changing PR red.
+- Regenerated with `npm run arggon -- init --no-commit` (not by hand): committed copy == marker + template (byte-identical, verified).
+- Fixture: `cli/src/headless-ci.test.ts` adds the matching assertion — a local edit of the vendored workflow must NOT fire the gate (and the AGENTS.md mutation must still fire it); `ArggonManager/docs/ci.md` documents the trigger scoping and the exclusion.
+- Expected/observed on this PR: before, a template-changing PR was red by construction; now `tasks-validate` on the PR event is **pass (33 s)** even though the committed workflow differs from the pinned ref's render.
+
+**F4 (info) — model-driven smokes** (`84617f7`)
+
+- "Model-driven and timing sensitive: run each one alone" documented in `docs/opencode2.md` (verify block), `docs/playbooks/opencode.md` (evidence section), `docs/agents.md` (evidence harness) and both harness headers (`smoke/opencode-smoke.ts`, `smoke/opencode-wave.ts`).
+
+**Gates (head `604eb6d`, after the review fixes)**
+
+- `npm test` 89 files / **1,454 tests** green · `npm run lint` clean · `npm run build` ok · `npm run check:plugin` exit 0
+- `arggon validate` ok (0 warnings) · `arggon spec validate` ok
+- `npm run context:report -- --strict` exit 0, `regressions: []`: native tools 11,821 B ≤ 12,288 B (15 definitions, 9 pinned), item block 252 B ≤ 1,024 B, AGENTS.md 2,005 B ≤ 2,048 B, MCP 10,507 B ≤ 12,288 B
+- `npm run smoke:opencode` **26 scenarios / 0 failures** (144 checks, exit 0) — run alone, no concurrent harness
+- CI on `604eb6d`: `cli` **pass** (3m57s) · `tasks-validate` **pass** (33s, PR event)
+
+**Open questions / notes**
+
+- The exclusion only removes the self-referential case: a PR that changes _command/agent/config_ templates is still red against the pinned moving `opencode2` ref until the change lands there — inherent to the ref-based gate; the post-release step pins `ARGGON_REF` to the tag (release runbook step 6).
+- Owner decisions unchanged and still pending: bump `0.3.0` → `0.4.0`, remove `private`, tag `v0.4.0`, `npm publish` both packages (kernel first), pin `ARGGON_REF`.
