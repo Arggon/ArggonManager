@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-cleanup-no-gh-ignored
 title: cleanup --no-gh ignores the flag (pre-existing)
+assignee: Arggon
+branch: fix/bug-cleanup-no-gh-ignored
 parent: native-redesign
 labels: []
 priority: p3
 created: "2026-09-20"
-updated: "2026-09-20"
+updated: "2026-09-21"
+claimed_at: "2026-09-21T21:39:11.767Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-cleanup-no-gh-ignored
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-cleanup-no-gh-ignored.md
