@@ -170,3 +170,7 @@ Mutation evidence (guard is not vacuous):
 | `arggon validate`      | ok, 0 warnings, convention v5                                                                |
 | `arggon spec validate` | ok, 18 docs, 0 warnings                                                                      |
 | PR #387 CI             | running at `a633352` (previous head was green; results reported in the handoff/next session) |
+
+### handoff 2026-09-21 @Arggon — next: Re-review PR #387 at a633352 (finding 1 fixed: both span ends padded, values byte-exact; finding 2: coverage limit documented + stability test added, mutation-tested). CI green. Merge with a merge co…
+- branch: fix/bug-formatter-glues-markdown-spaces
+- open questions: Acceptable that the pitfalls.md revert is not machine-caught (base is already prettier-stable)? Corpus indentation rule waits for task-code-span-repair-sweep.
