@@ -234,3 +234,6 @@ F1–F4 cerrados con evidencia independiente; gates y CI verdes. El único trade
 3. No marco done — el flip queda para después del merge.
 
 Sin bloqueos. Cierre: **MERGE**.
+
+### 2026-09-21 @Arggon
+Coordinator note: reviewer verified F1-F4 with independent evidence (0 glued tokens vs base; post-hook linkedWorkspaces with/without install; skill sync; count). Gates 1463 tests, lint/build/check:plugin/validate/spec; CI pass on 219195e. The formatter root cause is filed as bug-formatter-glues-markdown-spaces and the real resolution flip as task-start-worktree-lib-resolution. Merged with merge commit; item flipped to done.
