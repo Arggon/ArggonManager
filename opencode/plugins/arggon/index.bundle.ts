@@ -4425,12 +4425,15 @@ function runTrend(opts) {
     const tasksDir = location.dir;
     const root = location.repoRoot;
     const relTasks = (0, node_path_1.relative)(root, tasksDir).split(node_path_1.sep).join("/");
-    const pathspec = [relTasks, paths_js_1.LEGACY_TRACKER_DIR_NAME];
+    const execGit = opts.execGit ?? defaultExecGit;
+    const pathspec = [relTasks];
+    if (location.layout !== "legacy" && hasLegacyTrackerHistory(execGit, root)) {
+        pathspec.push(paths_js_1.LEGACY_TRACKER_DIR_NAME);
+    }
     const docsRel = (0, node_path_1.relative)(root, location.docsDir).split(node_path_1.sep).join("/");
     if (docsRel.startsWith(`${relTasks}/`)) {
         pathspec.push(`:(exclude)${docsRel}`);
     }
-    const execGit = opts.execGit ?? defaultExecGit;
     let out;
     try {
         out = execGit("git", ["log", "-p", "--no-color", "--no-ext-diff", "--format=%x1e%H%x1f%cI", "--", ...pathspec], { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
@@ -4510,6 +4513,15 @@ function runTrend(opts) {
     }))
         .sort((a, b) => (a.type < b.type ? -1 : a.type > b.type ? 1 : 0));
     return { weeks, cycleTime };
+}
+function hasLegacyTrackerHistory(execGit, root) {
+    try {
+        const out = execGit("git", ["log", "--format=%H", "-1", "--", `${paths_js_1.LEGACY_TRACKER_DIR_NAME}/${paths_js_1.CONVENTION_FILE_NAME}`], { cwd: root, encoding: "utf8", maxBuffer: 1024 * 1024 });
+        return out.trim().length > 0;
+    }
+    catch {
+        return false;
+    }
 }
 function parseSince(since) {
     if (since === undefined)
