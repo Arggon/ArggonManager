@@ -81,3 +81,6 @@ Left unchecked in the body so the coordinator closes it after CI/merge.
 ### handoff 2026-09-21 @Arggon (session: ses_f3a17cb2affebfr36BKg1Dk5CZ) — next: Review draft PR #383 (commit 45056fd + tracker commit): confirm the probe heuristic in lib/src/trend.ts and the regenerated plugin bundle; then merge (merge commit, tracker-carrying branch) once CI i…
 - branch: fix/bug-layout-trend-pathspec
 - open questions: docs/json-output.md line ~489 still says the trend mining is 'a single git log -p pass' (still true; the probe is a separate git log -1) — docs are owned by a parallel worker, so the sentence was lef…
+
+### 2026-09-21 @Arggon
+CI green on PR #383: `cli` pass (2m26s), `tasks-validate` pass (34s) — https://github.com/Arggon/ArggonManager/actions/runs/35658926382 . All acceptance criteria now evidenced: history-proof pathspec gate, regression test vs baseline, migrated-repo parity (F1), `arggon validate`/CI green. Item left in `in_progress` for the coordinator to complete after merge.
