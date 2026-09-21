@@ -52,14 +52,25 @@ source), but the tests that spawn the real CLI resolve it through
 `ERR_MODULE_NOT_FOUND`. CI runs `npm ci` → `npm run build` → `npm test`
 ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
-`arggon start <id> --worktree` links the primary checkout's `node_modules` into
-the worktree, so inside a worktree `@arggon/lib` (and every other workspace
-package) resolves to the **primary** checkout's build: work that changes `lib/`
-must either build where the imports resolve, or give the worktree its own
-install — `x-worktree.post-start: npm ci` in `ArggonManager/.convention.yml`
-reifies the workspace links locally (and its `prepare` builds them). `arggon
-start --worktree` reports the shadowed packages in `linkedWorkspaces` (`--json`,
-see [`ArggonManager/docs/json-output.md`](ArggonManager/docs/json-output.md)) and on stdout.
+`arggon start <id> --worktree` prepares a fresh worktree for the project gate
+and for worktree-local resolution: when the primary checkout has a
+`node_modules` and the worktree does not, start mirrors the primary install as a
+**link farm** (a real `node_modules` directory whose entries link the primary's
+packages). A workspace package the worktree carries its own copy of — here
+`@arggon/lib` — resolves to the **worktree copy**: start runs that package's own
+`build` script before the claim commit when the copy has no build output yet, so
+the pre-commit gate loads the branch's kernel. A copy that could not be built
+stays on the primary's install and is reported in `linkedWorkspaces` (`--json`,
+see [`ArggonManager/docs/json-output.md`](ArggonManager/docs/json-output.md)) and
+on stdout; the worktree-local builds are reported on stdout too. A full
+worktree-local install is still the npm-native alternative: `npm ci`, or
+`x-worktree.post-start: npm ci` in `ArggonManager/.convention.yml`, reifies the
+workspace links locally and its `prepare` builds them.
+
+Rebuild after changing `lib/`: the worktree's spawned CLI and the tests that
+launch it resolve `@arggon/lib` through `node_modules` → `lib/dist`
+(`npm run build --workspace @arggon/lib`), and the flip means the worktree's own
+build is what runs.
 
 ## Propose schema / convention changes
 
