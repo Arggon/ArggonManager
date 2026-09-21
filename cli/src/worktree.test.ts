@@ -1274,3 +1274,153 @@ describe("arggon cleanup", () => {
     expect(calls()).toHaveLength(1);
   });
 });
+
+describe("start --worktree flips workspace packages to the worktree copy (task-start-worktree-lib-resolution)", () => {
+  /** A built copy of the workspace package: its declared entry file. */
+  function writeEntry(dir: string): void {
+    mkdirSync(join(dir, "lib", "dist"), { recursive: true });
+    writeFileSync(join(dir, "lib", "dist", "index.js"), "module.exports = 1;\n");
+  }
+
+  /**
+   * The repo's own shape with a real build: `lib/` committed with a `build`
+   * script that produces the declared entry, plus the npm workspace link in the
+   * primary install. `built` also writes the primary's build output (gitignored,
+   * so a fresh worktree does not carry it), which is what a gate that falls back
+   * to the primary's copy resolves.
+   */
+  function addBuildableWorkspacePackage(
+    dir: string,
+    opts: { build?: string | null; built?: boolean } = {},
+  ): void {
+    addWorkspaceLink(dir, "@arggon", "lib", "lib");
+    mkdirSync(join(dir, "lib"), { recursive: true });
+    const manifest: Record<string, unknown> = {
+      name: "@arggon/lib",
+      version: "1.0.0",
+      main: "dist/index.js",
+    };
+    if (opts.build !== null) {
+      manifest.scripts = {
+        build: opts.build ?? "mkdir -p dist && echo module.exports = 1 > dist/index.js",
+      };
+    }
+    writeFileSync(join(dir, "lib", "package.json"), JSON.stringify(manifest));
+    writeFileSync(join(dir, ".gitignore"), "node_modules/\ndist/\n");
+    if (opts.built) writeEntry(dir);
+    git(["add", "lib", ".gitignore"], dir);
+    git(["commit", "--quiet", "-m", "workspace package"], dir);
+  }
+
+  /**
+   * The documented gate stand-in: it records where the CLI resolves
+   * `@arggon/lib` from the worktree, and fails the commit when it cannot
+   * resolve at all.
+   */
+  function setResolutionGate(dir: string): void {
+    setPreCommitHook(
+      dir,
+      "#!/bin/sh\n" +
+        "node -e \"require('fs').writeFileSync('.gate-resolution', require.resolve('@arggon/lib'))\" || exit 1\n",
+    );
+  }
+
+  it("resolves the workspace package to the worktree copy and runs the gate against it", () => {
+    const dir = initRepo();
+    addBuildableWorkspacePackage(dir);
+    setResolutionGate(dir);
+    const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    expect(result.linkedNodeModules).toBe(true);
+    expect(result.builtWorkspaces).toEqual(["@arggon/lib"]);
+    expect(result.linkedWorkspaces).toEqual([]);
+    expect(result.committed).toBe(true);
+    // The gate ran BEFORE the claim commit and loaded the worktree's own build:
+    // this is the flip, not a documented limitation.
+    expect(readFileSync(join(expectedPath, ".gate-resolution"), "utf8")).toBe(
+      join(expectedPath, "lib", "dist", "index.js"),
+    );
+    // The install is a link farm (a real directory, ignored by the repo's
+    // node_modules/ pattern) whose workspace entry points at the worktree copy.
+    expect(lstatSync(join(expectedPath, "node_modules")).isSymbolicLink()).toBe(false);
+    expect(readlinkSync(join(expectedPath, "node_modules", "@arggon", "lib"))).toBe(
+      join(expectedPath, "lib"),
+    );
+    expect(git(["status", "--porcelain"], expectedPath)).not.toContain("node_modules");
+    // The claim commit still stages only the item file.
+    expect(git(["show", "--name-only", "--format=", "HEAD"], expectedPath).trim()).toBe(
+      "ArggonManager/launch/auth/login/task-alpha.md",
+    );
+  });
+
+  it("keeps the primary's copy and reports it when the worktree copy cannot be built", () => {
+    const dir = initRepo();
+    addBuildableWorkspacePackage(dir, { build: null, built: true });
+    setResolutionGate(dir);
+    const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    expect(result.builtWorkspaces).toEqual([]);
+    // The unbuilt copy has no build script to run: it stays on the primary's
+    // copy, and the report keeps the requirement visible.
+    expect(result.linkedWorkspaces).toEqual(["@arggon/lib"]);
+    expect(result.committed).toBe(true);
+    expect(readFileSync(join(expectedPath, ".gate-resolution"), "utf8")).toBe(
+      join(dir, "lib", "dist", "index.js"),
+    );
+  });
+
+  it("falls back to the primary's copy when the local build fails, and the claim still lands", () => {
+    const dir = initRepo();
+    addBuildableWorkspacePackage(dir, { build: "exit 1", built: true });
+    setResolutionGate(dir);
+    const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    expect(result.builtWorkspaces).toEqual([]);
+    expect(result.linkedWorkspaces).toEqual(["@arggon/lib"]);
+    expect(result.committed).toBe(true);
+    expect(readFileSync(join(expectedPath, ".gate-resolution"), "utf8")).toBe(
+      join(dir, "lib", "dist", "index.js"),
+    );
+  });
+
+  it("cleanup --prune removes a farm worktree without following its entries", () => {
+    const dir = initRepo();
+    addBuildableWorkspacePackage(dir);
+    addFakeDependency(dir, "fake-gate-dep");
+    const started = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    const wt = started.worktreePath!;
+    expect(started.builtWorkspaces).toEqual(["@arggon/lib"]);
+
+    // Close the item on its branch and merge it, so cleanup can prune.
+    runUpdate({ cwd: wt, id: "task-alpha", status: "done", now: NOW });
+    git(["add", "ArggonManager"], wt);
+    git(["commit", "--quiet", "-m", "close task-alpha"], wt);
+    git(["merge", "--quiet", "feat/task-alpha"], dir);
+
+    const cleanup = runCleanup({ cwd: dir, prune: true, noGh: true });
+
+    expect(cleanup.failures).toEqual([]);
+    expect(existsSync(wt)).toBe(false);
+    // Removing the farm never followed its entries into the primary install.
+    expect(existsSync(join(dir, "node_modules", "fake-gate-dep", "index.js"))).toBe(true);
+    expect(existsSync(join(dir, "lib", "package.json"))).toBe(true);
+  });
+});
