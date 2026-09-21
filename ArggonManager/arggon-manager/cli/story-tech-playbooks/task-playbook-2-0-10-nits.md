@@ -35,6 +35,10 @@ Non-blocking nits from the PR #373 review (`task-playbook-opencode-2-0-10`):
 - [ ] Pin statements refreshed outside the accepted set: `docs/adr/0011` §7,
       `ArggonManager/docs/specs/spec-native-first-011.md` ("Pinned runtime
       2.0.10") and `ArggonManager/docs/plans/plan-native-first-011.md`.
+- [ ] `exploration-opencode2-native-010` F4.1 (:244) still says "pin 2.0.10" —
+      refresh it with the tensions line.
+- [ ] `opencode.md:451,458` prettier de-indents 2 continuation lines (base was
+      clean) — same family as `bug-formatter-glues-markdown-spaces`.
 - [ ] The playbook's Context budgets snapshot matches `context:report --json`
       after the W7 trim + PR #384 skill sync (11.821 / 25.275 / 12.885+19.604).
 
