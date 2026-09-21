@@ -112,3 +112,54 @@ denies git push` in two independent runs: the reviewer model _declines_ to
 ### handoff 2026-09-21 @Arggon — next: Review PR #378 (draft) against the W5 acceptance and gates; if green, merge with a MERGE commit (the branch carries tracker auto-commits) and flip task-native-tui to done. Evidence to re-check: npm r…
 - branch: feat/task-native-tui
 - open questions: smoke:opencode W4 'reviewer shell gate denies git push' flaked twice because the model declines the push (fixture has no origin remote) — file a W6/W7 follow-up to plant an origin or relax the check?…
+
+### 2026-09-21 @Arggon
+**Reviewer verdict — PR #378 (independent audit).** Reviewed at PR head `3e3c75d` (worktree `ArggonManager-opencode2-task-native-tui`), base `opencode2`, CI `cli` run `35609904681` = success on that SHA.
+
+**Verdict: NO-MERGE as-is (changes requested) — 1 blocking finding (P1). Everything else in the W5 acceptance is verified green. Do not mark done; merge with a merge commit, never squash.**
+
+## P1 (blocking) — `boardSnapshot()` throws on a corrupt tracker, contradicting the item's "never throws" scope
+
+- `opencode/plugins/arggon/board.ts:147`: `itemsById(kernelItems)` is **outside** the `try` that wraps `findTasksDir`/`loadItems` (lines 132–145). `itemsById` throws `Duplicate id '…' under the tracker` (`lib/src/items.ts:306`).
+- Real-runtime repro (PTY, opencode 2.0.12): fresh `init` fixture + two items with `id: dup`, API session, `opencode -s <ses>` in a pty, type `/arggon-board` → the host shows `Plugin arggon.tui crashed in slot session.panel: Duplicate id 'dup' under the tracker (…/two.md and …/one.md)`; the `arggon board` panel never renders. The session survives (host-contained), but the board/status surface is dead until the tree is fixed.
+- Direct repro through the vendored bundle (no runtime needed): `boardSnapshot(root)` throws (`/tmp/opencode/tui-probe/dup-probe.ts`, fixture `/tmp/board-dupe-bL85qb`).
+- Expected by the module contract ("never throws … a missing/corrupt tracker degrades to an empty snapshot with a human reason, and the panel keeps rendering"): `board.test.ts` only covers the no-tracker case, so the claim is untested for the corrupt case.
+- Fix (small): move `itemsById` (or the whole snapshot assembly) inside the guarded block and return an `error` snapshot on any read failure; add a regression test with duplicate ids.
+
+## P2 (decision the coordinator must close) — runtime drift 2.0.12 vs the pinned 2.0.10
+
+The playbook frontmatter still pins `version: 2.0.10`; all W5 probes, `smoke:tui` and the manual checklist ran on the local **2.0.12** (documented in the playbook). The upgrade policy asks for a pin refresh + A/B re-probe on a new 2.x. CI does not run `smoke:tui`, so the pinned runtime has **no** W5 end-to-end evidence. Decide explicitly before/with merge: refresh the pin to 2.0.12 (record the import A/B probe) or accept the documented drift.
+
+## What I verified (reproduced, not taken from the checklist text)
+
+- `npm run smoke:tui`: 11/11 ok — fresh init (both entrypoints vendored, no `node_modules`), 4-item tree, plugin discovery, API session, PTY `/arggon-board`, captured panel + palette entry, no plugin load failure.
+- Independent PTY probes (own harness: `/tmp/opencode/tui-probe/`, raw captures + a minimal VT emulator): open 120×40 renders header + 4-row tree; **60×20** renders clipped, no crash; **`esc`** closes and the final screen is the session view; **`f`** moves the header from row 2 col 61 → row 1 col 1 (full-screen); **sidebar at 200 cols** shows `arggon ▶ task-probe-task todo` on a `feat/<id>` branch and `arggon · 1 ready · next …` without an active item.
+- Hostile bytes: `sanitizeHumanTextUncapped` (C0/DEL/C1 + U+2028/29) applied to every repo-controlled field; unit tests cover ANSI/OSC/newline injection.
+- Display-only: board.ts imports only read APIs (`findTasksDir`, `loadItems`, `itemsById`, `openDependencies`, `runNext`, `sanitize…`); the no-write unit test passes.
+- Feature detection + failure isolation: every optional surface (`ui.slot`, `ui.panel.open`, `ui.toast.show`, `keymap.layer`, `data.location.vcs.info`) is optional-chained and try/caught, `setup` returns a noop disposer on failure, `panel.open → false` becomes a toast (unit-tested).
+- Bundle: rebuild byte-identical (`check:plugin`, 39 modules, 326,046 B); the wrapper forwards every named value export `tui.tsx` imports (`ARGON_BOARD_PANEL`, `boardSnapshot`, `boardTreeLines`, `sidebarStatusLine`, …); bundle loads dependency-less in a temp dir.
+- Type gate `cli/tsconfig.plugin.json` strict (`index.ts` + `board.ts`; `@arggon/lib` → `lib/src/index.ts`, build-independent) passes.
+- Provenance/parity: `init` stamps `tui.tsx` (`// arggon:generated template="…"`), byte-parity + idempotent refresh asserted in `init-opencode.test.ts`; `.gitignore` covers the derived copy.
+- Gates: `npm test` 1437 passed / 1 failed, `lint`, `build`, `check:plugin`, `arggon validate` (v5, 0 warnings), `context:report -- --strict` all bounds pass with the claimed bytes (AGENTS 2,005 B; native 12,182 B; MCP 10,507 B; item block 252 B).
+  - The 1 failure is `cli/src/measure.test.ts` "[…] /tmp hygiene" (`/tmp/arggon-budget-*` leftover): flake from a concurrent run — isolated rerun green (11/11), file untouched by the PR, CI green on the same SHA. Pre-existing, not W5.
+- Scope: only W5 files; no W6/W7 changes, no server-plugin behavior change beyond the additive export block.
+
+## P3 (non-blocking notes / possible follow-ups)
+
+- `board.ts:306-312`: `sidebarStatusLine` reimplements the kernel's ready predicate (todo + unassigned + task/bug + no open deps) instead of reusing `isClaimable`/`isReady`; it matches `runNext` today but can silently drift from the kernel.
+- `tui.tsx` is deliberately outside the strict type gate (no `solid-js` dep); eslint runs on it and smoke covers the load, but the 282-line wiring has no static type check. Feasible: map `solid-js`/`@opentui/solid/*` to the stub in `cli/tsconfig.plugin.json` and include the file.
+- No in-repo regeneration/drift test for the derived `.opencode/plugins/arggon/tui.tsx` (only `index.ts` is self-healed in `plugin-copy.test.ts`); the copy in this worktree is unstamped (harmless, gitignored) but it is a stale-dogfood trap for W7.
+- `moduleValueExports` now forwards all 46 named value exports of the bundle entry (internals such as `sessionToken`, `setBounded` included). Inert, but it widens the vendored module's surface; an allowlist would keep it a board API.
+- `BoardItem.blockedReason` is populated but never rendered (dead field).
+- Prettier reformatting churn in `README.md`/`opencode2.md`/`playbook` — harmless noise.
+
+## Not verified by me
+
+- `ctrl+g` and the home-screen toast end-to-end (palette entry is smoke-asserted; binding + `panel.open → false` toast are unit-tested).
+- Anything on the pinned 2.0.10 (see P2).
+
+## Recommendation
+
+Request changes for P1 (one-line guard + regression test). After that, W5 is mergeable: merge commit (never squash), then the coordinator flips `task-native-tui` to done — I did not.
+
+*Note: the MCP `arggon_*` tools are unusable in this environment (global `arggon` 0.3.0 does not resolve the v5 tracker: `No tasks/ convention found`); this verdict was posted with the repo's local CLI, auto-committed on `feat/task-native-tui`.*
