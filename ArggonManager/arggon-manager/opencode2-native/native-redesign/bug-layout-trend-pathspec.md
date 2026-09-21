@@ -33,13 +33,13 @@ Post-merge residual from the PR #371 review (W0, `task-native-layout-rename`):
 
 ## Acceptance
 
-- [ ] The legacy `tasks` pathspec is included only when its history records
+- [x] The legacy `tasks` pathspec is included only when its history records
       `tasks/.convention.yml` (or the dir is otherwise proven to be a legacy
       tracker), so an unrelated `tasks/` cannot contribute.
-- [ ] Regression test: v5 tree + unrelated `tasks/` with item-like frontmatter
+- [x] Regression test: v5 tree + unrelated `tasks/` with item-like frontmatter
       → trend unchanged vs the no-`tasks/` baseline.
-- [ ] Migrated-repo trend parity test (F1) still green.
-- [ ] `arggon validate` green; CI green.
+- [x] Migrated-repo trend parity test (F1) still green.
+- [x] `arggon validate` green; CI green.
 
 ## Notes
 
