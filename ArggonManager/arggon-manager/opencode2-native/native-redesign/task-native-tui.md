@@ -279,3 +279,6 @@ Runtime drift (2.0.12 vs pin 2.0.10) is already filed as
 **MERGE** with a merge commit (never squash); the coordinator then flips `task-native-tui` to done. I did not mark it done.
 
 *Posted with the repo's local CLI because the MCP `arggon_*` tools cannot resolve the v5 tracker in this environment (global `arggon` 0.3.0); auto-committed on `feat/task-native-tui`.*
+
+### 2026-09-21 @Arggon
+Coordinator note: P1 verified fixed with independent direct+PTY probes (duplicate-id fixture → error snapshot, panel renders 'tracker unreadable', no host crash) and P3s all closed (kernel ready predicate, strict type gate, derived-copy parity, 5-name bundle allowlist, blockedReason). Gates 1444 tests, lint/build/check:plugin/validate/spec, smoke:tui 13/13, budget within ADR 0006; CI pass. Merged with merge commit; item flipped to done.
