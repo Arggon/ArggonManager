@@ -75,3 +75,7 @@ Capability snapshot (plugin C, `c-capability.json`): `app.version` 2.0.12; `perm
 - Stale pin statements outside the accepted file set: `docs/adr/0011-native-first-architecture.md` §7 ("Pin OpenCode 2.0.10"), `docs/specs/spec-native-first-011.md` ("Pinned runtime — OpenCode 2.0.10") and `docs/plans/plan-native-first-011.md` (risk note). The 2.0.10 refresh left them too; candidates for a nit follow-up.
 - The playbook's Context budgets snapshot is stale after W7's schema trim and the PR #384 skill sync: it says native `arggon` definitions 12,182 B / `fixedTotalBytes` 25,636 B / umbrella 11,942 B + references 18,100 B, while `npm run context:report -- --json` now reports 11,821 B / 25,275 B / umbrella 12,885 B + references 19,604 B (all bounds still pass). Not touched here.
 - `opencode mcp list` inside the /tmp fixture printed `No MCP servers configured` on a first run and listed the machine's global servers later, while the session connects them; recorded as a probe note in Testing so the next probe does not over-trust it as negative evidence.
+
+### handoff 2026-09-21 @Arggon — next: Coordinator review of draft PR #386 (docs-only pin refresh + A/B re-probe); no follow-up code expected. Merge with a merge commit (tracker auto-commits on this branch).
+- branch: feat/task-playbook-opencode-2-0-12
+- open questions: Transcripts are fixture-local (/tmp/opencode/opencode-plugin-import-probe-212/.smoke-evidence); stale pin refs (ADR 0011, spec/plan 011) and Context-budgets numbers flagged in my comment.
