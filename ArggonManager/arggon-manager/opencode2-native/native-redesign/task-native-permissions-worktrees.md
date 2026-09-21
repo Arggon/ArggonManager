@@ -110,3 +110,6 @@ The code matches its docstring: discardWorktree gets no branch on the stale/bran
 
 ### Verdict: MERGE
 No blocking findings remain at 4f9b88a. Merge with a MERGE commit — never squash. Item stays in_progress until the coordinator merges; I am not marking it done.
+
+### 2026-09-21 @Arggon
+Coordinator note: S1/S2 verified with independent repros (rollback ownership; attach guard on a foreign repo), reviewer denies the mutating tools, cleanup unlinks node_modules, payload docs contrasted against envelopes. Gates 1416 tests, lint/build/check:plugin, validate, spec, smoke 26/0, budget within ADR 0006; CI pass on 4f9b88a and dd3238b. Merged with merge commit; item flipped to done.
