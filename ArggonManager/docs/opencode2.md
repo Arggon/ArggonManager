@@ -194,6 +194,13 @@ npm run smoke:tui             # TUI evidence on a real runtime: init seam, plugi
 npm run context:report --strict   # context budgets: AGENTS.md, MCP schemas, item block, keep.tokens
 ```
 
+`smoke:opencode` and `smoke:opencode:wave` are **model-driven and timing
+sensitive**: run them on their own, without a concurrent test suite or another
+headless harness (a loaded machine can stall a provider call past the per-command
+timeout and leave a scenario half-done). The deterministic gates (`npm test`,
+lint/build/`check:plugin`, `validate`) are safe to run in parallel; `smoke:tui`
+is model-free and cheap.
+
 ## Side-by-side installs
 
 Both branches declare the same `arggon` bin (`package.json` → `./dist/cli.js`),

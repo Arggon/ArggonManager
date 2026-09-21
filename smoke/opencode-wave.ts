@@ -66,6 +66,11 @@
  * Deliberately NOT part of `npm test`: CI has no `opencode` binary. Run with
  * `npm run smoke:opencode:wave`; set `ARGON_SMOKE_KEEP=1` to keep fixtures even
  * on success, `OPENCODE_WAVE_MODEL` to pick another model.
+ *
+ * Model-driven and timing sensitive: run it ALONE. The wave is a chain of
+ * foreground subagent sessions; a concurrent test suite or another headless
+ * harness can stall a provider call past the per-command timeout and leave a
+ * phase half-done (deterministic gates are safe to run in parallel).
  */
 import { spawnSync } from "node:child_process";
 import {

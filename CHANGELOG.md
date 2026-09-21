@@ -21,8 +21,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
     typed tool errors and the session continues.
   - **Eleven native commands** (`/arggon-next`, `-start`, `-done`, `-handoff`,
     `-review`, `-status`, `-spec`, `-adr`, `-explore`, `-playbook`, and the new
-    `/arggon-adopt`) that drive the tools directly — no CLI-driving prose, no
-    shell blocks.
+    `/arggon-adopt`) that drive the tools directly instead of shelling out to
+    the adapter. Two of them keep sanctioned shell steps by design: `/arggon-adopt`
+    runs the headless bootstrap (`npx arggon-manager init`, `adopt --ack`) and
+    `/arggon-start` publishes the branch (`git push`, `gh pr create --draft`).
   - **Vendored single-file plugin** (`.opencode/plugins/arggon/index.ts`, the
     kernel inlined, no `node_modules` needed in the adopter tree) and the
     **TUI board/status panel** (`.opencode/plugins/arggon/tui.tsx`,

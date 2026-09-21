@@ -394,7 +394,12 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   generated permissions active (a real `arggon-worker` session) and the
   reviewer gates (tool denied, `git push` denied, inspection still working))
   and exits 0 with
-  `skipped: opencode not installed` when the binary is absent. The plugin's pure parsers/block builder are unit-tested without
+  `skipped: opencode not installed` when the binary is absent. Both this
+  harness and the orchestration wave (`npm run smoke:opencode:wave`,
+  `docs/agents.md` §Orchestration) are **model-driven and timing sensitive: run
+  each one alone** — a concurrent suite or another headless harness can stall a
+  provider call past the per-command timeout and leave a scenario half-done
+  (deterministic gates are safe to run in parallel). The plugin's pure parsers/block builder are unit-tested without
   OpenCode next to the source (`opencode/plugins/arggon/index.test.ts`, run by
   the suite via the `opencode/**/*.test.ts` vitest include); the native tool
   namespace adds a contract suite (`opencode/plugins/arggon/tools.test.ts`)
