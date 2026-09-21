@@ -384,6 +384,16 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     expect(restore.status, restore.stderr).toBe(0);
     expect(runStep(DRIFT_STEP, fixture).status).toBe(0);
 
+    // The runner's own file is excluded from the comparison (bootstrap runner:
+    // its template change only reaches the pinned ref after merge, so gating it
+    // would fail every trigger/template edit's own PR); a local edit there must
+    // not fire the gate. Its step bodies are exercised verbatim above.
+    const workflowPath = join(fixture, WORKFLOW_DEST);
+    writeFileSync(workflowPath, `${readFileSync(workflowPath, "utf8")}\n# local trigger edit\n`);
+    expect(runStep(DRIFT_STEP, fixture).status).toBe(0);
+    const restoreWorkflow = git(["checkout", "--", WORKFLOW_DEST], fixture);
+    expect(restoreWorkflow.status, restoreWorkflow.stderr).toBe(0);
+
     // N3 hardening: the gate activates on any committed provenance marker, not
     // on the state file alone — untrack the state file and it must still fire.
     const untrack = git(["rm", "--cached", "ArggonManager/.convention.yml"], fixture);

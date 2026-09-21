@@ -9,7 +9,16 @@
 name: arggon
 
 on:
+  # Cheap (~30-60 s) but deliberately scoped: the drift gate below compares the
+  # committed seam against the pinned `ARGGON_REF`, so the job must not run on
+  # every topic-branch push or tracker auto-commit (adjust the branch list to
+  # YOUR default branch(es); pull requests always run it so a stale seam is
+  # caught before merge). The runner's own file is excluded from the comparison
+  # (see the drift-gate step): a self-bootstrapping workflow cannot be gated
+  # against the pinned ref, because its own template change only reaches that
+  # ref after merge.
   push:
+    branches: [main, opencode2]
   pull_request:
 
 env:
@@ -59,9 +68,13 @@ jobs:
             exit 0
           fi
           # `init` refreshes the per-doc generatedAt bookkeeping on every run,
-          # so the state file is excluded; every other generated file must be
+          # so the state file is excluded. The runner's own file is excluded
+          # too: it bootstraps itself (its template change only reaches the
+          # pinned ref after merge, so gating it would make every trigger edit
+          # fail its own PR) and its step bodies are exercised verbatim by
+          # `cli/src/headless-ci.test.ts`. Every other generated file must be
           # byte-identical to what the pinned ref generates.
-          dirty=$(git status --porcelain -- . ':(exclude)ArggonManager/.convention.yml' ':(exclude)tasks/.convention.yml')
+          dirty=$(git status --porcelain -- . ':(exclude)ArggonManager/.convention.yml' ':(exclude)tasks/.convention.yml' ':(exclude).github/workflows/arggon.yml')
           if [ -n "$dirty" ]; then
             echo "the committed arggon seam predates the pinned ref — run 'arggon init' and commit:"
             echo "$dirty"
