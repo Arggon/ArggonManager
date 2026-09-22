@@ -143,3 +143,35 @@ El fix = `lib/LICENSE` + `lib/package.json` + `package-lock.json` (0 código, 0 
 **MERGE — confirmado (merge commit, nunca squash).** Después: el item queda `in_progress` hasta el tag `v0.4.0` + publish kernel-first + pin `ARGGON_REF: v0.4.0` (follow-up).
 
 *Publicado con el CLI local (los `tools.arggon.*` no resuelven el tracker v5 en esta sesión); comentario auto-commiteado en `opencode2`.*
+
+### 2026-09-22 @Arggon
+### Review verdict (ronda 3) — PR #396 · head revisado `837f9a54` · base `opencode2` (draft)
+
+**NO-MERGE (request changes).** El rename a `@arggondev/lib` está completo y es un rename puro verificado (128 archivos, bundle +18 B, 0 cambios de comportamiento), pero quedan dos bloqueantes chicos: un alias de vitest sin renombrar (los tests ya no resuelven el kernel a `lib/src`) y CI rojo (`tasks-validate`) por el paso de install del workflow contra el ref pinneado.
+
+## F1 (bloqueante, 1 línea) — `vitest.config.ts:12`: alias del kernel sin renombrar
+
+`find: /^@arggon\/lib$/` sigue apuntando al specifier viejo; 75 archivos bajo `cli/src` importan `@arggondev/lib`, así que el alias no matchea (`/^@arggon\/lib$/.test("@arggondev/lib")` → `false`). Consecuencia verificada en clon limpio (`npm ci` 0, luego `mv lib/dist` fuera): `npx vitest run cli/src/atomic-config-writers.test.ts` → `Error: Failed to resolve entry for package "@arggondev/lib". The package may have incorrect main/module/exports specified in its package.json.` La resolución cae por `node_modules/@arggondev/lib` → `lib/dist/index.js` (`node --input-type=module -e "import.meta.resolve('@arggondev/lib')"` → `.../lib/dist/index.js`), no a `lib/src/index.ts` como prometen el comentario de la config (`vitest.config.ts:6-9`) y el docstring de `cli/src/lib.test.ts` ("vitest resolves `@arggondev/lib` to the source entry, so no build is required"). Hoy la suite pasa porque `npm ci` corre `prepare` y construye `dist/`, pero el contrato "tests contra fuente, sin build previo" quedó roto y un cambio en `lib/src` sin rebuild se testea contra `dist` viejo en silencio. **Fix:** `find: /^@arggondev\/lib$/`. Es el único ref stale que queda: `git grep -n "@arggon/lib"` → 0 y `git grep -nE 'arggon\\/lib'` → 1 hit (esta línea).
+
+## F2 (bloqueante) — CI `tasks-validate` rojo: el workflow empaqueta `@arggondev/lib` contra `ARGGON_REF: opencode2` (pre-rename)
+
+Run `35715647962` (head `837f9a54`): el job clona `opencode2` y ejecuta el step del head `npm pack --workspace @arggondev/lib` → `npm error No workspaces found: --workspace=@arggondev/lib` (el clone sigue con `@arggon/lib`: su build imprime `> @arggon/lib@0.4.0 build`), exit 1. El job `cli` run `35715647897` **pass** (4m17s, `check:plugin` incluido). Es transicional (post-merge el ref pinneado ya tiene el nombre nuevo), pero el PR no queda verde como está: el archivo del workflow está excluido del drift gate por self-bootstrapping y el paso de install necesita la misma tolerancia. **Fix sugerido (verificado en npm 12.0.2 y npm 10.9.4):** pack por path + glob tolerante — `npm pack --workspace lib --pack-destination "$RUNNER_TEMP/arggon-packs"` y `npm install -g "$RUNNER_TEMP/arggon-packs"/*-lib-*.tgz "$RUNNER_TEMP/arggon-packs"/arggon-manager-*.tgz` (npm acepta path como workspace y el glob matchea ambos nombres). Alternativa: decisión explícita del owner/coord de mergear con ese job rojo transicional y verificarlo post-merge; sin eso, CI no está verde.
+
+## Verificado (worktree head `837f9a54` + clon limpio)
+
+- **Rename puro:** normalizando `arggondev`→`arggon` en los 128 archivos del diff (`origin/opencode2...HEAD`), solo difieren 5: `.convention.yml` (bookkeeping de init: arggonVersion 0.4.0 + generatedAt), ADR 0013 (enmienda), `package-lock.json` (línea `license: MIT` del root, sync con el package.json ya mergeado), `docs/json-output.md` (reflow de tabla de prettier) y el body del item (handles `arggondev` históricos). Cero cambios de comportamiento; `index.bundle.ts` 338.601 B = 338.583 del base + 18 B (6 ocurrencias × 3 chars; 0 refs viejas en el bundle).
+- **Gates:** `npm test` **92 files / 1498 passed, 0 failed, 0 skipped**; `headless bootstrap + CI (packed install)` **(6) passed** (corren con el tarball nuevo, no skipean). `npm run build` 0 · `npm run check:plugin` 0 (bundle sin drift; `git status --porcelain` vacío) · `npm run lint` 0 · `arggon validate --json` `{errors:[],warnings:[]}` (layout `arggon-manager`, conventionVersion 5) · `arggon spec validate` ok (18 docs, 0 warnings) · `arggon --version` → `0.4.0 (837f9a54, feat/task-release-0-4-0-scope)` (tsx y dist compilado).
+- **Pack/publish:** lib `arggondev-lib-0.4.0.tgz` **79 files / 124.325 B (124.3 kB)**, LICENSE presente, 0 `.test.`; root `arggon-manager-0.4.0.tgz` **109 files / 334.705 B (334.7 kB)**, LICENSE presente, 0 `.test.` (clavan los números del PR). `npm publish --dry-run -w @arggondev/lib`: *"Publishing to https://registry.npmjs.org/ with tag latest and **public access**"*.
+- **Lock/install:** clon limpio `npm ci` exit 0 y `lib/dist/index.js` construido; `node_modules/@arggondev/lib` es el único scope linkeado (0 `@arggon` stale, también en el worktree); `npm ls @arggondev/lib` → `arggon-manager@0.4.0 └── @arggondev/lib@0.4.0 -> ./lib`.
+- **ADR 0013:** enmienda presente (`Amendment (2026-09-22)`: nombre publicado, scope `@arggon` no disponible, "The architecture is unchanged"); header y cuerpo renombrados; sin cambios de arquitectura.
+- **Scope:** base `opencode2`, PR draft; sin tag `v0.4.0` (local v0.2.0/v0.3.0; origin 0) ni pasos de publish nuevos (solo `.github/workflows/arggon.yml` renombrado); sin merge a `main`. Item `in_progress` con acceptance sin tildar (correcto: tag/publish/pin pendientes).
+- **CI:** `cli` pass (`35715647897`); `tasks-validate` fail (`35715647962`, ver F2).
+
+## No verificado / residual
+
+- Tag/publish reales (bloqueados por el scope npm; fuera de alcance por diseño).
+- Windows: fixtures `skipIf(win32)` por diseño.
+- Residual menor (preexistente, no de este PR): `ADR 0013:40` y `ArggonManager/docs/ci.md:24,26` siguen diciendo `^0.3.0` mientras `package.json` declara `^0.4.0`; conviene corregirlo en el follow-up pre-publish.
+- Residual local (no viaja al repo): las copias vendoreadas `.agents/skills/*` se renombraron a mano; `arggon init --dry-run` las reporta `modified-skip` (checksums 0.3.0) y `doctor` da 5 modified vs 2 del base. `.agents/skills/` es gitignored y el drift gate de CI no las mira.
+
+**NO-MERGE (request changes): F1 + F2 antes del merge; ambos son de una línea / un step.** Al reanudar: fix del alias, re-correr gates y CI; después merge commit (nunca squash). El item queda `in_progress` (tag `v0.4.0` + publish kernel-first + pin `ARGGON_REF: v0.4.0` siguen pendientes).
