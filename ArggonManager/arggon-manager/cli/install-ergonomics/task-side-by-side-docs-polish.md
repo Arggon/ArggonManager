@@ -47,14 +47,37 @@ merged as `bc6291e`):
 
 ## Acceptance
 
-- [ ] `docs/opencode2.md` distinguishes rebuild (Option A) vs reinstall/repack
+- [x] `docs/opencode2.md` distinguishes rebuild (Option A) vs reinstall/repack
       (Option B) in the dev bootstrap paragraph.
-- [ ] Option B notes the npm-12 script-blocking caveat (build/install order).
-- [ ] `.gitignore` covers `mise.local.toml`, or the docs no longer imply it is
+- [x] Option B notes the npm-12 script-blocking caveat (build/install order).
+- [x] `.gitignore` covers `mise.local.toml`, or the docs no longer imply it is
       an in-tree file.
-- [ ] `arggon validate` green; docs-only diff.
+- [x] `arggon validate` green; docs-only diff.
 
 ## Notes
 
 - Superseded if `task-native-capability-audit` drops the CLI install story
   (`opencode2-native` epic); cancel with a comment in that case.
+
+### 2026-09-22 @Arggon
+**Evidencia worker** — branch `feat/task-side-by-side-docs-polish`, commit `856512b`.
+
+Cambios (docs-only + tracker):
+- `ArggonManager/docs/opencode2.md` § Dev checkout bootstrap, separado por opción: A rebuild (`npm run build`; el wrapper executa el dist del checkout); B reinstall/repack (`--install-links`; ningún rebuild del checkout alcanza la copia congelada).
+- Option B: bullet **npm 12 script caveat** — orden build/install, `npm install` primero (root prepare construye) o `--allow-scripts=file:$PWD`, y el path de tarball del README raíz como install soportado.
+- `.gitignore`: `mise.local.toml` + comentario (docs siguen recomendando keep it out of git).
+- § Verify: el ejemplo de `plugin.list` aclara que es una entrada entre los builtins (F3).
+
+Extra (flag al reviewer): en el mismo párrafo, la frase "tsc emite dist/cli.js a 644" era falsa tras task-npm-packaging — el `postbuild` chmoda a 0755 (verificado: `stat -c %a dist/cli.js` → 755) y el README raíz ya lo documenta. La reescribí junto con F1; si se considera fuera de alcance es un revert de ~3 líneas.
+
+Gates (worktree):
+- `npm test` → 92 files / 1498 tests passed
+- `npm run lint` → clean
+- `npm run arggon -- validate` → ok (0 warnings, convention v5)
+- `npm run arggon -- spec validate` → ok (18 docs, 0 warnings)
+
+Evidencia npm 12 (probe aislado /tmp/opencode/npm12-probe, npm 12.0.2):
+- checkout sin construir + `npm install -g --prefix <p> .` → exit 0 + `npm warn install-scripts … (prepare: node build.js)`; sin `dist/` y sin `<p>/bin`.
+- `npm install` en el checkout → root `prepare` corre y construye `dist/`.
+- `npm ci` → también corre el `prepare` raíz (reconstruyó `dist/` tras borrarlo).
+- tras construir, `npm install -g --prefix <p2> .` → bin symlink presente y ejecuta.
