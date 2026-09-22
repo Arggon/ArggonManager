@@ -40,18 +40,19 @@ inline. Trivial items (one-line fixes, doc tweaks) stay inline. Full rules:
 
 `arggon start <id> --worktree` claims, creates (or attaches to) the worktree at
 `../<repo-name>-<id>`, runs the claim commit/push inside it, and records
-`worktree_path` on the item. Start prepares the worktree first — it links the
-primary checkout's `node_modules` when the worktree lacks one, so the repo's
-pre-commit gate can run (the link is untracked and start never commits it; it is
-removed before a configured `x-worktree.post-start` hook runs, so `npm ci`
-cannot reify through it and empty the primary install) — and a failure after
-creation keeps the worktree and branch instead of deleting them (the error names
-the failing step, path and remediation; re-running attaches). The linked install
-is the primary's, so workspace packages the worktree also carries
-(`node_modules/@arggon/lib -> ../../lib`) resolve into the primary copy: the
-spawned CLI/tests then run the primary's build. `start --worktree` names them as
-`linkedWorkspaces` in `--json` (re-read after the hook); a worktree that must use
-its own copy needs a real local install (`npm ci`, e.g. via
+`worktree_path` on the item. Start prepares the worktree first — it mirrors the
+primary checkout's `node_modules` as a per-worktree link farm when the worktree
+lacks an install, so the repo's pre-commit gate can run (start never commits the
+install; it is removed before a configured `x-worktree.post-start` hook runs, so
+`npm ci` cannot reify through it and empty the primary install) — and a failure
+after creation keeps the worktree and branch instead of deleting them (the error
+names the failing step, path and remediation; re-running attaches). The workspace
+packages the worktree also carries (`node_modules/@arggon/lib -> ../../lib`) are
+pointed at the worktree copy and pre-built with the package's own `build` script
+before the claim commit when their declared entry is missing, so the spawned
+CLI/tests run the branch's build; a copy that could not be built keeps the
+primary's copy and is named by `linkedWorkspaces` in `--json` (re-read after the
+hook). A worktree that must use a full local install can run `npm ci` (e.g. via
 `x-worktree.post-start: npm ci`). Move the session into that path
 (`session_move` in OpenCode V2) so every later command runs there. When the work
 is merged, `arggon cleanup` lists stale worktrees and `--prune` removes them.

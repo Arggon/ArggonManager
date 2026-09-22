@@ -4,6 +4,7 @@ import { basename, join, relative, resolve, sep } from "node:path";
 import {
   LEGACY_TRACKER_DIR_NAME,
   TRACKER_DIR_NAME,
+  buildLocalWorkspaces,
   findTasksDir,
   itemsById,
   linkNodeModules,
@@ -25,7 +26,12 @@ import {
  * share the ownership rule. Re-exported here for the CLI surface (and its
  * tests), which keeps importing them from `./start.js`.
  */
-export { linkNodeModules, linkedWorkspacePackages, unlinkNodeModulesLink } from "@arggon/lib";
+export {
+  buildLocalWorkspaces,
+  linkNodeModules,
+  linkedWorkspacePackages,
+  unlinkNodeModulesLink,
+} from "@arggon/lib";
 import { runBranch, type GitRunner } from "./branch.js";
 
 export type StartOptions = {
@@ -73,31 +79,42 @@ export type StartResult = {
   /** True when the worktree was created this run; false on attach or without --worktree. */
   worktreeCreated: boolean;
   /**
-   * True when `--worktree` linked the primary checkout's `node_modules` into
-   * the worktree this run (bug-start-worktree-node-modules): a fresh worktree
-   * has no dependencies, so the documented pre-commit gate
-   * (`npm run arggon -- validate`) would fail with ERR_MODULE_NOT_FOUND and
-   * the claim commit could never land. Best-effort: false when the primary has
-   * no `node_modules`, the worktree already has one, the link could not be
-   * created, or the start ran without `--worktree`.
+   * True when `--worktree` prepared the worktree's install this run
+   * (bug-start-worktree-node-modules): a fresh worktree has no dependencies, so
+   * the documented pre-commit gate (`npm run arggon -- validate`) would fail
+   * with ERR_MODULE_NOT_FOUND and the claim commit could never land. Best-effort:
+   * false when the primary has no `node_modules`, the worktree already has an
+   * install, the install could not be created, or the start ran without
+   * `--worktree`.
    */
   linkedNodeModules: boolean;
   /**
-   * Workspace packages the worktree's install resolves into the **primary**
-   * checkout (W6/PR-374 review finding 2), e.g. `["@arggon/lib"]` in this repo:
-   * the worktree's spawned CLI/tests then run the primary's kernel build even
-   * though the worktree carries its own copy. Reported so the requirement is
-   * visible — build where the imports resolve, or give the worktree its own
+   * Workspace packages the worktree's install still resolves into the **primary**
+   * checkout (W6/PR-374 finding 2), e.g. `["@arggon/lib"]` in this repo. Start
+   * links the primary install as a per-worktree link farm, so a workspace
+   * package the worktree owns is pointed at the worktree copy and built before
+   * the claim-commit gate (`builtWorkspaces`); only packages that could not be
+   * flipped land here (no local build output and no build script, a failed
+   * build, or an install that could not be farmed). Reported so the requirement
+   * is visible — build where the imports resolve, or give the worktree its own
    * install (`npm ci`, e.g. via `x-worktree.post-start: npm ci`).
    *
    * Describes the state the worktree is LEFT in: recomputed after a configured
    * `x-worktree.post-start` hook, so a hook that reifies a local install
-   * reports `[]` (the pre-hook link only ever existed for the claim-commit
-   * gate window — PR #384 review F2). Empty when the worktree has no install,
+   * reports `[]` (the pre-hook farm only ever existed for the claim-commit gate
+   * window — PR #384 review F2). Empty when the worktree has no install,
    * resolves locally, or has no shadowed workspace package; set on attach runs
-   * too (the link may predate this run).
+   * too (the install may predate this run).
    */
   linkedWorkspaces: string[];
+  /**
+   * Workspace packages start built in the worktree and pointed at the worktree
+   * copy (task-start-worktree-lib-resolution), e.g. `["@arggon/lib"]`. The
+   * worktree's spawned CLI then loads the worktree's kernel instead of the
+   * primary's build. Empty without a worktree, when every local copy is already
+   * importable, or when no local copy could be built.
+   */
+  builtWorkspaces: string[];
   /**
    * `x-worktree.post-start` outcome (task-start-post-hook): set only when a
    * new worktree was created, a hook is configured, and `--no-hook` was not
@@ -523,6 +540,7 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
       worktreeCreated: false,
       linkedNodeModules: false,
       linkedWorkspaces: [],
+      builtWorkspaces: [],
       item: branch.item,
     };
   });
@@ -606,13 +624,16 @@ type WorktreeStartInput = {
  * `worktree_path` record, claim commit, push, and the optional draft PR from
  * INSIDE the worktree. The main checkout stays on its current branch and clean.
  * The worktree is prepared for the project gate first (the primary checkout's
- * `node_modules` is linked in when the worktree lacks one —
- * bug-start-worktree-node-modules); the link is removed before a configured
- * post-start hook runs (so `npm ci` cannot reify through it and empty the
- * primary install) and re-created only when the hook leaves no `node_modules`.
- * A failure after the worktree exists NEVER rolls it back: the worktree and
- * branch are kept, and the error names the failing step, the kept path, the
- * remediation, and the attach re-run.
+ * install is linked in when the worktree lacks one —
+ * bug-start-worktree-node-modules), as a link farm that points the workspace
+ * packages the worktree owns at the worktree copy; those copies are built
+ * before the claim commit so the gate resolves them worktree-locally
+ * (task-start-worktree-lib-resolution). The install is removed before a
+ * configured post-start hook runs (so `npm ci` cannot reify through it and
+ * empty the primary install) and re-created only when the hook leaves no
+ * `node_modules`. A failure after the worktree exists NEVER rolls it back: the
+ * worktree and branch are kept, and the error names the failing step, the kept
+ * path, the remediation, and the attach re-run.
  */
 function startInWorktree(input: WorktreeStartInput): StartResult {
   const { id, item, assignee, root, gitRunner, opts } = input;
@@ -659,10 +680,20 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
   let step = "preparing the worktree";
   let linkedNodeModules = false;
   let linkedWorkspaces: string[] = [];
+  let builtWorkspaces: string[] = [];
   try {
     linkedNodeModules = linkNodeModules(root, worktreePath);
-    // Reported regardless of who created the link: on attach runs the install
-    // (and its resolution) is still the primary's.
+    // Pre-build the worktree's own copies of the workspace packages the install
+    // shadows (task-start-worktree-lib-resolution): a fresh worktree has no
+    // build output, and without this the claim-commit gate would load the
+    // primary's kernel. Best-effort — a copy that could not be built stays on
+    // the primary's install and is reported by `linkedWorkspaces` below.
+    step = "building the worktree's workspace packages";
+    builtWorkspaces = buildLocalWorkspaces(root, worktreePath);
+    // Resolution report (W6/PR-374 finding 2): recomputed at the end too, so a
+    // post-start hook that reifies a local install is reflected in the returned
+    // state (PR #384 review F2).
+    step = "preparing the worktree";
     linkedWorkspaces = linkedWorkspacePackages(root, worktreePath);
 
     // All item writes and git steps run from the worktree from here on.
@@ -767,6 +798,7 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       worktreeCreated,
       linkedNodeModules,
       linkedWorkspaces,
+      builtWorkspaces,
       postStart,
       item: finalItem,
     };

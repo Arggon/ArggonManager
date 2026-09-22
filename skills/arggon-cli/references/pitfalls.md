@@ -52,36 +52,40 @@ agents in this codebase — read before mutating the tracker or merging.
 ## Repo hygiene and staging
 
 - **Worktree starts prepare and keep the worktree** (bug-start-worktree-node-modules):
-  `start --worktree` links the primary checkout's `node_modules` into a fresh
-  worktree before the claim commit (additive `linkedNodeModules` in `--json`), so
-  the wired pre-commit gate runs there — the old manual `git worktree add` +
-  `ln -s` + re-run dance is gone. The link is untracked and NOT ignored
-  (`node_modules/` matches directories only); start never commits it (the claim
-  commit stages only the item file), and before a configured
-  `x-worktree.post-start` hook runs start removes the link so `npm ci` cannot
-  reify through it and empty the primary install, re-linking only when the hook
-  leaves no `node_modules`. A failure after the worktree exists never rolls
+  `start --worktree` prepares a fresh worktree's install before the claim commit
+  (additive `linkedNodeModules` in `--json`), so the wired pre-commit gate runs
+  there — the old manual `git worktree add` + `ln -s` + re-run dance is gone. The
+  install mirrors the primary checkout's `node_modules` as a link farm (a real
+  directory whose entries link the primary's packages; a bare symlink when the
+  worktree shadows no workspace package), and start never commits it (the claim
+  commit stages only the item file). Before a configured
+  `x-worktree.post-start` hook runs start removes the install so `npm ci` cannot
+  reify through it and empty the primary install, re-creating it only when the
+  hook leaves no `node_modules`. A failure after the worktree exists never rolls
   it back: the worktree and branch survive, the error names the failing step, path
   and remediation, and re-running `start --worktree` attaches and retries the
   failed claim commit (a failed push is the exception: push it manually, as the
   error says). Hooks are never bypassed. Discard an unwanted worktree with
   the command the error prints (`git worktree remove --force <path>`, plus
   `git branch -D <branch>` when start created the branch).
-- **A linked worktree resolves workspace packages into the PRIMARY checkout.**
-  The linked `node_modules` is the primary's whole install, so npm/workspace
-  links inside it (`node_modules/@arggon/lib -> ../../lib`) resolve to the
-  primary's copy even though the worktree carries its own: the spawned CLI and
-  tests run the primary's build (stale when the worktree's copy differs,
-  `ERR_MODULE_NOT_FOUND` when the primary was never built). `start --worktree`
-  reports the shadowed packages as `linkedWorkspaces` in `--json` (plus a stdout
-  note) — re-read after the `x-worktree.post-start` hook, so a hook that installs
-  locally (the recommended `npm ci`) reports `[]`. To work against the worktree's
-  own copy, give it a real local install (`npm ci`) instead of relying on the
-  link; otherwise build where the imports resolve.
+- **A worktree resolves workspace packages to its OWN copy, and reports the
+  exceptions.** `start --worktree` points every workspace package the worktree
+  also carries (`node_modules/@arggon/lib` shape) at the worktree copy and
+  pre-builds it with the package's own `build` script when its declared entry is
+  missing (the built names are printed on stdout), so the spawned CLI and tests
+  run the branch's build instead of the primary's. Every such package with a
+  `build` script is pre-built by default — deliberately, because a local copy is
+  preferred whenever it exists and a failed build falls back visibly (a
+  per-invocation opt-out is a candidate follow-up, not a flag today). A copy that
+  could not be built — no `build` script, a failing build, or no declared entry —
+  keeps the primary's copy and is reported as `linkedWorkspaces` in `--json`
+  (plus a stdout note), re-read after the `x-worktree.post-start` hook so a hook
+  that installs locally (the recommended `npm ci`) reports `[]`. To force a full
+  worktree-local install instead, run `npm ci` there.
 - **Stage explicit paths — never `git add -A` / `git add .`.** Directory patterns
-  like `node_modules/` match directories only, so in worktrees where `node_modules`
-  is a SYMLINK to a shared install it is untracked-but-not-ignored and `-A`
-  commits it. Explicit paths also protect against sweeping unrelated dirty files
+  like `node_modules/` match directories only, so a `node_modules` SYMLINK to a
+  shared install is untracked-but-not-ignored and `-A` commits it (a start-created
+  link farm is a real directory, so the pattern does cover that case). Explicit paths also protect against sweeping unrelated dirty files
   into your commit. Tracker mutations stage surgically (`git add -- <path>` only);
   your own commits should do the same.
 - A stale `dist` after a pull → `unknown option` errors: rebuild

@@ -2188,8 +2188,8 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
 exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.unlinkNodeModulesLink = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.runSync = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = void 0;
+exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.unlinkNodeModulesLink = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.runSync = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2325,8 +2325,14 @@ Object.defineProperty(exports, "classifyCleanupEntry", { enumerable: true, get: 
 Object.defineProperty(exports, "defaultCleanupGit", { enumerable: true, get: function () { return cleanup_js_1.defaultCleanupGit; } });
 Object.defineProperty(exports, "findMergedPr", { enumerable: true, get: function () { return cleanup_js_1.findMergedPr; } });
 var worktree_js_1 = require("./worktree.js");
+Object.defineProperty(exports, "buildLocalWorkspaces", { enumerable: true, get: function () { return worktree_js_1.buildLocalWorkspaces; } });
 Object.defineProperty(exports, "linkNodeModules", { enumerable: true, get: function () { return worktree_js_1.linkNodeModules; } });
 Object.defineProperty(exports, "linkedWorkspacePackages", { enumerable: true, get: function () { return worktree_js_1.linkedWorkspacePackages; } });
+Object.defineProperty(exports, "localWorkspacePackages", { enumerable: true, get: function () { return worktree_js_1.localWorkspacePackages; } });
+Object.defineProperty(exports, "packageBuildScript", { enumerable: true, get: function () { return worktree_js_1.packageBuildScript; } });
+Object.defineProperty(exports, "packageEntryExists", { enumerable: true, get: function () { return worktree_js_1.packageEntryExists; } });
+Object.defineProperty(exports, "packageEntryPaths", { enumerable: true, get: function () { return worktree_js_1.packageEntryPaths; } });
+Object.defineProperty(exports, "pointWorkspaceAtLocal", { enumerable: true, get: function () { return worktree_js_1.pointWorkspaceAtLocal; } });
 Object.defineProperty(exports, "unlinkNodeModulesLink", { enumerable: true, get: function () { return worktree_js_1.unlinkNodeModulesLink; } });
 var import_issues_js_1 = require("./import-issues.js");
 Object.defineProperty(exports, "runImportIssues", { enumerable: true, get: function () { return import_issues_js_1.runImportIssues; } });
@@ -5538,16 +5544,209 @@ function formatValidateHuman(result) {
 __arggonModules.set("lib/src/worktree.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.packageEntryPaths = packageEntryPaths;
+exports.packageEntryExists = packageEntryExists;
+exports.packageBuildScript = packageBuildScript;
+exports.localWorkspacePackages = localWorkspacePackages;
 exports.linkNodeModules = linkNodeModules;
 exports.unlinkNodeModulesLink = unlinkNodeModulesLink;
+exports.pointWorkspaceAtLocal = pointWorkspaceAtLocal;
+exports.buildLocalWorkspaces = buildLocalWorkspaces;
 exports.linkedWorkspacePackages = linkedWorkspacePackages;
+const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
+const LINK_FARM_MARKER = ".arggon-link-farm";
+function isInside(parent, child) {
+    return child === parent || child.startsWith(`${parent}${node_path_1.sep}`);
+}
+function packageManifest(pkgDir) {
+    try {
+        const parsed = JSON.parse((0, node_fs_1.readFileSync)((0, node_path_1.join)(pkgDir, "package.json"), "utf8"));
+        return parsed !== null && typeof parsed === "object"
+            ? parsed
+            : null;
+    }
+    catch {
+        return null;
+    }
+}
+function packageEntryPaths(pkgDir) {
+    const manifest = packageManifest(pkgDir);
+    if (!manifest)
+        return [];
+    const entries = [];
+    const collect = (value) => {
+        if (typeof value === "string") {
+            entries.push(value);
+            return;
+        }
+        if (value === null || typeof value !== "object")
+            return;
+        const record = value;
+        for (const condition of ["import", "default", "require", "node"])
+            collect(record[condition]);
+    };
+    const exportsField = manifest.exports;
+    if (typeof exportsField === "string")
+        collect(exportsField);
+    else if (exportsField !== null && typeof exportsField === "object") {
+        const record = exportsField;
+        collect("." in record ? record["."] : record);
+    }
+    if (entries.length === 0) {
+        if (typeof manifest.main === "string")
+            entries.push(manifest.main);
+        else
+            entries.push("index.js");
+    }
+    return [...new Set(entries.map((entry) => (0, node_path_1.resolve)(pkgDir, entry)))];
+}
+function packageEntryExists(pkgDir) {
+    const entries = packageEntryPaths(pkgDir);
+    return entries.length > 0 && entries.some((entry) => (0, node_fs_1.existsSync)(entry));
+}
+function packageBuildScript(pkgDir) {
+    const scripts = packageManifest(pkgDir)?.scripts;
+    if (scripts === null || typeof scripts !== "object")
+        return undefined;
+    const build = scripts.build;
+    return typeof build === "string" && build.trim().length > 0 ? build : undefined;
+}
+function primaryWorkspaceLinks(primaryRoot) {
+    const links = new Map();
+    let primary;
+    try {
+        primary = (0, node_fs_1.realpathSync)(primaryRoot);
+    }
+    catch {
+        return links;
+    }
+    const modules = (0, node_path_1.join)(primary, "node_modules");
+    const consider = (name, link) => {
+        try {
+            if (!(0, node_fs_1.lstatSync)(link).isSymbolicLink())
+                return;
+            const target = (0, node_path_1.resolve)((0, node_fs_1.realpathSync)((0, node_path_1.dirname)(link)), (0, node_fs_1.readlinkSync)(link));
+            if (!isInside(primary, target) || isInside(modules, target))
+                return;
+            const rel = (0, node_path_1.relative)(primary, target);
+            if (rel === "")
+                return;
+            links.set(name, { target, relativePath: rel.split(node_path_1.sep).join("/") });
+        }
+        catch {
+        }
+    };
+    let entries;
+    try {
+        entries = (0, node_fs_1.readdirSync)(modules, { withFileTypes: true });
+    }
+    catch {
+        return links;
+    }
+    for (const entry of entries) {
+        if (entry.name.startsWith("."))
+            continue;
+        const path = (0, node_path_1.join)(modules, entry.name);
+        if (entry.name.startsWith("@")) {
+            let members;
+            try {
+                members = (0, node_fs_1.readdirSync)(path, { withFileTypes: true });
+            }
+            catch {
+                continue;
+            }
+            for (const member of members) {
+                if (member.name.startsWith("."))
+                    continue;
+                consider(`${entry.name}/${member.name}`, (0, node_path_1.join)(path, member.name));
+            }
+            continue;
+        }
+        consider(entry.name, path);
+    }
+    return links;
+}
+function localWorkspacePackages(primaryRoot, worktreePath) {
+    return localPackagesFromLinks(primaryWorkspaceLinks(primaryRoot), worktreePath);
+}
+function localPackagesFromLinks(links, worktreePath) {
+    const packages = [];
+    for (const [name, link] of links) {
+        const path = (0, node_path_1.join)(worktreePath, link.relativePath);
+        if (!(0, node_fs_1.existsSync)(path))
+            continue;
+        packages.push({ name, path, relativePath: link.relativePath });
+    }
+    return packages.sort((a, b) => a.name.localeCompare(b.name));
+}
+function linkEntry(source, to) {
+    let type = "file";
+    try {
+        if ((0, node_fs_1.statSync)(source).isDirectory()) {
+            type = process.platform === "win32" ? "junction" : "dir";
+        }
+    }
+    catch {
+    }
+    (0, node_fs_1.symlinkSync)(source, to, type);
+}
+function createLinkFarm(target, link, workspaceLinks, locals) {
+    const overrides = new Map();
+    for (const pkg of locals) {
+        if (packageEntryExists(pkg.path))
+            overrides.set(pkg.name, pkg.path);
+    }
+    const sourceFor = (name, from) => overrides.get(name) ?? workspaceLinks.get(name)?.target ?? from;
+    try {
+        (0, node_fs_1.mkdirSync)(link, { recursive: true });
+    }
+    catch {
+        return false;
+    }
+    try {
+        for (const entry of (0, node_fs_1.readdirSync)(target, { withFileTypes: true })) {
+            const from = (0, node_path_1.join)(target, entry.name);
+            if (entry.name.startsWith("@")) {
+                let members;
+                try {
+                    members = (0, node_fs_1.readdirSync)(from, { withFileTypes: true });
+                }
+                catch {
+                    linkEntry(from, (0, node_path_1.join)(link, entry.name));
+                    continue;
+                }
+                (0, node_fs_1.mkdirSync)((0, node_path_1.join)(link, entry.name), { recursive: true });
+                for (const member of members) {
+                    const name = `${entry.name}/${member.name}`;
+                    linkEntry(sourceFor(name, (0, node_path_1.join)(from, member.name)), (0, node_path_1.join)(link, entry.name, member.name));
+                }
+                continue;
+            }
+            linkEntry(sourceFor(entry.name, from), (0, node_path_1.join)(link, entry.name));
+        }
+        (0, node_fs_1.writeFileSync)((0, node_path_1.join)(link, LINK_FARM_MARKER), `${(0, node_path_1.resolve)(target)}\n`);
+        return true;
+    }
+    catch {
+        try {
+            (0, node_fs_1.rmSync)(link, { recursive: true, force: true });
+        }
+        catch {
+        }
+        return false;
+    }
+}
 function linkNodeModules(primaryRoot, worktreePath) {
     const target = (0, node_path_1.join)(primaryRoot, "node_modules");
     const link = (0, node_path_1.join)(worktreePath, "node_modules");
     if (!(0, node_fs_1.existsSync)(target) || (0, node_fs_1.existsSync)(link))
         return false;
+    const workspaceLinks = primaryWorkspaceLinks(primaryRoot);
+    const locals = localPackagesFromLinks(workspaceLinks, worktreePath);
+    if (locals.length > 0 && createLinkFarm(target, link, workspaceLinks, locals))
+        return true;
     try {
         (0, node_fs_1.symlinkSync)(target, link, process.platform === "win32" ? "junction" : "dir");
         return true;
@@ -5556,34 +5755,124 @@ function linkNodeModules(primaryRoot, worktreePath) {
         return false;
     }
 }
+function ownedLinkFarm(primaryRoot, worktreePath) {
+    const link = (0, node_path_1.join)(worktreePath, "node_modules");
+    try {
+        if ((0, node_fs_1.lstatSync)(link).isSymbolicLink())
+            return null;
+        const marker = (0, node_fs_1.readFileSync)((0, node_path_1.join)(link, LINK_FARM_MARKER), "utf8").trim();
+        if (marker.length === 0)
+            return null;
+        if ((0, node_path_1.resolve)(marker) !== (0, node_path_1.resolve)((0, node_path_1.join)(primaryRoot, "node_modules")))
+            return null;
+        return link;
+    }
+    catch {
+        return null;
+    }
+}
 function unlinkNodeModulesLink(primaryRoot, worktreePath) {
     const target = (0, node_path_1.resolve)((0, node_path_1.join)(primaryRoot, "node_modules"));
     const link = (0, node_path_1.join)(worktreePath, "node_modules");
+    let isLink;
     try {
-        if (!(0, node_fs_1.lstatSync)(link).isSymbolicLink())
+        isLink = (0, node_fs_1.lstatSync)(link).isSymbolicLink();
+    }
+    catch {
+        return false;
+    }
+    if (isLink) {
+        try {
+            if ((0, node_path_1.resolve)((0, node_path_1.dirname)(link), (0, node_fs_1.readlinkSync)(link)) !== target)
+                return false;
+        }
+        catch {
             return false;
-        if ((0, node_path_1.resolve)((0, node_path_1.dirname)(link), (0, node_fs_1.readlinkSync)(link)) !== target)
-            return false;
+        }
+        try {
+            (0, node_fs_1.unlinkSync)(link);
+            return true;
+        }
+        catch {
+            try {
+                (0, node_fs_1.rmdirSync)(link);
+                return true;
+            }
+            catch {
+                return false;
+            }
+        }
+    }
+    if (ownedLinkFarm(primaryRoot, worktreePath) === null)
+        return false;
+    try {
+        (0, node_fs_1.rmSync)(link, { recursive: true, force: true });
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
+function pointWorkspaceAtLocal(primaryRoot, worktreePath, name) {
+    const link = ownedLinkFarm(primaryRoot, worktreePath);
+    if (link === null)
+        return false;
+    const local = localWorkspacePackages(primaryRoot, worktreePath).find((pkg) => pkg.name === name);
+    if (!local)
+        return false;
+    const entry = (0, node_path_1.join)(link, ...name.split("/"));
+    const staged = `${entry}.arggon-new`;
+    try {
+        (0, node_fs_1.unlinkSync)(staged);
+    }
+    catch {
+    }
+    try {
+        linkEntry(local.path, staged);
     }
     catch {
         return false;
     }
     try {
-        (0, node_fs_1.unlinkSync)(link);
+        (0, node_fs_1.renameSync)(staged, entry);
         return true;
     }
     catch {
         try {
-            (0, node_fs_1.rmdirSync)(link);
-            return true;
+            (0, node_fs_1.unlinkSync)(staged);
         }
         catch {
-            return false;
         }
+        return false;
     }
 }
-function isInside(parent, child) {
-    return child === parent || child.startsWith(`${parent}${node_path_1.sep}`);
+function defaultWorkspaceBuildRunner(pkgDir) {
+    const npm = process.platform === "win32" ? "npm.cmd" : "npm";
+    (0, node_child_process_1.spawnSync)(npm, ["run", "build"], {
+        cwd: pkgDir,
+        encoding: "utf8",
+        stdio: ["ignore", "pipe", "pipe"],
+    });
+}
+function buildLocalWorkspaces(primaryRoot, worktreePath, deps = {}) {
+    const runBuild = deps.runBuild ?? defaultWorkspaceBuildRunner;
+    const built = [];
+    for (const pkg of localWorkspacePackages(primaryRoot, worktreePath)) {
+        try {
+            if (packageEntryExists(pkg.path))
+                continue;
+            if (packageBuildScript(pkg.path) === undefined)
+                continue;
+            runBuild(pkg.path);
+            if (!packageEntryExists(pkg.path))
+                continue;
+            if (pointWorkspaceAtLocal(primaryRoot, worktreePath, pkg.name))
+                built.push(pkg.name);
+        }
+        catch {
+        }
+    }
+    return built;
 }
 function linkedWorkspacePackages(primaryRoot, worktreePath) {
     const names = [];

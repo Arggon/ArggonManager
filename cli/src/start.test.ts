@@ -12,7 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCreate, runUpdate } from "@arggon/lib";
+import { buildLocalWorkspaces, pointWorkspaceAtLocal, runCreate, runUpdate } from "@arggon/lib";
 import { runInit } from "./init.js";
 import {
   linkNodeModules,
@@ -387,5 +387,158 @@ describe("linkedWorkspacePackages (W6/PR-374 review finding 2)", () => {
     const bareWt = mkdtempSync(join(tmpdir(), "arggon-linked-bare-"));
     expect(linkedWorkspacePackages(primary, bareWt)).toEqual([]);
     expect(linkedWorkspacePackages(join(primary, "missing"), wt)).toEqual([]);
+  });
+});
+
+/**
+ * The worktree resolution flip (task-start-worktree-lib-resolution): the
+ * install is a link farm whose workspace entries point at the worktree copy
+ * once that copy is importable, pre-built before the claim-commit gate.
+ */
+describe("worktree link farm (task-start-worktree-lib-resolution)", () => {
+  /** The repo's own workspace shape: `lib/` + `node_modules/@arggon/lib -> ../../lib`. */
+  function addWorkspacePair(primary: string, wt: string, manifest: Record<string, unknown>): void {
+    for (const root of [primary, wt]) {
+      mkdirSync(join(root, "lib"), { recursive: true });
+      writeFileSync(join(root, "lib", "package.json"), JSON.stringify(manifest));
+    }
+    mkdirSync(join(primary, "node_modules", "@arggon"), { recursive: true });
+    const link = join(primary, "node_modules", "@arggon", "lib");
+    if (!existsSync(link)) symlinkSync("../../lib", link, "dir");
+  }
+
+  /** An ordinary primary dependency, to prove non-workspace entries still link. */
+  function addDependency(primary: string, name: string): void {
+    const dep = join(primary, "node_modules", name);
+    mkdirSync(dep, { recursive: true });
+    writeFileSync(join(dep, "index.js"), "module.exports = true;\n");
+  }
+
+  function writeEntry(root: string): void {
+    writePackageEntry(join(root, "lib"));
+  }
+
+  /** The declared entry file of a package copy (`dist/index.js`). */
+  function writePackageEntry(pkgDir: string): void {
+    mkdirSync(join(pkgDir, "dist"), { recursive: true });
+    writeFileSync(join(pkgDir, "dist", "index.js"), "module.exports = 'local';\n");
+  }
+
+  it("flips a local copy that is already importable and links the rest from the primary", () => {
+    const primary = mkdtempSync(join(tmpdir(), "arggon-farm-primary-"));
+    const wt = mkdtempSync(join(tmpdir(), "arggon-farm-wt-"));
+    addWorkspacePair(primary, wt, { name: "@arggon/lib", main: "dist/index.js" });
+    addDependency(primary, "commander");
+    writeEntry(wt); // the worktree copy is built already
+
+    expect(linkNodeModules(primary, wt)).toBe(true);
+
+    const farm = join(wt, "node_modules");
+    // A real directory (a `node_modules/` ignore pattern matches it, so git
+    // stays clean) whose workspace entry points at the worktree copy.
+    expect(lstatSync(farm).isSymbolicLink()).toBe(false);
+    expect(readlinkSync(join(farm, "@arggon", "lib"))).toBe(join(wt, "lib"));
+    // Ordinary dependencies still resolve to the primary install.
+    expect(existsSync(join(farm, "commander", "index.js"))).toBe(true);
+    // Nothing is left resolving into the primary.
+    expect(linkedWorkspacePackages(primary, wt)).toEqual([]);
+  });
+
+  it("keeps the primary's copy while the local copy has no build output", () => {
+    const primary = mkdtempSync(join(tmpdir(), "arggon-farm-empty-primary-"));
+    const wt = mkdtempSync(join(tmpdir(), "arggon-farm-empty-wt-"));
+    addWorkspacePair(primary, wt, { name: "@arggon/lib", main: "dist/index.js" });
+
+    expect(linkNodeModules(primary, wt)).toBe(true);
+    // Never a dangling package: the entry points at the primary's own copy (not
+    // at the install's own symlink, so the shadowing stays detectable).
+    expect(readlinkSync(join(wt, "node_modules", "@arggon", "lib"))).toBe(join(primary, "lib"));
+    expect(linkedWorkspacePackages(primary, wt)).toEqual(["@arggon/lib"]);
+  });
+
+  it("builds a local copy and flips the entry, and reports what it could not build", () => {
+    const primary = mkdtempSync(join(tmpdir(), "arggon-build-primary-"));
+    const wt = mkdtempSync(join(tmpdir(), "arggon-build-wt-"));
+    addWorkspacePair(primary, wt, {
+      name: "@arggon/lib",
+      main: "dist/index.js",
+      scripts: { build: "tsc -p tsconfig.json" },
+    });
+    expect(linkNodeModules(primary, wt)).toBe(true);
+    expect(linkedWorkspacePackages(primary, wt)).toEqual(["@arggon/lib"]);
+
+    const built = buildLocalWorkspaces(primary, wt, {
+      runBuild: (pkgDir) => writePackageEntry(pkgDir),
+    });
+
+    expect(built).toEqual(["@arggon/lib"]);
+    expect(readlinkSync(join(wt, "node_modules", "@arggon", "lib"))).toBe(join(wt, "lib"));
+    expect(linkedWorkspacePackages(primary, wt)).toEqual([]);
+
+    // A failing build (or one that does not produce the declared entry) leaves
+    // the primary's copy in place and reports the package.
+    const failing = mkdtempSync(join(tmpdir(), "arggon-build-fail-wt-"));
+    addWorkspacePair(primary, failing, {
+      name: "@arggon/lib",
+      main: "dist/index.js",
+      scripts: { build: "tsc -p tsconfig.json" },
+    });
+    linkNodeModules(primary, failing);
+    const failed = buildLocalWorkspaces(primary, failing, {
+      runBuild: () => {
+        throw new Error("tsc failed");
+      },
+    });
+    expect(failed).toEqual([]);
+    expect(linkedWorkspacePackages(primary, failing)).toEqual(["@arggon/lib"]);
+
+    // No build script at all: nothing to run, the primary's copy stands.
+    const scriptless = mkdtempSync(join(tmpdir(), "arggon-build-none-wt-"));
+    addWorkspacePair(primary, scriptless, { name: "@arggon/lib", main: "dist/index.js" });
+    linkNodeModules(primary, scriptless);
+    expect(buildLocalWorkspaces(primary, scriptless)).toEqual([]);
+    expect(linkedWorkspacePackages(primary, scriptless)).toEqual(["@arggon/lib"]);
+  });
+
+  it("unlinks a farm without following its entries into the primary install", () => {
+    const primary = mkdtempSync(join(tmpdir(), "arggon-farm-unlink-primary-"));
+    const wt = mkdtempSync(join(tmpdir(), "arggon-farm-unlink-wt-"));
+    addWorkspacePair(primary, wt, { name: "@arggon/lib", main: "dist/index.js" });
+    addDependency(primary, "commander");
+    writeEntry(wt);
+    writeEntry(primary); // the primary checkout is built (the worktree's is not)
+    expect(linkNodeModules(primary, wt)).toBe(true);
+
+    expect(unlinkNodeModulesLink(primary, wt)).toBe(true);
+    expect(existsSync(join(wt, "node_modules"))).toBe(false);
+    // The farm's entries were unlinked, never followed.
+    expect(existsSync(join(primary, "node_modules", "commander", "index.js"))).toBe(true);
+    expect(existsSync(join(primary, "lib", "dist", "index.js"))).toBe(true);
+    expect(lstatSync(join(primary, "node_modules", "@arggon", "lib")).isSymbolicLink()).toBe(true);
+
+    // A foreign directory carrying someone else's marker is never ours.
+    const foreign = mkdtempSync(join(tmpdir(), "arggon-farm-foreign-"));
+    mkdirSync(join(foreign, "node_modules"), { recursive: true });
+    writeFileSync(join(foreign, "node_modules", ".arggon-link-farm"), "/somewhere/else\n");
+    writeFileSync(join(foreign, "node_modules", "keep.txt"), "keep");
+    expect(unlinkNodeModulesLink(primary, foreign)).toBe(false);
+    expect(existsSync(join(foreign, "node_modules", "keep.txt"))).toBe(true);
+  });
+
+  it("never rewrites an install it did not create", () => {
+    const primary = mkdtempSync(join(tmpdir(), "arggon-point-primary-"));
+    const wt = mkdtempSync(join(tmpdir(), "arggon-point-wt-"));
+    addWorkspacePair(primary, wt, { name: "@arggon/lib", main: "dist/index.js" });
+    // The npm-reified shape (what `npm ci` in the worktree gives): a real
+    // install whose workspace link already points at the worktree copy.
+    mkdirSync(join(wt, "node_modules", "@arggon"), { recursive: true });
+    symlinkSync("../../lib", join(wt, "node_modules", "@arggon", "lib"), "dir");
+
+    expect(pointWorkspaceAtLocal(primary, wt, "@arggon/lib")).toBe(false);
+    expect(readlinkSync(join(wt, "node_modules", "@arggon", "lib"))).toBe("../../lib");
+
+    // And without an install there is nothing to point.
+    const bare = mkdtempSync(join(tmpdir(), "arggon-point-bare-"));
+    expect(pointWorkspaceAtLocal(primary, bare, "@arggon/lib")).toBe(false);
   });
 });
