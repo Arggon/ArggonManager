@@ -106,3 +106,6 @@ CI is pending on the PR, so acceptance box 4 stays open for the coordinator.
 ### handoff 2026-09-22 @Arggon — next: Review PR #391 (draft, base opencode2); merge with a merge commit (tracker-carrying); after CI green tick box 4 and flip done.
 - branch: feat/task-code-span-repair-sweep
 - open questions: Guard pins 15 prose files byte-stable — a later reformat needs the list updated in the same PR; tracker-item glues in the 2 done items intentionally left as history.
+
+### 2026-09-22 @Arggon
+CI green on PR #391 @ efff977 (draft, base opencode2): `cli` pass (3m25s, run 35673225273) and `tasks-validate` pass (26s, run 35673225284). `arggon validate` ok locally too (0 warnings, convention v5), so acceptance box 4 is verified end to end — it stays unticked only because the done flip belongs to the coordinator after the merge.
