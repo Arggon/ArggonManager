@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-plugin-source-prettier-policy
 title: Plugin source prettier policy + exploration-010 status
+assignee: Arggon
+branch: feat/task-plugin-source-prettier-policy
 parent: tooling-and-environment
 labels: []
 priority: p3
 created: "2026-09-22"
 updated: "2026-09-22"
+claimed_at: "2026-09-22T01:28:45.565Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-plugin-source-prettier-policy
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-plugin-source-prettier-policy.md
