@@ -17,10 +17,14 @@ This document is the full recipe. The runnable workflow ships with
 
 Requires **Node.js 22.12+**. `arggon-manager` (bin + templates + vendored
 plugin) and `@arggondev/lib` (kernel) are **two packages**
-([ADR 0013](./adr/0013-lib-package-split.md)) and both stay `private: true`
-until the release wave, so there is no npm one-liner yet.
+([ADR 0013](./adr/0013-lib-package-split.md)) and both are published
+(`arggon-manager@0.4.0`, `@arggondev/lib@0.4.0`). The released install is one line:
 
-**Pre-release — pack both packages from a pinned checkout.** The root tarball
+```bash
+npm install -g arggon-manager      # pulls @arggondev/lib from the registry
+```
+
+**From a pinned checkout (development) — pack both packages.** The root tarball
 alone is **not installable**: it declares `@arggondev/lib: ^0.4.0` and that package
 is not on the registry (a lone `npm install -g arggon-manager-<v>.tgz` fails
 with `404 @arggondev/lib@^0.4.0`). Pack and install **both** tarballs in one
@@ -43,7 +47,7 @@ The tarball ships production `dist/`, `templates/`, `skills/` and `opencode/`;
 installing it needs no scripts. npm may warn that the tarball's blocked
 `prepare` was skipped — benign, the build is already inside.
 
-**Released (post-W7) — one line:**
+**Released — one line:**
 
 ```bash
 npm install -g arggon-manager      # both packages from the registry
