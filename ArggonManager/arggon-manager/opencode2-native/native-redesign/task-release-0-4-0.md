@@ -216,3 +216,6 @@ Template + copia del repo + docs + test actualizados a `npm pack --workspace lib
 
 ### 2026-09-22 @Arggon
 Post-release PR #397 evidence: pin ARGGON_REF v0.4.0 (template + repo copy), README/ci.md one-liner primary, from-checkout recipe kept; review F1-F3 applied (registry statements corrected, docstring updated). Gates 1498 tests, validate, spec validate, headless-ci 6/6; CI pass. Residual: the published 0.4.0 generates ARGGON_REF: opencode2 — the v0.4.0 pin reaches npm adopters with the next publish (0.4.1/follow-up).
+
+### handoff 2026-09-22 @Arggon — next: Merge #397, FF opencode2 to main, then close the release item and containers.
+- branch: feat/task-release-0-4-0-post
