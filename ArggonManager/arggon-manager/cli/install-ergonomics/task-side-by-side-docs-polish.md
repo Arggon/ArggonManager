@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-19"
 updated: "2026-09-22"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-side-by-side-docs-polish
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/install-ergonomics/task-side-by-side-docs-polish.md
