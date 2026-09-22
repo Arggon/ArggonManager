@@ -251,7 +251,7 @@ _.path = ["~/.local/share/arggon-oc2/bin"]
 instead of linking it:
 
 ```bash
-npm ci && npm run build        # neither install nor pack builds dist/
+npm ci && npm run build        # npm 12 blocks the packed copy's prepare; build first
 npm install -g --install-links --prefix ~/.local/share/arggon-oc2 <checkout>
 ln -sf ~/.local/share/arggon-oc2/bin/arggon ~/.local/bin/arggon-oc2
 ```
@@ -262,8 +262,15 @@ ln -sf ~/.local/share/arggon-oc2/bin/arggon ~/.local/bin/arggon-oc2
   `npm install -g --prefix ~/.local/share/arggon-oc2 <tarball>`) is
   equivalent. The tarball carries `dist/` because npm follows the declared
   `bin` into the gitignored directory (verified on npm 12.0.2).
-- Neither install nor pack builds `dist/`, so build the checkout first
-  (packaging debt: [`task-npm-packaging`](../arggon-manager/cli/install-ergonomics/task-npm-packaging.md)).
+- **npm 12 script caveat:** install scripts run only when approved, so
+  `npm link` / `npm install -g .` on an _unbuilt_ checkout exit 0 with no
+  `dist/` and no bin — the root `prepare` never runs (verified on npm 12.0.2).
+  In this recipe the explicit `npm run build` is what puts `dist/` in the pack
+  (`npm ci` builds via the root `prepare` too); if you link a checkout
+  directly instead, run `npm install` first and link after, or approve the
+  script by its resolved identity (`npm install -g . --allow-scripts=file:$PWD`).
+  The tarball path in the [root README](../../README.md#install) is the
+  supported install.
 
 Option B also benefits from the same `mise.toml` snippet: both layouts expose
 an `arggon` shim in `~/.local/share/arggon-oc2/bin`.
@@ -305,12 +312,18 @@ oc2 checkout). Two fixes:
 
 ### Dev checkout bootstrap
 
-- `npm run build` is plain `tsc`, which emits `dist/cli.js` at mode `644`. A
-  bare symlink to that file fails with `Permission denied`; `npm link` and
-  `npm install -g` fix the mode (npm's bin links), and Option A's wrapper
-  sidesteps the question (`exec node …` does not need the bit). Rebuild after
-  every pull or branch switch — both shims execute `dist/`, which is
-  gitignored.
+- `npm run build` (`tsc` plus the `postbuild` step) emits the gitignored
+  `dist/cli.js` and chmods it to `0755`, so a plain symlink works; `npm link`
+  and `npm install -g` also produce working bin links, and Option A's wrapper
+  sidesteps the question (`exec node …` does not need the bit). Refresh the
+  CLI after every pull or branch switch — how depends on the layout:
+  - **Option A (named shim):** rebuild the checkout (`npm run build`). The
+    wrapper `exec`s the checkout's `dist/cli.js`, so the rebuild is what
+    updates the CLI the project resolves.
+  - **Option B (frozen prefix):** reinstall/repack. The prefix runs the packed
+    copy's `dist/`, which no checkout rebuild touches; re-run the Option B
+    recipe (build, then the `--install-links` install) after every pull or
+    branch switch.
 - `.opencode/plugins/arggon/index.ts` and `.agents/skills/*` are gitignored
   generated copies of committed sources; a fresh dev checkout — and every new
   worktree — has none. `arggon init` regenerates them (never overwriting
@@ -328,6 +341,7 @@ readlink -f "$(which arggon)"   # → the shim (A) / <prefix>/lib/node_modules/�
 
 # 2. the plugin is discovered by the project's OpenCode server
 #    TUI: Ctrl+P → Plugins → arggon (local, active)
+#    (the response also lists the builtin plugins; the arggon entry reads:)
 opencode api plugin.list --param "location[directory]=$PWD"
 # → {"id":"arggon","source":{"type":"local","path":"…/arggon/index.ts"},"state":{"status":"active"}}
 

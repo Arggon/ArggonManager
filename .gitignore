@@ -23,3 +23,8 @@ coverage/
 # Tooling artifacts (video2code / video-agent sessions)
 .v2c/
 .video_agent/
+
+# task-side-by-side-docs-polish: machine-local mise overrides stay untracked
+# (docs/opencode2.md recommends them over the tracked mise.toml only for
+# personal overrides; worktrees must keep inheriting the committed PATH).
+mise.local.toml
