@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-ui-browser-smoke-ci
 title: "Browser smoke in CI: @smoke Playwright spec + TUI frame check"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [ui, smoke, ci]
 priority: p2
 created: "2026-09-22"
 updated: "2026-09-22"
-claimed_at: "2026-09-22T22:56:04.543Z"
 depends_on: [bug-ci-version-guard-dev-only]
 worktree_path: /home/arggon/Projects/ArggonManager-task-ui-browser-smoke-ci
 ---
