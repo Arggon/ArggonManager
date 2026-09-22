@@ -47,3 +47,10 @@ After v0.4.0 this blocks dev-only edits (adding a test/dev dependency, a script)
 - [ ] The release-forgotten case still fails: probe the predicate against a synthetic shipping-field change with the current version tagged (expected fail vs observed, recorded in the item comment)
 - [ ] The step carries a comment explaining the scoping; `cli` check green on the proving PR
 - [ ] Fixed in `task-ui-browser-smoke-ci`'s PR (hard prerequisite there) and referenced from both items — or in a dedicated PR if the smoke item lands first
+
+### 2026-09-22 @ses_f34ab7c2effeGb96Q5UOGLzjgq
+Fixed in `task-ui-browser-smoke-ci`'s PR: https://github.com/Arggon/ArggonManager/pull/401 (branch `feat/task-ui-browser-smoke-ci`, commit `50c89218`).
+
+- `cli/version-guard.mjs` scopes the demand to `name`/`version`/`private`/`bin`/`files`/`dependencies`/`engines`; dev-only changes pass with a message, shipping-field changes still fail when tagged.
+- Probe expected vs observed is recorded on `task-ui-browser-smoke-ci` (dev-only PASS; dependencies+tagged FAIL; dependencies+untagged PASS).
+- Extra finding fixed in the same step: the guard was silently dead on PRs (`origin/main...HEAD` has no merge base in the shallow checkout — CI run 35794199343); the step now diffs against `github.event.pull_request.base.sha` and actually runs (green on PR #401, `cli` job prints the dev-only pass).
