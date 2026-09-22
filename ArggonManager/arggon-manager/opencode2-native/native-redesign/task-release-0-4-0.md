@@ -10,7 +10,6 @@ labels: []
 priority: p1
 created: "2026-09-21"
 updated: "2026-09-22"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-release-0-4-0
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-release-0-4-0.md
