@@ -12,11 +12,11 @@ agents in this codebase — read before mutating the tracker or merging.
 - `in_progress` on a claimable type without `assignee` is rejected;
   initiatives/epics may be `in_progress` unassigned.
 - Claims carry a soft lease (`claimed_at`, ISO date-time) — reporting only.
-  `list --stale --older-than 7d` reports stale claims. `update --steal --reason
-"<why>" --assignee <you>` is **HUMAN-only** (agents refused behave like
-  `--force`), double-gated: the repo must arm `x-tracker.allow-steal: true` and it
-  must run at an interactive terminal with a y/N confirmation. Agents coordinate
-  instead of stealing.
+  `list --stale --older-than 7d` reports stale claims.
+  `update --steal --reason "<why>" --assignee <you>` is **HUMAN-only** (agents
+  refused behave like `--force`), double-gated: the repo must arm
+  `x-tracker.allow-steal: true` and it must run at an interactive terminal with a
+  y/N confirmation. Agents coordinate instead of stealing.
 - `update --status blocked` requires `--blocked-reason`; `blocked_reason` is
   forbidden otherwise.
 - **Cascade:** a terminal status (done/cancelled) auto-completes ancestor
