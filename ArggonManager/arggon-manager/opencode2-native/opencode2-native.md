@@ -1,15 +1,14 @@
 ---
 type: epic
-status: todo
+status: done
 id: opencode2-native
 title: "OpenCode2-native ArggonManager: full redesign"
 parent: arggon-manager
 labels: []
 priority: p0
 created: "2026-09-19"
-updated: "2026-09-19"
+updated: "2026-09-22"
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/opencode2-native.md (epic index; required).
   parent MUST be the initiative id. Container ids must not start with task-/bug-.
@@ -32,10 +31,10 @@ surface is the product; portability to other runtimes is not a requirement.
 
 ## Acceptance
 
-- [ ] Capability audit complete (every OpenCode V2 surface, dated sources).
-- [ ] ADR succeeding/superseding 0010 with the chosen architecture.
-- [ ] Spec + plan for the new ArggonManager.
-- [ ] Implementation waves filed as stories/tasks and closed.
+- [x] Capability audit complete (every OpenCode V2 surface, dated sources).
+- [x] ADR succeeding/superseding 0010 with the chosen architecture.
+- [x] Spec + plan for the new ArggonManager.
+- [x] Implementation waves filed as stories/tasks and closed.
 
 ## Notes
 

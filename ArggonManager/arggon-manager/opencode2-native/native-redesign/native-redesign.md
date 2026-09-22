@@ -1,15 +1,14 @@
 ---
 type: story
-status: todo
+status: done
 id: native-redesign
 title: OpenCode2 capability audit and complete native redesign
 parent: opencode2-native
 labels: []
 priority: p0
 created: "2026-09-19"
-updated: "2026-09-19"
+updated: "2026-09-22"
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/opencode2-native/native-redesign/native-redesign.md (story index; required).
   parent MUST be the epic id. Optional style prefixes (e.g. story-) are not type discriminators.
@@ -25,9 +24,9 @@ the architecture decision (ADR), the contract (spec) and the wave plan.
 
 ## Acceptance
 
-- [ ] `task-native-capability-audit` closed: exploration with inventory,
+- [x] `task-native-capability-audit` closed: exploration with inventory,
       capability map and recommendation.
-- [ ] Follow-up tasks for the ADR and the spec/plan filed and closed.
+- [x] Follow-up tasks for the ADR and the spec/plan filed and closed.
 
 ## Notes
 

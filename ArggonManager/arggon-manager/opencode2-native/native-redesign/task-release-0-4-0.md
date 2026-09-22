@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-release-0-4-0
 title: "Release 0.4.0: kernel-first publish + tag"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p1
 created: "2026-09-21"
 updated: "2026-09-22"
-claimed_at: "2026-09-22T02:01:58.584Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-release-0-4-0
 ---
 <!--
