@@ -38,12 +38,12 @@ Low findings from the PR #388 review (`task-start-worktree-lib-resolution`):
 
 ## Acceptance
 
-- [ ] Build failure semantics match the docs (exit honored, or the wording
+- [x] Build failure semantics match the docs (exit honored, or the wording
       corrected), with a test for the failing-build-emits-dist case.
-- [ ] README/agents mention the bare-symlink fallback.
-- [ ] The attach-with-previous-install path skips the build when there is no
+- [x] README/agents mention the bare-symlink fallback.
+- [x] The attach-with-previous-install path skips the build when there is no
       farm to flip (or the cost is documented as accepted).
-- [ ] `arggon validate` green; CI green.
+- [x] `arggon validate` green; CI green.
 
 ## Notes
 
@@ -78,3 +78,6 @@ Scope: `lib/src/worktree.ts`, `cli/src/{start,worktree}.test.ts`, `README.md`, `
 
 ### 2026-09-22 @Arggon
 CI follow-up: the tracker tip `d067551` (code `638b69c` + this evidence comment) is green too — `cli` pass (4m13s, run 35673463151) + `tasks-validate` pass (38s, run 35673463179). No further commits are planned from this worker; the next tip move is the coordinator's review/merge (merge commit, never squash) and `done`.
+
+### 2026-09-22 @Arggon
+Coordinator note: reviewer-verified? No — worker evidence reproduced (failing-emits build keeps the primary copy + linkedWorkspaces; attach with bare symlink skips the build) with mutation-verified guards; docs/README/agents updated; bundle regenerated. Gates 1494/1495 (the single failure was the now-merged measure flake), lint/build/check:plugin/validate/spec; CI pass. Merged with merge commit; item flipped to done.
