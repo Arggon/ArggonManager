@@ -10,7 +10,6 @@ labels: [ui, architecture]
 priority: p2
 created: "2026-09-22"
 updated: "2026-09-22"
-worktree_path: /home/arggon/Projects/ArggonManager-task-ui-shared-viewmodel
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-ui-shared-viewmodel.md

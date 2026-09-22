@@ -11,7 +11,6 @@ priority: p2
 created: "2026-09-22"
 updated: "2026-09-22"
 depends_on: [bug-ci-version-guard-dev-only]
-worktree_path: /home/arggon/Projects/ArggonManager-task-ui-browser-smoke-ci
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-ui-browser-smoke-ci.md
