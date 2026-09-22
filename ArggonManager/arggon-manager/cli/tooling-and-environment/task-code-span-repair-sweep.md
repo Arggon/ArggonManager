@@ -77,7 +77,7 @@ Worker evidence (branch `feat/task-code-span-repair-sweep`, content commit 395f0
 
 **Scope found by sweep.** The item named 8 docs; a corpus scan (raw span slices via `prettier.__debug.parse`, all 272 prose `.md` outside the tracker item tree) found 5 more in the same class: `exploration-{opencode-v2-native-009,smoke-ui-testing-006}.md`, `playbooks/{opencode,typescript}.md`, `specs/spec-spec-audit-006.md`. All 13 repaired — every affected span now sits on one line, like the #387 pitfalls.md repair.
 
-**Repair semantics (expected vs observed).** For the 12 indent-variant spans the value went from `<before>\n<after>` to `<before> <after>` — the rendered text is unchanged (CommonMark turns the in-span line ending into a space), the source is now formatter-stable. `spec-spec-audit-006.md`'s ` ` … ` ` re-encoded to prettier's canonical `` `…` `` (same parsed value). Checked HEAD vs worktree with `prettier.__debug.parse`: in every file the span-value list is identical except exactly those intended spans — no prose token added, removed or merged.
+**Repair semantics (expected vs observed).** For the 12 indent-variant spans the value went from `<before>\n<after>` to `<before> <after>` — the rendered text is unchanged (CommonMark turns the in-span line ending into a space), the source is now formatter-stable. `spec-spec-audit-006.md`'s triple-backtick ellipsis span re-encoded to prettier's canonical single-backtick `` `…` `` (same parsed value). Checked HEAD vs worktree with `prettier.__debug.parse`: in every file the span-value list is identical except exactly those intended spans — no prose token added, removed or merged.
 
 **Guard (`cli/src/prose-format.test.ts`).**
 
@@ -102,3 +102,7 @@ Worker evidence (branch `feat/task-code-span-repair-sweep`, content commit 395f0
 **Scope hygiene.** No overlap with parallel items: `ArggonManager/docs/json-output.md`, `skills/**`, `lib/src/worktree.ts` (start-build-exit) and `cli/src/measure*` (measure flake) untouched. The extra formatter output in the 5 sweep-found files is prettier's canonical form of pre-existing prose (table re-padding, `*emphasis*` → `_emphasis_`, a `+` list marker, two list-continuation indents).
 
 CI is pending on the PR, so acceptance box 4 stays open for the coordinator.
+
+### handoff 2026-09-22 @Arggon — next: Review PR #391 (draft, base opencode2); merge with a merge commit (tracker-carrying); after CI green tick box 4 and flip done.
+- branch: feat/task-code-span-repair-sweep
+- open questions: Guard pins 15 prose files byte-stable — a later reformat needs the list updated in the same PR; tracker-item glues in the 2 done items intentionally left as history.
