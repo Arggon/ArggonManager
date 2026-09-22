@@ -75,3 +75,6 @@ Scope: `lib/src/worktree.ts`, `cli/src/{start,worktree}.test.ts`, `README.md`, `
 ### handoff 2026-09-22 @Arggon — next: Review draft PR #390 (fix 638b69c + tracker commits); confirm CI on the final tip, merge with a merge commit (never squash), then flip done.
 - branch: feat/task-start-build-exit-visibility
 - open questions: None blocking. Deliberate: a reified npm ci install with a missing declared entry is still built (the gate needs it) — only a bare symlink to the primary install is skipped; the attach skip is proven…
+
+### 2026-09-22 @Arggon
+CI follow-up: the tracker tip `d067551` (code `638b69c` + this evidence comment) is green too — `cli` pass (4m13s, run 35673463151) + `tasks-validate` pass (38s, run 35673463179). No further commits are planned from this worker; the next tip move is the coordinator's review/merge (merge commit, never squash) and `done`.
