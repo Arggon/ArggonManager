@@ -36,20 +36,20 @@ Non-blocking nits from the PR #373 review (`task-playbook-opencode-2-0-10`):
 
 ## Acceptance
 
-- [ ] Pin statements refreshed outside the accepted set: `docs/adr/0011` §7,
+- [x] Pin statements refreshed outside the accepted set: `docs/adr/0011` §7,
       `ArggonManager/docs/specs/spec-native-first-011.md` ("Pinned runtime
       2.0.10") and `ArggonManager/docs/plans/plan-native-first-011.md`.
-- [ ] `exploration-opencode2-native-010` F4.1 (:244) still says "pin 2.0.10" —
+- [x] `exploration-opencode2-native-010` F4.1 (:244) still says "pin 2.0.10" —
       refresh it with the tensions line.
-- [ ] `opencode.md:451,458` prettier de-indents 2 continuation lines (base was
+- [x] `opencode.md:451,458` prettier de-indents 2 continuation lines (base was
       clean) — same family as `bug-formatter-glues-markdown-spaces`.
-- [ ] The playbook's Context budgets snapshot matches `context:report --json`
-      after the W7 trim + PR #384 skill sync (11.821 / 25.275 / 12.885+19.604).
+- [x] The playbook's Context budgets snapshot matches `context:report --json`
+      after the W7 trim + PR #384 skill sync (11.821 / 25.275 / 12.995+20.625).
 
-- [ ] Exploration 010 "Open tensions" marks the pin refresh as landed.
-- [ ] The plugin header references the 2.0.10 re-probe date (or points to the
+- [x] Exploration 010 "Open tensions" marks the pin refresh as landed.
+- [x] The plugin header references the 2.0.10 re-probe date (or points to the
       playbook's research record).
-- [ ] `arggon validate` green; CI green.
+- [x] `arggon validate` green; CI green.
 
 ## Notes
 
@@ -131,3 +131,6 @@ Alcance revisado: `git diff opencode2...HEAD` = 6 ficheros de contenido (+34/−
 - Pendientes ya fileteados en base `5613c3e` (`task-plugin-source-prettier-policy`): prettier del source del plugin (confirmo el fallo también en `opencode2:opencode/plugins/arggon/index.ts`) y status de exploration-010. Fuera de scope.
 
 **Veredicto: merge con merge commit** (el branch lleva commits del tracker); nunca squash. No marco el item done.
+
+### 2026-09-22 @Arggon
+Coordinator note: reviewer verified pins/header/budgets against the live report (11.821/25.275/12.995+20.625), the #391 repair stays stable, and the bundle is byte-identical (comments stripped). Lows applied in the closure: probe list now includes 2.0.12 (one-line comment, bundle unchanged) and the acceptance parenthesis updated to the live numbers. Gates 1498 tests, lint/build/check:plugin/validate/spec; CI pass. Merged with merge commit; item flipped to done.
