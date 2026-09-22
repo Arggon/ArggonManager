@@ -82,3 +82,7 @@ Commits: b88f089 claim, cf619ee policy + exploration-010, c6f48fc acceptance tic
 Observation (out of scope, no item filed): `exploration-opencode-v2-native-009`
 is also still `status: open` with Decision "Pending" although ADR 0010 landed —
 candidate for a separate close-out.
+
+### handoff 2026-09-22 @Arggon — next: Coordinator: review PR #393 (draft, base opencode2), confirm CI on the final head, merge, then flip the item done.
+- branch: feat/task-plugin-source-prettier-policy
+- open questions: exploration-009 still open (Decision Pending) though ADR 0010 landed - separate close-out item? ~340 other prettier-dirty files remain out of scope.
