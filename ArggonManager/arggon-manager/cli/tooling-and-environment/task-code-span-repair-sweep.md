@@ -52,7 +52,7 @@ enough: prettier deletes it again).
       not rewrite a code span" rule + byte-stability list of the 15 files).
 - [x] Tracker-item evidence quotes left as-is (body-only history); the
       exclusion is documented in the guard with both item ids.
-- [ ] `arggon validate` green; CI green.
+- [x] `arggon validate` green; CI green.
 
 ## Result
 
@@ -109,3 +109,6 @@ CI is pending on the PR, so acceptance box 4 stays open for the coordinator.
 
 ### 2026-09-22 @Arggon
 CI green on PR #391 @ efff977 (draft, base opencode2): `cli` pass (3m25s, run 35673225273) and `tasks-validate` pass (26s, run 35673225284). `arggon validate` ok locally too (0 warnings, convention v5), so acceptance box 4 is verified end to end — it stays unticked only because the done flip belongs to the coordinator after the merge.
+
+### 2026-09-22 @Arggon
+Coordinator note: 13 docs repaired with the #387 technique (+5 found in the same class) and the guard now carries the corpus-wide rule 'prettier never rewrites a code span's source text' with mutation coverage (reverting node.md fails with the exact span); tracker quotes left as history with documented exclusion. Gates 1491 tests, lint, validate, spec validate, prettier check/write byte-stable; CI pass on 48f2eca. Merged with merge commit; item flipped to done.
