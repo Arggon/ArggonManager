@@ -174,3 +174,33 @@ Mutation evidence (guard is not vacuous):
 ### handoff 2026-09-21 @Arggon — next: Re-review PR #387 at a633352 (finding 1 fixed: both span ends padded, values byte-exact; finding 2: coverage limit documented + stability test added, mutation-tested). CI green. Merge with a merge co…
 - branch: fix/bug-formatter-glues-markdown-spaces
 - open questions: Acceptable that the pitfalls.md revert is not machine-caught (base is already prettier-stable)? Corpus indentation rule waits for task-code-span-repair-sweep.
+
+### 2026-09-22 @Arggon
+**Final review verdict — PR #387 @ `d653c12` (draft, base `opencode2`): MERGE (merge commit, never squash).**
+
+### Finding 1 (change request) — FIXED, verified byte-exact
+
+- All four spans now parse as single code spans with the exact CLI strings, measured against the **real** constants: `OPENCODE_MCP_HINT` imported from `cli/src/doctor.ts` (129 chars) and `NOT_A_REPO_WARNING` taken from a real `arggon init --dry-run --json` run in a non-git dir (130 chars):
+  - init warning (`:140`): 130/130 exact — `not a git repository — branch/worktree/push/PR flows and the pre-commit validate hook will be unavailable until you run \`git init\``
+  - `opencode.mcp.hint` (`:184`): 129/129 exact — `optional: the native arggon tools do not need MCP — keep "mcp.servers.arggon" only for non-OpenCode clients that use \`arggon mcp\``
+  - outdated-docs hint (`:164`): 72/72 exact; doctor sample JSON (`:659`): 178/178 exact.
+- `prettier --check` clean on both repaired files and `prettier --write` is a byte-identical no-op on each. `diff(prettier(base), head)` is now exactly the 4 span lines — the `start`-table reflow remains canonical padding only.
+
+### Finding 2 (info) — ADDRESSED
+
+- The test header now states the coverage limit explicitly (token merges only; the `pitfalls.md` indent repair is a whitespace-run replacement; embedded fences out of scope; corpus-wide indentation rule deferred to `task-code-span-repair-sweep`).
+- The new stability test pins `prettier --write` as a no-op on the two repaired files. Mutation matrix re-verified by me:
+  - `json-output.md` ← base → **both tests fail** (token test names the 4 glues; stability test reports the file no longer prettier-clean).
+  - `pitfalls.md` ← base → **both pass** — the documented limit.
+  - additionally, introducing the pre-`8c98b03` multi-line span shape in `pitfalls.md` → stability test **fails** with the file named, so the companion test has real discriminating power for a newly introduced multi-line span.
+
+### Gates at `d653c12`
+
+- `npm test`: **91 files / 1468 tests pass** (the +1 is the stability test); `npm run lint`, `build`, `check:plugin` (bundle unchanged), `arggon validate` (ok, 0 warnings, convention v5), `arggon spec validate` (ok, 18 docs, 0 warnings) — all green locally.
+- CI `cli` (4m8s) + `tasks-validate` (32s) green at head `d653c12` (`headSha` verified on both runs). PR `MERGEABLE`.
+- Scope: exactly 4 files (item + `docs/json-output.md` + `skills/arggon-cli/references/pitfalls.md` + `cli/src/prose-format.test.ts`); no `start.ts` / `lib/README` / `smoke/**` touched. Item stays `in_progress`, assignee Arggon, not marked done.
+- Smoke bar: docs + test-only, no CLI/UI behavior change → exempt per `engineering.md`.
+
+### Recommendation
+
+**MERGE with a merge commit (never squash)** — the PR is still a draft, so mark it ready first. The corpus-wide indentation rule stays in `task-code-span-repair-sweep`. No open findings.
