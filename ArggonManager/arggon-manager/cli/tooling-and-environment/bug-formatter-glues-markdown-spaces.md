@@ -204,3 +204,6 @@ Mutation evidence (guard is not vacuous):
 ### Recommendation
 
 **MERGE with a merge commit (never squash)** — the PR is still a draft, so mark it ready first. The corpus-wide indentation rule stays in `task-code-span-repair-sweep`. No open findings.
+
+### 2026-09-22 @Arggon
+Coordinator note: reviewer verified byte-exact parsed values against the real constants (130/130, 129/129, 72/72, 178/178), prettier --check clean and --write byte-identical, stability test + mutation matrix reproduced, limits documented. Gates 1468 tests, lint/build/check:plugin/validate/spec; CI pass. Corpus-wide indent rule deferred to task-code-span-repair-sweep. Merged with merge commit; item flipped to done.
