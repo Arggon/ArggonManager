@@ -77,3 +77,6 @@ Resolution (worker `Arggon`, branch `fix/bug-measure-tmp-hygiene-flake`, commit 
 ### handoff 2026-09-22 @Arggon — next: Review the draft PR (cli/src/measure.ts + measure.test.ts), verify gates, merge, then flip the item to done.
 - branch: fix/bug-measure-tmp-hygiene-flake
 - open questions: None blocking. The item notes a possible supersede by the opencode2-native redesign: if the measure/doctor surface is ever rewritten, the per-run tree helper plus the two regression tests move with i…
+
+### 2026-09-22 @Arggon
+Evidence addendum: CI on PR #389 is green (cli pass 4m17s, tasks-validate pass 38s). Sibling-suite loop over 8 consecutive `vitest run cli/src/measure.test.ts` (overlapping the full suite) → 8/8 exit 0, 13/13 tests each; no /tmp/arggon-budget-* leftovers at the end. PR: https://github.com/Arggon/ArggonManager/pull/389
