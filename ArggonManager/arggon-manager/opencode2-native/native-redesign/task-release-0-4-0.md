@@ -1,14 +1,17 @@
 ---
 type: task
-status: blocked
+status: in_progress
 id: task-release-0-4-0
 title: "Release 0.4.0: kernel-first publish + tag"
+assignee: Arggon
+branch: feat/task-release-0-4-0
 parent: native-redesign
 labels: []
 priority: p1
 created: "2026-09-21"
-updated: "2026-09-21"
-blocked_reason: product-owner approval for publish/tag 0.4.0
+updated: "2026-09-22"
+claimed_at: "2026-09-22T02:01:58.584Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-release-0-4-0
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-release-0-4-0.md
@@ -46,6 +49,12 @@ Steps (from the runbook):
 ## Notes
 
 - Blocked on the PO release decision (2026-09-21).
+
+### 2026-09-22 @Arggon
+Release prep evidence: bump 0.3.0→0.4.0 (root+lib), private off, kernel dep range ^0.3.0→^0.4.0 (without it the packed-install suite fails E404 and skips 6 tests), CHANGELOG [0.4.0] - 2026-09-22. Review F1-F3 applied: lock synced, lib publishConfig {access: public} + license MIT + LICENSE in the tarball (79 files/124.3 kB). Gates 1498 tests, build, check:plugin, validate, spec validate. Pending (owner gate): merge opencode2→main, tag v0.4.0, npm publish kernel-first — blocked on the @arggon npm scope (account arggondev; org must be created or an alternative chosen).
+
+### handoff 2026-09-22 @Arggon — next: After the @arggon scope exists: merge opencode2 to main, tag v0.4.0, npm publish --workspace @arggon/lib then npm publish; then pin ARGGON_REF v0.4.0 and re-run init.
+- branch: feat/task-release-0-4-0
 
 ### 2026-09-22 @Arggon
 ### Review verdict (ronda 1) — PR #395 · head revisado `9f7cb03` · base `opencode2` (draft)

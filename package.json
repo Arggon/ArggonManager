@@ -1,7 +1,6 @@
 {
   "name": "arggon-manager",
-  "version": "0.3.0",
-  "private": true,
+  "version": "0.4.0",
   "description": "Git-native project management CLI (ArggonManager)",
   "type": "module",
   "workspaces": [
@@ -43,7 +42,7 @@
     "node": ">=22.12.0"
   },
   "dependencies": {
-    "@arggon/lib": "^0.3.0",
+    "@arggon/lib": "^0.4.0",
     "commander": "^13.1.0"
   },
   "devDependencies": {
@@ -54,5 +53,6 @@
     "typescript": "^5.8.2",
     "typescript-eslint": "^8.26.1",
     "vitest": "^5.0.0"
-  }
+  },
+  "license": "MIT"
 }
