@@ -27,3 +27,16 @@ updated: "2026-09-22"
 - [ ] 
 
 ## Notes
+
+### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Context
+
+The TUI is read-only v1 by story acceptance (`story-tui-board`). The board already proved the safe write pattern: client-side rules identical to `status.ts`/`update.ts`, an embedded parity test, and every write through the kernel `runUpdate` — never force, never steal. Extending the terminal board with actions needs the same treatment and a spec before code.
+
+## Acceptance
+
+- [ ] Spec + plan under `ArggonManager/docs/specs/` + `docs/plans/` written first (claim, transitions, confirmations, error surfacing, why force/steal stay impossible)
+- [ ] `c` claims (assignee prompt), legal status transitions apply with confirmation; `blocked` requires a reason; all writes go through `runUpdate`
+- [ ] Parity test: embedded rules ≡ board `evaluateDrop` ≡ kernel transition table
+- [ ] Failures surface actionably in the footer; the board never leaves the alternate screen dirty
+- [ ] Golden tests + pty evidence; README + docs updated
