@@ -27,3 +27,14 @@ updated: "2026-09-22"
 - [ ] 
 
 ## Notes
+
+### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Context
+
+Claim (assignee) and blocked-reason collection use `window.prompt` — blocking, unstyled, unlabeled, no validation, and hard to drive by keyboard/screen readers. A failed update after a legal drop reverts the card but offers no retry/undo affordance.
+
+## Acceptance
+
+- [ ] An in-page dialog replaces both prompts: assignee required for `in_progress` claims, non-empty reason required for `blocked`, inline validation, Esc cancels, focus trapped and restored
+- [ ] Success toast offers an explicit undo when the reverse transition is legal (never force, never steal — same parity rules); failure keeps the current revert path
+- [ ] Tests + Playwright-CLI smoke (drop → dialog → cancel; drop → dialog → confirm; undo path); README/docs updated
