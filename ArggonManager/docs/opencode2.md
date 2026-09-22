@@ -264,11 +264,11 @@ ln -sf ~/.local/share/arggon-oc2/bin/arggon ~/.local/bin/arggon-oc2
   `bin` into the gitignored directory (verified on npm 12.0.2).
 - **npm 12 script caveat:** install scripts run only when approved, so
   `npm link` / `npm install -g .` on an _unbuilt_ checkout exit 0 with no
-  `dist/` and no bin — the root `prepare` never runs (verified on npm 12.0.2).
+  `dist/` and no bin — the copy's `prepare` never runs (verified on npm 12.0.2).
   In this recipe the explicit `npm run build` is what puts `dist/` in the pack
   (`npm ci` builds via the root `prepare` too); if you link a checkout
   directly instead, run `npm install` first and link after, or approve the
-  script by its resolved identity (`npm install -g . --allow-scripts=file:$PWD`).
+  script by its resolved identity (`npm install -g . --allow-scripts=arggon-manager (or npm install-scripts approve)`).
   The tarball path in the [root README](../../README.md#install) is the
   supported install.
 
