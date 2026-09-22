@@ -41,10 +41,10 @@ Steps (from the runbook):
 
 ## Acceptance
 
-- [ ] Product-owner approval recorded.
-- [ ] Version bump + `private` removed merged to `main`.
-- [ ] `v0.4.0` tag pushed; both packages published and verified.
-- [ ] Workflow template pinned to `v0.4.0`; `init` re-run; docs updated.
+- [x] Product-owner approval recorded.
+- [x] Version bump + `private` removed merged to `main`.
+- [x] `v0.4.0` tag pushed; both packages published and verified.
+- [x] Workflow template pinned to `v0.4.0`; `init` re-run; docs updated.
 
 ## Notes
 
@@ -474,3 +474,6 @@ Texto actual: "Pack and install **both** tarballs from the same directory so the
 **NO-MERGE (request changes): solo F1' (una frase).** Todo lo demás está merge-ready.
 
 *Publicado con el CLI local (los `tools.arggon.*` no resuelven el tracker v5 en esta sesión); el comment auto-commitea en `opencode2`.*
+
+### 2026-09-22 @Arggon
+Release 0.4.0 complete: arggon-manager@0.4.0 + @arggondev/lib@0.4.0 published (kernel first), tag v0.4.0 on 394654f5, clean global install verified (arggon --version 0.4.0, init from the installed package), ARGGON_REF pinned to v0.4.0 and docs moved to the released one-liner (PR #397), main fast-forwarded to 097e449b. Residual: the published 0.4.0 still generates ARGGON_REF: opencode2 — reaches npm adopters with the next publish (0.4.1).
