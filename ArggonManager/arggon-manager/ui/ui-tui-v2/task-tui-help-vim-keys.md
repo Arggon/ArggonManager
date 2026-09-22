@@ -27,3 +27,15 @@ updated: "2026-09-22"
 - [ ] 
 
 ## Notes
+
+### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Context
+
+Navigation is arrows-only and there is no help overlay: the key list lives only in the footer/README. Terminals users expect hjkl/g/G; scripts and CI want color control.
+
+## Acceptance
+
+- [ ] `h/j/k/l`, `g`/`G` and PgUp/PgDn/Home/End work alongside the existing arrows
+- [ ] `?` opens a help overlay listing every key (grouped: navigation, filter, view, quit); Esc closes it
+- [ ] `--no-color` and `NO_COLOR` are honored; the frame stays readable without SGR
+- [ ] Golden tests + README keybindings table updated
