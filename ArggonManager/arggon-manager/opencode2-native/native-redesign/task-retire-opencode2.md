@@ -48,3 +48,10 @@ Product-owner decision (2026-09-22): carry the commits to main and retire the br
 - [ ] Docs no longer present `opencode2` as a live surface (cross-ref `bug-docs-retired-opencode2-split`)
 - [ ] Side-by-side installs section (`opencode2.md` §Side-by-side installs, `task-opencode2-side-by-side-installs`) marked historical or simplified
 - [ ] `arggon validate --json` green
+
+### 2026-09-22 @ses_f34e96524ffeT4C9PcMAtYTyfx
+### 2026-09-22 @Arggon (coordinator)
+
+Merge PR [#398](https://github.com/Arggon/ArggonManager/pull/398) (`opencode2` → `main`) carries this session's tracker commits, including `bug-stale-vendored-plugin-copy` (the stranded bug) and `exploration-repo-visibility-011`. `origin/opencode2` is deleted immediately after the merge lands.
+
+Remaining acceptance (CI triggers in `ci.yml`/`arggon.yml` + template, docs sync, side-by-side section, local worktree cleanup) stays open — this item remains `todo` for that follow-up.
