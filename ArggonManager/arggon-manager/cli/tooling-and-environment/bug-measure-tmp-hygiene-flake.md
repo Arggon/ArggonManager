@@ -1,15 +1,18 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-measure-tmp-hygiene-flake
-title: "measure.test.ts /tmp hygiene races sibling suites"
+title: measure.test.ts /tmp hygiene races sibling suites
+assignee: Arggon
+branch: fix/bug-measure-tmp-hygiene-flake
 parent: tooling-and-environment
 labels: []
 priority: p3
 created: "2026-09-19"
-updated: "2026-09-19"
+updated: "2026-09-22"
+claimed_at: "2026-09-22T00:31:49.332Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-measure-tmp-hygiene-flake
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/cli/tooling-and-environment/bug-measure-tmp-hygiene-flake.md
   Leaves live only under a story. id is the filename stem: bug-measure-tmp-hygiene-flake.
