@@ -265,3 +265,42 @@ El item no tiene `arggon comment`/`handoff` de esta ronda (la evidencia quedó s
 **NO-MERGE (request changes): F1 + F2 en un commit de wording; F3 opcional en el mismo commit.** Después: re-correr gates/CI, merge commit (nunca squash), FF `opencode2` → `main` y cierre del item/contenedores (coordinador).
 
 *Publicado con el CLI local (los `tools.arggon.*` no resuelven el tracker v5 en esta sesión); el comment auto-commitea en `opencode2`.*
+
+### 2026-09-22 @Arggon
+### Review verdict (ronda 6 — final) — PR #397 · head revisado `a60a02d7` · base `opencode2` (draft)
+
+**NO-MERGE (request changes) — un solo fix de una frase.** F1 (fondo), F2, F3 y F4 están corregidos y verificados; gates y CI verdes. Queda **una afirmación falsa nueva** introducida por el fix de F1: `ci.md:29` "(and the install works offline)".
+
+## F1' (bloqueante, 1 frase) — `ArggonManager/docs/ci.md:29`: "the install works offline" es falso
+
+Texto actual: "Pack and install **both** tarballs from the same directory so the checkout's versions stay pinned **(and the install works offline)**; the root tarball also resolves `@arggondev/lib` from the registry since 0.4.0."
+
+- El propio doc se contradice: `ci.md:113-115` → "The recipe is **not offline-hermetic**: … installs the two tarballs, **whose only runtime dependency is `commander`**. CI runners have the registry".
+- Repro (npm 12.0.2): `npm install -g --prefix /tmp/opencode/pr397-offline --cache /tmp/opencode/npm-cache-empty --offline /tmp/opencode/pr397-packs/arggondev-lib-0.4.0.tgz /tmp/opencode/pr397-packs/arggon-manager-0.4.0.tgz` → `npm error code ENOTCACHED … request to https://registry.npmjs.org/commander failed`. El kernel sí se resuelve local (no falla por él), pero `commander` (dep runtime del root: `npm view arggon-manager@0.4.0 dependencies` → `{ '@arggondev/lib': '^0.4.0', commander: '^13.1.0' }`) sale del registry.
+- Fix: borrar el paréntesis, o reformular: "…keeps the checkout's versions pinned (the kernel resolves locally; `commander` still comes from the registry — see the not-offline-hermetic note below)".
+
+## F1/F2/F3/F4 — verificados
+
+- **F1 (afirmaciones corregidas):** `npm view @arggondev/lib version` / `npm view arggon-manager version` → ambos `0.4.0` (`latest`); tarball raíz **solo** con cache limpia → instala y resuelve el kernel del registry (`arggon --version` = 0.4.0). README:135 y ci.md:27-30 ya no dicen "not on the registry"/"not installable".
+- **F2:** comentario del workflow (template y copia, idénticos salvo el marker `# arggon:generated`) correcto: pack del ref pinneado para validar el seam exacto + one-liner disponible desde 0.4.0.
+- **F3:** docstring `cli/src/headless-ci.test.ts:21-27` corregido (sin `private`/404).
+- **F4:** el md del item en la rama ya trae comment de evidencia + `### handoff` (`eda1b77e`, `a60a02d7`).
+- **Grep de frases viejas** en los archivos del PR (`not published|not on the registry|stay .*private|no npm release|404 @arggondev`): **0 hits** (solo queda "release wave" en README:538, prosa de versionado, no relacionada).
+
+## Gates @`a60a02d7` (worktree)
+
+`npm test` **92 files / 1498 passed** (0 failed, 0 skipped), `headless-ci` **6/6** (45.9s) · `npm run build` 0 · `npm run check:plugin` 0 (bundle 338.601 B, sin drift, `git status` limpio) · `npm run lint` 0 · `arggon validate --json` `{errors:[],warnings:[]}` · `arggon spec validate` ok (18 docs, 0 warnings) · drift gate simulado con el bin v0.4.0 sobre un clon del head → `DIRTY=[]` (solo `M ArggonManager/.convention.yml`, excluido por diseño) · template vs copia idénticos.
+
+## CI
+
+- Verde para `74363f83` (el head de código): `cli` pass (run `35721188905`) · `tasks-validate` pass (run `35721188834`).
+- **Aviso:** el tip `a60a02d7` (los 2 commits de tracker, solo el md del item) **no tiene check runs** — se pushearon después del último run. No afecta build/test, pero conviene verificar el run del próximo push (el fix de F1') sobre el tip antes del merge.
+
+## Merge (mecánica)
+
+- Los commits de tracker de la rama apendean el md del item y el veredicto de la ronda 5 (`b3b7611d`, ya en `origin/opencode2`) apendea la misma zona → **1 conflicto esperado** en `ArggonManager/arggon-manager/opencode2-native/native-redesign/task-release-0-4-0.md`; resolver conservando ambas secciones (no perder el veredicto).
+- Después: merge commit (nunca squash), FF `opencode2` → `main` y cierre del item/contenedores.
+
+**NO-MERGE (request changes): solo F1' (una frase).** Todo lo demás está merge-ready.
+
+*Publicado con el CLI local (los `tools.arggon.*` no resuelven el tracker v5 en esta sesión); el comment auto-commitea en `opencode2`.*
