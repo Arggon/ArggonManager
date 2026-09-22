@@ -73,3 +73,7 @@ Resolution (worker `Arggon`, branch `fix/bug-measure-tmp-hygiene-flake`, commit 
 **Gates.** `npm test` 92/1492 green (sibling suite running); `npm run lint` clean; `npm run build` clean (plugin bundle unchanged); `npx prettier --check` clean; `arggon validate` ok (0 warnings, convention v5). Smoke probe: `doctor --json --budget` from an adopter tree → `ok:true`, budget present, tree `arggon-budget-<pid>-XXXXXX` created and removed.
 
 **Files.** `cli/src/measure.ts`, `cli/src/measure.test.ts` — no public CLI flag or JSON-payload change (`BudgetResult` untouched).
+
+### handoff 2026-09-22 @Arggon — next: Review the draft PR (cli/src/measure.ts + measure.test.ts), verify gates, merge, then flip the item to done.
+- branch: fix/bug-measure-tmp-hygiene-flake
+- open questions: None blocking. The item notes a possible supersede by the opencode2-native redesign: if the measure/doctor surface is ever rewritten, the per-run tree helper plus the two regression tests move with i…
