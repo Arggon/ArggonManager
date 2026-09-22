@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-21"
 updated: "2026-09-22"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-start-worktree-lib-resolution
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-start-worktree-lib-resolution.md
