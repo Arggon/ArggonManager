@@ -98,3 +98,7 @@ Branch `feat/task-playbook-2-0-10-nits`, worktree `../ArggonManager-opencode2-ta
 ### Observation (out of scope, coordinator's call)
 
 `opencode/plugins/arggon/index.ts` is **not** prettier-clean on the base: the committed source is semicolon-free while `.prettierrc.json` defaults to semicolons, and `.prettierignore` only excludes the generated bundle — so `npm run format` would rewrite ~1.5k lines. I applied the header edit with a shell patch to keep this diff at 6 lines. No item filed.
+
+### handoff 2026-09-22 @Arggon — next: Review PR #392 (docs+comment only), watch CI, merge with a merge commit (tracker-carrying), then tick the acceptance list and flip the item to done.
+- branch: feat/task-playbook-2-0-10-nits
+- open questions: Plugin source not prettier-clean on base (format once or .prettierignore?); exploration-010 status still open (out of scope); plugin line ~2890 probe list omits 2.0.12.
