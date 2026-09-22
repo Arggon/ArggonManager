@@ -1,10 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { mkdtempSync as _mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync as _mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  createMeasurementTree,
   evaluateBudget,
   formatBudgetLines,
   measureBudget,
@@ -12,6 +13,7 @@ import {
   buildMcpSchemaBudget,
   cliCommand,
   AGENTS_MD_BUDGET_BYTES,
+  FIXTURE_TASK_COUNT,
   MCP_TOOLS_BUDGET_BYTES,
   MCP_TOOLS_BASELINE_BYTES,
 } from "./measure.js";
@@ -50,17 +52,46 @@ describe("budget measurement (task-adr0006-remeasure, ADR 0006)", () => {
     expect(m.showBytes).toBeLessThan(2_048); // bounded read (ADR 0006 dir 3)
   }, 60_000);
 
-  it("always deletes the measurement temp tree (/tmp hygiene)", async () => {
-    await measureBudget();
-    const leftovers = spawnSync(
-      "bash",
-      ["-c", "ls -d ${TMPDIR:-/tmp}/arggon-budget-* 2>/dev/null || true"],
-      {
-        encoding: "utf8",
-      },
-    );
-    expect(leftovers.stdout.trim()).toBe("");
+  it("creates a unique measurement tree per run under the given root", () => {
+    const root = mkdtempSync(join(tmpdir(), "arggon-budget-unit-"));
+    const first = createMeasurementTree(root);
+    const second = createMeasurementTree(root);
+    try {
+      expect(first).not.toBe(second); // mkdtemp: no shared tree between runs
+      const prefix = join(root, `arggon-budget-${process.pid}-`);
+      expect(first.startsWith(prefix)).toBe(true); // owned by this process
+      expect(second.startsWith(prefix)).toBe(true);
+    } finally {
+      rmSync(first, { recursive: true, force: true });
+      rmSync(second, { recursive: true, force: true });
+    }
+  });
+
+  it("always deletes the measurement temp tree (private root; no shared-path globbing)", async () => {
+    // bug-measure-tmp-hygiene-flake: the run's tree lives under a root owned by
+    // this test, so the assertion cannot see — or delete — the in-flight trees
+    // of sibling suites on the same machine (the old script globbed
+    // ${TMPDIR:-/tmp}/arggon-budget-* and flagged exactly those).
+    const root = mkdtempSync(join(tmpdir(), "arggon-budget-hygiene-"));
+    await measureBudget({ tmpRoot: root });
+    expect(readdirSync(root)).toEqual([]);
   }, 60_000);
+
+  it("two concurrent runs in one root never interfere (race regression)", async () => {
+    // bug-measure-tmp-hygiene-flake regression: a sibling run's in-flight tree
+    // (here `sibling`, created before the runs) must survive untouched, and
+    // each of the two concurrent runs must remove only its own tree.
+    const root = mkdtempSync(join(tmpdir(), "arggon-budget-race-"));
+    const sibling = mkdtempSync(join(root, "arggon-budget-sibling-"));
+    const [a, b] = await Promise.all([
+      measureBudget({ tmpRoot: root }),
+      measureBudget({ tmpRoot: root }),
+    ]);
+    expect(a.fixtureItems).toBe(FIXTURE_TASK_COUNT + 3);
+    expect(b.fixtureItems).toBe(FIXTURE_TASK_COUNT + 3);
+    expect(existsSync(sibling)).toBe(true); // never deleted by a sibling run
+    expect(readdirSync(root)).toEqual([basename(sibling)]); // only own trees removed
+  }, 120_000);
 
   it("reports the init --full tree as an advisory line with numeric growth vs the baseline", async () => {
     const m = await measureBudget();
