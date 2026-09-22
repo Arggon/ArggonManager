@@ -194,3 +194,7 @@ Gates after the sync: `npm run build` ✅ · `npm test` **1490/1490 (92 files)**
 `npm run lint` ✅ · `npm run check:plugin` ✅ (bundle 337936 B, no drift) ·
 `npm run arggon -- validate` ✅ v5 · `npm run arggon -- spec validate` ✅ 18 ·
 prettier ✅ on the four touched files (byte-stable where the guard pins it).
+
+### handoff 2026-09-22 @Arggon — next: Review the resumed round (merge 09b7254 + docs/skill sync 7beeedd; 1490 tests, all gates green): confirm CI on the final tip, then merge (merge commit, never squash) and flip done.
+- branch: feat/task-start-worktree-lib-resolution
+- open questions: None blocking. Note the deliberate default: start pre-builds every shadowed workspace package with a build script and a missing entry (no opt-out today; per-invocation skip is a candidate follow-up);…
