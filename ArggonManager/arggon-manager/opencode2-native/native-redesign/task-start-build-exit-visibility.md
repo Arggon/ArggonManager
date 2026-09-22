@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-start-build-exit-visibility
 title: start build-exit visibility + symlink-fallback docs
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-22"
 updated: "2026-09-22"
-claimed_at: "2026-09-22T00:31:48.532Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-start-build-exit-visibility
 ---
 <!--
