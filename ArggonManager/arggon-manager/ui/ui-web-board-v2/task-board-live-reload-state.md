@@ -27,3 +27,15 @@ updated: "2026-09-22"
 - [ ] 
 
 ## Notes
+
+### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Context
+
+Serve mode broadcasts an SSE `reload` and the page runs `location.reload()` for any tracker change (`cli/src/board-serve.ts` RELOAD_SCRIPT), so scroll position, filters, collapsed columns and an open drawer are lost on every write. There is also no indicator when the SSE stream drops and the view goes stale.
+
+## Acceptance
+
+- [ ] A live reload preserves scroll, filter/lens, collapsed columns and an open drawer (state snapshot/restore around rebuild, or a targeted DOM refresh without full `location.reload()`)
+- [ ] A connection state indicator (connecting/live/reconnecting) driven by EventSource `onopen`/`onerror`; a stale board is visually marked
+- [ ] Manual refresh and the offline static export are unaffected (the reload client is serve-only)
+- [ ] Tests (serve unit + Playwright-CLI smoke: move a card, assert preserved state and banner transitions); docs updated
