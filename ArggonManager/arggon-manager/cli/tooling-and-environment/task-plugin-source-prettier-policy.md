@@ -13,7 +13,6 @@ updated: "2026-09-22"
 claimed_at: "2026-09-22T01:28:45.565Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-plugin-source-prettier-policy
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-plugin-source-prettier-policy.md
   Leaves live only under a story. id is the filename stem: task-plugin-source-prettier-policy.
@@ -53,3 +52,33 @@ Observations from the PR #392 review (`task-playbook-2-0-10-nits`):
 - `exploration-opencode2-native-010` → `status: decided` with the Decision section
   linking ADR 0011 (Accepted) and recording that W0–W7 shipped
   (`spec`/`plan-native-first-011` are `implemented`).
+
+### 2026-09-22 @Arggon
+Evidence (worker run, 2026-09-22). Decision applied: keep the authored
+semicolon-free style — `opencode/plugins/arggon/index.ts` added to
+`.prettierignore` with the rationale in the comment (the generated bundle is
+what adopters receive, so reformatting only churns ~2.9k lines of history). No
+source edits. `exploration-opencode2-native-010`: `status: open` → `decided`,
+Decision section links ADR 0011 (Accepted) + ADR 0013 and records W0–W7 shipped
+(`spec`/`plan-native-first-011` are `implemented`); closed-status convention
+follows exploration-005/006 (`decided`).
+
+Commands (worktree `feat/task-plugin-source-prettier-policy`):
+- `npx prettier --check opencode/plugins/arggon/index.ts` → clean (ignored; exit 0)
+- `npx prettier --write opencode/plugins/arggon/index.ts` → sha256 unchanged (no-op)
+- `npx prettier --check opencode/plugins/arggon/index.bundle.ts` → clean (still ignored)
+- `npx prettier --check ArggonManager/docs/explorations/exploration-opencode2-native-010.md` → clean, byte-stable
+- `npm test` → 92 files / 1498 tests passed
+- `npm run lint` → exit 0
+- `npm run build` → exit 0 (bundle unchanged, 338583 bytes)
+- `npm run check:plugin` → exit 0
+- `npm run arggon -- validate --json` → ok:true, 0 errors/warnings
+- `npm run arggon -- spec validate` → ok (18 docs, 0 warnings)
+- `gh pr checks 393` → cli pass (4m18s), tasks-validate pass (34s) on head cf619ee
+
+PR: https://github.com/Arggon/ArggonManager/pull/393 (draft, base `opencode2`).
+Commits: b88f089 claim, cf619ee policy + exploration-010, c6f48fc acceptance tick.
+
+Observation (out of scope, no item filed): `exploration-opencode-v2-native-009`
+is also still `status: open` with Decision "Pending" although ADR 0010 landed —
+candidate for a separate close-out.
