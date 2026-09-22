@@ -17,7 +17,7 @@ import {
   runCreate,
   runUpdate,
   stringifyFrontmatter,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 

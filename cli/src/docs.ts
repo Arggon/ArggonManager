@@ -19,7 +19,7 @@ import {
   writeFileAtomic,
   type GeneratedEntry,
   type TrackerLayout,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 import { bundledTemplatesDir, packageRoot } from "./package-assets.js";
 
 /**
@@ -207,7 +207,7 @@ export const BUNDLED_SKILLS = [
  * Bundled OpenCode V2 plugin (plan-opencode2-009 W2; single-file bundle W3,
  * `task-native-commands-seam`): `arggon init` vendors the **generated**
  * `opencode/plugins/arggon/index.bundle.ts` — the plugin source with
- * `@arggon/lib` inlined by `npm run build:plugin` — to
+ * `@arggondev/lib` inlined by `npm run build:plugin` — to
  * `.opencode/plugins/arggon/index.ts`, where V2 discovers it automatically and
  * loads it in a dependency-less adopter tree (ADR 0011 §5/§6, ADR 0013). Like
  * the skills, the copy carries a generated marker (a `//` line for TypeScript

@@ -39,7 +39,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { parseFrontmatter, runCreate, runUpdate } from "@arggon/lib";
+import { parseFrontmatter, runCreate, runUpdate } from "@arggondev/lib";
 import { runInit } from "../../../cli/src/init.js";
 import {
   ARGON_TOOL_NAMESPACE,
@@ -279,7 +279,7 @@ let kernel: ArgonKernel;
 
 beforeAll(async () => {
   const loaded = await loadArgonKernel();
-  expect(loaded, "@arggon/lib must resolve in the repo").toBeDefined();
+  expect(loaded, "@arggondev/lib must resolve in the repo").toBeDefined();
   kernel = loaded as ArgonKernel;
 });
 

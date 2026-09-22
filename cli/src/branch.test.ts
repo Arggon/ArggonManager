@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runBranch, type GitRunner } from "./branch.js";
-import { runCreate, runUpdate } from "@arggon/lib";
+import { runCreate, runUpdate } from "@arggondev/lib";
 import { runInit } from "./init.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.

@@ -318,7 +318,7 @@ D2 = contract kept, mechanics native.**
 Adopted — [ADR 0011 — Native-first architecture](../adr/0011-native-first-architecture.md)
 (Accepted 2026-09-19): candidate B (native-first hybrid) with D1 = git-native
 tracker stays canonical and D2 = methodology contract kept, mechanics native;
-MCP dropped from the default path and the kernel shipped as `@arggon/lib`
+MCP dropped from the default path and the kernel shipped as `@arggondev/lib`
 ([ADR 0013](../adr/0013-lib-package-split.md)). The program's waves all
 shipped — W0–W7 `task-native-*` items done/cancelled (2026-09-19 → 2026-09-21)
 and [spec-native-first-011](../specs/spec-native-first-011.md) /

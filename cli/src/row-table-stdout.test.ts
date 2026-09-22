@@ -11,7 +11,7 @@ import {
   runShow,
   updateGeneratedSection,
   type ContractWorkItem as WorkItem,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 import { arggonVersion, checksumOf } from "./docs.js";
 
 import { removeFixtureTree } from "./test-tmp.js";

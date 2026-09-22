@@ -13,7 +13,7 @@ import {
 
 // W3 task-native-commands-seam: the vendored plugin is a single-file,
 // dependency-free bundle built from opencode/plugins/arggon/index.ts with
-// @arggon/lib inlined (ADR 0011 §5/§6, ADR 0013). `arggon init` vendors the
+// @arggondev/lib inlined (ADR 0011 §5/§6, ADR 0013). `arggon init` vendors the
 // committed artifact `opencode/plugins/arggon/index.bundle.ts` to
 // `.opencode/plugins/arggon/index.ts`.
 //
@@ -53,9 +53,9 @@ describe("vendored plugin bundle parity (W3)", () => {
     expect(bundleOnDisk(), STALE_HINT).toBe(code);
   });
 
-  it("inlines @arggon/lib through the build-time edge table (no runtime resolution)", () => {
+  it("inlines @arggondev/lib through the build-time edge table (no runtime resolution)", () => {
     const { edges } = buildPluginBundle(repoRoot);
-    expect(edges.get(`opencode/plugins/arggon/index.ts\u0000@arggon/lib`)).toBe("lib/src/index.ts");
+    expect(edges.get(`opencode/plugins/arggon/index.ts\u0000@arggondev/lib`)).toBe("lib/src/index.ts");
     // The kernel's own relative imports all map to inlined modules.
     expect(edges.get("lib/src/index.ts\u0000./list.js")).toBe("lib/src/list.ts");
   });

@@ -23,7 +23,7 @@ This document is owned by **Software Architect**. It complements [`ArggonManager
 ```text
 ArggonManager/          # git-native work tree + product docs (see `ArggonManager/docs/convention.md`)
   docs/                 # product docs: convention, engineering, agents, adr/, specs/, plans/
-lib/                    # @arggon/lib kernel package (ADR 0013): TypeScript sources (lib/src)
+lib/                    # @arggondev/lib kernel package (ADR 0013): TypeScript sources (lib/src)
   src/index.ts          # kernel entry: items, rules, paths, envelopes + operations
   src/operations.ts     # in-process operations: --json envelope + exit codes per command
 cli/                    # root package (arggon-manager): CLI, seam generation, MCP adapter

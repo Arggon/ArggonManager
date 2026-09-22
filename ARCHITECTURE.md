@@ -39,7 +39,7 @@ cli.ts (commander)                     parse args, resolve repo root (paths.ts)
               └─> json.ts / contract.ts      schemaVersion 1 envelope + conventionVersion
 ```
 
-The kernel package entry (`lib/src/index.ts`, package `@arggon/lib`, ADR 0013) exposes
+The kernel package entry (`lib/src/index.ts`, package `@arggondev/lib`, ADR 0013) exposes
 this stack — items, rules, paths and the `--json` envelopes — as one typed surface; the
 root CLI, the MCP adapter and (from W2/W3) the native plugin tools consume the same
 operations (ADR 0011 §4: one logic path, one library).
@@ -65,7 +65,7 @@ never-overwrite (Copier/Helm semantics).
       agents.md     # agent playbook: claims, PRs, JSON contract, MCP
       adr/ specs/ plans/ playbooks/
     <initiative>/<epic>/<story>/  # work items (task-*.md / bug-*.md leaves)
-  lib/              # @arggon/lib: the kernel package (ADR 0013), tests co-located
+  lib/              # @arggondev/lib: the kernel package (ADR 0013), tests co-located
     src/index.ts    # kernel entry: items, rules, paths, envelopes + operations
     src/items|status|update|rules|relations|ids|frontmatter|dates|filter|json|contract.ts
                     # item model, transitions, invariants, envelope contract
@@ -95,7 +95,7 @@ never-overwrite (Copier/Helm semantics).
   status; the CLI implements it and `arggon validate` enforces it — never the reverse.
 - Commands import the kernel; kernel modules never import command modules.
 - Machine surfaces (CLI, MCP adapter, native tools) consume the kernel through the
-  `@arggon/lib` package entry; envelope assembly lives in the kernel operations
+  `@arggondev/lib` package entry; envelope assembly lives in the kernel operations
   (`lib/src/operations.ts`), never in a surface. The kernel ships no assets or
   printing: the root adapter injects the item-templates dir
   (`cli/src/package-assets.ts`).

@@ -1,7 +1,7 @@
 # Release runbook
 
 Cutting a release of ArggonManager — the version bump, the changelog entry, the
-`vX.Y.Z` tag, and the npm publication of the two packages (`@arggon/lib` and
+`vX.Y.Z` tag, and the npm publication of the two packages (`@arggondev/lib` and
 `arggon-manager`, ADR 0013).
 
 ## When to run it
@@ -44,7 +44,7 @@ is the first wave that publishes the packages.
 
 ## Steps
 
-1. Bump `"version"` in `package.json` (0.Y.Z). `@arggon/lib` versions in
+1. Bump `"version"` in `package.json` (0.Y.Z). `@arggondev/lib` versions in
    lockstep with the root; the root declares it as `^0.Y.Z`.
 2. Turn the `## [Unreleased]` section of `CHANGELOG.md` into
    `## <version> (YYYY-MM-DD)` and list **adopter-facing** changes: templates,
@@ -73,22 +73,22 @@ is the first wave that publishes the packages.
 
 Both packages stay `private: true` until the release wave. The release PR
 removes the flag from `package.json` (root) and `lib/package.json`
-(`@arggon/lib`); then, from the tagged commit:
+(`@arggondev/lib`); then, from the tagged commit:
 
 ```bash
 npm ci                                   # prepare builds lib/dist + dist/ + the plugin bundle
-npm publish --workspace @arggon/lib      # kernel first
+npm publish --workspace @arggondev/lib      # kernel first
 npm publish                              # arggon-manager (bin + templates + plugin)
 ```
 
 Notes:
 
-- The root package cannot resolve `@arggon/lib` from the registry before the
-  kernel is published: publish `@arggon/lib` first (same version), and never
+- The root package cannot resolve `@arggondev/lib` from the registry before the
+  kernel is published: publish `@arggondev/lib` first (same version), and never
   publish the root alone.
 - `npm pack` is the pre-release rehearsal and stays the documented install path
   until the registry has both packages (`ArggonManager/docs/ci.md`).
-- Verify after publishing: `npm view @arggon/lib version`,
+- Verify after publishing: `npm view @arggondev/lib version`,
   `npm view arggon-manager version`, then in a scratch directory
   `npm install -g arggon-manager && arggon --version` — the one-liner replaces
   the two-tarball block in the docs (`README.md` § Install,

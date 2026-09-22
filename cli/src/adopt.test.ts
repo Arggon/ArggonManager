@@ -30,7 +30,7 @@ import {
   runCreate,
   runUpdate,
   updateGeneratedSection,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 import { arggonVersion, checksumOf, GENERATED_DOC_COUNT } from "./docs.js";
 import { runDoctor } from "./doctor.js";
 

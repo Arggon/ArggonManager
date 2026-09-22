@@ -16,7 +16,7 @@ import {
   parseLog,
   parseSince,
   runTrend,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 import { runLayoutMigrate } from "./layout-migrate.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.

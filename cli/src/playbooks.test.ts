@@ -11,7 +11,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { itemsById, loadItems, runCreate } from "@arggon/lib";
+import { itemsById, loadItems, runCreate } from "@arggondev/lib";
 import { bundledTemplatesDir } from "./package-assets.js";
 
 import {

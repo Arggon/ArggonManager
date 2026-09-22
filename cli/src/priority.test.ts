@@ -9,7 +9,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseConventionConfig, runPriorityMigrate } from "@arggon/lib";
+import { parseConventionConfig, runPriorityMigrate } from "@arggondev/lib";
 
 // bug-…/task-priority-field-schema: `arggon priority migrate` moves the legacy
 // pN LABEL convention into the v4 `priority` field (highest priority = lowest

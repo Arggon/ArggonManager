@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { evaluateDrop, renderBoardHtml } from "./board.js";
-import { runUpdate } from "@arggon/lib";
+import { runUpdate } from "@arggondev/lib";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];

@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseConventionConfig, runCreate, runUpdate } from "@arggon/lib";
+import { parseConventionConfig, runCreate, runUpdate } from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 import {

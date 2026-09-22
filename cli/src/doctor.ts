@@ -17,7 +17,7 @@ import {
   sanitizeHumanText,
   sanitizeHumanValue,
   type TrackerLayout,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 import { bundledTemplatesDir } from "./package-assets.js";
 import {
   checksumMatches,
@@ -32,7 +32,7 @@ import { measureBudget, formatBudgetLines, type BudgetResult } from "./measure.j
 
 // The sanitizer implementation moved to sanitize.ts (bug-cli-error-output-injection
 // F1) so the CLI error channel shares it; re-exported for existing consumers.
-export { MAX_HUMAN_VALUE_CHARS } from "@arggon/lib";
+export { MAX_HUMAN_VALUE_CHARS } from "@arggondev/lib";
 
 export type DoctorDocs = {
   /** Total x-generated provenance entries. */

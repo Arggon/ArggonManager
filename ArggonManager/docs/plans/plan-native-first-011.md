@@ -31,10 +31,10 @@ ADR 0006 surfaces it touches.
 - **Acceptance:** the package imports from a clean build; the full suite
   (1311+) is green; no rule logic moves outside the kernel.
 - **W1b note (ADR 0013, `task-native-lib-package`):** the library is its own
-  package `@arggon/lib` under the workspace (`lib/`), and the root package
+  package `@arggondev/lib` under the workspace (`lib/`), and the root package
   depends on it; the `arggon-manager/lib` subpath export is removed. W2
   consumes the package entry, and the W3 vendored single-file plugin bundle
-  builds from `@arggon/lib` (the kernel stays dependency-free and asset-free;
+  builds from `@arggondev/lib` (the kernel stays dependency-free and asset-free;
   the root adapter injects the item-templates dir).
 
 ## T2: W2 — Native tools

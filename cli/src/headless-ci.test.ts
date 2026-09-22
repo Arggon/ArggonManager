@@ -18,9 +18,9 @@
  *   4. **MCP is not required anywhere** — no executed step mentions it, and the
  *      recipe stays green with `.mcp.json` and the whole OpenCode seam deleted.
  *
- * Why both tarballs: `@arggon/lib` is `private` (no npm release yet), so the
+ * Why both tarballs: `@arggondev/lib` is `private` (no npm release yet), so the
  * root tarball alone cannot resolve its kernel dependency — `npm install -g
- * arggon-manager-<v>.tgz` fails with `404 @arggon/lib@^0.3.0`. The documented
+ * arggon-manager-<v>.tgz` fails with `404 @arggondev/lib@^0.3.0`. The documented
  * mechanism (ArggonManager/docs/ci.md) packs both packages from a pinned
  * checkout and installs them in one command; this test does exactly that.
  *
@@ -49,7 +49,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CONVENTION_VERSION } from "@arggon/lib";
+import { CONVENTION_VERSION } from "@arggondev/lib";
 import { freshCloneCopy } from "./pack-fixtures.js";
 import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
 
@@ -209,7 +209,7 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     expect(install.status, `${install.stdout}\n${install.stderr}`).toBe(0);
     // The recipe created the pack destination and put both tarballs in it.
     const packs = readdirSync(join(runnerTemp, "arggon-packs")).sort();
-    expect(packs.filter((name) => /^arggon-lib-.*\.tgz$/.test(name))).toHaveLength(1);
+    expect(packs.filter((name) => /^.*-lib-.*\.tgz$/.test(name))).toHaveLength(1);
     expect(packs.filter((name) => /^arggon-manager-.*\.tgz$/.test(name))).toHaveLength(1);
     // `npm ci` + `prepare` built both packages inside the clone.
     expect(existsSync(join(runnerTemp, "arggon-manager", "dist", "cli.js"))).toBe(true);
@@ -295,7 +295,7 @@ describePacked("headless bootstrap + CI (packed install)", () => {
       executable.indexOf("npm pack"),
     );
     expect(install).toContain('mkdir -p "$RUNNER_TEMP/arggon-packs"');
-    expect(install).toContain("npm pack --workspace @arggon/lib");
+    expect(install).toContain("npm pack --workspace lib");
     expect(install).toContain("npm install -g");
     // The recipe is an init-vendored artifact: it must ship in the tarball
     // (the installed package is what `init` reads its templates from) and be
@@ -311,7 +311,7 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     }
     // The recipe is documented in every place B1 touched, mkdir included.
     const doc = readFileSync(CI_DOC, "utf8");
-    expect(doc).toContain("npm pack --workspace @arggon/lib");
+    expect(doc).toContain("npm pack --workspace lib");
     expect(doc).toContain("mkdir -p /tmp/arggon-packs");
     expect(doc).toMatch(/no model, no MCP/i);
     expect(doc).toContain("headless-ci.test.ts");

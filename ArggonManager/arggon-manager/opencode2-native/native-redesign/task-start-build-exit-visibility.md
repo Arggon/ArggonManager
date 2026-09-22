@@ -61,8 +61,8 @@ Tests (mutation-verified: removing either guard fails 2 tests):
 - `cli/src/start.test.ts`: failing-build-emits-entry keeps primary; bare-symlink attach skips; reified install still builds.
 - `cli/src/worktree.test.ts` (real git + real `npm run build` + real pre-commit gate): failing-emits e2e and attach-skip e2e.
 
-Before/after repro (real CLI on a /tmp fixture repo, real gate hook recording `require.resolve("@arggon/lib")`):
-- Phase A, fresh `start --worktree` with a build that emits `dist/index.js` then exits 1 — before: `linkedWorkspaces: []`, farm entry flipped to the worktree copy, gate resolved `<wt>/lib/dist/index.js`; after: `linkedWorkspaces: ["@arggon/lib"]`, farm entry → primary, gate resolved `<primary>/lib/dist/index.js`. The build emitted the entry in both runs (yes).
+Before/after repro (real CLI on a /tmp fixture repo, real gate hook recording `require.resolve("@arggondev/lib")`):
+- Phase A, fresh `start --worktree` with a build that emits `dist/index.js` then exits 1 — before: `linkedWorkspaces: []`, farm entry flipped to the worktree copy, gate resolved `<wt>/lib/dist/index.js`; after: `linkedWorkspaces: ["@arggondev/lib"]`, farm entry → primary, gate resolved `<primary>/lib/dist/index.js`. The build emitted the entry in both runs (yes).
 - Phase B, attach to a pre-created worktree whose install is a bare symlink — before: worktree `lib/dist` PRESENT (wasted build); after: absent (skipped), gate resolved the primary's copy.
 
 Gates on `638b69c`: `npm test` 1494/1495 — the only failure is the pre-existing `bug-measure-tmp-hygiene-flake` (shared-`/tmp` race with concurrent sibling suites; leftover dir names changed between runs; explicitly out of scope for this item) · `npm run lint` ✅ · `npm run build` ✅ · `npm run check:plugin` ✅ (bundle regenerated + committed) · `arggon validate` ✅ v5 · `arggon spec validate` ✅ 18 · prettier ✅ on every touched file.

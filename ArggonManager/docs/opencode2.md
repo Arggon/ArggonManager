@@ -73,7 +73,7 @@ namespace:
 - **Native `arggon` tools (ADR 0011, W2/W3)** — registers the twelve kernel
   tools (`tools.arggon.list`, `create`, `update`, `show`, `next`, `report`,
   `validate`, `comment`, `handoff`, `priority`, `sync`, `import_issues`) that
-  call the kernel **in-process** (the bundle inlines `@arggon/lib`) and return
+  call the kernel **in-process** (the bundle inlines `@arggondev/lib`) and return
   the documented `--json` envelopes. The core tools are `options.pinned` (the
   W3 eight plus `start` from W4: nine) so the runtime keeps them in its Code
   Mode catalog; a kernel failure becomes a typed tool error (`ArgonToolError`:

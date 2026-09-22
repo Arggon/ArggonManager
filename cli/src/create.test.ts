@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseFrontmatter, runCreate, toContractWorkItem } from "@arggon/lib";
+import { parseFrontmatter, runCreate, toContractWorkItem } from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 

@@ -21,7 +21,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { defaultCleanupGit, runCleanup } from "./cleanup.js";
-import { parseFrontmatter, runCreate, runUpdate, runValidate } from "@arggon/lib";
+import { parseFrontmatter, runCreate, runUpdate, runValidate } from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 import { defaultStartGit, runStart } from "./start.js";
@@ -138,7 +138,7 @@ function addFakeDependency(dir: string, name: string): void {
 }
 
 /**
- * npm workspace link in the install — the repo's own `@arggon/lib` shape:
+ * npm workspace link in the install — the repo's own `@arggondev/lib` shape:
  * `node_modules/<scope>/<name> -> ../../<target>` (a relative link to the
  * checkout's own package directory).
  */
@@ -153,9 +153,9 @@ function addWorkspaceLink(dir: string, scope: string, name: string, target: stri
  * package copy the linked install shadows.
  */
 function addWorkspacePackage(dir: string): void {
-  addWorkspaceLink(dir, "@arggon", "lib", "lib");
+  addWorkspaceLink(dir, "@arggondev", "lib", "lib");
   mkdirSync(join(dir, "lib"), { recursive: true });
-  writeFileSync(join(dir, "lib", "package.json"), JSON.stringify({ name: "@arggon/lib" }));
+  writeFileSync(join(dir, "lib", "package.json"), JSON.stringify({ name: "@arggondev/lib" }));
   git(["add", "lib"], dir);
   git(["commit", "--quiet", "-m", "workspace package"], dir);
 }
@@ -360,11 +360,11 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     expect(result.linkedNodeModules).toBe(true);
     // Resolution goes into the primary checkout: the worktree's spawned CLI and
     // tests would run the primary's kernel build, not the worktree's own copy.
-    expect(result.linkedWorkspaces).toEqual(["@arggon/lib"]);
+    expect(result.linkedWorkspaces).toEqual(["@arggondev/lib"]);
     // A worktree without its own copy has nothing to shadow: the fresh worktree
     // of a repo that does not track `lib/` stays silent.
     const plain = initRepo();
-    addWorkspaceLink(plain, "@arggon", "lib", "lib");
+    addWorkspaceLink(plain, "@arggondev", "lib", "lib");
     const plainResult = runStart(
       { cwd: plain, id: "task-bravo", assignee: "arggon", worktree: true, now: NOW },
       { git: localGit() },
@@ -378,7 +378,7 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     // The remediation the docs recommend, run as the post-start hook: it
     // reifies a real local install whose workspace link points at the
     // worktree's own copy.
-    setPostStart(dir, "mkdir -p node_modules/@arggon && ln -s ../../lib node_modules/@arggon/lib");
+    setPostStart(dir, "mkdir -p node_modules/@arggondev && ln -s ../../lib node_modules/@arggondev/lib");
 
     const result = runStart(
       { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
@@ -404,7 +404,7 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     );
     expect(relinked.postStart?.ok).toBe(true);
     expect(relinked.linkedNodeModules).toBe(true);
-    expect(relinked.linkedWorkspaces).toEqual(["@arggon/lib"]);
+    expect(relinked.linkedWorkspaces).toEqual(["@arggondev/lib"]);
   });
 
   it("keeps the worktree, reports the failing step + remediation, and a re-run attaches", () => {
@@ -1293,10 +1293,10 @@ describe("start --worktree flips workspace packages to the worktree copy (task-s
     dir: string,
     opts: { build?: string | null; built?: boolean } = {},
   ): void {
-    addWorkspaceLink(dir, "@arggon", "lib", "lib");
+    addWorkspaceLink(dir, "@arggondev", "lib", "lib");
     mkdirSync(join(dir, "lib"), { recursive: true });
     const manifest: Record<string, unknown> = {
-      name: "@arggon/lib",
+      name: "@arggondev/lib",
       version: "1.0.0",
       main: "dist/index.js",
     };
@@ -1314,14 +1314,14 @@ describe("start --worktree flips workspace packages to the worktree copy (task-s
 
   /**
    * The documented gate stand-in: it records where the CLI resolves
-   * `@arggon/lib` from the worktree, and fails the commit when it cannot
+   * `@arggondev/lib` from the worktree, and fails the commit when it cannot
    * resolve at all.
    */
   function setResolutionGate(dir: string): void {
     setPreCommitHook(
       dir,
       "#!/bin/sh\n" +
-        "node -e \"require('fs').writeFileSync('.gate-resolution', require.resolve('@arggon/lib'))\" || exit 1\n",
+        "node -e \"require('fs').writeFileSync('.gate-resolution', require.resolve('@arggondev/lib'))\" || exit 1\n",
     );
   }
 
@@ -1337,7 +1337,7 @@ describe("start --worktree flips workspace packages to the worktree copy (task-s
     );
 
     expect(result.linkedNodeModules).toBe(true);
-    expect(result.builtWorkspaces).toEqual(["@arggon/lib"]);
+    expect(result.builtWorkspaces).toEqual(["@arggondev/lib"]);
     expect(result.linkedWorkspaces).toEqual([]);
     expect(result.committed).toBe(true);
     // The gate ran BEFORE the claim commit and loaded the worktree's own build:
@@ -1348,7 +1348,7 @@ describe("start --worktree flips workspace packages to the worktree copy (task-s
     // The install is a link farm (a real directory, ignored by the repo's
     // node_modules/ pattern) whose workspace entry points at the worktree copy.
     expect(lstatSync(join(expectedPath, "node_modules")).isSymbolicLink()).toBe(false);
-    expect(readlinkSync(join(expectedPath, "node_modules", "@arggon", "lib"))).toBe(
+    expect(readlinkSync(join(expectedPath, "node_modules", "@arggondev", "lib"))).toBe(
       join(expectedPath, "lib"),
     );
     expect(git(["status", "--porcelain"], expectedPath)).not.toContain("node_modules");
@@ -1372,7 +1372,7 @@ describe("start --worktree flips workspace packages to the worktree copy (task-s
     expect(result.builtWorkspaces).toEqual([]);
     // The unbuilt copy has no build script to run: it stays on the primary's
     // copy, and the report keeps the requirement visible.
-    expect(result.linkedWorkspaces).toEqual(["@arggon/lib"]);
+    expect(result.linkedWorkspaces).toEqual(["@arggondev/lib"]);
     expect(result.committed).toBe(true);
     expect(readFileSync(join(expectedPath, ".gate-resolution"), "utf8")).toBe(
       join(dir, "lib", "dist", "index.js"),
@@ -1391,7 +1391,7 @@ describe("start --worktree flips workspace packages to the worktree copy (task-s
     );
 
     expect(result.builtWorkspaces).toEqual([]);
-    expect(result.linkedWorkspaces).toEqual(["@arggon/lib"]);
+    expect(result.linkedWorkspaces).toEqual(["@arggondev/lib"]);
     expect(result.committed).toBe(true);
     expect(readFileSync(join(expectedPath, ".gate-resolution"), "utf8")).toBe(
       join(dir, "lib", "dist", "index.js"),
@@ -1416,7 +1416,7 @@ describe("start --worktree flips workspace packages to the worktree copy (task-s
     );
 
     expect(result.builtWorkspaces).toEqual([]);
-    expect(result.linkedWorkspaces).toEqual(["@arggon/lib"]);
+    expect(result.linkedWorkspaces).toEqual(["@arggondev/lib"]);
     expect(result.committed).toBe(true);
     expect(readFileSync(join(expectedPath, ".gate-resolution"), "utf8")).toBe(
       join(dir, "lib", "dist", "index.js"),
@@ -1456,7 +1456,7 @@ describe("start --worktree flips workspace packages to the worktree copy (task-s
     // The build was skipped, not run and discarded: no local build output
     // appeared and the install keeps resolving the primary's copy.
     expect(existsSync(join(expectedPath, "lib", "dist", "index.js"))).toBe(false);
-    expect(result.linkedWorkspaces).toEqual(["@arggon/lib"]);
+    expect(result.linkedWorkspaces).toEqual(["@arggondev/lib"]);
     expect(result.committed).toBe(true);
     expect(readFileSync(join(expectedPath, ".gate-resolution"), "utf8")).toBe(
       join(dir, "lib", "dist", "index.js"),
@@ -1472,7 +1472,7 @@ describe("start --worktree flips workspace packages to the worktree copy (task-s
       { git: localGit() },
     );
     const wt = started.worktreePath!;
-    expect(started.builtWorkspaces).toEqual(["@arggon/lib"]);
+    expect(started.builtWorkspaces).toEqual(["@arggondev/lib"]);
 
     // Close the item on its branch and merge it, so cleanup can prune.
     runUpdate({ cwd: wt, id: "task-alpha", status: "done", now: NOW });

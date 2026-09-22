@@ -18,7 +18,7 @@ import {
   runCreate,
   updateGeneratedSection,
   type GeneratedEntry,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 import { GENERATED_DOC_COUNT, OPENCODE_CONFIG_CANDIDATES } from "./docs.js";
 import {
   formatDoctorReport,

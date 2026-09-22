@@ -26,7 +26,7 @@ import {
   readConventionConfig,
   updateGeneratedSection,
   type GeneratedEntry,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 import { runInit } from "./init.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.

@@ -70,7 +70,7 @@ agents in this codebase — read before mutating the tracker or merging.
   `git branch -D <branch>` when start created the branch).
 - **A worktree resolves workspace packages to its OWN copy, and reports the
   exceptions.** `start --worktree` points every workspace package the worktree
-  also carries (`node_modules/@arggon/lib` shape) at the worktree copy and
+  also carries (`node_modules/@arggondev/lib` shape) at the worktree copy and
   pre-builds it with the package's own `build` script when its declared entry is
   missing (the built names are printed on stdout), so the spawned CLI and tests
   run the branch's build instead of the primary's. Every such package with a

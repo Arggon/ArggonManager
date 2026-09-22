@@ -22,7 +22,7 @@ import {
   runValidate,
   toContractWorkItem,
   type GhExecutor,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 

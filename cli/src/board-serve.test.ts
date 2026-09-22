@@ -16,7 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { startBoardServer, type BoardServeHandle } from "./board-serve.js";
 import type { BoardGithub, PrInfo } from "./board.js";
 import { runInit } from "./init.js";
-import { runCreate } from "@arggon/lib";
+import { runCreate } from "@arggondev/lib";
 import { removeFixtureTree } from "./test-tmp.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test

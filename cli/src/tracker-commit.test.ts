@@ -36,7 +36,7 @@ import {
   trackerCommitMessage,
   trackerGitLockKey,
   updateCommitMessage,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 import { runStart, defaultStartGit } from "./start.js";
@@ -336,7 +336,7 @@ describe("tracker auto-commit with gitignored paths", () => {
     const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     vi.resetModules();
     try {
-      const { commitTrackerMutation: mockedMutation } = await import("@arggon/lib");
+      const { commitTrackerMutation: mockedMutation } = await import("@arggondev/lib");
       const result = mockedMutation(dir, [join(dir, tracked), join(dir, ignored)], {
         message: trackerCommitMessage("generated", ["init docs (2 files)"]),
       });
@@ -858,7 +858,7 @@ function execGh(payload: string) {
   return ((_file: string, args: string[]) => {
     if (args[0] === "issue") return payload;
     throw new Error(`Unexpected: ${args.join(" ")}`);
-  }) as unknown as import("@arggon/lib").GhExecutor;
+  }) as unknown as import("@arggondev/lib").GhExecutor;
 }
 
 describe("tracker auto-commit on import-issues", () => {
@@ -963,7 +963,7 @@ describe("commitTrackerMutation edge cases", () => {
     // import below re-evaluates tracker-commit.js against the mock.
     vi.resetModules();
     try {
-      const { commitTrackerMutation: mockedMutation } = await import("@arggon/lib");
+      const { commitTrackerMutation: mockedMutation } = await import("@arggondev/lib");
       const result = mockedMutation(dir, [itemPath], {
         message: trackerCommitMessage("commented", ["task-rate-limit"]),
       });
@@ -1017,7 +1017,7 @@ describe("commitTrackerMutation edge cases", () => {
     const stderr = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     vi.resetModules();
     try {
-      const mod = await import("@arggon/lib");
+      const mod = await import("@arggondev/lib");
       const result = mod.commitTrackerMutation(dir, [itemPath], {
         message: trackerCommitMessage("commented", ["task-rate-limit"]),
       });

@@ -10,7 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { HANDOFF_SESSION_CAP, conventionPathForRoot, runCreate } from "@arggon/lib";
+import { HANDOFF_SESSION_CAP, conventionPathForRoot, runCreate } from "@arggondev/lib";
 import { arggonVersion } from "./docs.js";
 
 import { runInit } from "./init.js";

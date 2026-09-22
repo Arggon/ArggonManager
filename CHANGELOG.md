@@ -36,7 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **`ArggonManager/` tracker root** (ADR 0012): the tracker and all product
   docs live under `ArggonManager/`; legacy `tasks/` trees are still detected and
   migrate with `arggon migrate --layout` — no hard break.
-- **Two-package distribution** (ADR 0013): `@arggon/lib` (the kernel package)
+- **Two-package distribution** (ADR 0013): `@arggondev/lib` (the kernel package)
   and `arggon-manager` (headless bin + templates + plugin). Pre-release they
   install from packed tarballs (both together — the root package alone cannot
   resolve the private kernel); after the release wave, one line:

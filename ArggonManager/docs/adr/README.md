@@ -13,4 +13,4 @@ Files: `NNNN-short-title.md` (four-digit number, kebab title).
 | [0010](./0010-opencode2-native-architecture.md) | OpenCode2 native architecture: portable kernel, native V2 surface            | Partially superseded by 0011    |
 | [0011](./0011-native-first-architecture.md)     | Native-first architecture: OpenCode-native surface over a git-native tracker | Accepted (amended by 0013)      |
 | [0012](./0012-tracker-root-layout.md)           | Tracker root and product docs layout: `ArggonManager/`                       | Accepted                        |
-| [0013](./0013-lib-package-split.md)             | Kernel package: `@arggon/lib`                                                | Accepted                        |
+| [0013](./0013-lib-package-split.md)             | Kernel package: `@arggondev/lib`                                                | Accepted                        |

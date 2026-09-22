@@ -290,7 +290,7 @@ describe("TUI entry wiring (registerArgonTui)", () => {
     for (const forbidden of [
       'from "@opencode/plugin',
       'require("@opencode/plugin',
-      'from "@arggon/lib',
+      'from "@arggondev/lib',
     ]) {
       expect(source).not.toContain(forbidden);
     }

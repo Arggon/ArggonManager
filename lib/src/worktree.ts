@@ -55,7 +55,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
  * workspace-link shape (`<install>/@scope/name -> ../../<relativePath>`).
  */
 export type LocalWorkspacePackage = {
-  /** Package name as it appears in the install, e.g. `@arggon/lib`. */
+  /** Package name as it appears in the install, e.g. `@arggondev/lib`. */
   name: string;
   /** Absolute path of the worktree's own copy, e.g. `<worktree>/lib`. */
   path: string;
@@ -132,7 +132,7 @@ export function packageBuildScript(pkgDir: string): string | undefined {
 /**
  * Workspace links inside the PRIMARY install: entries whose symlink resolves
  * into the primary checkout itself but outside its install
- * (`node_modules/@arggon/lib -> ../../lib`). Ordinary dependencies and
+ * (`node_modules/@arggondev/lib -> ../../lib`). Ordinary dependencies and
  * install-internal aliases are not workspace links. Physical detection (as in
  * `linkedWorkspacePackages`): symlinks are resolved through their real parent,
  * so a workspace whose own directory does not exist is simply absent.

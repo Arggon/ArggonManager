@@ -2,7 +2,7 @@
 type: task
 status: done
 id: task-start-worktree-lib-resolution
-title: "Worktree resolution: flip @arggon/lib to the worktree copy"
+title: "Worktree resolution: flip @arggondev/lib to the worktree copy"
 assignee: Arggon
 branch: feat/task-start-worktree-lib-resolution
 parent: native-redesign
@@ -18,15 +18,15 @@ updated: "2026-09-22"
   parent MUST be the story id. Omit assignee when unassigned. Omit blocked_reason unless status is blocked.
 -->
 
-# Worktree resolution: flip @arggon/lib to the worktree copy
+# Worktree resolution: flip @arggondev/lib to the worktree copy
 
 ## Context
 
 Follow-up from the PR #384 review (`task-native-lib-hygiene`, finding 2). The
 current fix documents and enforces the limit: a linked `node_modules` makes
-`@arggon/lib` resolve to the **primary** checkout, and `start` reports the
+`@arggondev/lib` resolve to the **primary** checkout, and `start` reports the
 affected workspace packages (`linkedWorkspaces`, additive). The real flip was
-deferred because a link farm pointing `@arggon/lib` at the worktree copy needs
+deferred because a link farm pointing `@arggondev/lib` at the worktree copy needs
 `<worktree>/lib/dist` **before** the claim commit's pre-commit gate — either
 `start` builds the kernel (layering question) or
 `bug-start-worktree-node-modules` regresses.
@@ -37,7 +37,7 @@ deferred because a link farm pointing `@arggon/lib` at the worktree copy needs
       a per-worktree link farm with a pre-built `lib/dist`, or a documented
       permanent limit.
 - [x] If flipped: tests cover a fresh worktree where the CLI resolves
-      `@arggon/lib` to the worktree copy, and the pre-commit gate still runs.
+      `@arggondev/lib` to the worktree copy, and the pre-commit gate still runs.
 - [x] Docs (`CONTRIBUTING`/`README`/`json-output`) and the skill match the
       behavior; no regression of `bug-start-worktree-node-modules`.
       `CONTRIBUTING`/`README`/`docs/agents.md`/`docs/convention.md` landed with
@@ -69,7 +69,7 @@ script, so the pre-commit gate loads the branch's kernel. A copy that cannot be
 built (no script, failing build, missing entry) keeps the primary's copy and is
 reported by `linkedWorkspaces` — `bug-start-worktree-node-modules` cannot
 regress. The rule is generic npm-workspace knowledge (same shape as
-`linkedWorkspacePackages`), not kernel-specific: no hardcoded `@arggon/lib` and
+`linkedWorkspacePackages`), not kernel-specific: no hardcoded `@arggondev/lib` and
 no new config key or CLI flag.
 
 Rejected alternatives, with measured evidence:
@@ -85,29 +85,29 @@ Rejected alternatives, with measured evidence:
 
 ## Before / after (real CLI + real pre-commit gate, fresh worktree)
 
-Before: `@arggon/lib` resolved to `<primary>/lib/dist/index.js` and `start`
+Before: `@arggondev/lib` resolved to `<primary>/lib/dist/index.js` and `start`
 printed the `linkedWorkspaces` note. After (fresh clone, scratch bare origin,
 `start --worktree` on a claimed item):
 
 ```
 node_modules: linked from the primary checkout (the project gate can run in the worktree)
-workspace: built @arggon/lib from the worktree copy (the install resolves it worktree-locally)
+workspace: built @arggondev/lib from the worktree copy (the install resolves it worktree-locally)
 ```
 
 Observed (all paths in the fresh worktree):
 
-- the pre-commit hook's own `require.resolve('@arggon/lib')` record:
+- the pre-commit hook's own `require.resolve('@arggondev/lib')` record:
   `<wt>/lib/dist/index.js` — the gate (before the claim commit) loaded the
   branch's kernel, not the primary's
 - resolution from the CLI entry (`createRequire('<wt>/cli/src/cli.ts')`):
   `<wt>/lib/dist/index.js`
 - install shape: `node_modules` is a real directory;
-  `node_modules/@arggon/lib -> <wt>/lib`; `node_modules/tsx -> <primary>/node_modules/tsx`
+  `node_modules/@arggondev/lib -> <wt>/lib`; `node_modules/tsx -> <primary>/node_modules/tsx`
 - `git status --porcelain` in the fresh worktree lists no `node_modules`
   (the farm directory is ignored); the claim commit still stages only the item
   file
 - negative proof: deleting `<wt>/lib/dist/index.js` makes the spawned CLI fail
-  with `ERR_MODULE_NOT_FOUND ... <wt>/node_modules/@arggon/lib/dist/index.js` —
+  with `ERR_MODULE_NOT_FOUND ... <wt>/node_modules/@arggondev/lib/dist/index.js` —
   there is no silent fallback to the primary's build
 - `start` wall time 3.4 s total (kernel build included)
 
@@ -212,24 +212,24 @@ código, scope, y smoke bloqueante de CLI (evidencia abajo). CI en `67bd906`:
 
 Clone scratch de la rama en `/tmp/opencode/pr388-smoke` (origin redirigido a un
 bare local para no tocar el repo), `npm ci` real, hook `pre-commit` real que
-registra `require.resolve('@arggon/lib')` y corre `npm run arggon -- validate`.
+registra `require.resolve('@arggondev/lib')` y corre `npm run arggon -- validate`.
 
 - **Fresh worktree (`start <id> --worktree`)**: el claim commit corrió el gate y
-  registró `<wt>/lib/dist/index.js`; `createRequire('<wt>/cli/src/cli.ts').resolve('@arggon/lib')`
+  registró `<wt>/lib/dist/index.js`; `createRequire('<wt>/cli/src/cli.ts').resolve('@arggondev/lib')`
   → `<wt>/lib/dist/index.js`; stdout
-  `workspace: built @arggon/lib from the worktree copy (the install resolves it worktree-locally)`;
+  `workspace: built @arggondev/lib from the worktree copy (the install resolves it worktree-locally)`;
   `arggon validate` ok dentro del gate.
-- **Farm**: `node_modules` es directorio real; `@arggon/lib -> <wt>/lib`;
+- **Farm**: `node_modules` es directorio real; `@arggondev/lib -> <wt>/lib`;
   `.arggon-link-farm` → `<primary>/node_modules`; `tsx -> <primary>/node_modules/tsx`;
   `git status --porcelain` vacío; el claim commit stagea solo el item `.md`.
 - **Negativo**: borrar `<wt>/lib/dist/index.js` → el CLI en el worktree sale 1 con
-  `ERR_MODULE_NOT_FOUND ... file://<wt>/node_modules/@arggon/lib/dist/index.js`
-  (sin fallback al primario); rebuild `npm run build --workspace @arggon/lib` en el
+  `ERR_MODULE_NOT_FOUND ... file://<wt>/node_modules/@arggondev/lib/dist/index.js`
+  (sin fallback al primario); rebuild `npm run build --workspace @arggondev/lib` en el
   worktree ok.
-- **`npm ci` sobre el farm**: reifica (install real, `@arggon/lib -> ../../lib`),
+- **`npm ci` sobre el farm**: reifica (install real, `@arggondev/lib -> ../../lib`),
   primario intacto.
 - **`cleanup --prune`**: remueve el worktree del farm sin seguir entradas (el
-  primario conserva `lib/dist` y `node_modules/@arggon/lib`); el `git branch -d`
+  primario conserva `lib/dist` y `node_modules/@arggondev/lib`); el `git branch -d`
   falló solo por el remoto sintético no pusheado y se reportó como
   `leftoverBranch` (comportamiento documentado).
 - **Regresión `bug-start-worktree-node-modules`**: sin workspace package shadowed

@@ -20,7 +20,7 @@ import {
   sanitizeHumanTextUncapped,
   toContractWorkItem,
   type ContractWorkItem as WorkItem,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 /** Default geometry when the terminal size cannot be queried. */
 export const TUI_DEFAULT_WIDTH = 80;

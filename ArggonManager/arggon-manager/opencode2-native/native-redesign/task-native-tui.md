@@ -136,7 +136,7 @@ The playbook frontmatter still pins `version: 2.0.10`; all W5 probes, `smoke:tui
 - Display-only: board.ts imports only read APIs (`findTasksDir`, `loadItems`, `itemsById`, `openDependencies`, `runNext`, `sanitize…`); the no-write unit test passes.
 - Feature detection + failure isolation: every optional surface (`ui.slot`, `ui.panel.open`, `ui.toast.show`, `keymap.layer`, `data.location.vcs.info`) is optional-chained and try/caught, `setup` returns a noop disposer on failure, `panel.open → false` becomes a toast (unit-tested).
 - Bundle: rebuild byte-identical (`check:plugin`, 39 modules, 326,046 B); the wrapper forwards every named value export `tui.tsx` imports (`ARGON_BOARD_PANEL`, `boardSnapshot`, `boardTreeLines`, `sidebarStatusLine`, …); bundle loads dependency-less in a temp dir.
-- Type gate `cli/tsconfig.plugin.json` strict (`index.ts` + `board.ts`; `@arggon/lib` → `lib/src/index.ts`, build-independent) passes.
+- Type gate `cli/tsconfig.plugin.json` strict (`index.ts` + `board.ts`; `@arggondev/lib` → `lib/src/index.ts`, build-independent) passes.
 - Provenance/parity: `init` stamps `tui.tsx` (`// arggon:generated template="…"`), byte-parity + idempotent refresh asserted in `init-opencode.test.ts`; `.gitignore` covers the derived copy.
 - Gates: `npm test` 1437 passed / 1 failed, `lint`, `build`, `check:plugin`, `arggon validate` (v5, 0 warnings), `context:report -- --strict` all bounds pass with the claimed bytes (AGENTS 2,005 B; native 12,182 B; MCP 10,507 B; item block 252 B).
   - The 1 failure is `cli/src/measure.test.ts` "[…] /tmp hygiene" (`/tmp/arggon-budget-*` leftover): flake from a concurrent run — isolated rerun green (11/11), file untouched by the PR, CI green on the same SHA. Pre-existing, not W5.

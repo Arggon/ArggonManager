@@ -23,7 +23,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { runCreate } from "@arggon/lib";
+import { runCreate } from "@arggondev/lib";
 import { runInit } from "./init.js";
 import { removeFixtureTree } from "./test-tmp.js";
 

@@ -22,7 +22,7 @@ export interface PackedFile {
 }
 
 export interface PackResult {
-  /** Tarball file name inside the pack destination (`arggon-lib-0.3.0.tgz`). */
+  /** Tarball file name inside the pack destination (`arggondev-lib-0.3.0.tgz`). */
   filename: string;
   name: string;
   version: string;

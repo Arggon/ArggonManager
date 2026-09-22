@@ -18,7 +18,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runAdoptAck } from "./adopt.js";
-import { CONVENTION_VERSION, readConventionConfig } from "@arggon/lib";
+import { CONVENTION_VERSION, readConventionConfig } from "@arggondev/lib";
 import { generateDocs } from "./docs.js";
 import { runInit } from "./init.js";
 
@@ -40,8 +40,8 @@ vi.mock("node:fs", async (importOriginal) => {
   };
 });
 
-vi.mock("@arggon/lib", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@arggon/lib")>();
+vi.mock("@arggondev/lib", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@arggondev/lib")>();
   return {
     ...actual,
     writeFileAtomic(path: string, content: string) {

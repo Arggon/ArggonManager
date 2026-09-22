@@ -15,7 +15,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseFrontmatter, runCreate } from "@arggon/lib";
+import { parseFrontmatter, runCreate } from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 import { removeFixtureTree } from "./test-tmp.js";

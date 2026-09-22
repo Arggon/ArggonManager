@@ -2,7 +2,7 @@ import { mkdtempSync as _mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { assertUpdateRules, runCreate, runUpdate } from "@arggon/lib";
+import { assertUpdateRules, runCreate, runUpdate } from "@arggondev/lib";
 import { runInit } from "./init.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.

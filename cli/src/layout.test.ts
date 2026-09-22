@@ -27,7 +27,7 @@ import {
   runList,
   runValidate,
   trackerAt,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 const tmpDirs: string[] = [];
 afterEach(() => {

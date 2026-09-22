@@ -8,7 +8,7 @@ import {
   parseConventionConfig,
   updateGeneratedSection,
   writeFileAtomic,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 /**
  * `arggon migrate --layout` (ADR 0012): move a legacy `tasks/` tracker (and

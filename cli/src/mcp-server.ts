@@ -17,12 +17,12 @@ import {
   updateOperation,
   validateOperation,
   type CommandOutcome,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 /**
  * Stdio MCP server exposing the shared kernel (list/create/update/comment) as
  * MCP tools. No new schema logic: tool handlers call the shared kernel
- * operations (`lib/src/operations.ts`, exported by the `@arggon/lib`
+ * operations (`lib/src/operations.ts`, exported by the `@arggondev/lib`
  * entry) — the same path the CLI uses — and return the documented `--json`
  * envelope objects as tool text.
  * Agent playbook rules are enforced by passing `agent: true` to runUpdate —

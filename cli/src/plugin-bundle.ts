@@ -5,7 +5,7 @@
  * `arggon init` vendors ONE file into `.opencode/plugins/arggon/index.ts`: the
  * adopter tree must load the plugin (and the native `arggon` tools) without a
  * `node_modules` install. The bundle is built here from the plugin source
- * (`opencode/plugins/arggon/index.ts`) with `@arggon/lib` inlined, using only
+ * (`opencode/plugins/arggon/index.ts`) with `@arggondev/lib` inlined, using only
  * the TypeScript compiler API (already a devDependency) — no bundler
  * dependency:
  *
@@ -41,7 +41,7 @@ export const PLUGIN_BUNDLE = "opencode/plugins/arggon/index.bundle.ts";
 export const KERNEL_ENTRY = "lib/src/index.ts";
 
 /** Bare specifier the plugin imports the kernel with (mapped to KERNEL_ENTRY). */
-export const KERNEL_PACKAGE = "@arggon/lib";
+export const KERNEL_PACKAGE = "@arggondev/lib";
 
 /**
  * Named exports the vendored bundle forwards (W5 `task-native-tui`). The
@@ -89,7 +89,7 @@ function toPosix(path: string): string {
  *
  * TypeScript NodeNext source imports carry the emitted `.js` extension even
  * though the file on disk is `.ts` (`./frontmatter.js`), so the `.ts` sibling
- * is tried first; `@arggon/lib` maps to the kernel entry.
+ * is tried first; `@arggondev/lib` maps to the kernel entry.
  */
 export function resolveModuleSpecifier(
   root: string,

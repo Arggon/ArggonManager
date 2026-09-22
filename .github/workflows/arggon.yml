@@ -22,7 +22,7 @@ on:
   pull_request:
 
 env:
-  # While `arggon-manager` and `@arggon/lib` stay `private` (no npm release
+  # While `arggon-manager` and `@arggondev/lib` stay `private` (no npm release
   # yet), the bin is packed from this pinned checkout — BOTH packages, because
   # the root tarball alone cannot resolve the private kernel dependency.
   # After release, replace the install step with the one-liner
@@ -47,9 +47,9 @@ jobs:
           # `npm pack --pack-destination` does not create the destination
           # directory (ENOENT, exit 254 on npm 10 and 12): create it first.
           mkdir -p "$RUNNER_TEMP/arggon-packs"
-          npm pack --workspace @arggon/lib --pack-destination "$RUNNER_TEMP/arggon-packs"
+          npm pack --workspace lib --pack-destination "$RUNNER_TEMP/arggon-packs"
           npm pack --pack-destination "$RUNNER_TEMP/arggon-packs"
-          npm install -g "$RUNNER_TEMP/arggon-packs"/arggon-lib-*.tgz \
+          npm install -g "$RUNNER_TEMP/arggon-packs"/*-lib-*.tgz \
                          "$RUNNER_TEMP/arggon-packs"/arggon-manager-*.tgz
 
       - name: Bootstrap the tracker (idempotent; never overwrites adopter files)

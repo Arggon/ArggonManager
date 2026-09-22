@@ -18,7 +18,7 @@ import {
   unlinkNodeModulesLink,
   withItemLock,
   type WorkItem,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 /**
  * Worktree dependency-link helpers live in the kernel since W4
@@ -31,7 +31,7 @@ export {
   linkNodeModules,
   linkedWorkspacePackages,
   unlinkNodeModulesLink,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 import { runBranch, type GitRunner } from "./branch.js";
 
 export type StartOptions = {
@@ -90,7 +90,7 @@ export type StartResult = {
   linkedNodeModules: boolean;
   /**
    * Workspace packages the worktree's install still resolves into the **primary**
-   * checkout (W6/PR-374 finding 2), e.g. `["@arggon/lib"]` in this repo. Start
+   * checkout (W6/PR-374 finding 2), e.g. `["@arggondev/lib"]` in this repo. Start
    * links the primary install as a per-worktree link farm, so a workspace
    * package the worktree owns is pointed at the worktree copy and built before
    * the claim-commit gate (`builtWorkspaces`); only packages that could not be
@@ -109,7 +109,7 @@ export type StartResult = {
   linkedWorkspaces: string[];
   /**
    * Workspace packages start built in the worktree and pointed at the worktree
-   * copy (task-start-worktree-lib-resolution), e.g. `["@arggon/lib"]`. The
+   * copy (task-start-worktree-lib-resolution), e.g. `["@arggondev/lib"]`. The
    * worktree's spawned CLI then loads the worktree's kernel instead of the
    * primary's build. Empty without a worktree, when every local copy is already
    * importable, or when no local copy could be built.

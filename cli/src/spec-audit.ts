@@ -17,7 +17,7 @@ import {
   findTasksDir,
   repoRootFromTasks,
   sanitizeHumanTextUncapped,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 // ---------------------------------------------------------------------------
 // Normalization + similarity (exported for tests)

@@ -39,14 +39,14 @@ Two npm packages make up this repo:
 - **`arggon-manager`** — the manifest at the **repo root**: the CLI/headless bin
   (`cli/src/` → `dist/`), the vendored plugin and the runtime assets
   (`templates/`, `skills/`, `opencode/`).
-- **`@arggon/lib`** (`lib/`, ADR [`0013`](ArggonManager/docs/adr/0013-lib-package-split.md)) —
+- **`@arggondev/lib`** (`lib/`, ADR [`0013`](ArggonManager/docs/adr/0013-lib-package-split.md)) —
   the kernel library (`lib/src/` → `lib/dist/`) that the CLI and the native
-  tools consume through the workspace; every `@arggon/lib` import in `cli/`
+  tools consume through the workspace; every `@arggondev/lib` import in `cli/`
   resolves through `node_modules` to `lib/dist`.
 
 `npm run build` builds the kernel first, then the root. **Build before running
 the suite** (and after any `lib/**` change): the tests that drive surfaces in
-process do not need the build (vitest resolves `@arggon/lib` to the kernel
+process do not need the build (vitest resolves `@arggondev/lib` to the kernel
 source), but the tests that spawn the real CLI resolve it through
 `node_modules` → `lib/dist`, so without a build they fail with
 `ERR_MODULE_NOT_FOUND`. CI runs `npm ci` → `npm run build` → `npm test`
@@ -57,7 +57,7 @@ and for worktree-local resolution: when the primary checkout has a
 `node_modules` and the worktree does not, start mirrors the primary install as a
 **link farm** (a real `node_modules` directory whose entries link the primary's
 packages). A workspace package the worktree carries its own copy of — here
-`@arggon/lib` — resolves to the **worktree copy**: start runs that package's own
+`@arggondev/lib` — resolves to the **worktree copy**: start runs that package's own
 `build` script before the claim commit when the copy has no build output yet, so
 the pre-commit gate loads the branch's kernel. A copy that could not be built
 stays on the primary's install and is reported in `linkedWorkspaces` (`--json`,
@@ -68,8 +68,8 @@ worktree-local install is still the npm-native alternative: `npm ci`, or
 workspace links locally and its `prepare` builds them.
 
 Rebuild after changing `lib/`: the worktree's spawned CLI and the tests that
-launch it resolve `@arggon/lib` through `node_modules` → `lib/dist`
-(`npm run build --workspace @arggon/lib`), and the flip means the worktree's own
+launch it resolve `@arggondev/lib` through `node_modules` → `lib/dist`
+(`npm run build --workspace @arggondev/lib`), and the flip means the worktree's own
 build is what runs.
 
 ## Propose schema / convention changes
