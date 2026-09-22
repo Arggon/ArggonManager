@@ -213,3 +213,55 @@ Template + copia del repo + docs + test actualizados a `npm pack --workspace lib
 - Windows: fixtures `skipIf(win32)` por diseño.
 
 **MERGE — confirmado (merge commit, nunca squash).** Después: merge a `main`, tag `v0.4.0`, publish kernel-first (`npm publish --workspace @arggondev/lib` → `npm publish`), pin `ARGGON_REF: v0.4.0` + re-run `init`, y recién ahí el item a `done`.
+
+### 2026-09-22 @Arggon
+### Review verdict (ronda 5) — PR #397 · head revisado `5870828f` · base `opencode2` (draft)
+
+**NO-MERGE (request changes).** El objetivo del PR está cumplido y verificado — pin `ARGGON_REF: v0.4.0` contra el tag real, template y copia coherentes, drift gate limpio, gates locales 1498/1498 + headless-ci 6/6 y CI del head verde — pero quedan dos afirmaciones post-release ya falsas en los mismos archivos que el PR edita (README/ci.md) y en el comentario del template del workflow. Es un fix de wording (1 commit); después, merge commit.
+
+## F1 (bloqueante, 1 commit de docs) — "not on the registry / 404" ya es falso
+
+- `README.md:135` (párrafo reescrito por este PR): "…declares the kernel package `@arggondev/lib`, which is **not on the registry**, so installing the root tarball alone fails with `404 @arggondev/lib`".
+- `ArggonManager/docs/ci.md:28-30`: "The root tarball alone is **not installable** … that package is not on the registry (a lone `npm install -g arggon-manager-<v>.tgz` fails with `404 @arggondev/lib@^0.4.0`)".
+
+Es falso desde el publish de 0.4.0 y contradice la frase dos líneas más arriba en ambos archivos ("both are published (`arggon-manager@0.4.0`, `@arggondev/lib@0.4.0`)"). Evidencia (npm 12.0.2 / node 26.7.0):
+
+- `npm view @arggondev/lib version dist-tags` → `0.4.0` / `latest: 0.4.0`; `npm view arggon-manager@0.4.0 dependencies` → `{ '@arggondev/lib': '^0.4.0', commander: '^13.1.0' }`.
+- Tarball raíz publicado **solo**: descargado de `registry.npmjs.org/arggon-manager/-/arggon-manager-0.4.0.tgz` y `npm install -g --prefix /tmp/opencode/pr397-tgz-prefix …/arggon-manager-0.4.0.tgz` → `added 3 packages` (arggon-manager + `@arggondev` + commander) y `arggon --version` → `0.4.0 (394654f5, opencode2)`. No hay 404.
+
+Fix sugerido: calificar la receta a checkouts **pre-release** (kernel aún sin publicar), p.ej. "if the pinned checkout's kernel version is not on the registry (pre-release branch), the root tarball alone fails with 404 — pack both".
+
+## F2 (bloqueante, mismo commit) — el comentario del workflow quedó auto-contradictorio
+
+`templates/docs/github/workflows/arggon.yml:24-28` (y su copia `.github/workflows/arggon.yml:25-29`) sigue diciendo: "While `arggon-manager` and `@arggondev/lib` stay `private` (**no npm release yet**), the bin is packed from this pinned checkout…" y "**After release, replace the install step with the one-liner** `npm install -g arggon-manager` and drop these two variables" — mientras el hunk que este PR cambia pone `ARGGON_REF: v0.4.0` (el release) y conserva el install empaquetado. El archivo se vende a los adopters vía `templates/`. Fix: reescribir el comentario al estado real (el path empaquetado se mantiene a propósito contra el ref pinneado; el one-liner es el camino de adopción) o, si se quiere seguir su propia instrucción, cambiar el step al one-liner en el mismo PR.
+
+## F3 (menor, preexistente) — docstring con versión vieja
+
+`cli/src/headless-ci.test.ts:21-23` sigue afirmando que el kernel es `private` (no npm release) y `404 @arggondev/lib@^0.3.0` (ya señalado como residual cosmético en la ronda 4). No bloquea; arreglarlo junto con F1/F2 es gratis.
+
+## F4 (menor, proceso) — sin comment/handoff en el item
+
+El item no tiene `arggon comment`/`handoff` de esta ronda (la evidencia quedó solo en el body del PR); `ArggonManager/docs/agents.md:22` marca el comentario del item como canal de handoff. No bloquea.
+
+## Verificado (worktree `5870828f` + clon limpio + registry)
+
+- **Pin:** tag anotado `v0.4.0` (`3ec7938c`) → `394654f5` (merge del release); `git ls-remote --tags origin` y `git show v0.4.0:lib/package.json` → `@arggondev/lib@0.4.0` (el step `npm pack --workspace lib` funciona contra el ref pinneado; lo prueba el job `tasks-validate` verde). Template vs copia: `tail -n +2 .github/workflows/arggon.yml | diff - templates/docs/github/workflows/arggon.yml` → idénticos (solo el marker `# arggon:generated`).
+- **init/drift:** `init --dry-run` en el head → el workflow es `modified-skip` (ya lo era en el base: checksum registrado `3bc6ebd3…` vs archivo base `587d4f4d…` / head `e897e26c…`; no es drift nuevo y el gate lo excluye). Simulé el gate de CI con el bin v0.4.0 en un clon del head: `init --no-commit` → `git status --porcelain` excluyendo `ArggonManager/.convention.yml`, `tasks/.convention.yml` y `.github/workflows/arggon.yml` → **vacío** (solo queda `M ArggonManager/.convention.yml`, excluido por diseño).
+- **Docs:** versión publicada y one-liner correctos; receta from-checkout ejecutada end-to-end: `npm pack --workspace lib` + `npm pack` → `arggondev-lib-0.4.0.tgz` + `arggon-manager-0.4.0.tgz`, glob tolerante `*-lib-*.tgz`, install → `arggon --version` = `0.4.0 (5870828f, feat/task-release-0-4-0-post)`; `git status` limpio tras el pack.
+- **Gates @`5870828f`:** `npm test` **92 files / 1498 passed (0 failed, 0 skipped)**, `headless-ci` **6/6** (45.6s) · `npm run build` 0 · `npm run check:plugin` 0 (bundle 338.601 B, sin drift, `git status` limpio) · `npm run lint` 0 · `arggon validate --json` `{errors:[],warnings:[]}` · `arggon spec validate` ok (18 docs, 0 warnings).
+- **CI del head:** `cli` **pass** (4m15s, run `35720138727`) · `tasks-validate` **pass** (37s, run `35720138712`).
+- **Scope:** 5 archivos (`templates/docs/github/workflows/arggon.yml`, `.github/workflows/arggon.yml`, `README.md`, `ArggonManager/docs/ci.md`, `ArggonManager/.convention.yml` con **solo** 20 líneas `generatedAt`; 0 checksums). Sin cambios de código/comportamiento; base `opencode2`, draft, 2 commits sobre `394654f5`.
+
+## Residual (no bloqueante, fuera de alcance)
+
+- El pin solo llega a los adopters con el próximo publish: `arggon init` desde el `arggon-manager@0.4.0` **publicado** genera el workflow con `ARGGON_REF: opencode2` (verificado). Si el one-liner es el camino primario, conviene un 0.4.1 (o un follow-up) para que el template publicado apunte al tag.
+- `CHANGELOG.md` [0.4.0] y `docs/runbooks/release.md:74` conservan prosa "private hasta la release wave" (histórica/por-diseño).
+
+## No verificado
+
+- Windows (fixtures `skipIf(win32)` por diseño).
+- El publish/tag reales ocurrieron antes de este PR; verifiqué el resultado vía registry (`npm view`) y el tag, no la ejecución del publish.
+
+**NO-MERGE (request changes): F1 + F2 en un commit de wording; F3 opcional en el mismo commit.** Después: re-correr gates/CI, merge commit (nunca squash), FF `opencode2` → `main` y cierre del item/contenedores (coordinador).
+
+*Publicado con el CLI local (los `tools.arggon.*` no resuelven el tracker v5 en esta sesión); el comment auto-commitea en `opencode2`.*
