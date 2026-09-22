@@ -89,3 +89,7 @@ candidate for a separate close-out.
 
 ### 2026-09-22 @Arggon
 Scope extension (coordinator): exploration-opencode-v2-native-009 closed as well — status: open → decided, Decision section links ADR 0010 (Accepted 2026-09-18) and records the later amendments (ADR 0011 §2/§3 + packaging, ADR 0012 layout, ADR 0013 kernel packaging); no history rewritten. Commit 1a66c44. Gates re-run: prettier --check clean + byte-stable (prose-format rule 3), argmon validate ok, spec validate ok (18 docs, 0 warnings), npm test 92 files / 1498 passed.
+
+### handoff 2026-09-22 @Arggon — next: Coordinator: review PR #393 (draft, base opencode2) — now also closes exploration-009; confirm CI on the final head, merge, then flip the item done.
+- branch: feat/task-plugin-source-prettier-policy
+- open questions: None blocking; both explorations (009, 010) are decided now. ~343 other prettier-dirty files remain out of scope.
