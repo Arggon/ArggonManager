@@ -27,3 +27,15 @@ updated: "2026-09-22"
 - [ ] 
 
 ## Notes
+
+### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Context
+
+The board always renders five equal columns; on a mature tracker the done column dominates the page (41,662 px of 41,752 px body height on 2026-09-22). There is no collapse, no hide-done lens, and headers scroll away.
+
+## Acceptance
+
+- [ ] Any column can be collapsed/expanded; a toggle can hide `done`/`cancelled`; the header keeps the count visible when collapsed
+- [ ] Column headers stay visible while scrolling (sticky) without breaking the existing grid/responsive rules
+- [ ] State persists in localStorage (documented choice) and resets cleanly; static and serve modes behave the same
+- [ ] No runtime dependencies; tests + Playwright-CLI smoke; README updated
