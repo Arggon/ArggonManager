@@ -96,3 +96,7 @@ Existing oracles untouched and green: `cli/src/board.test.ts`, `board-parity.tes
 - **F2 — contract items carry `depends_on`, the lens reads kernel `dependsOn`.** Documented on `ViewItem`; lens consumers should pass kernel-shaped items. Not worked around here (scope).
 - **F3 — `board-serve.ts` keeps its own id comparator** (line ~107), explicitly out of scope per the item. Candidate follow-up if full id-sort consolidation is wanted.
 - **F0 — `start --worktree` claim commit failed in this environment**: `{"skipped":"git commit failed: sh: line 1: tsx: command not found"}` (no `node_modules` prepared in the fresh worktree); I ran `npm ci` and committed the claim manually (`chore(tasks): started task-ui-shared-viewmodel`). Worth a look at `start --worktree` friction (not filed).
+
+### handoff 2026-09-22 @ses_f34ab7c2fffe7rHSRQcARR0Hvz (session: ses_f34ab7c2fffe7rHSRQcARR0Hvz) — next: Review PR #400 (CI green); merge (merge-commit, tracker commits on the branch) and flip the item done once the acceptance checklist is ticked.
+- branch: feat/task-ui-shared-viewmodel
+- open questions: F1 applyViewLens shipped with no consumer yet (v2 lens entry); F2 lens reads kernel dependsOn, contract items carry depends_on; F3 board-serve.ts sort out of scope; F0 start --worktree claim commit f…
