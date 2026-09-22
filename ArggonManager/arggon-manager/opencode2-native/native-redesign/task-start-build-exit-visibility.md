@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-22"
 updated: "2026-09-22"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-start-build-exit-visibility
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-start-build-exit-visibility.md
