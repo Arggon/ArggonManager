@@ -1,14 +1,17 @@
 ---
 type: task
-status: blocked
+status: in_progress
 id: task-release-0-4-0
 title: "Release 0.4.0: kernel-first publish + tag"
+assignee: Arggon
+branch: feat/task-release-0-4-0
 parent: native-redesign
 labels: []
 priority: p1
 created: "2026-09-21"
-updated: "2026-09-21"
-blocked_reason: product-owner approval for publish/tag 0.4.0
+updated: "2026-09-22"
+claimed_at: "2026-09-22T02:01:58.584Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-release-0-4-0
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-release-0-4-0.md
