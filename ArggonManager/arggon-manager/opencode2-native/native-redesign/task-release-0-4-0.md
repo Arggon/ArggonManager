@@ -175,3 +175,41 @@ Run `35715647962` (head `837f9a54`): el job clona `opencode2` y ejecuta el step 
 - Residual local (no viaja al repo): las copias vendoreadas `.agents/skills/*` se renombraron a mano; `arggon init --dry-run` las reporta `modified-skip` (checksums 0.3.0) y `doctor` da 5 modified vs 2 del base. `.agents/skills/` es gitignored y el drift gate de CI no las mira.
 
 **NO-MERGE (request changes): F1 + F2 antes del merge; ambos son de una línea / un step.** Al reanudar: fix del alias, re-correr gates y CI; después merge commit (nunca squash). El item queda `in_progress` (tag `v0.4.0` + publish kernel-first + pin `ARGGON_REF: v0.4.0` siguen pendientes).
+
+### 2026-09-22 @Arggon
+### Review verdict (ronda 4 — final) — PR #396 · head revisado `46f5af5b` · base `opencode2` (draft)
+
+**MERGE — confirmado.** F1 y F2 corregidos y verificados en el head nuevo; CI del head **verde** (`cli` pass 4m36s run `35717441643`; `tasks-validate` pass 38s run `35717441640`). Gates locales 1498/1498 con packed-install 6/6. Merge commit, nunca squash; el item queda `in_progress` (tag `v0.4.0` + publish kernel-first + pin `ARGGON_REF` pendientes; scope ya resuelto como `@arggondev/lib`).
+
+## F1 — alias de vitest (verificado)
+
+`vitest.config.ts:12` → `find: /^@arggondev\/lib$/`. Reproducción en clon limpio del head (`npm ci` 0): con `lib/dist` movido fuera, `npx vitest run cli/src/atomic-config-writers.test.ts cli/src/lib.test.ts` → **2 files / 10 tests passed** (antes: `Failed to resolve entry for package "@arggondev/lib"`). Los tests vuelven a resolver `lib/src/index.ts` sin build previo, como dicen el comentario de la config y el docstring de `lib.test.ts`. Auditoría de refs stale: `git grep "@arggon/lib"` → 0 y `git grep -nE 'arggon\\/lib'` → 0.
+
+## F2 — workflow transicional (verificado)
+
+Template + copia del repo + docs + test actualizados a `npm pack --workspace lib` y glob `*-lib-*.tgz`; `headless-ci.test.ts` con `^.*-lib-.*\.tgz$`. Escenario transicional reproducido con el ref pinneado real (`git clone --branch opencode2`, pre-rename, `lib/package.json` = `@arggon/lib`): pack por path → `arggon-lib-0.4.0.tgz` + `arggon-manager-0.4.0.tgz`, el glob tolerante matchea e instala; `arggon --version` → `0.4.0` con **npm 12.0.2** y **npm 10.9.4** (install con prefix temporal, sin tocar el global). En CI real, `tasks-validate` pasa (38s) contra el ref pre-rename. Template vs copia del repo: idénticos salvo el comentario repo-específico (preexistente).
+
+## Extras (verificados)
+
+- `^0.3.0` → `^0.4.0` en `ADR 0013:40` y `ci.md:24,26`.
+- `skills:sync` en clon limpio: "synced 6 bundled skill file(s)", `git status` vacío (sin drift).
+- Rename puro intacto: bundle 338.601 B; `dist/cli.js` del tarball root 0 refs viejas / 1 nueva.
+
+## Gates @`46f5af5b` (worktree + clon limpio)
+
+- `npm test` **92 files / 1498 passed (0 failed, 0 skipped)**, `headless bootstrap + CI (packed install)` **6/6** · `npm run build` 0 · `npm run check:plugin` 0 (bundle sin drift; `git status` limpio) · `npm run lint` 0 · `arggon validate --json` `{errors:[],warnings:[]}` · `arggon spec validate` ok (18 docs, 0 warnings).
+- `npm pack --dry-run`: lib `arggondev-lib-0.4.0.tgz` **79 files / 124.325 B (124.3 kB)** con LICENSE; root `arggon-manager-0.4.0.tgz` **109 files / 334.7 kB** con LICENSE; 0 `.test.`. `npm publish --dry-run -w @arggondev/lib` → *"public access"*.
+- CI `46f5af5b`: `cli` **pass** (4m36s) · `tasks-validate` **pass** (38s).
+
+## Residual (no bloqueante)
+
+- Comentarios con versión vieja: `cli/src/headless-ci.test.ts:23` (`404 @arggondev/lib@^0.3.0`) y `cli/src/pack-fixtures.ts:25` (ejemplo `arggondev-lib-0.3.0.tgz`); cosmético.
+- `README.md:137` mantiene el nombre explícito `arggondev-lib-<version>.tgz` en el install (correcto para el checkout post-rename; `ci.md`/`agents.md` usan el glob por el ref pinneado).
+- Bodies de items con evidencia histórica (`arggon-lib-0.3.0.tgz`, `^0.3.0`) — historia, por diseño.
+
+## No verificado
+
+- Tag/publish reales (post-merge; el scope ya está resuelto).
+- Windows: fixtures `skipIf(win32)` por diseño.
+
+**MERGE — confirmado (merge commit, nunca squash).** Después: merge a `main`, tag `v0.4.0`, publish kernel-first (`npm publish --workspace @arggondev/lib` → `npm publish`), pin `ARGGON_REF: v0.4.0` + re-run `init`, y recién ahí el item a `done`.
