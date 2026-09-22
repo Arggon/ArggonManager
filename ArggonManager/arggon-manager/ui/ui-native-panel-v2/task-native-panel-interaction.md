@@ -27,3 +27,15 @@ updated: "2026-09-22"
 - [ ] 
 
 ## Notes
+
+### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Context
+
+The W5 panel renders flat tree lines (header + counts + up to 200 lines) and only binds esc/f/r; there is no selection, no item detail and no way to jump to the kernel `next` suggestion or the session's active item (both already computed in `boardSnapshot`).
+
+## Acceptance
+
+- [ ] j/k (and PgUp/PgDn/g/G) move a visible selection over the tree; Enter opens the selected item (file path or an inline detail block with body/checklist), Esc returns
+- [ ] `n` jumps to the `next` suggestion and `a` to the active session item; the header keeps totals and the counts line
+- [ ] Width-aware clipping and sanitization preserved; no slot crash on a corrupt tracker (existing P1 guard)
+- [ ] `npm run smoke:tui` extended with a selection capture; docs/opencod2 TUI section updated
