@@ -27,3 +27,15 @@ updated: "2026-09-22"
 - [ ] 
 
 ## Notes
+
+### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Context
+
+The same derived display logic is implemented per surface: dependency-blocked detection and counts exist in `cli/src/board.ts`, `cli/src/tui.ts` and `opencode/plugins/arggon/board.ts`; grouping/sorting/tree flattening will keep diverging as the v2 features land. The kernel already owns the rules (`openDependencies`, `isReady`, `parseFilter`) but not the derived view model.
+
+## Acceptance
+
+- [ ] One pure module (e.g. `lib/src/view-model.ts`) exports the board view model: filter/lens application, sorting (id/priority/rank), grouping, dep-blocked marks, per-status counts and tree flattening — dependency-free, fully unit-tested
+- [ ] All three surfaces consume it; no behavior change (existing golden/byte tests stay green; plugin bundle regenerated and `npm run check:plugin` green)
+- [ ] The module's surface is documented where lib surfaces are documented; if it changes a public contract, an ADR precedes it
+- [ ] No new runtime dependency; `npm test` + `arggon validate --json` green
