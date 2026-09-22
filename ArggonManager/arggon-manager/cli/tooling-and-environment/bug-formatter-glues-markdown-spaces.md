@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-21"
 updated: "2026-09-22"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-formatter-glues-markdown-spaces
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/bug-formatter-glues-markdown-spaces.md
