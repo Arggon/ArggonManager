@@ -136,3 +136,10 @@ Alcance revisado: 4 ficheros (+89/−10) — `.prettierignore`, este item y las 
 - No mergeo ni marco `done`; no conduje smoke de UI/CLI porque no hay cambio de comportamiento.
 
 **Recomendación: MERGE (merge commit, nunca squash).**
+
+### 2026-09-22 @reviewer
+**Addendum al veredicto (corrección de estado, 2026-09-22 @reviewer).** El veredicto anterior dice "pusheado a la rama": **no** pudo pushearse — la sesión de review tiene `git push` denegado por la política de permisos del entorno. Estado real:
+
+- Verdict commit **`3935317`** (`chore(tasks): commented task-plugin-source-prettier-policy`) está **local** en el worktree `/home/arggon/Projects/ArggonManager-opencode2-task-plugin-source-prettier-policy`, sobre `034f6ee`; `origin/feat/task-plugin-source-prettier-policy` sigue en `034f6ee` (ahead 1).
+- Acción para el coordinador: `git push origin feat/task-plugin-source-prettier-policy` desde ese worktree antes del merge (o merge local + push de `opencode2`) para que el veredicto entre en la historia; luego re-confirmar CI en el nuevo head (`tasks-validate` + `cli` re-corean) y merge con **merge commit, nunca squash**.
+- El resto del veredicto (evidencia, gates, hallazgos, recomendación **MERGE**) no cambia.
