@@ -40,3 +40,13 @@ ADR 0008 chose two tiers: review-time Playwright CLI (used ad hoc today) and an 
 - [ ] A CI job runs the spec on Chromium only; Playwright stays dev-only (never a runtime dependency) and the job skips cleanly when browsers are unavailable
 - [ ] The TUI gets a scripted frame assertion (reuse the smoke fixture pattern) or a documented manual step in the same docs section
 - [ ] docs/engineering.md testing table + CONTRIBUTING.md commands updated; CI green on the PR
+
+### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Coordinator amendment (2026-09-22, pre-claim)
+
+Two scope clarifications before this item is claimed:
+
+1. **Drop the filter assertion from the spec's initial scope.** The board has no filter UI yet — that is `task-board-filter-lenses` (wave 1) and its own acceptance already requires a filter smoke. The `@smoke` spec here must cover what exists today: board renders, cards match `arggon list --json`, one legal status move round-trips and persists (`arggon show`), and the spec is structured so later UI features add cases. The wave-1 item extends the spec.
+2. **`bug-ci-version-guard-dev-only` is a hard prerequisite and is in scope here** (dependency recorded): adding `@playwright/test` to devDependencies trips the inline version guard in `.github/workflows/ci.yml`, which fails on any `package.json` change while v0.4.0 is tagged. Fix the guard scoping (publish-relevant fields only) in this PR, reference the bug id and this item in the PR body, and keep the release-forgotten behavior for shipping fields with a local probe as evidence. This is an authorized, documented scope addition, not diff creep.
+
+Everything else in the original acceptance stands.
