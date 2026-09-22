@@ -85,3 +85,6 @@ Evidencia npm 12 (probe aislado /tmp/opencode/npm12-probe, npm 12.0.2):
 ### handoff 2026-09-22 @Arggon — next: Coordinator: review the draft PR and merge with a MERGE commit (tracker-carrying branch), then mark done. No worker action pending.
 - branch: feat/task-side-by-side-docs-polish
 - open questions: ¿Se acepta el fix del wording 644/exec-bit (build ahora chmoda 0755) dentro de este PR o se separa?; F3 quedó matizado en el ejemplo de plugin.list.
+
+### 2026-09-22 @Arggon
+PR draft: https://github.com/Arggon/ArggonManager/pull/394 (base `opencode2`) — commits: `856512b` (docs + .gitignore), `29c70a7`/`144d022` (tracker). Item left `in_progress` for the coordinator to merge and close (tracker-carrying branch → merge commit, no squash).
