@@ -93,3 +93,44 @@ Impacto verificado (no rompe nada hoy): CI `35678373648` (npm 10/Node 22) pasa `
 - Los `tools.arggon.*` de esta sesión no resuelven el tracker v5 ("No tasks/ convention found"), así que el veredicto se publica con el CLI local (auto-commit a `opencode2`), igual que el veredicto de `task-native-headless-ci`.
 
 **NO-MERGE (request changes): F1 + F2 antes del merge; F3 antes del `npm publish`; F4 sin acción bloqueante. Al reanudar: commitear el lock, `publishConfig` en `lib/package.json`, re-correr gates/CI. Después, merge commit (nunca squash); el item queda `in_progress` — su acceptance (PO, tag, publish, pin del workflow) sigue pendiente.**
+
+### 2026-09-22 @Arggon
+### Review verdict (ronda 2 — final) — PR #395 · head revisado `7288c2f` · base `opencode2` (draft)
+
+**MERGE — confirmado.** F1–F3 corregidos y verificados en el head nuevo; F4 (tracker) ok. Gates locales 1498/1498 con packed-install 6/6 y CI de `7288c2f` verde. Merge commit, nunca squash; el item queda `in_progress` (tag/publish bloqueados por el scope `@arggon`).
+
+## F1 — lock sincronizado (verificado)
+
+`package-lock.json` @`7288c2f`: root `0.4.0` (`:3`), `packages[""]` `0.4.0` (`:9`), dep `^0.4.0` (`:14`), entrada `lib` `0.4.0` + `license: MIT` (`:35-36`). `grep -c '"version": "0.3.0"'` → 0 y no queda ningún `^0.3.0`. En clon limpio: `npm ci` exit 0 y `npm ls @arggon/lib` → `arggon-manager@0.4.0 └── @arggon/lib@0.4.0 -> ./lib`.
+
+## F2 — publish público (verificado)
+
+`lib/package.json:26-28` → `"publishConfig": { "access": "public" }`. `npm publish --dry-run -w @arggon/lib` en el clon del head: *"Publishing to https://registry.npmjs.org/ with tag latest and **public access** (dry-run)"* (antes decía "default access"). El bloqueo real sigue siendo el scope: `npm view @arggon/lib version` → 404, a crear/elegir por el PO.
+
+## F3 — licencia (verificado, con residual menor)
+
+`lib/LICENSE` es byte-idéntico al `LICENSE` raíz (MIT); `"license": "MIT"` declarado en `lib/package.json:25`; el tarball del kernel pasa a **79 files / 124.3 kB** con `LICENSE` presente (0 `.test.`/test-tmp/pack-fixtures). Residual no bloqueante: el `package.json` del root sigue sin campo `"license"` (su tarball sí lleva el texto `LICENSE`, así que la distribución es correcta; npmjs no mostrará SPDX). Sugerencia: agregarlo en el follow-up pre-publish / al pinchar `ARGGON_REF`.
+
+## F4 — tracker (verificado)
+
+El item ya tiene el comment de evidencia + `### handoff` (`7845a99`, `29beb10`; solo el md del item). Aviso de mecánica de merge: esos dos commits de tracker apendean al final del md y el veredicto de la ronda 1 ya está en `opencode2` (`7ff0340`) apendeando la misma zona → `diff3` marca **1 conflicto** al integrar. Opciones: (a) no pushear los commits de tracker y publicar el comment/handoff en `opencode2` con el CLI (como se hizo con el veredicto), o (b) mergear y resolver el md conservando ambas secciones. No toca código (`git diff 7288c2f..29beb10` = solo el md).
+
+## Gates @`7288c2f` (clon limpio, CI-equivalentes)
+
+- `npm ci` 0 · `npm ls` `0.4.0 -> ./lib` · `npm run build` 0 · `npm run check:plugin` 0 · `npm test` **92 files / 1498 passed (0 failed, 0 skipped)**, `headless bootstrap + CI (packed install)` **6/6** · `npm run lint` 0 · `arggon validate --json` `{errors:[],warnings:[]}` · `arggon spec validate` ok (18 docs, 0 warnings) · `context:report -- --strict` → all bounds pass.
+- `npm pack --dry-run`: lib **79 files / 124.3 kB** (con `LICENSE`), root **109 files / 334.6 kB** (con `LICENSE`); sin tests ni artefactos de desarrollo.
+- `npm publish --dry-run`: lib con **public access**; root ok (unscoped, público por defecto).
+- CI GitHub @`7288c2f`: `cli` **pass** (3m18s, run `35678997811`) · `tasks-validate` **pass** (36s, run `35678997798`).
+
+## Scope
+
+El fix = `lib/LICENSE` + `lib/package.json` + `package-lock.json` (0 código, 0 plantillas, 0 comportamiento). Sin tag `v0.4.0`, sin pasos de publish, PR base `opencode2` y draft. Item `in_progress` y acceptance sin tildar (honesto): tag/publish/pin siguen pendientes y bloqueados por el scope npm.
+
+## No verificado
+
+- Publish/tag reales (el scope `@arggon` no existe para `arggondev`: `npm view` → 404; decisión y creación del PO).
+- Windows: fixture `skipIf(win32)` por diseño.
+
+**MERGE — confirmado (merge commit, nunca squash).** Después: el item queda `in_progress` hasta el tag `v0.4.0` + publish kernel-first + pin `ARGGON_REF: v0.4.0` (follow-up).
+
+*Publicado con el CLI local (los `tools.arggon.*` no resuelven el tracker v5 en esta sesión); comentario auto-commiteado en `opencode2`.*
