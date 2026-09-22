@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-playbook-2-0-10-nits
 title: "Playbook 2.0.10 nits: exploration-010 tension + plugin header probe note"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-20"
 updated: "2026-09-22"
-claimed_at: "2026-09-22T01:09:24.973Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-playbook-2-0-10-nits
 ---
 <!--
