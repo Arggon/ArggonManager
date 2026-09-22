@@ -1,15 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-side-by-side-docs-polish
 title: "Side-by-side docs polish: Option B rebuild wording + mise.local.toml ignore"
+assignee: Arggon
+branch: feat/task-side-by-side-docs-polish
 parent: install-ergonomics
 labels: []
 priority: p3
 created: "2026-09-19"
-updated: "2026-09-19"
+updated: "2026-09-22"
+claimed_at: "2026-09-22T01:28:08.039Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-side-by-side-docs-polish
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/cli/install-ergonomics/task-side-by-side-docs-polish.md
   Leaves live only under a story. id is the filename stem: task-side-by-side-docs-polish.
