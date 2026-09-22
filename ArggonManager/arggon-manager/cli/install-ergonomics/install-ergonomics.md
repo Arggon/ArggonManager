@@ -1,15 +1,16 @@
 ---
 type: story
-status: todo
+status: in_progress
 id: install-ergonomics
 title: "Install ergonomics: packaging and side-by-side installs"
+assignee: Arggon
 parent: cli
 labels: []
 priority: p3
 created: "2026-09-19"
-updated: "2026-09-19"
+updated: "2026-09-22"
+claimed_at: "2026-09-22T02:01:04.626Z"
 ---
-
 <!--
   Placement (v0): tasks/arggon-manager/cli/install-ergonomics/install-ergonomics.md (story index; required).
   parent MUST be the epic id. Optional style prefixes (e.g. story-) are not type discriminators.
