@@ -40,12 +40,13 @@ deferred because a link farm pointing `@arggon/lib` at the worktree copy needs
       permanent limit.
 - [x] If flipped: tests cover a fresh worktree where the CLI resolves
       `@arggon/lib` to the worktree copy, and the pre-commit gate still runs.
-- [ ] Docs (`CONTRIBUTING`/`README`/`json-output`) and the skill match the
+- [x] Docs (`CONTRIBUTING`/`README`/`json-output`) and the skill match the
       behavior; no regression of `bug-start-worktree-node-modules`.
       `CONTRIBUTING`/`README`/`docs/agents.md`/`docs/convention.md` landed with
-      the code; `docs/json-output.md` + `skills/arggon-cli/**` still describe
-      the whole-install link and are owned by the parallel formatter worker
-      (coordination note in the comment below).
+      the code; `docs/json-output.md` + `skills/arggon-cli/**` synced in
+      `7beeedd` after the formatter worker's PR #387 merged (prettier-stable,
+      prose guard green). `builtWorkspaces` stays stdout-only — the documented
+      `--json` envelope is unchanged.
 - [x] `arggon validate` green; CI green.
 
 ## Notes
@@ -161,3 +162,35 @@ CI follow-up: the code tip `58bfe82` was already green, and the tracker tip
 `cli` pass (4m9s, run 35669216643) + `tasks-validate` pass (37s, run 35669216660).
 No further commits are planned from this worker; the next tip move is the
 coordinator's review/merge.
+
+### 2026-09-22 @Arggon
+Acceptance 3 closed (resume after the formatter worker's PR #387 merged into
+`opencode2`).
+
+- `09b7254` merge of `origin/opencode2` — clean; #387's prose repairs and
+  `cli/src/prose-format.test.ts` guard are in.
+- `7beeedd` sync: `ArggonManager/docs/json-output.md` (`linkedNodeModules` row →
+  per-worktree link farm, or a bare symlink when no workspace package is
+  shadowed; `linkedWorkspaces` row → only what stayed on the primary's copy,
+  with the pre-build and the visible fallback; `start` prose → worktree-local
+  resolution), `skills/arggon-cli/SKILL.md` (claim step),
+  `references/pitfalls.md` (prepare/keep bullet, the resolution bullet, the
+  staging nuance) and `references/orchestration.md` (worktrees in practice).
+- `builtWorkspaces` remains **stdout-only**: the documented `--json` envelope is
+  unchanged (no field, no row).
+- The json-output table keeps the base's canonical prettier width, so the diff is
+  3 semantic lines (two rows + the `start` prose). `npm run skills:sync`
+  regenerated the 6 bundled copies (gitignored);
+  `prose-format.test.ts` + `skill-copy.test.ts` + `skill-generated-commands.test.ts`
+  are green.
+- Coordinator decision recorded in the skill/doc: start pre-builds **every**
+  shadowed workspace package that declares a `build` script and whose declared
+  entry is missing — deliberate default (a local copy is preferred whenever it
+  exists; a failed build falls back visibly to the primary and `linkedWorkspaces`
+  names it). No opt-out today; a per-invocation skip is noted as a candidate
+  follow-up.
+
+Gates after the sync: `npm run build` ✅ · `npm test` **1490/1490 (92 files)** ✅ ·
+`npm run lint` ✅ · `npm run check:plugin` ✅ (bundle 337936 B, no drift) ·
+`npm run arggon -- validate` ✅ v5 · `npm run arggon -- spec validate` ✅ 18 ·
+prettier ✅ on the four touched files (byte-stable where the guard pins it).
