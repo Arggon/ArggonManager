@@ -87,3 +87,7 @@ Related finding fixed in the same step: the old guard was **silently dead on PRs
 - PR #401 is the merge vehicle for both items; merge-merge (tracker commits ride the branch).
 - Acceptance boxes left unchecked for you to tick at completion.
 - `ui-smoke` adds ~1.5 min wall time (measured 1m30s, Chromium install included); kept Chromium-only/one-worker per ADR 0008.
+
+### handoff 2026-09-22 @ses_f34ab7c2effeGb96Q5UOGLzjgq (session: ses_f34ab7c2effeGb96Q5UOGLzjgq) — next: Coordinator: review PR #401 (both ids referenced), merge-merge, tick acceptance, set done. CI green on 50c89218: cli, ui-smoke, tasks-validate all pass.
+- branch: feat/task-ui-browser-smoke-ci
+- open questions: ui-smoke adds ~1.5 min wall time (Chromium install) — acceptable? Guard step is now live in CI (shallow-checkout fix); confirm the scoped field list matches intent.
