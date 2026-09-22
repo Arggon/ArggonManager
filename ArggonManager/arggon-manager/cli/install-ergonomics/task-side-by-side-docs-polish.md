@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-side-by-side-docs-polish
 title: "Side-by-side docs polish: Option B rebuild wording + mise.local.toml ignore"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-19"
 updated: "2026-09-22"
-claimed_at: "2026-09-22T01:28:08.039Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-side-by-side-docs-polish
 ---
 <!--
