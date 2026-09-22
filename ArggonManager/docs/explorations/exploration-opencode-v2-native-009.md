@@ -1,7 +1,7 @@
 ---
 exploration_id: opencode-v2-native-009
 title: Native OpenCode V2 integration for ArggonManager
-status: open
+status: decided
 created: 2026-09-17
 ---
 
@@ -254,5 +254,15 @@ OpenCode, and inventing a separate OpenCode-only workflow dialect.
 
 ## Decision
 
-Pending — the next free ADR number is **0010** (`0009` is item priority and
-ranking). Link `docs/adr/0010-<slug>.md` here once accepted.
+Adopted — [ADR 0010 — OpenCode2 native
+architecture](../adr/0010-opencode2-native-architecture.md) (Accepted
+2026-09-18): the two-layer decision — portable core (tracker, kernel, CLI, MCP)
+unchanged plus a generated, optional native V2 surface (vendored plugin,
+agents, commands, skill, config seam) — implements this exploration's staged
+B+C recommendation with A as the baseline. Later amendments: §2/§3 and the
+packaging deferrals are superseded by
+[ADR 0011](../adr/0011-native-first-architecture.md) (native-first, in-process
+kernel, MCP out of the default path), the layout by
+[ADR 0012](../adr/0012-tracker-root-layout.md), and the kernel packaging by
+[ADR 0013](../adr/0013-lib-package-split.md) (`@arggon/lib`). Closed as
+**decided** (task-plugin-source-prettier-policy).
