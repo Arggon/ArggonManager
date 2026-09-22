@@ -14,11 +14,18 @@
  */
 import {
   STATUSES,
+  buildStatusIndex,
   findTasksDir,
+  hasOpenDependencies,
+  itemsForStatus,
   loadItems,
+  matchesSubstringFilter,
   repoRootFromTasks,
   sanitizeHumanTextUncapped,
+  sortById,
+  statusCounts,
   toContractWorkItem,
+  visibleItems,
   type ContractWorkItem as WorkItem,
 } from "@arggondev/lib";
 
@@ -70,55 +77,44 @@ export function initialTuiState(
 
 /**
  * Items feeding the TUI: same kernel read path as the HTML board, sorted
- * lexicographically by id (same rule as renderBoardHtml / list).
+ * lexicographically by id (same rule as renderBoardHtml / list), through the
+ * shared view-model.
  */
 export function loadTuiItems(cwd: string): { root: string; items: WorkItem[] } {
   const tasksDir = findTasksDir(cwd);
   const root = repoRootFromTasks(tasksDir);
-  const items = loadItems(tasksDir)
-    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    .map((item) => toContractWorkItem(item, root));
+  const items = sortById(loadItems(tasksDir)).map((item) => toContractWorkItem(item, root));
   return { root, items };
 }
 
 /** Case-insensitive substring match on id or title (empty filter matches all). */
 export function tuiFilterMatches(item: WorkItem, filter: string): boolean {
-  if (filter === "") return true;
-  const needle = filter.toLowerCase();
-  return (
-    item.id.toLowerCase().includes(needle) || (item.title ?? "").toLowerCase().includes(needle)
-  );
+  return matchesSubstringFilter(item, filter);
 }
 
 /** Filtered + lexicographically sorted items (the cards the TUI renders). */
 export function visibleTuiItems(items: WorkItem[], filter: string): WorkItem[] {
-  const sorted = [...items].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
-  return sorted.filter((item) => tuiFilterMatches(item, filter));
+  return visibleItems(items, filter);
 }
 
 /** Items of one column, filtered. */
 export function tuiColumnItems(items: WorkItem[], filter: string, status: string): WorkItem[] {
-  return visibleTuiItems(items, filter).filter((item) => item.status === status);
+  return itemsForStatus(items, filter, status);
 }
-
-const TUI_TERMINAL_DEP = new Set(["done", "cancelled"]);
 
 /**
  * True when the item has open dependencies (dep not done/cancelled; unknown
- * dep ids count as open — same rule as the HTML board, ADR 0004).
+ * dep ids count as open — the shared view-model rule, ADR 0004).
  */
 export function tuiDepBlocked(items: WorkItem[], item: WorkItem): boolean {
   if (item.depends_on.length === 0) return false;
-  const statusById = new Map(items.map((it) => [it.id, it.status] as const));
-  return item.depends_on.some((depId) => {
-    const status = statusById.get(depId);
-    return !status || !TUI_TERMINAL_DEP.has(status);
-  });
+  return hasOpenDependencies(item.depends_on, buildStatusIndex(items));
 }
 
 /** Visible card count per status, aligned with STATUSES (for key clamping). */
 export function tuiColumnCounts(items: WorkItem[], filter: string): number[] {
-  return STATUSES.map((status) => tuiColumnItems(items, filter, status).length);
+  const counts = statusCounts(visibleItems(items, filter));
+  return STATUSES.map((status) => counts[status]);
 }
 
 /**
@@ -266,19 +262,27 @@ export function renderTui(
   });
   lines.push(padEndTo(headers.join(""), width));
 
-  // Card rows: one line per item, per column, up to the body height.
+  // Card rows: one line per item, per column, up to the body height. The
+  // status index is built once per frame for the dependency marks.
+  const statusById = buildStatusIndex(items);
   const columnCards = STATUSES.map((status, i) =>
-    tuiColumnItems(items, state.filter, status).map((item, j) => {
-      const line = padEndTo(
-        clipLine(
-          cardLine(item, i === state.column && j === state.card, tuiDepBlocked(items, item)),
+    visible
+      .filter((item) => item.status === status)
+      .map((item, j) => {
+        const line = padEndTo(
+          clipLine(
+            cardLine(
+              item,
+              i === state.column && j === state.card,
+              hasOpenDependencies(item.depends_on, statusById),
+            ),
+            colWidth,
+          ),
           colWidth,
-        ),
-        colWidth,
-      );
-      if (!color) return line;
-      return i === state.column && j === state.card ? `\x1b[7m${line}\x1b[0m` : line;
-    }),
+        );
+        if (!color) return line;
+        return i === state.column && j === state.card ? `\x1b[7m${line}\x1b[0m` : line;
+      }),
   );
   for (let row = 0; row < cardRows; row++) {
     let line = "";

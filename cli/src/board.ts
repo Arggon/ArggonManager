@@ -2,10 +2,15 @@ import { writeFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import {
   STATUSES,
+  buildStatusIndex,
   findTasksDir,
   ghPrListJson,
+  groupItemsBy,
   loadItems,
+  openDependencyIds,
   repoRootFromTasks,
+  sortById,
+  statusCounts,
   toContractWorkItem,
   type ContractWorkItem as WorkItem,
 } from "@arggondev/lib";
@@ -133,7 +138,7 @@ export function runBoard(opts: BoardOptions): BoardResult {
     }
     groupBy = opts.groupBy;
   }
-  const items = loadItems(tasksDir).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const items = sortById(loadItems(tasksDir));
   let overlay = new Map<string, PrInfo>();
   if (opts.github) {
     const reader = opts.gh ?? defaultBoardGithub();
@@ -329,7 +334,7 @@ export function renderBoardHtml(
   },
 ): string {
   const esc = escapeHtml;
-  const sorted = [...items].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const sorted = sortById(items);
   const prs = opts.prs ?? new Map<string, PrInfo>();
   // Offline snapshot stays byte-identical: the PR line only renders with the live overlay on.
   const showPr = opts.live === true;
@@ -337,15 +342,11 @@ export function renderBoardHtml(
   const groupByMilestone = opts.groupBy === "milestone";
   const groupByStory = opts.groupBy === "story";
 
-  // Dependency edges (ADR 0004): a dep is open when it is not done/cancelled;
-  // unknown ids count as open (validate flags them as UNKNOWN_DEPENDENCY).
-  const TERMINAL_DEP = new Set(["done", "cancelled"]);
-  const statusById = new Map(sorted.map((item) => [item.id, item.status] as const));
-  const openDeps = (item: WorkItem): string[] =>
-    item.depends_on.filter((depId) => {
-      const status = statusById.get(depId);
-      return !status || !TERMINAL_DEP.has(status);
-    });
+  // Dependency edges (ADR 0004) through the shared view-model (kernel rule):
+  // a dep is open when it is not done/cancelled; unknown ids count as open
+  // (validate flags them as UNKNOWN_DEPENDENCY).
+  const statusById = buildStatusIndex(sorted);
+  const openDeps = (item: WorkItem): string[] => openDependencyIds(item.depends_on, statusById);
 
   const NO_MILESTONE = null;
   const milestoneOf = (item: WorkItem): string | null =>
@@ -409,30 +410,13 @@ export function renderBoardHtml(
 </div>`;
     };
 
-    // Groups render in this order: keys ascending, then the key-less group.
-    let groups: Array<{ key: string | null; items: WorkItem[] }>;
-    if (groupByMilestone || groupByStory) {
-      const byKey = new Map<string | null, WorkItem[]>();
-      for (const item of columnItems) {
-        const key = groupKeyOf(item);
-        const bucket = byKey.get(key);
-        if (bucket) bucket.push(item);
-        else byKey.set(key, [item]);
-      }
-      const withKey = [...byKey.keys()]
-        .filter((key): key is string => key !== NO_GROUP)
-        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
-        .map((key) => ({ key, items: byKey.get(key)! }));
-      const bare = byKey.get(NO_GROUP);
-      groups =
-        bare && withKey.length > 0
-          ? [...withKey, { key: NO_GROUP, items: bare }]
-          : bare
-            ? [{ key: NO_GROUP, items: bare }]
-            : withKey;
-    } else {
-      groups = columnItems.length > 0 ? [{ key: NO_GROUP, items: columnItems }] : [];
-    }
+    // Groups render in this order (shared view-model rule): keys ascending,
+    // then the key-less group. An ungrouped column keeps a single key-less
+    // bucket, which renders exactly like the plain card body.
+    const groups = groupItemsBy(
+      columnItems,
+      groupByMilestone || groupByStory ? groupKeyOf : () => NO_GROUP,
+    );
 
     const cards = groups
       .map(({ key, items: groupItems }) => {
@@ -451,9 +435,8 @@ export function renderBoardHtml(
 </section>`;
   }).join("\n");
 
-  const counts = STATUSES.map(
-    (status) => `${status}: ${sorted.filter((item) => item.status === status).length}`,
-  ).join(" · ");
+  const statusTotals = statusCounts(sorted);
+  const counts = STATUSES.map((status) => `${status}: ${statusTotals[status]}`).join(" · ");
   const repo = opts.repoName ? ` — ${esc(opts.repoName)}` : "";
   const live = showPr ? ` · live GitHub overlay (${prs.size} PR(s))` : "";
 

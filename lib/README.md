@@ -29,13 +29,29 @@ the npm workspace (`"workspaces": ["lib"]`).
 The machine surfaces (CLI, MCP adapter, and the native plugin tools of
 W2/W3/W4) rely on this subset — it is the contract:
 
-| Area           | Exports                                                                                                                                                                                                                                |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **items**      | `loadItems`, `itemsById`, `tryLoadItem`, `softTryLoadItem`, `walkTasksTree`, `acceptanceComplete`, `toContractWorkItem`                                                                                                                |
-| **rules**      | `assertUpdateRules`, status/claim primitives (`canTransition`, `isClaimed`, `isClaimable`, `unclaim`, `assertClaimAndBlocked`), `assertParentEdge`/`expectedParentType`, id/label/branch guards                                        |
-| **paths**      | `TRACKER_DIR_NAME`, `LEGACY_TRACKER_DIR_NAME`, `trackerAt`, `findTrackerLocation`, `findTasksDir`, `repoRootFromTasks`, `newItemPath`, `readConventionVersion`                                                                         |
-| **envelopes**  | `JSON_SCHEMA_VERSION`, `successEnvelope`, `failEnvelope`, `compactWorkItem`, `commitPayload`                                                                                                                                           |
-| **operations** | `listOperation`, `createOperation`, `updateOperation`, `showOperation`, `nextOperation`, `reportOperation`, `validateOperation`, `commentOperation`, `handoffOperation`, `priorityOperation`, `syncOperation`, `importIssuesOperation` |
+| Area           | Exports                                                                                                                                                                                                                                                    |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **items**      | `loadItems`, `itemsById`, `tryLoadItem`, `softTryLoadItem`, `walkTasksTree`, `acceptanceComplete`, `toContractWorkItem`                                                                                                                                    |
+| **rules**      | `assertUpdateRules`, status/claim primitives (`canTransition`, `isClaimed`, `isClaimable`, `unclaim`, `assertClaimAndBlocked`), `assertParentEdge`/`expectedParentType`, id/label/branch guards                                                            |
+| **paths**      | `TRACKER_DIR_NAME`, `LEGACY_TRACKER_DIR_NAME`, `trackerAt`, `findTrackerLocation`, `findTasksDir`, `repoRootFromTasks`, `newItemPath`, `readConventionVersion`                                                                                             |
+| **envelopes**  | `JSON_SCHEMA_VERSION`, `successEnvelope`, `failEnvelope`, `compactWorkItem`, `commitPayload`                                                                                                                                                               |
+| **operations** | `listOperation`, `createOperation`, `updateOperation`, `showOperation`, `nextOperation`, `reportOperation`, `validateOperation`, `commentOperation`, `handoffOperation`, `priorityOperation`, `syncOperation`, `importIssuesOperation`                     |
+| **view-model** | `sortById`, `sortByPriority`, `priorityTier`, `visibleItems`, `itemsForStatus`, `matchesSubstringFilter`, `applyViewLens`, `openDependencyIds`, `hasOpenDependencies`, `buildStatusIndex`, `statusCounts`, `groupItemsBy`, `treeEntries`, `readyTodoCount` |
+
+### Board view-model (`lib/src/view-model.ts`)
+
+`task-ui-shared-viewmodel`: the derived board data every board surface renders —
+the web board (`cli/src/board.ts`), the terminal kanban (`cli/src/tui.ts`) and
+the native OpenCode panel (`opencode/plugins/arggon/board.ts`) — so the three
+cannot drift as the v2 filters/lenses land. It composes the kernel rules as the
+single source (`openDependencies`/`isReady`, `isClaimable`, `parseFilter`/
+`matchesPredicate`, `priorityRank`) and adds no I/O, no printing and no
+dependency: every function takes already-loaded item arrays and none of them
+mutates its input. `groupItemsBy` implements the keyed-group / no-group bucket
+rule; `treeEntries` the depth-first, cycle-safe parent flattening;
+`openDependencyIds`/`hasOpenDependencies` the ADR 0004 dependency mark;
+`applyViewLens` the filter-expression + status + readiness + sort lens
+(`@me` resolution stays the caller's job, as in `runList`).
 
 `rules.ts` stays the single source of the claim/reopen invariants: the entry
 re-exports it by identity (pinned in `lib/src/index.test.ts`), never as a wrapper.

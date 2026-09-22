@@ -17,15 +17,17 @@
  */
 import {
   findTasksDir,
-  isClaimable,
-  isReady,
   itemsById,
   loadItems,
-  openDependencies,
+  openDependencyIds,
+  readyTodoCount,
   repoRootFromTasks,
   runNext,
   sanitizeHumanError,
   sanitizeHumanTextUncapped,
+  sortById,
+  statusCounts,
+  treeEntries,
   type ItemType,
   type Status,
 } from "@arggondev/lib";
@@ -112,7 +114,7 @@ export function emptyBoardSnapshot(reason: string): BoardSnapshot {
   return {
     root: null,
     items: [],
-    counts: emptyCounts(),
+    counts: statusCounts([]),
     activeId: null,
     nextId: null,
     error: reason,
@@ -161,8 +163,8 @@ export function boardSnapshot(cwd: string, input: BoardActiveInput = {}): BoardS
     // Duplicate ids throw here; the guard above turns that into an error
     // snapshot instead of a plugin-slot crash.
     const byId = itemsById(kernelItems) as Map<string, { status: Status }>;
-    const items: BoardItem[] = kernelItems
-      .map((item) => ({
+    const items: BoardItem[] = sortById(
+      kernelItems.map((item) => ({
         id: item.id,
         type: item.type,
         title: sanitizeHumanTextUncapped(item.title ?? item.id),
@@ -172,10 +174,10 @@ export function boardSnapshot(cwd: string, input: BoardActiveInput = {}): BoardS
         priority: item.priority ?? null,
         blockedReason: item.blockedReason ?? null,
         dependsOn: [...item.dependsOn],
-        openDeps: openDependencies(item, byId),
+        openDeps: openDependencyIds(item.dependsOn, byId),
         active: false,
-      }))
-      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+      })),
+    );
 
     const activeId = activeBoardId(items, input);
     for (const item of items) item.active = item.id === activeId;
@@ -202,58 +204,25 @@ export function boardSnapshot(cwd: string, input: BoardActiveInput = {}): BoardS
   }
 }
 
-function emptyCounts(): Record<Status, number> {
-  return { todo: 0, in_progress: 0, blocked: 0, done: 0, cancelled: 0 };
-}
-
-/** Item counts per status (pure). */
+/**
+ * Item counts per status (pure), through the shared view-model: every v0
+ * status is present, zero-filled.
+ */
 export function countBoardStatuses(items: readonly BoardItem[]): Record<Status, number> {
-  const counts = emptyCounts();
-  for (const item of items) counts[item.status] += 1;
-  return counts;
+  return statusCounts(items);
 }
 
 /** One flattened tree entry: the item plus its nesting depth. Pure. */
 export type BoardTreeEntry = { item: BoardItem; depth: number };
 
 /**
- * Depth-first, id-sorted flattening of the parent tree. Roots are items whose
+ * Depth-first, id-sorted flattening of the parent tree, through the shared
+ * view-model (`treeEntries`, task-ui-shared-viewmodel). Roots are items whose
  * parent is absent/unknown (a malformed tree renders as roots instead of
  * disappearing); a cycle guard makes the walk total. Pure.
  */
 export function boardTreeEntries(items: readonly BoardItem[]): BoardTreeEntry[] {
-  const known = new Set(items.map((item) => item.id));
-  const children = new Map<string, BoardItem[]>();
-  const roots: BoardItem[] = [];
-  for (const item of items) {
-    const parent = item.parent;
-    if (parent === null || parent === "" || !known.has(parent)) {
-      roots.push(item);
-      continue;
-    }
-    const bucket = children.get(parent) ?? [];
-    bucket.push(item);
-    children.set(parent, bucket);
-  }
-  const byId = (a: BoardItem, b: BoardItem): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-  roots.sort(byId);
-  for (const bucket of children.values()) bucket.sort(byId);
-
-  const entries: BoardTreeEntry[] = [];
-  const visited = new Set<string>();
-  const walk = (item: BoardItem, depth: number): void => {
-    if (visited.has(item.id)) return;
-    visited.add(item.id);
-    entries.push({ item, depth });
-    for (const child of children.get(item.id) ?? []) walk(child, depth + 1);
-  };
-  for (const root of roots) walk(root, 0);
-  // Total walk: a cycle whose members have known parents is unreachable from
-  // any root — render those remaining items as roots instead of losing them.
-  for (const item of [...items].sort(byId)) {
-    if (!visited.has(item.id)) walk(item, 0);
-  }
-  return entries;
+  return treeEntries(items);
 }
 
 /** Clip one line to `width` visible columns, marking a cut with an ellipsis. */
@@ -322,10 +291,11 @@ export function boardTreeLines(
  * Short status line for the sidebar contribution: the active item when the
  * session resolves one, else the tracker's ready signal. Pure.
  *
- * The ready count uses the kernel's own definition — `isClaimable(type)` +
- * `todo` + unclaimed + `isReady` (deps terminal) — instead of a copied
- * predicate, so it cannot drift from the kernel. `next` narrows the pool to
- * leaf work, so the count can exceed what `/arggon-next` would suggest.
+ * The ready count is the kernel's own definition — `isClaimable(type)` +
+ * `todo` + unclaimed + `isReady` (deps terminal) — shared through the
+ * view-model (`readyTodoCount`), so it cannot drift from the kernel. `next`
+ * narrows the pool to leaf work, so the count can exceed what `/arggon-next`
+ * would suggest.
  */
 export function sidebarStatusLine(snapshot: BoardSnapshot, width = 0): string {
   const clip = (line: string): string => (width > 0 ? clipBoardLine(line, width) : line);
@@ -334,14 +304,8 @@ export function sidebarStatusLine(snapshot: BoardSnapshot, width = 0): string {
   if (active !== undefined) {
     return clip(`arggon ▶ ${sanitizeHumanTextUncapped(active.id)} ${active.status}`);
   }
-  const byId = new Map(snapshot.items.map((item) => [item.id, { status: item.status }] as const));
-  const ready = snapshot.items.filter(
-    (item) =>
-      isClaimable(item.type) &&
-      item.status === "todo" &&
-      item.assignee === null &&
-      isReady(item, byId),
-  ).length;
+  // Kernel readiness (isClaimable + isReady), shared through the view-model.
+  const ready = readyTodoCount(snapshot.items);
   const next =
     snapshot.nextId !== null ? ` · next ${sanitizeHumanTextUncapped(snapshot.nextId)}` : "";
   return clip(`arggon · ${ready} ready${next}`);
