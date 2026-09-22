@@ -71,3 +71,7 @@ Gates on `638b69c`: `npm test` 1494/1495 — the only failure is the pre-existin
 CI: `cli` pass (4m16s, run 35673130685) + `tasks-validate` pass (37s, run 35673130879) on the pushed tip. PR #390 is draft and mergeable; tracker-carrying branch → merge commit, never squash.
 
 Scope: `lib/src/worktree.ts`, `cli/src/{start,worktree}.test.ts`, `README.md`, `ArggonManager/docs/{agents,json-output}.md`, `skills/arggon-cli/references/pitfalls.md`, regenerated `opencode/plugins/arggon/index.bundle.ts`. No overlap with `cli/src/measure*` or the code-span sweep.
+
+### handoff 2026-09-22 @Arggon — next: Review draft PR #390 (fix 638b69c + tracker commits); confirm CI on the final tip, merge with a merge commit (never squash), then flip done.
+- branch: feat/task-start-build-exit-visibility
+- open questions: None blocking. Deliberate: a reified npm ci install with a missing declared entry is still built (the gate needs it) — only a bare symlink to the primary install is skipped; the attach skip is proven…
