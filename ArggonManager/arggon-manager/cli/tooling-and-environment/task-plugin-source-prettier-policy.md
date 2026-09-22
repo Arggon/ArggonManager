@@ -143,3 +143,6 @@ Alcance revisado: 4 ficheros (+89/−10) — `.prettierignore`, este item y las 
 - Verdict commit **`3935317`** (`chore(tasks): commented task-plugin-source-prettier-policy`) está **local** en el worktree `/home/arggon/Projects/ArggonManager-opencode2-task-plugin-source-prettier-policy`, sobre `034f6ee`; `origin/feat/task-plugin-source-prettier-policy` sigue en `034f6ee` (ahead 1).
 - Acción para el coordinador: `git push origin feat/task-plugin-source-prettier-policy` desde ese worktree antes del merge (o merge local + push de `opencode2`) para que el veredicto entre en la historia; luego re-confirmar CI en el nuevo head (`tasks-validate` + `cli` re-corean) y merge con **merge commit, nunca squash**.
 - El resto del veredicto (evidencia, gates, hallazgos, recomendación **MERGE**) no cambia.
+
+### 2026-09-22 @Arggon
+Coordinator note: reviewer verified the ignore is load-bearing (dirty without it, no-op with it), bundle still pinned, both explorations decided with resolving links, gates 1498 + CI. Nits applied in the closure: .prettierignore now covers the whole plugin dir (source + tests, per the review's scope note) and the comment wording is fixed; evidence heads noted (final = 034f6ee). Repo-wide ~343 prettier-dirty files remain a known broader footgun (out of scope). Merged with merge commit; item flipped to done.
