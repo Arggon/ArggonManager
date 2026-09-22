@@ -448,17 +448,17 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
 - Re-verified on 2.0.12 (2026-09-21, `opencode v2.0.12`): the plugin-import
   A/B re-probe recorded in task-playbook-opencode-2-0-12 (same dependency-less
   fixture shape — no `node_modules` in the fixture or any ancestor: plugin A,
-  the docs static import, failed to load with `Cannot find package
-  '@opencode/plugin'` and never wrote its setup marker; plugin B, the vendored
-  bundle, loaded, registered the fifteen native tools and executed
-  `tools.arggon.next({})` in a real session; exit 0; the first `execute`
-  completed, so the 2.0.10 catalog lag was not reproduced). The full harness was
-  re-run on 2.0.12 by W6/W7 (`task-native-headless-ci`,
+  the docs static import, failed to load with
+  `Cannot find package '@opencode/plugin'` and never wrote its setup marker;
+  plugin B, the vendored bundle, loaded, registered the fifteen native tools and
+  executed `tools.arggon.next({})` in a real session; exit 0; the first
+  `execute` completed, so the 2.0.10 catalog lag was not reproduced). The full
+  harness was re-run on 2.0.12 by W6/W7 (`task-native-headless-ci`,
   `task-native-dogfood-release`): 26 scenarios / 144 checks / 0 failures. Probe
-  note: `opencode mcp list` in the dependency-less fixture printed `No MCP
-  servers configured` on a first run and listed the machine's global servers
-  later — assert the absence of an `arggon` MCP server from the config files
-  plus the plugin's registration log, not from `mcp list` alone.
+  note: `opencode mcp list` in the dependency-less fixture printed
+  `No MCP servers configured` on a first run and listed the machine's global
+  servers later — assert the absence of an `arggon` MCP server from the config
+  files plus the plugin's registration log, not from `mcp list` alone.
 
 ## Security
 

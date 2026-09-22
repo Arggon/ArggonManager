@@ -39,7 +39,7 @@ this exploration picks the tooling so the gate is codified, not tribal.
    agent/visual-testing platforms.
 9. **Webwright (`microsoft/Webwright`)** — MIT Python "SWE-style browser
    agent framework": turns a coding LLM into a browser agent via
-   code-as-action (the model writes and runs Playwright *Python* scripts in
+   code-as-action (the model writes and runs Playwright _Python_ scripts in
    a terminal loop). First public release 2026-05-04; ~1.5k LoC; needs an
    LLM backend (OpenAI/Anthropic/OpenRouter).
 
@@ -52,10 +52,10 @@ Weighted, "better" means:
 2. **Agent-runner friendly (high)** — reviews in this repo are executed by
    agents; the tool must be drivable by an agent with bounded token cost and
    without bespoke test code for every PR.
-3. **Fits the actual UI surface (high)** — the product UI is `arggon board
-   --serve` (local HTTP server + static board HTML with drag-and-drop state
-   changes routed through the kernel). No mobile, no cross-browser matrix, no
-   hosted anything (SaaS is out without an ADR).
+3. **Fits the actual UI surface (high)** — the product UI is
+   `arggon board --serve` (local HTTP server + static board HTML with
+   drag-and-drop state changes routed through the kernel). No mobile, no
+   cross-browser matrix, no hosted anything (SaaS is out without an ADR).
 4. **Dependency weight (medium)** — repo ships `commander` as its only runtime
    dependency; browsers/bundled tooling must stay dev-only or npx-only.
 5. **Maintenance burden (medium)** — smoke specs must not rot with every CSS

@@ -25,17 +25,18 @@ requiring an ADR (docs/engineering.md).
 
 - `npm i -D typescript@~5.8.2` (pinned minor — compiler behavior stays stable
   within the pin; bump the pin deliberately, never via a blanket `npm update`).
-- Config: `tsconfig.json` with `strict: true`, `module`/`moduleResolution:
-  NodeNext`, `target: ES2022`, `declaration: true`, ESM emit to `dist/`.
-- Typecheck gate: `npx tsc -p tsconfig.json --noEmit` (CI runs it via `npm run
-  build`).
+- Config: `tsconfig.json` with `strict: true`,
+  `module`/`moduleResolution: NodeNext`, `target: ES2022`, `declaration: true`,
+  ESM emit to `dist/`.
+- Typecheck gate: `npx tsc -p tsconfig.json --noEmit` (CI runs it via
+  `npm run build`).
 - Linting: `typescript-eslint` ^8.26.1 with `eslint` ^9 (flat config), gate:
   `npm run lint`.
 
 ## Conventions
 
 - Strict mode everywhere — no `any` leaks into kernel modules; prefer `unknown`
-  + narrowing at I/O boundaries (frontmatter, fs reads).
+  - narrowing at I/O boundaries (frontmatter, fs reads).
 - ESM imports use `.js` extensions on relative specifiers (NodeNext emits and
   resolves ESM); `import type` for type-only imports.
 - No `enum`/parameter properties (TS-only runtime constructs) — plain objects

@@ -70,9 +70,9 @@ question is how to compose them:
   validation, no ordering guarantee, and requirement 1 says items "must be
   capable of having a priority" — a convention inside a generic list is the
   status quo that already failed to reach `next`.
-- **(c) Dedicated field + one-shot migration**: (a) plus `arggon priority
-  migrate [--dry-run]` moving existing `pN` labels into the field (41 items;
-  labels stay for non-priority uses — no double representation).
+- **(c) Dedicated field + one-shot migration**: (a) plus
+  `arggon priority migrate [--dry-run]` moving existing `pN` labels into the
+  field (41 items; labels stay for non-priority uses — no double representation).
 
 ## Orchestrator flow (requirement 2)
 

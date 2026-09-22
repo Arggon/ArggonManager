@@ -18,18 +18,18 @@ commands), how do adopting repos receive them? Investigated 2026-09-16 in code
   no package releases yet); `arggon --version` reads package.json (0.1.0
   since forever — the stamp exists but carries no information).
 - Every generated doc records provenance in `tasks/.convention.yml`
-  `x-generated:` → `{ template, checksum (sha256 of file as written),
-  arggonVersion, generatedAt }`, plus an `acknowledged` flag from
-  `arggon adopt --ack`.
+  `x-generated:` →
+  `{ template, checksum (sha256 of file as written), arggonVersion, generatedAt }`,
+  plus an `acknowledged` flag from `arggon adopt --ack`.
 - **Re-running `arggon init` is the designed upgrade path** (Copier-style):
   not-on-disk → created; untouched (checksum matches) → silently regenerated
   from the CURRENT template; adopter-modified → skipped by default
   (`--backup` = move aside + regenerate); **acknowledged → always skipped**
   ("it is yours").
-- Doctor reports provenance buckets (`untouched/modified/acknowledged/
-  acknowledgedDrifted/stale/missing`) but `stale` means "template no longer
-  generated" (renames) — nothing reports "the upstream template content
-  changed since you generated/acked".
+- Doctor reports provenance buckets
+  (`untouched/modified/acknowledged/acknowledgedDrifted/stale/missing`) but
+  `stale` means "template no longer generated" (renames) — nothing reports "the
+  upstream template content changed since you generated/acked".
 
 ### The structural finding (evidence)
 

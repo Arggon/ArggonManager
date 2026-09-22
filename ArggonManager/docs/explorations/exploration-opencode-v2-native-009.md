@@ -67,10 +67,11 @@ pinning, reviewer visibility.
   `AGENTS.md` only and does **not** use `CLAUDE.md` as a fallback — the
   generated `CLAUDE.md` shim serves other tools, not V2.
 - **Skills**: `.agents/skills` is a documented project compatibility source;
-  discovery order is `.claude/skills` → `.agents/skills` → `~/.config/opencode/
-  skills` → project `.opencode/skills` → explicit `skills` config entries, later
-  sources overriding by ID (source: https://opencode.ai/v2/docs/skills/,
-  2026-09-17). Because init bundles `arggon-cli` and `arggon-upgrade` under
+  discovery order is `.claude/skills` → `.agents/skills` →
+  `~/.config/opencode/skills` → project `.opencode/skills` → explicit `skills`
+  config entries, later sources overriding by ID (source:
+  https://opencode.ai/v2/docs/skills/, 2026-09-17). Because init bundles
+  `arggon-cli` and `arggon-upgrade` under
   `.agents/skills/`, **any V2 session in an initialized repo already discovers
   the skill today** — this is the most valuable implicit integration. Slash
   visibility is controlled by `slash` / `metadata.opencode/slash`;
@@ -132,10 +133,10 @@ pinning, reviewer visibility.
   https://opencode.ai/v2/docs/build/plugins/, 2026-09-17). A vendored plugin
   template therefore needs no adopter config — but package plugins can be
   versioned and upgraded via `opencode plugin add|update` (same sources).
-- **Documented (non-experimental) surfaces**: `session.hook("prompt" |
-  "context" | "compaction" | "title" | "generate")`, `tool.hook("execute.before"
-  | "execute.after")`, `permission.hook("evaluate")`, `shell.hook(
-  "create.before")`, transforms for `mcp`, `agent`, `command`, `skill`, `tool`,
+- **Documented (non-experimental) surfaces**:
+  `session.hook("prompt" | "context" | "compaction" | "title" | "generate")`,
+  `tool.hook("execute.before" | "execute.after")`, `permission.hook("evaluate")`,
+  `shell.hook("create.before")`, transforms for `mcp`, `agent`, `command`, `skill`, `tool`,
   `reference`, `vcs`, `worktree`, `websearch`, `provider`, `model`,
   `integration`, plus `ctx.event.subscribe`, `ctx.storage`, `ctx.generate.text`,
   `ctx.session.*`, and plugin RPC (sources: https://opencode.ai/v2/docs/build/
@@ -181,18 +182,18 @@ pinning, reviewer visibility.
 
 ### Inert / unsupported V2 surfaces (do not build on)
 
-| Surface | State |
-| --- | --- |
-| `instructions` config array | Accepted but entries are not loaded; `AGENTS.md` is the mechanism (https://opencode.ai/v2/docs/instructions/) |
-| Agent `request` overlays | Preserved but not sent yet (https://opencode.ai/v2/docs/agents/) |
-| Session sharing (`share`) | Not supported yet (https://opencode.ai/v2/docs/sharing/) |
-| `username` | Accepted, not displayed (https://opencode.ai/v2/docs/config/) |
-| Built-in `scout` agent | V2 has none (https://opencode.ai/v2/docs/agents/) |
-| `warming` | Exists, disabled by default, real provider requests/cost; keep off for arggon work (https://opencode.ai/v2/docs/warming/) |
-| `formatter` | Available and cheap: `formatter: true` runs project-local prettier after write/edit/patch (https://opencode.ai/v2/docs/formatters/) |
-| Snapshots (`/undo`) | Active-directory files only inside a git worktree; no git state (commits/branches), no ignored files, untracked >2 MiB not captured; cannot revert tracker auto-commits (https://opencode.ai/v2/docs/snapshots/) |
-| Compaction | Checkpoint-based, lossy; hooks can observe/override; tune `compaction.keep.tokens` per project (https://opencode.ai/v2/docs/compaction/) |
-| MCP `_meta.sessionID` | Sent by OpenCode on calls made for a session; opaque correlation only, never auth (https://opencode.ai/v2/docs/mcp-servers/) |
+| Surface                     | State                                                                                                                                                                                                            |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `instructions` config array | Accepted but entries are not loaded; `AGENTS.md` is the mechanism (https://opencode.ai/v2/docs/instructions/)                                                                                                    |
+| Agent `request` overlays    | Preserved but not sent yet (https://opencode.ai/v2/docs/agents/)                                                                                                                                                 |
+| Session sharing (`share`)   | Not supported yet (https://opencode.ai/v2/docs/sharing/)                                                                                                                                                         |
+| `username`                  | Accepted, not displayed (https://opencode.ai/v2/docs/config/)                                                                                                                                                    |
+| Built-in `scout` agent      | V2 has none (https://opencode.ai/v2/docs/agents/)                                                                                                                                                                |
+| `warming`                   | Exists, disabled by default, real provider requests/cost; keep off for arggon work (https://opencode.ai/v2/docs/warming/)                                                                                        |
+| `formatter`                 | Available and cheap: `formatter: true` runs project-local prettier after write/edit/patch (https://opencode.ai/v2/docs/formatters/)                                                                              |
+| Snapshots (`/undo`)         | Active-directory files only inside a git worktree; no git state (commits/branches), no ignored files, untracked >2 MiB not captured; cannot revert tracker auto-commits (https://opencode.ai/v2/docs/snapshots/) |
+| Compaction                  | Checkpoint-based, lossy; hooks can observe/override; tune `compaction.keep.tokens` per project (https://opencode.ai/v2/docs/compaction/)                                                                         |
+| MCP `_meta.sessionID`       | Sent by OpenCode on calls made for a session; opaque correlation only, never auth (https://opencode.ai/v2/docs/mcp-servers/)                                                                                     |
 
 ### Local evidence (this repo, 2026-09-17)
 
@@ -210,13 +211,13 @@ pinning, reviewer visibility.
 
 ### Risk register (V2 churn)
 
-| Risk | Mitigation |
-| --- | --- |
-| MCP registration shape changes | Plugin transform + doctor verification; keep `.mcp.json` for other clients |
-| Plugin API drift (2.0.x) | Thin, optional, version-pinned plugin; ADR records revisit trigger |
+| Risk                                                                                                     | Mitigation                                                                                     |
+| -------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| MCP registration shape changes                                                                           | Plugin transform + doctor verification; keep `.mcp.json` for other clients                     |
+| Plugin API drift (2.0.x)                                                                                 | Thin, optional, version-pinned plugin; ADR records revisit trigger                             |
 | Two worktree conventions (`arggon start --worktree` → `../<repo>-<id>` vs OpenCode `worktree.directory`) | Keep arggon authoritative; document alignment guidance; no plugin worktree strategy in phase 1 |
-| Inert features silently relied upon | The table above; no dependency on them |
-| `.agents/skills` precedence below project `.opencode/skills` | Do not generate duplicate skill IDs under `.opencode/skills` |
+| Inert features silently relied upon                                                                      | The table above; no dependency on them                                                         |
+| `.agents/skills` precedence below project `.opencode/skills`                                             | Do not generate duplicate skill IDs under `.opencode/skills`                                   |
 
 ## Recommendation
 

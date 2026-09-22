@@ -15,14 +15,14 @@ this. `task-nothing-to-commit-masking` (PR #241) added the residue probe.
 ## Occurrences (CI log evidence)
 
 1. **2026-09-14T22:33Z, run 34904682283** (PR #207 first run, branch
-   `feat/task-adopt-scan-count-constant`, pre-#214/#241). `AssertionError:
-   expected 'M tasks/launch/auth/story-login/task-…' to be ''` at the
-   then-clean-tree assert (`labs/torture.test.ts:317` at that revision),
+   `feat/task-adopt-scan-count-constant`, pre-#214/#241).
+   `AssertionError: expected 'M tasks/launch/auth/story-login/task-…' to be ''`
+   at the then-clean-tree assert (`labs/torture.test.ts:317` at that revision),
    scenario 2 (N=6 commenting processes), 3292ms test time. Passing on rerun.
 2. **2026-09-15T16:21Z, run 34994442279** (main push, merge of PRs #229/#231;
    post-#214, 24 min before #241 merged — very likely this run triggered
-   #241). `AssertionError: expected 'M tasks/launch/auth/story-login/task-a.md'
-   to be ''` at `labs/torture.test.ts:341`.
+   #241). `AssertionError: expected 'M tasks/launch/auth/story-login/task-a.md' to be ''`
+   at `labs/torture.test.ts:341`.
 3. **2026-09-15T22:30Z, PR #260 first run** (branch
    `feat/task-handoff-provenance-session-identifier-in-handoff-sections`,
    post-#214 AND post-#241). Dirty `task-f.md` per the item body; the run's

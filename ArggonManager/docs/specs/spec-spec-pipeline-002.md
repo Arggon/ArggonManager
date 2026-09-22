@@ -52,11 +52,11 @@ arggon spec new <slug> [--title <t>] [--plan]   # scaffold spec (and plan)
 
 ## Contrato JSON
 
-- `--json` envelope mirrors `validate`: `{ ok, schemaVersion, conventionVersion,
-  command: "spec", errors, warnings }`; `ok` is false iff `errors.length > 0`,
-  and a failed run carries `error.code: "SPEC_FAILED"` (also used for
-  `spec new` failures). `spec new` success emits `{ files: string[] }` (posix,
-  relative to the repo root).
+- `--json` envelope mirrors `validate`:
+  `{ ok, schemaVersion, conventionVersion, command: "spec", errors, warnings }`;
+  `ok` is false iff `errors.length > 0`, and a failed run carries
+  `error.code: "SPEC_FAILED"` (also used for `spec new` failures). `spec new`
+  success emits `{ files: string[] }` (posix, relative to the repo root).
 
 ## Aceptación
 

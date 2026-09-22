@@ -30,14 +30,14 @@ arggon spec audit --duplicate-threshold 0.85 --merge-threshold 0.45
 
 Flags (defaults documented in `--help`):
 
-| Flag | Default | Meaning |
-|---|---|---|
-| `--duplicate-threshold <n>` | `0.85` | similarity at/above this classifies a pair DUPLICATE |
-| `--merge-threshold <n>` | `0.45` | similarity at/above this classifies a pair MERGE |
-| `--min-shared-titles <n>` | `2` | shared requirement/scenario titles at/above this (with similarity >= `--shared-title-floor`) classify a pair MERGE — the "diverging duplicate" shape (same requirements, rewritten prose) |
-| `--shared-title-floor <n>` | `0.15` | minimum similarity for the shared-titles MERGE path |
-| `--report-floor <n>` | `0.15` | pairs below this similarity AND with zero shared titles are not reported (only counted) |
-| `--json` | off | one JSON envelope on stdout (agent contract, `command: "spec"`) |
+| Flag                        | Default | Meaning                                                                                                                                                                                   |
+| --------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--duplicate-threshold <n>` | `0.85`  | similarity at/above this classifies a pair DUPLICATE                                                                                                                                      |
+| `--merge-threshold <n>`     | `0.45`  | similarity at/above this classifies a pair MERGE                                                                                                                                          |
+| `--min-shared-titles <n>`   | `2`     | shared requirement/scenario titles at/above this (with similarity >= `--shared-title-floor`) classify a pair MERGE — the "diverging duplicate" shape (same requirements, rewritten prose) |
+| `--shared-title-floor <n>`  | `0.15`  | minimum similarity for the shared-titles MERGE path                                                                                                                                       |
+| `--report-floor <n>`        | `0.15`  | pairs below this similarity AND with zero shared titles are not reported (only counted)                                                                                                   |
+| `--json`                    | off     | one JSON envelope on stdout (agent contract, `command: "spec"`)                                                                                                                           |
 
 ## Design
 
@@ -46,7 +46,7 @@ Scope: every pair (i < j, sorted by filename) over the `*.md` files directly in
 No `ArggonManager/docs/plans` scan; no single-spec mode (keep scope to the corpus audit).
 
 **Normalization** (documented, deterministic): strip YAML frontmatter, strip
-fenced code blocks (``` … ``` — code samples are boilerplate, not spec prose),
+fenced code blocks (`…` — code samples are boilerplate, not spec prose),
 lowercase, keep only `[a-z0-9]+` word tokens, collapse whitespace.
 
 **Similarity metric**: word-shingle Jaccard with shingle size k = 3 (three
