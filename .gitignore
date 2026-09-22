@@ -1,6 +1,9 @@
 node_modules/
 dist/
 coverage/
+# task-ui-browser-smoke-ci: Playwright (dev-only) run artifacts
+test-results/
+playwright-report/
 .DS_Store
 *.log
 

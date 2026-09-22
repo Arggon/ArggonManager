@@ -72,6 +72,26 @@ launch it resolve `@arggondev/lib` through `node_modules` → `lib/dist`
 (`npm run build --workspace @arggondev/lib`), and the flip means the worktree's own
 build is what runs.
 
+### UI smoke tests (dev-only)
+
+The `ui-smoke` CI job runs the durable smoke net for the board and the TUI
+([ADR 0008](ArggonManager/docs/adr/0008-review-smoke-gate.md)); the review-time
+browser gate stays the Playwright CLI drive described in
+`ArggonManager/docs/engineering.md` § Smoke test. Locally:
+
+- `npm run build` — both specs drive the **built** bin on a temp fixture
+- `npx playwright install chromium` — once per machine; `@playwright/test` is a
+  devDependency and never ships
+- `npx playwright test --grep @smoke` — board smoke: `board --serve` renders one
+  card per `arggon list` item, one status move round-trips through the UI and
+  persists (`arggon show`)
+- `npm run smoke:tui-board` — TUI frame check: `arggon board --tui` renders in a
+  pty and the capture carries the five status headers plus a seeded item id
+  (skips cleanly where util-linux `script` is unavailable)
+
+The Playwright specs live in `e2e/`, outside vitest's include globs, so
+`npm test` never picks them up.
+
 ## Propose schema / convention changes
 
 1. Open an issue describing the change and why (agents + humans must share one rule).

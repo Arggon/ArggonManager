@@ -21,12 +21,25 @@ jobs:
         # bump, wedging every tracker commit and auto-done flip in between.
         # And only when the PR touches package.json: tracker-only flip PRs
         # must never be blocked by the version guard.
+        #
+        # bug-ci-version-guard-dev-only: the demand is scoped to the
+        # publish-relevant fields (name/version/private/bin/files/dependencies/
+        # engines — cli/version-guard.mjs). A devDependency or script change is
+        # not adopter-facing and must not force a release bump; a shipping-field
+        # change while the version is already tagged still fails.
+        #
+        # The default checkout is shallow, so `origin/main...HEAD` had no merge
+        # base and the old inline check silently passed on every PR. Fetch the
+        # PR's own base commit by SHA instead (exact, ancestry-free) and compare
+        # trees two-dot; the file list and the base content come from it.
         if: github.event_name == 'pull_request'
         run: |
           git fetch --tags --force
-          if ! git diff --name-only origin/main...HEAD | grep -q '^package\.json$'; then exit 0; fi
-          v=$(node -p "require('./package.json').version")
-          if git rev-parse -q --verify "refs/tags/v$v" >/dev/null; then echo "version $v already tagged - bump package.json"; exit 1; fi
+          base='${{ github.event.pull_request.base.sha }}'
+          git fetch --no-tags --depth=1 origin "$base"
+          if ! git diff --name-only FETCH_HEAD HEAD | grep -q '^package\.json$'; then exit 0; fi
+          git show FETCH_HEAD:package.json > "$RUNNER_TEMP/package-base.json"
+          node cli/version-guard.mjs "$RUNNER_TEMP/package-base.json"
       - run: npm run build
       - name: Fail if the committed plugin bundle drifted from its source
         # The artifact is committed and vendored to adopters by `init`; the
@@ -35,3 +48,23 @@ jobs:
         run: npm run check:plugin
       - run: npm run test
       - run: npm run lint
+
+  ui-smoke:
+    # task-ui-browser-smoke-ci (ADR 0008 tier 2): the durable `@smoke` browser
+    # spec plus the pty TUI frame check. Chromium-only and one worker; the
+    # review-time real-browser gate stays Playwright CLI on the reviewer side.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Install Chromium (Playwright is a devDependency, never shipped)
+        run: npx playwright install --with-deps chromium
+      - name: Browser smoke (board --serve on a temp fixture)
+        run: npx playwright test --grep @smoke
+      - name: TUI frame check (pty)
+        run: npm run smoke:tui-board
