@@ -1,8 +1,9 @@
 ---
 type: bug
-status: todo
+status: done
 id: bug-ci-version-guard-dev-only
 title: CI version guard demands a release bump for dev-only package.json changes
+assignee: Arggon
 parent: tooling-and-environment
 labels: [ci, tooling]
 priority: p2
@@ -54,3 +55,14 @@ Fixed in `task-ui-browser-smoke-ci`'s PR: https://github.com/Arggon/ArggonManage
 - `cli/version-guard.mjs` scopes the demand to `name`/`version`/`private`/`bin`/`files`/`dependencies`/`engines`; dev-only changes pass with a message, shipping-field changes still fail when tagged.
 - Probe expected vs observed is recorded on `task-ui-browser-smoke-ci` (dev-only PASS; dependencies+tagged FAIL; dependencies+untagged PASS).
 - Extra finding fixed in the same step: the guard was silently dead on PRs (`origin/main...HEAD` has no merge base in the shallow checkout — CI run 35794199343); the step now diffs against `github.event.pull_request.base.sha` and actually runs (green on PR #401, `cli` job prints the dev-only pass).
+
+### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Merge verification — done (coordinator)
+
+Fix landed in PR #401 (rebase-merged). Verified by the coordinator:
+
+- `cli/version-guard.test.ts` pins the predicate: devDependencies/scripts/added non-shipping fields/object-key order are ignored; every changed shipping field is reported in order; a missing field equals null; `SHIPPING_FIELDS` exact.
+- Local probes on merged main: dev-only change → exit 0 with "dev-only change, no version bump required"; shipping-field change with v0.4.0 tagged → exit 1 "version 0.4.0 already tagged (publish-relevant fields changed: dependencies)".
+- The CI step now actually executes (it was silently dead before: shallow checkout → no merge base → the `! grep` path always exited 0); on PR #401 it printed the dev-only pass and the `cli` check stayed green.
+
+Auto-done skipped this item because it was still `todo`/unclaimed when #401 merged — claimed and completed manually here.

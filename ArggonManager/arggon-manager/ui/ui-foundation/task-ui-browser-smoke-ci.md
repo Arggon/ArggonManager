@@ -90,3 +90,20 @@ Related finding fixed in the same step: the old guard was **silently dead on PRs
 ### handoff 2026-09-22 @ses_f34ab7c2effeGb96Q5UOGLzjgq (session: ses_f34ab7c2effeGb96Q5UOGLzjgq) — next: Coordinator: review PR #401 (both ids referenced), merge-merge, tick acceptance, set done. CI green on 50c89218: cli, ui-smoke, tasks-validate all pass.
 - branch: feat/task-ui-browser-smoke-ci
 - open questions: ui-smoke adds ~1.5 min wall time (Chromium install) — acceptable? Guard step is now live in CI (shallow-checkout fix); confirm the scoped field list matches intent.
+
+### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Coordinator review — PASS (lead architect) + merge verification
+
+Reviewed PR #401 (rebase-merged; auto-done #403 marked this item done).
+
+**Scope.** `@playwright/test` as a devDependency only; `playwright.config.ts` (testDir `e2e`, Chromium, 1 worker); `e2e/board.smoke.spec.ts` (temp git fixture + `init` + 4-item CLI chain; exact card-id parity with `arggon list --json`; `todo → cancelled` through a real HTML5 drag; toast-gated persistence check via `arggon show`; SIGTERM/SIGKILL cleanup); `smoke/tui-board-smoke.ts` pty frame check (+ predicate test) with `smoke:tui-board`; `ui-smoke` CI job; docs (`engineering.md` testing table, `CONTRIBUTING.md`); run artifacts gitignored. The coordinator amendment was honored (no filter assertion — wave-1 `task-board-filter-lenses` extends the spec).
+
+**Independent coordinator verification.**
+- `npx playwright test --grep @smoke` in the worktree: **2 passed** (1.7s), real Chromium.
+- `npm run smoke:tui-board`: **passed** (pty frame carries the five headers + seeded id).
+- CI on the rebased head: `ui-smoke` 1m28s, `cli` 4m19s, `tasks-validate` 34s.
+- Guard fix probes on merged main: dev-only change → exit 0 ("no version bump required"); shipping field change with v0.4.0 tagged → exit 1. `cli/version-guard.test.ts` pins the predicate.
+
+**Acceptance — verified.** Durable `@smoke` spec runs in CI Chromium-only with a dev-only dependency; TUI frame check scripted; docs updated; required `cli` check untouched and green.
+
+**Extra finding handled in-PR:** the old version guard was silently dead on every PR (shallow checkout has no merge base, so the `! grep` short-circuit always passed); the step now fetches the PR base by SHA and diffs two-dot — the bug item records it.

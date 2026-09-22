@@ -99,3 +99,20 @@ Existing oracles untouched and green: `cli/src/board.test.ts`, `board-parity.tes
 ### handoff 2026-09-22 @ses_f34ab7c2fffe7rHSRQcARR0Hvz (session: ses_f34ab7c2fffe7rHSRQcARR0Hvz) — next: Review PR #400 (CI green); merge (merge-commit, tracker commits on the branch) and flip the item done once the acceptance checklist is ticked.
 - branch: feat/task-ui-shared-viewmodel
 - open questions: F1 applyViewLens shipped with no consumer yet (v2 lens entry); F2 lens reads kernel dependsOn, contract items carry depends_on; F3 board-serve.ts sort out of scope; F0 start --worktree claim commit f…
+
+### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Coordinator review — PASS (lead architect) + merge verification
+
+Reviewed PR #400 (head 903ebf0f; rebase-merged; auto-done #402 marked this item done). Merge commit lineage is linear and keeps the worker's claim/evidence commits.
+
+**Architecture / scope.** New pure `lib/src/view-model.ts` (+25 tests) consumed by the three surfaces through the lib entry; kernel-first (openDependencies/isReady/isClaimable/parseFilter/priorityRank), no I/O, no new deps. `evaluateDrop` stays in place (its source is inlined into the page). Plugin bundle regenerated; `lib/README.md` + `lib/src/index.ts` document the surface. No ADR needed (internal lib surface).
+
+**Independent coordinator verification.**
+- Focused suites: view-model 25 + board 36 + board-parity 7 + board-serve 12 + tui 32 + plugin board 13 = **125 passed** (`npx vitest run …`, 6 files).
+- `npm run check:plugin`: clean (bundle rebuilt, no diff).
+- Worker differential probe (recorded above): 26 render sections byte-identical between base `46039d1` and code `c249b19` (903 lines, empty diff) — the no-behavior-change evidence.
+- CI green on the PR head (cli 3m28s, tasks-validate 34s).
+
+**Acceptance — verified.** One pure module consumed by all three surfaces with no behavior change (probe + suites); bundle regenerated and drift-gate green; surface documented; no runtime dependency; `arggon validate` green.
+
+**Findings consolidation (coordinator).** F0 → filed `bug-native-start-worktree-no-install`; F2 → filed `task-ui-viewmodel-contract-deps`; F1 informational (applyViewLens is the wave-1 surface, already test-pinned); F3 no action.
