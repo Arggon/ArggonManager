@@ -27,3 +27,15 @@ updated: "2026-09-22"
 - [ ] 
 
 ## Notes
+
+### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Context
+
+The board shows per-column counts only; progress per epic/story, blocked items with reasons, WIP and priority mix require running `arggon report`. A compact rollup header would make the board the standing PM view without duplicating report logic.
+
+## Acceptance
+
+- [ ] A summary panel computes from the kernel report/aggregation (single source, no copied rules): per-epic completion (done+cancelled/total), blocked count with reasons, in_progress (WIP) count and priority mix
+- [ ] With `--group-by story`, group headers show a completion fraction
+- [ ] Payload stays bounded (computed at render, no per-item bloat); static + serve parity; tests
+- [ ] README + docs/json-output.md updated
