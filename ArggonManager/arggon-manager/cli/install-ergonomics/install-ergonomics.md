@@ -37,8 +37,8 @@ rule-logic or tracker changes.
 
 ## Acceptance
 
-- [ ] `task-npm-packaging` closed: the package ships a slim, buildable tarball.
-- [ ] `task-opencode2-side-by-side-installs` closed: documented, verified
+- [x] `task-npm-packaging` closed: the package ships a slim, buildable tarball.
+- [x] `task-opencode2-side-by-side-installs` closed: documented, verified
       recipe for running both builds at once.
 
 ## Notes
