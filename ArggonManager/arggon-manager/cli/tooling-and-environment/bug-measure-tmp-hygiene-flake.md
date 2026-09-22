@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-measure-tmp-hygiene-flake
 title: measure.test.ts /tmp hygiene races sibling suites
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-19"
 updated: "2026-09-22"
-claimed_at: "2026-09-22T00:31:49.332Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-measure-tmp-hygiene-flake
 ---
 <!--
