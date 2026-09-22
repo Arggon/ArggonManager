@@ -120,7 +120,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(repoRoot, "cli/src/cli.ts");
 const tsx = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
-// W3: init vendors the committed single-file bundle (plugin + @arggon/lib
+// W3: init vendors the committed single-file bundle (plugin + @arggondev/lib
 // inlined), not the source; the fixture needs no `node_modules`.
 const PLUGIN_SOURCE = join(repoRoot, "opencode/plugins/arggon/index.bundle.ts");
 const PLUGIN_DEST = ".opencode/plugins/arggon/index.ts";

@@ -125,16 +125,16 @@ Copy a stub into the tracker root (`ArggonManager/`) per [`ArggonManager/docs/co
 
 ## Install
 
-Requires **Node.js 22.12+** (`engines` enforces it). The packages are not published to npm yet (both stay `private` until the release wave): build them from a checkout and install **both** tarballs together — no pre-build step needed. `arggon-manager` (bin + `templates/`, `skills/`, `opencode/`) declares the kernel package `@arggon/lib`, which is not on the registry, so installing the root tarball alone fails with `404 @arggon/lib`; installing both in one command resolves the dependency from the tarball:
+Requires **Node.js 22.12+** (`engines` enforces it). The packages are not published to npm yet (both stay `private` until the release wave): build them from a checkout and install **both** tarballs together — no pre-build step needed. `arggon-manager` (bin + `templates/`, `skills/`, `opencode/`) declares the kernel package `@arggondev/lib`, which is not on the registry, so installing the root tarball alone fails with `404 @arggondev/lib`; installing both in one command resolves the dependency from the tarball:
 
 ```bash
 git clone https://github.com/Arggon/ArggonManager
 cd ArggonManager
 npm install                                                            # deps; prepare builds lib/dist + dist/
 mkdir -p /tmp/arggon-packs                                             # `npm pack --pack-destination` does not create it
-npm pack --workspace @arggon/lib --pack-destination /tmp/arggon-packs
+npm pack --workspace @arggondev/lib --pack-destination /tmp/arggon-packs
 npm pack --pack-destination /tmp/arggon-packs
-npm install -g /tmp/arggon-packs/arggon-lib-<version>.tgz /tmp/arggon-packs/arggon-manager-<version>.tgz
+npm install -g /tmp/arggon-packs/arggondev-lib-<version>.tgz /tmp/arggon-packs/arggon-manager-<version>.tgz
 arggon --version
 ```
 
@@ -155,7 +155,7 @@ Requires **Node.js 22.12+** (needed by vitest 5 in the dev toolchain; `engines` 
 Root install; two packages — the CLI in `cli/`, the kernel in `lib/`
 ([ADR 0013](ArggonManager/docs/adr/0013-lib-package-split.md)). `npm run build`
 builds the kernel first, then the root; build before `npm test` (the tests that
-spawn the CLI resolve `@arggon/lib` through `lib/dist` — see
+spawn the CLI resolve `@arggondev/lib` through `lib/dist` — see
 [CONTRIBUTING.md](CONTRIBUTING.md)):
 
 ```bash
@@ -306,7 +306,7 @@ arggon show task-rate-limit --tail-comments 10
 arggon show task-rate-limit --body
 ```
 
-Shared kernel (`@arggon/lib`, [ADR 0013](ArggonManager/docs/adr/0013-lib-package-split.md)): `lib/src/paths.ts`, `frontmatter.ts`, `ids.ts`, `status.ts`, `items.ts`, `relations.ts`, `dates.ts`.
+Shared kernel (`@arggondev/lib`, [ADR 0013](ArggonManager/docs/adr/0013-lib-package-split.md)): `lib/src/paths.ts`, `frontmatter.ts`, `ids.ts`, `status.ts`, `items.ts`, `relations.ts`, `dates.ts`.
 
 ### `arggon validate`
 

@@ -18,7 +18,7 @@ import {
   summarizeChecks,
 } from "./board.js";
 import type { BoardGithub, PrInfo } from "./board.js";
-import { type ContractWorkItem as WorkItem } from "@arggon/lib";
+import { type ContractWorkItem as WorkItem } from "@arggondev/lib";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];

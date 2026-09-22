@@ -264,5 +264,5 @@ packaging deferrals are superseded by
 [ADR 0011](../adr/0011-native-first-architecture.md) (native-first, in-process
 kernel, MCP out of the default path), the layout by
 [ADR 0012](../adr/0012-tracker-root-layout.md), and the kernel packaging by
-[ADR 0013](../adr/0013-lib-package-split.md) (`@arggon/lib`). Closed as
+[ADR 0013](../adr/0013-lib-package-split.md) (`@arggondev/lib`). Closed as
 **decided** (task-plugin-source-prettier-policy).

@@ -1,10 +1,15 @@
-# 0013 Kernel package: `@arggon/lib`
+# 0013 Kernel package: `@arggondev/lib`
 
 - Status: Accepted
 - Date: 2026-09-20
 - Deciders: product owner (Gonzalo), coordinator/architect (Arggon)
 - Amends: [ADR 0011](0011-native-first-architecture.md) §5 (distribution)
 - Programme: `task-native-lib-package` (W1b, under `native-redesign`)
+
+- Amendment (2026-09-22): the package publishes as **`@arggondev/lib`** — the
+  owner's npm scope; the `@arggon` scope was unavailable. The architecture is
+  unchanged and every mention below refers to the same package under its
+  published name.
 
 ## Context
 
@@ -15,14 +20,14 @@ exposed it as a **subpath export** (`arggon-manager/lib`) of the (private) root
 package, and explicitly deferred the package shape to W3/W7.
 
 Product-owner decision (2026-09-20): the kernel ships as its **own package,
-`@arggon/lib`**, not as a subpath export. The root package
+`@arggondev/lib`**, not as a subpath export. The root package
 (`arggon-manager`) publishes the plugin build + the headless bin and depends on
-`@arggon/lib`. The drivers:
+`@arggondev/lib`. The drivers:
 
 - W2 (`task-native-tools`) and W3 consume a versioned package boundary instead
   of a private subpath; the native tools' dependency is explicit.
 - The W3 vendored plugin stays a **single-file, dependency-free bundle built
-  from `@arggon/lib`** — the kernel is the bundle input, not an npm dependency
+  from `@arggondev/lib`** — the kernel is the bundle input, not an npm dependency
   of adopter trees.
 - The kernel can evolve and be published independently of the seam assets
   (templates, skills, `opencode/`, the plugin).
@@ -30,9 +35,9 @@ Product-owner decision (2026-09-20): the kernel ships as its **own package,
 ## Decision
 
 1. **One workspace, two packages.** The kernel lives in `lib/` as
-   `@arggon/lib` (own `package.json`, `tsconfig.json`, `exports`, ESM only, no
+   `@arggondev/lib` (own `package.json`, `tsconfig.json`, `exports`, ESM only, no
    runtime dependencies). The root package declares `"workspaces": ["lib"]`
-   and depends on `"@arggon/lib"` (`^0.3.0`), linked by the workspace; the
+   and depends on `"@arggondev/lib"` (`^0.3.0`), linked by the workspace; the
    root's `arggon-manager/lib` subpath export is removed.
 2. **Surface unchanged.** The entry (`lib/src/index.ts`) is the W1 kernel
    surface — items, rules, paths, envelopes and the twelve `*Operation`s — with
@@ -42,7 +47,7 @@ Product-owner decision (2026-09-20): the kernel ships as its **own package,
    frontmatter/id primitives, command `run*` kernels) are public for the root
    package but are not frozen for native consumers.
 3. **No deep imports.** The CLI, the MCP adapter and the root tests import
-   `@arggon/lib`; the W1 polish findings (`PriorityMigrateOptions`,
+   `@arggondev/lib`; the W1 polish findings (`PriorityMigrateOptions`,
    `SyncFilled`, `HANDOFF_SESSION_CAP`, `parseCsvList`) are re-exported so
    `mcp-server.ts` has no kernel deep imports.
 4. **Assets stay in the root package.** The library ships no templates,
@@ -51,7 +56,7 @@ Product-owner decision (2026-09-20): the kernel ships as its **own package,
    the `templatesDir` injected by the root adapter (`create`/`import-issues`
    options); W2/W3 must inject it (or embed the templates in the plugin
    bundle).
-5. **Build order.** `npm run build` builds `@arggon/lib` first, then the root
+5. **Build order.** `npm run build` builds `@arggondev/lib` first, then the root
    `tsc`; CI stays `npm ci && npm run build && npm test && npm run lint`.
 6. **Publishing deferred.** Both packages stay `private: true` until the
    release waves (W6/W7) flip them and pin registry versions. The kernel

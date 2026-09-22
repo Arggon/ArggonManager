@@ -11,7 +11,7 @@ import {
   runCreate,
   runHandoff,
   runValidate,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";

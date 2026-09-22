@@ -24,11 +24,11 @@ updated: "2026-09-21"
 
 Findings from the PR #374 review (`task-native-lib-package`, ADR 0013):
 
-1. **MEDIUM** — `@arggon/lib`'s `.d.ts` import `commander` without declaring it
+1. **MEDIUM** — `@arggondev/lib`'s `.d.ts` import `commander` without declaring it
    in `lib/package.json` (consumer repro: `TS2307`). Runtime is dependency-free,
    but the public types leak it. Release-blocking for W6/W7.
 2. **MEDIUM** — `npm test` and the child CLI require a prior `lib` build, and in
-   worktrees with linked `node_modules`, `@arggon/lib` resolves to the
+   worktrees with linked `node_modules`, `@arggondev/lib` resolves to the
    **primary checkout** (repro: `ERR_MODULE_NOT_FOUND` when hiding `lib/dist`;
    the `start --worktree` link simulation resolves to PRIMARY). Follow-up in
    docs or `start` tooling.
@@ -45,7 +45,7 @@ Findings from the PR #374 review (`task-native-lib-package`, ADR 0013):
       (Removed: `JsonProgram` is structural; the consumer type-check is pinned
       in `cli/src/lib-build.test.ts` and mutation-verified.)
 - [x] Worktree resolution: tests/CLI work in a linked worktree without
-      resolving `@arggon/lib` to the primary (or the requirement is documented
+      resolving `@arggondev/lib` to the primary (or the requirement is documented
       and enforced in `start`).
       (Documented in `CONTRIBUTING.md`/`lib/README.md`/`README.md` and reported
       by `start --worktree` as `linkedWorkspaces` + stdout note; the full
@@ -67,7 +67,7 @@ Findings from the PR #374 review (`task-native-lib-package`, ADR 0013):
 
 ## Notes
 
-- PO decisions still open: publishing/versioning of `@arggon/lib` (private
+- PO decisions still open: publishing/versioning of `@arggondev/lib` (private
   until W6/W7) and the W2/W3 `templatesDir` injection requirement.
 
 ### 2026-09-21 @Arggon
@@ -87,19 +87,19 @@ Environment note: this worktree was started with `--worktree` (linked `node_modu
 
 ## Finding 1 — commander types (before/after)
 
-Consumer fixture: real copy of `lib/dist` (+`@types/node`, **no commander**) under `node_modules/@arggon/lib`, `tsc --noEmit --strict --module nodenext consumer.ts`.
+Consumer fixture: real copy of `lib/dist` (+`@types/node`, **no commander**) under `node_modules/@arggondev/lib`, `tsc --noEmit --strict --module nodenext consumer.ts`.
 
-- before (primary's build): `node_modules/@arggon/lib/dist/json.d.ts(1,30): error TS2307: Cannot find module 'commander' or its corresponding type declarations.`
+- before (primary's build): `node_modules/@arggondev/lib/dist/json.d.ts(1,30): error TS2307: Cannot find module 'commander' or its corresponding type declarations.`
 - after: exit 0.
   Mutation sanity: re-adding the commander type to `lib/src/json.ts` makes the new test fail with that exact TS2307. `dist/*.d.ts` now import only `node:*` and relative modules.
 
 ## Finding 2 — worktree resolution (smoke, real `dist/cli.js` on a fixture repo)
 
-- workspace link (`node_modules/@arggon/lib -> ../../lib`) + committed `lib/`: `linkedNodeModules=true linkedWorkspaces=["@arggon/lib"]`
+- workspace link (`node_modules/@arggondev/lib -> ../../lib`) + committed `lib/`: `linkedNodeModules=true linkedWorkspaces=["@arggondev/lib"]`
 - plain install (no workspace link): `linkedNodeModules=true linkedWorkspaces=[]`
-- human output: `note: @arggon/lib resolve(s) into the primary checkout through the linked install — build there, or run \`npm ci\` in the worktree (e.g. \`x-worktree.post-start: npm ci\`) for worktree-local resolution`
+- human output: `note: @arggondev/lib resolve(s) into the primary checkout through the linked install — build there, or run \`npm ci\` in the worktree (e.g. \`x-worktree.post-start: npm ci\`) for worktree-local resolution`
 - `arggon validate`/`npm test`-requires-a-build is now documented in CONTRIBUTING (CI already builds before testing).
-  Decision (deviation from the item's first option, reported for review): the resolution itself was NOT changed. A link farm pointing `@arggon/lib` at the worktree copy needs `<worktree>/lib/dist` **before** the claim commit's pre-commit gate, so `start` would have to build the kernel (kernel layering) or the gate would fail — regressing `bug-start-worktree-node-modules`. The item explicitly allows "documented and enforced in `start`", which is what landed (`linkedWorkspaces` + stdout note + docs). If the coordinator wants the real resolution flip, it needs its own item (build-before-gate design).
+  Decision (deviation from the item's first option, reported for review): the resolution itself was NOT changed. A link farm pointing `@arggondev/lib` at the worktree copy needs `<worktree>/lib/dist` **before** the claim commit's pre-commit gate, so `start` would have to build the kernel (kernel layering) or the gate would fail — regressing `bug-start-worktree-node-modules`. The item explicitly allows "documented and enforced in `start`", which is what landed (`linkedWorkspaces` + stdout note + docs). If the coordinator wants the real resolution flip, it needs its own item (build-before-gate design).
 
 ## Finding 3 — identity test
 
@@ -121,7 +121,7 @@ Fake `gh` logging `$PWD`, probe run from `/tmp/opencode` (the "server" cwd) with
 
 - ADR index rows 0005–0009: flagged as pre-existing in the item context, outside its acceptance — untouched.
 - `ArggonManager/docs/agents.md` (generated, drift-gated against `templates/`) does not mention `linkedWorkspaces`; the adopter template was not changed.
-- PO decisions in Notes (publishing/versioning of `@arggon/lib`, W2/W3 `templatesDir` injection) untouched.
+- PO decisions in Notes (publishing/versioning of `@arggondev/lib`, W2/W3 `templatesDir` injection) untouched.
 
 ### handoff 2026-09-21 @Arggon — next: Review PR #384 (5 commits + tracker ticks): confirm CI green, then merge (tracker-carrying branch: merge commit, not squash) and flip the item to done.
 
@@ -149,8 +149,8 @@ El paquete verifica de punta a punta (los 7 boxes, con mutación/smoke independi
 - Pedido: restaurar los espacios en un commit del worker; con eso el PR queda mergeable.
 
 **F2 · BAJA · `cli/src/start.ts:662` (cálculo) vs `:735` (hook) vs `:757` (return) — `linkedWorkspaces` reporta el estado pre-hook**
-- `linkedWorkspaces` se computa antes de `x-worktree.post-start`. Con `x-worktree.post-start: npm ci` (la remediación que el propio doc recomienda), el hook reifica un install local pero el envelope y stdout siguen diciendo `["@arggon/lib"]` / "resolve(s) into the primary".
-- Repro real (CLI `dist/cli.js`, fixture git con `node_modules/@arggon/lib -> ../../lib` y hook que reifica): `start --json` → `{'ok': True, 'linkedNodeModules': True, 'linkedWorkspaces': ['@arggon/lib'], 'postStart': {'ok': True}}`; tras el hook el worktree resuelve local. Es advisory (no rompe), pero contradice la definición del campo ("the worktree's install resolves into the primary"). Sugerencia: recalcular tras el hook antes del return, o documentar que reporta el estado pre-hook (la ventana del gate).
+- `linkedWorkspaces` se computa antes de `x-worktree.post-start`. Con `x-worktree.post-start: npm ci` (la remediación que el propio doc recomienda), el hook reifica un install local pero el envelope y stdout siguen diciendo `["@arggondev/lib"]` / "resolve(s) into the primary".
+- Repro real (CLI `dist/cli.js`, fixture git con `node_modules/@arggondev/lib -> ../../lib` y hook que reifica): `start --json` → `{'ok': True, 'linkedNodeModules': True, 'linkedWorkspaces': ['@arggondev/lib'], 'postStart': {'ok': True}}`; tras el hook el worktree resuelve local. Es advisory (no rompe), pero contradice la definición del campo ("the worktree's install resolves into the primary"). Sugerencia: recalcular tras el hook antes del return, o documentar que reporta el estado pre-hook (la ventana del gate).
 
 **F3 · BAJA · `skills/arggon-cli/SKILL.md:132-136` y `references/pitfalls.md:54-62` sin sincronizar**
 - `ArggonManager/docs/engineering.md:35` exige `skills/arggon-cli/` "keep in sync with `ArggonManager/docs/json-output.md`" y el PR añadió campo + caveat al doc JSON sin tocar el skill (que sí documenta `linkedNodeModules` y los worktree starts). Fix barato en el mismo PR o follow-up. Nota: `.agents/skills/arggon-cli/` es copia generada (gitignored); el source commiteado es `skills/arggon-cli/`.
@@ -180,7 +180,7 @@ Review-round fixes for the F1–F4 verdict (`git range 5590acb..11be0c4`, pushed
 
 **F1 (MEDIA) — restored + root cause.** `abdb28f` restores all **four** glued spaces in `ArggonManager/docs/json-output.md` (verdict said 3; `:184` had two — `` `null` otherwise `` and `and `.mcp.json``— and `:659` two:`` `v1.findings` entries `` and `such as `{`). Token-set comparison vs `origin/opencode2`now finds zero glued tokens. Cause is *not* a hand edit:`opencode.jsonc`has`"formatter": true`, so editing the file ran prettier, and **prettier 3.9.6 glues those four spaces itself** — repro on the untouched base: `git show origin/opencode2:... > /tmp/base.md && npx prettier --write /tmp/base.md`→ the same glues (and`prettier --check`already warns on the base). The file therefore cannot be prose-correct and prettier-clean at once; the restore leaves`prettier --check`warning on that one file only (no CI job runs prettier). Reported for a possible follow-up (markdown formatter guard):`npm run format` would corrupt the reviewer-quoted text in this very item body too. Every other touched file is prettier-clean.
 
-**F2 (BAJA) — fixed at the source.** `f56674b` recomputes `linkedWorkspaces` after `x-worktree.post-start` (before the return) and docs now state it describes the state the worktree is _left in_; the pre-hook link only covered the claim-commit gate window. Real-CLI smoke (fixture with `node_modules/@arggon/lib -> ../../lib` + a `npm ci`-shaped reify hook): reified → `{"linkedNodeModules":true,"linkedWorkspaces":[],"postStart":true}` (was `["@arggon/lib"]`) and the stdout note is gone; control hook that leaves no install → start re-links and reports `["@arggon/lib"]`. Test mutation-verified (removing the recompute → `expected [ '@arggon/lib' ] to deeply equal []`).
+**F2 (BAJA) — fixed at the source.** `f56674b` recomputes `linkedWorkspaces` after `x-worktree.post-start` (before the return) and docs now state it describes the state the worktree is _left in_; the pre-hook link only covered the claim-commit gate window. Real-CLI smoke (fixture with `node_modules/@arggondev/lib -> ../../lib` + a `npm ci`-shaped reify hook): reified → `{"linkedNodeModules":true,"linkedWorkspaces":[],"postStart":true}` (was `["@arggondev/lib"]`) and the stdout note is gone; control hook that leaves no install → start re-links and reports `["@arggondev/lib"]`. Test mutation-verified (removing the recompute → `expected [ '@arggondev/lib' ] to deeply equal []`).
 
 **F3 (BAJA).** `8c98b03` syncs the committed source `skills/arggon-cli/` (SKILL.md claim step, `references/pitfalls.md`, `references/orchestration.md`) with `docs/json-output.md`; `npm run skills:sync` regenerated the gitignored `.agents/skills/arggon-cli/**`; `skill-copy.test.ts` green.
 
@@ -210,9 +210,9 @@ F1–F4 cerrados con evidencia independiente; gates y CI verdes. El único trade
 - Follow-up ya fileteado en base: `bug-formatter-glues-markdown-spaces` (`22e0f6d`), con repro sobre el base. Ningún CI corre prettier, así que el warning de `json-output.md` no bloquea.
 
 **F2 — RESUELTO.** `f56674b` recalcula `linkedWorkspaces` tras el `x-worktree.post-start` antes del return, y el doc/JSON contract dicen que describe el estado en que queda el worktree. Smoke real con el CLI `dist` sobre fixtures git:
-- Caso A (hook que reifica local, forma `npm ci`): human **sin** nota; `--json` → `{'ok': True, 'linkedNodeModules': True, 'linkedWorkspaces': [], 'postStart': True}`; el worktree queda con `node_modules/@arggon/lib -> ../../lib` local.
-- Caso B (hook `true`, deja sin install): start re-linkea y reporta `{'linkedNodeModules': True, 'linkedWorkspaces': ['@arggon/lib'], 'postStart': True}` + nota stdout.
-- Test nuevo mutation-verified en copia `/tmp`: quitando el recompute falla con `expected [ '@arggon/lib' ] to deeply equal []`.
+- Caso A (hook que reifica local, forma `npm ci`): human **sin** nota; `--json` → `{'ok': True, 'linkedNodeModules': True, 'linkedWorkspaces': [], 'postStart': True}`; el worktree queda con `node_modules/@arggondev/lib -> ../../lib` local.
+- Caso B (hook `true`, deja sin install): start re-linkea y reporta `{'linkedNodeModules': True, 'linkedWorkspaces': ['@arggondev/lib'], 'postStart': True}` + nota stdout.
+- Test nuevo mutation-verified en copia `/tmp`: quitando el recompute falla con `expected [ '@arggondev/lib' ] to deeply equal []`.
 
 **F3 — RESUELTO.** `8c98b03` sincroniza `skills/arggon-cli/SKILL.md`, `references/pitfalls.md` y `references/orchestration.md` con `docs/json-output.md` (los 3 documentan `linkedWorkspaces`, post-hook y remediación). `cli/src/skill-copy.test.ts` 7/7 ✅; `npm run skills:sync` idempotente y sin drift (`git status` limpio).
 

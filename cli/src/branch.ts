@@ -8,7 +8,7 @@ import {
   resolveBranchName,
   runUpdate,
   type WorkItem,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 export type BranchOptions = {
   cwd: string;

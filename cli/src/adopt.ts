@@ -24,7 +24,7 @@ import {
   type GeneratedEntry,
   type TrackerCommitResult,
   type WorkItem,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 import { arggonVersion, checksumOf } from "./docs.js";
 import { bundledTemplatesDir } from "./package-assets.js";

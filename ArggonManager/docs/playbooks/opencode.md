@@ -42,7 +42,7 @@ docs or the V1 schema for V2 work.
 - `arggon init` vendors the plugin at `.opencode/plugins/arggon/index.ts`
   (auto-discovered, zero config). Since W3 it is the **single-file,
   dependency-free bundle** built from `opencode/plugins/arggon/index.ts` with
-  `@arggon/lib` inlined (`npm run build:plugin`; the artifact is committed and
+  `@arggondev/lib` inlined (`npm run build:plugin`; the artifact is committed and
   drift-gated by `npm run check:plugin` in CI), so a fresh adopter tree needs
   no `node_modules`. Since W5 (`task-native-tui`) it also vendors the **TUI
   entry** `.opencode/plugins/arggon/tui.tsx` beside it (OpenCode discovers the
@@ -60,7 +60,7 @@ docs or the V1 schema for V2 work.
     `ctx.tool.transform`, `options.namespace: "arggon"` + `options.codemode:
 true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
     namespace. Each tool calls the kernel **in-process** (the bundle's inlined
-    `@arggon/lib`; the same `*Operation` the CLI's `--json` path uses) and
+    `@arggondev/lib`; the same `*Operation` the CLI's `--json` path uses) and
     returns the documented envelope; a kernel failure becomes an `ArgonToolError`
     (typed tool error carrying `code` + envelope) instead of a throw through a
     hook — the session continues (failure isolation). The core nine
@@ -159,7 +159,7 @@ true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
   `setup` never runs; the session still exits 0). Since W3 the vendored artifact
   is the **generated single-file bundle**
   (`opencode/plugins/arggon/index.bundle.ts` → `.opencode/plugins/arggon/index.ts`),
-  built by `npm run build:plugin` from the source with `@arggon/lib` inlined:
+  built by `npm run build:plugin` from the source with `@arggondev/lib` inlined:
   every reachable module is transpiled to CommonJS with the TypeScript compiler
   API (no bundler dependency) and wrapped in a tiny ESM module registry, so the
   only bare import left is `node:module`. The plain `{ id, setup }` default

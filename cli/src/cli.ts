@@ -55,7 +55,7 @@ import {
   updateOperation,
   validateOperation,
   type TrendResult,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 import { runStart } from "./start.js";
 import { runCleanup } from "./cleanup.js";

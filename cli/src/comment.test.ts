@@ -5,7 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { PassThrough } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { runComment, runCreate, runUpdate, runValidate } from "@arggon/lib";
+import { runComment, runCreate, runUpdate, runValidate } from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";

@@ -132,7 +132,7 @@ arggon validate  # Validate tracker frontmatter and tree integrity
    `../<repo-name>-<id>`. `--worktree` prepares a fresh worktree before the claim
    commit: it mirrors the primary checkout's install as a per-worktree link farm
    (reported as `linkedNodeModules`), points every workspace package the worktree
-   also carries (e.g. `@arggon/lib`) at the **worktree copy**, and pre-builds that
+   also carries (e.g. `@arggondev/lib`) at the **worktree copy**, and pre-builds that
    copy with the package's own `build` script when its declared entry is missing —
    so the pre-commit gate loads the branch's kernel (the built names are printed
    on stdout). A copy that could not be built keeps the primary's copy and is

@@ -18,7 +18,7 @@ import {
   softTryLoadItem,
   stringifyFrontmatter,
   toContractWorkItem,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 

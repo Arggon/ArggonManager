@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseFrontmatter, runCreate, runList, runUpdate, runValidate } from "@arggon/lib";
+import { parseFrontmatter, runCreate, runList, runUpdate, runValidate } from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 

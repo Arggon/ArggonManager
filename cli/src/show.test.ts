@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { DEFAULT_TAIL_COMMENTS, runComment, runCreate, runShow } from "@arggon/lib";
+import { DEFAULT_TAIL_COMMENTS, runComment, runCreate, runShow } from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 

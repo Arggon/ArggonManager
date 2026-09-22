@@ -26,7 +26,7 @@ import {
   slugify,
   writeFileAtomic,
   type PlaybooksConfig,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 import { bundledTemplatesDir } from "./package-assets.js";
 
 /** Default stale threshold for `arggon playbook status` (docs/convention.md x-playbooks). */

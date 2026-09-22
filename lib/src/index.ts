@@ -1,5 +1,5 @@
 /**
- * Kernel library entry (`@arggon/lib`, ADR 0011 §4 / ADR 0013: one logic path,
+ * Kernel library entry (`@arggondev/lib`, ADR 0011 §4 / ADR 0013: one logic path,
  * one library, shipped as its own package).
  *
  * The CLI (`arggon-manager`), the stdio MCP adapter and the native plugin

@@ -1,4 +1,4 @@
-# @arggon/lib — ArggonManager kernel
+# @arggondev/lib — ArggonManager kernel
 
 The kernel of ArggonManager as its own package ([ADR 0013](../ArggonManager/docs/adr/0013-lib-package-split.md),
 amending [ADR 0011 §5](../ArggonManager/docs/adr/0011-native-first-architecture.md)):
@@ -9,7 +9,7 @@ the npm workspace (`"workspaces": ["lib"]`).
 - **Entry:** `lib/src/index.ts` → `dist/index.js` + `dist/index.d.ts`, exposed
   through the package `exports` map (ESM only).
 - **Build:** `npm run build` at the repo root builds this package first
-  (`npm run build --workspace @arggon/lib`), then the root `tsc`. The kernel
+  (`npm run build --workspace @arggondev/lib`), then the root `tsc`. The kernel
   build runs two `tsc` passes: the emit pass (`tsconfig.json`) excludes
   `src/**/*.test.ts`, so `dist/` ships no test artifacts, and a `--noEmit`
   pass (`tsconfig.typecheck.json`) still type-checks the test files.

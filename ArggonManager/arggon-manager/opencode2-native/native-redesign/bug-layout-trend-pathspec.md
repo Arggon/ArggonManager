@@ -115,7 +115,7 @@ Diff = 4 ficheros: `lib/src/trend.ts`, `cli/src/trend.test.ts`, `opencode/plugin
 ## Residuales / notas (no bloqueantes)
 - Residual aceptado por el item: historia de migracion real + un `tasks/.convention.yml` ajeno commiteado despues seguiria minandose. Es la heuristica prescrita en el acceptance; lo confirmo como aceptado, no bloqueante.
 - `docs/json-output.md:489` ("a single `git log -p` pass") sigue siendo cierto: el mining es un unico `git log -p`; el probe es un `git log -1` aparte. Docs de otro worker; no requiere cambio en este PR.
-- Caveat de entorno (no defecto del PR): en este worktree `node_modules` es un symlink al checkout primario, asi que `tsx` / `npm run arggon --` resuelven `@arggon/lib` al `lib/dist` VIEJO del primario (sin fix). Por esa via el "after (worktree CLI)" registrado no se reproduce (devuelve el output pre-fix); el smoke correcto exige resolver el source del branch (lo hice con `--tsconfig` paths / copia scratch). CI no se ve afectada (`npm ci` real). A tener en cuenta en futuros smokes de lib desde worktrees.
+- Caveat de entorno (no defecto del PR): en este worktree `node_modules` es un symlink al checkout primario, asi que `tsx` / `npm run arggon --` resuelven `@arggondev/lib` al `lib/dist` VIEJO del primario (sin fix). Por esa via el "after (worktree CLI)" registrado no se reproduce (devuelve el output pre-fix); el smoke correcto exige resolver el source del branch (lo hice con `--tsconfig` paths / copia scratch). CI no se ve afectada (`npm ci` real). A tener en cuenta en futuros smokes de lib desde worktrees.
 - Nit: el `execGit` inyectado recibe ahora 2 llamadas (probe + mining); solo afecta a dobles de test.
 
 ## Cobertura de la verificacion

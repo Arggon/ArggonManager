@@ -4,7 +4,7 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     // Root adapters (CLI, MCP, tests) consume the kernel through its public
-    // package entry (@arggon/lib, ADR 0013). Tests resolve it to the source
+    // package entry (@arggondev/lib, ADR 0013). Tests resolve it to the source
     // entry so a run never depends on a previous `npm run build`; the built
     // artifact is exercised for real in cli/src/lib-build.test.ts.
     alias: [

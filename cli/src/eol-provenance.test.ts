@@ -14,7 +14,7 @@ import {
   parseConventionConfig,
   readGeneratedProjectName,
   updateGeneratedSection,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 import { checksumMatches, checksumOf, GENERATED_DOC_COUNT, normalizeEol } from "./docs.js";
 import { dryRunInit, runInit } from "./init.js";
 import { runAdoptAck } from "./adopt.js";

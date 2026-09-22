@@ -10,7 +10,7 @@
  *
  * Dependency shape (ADR 0013): the only static import is the kernel package.
  * This module is part of the vendored plugin graph — `npm run build:plugin`
- * inlines `@arggon/lib` into the committed single-file bundle, and the bundled
+ * inlines `@arggondev/lib` into the committed single-file bundle, and the bundled
  * named exports are what `tui.tsx` consumes (`./index.ts` in an adopter tree,
  * the source module in this repo). It must stay free of OpenCode/TUI imports
  * and of any npm dependency; node builtins only.
@@ -28,7 +28,7 @@ import {
   sanitizeHumanTextUncapped,
   type ItemType,
   type Status,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 /** Panel name shared between the slot contribution and the keymap command. */
 export const ARGON_BOARD_PANEL = "arggon.board";

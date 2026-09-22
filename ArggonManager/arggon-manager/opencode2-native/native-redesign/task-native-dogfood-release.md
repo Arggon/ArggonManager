@@ -100,7 +100,7 @@ Branch `feat/task-native-dogfood-release`, worktree `/home/arggon/Projects/Arggo
 
 1. Bump `0.3.0` → `0.4.0` in `package.json` (minor: new tools/commands/plugin/TUI/layout) and rename `[Unreleased]` to `## 0.4.0 (YYYY-MM-DD)`.
 2. Remove `private: true` from `package.json` and `lib/package.json` in the release PR.
-3. Merge to `main`, `git tag v0.4.0 && git push origin v0.4.0`, then `npm publish --workspace @arggon/lib` followed by `npm publish` (kernel first — the root cannot resolve `@arggon/lib` from the registry otherwise); verify `npm view` + a clean global install.
+3. Merge to `main`, `git tag v0.4.0 && git push origin v0.4.0`, then `npm publish --workspace @arggondev/lib` followed by `npm publish` (kernel first — the root cannot resolve `@arggondev/lib` from the registry otherwise); verify `npm view` + a clean global install.
 4. Follow-up PR: pin `ARGGON_REF: v0.4.0` in `templates/docs/github/workflows/arggon.yml`, re-run `init`, and switch README/ci.md to the registry one-liner.
 
 **CI (draft PR #381, base `opencode2`)**

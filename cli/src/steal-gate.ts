@@ -24,7 +24,7 @@ import {
   tryLoadItem,
   walkTasksTree,
   type Status,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 /** Refusal when the repo has not armed claim-steal (the default). */
 export const STEAL_DISABLED_MESSAGE =

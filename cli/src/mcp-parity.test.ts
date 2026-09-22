@@ -16,7 +16,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCreate } from "@arggon/lib";
+import { runCreate } from "@arggondev/lib";
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
 

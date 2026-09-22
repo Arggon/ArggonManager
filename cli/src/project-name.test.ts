@@ -15,7 +15,7 @@ import {
   parseGeneratedProjectName,
   readGeneratedProjectName,
   updateGeneratedSection,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 import { dryRunInit, runInit } from "./init.js";
 import { runDoctor } from "./doctor.js";
 

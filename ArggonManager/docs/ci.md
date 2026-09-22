@@ -16,14 +16,14 @@ This document is the full recipe. The runnable workflow ships with
 ## Install the headless bin
 
 Requires **Node.js 22.12+**. `arggon-manager` (bin + templates + vendored
-plugin) and `@arggon/lib` (kernel) are **two packages**
+plugin) and `@arggondev/lib` (kernel) are **two packages**
 ([ADR 0013](./adr/0013-lib-package-split.md)) and both stay `private: true`
 until the release wave, so there is no npm one-liner yet.
 
 **Pre-release — pack both packages from a pinned checkout.** The root tarball
-alone is **not installable**: it declares `@arggon/lib: ^0.3.0` and that package
+alone is **not installable**: it declares `@arggondev/lib: ^0.3.0` and that package
 is not on the registry (a lone `npm install -g arggon-manager-<v>.tgz` fails
-with `404 @arggon/lib@^0.3.0`). Pack and install **both** tarballs in one
+with `404 @arggondev/lib@^0.3.0`). Pack and install **both** tarballs in one
 command so npm resolves the kernel dependency locally. `npm pack
 --pack-destination` does **not** create the destination directory (npm 10 and 12
 both exit 254 with `ENOENT`), so create it first:
@@ -33,9 +33,9 @@ git clone --depth 1 --branch opencode2 https://github.com/Arggon/ArggonManager /
 cd /tmp/arggon-src
 npm ci                                                        # prepare builds lib/dist + dist
 mkdir -p /tmp/arggon-packs                                    # npm pack does not create it
-npm pack --workspace @arggon/lib --pack-destination /tmp/arggon-packs
+npm pack --workspace @arggondev/lib --pack-destination /tmp/arggon-packs
 npm pack --pack-destination /tmp/arggon-packs
-npm install -g /tmp/arggon-packs/arggon-lib-*.tgz /tmp/arggon-packs/arggon-manager-*.tgz
+npm install -g /tmp/arggon-packs/arggondev-lib-*.tgz /tmp/arggon-packs/arggon-manager-*.tgz
 arggon --version
 ```
 
@@ -55,7 +55,7 @@ first:
 
 ```bash
 mkdir -p /tmp/arggon-packs      # `npm pack --pack-destination` does not create it
-npm install --no-save /tmp/arggon-packs/arggon-lib-*.tgz /tmp/arggon-packs/arggon-manager-*.tgz
+npm install --no-save /tmp/arggon-packs/arggondev-lib-*.tgz /tmp/arggon-packs/arggon-manager-*.tgz
 npx arggon validate --json         # or: node_modules/.bin/arggon
 ```
 

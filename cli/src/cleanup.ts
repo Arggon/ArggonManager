@@ -15,7 +15,7 @@ import {
   type CleanupGit,
   type GhExecutor,
   type TrackerCommitResult,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 import { unlinkNodeModulesLink } from "./start.js";
 
@@ -34,7 +34,7 @@ export {
   type CleanupGit,
   type GhExecutor,
   type MergedPr,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 export type CleanupOptions = {
   cwd: string;

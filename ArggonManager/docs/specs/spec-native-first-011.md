@@ -108,12 +108,12 @@ trees do not need `node_modules` for the plugin to load.
 ### Distribution
 
 Two npm packages ([ADR 0013](../adr/0013-lib-package-split.md), amending
-[ADR 0011](../adr/0011-native-first-architecture.md) §5): **`@arggon/lib`** is
+[ADR 0011](../adr/0011-native-first-architecture.md) §5): **`@arggondev/lib`** is
 the kernel package (items, rules, paths and the `--json` envelopes; no runtime
 dependencies, no printed output, no bundled assets), and **`arggon-manager`**
-ships the headless bin + plugin and depends on `@arggon/lib` through the
+ships the headless bin + plugin and depends on `@arggondev/lib` through the
 workspace. The vendored plugin stays a **single-file, dependency-free bundle
-built from `@arggon/lib`** (never an npm dependency of adopter trees), so a
+built from `@arggondev/lib`** (never an npm dependency of adopter trees), so a
 fresh `init` still needs no `node_modules`. The `init`/`validate`/`doctor`
 headless surfaces stay in the `arggon-manager` bin, and the kernel entry is the
 versioned boundary the native tools (W2/W3) consume.
@@ -170,5 +170,5 @@ as the ADR 0006 gate; CI green required for every wave.
       adopter files.
 - [ ] Legacy `tasks/` trees are auto-detected and migrate to `ArggonManager/`
       without a hard break.
-- [ ] Distribution: two packages (`@arggon/lib` kernel + `arggon-manager`
+- [ ] Distribution: two packages (`@arggondev/lib` kernel + `arggon-manager`
       bin/plugin), and the prebuilt plugin loads without dependencies.

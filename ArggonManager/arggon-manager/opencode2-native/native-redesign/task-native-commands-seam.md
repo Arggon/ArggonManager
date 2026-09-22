@@ -56,7 +56,7 @@ Seam (ADR 0011 §5/§6, ADR 0013)
 
 Vendored bundle (single-file, dependency-free)
 
-- `npm run build:plugin` (postbuild) generates `opencode/plugins/arggon/index.bundle.ts` from `opencode/plugins/arggon/index.ts` with `@arggon/lib` inlined: 36 modules, 282,381 B, deterministic (md5 92fc312c…); the only bare import left is `node:module`. No bundler dependency (TypeScript compiler API + a tiny ESM module registry).
+- `npm run build:plugin` (postbuild) generates `opencode/plugins/arggon/index.bundle.ts` from `opencode/plugins/arggon/index.ts` with `@arggondev/lib` inlined: 36 modules, 282,381 B, deterministic (md5 92fc312c…); the only bare import left is `node:module`. No bundler dependency (TypeScript compiler API + a tiny ESM module registry).
 - `init` vendors that artifact to `.opencode/plugins/arggon/index.ts` with the standard `//` provenance marker and x-generated state; `cli/src/plugin-copy.test.ts` regenerates artifact + vendored copy and pins the bytes.
 - `opencode/plugins/arggon/bundle.test.ts` copies the artifact to a temp dir with **no `node_modules`**, imports it, runs `setup()` and calls tools: 12 tools registered (namespace/codemode), the pinned subset exact, `list`/`show` envelopes, `SHOW_FAILED` typed error.
 

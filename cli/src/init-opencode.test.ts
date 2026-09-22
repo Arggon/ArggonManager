@@ -14,7 +14,7 @@ import { fileURLToPath } from "node:url";
 import { afterAll, describe, expect, it } from "vitest";
 import { findOpenCodeConfig, generatedYamlMarker, stampGeneratedContent } from "./docs.js";
 import { runInit } from "./init.js";
-import { readConventionConfig } from "@arggon/lib";
+import { readConventionConfig } from "@arggondev/lib";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -483,7 +483,7 @@ describe("opencode seam: bundled plugin (W2/W3)", () => {
     const raw = readFileSync(join(dir, ...SEAM_PLUGIN.split("/")), "utf8");
     expect(raw.startsWith(`// arggon:generated template="${SEAM_PLUGIN_SOURCE}"\n`)).toBe(true);
     expect(raw).toContain('id: "arggon"');
-    // W3: @arggon/lib is inlined (no npm dependency), the optional
+    // W3: @arggondev/lib is inlined (no npm dependency), the optional
     // @opencode/plugin sugar and the MCP auto-registration are gone.
     expect(raw).toContain('__arggonModules.set("lib/src/index.ts"');
     expect(raw).not.toContain("@opencode/plugin");
@@ -551,7 +551,7 @@ describe("opencode seam: vendored TUI entry (W5)", () => {
     expect(raw).toContain('from "solid-js"');
     expect(raw).toContain('from "./index.ts"');
     expect(raw).not.toContain('from "@opencode/plugin');
-    expect(raw).not.toContain('from "@arggon/lib');
+    expect(raw).not.toContain('from "@arggondev/lib');
     expect(raw).toContain('append: "session.panel"');
     const config = readConventionConfig(dir);
     expect(config.generated[SEAM_TUI]?.template).toBe(SEAM_TUI_SOURCE);

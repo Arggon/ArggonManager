@@ -1,13 +1,13 @@
 /**
  * Kernel library surface (W1 `task-native-kernel-lib`, repackaged as
- * `@arggon/lib` by W1b/ADR 0013): the package entry is the one path the
+ * `@arggondev/lib` by W1b/ADR 0013): the package entry is the one path the
  * machine surfaces (CLI today; MCP adapter; native tools in W2/W3) consume,
  * and the operations return the documented `--json` envelopes with the CLI's
  * exit-code semantics.
  *
  * The clean-build import and the CLI byte parity of those envelopes are pinned
  * in lib-build.test.ts; this file drives the entry in process (vitest resolves
- * `@arggon/lib` to the source entry, so no build is required). The entry's
+ * `@arggondev/lib` to the source entry, so no build is required). The entry's
  * re-export-by-identity contract is pinned where the modules live
  * (`lib/src/index.test.ts` — comparing the entry against itself here could
  * never fail; W6/PR-374 review finding 3).
@@ -16,9 +16,9 @@ import { mkdtempSync as _mkdtempSync, readFileSync, writeFileSync } from "node:f
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { runCreate } from "@arggon/lib";
+import { runCreate } from "@arggondev/lib";
 import { runInit } from "./init.js";
-import * as lib from "@arggon/lib";
+import * as lib from "@arggondev/lib";
 import { removeFixtureTree } from "./test-tmp.js";
 
 /**

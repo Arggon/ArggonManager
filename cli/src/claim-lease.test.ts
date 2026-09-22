@@ -9,7 +9,7 @@ import {
   runList,
   runUpdate,
   toContractWorkItem,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 

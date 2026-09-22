@@ -8,7 +8,7 @@ import {
   repoRootFromTasks,
   runUpdate,
   toContractWorkItem,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 /**
  * `arggon board --serve` (task-board-serve): serve the static board locally

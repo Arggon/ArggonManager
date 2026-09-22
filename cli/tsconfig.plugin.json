@@ -10,7 +10,7 @@
     "jsx": "preserve",
     "baseUrl": "..",
     "paths": {
-      "@arggon/lib": ["lib/src/index.ts"],
+      "@arggondev/lib": ["lib/src/index.ts"],
       "solid-js": ["cli/types/tui-runtime.d.ts"]
     }
   },

@@ -8,7 +8,7 @@ import {
   repoRootFromTasks,
   toContractWorkItem,
   type ContractWorkItem as WorkItem,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 
 export const DEFAULT_BOARD_FILE = "board.html";
 

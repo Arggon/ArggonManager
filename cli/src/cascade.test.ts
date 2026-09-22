@@ -21,7 +21,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { loadItems, lockFilePathFor, parseFrontmatter, runCreate, runUpdate } from "@arggon/lib";
+import { loadItems, lockFilePathFor, parseFrontmatter, runCreate, runUpdate } from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 
@@ -486,7 +486,7 @@ describe("acceptance-aware cascade", () => {
   });
 
   it("acceptanceComplete: no checklist, all-checked, and unchecked cases", async () => {
-    const { acceptanceComplete } = await import("@arggon/lib");
+    const { acceptanceComplete } = await import("@arggondev/lib");
     expect(acceptanceComplete("no checkboxes here")).toBe(true);
     expect(acceptanceComplete("- [x] done\n- [X] also done")).toBe(true);
     expect(acceptanceComplete("  - [ ] indented pending")).toBe(false);

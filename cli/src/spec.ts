@@ -19,7 +19,7 @@ import {
   sanitizeHumanError,
   writeFileAtomic,
   type Issue,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 import { bundledTemplatesDir } from "./package-assets.js";
 
 export type SpecValidateOptions = {

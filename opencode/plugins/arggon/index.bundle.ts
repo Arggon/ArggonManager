@@ -1,5 +1,5 @@
 // ArggonManager plugin bundle — GENERATED, do not edit, do not vendor by hand.
-// Build: npm run build:plugin (opencode/plugins/arggon/index.ts graph + @arggon/lib inlined).
+// Build: npm run build:plugin (opencode/plugins/arggon/index.ts graph + @arggondev/lib inlined).
 // OpenCode V2 loads the vendored copy at .opencode/plugins/arggon/index.ts.
 import { createRequire as __arggonCreateRequire } from "node:module"
 
@@ -153,9 +153,9 @@ __arggonEdges.set("lib/src/validate.ts\u0000./priority.js", "lib/src/priority.ts
 __arggonEdges.set("lib/src/validate.ts\u0000./relations.js", "lib/src/relations.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./sanitize.js", "lib/src/sanitize.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./status.js", "lib/src/status.ts")
-__arggonEdges.set("opencode/plugins/arggon/board.ts\u0000@arggon/lib", "lib/src/index.ts")
+__arggonEdges.set("opencode/plugins/arggon/board.ts\u0000@arggondev/lib", "lib/src/index.ts")
 __arggonEdges.set("opencode/plugins/arggon/index.ts\u0000./board.js", "opencode/plugins/arggon/board.ts")
-__arggonEdges.set("opencode/plugins/arggon/index.ts\u0000@arggon/lib", "lib/src/index.ts")
+__arggonEdges.set("opencode/plugins/arggon/index.ts\u0000@arggondev/lib", "lib/src/index.ts")
 
 function __arggonRequire(id, from) {
   const resolved = from === undefined ? id : (__arggonEdges.get(from + "\u0000" + id) ?? id)
@@ -5964,7 +5964,7 @@ exports.boardCountsLine = boardCountsLine;
 exports.boardItemLine = boardItemLine;
 exports.boardTreeLines = boardTreeLines;
 exports.sidebarStatusLine = sidebarStatusLine;
-const lib_1 = require("@arggon/lib");
+const lib_1 = require("@arggondev/lib");
 exports.ARGON_BOARD_PANEL = "arggon.board";
 exports.BOARD_TYPE_BADGES = {
     initiative: "I",
@@ -8066,8 +8066,8 @@ function pluginTemplatesDir(moduleUrl = import.meta.url) {
 let kernelPromise;
 let toolsRegistrationLogged = false;
 function loadArgonKernel() {
-    kernelPromise ??= Promise.resolve().then(() => __importStar(require("@arggon/lib"))).then((module) => module, (error) => {
-        logOnce("kernel-import", "@arggon/lib unavailable (native tools idle)", error);
+    kernelPromise ??= Promise.resolve().then(() => __importStar(require("@arggondev/lib"))).then((module) => module, (error) => {
+        logOnce("kernel-import", "@arggondev/lib unavailable (native tools idle)", error);
         return undefined;
     });
     return kernelPromise;

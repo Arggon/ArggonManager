@@ -7,7 +7,7 @@
  * caught exactly that: an undefined `ToolEditorLike` → TS2304). This gate runs
  * a strict `tsc --noEmit` over the plugin sources through
  * `cli/tsconfig.plugin.json`: the server entry, the board surface (`board.ts`,
- * a static `@arggon/lib` import mapped to `lib/src/index.ts` so the check needs
+ * a static `@arggondev/lib` import mapped to `lib/src/index.ts` so the check needs
  * no prior build) and the TUI entry `tui.tsx` (W5 review P3: it used to be
  * gated only by eslint + smoke). `solid-js`/JSX resolve to the repo-only
  * `cli/types/tui-runtime.d.ts` shim — the runtime provides them at load time

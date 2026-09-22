@@ -12,7 +12,7 @@
 
 import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
-import { docsDirForRoot, findTasksDir, repoRootFromTasks, writeFileAtomic } from "@arggon/lib";
+import { docsDirForRoot, findTasksDir, repoRootFromTasks, writeFileAtomic } from "@arggondev/lib";
 
 // ---------------------------------------------------------------------------
 // Shared corpus-adapter extension point

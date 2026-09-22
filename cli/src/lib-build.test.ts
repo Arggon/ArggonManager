@@ -1,5 +1,5 @@
 /**
- * Clean-build gate for the kernel package (`@arggon/lib`, ADR 0013).
+ * Clean-build gate for the kernel package (`@arggondev/lib`, ADR 0013).
  *
  * Acceptance: the kernel package imports from a clean `npm run build` (no
  * pre-existing `dist/`), its public entry resolves through the package
@@ -10,7 +10,7 @@
  * The build runs in a fresh-clone copy (tracked files + a linked
  * `node_modules`), so the gate is a real clean build and never deletes the
  * working tree's `dist/` while sibling test files are spawning the CLI. The
- * copy's own `node_modules/@arggon/lib` links to the copy's `lib/`, so the
+ * copy's own `node_modules/@arggondev/lib` links to the copy's `lib/`, so the
  * probe and the CLI exercise the artifact just built. Volatile fields (dates,
  * commit hashes, the fixture root path) are normalized on both sides;
  * everything else is byte-compared.
@@ -30,7 +30,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { runCreate, runUpdate } from "@arggon/lib";
+import { runCreate, runUpdate } from "@arggondev/lib";
 import { runInit } from "./init.js";
 import { removeFixtureTree } from "./test-tmp.js";
 
@@ -139,7 +139,7 @@ const WRITE_CASES: Array<{ name: string; args: string[]; seed?: (dir: string) =>
 
 /** One Node ESM process driving the built operations, keyed by case name. */
 const PROBE = `
-const lib = await import("@arggon/lib");
+const lib = await import("@arggondev/lib");
 const cwd = process.env.ARGGON_LIB_CWD;
 const only = process.env.ARGGON_LIB_CASE;
 const cases = {
@@ -238,7 +238,7 @@ function mkdtemp(prefix: string): string {
 /**
  * Fresh-clone stand-in: every tracked (plus untracked-but-uncommitted) file,
  * with no build output at all, and a `node_modules` assembled from linked
- * entries of the working tree's install. `@arggon/lib` links to the COPY's
+ * entries of the working tree's install. `@arggondev/lib` links to the COPY's
  * `lib/`, so the build and the probe exercise the copy — never the working
  * tree's `dist/`.
  */
@@ -263,8 +263,8 @@ function freshCloneCopy(): string {
   const nm = join(dir, "node_modules");
   mkdirSync(nm);
   for (const entry of readdirSync(join(root, "node_modules"))) {
-    if (entry === "@arggon") {
-      const scope = join(nm, "@arggon");
+    if (entry === "@arggondev") {
+      const scope = join(nm, "@arggondev");
       mkdirSync(scope);
       symlinkSync(join(dir, "lib"), join(scope, "lib"), "junction");
       continue;
@@ -388,7 +388,7 @@ describe("kernel package from a clean build", () => {
       exports: Record<string, { types?: string; import?: string; default?: string }>;
       dependencies?: Record<string, string>;
     };
-    expect(pkg.name).toBe("@arggon/lib");
+    expect(pkg.name).toBe("@arggondev/lib");
     expect(pkg.exports["."]).toEqual({
       types: "./dist/index.d.ts",
       import: "./dist/index.js",
@@ -409,7 +409,7 @@ describe("kernel package from a clean build", () => {
       dependencies?: Record<string, string>;
     };
     expect(pkg.workspaces).toEqual(["lib"]);
-    expect(pkg.dependencies?.["@arggon/lib"]).toBeTruthy();
+    expect(pkg.dependencies?.["@arggondev/lib"]).toBeTruthy();
   });
 
   it("type-checks from a consumer that has no undeclared kernel imports", () => {
@@ -426,7 +426,7 @@ describe("kernel package from a clean build", () => {
     // `node_modules` would satisfy the undeclared import and hide the leak.
     const consumer = mkdtemp("arggon-lib-consumer-");
     const nm = join(consumer, "node_modules");
-    const installed = join(nm, "@arggon", "lib");
+    const installed = join(nm, "@arggondev", "lib");
     mkdirSync(installed, { recursive: true });
     cpSync(join(copy, "lib", "dist"), join(installed, "dist"), { recursive: true });
     cpSync(join(copy, "lib", "package.json"), join(installed, "package.json"));
@@ -435,7 +435,7 @@ describe("kernel package from a clean build", () => {
     writeFileSync(
       join(consumer, "consumer.ts"),
       [
-        'import { JSON_SCHEMA_VERSION, listOperation, type WorkItem } from "@arggon/lib";',
+        'import { JSON_SCHEMA_VERSION, listOperation, type WorkItem } from "@arggondev/lib";',
         "",
         "export function probe(cwd: string) {",
         "  const item: WorkItem | null = null;",

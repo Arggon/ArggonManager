@@ -1,7 +1,7 @@
 /**
  * Distribution asset locations for the root package (ADR 0013).
  *
- * The kernel library (`@arggon/lib`) is asset-free: it reads the repo's own
+ * The kernel library (`@arggondev/lib`) is asset-free: it reads the repo's own
  * `templates/` first and takes a fallback templates directory as an explicit
  * caller option. These helpers resolve the *root* package root — where
  * `package.json`, `templates/`, `skills/` and `opencode/` live — so the CLI,

@@ -47,7 +47,7 @@ install; it is removed before a configured `x-worktree.post-start` hook runs, so
 `npm ci` cannot reify through it and empty the primary install) — and a failure
 after creation keeps the worktree and branch instead of deleting them (the error
 names the failing step, path and remediation; re-running attaches). The workspace
-packages the worktree also carries (`node_modules/@arggon/lib -> ../../lib`) are
+packages the worktree also carries (`node_modules/@arggondev/lib -> ../../lib`) are
 pointed at the worktree copy and pre-built with the package's own `build` script
 before the claim commit when their declared entry is missing, so the spawned
 CLI/tests run the branch's build; a copy that could not be built keeps the

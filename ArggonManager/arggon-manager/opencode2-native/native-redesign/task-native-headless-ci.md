@@ -51,7 +51,7 @@ W6 of `plan-native-first-011`. Keep `init`/`validate`/`doctor`/`--json` in the p
 - `templates/docs/github/workflows/arggon.yml` (new, tier-1) — init vendors the adopter CI workflow to `.github/workflows/arggon.yml` (never overwrites): install the packed bin (pre-release: pack BOTH tarballs from the pinned ref; released: `npm install -g arggon-manager`), `arggon init --no-commit`, committed-seam drift gate, `arggon validate --json`, `doctor`/`list` diagnostics. No model, no MCP, no OpenCode session.
 - `cli/src/docs.ts` — YAML destinations get a `#` provenance marker (an HTML comment as line one would not parse as a workflow) + the new destination mapping.
 - `ArggonManager/docs/ci.md` (new) — full recipe: install variants (pre-release two-tarball, released one-liner, repo-local `npm install --no-save`, dev checkout), the step table, MCP/OpenCode independence notes, fixture/evidence map.
-- `README.md` — install section fixed: it documented a single-tarball install broken since the ADR 0013 split (`404 @arggon/lib@^0.3.0`; verified). Also the tier-1 list + docs index. `ArggonManager/docs/agents.md` §CI gate now shows the packaged-bin job (same snippet `arggon instructions` prints) and links `ci.md`; `docs/opencode2.md` gains a section + program-table row.
+- `README.md` — install section fixed: it documented a single-tarball install broken since the ADR 0013 split (`404 @arggondev/lib@^0.3.0`; verified). Also the tier-1 list + docs index. `ArggonManager/docs/agents.md` §CI gate now shows the packaged-bin job (same snippet `arggon instructions` prints) and links `ci.md`; `docs/opencode2.md` gains a section + program-table row.
 - `cli/src/headless-ci.test.ts` (new) — packs both tarballs from a fresh-clone copy (asserts no `dist/`/`lib/dist/` before; `prepare` builds them), installs into a temp prefix, runs the **workflow's own step bodies verbatim** (`bash -e`) on an adopter-shaped git repo, and byte-compares the packed bin against the checkout CLI.
 - `cli/src/pack-fixtures.ts` (new) + `pack-contents.test.ts` refactor — shared packaging-test primitives (`npm`, `npm pack --json` parser incl. the npm 10 array shape, fresh-clone copy); test-only, excluded from the tarball via `!dist/pack-fixtures.*` (the `test-tmp` precedent, asserted by the pack test).
 - `cli/src/init.test.ts` / `init-docs.test.ts` — tier-1 list + YAML-marker assertion for the new artifact.
@@ -71,7 +71,7 @@ W6 of `plan-native-first-011`. Keep `init`/`validate`/`doctor`/`--json` in the p
 
 1. **`init` now vendors a GitHub Actions workflow** (tier-1, never overwrites). GitHub users get a working gate out of the box; non-GitHub repos carry an inert file. That is the "template/snippet for adopters, look at templates/**" reading of W6 — trivial to downgrade to a doc-only snippet or tier-2 if you prefer.
 2. **New `#` marker convention for YAML destinations** (required: GitHub Actions rejects a workflow whose first line is an HTML comment). Adds one branch to `stampGeneratedContent`.
-3. **Pre-release install needs BOTH tarballs** (root alone is un-installable while `@arggon/lib` is private). `private`/publishing stays W7; the workflow documents the released swap.
+3. **Pre-release install needs BOTH tarballs** (root alone is un-installable while `@arggondev/lib` is private). `private`/publishing stays W7; the workflow documents the released swap.
 4. **Pre-existing budget headroom:** native tools now 12,182 B ≤ 12,288 B advisory (106 B). W4/W5 additions; untouched here — worth watching in W7.
 
 **Open questions / follow-ups**
@@ -112,7 +112,7 @@ EXIT=254
 ```
 
 B1 es reproducible con el npm del runner y contra el workspace real:
-- `npx npm@10.9.4 pack --workspace @arggon/lib --pack-destination <dir inexistente>` → `ENOENT`, exit 254 (npm 10.9.4 es el de Node 22 en `ubuntu-latest`, el mismo que corre el workflow).
+- `npx npm@10.9.4 pack --workspace @arggondev/lib --pack-destination <dir inexistente>` → `ENOENT`, exit 254 (npm 10.9.4 es el de Node 22 en `ubuntu-latest`, el mismo que corre el workflow).
 - npm 12.0.2, mismo comando sobre este workspace → `ENOENT`.
 - Paquete mínimo con npm 10.9.4 → `ENOENT` (no es nada del monorepo).
 
@@ -145,7 +145,7 @@ Por qué CI y el fixture están verdes: `cli/src/headless-ci.test.ts:166` crea e
 - **Gates locales @ `8c6940c`:** `npm test` 89/1450 verde · lint clean · build clean · `check:plugin` exit 0 (39 módulos / 324.325 B) · `arggon validate` ok (0 warnings, v5) · `spec validate` ok (18 docs) · `context:report -- --strict` pass (native 12.182 ≤ 12.288 advisory, headroom 106 B).
 - **Fixture (leído + ejecutado):** asserta ausencia de `dist/`/`lib/dist` antes de `prepare` (`:163-164`); empaqueta ambos tarballs; instala en prefix temporal; corre 4 de 5 step bodies verbatim vía `bash -e` con `PATH` al bin empaquetado; drift gate en ambos sentidos (limpio pasa, `AGENTS.md` mutado falla y restaura); corre verde tras borrar `.mcp.json/opencode.jsonc/.opencode/.agents` con `doctor.opencode.mcp = {native:false, mcpJson:false}`; envelopes byte-idénticos bin empaquetado vs checkout para `init --no-commit`, `init` (auto-commit), `validate`, `doctor`, `list`, `list --full`, `show`, `show --body`, `next`, `report`.
 - **Tier-1/never-overwrite:** fichero preexistente del adoptante → `skipped[]`, bytes preservados; edit del generado → `modified[]`+`skipped[]`, preservado; re-run sin modificar → `updated[]`. Estado `x-generated` con checksum correcto.
-- **Docs:** `@arggon/lib` no publicado (404 real) y el root declara `^0.3.0` → el fix del README (dos tarballs) apunta al problema correcto, aunque la receta sigue rota por B1. `arggon instructions` imprime exactamente el snippet de agents.md.
+- **Docs:** `@arggondev/lib` no publicado (404 real) y el root declara `^0.3.0` → el fix del README (dos tarballs) apunta al problema correcto, aunque la receta sigue rota por B1. `arggon instructions` imprime exactamente el snippet de agents.md.
 - **Scope:** sin cambios en kernel/plugin (`lib/**`, `opencode/**` intactos); en `package.json` solo la exclusión del helper de test (`!dist/pack-fixtures.*`), y el pack test asserta que no viaja en el tarball.
 
 ## No verificado
@@ -169,7 +169,7 @@ Repro (before/after with the runner's npm):
 
 ```text
 # BEFORE — npm 10.9.4, destination missing
-$ npx --yes npm@10.9.4 pack --workspace @arggon/lib --pack-destination /tmp/opencode/w6-b1/arggon-packs
+$ npx --yes npm@10.9.4 pack --workspace @arggondev/lib --pack-destination /tmp/opencode/w6-b1/arggon-packs
 npm error path /tmp/opencode/w6-b1/arggon-packs/arggon-lib-0.3.0.tgz
 npm error errno -2
 npm error enoent ENOENT: no such file or directory, open '.../arggon-packs/arggon-lib-0.3.0.tgz'
@@ -180,7 +180,7 @@ npm error enoent ... EXIT=254
 
 # AFTER — mkdir -p first, same npm 10.9.4, same command
 $ mkdir -p /tmp/opencode/w6-b1/arggon-packs
-$ npx --yes npm@10.9.4 pack --workspace @arggon/lib --pack-destination /tmp/opencode/w6-b1/arggon-packs
+$ npx --yes npm@10.9.4 pack --workspace @arggondev/lib --pack-destination /tmp/opencode/w6-b1/arggon-packs
 EXIT=0  →  arggon-lib-0.3.0.tgz
 ```
 

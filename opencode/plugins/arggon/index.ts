@@ -5,7 +5,7 @@
  * `arggon init` vendors the **single-file, dependency-free bundle** built from
  * this source into `.opencode/plugins/arggon/index.ts`, where OpenCode V2
  * discovers it with zero configuration (ADR 0011 §5/§6, ADR 0013; the bundle
- * inlines `@arggon/lib`, so the adopter tree needs no `node_modules`). This
+ * inlines `@arggondev/lib`, so the adopter tree needs no `node_modules`). This
  * file stays the single source: `npm run build:plugin` regenerates the bundle
  * deterministically and `cli/src/plugin-copy.test.ts` drift-gates the committed
  * bytes (assert-before-write; `npm run check:plugin` in CI). Ambient behavior and the native tool namespace only,
@@ -20,7 +20,7 @@
  *      register list/create/update/show/next/report/validate/comment/handoff/
  *      priority/sync/import_issues with `ctx.tool.transform`, namespaced
  *      `arggon` and `options.codemode: true` (Code Mode: `tools.arggon.<name>`).
- *      Every tool calls the kernel **in-process** through `@arggon/lib` — the
+ *      Every tool calls the kernel **in-process** through `@arggondev/lib` — the
  *      same `*Operation` the CLI's `--json` path uses — and returns the
  *      documented envelope. Kernel failures throw `ArgonToolError` (a typed
  *      tool error carrying the failure code and envelope), never a throw
@@ -56,13 +56,13 @@
  * - Optional and failure-isolated: every path is feature-detected and wrapped,
  *   a failure logs once and no-ops; the plugin must never break a session, the
  *   CLI or the MCP server. The kernel import is guarded and cached: the source
- *   loaded directly in a tree without `@arggon/lib` registers no tools, while
+ *   loaded directly in a tree without `@arggondev/lib` registers no tools, while
  *   the vendored **bundle** inlines the kernel and always registers.
  * - Thin: no rules. State transitions go through the kernel
- *   (`@arggon/lib` in-process), the CLI (`execFile` with argument arrays) or
+ *   (`@arggondev/lib` in-process), the CLI (`execFile` with argument arrays) or
  *   the MCP server.
  * - Dependency-free: only Node builtins (`node:child_process`, `node:fs`,
- *   `node:path`, `node:url`). `@arggon/lib` is resolved with a guarded,
+ *   `node:path`, `node:url`). `@arggondev/lib` is resolved with a guarded,
  *   **literal** dynamic import: the bundle rewrites it to the inlined kernel,
  *   and this repo resolves the workspace package. `@opencode/plugin` is not
  *   imported at all: the documented static import fails to load an
@@ -1267,8 +1267,8 @@ const TOOL_ERROR_DETAIL_MAX_BYTES = 8192
 /** Bound of a runtime-provided session id used as the default author/session. */
 const SESSION_TOKEN_MAX_CHARS = 64
 
-/** Kernel surface the native tools consume (the `@arggon/lib` stable subset). */
-export type ArgonKernel = typeof import("@arggon/lib")
+/** Kernel surface the native tools consume (the `@arggondev/lib` stable subset). */
+export type ArgonKernel = typeof import("@arggondev/lib")
 
 /** Second `execute` argument V2 passes to a tool (session correlation only). */
 export type ArgonToolCallContext = { sessionID?: unknown }
@@ -2732,10 +2732,10 @@ let toolsRegistrationLogged = false
  * ambient paths keep working. Never cached on rejection.
  */
 export function loadArgonKernel(): Promise<ArgonKernel | undefined> {
-  kernelPromise ??= import("@arggon/lib").then(
+  kernelPromise ??= import("@arggondev/lib").then(
     (module) => module as ArgonKernel,
     (error: unknown) => {
-      logOnce("kernel-import", "@arggon/lib unavailable (native tools idle)", error)
+      logOnce("kernel-import", "@arggondev/lib unavailable (native tools idle)", error)
       return undefined
     },
   )

@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { runList, toContractWorkItem, type ContractWorkItem as WorkItem } from "@arggon/lib";
+import { runList, toContractWorkItem, type ContractWorkItem as WorkItem } from "@arggondev/lib";
 
 import { renderBoardHtml } from "./board.js";
 

@@ -27,7 +27,7 @@ import {
   type ItemType,
   type TrackerCommitResult,
   type TrackerLayout,
-} from "@arggon/lib";
+} from "@arggondev/lib";
 import { bundledTemplatesDir } from "./package-assets.js";
 
 import {
