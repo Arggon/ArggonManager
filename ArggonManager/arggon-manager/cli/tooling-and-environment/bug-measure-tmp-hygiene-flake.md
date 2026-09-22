@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-19"
 updated: "2026-09-22"
-worktree_path: /home/arggon/Projects/ArggonManager-opencode2-bug-measure-tmp-hygiene-flake
 ---
 <!--
   Placement (v0): tasks/arggon-manager/cli/tooling-and-environment/bug-measure-tmp-hygiene-flake.md
