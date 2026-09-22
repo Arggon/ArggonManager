@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-start-build-exit-visibility
 title: start build-exit visibility + symlink-fallback docs
+assignee: Arggon
+branch: feat/task-start-build-exit-visibility
 parent: native-redesign
 labels: []
 priority: p3
 created: "2026-09-22"
 updated: "2026-09-22"
+claimed_at: "2026-09-22T00:31:48.532Z"
+worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-start-build-exit-visibility
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-start-build-exit-visibility.md
