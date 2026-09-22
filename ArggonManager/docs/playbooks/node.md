@@ -25,10 +25,11 @@ October 2026; Node 22 is in Maintenance LTS. Sources:
 - Pin the minimum runtime in `package.json`: `"engines": { "node": ">=22.12.0" }`
   (22.12 is the last 22.x line with require(esm) unflagged, which this ESM-only
   repo relies on).
-- Install a specific toolchain with a version manager: `nvm install 24 && nvm
-  use 24` or `fnm use 24`. CI (`.github/workflows/ci.yml`) runs `node-version: 22`
-  to prove the minimum-supported line; local development on 24 LTS is fine
-  because engines floor it.
+- Install a specific toolchain with a version manager:
+  `nvm install 24 && nvm use 24` or `fnm use 24`.
+  CI (`.github/workflows/ci.yml`) runs `node-version: 22` to prove the
+  minimum-supported line; local development on 24 LTS is fine because engines
+  floor it.
 - Package manager: npm (lockfile `package-lock.json` committed); install with
   `npm ci` in clean checkouts/CI.
 
@@ -44,8 +45,8 @@ October 2026; Node 22 is in Maintenance LTS. Sources:
 
 ## Testing
 
-- Runner: vitest 5 (`npm run test` → `vitest run`); watch mode `npm run
-  test:watch`. See [vitest.md](vitest.md) for the runner playbook.
+- Runner: vitest 5 (`npm run test` → `vitest run`); watch mode
+  `npm run test:watch`. See [vitest.md](vitest.md) for the runner playbook.
 - Tests build temp trees (`mkdtemp`) instead of mutating this repo's live
   `tasks/`; golden trees live in `fixtures/`.
 - Full gates before every PR: `tsc -p tsconfig.json --noEmit`, `eslint`,

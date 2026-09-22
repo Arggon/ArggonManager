@@ -124,9 +124,8 @@ arggon priority migrate [--dry-run] [--json]
   auto-commit would spray 41 `chore(tasks)` commits into the history.)
 - `--dry-run` writes nothing and prints/plans exactly what a real run would
   change (same entry list). `--json` is additive:
-  `{ dryRun, scanned, changed, entries: [{ id, type, path, priority,
-  labelsRemoved, prioritySource, previousPriority? }] }` with
-  `prioritySource: "label" | "kept-explicit"`. Human output lists one line
+  `{ dryRun, scanned, changed, entries: [{ id, type, path, priority, labelsRemoved, prioritySource, previousPriority? }] }`
+  with `prioritySource: "label" | "kept-explicit"`. Human output lists one line
   per changed item. Failures use `error.code: "PRIORITY_FAILED"`.
 - Idempotent: after a run no item carries a pN label, so a second run scans,
   finds zero participants, and changes nothing.

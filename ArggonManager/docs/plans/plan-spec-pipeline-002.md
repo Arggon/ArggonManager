@@ -19,9 +19,9 @@ Derivado del spec `ArggonManager/docs/specs/spec-spec-pipeline-002.md`.
 
 ## T2: Registro CLI (`cli/src/cli.ts`)
 
-- `arggon spec validate [--file <path>] [--json]` y `arggon spec new <slug>
-  [--title] [--plan] [--json]`; envelope v1 con `command: "spec"`, fallos
-  `SPEC_FAILED`.
+- `arggon spec validate [--file <path>] [--json]` y
+  `arggon spec new <slug> [--title] [--plan] [--json]`; envelope v1 con
+  `command: "spec"`, fallos `SPEC_FAILED`.
 - **Aceptación:** `--json` espeja `validate`; exit code no-cero con errores.
 
 ## T3: Plantillas (`templates/spec.md`, `templates/plan.md`)

@@ -41,9 +41,9 @@ current major. Source: `npm view vitest version` / `npm view vitest time
 
 ## Testing
 
-- Coverage is not gated; the CI gate is `npm run test` green plus `npm run
-  build` and `npm run lint`. Add tests in the same PR as behavior changes
-  (docs/engineering.md review bar).
+- Coverage is not gated; the CI gate is `npm run test` green plus
+  `npm run build` and `npm run lint`. Add tests in the same PR as behavior
+  changes (docs/engineering.md review bar).
 
 ## Security
 
@@ -55,8 +55,8 @@ current major. Source: `npm view vitest version` / `npm view vitest time
     the browser-mode HTTP server `__screenshot-error` handler.
   - GHSA-g8mr-85jm-7xhm (2026): browser-mode `cdp()` API can proxy Chrome
     DevTools Protocol and overwrite config.
-  Sources: [github.com/vitest-dev/vitest/security/advisories](https://github.com/vitest-dev/vitest/security/advisories)
-  (accessed 2026-09-13).
+    Sources: [github.com/vitest-dev/vitest/security/advisories](https://github.com/vitest-dev/vitest/security/advisories)
+    (accessed 2026-09-13).
 - Run `npm audit` on dependency bumps; vitest ships as a devDependency only —
   it never ships to users of the built `dist/cli.js`.
 
