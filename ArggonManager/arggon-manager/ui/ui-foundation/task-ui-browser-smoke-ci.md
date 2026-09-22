@@ -27,3 +27,15 @@ updated: "2026-09-22"
 - [ ] 
 
 ## Notes
+
+### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Context
+
+ADR 0008 chose two tiers: review-time Playwright CLI (used ad hoc today) and an optional CI `@smoke` `@playwright/test` spec that was never implemented. Every UI change in the `ui` epic will need a durable regression net; the TUI exception (scripted pty render check) is already prototyped in `smoke/tui-smoke.ts`.
+
+## Acceptance
+
+- [ ] A `@smoke`-tagged Playwright spec: `board --serve` on a fixture renders cards matching `arggon list`, one status move round-trips and persists (verified with `arggon show`), and a filter reduces the view
+- [ ] A CI job runs the spec on Chromium only; Playwright stays dev-only (never a runtime dependency) and the job skips cleanly when browsers are unavailable
+- [ ] The TUI gets a scripted frame assertion (reuse the smoke fixture pattern) or a documented manual step in the same docs section
+- [ ] docs/engineering.md testing table + CONTRIBUTING.md commands updated; CI green on the PR
