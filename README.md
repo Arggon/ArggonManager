@@ -132,7 +132,7 @@ git clone https://github.com/Arggon/ArggonManager
 cd ArggonManager
 npm install                                                            # deps; prepare builds lib/dist + dist/
 mkdir -p /tmp/arggon-packs                                             # `npm pack --pack-destination` does not create it
-npm pack --workspace @arggondev/lib --pack-destination /tmp/arggon-packs
+npm pack --workspace lib --pack-destination /tmp/arggon-packs
 npm pack --pack-destination /tmp/arggon-packs
 npm install -g /tmp/arggon-packs/arggondev-lib-<version>.tgz /tmp/arggon-packs/arggon-manager-<version>.tgz
 arggon --version

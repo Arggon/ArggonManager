@@ -37,7 +37,7 @@ Product-owner decision (2026-09-20): the kernel ships as its **own package,
 1. **One workspace, two packages.** The kernel lives in `lib/` as
    `@arggondev/lib` (own `package.json`, `tsconfig.json`, `exports`, ESM only, no
    runtime dependencies). The root package declares `"workspaces": ["lib"]`
-   and depends on `"@arggondev/lib"` (`^0.3.0`), linked by the workspace; the
+   and depends on `"@arggondev/lib"` (`^0.4.0`), linked by the workspace; the
    root's `arggon-manager/lib` subpath export is removed.
 2. **Surface unchanged.** The entry (`lib/src/index.ts`) is the W1 kernel
    surface — items, rules, paths, envelopes and the twelve `*Operation`s — with

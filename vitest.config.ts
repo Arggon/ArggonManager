@@ -9,7 +9,7 @@ export default defineConfig({
     // artifact is exercised for real in cli/src/lib-build.test.ts.
     alias: [
       {
-        find: /^@arggon\/lib$/,
+        find: /^@arggondev\/lib$/,
         replacement: fileURLToPath(new URL("./lib/src/index.ts", import.meta.url)),
       },
       // W5 task-native-tui: `tui.tsx` is vendored verbatim and OpenCode
