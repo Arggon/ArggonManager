@@ -19,6 +19,10 @@
  *   (`ArggonManager/docs/json-output.md`): `successEnvelope`, `failEnvelope`,
  *   `compactWorkItem`, and one `*Operation` per command returning the exact
  *   documented envelope plus the CLI exit-code semantics.
+ * - **view-model** — the derived board data the web board, the terminal TUI and
+ *   the native panel all render (`view-model.ts`): id/priority ordering,
+ *   dependency-blocked marks, grouping, per-status counts, tree flattening and
+ *   the filter lens. Pure, no I/O, no new dependencies.
  *
  * The package ships no assets and no printing: argv parsing, TTY gates and
  * stdout formatting live in the root CLI; the bundled templates dir is
@@ -152,6 +156,26 @@ export type {
   PriorityMigrateOptions,
   PriorityMigrateResult,
 } from "./priority.js";
+
+// --- Board view-model (derived display data shared by web/TUI/panel) --------
+
+export {
+  applyViewLens,
+  buildStatusIndex,
+  groupItemsBy,
+  hasOpenDependencies,
+  itemsForStatus,
+  matchesSubstringFilter,
+  openDependencyIds,
+  priorityTier,
+  readyTodoCount,
+  sortById,
+  sortByPriority,
+  statusCounts,
+  treeEntries,
+  visibleItems,
+} from "./view-model.js";
+export type { ViewGroup, ViewItem, ViewLens, ViewTreeEntry } from "./view-model.js";
 
 // --- Envelopes (the `--json` contract) --------------------------------------
 

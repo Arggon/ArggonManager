@@ -70,6 +70,7 @@ __arggonEdges.set("lib/src/index.ts\u0000./tracker-commit.js", "lib/src/tracker-
 __arggonEdges.set("lib/src/index.ts\u0000./trend.js", "lib/src/trend.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./update.js", "lib/src/update.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./validate.js", "lib/src/validate.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./view-model.js", "lib/src/view-model.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./worktree.js", "lib/src/worktree.ts")
 __arggonEdges.set("lib/src/issue-roundtrip.ts\u0000./detect-repo.js", "lib/src/detect-repo.ts")
 __arggonEdges.set("lib/src/items.ts\u0000./frontmatter.js", "lib/src/frontmatter.ts")
@@ -153,6 +154,10 @@ __arggonEdges.set("lib/src/validate.ts\u0000./priority.js", "lib/src/priority.ts
 __arggonEdges.set("lib/src/validate.ts\u0000./relations.js", "lib/src/relations.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./sanitize.js", "lib/src/sanitize.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./status.js", "lib/src/status.ts")
+__arggonEdges.set("lib/src/view-model.ts\u0000./filter.js", "lib/src/filter.ts")
+__arggonEdges.set("lib/src/view-model.ts\u0000./next.js", "lib/src/next.ts")
+__arggonEdges.set("lib/src/view-model.ts\u0000./priority.js", "lib/src/priority.ts")
+__arggonEdges.set("lib/src/view-model.ts\u0000./status.js", "lib/src/status.ts")
 __arggonEdges.set("opencode/plugins/arggon/board.ts\u0000@arggondev/lib", "lib/src/index.ts")
 __arggonEdges.set("opencode/plugins/arggon/index.ts\u0000./board.js", "opencode/plugins/arggon/board.ts")
 __arggonEdges.set("opencode/plugins/arggon/index.ts\u0000@arggondev/lib", "lib/src/index.ts")
@@ -2187,9 +2192,9 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
-exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.unlinkNodeModulesLink = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.runSync = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = void 0;
+exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
+exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.unlinkNodeModulesLink = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2282,6 +2287,21 @@ Object.defineProperty(exports, "assertPriority", { enumerable: true, get: functi
 Object.defineProperty(exports, "isPriority", { enumerable: true, get: function () { return priority_js_1.isPriority; } });
 Object.defineProperty(exports, "priorityRank", { enumerable: true, get: function () { return priority_js_1.priorityRank; } });
 Object.defineProperty(exports, "runPriorityMigrate", { enumerable: true, get: function () { return priority_js_1.runPriorityMigrate; } });
+var view_model_js_1 = require("./view-model.js");
+Object.defineProperty(exports, "applyViewLens", { enumerable: true, get: function () { return view_model_js_1.applyViewLens; } });
+Object.defineProperty(exports, "buildStatusIndex", { enumerable: true, get: function () { return view_model_js_1.buildStatusIndex; } });
+Object.defineProperty(exports, "groupItemsBy", { enumerable: true, get: function () { return view_model_js_1.groupItemsBy; } });
+Object.defineProperty(exports, "hasOpenDependencies", { enumerable: true, get: function () { return view_model_js_1.hasOpenDependencies; } });
+Object.defineProperty(exports, "itemsForStatus", { enumerable: true, get: function () { return view_model_js_1.itemsForStatus; } });
+Object.defineProperty(exports, "matchesSubstringFilter", { enumerable: true, get: function () { return view_model_js_1.matchesSubstringFilter; } });
+Object.defineProperty(exports, "openDependencyIds", { enumerable: true, get: function () { return view_model_js_1.openDependencyIds; } });
+Object.defineProperty(exports, "priorityTier", { enumerable: true, get: function () { return view_model_js_1.priorityTier; } });
+Object.defineProperty(exports, "readyTodoCount", { enumerable: true, get: function () { return view_model_js_1.readyTodoCount; } });
+Object.defineProperty(exports, "sortById", { enumerable: true, get: function () { return view_model_js_1.sortById; } });
+Object.defineProperty(exports, "sortByPriority", { enumerable: true, get: function () { return view_model_js_1.sortByPriority; } });
+Object.defineProperty(exports, "statusCounts", { enumerable: true, get: function () { return view_model_js_1.statusCounts; } });
+Object.defineProperty(exports, "treeEntries", { enumerable: true, get: function () { return view_model_js_1.treeEntries; } });
+Object.defineProperty(exports, "visibleItems", { enumerable: true, get: function () { return view_model_js_1.visibleItems; } });
 var json_js_1 = require("./json.js");
 Object.defineProperty(exports, "JSON_SCHEMA_VERSION", { enumerable: true, get: function () { return json_js_1.JSON_SCHEMA_VERSION; } });
 Object.defineProperty(exports, "compactWorkItem", { enumerable: true, get: function () { return json_js_1.compactWorkItem; } });
@@ -5541,6 +5561,149 @@ function formatValidateHuman(result) {
 }
 })
 
+__arggonModules.set("lib/src/view-model.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.buildStatusIndex = buildStatusIndex;
+exports.openDependencyIds = openDependencyIds;
+exports.hasOpenDependencies = hasOpenDependencies;
+exports.sortById = sortById;
+exports.priorityTier = priorityTier;
+exports.sortByPriority = sortByPriority;
+exports.matchesSubstringFilter = matchesSubstringFilter;
+exports.visibleItems = visibleItems;
+exports.itemsForStatus = itemsForStatus;
+exports.statusCounts = statusCounts;
+exports.groupItemsBy = groupItemsBy;
+exports.treeEntries = treeEntries;
+exports.readyTodoCount = readyTodoCount;
+exports.applyViewLens = applyViewLens;
+const filter_js_1 = require("./filter.js");
+const next_js_1 = require("./next.js");
+const priority_js_1 = require("./priority.js");
+const status_js_1 = require("./status.js");
+function buildStatusIndex(items) {
+    return new Map(items.map((item) => [item.id, { status: item.status }]));
+}
+function openDependencyIds(dependsOn, byId) {
+    return (0, next_js_1.openDependencies)({ dependsOn: [...dependsOn] }, byId);
+}
+function hasOpenDependencies(dependsOn, byId) {
+    return openDependencyIds(dependsOn, byId).length > 0;
+}
+function sortById(items) {
+    return [...items].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+function priorityTier(priority) {
+    return priority !== null && priority !== undefined && (0, priority_js_1.isPriority)(priority)
+        ? (0, priority_js_1.priorityRank)(priority)
+        : (0, priority_js_1.priorityRank)("p3");
+}
+function sortByPriority(items) {
+    return [...items].sort((a, b) => priorityTier(a.priority) - priorityTier(b.priority) ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+function matchesSubstringFilter(item, filter) {
+    if (filter === "")
+        return true;
+    const needle = filter.toLowerCase();
+    return (item.id.toLowerCase().includes(needle) || (item.title ?? "").toLowerCase().includes(needle));
+}
+function visibleItems(items, filter) {
+    return sortById(items).filter((item) => matchesSubstringFilter(item, filter));
+}
+function itemsForStatus(items, filter, status) {
+    return visibleItems(items, filter).filter((item) => item.status === status);
+}
+function statusCounts(items) {
+    const counts = {};
+    for (const status of status_js_1.STATUSES)
+        counts[status] = 0;
+    for (const item of items)
+        counts[item.status] += 1;
+    return counts;
+}
+function groupItemsBy(items, keyOf) {
+    const byKey = new Map();
+    for (const item of items) {
+        const key = keyOf(item);
+        const bucket = byKey.get(key);
+        if (bucket)
+            bucket.push(item);
+        else
+            byKey.set(key, [item]);
+    }
+    const keyed = [...byKey.keys()]
+        .filter((key) => key !== null)
+        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+        .map((key) => ({ key, items: byKey.get(key) }));
+    const bare = byKey.get(null);
+    if (!bare)
+        return keyed;
+    if (keyed.length === 0)
+        return [{ key: null, items: bare }];
+    return [...keyed, { key: null, items: bare }];
+}
+function treeEntries(items) {
+    const known = new Set(items.map((item) => item.id));
+    const children = new Map();
+    const roots = [];
+    for (const item of items) {
+        const parent = item.parent ?? null;
+        if (parent === null || parent === "" || !known.has(parent)) {
+            roots.push(item);
+            continue;
+        }
+        const bucket = children.get(parent) ?? [];
+        bucket.push(item);
+        children.set(parent, bucket);
+    }
+    const byId = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    roots.sort(byId);
+    for (const bucket of children.values())
+        bucket.sort(byId);
+    const entries = [];
+    const visited = new Set();
+    const walk = (item, depth) => {
+        if (visited.has(item.id))
+            return;
+        visited.add(item.id);
+        entries.push({ item, depth });
+        for (const child of children.get(item.id) ?? [])
+            walk(child, depth + 1);
+    };
+    for (const root of roots)
+        walk(root, 0);
+    for (const item of [...items].sort(byId)) {
+        if (!visited.has(item.id))
+            walk(item, 0);
+    }
+    return entries;
+}
+function readyTodoCount(items) {
+    const byId = buildStatusIndex(items);
+    return items.filter((item) => (0, status_js_1.isClaimable)(item.type) &&
+        item.status === "todo" &&
+        (item.assignee ?? null) === null &&
+        (0, next_js_1.isReady)({ ...item, dependsOn: item.dependsOn ?? [] }, byId)).length;
+}
+function applyViewLens(items, lens = {}) {
+    const predicates = lens.filter === undefined || lens.filter.trim() === "" ? [] : (0, filter_js_1.parseFilter)(lens.filter);
+    const blockedByIndex = (0, filter_js_1.buildBlockedByIndex)(items);
+    const ancestorIndex = (0, filter_js_1.buildAncestorIndex)(items);
+    const statusById = buildStatusIndex(items);
+    const kept = items.filter((item) => {
+        if (lens.status !== undefined && item.status !== lens.status)
+            return false;
+        if (lens.ready === true && !(0, next_js_1.isReady)({ ...item, dependsOn: item.dependsOn ?? [] }, statusById)) {
+            return false;
+        }
+        return predicates.every((pred) => (0, filter_js_1.matchesPredicate)(item, pred, blockedByIndex, ancestorIndex));
+    });
+    return lens.sort === "priority" ? sortByPriority(kept) : sortById(kept);
+}
+})
+
 __arggonModules.set("lib/src/worktree.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -5999,7 +6162,7 @@ function emptyBoardSnapshot(reason) {
     return {
         root: null,
         items: [],
-        counts: emptyCounts(),
+        counts: (0, lib_1.statusCounts)([]),
         activeId: null,
         nextId: null,
         error: reason,
@@ -6030,8 +6193,7 @@ function boardSnapshot(cwd, input = {}) {
         const root = (0, lib_1.repoRootFromTasks)(tasksDir);
         const kernelItems = (0, lib_1.loadItems)(tasksDir);
         const byId = (0, lib_1.itemsById)(kernelItems);
-        const items = kernelItems
-            .map((item) => ({
+        const items = (0, lib_1.sortById)(kernelItems.map((item) => ({
             id: item.id,
             type: item.type,
             title: (0, lib_1.sanitizeHumanTextUncapped)(item.title ?? item.id),
@@ -6041,10 +6203,9 @@ function boardSnapshot(cwd, input = {}) {
             priority: item.priority ?? null,
             blockedReason: item.blockedReason ?? null,
             dependsOn: [...item.dependsOn],
-            openDeps: (0, lib_1.openDependencies)(item, byId),
+            openDeps: (0, lib_1.openDependencyIds)(item.dependsOn, byId),
             active: false,
-        }))
-            .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+        })));
         const activeId = activeBoardId(items, input);
         for (const item of items)
             item.active = item.id === activeId;
@@ -6068,50 +6229,11 @@ function boardSnapshot(cwd, input = {}) {
         return emptyBoardSnapshot((0, lib_1.sanitizeHumanError)(`tracker unreadable: ${detail(error)}`));
     }
 }
-function emptyCounts() {
-    return { todo: 0, in_progress: 0, blocked: 0, done: 0, cancelled: 0 };
-}
 function countBoardStatuses(items) {
-    const counts = emptyCounts();
-    for (const item of items)
-        counts[item.status] += 1;
-    return counts;
+    return (0, lib_1.statusCounts)(items);
 }
 function boardTreeEntries(items) {
-    const known = new Set(items.map((item) => item.id));
-    const children = new Map();
-    const roots = [];
-    for (const item of items) {
-        const parent = item.parent;
-        if (parent === null || parent === "" || !known.has(parent)) {
-            roots.push(item);
-            continue;
-        }
-        const bucket = children.get(parent) ?? [];
-        bucket.push(item);
-        children.set(parent, bucket);
-    }
-    const byId = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
-    roots.sort(byId);
-    for (const bucket of children.values())
-        bucket.sort(byId);
-    const entries = [];
-    const visited = new Set();
-    const walk = (item, depth) => {
-        if (visited.has(item.id))
-            return;
-        visited.add(item.id);
-        entries.push({ item, depth });
-        for (const child of children.get(item.id) ?? [])
-            walk(child, depth + 1);
-    };
-    for (const root of roots)
-        walk(root, 0);
-    for (const item of [...items].sort(byId)) {
-        if (!visited.has(item.id))
-            walk(item, 0);
-    }
-    return entries;
+    return (0, lib_1.treeEntries)(items);
 }
 function clipBoardLine(text, width) {
     if (width <= 0)
@@ -6168,11 +6290,7 @@ function sidebarStatusLine(snapshot, width = 0) {
     if (active !== undefined) {
         return clip(`arggon ▶ ${(0, lib_1.sanitizeHumanTextUncapped)(active.id)} ${active.status}`);
     }
-    const byId = new Map(snapshot.items.map((item) => [item.id, { status: item.status }]));
-    const ready = snapshot.items.filter((item) => (0, lib_1.isClaimable)(item.type) &&
-        item.status === "todo" &&
-        item.assignee === null &&
-        (0, lib_1.isReady)(item, byId)).length;
+    const ready = (0, lib_1.readyTodoCount)(snapshot.items);
     const next = snapshot.nextId !== null ? ` · next ${(0, lib_1.sanitizeHumanTextUncapped)(snapshot.nextId)}` : "";
     return clip(`arggon · ${ready} ready${next}`);
 }
