@@ -27,3 +27,15 @@ updated: "2026-09-22"
 - [ ] 
 
 ## Notes
+
+### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Context
+
+Enter currently prints the selected item's file path to the footer (README keybindings); reading the body, acceptance checklist or dependencies means quitting the TUI and opening the file. The kernel read path already provides everything the pane needs.
+
+## Acceptance
+
+- [ ] Enter opens a read-only detail pane for the selected item: title/type/status/priority/assignee, body (sanitized + wrapped, scrollable when longer than the pane), acceptance checkboxes, labels, dependencies with their statuses, branch/worktree_path/milestone and the path
+- [ ] Esc (or Enter) returns to the board with the selection, filter and scroll window preserved; a documented fallback for very narrow terminals
+- [ ] Content is sanitized through the existing human-text path; the pane never writes
+- [ ] Golden tests + pty evidence in the verdict; README keybindings updated
