@@ -52,3 +52,6 @@ Steps (from the runbook):
 
 ### 2026-09-22 @Arggon
 Release prep evidence: bump 0.3.0→0.4.0 (root+lib), private off, kernel dep range ^0.3.0→^0.4.0 (without it the packed-install suite fails E404 and skips 6 tests), CHANGELOG [0.4.0] - 2026-09-22. Review F1-F3 applied: lock synced, lib publishConfig {access: public} + license MIT + LICENSE in the tarball (79 files/124.3 kB). Gates 1498 tests, build, check:plugin, validate, spec validate. Pending (owner gate): merge opencode2→main, tag v0.4.0, npm publish kernel-first — blocked on the @arggon npm scope (account arggondev; org must be created or an alternative chosen).
+
+### handoff 2026-09-22 @Arggon — next: After the @arggon scope exists: merge opencode2 to main, tag v0.4.0, npm publish --workspace @arggon/lib then npm publish; then pin ARGGON_REF v0.4.0 and re-run init.
+- branch: feat/task-release-0-4-0
