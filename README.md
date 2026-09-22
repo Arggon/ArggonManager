@@ -132,7 +132,7 @@ npm install -g arggon-manager      # pulls @arggondev/lib from the registry
 arggon --version
 ```
 
-From a pinned checkout (development or pre-release), build and install **both** tarballs together — no pre-build step needed. `arggon-manager` (bin + `templates/`, `skills/`, `opencode/`) declares the kernel package `@arggondev/lib`, which is not on the registry, so installing the root tarball alone fails with `404 @arggondev/lib`; installing both in one command resolves the dependency from the tarball:
+From a pinned checkout (development or pre-release), build and install **both** tarballs together — no pre-build step needed. `arggon-manager` (bin + `templates/`, `skills/`, `opencode/`) declares the kernel package `@arggondev/lib`; packing and installing both from the same directory keeps the checkout's versions pinned (the root tarball also resolves the kernel from the registry since 0.4.0):
 
 ```bash
 git clone https://github.com/Arggon/ArggonManager

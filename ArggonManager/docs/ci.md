@@ -24,11 +24,10 @@ plugin) and `@arggondev/lib` (kernel) are **two packages**
 npm install -g arggon-manager      # pulls @arggondev/lib from the registry
 ```
 
-**From a pinned checkout (development) — pack both packages.** The root tarball
-alone is **not installable**: it declares `@arggondev/lib: ^0.4.0` and that package
-is not on the registry (a lone `npm install -g arggon-manager-<v>.tgz` fails
-with `404 @arggondev/lib@^0.4.0`). Pack and install **both** tarballs in one
-command so npm resolves the kernel dependency locally. `npm pack
+**From a pinned checkout (development) — pack both packages.** Pack and install
+**both** tarballs from the same directory so the checkout's versions stay pinned
+(and the install works offline); the root tarball also resolves `@arggondev/lib`
+from the registry since 0.4.0. `npm pack
 --pack-destination` does **not** create the destination directory (npm 10 and 12
 both exit 254 with `ENOENT`), so create it first:
 

@@ -22,11 +22,10 @@ on:
   pull_request:
 
 env:
-  # While `arggon-manager` and `@arggondev/lib` stay `private` (no npm release
-  # yet), the bin is packed from this pinned checkout — BOTH packages, because
-  # the root tarball alone cannot resolve the private kernel dependency.
-  # After release, replace the install step with the one-liner
-  # `npm install -g arggon-manager` and drop these two variables.
+  # The bin is packed from this pinned checkout — BOTH packages, so the
+  # workflow always validates the exact seam the ref ships. Since 0.4.0 both
+  # packages are on npm; to install the released one-liner instead, replace the
+  # install step with `npm install -g arggon-manager` and drop these variables.
   ARGGON_REPO: https://github.com/Arggon/ArggonManager.git
   ARGGON_REF: v0.4.0
 
