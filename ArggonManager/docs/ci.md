@@ -26,7 +26,7 @@ npm install -g arggon-manager      # pulls @arggondev/lib from the registry
 
 **From a pinned checkout (development) — pack both packages.** Pack and install
 **both** tarballs from the same directory so the checkout's versions stay pinned
-(and the install works offline); the root tarball also resolves `@arggondev/lib`
+(the kernel resolves locally; `commander` still comes from the registry — see the non-hermeticity note below); the root tarball also resolves `@arggondev/lib`
 from the registry since 0.4.0. `npm pack
 --pack-destination` does **not** create the destination directory (npm 10 and 12
 both exit 254 with `ENOENT`), so create it first:
