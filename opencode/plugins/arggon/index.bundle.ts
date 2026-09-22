@@ -5848,11 +5848,24 @@ function pointWorkspaceAtLocal(primaryRoot, worktreePath, name) {
 }
 function defaultWorkspaceBuildRunner(pkgDir) {
     const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-    (0, node_child_process_1.spawnSync)(npm, ["run", "build"], {
+    const result = (0, node_child_process_1.spawnSync)(npm, ["run", "build"], {
         cwd: pkgDir,
         encoding: "utf8",
         stdio: ["ignore", "pipe", "pipe"],
     });
+    return result.error === undefined && result.status === 0;
+}
+function installConsumesLocalBuild(primaryRoot, worktreePath, pkg) {
+    if (ownedLinkFarm(primaryRoot, worktreePath) !== null)
+        return true;
+    try {
+        const local = (0, node_fs_1.realpathSync)(pkg.path);
+        const target = (0, node_fs_1.realpathSync)((0, node_path_1.join)(worktreePath, "node_modules", ...pkg.name.split("/")));
+        return isInside(local, target);
+    }
+    catch {
+        return false;
+    }
 }
 function buildLocalWorkspaces(primaryRoot, worktreePath, deps = {}) {
     const runBuild = deps.runBuild ?? defaultWorkspaceBuildRunner;
@@ -5863,7 +5876,10 @@ function buildLocalWorkspaces(primaryRoot, worktreePath, deps = {}) {
                 continue;
             if (packageBuildScript(pkg.path) === undefined)
                 continue;
-            runBuild(pkg.path);
+            if (!installConsumesLocalBuild(primaryRoot, worktreePath, pkg))
+                continue;
+            if (!runBuild(pkg.path))
+                continue;
             if (!packageEntryExists(pkg.path))
                 continue;
             if (pointWorkspaceAtLocal(primaryRoot, worktreePath, pkg.name))

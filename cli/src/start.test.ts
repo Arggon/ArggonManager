@@ -468,7 +468,10 @@ describe("worktree link farm (task-start-worktree-lib-resolution)", () => {
     expect(linkedWorkspacePackages(primary, wt)).toEqual(["@arggon/lib"]);
 
     const built = buildLocalWorkspaces(primary, wt, {
-      runBuild: (pkgDir) => writePackageEntry(pkgDir),
+      runBuild: (pkgDir) => {
+        writePackageEntry(pkgDir);
+        return true;
+      },
     });
 
     expect(built).toEqual(["@arggon/lib"]);
@@ -498,6 +501,85 @@ describe("worktree link farm (task-start-worktree-lib-resolution)", () => {
     linkNodeModules(primary, scriptless);
     expect(buildLocalWorkspaces(primary, scriptless)).toEqual([]);
     expect(linkedWorkspacePackages(primary, scriptless)).toEqual(["@arggon/lib"]);
+  });
+
+  it("does not flip when the build fails but still emits the declared entry", () => {
+    const primary = mkdtempSync(join(tmpdir(), "arggon-build-emit-primary-"));
+    const wt = mkdtempSync(join(tmpdir(), "arggon-build-emit-wt-"));
+    addWorkspacePair(primary, wt, {
+      name: "@arggon/lib",
+      main: "dist/index.js",
+      scripts: { build: "tsc -p tsconfig.json" },
+    });
+    linkNodeModules(primary, wt);
+
+    // `tsc` without `noEmitOnError` writes the entry and exits non-zero: the
+    // exit is honored, so the partial entry is never flipped and the primary's
+    // copy stands (reported through `linkedWorkspacePackages`).
+    const built = buildLocalWorkspaces(primary, wt, {
+      runBuild: (pkgDir) => {
+        writePackageEntry(pkgDir);
+        return false;
+      },
+    });
+
+    expect(built).toEqual([]);
+    expect(readlinkSync(join(wt, "node_modules", "@arggon", "lib"))).toBe(join(primary, "lib"));
+    expect(linkedWorkspacePackages(primary, wt)).toEqual(["@arggon/lib"]);
+  });
+
+  it("skips the build when a previous install resolves the primary's copy", () => {
+    const primary = mkdtempSync(join(tmpdir(), "arggon-skip-build-primary-"));
+    const wt = mkdtempSync(join(tmpdir(), "arggon-skip-build-wt-"));
+    addWorkspacePair(primary, wt, {
+      name: "@arggon/lib",
+      main: "dist/index.js",
+      scripts: { build: "tsc -p tsconfig.json" },
+    });
+    // An install start did not create (an attach to a worktree prepared by an
+    // older flow): a bare symlink to the primary install, so `@arggon/lib`
+    // keeps resolving the primary's copy. There is no farm to flip, and the
+    // ~2s build would change nothing (PR #388 finding 3).
+    symlinkSync(join(primary, "node_modules"), join(wt, "node_modules"), "dir");
+
+    const calls: string[] = [];
+    const built = buildLocalWorkspaces(primary, wt, {
+      runBuild: (pkgDir) => {
+        calls.push(pkgDir);
+        writePackageEntry(pkgDir);
+        return true;
+      },
+    });
+
+    expect(calls).toEqual([]);
+    expect(built).toEqual([]);
+    expect(linkedWorkspacePackages(primary, wt)).toEqual(["@arggon/lib"]);
+  });
+
+  it("still builds when the install already resolves the worktree copy (npm ci)", () => {
+    const primary = mkdtempSync(join(tmpdir(), "arggon-reified-primary-"));
+    const wt = mkdtempSync(join(tmpdir(), "arggon-reified-wt-"));
+    addWorkspacePair(primary, wt, {
+      name: "@arggon/lib",
+      main: "dist/index.js",
+      scripts: { build: "tsc -p tsconfig.json" },
+    });
+    // The npm-reified shape (`npm ci` in the worktree): the workspace link
+    // already points at the worktree copy, so the declared entry is exactly
+    // what the gate needs — the build runs even though there is no farm.
+    mkdirSync(join(wt, "node_modules", "@arggon"), { recursive: true });
+    symlinkSync("../../lib", join(wt, "node_modules", "@arggon", "lib"), "dir");
+
+    const built = buildLocalWorkspaces(primary, wt, {
+      runBuild: (pkgDir) => {
+        writePackageEntry(pkgDir);
+        return true;
+      },
+    });
+
+    expect(built).toEqual([]); // nothing to flip: the link already resolves locally
+    expect(existsSync(join(wt, "lib", "dist", "index.js"))).toBe(true);
+    expect(linkedWorkspacePackages(primary, wt)).toEqual([]);
   });
 
   it("unlinks a farm without following its entries into the primary install", () => {

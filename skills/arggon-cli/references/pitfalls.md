@@ -75,10 +75,17 @@ agents in this codebase — read before mutating the tracker or merging.
   missing (the built names are printed on stdout), so the spawned CLI and tests
   run the branch's build instead of the primary's. Every such package with a
   `build` script is pre-built by default — deliberately, because a local copy is
-  preferred whenever it exists and a failed build falls back visibly (a
-  per-invocation opt-out is a candidate follow-up, not a flag today). A copy that
-  could not be built — no `build` script, a failing build, or no declared entry —
-  keeps the primary's copy and is reported as `linkedWorkspaces` in `--json`
+  preferred whenever it exists — but only when the install can consume the
+  result: a bare symlink to the primary install has no farm to flip, so an
+  attach re-run skips the build instead of paying ~2s for nothing (a reified
+  `npm ci` install, whose link already resolves the worktree copy, is still
+  built: the gate needs that declared entry). The build's exit is honored — a
+  failed build falls back visibly even when it still emitted the entry (`tsc`
+  without `noEmitOnError`) — so the gate never runs a kernel the build itself
+  reported as failed (a per-invocation opt-out is a candidate follow-up, not a
+  flag today). A copy that could not be built — no `build` script, a failed
+  build, or no declared entry — keeps the primary's copy and is reported as
+  `linkedWorkspaces` in `--json`
   (plus a stdout note), re-read after the `x-worktree.post-start` hook so a hook
   that installs locally (the recommended `npm ci`) reports `[]`. To force a full
   worktree-local install instead, run `npm ci` there.

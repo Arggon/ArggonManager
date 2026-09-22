@@ -1398,6 +1398,71 @@ describe("start --worktree flips workspace packages to the worktree copy (task-s
     );
   });
 
+  it("never flips a failed build that still emitted the declared entry (PR #388 finding 1)", () => {
+    const dir = initRepo();
+    // `tsc` without `noEmitOnError` writes the entry and still exits non-zero:
+    // the exit is honored, so the partial entry is never flipped and the gate
+    // falls back to the primary's copy, visibly reported.
+    addBuildableWorkspacePackage(dir, {
+      build: "mkdir -p dist && echo module.exports = 1 > dist/index.js && exit 1",
+      built: true,
+    });
+    setResolutionGate(dir);
+    const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    expect(result.builtWorkspaces).toEqual([]);
+    expect(result.linkedWorkspaces).toEqual(["@arggon/lib"]);
+    expect(result.committed).toBe(true);
+    expect(readFileSync(join(expectedPath, ".gate-resolution"), "utf8")).toBe(
+      join(dir, "lib", "dist", "index.js"),
+    );
+  });
+
+  it("skips the local build on attach when the install resolves the primary copy (PR #388 finding 3)", () => {
+    const dir = initRepo();
+    addBuildableWorkspacePackage(dir, { built: true });
+    setResolutionGate(dir);
+    const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
+    // A previous install start did not create: the documented manual shape, a
+    // bare symlink to the primary install. The worktree's workspace copy has no
+    // build output, but there is no farm to flip, so a build would only cost.
+    git(["worktree", "add", "--quiet", "-b", "feat/task-alpha", expectedPath], dir);
+    symlinkSync(join(dir, "node_modules"), join(expectedPath, "node_modules"), "dir");
+    runUpdate({
+      cwd: dir,
+      id: "task-alpha",
+      status: "in_progress",
+      assignee: "arggon",
+      branch: "feat/task-alpha",
+      worktreePath: expectedPath,
+      now: NOW,
+    });
+    git(["add", "ArggonManager"], dir);
+    git(["commit", "--quiet", "-m", "pre-created worktree"], dir);
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    expect(result.worktreeCreated).toBe(false);
+    expect(result.linkedNodeModules).toBe(false);
+    expect(result.builtWorkspaces).toEqual([]);
+    // The build was skipped, not run and discarded: no local build output
+    // appeared and the install keeps resolving the primary's copy.
+    expect(existsSync(join(expectedPath, "lib", "dist", "index.js"))).toBe(false);
+    expect(result.linkedWorkspaces).toEqual(["@arggon/lib"]);
+    expect(result.committed).toBe(true);
+    expect(readFileSync(join(expectedPath, ".gate-resolution"), "utf8")).toBe(
+      join(dir, "lib", "dist", "index.js"),
+    );
+  });
+
   it("cleanup --prune removes a farm worktree without following its entries", () => {
     const dir = initRepo();
     addBuildableWorkspacePackage(dir);

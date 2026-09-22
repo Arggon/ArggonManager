@@ -44,7 +44,10 @@ import { dirname, join, relative, resolve, sep } from "node:path";
  * for any local package that is not importable yet (its declared entry file is
  * missing), so the install never dangles; `buildLocalWorkspaces` then runs the
  * package's own `build` script and points the entry locally before the
- * claim-commit gate runs.
+ * claim-commit gate runs — only when the install can consume the result (a farm
+ * of ours to flip, or a reified install already resolving that copy, never a
+ * bare symlink left over on an attach) and only when the build exits 0, so a
+ * failed build falls back to the primary's copy visibly (PR #388 findings 1/3).
  */
 
 /**
@@ -443,17 +446,52 @@ export function pointWorkspaceAtLocal(
   }
 }
 
-/** Runs one package's `build` script in its directory (injectable for tests). */
-export type WorkspaceBuildRunner = (pkgDir: string) => void;
+/**
+ * Runs one package's `build` script in its directory (injectable for tests).
+ * Returns true only when the build succeeded (exit 0): callers never trust an
+ * entry a failed build emitted (PR #388 review finding 1).
+ */
+export type WorkspaceBuildRunner = (pkgDir: string) => boolean;
 
-/** `npm run build` in the package directory, inheriting the invoking env. */
-function defaultWorkspaceBuildRunner(pkgDir: string): void {
+/**
+ * `npm run build` in the package directory, inheriting the invoking env. The
+ * exit status is the contract: `tsc` without `noEmitOnError` emits output for a
+ * build it reports as failed, and flipping that partial entry would run the
+ * gate against a build the package itself rejected.
+ */
+function defaultWorkspaceBuildRunner(pkgDir: string): boolean {
   const npm = process.platform === "win32" ? "npm.cmd" : "npm";
-  spawnSync(npm, ["run", "build"], {
+  const result = spawnSync(npm, ["run", "build"], {
     cwd: pkgDir,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
   });
+  return result.error === undefined && result.status === 0;
+}
+
+/**
+ * True when the worktree's install can consume a local build: start's own link
+ * farm (which `pointWorkspaceAtLocal` flips once the entry exists), or an
+ * install entry that already resolves the worktree's copy (an npm-reified
+ * `npm ci`, whose workspace link points at `../../lib` — the declared entry is
+ * what the gate then needs). A bare symlink to the primary install — or no
+ * install at all — keeps resolving the primary's copy, so building the local
+ * one only costs time: attach re-runs skip it (PR #388 review finding 3).
+ * Physical and best-effort: an unreadable entry is a no.
+ */
+function installConsumesLocalBuild(
+  primaryRoot: string,
+  worktreePath: string,
+  pkg: LocalWorkspacePackage,
+): boolean {
+  if (ownedLinkFarm(primaryRoot, worktreePath) !== null) return true;
+  try {
+    const local = realpathSync(pkg.path);
+    const target = realpathSync(join(worktreePath, "node_modules", ...pkg.name.split("/")));
+    return isInside(local, target);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -464,11 +502,12 @@ function defaultWorkspaceBuildRunner(pkgDir: string): void {
  * primary's copy and the gate would run the PRIMARY's kernel — exactly the
  * staleness W6/PR-374 flagged. For every local package whose declared entry is
  * missing, the package's own `build` script is run (the repo's build, not a
- * hardcoded kernel step); when the entry exists afterwards the farm entry is
- * pointed at the worktree copy, otherwise the primary's copy stands and
- * `linkedWorkspacePackages` reports the package. Never throws: a failed or
- * absent build degrades to the previous (reported) behavior. Returns the names
- * it built and pointed locally.
+ * hardcoded kernel step) — but only when the install can consume the result
+ * (`installConsumesLocalBuild`) and only when the build exits 0; when the entry
+ * exists afterwards the farm entry is pointed at the worktree copy, otherwise
+ * the primary's copy stands and `linkedWorkspacePackages` reports the package.
+ * Never throws: a failed or absent build degrades to the previous (reported)
+ * behavior. Returns the names it built and pointed locally.
  */
 export function buildLocalWorkspaces(
   primaryRoot: string,
@@ -481,7 +520,14 @@ export function buildLocalWorkspaces(
     try {
       if (packageEntryExists(pkg.path)) continue; // already importable
       if (packageBuildScript(pkg.path) === undefined) continue; // nothing to run
-      runBuild(pkg.path);
+      // Never pay for a build the install cannot use: with a bare symlink to
+      // the primary install there is no farm to flip, so an attach re-run would
+      // rebuild for ~2s and still resolve the primary's copy (PR #388 finding 3).
+      if (!installConsumesLocalBuild(primaryRoot, worktreePath, pkg)) continue;
+      // The exit is honored: a failed build falls back visibly even when it
+      // emitted the declared entry (`tsc` without `noEmitOnError`), so the gate
+      // never runs a kernel the package itself reported as failed.
+      if (!runBuild(pkg.path)) continue;
       // A build that did not produce the declared entry leaves the primary's
       // copy in place: the gate keeps a loadable package and the report names
       // the shadowed one.
