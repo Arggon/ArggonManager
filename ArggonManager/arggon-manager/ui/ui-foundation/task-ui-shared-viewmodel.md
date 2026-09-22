@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-ui-shared-viewmodel
 title: "Extract the shared board view-model (web, TUI, OpenCode panel)"
+assignee: Arggon
+branch: feat/task-ui-shared-viewmodel
 parent: ui-foundation
 labels: [ui, architecture]
 priority: p2
 created: "2026-09-22"
 updated: "2026-09-22"
+claimed_at: "2026-09-22T22:55:24.949Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-ui-shared-viewmodel
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-ui-shared-viewmodel.md
