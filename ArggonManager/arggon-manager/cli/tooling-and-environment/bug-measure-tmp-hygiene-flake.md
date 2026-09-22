@@ -115,3 +115,6 @@ Evidence addendum: CI on PR #389 is green (cli pass 4m17s, tasks-validate pass 3
 - Este verdict se publica con `npm run arggon -- comment` (auto-commit `chore(tasks): commented ...`) porque los tools MCP `arggon_*` de esta sesión apuntan a `/home/arggon/Projects/ArggonManager` (convention v3) y fallan con `SHOW_FAILED`/`LIST_FAILED` en este workspace. Ese commit tracker-only mueve el tip: re-chequear CI tras el push.
 
 **Cierre: MERGE** (merge commit).
+
+### 2026-09-22 @Arggon
+Coordinator note: reviewer reproduced the concurrent-run failure at base and the pass at head, plus falsification (shared path fails the new tests); suite 1492 with sibling loops, zero /tmp leftovers, JSON contract unchanged. Gates lint/build/check:plugin/validate; CI pass on ca2b884. Merged with merge commit; item flipped to done.
