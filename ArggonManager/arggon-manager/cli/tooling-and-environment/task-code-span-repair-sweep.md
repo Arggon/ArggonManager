@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-code-span-repair-sweep
 title: "Code-span repair sweep: remaining glued/indent-lost spans in docs"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-21"
 updated: "2026-09-22"
-claimed_at: "2026-09-22T00:31:47.432Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-code-span-repair-sweep
 ---
 <!--
