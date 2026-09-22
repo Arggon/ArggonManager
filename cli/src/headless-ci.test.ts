@@ -18,11 +18,11 @@
  *   4. **MCP is not required anywhere** — no executed step mentions it, and the
  *      recipe stays green with `.mcp.json` and the whole OpenCode seam deleted.
  *
- * Why both tarballs: `@arggondev/lib` is `private` (no npm release yet), so the
- * root tarball alone cannot resolve its kernel dependency — `npm install -g
- * arggon-manager-<v>.tgz` fails with `404 @arggondev/lib@^0.3.0`. The documented
- * mechanism (ArggonManager/docs/ci.md) packs both packages from a pinned
- * checkout and installs them in one command; this test does exactly that.
+ * Why both tarballs: this test validates the from-checkout recipe — packing
+ * and installing both packages from the same directory keeps the checkout's
+ * pinned versions (since 0.4.0 the root tarball also resolves the kernel from
+ * the registry). The documented mechanism (ArggonManager/docs/ci.md) packs
+ * both packages from a pinned checkout and installs them in one command.
  *
  * The install step of the workflow clones the product repo, so the test points
  * `ARGGON_REPO`/`ARGGON_REF` at a throwaway local git repo built from a
