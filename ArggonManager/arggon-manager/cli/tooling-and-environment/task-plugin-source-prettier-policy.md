@@ -41,7 +41,7 @@ Observations from the PR #392 review (`task-playbook-2-0-10-nits`):
       config/ignore or a one-time format), documented.
 - [x] `npm run format` no longer surprises the plugin source.
 - [x] exploration-010 status reflects reality.
-- [ ] `arggon validate` green; CI green.
+- [x] `arggon validate` green; CI green.
 
 ## Notes
 
