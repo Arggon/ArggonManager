@@ -15,7 +15,10 @@
  *   against runMcpServer the same way mcp-parity.test.ts does — the LIVE
  *   surface, never a copy-pasted schema list.
  *
- * Pure report: everything is created under a temp dir that is always removed.
+ * Pure report: everything is created under a per-run temp dir that is always
+ * removed (bug-measure-tmp-hygiene-flake: `mkdtemp` under `$TMPDIR`, so two
+ * concurrent measurement runs — sibling suites on the same machine — cannot
+ * collide with or observe each other's tree).
  * Runs the real CLI from the RUNNING installation (tsx from source in the
  * repo, the installed dist/cli.js in adopter trees — bug-budget-adopter-trees)
  * so bytes are what an agent actually receives.
@@ -205,11 +208,33 @@ export async function measureMcpSchema(): Promise<McpSchemaBudget> {
 }
 
 /**
- * Measure all agent-facing surfaces. Creates a throwaway `init --full` tree
- * under os.tmpdir(), creates the deterministic fixture inside it, measures,
- * and ALWAYS removes the temp tree (the repo's /tmp hygiene history).
+ * Create the measurement tree for ONE run (bug-measure-tmp-hygiene-flake):
+ * `mkdtemp` under `tmpRoot` (default `os.tmpdir()`) with the owning pid in the
+ * prefix. `mkdtemp` guarantees a fresh path per call, so concurrent runs never
+ * share a tree; the caller removes exactly the path returned here — never a
+ * glob over the shared parent.
  */
-export async function measureBudget(): Promise<BudgetResult> {
+export function createMeasurementTree(tmpRoot: string = tmpdir()): string {
+  return mkdtempSync(join(tmpRoot, `arggon-budget-${process.pid}-`));
+}
+
+/** Options for {@link measureBudget} (test seam; not part of the JSON payload). */
+export type MeasureBudgetOptions = {
+  /**
+   * Parent directory for the per-run measurement tree. Defaults to
+   * `os.tmpdir()`; tests pass a private root so hygiene/concurrency assertions
+   * never inspect shared paths (bug-measure-tmp-hygiene-flake).
+   */
+  tmpRoot?: string;
+};
+
+/**
+ * Measure all agent-facing surfaces. Creates a throwaway `init --full` tree
+ * under os.tmpdir() (or `options.tmpRoot`), creates the deterministic fixture
+ * inside it, measures, and ALWAYS removes that exact tree — unique per run and
+ * never a shared path (the repo's /tmp hygiene history).
+ */
+export async function measureBudget(options: MeasureBudgetOptions = {}): Promise<BudgetResult> {
   const cmd = cliCommand();
   const cliEntry = cmd.args[cmd.args.length - 1];
   if (!existsSync(cliEntry)) {
@@ -217,7 +242,7 @@ export async function measureBudget(): Promise<BudgetResult> {
       `budget measurement runs the CLI from the running installation — entry not found: ${cliEntry}`,
     );
   }
-  const dir = mkdtempSync(join(tmpdir(), "arggon-budget-"));
+  const dir = createMeasurementTree(options.tmpRoot);
   try {
     runCli(["init", "--full", "--json"], dir);
     const agentsMd = join(dir, "AGENTS.md");
