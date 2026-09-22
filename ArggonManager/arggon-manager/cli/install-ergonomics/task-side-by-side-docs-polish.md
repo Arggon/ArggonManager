@@ -81,3 +81,7 @@ Evidencia npm 12 (probe aislado /tmp/opencode/npm12-probe, npm 12.0.2):
 - `npm install` en el checkout → root `prepare` corre y construye `dist/`.
 - `npm ci` → también corre el `prepare` raíz (reconstruyó `dist/` tras borrarlo).
 - tras construir, `npm install -g --prefix <p2> .` → bin symlink presente y ejecuta.
+
+### handoff 2026-09-22 @Arggon — next: Coordinator: review the draft PR and merge with a MERGE commit (tracker-carrying branch), then mark done. No worker action pending.
+- branch: feat/task-side-by-side-docs-polish
+- open questions: ¿Se acepta el fix del wording 644/exec-bit (build ahora chmoda 0755) dentro de este PR o se separa?; F3 quedó matizado en el ejemplo de plugin.list.
