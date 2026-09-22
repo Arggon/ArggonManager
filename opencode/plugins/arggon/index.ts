@@ -2887,7 +2887,7 @@ export type { BoardActiveInput, BoardItem, BoardSnapshot, BoardTreeEntry } from 
 
 // `Plugin.define` from `@opencode/plugin` is deliberately not imported: a
 // static import fails to load an auto-discovered plugin in a dependency-less
-// adopter tree (probes on 2.0.7/2.0.8/2.0.10, docs/playbooks/opencode.md), and
+// adopter tree (probes on 2.0.7/2.0.8/2.0.10/2.0.12, docs/playbooks/opencode.md), and
 // the guarded sugar needed a top-level await the single-file bundle cannot
 // carry. The plain definition object is a valid V2 plugin definition and loads
 // identically.
