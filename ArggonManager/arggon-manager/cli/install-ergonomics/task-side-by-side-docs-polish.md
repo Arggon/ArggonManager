@@ -117,3 +117,6 @@ Alcance revisado: `856512b` (docs + .gitignore) + tracker `6e2da1a`/`29c70a7`/`1
 2. npm sugiere la identidad por nombre (`--allow-scripts=arggon-manager` / `npm install-scripts approve <pkg>`); `file:$PWD` funciona (verificado), pero mencionar la forma por nombre ahorraría fricción.
 
 **Nota de entorno:** `tools.arggon.*` no resuelve el tracker v5 en esta sesión (binario global stale: "No tasks/ convention found"); veredicto publicado con el CLI del repo (mismo write path, auto-commit) y pusheado a la rama, como en reviews previos.
+
+### 2026-09-22 @Arggon
+Coordinator note: reviewer verified F1-F4 (frozen prefix ignores rebuilds; npm-12 probe reproduced; .gitignore covers mise.local.toml; the 644→755 correction is accurate and in scope) and CI. Non-blocking nits applied in the closure (copy's prepare wording + friendlier --allow-scripts hint). Gates 1498 tests, lint/validate/spec. Merged with merge commit; item flipped to done.
