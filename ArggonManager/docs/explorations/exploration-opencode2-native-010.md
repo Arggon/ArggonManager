@@ -241,7 +241,8 @@ mechanics).**
 ### F4 — Risks
 
 1. **API churn at 2.0.x.** Native tools/domains are newer than the CLI. Mitigate:
-   pin 2.0.10 in the playbook, feature-detect, keep every path failure-isolated.
+   pin 2.0.12 in the playbook (F1.16), feature-detect, keep every path
+   failure-isolated.
 2. **Bootstrap paradox.** Without a bootstrap artifact there is no `init` to
    generate the seam. A packaged bin (or template repo) must survive even in
    candidate A.
@@ -302,13 +303,15 @@ D2 = contract kept, mechanics native.**
 - **MCP adapter**: drop now vs keep as a conditional export; the directive is
   OpenCode-exclusive, so the default recommendation is drop.
 - **ADR 0006 re-measurement** as the gate for the native-tools wave.
-- **Playbook pin refresh** to 2.0.10 + A/B re-probe (filed as
-  `task-playbook-opencode-2-0-10`).
+- **Playbook pin refresh** to 2.0.10 + A/B re-probe — **landed** 2026-09-20
+  (`task-playbook-opencode-2-0-10`); the 2026-09-21 re-drift refreshed the pin
+  to 2.0.12 (`task-playbook-opencode-2-0-12`, F1.16).
 
 ### Follow-ups filed
 
 - `task-native-adr-0011` — ADR 0011 decision from this exploration.
 - `task-playbook-opencode-2-0-10` — refresh the playbook pin and re-probe.
+- `task-playbook-opencode-2-0-12` — re-drift refresh to 2.0.12 + A/B re-probe.
 
 ## Decision
 

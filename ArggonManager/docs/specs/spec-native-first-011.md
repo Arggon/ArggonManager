@@ -27,8 +27,8 @@ Invariants:
   bytes; tool schemas are measured per wave.
 - **Exclusive runtime** — OpenCode V2 is the target; non-OpenCode clients are
   out of scope (MCP is a conditional adapter, not shipped by default).
-- **Pinned runtime** — OpenCode 2.0.10 (playbook refresh filed as
-  `task-playbook-opencode-2-0-10`).
+- **Pinned runtime** — OpenCode 2.0.12 (playbook refresh filed as
+  `task-playbook-opencode-2-0-12`).
 
 ## Synopsis
 

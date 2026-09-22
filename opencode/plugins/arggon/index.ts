@@ -66,12 +66,12 @@
  *   **literal** dynamic import: the bundle rewrites it to the inlined kernel,
  *   and this repo resolves the workspace package. `@opencode/plugin` is not
  *   imported at all: the documented static import fails to load an
- *   auto-discovered plugin in a dependency-less tree on 2.0.7, 2.0.8 and
- *   2.0.10 (A/B re-probe 2026-09-18,
- *   task-opencode-v2-plugin-import-gotcha; details in docs/playbooks/opencode.md),
- *   and the optional `Plugin.define` sugar is not worth a top-level await in
- *   the bundle. The plain default export below is a valid V2 plugin definition
- *   and loads on 2.0.x without it.
+ *   auto-discovered plugin in a dependency-less tree on 2.0.7, 2.0.8, 2.0.10
+ *   and 2.0.12 (A/B re-probes 2026-09-18, 2026-09-20 and 2026-09-21;
+ *   task-opencode-v2-plugin-import-gotcha; research record in
+ *   docs/playbooks/opencode.md), and the optional `Plugin.define` sugar is not
+ *   worth a top-level await in the bundle. The plain default export below is a
+ *   valid V2 plugin definition and loads on 2.0.x without it.
  *
  * Pure helpers are exported for unit tests
  * (opencode/plugins/arggon/index.test.ts); `onToolAfter` is exported so its
