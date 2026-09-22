@@ -27,3 +27,15 @@ updated: "2026-09-22"
 - [ ] 
 
 ## Notes
+
+### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Context
+
+Cards are sorted lexicographically by id; the kernel's priority field and `next` ranking (claimable + todo + unclaimed + deps terminal, by downstream weight) are invisible in the TUI, so the terminal view cannot answer "what should I pull next?".
+
+## Acceptance
+
+- [ ] `s` cycles sort: id | priority | next-rank (deterministic tie-breaks), applied per column
+- [ ] `r` toggles a ready-only lens using the kernel `isReady`/claim rules (no copied predicate)
+- [ ] Rows surface priority, assignee and blocked markers; the header shows the active sort/lens
+- [ ] Golden tests + pty evidence; README keybindings updated
