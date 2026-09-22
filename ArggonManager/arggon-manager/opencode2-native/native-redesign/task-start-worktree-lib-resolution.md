@@ -292,3 +292,6 @@ los dos tests, docs (`README`, `CONTRIBUTING`, `agents`, `convention`,
   previos.
 
 **Recomendación final: merge con merge commit (nunca squash).**
+
+### 2026-09-22 @Arggon
+Coordinator note: reviewer verified the link farm end-to-end with a real pre-commit gate (branch kernel, no silent fallback, npm ci reifies, cleanup prunes, bare-symlink fallback regression covered). Gates 1490 tests, lint/build/check:plugin/validate/spec; CI pass. Lows filed as task-start-build-exit-visibility. Merged with merge commit; item flipped to done.
