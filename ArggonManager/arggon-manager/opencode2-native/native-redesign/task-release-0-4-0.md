@@ -213,3 +213,6 @@ Template + copia del repo + docs + test actualizados a `npm pack --workspace lib
 - Windows: fixtures `skipIf(win32)` por diseño.
 
 **MERGE — confirmado (merge commit, nunca squash).** Después: merge a `main`, tag `v0.4.0`, publish kernel-first (`npm publish --workspace @arggondev/lib` → `npm publish`), pin `ARGGON_REF: v0.4.0` + re-run `init`, y recién ahí el item a `done`.
+
+### 2026-09-22 @Arggon
+Post-release PR #397 evidence: pin ARGGON_REF v0.4.0 (template + repo copy), README/ci.md one-liner primary, from-checkout recipe kept; review F1-F3 applied (registry statements corrected, docstring updated). Gates 1498 tests, validate, spec validate, headless-ci 6/6; CI pass. Residual: the published 0.4.0 generates ARGGON_REF: opencode2 — the v0.4.0 pin reaches npm adopters with the next publish (0.4.1/follow-up).
