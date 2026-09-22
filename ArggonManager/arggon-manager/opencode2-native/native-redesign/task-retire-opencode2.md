@@ -27,3 +27,24 @@ updated: "2026-09-22"
 - [ ] 
 
 ## Notes
+
+### 2026-09-22 @ses_f34e96524ffeT4C9PcMAtYTyfx
+## Context
+
+`opencode2` = `main` + 2 tracker commits (`b94a64e0` created `bug-stale-vendored-plugin-copy`, `44a4b3fa` commented it) — the only open item in the tracker (284 items: 281 done, 2 cancelled, 1 todo). Zero product diff; the release merged the surface to main.
+
+Product-owner decision (2026-09-22): carry the commits to main and retire the branch.
+
+## Done this session (2026-09-22)
+
+- Merge PR `opencode2` → `main` (merge commit, no squash — it carries tracker auto-commits) lands the stranded bug + this wave's filed items + `exploration-repo-visibility-001`.
+- `origin/opencode2` deleted after the merge.
+
+## Acceptance
+
+- [ ] `bug-stale-vendored-plugin-copy` exists on main (was only on opencode2)
+- [ ] `origin/opencode2` deleted; local worktree/branch cleanup documented (`git worktree list` / `git branch -d`)
+- [ ] CI triggers no longer list `opencode2` in `.github/workflows/ci.yml` and `.github/workflows/arggon.yml` (template `templates/docs/github/workflows/arggon.yml` lands with the next release ref per the release runbook)
+- [ ] Docs no longer present `opencode2` as a live surface (cross-ref `bug-docs-retired-opencode2-split`)
+- [ ] Side-by-side installs section (`opencode2.md` §Side-by-side installs, `task-opencode2-side-by-side-installs`) marked historical or simplified
+- [ ] `arggon validate --json` green
