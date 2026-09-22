@@ -350,27 +350,29 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   injected item block ≤ 1024 B (`ITEM_BLOCK_MAX_BYTES`, per-field clipping),
   MCP `tools/list` ≤ 12,288 B advisory (`task-schema-budget`). The report
   flags crossings inline like `doctor --budget` does.
-- Snapshot (2026-09-20, W4 `task-native-permissions-worktrees` — values move
+- Snapshot (2026-09-21, after the W7 trim + PR #384 skill sync — values move
   when the skills or tool schemas do, so re-run the report before relying on
   them): MCP `tools/list` 10,507 B and the native `arggon` definitions
-  12,182 B (15 tools, 9 pinned) are the dominant costs, generated AGENTS.md
-  ~2.0 KB, advertised descriptions ~0.9 KB total. The W5 skill split cut the on-load skill from 21,955 B (single file) to
-  an 11,942 B fixture umbrella, with the 18,100 B of references paid only when
+  11,821 B (15 tools, 9 pinned) are the dominant costs, generated AGENTS.md
+  2,005 B, advertised descriptions ~0.9 KB total, fixed per-session total
+  25,275 B. The W5 skill split cut the on-load skill from 21,955 B (single
+  file) to a 12,995 B umbrella, with the 20,625 B of references paid only when
   a task needs them. Those skill numbers are **source bytes** (this repo's
   `skills/arggon-cli/`, before marker stamping); the report's on-demand table
-  prints **fixture bytes** after `arggon init` stamping. Compare within one
-  basis, never sum source and fixture numbers. The MCP surface still exists for
-  other clients, so the report keeps measuring it; on the W3 default path it is
-  not registered, so a real adopter session does not pay it. `keep.tokens:
-15000` matches the V2 default: retention is ~2.5x the fixed surface, so keep
-  it unless exact recent detail matters more than new-work headroom.
+  prints **fixture bytes** after `arggon init` stamping (13,059 B umbrella +
+  20,950 B references; the `arggon-upgrade` skill adds 4,250 B when loaded).
+  Compare within one basis, never sum source and fixture numbers. The MCP
+  surface still exists for other clients, so the report keeps measuring it; on
+  the W3 default path it is not registered, so a real adopter session does not
+  pay it. `keep.tokens: 15000` matches the V2 default: retention is ~2.5x the
+  fixed surface, so keep it unless exact recent detail matters more than
+  new-work headroom.
 - **W5 (`task-native-tui`) adds no prompt-side surface.** The TUI panel/sidebar
   registration contributes no tool schema and no instruction or skill bytes, so
-  the measured ADR 0006 surfaces are byte-identical before/after: `AGENTS.md`
-  2,005 B, native `arggon` definitions 12,182 B (15 tools, 9 pinned), MCP
-  `tools/list` 10,507 B, `fixedTotalBytes` 25,636 B, item block ≤ 1,024 B
-  (measured 2026-09-21, `context:report` before/after). The only number that
-  moves is `doctor.initTreeBytes` (411,370 → 434,227 B): the on-disk size of the
+  the ADR 0006 surfaces were byte-identical before/after at W5 (measured
+  2026-09-21, `context:report` before/after; the snapshot above carries the
+  current values after the W7 trim + PR #384). The only number that moved at W5
+  is `doctor.initTreeBytes` (411,370 → 434,227 B): the on-disk size of the
   vendored seam — the bundle now inlines the board surface and the TUI entry is
   vendored beside it — not a model-context surface.
 

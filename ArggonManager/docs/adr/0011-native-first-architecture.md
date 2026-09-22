@@ -58,8 +58,8 @@ and the **one logic path** rule remain.
    `@arggon/lib`._
 6. **Config seam.** The generated `opencode.jsonc` stops writing the MCP
    stanza; it keeps formatter/compaction and, if needed, permission defaults.
-7. **Version policy.** Pin OpenCode 2.0.10 (playbook refresh filed as
-   `task-playbook-opencode-2-0-10`), feature-detect optional surfaces, keep
+7. **Version policy.** Pin OpenCode 2.0.12 (playbook refresh filed as
+   `task-playbook-opencode-2-0-12`), feature-detect optional surfaces, keep
    every path failure-isolated, and re-measure ADR 0006 budgets as the gate of
    the native-tools wave.
 8. **Migration.** `init` provenance semantics upgrade existing adopters; the

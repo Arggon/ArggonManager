@@ -105,7 +105,7 @@ ADR 0006 surfaces it touches.
 
 ## Risks and rollback
 
-- **API churn (2.0.x):** pin 2.0.10, feature-detect every optional surface;
+- **API churn (2.0.x):** pin 2.0.12, feature-detect every optional surface;
   rollback is the previous vendored plugin kept by `init` provenance.
 - **Kernel extraction regressions:** the parity suite gates T1; the CLI stays
   until T7.
