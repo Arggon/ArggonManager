@@ -130,17 +130,19 @@ arggon validate  # Validate tracker frontmatter and tree integrity
 2. **Claim:** `start <id> --assignee <login> [--worktree] [--open-pr]` claims,
    branches, commits, pushes and (with `--worktree`) moves everything into
    `../<repo-name>-<id>`. `--worktree` prepares a fresh worktree before the claim
-   commit (links the primary checkout's `node_modules` when the worktree lacks
-   one — reported as `linkedNodeModules`; the link is untracked, never committed
-   by start, and is removed before a configured `x-worktree.post-start` hook so
-   `npm ci` cannot empty the primary install). That install is the primary's, so
-   workspace packages the worktree also carries (e.g. `@arggon/lib`) resolve into
-   the **primary** copy — reported as `linkedWorkspaces` (re-read after the hook,
-   so a hook that installs locally reports `[]`): build where they resolve, or
-   give the worktree its own install (`npm ci`, e.g. `x-worktree.post-start: npm ci`).
-   A failure never rolls the worktree back: fix the reported cause and re-run
-   `start --worktree` to attach. Claim taken (`START_FAILED`) → pick another item;
-   never `--force`, never steal. Manual fallback:
+   commit: it mirrors the primary checkout's install as a per-worktree link farm
+   (reported as `linkedNodeModules`), points every workspace package the worktree
+   also carries (e.g. `@arggon/lib`) at the **worktree copy**, and pre-builds that
+   copy with the package's own `build` script when its declared entry is missing —
+   so the pre-commit gate loads the branch's kernel (the built names are printed
+   on stdout). A copy that could not be built keeps the primary's copy and is
+   reported as `linkedWorkspaces` (`--json`, re-read after a configured
+   `x-worktree.post-start` hook, so a hook that installs locally reports `[]`);
+   the install is never committed by start and is removed before the hook so
+   `npm ci` cannot empty the primary install. A failure never rolls the worktree
+   back: fix the reported cause and re-run `start --worktree` to attach. Claim
+   taken (`START_FAILED`) → pick another item; never `--force`, never steal.
+   Manual fallback:
    `update <id> --status in_progress --assignee <login>` + `branch <id>`.
 3. **Record findings:** `create task|bug "<title>" --parent <story-id>` — file new
    work instead of growing the PR.
