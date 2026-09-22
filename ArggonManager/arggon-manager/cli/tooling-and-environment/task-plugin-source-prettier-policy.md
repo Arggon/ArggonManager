@@ -13,6 +13,7 @@ updated: "2026-09-22"
 claimed_at: "2026-09-22T01:28:45.565Z"
 worktree_path: /home/arggon/Projects/ArggonManager-opencode2-task-plugin-source-prettier-policy
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-plugin-source-prettier-policy.md
   Leaves live only under a story. id is the filename stem: task-plugin-source-prettier-policy.
@@ -36,12 +37,19 @@ Observations from the PR #392 review (`task-playbook-2-0-10-nits`):
 
 ## Acceptance
 
-- [ ] The plugin-source formatting policy is decided and enforced (prettier
+- [x] The plugin-source formatting policy is decided and enforced (prettier
       config/ignore or a one-time format), documented.
-- [ ] `npm run format` no longer surprises the plugin source.
-- [ ] exploration-010 status reflects reality.
+- [x] `npm run format` no longer surprises the plugin source.
+- [x] exploration-010 status reflects reality.
 - [ ] `arggon validate` green; CI green.
 
 ## Notes
 
 - Filed from the PR #392 review; cosmetic.
+- Decision: keep the authored semicolon-free style — `opencode/plugins/arggon/index.ts`
+  is ignored by `.prettierignore` with the rationale (the generated bundle is what
+  adopters receive, so reformatting only churns ~2.9k lines of history).
+  `prettier --write` on the file is a no-op (sha256 unchanged).
+- `exploration-opencode2-native-010` → `status: decided` with the Decision section
+  linking ADR 0011 (Accepted) and recording that W0–W7 shipped
+  (`spec`/`plan-native-first-011` are `implemented`).

@@ -1,3 +1,12 @@
+# Authored plugin entry source: deliberately written semicolon-free since its
+# first commit, against .prettierrc.json's defaults, so `npm run format` would
+# rewrite the whole file (~2.9k lines) as style-only churn and bury its
+# history. Policy (task-plugin-source-prettier-policy): keep the authored
+# style; the generated bundle is what adopters receive, so formatting this
+# source buys nothing. Do not reformat — the bundle above stays pinned by
+# `npm run check:plugin`.
+opencode/plugins/arggon/index.ts
+
 # Generated plugin bundle: rebuilt by `npm run build:plugin` and pinned
 # byte-for-byte by cli/src/plugin-copy.test.ts / bundle.test.ts. Formatting it
 # would only create drift.

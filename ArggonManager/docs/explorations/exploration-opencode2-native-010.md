@@ -1,7 +1,7 @@
 ---
 exploration_id: exploration-opencode2-native-010
 title: OpenCode2-native ArggonManager — capability audit and native redesign
-status: open
+status: decided
 created: 2026-09-19
 ---
 
@@ -315,4 +315,12 @@ D2 = contract kept, mechanics native.**
 
 ## Decision
 
-<!-- ADR reference placeholder: docs/adr/0011-<slug>.md once the ADR lands. -->
+Adopted — [ADR 0011 — Native-first architecture](../adr/0011-native-first-architecture.md)
+(Accepted 2026-09-19): candidate B (native-first hybrid) with D1 = git-native
+tracker stays canonical and D2 = methodology contract kept, mechanics native;
+MCP dropped from the default path and the kernel shipped as `@arggon/lib`
+([ADR 0013](../adr/0013-lib-package-split.md)). The program's waves all
+shipped — W0–W7 `task-native-*` items done/cancelled (2026-09-19 → 2026-09-21)
+and [spec-native-first-011](../specs/spec-native-first-011.md) /
+[plan-native-first-011](../plans/plan-native-first-011.md) `implemented` — so
+this exploration closes as **decided** (task-plugin-source-prettier-policy).
