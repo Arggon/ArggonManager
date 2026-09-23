@@ -130,3 +130,7 @@ row 1/112 · ↑/↓ line · PgUp/PgDn p…
 1. Docs outside this item's file ownership now describe the old smoke harness: `ArggonManager/docs/engineering.md` §Smoke test ("sends `q`, and asserts the frame carries the five status headers and a seeded item id") and `CONTRIBUTING.md` ("TUI frame check: … the five status headers plus a seeded item id"). The harness now drives a 7-step session ending on the detail pane. One-clause refresh — needs a file owner.
 2. The branch carries the claim + this evidence auto-commit; merge (not squash) per docs/agents.md §0.
 3. Behaviour note for review: `enter` no longer prints the path (the pane carries it); an empty column still shows "(no item selected)".
+
+### handoff 2026-09-23 @ses_f343321d6ffeYUdt96vaXCUSTA (session: ses_f343321d6ffeYUdt96vaXCUSTA) — next: Address PR #410 review comments; coordinator merges (not squash) and flips done. Worktree ../ArggonManager-task-tui-detail-pane
+- branch: feat/task-tui-detail-pane
+- open questions: engineering.md §Smoke test + CONTRIBUTING.md still describe smoke:tui-board as headers+q only (now 7 pane steps) — outside my scope; enter no longer prints the path (pane carries it)
