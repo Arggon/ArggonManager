@@ -14,15 +14,22 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   ARGON_BOARD_PANEL,
+  BOARD_DETAIL_MAX_LINE_CHARS,
   activeBoardId,
   boardCountsLine,
+  boardDetailLines,
   boardHeaderLine,
+  boardItemDetail,
   boardItemLine,
   boardRoot,
   boardSnapshot,
   boardTreeEntries,
   boardTreeLines,
   clipBoardLine,
+  emptyBoardSelection,
+  moveBoardSelection,
+  resolveBoardSelection,
+  selectBoardItem,
   sidebarStatusLine,
   type BoardItem,
   type BoardSnapshot,
@@ -39,12 +46,12 @@ function write(root: string, rel: string, content: string): void {
   writeFileSync(full, content, "utf8");
 }
 
-function item(id: string, fields: Record<string, string>, title: string): string {
+function item(id: string, fields: Record<string, string>, title: string, body?: string): string {
   const frontmatter = Object.entries({ type: "task", status: "todo", id, title, ...fields })
     .filter(([, value]) => value !== "")
     .map(([key, value]) => `${key}: ${value}`)
     .join("\n");
-  return `---\n${frontmatter}\n---\n\n# ${title}\n`;
+  return `---\n${frontmatter}\n---\n\n${body ?? `# ${title}\n`}`;
 }
 
 /**
@@ -80,7 +87,26 @@ function fixture(): string {
   write(
     root,
     `${base}/launch/core/story-a/task-one.md`,
-    item("task-one", { parent: "story-a", priority: "p1" }, "First task"),
+    item(
+      "task-one",
+      { parent: "story-a", priority: "p1" },
+      "First task",
+      [
+        "# First task",
+        "",
+        "<!-- the item template's placement note: authoring metadata, not content -->",
+        "",
+        "## Context",
+        "",
+        "Context line one.",
+        "",
+        "## Acceptance",
+        "",
+        "- [ ] first criterion",
+        "- [x] second criterion",
+        "",
+      ].join("\n"),
+    ),
   );
   write(
     root,
@@ -200,6 +226,7 @@ describe("board snapshot (kernel-backed, display-only)", () => {
       .filter((entry) => String(entry).endsWith(".md"))
       .map((entry) => readFileSync(join(root, "ArggonManager", String(entry)), "utf8"));
     boardSnapshot(root, { branch: "feat/task-one" });
+    boardItemDetail(root, "task-one");
     expect(readdirSync(join(root, "ArggonManager"), { recursive: true }).sort()).toEqual(before);
     expect(
       readdirSync(join(root, "ArggonManager"), { recursive: true })
@@ -271,7 +298,8 @@ describe("board text renderers", () => {
     const taskTwo = lines.find((line) => line.includes("task-two")) ?? "";
     expect(taskTwo).toContain("⌫task-one");
     const taskOne = lines.find((line) => line.includes("T task-one")) ?? "";
-    expect(taskOne.startsWith("      ▶· T task-one")).toBe(true);
+    // The always-present cursor gutter shifts every line one column right.
+    expect(taskOne.startsWith("       ▶· T task-one")).toBe(true);
   });
 
   it("clips to the panel width and bounds the visible tree", () => {
@@ -353,5 +381,210 @@ describe("board text renderers", () => {
     expect(activeBoardId(items, { branch: "feat/ghost" })).toBeNull();
     expect(activeBoardId(items, { branch: "feat/ghost", envItem: "bug-b" })).toBe("bug-b");
     expect(activeBoardId(items, { branch: "feat/task-a", envItem: "ghost" })).toBe("task-a");
+  });
+});
+
+/** Root with no tracker at all (the error-snapshot shape). */
+function emptyRoot(): string {
+  const root = mkdtempSync(join(tmpdir(), "arggon-board-none-"));
+  tmpDirs.push(root);
+  return root;
+}
+
+describe("board selection state machine (pure)", () => {
+  it("seeds on the first line and moves/clamps over the flattened tree", () => {
+    const snapshot = boardSnapshot(fixture());
+    expect(emptyBoardSelection()).toEqual({ index: -1, id: null });
+    // No selection: the first move lands on the first line, never past it.
+    expect(resolveBoardSelection(snapshot, emptyBoardSelection())).toEqual({
+      index: 0,
+      id: "launch",
+    });
+    expect(moveBoardSelection(snapshot, emptyBoardSelection(), "down")).toEqual({
+      index: 0,
+      id: "launch",
+    });
+    expect(moveBoardSelection(snapshot, { index: 0, id: "launch" }, "down")).toEqual({
+      index: 1,
+      id: "core",
+    });
+    expect(moveBoardSelection(snapshot, { index: 0, id: "launch" }, "up")).toEqual({
+      index: 0,
+      id: "launch",
+    });
+    expect(moveBoardSelection(snapshot, { index: 4, id: "task-one" }, "page-down")).toEqual({
+      index: 5,
+      id: "task-two",
+    });
+    expect(moveBoardSelection(snapshot, { index: 5, id: "task-two" }, "page-up")).toEqual({
+      index: 0,
+      id: "launch",
+    });
+    expect(moveBoardSelection(snapshot, { index: 0, id: "launch" }, "last")).toEqual({
+      index: 5,
+      id: "task-two",
+    });
+    expect(moveBoardSelection(snapshot, { index: 5, id: "task-two" }, "first")).toEqual({
+      index: 0,
+      id: "launch",
+    });
+    // A stale index (the tree shrank) clamps before the move.
+    expect(moveBoardSelection(snapshot, { index: 99, id: "ghost" }, "up")).toEqual({
+      index: 4,
+      id: "task-one",
+    });
+  });
+
+  it("resolves a reload by id first and falls back to the clamped index", () => {
+    const snapshot = boardSnapshot(fixture());
+    // The item still exists: the id wins over the (possibly stale) index.
+    expect(resolveBoardSelection(snapshot, { index: 0, id: "task-two" })).toEqual({
+      index: 5,
+      id: "task-two",
+    });
+    expect(resolveBoardSelection(snapshot, { index: 3, id: "bug-three" })).toEqual({
+      index: 3,
+      id: "bug-three",
+    });
+    // The item is gone: the previous position clamps into the new tree.
+    expect(resolveBoardSelection(snapshot, { index: 2, id: "ghost" })).toEqual({
+      index: 2,
+      id: "story-a",
+    });
+  });
+
+  it("jumps to an id (next/active) and stays total on empty snapshots", () => {
+    const snapshot = boardSnapshot(fixture());
+    expect(selectBoardItem(snapshot, "task-two")).toEqual({ index: 5, id: "task-two" });
+    expect(selectBoardItem(snapshot, snapshot.nextId)).toEqual({ index: 4, id: "task-one" });
+    expect(selectBoardItem(snapshot, "ghost")).toBeNull();
+    expect(selectBoardItem(snapshot, null)).toBeNull();
+    expect(selectBoardItem(snapshot, "  ")).toBeNull();
+
+    const empty = boardSnapshot(emptyRoot());
+    expect(resolveBoardSelection(empty, { index: 3, id: "task-one" })).toEqual(
+      emptyBoardSelection(),
+    );
+    expect(moveBoardSelection(empty, { index: 3, id: "task-one" }, "down")).toEqual(
+      emptyBoardSelection(),
+    );
+    expect(selectBoardItem(empty, "task-one")).toBeNull();
+  });
+});
+
+describe("board inline detail block (kernel-backed, bounded, sanitized)", () => {
+  it("reads the acceptance rows and body through the kernel's show path", () => {
+    const root = fixture();
+    const detail = boardItemDetail(root, "task-one");
+    expect(detail.error).toBeNull();
+    expect(detail.id).toBe("task-one");
+    expect(detail.title).toBe("First task");
+    expect(detail.path).toContain("task-one.md");
+    // Checklist order and marks are preserved; the template's HTML comment and
+    // the H1 (already rendered as `id — title`) are authoring metadata.
+    expect(detail.acceptance).toEqual(["[ ] first criterion", "[x] second criterion"]);
+    expect(detail.acceptanceDone).toBe(1);
+    expect(detail.acceptanceTotal).toBe(2);
+    expect(detail.body).toEqual(["## Context", "", "Context line one.", "", "## Acceptance"]);
+    expect(detail.truncated).toBe(false);
+
+    // Embedded under the selected line as one width-clipped block.
+    const lines = boardTreeLines(boardSnapshot(root), {
+      width: 60,
+      selection: { index: 4, id: "task-one" },
+      detail,
+    });
+    const treeIndex = lines.findIndex((line) => line.includes("T task-one — First task"));
+    expect(treeIndex).toBeGreaterThan(0);
+    expect(lines[treeIndex]?.startsWith("❯")).toBe(true);
+    expect(lines.slice(treeIndex + 1, treeIndex + 9)).toEqual([
+      "  ┌ argon detail · task-one — First task",
+      "  │ [ ] first criterion",
+      "  │ [x] second criterion",
+      "  │ ## Context",
+      "  │",
+      "  │ Context line one.",
+      "  │",
+      "  │ ## Acceptance",
+    ]);
+    expect(lines[treeIndex + 9]?.startsWith("  └ 1/2 acceptance")).toBe(true);
+    for (const line of lines) expect(line.length).toBeLessThanOrEqual(60);
+  });
+
+  it("escapes hostile bytes and bounds rows by the shared budget", () => {
+    const root = fixture();
+    const base = "ArggonManager/arggon-manager/launch/core/story-a";
+    write(
+      root,
+      `${base}/task-long.md`,
+      item(
+        "task-long",
+        { parent: "story-a" },
+        "Long task",
+        [
+          "# Long task",
+          ...Array.from({ length: 40 }, (_, index) => `body row ${index + 1} \u001b[31m`),
+          "x".repeat(BOARD_DETAIL_MAX_LINE_CHARS * 2),
+          "",
+          "- [ ] one",
+          "- [ ] two",
+        ].join("\n"),
+      ),
+    );
+    const detail = boardItemDetail(root, "task-long", { rows: 6 });
+    expect(detail.error).toBeNull();
+    expect(detail.truncated).toBe(true);
+    expect(detail.acceptance).toEqual(["[ ] one", "[ ] two"]);
+    expect(detail.body).toHaveLength(4); // 6-row budget shared with acceptance
+    expect(detail.acceptanceTotal).toBe(2);
+
+    const block = boardDetailLines(detail, { width: 80 });
+    expect(block.some((line) => line.includes("more row(s) omitted"))).toBe(true);
+    const hostile = block.find((line) => line.includes("body row 1")) ?? "";
+    expect(hostile).toContain("\\u001b[31m");
+    for (const line of block) {
+      expect(line.length).toBeLessThanOrEqual(80);
+      expect(line).not.toContain("\u001b");
+      expect(line).not.toContain("\n");
+    }
+    // Without a width the per-row raw bound still holds (prefix + row + ellipsis).
+    for (const line of boardDetailLines(detail)) {
+      expect(line.length).toBeLessThanOrEqual(BOARD_DETAIL_MAX_LINE_CHARS + 4);
+    }
+  });
+
+  it("degrades to an error block instead of throwing (missing item, corrupt tracker)", () => {
+    const root = fixture();
+    const missing = boardItemDetail(root, "ghost");
+    expect(missing.error).toContain("detail unavailable");
+    expect(missing.error).toContain("not found");
+    expect(missing.acceptance).toEqual([]);
+    expect(missing.body).toEqual([]);
+    expect(boardDetailLines(missing)).toEqual([
+      "  ┌ argon detail · ghost",
+      expect.stringContaining("  └ detail unavailable"),
+    ]);
+
+    // The P1 corrupt-tracker guard applies to the detail read too.
+    const corrupt = boardItemDetail(corruptFixture(), "dup");
+    expect(corrupt.error).toContain("detail unavailable");
+    expect(corrupt.error).toContain("Duplicate id 'dup'");
+
+    expect(boardItemDetail(emptyRoot(), "task-one").error).toContain("detail unavailable");
+    // No selection: never reads, never throws.
+    expect(boardItemDetail(root, "  ").error).toContain("no selected item");
+  });
+
+  it("keeps the tree window on the selection beyond the entry cap", () => {
+    const snapshot = boardSnapshot(fixture());
+    const lines = boardTreeLines(snapshot, {
+      limit: 3,
+      selection: { index: 5, id: "task-two" },
+    });
+    // header + counts + head marker + 3 entries (the window ends at the last row)
+    expect(lines).toHaveLength(6);
+    expect(lines[2]).toBe("… 3 earlier item(s)");
+    expect(lines[5]?.startsWith("❯")).toBe(true);
+    expect(lines[5]).toContain("T task-two");
   });
 });

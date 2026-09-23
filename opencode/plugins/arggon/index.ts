@@ -2867,12 +2867,18 @@ function dispose(registration: unknown): void {
 // `cli/src/plugin-bundle.ts` (the emitted wrapper forwards every named export).
 export {
   ARGON_BOARD_PANEL,
+  BOARD_DETAIL_MAX_LINE_CHARS,
+  BOARD_DETAIL_MAX_ROWS,
+  BOARD_SELECTION_MARK,
+  BOARD_SELECTION_PAGE,
   BOARD_STATUS_MARKS,
   BOARD_STATUS_ORDER,
   BOARD_TYPE_BADGES,
   activeBoardId,
   boardCountsLine,
+  boardDetailLines,
   boardHeaderLine,
+  boardItemDetail,
   boardItemLine,
   boardRoot,
   boardSnapshot,
@@ -2880,10 +2886,23 @@ export {
   boardTreeLines,
   clipBoardLine,
   countBoardStatuses,
+  emptyBoardSelection,
   emptyBoardSnapshot,
+  moveBoardSelection,
+  resolveBoardSelection,
+  selectBoardItem,
   sidebarStatusLine,
 } from "./board.js"
-export type { BoardActiveInput, BoardItem, BoardSnapshot, BoardTreeEntry } from "./board.js"
+export type {
+  BoardActiveInput,
+  BoardItem,
+  BoardItemDetail,
+  BoardSelection,
+  BoardSelectionMove,
+  BoardSnapshot,
+  BoardTreeEntry,
+  BoardTreeOptions,
+} from "./board.js"
 
 // `Plugin.define` from `@opencode/plugin` is deliberately not imported: a
 // static import fails to load an auto-discovered plugin in a dependency-less
