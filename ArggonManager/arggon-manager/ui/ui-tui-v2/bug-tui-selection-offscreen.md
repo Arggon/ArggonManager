@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-tui-selection-offscreen
 title: "TUI selection can leave the screen: no scroll window in long columns"
+assignee: Arggon
+branch: fix/bug-tui-selection-offscreen
 parent: ui-tui-v2
 labels: [tui, ui]
 priority: p1
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-23"
+claimed_at: "2026-09-23T00:00:53.024Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-tui-selection-offscreen
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-tui-v2/bug-tui-selection-offscreen.md
