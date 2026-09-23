@@ -103,3 +103,16 @@ The shared view-model (task-ui-shared-viewmodel, merged in PR #400) is now avail
 ### handoff 2026-09-23 @ses_f346f75d6ffe4HZG1eZrsa7E8i (session: ses_f346f75d6ffe4HZG1eZrsa7E8i) — next: Review PR #406 (CI green: cli, ui-smoke, tasks-validate) on head 0a70e6fc; drive board --serve and click a lens chip; merge (not squash) and rebase sibling wave-1 PRs.
 - branch: feat/task-board-filter-lenses
 - open questions: parent: could join v1 cheaply (deliberately excluded); typed assignee:@me needs env/gh at generation time; @me resolution is baked per generated file by design.
+
+### 2026-09-23 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Coordinator review — PASS (lead architect) + merge verification
+
+PR #406 (rebase-merged; auto-done #409 marked this item done).
+
+**Independent verification.** Focused suites: 77 passed (board 52 + parity 13 + serve 12); `npx playwright test --grep @smoke` → **5/5 passed** in a real Chromium, including the offline static-export filter case. Code review: `applyBoardFilter` is a self-contained mirror stringified into the page (evaluateDrop pattern); the parity suite proves embedded source === TS source === `runList` over the expression table and refuses malformed expressions; the kernel-only dependency predicates are refused with a kernel pointer (documented divergence, parity-asserted); `x-views` + `@me` are generation-time reads (the static export has no server); serve re-reads views per render and degrades on malformed config; URL hash state; no `lib/**`, no plugin bundle, no new CLI flags, no JSON field changes; README + json-output board section updated.
+
+**Acceptance verified:** filter/search control in the static export and serve; saved views as lens chips; URL round-trip (share/reload/copy) and clean clear; per-column counts follow the filtered set; clean degradation without `x-views`; tests + browser smoke; docs. The item's pre-claim note (only the documented non-dependency subset) was honored.
+
+**Note:** the worker's evidence comments had landed on the primary checkout (not the branch) and would have been lost by the rebase-merge; recovered into main as `b16bf0a3` before this verdict.
+
+Follow-up filed: `task-board-filter-dep-predicates` (p3) — enable `parent:`, `depends-on:`, `blocked-by:` and readiness now that the dual-shape lens is merged.
