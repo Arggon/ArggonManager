@@ -5,9 +5,9 @@ id: bug-native-start-worktree-no-install
 title: tools.arggon.start --worktree skips the claim commit in a fresh worktree (no install prepared)
 parent: native-redesign
 labels: [opencode-seam, worktree]
-priority: p2
+priority: p1
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-23"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-native-start-worktree-no-install.md
