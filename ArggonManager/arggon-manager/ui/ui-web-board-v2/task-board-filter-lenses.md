@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-board-filter-lenses
 title: "Web board filter lenses: search, saved x-views and URL state"
+assignee: Arggon
+branch: feat/task-board-filter-lenses
 parent: ui-web-board-v2
 labels: [viewer, board, ui]
 priority: p1
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-23"
+claimed_at: "2026-09-23T00:03:48.069Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-board-filter-lenses
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-filter-lenses.md
