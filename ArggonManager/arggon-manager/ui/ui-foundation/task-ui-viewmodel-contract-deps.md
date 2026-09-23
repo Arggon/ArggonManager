@@ -85,3 +85,7 @@ Other gates (post-commit): `npm run lint` exit 0 · `npm run build` exit 0 (lib 
 
 - PR #404 · head a0786746415d46ab3da63f7d199e8de54af9a84d · CI: cli pass (4m28s, includes the plugin drift gate), tasks-validate pass, ui-smoke pass.
 - Open questions: none for this item. Process note: the fresh worktree hit the known `bug-native-start-worktree-no-install` (claim commit skipped, `tsx: command not found`); `npm ci` + manual claim commit 3b68d6de fixed it, no `--no-verify` used.
+
+### handoff 2026-09-23 @ses_f346f75cfffe3Ysb3GZMLd5VJw (session: ses_f346f75cfffe3Ysb3GZMLd5VJw) — next: Coordinator: review PR #404 (gates green), paste the consumption-form paragraph into task-board-filter-lenses, merge, then flip task-ui-viewmodel-contract-deps done.
+- branch: feat/task-ui-viewmodel-contract-deps
+- open questions: None blocking; the 'task-board-filter-lenses consumes the chosen form' acceptance box is a coordinator note, not code in this PR.
