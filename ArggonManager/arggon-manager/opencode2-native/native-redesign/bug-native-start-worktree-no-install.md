@@ -47,3 +47,14 @@ The CLI path (`arggon start --worktree`) prepares the worktree's install before 
 - [ ] Decide and document the native path's install contract in `ArggonManager/docs/agents.md` §Orchestration and the OpenCode playbook (what `tools.arggon.start` guarantees about the worktree install)
 - [ ] Regression coverage for the native path (unit or smoke scenario) — a fresh worktree must not silently lose its claim commit
 - [ ] `npm test`, `npm run check:plugin`, `arggon validate` green on the fix
+
+### 2026-09-23 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Wave 1 occurrences (coordinator, 2026-09-22)
+
+All three wave-1 workers hit this in fresh worktrees; consolidated evidence:
+
+1. `bug-tui-selection-offscreen` (PR #405): claim commit skipped; worker ran `npm ci` and committed the claim manually (`28f1b139`).
+2. `task-board-filter-lenses` (PR #406): same; manual claim commit `207ef781`.
+3. `task-ui-viewmodel-contract-deps` (PR #404): same; manual claim commit `3b68d6de`.
+
+So the trap is reproducible (3/3) on a cold `node_modules`: `tools.arggon.start({worktree:true})` creates the worktree/branch and pushes, but the wired pre-commit gate cannot run there and the claim commit is silently absent from the result. The CLI path prepares a link farm for exactly this (`linkedNodeModules`); the native tool path either skipped that preparation or did not surface its failure. Consider raising the priority if the native start path stays the default for workers.
