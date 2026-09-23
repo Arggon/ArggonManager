@@ -10,7 +10,6 @@ labels: [tui, ui]
 priority: p1
 created: "2026-09-22"
 updated: "2026-09-23"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-tui-selection-offscreen
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-tui-v2/bug-tui-selection-offscreen.md
