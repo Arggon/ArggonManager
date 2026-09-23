@@ -12,12 +12,14 @@ import { renderBoardHtml } from "./board.js";
 import {
   clampTuiState,
   clipLine,
+  followTuiScroll,
   handleKey,
   initialTuiState,
   loadTuiItems,
   renderTui,
   runTuiBoard,
   selectedTuiItem,
+  tuiBodyRows,
   tuiColumnCounts,
   tuiDepBlocked,
   visibleTuiItems,
@@ -85,7 +87,9 @@ describe("renderTui golden (80x8, color off)", () => {
       " ".repeat(80),
       " ".repeat(80),
       " ".repeat(80),
-      "←/→ column · ↑/↓ card · / search · enter path · q quit" + " ".repeat(26),
+      // The position leads (bug-tui-selection-offscreen); at 80 columns the
+      // tail of the key help is clipped, never the position.
+      "row 1/2 · ←/→ column · ↑/↓ card · PgUp/PgDn page · home/end · / search · enter …",
     ]);
   });
 
@@ -139,11 +143,17 @@ describe("renderTui golden (80x8, color off)", () => {
     state = handleKey(state, "b");
     expect(lines(renderTui(THREE, state, { color: false }))[7]).toContain("/b█");
     state = handleKey(state, "\r");
-    // After applying the filter the footer is help again; Enter shows a path.
-    expect(lines(renderTui(THREE, state, { color: false }))[7]).toContain("enter path");
-    const withPath = handleKey(initialTuiState(80, 8), "\r", [], "tasks/x/bug-beta.md");
+    // After applying the filter the footer is the position + help again (the
+    // help tail clips at 80 columns); Enter shows a path.
+    expect(lines(renderTui(THREE, state, { color: false }))[7]).toContain("row 1/1 · ←/→ column");
+    const withPath = handleKey(
+      initialTuiState(80, 8),
+      "\r",
+      [2, 1, 0, 0, 0],
+      "tasks/x/bug-beta.md",
+    );
     expect(lines(renderTui(THREE, withPath, { color: false }))[7]).toBe(
-      "tasks/x/bug-beta.md" + " ".repeat(61),
+      "row 1/2 · tasks/x/bug-beta.md".padEnd(80, " "),
     );
   });
 
@@ -288,6 +298,159 @@ describe("clampTuiState and selection helpers", () => {
   });
 });
 
+// ---------- scroll window (bug-tui-selection-offscreen) ----------
+
+/** Long single-status column: ids sort lexicographically in creation order. */
+function longColumn(n: number, status: WorkItem["status"] = "todo"): WorkItem[] {
+  return Array.from({ length: n }, (_, i) =>
+    item({
+      id: `demo-${String(i).padStart(2, "0")}`,
+      type: "task",
+      status,
+      title: `Demo item ${i}`,
+    }),
+  );
+}
+
+const LONG = longColumn(30);
+
+describe("tuiBodyRows / followTuiScroll", () => {
+  it("derives the body height from the frame geometry", () => {
+    expect(tuiBodyRows(24)).toBe(21);
+    expect(tuiBodyRows(8)).toBe(5);
+    expect(tuiBodyRows(3)).toBe(0);
+    expect(tuiBodyRows(1)).toBe(0);
+  });
+
+  it("keeps the selection inside the window and never pages past the end", () => {
+    // 30 cards, 21 rows: the last full page starts at index 9.
+    expect(followTuiScroll(0, 0, 30, 21)).toBe(0);
+    expect(followTuiScroll(20, 0, 30, 21)).toBe(0); // still the last visible row
+    expect(followTuiScroll(21, 0, 30, 21)).toBe(1); // one past the window
+    expect(followTuiScroll(29, 0, 30, 21)).toBe(9); // last page, no overshoot
+    expect(followTuiScroll(29, 9, 30, 21)).toBe(9); // idempotent
+    expect(followTuiScroll(0, 9, 30, 21)).toBe(0); // back to the top
+    // Short column: never show empty space while items exist.
+    expect(followTuiScroll(3, 5, 5, 21)).toBe(0);
+    // Degenerate geometry.
+    expect(followTuiScroll(3, 4, 0, 21)).toBe(0);
+    expect(followTuiScroll(3, 4, 10, 0)).toBe(0);
+  });
+});
+
+describe("TUI scroll window (bug-tui-selection-offscreen)", () => {
+  it("renders the highlighted row when the selection is at the bottom of a long column", () => {
+    const counts = tuiColumnCounts(LONG, "");
+    let state = initialTuiState(200, 24); // 21 body rows
+    for (let i = 0; i < 29; i++) state = handleKey(state, "\x1b[B", counts);
+    expect(state.card).toBe(29);
+    expect(state.scroll).toBe(9);
+    const frame = renderTui(LONG, state);
+    // Exactly one body highlight (the column header uses `1;7`, not `7`).
+    expect((frame.match(/\x1b\[7m/g) ?? []).length).toBe(1);
+    expect(frame).toContain("\x1b[7m> T demo-29 Demo item 29");
+    expect(frame).toContain("  T demo-09 Demo item 9"); // first window row
+    expect(frame).not.toContain("demo-08");
+    expect(lines(frame)[23]).toContain("row 30/30");
+  });
+
+  it("keeps the 80x24 repro frame on the selected card (no stale top-of-column window)", () => {
+    const counts = tuiColumnCounts(LONG, "");
+    let state = initialTuiState(80, 24);
+    for (let i = 0; i < 25; i++) state = handleKey(state, "\x1b[B", counts);
+    expect(state.card).toBe(25);
+    expect(state.scroll).toBe(5); // 25 - 21 + 1
+    const frame = renderTui(LONG, state);
+    expect((frame.match(/\x1b\[7m/g) ?? []).length).toBe(1);
+    expect(frame).toContain("\x1b[7m> T demo-25 Dem…");
+    expect(frame).not.toContain("demo-04"); // the window no longer starts at 0
+    expect(lines(frame)[23]).toContain("row 26/30");
+  });
+
+  it("PgDn/PgUp/Home/End page the column without overshoot or empty pages", () => {
+    const counts = tuiColumnCounts(LONG, "");
+    let state = initialTuiState(200, 24); // page = 21 rows
+    state = handleKey(state, "\x1b[6~", counts); // PgDn
+    expect(state.card).toBe(21);
+    expect(state.scroll).toBe(1);
+    state = handleKey(state, "\x1b[6~", counts); // PgDn again: last card, last page
+    expect(state.card).toBe(29);
+    expect(state.scroll).toBe(9);
+    state = handleKey(state, "\x1b[6~", counts); // no overshoot past the end
+    expect(state.card).toBe(29);
+    expect(state.scroll).toBe(9);
+    state = handleKey(state, "\x1b[5~", counts); // PgUp: one page back
+    expect(state.card).toBe(8);
+    expect(state.scroll).toBe(8);
+    state = handleKey(state, "\x1b[F", counts); // End (xterm)
+    expect(state.card).toBe(29);
+    expect(state.scroll).toBe(9);
+    state = handleKey(state, "\x1b[4~", counts); // End (vt220)
+    expect(state.card).toBe(29);
+    expect(state.scroll).toBe(9);
+    state = handleKey(state, "\x1b[1~", counts); // Home (vt220)
+    expect(state.card).toBe(0);
+    expect(state.scroll).toBe(0);
+    state = handleKey(state, "\x1b[H", counts); // Home (xterm)
+    expect(state.card).toBe(0);
+    expect(state.scroll).toBe(0);
+    state = handleKey(state, "\x1b[5~", counts); // PgUp at the top stays put
+    expect(state.card).toBe(0);
+    expect(state.scroll).toBe(0);
+  });
+
+  it("keeps the window valid after a resize (both directions)", () => {
+    const counts = tuiColumnCounts(LONG, "");
+    let state = initialTuiState(200, 24);
+    for (let i = 0; i < 29; i++) state = handleKey(state, "\x1b[B", counts);
+    expect(state.scroll).toBe(9);
+
+    // Grow: the whole column fits, so the window starts at the top.
+    const grown = clampTuiState({ ...state, height: 42 }, counts);
+    expect(grown.card).toBe(29);
+    expect(grown.scroll).toBe(0);
+    const grownFrame = renderTui(LONG, grown, { color: false });
+    expect(grownFrame).toContain("demo-00");
+    expect(grownFrame).toContain("> T demo-29");
+
+    // Shrink: the window pulls back so the last page stays full.
+    const shrunk = clampTuiState({ ...state, height: 10 }, counts);
+    expect(shrunk.card).toBe(29);
+    expect(shrunk.scroll).toBe(23); // 30 - 7 body rows
+    const shrunkFrame = renderTui(LONG, shrunk, { color: false });
+    expect(shrunkFrame).not.toContain("demo-22");
+    expect(shrunkFrame).toContain("> T demo-29");
+  });
+
+  it("keeps the window valid after a filter shrinks the column", () => {
+    const counts = tuiColumnCounts(LONG, "");
+    let state = initialTuiState(200, 24);
+    for (let i = 0; i < 29; i++) state = handleKey(state, "\x1b[B", counts);
+    expect(state.scroll).toBe(9);
+
+    const filteredCounts = tuiColumnCounts(LONG, "demo-2"); // demo-20..demo-29
+    expect(filteredCounts[0]).toBe(10);
+    const next = clampTuiState({ ...state, filter: "demo-2" }, filteredCounts);
+    expect(next.card).toBe(9);
+    expect(next.scroll).toBe(0);
+    const frame = renderTui(LONG, next, { color: false });
+    expect(frame).toContain("> T demo-29 Demo item 29");
+    expect(frame).toContain("demo-20");
+    expect(frame).toContain("row 10/10");
+  });
+
+  it("shows the position in the footer and follows the selection", () => {
+    const counts = tuiColumnCounts(LONG, "");
+    let state = initialTuiState(200, 24);
+    expect(lines(renderTui(LONG, state, { color: false }))[23]).toContain("row 1/30");
+    for (let i = 0; i < 29; i++) state = handleKey(state, "\x1b[B", counts);
+    expect(lines(renderTui(LONG, state, { color: false }))[23]).toContain("row 30/30");
+    // Empty column: an honest zero instead of a stale row.
+    const empty = { ...state, column: 3 };
+    expect(lines(renderTui(LONG, empty, { color: false }))[23]).toContain("row 0/0");
+  });
+});
+
 // ---------- data parity with list / board (kernel read path) ----------
 
 function writeItem(root: string, rel: string, frontmatter: Record<string, string>): void {
@@ -428,6 +591,61 @@ describe("runTuiBoard loop", () => {
         output: notTty,
       }),
     ).rejects.toThrow("board --tui requires an interactive terminal");
+  });
+});
+
+/** newTree() plus 30 todo tasks (demo-00..demo-29) to force a scroll window. */
+function longTree(): string {
+  const root = newTree();
+  for (let i = 0; i < 30; i++) {
+    const id = `demo-${String(i).padStart(2, "0")}`;
+    writeItem(root, `tasks/launch/epic-a/story-login/${id}.md`, {
+      type: "task",
+      status: "todo",
+      id,
+      parent: "story-login",
+      title: `Demo item ${i}`,
+    });
+  }
+  return root;
+}
+
+describe("runTuiBoard scroll window (bug-tui-selection-offscreen)", () => {
+  it("pages with PgDn/End (CSI keys) and keeps the window valid across a resize", async () => {
+    const root = longTree();
+    const todoCount = tuiColumnCounts(loadTuiItems(root).items, "")[0]!;
+    const term = fakeTerminal();
+    term.output.columns = 200; // wide: card ids render unclipped
+    term.output.rows = 24; // 21 body rows
+    const done = runTuiBoard({ cwd: root, input: term.input, output: term.output });
+    const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 25));
+    term.input.write("\x1b[6~"); // PgDn: one full body page
+    await tick();
+    term.input.write("\x1b[F"); // End: last card
+    await tick();
+    term.output.rows = 10; // shrink: 7 body rows
+    term.output.emit("resize");
+    await tick();
+    term.input.write("q");
+    await done;
+
+    const text = term.outputText();
+    expect(text).toContain("row 1/" + todoCount); // initial frame
+    // PgDn moved the window and kept the highlighted row in the frame (the
+    // old 3-char splitter cut `\x1b[6~` into unknown keys and did nothing).
+    expect(text).toContain("row 22/" + todoCount);
+    expect(text).toContain("\x1b[7m> T demo-21 Demo item 21");
+    expect(text).toContain("row " + todoCount + "/" + todoCount); // End
+    expect(text).toContain("\x1b[7m> T task-rate-limit Add rate limiting");
+    // Last frame = after the resize: full height, window pulled back, selected
+    // row drawn.
+    const frames = text.split("\x1b[H\x1b[2J").slice(1);
+    const lastLines = lines(`\x1b[H\x1b[2J${frames[frames.length - 1] ?? ""}`);
+    expect(lastLines.length).toBe(10);
+    const body = lastLines.join("\n");
+    expect(body).toContain("row " + todoCount + "/" + todoCount);
+    expect(body).toContain("\x1b[7m> T task-rate-limit Add rate limiting");
+    expect(body).not.toContain("demo-19"); // window starts after demo-25
   });
 });
 
