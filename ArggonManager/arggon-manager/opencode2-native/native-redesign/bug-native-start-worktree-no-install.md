@@ -58,3 +58,14 @@ All three wave-1 workers hit this in fresh worktrees; consolidated evidence:
 3. `task-ui-viewmodel-contract-deps` (PR #404): same; manual claim commit `3b68d6de`.
 
 So the trap is reproducible (3/3) on a cold `node_modules`: `tools.arggon.start({worktree:true})` creates the worktree/branch and pushes, but the wired pre-commit gate cannot run there and the claim commit is silently absent from the result. The CLI path prepares a link farm for exactly this (`linkedNodeModules`); the native tool path either skipped that preparation or did not surface its failure. Consider raising the priority if the native start path stays the default for workers.
+
+### 2026-09-23 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Wave 2 occurrences (coordinator, 2026-09-22)
+
+All three wave-2 workers hit it again in fresh worktrees — 3/3, six total across waves 0–1:
+
+1. `task-board-item-detail` (PR #412): manual claim `a54f4580`.
+2. `task-tui-detail-pane` (PR #410): manual claim `6719188a`.
+3. `task-native-panel-interaction` (PR #411): manual claim `dfef2442`.
+
+Every occurrence costs a manual `npm ci` + claim commit and the tool result stays silent about the skipped claim. Raising priority to p1: this is the default worker path for every orchestrated item.
