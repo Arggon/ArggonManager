@@ -50,3 +50,53 @@ Impact: any column with more cards than the terminal body height (every mature t
 - [ ] PgUp/PgDn (and Home/End) scroll predictably; the footer shows the position (e.g. `row 61/281`)
 - [ ] Golden tests cover: selection at the bottom of a long column renders the highlighted row; window stays valid after resize and after filters change
 - [ ] pty evidence (before/after) in the review verdict; README keybindings updated
+
+### 2026-09-23 @ses_f346f75d7ffe1ji5AVdwAh8Ewo
+## Implementation (PR #405, branch `fix/bug-tui-selection-offscreen`, head `a203305b`)
+
+Scroll window over the selected column, pure and golden-tested:
+
+- `TuiState.scroll` (window start) + exported `followTuiScroll(card, scroll, count, rows)` and `tuiBodyRows(height)`; `renderTui` re-derives the window per frame (so a frame is always valid), `clampTuiState` re-derives it after filters/resize/tree re-reads.
+- `PgUp`/`PgDn` page the selection, `Home`/`End` jump to the column edges (xterm/vt220/rxvt sequences); the CSI splitter now reads whole escape sequences (`\x1b[6~` used to split into unknown keys), `↑`/`↓` clamp to the column count when counts are known.
+- Footer leads with the position in every mode (`row 61/281 · …`), so narrow terminals clip the help tail, never the position.
+- `runTuiBoard` stays wiring-only (re-read before clamp, re-clamp on resize); zero writes, raw ANSI, no new deps (ADR 0001); per-cell padding + id/title sanitization untouched; filter/search behavior unchanged.
+
+## Gates (all run in the worktree)
+
+- `npm test` → 95 files / **1542 tests passed** (41 in `cli/src/tui.test.ts`).
+- `npm run lint` → clean. `npm run build` → clean; committed plugin bundle unchanged (no drift).
+- `npm run arggon -- validate --json` → `{"ok":true,...,"errors":[],"warnings":[]}`.
+- `npm run smoke:tui-board` → passed (frame carries the five status headers + seeded id).
+- CI on `a203305b`: `cli` pass (4m29s), `tasks-validate` pass (37s), `ui-smoke` pass (1m35s) — runs 35801209730 / 35801209776.
+
+## Acceptance evidence
+
+- Scroll window keeps the selected card visible, no paging past the end, no empty rows while items exist: `followTuiScroll` unit cases + goldens (bottom of a 30-card column at 200x24 and the 80x24 repro; resize grow/shrink; filter shrink to 10 cards → `row 10/10`).
+- PgUp/PgDn/Home/End + footer position: golden paging test (no overshoot at either edge, `PgUp` at the top stays put) and a loop-level test driving `PgDn`/`End` as single CSI keys through `runTuiBoard` plus a resize.
+- pty evidence + README keybinding table (below).
+
+## Before / after pty (`script`-driven, 160x42, this tracker, done column 284 cards, `→`x3 + `↓`x60)
+
+BEFORE (base `e1ccacfc`, built from `git show e1ccacfc:cli/src/tui.ts`):
+```
+body highlights (\x1b[7m) in last frame: 0
+done first body row: "  E agent-coordination agent-co…"   <- window still starts at row 0
+done last body row:  "  B bug-scaffold-empty-files sc…"
+footer: "←/→ column · ↑/↓ card · / search · enter path · q quit"
+```
+
+AFTER (same fixture, same keys):
+```
+body highlights (\x1b[7m) in last frame: 1
+done first body row: "  B bug-convention-config-scala…"   <- window follows the selection (start 22)
+done last body row:  "> I scale-adoption Scale adopti…"   <- selected card drawn + highlighted
+footer: "row 61/284 · ←/→ column · ↑/↓ card · PgUp/PgDn page · home/end · / search · enter path · q quit"
+```
+
+AFTER (`→`x3, `PgDn`, `PgDn`, `End`): highlighted cell `"> E views Views and filtering"`, footer `row 284/284 · …`.
+
+## Notes / open questions
+
+- Known issue `bug-native-start-worktree-no-install` hit: `start --worktree` skipped the claim commit (`tsx: command not found`); ran `npm ci` in the worktree and committed the claim manually (`28f1b139`).
+- Pre-existing, not addressed: a CSI sequence split across two stdin chunks (a lone trailing `ESC` in one chunk) is still treated as the Esc key; terminals write sequences atomically in practice, so the fix keeps the per-chunk parser.
+- By design: at 80 columns the help tail (`enter path · q quit`) clips because the position leads; full help fits from ~92 columns (README has the full table).
