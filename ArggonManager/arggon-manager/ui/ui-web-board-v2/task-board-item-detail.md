@@ -75,3 +75,16 @@ Cards show the frontmatter summary only; the item body (context, acceptance chec
 ### handoff 2026-09-23 @ses_f343321d7ffe297DRUxJhppxI3 (session: ses_f343321d7ffe297DRUxJhppxI3) — next: Coordinator review of PR #412 (head dc166d18); merge, then verify the @smoke drawer cases on merged main before flipping done.
 - branch: feat/task-board-item-detail
 - open questions: Static --details opt-in follow-up? cli/README.md board route paragraph not updated (outside item file scope).
+
+### 2026-09-23 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Coordinator review — PASS (lead architect) + merge verification
+
+PR #412 (rebase-merged; auto-done #413 marked this item done).
+
+**Independent verification.** Focused suites 87 passed (board + parity + serve); `npx playwright test --grep @smoke` → **9/9** in real Chromium, including the 4 new drawer cases: Enter opens the drawer with checklist + deps; Esc closes the drawer before the filter's clear from a filtered view; the live-overlay PR badge renders as a link and refuses non-http URLs; a live reload that removes the item closes the drawer gracefully.
+
+**Code review.** The route is `GET /api/item?id=` — a pure read through the kernel bounded path (`runShow` + the shared status index), with documented caps (prose 8 KB, 4 KB per comment, clipped on code-point boundaries) and `prose_truncated`/`comments[].truncated` flags; acceptance rows are parsed from the clipped prose; dependency states follow the ADR 0004 terminal rule; the PR match comes from the cached overlay; unknown ids → 404; no write path anywhere. Client: drawer coexists with the merged filter lens (Esc order), focus returns, every value is escaped (the PR-link test pins URL refusal).
+
+**Design decision accepted:** drawer is serve-only; the static export stays lean and byte-identical (measured: item 22,425 B → `/api/item` 9,721 B; served page +9,911 B one-time chrome). The acceptance allowed either path with a documented trade-off — this one is documented in README + json-output.
+
+**Follow-ups filed:** `task-board-static-details` (p3, optional bounded `--details` static export) and `task-ui-docs-refresh` (p3: `cli/README.md` `/api/item` note).
