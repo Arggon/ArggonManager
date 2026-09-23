@@ -1,13 +1,21 @@
 import { watch, type FSWatcher } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
-import { renderBoardHtml, defaultBoardGithub, type BoardGithub, type PrInfo } from "./board.js";
 import {
+  renderBoardHtml,
+  defaultBoardGithub,
+  type BoardDetailPayload,
+  type BoardGithub,
+  type PrInfo,
+} from "./board.js";
+import {
+  buildStatusIndex,
   findTasksDir,
   loadItems,
   readConventionConfig,
   repoRootFromTasks,
   resolveCurrentLogin,
+  runShow,
   runUpdate,
   toContractWorkItem,
 } from "@arggondev/lib";
@@ -26,6 +34,13 @@ import {
  * a fixed interval. Rate-limit/gh failures are swallowed: the last good PR
  * snapshot (or none) keeps rendering and cards degrade to the neutral badge —
  * the same clean degradation as the offline board.
+ *
+ * Item detail drawer (task-board-item-detail): `GET /api/item?id=<id>` answers
+ * with the kernel bounded read (`runShow`: prose + the last 3 comments, clipped
+ * to a documented per-item byte cap) plus dependency states and the cached PR
+ * match, and the served page opens it on card click/Enter. Serve-only: the
+ * static export stays lean and has no drawer. Read-only — the route never
+ * touches the tracker.
  */
 
 const RELOAD_SCRIPT =
@@ -59,6 +74,94 @@ export type BoardServeHandle = {
   /** Stops the watcher, disconnects SSE clients, closes the server. */
   close: () => Promise<void>;
 };
+
+/**
+ * Per-item byte caps for the serve-mode detail drawer (task-board-item-detail):
+ * the item body is prose that grows with the corpus, so the route clips it
+ * before it reaches the browser (ADR 0006 spirit). The prose cap also bounds
+ * the acceptance rows parsed from it; the comment cap applies per comment in
+ * the kernel tail (DEFAULT_TAIL_COMMENTS entries). `prose_truncated` /
+ * `comments[].truncated` tell the drawer to point at the item file.
+ */
+export const MAX_DETAIL_PROSE_BYTES = 8 * 1024;
+export const MAX_DETAIL_COMMENT_BYTES = 4 * 1024;
+
+/** Clip `text` to at most `maxBytes` UTF-8 bytes without splitting a code point. */
+export function clipDetailText(
+  text: string,
+  maxBytes: number,
+): { text: string; truncated: boolean } {
+  if (Buffer.byteLength(text, "utf8") <= maxBytes) return { text, truncated: false };
+  let bytes = 0;
+  let clipped = "";
+  for (const ch of text) {
+    const size = Buffer.byteLength(ch, "utf8");
+    if (bytes + size > maxBytes) break;
+    clipped += ch;
+    bytes += size;
+  }
+  return { text: clipped, truncated: true };
+}
+
+/** Read-only acceptance rows: `- [ ]`/`- [x]` lines of the item prose. */
+export function parseAcceptanceRows(prose: string): Array<{ text: string; checked: boolean }> {
+  const rows: Array<{ text: string; checked: boolean }> = [];
+  for (const line of prose.split("\n")) {
+    const match = /^\s*[-*]\s+\[([ xX])\]\s+(.*)$/.exec(line);
+    if (match) rows.push({ text: match[2].trim(), checked: match[1].toLowerCase() === "x" });
+  }
+  return rows;
+}
+
+/**
+ * Assemble the `/api/item` payload through the kernel bounded read path:
+ * `runShow` (ADR 0006 — prose + the last `DEFAULT_TAIL_COMMENTS` comments,
+ * never the full body) plus the shared status index for dependency states
+ * (the ADR 0004 open/terminal rule; unknown ids count as open, exactly like
+ * the card's blocked-by line). Pure read: no writes, no locks, no commit.
+ * `id` not found throws `runShow`'s message (the route maps it to 404).
+ * Cost: two kernel reads per request (O(n) over the tracker — `runShow` for
+ * the item, `loadItems` for the dependency index); the route is triggered by a
+ * user opening one drawer, never by the poll loop.
+ */
+export function buildBoardDetail(opts: {
+  cwd: string;
+  id: string;
+  /** Live PR overlay snapshot (branch -> PrInfo); absent = no PR data. */
+  prs?: Map<string, PrInfo>;
+}): BoardDetailPayload {
+  const shown = runShow({ cwd: opts.cwd, id: opts.id });
+  const statusById = buildStatusIndex(loadItems(findTasksDir(opts.cwd)));
+  const item = toContractWorkItem(shown.item, shown.root);
+  const prose = clipDetailText(shown.prose, MAX_DETAIL_PROSE_BYTES);
+  const comments = shown.comments.map((comment) => {
+    const clipped = clipDetailText(comment.lines.join("\n"), MAX_DETAIL_COMMENT_BYTES);
+    return {
+      date: comment.date,
+      author: comment.author,
+      text: clipped.text,
+      truncated: clipped.truncated,
+    };
+  });
+  const dependencies = shown.item.dependsOn.map((depId) => {
+    const entry = statusById.get(depId);
+    const status = entry ? entry.status : null;
+    return { id: depId, status, terminal: status === "done" || status === "cancelled" };
+  });
+  return {
+    ok: true,
+    item,
+    detail: {
+      prose: prose.text,
+      prose_truncated: prose.truncated,
+      acceptance: parseAcceptanceRows(prose.text),
+      comments,
+      hidden_comments: shown.allComments.length - shown.comments.length,
+      dependencies,
+      pr: item.branch ? (opts.prs?.get(item.branch) ?? null) : null,
+    },
+  };
+}
 
 export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
   const tasksDir = findTasksDir(opts.cwd);
@@ -135,6 +238,10 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
         diffLinks: true,
         lenses,
         me,
+        // Serve-only item detail drawer (task-board-item-detail): cards fetch
+        // `/api/item` through the kernel bounded read. The static export never
+        // sets this flag and stays lean.
+        details: true,
       },
     );
     // Live-reload client, injected only in serve mode; the static export
@@ -215,6 +322,26 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
         res.end(JSON.stringify({ ok: true, changed: result.changed }));
       } catch (err) {
         sendUpdateError(res, 400, err instanceof Error ? err.message : String(err));
+      }
+      return;
+    }
+    // Item detail drawer (task-board-item-detail): a pure read through the
+    // kernel bounded `show` path. GET only; the browser never reads tracker
+    // files, and there is no write path here.
+    if (req.method === "GET" && url.pathname === "/api/item") {
+      const id = (url.searchParams.get("id") ?? "").trim();
+      if (!id) {
+        sendUpdateError(res, 400, "item detail requires ?id=<item-id>");
+        return;
+      }
+      try {
+        const payload = buildBoardDetail({ cwd: root, id, prs });
+        res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store" });
+        res.end(JSON.stringify(payload));
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (message.includes("not found under the tracker")) sendUpdateError(res, 404, message);
+        else sendUpdateError(res, 500, message);
       }
       return;
     }

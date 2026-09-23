@@ -8,15 +8,22 @@
  * 127.0.0.1-only binding.
  */
 import { spawn, spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync as _mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { startBoardServer, type BoardServeHandle } from "./board-serve.js";
-import type { BoardGithub, PrInfo } from "./board.js";
+import {
+  MAX_DETAIL_COMMENT_BYTES,
+  MAX_DETAIL_PROSE_BYTES,
+  clipDetailText,
+  parseAcceptanceRows,
+  startBoardServer,
+  type BoardServeHandle,
+} from "./board-serve.js";
+import type { BoardDetailPayload, BoardGithub, PrInfo } from "./board.js";
 import { runInit } from "./init.js";
-import { runCreate } from "@arggondev/lib";
+import { runCreate, runShow, runUpdate } from "@arggondev/lib";
 import { removeFixtureTree } from "./test-tmp.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test
@@ -307,5 +314,225 @@ describe("arggon board --serve (CLI)", () => {
     expect(proc.status).not.toBe(0);
     const envelope = JSON.parse(proc.stdout) as { ok: boolean; error: { message: string } };
     expect(envelope.error.message).toMatch(/invalid --port '99999'/);
+  });
+});
+
+describe("board --serve item detail (task-board-item-detail)", () => {
+  let detailDir: string;
+  let detailHandle: BoardServeHandle;
+
+  /** Replace an item's body, keeping its frontmatter (fixture setup). */
+  function setBody(id: string, body: string): void {
+    const path = runShow({ cwd: detailDir, id }).path;
+    const lines = readFileSync(path, "utf8").split("\n");
+    const end = lines.indexOf("---", 1);
+    writeFileSync(path, `${lines.slice(0, end + 1).join("\n")}\n\n${body}\n`, "utf8");
+  }
+
+  beforeAll(async () => {
+    detailDir = mkdtempSync(join(tmpdir(), "arggon-serve-detail-"));
+    runInit({ dir: detailDir, force: false });
+    runCreate({ cwd: detailDir, type: "initiative", title: "Detail MVP" });
+    runCreate({ cwd: detailDir, type: "epic", title: "Detail core", parent: "detail-mvp" });
+    runCreate({
+      cwd: detailDir,
+      type: "story",
+      title: "Detail entries",
+      parent: "detail-core",
+      id: "detail-entries",
+    });
+    runCreate({
+      cwd: detailDir,
+      type: "task",
+      title: "Detail task",
+      parent: "detail-entries",
+      id: "task-detail",
+    });
+    runCreate({
+      cwd: detailDir,
+      type: "task",
+      title: "Open dep",
+      parent: "detail-entries",
+      id: "task-dep-open",
+    });
+    runCreate({
+      cwd: detailDir,
+      type: "task",
+      title: "Terminal dep",
+      parent: "detail-entries",
+      id: "task-dep-terminal",
+    });
+    runCreate({
+      cwd: detailDir,
+      type: "task",
+      title: "Huge body",
+      parent: "detail-entries",
+      id: "task-huge",
+    });
+    runUpdate({ cwd: detailDir, id: "task-detail", dependsOn: "task-dep-open,task-dep-terminal" });
+    runUpdate({ cwd: detailDir, id: "task-detail", branch: "feat/task-detail" });
+    runUpdate({ cwd: detailDir, id: "task-detail", priority: "p1" });
+    runUpdate({ cwd: detailDir, id: "task-dep-terminal", status: "cancelled" });
+    setBody(
+      "task-detail",
+      `# Detail task
+
+## Context
+
+Detail body fixture line.
+
+## Acceptance
+
+- [x] done row
+- [ ] open row
+
+hostile <img src=x onerror="alert(1)"> text
+
+### 2026-09-20 @alice
+comment one
+
+### 2026-09-21 @bob
+comment two
+
+### 2026-09-22 @carol
+comment three
+
+### 2026-09-23 @dave
+comment four
+
+### 2026-09-24 @erin
+comment five`,
+    );
+    setBody(
+      "task-huge",
+      `${"x".repeat(MAX_DETAIL_PROSE_BYTES + 512)}
+
+### 2026-09-24 @huge
+${"y".repeat(MAX_DETAIL_COMMENT_BYTES + 512)}`,
+    );
+    const gh: BoardGithub = {
+      listPrs: () => [
+        {
+          branch: "feat/task-detail",
+          number: 42,
+          url: "https://github.com/o/r/pull/42",
+          state: "OPEN",
+          isDraft: false,
+          checks: "passing",
+        },
+      ],
+    };
+    detailHandle = startBoardServer({ cwd: detailDir, gh, pollMs: 60_000 });
+    await detailHandle.ready;
+  });
+
+  afterAll(async () => {
+    await detailHandle.close();
+    removeFixtureTree(detailDir);
+  });
+
+  it("clips detail text at a UTF-8 byte cap without splitting a code point", () => {
+    expect(clipDetailText("abc", 3)).toEqual({ text: "abc", truncated: false });
+    expect(clipDetailText("abcd", 3)).toEqual({ text: "abc", truncated: true });
+    const clipped = clipDetailText("é".repeat(10), 5);
+    expect(clipped.text).toBe("éé");
+    expect(Buffer.byteLength(clipped.text, "utf8")).toBe(4);
+    expect(clipped.truncated).toBe(true);
+  });
+
+  it("parses read-only acceptance rows from the prose", () => {
+    expect(
+      parseAcceptanceRows("# T\n\n- [x] done row\n* [ ] open row\n- [X] upper\n- [] no\nplain\n"),
+    ).toEqual([
+      { text: "done row", checked: true },
+      { text: "open row", checked: false },
+      { text: "upper", checked: true },
+    ]);
+  });
+
+  it("serves the item detail through the kernel bounded read", async () => {
+    const res = await fetch(`${detailHandle.url}/api/item?id=task-detail`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("cache-control")).toBe("no-store");
+    const body = (await res.json()) as BoardDetailPayload;
+    expect(body.ok).toBe(true);
+    expect(body.item.id).toBe("task-detail");
+    expect(body.item.branch).toBe("feat/task-detail");
+    expect(body.item.priority).toBe("p1");
+    expect(body.item.path.endsWith("task-detail.md")).toBe(true);
+    expect(body.detail.prose).toContain("Detail body fixture line.");
+    // Raw JSON keeps the untrusted text verbatim; the browser renders it as
+    // text (see the @smoke spec) — the route never HTML-escapes JSON.
+    expect(body.detail.prose).toContain('<img src=x onerror="alert(1)">');
+    expect(body.detail.prose_truncated).toBe(false);
+    expect(body.detail.acceptance).toEqual([
+      { text: "done row", checked: true },
+      { text: "open row", checked: false },
+    ]);
+    expect(body.detail.dependencies).toEqual([
+      { id: "task-dep-open", status: "todo", terminal: false },
+      { id: "task-dep-terminal", status: "cancelled", terminal: true },
+    ]);
+    expect(body.detail.pr?.number).toBe(42);
+    // Kernel comment tail: the last DEFAULT_TAIL_COMMENTS entries only.
+    expect(body.detail.comments.map((comment) => comment.author)).toEqual([
+      "carol",
+      "dave",
+      "erin",
+    ]);
+    expect(body.detail.comments[0].text).toBe("comment three");
+    expect(body.detail.hidden_comments).toBe(2);
+  });
+
+  it("bounds the payload: prose cap, per-comment cap, no PR without a branch match", async () => {
+    const huge = (await (
+      await fetch(`${detailHandle.url}/api/item?id=task-huge`)
+    ).json()) as BoardDetailPayload;
+    expect(huge.detail.prose_truncated).toBe(true);
+    expect(Buffer.byteLength(huge.detail.prose, "utf8")).toBeLessThanOrEqual(
+      MAX_DETAIL_PROSE_BYTES,
+    );
+    expect(huge.detail.comments).toHaveLength(1);
+    expect(huge.detail.comments[0].truncated).toBe(true);
+    expect(Buffer.byteLength(huge.detail.comments[0].text, "utf8")).toBeLessThanOrEqual(
+      MAX_DETAIL_COMMENT_BYTES,
+    );
+
+    const open = (await (
+      await fetch(`${detailHandle.url}/api/item?id=task-dep-open`)
+    ).json()) as BoardDetailPayload;
+    expect(open.item.branch).toBe(null);
+    expect(open.detail.pr).toBe(null);
+  });
+
+  it("answers invalid and missing ids with JSON errors and never writes", async () => {
+    const taskPath = runShow({ cwd: detailDir, id: "task-detail" }).path;
+    const before = readFileSync(taskPath, "utf8");
+
+    const noId = await fetch(`${detailHandle.url}/api/item`);
+    expect(noId.status).toBe(400);
+    const noIdBody = (await noId.json()) as { ok: boolean; error: { message: string } };
+    expect(noIdBody.ok).toBe(false);
+    expect(noIdBody.error.message).toContain("?id=");
+
+    const missing = await fetch(`${detailHandle.url}/api/item?id=task-nope`);
+    expect(missing.status).toBe(404);
+    const missingBody = (await missing.json()) as { ok: boolean; error: { message: string } };
+    expect(missingBody.ok).toBe(false);
+    expect(missingBody.error.message).toContain("not found under the tracker");
+
+    // GET only: a POST falls through to the JSON 404 (no write path here).
+    const post = await fetch(`${detailHandle.url}/api/item?id=task-detail`, { method: "POST" });
+    expect(post.status).toBe(404);
+
+    expect(readFileSync(taskPath, "utf8")).toBe(before);
+  });
+
+  it("serves the drawer shell and endpoint wiring on the page (serve-only)", async () => {
+    const html = await (await fetch(`${detailHandle.url}/`)).text();
+    expect(html).toContain('id="board-drawer"');
+    expect(html).toContain('data-detail-endpoint="/api/item"');
+    expect(html).toContain('tabindex="0"');
+    expect(html).toContain("wireBoardDetail(toast, renderBoardDetail);");
   });
 });
