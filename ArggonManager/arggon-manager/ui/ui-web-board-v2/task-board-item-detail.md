@@ -64,3 +64,7 @@ Cards show the frontmatter summary only; the item body (context, acceptance chec
 **Fixture note:** the drawer/reload fixture tasks live in `cancelled` so the todo column stays short — Playwright's `dragTo` re-scrolls for the target and a mid-drag scroll makes Chromium resolve the drag source under the stale pointer (the pre-existing status-move test would grab a neighbour card). Pre-existing @smoke cases stay green.
 
 **Open questions (for coordinator):** (1) static `--details` opt-in as a follow-up? (2) `cli/README.md`'s board.ts paragraph does not mention the `/api/item` route (file outside this item's allowlist).
+
+### handoff 2026-09-23 @ses_f343321d7ffe297DRUxJhppxI3 (session: ses_f343321d7ffe297DRUxJhppxI3) — next: Coordinator review of PR #412 (head dc166d18 + tracker commits); merge when green, then verify the @smoke drawer cases on merged main before flipping done.
+- branch: main
+- open questions: Static --details opt-in follow-up? cli/README.md board route paragraph not updated (outside item file scope).
