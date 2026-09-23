@@ -6118,17 +6118,23 @@ function linkedWorkspacePackages(primaryRoot, worktreePath) {
 __arggonModules.set("opencode/plugins/arggon/board.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_TYPE_BADGES = exports.ARGON_BOARD_PANEL = void 0;
+exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_SELECTION_MARK = exports.BOARD_SELECTION_PAGE = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_TYPE_BADGES = exports.ARGON_BOARD_PANEL = void 0;
 exports.boardRoot = boardRoot;
 exports.emptyBoardSnapshot = emptyBoardSnapshot;
 exports.activeBoardId = activeBoardId;
 exports.boardSnapshot = boardSnapshot;
 exports.countBoardStatuses = countBoardStatuses;
 exports.boardTreeEntries = boardTreeEntries;
+exports.emptyBoardSelection = emptyBoardSelection;
+exports.resolveBoardSelection = resolveBoardSelection;
+exports.moveBoardSelection = moveBoardSelection;
+exports.selectBoardItem = selectBoardItem;
 exports.clipBoardLine = clipBoardLine;
 exports.boardHeaderLine = boardHeaderLine;
 exports.boardCountsLine = boardCountsLine;
 exports.boardItemLine = boardItemLine;
+exports.boardItemDetail = boardItemDetail;
+exports.boardDetailLines = boardDetailLines;
 exports.boardTreeLines = boardTreeLines;
 exports.sidebarStatusLine = sidebarStatusLine;
 const lib_1 = require("@arggondev/lib");
@@ -6239,6 +6245,55 @@ function countBoardStatuses(items) {
 function boardTreeEntries(items) {
     return (0, lib_1.treeEntries)(items);
 }
+exports.BOARD_SELECTION_PAGE = 10;
+function emptyBoardSelection() {
+    return { index: -1, id: null };
+}
+function selectionAt(entries, index) {
+    if (entries.length === 0)
+        return emptyBoardSelection();
+    const clamped = Math.min(Math.max(index, 0), entries.length - 1);
+    return { index: clamped, id: entries[clamped].item.id };
+}
+function resolveBoardSelection(snapshot, previous) {
+    const entries = boardTreeEntries(snapshot.items);
+    if (entries.length === 0)
+        return emptyBoardSelection();
+    if (previous.id !== null) {
+        const index = entries.findIndex((entry) => entry.item.id === previous.id);
+        if (index >= 0)
+            return { index, id: previous.id };
+    }
+    return selectionAt(entries, previous.index);
+}
+function moveBoardSelection(snapshot, selection, move) {
+    const entries = boardTreeEntries(snapshot.items);
+    if (entries.length === 0)
+        return emptyBoardSelection();
+    const current = selection.index < 0 ? -1 : Math.min(selection.index, entries.length - 1);
+    switch (move) {
+        case "first":
+            return selectionAt(entries, 0);
+        case "last":
+            return selectionAt(entries, entries.length - 1);
+        case "page-up":
+            return selectionAt(entries, current - exports.BOARD_SELECTION_PAGE);
+        case "page-down":
+            return selectionAt(entries, current + exports.BOARD_SELECTION_PAGE);
+        case "up":
+            return selectionAt(entries, current - 1);
+        case "down":
+            return selectionAt(entries, current + 1);
+    }
+}
+function selectBoardItem(snapshot, id) {
+    const wanted = (id ?? "").trim();
+    if (wanted === "")
+        return null;
+    const entries = boardTreeEntries(snapshot.items);
+    const index = entries.findIndex((entry) => entry.item.id === wanted);
+    return index < 0 ? null : { index, id: wanted };
+}
 function clipBoardLine(text, width) {
     if (width <= 0)
         return "";
@@ -6256,8 +6311,10 @@ function boardHeaderLine(snapshot) {
 function boardCountsLine(snapshot) {
     return exports.BOARD_STATUS_ORDER.map((status) => `${status} ${snapshot.counts[status]}`).join(" · ");
 }
-function boardItemLine(entry) {
+exports.BOARD_SELECTION_MARK = "❯";
+function boardItemLine(entry, options = {}) {
     const { item, depth } = entry;
+    const cursor = options.selected === true ? exports.BOARD_SELECTION_MARK : " ";
     const indent = "  ".repeat(Math.min(depth, 8));
     const active = item.active ? "▶" : " ";
     const mark = exports.BOARD_STATUS_MARKS[item.status];
@@ -6267,8 +6324,96 @@ function boardItemLine(entry) {
     const reason = item.blockedReason !== null && item.blockedReason !== ""
         ? ` · blocked: ${(0, lib_1.sanitizeHumanTextUncapped)(item.blockedReason)}`
         : "";
-    return (`${indent}${active}${mark} ${badge} ${(0, lib_1.sanitizeHumanTextUncapped)(item.id)}${blocked}${assignee}` +
+    return (`${cursor}${indent}${active}${mark} ${badge} ${(0, lib_1.sanitizeHumanTextUncapped)(item.id)}${blocked}${assignee}` +
         ` — ${(0, lib_1.sanitizeHumanTextUncapped)(item.title)}${reason}`);
+}
+exports.BOARD_DETAIL_MAX_ROWS = 16;
+exports.BOARD_DETAIL_MAX_LINE_CHARS = 200;
+const BOARD_ACCEPTANCE_ROW = /^\s*[-*]\s+\[([ xX])\]\s?(.*)$/;
+function splitBoardDetailRows(prose) {
+    const acceptance = [];
+    const body = [];
+    for (const raw of prose.replace(/<!--[\s\S]*?-->/g, "").split(/\r?\n/)) {
+        const row = raw.replace(/\t/g, "  ").trimEnd();
+        const check = BOARD_ACCEPTANCE_ROW.exec(row);
+        if (check) {
+            const mark = (check[1] ?? " ").toLowerCase() === "x" ? "x" : " ";
+            const text = (check[2] ?? "").trimEnd();
+            acceptance.push(text === "" ? `[${mark}]` : `[${mark}] ${text}`);
+            continue;
+        }
+        if (body.length === 0 && acceptance.length === 0 && /^#\s+/.test(row))
+            continue;
+        if (row.trim() === "") {
+            if (body.length === 0 || body[body.length - 1] === "")
+                continue;
+            body.push("");
+            continue;
+        }
+        body.push(row);
+    }
+    while (body.length > 0 && body[body.length - 1] === "")
+        body.pop();
+    return { acceptance, body };
+}
+function boardItemDetail(cwd, id, options = {}) {
+    const requested = id.trim();
+    const failed = (error) => ({
+        id: requested,
+        title: null,
+        path: null,
+        acceptance: [],
+        body: [],
+        acceptanceDone: 0,
+        acceptanceTotal: 0,
+        truncated: false,
+        error: (0, lib_1.sanitizeHumanError)(error),
+    });
+    if (requested === "")
+        return failed("detail unavailable: no selected item");
+    try {
+        const shown = (0, lib_1.runShow)({ cwd, id: requested });
+        const { acceptance, body } = splitBoardDetailRows(shown.prose);
+        const budget = Math.max(options.rows ?? exports.BOARD_DETAIL_MAX_ROWS, 0);
+        const shownAcceptance = acceptance.slice(0, budget);
+        const shownBody = body.slice(0, Math.max(budget - shownAcceptance.length, 0));
+        const row = (value) => clipBoardLine((0, lib_1.sanitizeHumanTextUncapped)(value), exports.BOARD_DETAIL_MAX_LINE_CHARS);
+        return {
+            id: requested,
+            title: (0, lib_1.sanitizeHumanTextUncapped)(shown.item.title ?? requested),
+            path: (0, lib_1.sanitizeHumanTextUncapped)(shown.path),
+            acceptance: shownAcceptance.map(row),
+            body: shownBody.map(row),
+            acceptanceDone: acceptance.filter((entry) => entry.startsWith("[x]")).length,
+            acceptanceTotal: acceptance.length,
+            truncated: acceptance.length + body.length > budget,
+            error: null,
+        };
+    }
+    catch (error) {
+        return failed(`detail unavailable: ${detail(error)}`);
+    }
+}
+function boardDetailLines(detail, options = {}) {
+    const width = options.width ?? 0;
+    const clip = (line) => (width > 0 ? clipBoardLine(line, width) : line);
+    if (detail.error !== null) {
+        return [clip(`  ┌ argon detail · ${detail.id}`), clip(`  └ ${detail.error}`)];
+    }
+    const lines = [clip(`  ┌ argon detail · ${detail.id} — ${detail.title ?? detail.id}`)];
+    const row = (value) => (value === "" ? "  │" : `  │ ${value}`);
+    for (const entry of detail.acceptance)
+        lines.push(clip(row(entry)));
+    for (const entry of detail.body)
+        lines.push(clip(row(entry)));
+    if (detail.truncated)
+        lines.push(clip("  │ … more row(s) omitted"));
+    const acceptance = detail.acceptanceTotal > 0
+        ? `${detail.acceptanceDone}/${detail.acceptanceTotal} acceptance`
+        : "no acceptance rows";
+    const path = detail.path !== null ? ` · ${detail.path}` : "";
+    lines.push(clip(`  └ ${acceptance}${path} · esc returns`));
+    return lines;
 }
 function boardTreeLines(snapshot, options = {}) {
     const width = options.width ?? 0;
@@ -6279,9 +6424,23 @@ function boardTreeLines(snapshot, options = {}) {
         return lines;
     lines.push(clip(boardCountsLine(snapshot)));
     const entries = boardTreeEntries(snapshot.items);
-    for (const entry of entries.slice(0, Math.max(limit, 0)))
-        lines.push(clip(boardItemLine(entry)));
-    const hidden = entries.length - Math.min(entries.length, Math.max(limit, 0));
+    const cap = Math.max(limit, 0);
+    const selected = options.selection?.index ?? -1;
+    const start = cap > 0 && selected >= cap
+        ? Math.min(selected - cap + 1, Math.max(entries.length - cap, 0))
+        : 0;
+    if (start > 0)
+        lines.push(clip(`… ${start} earlier item(s)`));
+    const visible = entries.slice(start, start + cap);
+    visible.forEach((entry, offset) => {
+        const index = start + offset;
+        lines.push(clip(boardItemLine(entry, { selected: index === selected })));
+        if (options.detail != null && options.detail.id === entry.item.id) {
+            for (const row of boardDetailLines(options.detail))
+                lines.push(clip(row));
+        }
+    });
+    const hidden = entries.length - start - visible.length;
     if (hidden > 0)
         lines.push(clip(`… ${hidden} more item(s)`));
     return lines;
@@ -6336,7 +6495,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sidebarStatusLine = exports.emptyBoardSnapshot = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardHeaderLine = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.ARGON_BOARD_PANEL = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
+exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
 exports.isArggonItemId = isArggonItemId;
 exports.parseArggonItemFromCommand = parseArggonItemFromCommand;
 exports.parseArggonItemFromCode = parseArggonItemFromCode;
@@ -8296,12 +8455,18 @@ function dispose(registration) {
 }
 var board_js_1 = require("./board.js");
 Object.defineProperty(exports, "ARGON_BOARD_PANEL", { enumerable: true, get: function () { return board_js_1.ARGON_BOARD_PANEL; } });
+Object.defineProperty(exports, "BOARD_DETAIL_MAX_LINE_CHARS", { enumerable: true, get: function () { return board_js_1.BOARD_DETAIL_MAX_LINE_CHARS; } });
+Object.defineProperty(exports, "BOARD_DETAIL_MAX_ROWS", { enumerable: true, get: function () { return board_js_1.BOARD_DETAIL_MAX_ROWS; } });
+Object.defineProperty(exports, "BOARD_SELECTION_MARK", { enumerable: true, get: function () { return board_js_1.BOARD_SELECTION_MARK; } });
+Object.defineProperty(exports, "BOARD_SELECTION_PAGE", { enumerable: true, get: function () { return board_js_1.BOARD_SELECTION_PAGE; } });
 Object.defineProperty(exports, "BOARD_STATUS_MARKS", { enumerable: true, get: function () { return board_js_1.BOARD_STATUS_MARKS; } });
 Object.defineProperty(exports, "BOARD_STATUS_ORDER", { enumerable: true, get: function () { return board_js_1.BOARD_STATUS_ORDER; } });
 Object.defineProperty(exports, "BOARD_TYPE_BADGES", { enumerable: true, get: function () { return board_js_1.BOARD_TYPE_BADGES; } });
 Object.defineProperty(exports, "activeBoardId", { enumerable: true, get: function () { return board_js_1.activeBoardId; } });
 Object.defineProperty(exports, "boardCountsLine", { enumerable: true, get: function () { return board_js_1.boardCountsLine; } });
+Object.defineProperty(exports, "boardDetailLines", { enumerable: true, get: function () { return board_js_1.boardDetailLines; } });
 Object.defineProperty(exports, "boardHeaderLine", { enumerable: true, get: function () { return board_js_1.boardHeaderLine; } });
+Object.defineProperty(exports, "boardItemDetail", { enumerable: true, get: function () { return board_js_1.boardItemDetail; } });
 Object.defineProperty(exports, "boardItemLine", { enumerable: true, get: function () { return board_js_1.boardItemLine; } });
 Object.defineProperty(exports, "boardRoot", { enumerable: true, get: function () { return board_js_1.boardRoot; } });
 Object.defineProperty(exports, "boardSnapshot", { enumerable: true, get: function () { return board_js_1.boardSnapshot; } });
@@ -8309,7 +8474,11 @@ Object.defineProperty(exports, "boardTreeEntries", { enumerable: true, get: func
 Object.defineProperty(exports, "boardTreeLines", { enumerable: true, get: function () { return board_js_1.boardTreeLines; } });
 Object.defineProperty(exports, "clipBoardLine", { enumerable: true, get: function () { return board_js_1.clipBoardLine; } });
 Object.defineProperty(exports, "countBoardStatuses", { enumerable: true, get: function () { return board_js_1.countBoardStatuses; } });
+Object.defineProperty(exports, "emptyBoardSelection", { enumerable: true, get: function () { return board_js_1.emptyBoardSelection; } });
 Object.defineProperty(exports, "emptyBoardSnapshot", { enumerable: true, get: function () { return board_js_1.emptyBoardSnapshot; } });
+Object.defineProperty(exports, "moveBoardSelection", { enumerable: true, get: function () { return board_js_1.moveBoardSelection; } });
+Object.defineProperty(exports, "resolveBoardSelection", { enumerable: true, get: function () { return board_js_1.resolveBoardSelection; } });
+Object.defineProperty(exports, "selectBoardItem", { enumerable: true, get: function () { return board_js_1.selectBoardItem; } });
 Object.defineProperty(exports, "sidebarStatusLine", { enumerable: true, get: function () { return board_js_1.sidebarStatusLine; } });
 exports.default = definition;
 })
@@ -8317,7 +8486,12 @@ exports.default = definition;
 const __arggonEntry = __arggonRequire("opencode/plugins/arggon/index.ts", undefined)
 export default __arggonEntry.default
 export const ARGON_BOARD_PANEL = __arggonEntry.ARGON_BOARD_PANEL
+export const boardItemDetail = __arggonEntry.boardItemDetail
 export const boardSnapshot = __arggonEntry.boardSnapshot
 export const boardTreeLines = __arggonEntry.boardTreeLines
+export const emptyBoardSelection = __arggonEntry.emptyBoardSelection
 export const emptyBoardSnapshot = __arggonEntry.emptyBoardSnapshot
+export const moveBoardSelection = __arggonEntry.moveBoardSelection
+export const resolveBoardSelection = __arggonEntry.resolveBoardSelection
+export const selectBoardItem = __arggonEntry.selectBoardItem
 export const sidebarStatusLine = __arggonEntry.sidebarStatusLine

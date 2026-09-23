@@ -231,6 +231,19 @@ focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
     `Plugin arggon.tui crashed in slot session.panel`), with a per-surface
     try/catch as belt-and-braces. Unit tests cover both, and `smoke:tui`
     reproduces the duplicate-id case end-to-end in the PTY.
+  - **Panel interaction (W6 `task-native-panel-interaction`, same 2.0.12
+    surface).** The panel is navigable without any new API: one keymap layer
+    registers plain-letter/`pagedown`/`pageup`/`home`/`end`/`shift+g`/`return`
+    binds (all names from the documented keybind reference), the selection is a
+    pure index/id state machine over `boardTreeEntries`, and `Enter` toggles an
+    inline detail block read through the kernel's bounded `runShow` path
+    (acceptance rows + prose, sanitized, 16 rows / 200 chars per row) — the
+    panel stays display-only. `n`/`a` reuse the snapshot's kernel `next` id and
+    the session's active id; `r` resolves the cursor by id so it survives a
+    reload. OpenTUI redraws only changed cells (a cursor move rewrites one
+    cell, not the row), so `smoke:tui` replays the PTY capture into bounded
+    screen frames (CUP/SGR/erase subset) and asserts the drawn states; raw
+    capture substrings are not a reliable signal for diffed TUIs.
   - Dispatch (verified with the shipped plugin on 2.0.12): inside a session the
     panel opens from the slash command `/arggon-board`, from the palette entry
     (Ctrl+P → _Open Arggon board_) **and** from the `ctrl+g` binding registered
@@ -247,7 +260,11 @@ focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
     4-item tree → `opencode plugin list` → API-created empty session → TUI run
     → types `/arggon-board` → asserts the captured panel header + tree, no
     plugin load failure, and that a duplicate-id tracker renders the unreadable
-    header instead of a slot crash). Unit wiring:
+    header instead of a slot crash; W6 adds the interaction capture — the keys
+    are sent only after the panel header appears, then `j`/`n`/`a`/`Enter` are
+    asserted on the replayed screen frames: `❯` cursor on `E core`, on
+    `T task-board-task` (kernel `next`), on `▶· S story` (`ARGON_ITEM=story`)
+    and the `┌ argon detail · story — Story` block). Unit wiring:
     `opencode/plugins/arggon/tui.test.ts` + `board.test.ts` with the runtime
     stubs in `test/tui-runtime-stub.ts` (vitest aliases
     `solid-js`/`@opentui/solid/jsx-runtime`, oxc `jsx` config); the strict type
@@ -388,9 +405,16 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   `cli/src/plugin-copy.test.ts` (bundle drift gate, the `BUNDLE_EXPORTS`
   allowlist ⇄ `tui.tsx` imports parity, and the self-healing derived copies of
   both vendored files) and the extended `bundle.test.ts` (the dependency-less
-  bundle serves the board surface from the inlined kernel). `npm run smoke:tui`
+  bundle serves the board surface from the inlined kernel). W6
+  (`task-native-panel-interaction`) extends both suites: `board.test.ts` covers
+  the selection state machine (seed/move/clamp/jump/reload-by-id), the
+  window-follow render and the bounded/sanitized detail block (acceptance rows,
+  hostile bytes, error degradation), while `tui.test.ts` drives
+  `createBoardController` (navigation, jumps + toasts, detail toggle, esc
+  detail-first) and pins the panel keymap's id→bind table. `npm run smoke:tui`
   is the PTY end-to-end evidence (init → tree → plugin discovery → session →
-  `/arggon-board` → captured panel → duplicate-id degradation).
+  `/arggon-board` → captured panel → selection/jumps/detail frames →
+  duplicate-id degradation).
 - Fixture smoke: `arggon init` in a temp tree creates the seam; a second run
   leaves an edited `opencode.jsonc` byte-identical (adopter-owned); a tree with
   its own `opencode.json` reports the config skip and writes no `opencode.jsonc`.

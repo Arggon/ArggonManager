@@ -157,20 +157,37 @@ the panel shows `no ArggonManager tracker found here`, and a corrupt tracker
 (duplicate ids) shows `tracker unreadable: …` instead of crashing the slot —
 the session keeps working in both cases.
 
+The tree is navigable (W6 `task-native-panel-interaction`): every line carries a
+one-column cursor gutter, `j`/`k` (or `↓`/`↑`) move the `❯` cursor, `PgUp`/`PgDn`
+page, `g`/`Home` and `G`/`End` jump to the first/last line, and `r` re-reads the
+tracker keeping the cursor on the same item when it still exists (the 200-line
+cap is preserved; the window follows the cursor when it passes it). `Enter`
+toggles an inline detail block under the selected line — the item's acceptance
+rows plus its body, read through the kernel's bounded `runShow` path, sanitized
+and capped (16 rows, 200 chars/row) — and `Esc` closes the block before the
+panel. `n` jumps to the kernel `next` suggestion and `a` to the session's active
+item (`ARGON_ITEM` or the `feat/<id>`/`fix/<id>` branch), with a toast when there
+is no target. Nothing in the panel writes to the tracker.
+
 **Manual checklist** (no interactive driver in CI — the automated evidence is
 `npm run smoke:tui`, which drives exactly this flow in a PTY: init → tree →
 `/arggon-board` → panel captured):
 
-| Step                                                     | Expected                                                                                                                                                   |
-| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Open a session, run `/arggon-board`                      | Panel opens, header `arggon board · N item(s) · next: <id>`, counters line, indented tree (I/E/S/T/B badge + status glyph + id + title)                    |
-| `esc`                                                    | Panel closes; the session view returns; nothing else changes                                                                                               |
-| `f`                                                      | Presentation toggles to full-screen and back (host no-op on a narrow terminal — it is already full-screen)                                                 |
-| `r`                                                      | Tree is re-read from disk (edits to items appear)                                                                                                          |
-| Resize to a narrow terminal (< ~70 cols)                 | Panel stays full-screen, each line clips with `…`, no wrap/ghost                                                                                           |
-| Sidebar (wide terminal, ~160 cols)                       | `arggon ▶ <active item> <status>` when the session resolves an item, else `arggon · N ready · next <id>`; the host hides the sidebar on narrower terminals |
-| Open the TUI outside a tracker                           | `arggon board · no ArggonManager tracker found here`; session unaffected                                                                                   |
-| Open the TUI with a corrupt tracker (duplicate item ids) | `arggon board · tracker unreadable: Duplicate id '…'`; no "crashed in slot" overlay, session unaffected                                                    |
+| Step                                                     | Expected                                                                                                                                                                                                               |
+| -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Open a session, run `/arggon-board`                      | Panel opens, header `arggon board · N item(s) · next: <id>`, counters line, indented tree (I/E/S/T/B badge + status glyph + id + title), cursor `❯` on the first line                                                  |
+| `j` / `k` (or `↓`/`↑`)                                   | Cursor moves one tree line down/up; the selected line is marked `❯`; `j` at the last line stays there                                                                                                                  |
+| `PgUp` / `PgDn`, `g` / `Home`, `G` / `End`               | Cursor pages (10 rows) or jumps to the first/last line; the window follows beyond the 200-line cap                                                                                                                     |
+| `n` / `a`                                                | Cursor jumps to the kernel `next` suggestion / the session's active item (`ARGON_ITEM` or `feat/<id>`/`fix/<id>` branch); a toast when there is no target                                                              |
+| `Enter`                                                  | Inline detail block under the selected line: `┌ argon detail · <id> — <title>`, acceptance rows `[ ]`/`[x]`, bounded sanitized body, `└ x/y acceptance · path`; `Enter` again or moving the cursor returns to the tree |
+| `Esc` (detail block open)                                | Detail block closes; the tree stays with the cursor where it was                                                                                                                                                       |
+| `esc` (no detail block)                                  | Panel closes; the session view returns; nothing else changes                                                                                                                                                           |
+| `f`                                                      | Presentation toggles to full-screen and back (host no-op on a narrow terminal — it is already full-screen)                                                                                                             |
+| `r`                                                      | Tree is re-read from disk (edits to items appear); the cursor stays on the same item when it still exists, else clamps                                                                                                 |
+| Resize to a narrow terminal (< ~70 cols)                 | Panel stays full-screen, each line clips with `…`, no wrap/ghost (the detail block clips with it)                                                                                                                      |
+| Sidebar (wide terminal, ~160 cols)                       | `arggon ▶ <active item> <status>` when the session resolves an item, else `arggon · N ready · next <id>`; the host hides the sidebar on narrower terminals                                                             |
+| Open the TUI outside a tracker                           | `arggon board · no ArggonManager tracker found here`; session unaffected                                                                                                                                               |
+| Open the TUI with a corrupt tracker (duplicate item ids) | `arggon board · tracker unreadable: Duplicate id '…'`; no "crashed in slot" overlay, session unaffected; `Enter`/`n`/`a` stay inert                                                                                    |
 
 ## Guarantees
 
