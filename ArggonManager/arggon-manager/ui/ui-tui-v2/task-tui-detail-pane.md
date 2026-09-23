@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-tui-detail-pane
 title: "TUI detail pane: read an item without leaving the board"
+assignee: Arggon
+branch: feat/task-tui-detail-pane
 parent: ui-tui-v2
 labels: [tui, ui]
 priority: p1
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-23"
+claimed_at: "2026-09-23T01:07:46.046Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-tui-detail-pane
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-tui-v2/task-tui-detail-pane.md
