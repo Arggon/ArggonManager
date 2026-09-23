@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-board-item-detail
 title: "Web board item detail drawer (body, checklist, deps, PR)"
+assignee: Arggon
+branch: feat/task-board-item-detail
 parent: ui-web-board-v2
 labels: [viewer, board, ui]
 priority: p1
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-23"
+claimed_at: "2026-09-23T01:06:42.726Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-board-item-detail
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-item-detail.md
