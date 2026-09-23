@@ -8,7 +8,9 @@ import {
   groupItemsBy,
   loadItems,
   openDependencyIds,
+  readConventionConfig,
   repoRootFromTasks,
+  resolveCurrentLogin,
   sortById,
   statusCounts,
   toContractWorkItem,
@@ -28,6 +30,13 @@ export type BoardOptions = {
   groupBy?: string;
   /** Injectable GitHub reader (tests pass a fake; default shells out to `gh`). */
   gh?: BoardGithub;
+  /**
+   * Resolved login baked into the page for `@me` in a lens/filter expression
+   * (task-board-filter-lenses). Default resolves like `runList`'s caller
+   * (`resolveCurrentLogin`: env, then `gh`); tests inject `null` for hermetic,
+   * subprocess-free renders.
+   */
+  me?: string | null;
 };
 
 export type BoardResult = {
@@ -144,6 +153,17 @@ export function runBoard(opts: BoardOptions): BoardResult {
     const reader = opts.gh ?? defaultBoardGithub();
     overlay = new Map(reader.listPrs(root).map((pr) => [pr.branch, pr]));
   }
+  // Saved views (x-views) and the @me login are generation-time reads, exactly
+  // like `runList --view`: the static page has no server to consult. A
+  // malformed convention file degrades to no lenses (validate reports it) —
+  // the board never grew a config-validation dependency.
+  let lenses: Record<string, string> = {};
+  try {
+    lenses = readConventionConfig(root).views;
+  } catch {
+    lenses = {};
+  }
+  const me = opts.me !== undefined ? opts.me : (resolveCurrentLogin() ?? null);
   const html = renderBoardHtml(
     items.map((item) => toContractWorkItem(item, root)),
     {
@@ -151,6 +171,8 @@ export function runBoard(opts: BoardOptions): BoardResult {
       prs: overlay,
       live: opts.github === true,
       groupBy,
+      lenses,
+      me,
     },
   );
   const outPath = opts.out ? resolve(opts.cwd, opts.out) : resolve(root, DEFAULT_BOARD_FILE);
@@ -298,6 +320,257 @@ export function evaluateDrop(
   return { ok: true, reason: "" };
 }
 
+/** Item shape the embedded board lens reads (a subset of the contract WorkItem). */
+export type BoardLensItem = {
+  id: string;
+  title?: string | null;
+  type: string;
+  status: string;
+  assignee?: string | null;
+  labels?: string[];
+  parent?: string | null;
+  priority?: string | null;
+};
+
+/** Board lens verdict: the visible ids, or the actionable refusal message. */
+export type BoardLensResult = { ok: true; visible: string[] } | { ok: false; error: string };
+
+/**
+ * Client-side board lens (task-board-filter-lenses): free text on id/title
+ * plus the supported kernel predicates, 1:1 with `lib/src/filter.ts` for that
+ * subset. The board renderer embeds this function's compiled source into the
+ * page script, so it must stay self-contained: no module-scope references,
+ * no template literals.
+ *
+ * Supported predicate fields: `type`, `status`, `label`, `assignee`,
+ * `priority`, `ancestor`. Tokens without a colon are free text
+ * (case-insensitive substring on id/title), ANDed with the predicates; `!`
+ * negates predicates only. Quoting, `!` negation, empty-value and quote
+ * errors mirror the kernel parser, and `type`/`status`/`priority` values are
+ * validated like `runList` does (same messages). `assignee:@me` resolves
+ * through the caller-passed `me` (the same rule as `runList`: `@me` is the
+ * caller's job) and fails loudly when it cannot be resolved.
+ *
+ * The kernel's `parent:`, `depends-on:` and `blocked-by:` predicates (and the
+ * `ready` lens) are NOT in the v1 board subset: the board renders contract
+ * WorkItems (`depends_on`) while the kernel lens reads `dependsOn` — that
+ * shape resolution lives in task-ui-viewmodel-contract-deps — so the board
+ * refuses them with a pointer to `arggon list` instead of silently dropping
+ * the dependency semantics. That divergence is asserted in
+ * cli/src/board-parity.test.ts.
+ */
+export function applyBoardFilter(
+  items: BoardLensItem[],
+  expr: string,
+  me?: string | null,
+): BoardLensResult {
+  const BOARD_FIELDS = ["type", "status", "label", "assignee", "priority", "ancestor"];
+  const KERNEL_ONLY_FIELDS = ["parent", "depends-on", "blocked-by"];
+  const TYPES = ["initiative", "epic", "story", "task", "bug"];
+  const STATUSES = ["todo", "in_progress", "blocked", "done", "cancelled"];
+  const PRIORITIES = ["p0", "p1", "p2", "p3"];
+
+  /** Split on whitespace outside single/double quotes (quotes kept), like the kernel. */
+  function splitTokens(text: string): string[] {
+    const tokens: string[] = [];
+    let current = "";
+    let quote: string | null = null;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text.charAt(i);
+      if (quote) {
+        current += ch;
+        if (ch === quote) quote = null;
+      } else if (ch === '"' || ch === "'") {
+        quote = ch;
+        current += ch;
+      } else if (/\s/.test(ch)) {
+        if (current) {
+          tokens.push(current);
+          current = "";
+        }
+      } else {
+        current += ch;
+      }
+    }
+    if (quote) throw new Error("unterminated quote in filter expression: " + text);
+    if (current) tokens.push(current);
+    return tokens;
+  }
+
+  /** Strip one matching pair of surrounding quotes; reject stray quotes, like the kernel. */
+  function unquote(value: string, text: string): string {
+    if (value.length >= 2 && value.charAt(0) === '"' && value.charAt(value.length - 1) === '"') {
+      return value.slice(1, -1);
+    }
+    if (value.length >= 2 && value.charAt(0) === "'" && value.charAt(value.length - 1) === "'") {
+      return value.slice(1, -1);
+    }
+    if (value.indexOf('"') !== -1 || value.indexOf("'") !== -1) {
+      throw new Error("mismatched quotes in filter expression: " + text);
+    }
+    return value;
+  }
+
+  function messageOf(err: unknown): string {
+    return err instanceof Error ? err.message : String(err);
+  }
+
+  function nullable(value: string | null | undefined): string | null {
+    return value === undefined || value === null ? null : value;
+  }
+
+  try {
+    const tokens = splitTokens(expr.trim());
+    const predicates: Array<{ field: string; value: string; negated: boolean }> = [];
+    const needles: string[] = [];
+    for (let t = 0; t < tokens.length; t++) {
+      const token = tokens[t];
+      let negated = false;
+      let rest = token;
+      if (rest.charAt(0) === "!") {
+        negated = true;
+        rest = rest.slice(1);
+      }
+      const colon = rest.indexOf(":");
+      if (colon <= 0) {
+        if (negated) {
+          return {
+            ok: false,
+            error:
+              'bad filter token "' +
+              token +
+              '" (negation applies to field:value predicates; free text matches id/title as-is)',
+          };
+        }
+        needles.push(unquote(rest, expr).toLowerCase());
+        continue;
+      }
+      const field = rest.slice(0, colon);
+      if (KERNEL_ONLY_FIELDS.indexOf(field) !== -1) {
+        return {
+          ok: false,
+          error:
+            'the board lens does not support "' +
+            field +
+            ':" (v1 subset: ' +
+            BOARD_FIELDS.join(", ") +
+            " plus free text on id/title; use `arggon list --filter` for parent:, depends-on: and blocked-by:)",
+        };
+      }
+      if (BOARD_FIELDS.indexOf(field) === -1) {
+        return {
+          ok: false,
+          error:
+            'unknown filter field "' +
+            field +
+            '". Allowed on the board: ' +
+            BOARD_FIELDS.join(", ") +
+            ' (a token without ":" is free text on id/title)',
+        };
+      }
+      let value = unquote(rest.slice(colon + 1), expr);
+      if (!value) {
+        return { ok: false, error: 'empty value in filter token "' + token + '"' };
+      }
+      if (field === "type" && TYPES.indexOf(value) === -1) {
+        return { ok: false, error: 'unknown type "' + value + '". Allowed: ' + TYPES.join(", ") };
+      }
+      if (field === "status" && STATUSES.indexOf(value) === -1) {
+        return {
+          ok: false,
+          error: 'unknown status "' + value + '". Allowed: ' + STATUSES.join(", "),
+        };
+      }
+      if (field === "priority" && value !== "none" && PRIORITIES.indexOf(value) === -1) {
+        return {
+          ok: false,
+          error: 'unknown priority "' + value + '". Allowed: ' + PRIORITIES.join(", ") + ", none",
+        };
+      }
+      if (field === "assignee" && value === "@me") {
+        if (me === undefined || me === null || me === "") {
+          return {
+            ok: false,
+            error:
+              "could not resolve @me (set GITHUB_USER or GITHUB_ACTOR, or authenticate gh: gh api user)",
+          };
+        }
+        value = me;
+      }
+      predicates.push({ field: field, value: value, negated: negated });
+    }
+
+    // Ancestor index over the WHOLE input (like the kernel's buildAncestorIndex):
+    // the parent chain only, nearest parent first, cycle-safe; the item itself
+    // is never in its own chain.
+    const parentOf = new Map<string, string>();
+    for (let p = 0; p < items.length; p++) {
+      const parentItem = items[p];
+      if (parentItem.id && parentItem.parent) parentOf.set(parentItem.id, parentItem.parent);
+    }
+    const ancestors = new Map<string, string[]>();
+    for (let a = 0; a < items.length; a++) {
+      const chain: string[] = [];
+      const visited = new Set<string>([items[a].id]);
+      let cur = parentOf.get(items[a].id);
+      while (cur !== undefined && !visited.has(cur)) {
+        chain.push(cur);
+        visited.add(cur);
+        cur = parentOf.get(cur);
+      }
+      ancestors.set(items[a].id, chain);
+    }
+
+    function predicateHits(
+      item: BoardLensItem,
+      pred: { field: string; value: string; negated: boolean },
+    ): boolean {
+      let hit: boolean;
+      if (pred.field === "type") hit = item.type === pred.value;
+      else if (pred.field === "status") hit = item.status === pred.value;
+      else if (pred.field === "assignee") hit = nullable(item.assignee) === pred.value;
+      else if (pred.field === "label") hit = (item.labels || []).indexOf(pred.value) !== -1;
+      else if (pred.field === "priority") {
+        hit = nullable(item.priority) === (pred.value === "none" ? null : pred.value);
+      } else {
+        hit = (ancestors.get(item.id) || []).indexOf(pred.value) !== -1;
+      }
+      return pred.negated ? !hit : hit;
+    }
+
+    const visible: string[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      let keep = true;
+      for (let j = 0; j < predicates.length && keep; j++) {
+        if (!predicateHits(item, predicates[j])) keep = false;
+      }
+      for (let k = 0; k < needles.length && keep; k++) {
+        const id = String(item.id || "").toLowerCase();
+        const title = String(item.title || "").toLowerCase();
+        if (id.indexOf(needles[k]) === -1 && title.indexOf(needles[k]) === -1) keep = false;
+      }
+      if (keep) visible.push(item.id);
+    }
+    return { ok: true, visible: visible };
+  } catch (err) {
+    return { ok: false, error: messageOf(err) };
+  }
+}
+
+/**
+ * JSON for a `<script>` context: `<` is escaped so a title like
+ * `</script><script>alert(1)</script>` cannot break out, and the two
+ * line-separator code points stay valid string characters. Rendered values
+ * are still JSON.parse-able by the browser.
+ */
+function embedJson(value: unknown): string {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
 /**
  * Pure renderer for the static board. Columns are the v0 statuses in enum
  * order; every card shows its own status (no rollup). All dynamic text is
@@ -318,6 +591,14 @@ export function evaluateDrop(
  * visually distinct: a `dep-blocked` class (dimmed card) plus a
  * `blocked by N` badge, and a `↳ blocked by <id>` line per open dep;
  * terminal deps render nothing.
+ * With `lenses` (task-board-filter-lenses: the tracker `x-views` map) the page
+ * gains one chip per saved view (name + `name: expression` tooltip) and a
+ * filter/search box over the same client-side lens for every board — static
+ * export and serve alike. The active expression round-trips through the URL
+ * hash (`#filter=<expr>`); `me` is the generation-time `@me` login (the
+ * caller resolves it, like `runList`). Both options are additive: without
+ * `lenses` the chips container is absent and the board degrades to the plain
+ * export plus the filter box.
  */
 export function renderBoardHtml(
   items: WorkItem[],
@@ -329,6 +610,10 @@ export function renderBoardHtml(
     /** Serve-mode review surface (task-board-review-surface): add per-PR diff links. */
     diffLinks?: boolean;
     groupBy?: "milestone" | "story";
+    /** Saved views (`x-views`) rendered as lens chips: view name -> filter expression. */
+    lenses?: Record<string, string>;
+    /** Resolved login for `@me` in an expression; null/absent = unresolved (loud error). */
+    me?: string | null;
   } = {
     generatedAt: "",
   },
@@ -341,6 +626,35 @@ export function renderBoardHtml(
   const diffLinks = showPr && opts.diffLinks === true;
   const groupByMilestone = opts.groupBy === "milestone";
   const groupByStory = opts.groupBy === "story";
+  const lenses = opts.lenses ?? {};
+  const lensNames = Object.keys(lenses);
+  const me = opts.me ?? null;
+
+  // The client-side lens filters a snapshot of the card fields that travels
+  // with the page (there is no server to read the tracker from). Only the
+  // fields the embedded predicate mirror reads are included.
+  const lensItems: BoardLensItem[] = sorted.map((item) => ({
+    id: item.id,
+    title: item.title,
+    type: item.type,
+    status: item.status,
+    assignee: item.assignee,
+    labels: item.labels,
+    parent: item.parent,
+    priority: item.priority,
+  }));
+
+  // Saved views (x-views) as lens chips. Tooltip = name + expression, so the
+  // predicate behind a chip is visible without leaving the board.
+  const lensChips =
+    lensNames.length > 0
+      ? `<div class="lenses" id="board-lenses">${lensNames
+          .map((name) => {
+            const expr = lenses[name];
+            return `<button type="button" class="lens" data-name="${esc(name)}" data-filter="${esc(expr)}" title="${esc(`${name}: ${expr}`)}">${esc(name)}</button>`;
+          })
+          .join("")}</div>`
+      : "";
 
   // Dependency edges (ADR 0004) through the shared view-model (kernel rule):
   // a dep is open when it is not done/cancelled; unknown ids count as open
@@ -501,6 +815,18 @@ header .meta { color: #59636e; font-size: 13px; }
 #board-toast.show { display: block; }
 #board-toast.refused { background: #cf222e; }
 #board-toast.ok { background: #1a7f37; }
+.filterbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+.filterbar label { font-size: 11px; color: #59636e; text-transform: uppercase; letter-spacing: 0.05em; }
+#board-filter-input { flex: 1 1 260px; max-width: 560px; padding: 6px 10px; font-size: 13px; font-family: inherit; border: 1px solid #d0d4da; border-radius: 6px; background: #fff; color: inherit; }
+#board-filter-input:focus { outline: 2px solid #0550ae; outline-offset: -1px; }
+#board-filter-clear { padding: 6px 10px; font-size: 12px; font-family: inherit; border: 1px solid #d0d4da; border-radius: 6px; background: #fff; cursor: pointer; }
+.filter-count { font-size: 12px; color: #59636e; }
+.filter-error { display: none; font-size: 12px; color: #cf222e; }
+.filter-error.show { display: inline; }
+.lenses { display: flex; flex-wrap: wrap; gap: 6px; }
+.lens { border: 1px solid #d0d4da; background: #fff; border-radius: 12px; padding: 3px 10px; font-size: 12px; font-family: inherit; color: inherit; cursor: pointer; }
+.lens.active { background: #0550ae; border-color: #0550ae; color: #fff; }
+.card.filtered-out, .mgroup-head.filtered-out { display: none; }
 </style>
 </head>
 <body>
@@ -508,6 +834,14 @@ header .meta { color: #59636e; font-size: 13px; }
   <h1>arggon board${repo}</h1>
   <div class="meta">generated ${esc(opts.generatedAt)} · ${sorted.length} item(s) · <span id="status-counts">${counts}</span> · tracker files remain the source of truth; drops persist only against a live server (arggon board --serve)${live}</div>
 </header>
+<div class="filterbar" id="board-filterbar">
+  <label for="board-filter-input">filter</label>
+  <input id="board-filter-input" type="search" autocomplete="off" spellcheck="false" placeholder="free text or field:value (type, status, label, assignee, priority, ancestor)">
+  <button type="button" id="board-filter-clear">clear</button>
+  <span id="board-filter-count" class="filter-count">${sorted.length} item(s)</span>
+  <span id="board-filter-error" class="filter-error" role="alert"></span>
+  ${lensChips}
+</div>
 <main class="board">
 ${columns}
 </main>
@@ -515,8 +849,17 @@ ${columns}
 <script>
 'use strict';
 ${evaluateDrop.toString()}
+/* board-filter:start */
+${applyBoardFilter.toString()}
+/* board-filter:end */
 (function () {
   var ENDPOINT = document.body.getAttribute("data-update-endpoint") || "/api/update";
+  var BOARD_ITEMS = ${embedJson(lensItems)};
+  var BOARD_ME = ${embedJson(me)};
+  var filterInput = document.getElementById("board-filter-input");
+  var filterError = document.getElementById("board-filter-error");
+  var filterCount = document.getElementById("board-filter-count");
+  var lensChips = document.querySelectorAll("#board-lenses .lens");
   var toastTimer = null;
   function toast(message, kind) {
     var el = document.getElementById("board-toast");
@@ -528,10 +871,16 @@ ${evaluateDrop.toString()}
   function columnFor(status) {
     return document.querySelector('.column[data-status="' + status + '"]');
   }
+  function currentExpr() {
+    return filterInput ? filterInput.value : "";
+  }
+  function visibleCards(column) {
+    return column.querySelectorAll(".card:not(.filtered-out)");
+  }
   function refreshCounts() {
     var parts = [];
     document.querySelectorAll(".column").forEach(function (col) {
-      var n = col.querySelectorAll(".card").length;
+      var n = visibleCards(col).length;
       col.querySelector(".count").textContent = String(n);
       parts.push(col.getAttribute("data-status") + ": " + n);
     });
@@ -541,7 +890,7 @@ ${evaluateDrop.toString()}
   function normalizeEmpties() {
     document.querySelectorAll(".column").forEach(function (col) {
       var empty = col.querySelector(".empty");
-      if (col.querySelectorAll(".card").length === 0) {
+      if (visibleCards(col).length === 0) {
         if (!empty) {
           var d = document.createElement("div");
           d.className = "empty";
@@ -553,6 +902,97 @@ ${evaluateDrop.toString()}
       }
     });
   }
+  function refreshGroupHeads() {
+    document.querySelectorAll(".column").forEach(function (col) {
+      col.querySelectorAll(".mgroup-head").forEach(function (head) {
+        var visible = 0;
+        var sib = head.nextElementSibling;
+        while (sib && !sib.classList.contains("mgroup-head")) {
+          if (sib.classList.contains("card") && !sib.classList.contains("filtered-out")) visible++;
+          sib = sib.nextElementSibling;
+        }
+        if (visible === 0) head.classList.add("filtered-out");
+        else head.classList.remove("filtered-out");
+      });
+    });
+  }
+  function refreshFilterCount() {
+    if (!filterCount) return;
+    var total = BOARD_ITEMS.length;
+    var shown = document.querySelectorAll(".board .card:not(.filtered-out)").length;
+    filterCount.textContent = shown === total ? total + " item(s)" : shown + " of " + total + " item(s)";
+  }
+  function setFilterState(expr) {
+    var result = applyBoardFilter(BOARD_ITEMS, expr, BOARD_ME);
+    // Prototype-less: ids like "constructor" must not read as visible.
+    var shown = Object.create(null);
+    if (result.ok) {
+      for (var i = 0; i < result.visible.length; i++) shown[result.visible[i]] = true;
+    } else {
+      // Invalid expression: keep the whole board visible, surface the error.
+      for (var j = 0; j < BOARD_ITEMS.length; j++) shown[BOARD_ITEMS[j].id] = true;
+    }
+    if (filterError) {
+      filterError.textContent = result.ok ? "" : result.error;
+      filterError.className = result.ok ? "filter-error" : "filter-error show";
+    }
+    document.querySelectorAll(".board .card").forEach(function (card) {
+      if (shown[card.getAttribute("data-id")]) card.classList.remove("filtered-out");
+      else card.classList.add("filtered-out");
+    });
+    lensChips.forEach(function (chip) {
+      chip.className = chip.getAttribute("data-filter") === expr ? "lens active" : "lens";
+    });
+    refreshCounts();
+    normalizeEmpties();
+    refreshGroupHeads();
+    refreshFilterCount();
+  }
+  function hashFilter() {
+    var match = /[#&]filter=([^&]*)/.exec(window.location.hash);
+    if (!match) return "";
+    try {
+      return decodeURIComponent(match[1]);
+    } catch (err) {
+      return match[1];
+    }
+  }
+  function writeHash(expr) {
+    var next = expr === "" ? "" : "#filter=" + encodeURIComponent(expr);
+    if (window.location.hash === next) return;
+    var base = window.location.pathname + window.location.search;
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState(null, "", base + next);
+    } else {
+      window.location.hash = next;
+    }
+  }
+  function setFilter(expr, writeUrl) {
+    if (filterInput) filterInput.value = expr;
+    if (writeUrl) writeHash(expr);
+    setFilterState(expr);
+  }
+  if (filterInput) {
+    filterInput.addEventListener("input", function () { setFilter(filterInput.value, true); });
+    filterInput.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") setFilter("", true);
+    });
+  }
+  var clearButton = document.getElementById("board-filter-clear");
+  if (clearButton) {
+    clearButton.addEventListener("click", function () {
+      setFilter("", true);
+      if (filterInput) filterInput.focus();
+    });
+  }
+  lensChips.forEach(function (chip) {
+    chip.addEventListener("click", function () {
+      var expr = chip.getAttribute("data-filter") || "";
+      setFilter(filterInput && filterInput.value === expr ? "" : expr, true);
+    });
+  });
+  window.addEventListener("hashchange", function () { setFilter(hashFilter(), false); });
+  setFilter(hashFilter(), false);
   var dragged = null;
   document.addEventListener("dragstart", function (e) {
     var card = e.target && e.target.closest ? e.target.closest(".card") : null;
@@ -628,8 +1068,7 @@ ${evaluateDrop.toString()}
     // Optimistic move; the catch below reverts it when the update call fails.
     card.setAttribute("data-status", to);
     columnFor(to).appendChild(card);
-    normalizeEmpties();
-    refreshCounts();
+    setFilterState(currentExpr());
     toast("… arggon update " + id + " --status " + to, "pending");
     fetch(ENDPOINT, {
       method: "POST",
@@ -653,8 +1092,7 @@ ${evaluateDrop.toString()}
         var col = columnFor(from);
         if (anchor && anchor.parentNode === col) col.insertBefore(card, anchor);
         else col.appendChild(card);
-        normalizeEmpties();
-        refreshCounts();
+        setFilterState(currentExpr());
         var message = err && err.message ? err.message : "update failed";
         if (message === "Failed to fetch") {
           message = "static snapshot: no update endpoint (serve with arggon board --serve)";

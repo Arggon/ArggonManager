@@ -16,7 +16,7 @@
  */
 import { expect, test } from "@playwright/test";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,6 +27,14 @@ const TIMEOUT_MS = 30_000;
 
 /** The task the status move drives; id derives from the title `Board task`. */
 const MOVED_ITEM_ID = "task-board-task";
+
+/** The labelled task the lens cases narrow to; id derives from `Board filter task`. */
+const FILTER_ITEM_ID = "task-board-filter-task";
+
+/** The `filter` value in a URL hash (null when the board is unfiltered). */
+function filterFromUrl(url: string): string | null {
+  return new URLSearchParams(new URL(url).hash.replace(/^#/, "")).get("filter");
+}
 
 type ListedItem = { id: string; status: string };
 
@@ -82,6 +90,25 @@ function createFixture(): string {
       "--json",
     ]);
   }
+  // A labelled task the filter cases narrow to; never moved by any test.
+  runCli(fixture, [
+    "create",
+    "task",
+    "Board filter task",
+    "--parent",
+    "entries",
+    "--labels",
+    "smoke",
+    "--json",
+  ]);
+  // Saved views (`x-views`, task-board-filter-lenses) for the lens cases,
+  // appended to the tracker convention after init.
+  const convention = join(fixture, "ArggonManager", ".convention.yml");
+  writeFileSync(
+    convention,
+    `${readFileSync(convention, "utf8").trimEnd()}\nx-views:\n  smoke: "label:smoke"\n  open: "status:todo"\n`,
+    "utf8",
+  );
   return fixture;
 }
 
@@ -172,6 +199,72 @@ test.describe("@smoke board --serve", () => {
       elements.map((element) => element.getAttribute("data-id")).sort(),
     );
     expect(ids).toEqual(listItems.map((item) => item.id).sort());
+  });
+
+  test("a saved lens filters the board, shrinks the column and round-trips through the URL", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    await expect(page.locator("#board-lenses .lens")).toHaveCount(2);
+    const chip = page.locator('#board-lenses .lens[data-name="smoke"]');
+    await expect(chip).toHaveAttribute("title", "smoke: label:smoke");
+
+    await chip.click();
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
+    await expect(page.locator(`.card:not(.filtered-out)[data-id="${FILTER_ITEM_ID}"]`)).toHaveCount(
+      1,
+    );
+    // Column counts and the meta line reflect the filtered set.
+    await expect(page.locator('.column[data-status="todo"] .count')).toHaveText("1");
+    await expect(page.locator('.column[data-status="done"] .count')).toHaveText("0");
+    await expect(page.locator("#board-filter-count")).toHaveText(
+      `1 of ${listItems.length} item(s)`,
+    );
+    await expect(page.locator("#board-filter-input")).toHaveValue("label:smoke");
+    expect(filterFromUrl(page.url())).toBe("label:smoke");
+
+    // Reload/share/copy: the URL hash restores the lens.
+    await page.reload();
+    await expect(page.locator("#board-filter-input")).toHaveValue("label:smoke");
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
+    await expect(page.locator('.column[data-status="todo"] .count')).toHaveText("1");
+
+    // Clearing restores the full board and drops the hash filter.
+    await page.locator("#board-filter-clear").click();
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(listItems.length);
+    await expect(page.locator("#board-filter-input")).toHaveValue("");
+    expect(filterFromUrl(page.url())).toBeNull();
+  });
+
+  test("free text narrows id/title and survives a reload", async ({ page }) => {
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-filter-input").fill("filter task");
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
+    await expect(page.locator(`.card:not(.filtered-out)[data-id="${FILTER_ITEM_ID}"]`)).toHaveCount(
+      1,
+    );
+    expect(filterFromUrl(page.url())).toBe("filter task");
+
+    await page.reload();
+    await expect(page.locator("#board-filter-input")).toHaveValue("filter task");
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
+  });
+
+  test("the static export filters offline through the same URL hash", async ({ page }) => {
+    const boardFile = join(fixture, "static-board.html");
+    runCli(fixture, ["board", "--out", boardFile]);
+    await page.goto(`file://${boardFile}`);
+    await expect(page.locator("#board-lenses .lens")).toHaveCount(2);
+
+    await page.locator('#board-lenses .lens[data-name="smoke"]').click();
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
+    await expect(page.locator(`.card:not(.filtered-out)[data-id="${FILTER_ITEM_ID}"]`)).toHaveCount(
+      1,
+    );
+    expect(filterFromUrl(page.url())).toBe("label:smoke");
+
+    await page.reload();
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
   });
 
   test("a status move round-trips through the UI and persists", async ({ page }) => {

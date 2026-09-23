@@ -12,10 +12,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   displayPath,
   escapeHtml,
+  applyBoardFilter,
   evaluateDrop,
   renderBoardHtml,
   runBoard,
   summarizeChecks,
+  type BoardLensItem,
 } from "./board.js";
 import type { BoardGithub, PrInfo } from "./board.js";
 import { type ContractWorkItem as WorkItem } from "@arggondev/lib";
@@ -159,7 +161,7 @@ describe("runBoard", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-board-"));
     mkdirSync(join(dir, "tasks"));
     writeFileSync(join(dir, "tasks/.convention.yml"), "version: 0\n");
-    const result = runBoard({ cwd: dir, out: "out.html", generatedAt: GENERATED_AT });
+    const result = runBoard({ cwd: dir, out: "out.html", generatedAt: GENERATED_AT, me: null });
     expect(result.outPath).toBe(join(dir, "out.html"));
     expect(result.itemCount).toBe(0);
     expect(existsSync(result.outPath)).toBe(true);
@@ -174,10 +176,53 @@ describe("runBoard", () => {
     writeFileSync(join(dir, "tasks/.convention.yml"), "version: 0\n");
     const sub = join(dir, "a", "b");
     mkdirSync(sub, { recursive: true });
-    const result = runBoard({ cwd: sub, generatedAt: GENERATED_AT });
+    const result = runBoard({ cwd: sub, generatedAt: GENERATED_AT, me: null });
     expect(result.root).toBe(dir);
     expect(result.outPath).toBe(join(dir, "board.html"));
     expect(existsSync(result.outPath)).toBe(true);
+  });
+});
+
+describe("runBoard saved views (task-board-filter-lenses)", () => {
+  function writeTracker(dir: string, convention: string): void {
+    mkdirSync(join(dir, "tasks"));
+    writeFileSync(join(dir, "tasks", ".convention.yml"), convention, "utf8");
+  }
+
+  it("renders x-views as lens chips and bakes the resolved @me at generation time", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-views-"));
+    writeTracker(dir, 'version: 0\nx-views:\n  smoke: "label:smoke"\n  mine: "assignee:@me"\n');
+    const result = runBoard({ cwd: dir, out: "out.html", generatedAt: GENERATED_AT, me: "arggon" });
+    const html = readFileSync(result.outPath, "utf8");
+    expect(html).toContain(
+      'data-name="smoke" data-filter="label:smoke" title="smoke: label:smoke">smoke</button>',
+    );
+    // The chip keeps the raw expression (tooltip) and the page bakes the login
+    // for `@me` — resolution is the caller's job, exactly like runList.
+    expect(html).toContain(
+      'data-name="mine" data-filter="assignee:@me" title="mine: assignee:@me"',
+    );
+    expect(html).toContain('var BOARD_ME = "arggon";');
+  });
+
+  it("degrades to no chips when x-views is absent or malformed", () => {
+    const bare = mkdtempSync(join(tmpdir(), "arggon-board-noviews-"));
+    writeTracker(bare, "version: 0\n");
+    const bareHtml = readFileSync(
+      runBoard({ cwd: bare, out: "out.html", generatedAt: GENERATED_AT, me: null }).outPath,
+      "utf8",
+    );
+    expect(bareHtml).not.toContain('id="board-lenses"');
+    expect(bareHtml).not.toContain('class="lens"');
+
+    const broken = mkdtempSync(join(tmpdir(), "arggon-board-badviews-"));
+    writeTracker(broken, "version: 0\nx-views: open\n");
+    const brokenHtml = readFileSync(
+      runBoard({ cwd: broken, out: "out.html", generatedAt: GENERATED_AT, me: null }).outPath,
+      "utf8",
+    );
+    expect(brokenHtml).not.toContain('id="board-lenses"');
+    expect(brokenHtml).not.toContain('class="lens"');
   });
 });
 
@@ -287,6 +332,178 @@ describe("evaluateDrop", () => {
   });
 });
 
+describe("applyBoardFilter (embedded board lens, task-board-filter-lenses)", () => {
+  /**
+   * Supported-subset table (v1), asserted 1:1 with the kernel in
+   * cli/src/board-parity.test.ts:
+   *   fields:    type, status, label, assignee, priority, ancestor
+   *   free text: any token without ":" (case-insensitive id/title substring)
+   *   excluded:  parent, depends-on, blocked-by, ready (kernel-only; refused
+   *              with a pointer to `arggon list --filter`)
+   */
+  const lensItems: BoardLensItem[] = [
+    {
+      id: "launch",
+      title: "Launch",
+      type: "initiative",
+      status: "todo",
+      assignee: null,
+      labels: ["core"],
+      parent: null,
+      priority: "p1",
+    },
+    {
+      id: "epic-a",
+      title: "Auth epic",
+      type: "epic",
+      status: "todo",
+      assignee: null,
+      labels: ["core", "security"],
+      parent: "launch",
+      priority: null,
+    },
+    {
+      id: "story-a",
+      title: "Login flow",
+      type: "story",
+      status: "todo",
+      assignee: "alice",
+      labels: ["security"],
+      parent: "epic-a",
+      priority: "p2",
+    },
+    {
+      id: "task-one",
+      title: "Fix login flow",
+      type: "task",
+      status: "in_progress",
+      assignee: "alice",
+      labels: ["security"],
+      parent: "story-a",
+      priority: "p1",
+    },
+    {
+      id: "task-two",
+      title: "Ship it",
+      type: "task",
+      status: "done",
+      assignee: "bob",
+      labels: [],
+      parent: "story-a",
+      priority: null,
+    },
+    {
+      id: "bug-one",
+      title: "Crash on empty",
+      type: "bug",
+      status: "todo",
+      assignee: null,
+      labels: ["bug"],
+      parent: "story-a",
+      priority: "p0",
+    },
+  ];
+
+  function visible(expr: string, me?: string | null): string[] {
+    const result = applyBoardFilter(lensItems, expr, me);
+    if (!result.ok) throw new Error(result.error);
+    return result.visible;
+  }
+
+  function errorOf(expr: string, me?: string | null): string {
+    const result = applyBoardFilter(lensItems, expr, me);
+    if (result.ok) throw new Error(`expected "${expr}" to be refused`);
+    return result.error;
+  }
+
+  it("matches every item for an empty expression, in input order", () => {
+    expect(visible("")).toEqual(lensItems.map((item) => item.id));
+    expect(visible("   ")).toEqual(lensItems.map((item) => item.id));
+  });
+
+  it("free text matches id or title, case-insensitively, ANDing multiple tokens", () => {
+    expect(visible("login")).toEqual(["story-a", "task-one"]);
+    expect(visible("LOGIN")).toEqual(["story-a", "task-one"]);
+    expect(visible("task-one")).toEqual(["task-one"]);
+    expect(visible('"login flow"')).toEqual(["story-a", "task-one"]);
+    expect(visible("login task-one")).toEqual(["task-one"]);
+  });
+
+  it("supports the documented predicate subset with kernel semantics", () => {
+    expect(visible("type:task")).toEqual(["task-one", "task-two"]);
+    expect(visible("status:done")).toEqual(["task-two"]);
+    expect(visible("label:security")).toEqual(["epic-a", "story-a", "task-one"]);
+    expect(visible("assignee:alice")).toEqual(["story-a", "task-one"]);
+    expect(visible('assignee:"alice"')).toEqual(["story-a", "task-one"]);
+    expect(visible("priority:p1")).toEqual(["launch", "task-one"]);
+    expect(visible("priority:none")).toEqual(["epic-a", "task-two"]);
+    expect(visible("status:todo label:security")).toEqual(["epic-a", "story-a"]);
+  });
+
+  it("walks the ancestor chain only (never the item itself, unknown ids never match)", () => {
+    expect(visible("ancestor:launch")).toEqual([
+      "epic-a",
+      "story-a",
+      "task-one",
+      "task-two",
+      "bug-one",
+    ]);
+    expect(visible("ancestor:epic-a")).toEqual(["story-a", "task-one", "task-two", "bug-one"]);
+    expect(visible("ancestor:task-one")).toEqual([]);
+    expect(visible("ancestor:missing")).toEqual([]);
+    expect(visible("!ancestor:epic-a")).toEqual(["launch", "epic-a"]);
+  });
+
+  it("negates predicates and ANDs them with free text", () => {
+    expect(visible("!type:task")).toEqual(["launch", "epic-a", "story-a", "bug-one"]);
+    expect(visible("!label:security")).toEqual(["launch", "task-two", "bug-one"]);
+    expect(visible("status:todo login")).toEqual(["story-a"]);
+  });
+
+  it("resolves assignee:@me through the caller and refuses an unresolved @me", () => {
+    expect(visible("assignee:@me", "alice")).toEqual(["story-a", "task-one"]);
+    expect(errorOf("assignee:@me", null)).toContain("could not resolve @me");
+    expect(errorOf("assignee:@me")).toContain("could not resolve @me");
+    // @me in another field is a literal value, exactly like the kernel.
+    expect(visible("label:@me", "alice")).toEqual([]);
+  });
+
+  it("refuses the kernel-only dependency predicates with a pointer to list --filter", () => {
+    for (const expr of ["parent:story-a", "depends-on:task-one", "blocked-by:task-one"]) {
+      const message = errorOf(expr);
+      expect(message).toContain(`does not support "${expr.split(":")[0]}:"`);
+      expect(message).toContain("arggon list --filter");
+    }
+  });
+
+  it("mirrors parseFilter's syntax and enum errors", () => {
+    expect(errorOf("foo:bar")).toContain('unknown filter field "foo"');
+    expect(errorOf("status:")).toBe('empty value in filter token "status:"');
+    expect(errorOf("!login")).toContain('bad filter token "!login"');
+    expect(errorOf('assignee:"Jane')).toContain("unterminated quote");
+    expect(errorOf('assignee:"Jane"x')).toContain("mismatched quotes");
+    expect(errorOf("status:bogus")).toBe(
+      'unknown status "bogus". Allowed: todo, in_progress, blocked, done, cancelled',
+    );
+    expect(errorOf("type:bogus")).toBe(
+      'unknown type "bogus". Allowed: initiative, epic, story, task, bug',
+    );
+    expect(errorOf("priority:p9")).toBe('unknown priority "p9". Allowed: p0, p1, p2, p3, none');
+  });
+
+  it("is cycle-safe on malformed parent chains and tolerates sparse items", () => {
+    const cyclic: BoardLensItem[] = [
+      { id: "a", type: "task", status: "todo", parent: "b" },
+      { id: "b", type: "task", status: "todo", parent: "a" },
+      { id: "c", type: "task", status: "todo", parent: "b" },
+      { id: "d", type: "task", status: "todo" },
+    ];
+    expect(applyBoardFilter(cyclic, "ancestor:b")).toEqual({ ok: true, visible: ["a", "c"] });
+    expect(applyBoardFilter(cyclic, "ancestor:a")).toEqual({ ok: true, visible: ["b", "c"] });
+    expect(applyBoardFilter(cyclic, "missing")).toEqual({ ok: true, visible: [] });
+  });
+});
+
 describe("renderBoardHtml drag-and-drop", () => {
   it("marks cards draggable with id/type/status/assignee data attributes", () => {
     const html = renderBoardHtml(
@@ -333,6 +550,76 @@ describe("renderBoardHtml drag-and-drop", () => {
     expect(html).toContain(
       '<span id="status-counts">todo: 1 · in_progress: 0 · blocked: 0 · done: 0 · cancelled: 0</span>',
     );
+  });
+});
+
+describe("renderBoardHtml filter lens (task-board-filter-lenses)", () => {
+  const lensItems = [
+    item({ id: "task-a", type: "task", status: "todo", title: "A", labels: ["smoke"] }),
+  ];
+
+  it("renders the filter box and one chip per saved view with name + expression tooltip", () => {
+    const html = renderBoardHtml(lensItems, {
+      generatedAt: GENERATED_AT,
+      lenses: { smoke: "label:smoke", mine: "assignee:@me" },
+      me: "arggon",
+    });
+    expect(html).toContain('id="board-filter-input"');
+    expect(html).toContain('id="board-filter-clear"');
+    expect(html).toContain('id="board-filter-count"');
+    expect(html).toContain('id="board-lenses"');
+    expect(html).toContain(
+      'data-name="smoke" data-filter="label:smoke" title="smoke: label:smoke">smoke</button>',
+    );
+    expect(html).toContain(
+      'data-name="mine" data-filter="assignee:@me" title="mine: assignee:@me"',
+    );
+    expect(html).toContain('var BOARD_ME = "arggon";');
+    expect(html).toContain(applyBoardFilter.toString());
+  });
+
+  it("renders no chips without x-views and defaults @me to unresolved", () => {
+    const html = renderBoardHtml(lensItems, { generatedAt: GENERATED_AT });
+    expect(html).not.toContain('id="board-lenses"');
+    expect(html).not.toContain('class="lens"');
+    expect(html).toContain("var BOARD_ME = null;");
+  });
+
+  it("renders identical HTML with empty lenses and an explicit null @me (unchanged export)", () => {
+    const plain = renderBoardHtml(lensItems, { generatedAt: GENERATED_AT });
+    const explicit = renderBoardHtml(lensItems, {
+      generatedAt: GENERATED_AT,
+      lenses: {},
+      me: null,
+    });
+    expect(explicit).toBe(plain);
+  });
+
+  it("escapes hostile view names and expressions", () => {
+    const html = renderBoardHtml(lensItems, {
+      generatedAt: GENERATED_AT,
+      lenses: { '"><script>alert(1)</script>': 'status:todo" onmouseover="alert(1)' },
+    });
+    expect(html).not.toContain("<script>alert(1)");
+    expect(html).not.toContain('onmouseover="alert(1)"');
+    expect(html).toContain("&quot;&gt;&lt;script&gt;");
+  });
+
+  it("embeds the item snapshot script-safely", () => {
+    const html = renderBoardHtml(
+      [
+        item({
+          id: "task-x",
+          type: "task",
+          status: "todo",
+          title: "</script><script>alert(1)</script>",
+        }),
+      ],
+      { generatedAt: GENERATED_AT },
+    );
+    expect(html).toContain("var BOARD_ITEMS = [");
+    expect(html).toContain("\\u003cscript>alert(1)");
+    expect(html).not.toContain("<script>alert(1)");
   });
 });
 
@@ -494,6 +781,7 @@ describe("runBoard github overlay", () => {
       generatedAt: GENERATED_AT,
       github: true,
       gh,
+      me: null,
     });
     expect(result.prCount).toBe(1);
     expect(seen).toEqual([dir]);
@@ -629,6 +917,7 @@ describe("runBoard --group-by story (task-board-dependency-visuals)", () => {
       out: join(dir, "board.html"),
       generatedAt: GENERATED_AT,
       groupBy: "story",
+      me: null,
     });
     expect(result.groupBy).toBe("story");
     const html = readFileSync(result.outPath, "utf8");
