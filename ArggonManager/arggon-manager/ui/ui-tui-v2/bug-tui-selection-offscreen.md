@@ -100,3 +100,7 @@ AFTER (`→`x3, `PgDn`, `PgDn`, `End`): highlighted cell `"> E views Views and f
 - Known issue `bug-native-start-worktree-no-install` hit: `start --worktree` skipped the claim commit (`tsx: command not found`); ran `npm ci` in the worktree and committed the claim manually (`28f1b139`).
 - Pre-existing, not addressed: a CSI sequence split across two stdin chunks (a lone trailing `ESC` in one chunk) is still treated as the Esc key; terminals write sequences atomically in practice, so the fix keeps the per-chunk parser.
 - By design: at 80 columns the help tail (`enter path · q quit`) clips because the position leads; full help fits from ~92 columns (README has the full table).
+
+### handoff 2026-09-23 @ses_f346f75d7ffe1ji5AVdwAh8Ewo (session: ses_f346f75d7ffe1ji5AVdwAh8Ewo) — next: Review PR #405 (head a203305b, CI green) and merge; then tick the item checklist and flip bug-tui-selection-offscreen to done.
+- branch: fix/bug-tui-selection-offscreen
+- open questions: CSI sequences split across stdin chunks still treat a lone ESC as Esc (pre-existing, not addressed); at 80 cols the footer clips the help tail by design because the position leads.
