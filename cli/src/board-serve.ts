@@ -5,7 +5,9 @@ import { renderBoardHtml, defaultBoardGithub, type BoardGithub, type PrInfo } fr
 import {
   findTasksDir,
   loadItems,
+  readConventionConfig,
   repoRootFromTasks,
+  resolveCurrentLogin,
   runUpdate,
   toContractWorkItem,
 } from "@arggondev/lib";
@@ -39,6 +41,12 @@ export type BoardServeOptions = {
   gh?: BoardGithub;
   /** PR poll interval in ms (default 60_000). */
   pollMs?: number;
+  /**
+   * Resolved login baked into the page for `@me` in a lens/filter expression
+   * (task-board-filter-lenses); default resolves once at startup like
+   * `runList`'s caller. Tests inject `null` to stay hermetic.
+   */
+  me?: string | null;
 };
 
 export type BoardServeHandle = {
@@ -62,6 +70,10 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
     }
     groupBy = opts.groupBy;
   }
+
+  // `@me` is resolved once at startup (the same rule as runList's caller):
+  // per-request resolution would shell out to gh on every reload.
+  const me = opts.me !== undefined ? opts.me : (resolveCurrentLogin() ?? null);
 
   const clients = new Set<ServerResponse>();
   let debounce: NodeJS.Timeout | undefined;
@@ -105,9 +117,25 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
 
   const render = (): string => {
     const items = loadItems(tasksDir).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    // Saved views are re-read per render (the watcher reloads on config
+    // changes); a malformed convention file degrades to no chips, never a 500.
+    let lenses: Record<string, string> = {};
+    try {
+      lenses = readConventionConfig(root).views;
+    } catch {
+      lenses = {};
+    }
     const html = renderBoardHtml(
       items.map((item) => toContractWorkItem(item, root)),
-      { generatedAt: new Date().toISOString(), groupBy, prs, live: true, diffLinks: true },
+      {
+        generatedAt: new Date().toISOString(),
+        groupBy,
+        prs,
+        live: true,
+        diffLinks: true,
+        lenses,
+        me,
+      },
     );
     // Live-reload client, injected only in serve mode; the static export
     // stays byte-identical to the plain `arggon board` output.

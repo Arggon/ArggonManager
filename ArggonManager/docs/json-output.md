@@ -510,6 +510,8 @@ With `--github` the board overlays live PR state (number, draft/ready, checks) o
 
 `--tui` is an interactive read-only terminal kanban (story-tui-board), **not a data format**: it is not combinable with `--json` (fails with `error.code: "BOARD_FAILED"`) and emits no envelope — it renders ANSI frames until you press `q`. It also fails with `BOARD_FAILED` when stdout is not a TTY (piped output). It performs no writes: it re-reads the tree over the same kernel read path as `list`/`board` after every keypress.
 
+The board page carries a client-side filter lens (task-board-filter-lenses), in the static export and `--serve` alike: a search/filter box plus one chip per tracker `x-views` saved view (name + `name: expression` tooltip). It filters the already-rendered cards with the kernel's filter semantics for the supported subset — free text on id/title and `type:`, `status:`, `label:`, `assignee:`, `priority:`, `ancestor:`, including quoting, `!` negation, enum errors and generation-time `@me` resolution like `list --filter`/`--view`; `parent:`, `depends-on:`, `blocked-by:` and readiness are not in the board subset and are refused with a pointer to `arggon list`. The active expression round-trips through the URL hash (`#filter=<expr>`), and a tracker without `x-views` renders without chips. Presentation-only: no JSON field changes.
+
 ### `sync`
 
 | Field         | Type                             | Notes                                                                 |
