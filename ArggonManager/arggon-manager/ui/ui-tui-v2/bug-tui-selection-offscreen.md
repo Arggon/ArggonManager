@@ -103,3 +103,16 @@ AFTER (`→`x3, `PgDn`, `PgDn`, `End`): highlighted cell `"> E views Views and f
 ### handoff 2026-09-23 @ses_f346f75d7ffe1ji5AVdwAh8Ewo (session: ses_f346f75d7ffe1ji5AVdwAh8Ewo) — next: Review PR #405 (head a203305b, CI green) and merge; then tick the item checklist and flip bug-tui-selection-offscreen to done.
 - branch: fix/bug-tui-selection-offscreen
 - open questions: CSI sequences split across stdin chunks still treat a lone ESC as Esc (pre-existing, not addressed); at 80 cols the footer clips the help tail by design because the position leads.
+
+### 2026-09-23 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Coordinator review — PASS (lead architect) + merge verification
+
+PR #405 (rebase-merged; auto-done #408 marked this item done).
+
+**Independent verification.** `npx vitest run cli/src/tui.test.ts` → 41 passed; `npm run smoke:tui-board` passed. Code review: `followTuiScroll` is pure with explicit invariants (never past the end, never shows empty rows while cards exist), `tuiBodyRows` centralizes the -3 geometry, the window is re-derived per frame (a stale state still renders a valid frame) and only the selected column is windowed; PgUp/PgDn/Home/End variants handled; per-cell padding + sanitization untouched; `runTuiBoard` stays wiring-only.
+
+**Worker pty evidence reproduced the bug and closes it** (160x42, done column 284 cards): before = 0 body highlights, window rows 0..38, no position; after = 1 highlight, window start 22, footer `row 61/284`; `PgDn`x2 + `End` → `row 284/284` with the last card highlighted.
+
+**Acceptance verified:** scroll window + keys + footer position; golden tests (bottom-of-column at 80x24 and 200x24, follow invariants, paging without overshoot, resize grow/shrink, filter shrink, loop-level CSI keys); README keybindings updated.
+
+Follow-up filed: `bug-tui-split-escape-sequences` (p3) for the chunk-split CSI edge the worker reported.
