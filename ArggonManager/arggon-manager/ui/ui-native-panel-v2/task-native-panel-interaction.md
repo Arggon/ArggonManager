@@ -83,3 +83,7 @@ The W5 panel renders flat tree lines (header + counts + up to 200 lines) and onl
 1. Only `j`/`n`/`a`/Enter are exercised in the PTY smoke; `PgUp/PgDn/g/G/Home/End` binds are pinned by unit tests using documented key names but not driven on the real runtime (extending the smoke is cheap if the coordinator wants it).
 2. The smoke's screen replay implements the CSI subset OpenTUI emitted on 2.0.14; a runtime change to new sequences would fail loudly (never silently pass).
 3. The `a` jump depends on ARGON_ITEM or the convention branch; the smoke pins `ARGON_ITEM=story` because the fixture is not a git repo.
+
+### handoff 2026-09-23 @ses_f343321cdffeKlIPKIsESUxF4P (session: ses_f343321cdffeKlIPKIsESUxF4P) — next: Coordinator review of PR #411 (head 6035c8a + tracker comment commit); after merge verify main and flip the item done; resume in ../ArggonManager-task-native-panel-interaction if changes are requeste…
+- branch: feat/task-native-panel-interaction
+- open questions: PgUp/PgDn/g/G unit-pinned only (not PTY-driven); smoke screen replay covers the CSI subset seen on opencode 2.0.14; bundle forwards 5 new board exports via BUNDLE_EXPORTS.
