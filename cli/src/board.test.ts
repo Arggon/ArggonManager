@@ -14,9 +14,11 @@ import {
   escapeHtml,
   applyBoardFilter,
   evaluateDrop,
+  renderBoardDetail,
   renderBoardHtml,
   runBoard,
   summarizeChecks,
+  wireBoardDetail,
   type BoardLensItem,
 } from "./board.js";
 import type { BoardGithub, PrInfo } from "./board.js";
@@ -620,6 +622,54 @@ describe("renderBoardHtml filter lens (task-board-filter-lenses)", () => {
     expect(html).toContain("var BOARD_ITEMS = [");
     expect(html).toContain("\\u003cscript>alert(1)");
     expect(html).not.toContain("<script>alert(1)");
+  });
+});
+
+describe("renderBoardHtml item detail drawer (task-board-item-detail, serve-only)", () => {
+  const items = [item({ id: "task-a", type: "task", status: "todo", title: "A" })];
+
+  it("renders the drawer shell, focusable cards and /api/item wiring only with details: true", () => {
+    const html = renderBoardHtml(items, { generatedAt: GENERATED_AT, details: true });
+    expect(html).toContain('id="board-drawer"');
+    expect(html).toContain('id="board-drawer-body"');
+    expect(html).toContain('role="dialog"');
+    expect(html).toContain('data-detail-endpoint="/api/item"');
+    expect(html).toContain('tabindex="0"');
+    expect(html).toContain(renderBoardDetail.toString());
+    expect(html).toContain(wireBoardDetail.toString());
+    expect(html).toContain("wireBoardDetail(toast, renderBoardDetail);");
+  });
+
+  it("keeps the static export lean and byte-identical without details", () => {
+    const plain = renderBoardHtml(items, { generatedAt: GENERATED_AT });
+    const explicit = renderBoardHtml(items, { generatedAt: GENERATED_AT, details: false });
+    expect(explicit).toBe(plain);
+    expect(plain).not.toContain("board-drawer");
+    expect(plain).not.toContain("/api/item");
+    expect(plain).not.toContain("tabindex");
+    expect(plain).not.toContain("renderBoardDetail");
+  });
+
+  it("runBoard's static export stays drawer-free (no --details opt-in in this item)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-nodrawer-"));
+    writeBranchedTree(dir);
+    const result = runBoard({ cwd: dir, out: "out.html", generatedAt: GENERATED_AT, me: null });
+    const html = readFileSync(result.outPath, "utf8");
+    expect(html).toContain("task-one");
+    expect(html).not.toContain("board-drawer");
+    expect(html).not.toContain("/api/item");
+  });
+
+  it("embeds detail renderers that never turn untrusted text into HTML", () => {
+    for (const source of [renderBoardDetail.toString(), wireBoardDetail.toString()]) {
+      expect(source).not.toContain("innerHTML");
+      expect(source).not.toContain("insertAdjacentHTML");
+      expect(source).not.toContain("outerHTML");
+    }
+    // The renderer writes values through textContent/DOM text nodes.
+    expect(renderBoardDetail.toString()).toContain("textContent");
+    // PR links are only wired for absolute http(s) URLs.
+    expect(renderBoardDetail.toString()).toContain("/^https?:\\/\\//");
   });
 });
 

@@ -572,6 +572,335 @@ function embedJson(value: unknown): string {
 }
 
 /**
+ * Per-item detail payload for the serve-mode drawer (`GET /api/item`, see
+ * cli/src/board-serve.ts). `item` is the contract WorkItem (the same shape the
+ * board renders); `detail` carries the kernel bounded read (`show` semantics:
+ * prose + the last DEFAULT_TAIL_COMMENTS comments, each field capped
+ * server-side). The client renders all of it as DOM text nodes.
+ */
+export type BoardDetailPayload = {
+  ok: true;
+  item: WorkItem;
+  detail: {
+    prose: string;
+    /** The server's per-item prose cap cut the text (acceptance rows included). */
+    prose_truncated: boolean;
+    acceptance: Array<{ text: string; checked: boolean }>;
+    comments: Array<{ date: string; author: string; text: string; truncated: boolean }>;
+    /** Comments omitted by the kernel tail (allComments - tail). */
+    hidden_comments: number;
+    dependencies: Array<{ id: string; status: string | null; terminal: boolean }>;
+    pr: PrInfo | null;
+  };
+};
+
+/**
+ * Serve-only drawer chrome (task-board-item-detail). Rendered only with
+ * `details: true`; the static export stays lean and byte-identical without it.
+ */
+const DETAIL_CSS = `
+.card[tabindex="0"] { cursor: pointer; }
+.card:focus-visible { outline: 2px solid #0550ae; outline-offset: 2px; }
+body.drawer-open { overflow: hidden; }
+.drawer { position: fixed; inset: 0; z-index: 20; }
+.drawer[hidden] { display: none; }
+.drawer-backdrop { position: absolute; inset: 0; background: rgb(0 0 0 / 0.35); }
+.drawer-panel { position: absolute; top: 0; right: 0; bottom: 0; width: min(560px, 92vw); background: #fff; box-shadow: -4px 0 16px rgb(0 0 0 / 0.2); padding: 16px; overflow-y: auto; }
+.drawer-close { position: absolute; top: 8px; right: 10px; border: 1px solid #d0d4da; background: #fff; border-radius: 6px; width: 28px; height: 28px; font-size: 16px; line-height: 1; cursor: pointer; }
+.drawer-title { margin: 0 34px 6px 0; font-size: 16px; overflow-wrap: anywhere; }
+.drawer-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
+.drawer-meta code { font-size: 11px; color: #59636e; }
+.drawer-row { display: flex; gap: 8px; font-size: 12px; margin-top: 3px; }
+.drawer-k { color: #59636e; min-width: 84px; }
+.drawer-v { overflow-wrap: anywhere; }
+.drawer-section { margin-top: 14px; border-top: 1px solid #e7ebef; padding-top: 10px; }
+.drawer-section h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #424a53; }
+.drawer-body-text { white-space: pre-wrap; font-size: 13px; overflow-wrap: anywhere; }
+.drawer-check { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; margin: 2px 0; }
+.drawer-check input { margin-top: 2px; }
+.drawer-dep { font-size: 12px; font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+.drawer-dep.open { color: #9a3412; }
+.drawer-dep.terminal { color: #1a7f37; }
+.drawer-dep.missing { color: #cf222e; }
+.drawer-note { color: #59636e; font-size: 11px; margin-top: 4px; }
+.drawer-comment { margin-top: 8px; }
+.drawer-who { color: #59636e; font-size: 11px; }
+.drawer-panel a { color: #0550ae; }
+`;
+
+const DRAWER_MARKUP = `<div id="board-drawer" class="drawer" hidden aria-hidden="true">
+  <div class="drawer-backdrop" id="board-drawer-backdrop"></div>
+  <aside class="drawer-panel" role="dialog" aria-modal="true" aria-label="item detail">
+    <button type="button" class="drawer-close" id="board-drawer-close" aria-label="close item detail">×</button>
+    <div id="board-drawer-body" class="drawer-body"></div>
+  </aside>
+</div>`;
+
+/**
+ * Client renderer for the serve-mode detail drawer. Embedded into the page
+ * script with `toString()` (like `evaluateDrop`/`applyBoardFilter`), so it
+ * must stay self-contained: no module-scope references, no template literals.
+ *
+ * Untrusted tracker content is rendered exclusively through `textContent` and
+ * `createElement` — the body is markdown text, never HTML (a hostile
+ * `<img onerror>` line stays a literal string). PR links only get an href for
+ * an absolute http(s) URL.
+ */
+export function renderBoardDetail(container: HTMLElement, payload: BoardDetailPayload): void {
+  const doc = container.ownerDocument;
+  const item = payload.item || ({} as BoardDetailPayload["item"]);
+  const detail = payload.detail || ({} as BoardDetailPayload["detail"]);
+
+  function el(tag: string, className: string, text?: string): HTMLElement {
+    const node = doc.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+  function row(key: string, value: string): HTMLElement {
+    const line = el("div", "drawer-row");
+    line.appendChild(el("span", "drawer-k", key));
+    line.appendChild(el("span", "drawer-v", value));
+    return line;
+  }
+  function section(title: string, className: string): HTMLElement {
+    const node = el("section", "drawer-section " + className);
+    node.appendChild(el("h3", "", title));
+    return node;
+  }
+
+  container.textContent = "";
+  container.appendChild(el("h2", "drawer-title", String(item.title || item.id || "item")));
+
+  const meta = el("div", "drawer-meta");
+  meta.appendChild(el("span", "type", String(item.type || "?")));
+  if (item.priority) {
+    meta.appendChild(el("span", "priority " + String(item.priority), String(item.priority)));
+  }
+  meta.appendChild(el("span", "status", String(item.status || "?")));
+  meta.appendChild(el("code", "", String(item.id || "")));
+  container.appendChild(meta);
+
+  container.appendChild(
+    row("assignee", item.assignee ? "@" + String(item.assignee) : "unassigned"),
+  );
+  if (item.parent) container.appendChild(row("parent", String(item.parent)));
+  container.appendChild(
+    row("labels", item.labels && item.labels.length > 0 ? item.labels.join(", ") : "none"),
+  );
+  container.appendChild(row("branch", item.branch ? String(item.branch) : "none"));
+  container.appendChild(row("worktree", item.worktree_path ? String(item.worktree_path) : "none"));
+  container.appendChild(row("path", String(item.path || "")));
+  if (item.milestone) container.appendChild(row("milestone", String(item.milestone)));
+  if (item.issue !== null && item.issue !== undefined) {
+    container.appendChild(row("issue", "#" + String(item.issue)));
+  }
+
+  const depsSection = section("dependencies", "drawer-deps");
+  const deps = detail.dependencies || [];
+  if (deps.length === 0) depsSection.appendChild(el("div", "drawer-note", "none"));
+  for (let d = 0; d < deps.length; d++) {
+    const dep = deps[d];
+    const state = dep.status ? String(dep.status) : "missing";
+    const depClass = dep.terminal ? "terminal" : dep.status ? "open" : "missing";
+    depsSection.appendChild(el("div", "drawer-dep " + depClass, String(dep.id) + " · " + state));
+  }
+  container.appendChild(depsSection);
+
+  const prSection = section("pull request", "drawer-pr");
+  const pr = detail.pr;
+  if (pr && pr.url && /^https?:\/\//.test(String(pr.url))) {
+    const link = doc.createElement("a");
+    link.href = String(pr.url);
+    link.target = "_blank";
+    link.rel = "noreferrer noopener";
+    const checks = pr.checks && pr.checks !== "unknown" ? " · " + String(pr.checks) : "";
+    link.textContent =
+      "#" +
+      String(pr.number) +
+      " · " +
+      String(pr.state || "").toLowerCase() +
+      (pr.isDraft ? " · draft" : "") +
+      checks;
+    prSection.appendChild(link);
+  } else {
+    prSection.appendChild(el("div", "drawer-note", "○ no PR"));
+  }
+  container.appendChild(prSection);
+
+  const acceptance = detail.acceptance || [];
+  if (acceptance.length > 0) {
+    const accSection = section("acceptance", "drawer-acceptance");
+    for (let a = 0; a < acceptance.length; a++) {
+      const check = doc.createElement("label");
+      check.className = "drawer-check";
+      const box = doc.createElement("input");
+      box.type = "checkbox";
+      box.disabled = true;
+      box.checked = acceptance[a].checked === true;
+      check.appendChild(box);
+      check.appendChild(el("span", "", String(acceptance[a].text)));
+      accSection.appendChild(check);
+    }
+    container.appendChild(accSection);
+  }
+
+  const bodySection = section("body", "drawer-prose");
+  bodySection.appendChild(el("div", "drawer-body-text", String(detail.prose || "")));
+  if (detail.prose_truncated) {
+    bodySection.appendChild(
+      el("div", "drawer-note", "body truncated — open the item file for the full text"),
+    );
+  }
+  container.appendChild(bodySection);
+
+  const comments = detail.comments || [];
+  const hidden = detail.hidden_comments || 0;
+  const commentsSection = section(
+    "comments (" + comments.length + " of " + (comments.length + hidden) + ")",
+    "drawer-comments",
+  );
+  if (comments.length === 0) commentsSection.appendChild(el("div", "drawer-note", "none"));
+  for (let c = 0; c < comments.length; c++) {
+    const comment = el("div", "drawer-comment");
+    comment.appendChild(
+      el("div", "drawer-who", String(comments[c].date) + " @" + String(comments[c].author)),
+    );
+    comment.appendChild(el("div", "drawer-body-text", String(comments[c].text)));
+    if (comments[c].truncated) {
+      comment.appendChild(el("div", "drawer-note", "comment truncated"));
+    }
+    commentsSection.appendChild(comment);
+  }
+  container.appendChild(commentsSection);
+}
+
+/**
+ * Event wiring for the detail drawer. Embedded with `toString()` and invoked
+ * as `wireBoardDetail(toast, renderBoardDetail)`; the two dependencies are
+ * parameters so the function stays self-contained. Esc is captured on
+ * `document` and stopped while the drawer is open, so it closes the drawer
+ * before the filter input's own Escape-to-clear can run.
+ */
+export function wireBoardDetail(
+  toast: (message: string, kind?: string) => void,
+  renderDetail: (container: HTMLElement, payload: BoardDetailPayload) => void,
+): void {
+  const drawer = document.getElementById("board-drawer");
+  const body = document.getElementById("board-drawer-body");
+  const closeButton = document.getElementById("board-drawer-close");
+  const backdrop = document.getElementById("board-drawer-backdrop");
+  if (!drawer || !body) return;
+  const drawerEl: HTMLElement = drawer;
+  const bodyEl: HTMLElement = body;
+  let lastCard: HTMLElement | null = null;
+  let seq = 0;
+
+  function close(restoreFocus: boolean): void {
+    if (drawerEl.hidden) return;
+    drawerEl.hidden = true;
+    drawerEl.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("drawer-open");
+    seq++;
+    if (restoreFocus && lastCard && lastCard.isConnected) lastCard.focus();
+  }
+
+  function open(card: Element): void {
+    const id = card.getAttribute("data-id") || "";
+    if (!id) return;
+    lastCard = card as HTMLElement;
+    const current = ++seq;
+    drawerEl.hidden = false;
+    drawerEl.setAttribute("aria-hidden", "false");
+    document.body.classList.add("drawer-open");
+    bodyEl.textContent = "loading …";
+    if (closeButton) closeButton.focus();
+    const endpoint = document.body.getAttribute("data-detail-endpoint") || "/api/item";
+    fetch(endpoint + "?id=" + encodeURIComponent(id))
+      .then(function (res) {
+        return res
+          .json()
+          .catch(function () {
+            return { ok: false, error: { message: "HTTP " + res.status } };
+          })
+          .then(function (data: { ok?: boolean; error?: { message?: string } }) {
+            return { status: res.status, data: data };
+          });
+      })
+      .then(function (result) {
+        if (current !== seq || drawerEl.hidden) return;
+        if (result.data && result.data.ok) {
+          renderDetail(bodyEl, result.data as BoardDetailPayload);
+          return;
+        }
+        const message =
+          result.data && result.data.error && result.data.error.message
+            ? result.data.error.message
+            : "detail request failed";
+        if (result.status === 404) {
+          close(true);
+          toast("item " + id + " is gone — " + message, "refused");
+          return;
+        }
+        bodyEl.textContent = "";
+        const note = document.createElement("div");
+        note.className = "drawer-note";
+        note.textContent = message;
+        bodyEl.appendChild(note);
+      })
+      .catch(function (err: { message?: string }) {
+        if (current !== seq || drawerEl.hidden) return;
+        bodyEl.textContent =
+          "detail unavailable — " + (err && err.message ? err.message : "fetch failed");
+      });
+  }
+
+  document.addEventListener("click", function (event) {
+    const target = event.target as Element | null;
+    if (!target || typeof target.closest !== "function") return;
+    if (target.closest("#board-drawer")) return;
+    if (target.closest("a, button, input, select, textarea")) return;
+    const card = target.closest(".card");
+    if (card) open(card);
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "Enter" && event.key !== " " && event.key !== "Spacebar") return;
+    if (!drawerEl.hidden) return;
+    const target = event.target as Element | null;
+    if (!target || typeof target.closest !== "function") return;
+    if (target.closest("a, button, input, select, textarea")) return;
+    const card = target.closest(".card");
+    if (!card) return;
+    event.preventDefault();
+    open(card);
+  });
+
+  document.addEventListener(
+    "keydown",
+    function (event) {
+      if (drawerEl.hidden) return;
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      close(true);
+    },
+    true,
+  );
+
+  if (closeButton) {
+    closeButton.addEventListener("click", function () {
+      close(true);
+    });
+  }
+  if (backdrop) {
+    backdrop.addEventListener("click", function () {
+      close(true);
+    });
+  }
+}
+
+/**
  * Pure renderer for the static board. Columns are the v0 statuses in enum
  * order; every card shows its own status (no rollup). All dynamic text is
  * HTML-escaped. Sorted lexicographically by id within each column. With
@@ -599,6 +928,11 @@ function embedJson(value: unknown): string {
  * caller resolves it, like `runList`). Both options are additive: without
  * `lenses` the chips container is absent and the board degrades to the plain
  * export plus the filter box.
+ * With `details` (task-board-item-detail, serve-only) cards become focusable
+ * (`tabindex`) and the page carries the drawer shell + client script that
+ * fetches `/api/item?id=<id>` (kernel bounded read) and renders it as DOM
+ * text nodes. Without the flag the static export is byte-identical to the
+ * pre-drawer output: no drawer markup, no endpoint wiring, no extra script.
  */
 export function renderBoardHtml(
   items: WorkItem[],
@@ -614,6 +948,14 @@ export function renderBoardHtml(
     lenses?: Record<string, string>;
     /** Resolved login for `@me` in an expression; null/absent = unresolved (loud error). */
     me?: string | null;
+    /**
+     * Serve-mode item detail drawer (task-board-item-detail): focusable cards
+     * (click/Enter) plus the drawer shell and its client script, which fetches
+     * `/api/item?id=<id>` (kernel bounded read) and renders the payload as DOM
+     * text nodes. Serve-only, like `diffLinks`: the static export stays lean
+     * and byte-identical without the flag.
+     */
+    details?: boolean;
   } = {
     generatedAt: "",
   },
@@ -629,6 +971,7 @@ export function renderBoardHtml(
   const lenses = opts.lenses ?? {};
   const lensNames = Object.keys(lenses);
   const me = opts.me ?? null;
+  const details = opts.details === true;
 
   // The client-side lens filters a snapshot of the card fields that travels
   // with the page (there is no server to read the tracker from). Only the
@@ -710,7 +1053,7 @@ export function renderBoardHtml(
       const priorityChip = item.priority
         ? `<span class="priority ${esc(item.priority)}">${esc(item.priority)}</span>`
         : "";
-      return `<div class="card${blocked.length ? " dep-blocked" : ""}" draggable="true" data-id="${esc(item.id)}" data-type="${esc(item.type)}" data-status="${esc(item.status)}"${item.assignee ? ` data-assignee="${esc(item.assignee)}"` : ""}${milestoneOf(item) ? ` data-milestone="${esc(milestoneOf(item)!)}"` : ""}>
+      return `<div class="card${blocked.length ? " dep-blocked" : ""}" draggable="true"${details ? ' tabindex="0"' : ""} data-id="${esc(item.id)}" data-type="${esc(item.type)}" data-status="${esc(item.status)}"${item.assignee ? ` data-assignee="${esc(item.assignee)}"` : ""}${milestoneOf(item) ? ` data-milestone="${esc(milestoneOf(item)!)}"` : ""}>
   <div class="card-head"><span class="type" data-type="${esc(item.type)}" style="--type-color: ${TYPE_COLORS[item.type]}">${esc(item.type)}</span>${priorityChip}<code>${esc(item.id)}</code>${blockedBadge}</div>
   <div class="title">${title}</div>
   ${breadcrumb}
@@ -827,9 +1170,10 @@ header .meta { color: #59636e; font-size: 13px; }
 .lens { border: 1px solid #d0d4da; background: #fff; border-radius: 12px; padding: 3px 10px; font-size: 12px; font-family: inherit; color: inherit; cursor: pointer; }
 .lens.active { background: #0550ae; border-color: #0550ae; color: #fff; }
 .card.filtered-out, .mgroup-head.filtered-out { display: none; }
+${details ? DETAIL_CSS : ""}
 </style>
 </head>
-<body>
+<body${details ? ' data-detail-endpoint="/api/item"' : ""}>
 <header>
   <h1>arggon board${repo}</h1>
   <div class="meta">generated ${esc(opts.generatedAt)} · ${sorted.length} item(s) · <span id="status-counts">${counts}</span> · tracker files remain the source of truth; drops persist only against a live server (arggon board --serve)${live}</div>
@@ -846,12 +1190,15 @@ header .meta { color: #59636e; font-size: 13px; }
 ${columns}
 </main>
 <div id="board-toast" role="status" aria-live="polite"></div>
+${details ? DRAWER_MARKUP : ""}
 <script>
 'use strict';
 ${evaluateDrop.toString()}
 /* board-filter:start */
 ${applyBoardFilter.toString()}
 /* board-filter:end */
+${details ? renderBoardDetail.toString() : ""}
+${details ? wireBoardDetail.toString() : ""}
 (function () {
   var ENDPOINT = document.body.getAttribute("data-update-endpoint") || "/api/update";
   var BOARD_ITEMS = ${embedJson(lensItems)};
@@ -1100,6 +1447,7 @@ ${applyBoardFilter.toString()}
         toast("✗ " + id + " not moved — " + message + " (run: arggon update " + id + " --status " + to + ")", "refused");
       });
   }
+  ${details ? "wireBoardDetail(toast, renderBoardDetail);" : ""}
 })();
 </script>
 </body>
