@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-board-item-detail
 title: "Web board item detail drawer (body, checklist, deps, PR)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [viewer, board, ui]
 priority: p1
 created: "2026-09-22"
 updated: "2026-09-23"
-claimed_at: "2026-09-23T01:06:42.726Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-board-item-detail
 ---
 <!--
