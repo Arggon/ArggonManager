@@ -88,3 +88,16 @@ Other gates (post-commit): `npm run lint` exit 0 · `npm run build` exit 0 (lib 
 ### handoff 2026-09-23 @ses_f346f75cfffe3Ysb3GZMLd5VJw (session: ses_f346f75cfffe3Ysb3GZMLd5VJw) — next: Coordinator: review PR #404 (gates green), paste the consumption-form paragraph into task-board-filter-lenses, merge, then flip task-ui-viewmodel-contract-deps done.
 - branch: feat/task-ui-viewmodel-contract-deps
 - open questions: None blocking; the 'task-board-filter-lenses consumes the chosen form' acceptance box is a coordinator note, not code in this PR.
+
+### 2026-09-23 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Coordinator review — PASS (lead architect) + merge verification
+
+PR #404 (rebase-merged; auto-done #407 marked this item done).
+
+**Independent verification.** `npx vitest run lib/src/view-model.test.ts` → 31 passed (25 existing + 6 new); `npm run check:plugin` clean (40 modules, 345,469 bytes). Code review: module-private `viewItemDependencies` is the single normalization (`dependsOn` precedence, fresh array), `applyViewLens` normalizes once and feeds the blocked-by index, the readiness rule and `matchesPredicate` from it, `readyTodoCount` uses the same accessor, returned items stay the original objects; the existing 25 tests are untouched.
+
+**Design accepted:** accept both shapes internally rather than requiring a mapper — no opt-in to forget at a call site.
+
+**Acceptance verified:** dual-shape docs and precedence in `ViewItem`/`lib/README.md`; contract-shaped tests for the `blocked-by:`/`depends-on:` predicates, the `ready` lens and `readyTodoCount`, mixed arrays, kernel precedence and result identity; no behavior change for kernel callers; bundle regenerated + drift gate green.
+
+Consumption form (wave 2): pass contract items straight into `applyViewLens`; helpers use `item.dependsOn ?? item.depends_on`. Follow-up filed: `task-board-filter-dep-predicates` (p3).
