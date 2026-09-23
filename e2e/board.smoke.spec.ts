@@ -31,6 +31,31 @@ const MOVED_ITEM_ID = "task-board-task";
 /** The labelled task the lens cases narrow to; id derives from `Board filter task`. */
 const FILTER_ITEM_ID = "task-board-filter-task";
 
+/**
+ * Detail-drawer fixture (task-board-item-detail): a task with a body,
+ * acceptance rows, a hostile line, a branch and two dependencies (one open,
+ * one terminal), plus a task deleted mid-test to prove a live reload closes
+ * the drawer. Ids derive from the fixture titles below.
+ */
+const DETAIL_ITEM_ID = "task-board-detail-task";
+const DETAIL_DEP_ID = "task-board-detail-dep";
+const DETAIL_DONE_DEP_ID = "task-board-detail-done-dep";
+const RELOAD_ITEM_ID = "task-board-reload-task";
+
+/** Body of the detail fixture: checklist rows plus a hostile "HTML" line. */
+const DETAIL_BODY = `# Board detail task
+
+## Context
+
+Detail drawer fixture body.
+
+## Acceptance
+
+- [x] done row
+- [ ] open row
+
+hostile <img src=x onerror="window.__xss=1"> text`;
+
 /** The `filter` value in a URL hash (null when the board is unfiltered). */
 function filterFromUrl(url: string): string | null {
   return new URLSearchParams(new URL(url).hash.replace(/^#/, "")).get("filter");
@@ -56,6 +81,28 @@ function runCli(fixture: string, args: string[]): string {
 /** Run the CLI with `--json` and parse the envelope. */
 function cliJson<T>(fixture: string, args: string[]): T {
   return JSON.parse(runCli(fixture, [...args, "--json"])) as T;
+}
+
+/** Absolute path of a tracker item file (from `arggon show --json`). */
+function itemFilePath(fixture: string, id: string): string {
+  return join(fixture, cliJson<{ item: { path: string } }>(fixture, ["show", id]).item.path);
+}
+
+/** Replace an item's body, keeping its frontmatter (fixture setup). */
+function setBody(fixture: string, id: string, body: string): void {
+  const path = itemFilePath(fixture, id);
+  const lines = readFileSync(path, "utf8").split("\n");
+  const end = lines.indexOf("---", 1);
+  writeFileSync(path, `${lines.slice(0, end + 1).join("\n")}\n\n${body}\n`, "utf8");
+}
+
+/** Add one frontmatter line to an item (fixture setup for kernel-only fields). */
+function addFrontmatterLine(fixture: string, id: string, line: string): void {
+  const path = itemFilePath(fixture, id);
+  const lines = readFileSync(path, "utf8").split("\n");
+  const end = lines.indexOf("---", 1);
+  lines.splice(end, 0, line);
+  writeFileSync(path, lines.join("\n"), "utf8");
 }
 
 /** Fresh git repo + `arggon init` + a 4-item tree, all through the CLI. */
@@ -101,6 +148,46 @@ function createFixture(): string {
     "smoke",
     "--json",
   ]);
+  // Detail-drawer fixture (task-board-item-detail). The detail and reload
+  // tasks sit in `cancelled` (not `todo`) so the todo column stays short
+  // enough that the status-move test's drag needs no mid-drag scroll:
+  // Playwright's dragTo re-scrolls for the drop target, and a scroll between
+  // mousedown and the first move makes Chromium resolve the drag source under
+  // the stale pointer position (it grabbed a neighbouring card).
+  runCli(fixture, [
+    "create",
+    "task",
+    "Board detail task",
+    "--parent",
+    "entries",
+    "--labels",
+    "detail",
+    "--json",
+  ]);
+  runCli(fixture, ["create", "task", "Board detail dep", "--parent", "entries", "--json"]);
+  runCli(fixture, ["create", "task", "Board detail done dep", "--parent", "entries", "--json"]);
+  runCli(fixture, ["create", "task", "Board reload task", "--parent", "entries", "--json"]);
+  runCli(fixture, [
+    "update",
+    DETAIL_ITEM_ID,
+    "--depends-on",
+    `${DETAIL_DEP_ID},${DETAIL_DONE_DEP_ID}`,
+    "--json",
+  ]);
+  runCli(fixture, [
+    "update",
+    DETAIL_ITEM_ID,
+    "--branch",
+    "feat/task-board-detail",
+    "--priority",
+    "p1",
+    "--json",
+  ]);
+  runCli(fixture, ["update", DETAIL_DONE_DEP_ID, "--status", "cancelled", "--json"]);
+  runCli(fixture, ["update", DETAIL_ITEM_ID, "--status", "cancelled", "--json"]);
+  runCli(fixture, ["update", RELOAD_ITEM_ID, "--status", "cancelled", "--json"]);
+  addFrontmatterLine(fixture, DETAIL_ITEM_ID, "worktree_path: /tmp/arggon-wt");
+  setBody(fixture, DETAIL_ITEM_ID, DETAIL_BODY);
   // Saved views (`x-views`, task-board-filter-lenses) for the lens cases,
   // appended to the tracker convention after init.
   const convention = join(fixture, "ArggonManager", ".convention.yml");
@@ -287,5 +374,152 @@ test.describe("@smoke board --serve", () => {
     await expect
       .poll(() => cliJson<{ item: ListedItem }>(fixture, ["show", MOVED_ITEM_ID]).item.status)
       .toBe("cancelled");
+  });
+
+  test("opens the item detail drawer (Enter), renders the checklist and deps, Esc returns focus", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    const card = page.locator(`.card[data-id="${DETAIL_ITEM_ID}"]`);
+    await expect(card).toHaveCount(1);
+
+    // Cards are focusable in serve mode: Enter opens the drawer.
+    await card.focus();
+    await page.keyboard.press("Enter");
+    const drawer = page.locator("#board-drawer");
+    await expect(drawer).toBeVisible();
+    await expect(drawer.locator(".drawer-title")).toHaveText("Board detail task");
+    const meta = drawer.locator(".drawer-meta");
+    await expect(meta).toContainText("task");
+    await expect(meta).toContainText("p1");
+    await expect(meta).toContainText("cancelled");
+    await expect(drawer.locator(".drawer-row").filter({ hasText: "labels" })).toContainText(
+      "detail",
+    );
+    await expect(drawer.locator(".drawer-row").filter({ hasText: "branch" })).toContainText(
+      "feat/task-board-detail",
+    );
+    await expect(drawer.locator(".drawer-row").filter({ hasText: "worktree" })).toContainText(
+      "/tmp/arggon-wt",
+    );
+    await expect(drawer.locator(".drawer-row").filter({ hasText: "path" })).toContainText(
+      `${DETAIL_ITEM_ID}.md`,
+    );
+    // Acceptance rows render read-only with their checked state.
+    await expect(drawer.locator(".drawer-acceptance .drawer-check")).toHaveCount(2);
+    await expect(drawer.locator(".drawer-acceptance .drawer-check input:checked")).toHaveCount(1);
+    await expect(drawer.locator(".drawer-acceptance .drawer-check input:disabled")).toHaveCount(2);
+    await expect(drawer.locator(".drawer-acceptance .drawer-check").nth(1)).toContainText(
+      "open row",
+    );
+    // Dependencies carry their kernel status (open vs terminal).
+    await expect(drawer.locator(".drawer-deps .drawer-dep.open")).toHaveText(
+      `${DETAIL_DEP_ID} · todo`,
+    );
+    await expect(drawer.locator(".drawer-deps .drawer-dep.terminal")).toHaveText(
+      `${DETAIL_DONE_DEP_ID} · cancelled`,
+    );
+    // Degraded live overlay (no gh in the fixture): the PR section says so.
+    await expect(drawer.locator(".drawer-pr")).toContainText("no PR");
+    // The hostile body line is text, never an element.
+    await expect(drawer.locator(".drawer-prose .drawer-body-text")).toContainText(
+      '<img src=x onerror="window.__xss=1">',
+    );
+    await expect(drawer.locator("img")).toHaveCount(0);
+    expect(
+      await page.evaluate(() => (window as unknown as { __xss?: number }).__xss),
+    ).toBeUndefined();
+
+    // Esc closes the drawer and returns focus to the card that opened it.
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(card).toBeFocused();
+
+    // A plain click opens it too; the close button restores focus as well.
+    await card.click();
+    await expect(drawer).toBeVisible();
+    await drawer.locator("#board-drawer-close").click();
+    await expect(drawer).toBeHidden();
+    await expect(card).toBeFocused();
+  });
+
+  test("opens the drawer from a filtered view; Esc closes it before the filter's clear", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-filter-input").fill("label:detail");
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
+    const card = page.locator(`.card:not(.filtered-out)[data-id="${DETAIL_ITEM_ID}"]`);
+    await card.click();
+    await expect(page.locator("#board-drawer")).toBeVisible();
+    await expect(page.locator("#board-drawer .drawer-title")).toHaveText("Board detail task");
+
+    // With the drawer open, Esc is captured by the drawer: the focused filter
+    // input's own Escape-to-clear must not run first.
+    await page.locator("#board-filter-input").focus();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#board-drawer")).toBeHidden();
+    await expect(page.locator("#board-filter-input")).toHaveValue("label:detail");
+    // A second Escape (drawer closed, input focused) clears the filter as before.
+    await page.locator("#board-filter-input").focus();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#board-filter-input")).toHaveValue("");
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(listItems.length);
+  });
+
+  test("renders the live-overlay PR badge as a link (and refuses non-http URLs)", async ({
+    page,
+  }) => {
+    let prPayload: Record<string, unknown> | null = {
+      branch: "feat/task-board-detail",
+      number: 42,
+      url: "https://github.com/o/r/pull/42",
+      state: "OPEN",
+      isDraft: false,
+      checks: "passing",
+    };
+    await page.route("**/api/item*", async (route) => {
+      const response = await route.fetch();
+      const payload = (await response.json()) as { detail: { pr: unknown } };
+      payload.detail.pr = prPayload;
+      await route.fulfill({ json: payload });
+    });
+    await page.goto(server?.url ?? "");
+    await page.locator(`.card[data-id="${DETAIL_ITEM_ID}"]`).click();
+    const pr = page.locator("#board-drawer .drawer-pr");
+    await expect(pr.locator("a")).toHaveAttribute("href", "https://github.com/o/r/pull/42");
+    await expect(pr.locator("a")).toHaveText("#42 · open · passing");
+    await page.keyboard.press("Escape");
+
+    // A hostile PR URL never becomes a link (the client only wires http(s)).
+    prPayload = {
+      branch: "feat/task-board-detail",
+      number: 43,
+      url: "javascript:window.__xss=1",
+      state: "OPEN",
+      isDraft: false,
+      checks: "unknown",
+    };
+    await page.locator(`.card[data-id="${DETAIL_ITEM_ID}"]`).click();
+    await expect(page.locator("#board-drawer .drawer-pr a")).toHaveCount(0);
+    await expect(page.locator("#board-drawer .drawer-pr")).toContainText("no PR");
+  });
+
+  test("a live reload that removes the item closes the drawer gracefully", async ({ page }) => {
+    await page.goto(server?.url ?? "");
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(String(error)));
+    const card = page.locator(`.card[data-id="${RELOAD_ITEM_ID}"]`);
+    await expect(card).toHaveCount(1);
+    await card.click();
+    await expect(page.locator("#board-drawer")).toBeVisible();
+    await expect(page.locator("#board-drawer .drawer-title")).toHaveText("Board reload task");
+
+    rmSync(itemFilePath(fixture, RELOAD_ITEM_ID));
+    // The watcher pushes an SSE reload; the board comes back without the item
+    // and the drawer is closed (never left open over a missing item).
+    await expect(page.locator(`.card[data-id="${RELOAD_ITEM_ID}"]`)).toHaveCount(0);
+    await expect(page.locator("#board-drawer")).toBeHidden();
+    expect(errors).toEqual([]);
   });
 });
