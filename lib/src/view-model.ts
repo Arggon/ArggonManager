@@ -26,8 +26,10 @@
  *   kernel `WorkItem`, the JSON-contract `WorkItem` (snake-case `depends_on`)
  *   and the panel's `BoardItem` can all consume it. Functions that read
  *   dependencies take the id list explicitly (`openDependencyIds`,
- *   `hasOpenDependencies`) or the kernel `dependsOn` field (`applyViewLens`,
- *   `readyTodoCount`).
+ *   `hasOpenDependencies`); `applyViewLens`/`readyTodoCount` take the item and
+ *   accept either dependency field (`dependsOn` ?? `depends_on`, see
+ *   `ViewItem`), so a contract-shaped caller cannot silently lose the
+ *   `depends-on:`/`blocked-by:` predicates or the `ready` lens.
  * - **No printing, no I/O, no new dependencies.**
  *
  * Purity and the derived results are pinned by `lib/src/view-model.test.ts`;
@@ -225,10 +227,26 @@ export function treeEntries<T extends { id: string; parent?: string | null }>(
 }
 
 /**
+ * Dependency ids of one item in either accepted shape: the kernel `dependsOn`
+ * field, falling back to the JSON-contract alias `depends_on` only when that
+ * field is absent. The precedence is deliberate — a kernel item carrying an
+ * empty `dependsOn` means "no dependencies" and never falls through to the
+ * alias. Always a fresh array. Module-private by design: the accepted shape is
+ * the contract (`ViewItem`), not this accessor.
+ */
+function viewItemDependencies(item: {
+  dependsOn?: readonly string[];
+  depends_on?: readonly string[];
+}): string[] {
+  return [...(item.dependsOn ?? item.depends_on ?? [])];
+}
+
+/**
  * Count of claimable, unclaimed `todo` items whose dependencies are all
  * terminal — the kernel composition (`isClaimable` + `isReady`) the native
- * panel surfaces as "N ready". An absent `dependsOn` means no dependencies,
- * so contract-shaped items count too. Pure.
+ * panel surfaces as "N ready". An absent dependency field means no
+ * dependencies; both the kernel `dependsOn` and the JSON-contract `depends_on`
+ * are accepted (see `ViewItem`). Pure.
  */
 export function readyTodoCount<
   T extends {
@@ -237,6 +255,7 @@ export function readyTodoCount<
     status: Status;
     assignee?: string | null;
     dependsOn?: string[];
+    depends_on?: string[];
   },
 >(items: readonly T[]): number {
   const byId = buildStatusIndex(items);
@@ -245,15 +264,18 @@ export function readyTodoCount<
       isClaimable(item.type) &&
       item.status === "todo" &&
       (item.assignee ?? null) === null &&
-      isReady({ ...item, dependsOn: item.dependsOn ?? [] }, byId),
+      isReady({ ...item, dependsOn: viewItemDependencies(item) }, byId),
   ).length;
 }
 
 /**
  * Item shape the lens reads: the kernel `WorkItem` and the JSON-contract
- * `WorkItem` both satisfy it. Contract items carry `depends_on` instead of
- * `dependsOn`, so the `depends-on:`/`blocked-by:` predicates and the `ready`
- * lens only see dependencies when the caller passes kernel-shaped items.
+ * `WorkItem` both satisfy it. Dependencies are accepted in either shape —
+ * kernel `dependsOn` or JSON-contract `depends_on`, with `dependsOn` winning
+ * when an item carries both — so passing contract-shaped items cannot
+ * silently disable the `depends-on:`/`blocked-by:` predicates or the `ready`
+ * lens. A caller keeping its own dependency accessor uses the same rule:
+ * `item.dependsOn ?? item.depends_on ?? []`.
  */
 export type ViewItem = {
   id: string;
@@ -265,7 +287,10 @@ export type ViewItem = {
   parent?: string | null;
   milestone?: string | null;
   priority?: string | null;
+  /** Ids this item waits for (kernel field). */
   dependsOn?: string[];
+  /** JSON-contract alias of `dependsOn` (snake_case); read only when `dependsOn` is absent. */
+  depends_on?: string[];
 };
 
 /** Filter/lens/sort options for `applyViewLens`. All fields optional. */
@@ -293,20 +318,29 @@ export type ViewLens = {
  * narrowed set would make a filtered-out dependency look unknown — hence open.
  * Predicates are ANDed; the empty lens is `sortById(items)`. Cost is one pass
  * over the items plus the two index builds (O(items + dependency edges)); the
- * result is a fresh array, the input is untouched. Pure.
+ * result is a fresh array, the input is untouched. Dependencies are read in
+ * either accepted shape (see `ViewItem`): the readiness rule and the
+ * `depends-on:`/`blocked-by:` predicates all consume the normalized
+ * `dependsOn`, so contract-shaped items behave exactly like kernel-shaped
+ * ones. Returned items are the input objects, never normalized copies. Pure.
  */
 export function applyViewLens<T extends ViewItem>(items: readonly T[], lens: ViewLens = {}): T[] {
   const predicates =
     lens.filter === undefined || lens.filter.trim() === "" ? [] : parseFilter(lens.filter);
-  const blockedByIndex = buildBlockedByIndex(items);
+  // One normalization pass shared by every dependency reader below: the
+  // blocked-by index, the `depends-on:`/`blocked-by:` predicates and the
+  // readiness rule must see the same edges whatever shape the caller passed.
+  const kernelItems = items.map((item) => ({ ...item, dependsOn: viewItemDependencies(item) }));
+  const blockedByIndex = buildBlockedByIndex(kernelItems);
   const ancestorIndex = buildAncestorIndex(items);
   const statusById = buildStatusIndex(items);
-  const kept = items.filter((item) => {
+  const kept = items.filter((item, index) => {
     if (lens.status !== undefined && item.status !== lens.status) return false;
-    if (lens.ready === true && !isReady({ ...item, dependsOn: item.dependsOn ?? [] }, statusById)) {
-      return false;
-    }
-    return predicates.every((pred) => matchesPredicate(item, pred, blockedByIndex, ancestorIndex));
+    const kernelItem = kernelItems[index]!;
+    if (lens.ready === true && !isReady(kernelItem, statusById)) return false;
+    return predicates.every((pred) =>
+      matchesPredicate(kernelItem, pred, blockedByIndex, ancestorIndex),
+    );
   });
   return lens.sort === "priority" ? sortByPriority(kept) : sortById(kept);
 }

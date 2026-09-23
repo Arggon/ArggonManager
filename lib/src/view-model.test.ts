@@ -9,6 +9,7 @@
  * assert the resulting behavior, not a private re-implementation.
  */
 import { describe, expect, it } from "vitest";
+import type { WorkItem as ContractWorkItem } from "./types.js";
 import {
   applyViewLens,
   buildStatusIndex,
@@ -37,6 +38,36 @@ function item(overrides: Partial<ViewItem> & Pick<ViewItem, "id">): ViewItem {
     parent: null,
     milestone: null,
     priority: null,
+    ...overrides,
+  };
+}
+
+/**
+ * A full JSON-contract item as `toContractWorkItem` emits it: snake_case
+ * `depends_on`, no `dependsOn` field — the shape the web board's serve path
+ * carries (task-ui-viewmodel-contract-deps).
+ */
+function contractItem(
+  overrides: Partial<ContractWorkItem> & Pick<ContractWorkItem, "id">,
+): ContractWorkItem {
+  return {
+    type: "task",
+    status: "todo",
+    title: null,
+    assignee: null,
+    branch: null,
+    parent: null,
+    labels: [],
+    priority: null,
+    created: null,
+    updated: null,
+    path: `ArggonManager/arggon-manager/x/${overrides.id}.md`,
+    blocked_reason: null,
+    milestone: null,
+    depends_on: [],
+    claimed_at: null,
+    worktree_path: null,
+    issue: null,
     ...overrides,
   };
 }
@@ -396,5 +427,106 @@ describe("applyViewLens", () => {
       "story-d",
       "epic-x",
     ]);
+  });
+});
+
+describe("contract-shaped items (depends_on)", () => {
+  it("readyTodoCount counts depends_on edges exactly like dependsOn", () => {
+    const kernelShape = [
+      item({ id: "done-x", status: "done" }),
+      item({ id: "open-y", status: "in_progress" }),
+      item({ id: "task-ready", dependsOn: ["done-x"] }),
+      item({ id: "task-waits", dependsOn: ["open-y"] }),
+      item({ id: "task-unknown-dep", dependsOn: ["gone-z"] }),
+    ];
+    const contractShape = [
+      contractItem({ id: "done-x", status: "done" }),
+      contractItem({ id: "open-y", status: "in_progress" }),
+      contractItem({ id: "task-ready", depends_on: ["done-x"] }),
+      contractItem({ id: "task-waits", depends_on: ["open-y"] }),
+      contractItem({ id: "task-unknown-dep", depends_on: ["gone-z"] }),
+    ];
+    expect(readyTodoCount(contractShape)).toBe(readyTodoCount(kernelShape));
+    expect(readyTodoCount(contractShape)).toBe(1);
+  });
+
+  it("applyViewLens resolves blocked-by: and depends-on: from depends_on", () => {
+    const items = [
+      contractItem({ id: "task-dependent", depends_on: ["task-blocker"] }),
+      contractItem({ id: "task-free" }),
+      contractItem({ id: "task-blocker", status: "in_progress" }),
+    ];
+    expect(applyViewLens(items, { filter: "blocked-by:task-blocker" }).map((e) => e.id)).toEqual([
+      "task-dependent",
+    ]);
+    expect(applyViewLens(items, { filter: "depends-on:task-blocker" }).map((e) => e.id)).toEqual([
+      "task-dependent",
+    ]);
+    // A contract item with no dependency edge is never pulled in.
+    expect(applyViewLens(items, { filter: "blocked-by:task-free" })).toEqual([]);
+  });
+
+  it("the ready lens narrows depends_on blockers exactly like dependsOn", () => {
+    const contractShape = [
+      contractItem({ id: "task-blocked", depends_on: ["task-open"] }),
+      contractItem({ id: "task-open", status: "in_progress" }),
+      contractItem({ id: "task-terminal", depends_on: ["task-done"] }),
+      contractItem({ id: "task-done", status: "done" }),
+    ];
+    const kernelShape = [
+      item({ id: "task-blocked", dependsOn: ["task-open"] }),
+      item({ id: "task-open", status: "in_progress" }),
+      item({ id: "task-terminal", dependsOn: ["task-done"] }),
+      item({ id: "task-done", status: "done" }),
+    ];
+    expect(applyViewLens(contractShape, { status: "todo", ready: true }).map((e) => e.id)).toEqual([
+      "task-terminal",
+    ]);
+    expect(applyViewLens(kernelShape, { status: "todo", ready: true }).map((e) => e.id)).toEqual([
+      "task-terminal",
+    ]);
+  });
+
+  it("resolves edges across mixed shapes in one array (kernel and contract items)", () => {
+    const items = [
+      contractItem({ id: "task-dependent", depends_on: ["task-blocker"] }),
+      item({ id: "task-blocker", status: "in_progress" }),
+      item({ id: "task-kernel-dependent", dependsOn: ["task-contract-blocker"] }),
+      contractItem({ id: "task-contract-blocker", status: "in_progress" }),
+    ];
+    expect(applyViewLens(items, { filter: "blocked-by:task-blocker" }).map((e) => e.id)).toEqual([
+      "task-dependent",
+    ]);
+    expect(
+      applyViewLens(items, { filter: "blocked-by:task-contract-blocker" }).map((e) => e.id),
+    ).toEqual(["task-kernel-dependent"]);
+    expect(readyTodoCount(items)).toBe(0);
+  });
+
+  it("lets kernel dependsOn win over depends_on when an item carries both", () => {
+    const hybrid = {
+      ...contractItem({ id: "task-hybrid" }),
+      dependsOn: [] as string[],
+      depends_on: ["task-open"],
+    };
+    const items = [hybrid, contractItem({ id: "task-open", status: "in_progress" })];
+    expect(applyViewLens(items, { filter: "blocked-by:task-open" })).toEqual([]);
+    expect(applyViewLens(items, { status: "todo", ready: true }).map((e) => e.id)).toEqual([
+      "task-hybrid",
+    ]);
+  });
+
+  it("returns the input objects untouched (no normalization leaks into the result)", () => {
+    const items = [
+      contractItem({ id: "task-a", depends_on: ["task-b"] }),
+      contractItem({ id: "task-b", status: "done" }),
+    ];
+    const lensed = applyViewLens(items, { filter: "depends-on:task-b" });
+    expect(lensed).toEqual([items[0]]);
+    expect(lensed[0]).toBe(items[0]);
+    expect(applyViewLens(items)).toEqual(items);
+    expect(applyViewLens(items)[0]).toBe(items[0]);
+    expect("dependsOn" in items[0]!).toBe(false);
+    expect(items[0]!.depends_on).toEqual(["task-b"]);
   });
 });

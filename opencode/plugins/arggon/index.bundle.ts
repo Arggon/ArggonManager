@@ -5680,25 +5680,29 @@ function treeEntries(items) {
     }
     return entries;
 }
+function viewItemDependencies(item) {
+    return [...(item.dependsOn ?? item.depends_on ?? [])];
+}
 function readyTodoCount(items) {
     const byId = buildStatusIndex(items);
     return items.filter((item) => (0, status_js_1.isClaimable)(item.type) &&
         item.status === "todo" &&
         (item.assignee ?? null) === null &&
-        (0, next_js_1.isReady)({ ...item, dependsOn: item.dependsOn ?? [] }, byId)).length;
+        (0, next_js_1.isReady)({ ...item, dependsOn: viewItemDependencies(item) }, byId)).length;
 }
 function applyViewLens(items, lens = {}) {
     const predicates = lens.filter === undefined || lens.filter.trim() === "" ? [] : (0, filter_js_1.parseFilter)(lens.filter);
-    const blockedByIndex = (0, filter_js_1.buildBlockedByIndex)(items);
+    const kernelItems = items.map((item) => ({ ...item, dependsOn: viewItemDependencies(item) }));
+    const blockedByIndex = (0, filter_js_1.buildBlockedByIndex)(kernelItems);
     const ancestorIndex = (0, filter_js_1.buildAncestorIndex)(items);
     const statusById = buildStatusIndex(items);
-    const kept = items.filter((item) => {
+    const kept = items.filter((item, index) => {
         if (lens.status !== undefined && item.status !== lens.status)
             return false;
-        if (lens.ready === true && !(0, next_js_1.isReady)({ ...item, dependsOn: item.dependsOn ?? [] }, statusById)) {
+        const kernelItem = kernelItems[index];
+        if (lens.ready === true && !(0, next_js_1.isReady)(kernelItem, statusById))
             return false;
-        }
-        return predicates.every((pred) => (0, filter_js_1.matchesPredicate)(item, pred, blockedByIndex, ancestorIndex));
+        return predicates.every((pred) => (0, filter_js_1.matchesPredicate)(kernelItem, pred, blockedByIndex, ancestorIndex));
     });
     return lens.sort === "priority" ? sortByPriority(kept) : sortById(kept);
 }

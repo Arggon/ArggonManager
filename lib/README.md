@@ -53,6 +53,17 @@ rule; `treeEntries` the depth-first, cycle-safe parent flattening;
 `applyViewLens` the filter-expression + status + readiness + sort lens
 (`@me` resolution stays the caller's job, as in `runList`).
 
+Dependency shapes (`task-ui-viewmodel-contract-deps`): `applyViewLens` and
+`readyTodoCount` read the kernel `dependsOn` field and fall back to the
+JSON-contract alias `depends_on` **only when `dependsOn` is absent** (the kernel
+field wins when an item carries both), so the web board's serve path — which
+carries `toContractWorkItem` output — keeps the `depends-on:`/`blocked-by:`
+predicates and the `ready` lens working with no mapping step, and a
+contract-shaped caller cannot silently lose dependency semantics. The
+explicit-id helpers (`openDependencyIds`, `hasOpenDependencies`) stay
+shape-agnostic: callers pass `item.dependsOn` or `item.depends_on` directly.
+The `ViewItem` type documents both accepted fields.
+
 `rules.ts` stays the single source of the claim/reopen invariants: the entry
 re-exports it by identity (pinned in `lib/src/index.test.ts`), never as a wrapper.
 
