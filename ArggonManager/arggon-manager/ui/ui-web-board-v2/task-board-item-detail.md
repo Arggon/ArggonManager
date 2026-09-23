@@ -68,3 +68,7 @@ Cards show the frontmatter summary only; the item body (context, acceptance chec
 ### handoff 2026-09-23 @ses_f343321d7ffe297DRUxJhppxI3 (session: ses_f343321d7ffe297DRUxJhppxI3) — next: Coordinator review of PR #412 (head dc166d18 + tracker commits); merge when green, then verify the @smoke drawer cases on merged main before flipping done.
 - branch: main
 - open questions: Static --details opt-in follow-up? cli/README.md board route paragraph not updated (outside item file scope).
+
+### handoff 2026-09-23 @ses_f343321d7ffe297DRUxJhppxI3 (session: ses_f343321d7ffe297DRUxJhppxI3) — next: Coordinator review of PR #412 (head dc166d18); merge, then verify the @smoke drawer cases on merged main before flipping done.
+- branch: feat/task-board-item-detail
+- open questions: Static --details opt-in follow-up? cli/README.md board route paragraph not updated (outside item file scope).
