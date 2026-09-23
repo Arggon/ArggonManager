@@ -134,3 +134,10 @@ row 1/112 · ↑/↓ line · PgUp/PgDn p…
 ### handoff 2026-09-23 @ses_f343321d6ffeYUdt96vaXCUSTA (session: ses_f343321d6ffeYUdt96vaXCUSTA) — next: Address PR #410 review comments; coordinator merges (not squash) and flips done. Worktree ../ArggonManager-task-tui-detail-pane
 - branch: feat/task-tui-detail-pane
 - open questions: engineering.md §Smoke test + CONTRIBUTING.md still describe smoke:tui-board as headers+q only (now 7 pane steps) — outside my scope; enter no longer prints the path (pane carries it)
+
+### 2026-09-23 @ses_f343321d6ffeYUdt96vaXCUSTA
+### Worker notes (protocol details)
+
+1. `tools.arggon.start` skipped the claim commit in the fresh worktree (known bug `bug-native-start-worktree-no-install`: no `node_modules` -> pre-commit `npm run arggon -- validate` fails with `tsx: command not found`). Remediation applied: `npm ci` + `npm run build --workspace @arggondev/lib` in the worktree, then the claim committed manually as `6719188a` ("chore(tasks): started task-tui-detail-pane") and pushed.
+2. The tracker auto-commits for this evidence comment + the handoff landed on **main** in the primary checkout (`c3c45614`, `d0304094`) because the native tools resolve the tracker root from the session cwd, not from the item worktree; main was pushed immediately after each mutation per docs/agents.md §0. The item file in the worktree/branch still carries only the claim, so the merge of the branch into main edits frontmatter (branch) and body (comments) in disjoint hunks — verified clean with `git merge-tree` (exit 0).
+3. PR #410 head stays `f833ea09` (implementation + tests + README + smoke); the CI results quoted above are for that exact sha (they were already green before this note).
