@@ -354,18 +354,28 @@ arggon board --tui            # interactive read-only terminal kanban (raw ANSI,
 - blocked cards: cards with open dependencies (deps not `done`/`cancelled`) render dimmed with a `blocked by N` badge in the card head plus the per-dep `↳ blocked by <id>` lines; in `--tui` such items carry a `⌫` tag
 - `--serve`: serves the board locally, **bound to 127.0.0.1 only**, and reloads the page whenever any file under the tracker root (`ArggonManager/`) changes; drag-and-drop posts to the update endpoint, which runs the same kernel update rules as the CLI. `--serve` is combinable with `--json` (the envelope is emitted once, then the server keeps running); see `ArggonManager/docs/json-output.md` for the payload fields. The served board is also the **review surface** (serve-only, not in the static export or `--tui`): cards with a `branch` carry a live PR strip — state (`draft/open/merged/closed`) + checks summary + a `diff` link to the PR's files view — polled from the shared `gh pr list` read path on a fixed interval (60s); a changed snapshot pushes an SSE reload. gh missing or unauthenticated, or a failed poll, degrades cleanly: cards fall back to the neutral `○ no PR` badge and the server keeps serving with the last good snapshot
 - item detail drawer (**serve-only**): click or Enter a card to open a read-only drawer fetched from `GET /api/item?id=<id>` — title, type/priority/status, body, acceptance checklist rows (read-only), labels, dependencies with their kernel statuses (open vs terminal), branch/`worktree_path`, the PR badge/link from the live overlay, and the item path. The read goes through the kernel bounded `show` path (prose + the last 3 comments) and the payload is capped (8 KiB of prose, 4 KiB per comment of UTF-8); a truncated body says so and points at the item file. Esc (or the close button/backdrop) closes it and returns focus to the card that opened it, and a live reload that removes the item closes it too. The drawer is deliberately **serve-only**: the static export stays lean and byte-identical (no drawer markup, no endpoint, no extra script), so an offline `board.html` never carries item bodies; the payload trade-off and the route contract are documented in `ArggonManager/docs/json-output.md`. Rendering is text-only (`textContent`/DOM text nodes), so hostile markdown lines in a body stay literal text. No tracker writes
-- `--tui`: interactive, read-only terminal kanban over the same kernel read path — five v0 status columns, dependency-light (raw ANSI escapes, no TUI framework, zero new dependencies). Re-reads the tree after every keypress, so it always shows the current tree. Requires an interactive terminal (piped stdout fails with `BOARD_FAILED`); **not combinable with `--json`** (it is a view, not a data format) or `--serve`. Keybindings:
+- `--tui`: interactive, read-only terminal kanban over the same kernel read path — five v0 status columns, dependency-light (raw ANSI escapes, no TUI framework, zero new dependencies). Re-reads the tree after every keypress, so it always shows the current tree; `enter` opens a read-only **detail pane** (item body, acceptance rows, dependencies) without leaving the board. Requires an interactive terminal (piped stdout fails with `BOARD_FAILED`); **not combinable with `--json`** (it is a view, not a data format) or `--serve`. Keybindings:
 
-| Key             | Action                                                                                 |
-| --------------- | -------------------------------------------------------------------------------------- |
-| `←` / `→`       | move the selected column (v0 status order)                                             |
-| `↑` / `↓`       | move the selected card within the column (long columns scroll; footer shows `row N/M`) |
-| `PgUp` / `PgDn` | move the selection one body page up/down, window included                              |
-| `Home` / `End`  | jump to the first / last card of the selected column                                   |
-| `/`             | open the search prompt (substring on id/title); `enter` applies, `esc` cancels         |
-| `esc`           | clear the active filter                                                                |
-| `enter`         | print the selected item's file path (does not open an editor)                          |
-| `q` / `Ctrl-C`  | quit, restoring the screen                                                             |
+| Key             | Board                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------- |
+| `←` / `→`       | move the selected column (v0 status order)                                                        |
+| `↑` / `↓`       | move the selected card within the column (long columns scroll; footer shows `row N/M`)            |
+| `PgUp` / `PgDn` | move the selection one body page up/down, window included                                         |
+| `Home` / `End`  | jump to the first / last card of the selected column                                              |
+| `/`             | open the search prompt (substring on id/title); `enter` applies, `esc` cancels                    |
+| `esc`           | clear the active filter                                                                           |
+| `enter`         | open the read-only detail pane for the selected item (an empty column shows `(no item selected)`) |
+| `q` / `Ctrl-C`  | quit, restoring the screen                                                                        |
+
+| Key             | Detail pane (`enter` on a card)                                   |
+| --------------- | ----------------------------------------------------------------- |
+| `↑` / `↓`       | scroll the content one line                                       |
+| `PgUp` / `PgDn` | scroll one page                                                   |
+| `Home` / `End`  | jump to the top / bottom of the content                           |
+| `esc` / `enter` | back to the board — selection, filter and scroll window untouched |
+| `q` / `Ctrl-C`  | quit, restoring the screen                                        |
+
+The detail pane reads one item without leaving the board: title, type, status, priority, assignee, labels, milestone, parent, branch, worktree path, file path, dependencies (each with its status; open deps carry the `⌫` marker), the acceptance checkbox rows with their count (the same task-list rule the container cascade checks) and the full markdown body (prose + comment history). The pane is **read-only** — it never writes the tracker — and every repo-controlled value and body line goes through the same human-text escaping as the cards. Bodies wrap to the terminal width: values are wrapped, never clipped, and long bodies are capped at 400 source lines / 1000 rendered lines (each cap is named by a marker line when it truncates). Below 40 columns the pane falls back to a stacked layout (one field per line, values wrapped) because packed field lines wrap mid-pair in a narrow terminal.
 
 The static export is a snapshot: re-run after tree changes to refresh (or use `--serve`). The generated file is a build artifact — safe to gitignore; deleting it loses nothing.
 
