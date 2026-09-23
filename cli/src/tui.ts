@@ -8,7 +8,8 @@
  *
  * Hygiene split (task-tui-board): every pure piece lives here as an exported
  * function — `renderTui` (frame -> string, golden-tested), `handleKey`
- * (keypress reducer), `clampTuiState` (selection bounds), `loadTuiItems`
+ * (keypress reducer), `clampTuiState` (selection bounds), `tuiColumnCounts`,
+ * `tuiBodyRows` + `followTuiScroll` (the scroll window), `loadTuiItems`
  * (shared data path). `runTuiBoard` only wires raw mode, keypress events and
  * resize to the pure pieces; it performs no writes anywhere.
  */
@@ -49,6 +50,13 @@ export type TuiState = {
   column: number;
   /** Index within the selected column's filtered items. */
   card: number;
+  /**
+   * Scroll window: index of the first card drawn in the selected column
+   * (bug-tui-selection-offscreen). Always clamped so the selected card is
+   * visible, the window never pages past the end and no empty rows are shown
+   * while the column has items; see `followTuiScroll`.
+   */
+  scroll: number;
   /** Active search filter (substring, case-insensitive, on id/title). */
   filter: string;
   /** Whether the `/` search prompt is open. */
@@ -68,6 +76,7 @@ export function initialTuiState(
     height: Math.max(1, Math.floor(height)),
     column: 0,
     card: 0,
+    scroll: 0,
     filter: "",
     searching: false,
     message: null,
@@ -118,14 +127,52 @@ export function tuiColumnCounts(items: WorkItem[], filter: string): number[] {
 }
 
 /**
- * Clamp the selection against real column sizes (used after filters change or
- * the tree is re-read; a selection may otherwise point past the end).
+ * Body rows available for cards: the frame spends one line on the header, one
+ * on the column headers and one on the footer (renderTui's geometry).
+ */
+export function tuiBodyRows(height: number): number {
+  const value = Math.floor(height);
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, value - 3);
+}
+
+/**
+ * Scroll window start (index of the first card drawn in the selected column)
+ * for `count` cards with a `rows`-high viewport, keeping `card` visible
+ * (bug-tui-selection-offscreen). The window follows the selection minimally —
+ * it only moves when the card would leave it — and is always valid:
+ *
+ * - never past the end (`scroll <= max(0, count - rows)`, so at most the last
+ *   page is shown and `PgDn`/`End` cannot overshoot), and
+ * - never empty while cards exist (`scroll` is pulled back so a full window is
+ *   drawn whenever `count >= rows`).
+ *
+ * Degenerate sizes return 0. Pure: no clamping of the selection itself (the
+ * caller owns `card`).
+ */
+export function followTuiScroll(card: number, scroll: number, count: number, rows: number): number {
+  const total = Math.max(0, Math.floor(count) || 0);
+  const height = Math.max(0, Math.floor(rows) || 0);
+  if (total === 0 || height === 0) return 0;
+  const maxScroll = Math.max(0, total - height);
+  const selected = Math.min(Math.max(Math.floor(card) || 0, 0), total - 1);
+  let next = Math.min(Math.max(Math.floor(scroll) || 0, 0), maxScroll);
+  if (selected < next) next = selected;
+  else if (selected >= next + height) next = Math.min(selected - height + 1, maxScroll);
+  return next;
+}
+
+/**
+ * Clamp the selection and the scroll window against real column sizes (used
+ * after filters change, a resize or a tree re-read; either may otherwise point
+ * past the end or render an empty page).
  */
 export function clampTuiState(state: TuiState, counts: number[]): TuiState {
   const column = Math.min(Math.max(state.column, 0), Math.max(STATUSES.length - 1, 0));
   const count = counts[column] ?? 0;
   const card = count === 0 ? 0 : Math.min(Math.max(state.card, 0), count - 1);
-  return { ...state, column, card };
+  const scroll = followTuiScroll(card, state.scroll, count, tuiBodyRows(state.height));
+  return { ...state, column, card, scroll };
 }
 
 /** Currently selected item, or null when its column is empty/filtered out. */
@@ -138,6 +185,12 @@ const ARROW_LEFT = "\x1b[D";
 const ARROW_RIGHT = "\x1b[C";
 const ARROW_UP = "\x1b[A";
 const ARROW_DOWN = "\x1b[B";
+const PAGE_UP = "\x1b[5~";
+const PAGE_DOWN = "\x1b[6~";
+/** Home variants: xterm (`\x1b[H`), vt220 (`\x1b[1~`), rxvt (`\x1b[7~`). */
+const HOME_KEYS = new Set(["\x1b[H", "\x1b[1~", "\x1b[7~"]);
+/** End variants: xterm (`\x1b[F`), vt220 (`\x1b[4~`), rxvt (`\x1b[8~`). */
+const END_KEYS = new Set(["\x1b[F", "\x1b[4~", "\x1b[8~"]);
 const CTRL_C = "\x03";
 const ESC = "\x1b";
 const ENTER = "\r";
@@ -146,7 +199,10 @@ const BACKSPACE = "\x7f";
 /**
  * Pure keypress reducer. `counts` are the visible card counts per status
  * (see tuiColumnCounts); `selectedPath` is the path of the currently selected
- * item, printed into the footer by Enter. Never mutates the input state.
+ * item, printed into the footer by Enter. Card moves keep the scroll window
+ * following the selection (and clamp at the column edges) whenever `counts`
+ * carries the selected column; without counts the reducer falls back to the
+ * unbounded card moves of the pure cases. Never mutates the input state.
  */
 export function handleKey(
   state: TuiState,
@@ -185,12 +241,23 @@ export function handleKey(
     case ARROW_RIGHT:
       return moveColumn(state, 1, counts);
     case ARROW_UP:
-      return { ...state, card: Math.max(state.card - 1, 0), message: null };
+      return moveCard(state, -1, counts);
     case ARROW_DOWN:
-      return { ...state, card: state.card + 1, message: null };
+      return moveCard(state, 1, counts);
+    case PAGE_UP:
+      return moveCard(state, -pageStep(state), counts);
+    case PAGE_DOWN:
+      return moveCard(state, pageStep(state), counts);
     default:
+      if (HOME_KEYS.has(key)) return selectCard(state, 0, counts);
+      if (END_KEYS.has(key)) return selectCard(state, "last", counts);
       return state;
   }
+}
+
+/** Cards a PgUp/PgDn moves: one body page, at least one row. */
+function pageStep(state: TuiState): number {
+  return Math.max(1, tuiBodyRows(state.height));
 }
 
 function moveColumn(state: TuiState, delta: number, counts: number[]): TuiState {
@@ -198,7 +265,36 @@ function moveColumn(state: TuiState, delta: number, counts: number[]): TuiState 
   if (column === state.column) return state;
   const count = counts[column] ?? 0;
   const card = count === 0 ? 0 : Math.min(state.card, count - 1);
-  return { ...state, column, card, message: null };
+  const scroll = followTuiScroll(card, state.scroll, count, tuiBodyRows(state.height));
+  return { ...state, column, card, scroll, message: null };
+}
+
+/**
+ * Move the selected card by `delta` within its column, clamped at both edges
+ * when the column count is known, and keep the scroll window following it.
+ */
+function moveCard(state: TuiState, delta: number, counts: number[]): TuiState {
+  const count = counts[state.column];
+  if (typeof count !== "number") {
+    // Pure reducer without counts: preserve the unbounded card move.
+    return { ...state, card: Math.max(state.card + delta, 0), message: null };
+  }
+  const last = Math.max(count - 1, 0);
+  const card = Math.min(Math.max(state.card + delta, 0), last);
+  const scroll = followTuiScroll(card, state.scroll, count, tuiBodyRows(state.height));
+  return { ...state, card, scroll, message: null };
+}
+
+/** Jump to the first/last card of the column, window included. */
+function selectCard(state: TuiState, position: 0 | "last", counts: number[]): TuiState {
+  const count = counts[state.column];
+  if (typeof count !== "number") {
+    return { ...state, card: position === "last" ? state.card : 0, message: null };
+  }
+  const last = Math.max(count - 1, 0);
+  const card = position === "last" ? last : Math.min(position, last);
+  const scroll = followTuiScroll(card, state.scroll, count, tuiBodyRows(state.height));
+  return { ...state, card, scroll, message: null };
 }
 
 /** Clip a single-line string to n visible columns, marking a cut with an ellipsis. */
@@ -230,8 +326,11 @@ function cardLine(item: WorkItem, selected: boolean, depBlocked: boolean): strin
  * Pure frame renderer: the whole terminal screen as one string (with a
  * leading clear+home and exactly `height` lines, each padded to `width` so
  * consecutive frames never ghost). Columns are the v0 statuses in enum
- * order, one card row per visible item, footer carries help / search prompt
- * / last message. With `color: false` (tests) no SGR sequences are emitted.
+ * order, one card row per visible item; the selected column renders through
+ * the scroll window (bug-tui-selection-offscreen) so the selected card is
+ * always drawn. The footer leads with the position (`row 61/281`) and then
+ * carries help / search prompt / last message. With `color: false` (tests) no
+ * SGR sequences are emitted.
  */
 export function renderTui(
   items: WorkItem[],
@@ -244,7 +343,14 @@ export function renderTui(
   const colWidth = Math.max(1, Math.floor(width / STATUSES.length));
   const visible = visibleTuiItems(items, state.filter);
   const counts = tuiColumnCounts(items, state.filter);
-  const cardRows = Math.max(0, height - 3);
+  const cardRows = tuiBodyRows(height);
+  const selectedCount = counts[state.column] ?? 0;
+  // The frame is always valid even with a stale state: the window is
+  // re-derived from the selection on every render (followTuiScroll), so the
+  // selected card is drawn whenever the column has one.
+  const selectedCard =
+    selectedCount === 0 ? 0 : Math.min(Math.max(state.card, 0), selectedCount - 1);
+  const scroll = followTuiScroll(selectedCard, state.scroll, selectedCount, cardRows);
 
   const lines: string[] = [];
 
@@ -262,28 +368,31 @@ export function renderTui(
   });
   lines.push(padEndTo(headers.join(""), width));
 
-  // Card rows: one line per item, per column, up to the body height. The
-  // status index is built once per frame for the dependency marks.
+  // Card rows: one line per item, per column, up to the body height. Only the
+  // selected column is windowed (bug-tui-selection-offscreen): it starts at
+  // `scroll` so the selected card is always drawn; the other columns keep
+  // rendering from their first card. The status index is built once per frame
+  // for the dependency marks.
   const statusById = buildStatusIndex(items);
-  const columnCards = STATUSES.map((status, i) =>
-    visible
+  const columnCards = STATUSES.map((status, i) => {
+    const start = i === state.column ? scroll : 0;
+    return visible
       .filter((item) => item.status === status)
+      .slice(start, start + cardRows)
       .map((item, j) => {
+        const index = start + j;
+        const isSelected = i === state.column && index === selectedCard;
         const line = padEndTo(
           clipLine(
-            cardLine(
-              item,
-              i === state.column && j === state.card,
-              hasOpenDependencies(item.depends_on, statusById),
-            ),
+            cardLine(item, isSelected, hasOpenDependencies(item.depends_on, statusById)),
             colWidth,
           ),
           colWidth,
         );
         if (!color) return line;
-        return i === state.column && j === state.card ? `\x1b[7m${line}\x1b[0m` : line;
-      }),
-  );
+        return isSelected ? `\x1b[7m${line}\x1b[0m` : line;
+      });
+  });
   for (let row = 0; row < cardRows; row++) {
     let line = "";
     for (let c = 0; c < STATUSES.length; c++) {
@@ -297,16 +406,19 @@ export function renderTui(
     lines.push(padEndTo(line, width));
   }
 
-  // Footer: search prompt > transient message > key help.
+  // Footer: the position (selected row over the selected column's size)
+  // always leads, then the search prompt > transient message > key help — so
+  // a narrow terminal clips the help instead of the position.
+  const position = `row ${selectedCount === 0 ? 0 : selectedCard + 1}/${selectedCount}`;
   let footer: string;
   if (state.searching) {
-    footer = `/${state.filter}█ — enter to apply, esc to cancel`;
+    footer = `${position} · /${state.filter}█ — enter to apply, esc to cancel`;
   } else if (state.message !== null) {
     // The message is the selected item's file path (Enter), i.e. repo-
     // controlled filename bytes: escape before rendering.
-    footer = sanitizeHumanTextUncapped(state.message);
+    footer = `${position} · ${sanitizeHumanTextUncapped(state.message)}`;
   } else {
-    footer = "←/→ column · ↑/↓ card · / search · enter path · q quit";
+    footer = `${position} · ←/→ column · ↑/↓ card · PgUp/PgDn page · home/end · / search · enter path · q quit`;
   }
   lines.push(padEndTo(clipLine(footer, width), width));
 
@@ -401,10 +513,11 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
             return;
           }
         }
-        current = clampTuiState(current, tuiColumnCounts(items, current.filter));
-        // Re-read after every keypress: the tree is the source of truth and
-        // may have changed while we were idle (no file watcher in v0).
+        // Re-read before clamping: the tree is the source of truth and may
+        // have changed while we were idle (no file watcher in v0); the clamp
+        // then uses the fresh counts, keeping the scroll window valid.
         items = loadTuiItems(opts.cwd).items;
+        current = clampTuiState(current, tuiColumnCounts(items, current.filter));
         render();
       } catch (err) {
         fail(err);
@@ -418,6 +531,9 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
           width: size(output.columns, current.width),
           height: size(output.rows, current.height),
         };
+        // A resize changes the body height: re-derive the window so it stays
+        // valid and the selected card stays visible.
+        current = clampTuiState(current, tuiColumnCounts(items, current.filter));
         render();
       } catch (err) {
         fail(err);
@@ -450,17 +566,28 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
 }
 
 /**
- * Split a stdin chunk into single keystrokes: escape sequences stay together
- * (arrows), everything else is one key per character.
+ * Split a stdin chunk into single keystrokes: CSI escape sequences stay
+ * together (arrows, PgUp/PgDn, Home/End), everything else is one key per
+ * character. A CSI sequence is `ESC [`, parameter bytes (0x30-0x3f),
+ * intermediate bytes (0x20-0x2f) and one final byte (0x40-0x7e) — reading the
+ * whole run keeps `\x1b[6~` (PgDn) from splitting into `\x1b[6` + `~`.
  */
 function splitKeys(text: string): string[] {
   const keys: string[] = [];
   let i = 0;
   while (i < text.length) {
-    if (text[i] === ESC && text.length - i >= 3 && text[i + 1] === "[") {
-      keys.push(text.slice(i, i + 3));
-      i += 3;
-      continue;
+    if (text[i] === ESC && text[i + 1] === "[") {
+      let end = i + 2;
+      while (end < text.length) {
+        const code = text.charCodeAt(end);
+        if (code < 0x20 || code > 0x3f) break;
+        end += 1;
+      }
+      if (end < text.length && text.charCodeAt(end) >= 0x40 && text.charCodeAt(end) <= 0x7e) {
+        keys.push(text.slice(i, end + 1));
+        i = end + 1;
+        continue;
+      }
     }
     keys.push(text[i]);
     i += 1;

@@ -354,14 +354,16 @@ arggon board --tui            # interactive read-only terminal kanban (raw ANSI,
 - `--serve`: serves the board locally, **bound to 127.0.0.1 only**, and reloads the page whenever any file under the tracker root (`ArggonManager/`) changes; drag-and-drop posts to the update endpoint, which runs the same kernel update rules as the CLI. `--serve` is combinable with `--json` (the envelope is emitted once, then the server keeps running); see `ArggonManager/docs/json-output.md` for the payload fields. The served board is also the **review surface** (serve-only, not in the static export or `--tui`): cards with a `branch` carry a live PR strip — state (`draft/open/merged/closed`) + checks summary + a `diff` link to the PR's files view — polled from the shared `gh pr list` read path on a fixed interval (60s); a changed snapshot pushes an SSE reload. gh missing or unauthenticated, or a failed poll, degrades cleanly: cards fall back to the neutral `○ no PR` badge and the server keeps serving with the last good snapshot
 - `--tui`: interactive, read-only terminal kanban over the same kernel read path — five v0 status columns, dependency-light (raw ANSI escapes, no TUI framework, zero new dependencies). Re-reads the tree after every keypress, so it always shows the current tree. Requires an interactive terminal (piped stdout fails with `BOARD_FAILED`); **not combinable with `--json`** (it is a view, not a data format) or `--serve`. Keybindings:
 
-| Key            | Action                                                                         |
-| -------------- | ------------------------------------------------------------------------------ |
-| `←` / `→`      | move the selected column (v0 status order)                                     |
-| `↑` / `↓`      | move the selected card within the column                                       |
-| `/`            | open the search prompt (substring on id/title); `enter` applies, `esc` cancels |
-| `esc`          | clear the active filter                                                        |
-| `enter`        | print the selected item's file path (does not open an editor)                  |
-| `q` / `Ctrl-C` | quit, restoring the screen                                                     |
+| Key             | Action                                                                                 |
+| --------------- | -------------------------------------------------------------------------------------- |
+| `←` / `→`       | move the selected column (v0 status order)                                             |
+| `↑` / `↓`       | move the selected card within the column (long columns scroll; footer shows `row N/M`) |
+| `PgUp` / `PgDn` | move the selection one body page up/down, window included                              |
+| `Home` / `End`  | jump to the first / last card of the selected column                                   |
+| `/`             | open the search prompt (substring on id/title); `enter` applies, `esc` cancels         |
+| `esc`           | clear the active filter                                                                |
+| `enter`         | print the selected item's file path (does not open an editor)                          |
+| `q` / `Ctrl-C`  | quit, restoring the screen                                                             |
 
 The static export is a snapshot: re-run after tree changes to refresh (or use `--serve`). The generated file is a build artifact — safe to gitignore; deleting it loses nothing.
 
