@@ -1,17 +1,22 @@
 /**
- * Terminal UI kanban (`arggon board --tui`) — story-tui-board / task-tui-board.
+ * Terminal UI kanban (`arggon board --tui`) — story-tui-board / task-tui-board /
+ * task-tui-detail-pane.
  *
  * Read-only interactive view over the same kernel read path as `list --json`
  * and the HTML board (loadItems -> toContractWorkItem). Dependency-light per
  * ADR 0001: raw ANSI escapes (clear/home, SGR colors, alternate screen), no
  * TUI framework, zero new npm dependencies.
  *
- * Hygiene split (task-tui-board): every pure piece lives here as an exported
- * function — `renderTui` (frame -> string, golden-tested), `handleKey`
- * (keypress reducer), `clampTuiState` (selection bounds), `tuiColumnCounts`,
- * `tuiBodyRows` + `followTuiScroll` (the scroll window), `loadTuiItems`
- * (shared data path). `runTuiBoard` only wires raw mode, keypress events and
- * resize to the pure pieces; it performs no writes anywhere.
+ * Hygiene split (task-tui-board / task-tui-detail-pane): every pure piece lives
+ * here as an exported function — `renderTui` (board frame -> string),
+ * `renderTuiDetail` + `buildTuiDetailLines` (detail pane frame + content),
+ * `renderTuiScreen` (the loop's dispatcher), `handleKey` (keypress reducer for
+ * both modes), `clampTuiState` (board selection bounds), `followTuiScroll` +
+ * `clampTuiDetailScroll` (the two scroll windows), `wrapTuiLine`,
+ * `tuiAcceptanceRows`, `tuiDependencySummary`, `tuiBodyRows` +
+ * `tuiDetailBodyRows` (frame geometry), `loadTuiItems` (shared data path,
+ * detail bodies included). `runTuiBoard` only wires raw mode, keypress events
+ * and resize to the pure pieces; it performs no writes anywhere.
  */
 import {
   STATUSES,
@@ -34,6 +39,31 @@ import {
 export const TUI_DEFAULT_WIDTH = 80;
 export const TUI_DEFAULT_HEIGHT = 24;
 
+/**
+ * Narrow-terminal threshold for the detail pane (task-tui-detail-pane). At or
+ * above this width the pane packs related fields on one line (`type: … ·
+ * status: …`); below it the packed lines wrap mid-pair and read as noise, so
+ * the pane falls back to a stacked layout: one field per line, values wrapped
+ * (never clipped) to the terminal width.
+ */
+export const TUI_DETAIL_NARROW_WIDTH = 40;
+
+/**
+ * Source body lines the detail pane renders before marking the rest truncated.
+ * The pane is a read view, not an editor: the cap keeps a hostile or
+ * comment-heavy body (this repo's items grow ~226 B per comment, forever)
+ * from making every frame render the whole file. The marker line names the
+ * cap and the omitted count, so nothing is silently dropped.
+ */
+export const TUI_DETAIL_MAX_BODY_LINES = 400;
+
+/**
+ * Hard cap on rendered detail lines (title + fields + acceptance + body,
+ * after wrapping). Bounds the per-keypress render cost independently of the
+ * body sizes on disk; when hit, a marker line says so.
+ */
+export const TUI_DETAIL_MAX_LINES = 1000;
+
 /** One-letter type badge per v0 type (I/E/S/T/B). */
 export const TYPE_BADGES: Record<WorkItem["type"], string> = {
   initiative: "I",
@@ -41,6 +71,36 @@ export const TYPE_BADGES: Record<WorkItem["type"], string> = {
   story: "S",
   task: "T",
   bug: "B",
+};
+
+/**
+ * Body source for the detail pane (task-tui-detail-pane). The kernel read path
+ * that feeds the board (`loadItems`) already parses every file, body included;
+ * `loadTuiItems` keeps the body beside the contract item instead of paying a
+ * second file read when Enter opens the pane. Read-only: nothing here is ever
+ * written back.
+ */
+export type TuiDetailSource = {
+  /** Item id (filename stem). */
+  id: string;
+  /** Raw markdown body (frontmatter excluded; comments included). */
+  body: string;
+};
+
+/**
+ * Detail-pane mode state (task-tui-detail-pane): which item is open and the
+ * pane's scroll window. Board state (column/card/scroll/filter) is untouched
+ * while a pane is open, so Esc/Enter returns to exactly the same board.
+ */
+export type TuiDetailState = {
+  /** Id of the item being read. */
+  id: string;
+  /**
+   * Index of the first content line drawn, in wrapped display lines. Clamped
+   * per render against the real line count (clampTuiDetailScroll), so a stale
+   * value or a resize still renders a valid window.
+   */
+  scroll: number;
 };
 
 export type TuiState = {
@@ -61,8 +121,13 @@ export type TuiState = {
   filter: string;
   /** Whether the `/` search prompt is open. */
   searching: boolean;
-  /** Transient footer line (e.g. the item path printed on Enter). */
+  /** Transient footer line (e.g. "(no item selected)" after Enter). */
   message: string | null;
+  /**
+   * Open detail pane (`null` = the board is the view) — task-tui-detail-pane.
+   * Read-only: the pane has no update path, it only reads the loaded items.
+   */
+  detail: TuiDetailState | null;
   /** Set by `q` / Ctrl-C; the loop exits when true. */
   quit: boolean;
 };
@@ -80,6 +145,7 @@ export function initialTuiState(
     filter: "",
     searching: false,
     message: null,
+    detail: null,
     quit: false,
   };
 }
@@ -87,13 +153,23 @@ export function initialTuiState(
 /**
  * Items feeding the TUI: same kernel read path as the HTML board, sorted
  * lexicographically by id (same rule as renderBoardHtml / list), through the
- * shared view-model.
+ * shared view-model — plus the raw bodies the detail pane reads
+ * (task-tui-detail-pane), keyed by id. Both come from the same `loadItems`
+ * pass, so the board and the pane can never disagree about an item.
  */
-export function loadTuiItems(cwd: string): { root: string; items: WorkItem[] } {
+export function loadTuiItems(cwd: string): {
+  root: string;
+  items: WorkItem[];
+  details: Map<string, TuiDetailSource>;
+} {
   const tasksDir = findTasksDir(cwd);
   const root = repoRootFromTasks(tasksDir);
-  const items = sortById(loadItems(tasksDir)).map((item) => toContractWorkItem(item, root));
-  return { root, items };
+  const kernelItems = sortById(loadItems(tasksDir));
+  const items = kernelItems.map((item) => toContractWorkItem(item, root));
+  const details = new Map<string, TuiDetailSource>(
+    kernelItems.map((item) => [item.id, { id: item.id, body: item.body }]),
+  );
+  return { root, items, details };
 }
 
 /** Case-insensitive substring match on id or title (empty filter matches all). */
@@ -134,6 +210,32 @@ export function tuiBodyRows(height: number): number {
   const value = Math.floor(height);
   if (!Number.isFinite(value)) return 0;
   return Math.max(0, value - 3);
+}
+
+/**
+ * Content rows of the detail pane: its frame spends one line on the pane
+ * header and one on the pane footer (renderTuiDetail's geometry).
+ */
+export function tuiDetailBodyRows(height: number): number {
+  const value = Math.floor(height);
+  if (!Number.isFinite(value)) return 0;
+  return Math.max(0, value - 2);
+}
+
+/**
+ * Pane scroll window: index of the first content line drawn for `lines`
+ * wrapped display lines in a `rows`-high viewport (task-tui-detail-pane). Same
+ * invariants as `followTuiScroll` without a selection to follow: never
+ * negative, never past the end (at most the last page is shown, so PgDn/End
+ * cannot overshoot) and 0 while the content fits or is empty. Degenerate sizes
+ * return 0.
+ */
+export function clampTuiDetailScroll(scroll: number, lines: number, rows: number): number {
+  const total = Math.max(0, Math.floor(lines) || 0);
+  const height = Math.max(0, Math.floor(rows) || 0);
+  if (total === 0 || height === 0) return 0;
+  const value = Math.floor(scroll);
+  return Math.min(Math.max(Number.isFinite(value) ? value : 0, 0), Math.max(0, total - height));
 }
 
 /**
@@ -197,21 +299,33 @@ const ENTER = "\r";
 const BACKSPACE = "\x7f";
 
 /**
- * Pure keypress reducer. `counts` are the visible card counts per status
- * (see tuiColumnCounts); `selectedPath` is the path of the currently selected
- * item, printed into the footer by Enter. Card moves keep the scroll window
- * following the selection (and clamp at the column edges) whenever `counts`
- * carries the selected column; without counts the reducer falls back to the
- * unbounded card moves of the pure cases. Never mutates the input state.
+ * Optional per-keypress context: the loop owns the data, the reducer stays
+ * pure. `counts` are the visible card counts per status (tuiColumnCounts);
+ * `selectedId` is the board card under the cursor (Enter opens its pane);
+ * `detailLines` is the open pane's total display line count (without it the
+ * pane reducer cannot clamp the window, so PgUp/PgDn fall back to unbounded
+ * moves for pure tests).
  */
-export function handleKey(
-  state: TuiState,
-  key: string,
-  counts: number[] = [],
-  selectedPath: string | null = null,
-): TuiState {
-  // Ctrl-C quits from anywhere, search prompt included.
+export type TuiKeyContext = {
+  counts?: number[];
+  selectedId?: string | null;
+  detailLines?: number;
+};
+
+/**
+ * Pure keypress reducer (board and detail pane). Board: Enter opens the
+ * read-only detail pane for the selected item (task-tui-detail-pane), Esc
+ * clears the filter, card moves keep the scroll window following the
+ * selection whenever `counts` carries the selected column. Detail pane: Esc
+ * and Enter return to the board with every board field untouched, ↑/↓ and
+ * PgUp/PgDn/Home/End scroll the pane, q quits. Never mutates the input state.
+ */
+export function handleKey(state: TuiState, key: string, ctx: TuiKeyContext = {}): TuiState {
+  // Ctrl-C quits from anywhere, pane and search prompt included.
   if (key === CTRL_C) return { ...state, quit: true };
+  if (state.detail !== null) return handleDetailKey(state, key, ctx.detailLines ?? 0);
+
+  const counts = ctx.counts ?? [];
 
   if (state.searching) {
     if (key === ESC) return { ...state, searching: false, filter: "" };
@@ -235,7 +349,12 @@ export function handleKey(
       return { ...state, filter: "", message: null };
     case ENTER:
     case "\n":
-      return { ...state, message: selectedPath ?? "(no item selected)" };
+      if (ctx.selectedId) {
+        // Enter reads the item instead of printing its path: the pane carries
+        // the path, the body, the acceptance rows and the dependencies.
+        return { ...state, detail: { id: ctx.selectedId, scroll: 0 }, message: null };
+      }
+      return { ...state, message: "(no item selected)" };
     case ARROW_LEFT:
       return moveColumn(state, -1, counts);
     case ARROW_RIGHT:
@@ -251,6 +370,45 @@ export function handleKey(
     default:
       if (HOME_KEYS.has(key)) return selectCard(state, 0, counts);
       if (END_KEYS.has(key)) return selectCard(state, "last", counts);
+      return state;
+  }
+}
+
+/**
+ * Detail-pane reducer (task-tui-detail-pane). Read-only: no key can write, and
+ * no key touches the board fields, so returning to the board restores the
+ * selection, the filter and the scroll window exactly. Esc and Enter both
+ * close the pane; q/Ctrl-C quit the app; `/` and every other board key are
+ * ignored inside the pane (it has no filter and no selection).
+ */
+function handleDetailKey(state: TuiState, key: string, lines: number): TuiState {
+  const detail = state.detail;
+  if (detail === null) return state;
+  const rows = tuiDetailBodyRows(state.height);
+  const scrollTo = (value: number): TuiState => ({
+    ...state,
+    detail: { ...detail, scroll: clampTuiDetailScroll(value, lines, rows) },
+  });
+  const page = Math.max(1, rows);
+
+  switch (key) {
+    case ESC:
+    case ENTER:
+    case "\n":
+      return { ...state, detail: null };
+    case "q":
+      return { ...state, quit: true };
+    case ARROW_UP:
+      return scrollTo(detail.scroll - 1);
+    case ARROW_DOWN:
+      return scrollTo(detail.scroll + 1);
+    case PAGE_UP:
+      return scrollTo(detail.scroll - page);
+    case PAGE_DOWN:
+      return scrollTo(detail.scroll + page);
+    default:
+      if (HOME_KEYS.has(key)) return scrollTo(0);
+      if (END_KEYS.has(key)) return scrollTo(lines);
       return state;
   }
 }
@@ -414,15 +572,307 @@ export function renderTui(
   if (state.searching) {
     footer = `${position} · /${state.filter}█ — enter to apply, esc to cancel`;
   } else if (state.message !== null) {
-    // The message is the selected item's file path (Enter), i.e. repo-
-    // controlled filename bytes: escape before rendering.
+    // Transient messages are repo-controlled text (an old path message, the
+    // "(no item selected)" hint): escape before rendering.
     footer = `${position} · ${sanitizeHumanTextUncapped(state.message)}`;
   } else {
-    footer = `${position} · ←/→ column · ↑/↓ card · PgUp/PgDn page · home/end · / search · enter path · q quit`;
+    footer = `${position} · ←/→ column · ↑/↓ card · PgUp/PgDn page · home/end · / search · enter detail · q quit`;
   }
   lines.push(padEndTo(clipLine(footer, width), width));
 
   return `\x1b[H\x1b[2J${lines.join("\n")}`;
+}
+
+// ---------------------------------------------------------------------------
+// Detail pane (task-tui-detail-pane): read one item without leaving the board.
+// ---------------------------------------------------------------------------
+
+/** One acceptance checkbox row of an item body. */
+export type TuiAcceptanceRow = {
+  checked: boolean;
+  /** Checkbox text (marker stripped, trimmed). */
+  text: string;
+};
+
+/**
+ * Word-wrap one sanitized display line to `width` columns: break at the last
+ * space that fits, hard-break a word longer than the line, drop the break
+ * space. The pane never clips values — it is scrollable, so wrapping is the
+ * documented narrow-terminal fallback. Returns [""] for empty input and [] for
+ * a degenerate width. Pure; callers sanitize BEFORE wrapping, so no control
+ * byte is ever measured or emitted by a hostile body line.
+ */
+export function wrapTuiLine(text: string, width: number): string[] {
+  const max = Math.floor(width);
+  if (!Number.isFinite(max) || max <= 0) return [];
+  if (text.length === 0) return [""];
+  const out: string[] = [];
+  let rest = text;
+  while (rest.length > max) {
+    let cut = rest.lastIndexOf(" ", max);
+    if (cut <= 0) cut = max;
+    out.push(rest.slice(0, cut));
+    rest = rest.slice(cut).replace(/^ +/, "");
+  }
+  out.push(rest);
+  return out;
+}
+
+/**
+ * Acceptance checkbox rows of a body (task-tui-detail-pane): the exact
+ * task-list rule the container cascade counts (`acceptanceComplete`, kernel
+ * task-cascade-acceptance-aware) — `- [ ]` / `- [x]` / `- [X]` with leading
+ * whitespace tolerated — so the pane shows the checklist whose completion the
+ * cascade checks, never a second interpretation of it.
+ */
+export function tuiAcceptanceRows(body: string): TuiAcceptanceRow[] {
+  const rows: TuiAcceptanceRow[] = [];
+  for (const line of body.split("\n")) {
+    const match = /^[ \t]*[-*] \[( |x|X)\]/.exec(line);
+    if (!match) continue;
+    rows.push({ checked: match[1] !== " ", text: line.slice(match[0].length).trim() });
+  }
+  return rows;
+}
+
+/**
+ * One-line dependency summary with each dependency's status: `a (in_progress
+ * ⌫), b (done)`. Open dependencies (not done/cancelled, unknown ids included —
+ * the board's ⌫ rule, ADR 0004) carry the marker; the caller sanitizes the
+ * result like every other field value.
+ */
+export function tuiDependencySummary(item: WorkItem, items: WorkItem[]): string {
+  if (item.depends_on.length === 0) return "(none)";
+  const byId = new Map(items.map((entry) => [entry.id, entry]));
+  return item.depends_on
+    .map((id) => {
+      const dep = byId.get(id);
+      if (!dep) return `${id} (unknown ⌫)`;
+      const open = dep.status !== "done" && dep.status !== "cancelled";
+      return `${id} (${dep.status}${open ? " ⌫" : ""})`;
+    })
+    .join(", ");
+}
+
+export type TuiDetailInput = {
+  /** The item being read; null when its id is no longer in the tree. */
+  item: WorkItem | null;
+  /** Id the pane was opened with (shown when `item` is null). */
+  id: string;
+  /** All loaded items — dependency statuses must not depend on the filter. */
+  items: WorkItem[];
+  /** Raw markdown body (kernel read path via loadTuiItems). */
+  body: string;
+  /** Terminal width the content is wrapped to. */
+  width: number;
+  /** Source body line cap; defaults to TUI_DETAIL_MAX_BODY_LINES. */
+  maxBodyLines?: number;
+  /** Rendered display line cap; defaults to TUI_DETAIL_MAX_LINES. */
+  maxLines?: number;
+};
+
+/**
+ * Pure detail-pane content builder (task-tui-detail-pane): sanitized, wrapped
+ * display lines in reading order — title, fields (type/status/priority/
+ * assignee, labels, milestone, parent, branch, worktree, path, dependencies
+ * with statuses), the acceptance excerpt, then the body. Everything
+ * repo-controlled goes through `sanitizeHumanTextUncapped` (the same
+ * human-text path as the board cards) per source line, so a hostile body line
+ * renders as inert `\uXXXX` text and cannot drive the terminal.
+ *
+ * Layout: `width >= TUI_DETAIL_NARROW_WIDTH` packs related fields on one line
+ * (`type: … · status: …`); below it the stacked layout puts one field per line
+ * and wraps values instead of clipping them. Two documented caps bound the
+ * output (see TUI_DETAIL_MAX_BODY_LINES / TUI_DETAIL_MAX_LINES); each cap is
+ * named by a marker line, so nothing is dropped silently. Read-only: the
+ * builder never touches the filesystem.
+ */
+export function buildTuiDetailLines(input: TuiDetailInput): string[] {
+  const width = Math.max(1, Math.floor(input.width) || 0);
+  const maxBodyLines = Math.max(
+    1,
+    Math.floor(input.maxBodyLines ?? TUI_DETAIL_MAX_BODY_LINES) || 0,
+  );
+  const maxLines = Math.max(1, Math.floor(input.maxLines ?? TUI_DETAIL_MAX_LINES) || 0);
+  const lines: string[] = [];
+  let truncated = false;
+
+  // Append one logical line, wrapped to the pane; continuation segments get
+  // `cont` (defaults to spaces matching the prefix) so indented content keeps
+  // its shape. Stops at the rendered-line cap and records the truncation.
+  const push = (prefix: string, text: string, cont?: string): void => {
+    const continuation = cont ?? " ".repeat(prefix.length);
+    const inner = Math.max(1, width - Math.max(prefix.length, continuation.length));
+    const parts = wrapTuiLine(text, inner);
+    for (let i = 0; i < parts.length; i++) {
+      if (lines.length >= maxLines) {
+        truncated = true;
+        return;
+      }
+      lines.push(`${i === 0 ? prefix : continuation}${parts[i]}`);
+    }
+  };
+
+  const safe = (value: string): string => sanitizeHumanTextUncapped(value);
+  const item = input.item;
+
+  if (item === null) {
+    push("", `item ${safe(input.id)} is not in the tree anymore`, "");
+    push("", "esc · back to the board (the tree is re-read on every key)", "");
+    return lines;
+  }
+
+  // Title line: the board's card vocabulary (badge + id + title).
+  push("", `${TYPE_BADGES[item.type]} ${safe(item.id)} — ${safe(item.title ?? item.id)}`, "");
+
+  // Fields. Labels/statuses/enums are repo-controlled values and are escaped
+  // like every other one; only the field NAMES and the separators are trusted.
+  const fields: Array<[string, string]> = [
+    ["type", item.type],
+    ["status", item.status],
+    ["priority", safe(item.priority ?? "(none)")],
+    ["assignee", safe(item.assignee ?? "(none)")],
+    ["labels", safe(item.labels.length > 0 ? item.labels.join(", ") : "(none)")],
+    ["milestone", safe(item.milestone ?? "(none)")],
+    ["parent", safe(item.parent ?? "(none)")],
+    ["branch", safe(item.branch ?? "(none)")],
+    ["worktree", safe(item.worktree_path ?? "(none)")],
+    ["path", safe(item.path)],
+    ["dependencies", safe(tuiDependencySummary(item, input.items))],
+  ];
+  const groups =
+    width < TUI_DETAIL_NARROW_WIDTH
+      ? fields.map(([label]) => [label])
+      : [
+          ["type", "status", "priority", "assignee"],
+          ["labels", "milestone"],
+          ["parent", "branch", "worktree"],
+          ["path", "dependencies"],
+        ];
+  const valueByLabel = new Map(fields);
+  for (const group of groups) {
+    push(
+      "",
+      group.map((label) => `${label}: ${valueByLabel.get(label) ?? "(none)"}`).join(" · "),
+      "",
+    );
+  }
+
+  // Acceptance excerpt: the cascade-counted rows plus the count, so the item's
+  // contract is readable before the body is scrolled.
+  const acceptance = tuiAcceptanceRows(input.body);
+  if (acceptance.length === 0) {
+    push("", "acceptance: (none)", "");
+  } else {
+    const checked = acceptance.filter((row) => row.checked).length;
+    push("", `acceptance ${checked}/${acceptance.length}:`, "");
+    for (const row of acceptance) {
+      push("  ", `[${row.checked ? "x" : " "}] ${safe(row.text)}`, "    ");
+    }
+  }
+
+  // Body: the raw markdown (prose and comment history), one sanitized line at
+  // a time, capped — the item is a file, not a buffer.
+  const body = input.body.replace(/^\n+/, "").replace(/\s+$/, "");
+  if (body === "") {
+    push("", "body: (empty)", "");
+  } else {
+    const source = body.split("\n");
+    push("", "body:", "");
+    for (const line of source.slice(0, maxBodyLines)) push("  ", safe(line), "  ");
+    if (source.length > maxBodyLines) {
+      push(
+        "",
+        `… body truncated: ${source.length - maxBodyLines} of ${source.length} line(s) omitted (cap ${maxBodyLines})`,
+        "",
+      );
+    }
+  }
+
+  if (truncated) {
+    if (lines.length >= maxLines) lines.pop();
+    lines.push(`… more content omitted (rendered line cap ${maxLines})`);
+  }
+  return lines;
+}
+
+/**
+ * The pane's content lines for one loaded snapshot: item lookup (null when the
+ * id vanished from the tree), raw body, dependency statuses, wrapped to
+ * `width`. Shared by the renderer and by the loop's keypress reducer, so
+ * scrolling always clamps against exactly the lines the frame draws.
+ */
+export function tuiDetailLinesFor(
+  items: WorkItem[],
+  details: ReadonlyMap<string, TuiDetailSource>,
+  detail: TuiDetailState,
+  width: number,
+): string[] {
+  const item = items.find((entry) => entry.id === detail.id) ?? null;
+  return buildTuiDetailLines({
+    item,
+    id: detail.id,
+    items,
+    body: details.get(detail.id)?.body ?? "",
+    width,
+  });
+}
+
+/**
+ * Pure detail-pane frame renderer (task-tui-detail-pane): pane header +
+ * scrollable content + footer, exactly `height` lines each padded to `width`
+ * (the board's no-ghosting rule). The window is re-derived from
+ * `detail.scroll` on every frame (clampTuiDetailScroll), so a stale value, a
+ * resize or a tree that shrank still renders a valid frame. With
+ * `color: false` (tests) no SGR sequences are emitted.
+ */
+export function renderTuiDetail(
+  items: WorkItem[],
+  detail: TuiDetailState,
+  details: ReadonlyMap<string, TuiDetailSource>,
+  geometry: { width: number; height: number },
+  opts: { color?: boolean } = {},
+): string {
+  const color = opts.color !== false;
+  const width = Math.max(1, Math.floor(geometry.width) || 0);
+  const height = Math.max(1, Math.floor(geometry.height) || 0);
+  const content = tuiDetailLinesFor(items, details, detail, width);
+  const rows = tuiDetailBodyRows(height);
+  const scroll = clampTuiDetailScroll(detail.scroll, content.length, rows);
+  const window = content.slice(scroll, scroll + rows);
+
+  const headerText = clipLine(
+    `arggon detail · ${sanitizeHumanTextUncapped(detail.id)} · esc back`,
+    width,
+  );
+  const header = color ? `\x1b[1m${headerText}\x1b[0m` : headerText;
+  // Position first, help last — a narrow terminal clips the help, never the
+  // position (same precedence as the board footer).
+  const footer = clipLine(
+    `row ${content.length === 0 ? 0 : scroll + 1}/${content.length} · ↑/↓ line · PgUp/PgDn page · home/end · esc back · q quit`,
+    width,
+  );
+
+  const out: string[] = [padEndTo(header, width)];
+  for (const line of window) out.push(padEndTo(clipLine(line, width), width));
+  out.push(padEndTo(footer, width));
+  while (out.length < height) out.push(" ".repeat(width));
+  return `\x1b[H\x1b[2J${out.slice(0, height).join("\n")}`;
+}
+
+/**
+ * The frame the loop draws (task-tui-detail-pane): the board, or the read-only
+ * detail pane when `state.detail` is set. Pure; `details` carries the bodies
+ * loaded beside the contract items (loadTuiItems).
+ */
+export function renderTuiScreen(
+  items: WorkItem[],
+  state: TuiState,
+  details: ReadonlyMap<string, TuiDetailSource> = new Map(),
+  opts: { color?: boolean } = {},
+): string {
+  if (state.detail === null) return renderTui(items, state, opts);
+  return renderTuiDetail(items, state.detail, details, state, opts);
 }
 
 /** Minimal output surface the loop needs (process.stdout or a test double). */
@@ -451,7 +901,8 @@ export type TuiLoopOptions = {
 
 /**
  * Interactive loop for `arggon board --tui`. Read-only: it re-reads the tree
- * after every keypress (cheap at v0 scale) and never writes. Fails with an
+ * after every keypress (cheap at v0 scale) and never writes. Enter opens the
+ * read-only detail pane; Esc/Enter return to the board. Fails with an
  * actionable error when stdout is not a TTY (piped output cannot render).
  */
 export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
@@ -462,7 +913,7 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
       new Error("board --tui requires an interactive terminal (stdout is not a TTY)"),
     );
   }
-  const { items: initialItems } = loadTuiItems(opts.cwd);
+  const initial = loadTuiItems(opts.cwd);
   const size = (value: number | undefined, fallback: number): number =>
     typeof value === "number" && value > 0 ? value : fallback;
   const state = initialTuiState(
@@ -471,7 +922,8 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
   );
 
   return new Promise<void>((resolve, reject) => {
-    let items = initialItems;
+    let items = initial.items;
+    let details = initial.details;
     let current = state;
     let settled = false;
 
@@ -498,16 +950,27 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
     };
 
     const render = (): void => {
-      output.write(renderTui(items, current));
+      output.write(renderTuiScreen(items, current, details));
     };
 
     const onData = (chunk: string | Buffer): void => {
       try {
         const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
-        const counts = tuiColumnCounts(items, current.filter);
-        const selected = selectedTuiItem(items, current);
         for (const key of splitKeys(text)) {
-          current = handleKey(current, key, counts, selected?.path ?? null);
+          // Context is re-derived per key: a chunk may open the pane, scroll
+          // it and close it again, and each key must be reduced against the
+          // state (and the data) the previous one left behind.
+          const counts = tuiColumnCounts(items, current.filter);
+          const selected = selectedTuiItem(items, current);
+          const detailLines =
+            current.detail === null
+              ? 0
+              : tuiDetailLinesFor(items, details, current.detail, current.width).length;
+          current = handleKey(current, key, {
+            counts,
+            selectedId: selected?.id ?? null,
+            detailLines,
+          });
           if (current.quit) {
             finish();
             return;
@@ -515,8 +978,12 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
         }
         // Re-read before clamping: the tree is the source of truth and may
         // have changed while we were idle (no file watcher in v0); the clamp
-        // then uses the fresh counts, keeping the scroll window valid.
-        items = loadTuiItems(opts.cwd).items;
+        // then uses the fresh counts, keeping the scroll window valid. The
+        // detail pane re-derives its own window per frame from the fresh
+        // bodies, so a body that shrank while open still renders valid.
+        const fresh = loadTuiItems(opts.cwd);
+        items = fresh.items;
+        details = fresh.details;
         current = clampTuiState(current, tuiColumnCounts(items, current.filter));
         render();
       } catch (err) {

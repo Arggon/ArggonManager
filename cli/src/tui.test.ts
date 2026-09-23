@@ -1,5 +1,11 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync as _mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  mkdirSync,
+  mkdtempSync as _mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { PassThrough } from "node:stream";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -10,6 +16,8 @@ import { runList, toContractWorkItem, type ContractWorkItem as WorkItem } from "
 import { renderBoardHtml } from "./board.js";
 
 import {
+  buildTuiDetailLines,
+  clampTuiDetailScroll,
   clampTuiState,
   clipLine,
   followTuiScroll,
@@ -17,14 +25,24 @@ import {
   initialTuiState,
   loadTuiItems,
   renderTui,
+  renderTuiDetail,
+  renderTuiScreen,
   runTuiBoard,
   selectedTuiItem,
+  TUI_DETAIL_MAX_BODY_LINES,
+  TUI_DETAIL_MAX_LINES,
+  TUI_DETAIL_NARROW_WIDTH,
+  tuiAcceptanceRows,
   tuiBodyRows,
   tuiColumnCounts,
   tuiDepBlocked,
+  tuiDependencySummary,
+  tuiDetailBodyRows,
+  tuiDetailLinesFor,
   visibleTuiItems,
+  wrapTuiLine,
 } from "./tui.js";
-import type { TuiState } from "./tui.js";
+import type { TuiDetailInput, TuiDetailSource, TuiState } from "./tui.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -144,16 +162,11 @@ describe("renderTui golden (80x8, color off)", () => {
     expect(lines(renderTui(THREE, state, { color: false }))[7]).toContain("/b█");
     state = handleKey(state, "\r");
     // After applying the filter the footer is the position + help again (the
-    // help tail clips at 80 columns); Enter shows a path.
+    // help tail clips at 80 columns); Enter with no selection only messages.
     expect(lines(renderTui(THREE, state, { color: false }))[7]).toContain("row 1/1 · ←/→ column");
-    const withPath = handleKey(
-      initialTuiState(80, 8),
-      "\r",
-      [2, 1, 0, 0, 0],
-      "tasks/x/bug-beta.md",
-    );
-    expect(lines(renderTui(THREE, withPath, { color: false }))[7]).toBe(
-      "row 1/2 · tasks/x/bug-beta.md".padEnd(80, " "),
+    const noItem = handleKey(initialTuiState(80, 8), "\r", { counts: [2, 1, 0, 0, 0] });
+    expect(lines(renderTui(THREE, noItem, { color: false }))[7]).toBe(
+      "row 1/2 · (no item selected)".padEnd(80, " "),
     );
   });
 
@@ -214,10 +227,10 @@ describe("handleKey", () => {
 
   it("re-clamps the card index when entering a smaller column (counts)", () => {
     const state = { ...initialTuiState(), card: 5 };
-    const moved = handleKey(state, "\x1b[C", [10, 2, 0, 0, 0]);
+    const moved = handleKey(state, "\x1b[C", { counts: [10, 2, 0, 0, 0] });
     expect(moved.column).toBe(1);
     expect(moved.card).toBe(1); // min(5, count-1)
-    const toEmpty = handleKey(moved, "\x1b[C", [10, 2, 0, 0, 0]);
+    const toEmpty = handleKey(moved, "\x1b[C", { counts: [10, 2, 0, 0, 0] });
     expect(toEmpty.column).toBe(2);
     expect(toEmpty.card).toBe(0); // empty column
   });
@@ -251,11 +264,16 @@ describe("handleKey", () => {
     expect(state.message).toBeNull();
   });
 
-  it("enter records the selected item's path as the footer message", () => {
-    const state = handleKey(initialTuiState(), "\r", [2, 1, 0, 0, 0], "tasks/x/bug-beta.md");
-    expect(state.message).toBe("tasks/x/bug-beta.md");
+  it("enter opens the detail pane for the selected item, or messages when the column is empty", () => {
+    const state = handleKey(initialTuiState(), "\r", {
+      counts: [2, 1, 0, 0, 0],
+      selectedId: "bug-beta",
+    });
+    expect(state.detail).toEqual({ id: "bug-beta", scroll: 0 });
     expect(state.quit).toBe(false);
-    const none = handleKey(initialTuiState(), "\r", [0, 0, 0, 0, 0], null);
+    expect(state.message).toBeNull();
+    const none = handleKey(initialTuiState(), "\r", { counts: [0, 0, 0, 0, 0], selectedId: null });
+    expect(none.detail).toBeNull();
     expect(none.message).toBe("(no item selected)");
   });
 
@@ -342,7 +360,7 @@ describe("TUI scroll window (bug-tui-selection-offscreen)", () => {
   it("renders the highlighted row when the selection is at the bottom of a long column", () => {
     const counts = tuiColumnCounts(LONG, "");
     let state = initialTuiState(200, 24); // 21 body rows
-    for (let i = 0; i < 29; i++) state = handleKey(state, "\x1b[B", counts);
+    for (let i = 0; i < 29; i++) state = handleKey(state, "\x1b[B", { counts });
     expect(state.card).toBe(29);
     expect(state.scroll).toBe(9);
     const frame = renderTui(LONG, state);
@@ -357,7 +375,7 @@ describe("TUI scroll window (bug-tui-selection-offscreen)", () => {
   it("keeps the 80x24 repro frame on the selected card (no stale top-of-column window)", () => {
     const counts = tuiColumnCounts(LONG, "");
     let state = initialTuiState(80, 24);
-    for (let i = 0; i < 25; i++) state = handleKey(state, "\x1b[B", counts);
+    for (let i = 0; i < 25; i++) state = handleKey(state, "\x1b[B", { counts });
     expect(state.card).toBe(25);
     expect(state.scroll).toBe(5); // 25 - 21 + 1
     const frame = renderTui(LONG, state);
@@ -370,31 +388,31 @@ describe("TUI scroll window (bug-tui-selection-offscreen)", () => {
   it("PgDn/PgUp/Home/End page the column without overshoot or empty pages", () => {
     const counts = tuiColumnCounts(LONG, "");
     let state = initialTuiState(200, 24); // page = 21 rows
-    state = handleKey(state, "\x1b[6~", counts); // PgDn
+    state = handleKey(state, "\x1b[6~", { counts }); // PgDn
     expect(state.card).toBe(21);
     expect(state.scroll).toBe(1);
-    state = handleKey(state, "\x1b[6~", counts); // PgDn again: last card, last page
+    state = handleKey(state, "\x1b[6~", { counts }); // PgDn again: last card, last page
     expect(state.card).toBe(29);
     expect(state.scroll).toBe(9);
-    state = handleKey(state, "\x1b[6~", counts); // no overshoot past the end
+    state = handleKey(state, "\x1b[6~", { counts }); // no overshoot past the end
     expect(state.card).toBe(29);
     expect(state.scroll).toBe(9);
-    state = handleKey(state, "\x1b[5~", counts); // PgUp: one page back
+    state = handleKey(state, "\x1b[5~", { counts }); // PgUp: one page back
     expect(state.card).toBe(8);
     expect(state.scroll).toBe(8);
-    state = handleKey(state, "\x1b[F", counts); // End (xterm)
+    state = handleKey(state, "\x1b[F", { counts }); // End (xterm)
     expect(state.card).toBe(29);
     expect(state.scroll).toBe(9);
-    state = handleKey(state, "\x1b[4~", counts); // End (vt220)
+    state = handleKey(state, "\x1b[4~", { counts }); // End (vt220)
     expect(state.card).toBe(29);
     expect(state.scroll).toBe(9);
-    state = handleKey(state, "\x1b[1~", counts); // Home (vt220)
+    state = handleKey(state, "\x1b[1~", { counts }); // Home (vt220)
     expect(state.card).toBe(0);
     expect(state.scroll).toBe(0);
-    state = handleKey(state, "\x1b[H", counts); // Home (xterm)
+    state = handleKey(state, "\x1b[H", { counts }); // Home (xterm)
     expect(state.card).toBe(0);
     expect(state.scroll).toBe(0);
-    state = handleKey(state, "\x1b[5~", counts); // PgUp at the top stays put
+    state = handleKey(state, "\x1b[5~", { counts }); // PgUp at the top stays put
     expect(state.card).toBe(0);
     expect(state.scroll).toBe(0);
   });
@@ -402,7 +420,7 @@ describe("TUI scroll window (bug-tui-selection-offscreen)", () => {
   it("keeps the window valid after a resize (both directions)", () => {
     const counts = tuiColumnCounts(LONG, "");
     let state = initialTuiState(200, 24);
-    for (let i = 0; i < 29; i++) state = handleKey(state, "\x1b[B", counts);
+    for (let i = 0; i < 29; i++) state = handleKey(state, "\x1b[B", { counts });
     expect(state.scroll).toBe(9);
 
     // Grow: the whole column fits, so the window starts at the top.
@@ -425,7 +443,7 @@ describe("TUI scroll window (bug-tui-selection-offscreen)", () => {
   it("keeps the window valid after a filter shrinks the column", () => {
     const counts = tuiColumnCounts(LONG, "");
     let state = initialTuiState(200, 24);
-    for (let i = 0; i < 29; i++) state = handleKey(state, "\x1b[B", counts);
+    for (let i = 0; i < 29; i++) state = handleKey(state, "\x1b[B", { counts });
     expect(state.scroll).toBe(9);
 
     const filteredCounts = tuiColumnCounts(LONG, "demo-2"); // demo-20..demo-29
@@ -443,7 +461,7 @@ describe("TUI scroll window (bug-tui-selection-offscreen)", () => {
     const counts = tuiColumnCounts(LONG, "");
     let state = initialTuiState(200, 24);
     expect(lines(renderTui(LONG, state, { color: false }))[23]).toContain("row 1/30");
-    for (let i = 0; i < 29; i++) state = handleKey(state, "\x1b[B", counts);
+    for (let i = 0; i < 29; i++) state = handleKey(state, "\x1b[B", { counts });
     expect(lines(renderTui(LONG, state, { color: false }))[23]).toContain("row 30/30");
     // Empty column: an honest zero instead of a stale row.
     const empty = { ...state, column: 3 };
@@ -453,7 +471,12 @@ describe("TUI scroll window (bug-tui-selection-offscreen)", () => {
 
 // ---------- data parity with list / board (kernel read path) ----------
 
-function writeItem(root: string, rel: string, frontmatter: Record<string, string>): void {
+function writeItem(
+  root: string,
+  rel: string,
+  frontmatter: Record<string, string>,
+  body = "# body\n",
+): void {
   const full = join(root, rel);
   mkdirSync(dirname(full), { recursive: true });
   const lines = Object.entries(frontmatter)
@@ -461,7 +484,7 @@ function writeItem(root: string, rel: string, frontmatter: Record<string, string
     .join("\n");
   writeFileSync(
     full,
-    `---\n${lines}\nlabels: []\ncreated: "2026-09-11"\nupdated: "2026-09-11"\n---\n\n# body\n`,
+    `---\n${lines}\nlabels: []\ncreated: "2026-09-11"\nupdated: "2026-09-11"\n---\n\n${body}`,
     "utf8",
   );
 }
@@ -520,6 +543,11 @@ describe("tui data parity (same kernel read path as list/board)", () => {
     expect(tui.root).toBe(list.root);
     const listContract = list.items.map((i) => toContractWorkItem(i, list.root));
     expect(tui.items).toEqual(listContract);
+    // Every item carries its raw body for the detail pane (same read pass, so
+    // board and pane can never disagree), keyed by id.
+    expect([...tui.details.keys()].sort()).toEqual(tui.items.map((i) => i.id).sort());
+    expect(tui.details.get("task-rate-limit")?.body).toContain("# body");
+    expect(tui.details.get("task-rate-limit")?.id).toBe("task-rate-limit");
   });
 
   it("renders the same ids/statuses the static HTML board renders", () => {
@@ -566,7 +594,9 @@ describe("runTuiBoard loop", () => {
     const term = fakeTerminal();
     const done = runTuiBoard({ cwd: root, input: term.input, output: term.output });
     term.input.write("\x1b[C"); // -> in_progress column
-    term.input.write("\r"); // print selected item's path
+    term.input.write("\r"); // open the read-only detail pane
+    term.input.write("\x1b[6~"); // PgDn inside the pane
+    term.input.write("\x1b"); // Esc: back to the board, same selection
     term.input.write("/"); // open search
     term.input.write("login");
     term.input.write("\x1b"); // cancel search
@@ -578,7 +608,15 @@ describe("runTuiBoard loop", () => {
     expect(text).toContain("arggon board --tui · 6 item(s)");
     expect(text).toContain("story-login"); // column header card of in_progress
     expect(text).toContain("filter: login");
-    expect(text).toContain("tasks/launch/epic-a/story-login/story-login.md");
+    // The pane opened on the selected card (in_progress column).
+    expect(text).toContain("arggon detail · story-login");
+    expect(text).toContain("esc back");
+    // Esc rendered the board again with the selection untouched: the frame
+    // after the pane is the board, still on the in_progress card.
+    const afterPane = text.slice(text.indexOf("arggon detail · story-login"));
+    const boardFrame = afterPane.slice(afterPane.indexOf("\x1b[H\x1b[2J"));
+    expect(boardFrame).toContain("arggon board --tui");
+    expect(boardFrame).toContain("> S story-login");
   });
 
   it("rejects with an actionable error when stdout is not a TTY", async () => {
@@ -776,5 +814,493 @@ describe("tui dependency visuals (task-board-dependency-visuals)", () => {
     expect(tuiDepBlocked(items, items[4])).toBe(false);
     expect(tuiDepBlocked(items, { ...items[3], depends_on: [] })).toBe(false);
     expect(tuiDepBlocked(items, { ...items[3], depends_on: ["missing"] })).toBe(true);
+  });
+});
+
+// ---------- detail pane (task-tui-detail-pane) ----------
+
+/** Body with acceptance rows, a wrapping line and a short tail. */
+const DETAIL_BODY = [
+  "# Context",
+  "",
+  "A line that is definitely longer than forty columns so that it wraps.",
+  "",
+  "## Acceptance",
+  "",
+  "- [x] first row",
+  "- [ ] second row",
+  "",
+  "## Notes",
+  "",
+  "tail",
+].join("\n");
+
+function detailItem(overrides: Partial<WorkItem> = {}): WorkItem {
+  return item({
+    id: "task-detail",
+    type: "task",
+    status: "in_progress",
+    title: "Read me in the pane",
+    assignee: "arggon",
+    branch: "feat/task-detail",
+    priority: "p1",
+    labels: ["tui", "ui"],
+    depends_on: ["bug-beta", "task-alpha", "done-zeta"],
+    worktree_path: "/tmp/wt/task-detail",
+    milestone: "2026-10-01",
+    ...overrides,
+  });
+}
+
+const DETAIL_ITEMS = [
+  detailItem(),
+  item({ id: "bug-beta", type: "bug", status: "todo", title: "Login 500" }),
+  item({ id: "task-alpha", type: "task", status: "in_progress", title: "Rate limit" }),
+  item({ id: "done-zeta", type: "task", status: "done", title: "Shipped" }),
+];
+
+const DETAIL_SOURCES = new Map<string, TuiDetailSource>([
+  ["task-detail", { id: "task-detail", body: DETAIL_BODY }],
+]);
+
+function detailLines(input: Partial<TuiDetailInput> = {}): string[] {
+  return buildTuiDetailLines({
+    item: detailItem(),
+    id: "task-detail",
+    items: DETAIL_ITEMS,
+    body: DETAIL_BODY,
+    width: 120,
+    ...input,
+  });
+}
+
+describe("detail pane: documented caps and threshold", () => {
+  it("pins the configuration the README and the renderer both name", () => {
+    expect(TUI_DETAIL_NARROW_WIDTH).toBe(40);
+    expect(TUI_DETAIL_MAX_BODY_LINES).toBe(400);
+    expect(TUI_DETAIL_MAX_LINES).toBe(1000);
+  });
+});
+
+describe("detail pane: wrapTuiLine", () => {
+  it("wraps at spaces, hard-breaks long words and handles degenerate widths", () => {
+    expect(wrapTuiLine("hello world", 20)).toEqual(["hello world"]);
+    expect(wrapTuiLine("aaaa bbbb cccc", 9)).toEqual(["aaaa bbbb", "cccc"]);
+    expect(wrapTuiLine("abcdefghij", 4)).toEqual(["abcd", "efgh", "ij"]);
+    expect(wrapTuiLine("", 10)).toEqual([""]);
+    expect(wrapTuiLine("anything", 0)).toEqual([]);
+    // Every segment fits the requested width (the pane's contract).
+    for (const line of wrapTuiLine("one two three four five six seven", 7)) {
+      expect(line.length).toBeLessThanOrEqual(7);
+    }
+  });
+});
+
+describe("detail pane: geometry and scroll clamp", () => {
+  it("derives the content rows from the pane frame", () => {
+    expect(tuiDetailBodyRows(24)).toBe(22);
+    expect(tuiDetailBodyRows(8)).toBe(6);
+    expect(tuiDetailBodyRows(2)).toBe(0);
+    expect(tuiDetailBodyRows(1)).toBe(0);
+  });
+
+  it("clamps the pane window to the content and never pages past the end", () => {
+    expect(clampTuiDetailScroll(0, 50, 20)).toBe(0);
+    expect(clampTuiDetailScroll(10, 50, 20)).toBe(10);
+    expect(clampTuiDetailScroll(30, 50, 20)).toBe(30); // last full page
+    expect(clampTuiDetailScroll(999, 50, 20)).toBe(30); // no overshoot
+    expect(clampTuiDetailScroll(-3, 50, 20)).toBe(0);
+    expect(clampTuiDetailScroll(5, 10, 20)).toBe(0); // content fits
+    expect(clampTuiDetailScroll(5, 0, 20)).toBe(0); // no content
+    expect(clampTuiDetailScroll(5, 50, 0)).toBe(0); // no room
+  });
+});
+
+describe("detail pane: acceptance rows", () => {
+  it("uses the cascade's task-list rule, marker variants included", () => {
+    const rows = tuiAcceptanceRows(
+      ["- [ ] open", "  * [x] done", "- [X] also done", "- [] not a checkbox", "prose"].join("\n"),
+    );
+    expect(rows).toEqual([
+      { checked: false, text: "open" },
+      { checked: true, text: "done" },
+      { checked: true, text: "also done" },
+    ]);
+  });
+});
+
+describe("detail pane: dependency summary", () => {
+  it("carries each dependency's status and marks the open ones", () => {
+    const dep = detailItem();
+    expect(tuiDependencySummary(dep, DETAIL_ITEMS)).toBe(
+      "bug-beta (todo ⌫), task-alpha (in_progress ⌫), done-zeta (done)",
+    );
+    expect(tuiDependencySummary(detailItem({ depends_on: [] }), DETAIL_ITEMS)).toBe("(none)");
+    // Unknown ids count as open, same rule as the board's ⌫ tag.
+    expect(tuiDependencySummary(detailItem({ depends_on: ["gone-z"] }), DETAIL_ITEMS)).toBe(
+      "gone-z (unknown ⌫)",
+    );
+    expect(
+      tuiDependencySummary(detailItem({ depends_on: ["cancel-z"] }), [
+        ...DETAIL_ITEMS,
+        item({ id: "cancel-z", type: "task", status: "cancelled" }),
+      ]),
+    ).toBe("cancel-z (cancelled)");
+  });
+});
+
+describe("detail pane: buildTuiDetailLines content (120 columns)", () => {
+  it("renders title, every field, the acceptance excerpt and the body", () => {
+    const got = detailLines();
+    expect(got[0]).toBe("T task-detail — Read me in the pane");
+    expect(got).toContain("type: task · status: in_progress · priority: p1 · assignee: arggon");
+    expect(got).toContain("labels: tui, ui · milestone: 2026-10-01");
+    expect(got).toContain(
+      "parent: (none) · branch: feat/task-detail · worktree: /tmp/wt/task-detail",
+    );
+    expect(got).toContain(
+      "path: tasks/x/task-detail.md · dependencies: bug-beta (todo ⌫), task-alpha (in_progress ⌫), done-zeta (done)",
+    );
+    expect(got).toContain("acceptance 1/2:");
+    expect(got).toContain("  [x] first row");
+    expect(got).toContain("  [ ] second row");
+    expect(got).toContain("body:");
+    expect(got).toContain("  # Context");
+    expect(got).toContain("  tail");
+    for (const line of got) expect(line.length).toBeLessThanOrEqual(120);
+  });
+
+  it("falls back to the id for a missing title and names absent fields", () => {
+    const got = detailLines({ item: detailItem({ title: null, assignee: null, labels: [] }) });
+    expect(got[0]).toBe("T task-detail — task-detail");
+    expect(got.join("\n")).toContain("assignee: (none)");
+    expect(got.join("\n")).toContain("labels: (none)");
+  });
+
+  it("reports an item that vanished from the tree instead of rendering a stale body", () => {
+    const got = detailLines({ item: null, id: "task-gone", body: "" });
+    expect(got[0]).toBe("item task-gone is not in the tree anymore");
+    expect(got.join("\n")).toContain("esc · back to the board");
+  });
+});
+
+describe("detail pane: wrapping, narrow layout, caps and sanitization", () => {
+  it("wraps the body to the pane width without clipping it", () => {
+    const got = detailLines({ width: 40 });
+    for (const line of got) expect(line.length).toBeLessThanOrEqual(40);
+    // The wrapping line survives in full: the wrap only replaces the break
+    // space, so a whitespace-normalized join reproduces the source text.
+    const joined = got.join("\n").replace(/\s+/g, " ");
+    expect(joined).toContain(
+      "A line that is definitely longer than forty columns so that it wraps.",
+    );
+    expect(joined).not.toContain("…");
+  });
+
+  it("stacks one field per line below the narrow threshold, values wrapped", () => {
+    const got = detailLines({ width: 30 });
+    expect(got).toContain("type: task");
+    expect(got).toContain("status: in_progress");
+    expect(got).toContain("priority: p1");
+    expect(got).toContain("assignee: arggon");
+    expect(got.some((line) => line.startsWith("type: task ·"))).toBe(false);
+    expect(got.some((line) => line.startsWith("labels: tui, ui ·"))).toBe(false);
+    for (const line of got) expect(line.length).toBeLessThanOrEqual(30);
+  });
+
+  it("caps the body lines and the rendered lines with explicit markers", () => {
+    const body = ["# Context", "one", "two", "three", "four", "five"].join("\n");
+    const cappedBody = detailLines({ body, maxBodyLines: 3 });
+    expect(cappedBody.join("\n")).toContain("… body truncated: 3 of 6 line(s) omitted (cap 3)");
+    expect(cappedBody.join("\n")).not.toContain("three");
+
+    const cappedAll = detailLines({ body, maxLines: 12 });
+    expect(cappedAll.length).toBeLessThanOrEqual(12);
+    expect(cappedAll[cappedAll.length - 1]).toContain("rendered line cap 12");
+  });
+
+  it("sanitizes every body line through the human-text path", () => {
+    const hostile = `${DETAIL_BODY}\n\u001b[31mred\u0007bell\u2028sep`;
+    const got = detailLines({ body: hostile, width: 120 });
+    const joined = got.join("\n");
+    expect(joined).not.toContain("\u001b");
+    expect(joined).not.toContain("\u0007");
+    expect(joined).not.toContain("\u2028");
+    expect(joined).toContain("\\u001b[31mred\\u0007bell\\u2028sep");
+  });
+
+  it("sanitizes hostile ids, titles, labels and dependency ids", () => {
+    const hostile = "\u001b[2J";
+    const got = detailLines({
+      item: detailItem({
+        id: `task-a${hostile}b`,
+        title: `title${hostile}`,
+        labels: [`lab${hostile}`],
+        depends_on: [`dep${hostile}`],
+        worktree_path: `/tmp${hostile}/wt`,
+      }),
+      id: "task-a\u001b[2Jb",
+    });
+    expect(got.join("\n")).not.toContain("\u001b");
+    expect(got.join("\n")).toContain("\\u001b[2J");
+  });
+});
+
+describe("detail pane: renderTuiDetail golden", () => {
+  const detail = { id: "task-detail", scroll: 0 };
+
+  it("renders exactly height padded lines: header, window, footer", () => {
+    const frame = renderTuiDetail(
+      DETAIL_ITEMS,
+      detail,
+      DETAIL_SOURCES,
+      { width: 80, height: 12 },
+      { color: false },
+    );
+    expect(frame.startsWith("\x1b[H\x1b[2J")).toBe(true);
+    const got = lines(frame);
+    expect(got.length).toBe(12);
+    for (const line of got) expect(line.length).toBe(80);
+    expect(got[0]).toBe("arggon detail · task-detail · esc back".padEnd(80));
+    const content = tuiDetailLinesFor(DETAIL_ITEMS, DETAIL_SOURCES, detail, 80);
+    expect(got.slice(1, 11)).toEqual(content.slice(0, 10).map((line) => line.padEnd(80)));
+    expect(got[11]).toContain(`row 1/${content.length} · ↑/↓ line`);
+    expect(got[11]).toContain("esc back · q quit");
+  });
+
+  it("scrolls the window with the pane scroll and clamps a stale one", () => {
+    const content = tuiDetailLinesFor(DETAIL_ITEMS, DETAIL_SOURCES, detail, 80);
+    const rows = tuiDetailBodyRows(12);
+    const scrolled = renderTuiDetail(
+      DETAIL_ITEMS,
+      { id: "task-detail", scroll: 3 },
+      DETAIL_SOURCES,
+      { width: 80, height: 12 },
+      { color: false },
+    );
+    const got = lines(scrolled);
+    expect(got[1]).toBe(content[3].padEnd(80));
+    expect(got[11]).toContain("row 4/");
+
+    // A stale scroll (content shrank, resize, tree re-read) still renders the
+    // last full window instead of an empty frame.
+    const clamped = renderTuiDetail(
+      DETAIL_ITEMS,
+      { id: "task-detail", scroll: 10_000 },
+      DETAIL_SOURCES,
+      { width: 80, height: 12 },
+      { color: false },
+    );
+    const clampedLines = lines(clamped);
+    const maxScroll = content.length - rows;
+    expect(clampedLines[1]).toBe(content[maxScroll].padEnd(80));
+    expect(clampedLines[11]).toContain(`row ${maxScroll + 1}/${content.length}`);
+  });
+
+  it("highlights the pane header with SGR when color is on", () => {
+    const frame = renderTuiDetail(DETAIL_ITEMS, detail, DETAIL_SOURCES, { width: 80, height: 12 });
+    expect(frame).toContain("\x1b[1marggon detail · task-detail · esc back");
+    const plain = renderTuiDetail(
+      DETAIL_ITEMS,
+      detail,
+      DETAIL_SOURCES,
+      { width: 80, height: 12 },
+      { color: false },
+    );
+    expect(plain).not.toContain("\x1b[1m");
+  });
+
+  it("renders a marker (not a stale body) when the item is gone", () => {
+    const frame = renderTuiDetail(
+      DETAIL_ITEMS,
+      { id: "task-gone", scroll: 0 },
+      DETAIL_SOURCES,
+      { width: 80, height: 8 },
+      { color: false },
+    );
+    expect(frame).toContain("item task-gone is not in the tree anymore");
+  });
+});
+
+describe("detail pane: renderTuiScreen dispatch", () => {
+  it("draws the board when no pane is open and the pane when one is", () => {
+    const boardState = initialTuiState(80, 8);
+    expect(renderTuiScreen(THREE, boardState, DETAIL_SOURCES, { color: false })).toBe(
+      renderTui(THREE, boardState, { color: false }),
+    );
+    const paneState = { ...boardState, detail: { id: "task-detail", scroll: 0 } };
+    expect(renderTuiScreen(THREE, paneState, DETAIL_SOURCES, { color: false })).toBe(
+      renderTuiDetail(
+        THREE,
+        { id: "task-detail", scroll: 0 },
+        DETAIL_SOURCES,
+        { width: 80, height: 8 },
+        { color: false },
+      ),
+    );
+  });
+});
+
+describe("detail pane: handleKey", () => {
+  /** The board in a known state, pane open on task-detail. */
+  const openPane = (overrides: Partial<TuiState> = {}): TuiState => ({
+    ...initialTuiState(80, 10),
+    column: 1,
+    card: 2,
+    scroll: 1,
+    filter: "log",
+    detail: { id: "task-detail", scroll: 0 },
+    ...overrides,
+  });
+
+  it("opens with Enter on the selected card and leaves the board state alone", () => {
+    const board = { ...initialTuiState(80, 10), column: 1, card: 2, scroll: 1, filter: "log" };
+    const opened = handleKey(board, "\r", { selectedId: "task-detail" });
+    expect(opened.detail).toEqual({ id: "task-detail", scroll: 0 });
+    expect(opened.column).toBe(1);
+    expect(opened.card).toBe(2);
+    expect(opened.scroll).toBe(1);
+    expect(opened.filter).toBe("log");
+    expect(opened.message).toBeNull();
+  });
+
+  it("closes on esc and on enter, restoring the board exactly", () => {
+    const state = openPane();
+    for (const key of ["\x1b", "\r"]) {
+      const back = handleKey(state, key, { detailLines: 100 });
+      expect(back.detail).toBeNull();
+      expect(back.column).toBe(state.column);
+      expect(back.card).toBe(state.card);
+      expect(back.scroll).toBe(state.scroll);
+      expect(back.filter).toBe(state.filter);
+      // The board is live again: Enter reopens on the same card.
+      const reopened = handleKey(back, "\r", { selectedId: "task-detail" });
+      expect(reopened.detail).toEqual({ id: "task-detail", scroll: 0 });
+    }
+  });
+
+  it("scrolls with ↑/↓ and pages with PgUp/PgDn, clamped to the content", () => {
+    const state = openPane();
+    const rows = tuiDetailBodyRows(state.height); // 8
+    expect(rows).toBe(8);
+    expect(handleKey(state, "\x1b[B", { detailLines: 100 }).detail?.scroll).toBe(1);
+    expect(handleKey(state, "\x1b[A", { detailLines: 100 }).detail?.scroll).toBe(0);
+    expect(handleKey(state, "\x1b[6~", { detailLines: 100 }).detail?.scroll).toBe(8);
+    expect(
+      handleKey(openPane({ detail: { id: "task-detail", scroll: 20 } }), "\x1b[5~", {
+        detailLines: 100,
+      }).detail?.scroll,
+    ).toBe(12);
+    expect(handleKey(state, "\x1b[F", { detailLines: 100 }).detail?.scroll).toBe(92);
+    expect(handleKey(state, "\x1b[4~", { detailLines: 100 }).detail?.scroll).toBe(92);
+    expect(
+      handleKey(openPane({ detail: { id: "task-detail", scroll: 50 } }), "\x1b[H", {
+        detailLines: 100,
+      }).detail?.scroll,
+    ).toBe(0);
+    expect(
+      handleKey(openPane({ detail: { id: "task-detail", scroll: 50 } }), "\x1b[1~", {
+        detailLines: 100,
+      }).detail?.scroll,
+    ).toBe(0);
+    // Batch typed into one chunk: the reducer's context (lines) still applies.
+    expect(handleKey(state, "\x1b[B", { detailLines: 4 }).detail?.scroll).toBe(0);
+  });
+
+  it("ignores board keys inside the pane, quits on q/Ctrl-C and never writes", () => {
+    const state = openPane();
+    expect(handleKey(state, "/", { detailLines: 100 })).toEqual(state);
+    expect(handleKey(state, "\x1b[C", { detailLines: 100 })).toEqual(state);
+    expect(handleKey(state, "x", { detailLines: 100 })).toEqual(state);
+    expect(handleKey(state, "q", { detailLines: 100 }).quit).toBe(true);
+    expect(handleKey(state, "\x03", { detailLines: 100 }).quit).toBe(true);
+  });
+});
+
+describe("detail pane: runTuiBoard loop", () => {
+  it("opens with Enter, scrolls with PgDn and Esc returns to the same selection", async () => {
+    const root = newTree();
+    const body = [
+      "## Acceptance",
+      "",
+      "- [x] long body checkbox",
+      "- [ ] second checkbox",
+      "",
+      ...Array.from({ length: 60 }, (_, i) => `Body line ${String(i).padStart(2, "0")}`),
+    ].join("\n");
+    writeItem(
+      root,
+      "tasks/launch/epic-a/story-login/task-rate-limit.md",
+      {
+        type: "task",
+        status: "todo",
+        id: "task-rate-limit",
+        parent: "story-login",
+        title: "Add rate limiting",
+      },
+      `${body}\n`,
+    );
+    const before = readFileSync(
+      join(root, "tasks/launch/epic-a/story-login/task-rate-limit.md"),
+      "utf8",
+    );
+
+    const term = fakeTerminal();
+    term.output.columns = 200;
+    term.output.rows = 24; // 22 pane rows
+    const done = runTuiBoard({ cwd: root, input: term.input, output: term.output });
+    const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 25));
+    term.input.write("\x1b[B"); // card 0 (epic-a) -> card 1
+    await tick();
+    term.input.write("\x1b[B"); // card 2: task-rate-limit
+    await tick();
+    term.input.write("\r"); // open the pane
+    await tick();
+    term.input.write("\x1b[6~"); // PgDn: one pane page
+    await tick();
+    term.input.write("\x1b"); // Esc: back to the board
+    await tick();
+    term.input.write("q");
+    await done;
+
+    const text = term.outputText();
+    expect(text).toContain("arggon detail · task-rate-limit · esc back");
+    expect(text).toContain("acceptance 1/2:");
+    expect(text).toContain("[x] long body checkbox");
+    expect(text).toContain("body:");
+    expect(text).toContain("row 1/"); // pane opened at the top
+    expect(text).toContain("row 23/"); // one page down (22 rows)
+    const frames = text.split("\x1b[H\x1b[2J");
+    const last = frames[frames.length - 1] ?? "";
+    expect(last.startsWith("arggon board --tui")).toBe(true);
+    expect(last).toContain("> T task-rate-limit Add rate limiting");
+    // The pane is read-only: the item file is byte-identical after the visit.
+    expect(
+      readFileSync(join(root, "tasks/launch/epic-a/story-login/task-rate-limit.md"), "utf8"),
+    ).toBe(before);
+  });
+
+  it("keeps the pane window valid when the item disappears mid-session", async () => {
+    const root = newTree();
+    const target = join(root, "tasks/launch/epic-a/story-login/task-rate-limit.md");
+    const term = fakeTerminal();
+    term.output.columns = 200;
+    term.output.rows = 24;
+    const done = runTuiBoard({ cwd: root, input: term.input, output: term.output });
+    const tick = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 25));
+    term.input.write("\x1b[B");
+    await tick();
+    term.input.write("\x1b[B");
+    await tick();
+    term.input.write("\r"); // pane open on task-rate-limit
+    await tick();
+    rmSync(target, { force: true }); // tree changed while the pane is open
+    term.input.write("\x1b[B"); // any key re-reads the tree
+    await tick();
+    term.input.write("\x1b");
+    await tick();
+    term.input.write("q");
+    await done;
+    expect(term.outputText()).toContain("item task-rate-limit is not in the tree anymore");
   });
 });
