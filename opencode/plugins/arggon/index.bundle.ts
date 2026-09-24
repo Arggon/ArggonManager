@@ -2193,8 +2193,8 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
 exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.unlinkNodeModulesLink = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = void 0;
+exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.unlinkNodeModulesLink = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2353,6 +2353,7 @@ Object.defineProperty(exports, "packageBuildScript", { enumerable: true, get: fu
 Object.defineProperty(exports, "packageEntryExists", { enumerable: true, get: function () { return worktree_js_1.packageEntryExists; } });
 Object.defineProperty(exports, "packageEntryPaths", { enumerable: true, get: function () { return worktree_js_1.packageEntryPaths; } });
 Object.defineProperty(exports, "pointWorkspaceAtLocal", { enumerable: true, get: function () { return worktree_js_1.pointWorkspaceAtLocal; } });
+Object.defineProperty(exports, "prepareWorktreeDependencies", { enumerable: true, get: function () { return worktree_js_1.prepareWorktreeDependencies; } });
 Object.defineProperty(exports, "unlinkNodeModulesLink", { enumerable: true, get: function () { return worktree_js_1.unlinkNodeModulesLink; } });
 var import_issues_js_1 = require("./import-issues.js");
 Object.defineProperty(exports, "runImportIssues", { enumerable: true, get: function () { return import_issues_js_1.runImportIssues; } });
@@ -4305,6 +4306,9 @@ function commitTrackerMutation(root, filePaths, opts) {
     if (paths.length === 0) {
         return { committed: false, skipReason: "no mutated files" };
     }
+    if (paths.some((path) => path === ".." || path.startsWith("../"))) {
+        return { committed: false, skipReason: "mutated path escapes repository root" };
+    }
     const probe = runGit(["rev-parse", "--git-dir"], root);
     if (probe.missing)
         return { committed: false, skipReason: "git not found" };
@@ -4345,7 +4349,7 @@ function commitTrackerMutation(root, filePaths, opts) {
                 result = { committed: false, skipReason: `git add failed: ${firstLine(add.err || add.out)}` };
                 return;
             }
-            commit = runGit(["commit", "-m", opts.message], root);
+            commit = runGit(["commit", "--only", "-m", opts.message, "--", ...stagePaths], root);
             if (commit.code !== 0) {
                 const detail = `${commit.out}\n${commit.err}`;
                 if (/nothing to commit|nothing added/.test(detail)) {
@@ -5719,6 +5723,7 @@ exports.linkNodeModules = linkNodeModules;
 exports.unlinkNodeModulesLink = unlinkNodeModulesLink;
 exports.pointWorkspaceAtLocal = pointWorkspaceAtLocal;
 exports.buildLocalWorkspaces = buildLocalWorkspaces;
+exports.prepareWorktreeDependencies = prepareWorktreeDependencies;
 exports.linkedWorkspacePackages = linkedWorkspacePackages;
 const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
@@ -6057,6 +6062,32 @@ function buildLocalWorkspaces(primaryRoot, worktreePath, deps = {}) {
     }
     return built;
 }
+function prepareWorktreeDependencies(primaryRoot, worktreePath, deps = {}) {
+    const worktreeModules = (0, node_path_1.join)(worktreePath, "node_modules");
+    const linkedNodeModules = linkNodeModules(primaryRoot, worktreePath);
+    const builtWorkspaces = buildLocalWorkspaces(primaryRoot, worktreePath, {
+        runBuild: deps.runBuild,
+    });
+    const linkedWorkspaces = linkedWorkspacePackages(primaryRoot, worktreePath);
+    const hasInstall = (0, node_fs_1.existsSync)(worktreeModules);
+    const primaryHasInstall = (0, node_fs_1.existsSync)((0, node_path_1.join)(primaryRoot, "node_modules"));
+    const install = linkedNodeModules
+        ? hasInstall
+            ? "linked"
+            : "unavailable"
+        : hasInstall
+            ? "existing"
+            : primaryHasInstall
+                ? "unavailable"
+                : "missing";
+    return {
+        ready: hasInstall && linkedWorkspaces.length === 0,
+        install,
+        linkedNodeModules,
+        builtWorkspaces,
+        linkedWorkspaces,
+    };
+}
 function linkedWorkspacePackages(primaryRoot, worktreePath) {
     const names = [];
     const worktreeModules = (0, node_path_1.join)(worktreePath, "node_modules");
@@ -6372,11 +6403,19 @@ const ITEM_MARKER = "<arggon-item>";
 const STORAGE_PREFIX = "arggon/session/";
 const MAX_CLI_OUTPUT = 256 * 1024;
 const MAX_VALUE_CHARS = 200;
+const MAX_NATIVE_PREPARATION_NAMES = 32;
+const MAX_NATIVE_PREPARATION_VALUE_CHARS = 200;
+const MAX_NATIVE_DETAIL_CHARS = 500;
+const MAX_NATIVE_ERROR_CHARS = 2048;
 function asString(value) {
     return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
 }
 function clip(value, max) {
     return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
+function boundedNativeText(value, max) {
+    const text = typeof value === "string" ? value : String(value);
+    return clip(text.replace(/[\u0000-\u001f\u007f]/g, " "), max);
 }
 function byteLength(text) {
     return new TextEncoder().encode(text).length;
@@ -7695,6 +7734,120 @@ function worktreeFail(kernel, command, code, message, conventionVersion) {
         }),
     };
 }
+function startFailure(kernel, message, conventionVersion, payload) {
+    const failure = worktreeFail(kernel, "start", "START_FAILED", boundedNativeText(message, MAX_NATIVE_ERROR_CHARS), conventionVersion);
+    return { ...failure, envelope: { ...failure.envelope, ...payload } };
+}
+function boundedPreparation(input) {
+    const built = input.builtWorkspaces
+        .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+        .map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS));
+    const linked = input.linkedWorkspaces
+        .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+        .map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS));
+    const truncated = input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
+        input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
+        built.some((name, index) => name !== input.builtWorkspaces[index]) ||
+        linked.some((name, index) => name !== input.linkedWorkspaces[index]);
+    return {
+        ready: input.ready,
+        install: input.install,
+        linkedNodeModules: input.linkedNodeModules,
+        builtWorkspaces: built,
+        linkedWorkspaces: linked,
+        ...(truncated ? { truncated: true } : {}),
+    };
+}
+function boundedNames(names) {
+    if (names === undefined)
+        return undefined;
+    return names
+        .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+        .map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS));
+}
+function boundedCommitPayload(result) {
+    const ignored = boundedNames(result.ignored);
+    if (result.committed) {
+        return {
+            ...(result.hash !== undefined
+                ? { hash: boundedNativeText(result.hash, MAX_NATIVE_DETAIL_CHARS) }
+                : {}),
+            ...(result.message !== undefined
+                ? { message: boundedNativeText(result.message, MAX_NATIVE_DETAIL_CHARS) }
+                : {}),
+            ...(ignored !== undefined ? { ignored } : {}),
+        };
+    }
+    return {
+        skipped: boundedNativeText(result.skipReason ?? "skipped", MAX_NATIVE_DETAIL_CHARS),
+        ...(ignored !== undefined ? { ignored } : {}),
+    };
+}
+function claimCommitFailure(skipped) {
+    return {
+        status: "failed",
+        committed: false,
+        skipped: boundedNativeText(skipped || "claim commit failed", MAX_NATIVE_DETAIL_CHARS),
+    };
+}
+function claimCommitNotAttempted(reason) {
+    return {
+        status: "not-attempted",
+        committed: false,
+        reason: boundedNativeText(reason, MAX_NATIVE_DETAIL_CHARS),
+    };
+}
+function envelopeMessage(envelope, fallback) {
+    const error = envelope.error !== null && typeof envelope.error === "object"
+        ? envelope.error
+        : undefined;
+    return boundedNativeText(asString(error?.message) ?? fallback, MAX_NATIVE_DETAIL_CHARS);
+}
+function commitNativeClaim(kernel, cwd, id) {
+    const shown = kernel.showOperation({ cwd, id, meta: true });
+    if (!shown.ok)
+        return { receipt: claimCommitFailure(envelopeMessage(shown.envelope, "claim item lookup failed")) };
+    const path = asString(shown.envelope.path);
+    if (path === undefined)
+        return { receipt: claimCommitFailure("claim item path unavailable") };
+    const result = kernel.commitTrackerMutation(cwd, [(0, node_path_1.resolve)(cwd, path)], {
+        message: kernel.trackerCommitMessage("claimed", [id]),
+        commit: true,
+    });
+    const ignored = boundedNames(result.ignored);
+    if (result.committed) {
+        return {
+            receipt: {
+                status: "committed",
+                committed: true,
+                ...(result.hash !== undefined
+                    ? { hash: boundedNativeText(result.hash, MAX_NATIVE_DETAIL_CHARS) }
+                    : {}),
+                ...(result.message !== undefined
+                    ? { message: boundedNativeText(result.message, MAX_NATIVE_DETAIL_CHARS) }
+                    : {}),
+                ...(ignored !== undefined ? { ignored } : {}),
+            },
+            payload: boundedCommitPayload(result),
+        };
+    }
+    if (result.skipReason === "nothing to commit") {
+        return {
+            receipt: {
+                status: "not-needed",
+                committed: true,
+                ...(ignored !== undefined ? { ignored } : {}),
+            },
+        };
+    }
+    return {
+        receipt: {
+            ...claimCommitFailure(result.skipReason ?? "git commit failed"),
+            ...(ignored !== undefined ? { ignored } : {}),
+        },
+        payload: boundedCommitPayload(result),
+    };
+}
 async function guarded(kernel, command, code, body) {
     try {
         return await body();
@@ -7837,14 +7990,16 @@ async function nativeStart(kernel, input, options) {
         return worktreeFail(kernel, "start", "START_FAILED", "could not resolve assignee (pass assignee, or set GITHUB_USER/GITHUB_ACTOR, or authenticate gh)", version);
     }
     const branch = itemBranch(kernel, root, item, input.branch);
+    const primaryRoot = canonicalRoot(options, root);
     const wantWorktree = input.worktree !== false;
-    let worktreePath = asString(item.worktree_path);
+    let worktreePath = wantWorktree ? asString(item.worktree_path) : undefined;
     if (worktreePath !== undefined && !(0, node_fs_1.existsSync)(worktreePath))
         worktreePath = undefined;
     let worktreeCreated = false;
     let branchCreated = false;
+    let preparation;
     if (wantWorktree) {
-        const canonical = canonicalRoot(options, root);
+        const canonical = primaryRoot;
         if (worktreePath === undefined) {
             const defaultPath = (0, node_path_1.join)((0, node_path_1.resolve)(canonical, ".."), `${(0, node_path_1.basename)(canonical)}-${id}`);
             if ((0, node_fs_1.existsSync)(defaultPath))
@@ -7879,6 +8034,30 @@ async function nativeStart(kernel, input, options) {
         }
         branchCreated = ensured.created;
     }
+    if (worktreePath !== undefined) {
+        try {
+            preparation = boundedPreparation(kernel.prepareWorktreeDependencies(primaryRoot, worktreePath));
+        }
+        catch (error) {
+            const preparationError = boundedPreparation({
+                ready: false,
+                install: "unavailable",
+                linkedNodeModules: false,
+                builtWorkspaces: [],
+                linkedWorkspaces: [],
+            });
+            return startFailure(kernel, `dependency preparation failed in ${worktreePath}: ${boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)}; ` +
+                "the worktree was kept (fix the install/workspace cause, then re-run this start to attach)", version, {
+                worktreePath,
+                worktreeCreated,
+                branchCreated,
+                branch,
+                preparation: preparationError,
+                claimCommitted: false,
+                claimCommit: claimCommitNotAttempted("dependency preparation failed"),
+            });
+        }
+    }
     const target = worktreePath ?? options.cwd;
     const update = kernel.updateOperation({
         cwd: target,
@@ -7887,8 +8066,17 @@ async function nativeStart(kernel, input, options) {
         assignee,
         branch,
         ...(worktreePath !== undefined ? { worktreePath } : {}),
+        commit: false,
         agent: true,
     });
+    const basePayload = {
+        id,
+        branch,
+        worktreePath: worktreePath ?? null,
+        worktreeCreated,
+        branchCreated,
+        ...(preparation !== undefined ? { preparation } : {}),
+    };
     if (!update.ok) {
         if (worktreeCreated && worktreePath !== undefined) {
             await discardWorktree(options, worktreePath, branchCreated ? branch : undefined);
@@ -7898,28 +8086,51 @@ async function nativeStart(kernel, input, options) {
             const error = failure.envelope.error;
             error.message = `${String(error.message)} (the worktree created by this run was removed again)`;
         }
-        return failure;
+        return {
+            ...failure,
+            envelope: {
+                ...failure.envelope,
+                ...basePayload,
+                claimCommitted: false,
+                claimCommit: claimCommitNotAttempted("claim update failed"),
+            },
+        };
+    }
+    let claim;
+    try {
+        claim = commitNativeClaim(kernel, target, id);
+    }
+    catch (error) {
+        claim = { receipt: claimCommitFailure(detail(error)) };
+    }
+    const claimPayload = {
+        ...basePayload,
+        item: update.envelope.item,
+        claimCommitted: claim.receipt.committed,
+        claimCommit: claim.receipt,
+        ...(claim.payload !== undefined ? { commit: claim.payload } : {}),
+    };
+    if (!claim.receipt.committed) {
+        const reason = claim.receipt.skipped ?? "claim commit failed";
+        const kept = worktreePath !== undefined
+            ? `the worktree was kept at ${worktreePath} (nothing was rolled back)`
+            : "the claim file was left in place for inspection";
+        return startFailure(kernel, `start failed while committing the claim; ${kept}. ` +
+            `${reason}. Fix the project gate/dependency cause, then re-run ` +
+            `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
+            "it attaches to the existing worktree and retries the claim commit.", version, claimPayload);
     }
     let pushed = false;
     if (input.push === true && worktreePath !== undefined) {
         const push = await run("git", ["push", "-u", "origin", branch], worktreePath, 60_000);
         if (push.code !== 0) {
-            return worktreeFail(kernel, "start", "START_FAILED", `push failed (${push.stderr.trim() || `git push exit ${push.code}`}); the worktree was kept at ${worktreePath}`, version);
+            return startFailure(kernel, `push failed (${push.stderr.trim() || `git push exit ${push.code}`}); the worktree was kept at ${worktreePath}`, version, { ...claimPayload, pushed: false });
         }
         pushed = true;
     }
     return {
         ok: true,
-        envelope: kernel.successEnvelope("start", {
-            id,
-            branch,
-            worktreePath: worktreePath ?? null,
-            worktreeCreated,
-            branchCreated,
-            pushed,
-            item: update.envelope.item,
-            ...(update.envelope.commit !== undefined ? { commit: update.envelope.commit } : {}),
-        }, version),
+        envelope: kernel.successEnvelope("start", { ...claimPayload, pushed }, version),
     };
 }
 function nativeBranch(kernel, input, options) {

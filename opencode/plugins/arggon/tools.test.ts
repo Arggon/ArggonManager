@@ -712,6 +712,22 @@ function seedGitTree(prefix = "arggon-w4-"): string {
   return dir;
 }
 
+/** Add a dependency only the primary checkout has; start must link it. */
+function addNativeGateDependency(dir: string): void {
+  const dep = join(dir, "node_modules", "native-gate-dep");
+  mkdirSync(dep, { recursive: true });
+  writeFileSync(join(dep, "package.json"), JSON.stringify({ name: "native-gate-dep", main: "index.js" }));
+  writeFileSync(join(dep, "index.js"), "module.exports = true;\n");
+}
+
+/** Install a real (never bypassed) dependency-requiring pre-commit gate. */
+function setNativePreCommitHook(dir: string, script: string): void {
+  const hook = join(dir, ".git", "hooks", "pre-commit");
+  mkdirSync(join(dir, ".git", "hooks"), { recursive: true });
+  writeFileSync(hook, script.endsWith("\n") ? script : `${script}\n`, "utf8");
+  chmodSync(hook, 0o755);
+}
+
 /**
  * Fake `ctx.worktree` domain backed by real git: the same observable contract
  * as the 2.0.10 Git strategy probed for W4 (detached worktree at the start
@@ -821,6 +837,15 @@ describe("worktree domain tools (W4)", () => {
     expect(output.worktreeCreated).toBe(true);
     expect(output.branchCreated).toBe(true);
     expect(output.pushed).toBe(false);
+    // A cold checkout without an install is reported honestly: the claim can
+    // still commit when no gate needs dependencies, but readiness is false.
+    expect(output.preparation).toMatchObject({
+      ready: false,
+      install: "missing",
+      linkedNodeModules: false,
+    });
+    expect(output.claimCommitted).toBe(true);
+    expect(output.claimCommit).toMatchObject({ status: "committed", committed: true });
 
     // The domain was used (parent = the checkout's parent, name <repo>-<id>).
     expect(calls.create).toHaveLength(1);
@@ -848,6 +873,164 @@ describe("worktree domain tools (W4)", () => {
     });
     expect(itemData(dir, "task-rate-limit")).toMatchObject({ status: "todo" });
     expect(itemData(dir, "task-rate-limit").branch).toBeUndefined();
+  });
+
+  it("keeps worktree:false in the canonical checkout and ignores a recorded worktree", async () => {
+    const dir = seedGitTree();
+    const recorded = join(dirname(dir), `${basename(dir)}-legacy-rate-limit`);
+    git(dir, ["worktree", "add", "--detach", recorded]);
+    runUpdate({ cwd: dir, id: "task-rate-limit", worktreePath: recorded });
+    if (gitOut(dir, ["status", "--porcelain"]) !== "") {
+      git(dir, ["add", "ArggonManager"]);
+      git(dir, ["commit", "-qm", "test: record legacy worktree"]);
+    }
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+
+    const output = (await tool(defs, "start").execute({
+      id: "task-rate-limit",
+      assignee: "smoke",
+      worktree: false,
+    })).output as Record<string, unknown>;
+
+    expect(calls.create).toHaveLength(0);
+    expect(output.worktreePath).toBeNull();
+    expect(output.preparation).toBeUndefined();
+    expect(output.claimCommitted).toBe(true);
+    expect(output.claimCommit).toMatchObject({ status: "committed", committed: true });
+    expect(gitOut(dir, ["log", "-1", "--pretty=%s"])).toBe(
+      "chore(tasks): claimed task-rate-limit",
+    );
+    // The old record is preserved, but this invocation did not enter that tree.
+    expect(itemData(dir, "task-rate-limit")).toMatchObject({
+      status: "in_progress",
+      assignee: "smoke",
+      worktree_path: recorded,
+    });
+    expect(existsSync(recorded)).toBe(true);
+    expect(gitOut(recorded, ["status", "--porcelain"])).toBe("");
+  });
+
+  it("does not report an ignored item as already-committed when branch-only start writes it", async () => {
+    const dir = seedGitTree();
+    const itemPath =
+      "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md";
+    git(dir, ["rm", "--cached", "--", itemPath]);
+    writeFileSync(join(dir, ".gitignore"), `${itemPath}\n`, "utf8");
+    git(dir, ["add", ".gitignore"]);
+    git(dir, ["commit", "-qm", "test: ignore item path"]);
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({
+        id: "task-rate-limit",
+        assignee: "smoke",
+        worktree: false,
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    expect(typed.envelope.claimCommitted).toBe(false);
+    expect(typed.envelope.claimCommit).toMatchObject({ status: "failed", committed: false });
+    const commit = typed.envelope.commit as Record<string, unknown>;
+    expect(String(commit.skipped)).toContain("all mutated paths are ignored");
+  });
+
+  it("prepares a dependency-requiring gate and reports readiness plus the claim commit", async () => {
+    const dir = seedGitTree();
+    addNativeGateDependency(dir);
+    setNativePreCommitHook(
+      dir,
+      "#!/bin/sh\nnode -e \"require('native-gate-dep')\" || exit 1\ntouch .native-gate-ran\n",
+    );
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+
+    const started = await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    const output = started.output as Record<string, unknown>;
+    const worktreePath = String(output.worktreePath);
+    const preparation = output.preparation as Record<string, unknown>;
+    const claimCommit = output.claimCommit as Record<string, unknown>;
+
+    expect(output.ok).toBe(true);
+    expect(preparation).toMatchObject({
+      ready: true,
+      install: "linked",
+      linkedNodeModules: true,
+      linkedWorkspaces: [],
+    });
+    expect(output.claimCommitted).toBe(true);
+    expect(claimCommit).toMatchObject({ status: "committed", committed: true });
+    expect(output.commit).toMatchObject({ message: "chore(tasks): claimed task-rate-limit" });
+    // The gate really ran in the fresh worktree; no --no-verify escape hatch.
+    expect(existsSync(join(worktreePath, ".native-gate-ran"))).toBe(true);
+    expect(gitOut(worktreePath, ["log", "-1", "--pretty=%s"])).toBe(
+      "chore(tasks): claimed task-rate-limit",
+    );
+  });
+
+  it("keeps the worktree and reports a skipped claim commit when the gate fails, then retries on attach", async () => {
+    const dir = seedGitTree();
+    setNativePreCommitHook(dir, '#!/bin/sh\necho "native gate: missing dependency" >&2\nexit 1\n');
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    const payload = typed.envelope;
+    const error = payload.error as Record<string, unknown>;
+    const worktreePath = String(payload.worktreePath);
+    const claimCommit = payload.claimCommit as Record<string, unknown>;
+
+    expect(typed.code).toBe("START_FAILED");
+    expect(payload.ok).toBe(false);
+    expect(payload.preparation).toMatchObject({
+      ready: false,
+      install: "missing",
+      linkedNodeModules: false,
+    });
+    expect(payload.claimCommitted).toBe(false);
+    expect(claimCommit).toMatchObject({ status: "failed", committed: false });
+    expect(String(error.message)).toContain("committing the claim");
+    expect(String(error.message)).toContain("worktree was kept");
+    expect(String(error.message)).toContain("tools.arggon.start");
+    expect(String(claimCommit.skipped)).toContain("native gate: missing dependency");
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toContain(
+      "feat/task-rate-limit",
+    );
+    expect(
+      gitOut(worktreePath, [
+        "status",
+        "--porcelain",
+        "--",
+        "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md",
+      ]),
+    ).not.toBe("");
+
+    // Fix the shared hook and attach: the dirty claim is retried, not silently
+    // accepted as a no-op.
+    setNativePreCommitHook(dir, "#!/bin/sh\nexit 0\n");
+    const retry = await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    const retryOutput = retry.output as Record<string, unknown>;
+    expect(retryOutput.worktreeCreated).toBe(false);
+    expect(retryOutput.worktreePath).toBe(worktreePath);
+    expect(retryOutput.claimCommitted).toBe(true);
+    expect(retryOutput.claimCommit).toMatchObject({ status: "committed", committed: true });
+    expect(gitOut(worktreePath, ["log", "-1", "--pretty=%s"])).toBe(
+      "chore(tasks): claimed task-rate-limit",
+    );
   });
 
   it("start refuses to steal a claim and removes the worktree it just created", async () => {

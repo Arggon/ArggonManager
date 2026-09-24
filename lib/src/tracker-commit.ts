@@ -299,6 +299,12 @@ export function commitTrackerMutation(
   if (paths.length === 0) {
     return { committed: false, skipReason: "no mutated files" };
   }
+  // The native claim path is expected to be inside the target worktree. Keep
+  // that invariant at the primitive boundary too: a caller cannot turn a
+  // relative/absolute path into an index operation outside the repository.
+  if (paths.some((path) => path === ".." || path.startsWith("../"))) {
+    return { committed: false, skipReason: "mutated path escapes repository root" };
+  }
   const probe = runGit(["rev-parse", "--git-dir"], root);
   if (probe.missing) return { committed: false, skipReason: "git not found" };
   if (probe.code !== 0) return { committed: false, skipReason: "not a git repository" };
@@ -353,7 +359,11 @@ export function commitTrackerMutation(
         result = { committed: false, skipReason: `git add failed: ${firstLine(add.err || add.out)}` };
         return;
       }
-      commit = runGit(["commit", "-m", opts.message], root);
+      // `--only` is essential even though the paths were staged above: a caller
+      // may already have unrelated files in the index. Commit the explicit
+      // mutation paths without sweeping those staged entries into the claim (and
+      // let the pre-commit hook see the same bounded index).
+      commit = runGit(["commit", "--only", "-m", opts.message, "--", ...stagePaths], root);
       if (commit.code !== 0) {
         const detail = `${commit.out}\n${commit.err}`;
         if (/nothing to commit|nothing added/.test(detail)) {
