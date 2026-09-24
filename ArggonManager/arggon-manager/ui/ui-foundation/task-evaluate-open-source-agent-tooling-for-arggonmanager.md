@@ -115,3 +115,14 @@ Current correction to the earlier evidence comment (historical text intentionall
 
 ### 2026-09-24 @Arggon
 Budget qualification: `show --json` is a bounded single-item read but has no hard byte budget in `doctor --budget`; the hard checks are generated `AGENTS.md` <= 2,048 B and the MCP schema <= 12,288 B advisory. The alternate-temp-root probes (show 778/784/824 B) further confirm that exact show bytes are path-qualified, not an invariant.
+
+### 2026-09-24 @Arggon-coordinator
+## Coordinator final review verdict — PR #416
+
+**APPROVE / merge after CI is green.** The provisional no-merge findings are resolved: volatile `doctor --budget` byte counts are explicitly qualified as process/path-dependent with bounded observations, and the legacy-shaped `@playwright/mcp` snippet is no longer presented as V2-ready; current V2 `mcp.servers`/`disabled` translation plus registration verification is required before any opt-in secondary pilot.
+
+The canonical follow-up Context/Acceptance body is complete and `git diff --check` is clean. Architecture/boundaries, scope, conventions, quality/security/scalability, docs-with-code, and acceptance honesty pass the engineering review bar.
+
+This is docs/tracker-only, so the blocking UI/TUI smoke exemption is valid. CI `cli`, `tasks-validate`, and `ui-smoke` are green at final head; local test, lint, build, `check:plugin`, `validate`, `spec`, and prose evidence is also green.
+
+No runtime dependency, generated config, product behavior, or tracker source-of-truth change was introduced. The original research item remains `in_progress` because its future pilot/ADR checkbox is conditional and the pilot has not run. The actionable follow-up may be completed by the coordinator immediately after merge. No item is marked done by this verdict.
