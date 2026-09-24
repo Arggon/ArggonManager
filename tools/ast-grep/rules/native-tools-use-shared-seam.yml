@@ -1,0 +1,90 @@
+id: native-tools-use-shared-seam
+language: TypeScript
+severity: error
+message: Native tool definitions must be added through the shared Arggon catalog seam.
+note: |
+  Rationale: TOOL_SPECS/WORKTREE_TOOL_SPECS feed both executable definitions and
+  schema parity checks. A second editor.add or tool() registration can silently
+  fork the native surface and escape those checks.
+  Scope: all hand-authored TypeScript. Tests and fixtures plus generated/vendored
+  plugin files are intentionally excluded.
+  Exception: registerArgonTools may register definitions it obtained from
+  argonToolDefinitions; that is the shared definition/registration seam.
+files:
+  - "**/*.ts"
+  - "**/*.tsx"
+ignores:
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - "**/__fixtures__/**"
+  - "fixtures/**"
+  - "e2e/**"
+  - "smoke/**"
+  - "test/**"
+  - "labs/**"
+  - ".opencode/plugins/arggon/**"
+  - "opencode/plugins/arggon/index.bundle.ts"
+  - "tools/ast-grep/**"
+rule:
+  any:
+    - all:
+        - pattern: $CTX.tool.transform($$$ARGS)
+        - not:
+            inside:
+              all:
+                - kind: function_declaration
+                - has:
+                    field: name
+                    regex: "^registerArgonTools$"
+                - has:
+                    pattern: argonToolDefinitions($$$CATALOG_ARGS)
+                    stopBy: end
+              stopBy: end
+    - all:
+        - pattern: $CTX.tool.add($$$ARGS)
+        - not:
+            inside:
+              all:
+                - kind: function_declaration
+                - has:
+                    field: name
+                    regex: "^registerArgonTools$"
+                - has:
+                    pattern: argonToolDefinitions($$$CATALOG_ARGS)
+                    stopBy: end
+              stopBy: end
+    - all:
+        - pattern: $CTX.tool.register($$$ARGS)
+        - not:
+            inside:
+              all:
+                - kind: function_declaration
+                - has:
+                    field: name
+                    regex: "^registerArgonTools$"
+                - has:
+                    pattern: argonToolDefinitions($$$CATALOG_ARGS)
+                    stopBy: end
+              stopBy: end
+    - all:
+        - pattern: $EDITOR.add({ $$$FIELDS })
+        - not:
+            inside:
+              all:
+                - kind: function_declaration
+                - has:
+                    field: name
+                    regex: "^registerArgonTools$"
+                - has:
+                    pattern: argonToolDefinitions($$$CATALOG_ARGS)
+                    stopBy: end
+              stopBy: end
+    - pattern: tool({ $$$FIELDS })
+    - all:
+        - pattern: import { $$$IMPORTS } from "@opencode/plugin"
+        - has:
+            kind: import_specifier
+            regex: '\btool\b'
+            stopBy: end

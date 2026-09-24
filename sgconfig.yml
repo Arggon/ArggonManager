@@ -1,0 +1,7 @@
+# Structural architecture guard. The CLI package is exact-pinned as a devDependency;
+# these rules are repository policy, not runtime behavior or published assets.
+ruleDirs:
+  - tools/ast-grep/rules
+
+testConfigs:
+  - testDir: tools/ast-grep/tests

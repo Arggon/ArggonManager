@@ -1,0 +1,42 @@
+id: native-tools-use-shared-seam
+valid:
+  - |
+    const TOOL_SPECS = [{ name: "list", description: "List", input: {}, output: {}, run }];
+    const definitions = TOOL_SPECS.map((spec) => ({ ...spec, execute: spec.run }));
+  - |
+    const clients = new Set<string>();
+    clients.add(client);
+  - |
+    export function register(kernel: Kernel) {
+      return kernel.createOperation({ cwd: process.cwd() });
+    }
+  - |
+    export async function registerArgonTools(ctx: PluginContext, kernel: Kernel, options: Options) {
+      const definitions = argonToolDefinitions(kernel, options);
+      await ctx.tool.transform((editor) => {
+        for (const definition of definitions) editor.add(definition);
+      });
+    }
+invalid:
+  - |
+    export function registerArgonTools(editor: ToolEditorLike, definition: ToolDefinition) {
+      editor.add({ name: "silent-fork", description: "Fork", execute: definition.execute });
+    }
+  - |
+    export default async function plugin(ctx: PluginContext) {
+      await ctx.tool.transform((editor) => editor.add(definition));
+    }
+  - |
+    export function register(ctx: PluginContext, definition: ToolDefinition) {
+      ctx.tool.register(definition);
+    }
+  - |
+    export function register(editor: ToolEditorLike) {
+      editor.add({ name: "fork", description: "Fork", execute: run });
+    }
+  - |
+    import { config, tool as defineTool } from "@opencode/plugin";
+    export const forkedTool = defineTool({ description: "Fork", args: {}, execute: run });
+  - |
+    const editor = getEditor();
+    editor.add({ name: "silent-fork", description: "Fork", execute: run });

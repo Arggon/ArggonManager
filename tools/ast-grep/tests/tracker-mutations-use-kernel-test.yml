@@ -1,0 +1,41 @@
+id: tracker-mutations-use-kernel
+valid:
+  - |
+    import { createOperation, updateOperation } from "@arggondev/lib";
+    export const mutate = () => createOperation({ cwd: process.cwd() });
+  - |
+    import { writeFileAtomic } from "@arggondev/lib";
+    writeFileAtomic(join(root, "docs", "notes.md"), body);
+    writeFileAtomic(join(root, "ArggonManager", "docs", "notes.md"), body);
+  - |
+    import { stringifyFrontmatter } from "./frontmatter.js";
+  - |
+    writeFileSync(outPath, html, "utf8");
+    renameSync(sourceAsset, destinationAsset);
+  - |
+    const raw = readFileSync(item.filePath, "utf8");
+    const next = transformForBoard(raw);
+invalid:
+  - |
+    import { runCreate, stringifyFrontmatter } from "@arggondev/lib";
+    writeFileAtomic(item.filePath, stringifyFrontmatter(data, body));
+  - |
+    import { stringifyFrontmatter as serializeItem } from "@arggondev/lib";
+    writeFileSync(item.filePath, serializeItem(data, body));
+  - |
+    import * as kernel from "@arggondev/lib";
+    writeFileSync(item.filePath, kernel.stringifyFrontmatter(data, body));
+  - |
+    writeFileSync(item.filePath, body, "utf8");
+  - |
+    renameSync(fresh.filePath, nextPath);
+  - |
+    rmSync(itemPath, { recursive: true, force: true });
+  - |
+    writeFileAtomic(trackerPath, serialize(body));
+  - |
+    appendFileSync(taskFile, note, "utf8");
+  - |
+    writeFileSync(join(tasksDir, `${id}.md`), body, "utf8");
+  - |
+    writeFileSync(filePath, body, "utf8");

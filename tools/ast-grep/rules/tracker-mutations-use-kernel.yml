@@ -1,0 +1,50 @@
+id: tracker-mutations-use-kernel
+language: TypeScript
+severity: error
+message: Tracker item mutations must go through the shared @arggondev/lib kernel.
+note: |
+  Rationale: adapters must not compose or persist item frontmatter themselves. The
+  kernel owns locking, status/claim rules, validation, cascades, and tracker commits.
+  The rule rejects both the item serializer seam and direct filesystem writes whose
+  path is recognizably an item/tracker path.
+  Scope: hand-authored TypeScript outside lib/src. Tests and fixtures, generated or
+  vendored plugin files, and the kernel itself are intentionally excluded.
+  Exception: lib/src is the shared mutation kernel. Writes to non-item product docs
+  remain the owning CLI command's responsibility and are not tracker item mutations.
+files:
+  - "**/*.ts"
+  - "**/*.tsx"
+ignores:
+  - "lib/src/**"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - "**/__fixtures__/**"
+  - "fixtures/**"
+  - "e2e/**"
+  - "smoke/**"
+  - "test/**"
+  - "labs/**"
+  - ".opencode/plugins/arggon/**"
+  - "opencode/plugins/arggon/index.bundle.ts"
+  - "tools/ast-grep/**"
+rule:
+  any:
+    - all:
+        - pattern: import { $$$IMPORTS } from "@arggondev/lib"
+        - has:
+            kind: import_specifier
+            regex: '\bstringifyFrontmatter\b'
+            stopBy: end
+    - pattern: stringifyFrontmatter($$$ARGS)
+    - pattern: $KERNEL.stringifyFrontmatter($$$ARGS)
+    - pattern: $WRITER($ITEM.filePath, $$$ARGS)
+    - pattern: $WRITER($ITEM.filePath)
+    - pattern: $WRITER($PATH, $$$ARGS)
+    - pattern: $WRITER($PATH)
+constraints:
+  WRITER:
+    regex: "^(writeFile|writeFileSync|appendFile|appendFileSync|writeFileAtomic|rename|renameSync|rm|rmSync|unlink|unlinkSync|truncate|truncateSync)$"
+  PATH:
+    regex: "(?i)(item|task|tracker)(file|path|dir)|(file|path|dir).*(item|task|tracker)|tasks|filePath"
