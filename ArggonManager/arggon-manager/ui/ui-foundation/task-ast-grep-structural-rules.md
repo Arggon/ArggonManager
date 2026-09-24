@@ -62,3 +62,7 @@ Review follow-up evidence for PR #418 (all blocking findings addressed):
 - Tracker: removed bare `filePath` matching; added source/destination, member, literal, nested `join`/`resolve`, and canonical tracker-item cases. `writeFileSync(filePath, ...)` is valid. `layout-migrate.ts` has one documented ADR-0012 inline root-migration suppression; `test-tmp.ts` and `pack-fixtures.ts` are explicit test-only exclusions.
 - Adversarial probe: temporary production TSX probe returned exit 1 with both rule IDs, while its bare-filePath valid probe returned no finding; probe files removed.
 - Gates after fixes: `npm test` (95 files/1611 tests), `npm run lint`, `npm run test:structure`, `npm run lint:structure`, `npm run build`, `npm run check:plugin`, native/CLI `validate`, Prettier, `git diff --check`, and package-surface check all green. Dependency remains exact dev-only @ast-grep/cli@0.45.3; no rewrite mode.
+
+### handoff 2026-09-24 @ses_f2b15dcecffeuVmXo3s1RGiJBJ (session: ses_f2b15dcecffeuVmXo3s1RGiJBJ) — next: Coordinator: review the narrowed rules and green evidence on PR #418, then merge; keep original in_progress until post-merge completion.
+- branch: feat/task-ast-grep-structural-rules
+- open questions: None.
