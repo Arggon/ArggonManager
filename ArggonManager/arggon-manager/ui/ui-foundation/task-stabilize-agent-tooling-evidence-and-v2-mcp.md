@@ -22,21 +22,16 @@ claimed_at: "2026-09-24T15:13:04.535Z"
 
 ## Context
 
-<!-- Why this task exists. -->
+This follow-up consolidates the two merge-blocking findings from the provisional
+lead-architect review of [PR #416](https://github.com/Arggon/ArggonManager/pull/416).
+The reviewer verdict remains in the [research item's history](task-evaluate-open-source-agent-tooling-for-arggonmanager.md).
 
-## Acceptance
-
-- [ ] 
-
-## Notes
-
-### 2026-09-24 @Arggon
-## Context
-
-This follow-up consolidates the two merge-blocking findings from the provisional lead-architect review of [PR #416](https://github.com/Arggon/ArggonManager/pull/416); the verdict is recorded in the [research item's reviewer comment](task-evaluate-open-source-agent-tooling-for-arggonmanager.md) (2026-09-24 @Arggon-reviewer).
-
-1. **Context-budget evidence:** exact `doctor --budget` `generatedAgentsMdBytes` and `showBytes` values vary because the throwaway project name is derived from a temporary path/PID. The exploration now reports the observed 2,020–2,021 B / 768–769 B range and preserves the stable under-budget/schema conclusion.
-2. **OpenCode V2 MCP setup:** the published `@playwright/mcp@0.0.82` OpenCode snippet uses legacy-shaped `mcp`/`enabled`. The exploration now requires translation and registration verification against the current V2 `mcp.servers`/`disabled` schema before any fallback pilot, while keeping the tool opt-in and secondary.
+- **Context-budget evidence:** exact `doctor --budget` generated-`AGENTS.md` and
+  `show` bytes vary with the throwaway path/PID; report a qualified range and
+  preserve the stable budget/schema conclusion.
+- **OpenCode V2 MCP setup:** the published `@playwright/mcp` snippet is
+  legacy-shaped `mcp`/`enabled`; require current V2 `mcp.servers`/`disabled`
+  translation and registration verification before any opt-in fallback pilot.
 
 ## Acceptance
 
@@ -44,6 +39,27 @@ This follow-up consolidates the two merge-blocking findings from the provisional
 - [x] Qualify the `@playwright/mcp` recommendation and record the V2 translation/registration gate and opt-in boundary.
 - [x] Run focused prose, tracker, and spec validation; introduce no ADR, runtime dependency, generated config, or product behavior change.
 - [ ] Coordinator reviews/merges PR #416 and completes this follow-up after merge.
+
+## Notes
+
+### 2026-09-24 @Arggon — review-resolution evidence
+
+The dated resolution evidence is retained here without duplicating the canonical
+Context/Acceptance sections:
+
+- Five default-temp-root `doctor --budget --json` runs returned generated
+  `AGENTS.md` **2,021 B** and `show` **769 B**; an earlier run returned
+  **2,020 B / 768 B**. Alternate temp roots returned `show` values of
+  **778 B / 784 B / 824 B**, confirming that exact temporary-context bytes are
+  process/path-qualified. `AGENTS.md` remains below **2,048 B**; `show` remains
+  bounded; MCP remains **10,507 B / ~2,627 tokens** below its **12,288 B**
+  advisory budget.
+- The published `@playwright/mcp@0.0.82` OpenCode snippet uses legacy-shaped
+  `mcp`/`enabled`; the exploration now requires translation and registration
+  verification against current V2 `mcp.servers`/`disabled`, with the fallback
+  opt-in and secondary.
+- Focused prose, tracker, and spec validation passed. No ADR, runtime dependency,
+  generated configuration, or product behavior change was introduced.
 
 ### handoff 2026-09-24 @Arggon (session: ses_f2c22e8bfffefNl32ha3H7kKPn) — next: Coordinator reviews/merges PR #416 after the two review findings are verified; leave this follow-up in_progress for post-merge completion.
 - branch: research/agent-tooling-2026-09-24
