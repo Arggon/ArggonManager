@@ -63,3 +63,19 @@ Conversely, the writer patterns never constrain the second argument of a move. T
 - The explicit generated/test ignores (bundle, hidden @@.opencode@@, fixtures, e2e/smoke/test/labs) are otherwise justified, and the canonical @@.ts@@ plugin source is scanned. New ast-grep files and package-lock are not in the supplied graph generation, so I read those directly.
 
 **Final review outcome for coordinator: NO-MERGE until the P1 rule/coverage gaps above are fixed and re-reviewed.
+
+### 2026-09-24 @arggon-reviewer
+## Provisional verdict correction — PR #418
+
+The previous provisional comment's ` markers are formatting artifacts; the findings and NO-MERGE recommendation stand.
+
+**P1 blockers:**
+- `tools/ast-grep/rules/native-tools-use-shared-seam.yml:32-83`: the exception is function-wide. A temp copy of the canonical `opencode/plugins/arggon/index.ts` with an extra `editor.add({ name: "silent-fork", ... })` inside `registerArgonTools` (which also calls `argonToolDefinitions`) scanned clean (exit 0). Extra `ctx.tool.register` / second transform also pass. The valid test at `tools/ast-grep/tests/native-tools-use-shared-seam-test.yml:14-18` uses `editor.add(definition)`, a form the rule never matches, and the same-name negative at `:22-24` omits the catalog call. Add real object-literal and catalog-plus-extra cases and narrow the exception.
+- Both rule files set `language: TypeScript` (`tools/ast-grep/rules/tracker-mutations-use-kernel.yml:2`, `.../native-tools-use-shared-seam.yml:2`) but list `**/*.tsx` (`:14-16`). `ast-grep --inspect entity` reports `language=Tsx,appliedRuleCount=0` for the hand-authored shipped `opencode/plugins/arggon/tui.tsx`; a temporary TSX file containing both forbidden forms scanned clean. Add TSX-capable coverage.
+- `tools/ast-grep/rules/tracker-mutations-use-kernel.yml:42-50` rejects generic `writeFileSync(filePath, ...)` via the `|filePath` alternative, despite the documented non-tracker product-doc exception; the test at `tools/ast-grep/tests/tracker-mutations-use-kernel-test.yml:41` enshrines it. The same patterns only constrain a writer's first argument, so real `cli/src/layout-migrate.ts:131` `renameSync(trackerMove.from, trackerMove.to)` and synthetic `renameSync(sourceAsset, taskPath)` scan clean. Add a valid generic-filePath case, destination/move negatives, and either a narrow documented layout-migration exception or enforcement.
+
+**P2:** `cli/src/test-tmp.ts:1-4` and `cli/src/pack-fixtures.ts:1-12` are test-only but are still scanned (`--inspect entity` gives each 2 rules), contrary to the README's broad harness-exclusion wording.
+
+**Verified:** local build/check:plugin, 95-file/1611-test suite, lint, both structure commands, validate, and diff check passed; PR CI `cli`, `tasks-validate`, and `ui-smoke` are green. Dependency is exact/dev-only, package surface excludes the rules/config, scan is `--threads 1`, and no rewrite/update flag exists. No product CLI/UI source changed, so browser/CLI smoke is not applicable; no review-time browser drive was run.
+
+**Recommendation: NO-MERGE pending the P1 fixes and re-review.
