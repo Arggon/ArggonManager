@@ -4,6 +4,7 @@ status: in_progress
 id: task-ast-grep-structural-rules-review-followup
 title: Close ast-grep structural rule review gaps
 assignee: Arggon
+branch: feat/task-ast-grep-structural-rules
 parent: ui-foundation
 labels: [tooling, architecture, ci]
 priority: p1
