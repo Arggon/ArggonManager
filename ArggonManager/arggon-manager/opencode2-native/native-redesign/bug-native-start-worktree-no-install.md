@@ -106,3 +106,8 @@ The user-approved implementation direction is stronger than the original either/
 - No Windows/macOS runtime validation; the pathspec finding reproduces on Linux, and the cross-drive guard was reviewed statically only.
 
 **NO-MERGE pending fixes and re-review.**
+
+### 2026-09-24 @ses_f2af667e6ffehT4bkVx6NvzwID
+### Evidence correction to provisional finding 5
+
+The count **48 orphaned `arggon-w4-*` sibling directories was cumulative across the review’s repeated focused/full executions**, not the output of one isolated full-suite run. The source-level finding is unchanged: `tools.test.ts` registers primary fixture directories but not the sibling worktrees those tests create, and the runs left orphaned siblings. The GIT_TRACE2 maintenance-child evidence and the `/tmp/outside.md` sentinel deletion each came from one isolated focused execution.
