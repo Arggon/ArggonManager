@@ -86,3 +86,6 @@ Review corrections: reproduced doctor --budget values as 2,020 B AGENTS.md / 768
 
 ### 2026-09-24 @Arggon
 Head-SHA clarification: the earlier evidence comment recorded d40ce189 (the code/documentation head before tracker handoff commits). After the required native comment/handoff auto-commits, the final pushed PR #416 head is 5029f4a6895108347af5abf6fed4f935ae87de27. Item remains in_progress and assigned to Arggon.
+
+### 2026-09-24 @Arggon
+Note: this clarification itself creates the next tracker auto-commit, so any SHA quoted in a tracker comment is necessarily the pre-comment head. The authoritative final head is the remote PR #416 head reported in the worker handoff; no product or runtime state changed.
