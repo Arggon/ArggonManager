@@ -947,7 +947,7 @@ describe("commitTrackerMutation edge cases", () => {
     const realExecFileSync = (await import("node:child_process")).execFileSync;
     vi.doMock("node:child_process", () => ({
       execFileSync: (file: string, args: string[], opts: unknown) => {
-        if (args?.[0] === "commit") {
+        if (args?.includes("commit")) {
           const err = Object.assign(new Error("git failed"), {
             status: 1,
             stdout: "On branch main\nnothing to commit, working tree clean\n",
@@ -1004,7 +1004,7 @@ describe("commitTrackerMutation edge cases", () => {
     const realExecFileSync = (await import("node:child_process")).execFileSync;
     vi.doMock("node:child_process", () => ({
       execFileSync: (file: string, args: string[], opts: unknown) => {
-        if (args?.[0] === "commit") {
+        if (args?.includes("commit")) {
           throw Object.assign(new Error("git failed"), {
             status: 1,
             stdout: "",

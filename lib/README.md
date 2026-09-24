@@ -37,6 +37,7 @@ W2/W3/W4) rely on this subset — it is the contract:
 | **envelopes**  | `JSON_SCHEMA_VERSION`, `successEnvelope`, `failEnvelope`, `compactWorkItem`, `commitPayload`                                                                                                                                                               |
 | **operations** | `listOperation`, `createOperation`, `updateOperation`, `showOperation`, `nextOperation`, `reportOperation`, `validateOperation`, `commentOperation`, `handoffOperation`, `priorityOperation`, `syncOperation`, `importIssuesOperation`                     |
 | **view-model** | `sortById`, `sortByPriority`, `priorityTier`, `visibleItems`, `itemsForStatus`, `matchesSubstringFilter`, `applyViewLens`, `openDependencyIds`, `hasOpenDependencies`, `buildStatusIndex`, `statusCounts`, `groupItemsBy`, `treeEntries`, `readyTodoCount` |
+| **worktrees**  | `prepareWorktreeDependencies` — the shared link/build/resolution preparation receipt used by CLI and native `start`; git/domain lifecycle stays with each surface                                                                                          |
 
 ### Board view-model (`lib/src/view-model.ts`)
 
@@ -77,7 +78,8 @@ imports, but is **not** frozen for native consumers:
 - human formatters (`formatListTable`, `renderShowText`, `formatReportTable`,
   `formatTrendTable`, `formatValidateHuman`) — the CLI's eyes-only surface;
 - tracker-commit/config helpers (`commitTrackerMutation`, `resolveAutoCommit`,
-  `updateGeneratedSection`, …) the root adapter wires;
+  `updateGeneratedSection`, …) the root adapter wires; native `start` also uses
+  the explicit tracker-commit primitive so a failed claim gate cannot be hidden;
 - worktree-cleanup classification and git plumbing (`classifyCleanupEntry`,
   `defaultCleanupGit`, `findMergedPr`, `CLEANUP_TERMINAL_STATUSES`) — shared by
   the CLI's `cleanup` and the native `cleanup` tool so the merge criterion

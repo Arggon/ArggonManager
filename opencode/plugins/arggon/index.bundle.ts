@@ -2193,8 +2193,8 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
 exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.unlinkNodeModulesLink = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = void 0;
+exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.unlinkNodeModulesLink = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2353,6 +2353,7 @@ Object.defineProperty(exports, "packageBuildScript", { enumerable: true, get: fu
 Object.defineProperty(exports, "packageEntryExists", { enumerable: true, get: function () { return worktree_js_1.packageEntryExists; } });
 Object.defineProperty(exports, "packageEntryPaths", { enumerable: true, get: function () { return worktree_js_1.packageEntryPaths; } });
 Object.defineProperty(exports, "pointWorkspaceAtLocal", { enumerable: true, get: function () { return worktree_js_1.pointWorkspaceAtLocal; } });
+Object.defineProperty(exports, "prepareWorktreeDependencies", { enumerable: true, get: function () { return worktree_js_1.prepareWorktreeDependencies; } });
 Object.defineProperty(exports, "unlinkNodeModulesLink", { enumerable: true, get: function () { return worktree_js_1.unlinkNodeModulesLink; } });
 var import_issues_js_1 = require("./import-issues.js");
 Object.defineProperty(exports, "runImportIssues", { enumerable: true, get: function () { return import_issues_js_1.runImportIssues; } });
@@ -4270,20 +4271,50 @@ function runGit(args, cwd, input) {
     }
 }
 function firstLine(text) {
-    return text.split("\n").find((line) => line.trim().length > 0)?.trim() ?? "git failed";
+    return (text
+        .split("\n")
+        .find((line) => line.trim().length > 0)
+        ?.trim() ?? "git failed");
 }
 function findIgnoredPaths(root, paths) {
-    const run = runGit(["check-ignore", "--stdin", "-z"], root, `${paths.join("\0")}\0`);
-    if (run.missing)
-        return null;
-    if (run.code === 1)
-        return [];
-    if (run.code !== 0)
-        return null;
-    return run.out.split("\0").filter((p) => p.length > 0);
+    const ignored = [];
+    for (const path of paths) {
+        const run = runGit(["check-ignore", "--stdin", "-z"], root, `${path}\0`);
+        if (run.missing)
+            return null;
+        if (run.code === 0) {
+            if (run.out.split("\0").includes(path))
+                ignored.push(path);
+        }
+        else if (run.code !== 1)
+            return null;
+    }
+    return ignored;
 }
 function rootRelativePaths(root, paths) {
     return paths.map((p) => (0, node_path_1.relative)(root, (0, node_path_1.resolve)(root, p)).split(node_path_1.sep).join("/")).sort();
+}
+function normalizeTrackerPaths(root, filePaths) {
+    const rootAbs = (0, node_path_1.resolve)(root);
+    const paths = [];
+    for (const input of filePaths) {
+        if (input.length === 0)
+            continue;
+        if (input.startsWith(":"))
+            return { paths: [], error: "pathspec magic" };
+        const absolute = (0, node_path_1.resolve)(rootAbs, input);
+        const rel = (0, node_path_1.relative)(rootAbs, absolute);
+        if (rel === "" || (0, node_path_1.isAbsolute)(rel))
+            return { paths: [], error: "outside-root" };
+        if (rel === ".." || rel.startsWith(`..${node_path_1.sep}`) || rel.startsWith("../")) {
+            return { paths: [], error: "outside-root" };
+        }
+        const normalized = rel.split(node_path_1.sep).join("/");
+        if (normalized.startsWith(":"))
+            return { paths: [], error: "pathspec magic" };
+        paths.push(normalized);
+    }
+    return { paths: [...new Set(paths)].sort() };
 }
 function resolveCommonGitDir(root) {
     const abs = runGit(["rev-parse", "--path-format=absolute", "--git-common-dir"], root);
@@ -4301,7 +4332,14 @@ function commitTrackerMutation(root, filePaths, opts) {
     if (opts.commit === false) {
         return { committed: false, skipReason: "auto-commit disabled" };
     }
-    const paths = [...new Set(rootRelativePaths(root, filePaths.filter((p) => p.length > 0)))];
+    const normalized = normalizeTrackerPaths(root, filePaths);
+    if (normalized.error === "pathspec magic") {
+        return { committed: false, skipReason: "pathspec magic is not allowed" };
+    }
+    if (normalized.error === "outside-root") {
+        return { committed: false, skipReason: "mutated path escapes repository root" };
+    }
+    const paths = normalized.paths;
     if (paths.length === 0) {
         return { committed: false, skipReason: "no mutated files" };
     }
@@ -4333,7 +4371,7 @@ function commitTrackerMutation(root, filePaths, opts) {
         for (let attempt = 1;; attempt++) {
             if (attempt > 1)
                 sleepSync(Math.min(exports.COMMIT_RETRY_MS * (attempt - 1), COMMIT_RETRY_MAX_SLEEP_MS));
-            add = runGit(["add", "--", ...stagePaths], root);
+            add = runGit(["--literal-pathspecs", "add", "--", ...stagePaths], root);
             if (add.code !== 0) {
                 if (isIndexLockContention(add)) {
                     locked = "git index locked";
@@ -4342,14 +4380,17 @@ function commitTrackerMutation(root, filePaths, opts) {
                     continue;
                 }
                 warnGitSkip(`git add failed: ${firstLine(add.err || add.out)}`);
-                result = { committed: false, skipReason: `git add failed: ${firstLine(add.err || add.out)}` };
+                result = {
+                    committed: false,
+                    skipReason: `git add failed: ${firstLine(add.err || add.out)}`,
+                };
                 return;
             }
-            commit = runGit(["commit", "-m", opts.message], root);
+            commit = runGit(["--literal-pathspecs", "commit", "--only", "-m", opts.message, "--", ...stagePaths], root);
             if (commit.code !== 0) {
                 const detail = `${commit.out}\n${commit.err}`;
                 if (/nothing to commit|nothing added/.test(detail)) {
-                    const residue = runGit(["status", "--porcelain", "--", ...stagePaths], root);
+                    const residue = runGit(["--literal-pathspecs", "status", "--porcelain", "--", ...stagePaths], root);
                     if (residue.code === 0 && residue.out.trim().length > 0) {
                         const lost = "nothing to commit (staged entry lost under contention)";
                         warnGitSkip(lost);
@@ -5719,6 +5760,7 @@ exports.linkNodeModules = linkNodeModules;
 exports.unlinkNodeModulesLink = unlinkNodeModulesLink;
 exports.pointWorkspaceAtLocal = pointWorkspaceAtLocal;
 exports.buildLocalWorkspaces = buildLocalWorkspaces;
+exports.prepareWorktreeDependencies = prepareWorktreeDependencies;
 exports.linkedWorkspacePackages = linkedWorkspacePackages;
 const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
@@ -6057,6 +6099,32 @@ function buildLocalWorkspaces(primaryRoot, worktreePath, deps = {}) {
     }
     return built;
 }
+function prepareWorktreeDependencies(primaryRoot, worktreePath, deps = {}) {
+    const worktreeModules = (0, node_path_1.join)(worktreePath, "node_modules");
+    const linkedNodeModules = linkNodeModules(primaryRoot, worktreePath);
+    const builtWorkspaces = buildLocalWorkspaces(primaryRoot, worktreePath, {
+        runBuild: deps.runBuild,
+    });
+    const linkedWorkspaces = linkedWorkspacePackages(primaryRoot, worktreePath);
+    const hasInstall = (0, node_fs_1.existsSync)(worktreeModules);
+    const primaryHasInstall = (0, node_fs_1.existsSync)((0, node_path_1.join)(primaryRoot, "node_modules"));
+    const install = linkedNodeModules
+        ? hasInstall
+            ? "linked"
+            : "unavailable"
+        : hasInstall
+            ? "existing"
+            : primaryHasInstall
+                ? "unavailable"
+                : "missing";
+    return {
+        ready: hasInstall && linkedWorkspaces.length === 0,
+        install,
+        linkedNodeModules,
+        builtWorkspaces,
+        linkedWorkspaces,
+    };
+}
 function linkedWorkspacePackages(primaryRoot, worktreePath) {
     const names = [];
     const worktreeModules = (0, node_path_1.join)(worktreePath, "node_modules");
@@ -6372,11 +6440,19 @@ const ITEM_MARKER = "<arggon-item>";
 const STORAGE_PREFIX = "arggon/session/";
 const MAX_CLI_OUTPUT = 256 * 1024;
 const MAX_VALUE_CHARS = 200;
+const MAX_NATIVE_PREPARATION_NAMES = 32;
+const MAX_NATIVE_PREPARATION_VALUE_CHARS = 200;
+const MAX_NATIVE_DETAIL_CHARS = 500;
+const MAX_NATIVE_ERROR_CHARS = 2048;
 function asString(value) {
     return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
 }
 function clip(value, max) {
     return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
+function boundedNativeText(value, max) {
+    const text = typeof value === "string" ? value : String(value);
+    return clip(text.replace(/[\u0000-\u001f\u007f]/g, " "), max);
 }
 function byteLength(text) {
     return new TextEncoder().encode(text).length;
@@ -7695,12 +7771,137 @@ function worktreeFail(kernel, command, code, message, conventionVersion) {
         }),
     };
 }
+function startFailure(kernel, message, conventionVersion, payload) {
+    const failure = worktreeFail(kernel, "start", "START_FAILED", boundedNativeText(message, MAX_NATIVE_ERROR_CHARS), conventionVersion);
+    return { ...failure, envelope: { ...failure.envelope, ...payload } };
+}
+function startNotAttempted(kernel, message, conventionVersion, payload, reason) {
+    return startFailure(kernel, message, conventionVersion, {
+        ...payload,
+        claimCommitted: false,
+        claimCommit: claimCommitNotAttempted(reason),
+    });
+}
+function boundedPreparation(input) {
+    const built = input.builtWorkspaces
+        .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+        .map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS));
+    const linked = input.linkedWorkspaces
+        .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+        .map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS));
+    const truncated = input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
+        input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
+        built.some((name, index) => name !== input.builtWorkspaces[index]) ||
+        linked.some((name, index) => name !== input.linkedWorkspaces[index]);
+    return {
+        ready: input.ready,
+        install: input.install,
+        linkedNodeModules: input.linkedNodeModules,
+        builtWorkspaces: built,
+        linkedWorkspaces: linked,
+        ...(truncated ? { truncated: true } : {}),
+    };
+}
+function boundedNames(names) {
+    if (names === undefined)
+        return undefined;
+    return names
+        .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+        .map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS));
+}
+function boundedCommitPayload(result) {
+    const ignored = boundedNames(result.ignored);
+    if (result.committed) {
+        return {
+            ...(result.hash !== undefined
+                ? { hash: boundedNativeText(result.hash, MAX_NATIVE_DETAIL_CHARS) }
+                : {}),
+            ...(result.message !== undefined
+                ? { message: boundedNativeText(result.message, MAX_NATIVE_DETAIL_CHARS) }
+                : {}),
+            ...(ignored !== undefined ? { ignored } : {}),
+        };
+    }
+    return {
+        skipped: boundedNativeText(result.skipReason ?? "skipped", MAX_NATIVE_DETAIL_CHARS),
+        ...(ignored !== undefined ? { ignored } : {}),
+    };
+}
+function claimCommitFailure(skipped) {
+    return {
+        status: "failed",
+        committed: false,
+        skipped: boundedNativeText(skipped || "claim commit failed", MAX_NATIVE_DETAIL_CHARS),
+    };
+}
+function claimCommitNotAttempted(reason) {
+    return {
+        status: "not-attempted",
+        committed: false,
+        reason: boundedNativeText(reason, MAX_NATIVE_DETAIL_CHARS),
+    };
+}
+function envelopeMessage(envelope, fallback) {
+    const error = envelope.error !== null && typeof envelope.error === "object"
+        ? envelope.error
+        : undefined;
+    return boundedNativeText(asString(error?.message) ?? fallback, MAX_NATIVE_DETAIL_CHARS);
+}
+function commitNativeClaim(kernel, cwd, id) {
+    const shown = kernel.showOperation({ cwd, id, meta: true });
+    if (!shown.ok) {
+        return { receipt: claimCommitNotAttempted(envelopeMessage(shown.envelope, "claim item lookup failed")) };
+    }
+    const path = asString(shown.envelope.path);
+    if (path === undefined)
+        return { receipt: claimCommitNotAttempted("claim item path unavailable") };
+    const result = kernel.commitTrackerMutation(cwd, [(0, node_path_1.resolve)(cwd, path)], {
+        message: kernel.trackerCommitMessage("claimed", [id]),
+        commit: true,
+    });
+    const ignored = boundedNames(result.ignored);
+    if (result.committed) {
+        return {
+            receipt: {
+                status: "committed",
+                committed: true,
+                ...(result.hash !== undefined
+                    ? { hash: boundedNativeText(result.hash, MAX_NATIVE_DETAIL_CHARS) }
+                    : {}),
+                ...(result.message !== undefined
+                    ? { message: boundedNativeText(result.message, MAX_NATIVE_DETAIL_CHARS) }
+                    : {}),
+                ...(ignored !== undefined ? { ignored } : {}),
+            },
+            payload: boundedCommitPayload(result),
+        };
+    }
+    if (result.skipReason === "nothing to commit") {
+        return {
+            receipt: {
+                status: "not-needed",
+                committed: true,
+                ...(ignored !== undefined ? { ignored } : {}),
+            },
+        };
+    }
+    return {
+        receipt: {
+            ...claimCommitFailure(result.skipReason ?? "git commit failed"),
+            ...(ignored !== undefined ? { ignored } : {}),
+        },
+        payload: boundedCommitPayload(result),
+    };
+}
 async function guarded(kernel, command, code, body) {
     try {
         return await body();
     }
     catch (error) {
         logOnce(`worktree-${command}`, `${command} failed unexpectedly`, error);
+        if (command === "start") {
+            return startNotAttempted(kernel, detail(error), undefined, {}, "unexpected start failure");
+        }
         return worktreeFail(kernel, command, code, detail(error));
     }
 }
@@ -7758,22 +7959,83 @@ async function createItemWorktree(options, repoRoot, id) {
     }
 }
 async function discardWorktree(options, directory, branch) {
+    const canonical = canonicalRoot(options, options.cwd);
+    const errors = [];
     const domain = options.worktree?.domain;
     const projectID = asString(options.worktree?.projectID);
+    let worktreeRemoved = false;
     if (domain?.remove !== undefined && projectID !== undefined) {
         try {
             await domain.remove({ projectID, directory, force: true });
+            if (!(0, node_fs_1.existsSync)(directory))
+                worktreeRemoved = true;
         }
         catch (error) {
-            logOnce("worktree-rollback", "worktree domain rollback failed", error);
+            errors.push(`worktree domain removal failed: ${detail(error)}`);
         }
     }
-    else {
-        await run("git", ["worktree", "remove", "--force", directory], options.cwd, 30_000);
+    if (!worktreeRemoved) {
+        const removed = await run("git", ["worktree", "remove", "--force", directory], canonical, 30_000);
+        if (removed.code === 0) {
+            worktreeRemoved = true;
+        }
+        else {
+            errors.push(`git worktree removal failed: ${removed.stderr.trim() || `exit ${removed.code ?? "unknown"}`}`);
+        }
     }
+    if ((0, node_fs_1.existsSync)(directory) || (await isRegisteredWorktree(canonical, directory))) {
+        worktreeRemoved = false;
+        errors.push(`worktree remains at ${directory}`);
+    }
+    let branchDeleted = branch === undefined ? null : false;
     if (branch !== undefined) {
-        await run("git", ["branch", "-D", branch], options.cwd, 10_000);
+        if (!worktreeRemoved) {
+            errors.push(`branch ${branch} was kept because its worktree remains`);
+        }
+        else {
+            const deleted = await run("git", ["branch", "-D", branch], canonical, 10_000);
+            branchDeleted = deleted.code === 0;
+            if (!branchDeleted) {
+                errors.push(`git branch deletion failed: ${deleted.stderr.trim() || `exit ${deleted.code ?? "unknown"}`}`);
+            }
+        }
     }
+    return {
+        worktreeRemoved,
+        branchDeleted,
+        ...(errors.length > 0
+            ? { error: boundedNativeText(errors.join("; "), MAX_NATIVE_DETAIL_CHARS) }
+            : {}),
+    };
+}
+async function cleanupClaimArtifacts(options, kernel, primaryRoot, worktreePath, worktreeCreated, branchCreated, branch, preparation) {
+    const preparationRemoved = preparation?.linkedNodeModules !== true || worktreePath === undefined
+        ? true
+        : kernel.unlinkNodeModulesLink(primaryRoot, worktreePath);
+    const discard = worktreeCreated && worktreePath !== undefined
+        ? await discardWorktree(options, worktreePath, branchCreated ? branch : undefined)
+        : undefined;
+    return { preparationRemoved, ...(discard !== undefined ? { discard } : {}) };
+}
+function cleanupDescription(cleanup, worktreeCreated, worktreePath, branch) {
+    if (!worktreeCreated) {
+        return cleanup.preparationRemoved
+            ? ""
+            : `the start-owned dependency link could not be removed from ${worktreePath ?? "the worktree"}`;
+    }
+    const discard = cleanup.discard;
+    if (cleanup.preparationRemoved &&
+        discard?.worktreeRemoved === true &&
+        (discard.branchDeleted === true || discard.branchDeleted === null)) {
+        return "the worktree created by this run was removed again";
+    }
+    const details = [
+        cleanup.preparationRemoved ? undefined : "the start-owned dependency link remains",
+        discard?.worktreeRemoved === false ? `the worktree remains at ${worktreePath ?? "the created path"}` : undefined,
+        discard?.branchDeleted === false ? `the branch remains: ${branch}` : undefined,
+        discard?.error,
+    ].filter((value) => value !== undefined);
+    return `rollback incomplete: ${details.join("; ")}`;
 }
 async function ensureWorktreeBranch(worktreePath, branch) {
     const exists = await run("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], worktreePath, 10_000);
@@ -7816,35 +8078,86 @@ async function staleClaimFields(kernel, canonicalCwd, worktreePath, id) {
     });
     return differing.length === 0 ? undefined : differing.join(", ");
 }
+async function preflightPlainBranch(kernel, options, root, branch) {
+    const ref = await run("git", ["check-ref-format", "--branch", branch], options.cwd, 10_000);
+    if (ref.code !== 0) {
+        return `branch '${branch}' is not a valid git branch (${ref.stderr.trim() || `git exit ${ref.code ?? "unknown"}`})`;
+    }
+    const worktrees = await run("git", ["worktree", "list", "--porcelain"], options.cwd, 10_000);
+    if (worktrees.code !== 0) {
+        return `could not inspect git worktrees before branch setup (${worktrees.stderr.trim() || `git exit ${worktrees.code ?? "unknown"}`})`;
+    }
+    let worktreePath;
+    for (const line of worktrees.stdout.split("\n")) {
+        if (line.startsWith("worktree ")) {
+            worktreePath = line.slice("worktree ".length).trim();
+        }
+        else if (line.trim() === `branch refs/heads/${branch}`) {
+            if (worktreePath !== undefined && (0, node_path_1.resolve)(worktreePath) !== (0, node_path_1.resolve)(options.cwd)) {
+                return `branch '${branch}' is already checked out at ${worktreePath}; detach it before plain start`;
+            }
+        }
+    }
+    const status = await run("git", ["status", "--porcelain", "--untracked-files=all"], options.cwd, 10_000);
+    if (status.code !== 0) {
+        return `could not inspect the canonical working tree before branch setup (${status.stderr.trim() || `git exit ${status.code ?? "unknown"}`})`;
+    }
+    const tracker = (0, node_path_1.relative)(root, kernel.findTasksDir(root)).split(node_path_1.sep).join("/");
+    const blocked = status.stdout.split("\n").filter((line) => {
+        if (line.trim().length === 0)
+            return false;
+        const code = line.slice(0, 2);
+        const path = line.slice(3).replace(/^"|"$/g, "");
+        return !(code === "??" && !path.startsWith(`${tracker}/`));
+    });
+    if (blocked.length > 0) {
+        return "the canonical working tree has tracked or tracker changes; commit/stash them before plain start";
+    }
+    return undefined;
+}
 async function nativeStart(kernel, input, options) {
     const id = asString(input.id);
-    if (id === undefined)
-        return worktreeFail(kernel, "start", "START_FAILED", "id is required");
+    if (id === undefined) {
+        return startNotAttempted(kernel, "id is required", undefined, {}, "invalid id");
+    }
     let root;
     try {
         root = sessionRoot(kernel, options.cwd);
     }
     catch (error) {
-        return worktreeFail(kernel, "start", "START_FAILED", detail(error));
+        return startNotAttempted(kernel, detail(error), undefined, { id }, "session root unavailable");
     }
     const version = kernel.readConventionVersion(root);
     const show = kernel.showOperation({ cwd: options.cwd, id, meta: true });
-    if (!show.ok)
-        return remapFailure(show.envelope, "start", "START_FAILED");
+    if (!show.ok) {
+        return startNotAttempted(kernel, envelopeMessage(show.envelope, "item lookup failed"), version, { id }, "item lookup failed");
+    }
     const item = (show.envelope.item ?? {});
     const assignee = asString(input.assignee) ?? asString(kernel.resolveCurrentLogin()) ?? undefined;
     if (assignee === undefined) {
-        return worktreeFail(kernel, "start", "START_FAILED", "could not resolve assignee (pass assignee, or set GITHUB_USER/GITHUB_ACTOR, or authenticate gh)", version);
+        return startNotAttempted(kernel, "could not resolve assignee (pass assignee, or set GITHUB_USER/GITHUB_ACTOR, or authenticate gh)", version, { id }, "assignee unavailable");
     }
     const branch = itemBranch(kernel, root, item, input.branch);
+    const primaryRoot = canonicalRoot(options, root);
     const wantWorktree = input.worktree !== false;
-    let worktreePath = asString(item.worktree_path);
+    let worktreePath = wantWorktree ? asString(item.worktree_path) : undefined;
     if (worktreePath !== undefined && !(0, node_fs_1.existsSync)(worktreePath))
         worktreePath = undefined;
     let worktreeCreated = false;
     let branchCreated = false;
+    let preparation;
+    const context = (extra = {}) => ({
+        id,
+        branch,
+        worktreePath: worktreePath ?? null,
+        worktreeCreated,
+        branchCreated,
+        ...(preparation !== undefined ? { preparation } : {}),
+        ...extra,
+    });
+    const failBeforeClaim = (message, reason, extra = {}) => startNotAttempted(kernel, message, version, context(extra), reason);
     if (wantWorktree) {
-        const canonical = canonicalRoot(options, root);
+        const canonical = primaryRoot;
         if (worktreePath === undefined) {
             const defaultPath = (0, node_path_1.join)((0, node_path_1.resolve)(canonical, ".."), `${(0, node_path_1.basename)(canonical)}-${id}`);
             if ((0, node_fs_1.existsSync)(defaultPath))
@@ -7852,74 +8165,146 @@ async function nativeStart(kernel, input, options) {
         }
         if (worktreePath !== undefined) {
             if (!(await isRegisteredWorktree(canonical, worktreePath))) {
-                return worktreeFail(kernel, "start", "START_FAILED", `${worktreePath} exists but is not a git worktree of this repo ` +
-                    "(move or remove the path first, or use the CLI fallback `arggon start --worktree`)", version);
+                return failBeforeClaim(`${worktreePath} exists but is not a git worktree of this repo ` +
+                    "(move or remove the path first, or use the CLI fallback `arggon start --worktree`)", "foreign worktree refused");
             }
         }
         else {
             const created = await createItemWorktree(options, root, id);
             if (created.directory === undefined) {
-                return worktreeFail(kernel, "start", "START_FAILED", created.error ?? "worktree creation failed", version);
+                return failBeforeClaim(created.error ?? "worktree creation failed", "worktree creation failed");
             }
             worktreePath = created.directory;
             worktreeCreated = true;
             const stale = await staleClaimFields(kernel, options.cwd, worktreePath, id);
             if (stale !== undefined) {
-                await discardWorktree(options, worktreePath);
-                return worktreeFail(kernel, "start", "START_FAILED", `the canonical checkout has uncommitted tracker changes for '${id}' (${stale}); ` +
-                    "commit or discard them, or use the CLI fallback `arggon start --worktree` " +
-                    "(the worktree created by this run was removed again)", version);
+                const cleanup = await cleanupClaimArtifacts(options, kernel, primaryRoot, worktreePath, worktreeCreated, branchCreated, branch, preparation);
+                const rollback = cleanup.discard !== undefined
+                    ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
+                    : { rollback: { preparationRemoved: cleanup.preparationRemoved } };
+                return failBeforeClaim(`the canonical checkout has uncommitted tracker changes for '${id}' (${stale}); ` +
+                    "commit or discard them, or use the CLI fallback `arggon start --worktree`. " +
+                    cleanupDescription(cleanup, worktreeCreated, worktreePath, branch), "stale canonical claim refused", rollback);
             }
         }
         const ensured = await ensureWorktreeBranch(worktreePath, branch);
         if (!ensured.ok) {
-            if (worktreeCreated)
-                await discardWorktree(options, worktreePath);
-            return worktreeFail(kernel, "start", "START_FAILED", `branch setup failed in ${worktreePath}: ${ensured.error ?? "unknown git error"}`, version);
+            const cleanup = await cleanupClaimArtifacts(options, kernel, primaryRoot, worktreePath, worktreeCreated, false, branch, preparation);
+            const rollback = cleanup.discard !== undefined
+                ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
+                : { rollback: { preparationRemoved: cleanup.preparationRemoved } };
+            return failBeforeClaim(`branch setup failed in ${worktreePath}: ${ensured.error ?? "unknown git error"}. ` +
+                cleanupDescription(cleanup, worktreeCreated, worktreePath, branch), "branch setup failed", rollback);
         }
         branchCreated = ensured.created;
     }
+    else {
+        const branchCheck = await run("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], options.cwd, 10_000);
+        if (branchCheck.code !== 0 && branchCheck.code !== 1) {
+            return failBeforeClaim(`could not inspect branch '${branch}': ${branchCheck.stderr.trim() || `git exit ${branchCheck.code ?? "unknown"}`}`, "branch ownership preflight failed");
+        }
+        if (branchCheck.code === 0 &&
+            asString(input.branch) === undefined &&
+            asString(item.branch) !== branch) {
+            return failBeforeClaim(`branch '${branch}' already exists but the item has no matching recorded branch; ` +
+                "record it explicitly or choose another branch", "branch ownership conflict");
+        }
+        const preflight = await preflightPlainBranch(kernel, options, root, branch);
+        if (preflight !== undefined) {
+            return failBeforeClaim(preflight, "plain-start preflight failed");
+        }
+    }
+    if (worktreePath !== undefined) {
+        try {
+            preparation = boundedPreparation(kernel.prepareWorktreeDependencies(primaryRoot, worktreePath));
+        }
+        catch (error) {
+            const preparationError = boundedPreparation({
+                ready: false,
+                install: "unavailable",
+                linkedNodeModules: false,
+                builtWorkspaces: [],
+                linkedWorkspaces: [],
+            });
+            const preparationRemoved = kernel.unlinkNodeModulesLink(primaryRoot, worktreePath);
+            return failBeforeClaim(`dependency preparation failed in ${worktreePath}: ${boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)}; ` +
+                (preparationRemoved
+                    ? "the start-owned dependency link was removed and the worktree was kept"
+                    : "the worktree and any start-owned dependency link were kept"), "dependency preparation failed", { preparation: preparationError, rollback: { preparationRemoved } });
+        }
+    }
     const target = worktreePath ?? options.cwd;
-    const update = kernel.updateOperation({
+    let update = kernel.updateOperation({
         cwd: target,
         id,
         status: "in_progress",
         assignee,
-        branch,
-        ...(worktreePath !== undefined ? { worktreePath } : {}),
+        ...(wantWorktree ? { branch, worktreePath } : {}),
+        commit: false,
         agent: true,
     });
     if (!update.ok) {
-        if (worktreeCreated && worktreePath !== undefined) {
-            await discardWorktree(options, worktreePath, branchCreated ? branch : undefined);
+        const cleanup = await cleanupClaimArtifacts(options, kernel, primaryRoot, worktreePath, worktreeCreated, branchCreated, branch, preparation);
+        const rollback = cleanup.discard !== undefined
+            ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
+            : { rollback: { preparationRemoved: cleanup.preparationRemoved } };
+        return failBeforeClaim(`${envelopeMessage(update.envelope, "claim update failed")}. ` +
+            cleanupDescription(cleanup, worktreeCreated, worktreePath, branch), "claim update refused", rollback);
+    }
+    if (!wantWorktree) {
+        const ensured = await ensureWorktreeBranch(options.cwd, branch);
+        if (!ensured.ok) {
+            return failBeforeClaim(`branch setup failed in ${options.cwd}: ${ensured.error ?? "unknown git error"}`, "branch setup failed");
         }
-        const failure = remapFailure(update.envelope, "start", "START_FAILED");
-        if (worktreeCreated && worktreePath !== undefined) {
-            const error = failure.envelope.error;
-            error.message = `${String(error.message)} (the worktree created by this run was removed again)`;
+        branchCreated = ensured.created;
+        const branchUpdate = kernel.updateOperation({
+            cwd: options.cwd,
+            id,
+            branch,
+            commit: false,
+            agent: true,
+        });
+        if (!branchUpdate.ok) {
+            return failBeforeClaim(envelopeMessage(branchUpdate.envelope, "branch record update failed"), "branch record update failed");
         }
-        return failure;
+        update = branchUpdate;
+    }
+    let claim;
+    try {
+        claim = commitNativeClaim(kernel, target, id);
+    }
+    catch (error) {
+        claim = { receipt: claimCommitFailure(detail(error)) };
+    }
+    const claimPayload = {
+        ...context(),
+        item: update.envelope.item,
+        claimCommitted: claim.receipt.committed,
+        claimCommit: claim.receipt,
+        ...(claim.payload !== undefined ? { commit: claim.payload } : {}),
+    };
+    if (!claim.receipt.committed) {
+        const reason = claim.receipt.skipped ?? "claim commit failed";
+        const kept = worktreePath !== undefined
+            ? `the worktree was kept at ${worktreePath} (nothing was rolled back)`
+            : "the claim file was left in place for inspection";
+        return startFailure(kernel, `start failed while committing the claim; ${kept}. ` +
+            `${reason}. Fix the project gate/dependency cause, then re-run ` +
+            `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
+            "it attaches to the existing worktree and retries the claim commit.", version, claimPayload);
     }
     let pushed = false;
-    if (input.push === true && worktreePath !== undefined) {
-        const push = await run("git", ["push", "-u", "origin", branch], worktreePath, 60_000);
+    const pushEligible = claim.receipt.status === "committed" || branchCreated;
+    if (input.push === true && pushEligible) {
+        const push = await run("git", ["push", "-u", "origin", branch], target, 60_000);
         if (push.code !== 0) {
-            return worktreeFail(kernel, "start", "START_FAILED", `push failed (${push.stderr.trim() || `git push exit ${push.code}`}); the worktree was kept at ${worktreePath}`, version);
+            return startFailure(kernel, `push failed (${push.stderr.trim() || `git push exit ${push.code}`}); the branch and claim were kept`, version, { ...claimPayload, pushed: false });
         }
         pushed = true;
     }
     return {
         ok: true,
-        envelope: kernel.successEnvelope("start", {
-            id,
-            branch,
-            worktreePath: worktreePath ?? null,
-            worktreeCreated,
-            branchCreated,
-            pushed,
-            item: update.envelope.item,
-            ...(update.envelope.commit !== undefined ? { commit: update.envelope.commit } : {}),
-        }, version),
+        envelope: kernel.successEnvelope("start", { ...claimPayload, pushed }, version),
     };
 }
 function nativeBranch(kernel, input, options) {

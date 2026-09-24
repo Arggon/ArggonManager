@@ -71,6 +71,8 @@ This checks out the branch and records it in the item's `branch` field. If the r
 
 The manual worktree step (`git worktree add ../<repo>-<id> -b <branch>`) can be folded into the claim: `arggon start <id> --worktree --assignee <login>` claims, creates (or attaches to) the worktree at `../<repo-name>-<id>`, and runs the claim commit / push / optional `--open-pr` inside it, recording the path on the item's `worktree_path` field. Before the claim commit it prepares the worktree for the project gate: when the primary checkout has a `node_modules` and the worktree does not (a fresh worktree never does), start links the primary install in (best-effort, reported as `linkedNodeModules` in `--json` and on stdout) — so a dependency-needing pre-commit gate (`npm run arggon -- validate`) runs in the fresh worktree with no manual symlink dance. When the worktree carries its own copy of a workspace package (here `@arggondev/lib`), the install is a per-worktree **link farm** — a real `node_modules` directory whose entries link the primary's packages — or a bare symlink to the primary install when the worktree shadows no workspace package; that copy is built with the package's own `build` script before the claim commit and resolved worktree-locally (printed on stdout), with the build's exit honored (a failed build never flips, so it falls back to the primary's copy even when it still emitted the entry) and builds skipped when the install cannot consume them (a bare symlink has no farm to flip, so an attach re-run does not rebuild); a local copy that could not be built stays on the primary's install and is named in `linkedWorkspaces` (`--json` + stdout). Start never commits the install (the claim commit stages only the item file) — but stage explicit paths, never `git add -A`. The install is removed before a configured `x-worktree.post-start` hook runs (so the canonical `npm ci` bootstraps a real install instead of reifying through it and emptying the primary checkout) and re-created only when the hook leaves no `node_modules`. A failure after the worktree exists **never** rolls it back: the worktree and branch are kept for inspection, and the error names the failing step, the worktree path, the remediation, and the fact that re-running `arggon start <id> --worktree` attaches to it (a failed push is the exception — attach does not retry it, and the error instructs `git push -u origin <branch>` manually). Hooks are never bypassed (`--no-verify` is never passed). When the work is done and merged, `arggon cleanup` lists (and with `--prune` removes) the stale worktrees; a kept worktree you do not want (e.g. after a claim conflict) is discarded with the exact command the failure message prints (`git worktree remove --force <path>`, plus `git branch -D <branch>` when start created the branch). `cleanup --prune` also auto-commits (it clears `worktree_path`), so push main right after it — an unpushed cleanup auto-commit has traveled as contraband on a branch cut before.
 
+Native `tools.arggon.start` uses that same kernel dependency-preparation path before its explicit claim commit. Its bounded `preparation` and `claimCommit` receipts make a required install, pre-commit gate, or claim-commit failure a typed failure (with the worktree kept and an attach/retry instruction), never an unqualified success; see §Orchestration → Native `start` dependency contract.
+
 One primary claimable id per branch when possible. Open a PR early; keep it small.
 
 ## 5. Done criteria
@@ -143,6 +145,32 @@ Non-trivial items are **orchestrated by default**: a coordinator agent delegates
 - Report findings back to the coordinator instead of filing tracker items — the coordinator consolidates and files.
 
 The claim, branch, PR, and validate rules above apply to subagents **unchanged**: same commands, same gates, same "never" list.
+
+### Native `start` dependency contract
+
+`tools.arggon.start({ id, assignee, worktree: true })` and
+`arggon start <id> --worktree` use the same kernel-level
+`prepareWorktreeDependencies` implementation before either surface writes the
+claim. It links the primary checkout's existing `node_modules` when the fresh
+worktree has none, builds workspace packages that the worktree owns, and
+re-reads which packages still resolve into the primary. The native result
+carries a bounded `preparation` receipt (`ready`, `install`,
+`linkedNodeModules`, `builtWorkspaces`, `linkedWorkspaces`) and an explicit
+`claimCommitted`/`claimCommit` outcome. A required dependency or pre-commit
+failure is a typed `START_FAILED`, never an unqualified `ok:true`: the native
+worktree and branch are kept, the skip reason is bounded, and the message gives
+the `tools.arggon.start` attach/retry command. `preparation.ready: false` is an
+honest receipt, not by itself a failure: a project with no dependency-needing
+gate may still have no install and commit the claim. The commit outcome is the
+authority; `claimCommit.status: "not-needed"` means no second commit was needed,
+not that a commit was silently skipped. Re-running after fixing the gate
+retries a dirty claim instead of treating the no-op update as success. Native
+start does not run the CLI-only `x-worktree.post-start` hook; a project that
+needs a full local install must first remove the start-created link/farm (the
+CLI hook does this automatically) and then run its package-native bootstrap in
+the returned worktree. Never run `npm ci` through a link to the primary
+install. Both surfaces keep the install out of the claim commit and never use
+`--no-verify`.
 
 ## JSON for agents
 
