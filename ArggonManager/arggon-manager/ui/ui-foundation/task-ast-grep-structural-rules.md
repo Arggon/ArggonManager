@@ -9,7 +9,6 @@ priority: p2
 created: "2026-09-24"
 updated: "2026-09-24"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-ast-grep-structural-rules.md
   Leaves live only under a story. id is the filename stem: task-ast-grep-structural-rules.
@@ -34,3 +33,33 @@ Adopt the dev-only `ast-grep` CLI as a low-context structural guard. Keep ESLint
 - [ ] `npm test`, `npm run lint`, `npm run lint:structure`, `npm run build`, `npm run check:plugin`, and `arggon validate` are green, with rule-test evidence in the PR.
 
 ## Notes
+
+### 2026-09-24 @arggon-reviewer
+## Provisional review — PR #418 (read-only; coordinator owns final tracker state)
+
+**Recommendation: NO-MERGE pending fixes.** Green CI is necessary here, but the new guard has reproducible false passes/false failures in the seams it claims to protect.
+
+### P1 — native seam exception is function-wide, not registration-specific
+@@tools/ast-grep/rules/native-tools-use-shared-seam.yml:32-83@@ suppresses a match whenever the call is inside any function declaration named @@registerArgonTools@@ that has *any* descendant @@argonToolDefinitions(...)@@ call. It does not prove that the registration uses the returned definitions. I copied the canonical @@opencode/plugins/arggon/index.ts@@ to a temp file, inserted one @@editor.add({ name: "silent-fork", ... })@@ beside the catalog-derived add in @@registerArgonTools@@, and ran @@ast-grep scan --rule ... --threads 1 --report-style short --color never@@; observed exit 0 with no diagnostic. Extra @@ctx.tool.register(...)@@ and a second @@ctx.tool.transform(...)@@ in the same function also pass. The rule's @@editor.add@@ pattern is object-literal-only, so @@editor.add(extraDefinition)@@ outside the seam also evades (temporary probe exit 0).
+
+The tests do not cover this boundary: @@tools/ast-grep/tests/native-tools-use-shared-seam-test.yml:14-18@@ uses @@editor.add(definition)@@, which the rule never matches; the only same-name negative at @@:22-24@@ omits @@argonToolDefinitions@@. Add the real object-literal catalog registration as a positive and catalog-plus-extra registration as a negative, then narrow the exception to the actual catalog-to-editor flow (or an equivalent narrowly constrained shape).
+
+### P1 — the declared TSX scope is silently skipped
+Both rules set @@language: TypeScript@@ (tracker rule @@tools/ast-grep/rules/tracker-mutations-use-kernel.yml:2@@; native rule @@.../native-tools-use-shared-seam.yml:2@@) while listing @@**/*.tsx@@ at @@:14-16@@. On the hand-authored, shipped canonical TUI source @@opencode/plugins/arggon/tui.tsx:1-25@@, @@ast-grep scan --inspect entity@@ reports @@language=Tsx,appliedRuleCount=0@@. A temporary TSX file containing both @@editor.add({ ... })@@ and @@writeFileSync(item.filePath, ...)@@ exited 0 under each rule. This is a production-source blind spot, not a justified generated-file exclusion. Add TSX-capable rule coverage/tests; do not hide the canonical TUI by excluding it.
+
+### P1 — tracker rule is both over- and under-inclusive
+@@tools/ast-grep/rules/tracker-mutations-use-kernel.yml:42-50@@ applies its path regex to the first writer argument. The regex's final @@|filePath@@ alternative (@@:50@@) rejects a legitimate product writer such as @@writeFileSync(filePath, body)@@; the test at @@tools/ast-grep/tests/tracker-mutations-use-kernel-test.yml:41@@ enshrines that false positive even though the rule note/README say non-item product docs are allowed (@@tools/ast-grep/README.md:14-16@@). The required @@item.filePath@@, @@taskPath@@, @@trackerPath@@, and @@tasksDir@@ cases did diagnose in independent probes, but the generic case did too.
+
+Conversely, the writer patterns never constrain the second argument of a move. The real production @@renameSync(trackerMove.from, trackerMove.to)@@ at @@cli/src/layout-migrate.ts:131@@ is scanned but produces no diagnostic; synthetic @@renameSync(sourceAsset, taskPath)@@ and @@renameSync(sourceAsset, item.filePath)@@ also exit 0. If layout migration is intentionally outside the kernel, it needs a narrow documented exception; otherwise the rule must catch the move. Add a valid generic-@@filePath@@ product-write case, destination/move negatives, and reconcile the “sole production exception is lib/src” claim.
+
+### P2 — test-helper scope is broader than the documentation
+@@cli/src/test-tmp.ts:1-4@@ and @@cli/src/pack-fixtures.ts:1-12@@ identify themselves as test-only helpers, but @@--inspect entity@@ shows both receiving 2 rules; the ignore list only covers test/spec suffixes and broad harness directories. This is not a production bypass today, but it can create fixture false positives and makes the README's “unit/smoke harnesses ... excluded” claim imprecise. Either explicitly scope those helpers out or document why they are scanned.
+
+### Verified / gate assessment
+- Full local @@npm run build && npm run check:plugin && npm test@@: 95 files / 1611 tests passed; @@npm run lint@@, @@npm run test:structure@@ (2 suites), @@npm run lint:structure@@, @@git diff --check@@, and @@npm run arggon -- validate --json@@ all passed.
+- PR CI is green: @@cli@@ (including both new structure commands), @@tasks-validate@@, and @@ui-smoke@@.
+- @@@ast-grep/cli@0.45.3@@ is exact and devDependencies-only; @@npm pack --dry-run@@/existing pack contract showed no @@sgconfig.yml@@ or @@tools/ast-grep/@@ in the published surface; no runtime dependency or MCP/codemod/rewrite mode was added. @@lint:structure@@ uses @@--threads 1@@ and CI contains no update/rewrite flag.
+- No product CLI/UI source changed, so the engineering CLI/browser smoke gate is not applicable; the existing UI CI smoke is green. I did not run a review-time real-browser drive.
+- The explicit generated/test ignores (bundle, hidden @@.opencode@@, fixtures, e2e/smoke/test/labs) are otherwise justified, and the canonical @@.ts@@ plugin source is scanned. New ast-grep files and package-lock are not in the supplied graph generation, so I read those directly.
+
+**Final review outcome for coordinator: NO-MERGE until the P1 rule/coverage gaps above are fixed and re-reviewed.
