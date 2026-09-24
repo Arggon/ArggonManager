@@ -83,3 +83,6 @@ Review corrections: reproduced doctor --budget values as 2,020 B AGENTS.md / 768
 ### handoff 2026-09-24 @Arggon (session: ses_f2c22e8bfffefNl32ha3H7kKPn) — next: Coordinator reviews and merges draft PR #416 after the research-only diff and gate evidence are accepted.
 - branch: research/agent-tooling-2026-09-24
 - open questions: Shell-task pilot needs a package-supported V2 beta runtime; Chromium waits for a fixed release and real registration/E2E; future ADR/playbook remains conditional.
+
+### 2026-09-24 @Arggon
+Head-SHA clarification: the earlier evidence comment recorded d40ce189 (the code/documentation head before tracker handoff commits). After the required native comment/handoff auto-commits, the final pushed PR #416 head is 5029f4a6895108347af5abf6fed4f935ae87de27. Item remains in_progress and assigned to Arggon.
