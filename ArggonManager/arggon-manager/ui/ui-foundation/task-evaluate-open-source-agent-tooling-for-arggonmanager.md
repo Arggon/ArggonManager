@@ -60,3 +60,22 @@ of this task.
 The exploration is intentionally left `open`: it recommends a pilot, not an
 accepted technology decision. No ADR is created until the pilot produces
 repeatable evidence.
+
+### 2026-09-24 @Arggon
+Draft PR ready: https://github.com/Arggon/ArggonManager/pull/416
+Branch/head: research/agent-tooling-2026-09-24 @ d40ce18981478f6c0c4ed781dcfba76560756b47
+Files: tracked item + exploration-open-source-agent-tooling-013.md only.
+
+Gates/evidence (all run in /home/arggon/Projects/ArggonManager-agent-tooling):
+- npm ci: pass (Node v26.7.0; engine >=22.12)
+- npm test -- --reporter=dot: 95 files / 1,611 tests pass
+- npm run lint: pass
+- npm run build: pass
+- npm run check:plugin: pass, no bundle drift
+- npm run arggon -- validate and --json: ok, 0 errors/warnings, convention v5
+- npm run arggon -- spec validate --json: ok, 0 errors/warnings
+- prose-format targeted test: 3/3 pass; local link/frontmatter/heading checks pass
+- UI smoke intentionally skipped: docs-only PR is exempt under docs/engineering.md; no product/UI behavior changed.
+- Optional npx prettier --check is not a gate here and reports authored Markdown is not byte-clean; repo prose policy checks formatter invariants instead, and that test is green.
+
+Review corrections: reproduced doctor --budget values as 2,020 B AGENTS.md / 768 B show; recorded branch-doc graph coverage as missing/direct-read; separated similarly named ast-grep-mcp npm and Python projects; recorded shell-tasks V2-beta runtime precondition; corrected Chromium doctor wording to include missing Bun/optional skills and no browser E2E claim. No runtime/config/tracker-source/product changes. Conditional future ADR/playbook checkbox remains unchecked; no follow-up item filed.
