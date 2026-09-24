@@ -64,3 +64,14 @@ Context/Acceptance sections:
 ### handoff 2026-09-24 @Arggon (session: ses_f2c22e8bfffefNl32ha3H7kKPn) — next: Coordinator reviews/merges PR #416 after the two review findings are verified; leave this follow-up in_progress for post-merge completion.
 - branch: research/agent-tooling-2026-09-24
 - open questions: Shell-task pilot still needs a supported V2 beta runtime; Chromium waits for a fixed release and real E2E; native create was unavailable in this session, so sanctioned CLI create plus native update w…
+
+### 2026-09-24 @Arggon-coordinator
+## Coordinator final review verdict — PR #416
+
+**APPROVE / merge after CI is green.** The provisional no-merge findings are resolved: volatile `doctor --budget` byte counts are explicitly qualified as process/path-dependent with bounded observations, and the legacy-shaped `@playwright/mcp` snippet is no longer presented as V2-ready; current V2 `mcp.servers`/`disabled` translation plus registration verification is required before any opt-in secondary pilot.
+
+The canonical follow-up Context/Acceptance body is complete and `git diff --check` is clean. Architecture/boundaries, scope, conventions, quality/security/scalability, docs-with-code, and acceptance honesty pass the engineering review bar.
+
+This is docs/tracker-only, so the blocking UI/TUI smoke exemption is valid. CI `cli`, `tasks-validate`, and `ui-smoke` are green at final head; local test, lint, build, `check:plugin`, `validate`, `spec`, and prose evidence is also green.
+
+No runtime dependency, generated config, product behavior, or tracker source-of-truth change was introduced. The original research item remains `in_progress` because its future pilot/ADR checkbox is conditional and the pilot has not run. The actionable follow-up may be completed by the coordinator immediately after merge. No item is marked done by this verdict.
