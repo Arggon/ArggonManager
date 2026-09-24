@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { readConventionConfig } from "./convention.js";
 import { withItemLock } from "./lock.js";
-import { join, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { sanitizeHumanError } from "./sanitize.js";
 
 /**
@@ -11,20 +11,20 @@ import { sanitizeHumanError } from "./sanitize.js";
  * clean-tree precondition and force a manual commit dance.
  *
  * Guardrails:
- *  - Staging is surgical: `git add -- <path>` for the mutated files only —
- *    never `git add -A` / `git add .`. The user's own pre-existing dirty
- *    files stay dirty (untracked by the tool's commit).
+ *  - Staging is surgical: `git --literal-pathspecs add -- <path>` for the
+ *    mutated files only — never `git add -A` / `git add .`. The user's own
+ *    pre-existing dirty files stay dirty (untracked by the tool's commit).
  *  - Ignored paths are skipped, not fatal (bug-init-ignored-artifacts-dirty-
  *    commit): `.gitignore`d mutated paths are partitioned out before staging
  *    and reported in the additive `ignored` field; they are never force-added.
  *    `git add` aborts the whole batch when one path is ignored (after staging
  *    the rest), which used to leave a dirty index with no commit.
-   *  - Best effort by design: non-git trees, missing git, or a no-op commit
-   *    (nothing staged) skip with a reason instead of failing the command —
-   *    the whole CLI already works without git. Exception (task-nothing-to-
-   *    commit-masking): a "nothing to commit" whose mutated paths still carry
-   *    changes means a concurrent index rewrite lost our staged entry — that
-   *    skip is REPORTED (stderr warning + payload), never quiet.
+ *  - Best effort by design: non-git trees, missing git, or a no-op commit
+ *    (nothing staged) skip with a reason instead of failing the command —
+ *    the whole CLI already works without git. Exception (task-nothing-to-
+ *    commit-masking): a "nothing to commit" whose mutated paths still carry
+ *    changes means a concurrent index rewrite lost our staged entry — that
+ *    skip is REPORTED (stderr warning + payload), never quiet.
  *  - Default ON, opt-out per invocation (`--no-commit`) and per tree
  *    (`tasks/.convention.yml` `x-tracker.auto-commit: false`, namespaced
  *    like `x-playbooks`); precedence is CLI flag > config > built-in
@@ -93,7 +93,11 @@ export function trackerCommitMessage(verb: TrackerCommitVerb, ids: string[]): st
  * same run (task-autocommit-update-import) — the cascade-mutated ancestors
  * ride in the same commit, so the message names them.
  */
-export function updateCommitMessage(verb: TrackerCommitVerb, id: string, cascadeIds: string[]): string {
+export function updateCommitMessage(
+  verb: TrackerCommitVerb,
+  id: string,
+  cascadeIds: string[],
+): string {
   const base = trackerCommitMessage(verb, [id]);
   return cascadeIds.length > 0 ? `${base} (cascade: ${cascadeIds.join(", ")})` : base;
 }
@@ -163,9 +167,7 @@ function isIndexLockContention(run: GitRun): boolean {
  */
 function warnGitSkip(skipReason: string): void {
   if (/^git (add|commit) failed|^git index locked|staged entry lost/.test(skipReason)) {
-    process.stderr.write(
-      `arggon: warning: commit skipped: ${sanitizeHumanError(skipReason)}\n`,
-    );
+    process.stderr.write(`arggon: warning: commit skipped: ${sanitizeHumanError(skipReason)}\n`);
   }
 }
 
@@ -200,40 +202,71 @@ function runGit(args: string[], cwd: string, input?: string): GitRun {
 }
 
 function firstLine(text: string): string {
-  return text.split("\n").find((line) => line.trim().length > 0)?.trim() ?? "git failed";
+  return (
+    text
+      .split("\n")
+      .find((line) => line.trim().length > 0)
+      ?.trim() ?? "git failed"
+  );
 }
 
 /**
- * Which of the given paths would git REFUSE to add because a `.gitignore`
- * rule matches them? NUL-delimited `git check-ignore --stdin -z` (paths may
- * carry any character except a `:(`-prefixed pathspec-magic sequence — e.g.
- * `:(exclude)…` or an invalid `:(…)` mnemonic makes check-ignore itself exit
- * 128; that is a probe failure like any other; no quoting ambiguity in either
- * direction). The index is consulted by git itself, so a TRACKED path that
- * happens to match a pattern is NOT reported (it stages normally) — exactly
- * the semantics of `git add`.
+ * Which of the given paths would Git refuse to add because a `.gitignore`
+ * rule matches them? `check-ignore` has no `--literal-pathspecs` mode, so probe
+ * one raw path at a time and accept a result only when Git's NUL-delimited
+ * output contains that exact path. A wildcard character in a filename may make
+ * the probe return other matches, but those can never be mistaken for the
+ * requested path. The caller rejects leading `:(` magic before this function.
+ * The index is consulted by Git itself, so a tracked path that happens to
+ * match a pattern is not reported (it stages normally).
  *
- * bug-init-ignored-artifacts-dirty-commit: `git add` is all-or-nothing across
- * its pathspecs — one ignored path aborts the whole add AFTER staging the
- * rest, leaving the caller's state update staged-but-uncommitted (a dirty
- * index with no commit). The commit primitive partitions these paths out
- * first.
- *
- * Returns `null` when the probe itself cannot answer (git absent, unexpected
- * exit — including a pathspec-magic rejection): callers then stage everything,
- * preserving the pre-probe behavior instead of guessing.
+ * Returns `null` when a probe cannot answer (Git absent or an unexpected
+ * exit): callers then preserve the pre-probe behavior rather than guessing.
  */
 function findIgnoredPaths(root: string, paths: string[]): string[] | null {
-  const run = runGit(["check-ignore", "--stdin", "-z"], root, `${paths.join("\0")}\0`);
-  if (run.missing) return null;
-  if (run.code === 1) return []; // exit 1 = none of the given paths is ignored
-  if (run.code !== 0) return null; // unexpected probe failure: do not filter
-  return run.out.split("\0").filter((p) => p.length > 0);
+  const ignored: string[] = [];
+  for (const path of paths) {
+    const run = runGit(["check-ignore", "--stdin", "-z"], root, `${path}\0`);
+    if (run.missing) return null;
+    if (run.code === 0) {
+      if (run.out.split("\0").includes(path)) ignored.push(path);
+    } else if (run.code !== 1) return null;
+  }
+  return ignored;
 }
 
 /** Root-relative posix form of paths that may arrive absolute or relative. */
 function rootRelativePaths(root: string, paths: string[]): string[] {
   return paths.map((p) => relative(root, resolve(root, p)).split(sep).join("/")).sort();
+}
+
+type NormalizedTrackerPaths = { paths: string[]; error?: "pathspec magic" | "outside-root" };
+
+/**
+ * Normalize caller paths before they reach Git. Git treats a leading `:(` as
+ * pathspec magic (for example `:(glob)**`), so accepting it would let one
+ * mutation expand to unrelated files. Absolute inputs are allowed only when
+ * they resolve inside this checkout; cross-root/cross-drive results are
+ * rejected. Git itself receives `--literal-pathspecs` on every path-bearing
+ * command as a second line of defense.
+ */
+function normalizeTrackerPaths(root: string, filePaths: string[]): NormalizedTrackerPaths {
+  const rootAbs = resolve(root);
+  const paths: string[] = [];
+  for (const input of filePaths) {
+    if (input.length === 0) continue;
+    if (input.startsWith(":")) return { paths: [], error: "pathspec magic" };
+    const absolute = resolve(rootAbs, input);
+    const rel = relative(rootAbs, absolute);
+    if (rel === "" || isAbsolute(rel)) return { paths: [], error: "outside-root" };
+    if (rel === ".." || rel.startsWith(`..${sep}`) || rel.startsWith("../")) {
+      return { paths: [], error: "outside-root" };
+    }
+    const normalized = rel.split(sep).join("/");
+    if (normalized.startsWith(":")) return { paths: [], error: "pathspec magic" };
+    paths.push(normalized);
+  }
+  return { paths: [...new Set(paths)].sort() };
 }
 
 /**
@@ -263,7 +296,8 @@ export function trackerGitLockKey(commonGitDir: string): string {
 
 /**
  * Commit tracker mutations: stage ONLY the given file paths (absolute or
- * root-relative, all resolved inside tasks/), then create one commit with
+ * root-relative, all resolved inside the repository root; Git pathspec magic is
+ * rejected. Then create one commit with
  * `message` covering them. Never throws — every failure mode (non-git tree,
  * git absent, nothing staged, failed commit) returns a skip result so the
  * caller's command succeeds. The user's pre-existing dirty files (and
@@ -290,20 +324,18 @@ export function commitTrackerMutation(
   if (opts.commit === false) {
     return { committed: false, skipReason: "auto-commit disabled" };
   }
-  // F1 (task-tracker-commit-ignored-nits): normalize BEFORE the dedupe. One
-  // file can arrive in two string forms (absolute + root-relative); the
-  // exact-string Set alone kept both, so `ignored[]` and its human count
-  // overcounted (the partition still worked — check-ignore echoes each input
-  // form verbatim). Normalizing first also makes the probe inputs canonical.
-  const paths = [...new Set(rootRelativePaths(root, filePaths.filter((p) => p.length > 0)))];
+  // Normalize before the ignore probe and the index operation. This rejects
+  // pathspec magic and keeps every later Git invocation literal.
+  const normalized = normalizeTrackerPaths(root, filePaths);
+  if (normalized.error === "pathspec magic") {
+    return { committed: false, skipReason: "pathspec magic is not allowed" };
+  }
+  if (normalized.error === "outside-root") {
+    return { committed: false, skipReason: "mutated path escapes repository root" };
+  }
+  const paths = normalized.paths;
   if (paths.length === 0) {
     return { committed: false, skipReason: "no mutated files" };
-  }
-  // The native claim path is expected to be inside the target worktree. Keep
-  // that invariant at the primitive boundary too: a caller cannot turn a
-  // relative/absolute path into an index operation outside the repository.
-  if (paths.some((path) => path === ".." || path.startsWith("../"))) {
-    return { committed: false, skipReason: "mutated path escapes repository root" };
   }
   const probe = runGit(["rev-parse", "--git-dir"], root);
   if (probe.missing) return { committed: false, skipReason: "git not found" };
@@ -317,8 +349,7 @@ export function commitTrackerMutation(
   const ignoredRun = findIgnoredPaths(root, paths);
   const ignoredPaths = ignoredRun ?? [];
   const ignoredSet = new Set(ignoredPaths);
-  const stagePaths =
-    ignoredPaths.length === 0 ? paths : paths.filter((p) => !ignoredSet.has(p));
+  const stagePaths = ignoredPaths.length === 0 ? paths : paths.filter((p) => !ignoredSet.has(p));
   if (stagePaths.length === 0) {
     return {
       committed: false,
@@ -341,14 +372,16 @@ export function commitTrackerMutation(
   // timeout or an exhausted retry is a REPORTED skip, never silent.
   const budget = opts.commitRetryTimeoutMs ?? COMMIT_RETRY_TIMEOUT_MS;
   const commonGitDir = resolveCommonGitDir(root);
-  let result: TrackerCommitResult | undefined;  const attempt = (): void => {
+  let result: TrackerCommitResult | undefined;
+  const attempt = (): void => {
     const deadline = Date.now() + budget;
     let locked: string | null = null;
     let add: GitRun | undefined;
     let commit: GitRun | undefined;
     for (let attempt = 1; ; attempt++) {
-      if (attempt > 1) sleepSync(Math.min(COMMIT_RETRY_MS * (attempt - 1), COMMIT_RETRY_MAX_SLEEP_MS));
-      add = runGit(["add", "--", ...stagePaths], root);
+      if (attempt > 1)
+        sleepSync(Math.min(COMMIT_RETRY_MS * (attempt - 1), COMMIT_RETRY_MAX_SLEEP_MS));
+      add = runGit(["--literal-pathspecs", "add", "--", ...stagePaths], root);
       if (add.code !== 0) {
         if (isIndexLockContention(add)) {
           locked = "git index locked";
@@ -356,14 +389,20 @@ export function commitTrackerMutation(
           continue;
         }
         warnGitSkip(`git add failed: ${firstLine(add.err || add.out)}`);
-        result = { committed: false, skipReason: `git add failed: ${firstLine(add.err || add.out)}` };
+        result = {
+          committed: false,
+          skipReason: `git add failed: ${firstLine(add.err || add.out)}`,
+        };
         return;
       }
       // `--only` is essential even though the paths were staged above: a caller
       // may already have unrelated files in the index. Commit the explicit
       // mutation paths without sweeping those staged entries into the claim (and
       // let the pre-commit hook see the same bounded index).
-      commit = runGit(["commit", "--only", "-m", opts.message, "--", ...stagePaths], root);
+      commit = runGit(
+        ["--literal-pathspecs", "commit", "--only", "-m", opts.message, "--", ...stagePaths],
+        root,
+      );
       if (commit.code !== 0) {
         const detail = `${commit.out}\n${commit.err}`;
         if (/nothing to commit|nothing added/.test(detail)) {
@@ -374,7 +413,10 @@ export function commitTrackerMutation(
           // mutation then sits written-but-uncommitted while git claims there is
           // nothing to do. Residue in the mutated paths = our entry was lost →
           // a REPORTED skip (warning + payload), never the quiet benign path.
-          const residue = runGit(["status", "--porcelain", "--", ...stagePaths], root);
+          const residue = runGit(
+            ["--literal-pathspecs", "status", "--porcelain", "--", ...stagePaths],
+            root,
+          );
           if (residue.code === 0 && residue.out.trim().length > 0) {
             const lost = "nothing to commit (staged entry lost under contention)";
             warnGitSkip(lost);
@@ -440,8 +482,7 @@ export function commitTrackerMutation(
 /** Map a kernel result to the `commit` payload field (undefined when absent). */
 export function commitPayload(result: TrackerCommitResult | undefined): CommitPayload | undefined {
   if (!result) return undefined;
-  const ignored =
-    result.ignored && result.ignored.length > 0 ? { ignored: result.ignored } : {};
+  const ignored = result.ignored && result.ignored.length > 0 ? { ignored: result.ignored } : {};
   if (result.committed && result.hash) {
     return { hash: result.hash, message: result.message ?? "", ...ignored };
   }

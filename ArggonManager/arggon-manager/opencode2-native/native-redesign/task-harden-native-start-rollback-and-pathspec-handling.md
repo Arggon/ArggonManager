@@ -35,13 +35,13 @@ The current PR branch/worktree is `fix/bug-native-start-worktree-no-install`; th
 
 ## Acceptance
 
-- [ ] `worktree:false` creates or attaches the item branch before committing, reports the real current/ref/branch state, commits on that branch, and pushes when requested or already eligible; attach/re-run creates no duplicate branch or commit, with a fail-before-mutation fallback when ownership cannot be guaranteed.
-- [ ] Claim-refusal rollback removes only a start-owned symlink/link farm through the kernel ownership helper before worktree removal, observes removal/branch cleanup, and never reports “removed again” when either remains; primary-install and sibling-worktree safety regressions pass, including domain-removal failure.
-- [ ] `commitTrackerMutation` rejects pathspec magic and unsupported absolute/cross-root paths, uses literal pathspecs for add/commit/check-ignore, commits only requested files, and preserves multi-file, cascade, ignored-path, and contention behavior.
-- [ ] Native-start early/foreign/stale/branch/refusal failures carry consistent bounded `claimCommitted`/`claimCommit` receipts and preparation data where known; no failure is an unqualified success.
-- [ ] `ArggonManager/docs/opencode2.md` is minimally updated for the native payload contract, with agents/OpenCode playbook wording matching behavior; no unrelated retired-branch docs sweep.
-- [ ] Native fixtures use a tracked unique parent, disable `maintenance.auto=false` before commits, clean the full parent on teardown, and repeated focused tests leave no `/tmp` or worktree artifacts.
-- [ ] Reviewer repro cases, dependency-gate/failed-retry/rollback evidence, full `npm test`, lint, build, check:plugin, validate, strict context report, schema budget, and `git diff --check` are green; unresolved platform limitations are documented.
+- [x] `worktree:false` creates or attaches the item branch before committing, reports the real current/ref/branch state, commits on that branch, and pushes when requested or already eligible; attach/re-run creates no duplicate branch or commit, with a fail-before-mutation fallback when ownership cannot be guaranteed.
+- [x] Claim-refusal rollback removes only a start-owned symlink/link farm through the kernel ownership helper before worktree removal, observes removal/branch cleanup, and never reports “removed again” when either remains; primary-install and sibling-worktree safety regressions pass, including domain-removal failure.
+- [x] `commitTrackerMutation` rejects pathspec magic and unsupported absolute/cross-root paths, uses literal pathspecs for add/commit/check-ignore, commits only requested files, and preserves multi-file, cascade, ignored-path, and contention behavior.
+- [x] Native-start early/foreign/stale/branch/refusal failures carry consistent bounded `claimCommitted`/`claimCommit` receipts and preparation data where known; no failure is an unqualified success.
+- [x] `ArggonManager/docs/opencode2.md` is minimally updated for the native payload contract, with agents/OpenCode playbook wording matching behavior; no unrelated retired-branch docs sweep.
+- [x] Native fixtures use a tracked unique parent, disable `maintenance.auto=false` before commits, clean the full parent on teardown, and repeated focused tests leave no `/tmp` or worktree artifacts.
+- [x] Reviewer repro cases, dependency-gate/failed-retry/rollback evidence, full `npm test`, lint, build, check:plugin, validate, strict context report, schema budget, and `git diff --check` are green; unresolved platform limitations are documented.
 
 ## Notes
 

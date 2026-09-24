@@ -29,6 +29,7 @@ function repo(): string {
   writeFileSync(join(root, "target.md"), "target 0\n");
   writeFileSync(join(root, "other.md"), "other 0\n");
   git(root, ["init", "-q"]);
+  git(root, ["config", "maintenance.auto", "false"]);
   git(root, ["config", "user.email", "commit-test@example.com"]);
   git(root, ["config", "user.name", "commit-test"]);
   git(root, ["add", "target.md", "other.md"]);
@@ -54,22 +55,58 @@ describe("commitTrackerMutation", () => {
     expect(git(root, ["status", "--short"])).toContain("M  other.md");
   });
 
+  it("rejects Git pathspec magic instead of expanding a glob", () => {
+    const root = repo();
+    writeFileSync(join(root, "target.md"), "target 1\n");
+    writeFileSync(join(root, "other.md"), "other 1\n");
+
+    const result = commitTrackerMutation(root, [":(glob)**"], {
+      message: "chore(tasks): claimed task-test",
+      commit: true,
+    });
+
+    expect(result).toMatchObject({
+      committed: false,
+      skipReason: "pathspec magic is not allowed",
+    });
+    expect(git(root, ["log", "-1", "--pretty=%s"])).toBe("fixture");
+    expect(git(root, ["status", "--short"])).toContain("target.md");
+  });
+
+  it("keeps wildcard characters literal in the ignore probe", () => {
+    const root = repo();
+    writeFileSync(join(root, ".gitignore"), "literalA.md\n", "utf8");
+    writeFileSync(join(root, "literalA.md"), "A\n", "utf8");
+    writeFileSync(join(root, "literal*.md"), "star\n", "utf8");
+    git(root, ["add", ".gitignore", "literal*.md"]);
+    git(root, ["add", "-f", "literalA.md"]);
+    git(root, ["commit", "-qm", "add literal names"]);
+    writeFileSync(join(root, "literal*.md"), "star 2\n", "utf8");
+
+    const result = commitTrackerMutation(root, ["literal*.md"], {
+      message: "chore(tasks): claimed task-test",
+      commit: true,
+    });
+
+    expect(result.committed).toBe(true);
+    expect(git(root, ["show", "--name-only", "--format=", "HEAD"])).toBe("literal*.md");
+    expect(git(root, ["status", "--short"])).toBe("");
+  });
+
   it("refuses a path outside the repository root", () => {
     const root = repo();
-    const outside = join(root, "..", "outside.md");
+    const outsideParent = mkdtempSync(join(tmpdir(), "arggon-tracker-outside-"));
+    roots.push(outsideParent);
+    const outside = join(outsideParent, "outside.md");
     writeFileSync(outside, "outside\n");
-    try {
-      const result = commitTrackerMutation(root, [outside], {
-        message: "chore(tasks): claimed task-test",
-        commit: true,
-      });
-      expect(result).toMatchObject({
-        committed: false,
-        skipReason: "mutated path escapes repository root",
-      });
-    } finally {
-      rmSync(outside, { force: true });
-    }
+    const result = commitTrackerMutation(root, [outside], {
+      message: "chore(tasks): claimed task-test",
+      commit: true,
+    });
+    expect(result).toMatchObject({
+      committed: false,
+      skipReason: "mutated path escapes repository root",
+    });
   });
 
   it("reports a pre-commit hook failure and leaves the claim staged for retry", () => {

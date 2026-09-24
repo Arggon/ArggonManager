@@ -27,9 +27,11 @@ import { spawnSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  readlinkSync,
   readdirSync,
   rmSync,
   symlinkSync,
@@ -38,7 +40,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { parseFrontmatter, runCreate, runUpdate } from "@arggondev/lib";
 import { runInit } from "../../../cli/src/init.js";
 import {
@@ -89,7 +91,7 @@ const EXPECTED_TOOLS = [
 const NATIVE_TOOLS_BUDGET_BYTES = 12_288;
 
 const tmpDirs: string[] = [];
-afterAll(() => {
+afterEach(() => {
   for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -202,6 +204,7 @@ function seedGitTwin(): string {
   mkdirSync(dir);
   seedInto(dir);
   git(dir, ["init", "-q"]);
+  git(dir, ["config", "maintenance.auto", "false"]);
   git(dir, ["config", "user.email", "parity@example.com"]);
   git(dir, ["config", "user.name", "parity"]);
   git(dir, ["remote", "add", "origin", "https://github.com/acme/demo.git"]);
@@ -702,9 +705,15 @@ function gitOut(dir: string, args: string[]): string {
 
 /** Initialized tracker inside a git repo (the worktree tools need both). */
 function seedGitTree(prefix = "arggon-w4-"): string {
-  const dir = mkdtemp(prefix);
+  // Keep every sibling worktree/remote under one tracked parent. The domain
+  // derives sibling paths from the repo basename, so the child layout makes
+  // teardown remove the whole fixture instead of leaving a /tmp worktree.
+  const parent = mkdtemp(`${prefix}parent-`);
+  const dir = join(parent, "repo");
+  mkdirSync(dir);
   seedInto(dir);
   git(dir, ["init", "-q"]);
+  git(dir, ["config", "maintenance.auto", "false"]);
   git(dir, ["config", "user.email", "w4@example.com"]);
   git(dir, ["config", "user.name", "w4"]);
   git(dir, ["add", "-A"]);
@@ -875,9 +884,13 @@ describe("worktree domain tools (W4)", () => {
     expect(itemData(dir, "task-rate-limit").branch).toBeUndefined();
   });
 
-  it("keeps worktree:false in the canonical checkout and ignores a recorded worktree", async () => {
+  it("keeps worktree:false on the created item branch, pushes once, and attaches without a duplicate", async () => {
     const dir = seedGitTree();
     const recorded = join(dirname(dir), `${basename(dir)}-legacy-rate-limit`);
+    const remote = join(dirname(dir), `${basename(dir)}-remote.git`);
+    git(dirname(remote), ["init", "--bare", "-q", remote]);
+    git(remote, ["config", "maintenance.auto", "false"]);
+    git(dir, ["remote", "add", "origin", remote]);
     git(dir, ["worktree", "add", "--detach", recorded]);
     runUpdate({ cwd: dir, id: "task-rate-limit", worktreePath: recorded });
     if (gitOut(dir, ["status", "--porcelain"]) !== "") {
@@ -891,24 +904,124 @@ describe("worktree domain tools (W4)", () => {
       id: "task-rate-limit",
       assignee: "smoke",
       worktree: false,
+      push: true,
     })).output as Record<string, unknown>;
+    const branch = "feat/task-rate-limit";
 
     expect(calls.create).toHaveLength(0);
     expect(output.worktreePath).toBeNull();
     expect(output.preparation).toBeUndefined();
+    expect(output.branchCreated).toBe(true);
+    expect(output.pushed).toBe(true);
     expect(output.claimCommitted).toBe(true);
     expect(output.claimCommit).toMatchObject({ status: "committed", committed: true });
+    expect(gitOut(dir, ["branch", "--show-current"])).toBe(branch);
+    expect(gitOut(dir, ["rev-parse", "--abbrev-ref", "HEAD"])).toBe(branch);
     expect(gitOut(dir, ["log", "-1", "--pretty=%s"])).toBe(
       "chore(tasks): claimed task-rate-limit",
     );
+    expect(gitOut(remote, ["rev-parse", "--verify", `refs/heads/${branch}`])).toMatch(/^[0-9a-f]+$/);
     // The old record is preserved, but this invocation did not enter that tree.
     expect(itemData(dir, "task-rate-limit")).toMatchObject({
       status: "in_progress",
       assignee: "smoke",
+      branch,
       worktree_path: recorded,
     });
     expect(existsSync(recorded)).toBe(true);
     expect(gitOut(recorded, ["status", "--porcelain"])).toBe("");
+
+    const attach = (await tool(defs, "start").execute({
+      id: "task-rate-limit",
+      assignee: "smoke",
+      worktree: false,
+      push: true,
+    })).output as Record<string, unknown>;
+    expect(attach.branchCreated).toBe(false);
+    expect(attach.claimCommitted).toBe(true);
+    expect(attach.claimCommit).toMatchObject({ status: "not-needed", committed: true });
+    expect(attach.pushed).toBe(false);
+    expect(gitOut(dir, ["branch", "--show-current"])).toBe(branch);
+    expect(gitOut(dir, ["log", "-1", "--pretty=%s"])).toBe(
+      "chore(tasks): claimed task-rate-limit",
+    );
+  });
+
+  it("returns a not-attempted receipt for a branch ownership conflict", async () => {
+    const dir = seedGitTree();
+    git(dir, ["branch", "feat/task-rate-limit"]);
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({
+        id: "task-rate-limit",
+        assignee: "smoke",
+        worktree: false,
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    expect(typed.envelope.claimCommitted).toBe(false);
+    expect(typed.envelope.claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+      reason: "branch ownership conflict",
+    });
+    expect(calls.create).toHaveLength(0);
+    expect(itemData(dir, "task-rate-limit")).toMatchObject({ status: "todo" });
+    expect(gitOut(dir, ["branch", "--show-current"])).not.toBe("feat/task-rate-limit");
+  });
+
+  it("fails plain start before claim mutation when the item branch is checked out elsewhere", async () => {
+    const dir = seedGitTree();
+    const sibling = join(dirname(dir), `${basename(dir)}-branch-holder`);
+    git(dir, ["worktree", "add", "-b", "feat/task-rate-limit", sibling]);
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({
+        id: "task-rate-limit",
+        assignee: "smoke",
+        branch: "feat/task-rate-limit",
+        worktree: false,
+      });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    expect(typed.envelope.claimCommitted).toBe(false);
+    expect(typed.envelope.claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+      reason: "plain-start preflight failed",
+    });
+    expect(itemData(dir, "task-rate-limit")).toMatchObject({ status: "todo" });
+    expect(calls.create).toHaveLength(0);
+  });
+
+  it("returns a not-attempted receipt before root/item resolution", async () => {
+    const defs = definitions(root);
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    expect(typed.envelope.claimCommitted).toBe(false);
+    expect(typed.envelope.claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+    });
   });
 
   it("does not report an ignored item as already-committed when branch-only start writes it", async () => {
@@ -1106,6 +1219,11 @@ describe("worktree domain tools (W4)", () => {
     expect(caught).toBeInstanceOf(ArgonToolError);
     const typed = caught as ArgonToolError;
     expect(typed.code).toBe("START_FAILED");
+    expect(typed.envelope.claimCommitted).toBe(false);
+    expect(typed.envelope.claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+    });
     expect(String((typed.envelope.error as { message?: unknown }).message)).toContain(
       "uncommitted tracker changes",
     );
@@ -1136,12 +1254,18 @@ describe("worktree domain tools (W4)", () => {
     expect(caught).toBeInstanceOf(ArgonToolError);
     const typed = caught as ArgonToolError;
     expect(typed.code).toBe("START_FAILED");
+    expect(typed.envelope.claimCommitted).toBe(false);
+    expect(typed.envelope.claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+    });
     expect(String((typed.envelope.error as { message?: unknown }).message)).toContain(
       "uncommitted tracker changes",
     );
     // The worktree this run created is gone; the branch it did NOT create stays.
     expect(calls.remove).toHaveLength(1);
     expect(existsSync(join(dirname(dir), `${basename(dir)}-task-rate-limit`))).toBe(false);
+    expect((typed.envelope.rollback as Record<string, unknown>).branchDeleted).toBeNull();
     expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toContain(
       "feat/task-rate-limit",
     );
@@ -1168,6 +1292,11 @@ describe("worktree domain tools (W4)", () => {
     }
     expect(caught).toBeInstanceOf(ArgonToolError);
     expect((caught as ArgonToolError).code).toBe("START_FAILED");
+    expect((caught as ArgonToolError).envelope.claimCommitted).toBe(false);
+    expect((caught as ArgonToolError).envelope.claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+    });
     // The worktree (checked out on the pre-existing branch) is removed; the
     // branch survives because this run only switched to it.
     expect(calls.remove).toHaveLength(1);
@@ -1180,12 +1309,129 @@ describe("worktree domain tools (W4)", () => {
     });
   });
 
+  it("removes only the start-owned link farm before rolling back a refused claim", async () => {
+    const dir = seedGitTree();
+    const sibling = join(dirname(dir), `${basename(dir)}-sibling`);
+    git(dir, ["worktree", "add", "--detach", sibling]);
+
+    // Commit a local workspace copy so the shared preparation chooses a
+    // link farm, rather than a bare node_modules symlink.
+    const local = join(dir, "lib");
+    mkdirSync(local, { recursive: true });
+    writeFileSync(
+      join(local, "package.json"),
+      JSON.stringify({ name: "@arggondev/lib", main: "index.js" }),
+      "utf8",
+    );
+    writeFileSync(join(local, "index.js"), "module.exports = 'primary';\n", "utf8");
+    git(dir, ["add", "lib"]);
+    git(dir, ["commit", "-qm", "test: local workspace"]);
+    const primaryModules = join(dir, "node_modules");
+    mkdirSync(join(primaryModules, "@arggondev"), { recursive: true });
+    mkdirSync(join(primaryModules, "ordinary-dependency"), { recursive: true });
+    writeFileSync(
+      join(primaryModules, "ordinary-dependency", "package.json"),
+      JSON.stringify({ name: "ordinary-dependency" }),
+      "utf8",
+    );
+    symlinkSync(local, join(primaryModules, "@arggondev", "lib"), "dir");
+
+    // The canonical claim is already owned by another assignee, so native
+    // start reaches preparation and update refusal rather than stopping early.
+    runUpdate({ cwd: dir, id: "task-rate-limit", status: "in_progress", assignee: "owner" });
+    git(dir, ["add", "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md"]);
+    git(dir, ["commit", "-qm", "test: commit owner claim"]);
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "intruder" });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    const payload = typed.envelope;
+    const rollback = payload.rollback as Record<string, unknown>;
+    const worktreePath = String(payload.worktreePath);
+    expect(payload.claimCommitted).toBe(false);
+    expect(payload.claimCommit).toMatchObject({ status: "not-attempted", committed: false });
+    expect(payload.preparation).toMatchObject({
+      install: "linked",
+      linkedNodeModules: true,
+      linkedWorkspaces: [],
+    });
+    expect(rollback).toMatchObject({
+      preparationRemoved: true,
+      worktreeRemoved: true,
+      branchDeleted: true,
+    });
+    expect(calls.remove).toHaveLength(1);
+    expect(existsSync(worktreePath)).toBe(false);
+    expect(gitOut(dir, ["worktree", "list", "--porcelain"])).not.toContain(worktreePath);
+    expect(existsSync(sibling)).toBe(true);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
+    // The primary install and its workspace link are untouched.
+    expect(existsSync(join(primaryModules, "ordinary-dependency", "package.json"))).toBe(true);
+    expect(lstatSync(join(primaryModules, "@arggondev", "lib")).isSymbolicLink()).toBe(true);
+    expect(readlinkSync(join(primaryModules, "@arggondev", "lib"))).toBe(resolve(local));
+  });
+
+  it("does not claim rollback success when domain removal leaves the worktree behind", async () => {
+    const dir = seedGitTree();
+    const sibling = join(dirname(dir), `${basename(dir)}-sibling`);
+    git(dir, ["worktree", "add", "--detach", sibling]);
+    const { domain, calls } = fakeDomain(dir);
+    const failingDomain = {
+      ...domain,
+      remove: async (input: { projectID: string; directory: string; force?: boolean }) => {
+        calls.remove.push(input);
+        // Break the worktree registration before rejecting the domain call;
+        // the compatibility git fallback must also fail and be observed.
+        rmSync(join(input.directory, ".git"), { force: true });
+        throw new Error("domain remove unavailable");
+      },
+    };
+    const defs = worktreeDefinitions(dir, failingDomain);
+    runUpdate({ cwd: dir, id: "task-rate-limit", status: "in_progress", assignee: "owner" });
+    git(dir, ["add", "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md"]);
+    git(dir, ["commit", "-qm", "test: commit owner claim"]);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "intruder" });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    const payload = typed.envelope;
+    const message = String((payload.error as { message?: unknown }).message);
+    expect(typed.code).toBe("START_FAILED");
+    expect(message).toContain("rollback incomplete");
+    expect(message).not.toContain("removed again");
+    expect(payload.claimCommitted).toBe(false);
+    expect(payload.claimCommit).toMatchObject({ status: "not-attempted", committed: false });
+    expect(calls.remove).toHaveLength(1);
+    expect(existsSync(String(payload.worktreePath))).toBe(true);
+    expect(existsSync(sibling)).toBe(true);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toContain(
+      "feat/task-rate-limit",
+    );
+    // No primary-install removal is attempted as part of a failed rollback.
+    expect(existsSync(join(dir, "node_modules"))).toBe(false);
+  });
+
   it("start refuses a recorded worktree_path that is not a worktree of this repo (W4 review S2)", async () => {
     const dir = seedGitTree();
     // A foreign git repository at the recorded path (not a worktree of `dir`).
     const foreign = join(dirname(dir), `${basename(dir)}-foreign`);
     mkdirSync(foreign, { recursive: true });
     git(foreign, ["init", "-q"]);
+    git(foreign, ["config", "maintenance.auto", "false"]);
     git(foreign, ["config", "user.email", "foreign@example.com"]);
     git(foreign, ["config", "user.name", "foreign"]);
     writeFileSync(join(foreign, "README.md"), "foreign\n", "utf8");
@@ -1204,6 +1450,11 @@ describe("worktree domain tools (W4)", () => {
     expect(caught).toBeInstanceOf(ArgonToolError);
     const typed = caught as ArgonToolError;
     expect(typed.code).toBe("START_FAILED");
+    expect(typed.envelope.claimCommitted).toBe(false);
+    expect(typed.envelope.claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+    });
     expect(String((typed.envelope.error as { message?: unknown }).message)).toContain(
       "not a git worktree",
     );
@@ -1218,6 +1469,7 @@ describe("worktree domain tools (W4)", () => {
     const foreign = join(dirname(dir), `${basename(dir)}-task-rate-limit`);
     mkdirSync(foreign, { recursive: true });
     git(foreign, ["init", "-q"]);
+    git(foreign, ["config", "maintenance.auto", "false"]);
     git(foreign, ["config", "user.email", "foreign@example.com"]);
     git(foreign, ["config", "user.name", "foreign"]);
     writeFileSync(join(foreign, "README.md"), "foreign\n", "utf8");
@@ -1233,6 +1485,11 @@ describe("worktree domain tools (W4)", () => {
       caught = error;
     }
     expect(caught).toBeInstanceOf(ArgonToolError);
+    expect((caught as ArgonToolError).envelope.claimCommitted).toBe(false);
+    expect((caught as ArgonToolError).envelope.claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+    });
     expect(String(((caught as ArgonToolError).envelope.error as { message?: unknown }).message)).toContain(
       "not a git worktree",
     );
@@ -1258,6 +1515,11 @@ describe("worktree domain tools (W4)", () => {
     }
     expect(caught).toBeInstanceOf(ArgonToolError);
     expect((caught as ArgonToolError).code).toBe("START_FAILED");
+    expect((caught as ArgonToolError).envelope.claimCommitted).toBe(false);
+    expect((caught as ArgonToolError).envelope.claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+    });
     expect(calls.create).toHaveLength(1);
     expect(existsSync(worktreePath)).toBe(true);
     expect(itemData(dir, "task-rate-limit", worktreePath)).toMatchObject({
@@ -1278,6 +1540,11 @@ describe("worktree domain tools (W4)", () => {
     expect(caught).toBeInstanceOf(ArgonToolError);
     const typed = caught as ArgonToolError;
     expect(typed.code).toBe("START_FAILED");
+    expect(typed.envelope.claimCommitted).toBe(false);
+    expect(typed.envelope.claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+    });
     expect(String((typed.envelope.error as { message?: unknown }).message)).toContain(
       "arggon start --worktree",
     );

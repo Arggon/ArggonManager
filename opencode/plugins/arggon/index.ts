@@ -81,7 +81,7 @@
 
 import { execFile } from "node:child_process"
 import { existsSync } from "node:fs"
-import { basename, dirname, join, resolve } from "node:path"
+import { basename, dirname, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 /** Minimal structural typing: the generated file must not import plugin types. */
@@ -1996,7 +1996,7 @@ function worktreeFail(
 function startFailure(
   kernel: ArgonKernel,
   message: string,
-  conventionVersion: number,
+  conventionVersion: number | undefined,
   payload: Record<string, unknown>,
 ): { ok: false; envelope: Record<string, unknown> } {
   const failure = worktreeFail(
@@ -2007,6 +2007,21 @@ function startFailure(
     conventionVersion,
   )
   return { ...failure, envelope: { ...failure.envelope, ...payload } }
+}
+
+/** Failure before a claim commit is attempted, with a consistent receipt. */
+function startNotAttempted(
+  kernel: ArgonKernel,
+  message: string,
+  conventionVersion: number | undefined,
+  payload: Record<string, unknown>,
+  reason: string,
+): { ok: false; envelope: Record<string, unknown> } {
+  return startFailure(kernel, message, conventionVersion, {
+    ...payload,
+    claimCommitted: false,
+    claimCommit: claimCommitNotAttempted(reason),
+  })
 }
 
 type NativePreparationReceipt = {
@@ -2197,6 +2212,15 @@ async function guarded(
     return await body()
   } catch (error) {
     logOnce(`worktree-${command}`, `${command} failed unexpectedly`, error)
+    if (command === "start") {
+      return startNotAttempted(
+        kernel,
+        detail(error),
+        undefined,
+        {},
+        "unexpected start failure",
+      )
+    }
     return worktreeFail(kernel, command, code, detail(error))
   }
 }
@@ -2285,32 +2309,138 @@ async function createItemWorktree(
   }
 }
 
+type DiscardWorktreeResult = {
+  worktreeRemoved: boolean;
+  /** null means this run did not own a branch, so no branch deletion was due. */
+  branchDeleted: boolean | null;
+  error?: string;
+};
+
 /**
- * Remove a worktree this run created (claim refused / branch setup failed) and
- * — only when this run also created the branch — delete it, so a lost race
- * leaves nothing behind without ever destroying a pre-existing branch.
- * Best-effort by design: a rollback failure is logged, never thrown, and never
- * hides the original error.
+ * Remove a worktree this run created and observe the result. The domain is the
+ * preferred path, but a failed domain call falls back to git; either way the
+ * directory and git inventory are checked before a branch is deleted. A
+ * rollback is never described as successful from an unobserved promise.
  */
 async function discardWorktree(
   options: ArgonToolOptions,
   directory: string,
   branch?: string,
-): Promise<void> {
-  const domain = options.worktree?.domain
-  const projectID = asString(options.worktree?.projectID)
+): Promise<DiscardWorktreeResult> {
+  const canonical = canonicalRoot(options, options.cwd);
+  const errors: string[] = [];
+  const domain = options.worktree?.domain;
+  const projectID = asString(options.worktree?.projectID);
+  let worktreeRemoved = false;
+
   if (domain?.remove !== undefined && projectID !== undefined) {
     try {
-      await domain.remove({ projectID, directory, force: true })
+      await domain.remove({ projectID, directory, force: true });
+      if (!existsSync(directory)) worktreeRemoved = true;
     } catch (error) {
-      logOnce("worktree-rollback", "worktree domain rollback failed", error)
+      errors.push(`worktree domain removal failed: ${detail(error)}`);
     }
-  } else {
-    await run("git", ["worktree", "remove", "--force", directory], options.cwd, 30_000)
   }
+
+  if (!worktreeRemoved) {
+    const removed = await run(
+      "git",
+      ["worktree", "remove", "--force", directory],
+      canonical,
+      30_000,
+    );
+    if (removed.code === 0) {
+      worktreeRemoved = true;
+    } else {
+      errors.push(
+        `git worktree removal failed: ${removed.stderr.trim() || `exit ${removed.code ?? "unknown"}`}`,
+      );
+    }
+  }
+
+  // A domain can resolve successfully while leaving a directory or inventory
+  // entry behind. Never delete the branch until the worktree is observably gone.
+  if (existsSync(directory) || (await isRegisteredWorktree(canonical, directory))) {
+    worktreeRemoved = false;
+    errors.push(`worktree remains at ${directory}`);
+  }
+
+  let branchDeleted: boolean | null = branch === undefined ? null : false;
   if (branch !== undefined) {
-    await run("git", ["branch", "-D", branch], options.cwd, 10_000)
+    if (!worktreeRemoved) {
+      errors.push(`branch ${branch} was kept because its worktree remains`);
+    } else {
+      const deleted = await run("git", ["branch", "-D", branch], canonical, 10_000);
+      branchDeleted = deleted.code === 0;
+      if (!branchDeleted) {
+        errors.push(
+          `git branch deletion failed: ${deleted.stderr.trim() || `exit ${deleted.code ?? "unknown"}`}`,
+        );
+      }
+    }
   }
+
+  return {
+    worktreeRemoved,
+    branchDeleted,
+    ...(errors.length > 0
+      ? { error: boundedNativeText(errors.join("; "), MAX_NATIVE_DETAIL_CHARS) }
+      : {}),
+  };
+}
+
+type ClaimCleanupResult = {
+  preparationRemoved: boolean;
+  discard?: DiscardWorktreeResult;
+};
+
+async function cleanupClaimArtifacts(
+  options: ArgonToolOptions,
+  kernel: ArgonKernel,
+  primaryRoot: string,
+  worktreePath: string | undefined,
+  worktreeCreated: boolean,
+  branchCreated: boolean,
+  branch: string,
+  preparation: NativePreparationReceipt | undefined,
+): Promise<ClaimCleanupResult> {
+  const preparationRemoved =
+    preparation?.linkedNodeModules !== true || worktreePath === undefined
+      ? true
+      : kernel.unlinkNodeModulesLink(primaryRoot, worktreePath);
+  const discard =
+    worktreeCreated && worktreePath !== undefined
+      ? await discardWorktree(options, worktreePath, branchCreated ? branch : undefined)
+      : undefined;
+  return { preparationRemoved, ...(discard !== undefined ? { discard } : {}) };
+}
+
+function cleanupDescription(
+  cleanup: ClaimCleanupResult,
+  worktreeCreated: boolean,
+  worktreePath: string | undefined,
+  branch: string,
+): string {
+  if (!worktreeCreated) {
+    return cleanup.preparationRemoved
+      ? ""
+      : `the start-owned dependency link could not be removed from ${worktreePath ?? "the worktree"}`;
+  }
+  const discard = cleanup.discard;
+  if (
+    cleanup.preparationRemoved &&
+    discard?.worktreeRemoved === true &&
+    (discard.branchDeleted === true || discard.branchDeleted === null)
+  ) {
+    return "the worktree created by this run was removed again";
+  }
+  const details = [
+    cleanup.preparationRemoved ? undefined : "the start-owned dependency link remains",
+    discard?.worktreeRemoved === false ? `the worktree remains at ${worktreePath ?? "the created path"}` : undefined,
+    discard?.branchDeleted === false ? `the branch remains: ${branch}` : undefined,
+    discard?.error,
+  ].filter((value): value is string => value !== undefined);
+  return `rollback incomplete: ${details.join("; ")}`;
 }
 
 /**
@@ -2385,6 +2515,48 @@ async function staleClaimFields(
   return differing.length === 0 ? undefined : differing.join(", ")
 }
 
+/** Preflight the branch switch and clean-tree conditions for plain start. */
+async function preflightPlainBranch(
+  kernel: ArgonKernel,
+  options: ArgonToolOptions,
+  root: string,
+  branch: string,
+): Promise<string | undefined> {
+  const ref = await run("git", ["check-ref-format", "--branch", branch], options.cwd, 10_000)
+  if (ref.code !== 0) {
+    return `branch '${branch}' is not a valid git branch (${ref.stderr.trim() || `git exit ${ref.code ?? "unknown"}`})`
+  }
+  const worktrees = await run("git", ["worktree", "list", "--porcelain"], options.cwd, 10_000)
+  if (worktrees.code !== 0) {
+    return `could not inspect git worktrees before branch setup (${worktrees.stderr.trim() || `git exit ${worktrees.code ?? "unknown"}`})`
+  }
+  let worktreePath: string | undefined
+  for (const line of worktrees.stdout.split("\n")) {
+    if (line.startsWith("worktree ")) {
+      worktreePath = line.slice("worktree ".length).trim()
+    } else if (line.trim() === `branch refs/heads/${branch}`) {
+      if (worktreePath !== undefined && resolve(worktreePath) !== resolve(options.cwd)) {
+        return `branch '${branch}' is already checked out at ${worktreePath}; detach it before plain start`
+      }
+    }
+  }
+  const status = await run("git", ["status", "--porcelain", "--untracked-files=all"], options.cwd, 10_000)
+  if (status.code !== 0) {
+    return `could not inspect the canonical working tree before branch setup (${status.stderr.trim() || `git exit ${status.code ?? "unknown"}`})`
+  }
+  const tracker = relative(root, kernel.findTasksDir(root)).split(sep).join("/")
+  const blocked = status.stdout.split("\n").filter((line) => {
+    if (line.trim().length === 0) return false
+    const code = line.slice(0, 2)
+    const path = line.slice(3).replace(/^"|"$/g, "")
+    return !(code === "??" && !path.startsWith(`${tracker}/`))
+  })
+  if (blocked.length > 0) {
+    return "the canonical working tree has tracked or tracker changes; commit/stash them before plain start"
+  }
+  return undefined
+}
+
 /**
  * `start` (native): claim + branch record + worktree through the domain, with
  * every rule enforced by the kernel (`updateOperation` with `agent: true` —
@@ -2400,26 +2572,42 @@ async function nativeStart(
   options: ArgonToolOptions,
 ): Promise<{ ok: boolean; envelope: Record<string, unknown> }> {
   const id = asString(input.id)
-  if (id === undefined) return worktreeFail(kernel, "start", "START_FAILED", "id is required")
+  if (id === undefined) {
+    return startNotAttempted(kernel, "id is required", undefined, {}, "invalid id")
+  }
   let root: string
   try {
     root = sessionRoot(kernel, options.cwd)
   } catch (error) {
-    return worktreeFail(kernel, "start", "START_FAILED", detail(error))
+    return startNotAttempted(
+      kernel,
+      detail(error),
+      undefined,
+      { id },
+      "session root unavailable",
+    )
   }
   const version = kernel.readConventionVersion(root)
   const show = kernel.showOperation({ cwd: options.cwd, id, meta: true })
-  if (!show.ok) return remapFailure(show.envelope, "start", "START_FAILED")
+  if (!show.ok) {
+    return startNotAttempted(
+      kernel,
+      envelopeMessage(show.envelope, "item lookup failed"),
+      version,
+      { id },
+      "item lookup failed",
+    )
+  }
   const item = (show.envelope.item ?? {}) as Record<string, unknown>
   const assignee =
     asString(input.assignee) ?? asString(kernel.resolveCurrentLogin()) ?? undefined
   if (assignee === undefined) {
-    return worktreeFail(
+    return startNotAttempted(
       kernel,
-      "start",
-      "START_FAILED",
       "could not resolve assignee (pass assignee, or set GITHUB_USER/GITHUB_ACTOR, or authenticate gh)",
       version,
+      { id },
+      "assignee unavailable",
     )
   }
   const branch = itemBranch(kernel, root, item, input.branch)
@@ -2436,6 +2624,23 @@ async function nativeStart(
   let worktreeCreated = false
   let branchCreated = false
   let preparation: NativePreparationReceipt | undefined
+
+  const context = (extra: Record<string, unknown> = {}): Record<string, unknown> => ({
+    id,
+    branch,
+    worktreePath: worktreePath ?? null,
+    worktreeCreated,
+    branchCreated,
+    ...(preparation !== undefined ? { preparation } : {}),
+    ...extra,
+  })
+  const failBeforeClaim = (
+    message: string,
+    reason: string,
+    extra: Record<string, unknown> = {},
+  ): { ok: false; envelope: Record<string, unknown> } =>
+    startNotAttempted(kernel, message, version, context(extra), reason)
+
   if (wantWorktree) {
     const canonical = primaryRoot
     if (worktreePath === undefined) {
@@ -2452,19 +2657,19 @@ async function nativeStart(
       // repo is never adopted — otherwise `start` would create/switch branches
       // inside a foreign repository that happens to sit at that path.
       if (!(await isRegisteredWorktree(canonical, worktreePath))) {
-        return worktreeFail(
-          kernel,
-          "start",
-          "START_FAILED",
+        return failBeforeClaim(
           `${worktreePath} exists but is not a git worktree of this repo ` +
             "(move or remove the path first, or use the CLI fallback `arggon start --worktree`)",
-          version,
+          "foreign worktree refused",
         )
       }
     } else {
       const created = await createItemWorktree(options, root, id)
       if (created.directory === undefined) {
-        return worktreeFail(kernel, "start", "START_FAILED", created.error ?? "worktree creation failed", version)
+        return failBeforeClaim(
+          created.error ?? "worktree creation failed",
+          "worktree creation failed",
+        )
       }
       worktreePath = created.directory
       worktreeCreated = true
@@ -2473,17 +2678,25 @@ async function nativeStart(
       // would re-claim a stale copy). Refuse instead of guessing.
       const stale = await staleClaimFields(kernel, options.cwd, worktreePath, id)
       if (stale !== undefined) {
-        // The branch was not created yet (no `ensureWorktreeBranch`): the
-        // rollback removes only the worktree this run created.
-        await discardWorktree(options, worktreePath)
-        return worktreeFail(
+        const cleanup = await cleanupClaimArtifacts(
+          options,
           kernel,
-          "start",
-          "START_FAILED",
+          primaryRoot,
+          worktreePath,
+          worktreeCreated,
+          branchCreated,
+          branch,
+          preparation,
+        )
+        const rollback = cleanup.discard !== undefined
+          ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
+          : { rollback: { preparationRemoved: cleanup.preparationRemoved } }
+        return failBeforeClaim(
           `the canonical checkout has uncommitted tracker changes for '${id}' (${stale}); ` +
-            "commit or discard them, or use the CLI fallback `arggon start --worktree` " +
-            "(the worktree created by this run was removed again)",
-          version,
+            "commit or discard them, or use the CLI fallback `arggon start --worktree`. " +
+            cleanupDescription(cleanup, worktreeCreated, worktreePath, branch),
+          "stale canonical claim refused",
+          rollback,
         )
       }
     }
@@ -2491,16 +2704,59 @@ async function nativeStart(
     if (!ensured.ok) {
       // `ensured.created` is false whenever setup failed, so this run never
       // created the branch: never delete it on rollback.
-      if (worktreeCreated) await discardWorktree(options, worktreePath)
-      return worktreeFail(
+      const cleanup = await cleanupClaimArtifacts(
+        options,
         kernel,
-        "start",
-        "START_FAILED",
-        `branch setup failed in ${worktreePath}: ${ensured.error ?? "unknown git error"}`,
-        version,
+        primaryRoot,
+        worktreePath,
+        worktreeCreated,
+        false,
+        branch,
+        preparation,
+      )
+      const rollback = cleanup.discard !== undefined
+        ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
+        : { rollback: { preparationRemoved: cleanup.preparationRemoved } }
+      return failBeforeClaim(
+        `branch setup failed in ${worktreePath}: ${ensured.error ?? "unknown git error"}. ` +
+          cleanupDescription(cleanup, worktreeCreated, worktreePath, branch),
+        "branch setup failed",
+        rollback,
       )
     }
     branchCreated = ensured.created
+  } else {
+    // Match the CLI plain-start ownership rule before the claim mutation: an
+    // existing generated branch with no matching recorded branch is a conflict,
+    // not an implicit attach. An explicit branch or a recorded matching branch
+    // may attach.
+    const branchCheck = await run(
+      "git",
+      ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`],
+      options.cwd,
+      10_000,
+    )
+    if (branchCheck.code !== 0 && branchCheck.code !== 1) {
+      return failBeforeClaim(
+        `could not inspect branch '${branch}': ${branchCheck.stderr.trim() || `git exit ${branchCheck.code ?? "unknown"}`}`,
+        "branch ownership preflight failed",
+      )
+    }
+    if (
+      branchCheck.code === 0 &&
+      asString(input.branch) === undefined &&
+      asString(item.branch) !== branch
+    ) {
+      return failBeforeClaim(
+        `branch '${branch}' already exists but the item has no matching recorded branch; ` +
+          "record it explicitly or choose another branch",
+        "branch ownership conflict",
+      )
+    }
+    const preflight = await preflightPlainBranch(kernel, options, root, branch)
+    if (preflight !== undefined) {
+      return failBeforeClaim(preflight, "plain-start preflight failed")
+    }
   }
 
   if (worktreePath !== undefined) {
@@ -2517,66 +2773,75 @@ async function nativeStart(
         builtWorkspaces: [],
         linkedWorkspaces: [],
       })
-      return startFailure(
-        kernel,
+      const preparationRemoved = kernel.unlinkNodeModulesLink(primaryRoot, worktreePath)
+      return failBeforeClaim(
         `dependency preparation failed in ${worktreePath}: ${boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)}; ` +
-          "the worktree was kept (fix the install/workspace cause, then re-run this start to attach)",
-        version,
-        {
-          worktreePath,
-          worktreeCreated,
-          branchCreated,
-          branch,
-          preparation: preparationError,
-          claimCommitted: false,
-          claimCommit: claimCommitNotAttempted("dependency preparation failed"),
-        },
+          (preparationRemoved
+            ? "the start-owned dependency link was removed and the worktree was kept"
+            : "the worktree and any start-owned dependency link were kept"),
+        "dependency preparation failed",
+        { preparation: preparationError, rollback: { preparationRemoved } },
       )
     }
   }
 
   const target = worktreePath ?? options.cwd
-  const update = kernel.updateOperation({
+  let update = kernel.updateOperation({
     cwd: target,
     id,
     status: "in_progress",
     assignee,
-    branch,
-    ...(worktreePath !== undefined ? { worktreePath } : {}),
+    ...(wantWorktree ? { branch, worktreePath } : {}),
     // The native surface commits the claim explicitly below so a failed
     // pre-commit gate cannot be hidden by updateOperation's best-effort commit.
     commit: false,
     agent: true,
   })
-  const basePayload: Record<string, unknown> = {
-    id,
-    branch,
-    worktreePath: worktreePath ?? null,
-    worktreeCreated,
-    branchCreated,
-    ...(preparation !== undefined ? { preparation } : {}),
-  }
   if (!update.ok) {
-    // A lost race must not leave the worktree this run created behind: the
-    // native domain has no item record to reap it from later. Only a branch
-    // THIS run created is deleted — a pre-existing branch (an attach) survives.
-    if (worktreeCreated && worktreePath !== undefined) {
-      await discardWorktree(options, worktreePath, branchCreated ? branch : undefined)
+    const cleanup = await cleanupClaimArtifacts(
+      options,
+      kernel,
+      primaryRoot,
+      worktreePath,
+      worktreeCreated,
+      branchCreated,
+      branch,
+      preparation,
+    )
+    const rollback = cleanup.discard !== undefined
+      ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
+      : { rollback: { preparationRemoved: cleanup.preparationRemoved } }
+    return failBeforeClaim(
+      `${envelopeMessage(update.envelope, "claim update failed")}. ` +
+        cleanupDescription(cleanup, worktreeCreated, worktreePath, branch),
+      "claim update refused",
+      rollback,
+    )
+  }
+
+  if (!wantWorktree) {
+    const ensured = await ensureWorktreeBranch(options.cwd, branch)
+    if (!ensured.ok) {
+      return failBeforeClaim(
+        `branch setup failed in ${options.cwd}: ${ensured.error ?? "unknown git error"}`,
+        "branch setup failed",
+      )
     }
-    const failure = remapFailure(update.envelope, "start", "START_FAILED")
-    if (worktreeCreated && worktreePath !== undefined) {
-      const error = failure.envelope.error as Record<string, unknown>
-      error.message = `${String(error.message)} (the worktree created by this run was removed again)`
+    branchCreated = ensured.created
+    const branchUpdate = kernel.updateOperation({
+      cwd: options.cwd,
+      id,
+      branch,
+      commit: false,
+      agent: true,
+    })
+    if (!branchUpdate.ok) {
+      return failBeforeClaim(
+        envelopeMessage(branchUpdate.envelope, "branch record update failed"),
+        "branch record update failed",
+      )
     }
-    return {
-      ...failure,
-      envelope: {
-        ...failure.envelope,
-        ...basePayload,
-        claimCommitted: false,
-        claimCommit: claimCommitNotAttempted("claim update failed"),
-      },
-    }
+    update = branchUpdate
   }
 
   let claim: { receipt: NativeClaimCommitReceipt; payload?: Record<string, unknown> }
@@ -2586,7 +2851,7 @@ async function nativeStart(
     claim = { receipt: claimCommitFailure(detail(error)) }
   }
   const claimPayload: Record<string, unknown> = {
-    ...basePayload,
+    ...context(),
     item: update.envelope.item,
     claimCommitted: claim.receipt.committed,
     claimCommit: claim.receipt,
@@ -2609,12 +2874,13 @@ async function nativeStart(
   }
 
   let pushed = false
-  if (input.push === true && worktreePath !== undefined) {
-    const push = await run("git", ["push", "-u", "origin", branch], worktreePath, 60_000)
+  const pushEligible = claim.receipt.status === "committed" || branchCreated
+  if (input.push === true && pushEligible) {
+    const push = await run("git", ["push", "-u", "origin", branch], target, 60_000)
     if (push.code !== 0) {
       return startFailure(
         kernel,
-        `push failed (${push.stderr.trim() || `git push exit ${push.code}`}); the worktree was kept at ${worktreePath}`,
+        `push failed (${push.stderr.trim() || `git push exit ${push.code}`}); the branch and claim were kept`,
         version,
         { ...claimPayload, pushed: false },
       )
