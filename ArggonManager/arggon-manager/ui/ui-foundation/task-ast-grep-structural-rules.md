@@ -86,3 +86,47 @@ The previous provisional comment's ` markers are formatting artifacts; the findi
 One more concrete P1 false negative belongs with the tracker finding: the regex in `tools/ast-grep/rules/tracker-mutations-use-kernel.yml:50` recognizes variable names such as `taskPath`, but not literal canonical item paths. A temp production-shaped `writeFileSync(join(root, "ArggonManager", "story", "story.md"), ...)` and the deeper `.../"launch"/"epic"/"story"/"task.md"` form both scanned with exit 0. Those are direct writes to canonical tracker items, so the current green scan is a false pass. Add literal-layout negatives while keeping `ArggonManager/docs` product writes allowed; the positive/negative boundary needs to be structural, not a broad ArggonManager substring.
 
 This reinforces the existing NO-MERGE recommendation; no project files were changed.
+
+### 2026-09-24 @arggon-reviewer
+## Provisional re-review — PR #418 at `abfbb3e313ddf0113d0da667a55032ec75d5dc78`
+
+**Recommendation: NO-MERGE pending the remaining P1 rule-precision fixes.** The remediation correctly fixes the earlier object-literal exception, TSX parser scope, bare-`filePath` false positive, helper ignores, and narrow layout-migration suppression. It does not yet make the claimed native/tracker boundaries materially true.
+
+### P1 — native rule still misses ordinary identifier/expression registrations and forged catalog data
+**File:** `tools/ast-grep/rules/native-tools-use-shared-seam.yml:36-102`
+
+The new rule only matches `editor.add({ ... })`. Independent full-config probes produced **exit 0 / no diagnostic** for:
+- `editor.add(extraTool)` and `editor.add(makeDefinition())` in TS and TSX;
+- a second definition loop whose add is `editor.add(extra)`;
+- a second exact-looking definition loop with an alternate namespace;
+- `const transform = ctx?.tool?.transform` followed by two aliased transform calls, including `editor.add(extraTool)`;
+- a correctly named `registerArgonTools` function whose `definitions` is a forged array while a decoy `argonToolDefinitions(...)` call is present and the exact-looking payload uses `namespace: "fork"`.
+
+I also copied the real canonical `opencode/plugins/arggon/index.ts`, replaced its catalog binding with a forged array, retained a call to `argonToolDefinitions`, and the rule still exited 0. The API type at `opencode/plugins/arggon/index.ts:134-137` accepts a variable definition, so identifier/factory registration is an ordinary type-valid production shape, not an exotic best-effort limitation. The new tests (`tools/ast-grep/tests/native-tools-use-shared-seam-test.yml:14-70`) cover the corrected object-literal flow and direct calls, but none of these identifier/alias/forged-result cases. A single direct `ctx.tool.transform` with the exact catalog flow is rejected, while multiple aliased transforms are not: the rule is asymmetric as well as incomplete.
+
+### P1 — tracker rule still has material false positives and false negatives
+**File:** `tools/ast-grep/rules/tracker-mutations-use-kernel.yml:46-88`
+
+False positives from ordinary non-tracker writes:
+- `writeFileSync(outputPath, "ArggonManager/story-alpha/task-beta.md")` (a content string, not a path);
+- `writeFileSync(outputPath, taskFileContent)` and `writeFileSync(outputPath, value.filePath)`;
+- `writeFileSync(join(root, "ArggonManager", "docs", "task-beta.md"), ...)` and the literal product-doc form `"ArggonManager/docs/task-beta.md"`.
+
+False negatives for ordinary canonical tracker paths:
+- `writeFileSync(join(root, "ArggonManager", "story", "story.md"), ...)`, plus initiative/epic index files;
+- dynamic forms such as a template-generated id under an `ArggonManager/story-alpha` directory, and the former ordinary form using `join(tasksDir, id + ".md")`.
+
+The rule's `inside: $WRITER(...)` checks all arguments/strings rather than path positions, and its literal regex requires a hyphenated leaf id, so it both flags content/product-doc data and misses canonical index/dynamic paths. The added source/destination, nested, and hyphenated-leaf positives do not close these cases.
+
+### P2 — acceptance/docs/PR evidence overstate the current result
+The follow-up item `ArggonManager/arggon-manager/ui/ui-foundation/task-ast-grep-structural-rules-review-followup.md:35-49` and the main task notes (`.../task-ast-grep-structural-rules.md:31-64`) check off the native and tracker boundaries as complete, but the probes above disprove those claims. The PR body is also still the pre-remediation summary and does not identify the follow-up item or the remaining identifier/dynamic-path limitations. The follow-up item is otherwise correctly placed under the story with a sensible P1 checklist; its native-plugin-source/bundle scope restriction is respected.
+
+### Verified
+- Full local `npm run build && npm run check:plugin && npm test && npm run lint && npm run test:structure && npm run lint:structure && npm run arggon -- validate --json` passed; npm test remains 95 files / 1611 tests.
+- CI is green: `cli`, `tasks-validate`, and `ui-smoke`.
+- `sgconfig.yml:9-14` now applies the Tsx parser to both .ts/.tsx; inspect reports canonical `opencode/plugins/arggon/tui.tsx` with 2 applied rules. Synthetic TSX object-literal/native and tracker cases are caught; bare `filePath` TSX is valid.
+- The `ast-grep-ignore: tracker-mutations-use-kernel` suppression at `cli/src/layout-migrate.ts:132-134` is narrow and ADR-0012-backed; an adjacent unsuppressed tracker violation still produced an error.
+- `cli/src/test-tmp.ts` and `cli/src/pack-fixtures.ts` now receive 0 rules; generated bundle and hidden .opencode output remain excluded. Package surface remains dev-only, exact-pinned, one-thread, no-rewrite, and excludes sgconfig/rules from the tarball.
+- No GitHub PR comments or reviews are present; the review history/verdict is being kept on the tracker item as required.
+
+**Final provisional outcome: NO-MERGE.**
