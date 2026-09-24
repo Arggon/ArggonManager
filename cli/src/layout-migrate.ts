@@ -128,7 +128,11 @@ export function runLayoutMigrate(opts: LayoutMigrateOptions): LayoutMigrateResul
     rewrittenGeneratedPaths.length > 0;
 
   if (!dryRun && changed) {
-    if (trackerMove !== null) renameSync(trackerMove.from, trackerMove.to);
+    if (trackerMove !== null) {
+      // ADR 0012 migrates the structural tracker root; it does not mutate an item.
+      // ast-grep-ignore: tracker-mutations-use-kernel
+      renameSync(trackerMove.from, trackerMove.to);
+    }
     if (docsMove !== null) {
       // The destination tracker dir exists (it was just moved, or already was
       // the v5 root); rename creates `<tracker>/docs` inside it.

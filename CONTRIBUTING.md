@@ -33,6 +33,8 @@ Requires **Node.js 22.12+** (needed by vitest 5 in the dev toolchain; `engines` 
 - `npm run build`
 - `npm test`
 - `npm run lint`
+- `npm run test:structure`
+- `npm run lint:structure`
 
 Two npm packages make up this repo:
 
@@ -71,6 +73,25 @@ Rebuild after changing `lib/`: the worktree's spawned CLI and the tests that
 launch it resolve `@arggondev/lib` through `node_modules` → `lib/dist`
 (`npm run build --workspace @arggondev/lib`), and the flip means the worktree's own
 build is what runs.
+
+### Structural architecture checks (dev-only)
+
+The exact-pinned `@ast-grep/cli` devDependency guards two architecture seams that
+ESLint/TypeScript do not express: tracker item mutations must stay in the shared
+kernel, and native tool registration must stay on the shared catalog seam. Run its
+positive/negative rule tests and the deterministic repository scan with:
+
+- `npm run test:structure`
+- `npm run lint:structure`
+
+Both CI commands run in the existing `cli` job. The scan uses the `Tsx` superset
+parser for hand-authored `.ts`/`.tsx` files, so JSX production code such as
+`opencode/plugins/arggon/tui.tsx` is covered by the same rule IDs. The scan only
+reports violations; it never uses `--update-all` or rewrites source. The native
+exception is limited to the catalog-definition loop and its exact editor payload;
+tracker root migration has one documented inline suppression. Rule scope,
+production exceptions, the bare-`filePath` decision, and explicit test-helper
+exclusions are documented in [`tools/ast-grep/README.md`](tools/ast-grep/README.md).
 
 ### UI smoke tests (dev-only)
 

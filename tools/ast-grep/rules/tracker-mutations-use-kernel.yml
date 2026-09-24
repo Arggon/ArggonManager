@@ -1,0 +1,92 @@
+id: tracker-mutations-use-kernel
+language: Tsx
+severity: error
+message: Tracker item mutations must go through the shared @arggondev/lib kernel.
+note: |
+  Rationale: adapters must not compose or persist item frontmatter themselves. The
+  kernel owns locking, status/claim rules, validation, cascades, and tracker commits.
+  The rule rejects the item serializer seam and filesystem mutations involving
+  recognizable item/tracker paths, including move destinations and nested path
+  expressions. A bare filePath is intentionally not a tracker signal.
+  Scope: hand-authored TypeScript/TSX outside lib/src. Tests and fixture harnesses,
+  generated or vendored plugin files, and the kernel itself are excluded.
+  Exception: lib/src is the shared mutation kernel. cli/src/layout-migrate.ts has
+  one inline, documented ADR-0012 root-migration suppression; product-doc writes
+  remain the owning CLI command's responsibility.
+files:
+  - "**/*.ts"
+  - "**/*.tsx"
+ignores:
+  - "lib/src/**"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - "**/__fixtures__/**"
+  - "fixtures/**"
+  - "e2e/**"
+  - "smoke/**"
+  - "test/**"
+  - "labs/**"
+  - "cli/src/test-tmp.ts"
+  - "cli/src/pack-fixtures.ts"
+  - ".opencode/plugins/arggon/**"
+  - "opencode/plugins/arggon/index.bundle.ts"
+  - "tools/ast-grep/**"
+rule:
+  any:
+    - all:
+        - pattern: import { $$$IMPORTS_SERIALIZE } from "@arggondev/lib"
+        - has:
+            kind: import_specifier
+            regex: '\bstringifyFrontmatter\b'
+            stopBy: end
+    - pattern: stringifyFrontmatter($$$SERIALIZE_CALL_ARGS)
+    - pattern: $KERNEL_SERIALIZE.stringifyFrontmatter($$$SERIALIZE_MEMBER_ARGS)
+    - all:
+        - kind: identifier
+        - regex: "(?i)(initiative|epic|story|task|tracker|item)(file|path|dir|id|move|source|dest)"
+        - inside:
+            pattern: $WRITER($$$WRITER_ARGS)
+            stopBy: end
+    - all:
+        - kind: member_expression
+        - regex: '(?i)\.filePath$'
+        - inside:
+            pattern: $WRITER($$$WRITER_ARGS)
+            stopBy: end
+    - all:
+        - kind: string
+        - regex: '(?i)(ArggonManager|tasks)/[^" ]*(initiative|epic|story|task|bug)-[^/ ]*\.md'
+        - inside:
+            pattern: $WRITER($$$WRITER_ARGS)
+            stopBy: end
+    - all:
+        - pattern: join($$$JOIN_PATH_ARGS)
+        - has:
+            kind: string
+            regex: "(?i)(ArggonManager|tasks)"
+            stopBy: end
+        - has:
+            kind: string
+            regex: '(?i)(initiative|epic|story|task|bug)-[^" ]*\.md'
+            stopBy: end
+        - inside:
+            pattern: $WRITER($$$WRITER_JOIN_ARGS)
+            stopBy: end
+    - all:
+        - pattern: resolve($$$RESOLVE_PATH_ARGS)
+        - has:
+            kind: string
+            regex: "(?i)(ArggonManager|tasks)"
+            stopBy: end
+        - has:
+            kind: string
+            regex: '(?i)(initiative|epic|story|task|bug)-[^" ]*\.md'
+            stopBy: end
+        - inside:
+            pattern: $WRITER($$$WRITER_RESOLVE_ARGS)
+            stopBy: end
+constraints:
+  WRITER:
+    regex: "^(writeFile|writeFileSync|appendFile|appendFileSync|writeFileAtomic|rename|renameSync|rm|rmSync|unlink|unlinkSync|truncate|truncateSync)$"
