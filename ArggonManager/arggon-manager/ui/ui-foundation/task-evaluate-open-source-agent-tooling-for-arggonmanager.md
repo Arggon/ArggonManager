@@ -112,3 +112,6 @@ The unchecked conditional ADR/playbook item is appropriate and is not a finding.
 
 ### 2026-09-24 @Arggon
 Current correction to the earlier evidence comment (historical text intentionally retained): `doctor --budget` generated-AGENTS/show byte counts are process/path-qualified because the throwaway project name derives from a temporary path/PID. Five current runs on 2026-09-24 returned 2,021 B / 769 B; the earlier observation was 2,020 B / 768 B. The exploration now reports the observed 2,020–2,021 B / 768–769 B range; list/MCP values remain stable and both surfaces stay under budget. The same PR correction qualifies the @playwright/mcp legacy snippet and requires current V2 mcp.servers/disabled translation plus registration verification before any opt-in fallback pilot.
+
+### 2026-09-24 @Arggon
+Budget qualification: `show --json` is a bounded single-item read but has no hard byte budget in `doctor --budget`; the hard checks are generated `AGENTS.md` <= 2,048 B and the MCP schema <= 12,288 B advisory. The alternate-temp-root probes (show 778/784/824 B) further confirm that exact show bytes are path-qualified, not an invariant.
