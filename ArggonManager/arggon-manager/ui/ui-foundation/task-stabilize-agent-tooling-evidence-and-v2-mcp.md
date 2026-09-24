@@ -44,3 +44,7 @@ This follow-up consolidates the two merge-blocking findings from the provisional
 - [x] Qualify the `@playwright/mcp` recommendation and record the V2 translation/registration gate and opt-in boundary.
 - [x] Run focused prose, tracker, and spec validation; introduce no ADR, runtime dependency, generated config, or product behavior change.
 - [ ] Coordinator reviews/merges PR #416 and completes this follow-up after merge.
+
+### handoff 2026-09-24 @Arggon (session: ses_f2c22e8bfffefNl32ha3H7kKPn) — next: Coordinator reviews/merges PR #416 after the two review findings are verified; leave this follow-up in_progress for post-merge completion.
+- branch: research/agent-tooling-2026-09-24
+- open questions: Shell-task pilot still needs a supported V2 beta runtime; Chromium waits for a fixed release and real E2E; native create was unavailable in this session, so sanctioned CLI create plus native update w…
