@@ -47,3 +47,7 @@ Follow-up implementation evidence (PR #418):
 - `sgconfig.yml` maps `.ts`/`.tsx` to the `Tsx` superset; inspect reports `opencode/plugins/arggon/tui.tsx` as `language=Tsx, appliedRuleCount=2`. TSX positive/negative tests are green.
 - Tracker rule makes bare `filePath` valid, detects move destinations and nested/literal tracker paths, and keeps the one ADR-0012 layout migration suppression. Helper exclusions are explicit for `cli/src/test-tmp.ts` and `cli/src/pack-fixtures.ts`.
 - Temporary adversarial probe returned both rule IDs and no finding for its valid bare-filePath TSX probe. Full gates and package-surface check are green; item remains in_progress for coordinator post-merge completion.
+
+### handoff 2026-09-24 @ses_f2b15dcecffeuVmXo3s1RGiJBJ (session: ses_f2b15dcecffeuVmXo3s1RGiJBJ) — next: Coordinator: review PR #418 against the six checked follow-up criteria and merge; leave follow-up in_progress for post-merge completion.
+- branch: feat/task-ast-grep-structural-rules
+- open questions: None.
