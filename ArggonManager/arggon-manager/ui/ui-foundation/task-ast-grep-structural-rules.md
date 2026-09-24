@@ -1,15 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-ast-grep-structural-rules
 title: Adopt ast-grep structural architecture rules
+assignee: Arggon
+branch: feat/task-ast-grep-structural-rules
 parent: ui-foundation
 labels: [tooling, architecture, ci]
 priority: p2
 created: "2026-09-24"
 updated: "2026-09-24"
+claimed_at: "2026-09-24T15:36:11.442Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-ast-grep-structural-rules
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-ast-grep-structural-rules.md
   Leaves live only under a story. id is the filename stem: task-ast-grep-structural-rules.
