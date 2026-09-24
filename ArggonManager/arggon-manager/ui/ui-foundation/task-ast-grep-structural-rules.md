@@ -79,3 +79,10 @@ The previous provisional comment's ` markers are formatting artifacts; the findi
 **Verified:** local build/check:plugin, 95-file/1611-test suite, lint, both structure commands, validate, and diff check passed; PR CI `cli`, `tasks-validate`, and `ui-smoke` are green. Dependency is exact/dev-only, package surface excludes the rules/config, scan is `--threads 1`, and no rewrite/update flag exists. No product CLI/UI source changed, so browser/CLI smoke is not applicable; no review-time browser drive was run.
 
 **Recommendation: NO-MERGE pending the P1 fixes and re-review.
+
+### 2026-09-24 @arggon-reviewer
+## Provisional review addendum — tracker path coverage
+
+One more concrete P1 false negative belongs with the tracker finding: the regex in `tools/ast-grep/rules/tracker-mutations-use-kernel.yml:50` recognizes variable names such as `taskPath`, but not literal canonical item paths. A temp production-shaped `writeFileSync(join(root, "ArggonManager", "story", "story.md"), ...)` and the deeper `.../"launch"/"epic"/"story"/"task.md"` form both scanned with exit 0. Those are direct writes to canonical tracker items, so the current green scan is a false pass. Add literal-layout negatives while keeping `ArggonManager/docs` product writes allowed; the positive/negative boundary needs to be structural, not a broad ArggonManager substring.
+
+This reinforces the existing NO-MERGE recommendation; no project files were changed.
