@@ -46,3 +46,6 @@ The current PR branch/worktree is `fix/bug-native-start-worktree-no-install`; th
 ## Notes
 
 Review context: PR #419 provisional NO-MERGE review, 2026-09-24. This item is intentionally separate tracker bookkeeping for the blocking findings; the original P1 item remains the implementation record.
+
+### 2026-09-24 @ses_f2b1605beffe4ketLzfuVHnIWN
+Review-fix evidence for PR #419 is complete in this worktree. All seven acceptance lines are checked after evidence: branch-only start has current/ref/branch/commit/push and attach assertions; rollback removes only owned preparation and observes domain/git removal (including failure); pathspec magic/cross-root guards and literal staging preserve ignored/exotic/cascade/contention behavior; early/foreign/stale/branch/refusal receipts are bounded and consistent; opencode2.md is minimally updated; fixtures use unique parents, maintenance.auto=false, and repeat cleanup; full gates and reviewer repros are green. The item remains intentionally in_progress for coordinator post-merge completion; do not mark done in this worktree.
