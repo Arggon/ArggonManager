@@ -49,3 +49,7 @@ Review context: PR #419 provisional NO-MERGE review, 2026-09-24. This item is in
 
 ### 2026-09-24 @ses_f2b1605beffe4ketLzfuVHnIWN
 Review-fix evidence for PR #419 is complete in this worktree. All seven acceptance lines are checked after evidence: branch-only start has current/ref/branch/commit/push and attach assertions; rollback removes only owned preparation and observes domain/git removal (including failure); pathspec magic/cross-root guards and literal staging preserve ignored/exotic/cascade/contention behavior; early/foreign/stale/branch/refusal receipts are bounded and consistent; opencode2.md is minimally updated; fixtures use unique parents, maintenance.auto=false, and repeat cleanup; full gates and reviewer repros are green. The item remains intentionally in_progress for coordinator post-merge completion; do not mark done in this worktree.
+
+### handoff 2026-09-24 @ses_f2b1605beffe4ketLzfuVHnIWN (session: ses_f2b1605beffe4ketLzfuVHnIWN) — next: Coordinator: re-review PR #419's blocking fixes, run the required review smoke, and complete this follow-up after merge verification.
+- branch: fix/bug-native-start-worktree-no-install
+- open questions: Standalone cold-start/model smoke remains in task-native-start-cold-smoke; Windows drive/junction paths were not executable on this Linux host.
