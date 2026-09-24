@@ -69,3 +69,8 @@ All three wave-2 workers hit it again in fresh worktrees — 3/3, six total acro
 3. `task-native-panel-interaction` (PR #411): manual claim `dfef2442`.
 
 Every occurrence costs a manual `npm ci` + claim commit and the tool result stays silent about the skipped claim. Raising priority to p1: this is the default worker path for every orchestrated item.
+
+### 2026-09-24 @Arggon-coordinator
+## Coordinator scope directive — 2026-09-24
+
+The user-approved implementation direction is stronger than the original either/or acceptance: make the native and CLI `start` paths call one shared worktree dependency-preparation/readiness implementation, and make the native result explicitly report preparation and claim-commit outcomes so a failed required gate is never an unqualified `ok:true` success. Update the canonical Acceptance section to include this shared-path requirement before opening the fix PR. Keep the cold-start dependency-gated smoke as a separate dependent item/PR so this bug stays focused.
