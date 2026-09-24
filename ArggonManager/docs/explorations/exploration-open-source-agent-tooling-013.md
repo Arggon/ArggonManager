@@ -75,12 +75,22 @@ Candidates are ranked against the measured bottleneck and these constraints:
 | Tracker size | Baseline `35ee8435`: `arggon doctor --json`: **320 items, 29 todo**; `report --json` shows **124 items in the `arggon-manager` report group** | Agent navigation and bounded reads matter; unbounded repository or tracker scans are already a known cost. |
 | Native surface | `opencode/plugins/arggon/index.ts` registers 15 native tools: `list`, `create`, `update`, `show`, `next`, `report`, `validate`, `comment`, `handoff`, `priority`, `sync`, `import_issues`, `start`, `branch`, `cleanup` | Do not add another tracker/orchestrator that competes with these tools. |
 | Context behavior | The plugin injects a bounded item block (hard maximum 1 KiB) and correlates sessions through storage/branch/environment | Persistent third-party memory is optional context, not a replacement for the tracker. |
-| Context budget | `doctor --budget`: generated `AGENTS.md` **2,020 B**, compact list **2,603 B**, full list **3,539 B**, show **768 B**, MCP schema **10,507 B / ~2,627 tokens** | Prefer small, purpose-specific tool surfaces; measure before enabling several large MCP catalogs. |
+| Context budget | `doctor --budget` (default temp root, 2026-09-24): five current runs returned generated `AGENTS.md` **2,021 B** and show **769 B**; an earlier run returned **2,020 B / 768 B** (default-root observed range **2,020–2,021 B / 768–769 B**). List remained **2,603 B / 3,539 B**; MCP schema **10,507 B / ~2,627 tokens**. Exact first/show values are process/path-qualified. | Treat the default-root range as qualified comparison evidence, not an invariant; `AGENTS.md` stays below 2,048 B, `show` remains bounded, and MCP stays below 12,288 B. |
 | UI work | UI epic has 18 todo leaves (9 web-board, 6 TUI, 2 OpenCode panel, 1 foundation) | Browser automation has an immediate, visible use case; a terminal tool cannot cover the web board. |
 | Existing smoke | CI already runs Playwright `@smoke` plus a PTY TUI frame check (`.github/workflows/ci.yml`) | A new browser tool should complement deterministic smoke, not replace CI. |
 | Runtime constraints | UI epic explicitly permits dev-only tools but forbids new runtime UI dependencies | External tooling should remain opt-in and outside the published package. |
 | Worktree readiness | The tracked P1 bug records native `tools.arggon.start` creating a worktree without preparing dependencies; the pre-commit gate then fails, the claim commit is skipped, and the tool can still return `ok:true` (initial report plus 3/3 wave-1 and 3/3 wave-2 occurrences) | Fix the default worker critical path before adding optional tools; readiness must be explicit and machine-verifiable. |
 | Runtime version drift | Local `opencode --version` is **v2.0.16**, while `docs/playbooks/opencode.md` still pins **2.0.12** | Refresh/pin the playbook before depending on any beta V2 plugin; candidate compatibility must be tested against the actual runtime. |
+
+`generatedAgentsMdBytes` and `showBytes` are process/path-qualified measurements,
+not stable constants: `doctor --budget` builds a throwaway project whose name is
+derived from a temporary path/PID, and `show --json` includes that path. The five
+current default-root runs above returned **2,021 B / 769 B**; the earlier
+observation returned **2,020 B / 768 B**. Alternate temp-root probes returned
+show values of **778 B / 784 B / 824 B**, so **768–769 B is only the
+same-environment comparison range**, not a global byte bound. The stable claims
+are that `AGENTS.md` remains below its **2,048 B** budget and the MCP schema
+remains **10,507 B / ~2,627 tokens**; neither conclusion changes.
 
 The graph index was refreshed for this review (7,662 nodes / 19,622 edges,
 2026-09-24). The cited local code paths had no recorded coverage gaps; the
@@ -96,7 +106,7 @@ graph evidence is not used to claim that either document is complete.
 | --- | --- | --- |
 | `codebase-memory-mcp` | `0.10.8` | Local binary; MIT; already configured in the current OpenCode environment. |
 | `opencode-chromium` | `1.7.2` | npm release observed 2026-09-08; separate V2 export plus legacy-style default; security fix not yet released. |
-| `@playwright/mcp` | `0.0.82` | npm release observed 2026-09-18; opt-in MCP fallback. |
+| `@playwright/mcp` | `0.0.82` | npm release observed 2026-09-18; opt-in secondary fallback whose published OpenCode snippet requires V2 translation/verification. |
 | `fast-check` | `4.10.2` | MIT; test-time dependency candidate. |
 | `opencode2-shell-tasks` | `0.1.1` | MIT; native V2, but state outside the repository. |
 | `opencode-planner` | `0.6.0` | MIT; dual V1/V2 adapter. |
@@ -317,8 +327,10 @@ dependency. The lowest-cost UI lane is therefore existing Playwright Test plus
 Apache-2.0 `playwright-cli` for agent-assisted browser exploration. The
 separate `@playwright/mcp` server exposes accessibility-tree snapshots,
 navigation, clicks, form filling, screenshots, network inspection, and related
-tools; Microsoft documents an explicit OpenCode `mcp` configuration and isolated
-mode.
+tools. The published OpenCode snippet is legacy-shaped (`mcp` plus `enabled`)
+and is not a V2-ready configuration to copy; it must be translated and checked
+against the current OpenCode V2 `mcp.servers`/`disabled` schema before use. The
+package's isolated mode remains a separate safety option.
 
 **Why they fit.** The web-board backlog explicitly includes keyboard/focus,
 ARIA, live state, detail drawers, and move dialogs. Playwright Test can make
@@ -328,14 +340,20 @@ interactive investigation and test generation.
 
 **Why MCP is not first.** It is MCP rather than native V2, exposes a much larger
 tool catalog, and its own documentation says CLI + skills are often more
-token-efficient for coding agents. It is appropriate for persistent exploratory
-loops or as a fallback when the native candidate fails the V2 registration
-check—not as a second global browser surface.
+token-efficient for coding agents. Its published OpenCode snippet is not proof
+of V2 compatibility: before any pilot, verify or translate it against the
+current `mcp.servers`/`disabled` schema and confirm registration in a disposable
+profile. It is appropriate for persistent exploratory loops or as a fallback
+when the native candidate fails the V2 registration check—not as a second
+global browser surface.
 
 **Recommended browser boundary.** Keep Playwright Test + axe in CI. Use
-`playwright-cli` for agent exploration. Enable `@playwright/mcp` only per
-session, with `--isolated`, `--headless`, `--no-webmcp`, omitted image
-responses, workspace-only file access, and an exact version pin. The MCP
+`playwright-cli` for agent exploration. Treat `@playwright/mcp` as an opt-in,
+secondary fallback only after its published configuration has been translated
+and verified against the current V2 `mcp.servers`/`disabled` schema. Use a
+temporary profile, `--isolated`, `--headless`, `--no-webmcp`, omitted image
+responses, workspace-only file access, and an exact version pin; do not copy the
+legacy `mcp`/`enabled` snippet or edit the generated `opencode.jsonc`. The MCP
 server is explicitly not a security boundary; do not attach a personal browser
 profile containing credentials or unrelated sessions.
 
@@ -492,7 +510,7 @@ OpenCode V2 plugin, not merely an MCP server.
 | `opencode2-shell-tasks` | Native V2 plugin | Yes; local state outside repo | MIT | Long-running interactive jobs | **Yes** | Low/medium | **Conditional server-only pilot** |
 | `opencode-chromium` | Native/legacy browser plugin | Yes, with extension/host | MIT | Exploratory browser QA | Claimed, unverified on 2.0.16 | Low if four-tool surface is kept | **Hold for fixed release** |
 | `opencode-chrome-devtools` | Community direct-CDP plugin | Yes | MIT | Lightweight browser QA | Unverified | Low/medium | Personal fallback only |
-| `@playwright/mcp` | MCP | Yes | Apache-2.0 | Persistent exploratory browser QA | No | High | Opt-in fallback |
+| `@playwright/mcp` | MCP | Yes | Apache-2.0 | Persistent exploratory browser QA | No | High | Opt-in secondary fallback after V2 verification |
 | Serena | MCP/LSP | Yes | GPL-3.0 app / MIT component | Semantic refactoring | No | Medium | Optional |
 | `ast-grep/ast-grep-mcp` (Python) | Experimental MCP | Yes, with Python/uv overhead | MIT | Interactive AST-rule authoring | No | Medium | Defer |
 | Langfuse | Self-hosted service | Yes | MIT (with documented EE boundaries) | Agent telemetry/evals | No | External infra | Defer |
@@ -525,9 +543,12 @@ OpenCode V2 plugin, not merely an MCP server.
 5. **Hold `opencode-chromium@1.7.2`** until a fixed release clears the archive
    issue and an actual OpenCode v2.0.16 registration/browser run passes. It is a
    secondary browser candidate, not the primary native pilot.
-6. **Use official `@playwright/mcp` as the browser fallback**, never both
-   browser surfaces in the same session. This avoids duplicate tools and gives
-   the project a vendor-supported escape hatch.
+6. **Use official `@playwright/mcp` as the browser fallback only after its
+   legacy-shaped snippet is translated and registration is verified against the
+   current V2 `mcp.servers`/`disabled` schema**; never enable both browser
+   surfaces in the same session. This avoids duplicate tools and gives the
+   project a vendor-supported escape hatch without presenting the package
+   snippet as V2-ready.
 7. **Do not adopt** another task tracker, agent execution framework, hosted
    planner, remote sandbox, or persistent memory layer as part of this change.
 
@@ -616,7 +637,9 @@ Run `arggon board --serve` against a disposable fixture and have the agent:
 
 **Days 6–7 — compare and decide**
 
-- Repeat the critical scenarios with `@playwright/mcp` in a separate session.
+- Repeat the critical scenarios with `@playwright/mcp` in a separate session,
+  first translating and verifying its published snippet against the current V2
+  `mcp.servers`/`disabled` schema; do not copy the legacy `mcp`/`enabled` shape.
 - Record time-to-find-defect, number of manual checks, tool-schema bytes,
   failures, unsafe actions, and any tracker drift.
 - Keep the native candidate only after a fixed release, if it materially beats
@@ -713,9 +736,10 @@ Until that gate passes, the correct status is **pilot proposed**, not “adopted
 
 ### External sources (accessed 2026-09-24)
 
-- OpenCode V2 plugin migration and API:
-  <https://opencode.ai/v2/docs/build/plugins/migrate-v1> and
-  <https://opencode.ai/v2/docs/build/plugins>.
+- OpenCode V2 plugin migration, API, and MCP server schema:
+  <https://opencode.ai/v2/docs/build/plugins/migrate-v1>,
+  <https://opencode.ai/v2/docs/build/plugins>, and
+  <https://opencode.ai/v2/docs/mcp-servers/>.
 - `opencode-chromium` README, compatibility, security, and package metadata:
   <https://github.com/Quindart-com/opencode-chromium>,
   <https://github.com/Quindart-com/opencode-chromium/blob/master/docs/compatibility.md>,
