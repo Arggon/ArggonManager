@@ -84,10 +84,14 @@ positive/negative rule tests and the deterministic repository scan with:
 - `npm run test:structure`
 - `npm run lint:structure`
 
-Both CI commands run in the existing `cli` job. The scan only reports violations;
-it never uses `--update-all` or rewrites source. Rule scope, production exceptions,
-and the generated/test-fixture exclusions are documented in
-[`tools/ast-grep/README.md`](tools/ast-grep/README.md).
+Both CI commands run in the existing `cli` job. The scan uses the `Tsx` superset
+parser for hand-authored `.ts`/`.tsx` files, so JSX production code such as
+`opencode/plugins/arggon/tui.tsx` is covered by the same rule IDs. The scan only
+reports violations; it never uses `--update-all` or rewrites source. The native
+exception is limited to the catalog-definition loop and its exact editor payload;
+tracker root migration has one documented inline suppression. Rule scope,
+production exceptions, the bare-`filePath` decision, and explicit test-helper
+exclusions are documented in [`tools/ast-grep/README.md`](tools/ast-grep/README.md).
 
 ### UI smoke tests (dev-only)
 

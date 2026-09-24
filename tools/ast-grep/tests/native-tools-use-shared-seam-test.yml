@@ -13,26 +13,60 @@ valid:
   - |
     export async function registerArgonTools(ctx: PluginContext, kernel: Kernel, options: Options) {
       const definitions = argonToolDefinitions(kernel, options);
-      await ctx.tool.transform((editor) => {
-        for (const definition of definitions) editor.add(definition);
+      await transform((editor) => {
+        for (const definition of definitions) {
+          editor.add({
+            ...definition,
+            options: { namespace: ARGON_TOOL_NAMESPACE, codemode: true },
+          });
+        }
       });
     }
+  - |
+    export const Action = () => (
+      <button onClick={() => kernel.listOperation({ cwd: "." })}>List</button>
+    );
 invalid:
   - |
     export function registerArgonTools(editor: ToolEditorLike, definition: ToolDefinition) {
       editor.add({ name: "silent-fork", description: "Fork", execute: definition.execute });
     }
   - |
-    export default async function plugin(ctx: PluginContext) {
-      await ctx.tool.transform((editor) => editor.add(definition));
+    export function registerArgonTools(editor: ToolEditorLike, kernel: Kernel) {
+      argonToolDefinitions(kernel, {});
+      for (const definition of definitions) {
+        editor.add({ name: "wrong-shape", description: "Fork", execute: async () => ({}) });
+      }
     }
   - |
-    export function register(ctx: PluginContext, definition: ToolDefinition) {
-      ctx.tool.register(definition);
+    export async function registerArgonTools(ctx: PluginContext, kernel: Kernel, options: Options) {
+      const definitions = argonToolDefinitions(kernel, options);
+      await transform((editor) => {
+        for (const definition of definitions) {
+          editor.add({ ...definition, options: { namespace: ARGON_TOOL_NAMESPACE, codemode: true } });
+        }
+        editor.add({ name: "extra", description: "Extra", execute: async () => ({}) });
+      });
     }
   - |
-    export function register(editor: ToolEditorLike) {
-      editor.add({ name: "fork", description: "Fork", execute: run });
+    export async function registerArgonTools(ctx: PluginContext, kernel: Kernel, options: Options) {
+      const definitions = argonToolDefinitions(kernel, options);
+      await transform((editor) => {
+        for (const definition of definitions) {
+          editor.add({ ...definition, options: { namespace: ARGON_TOOL_NAMESPACE, codemode: true } });
+        }
+      });
+      await ctx.tool.transform((editor) => {});
+    }
+  - |
+    export async function registerArgonTools(ctx: PluginContext, kernel: Kernel, options: Options) {
+      const definitions = argonToolDefinitions(kernel, options);
+      await transform((editor) => {
+        for (const definition of definitions) {
+          editor.add({ ...definition, options: { namespace: ARGON_TOOL_NAMESPACE, codemode: true } });
+        }
+      });
+      ctx.tool.register(extra);
     }
   - |
     import { config, tool as defineTool } from "@opencode/plugin";
@@ -40,3 +74,7 @@ invalid:
   - |
     const editor = getEditor();
     editor.add({ name: "silent-fork", description: "Fork", execute: run });
+  - |
+    export const Fork = ({ ctx, editor }: Props) => (
+      <button onClick={() => ctx.tool.register(extra)}>Register</button>
+    );

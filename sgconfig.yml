@@ -5,3 +5,10 @@ ruleDirs:
 
 testConfigs:
   - testDir: tools/ast-grep/tests
+
+# TypeScript and TSX use distinct parsers. Treat the hand-authored .ts files as
+# the TSX superset so one rule ID covers both without a second, drifting copy.
+languageGlobs:
+  tsx:
+    - "**/*.ts"
+    - "**/*.tsx"
