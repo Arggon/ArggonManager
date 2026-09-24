@@ -48,16 +48,34 @@ checks are labelled separately.
    tool that belongs *inside ArggonManager*. This report separates those two
    decisions.
 
-## Current-state evidence
+## Criteria
+
+Candidates are ranked against the measured bottleneck and these constraints:
+
+1. **Fit and leverage** — does it remove a measured ArggonManager development or
+   acceptance bottleneck without replacing the existing kernel or UI contracts?
+2. **License and maintenance** — is the license compatible with an external
+   developer tool, and is the release/maintenance surface credible enough to
+   revisit deliberately?
+3. **Context and operational cost** — how many tool-schema bytes, processes,
+   services, permissions, and setup steps does an agent or maintainer inherit?
+4. **Source-of-truth safety** — can the tool remain outside the Markdown tracker
+   and mutate repository state only through the shared kernel?
+5. **Local-only reversibility** — can it be isolated, removed, and rolled back
+   without a hosted account, remote database, or product runtime dependency?
+
+## Findings
+
+### Current-state evidence
 
 | Signal | Measured/current state | Implication |
 | --- | --- | --- |
 | Tracker health | `arggon validate --json`: `ok: true`, zero errors and warnings | The baseline is stable enough to add tooling without first repairing the tracker. |
 | Test baseline | `npm test -- --reporter=dot`: **95 files / 1,611 tests passed** (2026-09-24) | The next quality gain should target uncovered input/state spaces, not replace the existing suite. |
-| Tracker size | `arggon doctor --json`: **320 items, 29 todo**; `report --json` shows 124 items in the current report grouping | Agent navigation and bounded reads matter; unbounded repository or tracker scans are already a known cost. |
+| Tracker size | Baseline `35ee8435`: `arggon doctor --json`: **320 items, 29 todo**; `report --json` shows **124 items in the `arggon-manager` report group** | Agent navigation and bounded reads matter; unbounded repository or tracker scans are already a known cost. |
 | Native surface | `opencode/plugins/arggon/index.ts` registers 15 native tools: `list`, `create`, `update`, `show`, `next`, `report`, `validate`, `comment`, `handoff`, `priority`, `sync`, `import_issues`, `start`, `branch`, `cleanup` | Do not add another tracker/orchestrator that competes with these tools. |
 | Context behavior | The plugin injects a bounded item block (hard maximum 1 KiB) and correlates sessions through storage/branch/environment | Persistent third-party memory is optional context, not a replacement for the tracker. |
-| Context budget | `doctor --budget`: generated `AGENTS.md` **2,019 B**, compact list **2,603 B**, full list **3,539 B**, show **767 B**, MCP schema **10,507 B / ~2,627 tokens** | Prefer small, purpose-specific tool surfaces; measure before enabling several large MCP catalogs. |
+| Context budget | `doctor --budget`: generated `AGENTS.md` **2,020 B**, compact list **2,603 B**, full list **3,539 B**, show **768 B**, MCP schema **10,507 B / ~2,627 tokens** | Prefer small, purpose-specific tool surfaces; measure before enabling several large MCP catalogs. |
 | UI work | UI epic has 18 todo leaves (9 web-board, 6 TUI, 2 OpenCode panel, 1 foundation) | Browser automation has an immediate, visible use case; a terminal tool cannot cover the web board. |
 | Existing smoke | CI already runs Playwright `@smoke` plus a PTY TUI frame check (`.github/workflows/ci.yml`) | A new browser tool should complement deterministic smoke, not replace CI. |
 | Runtime constraints | UI epic explicitly permits dev-only tools but forbids new runtime UI dependencies | External tooling should remain opt-in and outside the published package. |
@@ -65,10 +83,12 @@ checks are labelled separately.
 | Runtime version drift | Local `opencode --version` is **v2.0.16**, while `docs/playbooks/opencode.md` still pins **2.0.12** | Refresh/pin the playbook before depending on any beta V2 plugin; candidate compatibility must be tested against the actual runtime. |
 
 The graph index was refreshed for this review (7,662 nodes / 19,622 edges,
-2026-09-24). The cited source paths had no recorded coverage gaps; the two
-parse-partial test files and the intentionally ignored generated `.opencode`
+2026-09-24). The cited local code paths had no recorded coverage gaps; the
+two parse-partial test files and the intentionally ignored generated `.opencode`
 copies were treated as source-fallback cases rather than graph-complete
-claims.
+claims. The two branch deliverables themselves were absent from the main
+index (coverage freshness: `missing`), so they were read directly; structural
+graph evidence is not used to claim that either document is complete.
 
 ### Version snapshot used for the comparison
 
@@ -80,7 +100,8 @@ claims.
 | `fast-check` | `4.10.2` | MIT; test-time dependency candidate. |
 | `opencode2-shell-tasks` | `0.1.1` | MIT; native V2, but state outside the repository. |
 | `opencode-planner` | `0.6.0` | MIT; dual V1/V2 adapter. |
-| `ast-grep-mcp` | `0.0.2` | MIT but explicitly experimental. |
+| `ast-grep-mcp` (npm) | `0.0.2` | MIT; a separate Node package from `spiritledsoftware`, not the Python project described below. |
+| `ast-grep/ast-grep-mcp` (Python) | `0.1.0` in `pyproject.toml` | MIT; experimental, Python >=3.13 and `uv` project. |
 
 Versions are observations, not permanent pins. Re-check release notes and
 licenses at implementation time.
@@ -169,13 +190,18 @@ focused tools—`background_bash`, `background_tasks`, `background_output`, and
   protect this new action.
 - The bundled `/tasks` TUI has evidence of theme/API drift. Server-only testing
   is safer than relying on the panel.
+- Its README currently requires a V2 beta runtime (`0.0.0-beta-*`); the local
+  stable `v2.0.16` is not a proven target. Do not call the pilot compatible until
+  a package-supported runtime is identified and tested.
 - It is an interactive aid, not a CI replacement. Do not use it unattended or
   wire it into the deterministic GitHub Actions smoke.
 
 **Local verification (2026-09-24).** The published tarball's source was
 inspected and exposes the V2 APIs above. A temporary OpenCode project loaded the
 plural `plugins` field, but the noninteractive `/api/plugin` response was empty;
-runtime registration on v2.0.16 therefore remains unverified.
+runtime registration on v2.0.16 therefore remains unverified. The package's
+own README requires a V2 beta runtime, so a compatible runtime is a precondition
+for the pilot rather than an assumption.
 
 **Verdict:** **Conditional, server-only pilot after the worktree fix.** If it
 proves useful, the likely durable ArggonManager change is a small internal
@@ -237,8 +263,8 @@ budget; the V2 module import exposed `id` plus `setup` alongside the legacy
 `server` adapter. A temporary OpenCode project using the plural `plugins` field
 started its local V2 server without a configuration error, but the noninteractive
 `/api/plugin` response was empty, so actual runtime registration is **not yet
-verified**. The overall doctor command remained non-zero only because optional
-cross-client skills were not installed; this is **not** evidence that a real
+verified**. The package doctor was non-zero in the package-only smoke (Bun and optional
+cross-client skills were not installed); this is **not** evidence that a real
 browser session passed.
 
 **Verdict:** **Do not adopt `1.7.2`; keep as a secondary browser candidate only
@@ -375,12 +401,14 @@ symbolic editing surface also overlaps with OpenCode's built-in edit tools.
 **Verdict:** **Optional experiment for IDE-heavy refactors; not a project
 dependency.**
 
-### G — `ast-grep` CLI and `ast-grep-mcp`
+### G — `ast-grep` CLI and the `ast-grep/ast-grep-mcp` Python project
 
 **What it is.** MIT-licensed structural search, lint, and rewrite tooling based
 on tree-sitter. The CLI can run syntax-aware searches, reviewed codemods, and
-YAML rules in CI without adding an MCP catalog. The separate MCP server exposes
-AST pattern search and rule testing for interactive rule authoring.
+YAML rules in CI without adding an MCP catalog. The separate
+`ast-grep/ast-grep-mcp` Python project exposes AST pattern search and rule testing
+for interactive rule authoring. It is a different project from the similarly
+named `ast-grep-mcp` npm package listed in the version snapshot.
 
 **Fit.** It can enforce architectural rules such as "tracker mutations go
 through the kernel", "native tool definitions stay in the shared catalog", or
@@ -466,7 +494,7 @@ OpenCode V2 plugin, not merely an MCP server.
 | `opencode-chrome-devtools` | Community direct-CDP plugin | Yes | MIT | Lightweight browser QA | Unverified | Low/medium | Personal fallback only |
 | `@playwright/mcp` | MCP | Yes | Apache-2.0 | Persistent exploratory browser QA | No | High | Opt-in fallback |
 | Serena | MCP/LSP | Yes | GPL-3.0 app / MIT component | Semantic refactoring | No | Medium | Optional |
-| ast-grep MCP | Experimental MCP | Yes, with Python/uv overhead | MIT | Interactive AST-rule authoring | No | Medium | Defer |
+| `ast-grep/ast-grep-mcp` (Python) | Experimental MCP | Yes, with Python/uv overhead | MIT | Interactive AST-rule authoring | No | Medium | Defer |
 | Langfuse | Self-hosted service | Yes | MIT (with documented EE boundaries) | Agent telemetry/evals | No | External infra | Defer |
 | `opencode-planner` | Dual V1/V2 plugin | Local | MIT | Planning | Partial | Medium | Reject: duplicates Arggon methodology |
 | Persistent memory | Service/plugin | Often self-hostable | Varies | Cross-session recall | Usually no | Variable | Reject for canonical state |
@@ -532,7 +560,9 @@ do not mask it with an environment manager.
 ### Pilot 2 — server-only `opencode2-shell-tasks` (seven days)
 
 1. Install exactly `opencode2-shell-tasks@0.1.1` in a disposable OpenCode
-   profile with the plugin SDK dependency isolated; do not use `@latest`.
+   profile on a V2 beta runtime explicitly supported by the package, with the
+   plugin SDK dependency isolated; do not use `@latest` or assume local
+   `v2.0.16` is compatible.
 2. Start with a local `background_bash` permission set to `ask`; explicitly
    deny it for the reviewer agent. Do not run unattended sessions.
 3. Compare a foreground unit suite, build, Playwright smoke, and PTY TUI smoke
@@ -542,8 +572,8 @@ do not mask it with an environment manager.
    outside the session. Confirm logs/task sidecars never enter the repository.
 5. Measure model tokens and time-to-next-action against foreground shell use.
 
-**Exit gate:** four tools register on the supported OpenCode runtime, zero
-permission bypasses, zero leaked process groups, zero duplicate wake-ups, and a
+**Exit gate:** four tools register on a package-supported OpenCode V2 runtime,
+zero permission bypasses, zero leaked process groups, zero duplicate wake-ups, and a
 repeatable benefit for interactive long jobs. If the gate passes, internalize
 only the minimal behavior in ArggonManager's existing plugin; do not ship the
 third-party package by default. If it fails, remove the profile and retain the
@@ -708,9 +738,13 @@ Until that gate passes, the correct status is **pilot proposed**, not “adopted
 - Serena:
   <https://github.com/oraios/serena> and
   <https://github.com/oraios/serena/blob/main/LICENSE>.
-- ast-grep and its MCP server:
-  <https://github.com/ast-grep/ast-grep> and
-  <https://github.com/ast-grep/ast-grep-mcp>.
+- ast-grep CLI and the Python MCP project:
+  <https://github.com/ast-grep/ast-grep>,
+  <https://github.com/ast-grep/ast-grep-mcp>, and its
+  <https://github.com/ast-grep/ast-grep-mcp/blob/main/pyproject.toml>.
+- The similarly named Node package is listed separately at
+  <https://www.npmjs.com/package/ast-grep-mcp> and
+  <https://github.com/spiritledsoftware/ast-grep-mcp>.
 - fast-check:
   <https://fast-check.dev/> and <https://github.com/dubzzz/fast-check>.
 - Langfuse:
