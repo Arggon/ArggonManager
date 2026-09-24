@@ -89,3 +89,7 @@ The user-approved implementation direction is stronger than the original either/
 
 ### 2026-09-24 @ses_f2b1605beffe4ketLzfuVHnIWN
 Implementation/evidence ready for coordinator review (PR #419): shared kernel prepareWorktreeDependencies now backs CLI + native; native prepares before explicit claim commit, returns bounded preparation/claim receipts, preserves honest ready=false/missing semantics, and maps required gate/commit failures to START_FAILED with kept worktree + attach retry. Added worktree:false, ignored-path, pre-staged-index, dependency-gate and failed-attempt-retry regressions. Gates: npm test (97 files/1623 tests), npm run lint, npm run build, npm run check:plugin, npm run arggon -- validate, tools.arggon.validate, git diff --check all passed. Standalone cold-start/model smoke intentionally remains the separate item. No findings requiring a new tracker item.
+
+### handoff 2026-09-24 @ses_f2b1605beffe4ketLzfuVHnIWN (session: ses_f2b1605beffe4ketLzfuVHnIWN) — next: Coordinator review PR #419, run the required review smoke, then merge after approval; do not mark done before merge verification.
+- branch: fix/bug-native-start-worktree-no-install
+- open questions: No open questions; standalone cold-start/model smoke remains the separate dependent item.
