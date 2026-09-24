@@ -13,7 +13,6 @@ updated: "2026-09-24"
 claimed_at: "2026-09-24T15:36:00.779Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-native-start-worktree-no-install
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-native-start-worktree-no-install.md
   Leaves live only under a story. id is the filename stem: bug-native-start-worktree-no-install.
@@ -96,3 +95,10 @@ Implementation/evidence ready for coordinator review (PR #419): shared kernel pr
 
 - branch: fix/bug-native-start-worktree-no-install
 - open questions: No open questions; standalone cold-start/model smoke remains the separate dependent item.
+
+### 2026-09-24 @ses_f2b1605beffe4ketLzfuVHnIWN
+## Review-fix evidence — 2026-09-24
+
+Pushed `d6ac9afc` for PR #419. The provisional NO-MERGE findings are addressed: `worktree:false` now preflights and creates/attaches the item branch before the explicit claim commit, records truthful current/ref/branch/push state, and has real first-start plus no-duplicate attach assertions. Claim-refusal cleanup now unlinks only an owned symlink/link farm before observed worktree/branch removal; primary-install, sibling-worktree, and domain-removal-failure regressions pass. `commitTrackerMutation` now rejects pathspec magic/cross-root results, uses literal pathspecs for add/commit/status, and exact-output matching for `check-ignore`; cascade/ignored/exotic/concurrency behavior remains green. Native pre-commit failures consistently carry bounded not-attempted claim receipts, and `opencode2.md` documents preparation/rollback receipts.
+
+Green gates: `npm test` (97 files / 1,630 tests), `npm run lint`, `npm run build`, `npm run check:plugin`, `npm run context:report -- --strict` (native catalog 11,821 B <= 12,288 B), `npm run arggon -- validate`, `tools.arggon.validate`, and `git diff --check`. Reviewer-focused cases passed (7 native/pathspec + 3 CLI edge); native tools repeated 3x with no fixture leftovers. Linux cannot exercise Windows cross-drive/junction behavior; that platform limitation is documented in the PR update. Standalone cold-start/model smoke remains in `task-native-start-cold-smoke`. Item intentionally remains in_progress for coordinator review/merge; no merge or completion was performed.
