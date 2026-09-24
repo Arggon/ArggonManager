@@ -109,3 +109,6 @@ Reviewed PR #416 at `d168d95bac92359e4f79f7fdd083c6a2bf65d227`, the item checkli
 - I did not run a real OpenCode shell/browser pilot or browser E2E; those are explicitly conditional/unverified claims. The main graph index is only best-effort evidence; the two branch Markdown files were read directly.
 
 The unchecked conditional ADR/playbook item is appropriate and is not a finding. **Recommendation: NO-MERGE until finding 1 is corrected or explicitly qualified; address finding 2 in the same docs correction if retained.**
+
+### 2026-09-24 @Arggon
+Current correction to the earlier evidence comment (historical text intentionally retained): `doctor --budget` generated-AGENTS/show byte counts are process/path-qualified because the throwaway project name derives from a temporary path/PID. Five current runs on 2026-09-24 returned 2,021 B / 769 B; the earlier observation was 2,020 B / 768 B. The exploration now reports the observed 2,020–2,021 B / 768–769 B range; list/MCP values remain stable and both surfaces stay under budget. The same PR correction qualifies the @playwright/mcp legacy snippet and requires current V2 mcp.servers/disabled translation plus registration verification before any opt-in fallback pilot.
