@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-stabilize-agent-tooling-evidence-and-v2-mcp
 title: Stabilize agent-tooling evidence and qualify Playwright MCP V2 setup
 assignee: Arggon
@@ -9,7 +9,6 @@ labels: [research, agents, tooling, review-followup]
 priority: p2
 created: "2026-09-24"
 updated: "2026-09-24"
-claimed_at: "2026-09-24T15:13:04.535Z"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-stabilize-agent-tooling-evidence-and-v2-mcp.md
@@ -38,7 +37,7 @@ The reviewer verdict remains in the [research item's history](task-evaluate-open
 - [x] Re-measure the volatile budget fields and qualify the exploration and current tracker evidence without rewriting historical comments.
 - [x] Qualify the `@playwright/mcp` recommendation and record the V2 translation/registration gate and opt-in boundary.
 - [x] Run focused prose, tracker, and spec validation; introduce no ADR, runtime dependency, generated config, or product behavior change.
-- [ ] Coordinator reviews/merges PR #416 and completes this follow-up after merge.
+- [x] Coordinator reviews/merges PR #416 and completes this follow-up after merge.
 
 ## Notes
 
@@ -62,10 +61,12 @@ Context/Acceptance sections:
   generated configuration, or product behavior change was introduced.
 
 ### handoff 2026-09-24 @Arggon (session: ses_f2c22e8bfffefNl32ha3H7kKPn) — next: Coordinator reviews/merges PR #416 after the two review findings are verified; leave this follow-up in_progress for post-merge completion.
+
 - branch: research/agent-tooling-2026-09-24
 - open questions: Shell-task pilot still needs a supported V2 beta runtime; Chromium waits for a fixed release and real E2E; native create was unavailable in this session, so sanctioned CLI create plus native update w…
 
 ### 2026-09-24 @Arggon-coordinator
+
 ## Coordinator final review verdict — PR #416
 
 **APPROVE / merge after CI is green.** The provisional no-merge findings are resolved: volatile `doctor --budget` byte counts are explicitly qualified as process/path-dependent with bounded observations, and the legacy-shaped `@playwright/mcp` snippet is no longer presented as V2-ready; current V2 `mcp.servers`/`disabled` translation plus registration verification is required before any opt-in secondary pilot.
