@@ -89,3 +89,23 @@ Head-SHA clarification: the earlier evidence comment recorded d40ce189 (the code
 
 ### 2026-09-24 @Arggon
 Note: this clarification itself creates the next tracker auto-commit, so any SHA quoted in a tracker comment is necessarily the pre-comment head. The authoritative final head is the remote PR #416 head reported in the worker handoff; no product or runtime state changed.
+
+### 2026-09-24 @Arggon-reviewer
+## Provisional lead-architect review (subagent; coordinator owns final verdict)
+
+Reviewed PR #416 at `d168d95bac92359e4f79f7fdd083c6a2bf65d227`, the item checklist/comments, the complete two-file diff, and `ArggonManager/docs/engineering.md`.
+
+### Findings (severity order)
+
+1. **P2 / merge-blocking evidence correction — the context-budget numbers are not reproducible as written.** `ArggonManager/docs/explorations/exploration-open-source-agent-tooling-013.md:78` records generated `AGENTS.md` = **2,020 B** and `show` = **768 B**, and the item evidence comment repeats that these were “reproduced” (task file:81). On the stated base (`35ee8435`) and in this worktree, `npm run --silent arggon -- doctor --budget --json` returns **2,021 B / 769 B**. This is not merely a missing test: `cli/src/measure.ts:217-219` puts the process PID in the throwaway measurement-tree name, and `cli/src/docs.ts:667-670` derives a fresh project name from that basename; the exact byte counts therefore vary with PID/path length. Please either record a current, explicitly qualified observation (or stable rounded/budget-relative values) in both the exploration and tracker evidence, rather than calling these exact figures reproducible. This does not change the conclusion that both remain under budget.
+
+2. **P2 / bounded external-integration caveat — qualify the `@playwright/mcp` OpenCode setup.** The recommendation at exploration:317-321 and 335-340 calls the package’s OpenCode configuration explicit and recommends enabling it. In the published `@playwright/mcp@0.0.82` README, however, the OpenCode snippet is legacy-shaped (`mcp` plus `enabled`), while this repo’s V2 policy requires `mcp.servers`/`disabled` (see `ArggonManager/docs/agents.md:123-129` and `ArggonManager/docs/playbooks/opencode.md:123-129`). The report should say that the package snippet is not a V2-ready config to copy and require verification against the current V2 schema before any fallback pilot. This is conditional tooling documentation, not a current product dependency.
+
+### Verified / not merge findings
+
+- The native/CLI asymmetry is accurate: `nativeStart` (`opencode/plugins/arggon/index.ts:2197-2356`) has no `linkNodeModules`/workspace-build preparation and returns an `ok:true` envelope after `updateOperation`; CLI `startInWorktree` (`cli/src/start.ts:638-814`) links, builds, then commits/pushes. `commitTrackerMutation` is explicitly best-effort (`lib/src/tracker-commit.ts:265-270, 426-438`). The report does not claim the bug is fixed.
+- External package/security claims checked against the dated tarballs/metadata are bounded: shell-tasks pins the beta SDK and the five-low/no-fix audit observation; Chromium 1.7.2 is held pending the cited post-release security fix and real registration/E2E. The report does not claim those pilots passed.
+- The diff is exactly the new tracker item plus the exploration; no package/config/generated artifact or unrelated formatting drift. All three CI jobs at the reviewed head are green (`cli`, `tasks-validate`, and `ui-smoke`). UI smoke was not required for this docs-only PR, and the green run is stronger evidence than the exemption.
+- I did not run a real OpenCode shell/browser pilot or browser E2E; those are explicitly conditional/unverified claims. The main graph index is only best-effort evidence; the two branch Markdown files were read directly.
+
+The unchecked conditional ADR/playbook item is appropriate and is not a finding. **Recommendation: NO-MERGE until finding 1 is corrected or explicitly qualified; address finding 2 in the same docs correction if retained.**
