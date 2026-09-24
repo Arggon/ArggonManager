@@ -79,3 +79,7 @@ Gates/evidence (all run in /home/arggon/Projects/ArggonManager-agent-tooling):
 - Optional npx prettier --check is not a gate here and reports authored Markdown is not byte-clean; repo prose policy checks formatter invariants instead, and that test is green.
 
 Review corrections: reproduced doctor --budget values as 2,020 B AGENTS.md / 768 B show; recorded branch-doc graph coverage as missing/direct-read; separated similarly named ast-grep-mcp npm and Python projects; recorded shell-tasks V2-beta runtime precondition; corrected Chromium doctor wording to include missing Bun/optional skills and no browser E2E claim. No runtime/config/tracker-source/product changes. Conditional future ADR/playbook checkbox remains unchecked; no follow-up item filed.
+
+### handoff 2026-09-24 @Arggon (session: ses_f2c22e8bfffefNl32ha3H7kKPn) — next: Coordinator reviews and merges draft PR #416 after the research-only diff and gate evidence are accepted.
+- branch: research/agent-tooling-2026-09-24
+- open questions: Shell-task pilot needs a package-supported V2 beta runtime; Chromium waits for a fixed release and real registration/E2E; future ADR/playbook remains conditional.
