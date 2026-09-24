@@ -7805,11 +7805,12 @@ function envelopeMessage(envelope, fallback) {
 }
 function commitNativeClaim(kernel, cwd, id) {
     const shown = kernel.showOperation({ cwd, id, meta: true });
-    if (!shown.ok)
-        return { receipt: claimCommitFailure(envelopeMessage(shown.envelope, "claim item lookup failed")) };
+    if (!shown.ok) {
+        return { receipt: claimCommitNotAttempted(envelopeMessage(shown.envelope, "claim item lookup failed")) };
+    }
     const path = asString(shown.envelope.path);
     if (path === undefined)
-        return { receipt: claimCommitFailure("claim item path unavailable") };
+        return { receipt: claimCommitNotAttempted("claim item path unavailable") };
     const result = kernel.commitTrackerMutation(cwd, [(0, node_path_1.resolve)(cwd, path)], {
         message: kernel.trackerCommitMessage("claimed", [id]),
         commit: true,

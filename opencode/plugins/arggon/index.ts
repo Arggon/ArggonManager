@@ -2132,9 +2132,11 @@ function commitNativeClaim(
   payload?: Record<string, unknown>
 } {
   const shown = kernel.showOperation({ cwd, id, meta: true })
-  if (!shown.ok) return { receipt: claimCommitFailure(envelopeMessage(shown.envelope, "claim item lookup failed")) }
+  if (!shown.ok) {
+    return { receipt: claimCommitNotAttempted(envelopeMessage(shown.envelope, "claim item lookup failed")) }
+  }
   const path = asString(shown.envelope.path)
-  if (path === undefined) return { receipt: claimCommitFailure("claim item path unavailable") }
+  if (path === undefined) return { receipt: claimCommitNotAttempted("claim item path unavailable") }
 
   const result = kernel.commitTrackerMutation(cwd, [resolve(cwd, path)], {
     // Keep the native tracker convention used by updateOperation; only the
