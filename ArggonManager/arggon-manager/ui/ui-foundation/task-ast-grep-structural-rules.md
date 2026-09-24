@@ -13,7 +13,6 @@ updated: "2026-09-24"
 claimed_at: "2026-09-24T15:36:11.442Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-ast-grep-structural-rules
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-ast-grep-structural-rules.md
   Leaves live only under a story. id is the filename stem: task-ast-grep-structural-rules.
@@ -38,3 +37,13 @@ Adopt the dev-only `ast-grep` CLI as a low-context structural guard. Keep ESLint
 - [x] `npm test`, `npm run lint`, `npm run lint:structure`, `npm run build`, `npm run check:plugin`, and `arggon validate` are green, with rule-test evidence in the PR.
 
 ## Notes
+
+### 2026-09-24 @ses_f2b15dcecffeuVmXo3s1RGiJBJ
+Implementation evidence for PR #418 (expected → observed):
+- Exact dev-only dependency: expected @ast-grep/cli@0.45.3 outside runtime deps/pack allowlist → observed devDependencies-only; npm pack --dry-run lists neither sgconfig.yml nor tools/ast-grep/.
+- Rule tests: expected both suites pass → observed `npm run test:structure` PASS for tracker-mutations-use-kernel and native-tools-use-shared-seam.
+- Production red probe: expected both boundaries reject a temporary cli/src file → observed exit 1 with tracker + native diagnostics; probe removed.
+- Scope probe: expected canonical source covered while generated bundle and fixture harnesses are excluded → observed --inspect entity applied 2 rules to opencode/plugins/arggon/index.ts and 0 to index.bundle.ts/e2e/smoke harnesses.
+- Full gates green: npm ci; build; check:plugin; test (95 files/1611 tests); lint; structure tests/scan; native validate (0 warnings); git diff --check.
+
+No product-scope finding or new tracker work was revealed. Local npm blocked dependency postinstall scripts by machine policy, but @ast-grep/cli runtime binary resolution worked and all commands completed; CI is queued on PR #418.
