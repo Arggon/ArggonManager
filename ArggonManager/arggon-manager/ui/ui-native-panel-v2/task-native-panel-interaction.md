@@ -39,3 +39,14 @@ The W5 panel renders flat tree lines (header + counts + up to 200 lines) and onl
 - [ ] `n` jumps to the `next` suggestion and `a` to the active session item; the header keeps totals and the counts line
 - [ ] Width-aware clipping and sanitization preserved; no slot crash on a corrupt tracker (existing P1 guard)
 - [ ] `npm run smoke:tui` extended with a selection capture; docs/opencod2 TUI section updated
+
+### 2026-09-28 @Arggon-coordinator
+## Coordinator state note — 2026-09-28
+
+This item is **unclaimed (`todo`)** but PR #411 (`feat/task-native-panel-interaction`) has been open since 2026-09-23 with real work on it. Recording the exact state so it is not lost:
+
+- Remote branch head: `73c03c80`; the local worktree `/home/arggon/Projects/ArggonManager-task-native-panel-interaction` is stale at `21a49f1d` (22 commits behind the remote, 4 local-only tracker commits). Any resumption must work from a fresh worktree off the **remote** branch, not the existing directory.
+- Diff against `main` at that head: ~1416 insertions across `opencode/plugins/arggon/board.ts`, `board.test.ts`, `tui.tsx`, `tui.test.ts`, `index.ts`, `index.bundle.ts` and `smoke/tui-smoke.ts`. No acceptance box in the body is ticked and no review verdict is on the item, so this PR has **never been reviewed against the engineering review bar**.
+- Not in the current wave: the active backlog is the P1 smoke normalizer, the shell-tasks pilot, the native start cold-start smoke, fast-check properties and axe-core CI. The panel PR also collides with the now-merged ast-grep native guard scope (`opencode/plugins/arggon/**`) and the `smoke/` module, so it needs its own wave.
+
+Next coordinator action when a wave frees up: claim the item properly, rebase/verify the branch against current `main` (the P1 shared worktree prep and the cleanup-observation fix both landed in the plugin since), run `npm run lint:structure`/`test:structure` plus the TUI smoke, review against the bar, and post the verdict here.
