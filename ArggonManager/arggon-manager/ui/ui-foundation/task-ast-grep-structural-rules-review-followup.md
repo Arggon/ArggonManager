@@ -112,3 +112,32 @@ Exact dev-only `@ast-grep/cli@0.45.3`, one-thread scans, existing CI wiring, and
 ### handoff 2026-09-28 @ses_f2b15dcecffeuVmXo3s1RGiJBJ (session: ses_f2b15dcecffeuVmXo3s1RGiJBJ) — next: Coordinator: review PR #418 at ab31d2af and merge; confirm CI ran for that SHA (GitHub created no run after ~14 min).
 - branch: feat/task-ast-grep-structural-rules
 - open questions: CI run for ab31d2af not created by GitHub yet; local ci-job steps all green. Nothing else open.
+
+### 2026-09-28 @ses_f2b15dcecffeuVmXo3s1RGiJBJ
+**Final integration for PR #418 — head `0a888c3d`** (no design changes).
+
+**1. Duplicate YAML key fixed.** `tools/ast-grep/rules/tracker-mutations-use-kernel.yml` declared `PATH_ONE` twice under `constraints`. js-yaml confirmed the pre-fix file threw `duplicated mapping key (82:3)`. The removed block was **byte-identical** to the kept one (verified: both the `regex` and the `not.regex` clauses compare equal), so YAML last-wins meant behavior was already the kept definition. Now a pure 5-line deletion, one definition, constraints = `MUTATOR`, `PATH_MULTI`, `PATH_ONE`. Rule tests and scan unchanged: 3/3 suites PASS, `lint:structure` exit 0.
+
+**2. `origin/main` merged normally** as `0a888c3d`. One conflict, in the ast item's Notes. Resolved append-only by concatenating the HEAD block then the main block, so main's P1 completion/cleanup bug history and the third re-review verdict are both preserved. Verified `diff` against **both** sides: no lines dropped from HEAD; the only lines not in main's copy are the intentional `status: in_progress` (vs main's `todo`) and the ticked acceptance boxes. All 26 `###` history sections are present. The P1 completion/cleanup bug items (`bug-native-start-worktree-no-install`, `bug-stale-vendored-plugin-copy`, `task-harden-native-start-rollback-and-pathspec-handling`) came in from main unmodified. No code changes in the resolution.
+
+Note: the merge commit initially failed the pre-commit hook with `@arggondev/lib does not provide an export named 'prepareWorktreeDependencies'`. Cause was a **stale `lib/dist`** predating main's new `lib/src/worktree.ts`, not a code change; `npm run build --workspace @arggondev/lib` cleared it and the commit succeeded.
+
+**3. Gates green at `0a888c3d`:**
+
+| Check | Result |
+|---|---|
+| `npm run build` | exit 0 |
+| `npm run check:plugin` | exit 0; rebuilt bundle **matches main's committed bundle** (369567 bytes) — no plugin/bundle edit by us |
+| `npm test` | exit 0; 97 files / 1633 tests (up from 95/1611 via main's new lib tests) |
+| `npm run lint` | exit 0 |
+| `npm run test:structure` | 3/3 suites PASS + non-plugin fixture scan |
+| `npm run lint:structure` | exit 0 |
+| `arggon validate --json` | ok, 0 warnings, convention v5 |
+| Prettier, `git diff --check` | clean |
+| package surface | 109 files; no `sgconfig.yml` / `tools/ast-grep/` leak |
+| non-plugin fixture | **0 findings** |
+| in-scope probe | **18/18 bypasses detected, 0 findings in valid region**; probe files removed |
+
+**4. CI now runs.** After the merge push GitHub created run **CI `36479791296`** and **arggon `36479791279`** for `0a888c3d`. CI **completed/success** (`cli`: success, `ui-smoke`: success); arggon **completed/success**. The earlier no-run condition resolved itself on this push — no comment, issue, or force-push was used. PR #418 is now **MERGEABLE** (`mergeStateStatus` was `BLOCKED` only for the pending check, now satisfied).
+
+**5. State:** both items remain `in_progress`; no GitHub comment or issue (PR still has 0 comments / 0 reviews); no force-push; not merged. Awaiting coordinator review and merge.
