@@ -1,16 +1,19 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-native-cleanup-unverified-worktree-removal
 title: "Native cleanup prune can report a worktree removed while the worktree, branch, and worktree_path record remain"
+assignee: Arggon
+branch: fix/bug-native-cleanup-unverified-worktree-removal
 parent: native-redesign
 labels: [opencode-seam, worktree, review-followup]
 priority: p1
 created: "2026-09-28"
 updated: "2026-09-28"
+claimed_at: "2026-09-28T20:07:44.061Z"
 depends_on: [bug-native-start-worktree-no-install]
+worktree_path: /home/arggon/Projects/ArggonManager-bug-native-cleanup-unverified-worktree-removal
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-native-cleanup-unverified-worktree-removal.md
   Leaves live only under a story. id is the filename stem: bug-native-cleanup-unverified-worktree-removal.
