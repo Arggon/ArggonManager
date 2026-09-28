@@ -12,6 +12,10 @@ valid:
   - |
     writeFileSync(filePath, body, "utf8");
     writeFileSync(filePath, "task-beta.md", "utf8");
+    writeFileSync(path, taskFileContent);
+    writeFileSync(outputPath, value.filePath);
+    writeFileSync(join(root, "ArggonManager", "docs", "story.md"), body);
+    writeFileSync("ArggonManager/docs/story.md", body);
     renameSync(sourceAsset, destinationAsset);
   - |
     export function Panel({ itemPath }: Props) {
@@ -35,9 +39,17 @@ invalid:
   - |
     writeFileSync(item.filePath, body, "utf8");
   - |
-    renameSync(oldPath, itemPath);
+    writeFileSync(value.filePath, body, "utf8");
   - |
-    renameSync(oldPath, join(root, "tasks", "story-alpha", "task-beta.md"));
+    writeFileSync("initiative.md", body);
+    writeFileSync("epic.md", body);
+    writeFileSync("story.md", body);
+  - |
+    writeFileSync(join(tasksDir, id + ".md"), body);
+  - |
+    writeFileSync(join(root, "tasks", "story.md"), body);
+  - |
+    unlink(value.filePath);
   - |
     writeFileSync(join(root, "ArggonManager", "arggon-manager", "ui", "story-alpha", "task-beta.md"), body);
   - |

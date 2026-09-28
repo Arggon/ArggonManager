@@ -130,7 +130,7 @@ export function runLayoutMigrate(opts: LayoutMigrateOptions): LayoutMigrateResul
   if (!dryRun && changed) {
     if (trackerMove !== null) {
       // ADR 0012 migrates the structural tracker root; it does not mutate an item.
-      // ast-grep-ignore: tracker-mutations-use-kernel
+      // ast-grep-ignore: tracker-mutations-use-kernel, tracker-rename-destination-use-kernel
       renameSync(trackerMove.from, trackerMove.to);
     }
     if (docsMove !== null) {

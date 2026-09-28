@@ -1,0 +1,41 @@
+id: tracker-rename-destination-use-kernel
+language: Tsx
+severity: error
+message: Tracker item move destinations must go through the shared @arggondev/lib kernel.
+note: |
+  Rationale: a rename can create or relocate an item even when its source path is
+  neutral, so the destination argument is a separate mutation boundary. Only the
+  source/destination path argument is inspected; content arguments are never
+  scanned. ArggonManager/docs product paths are excluded.
+  Scope and exceptions match tracker-mutations-use-kernel, including the narrow
+  documented ADR-0012 root-migration suppression in cli/src/layout-migrate.ts.
+files:
+  - "**/*.ts"
+  - "**/*.tsx"
+ignores:
+  - "lib/src/**"
+  - "**/*.test.ts"
+  - "**/*.test.tsx"
+  - "**/*.spec.ts"
+  - "**/*.spec.tsx"
+  - "**/__fixtures__/**"
+  - "fixtures/**"
+  - "e2e/**"
+  - "smoke/**"
+  - "test/**"
+  - "labs/**"
+  - "cli/src/test-tmp.ts"
+  - "cli/src/pack-fixtures.ts"
+  - ".opencode/plugins/arggon/**"
+  - "opencode/plugins/arggon/index.bundle.ts"
+  - "tools/ast-grep/**"
+rule:
+  pattern: $WRITER_DEST($SOURCE_DEST, $PATH_DEST)
+constraints:
+  WRITER_DEST:
+    regex: "^(rename|renameSync)$"
+  PATH_DEST:
+    all:
+      - regex: '(?i)(initiative|epic|story|task|tracker|item)(file|path|dir|id|move|source|dest)|\.filePath$|(^|[/"])(initiative|epic|story|task|bug)(-[^/" ]+)?\.md($|[/"])|(join|resolve)\([^)]*(ArggonManager|tasks)[^)]*(initiative|epic|story|task|bug)(-[^/)]*)?\.md|(join|resolve)\([^)]*tasksDir[^)]*\.md'
+      - not:
+          regex: '(?i)(ArggonManager|tasks)[^\n)]*(docs|documentation)[^\n)]*'

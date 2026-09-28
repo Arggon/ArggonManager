@@ -4,14 +4,16 @@ severity: error
 message: Native tool definitions must be added through the shared Arggon catalog seam.
 note: |
   Rationale: TOOL_SPECS/WORKTREE_TOOL_SPECS feed both executable definitions and
-  schema parity checks. A second editor.add or tool() registration can silently
-  fork the native surface and escape those checks.
+  schema parity checks. Identifier, factory, alias, namespace, and extra-loop
+  registration forms must not fork the native surface.
   Scope: all hand-authored TypeScript/TSX. Tests, fixture harnesses, test-only
   helpers, and generated/vendored plugin files are intentionally excluded.
-  Exception: one editor.add({ ...definition, options: { namespace, codemode } })
-  inside the for-of over definitions in registerArgonTools is allowed only when
-  that function also calls argonToolDefinitions. No exception covers ctx.tool
-  transforms, registrations, or tool() definitions.
+  Exception: the canonical transform call and its single editor.add payload are
+  recognized only when registerArgonTools binds definitions directly to
+  argonToolDefinitions(...) and transform directly to ctx?.tool?.transform, and
+  the add is inside the definitions loop with the exact definition spread and
+  namespace/codemode options. Identical duplicate calls inside that exact loop
+  are the only structurally indistinguishable case.
 files:
   - "**/*.ts"
   - "**/*.tsx"
@@ -33,18 +35,87 @@ ignores:
   - "tools/ast-grep/**"
 rule:
   any:
-    - pattern: $CTX_A.tool.transform($$$ARGS_A)
-    - pattern: $CTX_B.tool.add($$$ARGS_B)
-    - pattern: $CTX_C.tool.register($$$ARGS_C)
-    - pattern: tool({ $$$FIELDS_D })
+    - pattern: ctx.tool.transform($$$DIRECT_ARGS)
+    - pattern: ctx?.tool?.transform($$$OPTIONAL_ARGS)
+    - pattern: ctx.tool.add($$$ADD_CALL_ARGS)
+    - pattern: ctx.tool.register($$$REGISTER_CALL_ARGS)
     - all:
-        - pattern: import { $$$IMPORTS_E } from "@opencode/plugin"
-        - has:
-            kind: import_specifier
-            regex: '\btool\b'
-            stopBy: end
+        - pattern: const transform = ctx?.tool?.transform
+        - not:
+            inside:
+              all:
+                - kind: function_declaration
+                - has:
+                    field: name
+                    regex: "^registerArgonTools$"
+                - has:
+                    pattern: const definitions = argonToolDefinitions($$$DEFS_ALIAS_A)
+                    stopBy: end
+                - has:
+                    pattern: const transform = ctx?.tool?.transform
+                    stopBy: end
+              stopBy: end
     - all:
-        - pattern: $EDITOR_F.add({ $$$FIELDS_F })
+        - pattern: const transform = ctx.tool.transform
+        - not:
+            inside:
+              all:
+                - kind: function_declaration
+                - has:
+                    field: name
+                    regex: "^registerArgonTools$"
+                - has:
+                    pattern: const definitions = argonToolDefinitions($$$DEFS_ALIAS_B)
+                    stopBy: end
+                - has:
+                    pattern: const transform = ctx?.tool?.transform
+                    stopBy: end
+              stopBy: end
+    - all:
+        - pattern: const $ALIAS_A = ctx?.tool?.transform
+        - not:
+            pattern: const transform = ctx?.tool?.transform
+    - all:
+        - pattern: const $ALIAS_B = ctx.tool.transform
+        - not:
+            pattern: const transform = ctx?.tool?.transform
+    - all:
+        - pattern: transform($$$TRANSFORM_ALIAS_ARGS)
+        - not:
+            all:
+              - inside:
+                  all:
+                    - kind: function_declaration
+                    - has:
+                        field: name
+                        regex: "^registerArgonTools$"
+                    - has:
+                        pattern: const definitions = argonToolDefinitions($$$DEFS_TRANSFORM_A)
+                        stopBy: end
+                    - has:
+                        pattern: const transform = ctx?.tool?.transform
+                        stopBy: end
+                  stopBy: end
+              - has:
+                  kind: for_in_statement
+                  has:
+                    field: right
+                    pattern: definitions
+                  stopBy: end
+    - all:
+        - pattern: register($$$REGISTER_ALIAS_ARGS)
+    - all:
+        - pattern: registerTool($$$REGISTER_TOOL_ARGS)
+    - all:
+        - pattern: registerTools($$$REGISTER_TOOLS_ARGS)
+    - all:
+        - pattern: addTool($$$ADD_TOOL_ARGS)
+    - all:
+        - pattern: install($$$INSTALL_ARGS)
+    - all:
+        - pattern: configure($$$CONFIGURE_ARGS)
+    - all:
+        - pattern: editor.add($$$EDITOR_ADD_OUT_ARGS)
         - not:
             inside:
               all:
@@ -54,17 +125,29 @@ rule:
                     pattern: definitions
                 - inside:
                     all:
-                      - kind: function_declaration
+                      - kind: call_expression
                       - has:
-                          field: name
-                          regex: "^registerArgonTools$"
-                      - has:
-                          pattern: argonToolDefinitions($$$CATALOG_ARGS_F)
+                          field: function
+                          pattern: transform
+                      - inside:
+                          all:
+                            - kind: function_declaration
+                            - has:
+                                field: name
+                                regex: "^registerArgonTools$"
+                            - has:
+                                pattern: const definitions = argonToolDefinitions($$$DEFS_ADD_OUT)
+                                stopBy: end
+                            - has:
+                                pattern: const transform = ctx?.tool?.transform
+                                stopBy: end
                           stopBy: end
                     stopBy: end
               stopBy: end
     - all:
-        - pattern: $EDITOR_G.add({ $$$FIELDS_G })
+        - pattern: toolEditor.add($$$TOOL_EDITOR_ADD_ARGS)
+    - all:
+        - pattern: editor.add($$$EDITOR_ADD_IN_ARGS)
         - inside:
             all:
               - kind: for_in_statement
@@ -73,12 +156,22 @@ rule:
                   pattern: definitions
               - inside:
                   all:
-                    - kind: function_declaration
+                    - kind: call_expression
                     - has:
-                        field: name
-                        regex: "^registerArgonTools$"
-                    - has:
-                        pattern: argonToolDefinitions($$$CATALOG_ARGS_G)
+                        field: function
+                        pattern: transform
+                    - inside:
+                        all:
+                          - kind: function_declaration
+                          - has:
+                              field: name
+                              regex: "^registerArgonTools$"
+                          - has:
+                              pattern: const definitions = argonToolDefinitions($$$DEFS_ADD_IN)
+                              stopBy: end
+                          - has:
+                              pattern: const transform = ctx?.tool?.transform
+                              stopBy: end
                         stopBy: end
                   stopBy: end
             stopBy: end
@@ -100,3 +193,60 @@ rule:
                   kind: pair
                   regex: '^\s*codemode\s*:'
                   stopBy: end
+    - all:
+        - pattern: editor.namespace($$$NAMESPACE_ARGS)
+        - not:
+            all:
+              - pattern: "editor.namespace({ name: ARGON_TOOL_NAMESPACE, description: ARGON_TOOL_NAMESPACE_DESCRIPTION })"
+              - inside:
+                  all:
+                    - kind: call_expression
+                    - has:
+                        field: function
+                        pattern: transform
+                    - inside:
+                        all:
+                          - kind: function_declaration
+                          - has:
+                              field: name
+                              regex: "^registerArgonTools$"
+                          - has:
+                              pattern: const definitions = argonToolDefinitions($$$DEFS_NAMESPACE)
+                              stopBy: end
+                          - has:
+                              pattern: const transform = ctx?.tool?.transform
+                              stopBy: end
+                        stopBy: end
+                  stopBy: end
+    - all:
+        - pattern: toolEditor.namespace($$$TOOL_EDITOR_NAMESPACE_ARGS)
+    - all:
+        - pattern: for (const $LOOP_ITEM of definitions) { $$$LOOP_BODY }
+        - not:
+            inside:
+              all:
+                - kind: call_expression
+                - has:
+                    field: function
+                    pattern: transform
+                - inside:
+                    all:
+                      - kind: function_declaration
+                      - has:
+                          field: name
+                          regex: "^registerArgonTools$"
+                      - has:
+                          pattern: const definitions = argonToolDefinitions($$$DEFS_LOOP)
+                          stopBy: end
+                      - has:
+                          pattern: const transform = ctx?.tool?.transform
+                          stopBy: end
+                    stopBy: end
+              stopBy: end
+    - pattern: tool({ $$$TOOL_FIELDS })
+    - all:
+        - pattern: import { $$$TOOL_IMPORTS } from "@opencode/plugin"
+        - has:
+            kind: import_specifier
+            regex: '\btool\b'
+            stopBy: end

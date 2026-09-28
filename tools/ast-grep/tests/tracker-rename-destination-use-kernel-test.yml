@@ -1,0 +1,19 @@
+id: tracker-rename-destination-use-kernel
+valid:
+  - |
+    renameSync(oldPath, outputPath);
+    renameSync(oldPath, join(root, "ArggonManager", "docs", "story.md"));
+  - |
+    const content = "task-item.md";
+    renameSync(oldPath, destinationAsset);
+invalid:
+  - |
+    renameSync(oldPath, itemPath);
+  - |
+    renameSync(oldPath, value.filePath);
+  - |
+    renameSync(oldPath, join(root, "tasks", "story-alpha", "task-beta.md"));
+  - |
+    renameSync(oldPath, "ArggonManager/story.md");
+  - |
+    renameSync(oldPath, join(tasksDir, id + ".md"));

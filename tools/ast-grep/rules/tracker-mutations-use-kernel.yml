@@ -5,9 +5,10 @@ message: Tracker item mutations must go through the shared @arggondev/lib kernel
 note: |
   Rationale: adapters must not compose or persist item frontmatter themselves. The
   kernel owns locking, status/claim rules, validation, cascades, and tracker commits.
-  The rule rejects the item serializer seam and filesystem mutations involving
-  recognizable item/tracker paths, including move destinations and nested path
-  expressions. A bare filePath is intentionally not a tracker signal.
+  Only path arguments are inspected: write/unlink/truncate use their first path,
+  while rename checks its source and destination paths. Content arguments are never
+  scanned. A bare filePath/outputPath is intentionally not a tracker signal, and
+  ArggonManager/docs product paths are explicitly excluded.
   Scope: hand-authored TypeScript/TSX outside lib/src. Tests and fixture harnesses,
   generated or vendored plugin files, and the kernel itself are excluded.
   Exception: lib/src is the shared mutation kernel. cli/src/layout-migrate.ts has
@@ -43,50 +44,20 @@ rule:
             stopBy: end
     - pattern: stringifyFrontmatter($$$SERIALIZE_CALL_ARGS)
     - pattern: $KERNEL_SERIALIZE.stringifyFrontmatter($$$SERIALIZE_MEMBER_ARGS)
-    - all:
-        - kind: identifier
-        - regex: "(?i)(initiative|epic|story|task|tracker|item)(file|path|dir|id|move|source|dest)"
-        - inside:
-            pattern: $WRITER($$$WRITER_ARGS)
-            stopBy: end
-    - all:
-        - kind: member_expression
-        - regex: '(?i)\.filePath$'
-        - inside:
-            pattern: $WRITER($$$WRITER_ARGS)
-            stopBy: end
-    - all:
-        - kind: string
-        - regex: '(?i)(ArggonManager|tasks)/[^" ]*(initiative|epic|story|task|bug)-[^/ ]*\.md'
-        - inside:
-            pattern: $WRITER($$$WRITER_ARGS)
-            stopBy: end
-    - all:
-        - pattern: join($$$JOIN_PATH_ARGS)
-        - has:
-            kind: string
-            regex: "(?i)(ArggonManager|tasks)"
-            stopBy: end
-        - has:
-            kind: string
-            regex: '(?i)(initiative|epic|story|task|bug)-[^" ]*\.md'
-            stopBy: end
-        - inside:
-            pattern: $WRITER($$$WRITER_JOIN_ARGS)
-            stopBy: end
-    - all:
-        - pattern: resolve($$$RESOLVE_PATH_ARGS)
-        - has:
-            kind: string
-            regex: "(?i)(ArggonManager|tasks)"
-            stopBy: end
-        - has:
-            kind: string
-            regex: '(?i)(initiative|epic|story|task|bug)-[^" ]*\.md'
-            stopBy: end
-        - inside:
-            pattern: $WRITER($$$WRITER_RESOLVE_ARGS)
-            stopBy: end
+    - pattern: $WRITER_FIRST($PATH_FIRST, $$$REST_FIRST)
+    - pattern: $WRITER_ONE($PATH_ONE)
 constraints:
-  WRITER:
-    regex: "^(writeFile|writeFileSync|appendFile|appendFileSync|writeFileAtomic|rename|renameSync|rm|rmSync|unlink|unlinkSync|truncate|truncateSync)$"
+  WRITER_FIRST:
+    regex: "^(writeFile|writeFileSync|appendFile|appendFileSync|writeFileAtomic|rename|renameSync)$"
+  WRITER_ONE:
+    regex: "^(rm|rmSync|unlink|unlinkSync|truncate|truncateSync)$"
+  PATH_FIRST:
+    all:
+      - regex: '(?i)(initiative|epic|story|task|tracker|item)(file|path|dir|id|move|source|dest)|\.filePath$|(^|[/"])(initiative|epic|story|task|bug)(-[^/" ]+)?\.md($|[/"])|(join|resolve)\([^)]*(ArggonManager|tasks)[^)]*(initiative|epic|story|task|bug)(-[^/)]*)?\.md|(join|resolve)\([^)]*tasksDir[^)]*\.md'
+      - not:
+          regex: '(?i)(ArggonManager|tasks)[^\n)]*(docs|documentation)[^\n)]*'
+  PATH_ONE:
+    all:
+      - regex: '(?i)(initiative|epic|story|task|tracker|item)(file|path|dir|id|move|source|dest)|\.filePath$|(^|[/"])(initiative|epic|story|task|bug)(-[^/" ]+)?\.md($|[/"])|(join|resolve)\([^)]*(ArggonManager|tasks)[^)]*(initiative|epic|story|task|bug)(-[^/)]*)?\.md|(join|resolve)\([^)]*tasksDir[^)]*\.md'
+      - not:
+          regex: '(?i)(ArggonManager|tasks)[^\n)]*(docs|documentation)[^\n)]*'

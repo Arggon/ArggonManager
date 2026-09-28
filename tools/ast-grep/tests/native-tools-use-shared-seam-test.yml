@@ -12,8 +12,10 @@ valid:
     }
   - |
     export async function registerArgonTools(ctx: PluginContext, kernel: Kernel, options: Options) {
+      const transform = ctx?.tool?.transform;
       const definitions = argonToolDefinitions(kernel, options);
       await transform((editor) => {
+        editor.namespace({ name: ARGON_TOOL_NAMESPACE, description: ARGON_TOOL_NAMESPACE_DESCRIPTION });
         for (const definition of definitions) {
           editor.add({
             ...definition,
@@ -28,18 +30,64 @@ valid:
     );
 invalid:
   - |
-    export function registerArgonTools(editor: ToolEditorLike, definition: ToolDefinition) {
-      editor.add({ name: "silent-fork", description: "Fork", execute: definition.execute });
+    export function registerArgonTools(editor: ToolEditorLike, extraTool: ToolDefinition) {
+      editor.add(extraTool);
     }
   - |
-    export function registerArgonTools(editor: ToolEditorLike, kernel: Kernel) {
-      argonToolDefinitions(kernel, {});
-      for (const definition of definitions) {
-        editor.add({ name: "wrong-shape", description: "Fork", execute: async () => ({}) });
-      }
+    export function registerArgonTools(editor: ToolEditorLike) {
+      editor.add(makeDefinition());
     }
   - |
     export async function registerArgonTools(ctx: PluginContext, kernel: Kernel, options: Options) {
+      const transform = ctx?.tool?.transform;
+      const definitions = argonToolDefinitions(kernel, options);
+      await transform((editor) => {
+        for (const definition of definitions) {
+          editor.add({ ...definition, options: { namespace: ARGON_TOOL_NAMESPACE, codemode: true } });
+        }
+        for (const extra of definitions) editor.add(extra);
+      });
+    }
+  - |
+    export async function registerArgonTools(ctx: PluginContext, editor: ToolEditorLike) {
+      editor.namespace({ name: "other-namespace", description: "Fork" });
+    }
+  - |
+    export function aliasedTransform(ctx: PluginContext) {
+      const register = ctx.tool.transform;
+      register((editor) => {});
+    }
+  - |
+    export function arbitraryAlias(ctx: PluginContext) {
+      const t = ctx?.tool?.transform;
+      t((editor) => {});
+    }
+  - |
+    export function directOptionalTransform(ctx: PluginContext) {
+      ctx?.tool?.transform((editor) => {});
+    }
+  - |
+    export async function registerArgonTools(ctx: PluginContext, kernel: Kernel, options: Options) {
+      const transform = ctx?.tool?.transform;
+      const definitions = makeDefinitions();
+      argonToolDefinitions(kernel, options);
+      await transform((editor) => {
+        for (const definition of definitions) {
+          editor.add({ ...definition, options: { namespace: ARGON_TOOL_NAMESPACE, codemode: true } });
+        }
+      });
+    }
+  - |
+    export async function registerArgonTools(ctx: PluginContext, kernel: Kernel, options: Options) {
+      const transform = ctx?.tool?.transform;
+      const definitions = argonToolDefinitions(kernel, options);
+      await transform((editor) => {
+        for (const definition of definitions) editor.add(definition);
+      });
+    }
+  - |
+    export async function registerArgonTools(ctx: PluginContext, kernel: Kernel, options: Options) {
+      const transform = ctx?.tool?.transform;
       const definitions = argonToolDefinitions(kernel, options);
       await transform((editor) => {
         for (const definition of definitions) {
@@ -50,6 +98,7 @@ invalid:
     }
   - |
     export async function registerArgonTools(ctx: PluginContext, kernel: Kernel, options: Options) {
+      const transform = ctx?.tool?.transform;
       const definitions = argonToolDefinitions(kernel, options);
       await transform((editor) => {
         for (const definition of definitions) {
@@ -60,6 +109,7 @@ invalid:
     }
   - |
     export async function registerArgonTools(ctx: PluginContext, kernel: Kernel, options: Options) {
+      const transform = ctx?.tool?.transform;
       const definitions = argonToolDefinitions(kernel, options);
       await transform((editor) => {
         for (const definition of definitions) {
@@ -68,6 +118,8 @@ invalid:
       });
       ctx.tool.register(extra);
     }
+  - |
+    const forkedTool = tool({ description: "Fork", args: {}, execute: run });
   - |
     import { config, tool as defineTool } from "@opencode/plugin";
     export const forkedTool = defineTool({ description: "Fork", args: {}, execute: run });

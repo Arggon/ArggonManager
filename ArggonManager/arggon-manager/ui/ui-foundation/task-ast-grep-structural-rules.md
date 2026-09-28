@@ -13,6 +13,7 @@ updated: "2026-09-24"
 claimed_at: "2026-09-24T15:36:11.442Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-ast-grep-structural-rules
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-ast-grep-structural-rules.md
   Leaves live only under a story. id is the filename stem: task-ast-grep-structural-rules.
@@ -56,7 +57,9 @@ No product-scope finding or new tracker work was revealed. Local npm blocked dep
 - open questions: None.
 
 ### 2026-09-24 @ses_f2b15dcecffeuVmXo3s1RGiJBJ
+
 Review follow-up evidence for PR #418 (all blocking findings addressed):
+
 - Native seam: narrowed the sole exception to the exact `editor.add({ ...definition, options: { namespace, codemode } })` inside the `for (const definition of definitions)` flow in a `registerArgonTools` function that calls `argonToolDefinitions`; direct ctx transforms/registers remain errors. Added adversarial cases for extra adds, wrong shape, alternate registration, and second transform. No native plugin source or bundle edit.
 - TSX: verified ast-grep's separate TypeScript/TSX parsers and configured the `Tsx` superset via `languageGlobs`; `tui.tsx` is scanned as `Tsx` with both rules, and TSX valid/invalid cases pass.
 - Tracker: removed bare `filePath` matching; added source/destination, member, literal, nested `join`/`resolve`, and canonical tracker-item cases. `writeFileSync(filePath, ...)` is valid. `layout-migrate.ts` has one documented ADR-0012 inline root-migration suppression; `test-tmp.ts` and `pack-fixtures.ts` are explicit test-only exclusions.
@@ -64,5 +67,16 @@ Review follow-up evidence for PR #418 (all blocking findings addressed):
 - Gates after fixes: `npm test` (95 files/1611 tests), `npm run lint`, `npm run test:structure`, `npm run lint:structure`, `npm run build`, `npm run check:plugin`, native/CLI `validate`, Prettier, `git diff --check`, and package-surface check all green. Dependency remains exact dev-only @ast-grep/cli@0.45.3; no rewrite mode.
 
 ### handoff 2026-09-24 @ses_f2b15dcecffeuVmXo3s1RGiJBJ (session: ses_f2b15dcecffeuVmXo3s1RGiJBJ) — next: Coordinator: review the narrowed rules and green evidence on PR #418, then merge; keep original in_progress until post-merge completion.
+
 - branch: feat/task-ast-grep-structural-rules
 - open questions: None.
+
+### 2026-09-28 second re-review remediation
+
+Follow-up item: `task-ast-grep-structural-rules-review-followup` (same branch/worktree, `in_progress`).
+
+- Native rule now rejects identifier/factory adds, extra/second definition loops, alternate namespaces, direct/aliased transforms, direct registration, and forged `definitions` bindings with a decoy `argonToolDefinitions` call. The only exception requires the direct `definitions` and `transform` bindings plus the exact catalog loop/payload. The remaining documented limitation is a byte-for-byte identical duplicate inside that exact loop.
+- Tracker rules inspect only path arguments: content arguments such as `taskFileContent` and `value.filePath` are ignored, generic `filePath`/`outputPath` are valid, and `ArggonManager/docs` paths are excluded. Source and rename-destination paths, canonical `initiative.md`/`epic.md`/`story.md`, nested tracker paths, and `join(tasksDir, id + ".md")` are covered.
+- The full-config adversarial probe returned exit 1 with 28 findings across the three rule IDs, asserted every listed native/tracker bypass, and produced no finding for the valid content/canonical flow markers. Probe files were removed.
+- Final green evidence: `npm test` (95 files/1611 tests), `npm run lint`, `npm run test:structure` (3 suites), `npm run lint:structure`, `npm run build`, `npm run check:plugin`, native/CLI `validate`, Prettier, `git diff --check`, and package-surface check. No native plugin source or bundle path is in the PR diff.
+- Exact dev-only `@ast-grep/cli@0.45.3`, one-thread scan, CI wiring, and no-rewrite behavior remain unchanged.

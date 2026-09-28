@@ -87,11 +87,13 @@ positive/negative rule tests and the deterministic repository scan with:
 Both CI commands run in the existing `cli` job. The scan uses the `Tsx` superset
 parser for hand-authored `.ts`/`.tsx` files, so JSX production code such as
 `opencode/plugins/arggon/tui.tsx` is covered by the same rule IDs. The scan only
-reports violations; it never uses `--update-all` or rewrites source. The native
-exception is limited to the catalog-definition loop and its exact editor payload;
-tracker root migration has one documented inline suppression. Rule scope,
-production exceptions, the bare-`filePath` decision, and explicit test-helper
-exclusions are documented in [`tools/ast-grep/README.md`](tools/ast-grep/README.md).
+reports violations; it never uses `--update-all` or rewrites source. Tracker
+content arguments are not path-scanned, rename destinations have a separate
+rule, and the native exception is limited to the direct catalog-to-editor binding
+and exact payload. Tracker root migration has one documented inline suppression.
+Rule scope, production exceptions, content/path decisions, and explicit
+test-helper exclusions are documented in
+[`tools/ast-grep/README.md`](tools/ast-grep/README.md).
 
 ### UI smoke tests (dev-only)
 
