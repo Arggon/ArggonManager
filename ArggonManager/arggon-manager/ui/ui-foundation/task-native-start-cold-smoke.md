@@ -1,14 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-native-start-cold-smoke
 title: Add native start cold-start smoke with a dependency-requiring pre-commit gate
+assignee: Arggon
+branch: feat/task-native-start-cold-smoke
 parent: ui-foundation
 labels: [opencode-seam, worktree, smoke]
 priority: p2
 created: "2026-09-24"
-updated: "2026-09-24"
+updated: "2026-09-28"
+claimed_at: "2026-09-28T22:45:52.890Z"
 depends_on: [bug-native-start-worktree-no-install, task-ast-grep-structural-rules]
+worktree_path: /home/arggon/Projects/ArggonManager-task-native-start-cold-smoke
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-native-start-cold-smoke.md
