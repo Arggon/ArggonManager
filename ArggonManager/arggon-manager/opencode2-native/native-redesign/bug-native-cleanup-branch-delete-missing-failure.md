@@ -1,15 +1,18 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-native-cleanup-branch-delete-missing-failure
 title: "Native cleanup branch-delete failure is reported in pruned but omitted from failures[]"
+assignee: Arggon
+branch: fix/bug-native-cleanup-branch-delete-missing-failure
 parent: native-redesign
 labels: [opencode-seam, worktree, review-followup]
 priority: p3
 created: "2026-09-28"
 updated: "2026-09-28"
+claimed_at: "2026-09-28T23:16:18.280Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-native-cleanup-branch-delete-missing-failure
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-native-cleanup-branch-delete-missing-failure.md
   Leaves live only under a story. id is the filename stem: bug-native-cleanup-branch-delete-missing-failure.
