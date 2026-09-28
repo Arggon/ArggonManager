@@ -386,3 +386,45 @@ Reviewed head: `98d3420b` (last code-affecting commit `c60ef7b3`; integration me
 **Non-blocking, tracked separately:** `task-ast-grep-authoring-and-receiver-scope` (filed on main) captures the two residual gaps — the `$$$ARGS` authoring note is over-generalized, and the native canonical flow anchors the receiver name `editor`. Neither blocks this merge; the parity test mitigates the receiver-name gap. The smoke/reporting items on main are unrelated to this PR.
 
 **Bookkeeping only.** This comment records the approval verdict. No merge is performed and no item is marked `done`; both items stay `in_progress` for post-merge completion by the coordinator. No GitHub comment or issue was posted — review history lives on the tracker items per repo convention.
+
+### 2026-09-28 @arggon-reviewer
+## Provisional final review — PR #418 at `98d3420b4da2fc911c9a4c981a38daec2cd3cdc1`
+
+**Recommendation: PASS** (provisional; coordinator owns the final verdict and the merge).
+
+The final architecture is coherent: a path-scoped, high-confidence native guard, path-position/high-confidence tracker rules with honest documented limits, and the plugin schema/parity test as the authoritative second layer. No blocking finding remains. Green CI is no longer merely necessary — the adversarial probes that blocked the three prior reviews now pass.
+
+### Confirmed by independent probe
+
+**Native scope and fixture proof**
+- Rule is path-scoped: `tools/ast-grep/rules/native-tools-use-shared-seam.yml:19-26` → `opencode/plugins/arggon/**/*.ts(x)`, bundle + vendored `.opencode` + tests ignored. Inspect shows `index.ts` and `board.ts` and `tui.tsx` at 3 applied rules, `index.bundle.ts` at 0.
+- Scope control (decisive): the canonical native forms scanned at a **non-plugin** path with an explicit file argument return **0 findings**, the same file inside the plugin path returns 1, and a tracker violation at a non-plugin path still returns 1. So the committed fixture `tools/ast-grep/tests/non-plugin-valid.tsx` (scanned by `npm run test:structure`) genuinely proves scope — its 0 findings are scope, not pattern absence.
+- Legitimate non-plugin probe (`register/install/configure/addTool/registerTool(s)`, `editor.add`, `editor.namespace`, generic `definitions` loop, TSX) → **0 findings**. The over-broad P1 from the third review is gone.
+
+**In-scope bypasses (plugin path) — 12/12 detected, valid region clean**
+identifier `editor.add(extraTool)`; factory `editor.add(makeDefinition())`; `ctx.tool.add/register/transform` and `ctx?.tool?.transform`; `const { transform } = ctx.tool`; alias bindings; forged `definitions` with decoy `argonToolDefinitions`; `namespace: "fork"` inside the recognized loop; alternate-namespace second loop; `editor.namespace({name:"fork"})`; second transform; extra loop; `tool({...})` — all exit 1. Exact canonical flow → 0. **Alternate namespace is now rejected**, closing the prior P1.
+
+**Tracker rules — path position, high confidence**
+- Rejected: `rmSync(item.filePath, {recursive,force})`, `truncateSync(path,0)`, `rmdirSync(itemDir)`, `rm(join(tasksDir,…), opts)`, `unlink(item.filePath, cb)`, `writeFileSync(value.filePath,…)`, `taskPath`, literal `"ArggonManager/story/story.md"`, nested `join(root,"tasks",…,id+".md")`, rename source and destination, `stringifyFrontmatter`, and a TSX write. **Multi-argument removers are covered.**
+- Accepted: bare leaves `"story.md"`/`"initiative.md"`, `join(root,"docs","task-beta.md")`, `join(root,"product",…)`, `ArggonManager/docs`, content arguments, generic `filePath`/`outputPath`, neutral rename destination, non-tracker removals, read-only TSX.
+
+**Duplicate key, suppression, TSX, packaging**
+- `PATH_ONE` is defined once (present twice only at `40d40756`, removed at `55e38f95`); a strict duplicate-rejecting YAML load passes on all three rules and `sgconfig.yml`; constraints are exactly `MUTATOR, PATH_MULTI, PATH_ONE`.
+- ADR-0012 suppression is narrow: the suppressed `renameSync(trackerMove.from, …)` is clean, while a following tracker write, a following `rmSync(item.filePath,…)`, and a following unsuppressed rename destination all still fail. Suppression lists both tracker rule IDs.
+- TSX applies: `tui.tsx` = 3 rules; tracker TSX negative fires; TSX valid is clean.
+- Vendored copy is safe to ignore: `cli/src/plugin-copy.test.ts` pins/regenerates `.opencode/plugins/arggon/index.ts` from the deterministic build, so it is not a bypass path.
+- Scope: the only touched source file is `cli/src/layout-migrate.ts`, and its diff is solely the documented suppression comment plus brace reformat. No plugin source, bundle, or `lib/` change. Two merges of `origin/main` are integration only (no code).
+- Gates green at this head: `build`, `check:plugin`, **`npm test` 97 files / 1633 tests**, `lint`, `test:structure` (3/3 + fixture), `lint:structure`, `arggon validate`, Prettier, `git diff --check`, package surface (109 files, no `sgconfig.yml`/`tools/ast-grep/`).
+- PR: `mergeable=MERGEABLE`, checks `cli`/`tasks-validate`/`ui-smoke` SUCCESS for this exact SHA (CI 36481954947, arggon 36481954843), 0 comments, 0 reviews. The earlier CONFLICTING blocker is resolved; state is `BEHIND` by 5 tracker-only main commits.
+
+**Docs/acceptance honesty** — no comprehensive-enforcement claim remains: `tools/ast-grep/README.md:8`, `CONTRIBUTING.md:108`, the main item's new acceptance checkbox, the follow-up checkbox "Document deliberate/computed/destructured native indirection … do not claim those bypasses are covered", and the PR body section "These are high-confidence structural guards, not comprehensive semantic enforcement". The claimed mitigation is real: `opencode/plugins/arggon/tools.test.ts:308-341` captures **every** `add` and asserts `toEqual([...EXPECTED_TOOLS])` plus `registered).toBe(EXPECTED_TOOLS.length)`, so any fork routed through `registerArgonTools` fails tests regardless of the guard's reach.
+
+### Non-blocking follow-ups (not merge blockers)
+
+1. **Authoring note is over-generalized.** `tools/ast-grep/README.md` "Authoring notes" and the PR body say only the **last** sibling `$$$ARGS` pattern in one `any` is effective. The native rule has ~10 sibling `$$$` patterns under one `any` and I observed several distinct siblings firing in a single scan (one probe file produced 4 findings from 4 different siblings). The real constraint appears to involve *constrained* sibling metavariables. Left as-is this could push a future maintainer to refactor working rules. Worth a one-line correction or a follow-up item.
+2. **Receiver-name sensitivity is undocumented.** `toolEditor.add(extraTool)` inside the plugin is not flagged (only the identifier `editor` is anchored), while the documented native limitation covers only handle indirection (`const t = ctx?.tool?.transform`). Mitigated by the parity test's exact list equality, so low severity; a doc sentence would close it.
+3. **PR body evidence is stale**: it cites 95 files/1611 tests and merge `4517a283`; at the final head it is 97/1633 with merges `0a888c3d` and `c60ef7b3` and CI runs 36481954947/36481954843. No impact on the rules.
+
+### Required merge/CI steps
+
+None blocking. Coordinator: merge; optionally sync the 5 tracker-only main commits first if the branch must be up to date. Items stay `in_progress` for post-merge completion. Non-blocking items 1–3 above are best filed as a follow-up task per the repo convention rather than reopening this PR.
