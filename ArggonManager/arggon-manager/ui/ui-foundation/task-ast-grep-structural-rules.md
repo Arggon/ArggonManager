@@ -130,3 +130,54 @@ The follow-up item `ArggonManager/arggon-manager/ui/ui-foundation/task-ast-grep-
 - No GitHub PR comments or reviews are present; the review history/verdict is being kept on the tracker item as required.
 
 **Final provisional outcome: NO-MERGE.**
+
+### 2026-09-28 @arggon-reviewer
+## Provisional third re-review — PR #418 at `72de1d17f39b7ef4bb436a52d35477146561cc9e`
+
+**Recommendation: NO-MERGE.** The earlier object-literal, TSX, bare-filePath, content-argument, helper, and layout-suppression probes now pass, but the expanded native rule has a new overreach/underreach problem and the tracker remove rule still misses common signatures.
+
+### P0/P1 — PR is not mergeable
+GitHub reports `mergeable=CONFLICTING` and `mergeStateStatus=DIRTY` for this head, despite green checks. The branch must be updated/rebased and CI rerun before any merge.
+
+### P1 — native rule makes unrelated production code unmergeable and still has ordinary bypasses
+**File:** `tools/ast-grep/rules/native-tools-use-shared-seam.yml:106-116, 118, 148, 197, 222, 224`
+
+The rule now unconditionally matches generic names `register(...)`, `registerTool(...)`, `registerTools(...)`, `addTool(...)`, `install(...)`, and `configure(...)` anywhere in production TS/TSX. It also matches any `editor.add(...)`, `toolEditor.add(...)`, `editor.namespace(...)`, `toolEditor.namespace(...)`, or any `for (const definition of definitions)` outside the exact Arggon flow.
+
+Independent legitimate-module probes were rejected: a router/feature module using `register(router)`, `registerTool(router)`, `addTool(router)`, `install(router)`, `configure(router)`, and a document editor using `editor.add(doc)` / `editor.namespace(...)` / a generic definitions loop. This is a material future-unmergeability regression, not merely a best-effort limitation. The rule needs an Arggon/plugin scope or a stronger contextual predicate, plus valid tests for unrelated modules.
+
+Residual native false passes (full config, exit 0):
+- assignment after declaration: `let registrar; registrar = ctx?.tool?.transform; registrar(...)`;
+- member alias through a variable: `const api = ctx.tool; api.transform(...)`;
+- bracket member alias: `const registrar = ctx["tool"].transform`;
+- destructured rename: `const { transform: registrar } = ctx.tool; registrar(...)`;
+- destructured tool/member editor aliases: `const { tool } = ctx; tool.transform(...)`, `const { add } = editor; add(extraTool)`, `const add = editor.add`, and `const namespace = editor.namespace`.
+
+The direct declaration aliases and plain `const { transform } = ctx.tool` are caught, but those residual forms are ordinary refactoring shapes. A single canonical loop with `namespace: "fork"` also exits 0, and two exact-looking loops with the second namespace changed to `"fork"` exits 0. The latter is not a byte-for-byte identical duplicate, so the README's sole documented limitation is too narrow; the alternate-namespace test is only outside the canonical flow.
+
+### P1 — tracker remove signatures are still missed; product-path precision is incomplete
+**File:** `tools/ast-grep/rules/tracker-mutations-use-kernel.yml:47-63`
+
+Content arguments, generic filePath/outputPath, canonical literal/nested/dynamic item paths, rename sources/destinations, and the new `tracker-rename-destination-use-kernel` rule all passed independent probes. However `WRITER_ONE` only matches one-argument remove calls:
+
+- `rmSync(item.filePath, { recursive: true, force: true })` — no diagnostic;
+- `truncateSync(item.filePath, 0)` — no diagnostic;
+- `rmdirSync(itemDir)` and `rm(itemPath, { recursive: true })` — no diagnostic.
+
+These are ordinary Node removal signatures and contradict the rule note claiming remove/unlink/truncate path coverage. Add the extra-argument forms (and the intended remove API set) with tests.
+
+There is also a residual product-doc false positive: `writeFileSync(join(root, "docs", "task-beta.md"), ...)` and `join(root, "product", "task-beta.md")` are rejected, while only the documented `ArggonManager/docs` form is excluded. The repo's legacy/product `docs` tree is still a legitimate non-tracker path.
+
+### P2 — acceptance, docs, and PR evidence overstate coverage
+The follow-up item `task-ast-grep-structural-rules-review-followup.md:59-67` and the main task notes `task-ast-grep-structural-rules.md:74-82` claim all ordinary identifier/factory/alias/namespace/loop/forged forms and all listed tracker bypasses are covered. The probes above disprove that. The PR body makes the same claim and documents only the identical-duplicate limitation. The exact-duplicate case is an honest structural-indistinguishability note; the alternate-namespace, assignment/member/destructure, generic-name, and remove-signature cases are not.
+
+### Verified
+- Current local gates pass: `npm run build && npm run check:plugin && npm test && npm run lint && npm run test:structure && npm run lint:structure && npm run arggon -- validate --json`; 3 structure suites and 95 files/1611 tests.
+- CI `cli`, `tasks-validate`, and `ui-smoke` are green.
+- TSX is applied: inspect reports canonical `opencode/plugins/arggon/tui.tsx` with 3 rules; synthetic TSX object cases are caught and bare filePath TSX is valid.
+- Layout suppression is narrow: the comment lists both tracker rule IDs; an adjacent unsuppressed tracker violation still produced diagnostics. The third rule's scope/ignore list matches the main rule.
+- Helper ignores work: `cli/src/test-tmp.ts` and `cli/src/pack-fixtures.ts` receive 0 rules; generated bundle and hidden .opencode output remain excluded.
+- Package/CI scope is clean: exact dev-only ast-grep dependency, one-thread scan, no rewrite mode, no rules/config in the tarball, no native plugin source/bundle edits, and no unrelated files.
+- No GitHub PR comments or reviews are present; the verdict/history is being kept on the tracker item.
+
+**Provisional outcome: NO-MERGE pending the P0/P1 findings above.**
