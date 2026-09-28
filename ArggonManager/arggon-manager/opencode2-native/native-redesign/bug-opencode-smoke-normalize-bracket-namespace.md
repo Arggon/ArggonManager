@@ -1,15 +1,18 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-opencode-smoke-normalize-bracket-namespace
 title: OpenCode smoke namespace normalizer misses tools.arggon bracket-access calls
+assignee: Arggon
+branch: fix/bug-opencode-smoke-normalize-bracket-namespace
 parent: native-redesign
 labels: [opencode-seam, smoke, review-followup]
 priority: p1
 created: "2026-09-28"
 updated: "2026-09-28"
+claimed_at: "2026-09-28T21:44:24.716Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-opencode-smoke-normalize-bracket-namespace
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-opencode-smoke-normalize-bracket-namespace.md
   Leaves live only under a story. id is the filename stem: bug-opencode-smoke-normalize-bracket-namespace.
