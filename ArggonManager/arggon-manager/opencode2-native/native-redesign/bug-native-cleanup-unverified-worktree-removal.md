@@ -8,6 +8,7 @@ labels: [opencode-seam, worktree, review-followup]
 priority: p1
 created: "2026-09-28"
 updated: "2026-09-28"
+depends_on: [bug-native-start-worktree-no-install]
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-native-cleanup-unverified-worktree-removal.md
