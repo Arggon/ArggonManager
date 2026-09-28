@@ -365,3 +365,24 @@ PR file scope is unchanged by either merge: rules, tests, fixture, `sgconfig.yml
 ### handoff 2026-09-28 @ses_f2b15dcecffeuVmXo3s1RGiJBJ (session: ses_f2b15dcecffeuVmXo3s1RGiJBJ) — next: Coordinator: merge PR #418 at c60ef7b3 (MERGEABLE; CI 36481364837 green). Items stay in_progress until post-merge completion.
 - branch: feat/task-ast-grep-structural-rules
 - open questions: None. Duplicate YAML key fixed, origin/main merged twice, all gates and CI green.
+
+### 2026-09-28 @Arggon-coordinator
+## FINAL APPROVE — lead-architect review of PR #418: PASS
+
+Reviewed head: `98d3420b` (last code-affecting commit `c60ef7b3`; integration merges `0a888c3d` / `c60ef7b3`). PR is `mergeable=MERGEABLE`, 0 comments, 0 reviews, checks `cli`/`tasks-validate`/`ui-smoke` SUCCESS (CI `36481954947`, arggon `36481954843`, both completed/success).
+
+**Framing:** approved as **high-confidence structural guards**, not comprehensive semantic enforcement. Documented limitations stand as written and are not treated as gaps.
+
+**Passing areas:**
+
+- **Architecture and scope.** The native rule is path-scoped to `opencode/plugins/arggon/**/*.ts(x)` with the bundle, vendored `.opencode`, and tests excluded. The prior over-broad generic-name findings are gone: a legitimate non-plugin probe (`register`, `install`, `configure`, `addTool`, `registerTool(s)`, `editor.add`, `editor.namespace`, generic `definitions` loop, TSX) returns **0 findings**, and the committed fixture `tools/ast-grep/tests/non-plugin-valid.tsx` genuinely proves scope because the same forms fire when scanned inside the plugin path.
+- **TSX.** The `Tsx` superset parser applies to hand-authored `.ts`/`.tsx`, so shipped `tui.tsx` carries the rules; TSX negatives fire and TSX valid stays clean.
+- **Path-position tracker rules.** Content, encoding, and options arguments are never scanned. Single- **and** multi-argument `rm`/`rmdir`/`unlink`/`truncate` are inspected at their first path argument. Bare leaves, `join(root, "docs", …)`, `join(root, "product", …)`, `ArggonManager/docs`, and generic `filePath`/`outputPath` stay valid, while `item.filePath`, tracker identifiers, root-qualified item paths, `tasksDir` dynamic paths, and rename source/destination are rejected. Alternate namespaces (`namespace: "fork"`) are now rejected, closing the prior P1.
+- **ADR suppression.** The ADR-0012 suppression in `cli/src/layout-migrate.ts` is narrow and lists both tracker rule IDs: the suppressed rename is clean, while adjacent unsuppressed tracker writes, `rmSync(item.filePath, …)`, and unsuppressed rename destinations still fail.
+- **Exact dev-only dependency, package and CI surface.** `@ast-grep/cli@0.45.3` is exact-pinned and dev-only; the tarball has 109 files with neither `sgconfig.yml` nor `tools/ast-grep/`; scans are one-thread and no `--update-all`/rewrite mode exists. The only touched source file is the documented suppression comment in `cli/src/layout-migrate.ts`; no plugin source, bundle, or `lib/` change.
+- **Docs and acceptance honesty.** No comprehensive-enforcement claim remains in the rule notes, `tools/ast-grep/README.md`, `CONTRIBUTING.md`, the item acceptance checkboxes, or the PR body. The claimed mitigation is real: the plugin parity test asserts exact list equality of registered tools, so a fork routed through `registerArgonTools` fails regardless of the guard's reach.
+- **Gates.** `build`, `check:plugin`, `npm test` (**97 files / 1633 tests**), `lint`, `test:structure` (3/3 + fixture), `lint:structure`, `arggon validate` (0 warnings), Prettier, `git diff --check`, and package surface all green. The duplicate `PATH_ONE` constraint is fixed and a strict duplicate-rejecting YAML load passes on all rules.
+
+**Non-blocking, tracked separately:** `task-ast-grep-authoring-and-receiver-scope` (filed on main) captures the two residual gaps — the `$$$ARGS` authoring note is over-generalized, and the native canonical flow anchors the receiver name `editor`. Neither blocks this merge; the parity test mitigates the receiver-name gap. The smoke/reporting items on main are unrelated to this PR.
+
+**Bookkeeping only.** This comment records the approval verdict. No merge is performed and no item is marked `done`; both items stay `in_progress` for post-merge completion by the coordinator. No GitHub comment or issue was posted — review history lives on the tracker items per repo convention.
