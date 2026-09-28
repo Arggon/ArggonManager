@@ -3467,10 +3467,17 @@ async function nativeCleanup(
               ...(entry.via !== undefined ? { via: entry.via } : {}),
             })
           } catch (error) {
+            // A branch delete that fails after the worktree is gone is still a
+            // failure the caller must see, on BOTH surfaces: the structured
+            // `pruned` action AND the flat `failures` list, which would
+            // otherwise read as a clean run
+            // (bug-native-cleanup-branch-delete-missing-failure).
+            const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)
+            failures.push(`${entry.id}: ${message}`)
             pruned.push({
               id: entry.id,
               action: "failed",
-              error: detail(error),
+              error: message,
               leftoverBranch: entry.branch,
             })
           }
