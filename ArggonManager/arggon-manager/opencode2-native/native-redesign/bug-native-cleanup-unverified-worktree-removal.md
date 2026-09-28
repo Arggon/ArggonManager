@@ -77,3 +77,36 @@ identical; only the caller's force policy differs. Say the word and I flip clean
 and the cause is the pinned smoke model: `opencode run --model opencode-go/deepseek-v4-flash "Reply with only the word OK"`
 → `Error: Go usage limit exceeded`. Re-running the W4 group (worktree lifecycle + invariants +
 permissions) with `OPENCODE_SMOKE_MODEL=opencode/space-bunny-free` instead; result appended here.
+
+### 2026-09-28 @Arggon-worker
+## Headless smoke evidence (W4) — 2026-09-28
+
+The full `npm run smoke:opencode` harness is blocked by the pinned model's quota, not by this change:
+`opencode run --model opencode-go/deepseek-v4-flash "Reply with only the word OK"` → `Error: Go usage limit exceeded`,
+so all 47 checks failed, including ones with nothing to do with this item ("session still succeeds", "/next: session completes").
+
+Re-ran the W4 group with a working model: `OPENCODE_SMOKE_ONLY=w4 OPENCODE_SMOKE_MODEL=opencode/space-bunny-free npm run smoke:opencode`.
+
+- `invariants (W4)` — 13/13 ok (never-steal, no-reopen, permissions active).
+- `permissions (W4)` — 11/11 ok (reviewer catalog is the read-only set, shell gate denies `git push`, session not broken).
+- `worktree lifecycle (W4)` — 4 ok, then `FAIL model executed the native start tool`.
+
+**That one failure is a harness transcript-needle mismatch, not a product failure.** The transcript
+(`/tmp/arggon-smoke-lifecycle-UJ7M3z/.smoke-evidence/worktree-lifecycle-start.stdout.jsonl`, kept fixture) shows the
+tool call itself **completed** with a correct envelope:
+
+- frame 1: `tool_use execute completed`, code `return await tools.arggon["start"]({ id: "task-smoke-item", assignee: "smoke" })`
+- output: `{"ok": true, "command": "start", "id": "task-smoke-item", "branch": "feat/task-smoke-item",
+  "worktreePath": "/tmp/arggon-smoke-lifecycle-UJ7M3z-task-smoke-item", "worktreeCreated": true, "branchCreated": true, ...}`
+
+so the native `start` tool ran through the real OpenCode worktree domain from the dependency-less vendored bundle.
+The check missed it because `normalizeNamespace()` (smoke/opencode-smoke.ts:415) rewrites `tools["arggon"].x` →
+`tools.arggon.x` but not the equally valid `tools.arggon["x"]` form, so the needle `tools.arggon.start`
+(`smoke/opencode-smoke.ts:1383`) did not match the model's bracket-notation call. The pinned smoke model writes the
+dot form, which is why this does not show up there.
+
+**Not fixed here on purpose** — the harness is out of this item's scope and the coordinator owns filing
+(`references/orchestration.md`: findings go back to the coordinator, not into this diff). Suggested follow-up for
+the native-smoke surface: extend `normalizeNamespace` to also normalize `tools.arggon["x"]` / `tools.arggon['x']`.
+
+CI on PR #421: `cli` SUCCESS · `tasks-validate` SUCCESS · `ui-smoke` SUCCESS.
