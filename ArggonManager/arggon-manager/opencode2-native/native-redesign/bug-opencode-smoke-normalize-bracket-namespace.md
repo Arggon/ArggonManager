@@ -10,7 +10,6 @@ labels: [opencode-seam, smoke, review-followup]
 priority: p1
 created: "2026-09-28"
 updated: "2026-09-28"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-opencode-smoke-normalize-bracket-namespace
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-opencode-smoke-normalize-bracket-namespace.md
