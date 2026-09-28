@@ -108,7 +108,20 @@ namespace:
   | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
   | `start`   | `id`, `branch`, `worktreePath` (`null` with `worktree: false`), `worktreeCreated`, `branchCreated`, `pushed`, `item`, `preparation?` (bounded `ready`/install/workspace receipt), `claimCommitted`, `claimCommit` (`committed`, `not-needed`, `failed`, or `not-attempted` with a bounded reason), `commit?`, and `rollback?` on a refused claim |
   | `branch`  | `id`, `branch`, `item`, `commit?`                                                                                                                                                                                                                                                                                                                |
-  | `cleanup` | `base`, `candidates[]` (`id`, `status`, `branch`, `path`, `removable`, `reason`, `action`, `via?`), `pruned[]` (`id`, `action`, `error?`, `leftoverBranch?`, `via?`), `failures[]`, `commit?`                                                                                                                                                    |
+  | `cleanup` | `base`, `candidates[]` (`id`, `status`, `branch`, `path`, `removable`, `reason`, `action`, `via?`), `pruned[]` (`id`, `action`, `error?`, `leftoverPath?`, `leftoverBranch?`, `via?`), `failures[]`, `commit?`                                                                                                                                   |
+
+  `cleanup` prune removal is **observed**, never assumed: the domain removal is
+  checked against the directory and `git worktree list` before anything else
+  happens, and a domain that resolves without removing (or fails) falls through
+  to the literal `git worktree remove` fallback — the same primitive the `start`
+  rollback uses, without its force policy, so git keeps refusing dirty
+  worktrees. `removed worktree`, `deleted branch` and `cleared worktree_path`
+  are reported only when the removal is observably complete; otherwise the
+  candidate reports one bounded `failed` action plus a `failures[]` entry
+  carrying `leftoverPath` (the worktree that is still there) and
+  `leftoverBranch`, and both the branch and the `worktree_path` record are
+  preserved so the next `cleanup` can retry. Per-candidate failures never abort
+  the run and the cleared records still share ONE tracker commit.
 
   Every pre-commit `start` failure carries `claimCommitted: false` and a
   `claimCommit.status: "not-attempted"` receipt (with preparation/rollback
