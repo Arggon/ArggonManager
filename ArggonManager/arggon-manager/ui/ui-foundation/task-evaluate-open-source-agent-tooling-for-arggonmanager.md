@@ -137,3 +137,34 @@ Auto-done PR #417 (from the merged PR #416) proposed flipping this item to `done
 The isolated server-only `opencode2-shell-tasks` pilot is running now as `task-pilot-opencode2-shell-tasks-server-only`. This item stays `in_progress` until that gate reports and this box can be honestly ticked (or explicitly closed out as a documented negative result on the pilot item).
 
 PR #416 (the research/ADR candidate comparison itself) is merged; only the conditional pilot closure remains.
+
+### 2026-09-28 @Arggon-coordinator
+## Conditional box closes on a negative result — the pilot was not approved (2026-09-28)
+
+The last acceptance box reads:
+
+> - [ ] If the pilot is approved later, its exact versions, safety policy, schema budget, and rollback procedure are recorded in a dev-only playbook/ADR.
+
+**The condition did not fire, so the obligation never arose.** The isolated server-only pilot
+(`task-pilot-opencode2-shell-tasks-server-only`, PR #423 merged) returned **FAIL** on two of the
+three things it existed to test: `background_bash` at `ask` produced **zero** permission requests
+in 2/2 runs while a same-session `shell` at `ask` control did raise one (an unenforced permission
+boundary, reproducible, with the control arm ruling out "the model never asked"), and the package
+requires a `0.0.0-beta-*` runtime that does not exist — every measurement is against stable
+`v2.0.18`.
+
+So: **no dev-only ADR/playbook is warranted, and none was written.** Writing one would document a
+tooling path this repository has decided against on safety grounds. This closes the user's
+conditional ask in the negative, and the pilot item is the record.
+
+Under `ArggonManager/docs/agents.md` §5.1 the box is **explicitly waived with this rationale** rather
+than ticked: it is a conditional, and the negative resolution is that the "if" never became true.
+The other four boxes are ticked and were verified at research time.
+
+The measured result is not being discarded. Two follow-ups carry it:
+`task-record-shell-tasks-pilot-negative-result` (correct the exploration's recommendation with the
+gate table) and, from the pilot's own incident, `bug-native-tools-commit-to-primary-checkout` (p1)
+and `bug-worktree-readiness-misses-stale-primary-install` (p2).
+
+Marking this item `done`: the research deliverable (compare candidates, recommend, set a pilot
+gate) is complete, and the gate it set was executed and answered.
