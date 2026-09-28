@@ -56,11 +56,17 @@ existing refusal rollback test plus a lying-domain rollback that recovers throug
 **Gates:** `npm run lint` · `npm run build` · `npm run check:plugin` (bundle regenerated and committed) ·
 `npm run arggon -- validate --json` → `ok: true` · `npm run smoke:tui-board` passed.
 
-**Review smoke:** the W4 group is **40/40 green on this head** (independent review run), including the
-cleanup round-trip through the **real** OpenCode worktree domain. The full 47-check harness was not re-run: the
-pinned `opencode-go/deepseek-v4-flash` is quota-blocked (`Go usage limit exceeded`), and removal observation
-cannot be driven adversarially through a live, well-behaved domain — that is what the deterministic cases above
-are for. Box 1's force wording is amended to the upheld policy (see above).
+**Review smoke (corrected — the 40/40 run was on `b12467fd`, not on the final head):** the independent W4
+review run was **40/40 green on `b12467fd`**, including the cleanup round-trip through the **real** OpenCode
+worktree domain. Every commit after `b12467fd` is a **tests-and-item delta only** (S1 coverage plus the
+acceptance boxes) — no behavior, no contract, no docs change. The reviewer's run on the final head was
+**37/38**, the single miss being the transcript-needle check that
+[`bug-opencode-smoke-normalize-bracket-namespace`](../bug-opencode-smoke-normalize-bracket-namespace.md) tracks
+(model-spelling dependent, not a product signal), while the **changed cleanup surface was 19/19**. The full
+47-check harness was not re-run: the pinned `opencode-go/deepseek-v4-flash` is quota-blocked
+(`Go usage limit exceeded`), and removal observation cannot be driven adversarially through a live,
+well-behaved domain — that is what the deterministic cases above are for. Box 1's force wording is amended to
+the upheld policy (see above).
 
 ### 2026-09-28 @Arggon-worker
 ## Implementation — PR #421 (draft) — 2026-09-28
