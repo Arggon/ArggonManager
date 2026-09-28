@@ -809,12 +809,18 @@ function itemData(dir: string, id: string, root = dir): Record<string, unknown> 
   return parseFrontmatter(readFileSync(path, "utf8")).data as Record<string, unknown>;
 }
 
-/** Claim → worktree → commit → merge (stub PR) → done; returns the worktree path. */
+/**
+ * Claim → worktree → commit → merge (stub PR) → done; returns the worktree
+ * path. `withDomain` (optional) replaces the fake domain before the lifecycle
+ * runs, so a test can drive the removal contract the happy path never hits.
+ */
 async function completedWorktree(
   dir: string,
   id = "task-rate-limit",
+  withDomain?: (fake: ReturnType<typeof fakeDomain>) => void,
 ): Promise<{ worktreePath: string; defs: ArgonToolDefinition[]; calls: ReturnType<typeof fakeDomain>["calls"] }> {
   const { domain, calls } = fakeDomain(dir);
+  withDomain?.({ domain, calls });
   const defs = worktreeDefinitions(dir, domain);
   const started = await tool(defs, "start").execute({ id, assignee: "smoke" });
   const worktreePath = String((started.output as { worktreePath?: unknown }).worktreePath);
@@ -1579,6 +1585,43 @@ describe("worktree domain tools (W4)", () => {
     expect(existsSync(join(dir, "node_modules"))).toBe(false);
   });
 
+  it("rolls back through the same observed removal when the domain lies (git --force fallback)", async () => {
+    const dir = seedGitTree();
+    const { domain, calls } = fakeDomain(dir);
+    // The domain resolves without removing: the rollback must observe the
+    // leftover and fall through to the same git fallback the cleanup prune
+    // uses, only forced (the worktree is seconds old).
+    domain.remove = async (input) => {
+      calls.remove.push(input);
+    };
+    const defs = worktreeDefinitions(dir, domain);
+    // The canonical claim is owned by another assignee, so native start reaches
+    // the rollback instead of completing.
+    runUpdate({ cwd: dir, id: "task-rate-limit", status: "in_progress", assignee: "owner" });
+    git(dir, ["add", "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md"]);
+    git(dir, ["commit", "-qm", "test: commit owner claim"]);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "intruder" });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const payload = (caught as ArgonToolError).envelope;
+    const worktreePath = String(payload.worktreePath);
+    expect(payload.rollback).toMatchObject({ worktreeRemoved: true, branchDeleted: true });
+    // One domain call; the removal itself is only claimed because the
+    // directory AND the git inventory agree it is gone.
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: true },
+    ]);
+    expect(existsSync(worktreePath)).toBe(false);
+    expect(gitOut(dir, ["worktree", "list", "--porcelain"])).not.toContain(worktreePath);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
+  });
+
   it("start refuses a recorded worktree_path that is not a worktree of this repo (W4 review S2)", async () => {
     const dir = seedGitTree();
     // A foreign git repository at the recorded path (not a worktree of `dir`).
@@ -1781,6 +1824,186 @@ describe("worktree domain tools (W4)", () => {
     expect(existsSync(worktreePath)).toBe(false);
     // The canonical install is untouched (the link is removed, never followed).
     expect(existsSync(join(dir, "node_modules", "marker.txt"))).toBe(true);
+  });
+
+  it("cleanup prune observes the domain removal and falls back to git when the domain lies", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await completedWorktree(
+      dir,
+      "task-rate-limit",
+      ({ domain, calls: seen }) => {
+        // The reported defect: the domain resolves without removing anything.
+        domain.remove = async (input) => {
+          seen.remove.push(input);
+        };
+      },
+    );
+
+    const output = await tool(defs, "cleanup").execute({ prune: true });
+    const envelope = output.output as Record<string, unknown>;
+    expect(envelope.ok).toBe(true);
+    expect(envelope.failures).toEqual([]);
+    // The removal is reported once, and only because it was observed: the git
+    // fallback removed what the domain left behind.
+    expect(envelope.pruned).toEqual([
+      { id: "task-rate-limit", action: `removed worktree ${worktreePath}` },
+      { id: "task-rate-limit", action: "deleted branch feat/task-rate-limit" },
+      { id: "task-rate-limit", action: "cleared worktree_path" },
+    ]);
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: false },
+    ]);
+    expect(existsSync(worktreePath)).toBe(false);
+    expect(gitOut(dir, ["worktree", "list", "--porcelain"])).not.toContain(worktreePath);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+    expect(envelope.commit).toMatchObject({ message: "chore(tasks): pruned task-rate-limit" });
+  });
+
+  it("cleanup prune keeps the record and the branch when a lying domain and git both fail", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await completedWorktree(
+      dir,
+      "task-rate-limit",
+      ({ domain, calls: seen }) => {
+        domain.remove = async (input) => {
+          seen.remove.push(input);
+          // Break the registration so the git fallback fails too: nothing
+          // observed this worktree as removed.
+          rmSync(join(input.directory, ".git"), { force: true });
+        };
+      },
+    );
+
+    const output = await tool(defs, "cleanup").execute({ prune: true });
+    const envelope = output.output as Record<string, unknown>;
+    const actions = envelope.pruned as Array<Record<string, unknown>>;
+    // No removal, no branch deletion, no record clearing — ever.
+    expect(actions.map((action) => action.action)).toEqual(["failed"]);
+    const failed = actions[0];
+    expect(failed).toMatchObject({
+      id: "task-rate-limit",
+      leftoverPath: worktreePath,
+      leftoverBranch: "feat/task-rate-limit",
+    });
+    // Bounded, per-candidate, honest about both failed steps.
+    const message = String(failed.error);
+    expect(message).toContain("resolved without removing the worktree");
+    expect(message).toContain("git worktree removal failed");
+    expect(message.length).toBeLessThanOrEqual(500);
+    expect(envelope.failures).toEqual([`task-rate-limit: ${message}`]);
+    // No tracker commit: nothing was cleared.
+    expect(envelope.commit).toBeUndefined();
+    // The state stays recoverable through the normal cleanup path.
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toContain(
+      "feat/task-rate-limit",
+    );
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBe(worktreePath);
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: false },
+    ]);
+  });
+
+  it("cleanup prune never force-removes a foreign node_modules install and keeps the record", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs } = await completedWorktree(dir);
+    // A real install start never created (no link, no link-farm marker) is not
+    // ours to delete: the unlink helper leaves it alone, git still refuses the
+    // dirty worktree, and the candidate is reported instead of forced.
+    const foreign = join(worktreePath, "node_modules", "foreign-dep");
+    mkdirSync(foreign, { recursive: true });
+    writeFileSync(join(foreign, "package.json"), '{"name":"foreign-dep"}\n', "utf8");
+
+    const output = await tool(defs, "cleanup").execute({ prune: true });
+    const envelope = output.output as Record<string, unknown>;
+    const actions = envelope.pruned as Array<Record<string, unknown>>;
+    expect(actions.map((action) => action.action)).toEqual(["failed"]);
+    expect(actions[0]).toMatchObject({
+      id: "task-rate-limit",
+      leftoverPath: worktreePath,
+      leftoverBranch: "feat/task-rate-limit",
+    });
+    expect(String(actions[0].error)).toContain("git worktree removal failed");
+    expect(envelope.failures).toHaveLength(1);
+    expect(envelope.commit).toBeUndefined();
+    // The foreign install, the worktree, the branch and the record all survive.
+    expect(existsSync(join(foreign, "package.json"))).toBe(true);
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toContain(
+      "feat/task-rate-limit",
+    );
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBe(worktreePath);
+  });
+
+  it("cleanup prune keeps the rest of the run honest when one removal cannot be observed", async () => {
+    const dir = seedGitTree();
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    runCreate({ cwd: dir, type: "task", title: "Second task", parent: "story-login", id: "second" });
+
+    // Candidate A: removed through the domain, end to end.
+    const started = await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    const healthyPath = String((started.output as { worktreePath?: unknown }).worktreePath);
+    writeFileSync(join(healthyPath, "work.txt"), "work\n", "utf8");
+    git(healthyPath, ["add", "work.txt"]);
+    git(healthyPath, ["commit", "-qm", "feat: work"]);
+    git(dir, ["merge", "--no-ff", "feat/task-rate-limit", "-m", "Merge PR (stubbed)"]);
+    await tool(defs, "update").execute({ id: "task-rate-limit", status: "done" });
+
+    // Candidate B: done, merged and recorded, but its removal is unobservable.
+    const brokenPath = join(dirname(dir), `${basename(dir)}-task-second`);
+    git(dir, ["worktree", "add", "--detach", brokenPath]);
+    writeFileSync(join(brokenPath, "other.txt"), "other\n", "utf8");
+    git(brokenPath, ["add", "other.txt"]);
+    git(brokenPath, ["commit", "-qm", "feat: other work"]);
+    git(brokenPath, ["branch", "feat/task-second"]);
+    git(dir, ["merge", "--no-ff", "feat/task-second", "-m", "Merge PR (stubbed)"]);
+    runUpdate({ cwd: dir, id: "task-second", status: "in_progress", assignee: "smoke" });
+    runUpdate({
+      cwd: dir,
+      id: "task-second",
+      status: "done",
+      branch: "feat/task-second",
+      worktreePath: brokenPath,
+    });
+    domain.remove = async (input) => {
+      calls.remove.push(input);
+      if (input.directory === brokenPath) {
+        rmSync(join(input.directory, ".git"), { force: true });
+        return;
+      }
+      git(dir, ["worktree", "remove", input.directory]);
+    };
+
+    const output = await tool(defs, "cleanup").execute({ prune: true });
+    const envelope = output.output as Record<string, unknown>;
+    const actions = envelope.pruned as Array<Record<string, unknown>>;
+    // One honest failure for B, with the remaining path and the kept branch.
+    const failed = actions.filter((action) => action.action === "failed");
+    expect(failed).toHaveLength(1);
+    expect(failed[0]).toMatchObject({
+      id: "task-second",
+      leftoverPath: brokenPath,
+      leftoverBranch: "feat/task-second",
+    });
+    // A is still pruned end to end, and the run keeps ONE commit for the
+    // single cleared record.
+    expect(actions).toContainEqual({
+      id: "task-rate-limit",
+      action: `removed worktree ${healthyPath}`,
+    });
+    expect(actions).toContainEqual({
+      id: "task-rate-limit",
+      action: "deleted branch feat/task-rate-limit",
+    });
+    expect(actions).toContainEqual({ id: "task-rate-limit", action: "cleared worktree_path" });
+    expect(envelope.commit).toMatchObject({ message: "chore(tasks): pruned task-rate-limit" });
+    expect(existsSync(healthyPath)).toBe(false);
+    // B keeps its worktree, branch and record: still recoverable.
+    expect(existsSync(brokenPath)).toBe(true);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-second"])).toContain("feat/task-second");
+    expect(itemData(dir, "task-second").worktree_path).toBe(brokenPath);
   });
 
   it("cleanup without prune lists only and never touches the worktree", async () => {
