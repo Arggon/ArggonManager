@@ -8,8 +8,8 @@ labels: [research, agents, tooling]
 priority: p2
 created: "2026-09-28"
 updated: "2026-09-28"
+depends_on: [task-pilot-opencode2-shell-tasks-server-only]
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-record-shell-tasks-pilot-negative-result.md
   Leaves live only under a story. id is the filename stem: task-record-shell-tasks-pilot-negative-result.
