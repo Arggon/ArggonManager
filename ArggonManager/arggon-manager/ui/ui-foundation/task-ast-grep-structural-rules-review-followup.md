@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-ast-grep-structural-rules-review-followup
 title: Close ast-grep structural rule review gaps
 assignee: Arggon
@@ -9,7 +9,7 @@ parent: ui-foundation
 labels: [tooling, architecture, ci]
 priority: p1
 created: "2026-09-24"
-updated: "2026-09-24"
+updated: "2026-09-28"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-ast-grep-structural-rules-review-followup.md
