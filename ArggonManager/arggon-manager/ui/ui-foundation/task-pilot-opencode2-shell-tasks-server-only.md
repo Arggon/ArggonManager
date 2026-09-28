@@ -11,7 +11,6 @@ priority: p2
 created: "2026-09-24"
 updated: "2026-09-28"
 depends_on: [bug-native-start-worktree-no-install]
-worktree_path: /home/arggon/Projects/ArggonManager-task-pilot-opencode2-shell-tasks-server-only
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-pilot-opencode2-shell-tasks-server-only.md
