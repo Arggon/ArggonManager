@@ -108,3 +108,7 @@ The second review's P1s are addressed in the same item/worktree; no new tracker 
 **CI caveat — please confirm before merge:** GitHub has not created a run for `ab31d2af` after ~14 minutes of polling (`gh pr checks 418` reports no checks; the last PR run is for the previous SHA `72de1d17`). No force-push, PR comment, or issue was used to work around it. Locally, every step the `cli` CI job runs was executed green.
 
 Exact dev-only `@ast-grep/cli@0.45.3`, one-thread scans, existing CI wiring, and no-rewrite behavior are unchanged. No native plugin source or bundle path is in the diff.
+
+### handoff 2026-09-28 @ses_f2b15dcecffeuVmXo3s1RGiJBJ (session: ses_f2b15dcecffeuVmXo3s1RGiJBJ) — next: Coordinator: review PR #418 at ab31d2af and merge; confirm CI ran for that SHA (GitHub created no run after ~14 min).
+- branch: feat/task-ast-grep-structural-rules
+- open questions: CI run for ab31d2af not created by GitHub yet; local ci-job steps all green. Nothing else open.
