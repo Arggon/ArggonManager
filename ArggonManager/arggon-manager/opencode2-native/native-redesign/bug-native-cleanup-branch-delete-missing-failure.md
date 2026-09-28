@@ -28,11 +28,11 @@ PR #421 review verified a pre-existing native cleanup inconsistency: when worktr
 
 ## Acceptance
 
-- [ ] Every native branch-delete failure appends a bounded `<id>: <error>` entry to `failures[]` as well as the structured `pruned` failure.
-- [ ] Per-candidate continuation and the existing record-clearing semantics after an observed worktree removal remain unchanged.
-- [ ] Add a deterministic test for `git branch -d/-D` failure with no domain dependency.
-- [ ] Update the json-output contract only if needed to make the two failure surfaces explicit.
-- [ ] Full test, lint, build, `check:plugin`, and validate remain green.
+- [x] Every native branch-delete failure appends a bounded `<id>: <error>` entry to `failures[]` as well as the structured `pruned` failure. (A `pruned` failure for the branch delete already existed; only the flat entry was missing. The inner catch now pushes `boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)` into `failures` and reuses that same message for `pruned` — one bounded text on both surfaces. Pinned by the new test: `failures == ["task-rate-limit: <500-char message>"]`.)
+- [x] Per-candidate continuation and the existing record-clearing semantics after an observed worktree removal remain unchanged. (The new test asserts the full `pruned` sequence: failed → cleared for the failing candidate, then the second candidate still prunes end to end, both records cleared in ONE commit. The outer catch, the removal branch and the clearing block are untouched in the diff — 8 added lines inside the branch-delete catch only.)
+- [x] Add a deterministic test for `git branch -d/-D` failure with no domain dependency. (`cleanup prune reports a branch-delete failure on both surfaces and keeps pruning`: no `worktree` option at all, stale worktree records so no removal step runs, and a `defaultCleanupGit` wrapper that refuses `deleteBranch` + `deleteBranchForce` for one candidate. `-D` shares the one catch; its `via` entry point is unreachable here because the native path shells out to the real `gh`. Fails without the fix: `expected 867 to be 500`, then `expected [] to deeply equal [Array(1)]`.)
+- [x] Update the json-output contract only if needed to make the two failure surfaces explicit. (Not needed: `docs/json-output.md` §`cleanup` already documents `leftoverBranch` on the failed `pruned` action, `<id>: <message>` in `failures`, and states that per-item prune failures appear in BOTH. The code was the outlier, so the doc is unchanged.)
+- [x] Full test, lint, build, `check:plugin`, and validate remain green. (`npm test` 1661/1661; `lint` clean; `build` ok; `check:plugin` exit 0 after committing the regenerated bundle; `lint:structure` exit 0; `test:structure` 3 passed; `validate --json` `ok:true`, no errors/warnings.)
 
 ## Notes
 
@@ -67,3 +67,7 @@ Review finding S7 on PR #421, 2026-09-28; verified byte-identical at `origin/mai
 - `npm run arggon -- validate --json` → `{"ok":true,"schemaVersion":1,"conventionVersion":5,"command":"validate","layout":"arggon-manager","errors":[],"warnings":[]}`; the pre-commit hook also printed `arggon validate: ok (0 warning(s), convention v5)`.
 
 **Docs.** `ArggonManager/docs/json-output.md` needed no change: the `pruned` row already names `leftoverBranch` for a failed branch delete, the `failures` row already documents `<id>: <message>`, and the §`cleanup` prose already states that per-item prune failures "appear in `pruned` (`action: "failed"`, `error`) and `failures`". The code was the outlier, so the contract stays the single source of truth (and stays correct for the CLI fix filed above).
+
+### handoff 2026-09-28 @Arggon — next: Coordinator: review PR, merge it, then flip this item to done; CLI twin bug-cli-cleanup-branch-delete-missing-failure is filed and untouched
+- branch: fix/bug-native-cleanup-branch-delete-missing-failure
+- open questions: Should the CLI fix mirror the native bounded text exactly?; Is the new test's stale-record fixture acceptable to the reviewer vs a domain-based one?
