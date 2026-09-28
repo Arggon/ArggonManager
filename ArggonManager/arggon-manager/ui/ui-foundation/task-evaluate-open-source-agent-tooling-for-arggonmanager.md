@@ -1,14 +1,13 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-evaluate-open-source-agent-tooling-for-arggonmanager
 title: Evaluate open-source agent tooling for ArggonManager
 assignee: Arggon
 parent: ui-foundation
 labels: [research, agents, tooling]
 created: "2026-09-24"
-updated: "2026-09-24"
-claimed_at: "2026-09-24T14:01:05.692Z"
+updated: "2026-09-28"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-evaluate-open-source-agent-tooling-for-arggonmanager.md
