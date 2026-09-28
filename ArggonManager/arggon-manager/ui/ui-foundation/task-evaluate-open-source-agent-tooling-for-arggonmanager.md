@@ -126,3 +126,14 @@ The canonical follow-up Context/Acceptance body is complete and `git diff --chec
 This is docs/tracker-only, so the blocking UI/TUI smoke exemption is valid. CI `cli`, `tasks-validate`, and `ui-smoke` are green at final head; local test, lint, build, `check:plugin`, `validate`, `spec`, and prose evidence is also green.
 
 No runtime dependency, generated config, product behavior, or tracker source-of-truth change was introduced. The original research item remains `in_progress` because its future pilot/ADR checkbox is conditional and the pilot has not run. The actionable follow-up may be completed by the coordinator immediately after merge. No item is marked done by this verdict.
+
+### 2026-09-28 @Arggon-coordinator
+## Coordinator bookkeeping — 2026-09-28
+
+Auto-done PR #417 (from the merged PR #416) proposed flipping this item to `done`. **Closed, not merged**: the last acceptance box is conditional on the pilot outcome and is still unticked —
+
+- [ ] If the pilot is approved later, its exact versions, safety policy, schema budget, and rollback procedure are recorded in a dev-only playbook/ADR.
+
+The isolated server-only `opencode2-shell-tasks` pilot is running now as `task-pilot-opencode2-shell-tasks-server-only`. This item stays `in_progress` until that gate reports and this box can be honestly ticked (or explicitly closed out as a documented negative result on the pilot item).
+
+PR #416 (the research/ADR candidate comparison itself) is merged; only the conditional pilot closure remains.
