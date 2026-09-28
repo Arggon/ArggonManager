@@ -112,3 +112,13 @@ the general lesson recorded (compare mtime read-back-to-read-back, never across 
   CI-enforced one, and `lint:structure`/`test:structure` already run in the `cli` job. I am **not**
   forcing a workflow change into this PR (it is unowned surface, and the model-free claim is exactly
   what makes it a candidate); I will file it as a follow-up for an explicit decision.
+
+### 2026-09-28 @Arggon-coordinator
+### Follow-up filed (coordinator, 2026-09-28)
+
+The CI-wiring open question raised in my verdict is now tracked as
+`task-wire-native-start-cold-smoke-into-ci` (p3, parent `ui-foundation`). This PR deliberately does
+not touch `.github/workflows/**`: the gate is model-free and deterministic, which makes it a good CI
+citizen, but the lane belongs to a separate, explicitly-owned change rather than riding in on a smoke
+PR. No blocker on this item either way — the command is real, documented in four places, and
+falsifiable today.
