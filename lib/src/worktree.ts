@@ -569,7 +569,9 @@ export const MAX_MISSING_DEPENDENCIES = 10;
  *   the worktree declares none at all.
  * - `stale`: at least one does not; the report names them.
  * - `unknown`: nothing was compared — there is no install on the resolution
- *   path, or the manifest could not be read. Never reported as satisfied.
+ *   path, or the manifest is not readable as a JSON object (what npm itself
+ *   rejects with `EJSONPARSE`, plus a non-object root). Never reported as
+ *   satisfied, and `ready` follows it to false.
  *
  * What `satisfied` does NOT claim. It is a **presence** check over the declared
  * top-level set, not an install verification: installed versions are never
@@ -593,15 +595,36 @@ export type DeclaredDependencyReport = {
 
 /**
  * Top-level `dependencies` + `devDependencies` names a manifest declares, or
- * null when `package.json` is present but not readable as an object (an
- * unparseable manifest is not evidence that anything is installed). A directory
- * with no `package.json` at all declares nothing: an empty set, NOT an unknown,
- * so a project without a manifest is never reported stale.
+ * null when `package.json` is present but not readable as a JSON object.
+ *
+ * The three outcomes map onto the receipt one-for-one: no `package.json` means
+ * the tree declares NOTHING (an empty set, never a stale verdict — a
+ * dependency-free project must keep its readiness); a manifest that is not
+ * readable as an object means NOTHING WAS COMPARED (`unknown` — the verdict
+ * never guesses, and `ready` follows it to false); a readable one yields its
+ * declared names.
+ *
+ * npm's own tolerance is the bar, and the one place they differ is the UTF-8
+ * BOM: `json-parse-even-better-errors` (behind `read-package-json`) strips it,
+ * so a BOM-ed `package.json` installs fine and must not be called unreadable
+ * here. Everything npm rejects with `EJSONPARSE` — comments, trailing commas,
+ * truncation, an empty file, a non-object root — is rejected identically by
+ * `JSON.parse`, so `unknown` there matches npm instead of out-strictifying it.
+ * The shared `packageManifest` helper is deliberately left strict: it feeds the
+ * link farm's entry detection, where silently accepting a workspace manifest
+ * would change which copy resolves.
  */
 function declaredDependencyNames(pkgDir: string): string[] | null {
-  if (!existsSync(join(pkgDir, "package.json"))) return [];
-  const manifest = packageManifest(pkgDir);
-  if (manifest === null) return null;
+  const path = join(pkgDir, "package.json");
+  if (!existsSync(path)) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf8").replace(/^\uFEFF/, ""));
+  } catch {
+    return null;
+  }
+  if (parsed === null || typeof parsed !== "object") return null;
+  const manifest = parsed as Record<string, unknown>;
   const names = new Set<string>();
   for (const field of ["dependencies", "devDependencies"]) {
     const section = manifest[field];

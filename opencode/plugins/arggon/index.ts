@@ -2140,12 +2140,26 @@ function startNotAttempted(
   })
 }
 
+/** The kernel's coverage union (`ManifestCoverage` in `lib/src/worktree.ts`). */
+type NativeManifestCoverage = "satisfied" | "stale" | "unknown"
+
 type NativePreparationReceipt = {
   ready: boolean
   install: string
   linkedNodeModules: boolean
   builtWorkspaces: string[]
   linkedWorkspaces: string[]
+  /**
+   * Whether the install provides what the worktree's own `package.json`
+   * declares, and which declared names it does not provide
+   * (bug-worktree-readiness-misses-stale-primary-install). Forwarded from the
+   * kernel receipt, which owns the check and the list cap: a native caller
+   * reading only `ready: false` would have to shell out to the CLI to learn
+   * WHICH declared dependency the mirrored install is missing.
+   */
+  manifestCoverage: NativeManifestCoverage
+  missingDependencies: string[]
+  missingDependenciesTotal: number
   truncated?: boolean
 }
 
@@ -2167,13 +2181,26 @@ type NativeCommitResult = {
   ignored?: string[]
 }
 
-/** Keep a receipt bounded even when an install or git error is attacker-shaped. */
+/**
+ * Keep a receipt bounded even when an install or git error is attacker-shaped.
+ *
+ * The dependency-coverage fields are PROJECTED, never re-derived: the kernel
+ * receipt (`prepareWorktreeDependencies`) owns the manifest check and already
+ * caps `missingDependencies` at `MAX_MISSING_DEPENDENCIES` (10) — below this
+ * function's own list cap, so there is nothing left to re-slice. Only the
+ * per-name character bound is re-applied, like every other name in the receipt,
+ * and a kernel-side truncation is folded into the shared `truncated` flag so a
+ * capped list is never passed off as the whole set.
+ */
 function boundedPreparation(input: {
   ready: boolean
   install: string
   linkedNodeModules: boolean
   builtWorkspaces: string[]
   linkedWorkspaces: string[]
+  manifestCoverage: NativeManifestCoverage
+  missingDependencies: string[]
+  missingDependenciesTotal: number
 }): NativePreparationReceipt {
   const built = input.builtWorkspaces
     .slice(0, MAX_NATIVE_PREPARATION_NAMES)
@@ -2181,17 +2208,25 @@ function boundedPreparation(input: {
   const linked = input.linkedWorkspaces
     .slice(0, MAX_NATIVE_PREPARATION_NAMES)
     .map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS))
+  const missing = input.missingDependencies.map((name) =>
+    boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+  )
   const truncated =
     input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
     input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
+    input.missingDependenciesTotal > input.missingDependencies.length ||
     built.some((name, index) => name !== input.builtWorkspaces[index]) ||
-    linked.some((name, index) => name !== input.linkedWorkspaces[index])
+    linked.some((name, index) => name !== input.linkedWorkspaces[index]) ||
+    missing.some((name, index) => name !== input.missingDependencies[index])
   return {
     ready: input.ready,
     install: input.install,
     linkedNodeModules: input.linkedNodeModules,
     builtWorkspaces: built,
     linkedWorkspaces: linked,
+    manifestCoverage: input.manifestCoverage,
+    missingDependencies: missing,
+    missingDependenciesTotal: input.missingDependenciesTotal,
     ...(truncated ? { truncated: true } : {}),
   }
 }
@@ -3179,6 +3214,11 @@ async function nativeStartBody(
         linkedNodeModules: false,
         builtWorkspaces: [],
         linkedWorkspaces: [],
+        // A preparation that threw was never compared against the manifest:
+        // `unknown`, never a `satisfied` claim (same rule as the kernel).
+        manifestCoverage: "unknown",
+        missingDependencies: [],
+        missingDependenciesTotal: 0,
       })
       const preparationRemoved = kernel.unlinkNodeModulesLink(primaryRoot, worktreePath)
       return failBeforeClaim(

@@ -6105,11 +6105,19 @@ function buildLocalWorkspaces(primaryRoot, worktreePath, deps = {}) {
 }
 exports.MAX_MISSING_DEPENDENCIES = 10;
 function declaredDependencyNames(pkgDir) {
-    if (!(0, node_fs_1.existsSync)((0, node_path_1.join)(pkgDir, "package.json")))
+    const path = (0, node_path_1.join)(pkgDir, "package.json");
+    if (!(0, node_fs_1.existsSync)(path))
         return [];
-    const manifest = packageManifest(pkgDir);
-    if (manifest === null)
+    let parsed;
+    try {
+        parsed = JSON.parse((0, node_fs_1.readFileSync)(path, "utf8").replace(/^\uFEFF/, ""));
+    }
+    catch {
         return null;
+    }
+    if (parsed === null || typeof parsed !== "object")
+        return null;
+    const manifest = parsed;
     const names = new Set();
     for (const field of ["dependencies", "devDependencies"]) {
         const section = manifest[field];
@@ -7887,16 +7895,22 @@ function boundedPreparation(input) {
     const linked = input.linkedWorkspaces
         .slice(0, MAX_NATIVE_PREPARATION_NAMES)
         .map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS));
+    const missing = input.missingDependencies.map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS));
     const truncated = input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
         input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
+        input.missingDependenciesTotal > input.missingDependencies.length ||
         built.some((name, index) => name !== input.builtWorkspaces[index]) ||
-        linked.some((name, index) => name !== input.linkedWorkspaces[index]);
+        linked.some((name, index) => name !== input.linkedWorkspaces[index]) ||
+        missing.some((name, index) => name !== input.missingDependencies[index]);
     return {
         ready: input.ready,
         install: input.install,
         linkedNodeModules: input.linkedNodeModules,
         builtWorkspaces: built,
         linkedWorkspaces: linked,
+        manifestCoverage: input.manifestCoverage,
+        missingDependencies: missing,
+        missingDependenciesTotal: input.missingDependenciesTotal,
         ...(truncated ? { truncated: true } : {}),
     };
 }
@@ -8452,6 +8466,9 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
                 linkedNodeModules: false,
                 builtWorkspaces: [],
                 linkedWorkspaces: [],
+                manifestCoverage: "unknown",
+                missingDependencies: [],
+                missingDependenciesTotal: 0,
             });
             const preparationRemoved = kernel.unlinkNodeModulesLink(primaryRoot, worktreePath);
             return failBeforeClaim(`dependency preparation failed in ${worktreePath}: ${boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)}; ` +

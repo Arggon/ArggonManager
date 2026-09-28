@@ -305,11 +305,13 @@ focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
     primary `node_modules` (or reuses the worktree install), builds workspace
     packages owned by the worktree, and returns a bounded `preparation` receipt
     (`ready`, `install`, `linkedNodeModules`, `builtWorkspaces`,
-    `linkedWorkspaces`; `ready` also requires the mirrored install to provide the
-    worktree's declared `dependencies`/`devDependencies`, so a stale primary
-    install is reported as not ready rather than as usable — `agents.md` §4
-    carries the missing names and the remedy). The claim commit is explicit and
-    runs the normal pre-commit hook: a required bootstrap/gate failure is a typed
+    `linkedWorkspaces`, plus the dependency coverage the kernel receipt computes —
+    `manifestCoverage`, `missingDependencies` (capped at 10) and
+    `missingDependenciesTotal`; `ready` also requires the mirrored install to
+    provide the worktree's declared `dependencies`/`devDependencies`, so a stale
+    primary install is reported as not ready WITH the missing names rather than
+    as usable — `agents.md` §4 carries the remedy). The claim commit is explicit
+    and runs the normal pre-commit hook: a required bootstrap/gate failure is a typed
     `START_FAILED`, keeps the worktree, and reports `claimCommitted: false` plus
     the bounded `claimCommit` skip reason and an attach/retry instruction. A
     `preparation.ready: false` receipt is not itself a failure when no gate

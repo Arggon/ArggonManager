@@ -162,11 +162,13 @@ clauses: an install is present, no worktree-owned workspace package resolves
 into the primary, and the install provides what the worktree's own
 `package.json` declares — a linked install mirrors the primary's, so a
 devDependency merged since that install ran is missing from every worktree and
-`ready: false` is reported instead of a readiness the gate cannot use (the
-kernel receipt also carries `manifestCoverage` and the bounded
-`missingDependencies` names; the CLI `--json` envelope and stdout surface them
-— see §4). The remedy is the same on both surfaces: re-install the primary
-checkout, or give the worktree its own install. A required dependency or
+`ready: false` is reported instead of a readiness the gate cannot use. The
+receipt names the reason on BOTH surfaces: `manifestCoverage`,
+`missingDependencies` (kernel-capped at 10 names) and `missingDependenciesTotal`
+are part of the native `preparation` payload as well as the CLI `--json`
+envelope, so neither caller has to shell out to the other to learn which
+declared dependency is missing (see §4). The remedy is the same on both
+surfaces: re-install the primary checkout, or give the worktree its own install. A required dependency or
 pre-commit failure is a typed `START_FAILED`, never an unqualified `ok:true`: the native
 worktree and branch are kept, the skip reason is bounded, and the message gives
 the `tools.arggon.start` attach/retry command. `preparation.ready: false` is an

@@ -276,6 +276,35 @@ describe("prepareWorktreeDependencies reports a stale mirrored install", () => {
     expect(receipt.manifestCoverage).toBe("unknown");
     expect(receipt.ready).toBe(false);
   });
+
+  it("reads a BOM-ed manifest npm also accepts, and still rejects what npm rejects", () => {
+    // npm's parser (json-parse-even-better-errors) strips a UTF-8 BOM, so a
+    // BOM-ed package.json installs fine there: withholding readiness for it
+    // would report a stale install that does not exist. Comments/trailing
+    // commas are EJSONPARSE in npm, so they stay `unknown` — the check tracks
+    // npm's tolerance instead of inventing its own.
+    const { primary, worktree } = fixture();
+    addInstalledPackage(primary, "gate-dep");
+    writeFileSync(
+      join(worktree, "package.json"),
+      `\uFEFF${JSON.stringify({ dependencies: { "gate-dep": "^1.0.0" } })}`,
+    );
+
+    expect(prepareWorktreeDependencies(primary, worktree)).toMatchObject({
+      ready: true,
+      manifestCoverage: "satisfied",
+      missingDependencies: [],
+    });
+
+    writeFileSync(
+      join(worktree, "package.json"),
+      `{ // npm rejects this with EJSONPARSE\n"dependencies": { "gate-dep": "^1.0.0" }, }`,
+    );
+    expect(prepareWorktreeDependencies(primary, worktree)).toMatchObject({
+      manifestCoverage: "unknown",
+      ready: false,
+    });
+  });
 });
 
 describe("inspectDeclaredDependencies", () => {
