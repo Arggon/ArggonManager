@@ -8,8 +8,8 @@ labels: [playwright, accessibility, ci, ui]
 priority: p2
 created: "2026-09-24"
 updated: "2026-09-24"
+depends_on: [task-ast-grep-structural-rules]
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-axe-core-browser-ci.md
   Leaves live only under a story. id is the filename stem: task-axe-core-browser-ci.

@@ -8,7 +8,7 @@ labels: [testing, property-based, kernel]
 priority: p2
 created: "2026-09-24"
 updated: "2026-09-24"
-depends_on: [bug-native-start-worktree-no-install]
+depends_on: [bug-native-start-worktree-no-install, task-ast-grep-structural-rules]
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-fast-check-invariant-properties.md
