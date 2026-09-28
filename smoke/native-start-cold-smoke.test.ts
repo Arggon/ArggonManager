@@ -85,9 +85,13 @@ describe("native-start-cold-smoke: installFingerprint / installDrift", () => {
     const before = installFingerprint(dir);
     const later = new Date(before.mtimeMs + 60_000);
     utimesSync(join(dir, "node_modules"), later, later);
-    expect(installDrift(before, installFingerprint(dir))).toEqual([
-      `mtime ${before.mtimeMs} -> ${later.getTime()}`,
-    ]);
+    const after = installFingerprint(dir);
+    // The expected string reads the clock back instead of reusing the value
+    // handed to utimesSync: a filesystem that stores sub-second precision can
+    // hand back a fractionally different mtime than the one set (observed on the
+    // CI runner, which stored 431.999 where the test asked for 432).
+    expect(installDrift(before, after)).toEqual([`mtime ${before.mtimeMs} -> ${after.mtimeMs}`]);
+    expect(after.mtimeMs).toBeGreaterThanOrEqual(before.mtimeMs + 59_000);
   });
 
   it("compares by content, and never by clock, across two different installs", () => {
@@ -113,9 +117,7 @@ describe("native-start-cold-smoke: installFingerprint / installDrift", () => {
     // A file's content change inside a package is npm's business, not a start
     // decision; the smoke asserts install SHAPE, and says so.
     expect(installDrift(before, installFingerprint(dir))).toEqual([]);
-    expect(readdirSync(before.path).sort()).toEqual(
-      [".", "native-gate-dep"].filter((e) => e !== "."),
-    );
+    expect(readdirSync(before.path).sort()).toEqual(["native-gate-dep"]);
   });
 });
 
