@@ -31,16 +31,36 @@ This is a pre-existing native cleanup defect, not part of the P1 start-readiness
 
 ## Acceptance
 
-- [ ] Verify worktree removal physically and through `git worktree list` after the domain call; fall back to a literal `git worktree remove --force` when the domain resolves without removing it.
-- [ ] Never emit `removed worktree`, delete a branch, or clear `worktree_path` unless removal is observably complete.
-- [ ] A failed removal reports a bounded per-candidate failure with the remaining path and `leftoverBranch`, preserves the record, and keeps the rest of the cleanup run honest.
-- [ ] Reuse one shared removal/observation implementation with native start rollback; do not duplicate the rules.
-- [ ] Add deterministic tests for a lying/failing domain, git fallback success, both domain+git failure, foreign `node_modules` ownership, and record/branch preservation.
-- [ ] Update the native cleanup payload contract and `npm test`, lint, build, `check:plugin`, validate, and review smoke are green.
+- [x] Verify worktree removal physically and through `git worktree list` after the domain call; fall back to a literal `git worktree remove` whenever the domain call fails or resolves without removing the worktree. `--force` is a **policy input of that one shared primitive**, not a second rule: `true` for the `start` rollback, which discards the worktree it just created, and `false` for the cleanup prune, so git keeps refusing dirty worktrees and the native tool keeps byte-compatible with `arggon cleanup --prune` (upheld by the PR #421 review — `origin/main`'s cleanup path was already the unforced `git worktree remove`, and forcing natively would introduce forced deletion of uncommitted work that this bug never required).
+- [x] Never emit `removed worktree`, delete a branch, or clear `worktree_path` unless removal is observably complete.
+- [x] A failed removal reports a bounded per-candidate failure with the remaining path and `leftoverBranch`, preserves the record, and keeps the rest of the cleanup run honest.
+- [x] Reuse one shared removal/observation implementation with native start rollback; do not duplicate the rules.
+- [x] Add deterministic tests for a lying/failing domain, git fallback success, both domain+git failure, foreign `node_modules` ownership, and record/branch preservation.
+- [x] Update the native cleanup payload contract and `npm test`, lint, build, `check:plugin`, validate, and review smoke are green.
 
 ## Notes
 
 Review verdict: PR #419 re-review, 2026-09-28, finding 3.
+
+### 2026-09-28 @Arggon-worker — acceptance evidence (ticked after the PR #421 review)
+
+**Deterministic suite** (worktree `npm ci` bootstrap, branch `fix/bug-native-cleanup-unverified-worktree-removal`):
+`npm test` 97 files green, 7 `cleanup prune` cases — lying domain + git fallback success, lying domain + both fail,
+throwing domain + git fallback success, throwing domain + both fail (asserts the observed
+`worktree domain removal failed: …` and `git worktree removal failed` text, the ≤500-char bound, `failures[]`,
+`leftoverPath`/`leftoverBranch`, the preserved record/branch and the absence of a clear commit), foreign
+`node_modules` ownership, and one unobservable removal among two prunable candidates (healthy candidate still
+prunes end to end, one commit for the single cleared record). Start rollback reuses the same primitive: the
+existing refusal rollback test plus a lying-domain rollback that recovers through `git worktree remove --force`.
+
+**Gates:** `npm run lint` · `npm run build` · `npm run check:plugin` (bundle regenerated and committed) ·
+`npm run arggon -- validate --json` → `ok: true` · `npm run smoke:tui-board` passed.
+
+**Review smoke:** the W4 group is **40/40 green on this head** (independent review run), including the
+cleanup round-trip through the **real** OpenCode worktree domain. The full 47-check harness was not re-run: the
+pinned `opencode-go/deepseek-v4-flash` is quota-blocked (`Go usage limit exceeded`), and removal observation
+cannot be driven adversarially through a live, well-behaved domain — that is what the deterministic cases above
+are for. Box 1's force wording is amended to the upheld policy (see above).
 
 ### 2026-09-28 @Arggon-worker
 ## Implementation — PR #421 (draft) — 2026-09-28

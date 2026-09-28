@@ -1905,6 +1905,84 @@ describe("worktree domain tools (W4)", () => {
     ]);
   });
 
+  it("cleanup prune falls back to git when the domain throws", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await completedWorktree(
+      dir,
+      "task-rate-limit",
+      ({ domain, calls: seen }) => {
+        // The domain fails outright (it cannot remove): the git fallback is
+        // the documented compatibility path, and its removal is observed.
+        domain.remove = async (input) => {
+          seen.remove.push(input);
+          throw new Error("worktree domain unavailable");
+        };
+      },
+    );
+
+    const output = await tool(defs, "cleanup").execute({ prune: true });
+    const envelope = output.output as Record<string, unknown>;
+    expect(envelope.failures).toEqual([]);
+    expect(envelope.pruned).toEqual([
+      { id: "task-rate-limit", action: `removed worktree ${worktreePath}` },
+      { id: "task-rate-limit", action: "deleted branch feat/task-rate-limit" },
+      { id: "task-rate-limit", action: "cleared worktree_path" },
+    ]);
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: false },
+    ]);
+    expect(existsSync(worktreePath)).toBe(false);
+    expect(gitOut(dir, ["worktree", "list", "--porcelain"])).not.toContain(worktreePath);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+    expect(envelope.commit).toMatchObject({ message: "chore(tasks): pruned task-rate-limit" });
+  });
+
+  it("cleanup prune keeps the record and the branch when a throwing domain and git both fail", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await completedWorktree(
+      dir,
+      "task-rate-limit",
+      ({ domain, calls: seen }) => {
+        domain.remove = async (input) => {
+          seen.remove.push(input);
+          // Break the registration so the git fallback fails too, then reject:
+          // the reported failure is the domain one, and nothing is removed.
+          rmSync(join(input.directory, ".git"), { force: true });
+          throw new Error("worktree domain unavailable");
+        };
+      },
+    );
+
+    const output = await tool(defs, "cleanup").execute({ prune: true });
+    const envelope = output.output as Record<string, unknown>;
+    const actions = envelope.pruned as Array<Record<string, unknown>>;
+    expect(actions.map((action) => action.action)).toEqual(["failed"]);
+    const failed = actions[0];
+    expect(failed).toMatchObject({
+      id: "task-rate-limit",
+      leftoverPath: worktreePath,
+      leftoverBranch: "feat/task-rate-limit",
+    });
+    // The OBSERVED domain failure and the observed git failure, both named.
+    const message = String(failed.error);
+    expect(message).toContain("worktree domain removal failed: worktree domain unavailable");
+    expect(message).toContain("git worktree removal failed");
+    expect(message).toContain(`worktree remains at ${worktreePath}`);
+    expect(message.length).toBeLessThanOrEqual(500);
+    expect(envelope.failures).toEqual([`task-rate-limit: ${message}`]);
+    expect(envelope.commit).toBeUndefined();
+    // Preserved state: the next cleanup can retry.
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toContain(
+      "feat/task-rate-limit",
+    );
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBe(worktreePath);
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: false },
+    ]);
+  });
+
   it("cleanup prune never force-removes a foreign node_modules install and keeps the record", async () => {
     const dir = seedGitTree();
     const { worktreePath, defs } = await completedWorktree(dir);
