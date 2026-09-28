@@ -33,12 +33,14 @@ and must not be edited here.
 
 ## Acceptance
 
-- [ ] Narrow the native-tool exception to the actual `argonToolDefinitions` → catalog definitions → `editor.add` flow, with adversarial tests for extra adds, alternate registration, and second transforms.
+- [x] Narrow the native-tool rule to the hand-authored Arggon plugin sources and to the exact `argonToolDefinitions` → catalog definitions → `editor.add` flow, with adversarial tests for identifier/factory adds, alternate namespaces, forged `definitions` bindings, extra loops, second transforms, and direct ctx transforms/adds/registers.
 - [x] Cover hand-authored TSX with explicit ast-grep language configuration and positive/negative TSX tests, including `tui.tsx` scan evidence.
-- [ ] Remove the bare `filePath` tracker false positive while adding destination/move and canonical literal/nested tracker-item positives.
-- [ ] Document and scope the structural-root-migration exception for `cli/src/layout-migrate.ts` and reconcile `cli/src/test-tmp.ts` / `cli/src/pack-fixtures.ts` helper scope without opening a production bypass.
+- [x] Add valid non-plugin regression cases for `register(router)`, `install(router)`, `configure(router)`, `editor.add(doc)`, `editor.namespace(...)`, and a generic `definitions` loop, enforced by a committed scope fixture that `npm run test:structure` scans.
+- [x] Make the tracker rules high-confidence and path-position only: multi-argument `rm`/`rmdir`/`unlink`/`truncate` first-path forms are covered, bare leaf file-name inference is removed so `join(root,"docs","task-beta.md")` and `join(root,"product","task-beta.md")` are valid, and `item.filePath`, tracker/task identifiers, root-qualified `ArggonManager|tasks` paths, `tasksDir` dynamic paths, and rename source/destination are retained.
+- [x] Document and scope the structural-root-migration exception for `cli/src/layout-migrate.ts` and reconcile `cli/src/test-tmp.ts` / `cli/src/pack-fixtures.ts` helper scope without opening a production bypass.
 - [x] Preserve the exact dev-only dependency, deterministic one-thread scan, existing CI wiring, no-rewrite behavior, and package allowlist.
-- [ ] Record adversarial rule/probe evidence and green focused/full test, lint, build, plugin, validate, diff, and package-surface gates.
+- [x] Document deliberate/computed/destructured native indirection and the tracker bare-leaf tradeoff as outside structural scope, keeping plugin schema/parity tests authoritative; do not claim those bypasses are covered.
+- [x] Record adversarial rule/probe evidence and green focused/full test, lint, build, plugin, validate, diff, and package-surface gates.
 
 ## Notes
 
@@ -65,3 +67,12 @@ The second review's P1s are addressed in the same item/worktree; no new tracker 
 - Full-config probe: exit 1 with 28 findings across all three rule IDs, all listed native/tracker bypass markers asserted, and no finding on the valid canonical/content markers. Probe removed.
 - Final gates: `npm test` (95 files/1611 tests), `npm run lint`, `npm run test:structure` (3 suites), `npm run lint:structure`, `npm run build`, `npm run check:plugin`, native/CLI `validate`, Prettier, `git diff --check`, and package-surface check all green. Native plugin source and bundle remain untouched.
 - Remaining exact limitation: a byte-for-byte identical duplicate call inside the already-recognized canonical loop is not distinguishable by ast-grep; ordinary identifier, factory, alias, namespace, loop, and forged-binding forms are covered.
+
+### 2026-09-28 third re-review evidence
+
+- Native rule is now path-scoped to `opencode/plugins/arggon/**/*.ts(x)` (bundle, vendored `.opencode`, and tests ignored) with the unconditional generic-name patterns removed. The scope fixture `tools/ast-grep/tests/non-plugin-valid.tsx` carries `register(router)`, `install(router)`, `configure(router)`, `editor.add(doc)`, `editor.namespace(...)`, and a generic `definitions` loop; `npm run test:structure` scans it and observed 0 findings, which is how non-plugin scope is proven (`ast-grep test` does not evaluate `files`/`ignores`).
+- Native positives/negatives: exact canonical `registerArgonTools` flow valid (requires direct `definitions` binding from `argonToolDefinitions`, exact `const transform = ctx?.tool?.transform`, the catalog loop, `...definition`, `options`, `namespace: ARGON_TOOL_NAMESPACE`, `codemode: true`); `namespace: "fork"`, identifier/factory adds, direct and optional ctx transforms/adds/registers, a transform alias outside the flow, an extra loop, a second transform, `tool({...})`, and a wrong-shaped add are all negatives. Deliberate computed/destructured indirection is recorded as out of scope, not as covered.
+- Tracker rules are path-position only and high-confidence: `writeFileSync(outputPath, "ArggonManager/story-alpha/task-beta.md")`, `writeFileSync(path, taskFileContent)`, `writeFileSync(join(root,"docs","task-beta.md"))`, `writeFileSync(join(root,"product","task-beta.md"))`, `writeFileSync(join(root,"ArggonManager","docs","story.md"))`, generic `filePath`/`outputPath`, and bare-leaf writes are valid; `item.filePath`, `value.filePath`, `taskPath`/`trackerPath`/`taskFile` identifiers, `join(root,"ArggonManager","initiative","initiative.md")`, nested `…/story/epic/story.md`, `join(tasksDir, id + ".md")` and `join(tasksDir, name)`, rename destinations, and `rmSync(taskPath, { recursive: true, force: true })` / `rmdir(join(tasksDir, name), …)` / `unlink(item.filePath, callback)` / `truncate(taskFile, 0)` are negatives.
+- Tooling root cause worth keeping: only the last `$$$ARGS` sibling in one `any` is effective in `@ast-grep/cli@0.45.3`; the rules now contain exactly one each, with the serializer call expressed relationally.
+- Probes: legitimate non-plugin probe → 0 findings; in-scope plugin probe → 37 findings across all three rule IDs, 18/18 bypass blocks detected, 0 findings in the valid region; probe files removed.
+- Full gates after the merge with `origin/main` (`4517a283`): `npm test` 95 files/1611 tests, `npm run lint`, `npm run test:structure`, `npm run lint:structure`, `npm run build`, `npm run check:plugin`, `arggon validate`, Prettier, `git diff --check`, and package-surface check all green. Exact dev-only `@ast-grep/cli@0.45.3`, one-thread scans, existing CI wiring, and no-rewrite behavior unchanged.
