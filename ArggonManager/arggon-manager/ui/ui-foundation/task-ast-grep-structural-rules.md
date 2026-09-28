@@ -329,3 +329,35 @@ Note: the merge commit initially failed the pre-commit hook with `@arggondev/lib
 ### handoff 2026-09-28 @ses_f2b15dcecffeuVmXo3s1RGiJBJ (session: ses_f2b15dcecffeuVmXo3s1RGiJBJ) — next: Coordinator: review PR #418 at 0a888c3d (MERGEABLE, CI 36479791296 green) and merge; both items stay in_progress until post-merge completion.
 - branch: feat/task-ast-grep-structural-rules
 - open questions: None. Duplicate YAML key fixed, main merged, all gates and CI green.
+
+### 2026-09-28 @ses_f2b15dcecffeuVmXo3s1RGiJBJ
+**Final integration complete — head `c60ef7b3`. PR #418 is MERGEABLE with all checks green.**
+
+**1. Duplicate YAML key fixed.** `tools/ast-grep/rules/tracker-mutations-use-kernel.yml` declared `PATH_ONE` twice. js-yaml confirmed the pre-fix file threw `duplicated mapping key (82:3)`. The removed block was **byte-identical** to the kept one (both `regex` and `not.regex` compare equal), so last-wins YAML meant behavior already matched the kept definition. Now a pure 5-line deletion; constraints are `MUTATOR`, `PATH_MULTI`, `PATH_ONE`. Tests/scan unchanged: 3/3 PASS, `lint:structure` exit 0.
+
+**2. `origin/main` merged normally, twice, no code changes in either resolution.**
+- First merge: one conflict, the ast item's Notes, resolved **append-only** by concatenating HEAD then main. Verified with `diff` against **both** sides — no lines dropped from HEAD; the only lines absent from main's copy are the intentional `status: in_progress` (main has `todo`) and the ticked acceptance boxes. All history sections preserved, including the P1 completion/cleanup bug records and the third re-review verdict. Committed as `0a888c3d`.
+- The merge initially failed the pre-commit hook with `@arggondev/lib does not provide an export named 'prepareWorktreeDependencies'`. Root cause was a **stale `lib/dist`** predating main's new `lib/src/worktree.ts` — not a code change. `npm run build --workspace @arggondev/lib` cleared it; commit then succeeded.
+- After posting evidence, `mergeStateStatus` went `BEHIND` because main advanced again (5 tracker-only commits, zero overlap with our files). Merged cleanly with the `ort` strategy as `c60ef7b3` — **no conflict**, only `bug-native-cleanup-unverified-worktree-removal.md` and `bug-opencode-smoke-normalize-bracket-namespace.md`.
+
+**3. All gates green at `c60ef7b3`:**
+
+| Check | Result |
+|---|---|
+| `npm run build` | exit 0 |
+| `npm run check:plugin` | exit 0; rebuilt bundle matches main's committed bundle — no plugin/bundle edit by us |
+| `npm test` | exit 0; 97 files / 1633 tests |
+| `npm run lint` | exit 0 |
+| `npm run test:structure` | 3/3 suites PASS + non-plugin fixture scan |
+| `npm run lint:structure` | exit 0 |
+| `arggon validate --json` | ok, 0 warnings, convention v5 |
+| Prettier, `git diff --check` | clean |
+| package surface | 109 files; no `sgconfig.yml` / `tools/ast-grep/` leak |
+| non-plugin fixture | **0 findings** |
+| in-scope probe | **18/18 bypasses detected, 0 findings in valid region**; probe files removed |
+
+PR file scope is unchanged by either merge: rules, tests, fixture, `sgconfig.yml`, `package.json`, CI wiring, `CONTRIBUTING.md`, README, the two items, and the pre-existing ADR-0012 suppression in `cli/src/layout-migrate.ts`.
+
+**4. CI runs confirmed for the final head:** CI **`36481364837` completed/success** (`cli`: success, `ui-smoke`: success) and arggon **`36481364851` completed/success**. Earlier heads: `36479791296` also succeeded. The original no-run condition never recurred. No comment, issue, or force-push was used at any point.
+
+**5. State:** both items `in_progress`, PR has 0 comments / 0 reviews, not merged. Awaiting coordinator review and merge.
