@@ -141,3 +141,7 @@ Note: the merge commit initially failed the pre-commit hook with `@arggondev/lib
 **4. CI now runs.** After the merge push GitHub created run **CI `36479791296`** and **arggon `36479791279`** for `0a888c3d`. CI **completed/success** (`cli`: success, `ui-smoke`: success); arggon **completed/success**. The earlier no-run condition resolved itself on this push — no comment, issue, or force-push was used. PR #418 is now **MERGEABLE** (`mergeStateStatus` was `BLOCKED` only for the pending check, now satisfied).
 
 **5. State:** both items remain `in_progress`; no GitHub comment or issue (PR still has 0 comments / 0 reviews); no force-push; not merged. Awaiting coordinator review and merge.
+
+### handoff 2026-09-28 @ses_f2b15dcecffeuVmXo3s1RGiJBJ (session: ses_f2b15dcecffeuVmXo3s1RGiJBJ) — next: Coordinator: review PR #418 at 0a888c3d (MERGEABLE, CI 36479791296 green) and merge; both items stay in_progress until post-merge completion.
+- branch: feat/task-ast-grep-structural-rules
+- open questions: None. Duplicate YAML key fixed, main merged, all gates and CI green.
