@@ -300,13 +300,41 @@ focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
     refused before any branch is created/switched; a rollback removes only the
     worktree the run created and deletes only a branch the run created, so a
     pre-existing (unmerged) branch survives a refused claim.
-  - the native `start` tool is a deliberate subset of `arggon start --worktree`:
-    it does not link the primary checkout's `node_modules` and does not run the
-    `x-worktree.post-start` hook (the domain creates a plain worktree from the
-    canonical HEAD). The agent bootstraps the worktree explicitly when the
-    project gates need it (`npm ci`, `uv sync`, …); the CLI remains the
-    full-featured fallback. A domain-native bootstrap hook is a candidate
-    follow-up (W5/W7).
+  - the native `start` tool shares the kernel's dependency-preparation/readiness
+    path with the CLI: before the claim write/commit it links an existing
+    primary `node_modules` (or reuses the worktree install), builds workspace
+    packages owned by the worktree, and returns a bounded `preparation` receipt
+    (`ready`, `install`, `linkedNodeModules`, `builtWorkspaces`,
+    `linkedWorkspaces`). The claim commit is explicit and runs the normal
+    pre-commit hook: a required bootstrap/gate failure is a typed
+    `START_FAILED`, keeps the worktree, and reports `claimCommitted: false` plus
+    the bounded `claimCommit` skip reason and an attach/retry instruction. A
+    `preparation.ready: false` receipt is not itself a failure when no gate
+    needs an install (for example, a dependency-free project); the explicit
+    commit outcome remains authoritative. A successful attach/no-op reports
+    `claimCommitted: true` and `claimCommit.status: "not-needed"`, never an
+    invented second commit.
+    - `worktree: false` follows the same ordering rule in the canonical
+      checkout: branch ownership (preflight, then create/attach/switch) is
+      settled BEFORE the claim write, so a failed switch leaves the item
+      untouched. If the claim is refused after this run created the branch, the
+      rollback leaves the branch first, deletes only that owned branch, restores
+      the previous checkout, and reports the observed `rollback` receipt
+      (`branchDeleted: null` when no branch was owned). Attach/re-run reports
+      `branchCreated: false` and `claimCommit.status: "not-needed"` without a
+      duplicate branch or commit, and pushes only when the claim commit or the
+      branch creation makes the branch eligible.
+    - an unexpected failure is reported with the state observed so far, so a
+      claim commit that already landed keeps `claimCommitted: true` with its
+      committed status/hash; only failures before the commit is attempted carry
+      `claimCommit.status: "not-attempted"`.
+    - The domain still does not run the
+      CLI-only `x-worktree.post-start` hook; an adopter that needs a full local
+      install must first remove the start-created link/farm (the CLI hook does
+      this automatically), then run its package-native bootstrap (`npm ci`,
+      `uv sync`, …) in the worktree. Never reify a package manager through a
+      link to the primary install. The CLI remains the full-featured fallback
+      when the domain is unavailable.
 - **Permission action names (W4 probes).** A native plugin tool is gated as
   `<namespace>_<tool>` (`arggon_update`, probe: a `deny` removes
   `tools.arggon.update` from the Code Mode catalog — the model gets
