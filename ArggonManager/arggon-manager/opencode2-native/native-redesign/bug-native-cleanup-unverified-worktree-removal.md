@@ -378,3 +378,7 @@ Native `cleanup` payload row plus the observed-removal paragraph in `ArggonManag
 - S4 (actionable git-stderr hint) and S5/S6 (nits) were left alone by instruction; S6's semicolon drift stays inherited from #419 for `task-plugin-source-prettier-policy`.
 
 **Next step for the coordinator:** merge PR #421 (ready for review, CI green), then flip this item to `done`.
+
+### handoff 2026-09-28 @Arggon-coordinator (session: ses_f165d5e03ffeuQoAVgHB6lN7kE) — next: Merge PR #421 (final head d60b8341, CI green) and flip the item to done; FINAL APPROVE verdict is on the item as Arggon-coordinator.
+- branch: fix/bug-native-cleanup-unverified-worktree-removal
+- open questions: None blocking. Tracker comment commits (b32c7e88 final verdict) sit local on main in the primary checkout, unpushed - coordinator to push with main.
