@@ -61,16 +61,23 @@ describe("native-start-cold-smoke: installFingerprint / installDrift", () => {
     expect(installDrift(installFingerprint(dir), installFingerprint(dir))).toEqual([]);
   });
 
-  it("reports the emptied-install signature (count and entry set collapse)", () => {
+  it("reports the emptied-install signature (count, entry set and clock)", () => {
     const before = installFingerprint(installFixture(["native-gate-dep", "commander"]));
     rmSync(join(before.path, "commander"), { recursive: true, force: true });
+    // Pin the directory clock before comparing. Whether the kernel re-stamps a
+    // directory mtime on an unlink depends on the tick the removal landed in, so
+    // leaving it to chance made this assertion machine-speed dependent (it
+    // passed locally and failed on the CI runner). The count and the entry-set
+    // digest are the load-bearing "was it emptied?" signals; the mtime adds the
+    // reification case where the same names come back re-linked.
+    const pinned = new Date(1_000_000_000_000);
+    utimesSync(before.path, pinned, pinned);
     const after = installFingerprint(before.path.replace(/\/node_modules$/, ""));
-    const drift = installDrift(before, after);
-    // The count and the digest are the load-bearing signals; the mtime is a
-    // coarse-clock one (Linux stamps a directory from the current tick, so an
-    // instant remove inside the same tick leaves it unchanged) and is asserted
-    // on its own below.
-    expect(drift).toEqual(["entry count 2 -> 1", expect.stringContaining("entry set changed")]);
+    expect(installDrift(before, after)).toEqual([
+      "entry count 2 -> 1",
+      expect.stringContaining("entry set changed"),
+      `mtime ${before.mtimeMs} -> ${pinned.getTime()}`,
+    ]);
   });
 
   it("reports a reified install (same entries, new mtime) as drift", () => {
