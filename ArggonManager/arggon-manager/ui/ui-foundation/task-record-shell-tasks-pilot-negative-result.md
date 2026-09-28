@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-record-shell-tasks-pilot-negative-result
 title: Record the opencode2-shell-tasks pilot FAIL in the exploration and correct its recommendation
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [research, agents, tooling]
 priority: p2
 created: "2026-09-28"
 updated: "2026-09-28"
-claimed_at: "2026-09-28T22:45:57.360Z"
 depends_on: [task-pilot-opencode2-shell-tasks-server-only]
 worktree_path: /home/arggon/Projects/ArggonManager-task-record-shell-tasks-pilot-negative-result
 ---
