@@ -79,8 +79,3 @@ constraints:
       - regex: '(?i)(initiative|epic|story|task|tracker|item)(file|path|dir|id|move|source|dest)|\.filePath$|(ArggonManager|tasks)[^\n)]*(initiative|epic|story|task|bug)s?([-_][^\n)]*)?\.md|(join|resolve)\([^)]*tasksDir[^)]*\)'
       - not:
           regex: '(?i)(ArggonManager|tasks)[^\n)]*(docs|documentation)[^\n)]*'
-  PATH_ONE:
-    all:
-      - regex: '(?i)(initiative|epic|story|task|tracker|item)(file|path|dir|id|move|source|dest)|\.filePath$|(ArggonManager|tasks)[^\n)]*(initiative|epic|story|task|bug)s?([-_][^\n)]*)?\.md|(join|resolve)\([^)]*tasksDir[^)]*\)'
-      - not:
-          regex: '(?i)(ArggonManager|tasks)[^\n)]*(docs|documentation)[^\n)]*'
