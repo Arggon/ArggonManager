@@ -8658,10 +8658,12 @@ async function nativeCleanup(kernel, input, options) {
                         });
                     }
                     catch (error) {
+                        const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS);
+                        failures.push(`${entry.id}: ${message}`);
                         pruned.push({
                             id: entry.id,
                             action: "failed",
-                            error: detail(error),
+                            error: message,
                             leftoverBranch: entry.branch,
                         });
                     }

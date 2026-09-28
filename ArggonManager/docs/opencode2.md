@@ -279,6 +279,7 @@ the session keeps working in both cases.
 npm test                      # 1438+ tests
 npm run smoke:opencode        # headless scenarios on a real OpenCode runtime: dependency-less bundle, one session per native command, the W4 worktree lifecycle + invariants + permissions
 npm run smoke:opencode:wave   # scripted coordinator/worker/reviewer wave (2 fixtures)
+npm run smoke:native-start-cold  # deterministic + model-free: the native tools.arggon.start cold worktree (dependency-requiring pre-commit gate, bounded readiness/claim-commit receipt, claim commit with only the item file, re-run attach, untouched installs)
 npm run smoke:tui             # TUI evidence on a real runtime: init seam, plugin discovery, PTY run, /arggon-board opens and renders the tree
 npm run context:report --strict   # context budgets: AGENTS.md, MCP schemas, item block, keep.tokens
 ```
@@ -288,7 +289,10 @@ sensitive**: run them on their own, without a concurrent test suite or another
 headless harness (a loaded machine can stall a provider call past the per-command
 timeout and leave a scenario half-done). The deterministic gates (`npm test`,
 lint/build/`check:plugin`, `validate`) are safe to run in parallel; `smoke:tui`
-is model-free and cheap.
+and `smoke:native-start-cold` are model-free and cheap — the latter needs
+`npm run build` first, because it drives the native tool against **this
+checkout's** plugin source and kernel build, not a vendored or primary-copy
+build.
 
 ## Side-by-side installs
 
