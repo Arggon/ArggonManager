@@ -361,3 +361,7 @@ PR file scope is unchanged by either merge: rules, tests, fixture, `sgconfig.yml
 **4. CI runs confirmed for the final head:** CI **`36481364837` completed/success** (`cli`: success, `ui-smoke`: success) and arggon **`36481364851` completed/success**. Earlier heads: `36479791296` also succeeded. The original no-run condition never recurred. No comment, issue, or force-push was used at any point.
 
 **5. State:** both items `in_progress`, PR has 0 comments / 0 reviews, not merged. Awaiting coordinator review and merge.
+
+### handoff 2026-09-28 @ses_f2b15dcecffeuVmXo3s1RGiJBJ (session: ses_f2b15dcecffeuVmXo3s1RGiJBJ) — next: Coordinator: merge PR #418 at c60ef7b3 (MERGEABLE; CI 36481364837 green). Items stay in_progress until post-merge completion.
+- branch: feat/task-ast-grep-structural-rules
+- open questions: None. Duplicate YAML key fixed, origin/main merged twice, all gates and CI green.
