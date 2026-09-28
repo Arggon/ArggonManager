@@ -6404,7 +6404,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sidebarStatusLine = exports.emptyBoardSnapshot = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardHeaderLine = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.ARGON_BOARD_PANEL = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
+exports.sidebarStatusLine = exports.emptyBoardSnapshot = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardHeaderLine = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.ARGON_BOARD_PANEL = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
 exports.isArggonItemId = isArggonItemId;
 exports.parseArggonItemFromCommand = parseArggonItemFromCommand;
 exports.parseArggonItemFromCode = parseArggonItemFromCode;
@@ -6414,11 +6414,13 @@ exports.looksLikeCommitCommand = looksLikeCommitCommand;
 exports.buildItemBlock = buildItemBlock;
 exports.boundText = boundText;
 exports.parseValidateFailure = parseValidateFailure;
+exports.sessionDirectoryResolver = sessionDirectoryResolver;
 exports.itemCacheKey = itemCacheKey;
 exports.setBounded = setBounded;
 exports.onToolAfter = onToolAfter;
 exports.csvList = csvList;
 exports.sessionToken = sessionToken;
+exports.resolveToolCwd = resolveToolCwd;
 exports.worktreeOptions = worktreeOptions;
 exports.nativeToolSchemas = nativeToolSchemas;
 exports.nativeToolsCatalogBytes = nativeToolsCatalogBytes;
@@ -6995,6 +6997,15 @@ function run(bin, args, cwd, timeout) {
 function locationDirectory(ctx) {
     return asString(ctx.location?.directory);
 }
+function sessionDirectoryResolver(ctx) {
+    const get = ctx?.session?.get;
+    if (typeof get !== "function")
+        return undefined;
+    return async (sessionID) => {
+        const session = (await get({ sessionID }));
+        return asString(session?.location?.directory) ?? asString(session?.directory);
+    };
+}
 function hasTasksTree(directory) {
     try {
         return (0, node_fs_1.existsSync)((0, node_path_1.join)(directory, "ArggonManager")) || (0, node_fs_1.existsSync)((0, node_path_1.join)(directory, "tasks"));
@@ -7305,6 +7316,34 @@ function sessionToken(value) {
     if (token === "" || token.length > SESSION_TOKEN_MAX_CHARS)
         return undefined;
     return /^[A-Za-z0-9._:-]+$/.test(token) ? token : undefined;
+}
+exports.SESSION_ROOT_UNRESOLVED = "SESSION_ROOT_UNRESOLVED";
+async function resolveToolCwd(kernel, command, options, tool) {
+    const sessionID = sessionToken(tool?.sessionID);
+    if (sessionID === undefined || options.sessionDirectory === undefined) {
+        return { cwd: options.cwd };
+    }
+    let directory;
+    let failure;
+    try {
+        directory = asString(await options.sessionDirectory(sessionID));
+    }
+    catch (error) {
+        failure = detail(error);
+    }
+    if (directory === undefined) {
+        const cause = failure === undefined ? "" : ` (${boundedNativeText(failure, MAX_NATIVE_DETAIL_CHARS)})`;
+        return {
+            error: new ArgonToolError(kernel.failEnvelope({
+                command,
+                code: exports.SESSION_ROOT_UNRESOLVED,
+                message: `could not resolve the working directory of session ${sessionID}${cause}; refusing ` +
+                    `to fall back to the plugin location ${options.cwd}, which would commit to the ` +
+                    "checkout this plugin was loaded from instead of the session's own",
+            })),
+        };
+    }
+    return { cwd: directory };
 }
 const ID = { type: "string" };
 const STRINGS = { type: "array", items: { type: "string" } };
@@ -8685,7 +8724,11 @@ function argonToolDefinitions(kernel, options) {
         input: spec.input,
         output: spec.output,
         execute: async (input, tool) => {
-            const outcome = await spec.run(kernel, input ?? {}, options, tool);
+            const resolved = await resolveToolCwd(kernel, spec.name, options, tool);
+            if ("error" in resolved)
+                throw resolved.error;
+            const callOptions = resolved.cwd === options.cwd ? options : { ...options, cwd: resolved.cwd };
+            const outcome = await spec.run(kernel, input ?? {}, callOptions, tool);
             const envelope = outcome.envelope;
             if (!outcome.ok)
                 throw new ArgonToolError(envelope);
@@ -8759,6 +8802,7 @@ const definition = {
             if (directory !== undefined) {
                 await registerArgonTools(ctx, {
                     cwd: directory,
+                    sessionDirectory: sessionDirectoryResolver(ctx),
                     templatesDir: pluginTemplatesDir(),
                     worktree: worktreeOptions(ctx),
                 });
