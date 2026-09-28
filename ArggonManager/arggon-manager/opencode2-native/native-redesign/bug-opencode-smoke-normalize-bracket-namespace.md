@@ -28,13 +28,13 @@ PR #421's focused W4 smoke run exposed a harness false failure: the model emitte
 
 ## Acceptance
 
-- [ ] Normalize `tools.arggon["x"]` and `tools.arggon['x']` to the same canonical dot form already produced for `tools["arggon"].x`.
-- [ ] Preserve support for the existing nested/dot access forms and avoid rewriting unrelated bracket access.
-- [ ] Add focused unit coverage for double-quoted, single-quoted, and non-matching tool names.
-- [ ] Correct the `normalizeNamespace` doc comment that claims every valid namespace spelling is already handled.
-- [ ] Replace/rename the misleading `opencode-smoke.test.ts` case (“normalizes every bracket namespace spelling”) that currently asserts the un-normalized result and locks the gap in.
-- [ ] Re-run the affected W4 lifecycle smoke with a bounded model-independent fixture or transcript so the normalizer contract is verified without provider quota.
-- [ ] Full test, lint, build, `check:plugin`, and validate remain green.
+- [x] Normalize `tools.arggon["x"]` and `tools.arggon['x']` to the same canonical dot form already produced for `tools["arggon"].x`.
+- [x] Preserve support for the existing nested/dot access forms and avoid rewriting unrelated bracket access.
+- [x] Add focused unit coverage for double-quoted, single-quoted, and non-matching tool names.
+- [x] Correct the `normalizeNamespace` doc comment that claims every valid namespace spelling is already handled.
+- [x] Replace/rename the misleading `opencode-smoke.test.ts` case (“normalizes every bracket namespace spelling”) that currently asserts the un-normalized result and locks the gap in.
+- [x] Re-run the affected W4 lifecycle smoke with a bounded model-independent fixture or transcript so the normalizer contract is verified without provider quota.
+- [x] Full test, lint, build, `check:plugin`, and validate remain green.
 
 ## Notes
 

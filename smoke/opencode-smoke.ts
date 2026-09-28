@@ -407,13 +407,38 @@ export function parseTranscript(stdout: string): TranscriptEvent[] {
 }
 
 /**
- * Normalize the Code Mode namespace spellings a model produces:
- * `tools["arggon"].x` / `tools['arggon']['x']` → `tools.arggon.x`, so the
- * transcript checks accept every valid form (observed in the bounded command
- * sessions, W4).
+ * Normalize the Code Mode namespace spellings a model produces to the single
+ * canonical dot form the transcript needles use (`tools.arggon.<name>`), so a
+ * check matches every valid spelling instead of only the one the pinned smoke
+ * model happens to emit:
+ *
+ *   tools["arggon"].x  / tools['arggon']['x']  →  tools.arggon.x   (namespace)
+ *   tools.arggon["x"] / tools.arggon['x']     →  tools.arggon.x   (member)
+ *
+ * The member rewrite also accepts the backtick form and requires the closing
+ * quote to match the opening one. Both rewrites are anchored on the literal
+ * `tools` + `arggon` pair, so other namespaces
+ * (`tools["context7"]["resolve-library-id"]`) and unrelated bracket access are
+ * left untouched.
+ *
+ * bug-opencode-smoke-normalize-bracket-namespace: a W4 run whose model wrote
+ * the valid `tools.arggon["start"]({ … })` / `tools.arggon["update"]({ … })`
+ * ran the tools and got correct `ok:true` envelopes back, yet
+ * `executeJson(…, "tools.arggon.start")` reported "model executed the native
+ * start tool" as a false failure — indistinguishable from a real product
+ * failure, and flaky across runs of the same head. Every native-tool transcript
+ * check routes its needle through here, so this is the single place where the
+ * spellings are handled.
+ *
+ * Known bound: the needles are still shape-based, so a call hoisted behind a
+ * local alias (`const t = tools.arggon; t.next({})`) is not recognized. The
+ * harness prompts submit the exact code to run and the only deviation observed
+ * was the spelling of the call itself, which both rewrites above now cover.
  */
 export function normalizeNamespace(code: string): string {
-  return code.replace(/tools\s*\[\s*["']arggon["']\s*\]/g, "tools.arggon");
+  return code
+    .replace(/tools\s*\[\s*["']arggon["']\s*\]/g, "tools.arggon")
+    .replace(/(tools\.arggon)\s*\[\s*(["'`])([\w$-]+)\2\s*\]/g, "$1.$3");
 }
 
 /** Completed Code Mode calls that ran the native `next` tool successfully. */
@@ -441,19 +466,15 @@ function executedCode(stdout: string, needle: string): boolean {
 }
 
 /**
- * True when a completed Code Mode call invokes one native tool, accepting both
- * spellings a model produces: `tools.arggon.<name>(…)` and
- * `tools.arggon["<name>"](…)` (observed in the bounded command sessions).
+ * True when a completed Code Mode call invoked the native tool `name`, whatever
+ * spelling the model wrote it in: `normalizeNamespace` now folds the bracket
+ * forms into the canonical `tools.arggon.<name>`, so this is a single needle
+ * instead of a spelling list that can drift from the normalizer
+ * (bug-opencode-smoke-normalize-bracket-namespace). Exported for the transcript
+ * unit tests, like the other pure helpers here.
  */
-function executedTool(stdout: string, name: string): boolean {
-  const patterns = [`tools.arggon.${name}`, `tools.arggon["${name}"]`, `tools.arggon['${name}']`];
-  return parseTranscript(stdout).some((event) => {
-    if (event.type !== "tool_use" || event.part?.tool !== "execute") return false;
-    const state = event.part.state;
-    if (state?.status !== "completed") return false;
-    const code = normalizeNamespace(state.input?.code ?? "");
-    return patterns.some((pattern) => code.includes(pattern));
-  });
+export function executedTool(stdout: string, name: string): boolean {
+  return executedCode(stdout, `tools.arggon.${name}`);
 }
 
 /**
