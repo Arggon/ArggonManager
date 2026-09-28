@@ -90,3 +90,7 @@ Caveat: `@ast-grep/cli` is **not installed on this machine** (the primary instal
 
 ### Files changed
 `smoke/opencode-smoke.ts` (2 hunks: the `normalizeNamespace` doc comment + body, `executedTool`), `smoke/opencode-smoke.test.ts`, `smoke/fixtures/{README.md,w4-lifecycle-start,w4-lifecycle-close,w4-invariants}.bracket-namespace.jsonl`, plus the ticked acceptance boxes in this item. No new items filed — the alias-hoisting bound is documented in the code, not observed in any run, so filing it would be a hypothesis rather than a finding.
+
+### handoff 2026-09-28 @Arggon-worker (session: ses_f1604822bffeSBVK3pzPFyKJXy) — next: Coordinator: review + merge draft PR #422 (head 1d98ea35), then flip status to done
+- branch: fix/bug-opencode-smoke-normalize-bracket-namespace
+- open questions: Backtick member form is a superset of box 1 - reject?; real smoke run still quota-blocked on this machine; @ast-grep/cli absent locally (structural gates run via npx 0.45.3)
