@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-opencode-smoke-normalize-bracket-namespace
 title: OpenCode smoke namespace normalizer misses tools.arggon bracket-access calls
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [opencode-seam, smoke, review-followup]
 priority: p1
 created: "2026-09-28"
 updated: "2026-09-28"
-claimed_at: "2026-09-28T21:44:24.716Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-opencode-smoke-normalize-bracket-namespace
 ---
 <!--
