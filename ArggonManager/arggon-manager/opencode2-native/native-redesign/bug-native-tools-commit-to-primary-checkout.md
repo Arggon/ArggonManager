@@ -67,3 +67,26 @@ Found 2026-09-28 during the coordinator review of PRs #422 and #423. Not caused 
 the native tracker tools and the worktree lifecycle were never covered by a test that runs a
 committing tool from inside a worktree. Related but distinct: `bug-stale-vendored-plugin-copy`
 (vendored copy under `init` re-runs).
+
+### 2026-09-28 @Arggon
+Root cause established with evidence, before any fix was written.
+
+**It was a captured/stale root, not an explicit primary-checkout path.** `opencode/plugins/arggon/index.ts` resolves the tracker directory once, in `definition.setup()`:
+
+    const directory = locationDirectory(ctx)          // === ctx.location.directory
+    await registerArgonTools(ctx, { cwd: directory, … })
+
+`ArgonToolOptions.cwd` is then frozen for the plugin instance's lifetime, and all 15 tool specs pass that value straight to the kernel (`cwd: options.cwd`), so `findTasksDir()` walks up from the checkout the plugin was LOADED in. OpenCode V2's own docs (`/build/plugins`, Context) call `ctx.location` "the plugin instance's location, **not** the location of every session it can access or event it receives" — so after `opencode.session_move` the captured value is stale by construction. There is no separate primary-checkout lookup anywhere in the plugin; `canonicalRoot()`/`options.worktree.canonical` is used only for `start`'s worktree placement and never as a tracker root.
+
+**Live reproduction, read-only, in the very session that owns this fix** (this worktree is `/home/arggon/Projects/ArggonManager-bug-native-tools-commit-to-primary-checkout`):
+
+| source | resolved tracker root | status | assignee | branch | worktree_path |
+| --- | --- | --- | --- | --- | --- |
+| `tools.arggon.show({ id, meta: true })` (native, session cwd = this worktree) | `/home/arggon/Projects/ArggonManager` (primary, on `main`) | `todo` | `null` | `null` | `null` |
+| `npm run arggon -- show bug-native-tools-commit-to-primary-checkout --meta --json` (same worktree) | this worktree | `in_progress` | `Arggon` | `fix/bug-native-tools-commit-to-primary-checkout` | `/home/…/ArggonManager-bug-…` |
+
+The native read already answers from the primary's `main` while the worker's cwd is the worktree; a committing tool from the same session therefore commits to `main` — which is exactly how `b65ef7c6`/`adacc20a` reached `main` and how `d24215b9` was produced.
+
+**Why the session's own directory is the right resolution rule.** The V2 tool context is built as `{ sessionID, agent, messageID, id, progress, signal }` — V2 hands a plugin tool **no directory**, so `sessionID` is the only per-call signal of where the session works, and `ctx.session.get({ sessionID })` → `Session.Info.location.directory` is what `session.move` updates. The candidates rejected: (a) `ctx.location.directory` — the plugin instance's location, stale after a move (the defect); (b) `process.cwd()` — the host process's launch directory, and a background `opencode serve` carries its own, never the session's; (c) the item's recorded `worktree_path` — chicken-and-egg, reading it needs the root being resolved (it stays authoritative for what `start` attaches to, not for where a call resolves). A session's directory is the one rule that matches one-branch-per-item: the branch the session moved onto is the branch its commit must land on, so the evidence is in the PR.
+
+**The failure is loud, not silent.** Once a session is known, an unresolvable directory raises a typed tool error (`error.code: SESSION_ROOT_UNRESOLVED`, an `ArgonToolError` with the envelope) rather than falling back to the plugin location — committing to the wrong checkout because a lookup failed is the failure being fixed. The plugin-location fallback applies only when there is no calling session at all, and when the host has no `ctx.session.get` (degrades to the pre-fix behavior instead of breaking).
