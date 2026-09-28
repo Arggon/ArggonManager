@@ -7958,35 +7958,46 @@ async function createItemWorktree(options, repoRoot, id) {
         return { error: `worktree domain create failed for '${name}': ${detail(error)}` };
     }
 }
-async function discardWorktree(options, directory, branch) {
-    const canonical = canonicalRoot(options, options.cwd);
+async function removeWorktreeObserved(options, directory, root, policy) {
     const errors = [];
     const domain = options.worktree?.domain;
     const projectID = asString(options.worktree?.projectID);
-    let worktreeRemoved = false;
+    const gone = async () => !(0, node_fs_1.existsSync)(directory) && !(await isRegisteredWorktree(root, directory));
+    let via = null;
     if (domain?.remove !== undefined && projectID !== undefined) {
         try {
-            await domain.remove({ projectID, directory, force: true });
-            if (!(0, node_fs_1.existsSync)(directory))
-                worktreeRemoved = true;
+            await domain.remove({ projectID, directory, force: policy.force });
+            if (await gone())
+                via = "domain";
+            else
+                errors.push("the worktree domain resolved without removing the worktree");
         }
         catch (error) {
             errors.push(`worktree domain removal failed: ${detail(error)}`);
         }
     }
-    if (!worktreeRemoved) {
-        const removed = await run("git", ["worktree", "remove", "--force", directory], canonical, 30_000);
-        if (removed.code === 0) {
-            worktreeRemoved = true;
-        }
-        else {
+    if (via === null) {
+        const removed = await run("git", ["worktree", "remove", ...(policy.force ? ["--force"] : []), directory], root, 30_000);
+        if (removed.code !== 0) {
             errors.push(`git worktree removal failed: ${removed.stderr.trim() || `exit ${removed.code ?? "unknown"}`}`);
         }
+        else if (await gone()) {
+            via = "git";
+        }
+        else {
+            errors.push(`git worktree remove exited 0 but the worktree remains at ${directory}`);
+        }
     }
-    if ((0, node_fs_1.existsSync)(directory) || (await isRegisteredWorktree(canonical, directory))) {
-        worktreeRemoved = false;
+    const removed = via !== null;
+    if (!removed)
         errors.push(`worktree remains at ${directory}`);
-    }
+    return { removed, via, errors };
+}
+async function discardWorktree(options, directory, branch) {
+    const canonical = canonicalRoot(options, options.cwd);
+    const observation = await removeWorktreeObserved(options, directory, canonical, { force: true });
+    const errors = [...observation.errors];
+    const worktreeRemoved = observation.removed;
     let branchDeleted = branch === undefined ? null : false;
     if (branch !== undefined) {
         if (!worktreeRemoved) {
@@ -8470,20 +8481,6 @@ async function domainWorktrees(options) {
         return [];
     }
 }
-async function removeWorktree(kernel, options, root, directory) {
-    const domain = options.worktree?.domain;
-    const projectID = asString(options.worktree?.projectID);
-    if (domain?.remove !== undefined && projectID !== undefined) {
-        try {
-            await domain.remove({ projectID, directory, force: false });
-            return;
-        }
-        catch (error) {
-            logOnce("worktree-remove", "worktree domain remove failed; falling back to git", error);
-        }
-    }
-    kernel.defaultCleanupGit().removeWorktree(root, directory);
-}
 async function nativeCleanup(kernel, input, options) {
     let root;
     try {
@@ -8528,7 +8525,22 @@ async function nativeCleanup(kernel, input, options) {
                     if ((0, node_path_1.resolve)(canonical) !== (0, node_path_1.resolve)(root)) {
                         kernel.unlinkNodeModulesLink(root, entry.path);
                     }
-                    await removeWorktree(kernel, options, root, entry.path);
+                    const removal = await removeWorktreeObserved(options, entry.path, root, {
+                        force: false,
+                    });
+                    if (!removal.removed) {
+                        const message = boundedNativeText(removal.errors.join("; "), MAX_NATIVE_DETAIL_CHARS);
+                        failures.push(`${entry.id}: ${message}`);
+                        pruned.push({
+                            id: entry.id,
+                            action: "failed",
+                            error: message,
+                            leftoverPath: entry.path,
+                            ...(entry.branch !== null ? { leftoverBranch: entry.branch } : {}),
+                            ...(entry.via !== undefined ? { via: entry.via } : {}),
+                        });
+                        continue;
+                    }
                     pruned.push({
                         id: entry.id,
                         action: `removed worktree ${entry.path}`,

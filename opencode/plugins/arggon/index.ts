@@ -2314,6 +2314,92 @@ async function createItemWorktree(
   }
 }
 
+/** The one observed removal rule every worktree remover in this plugin shares. */
+type WorktreeRemovalObservation = {
+  /**
+   * True only when the directory is gone AND `git worktree list` no longer
+   * reports it. Never inferred from a resolved promise or a zero exit code.
+   */
+  removed: boolean;
+  /** Which step actually removed it (null when nothing did). */
+  via: "domain" | "git" | null;
+  /** Why the removal did not complete (empty when it did). */
+  errors: string[];
+};
+
+/**
+ * Force policy for a removal attempt chain. It is a policy input, not a second
+ * rule: the observation below is identical for every caller, so the start
+ * rollback and the cleanup prune can never disagree what "removed" means.
+ */
+type WorktreeRemovalPolicy = {
+  /**
+   * Applies to the domain call AND the git fallback. The start rollback forces
+   * (it discards a worktree this run just created); the cleanup prune does not,
+   * so git keeps refusing dirty worktrees exactly like `arggon cleanup --prune`.
+   */
+  force: boolean;
+};
+
+/**
+ * Remove one worktree and OBSERVE the result — the single removal/observation
+ * implementation shared by the native `start` rollback ({@link discardWorktree})
+ * and the native `cleanup` prune ({@link nativeCleanup}).
+ *
+ * The domain is the preferred path, but a resolved promise is not a removal: a
+ * domain that fails, or that leaves the worktree in place, falls through to the
+ * literal `git worktree remove` fallback, and the directory plus the git
+ * inventory are checked after every step. Callers gate every consequential
+ * action (branch deletion, `worktree_path` clearing) on `removed`.
+ */
+async function removeWorktreeObserved(
+  options: ArgonToolOptions,
+  directory: string,
+  root: string,
+  policy: WorktreeRemovalPolicy,
+): Promise<WorktreeRemovalObservation> {
+  const errors: string[] = [];
+  const domain = options.worktree?.domain;
+  const projectID = asString(options.worktree?.projectID);
+  // Physical state AND git inventory: a removal is complete only when both agree.
+  const gone = async (): Promise<boolean> =>
+    !existsSync(directory) && !(await isRegisteredWorktree(root, directory));
+  let via: WorktreeRemovalObservation["via"] = null;
+
+  if (domain?.remove !== undefined && projectID !== undefined) {
+    try {
+      await domain.remove({ projectID, directory, force: policy.force });
+      if (await gone()) via = "domain";
+      else errors.push("the worktree domain resolved without removing the worktree");
+    } catch (error) {
+      errors.push(`worktree domain removal failed: ${detail(error)}`);
+    }
+  }
+
+  if (via === null) {
+    const removed = await run(
+      "git",
+      ["worktree", "remove", ...(policy.force ? ["--force"] : []), directory],
+      root,
+      30_000,
+    );
+    if (removed.code !== 0) {
+      errors.push(
+        `git worktree removal failed: ${removed.stderr.trim() || `exit ${removed.code ?? "unknown"}`}`,
+      );
+    } else if (await gone()) {
+      via = "git";
+    } else {
+      // A zero exit is not proof either: report the leftover, not the success.
+      errors.push(`git worktree remove exited 0 but the worktree remains at ${directory}`);
+    }
+  }
+
+  const removed = via !== null;
+  if (!removed) errors.push(`worktree remains at ${directory}`);
+  return { removed, via, errors };
+}
+
 type DiscardWorktreeResult = {
   worktreeRemoved: boolean;
   /** null means this run did not own a branch, so no branch deletion was due. */
@@ -2322,10 +2408,11 @@ type DiscardWorktreeResult = {
 };
 
 /**
- * Remove a worktree this run created and observe the result. The domain is the
- * preferred path, but a failed domain call falls back to git; either way the
- * directory and git inventory are checked before a branch is deleted. A
- * rollback is never described as successful from an unobserved promise.
+ * Remove a worktree this run created and observe the result with the same
+ * primitive the cleanup prune uses (forced: the worktree is seconds old and
+ * holds nothing but this run's scaffolding). The directory and git inventory
+ * are checked before a branch is deleted: a rollback is never described as
+ * successful from an unobserved promise.
  */
 async function discardWorktree(
   options: ArgonToolOptions,
@@ -2333,45 +2420,13 @@ async function discardWorktree(
   branch?: string,
 ): Promise<DiscardWorktreeResult> {
   const canonical = canonicalRoot(options, options.cwd);
-  const errors: string[] = [];
-  const domain = options.worktree?.domain;
-  const projectID = asString(options.worktree?.projectID);
-  let worktreeRemoved = false;
-
-  if (domain?.remove !== undefined && projectID !== undefined) {
-    try {
-      await domain.remove({ projectID, directory, force: true });
-      if (!existsSync(directory)) worktreeRemoved = true;
-    } catch (error) {
-      errors.push(`worktree domain removal failed: ${detail(error)}`);
-    }
-  }
-
-  if (!worktreeRemoved) {
-    const removed = await run(
-      "git",
-      ["worktree", "remove", "--force", directory],
-      canonical,
-      30_000,
-    );
-    if (removed.code === 0) {
-      worktreeRemoved = true;
-    } else {
-      errors.push(
-        `git worktree removal failed: ${removed.stderr.trim() || `exit ${removed.code ?? "unknown"}`}`,
-      );
-    }
-  }
-
-  // A domain can resolve successfully while leaving a directory or inventory
-  // entry behind. Never delete the branch until the worktree is observably gone.
-  if (existsSync(directory) || (await isRegisteredWorktree(canonical, directory))) {
-    worktreeRemoved = false;
-    errors.push(`worktree remains at ${directory}`);
-  }
+  const observation = await removeWorktreeObserved(options, directory, canonical, { force: true });
+  const errors = [...observation.errors];
+  const worktreeRemoved = observation.removed;
 
   let branchDeleted: boolean | null = branch === undefined ? null : false;
   if (branch !== undefined) {
+    // Never delete the branch until the worktree is observably gone.
     if (!worktreeRemoved) {
       errors.push(`branch ${branch} was kept because its worktree remains`);
     } else {
@@ -3187,31 +3242,14 @@ async function domainWorktrees(options: ArgonToolOptions): Promise<string[]> {
   }
 }
 
-/** Remove one worktree: the domain when available, `git worktree remove` as the compatibility fallback. */
-async function removeWorktree(
-  kernel: ArgonKernel,
-  options: ArgonToolOptions,
-  root: string,
-  directory: string,
-): Promise<void> {
-  const domain = options.worktree?.domain
-  const projectID = asString(options.worktree?.projectID)
-  if (domain?.remove !== undefined && projectID !== undefined) {
-    try {
-      await domain.remove({ projectID, directory, force: false })
-      return
-    } catch (error) {
-      logOnce("worktree-remove", "worktree domain remove failed; falling back to git", error)
-    }
-  }
-  kernel.defaultCleanupGit().removeWorktree(root, directory)
-}
-
 /**
  * `cleanup` (native): classify every item with a `worktree_path` record with
  * the shared kernel rule (`classifyCleanupEntry`, the same one the CLI uses)
- * and, with `prune: true`, remove removable worktrees through the domain,
- * delete their merged branches and clear the records in ONE tracker commit.
+ * and, with `prune: true`, remove removable worktrees through the domain
+ * (observed, with a git fallback — the same primitive the start rollback uses),
+ * then delete their merged branches and clear the records in ONE tracker commit.
+ * A removal that is not observably complete reports a per-candidate failure
+ * and preserves both the branch and the record.
  * Skips (non-terminal item, unmerged branch, missing/foreign path) are
  * reported, never touched.
  */
@@ -3273,7 +3311,28 @@ async function nativeCleanup(
           if (resolve(canonical) !== resolve(root)) {
             kernel.unlinkNodeModulesLink(root, entry.path)
           }
-          await removeWorktree(kernel, options, root, entry.path)
+          // The SAME observed removal the start rollback uses, without its force
+          // policy: a dirty worktree must still be refused by git (bug-native-
+          // cleanup-unverified-worktree-removal).
+          const removal = await removeWorktreeObserved(options, entry.path, root, {
+            force: false,
+          })
+          if (!removal.removed) {
+            // A domain that resolves without removing (or a failing domain plus
+            // a failing git fallback) is never reported as a removal: keep the
+            // branch, keep the record, and name the leftover path.
+            const message = boundedNativeText(removal.errors.join("; "), MAX_NATIVE_DETAIL_CHARS)
+            failures.push(`${entry.id}: ${message}`)
+            pruned.push({
+              id: entry.id,
+              action: "failed",
+              error: message,
+              leftoverPath: entry.path,
+              ...(entry.branch !== null ? { leftoverBranch: entry.branch } : {}),
+              ...(entry.via !== undefined ? { via: entry.via } : {}),
+            })
+            continue
+          }
           pruned.push({
             id: entry.id,
             action: `removed worktree ${entry.path}`,
