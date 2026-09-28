@@ -428,3 +428,18 @@ identifier `editor.add(extraTool)`; factory `editor.add(makeDefinition())`; `ctx
 ### Required merge/CI steps
 
 None blocking. Coordinator: merge; optionally sync the 5 tracker-only main commits first if the branch must be up to date. Items stay `in_progress` for post-merge completion. Non-blocking items 1–3 above are best filed as a follow-up task per the repo convention rather than reopening this PR.
+
+### 2026-09-28 @Arggon-coordinator
+**Approval bookkeeping — PR #418 final head `a7d6bb07`.**
+
+Lead-architect review is **PASS**. The FINAL APPROVE verdict is posted on this item (author `Arggon-coordinator`) and on `task-ast-grep-structural-rules-review-followup`. The PR body was updated to the final reviewed evidence (head, merges `0a888c3d`/`c60ef7b3`, 97 files / 1633 tests, CI runs, high-confidence structural-guard framing, the separately filed follow-up). **No GitHub comment or issue was posted** — PR #418 still has 0 comments / 0 reviews.
+
+**One integration commit was required after the verdict.** The verdict push left the PR `CONFLICTING` because main had advanced with a tracker comment on this item, and GitHub does not create check runs for a conflicting PR — that is the direct cause of the earlier "no CI run" condition, not a workflow failure. Merged `origin/main` normally as `a7d6bb07`, append-only resolution of the Notes only: no lines dropped from either side (verified with `diff` against both parents), 36 history sections intact, both main's PASS verdict and our FINAL APPROVE block present, and no code/config files in the merge delta.
+
+**CI on the new head:** CI **`36484987621`** completed/success (`cli`: success, `ui-smoke`: success) and arggon **`36484987818`** completed/success. `statusCheckRollup`: `cli` SUCCESS, `tasks-validate` SUCCESS, `ui-smoke` SUCCESS.
+
+**Gates re-verified at `a7d6bb07`:** `build`, `check:plugin`, `npm test` (97 files / 1633 tests), `lint`, `test:structure` (3/3 + fixture), `lint:structure`, `arggon validate` (0 warnings), `git diff --check` — all green.
+
+Non-blocking authoring/receiver-scope gaps remain tracked as `task-ast-grep-authoring-and-receiver-scope` (filed on main, depends on this item); the smoke/reporting items on main are unrelated to this PR.
+
+No item is marked `done` and no merge was performed. Both items stay `in_progress` for post-merge completion by the coordinator.
