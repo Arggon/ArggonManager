@@ -17,6 +17,7 @@ import {
   parseArggonItemFromCommand,
   parseArggonItemFromTool,
   parseValidateFailure,
+  sessionDirectoryResolver,
   setBounded,
   worktreeOptions,
 } from "./index.js";
@@ -611,5 +612,56 @@ describe("plugin-context: worktree wiring (W4)", () => {
     expect(worktreeOptions({ worktree: { create: async () => ({}) } })).toEqual({
       domain: { create: expect.any(Function) },
     });
+  });
+});
+
+describe("plugin-context: session directory wiring (bug-native-tools-commit-to-primary-checkout)", () => {
+  it("reads the calling session's own location directory", async () => {
+    const resolve = sessionDirectoryResolver({
+      session: { get: async () => ({ location: { directory: "/worktrees/repo-task-x" } }) },
+    } as never);
+    expect(resolve).toBeDefined();
+    expect(await (resolve as (id: string) => Promise<string | undefined>)("ses_a")).toBe(
+      "/worktrees/repo-task-x",
+    );
+  });
+
+  it("falls back to a bare directory field and ignores a non-string one", async () => {
+    const bare = sessionDirectoryResolver({
+      session: { get: async () => ({ directory: "/plain/checkout" }) },
+    } as never);
+    expect(await (bare as (id: string) => Promise<string | undefined>)("ses_a")).toBe(
+      "/plain/checkout",
+    );
+    const blank = sessionDirectoryResolver({
+      session: { get: async () => ({ location: { directory: "  " }, directory: 7 }) },
+    } as never);
+    expect(await (blank as (id: string) => Promise<string | undefined>)("ses_a")).toBeUndefined();
+  });
+
+  it("stays feature-detected: no ctx.session.get means no resolver (the pre-fix behavior)", () => {
+    expect(sessionDirectoryResolver({})).toBeUndefined();
+    expect(sessionDirectoryResolver({ session: {} } as never)).toBeUndefined();
+    expect(
+      sessionDirectoryResolver({ session: { get: "not a function" } } as never),
+    ).toBeUndefined();
+  });
+
+  it("passes the requested session id through and propagates a lookup failure", async () => {
+    const seen: string[] = [];
+    const resolve = sessionDirectoryResolver({
+      session: {
+        get: async (input: { sessionID: string }) => {
+          seen.push(input.sessionID);
+          if (input.sessionID === "ses_boom") throw new Error("session store unavailable");
+          return { location: { directory: "/plain/checkout" } };
+        },
+      },
+    } as never) as (id: string) => Promise<string | undefined>;
+    expect(await resolve("ses_ok")).toBe("/plain/checkout");
+    expect(seen).toEqual(["ses_ok"]);
+    // The throw reaches resolveToolCwd, which turns it into a refusal rather
+    // than a silent fallback to the plugin location.
+    await expect(resolve("ses_boom")).rejects.toThrow("session store unavailable");
   });
 });

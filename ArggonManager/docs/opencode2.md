@@ -136,6 +136,66 @@ namespace:
   `CLEANUP_FAILED` (per-candidate prune failures stay in `pruned`/`failures`,
   like the CLI).
 
+### Where every native tool resolves the tracker root
+
+**The rule: a `tools.arggon.*` call resolves the tracker root from the _calling
+session's_ own directory, re-read on every call.** The kernel then walks up from
+it looking for `ArggonManager/.convention.yml` (legacy `tasks/`) exactly as the
+CLI walks up from its own cwd — one logic path, ADR 0011. So a session working in
+`../<repo>-<id>` reads and **commits in that worktree, on that worktree's
+branch**, and a session working in a plain checkout commits in that checkout on
+whatever branch it has checked out. Both are the CLI's behavior by construction,
+not a second rule.
+
+| the call comes from | the tracker root is | a `comment` commit lands on |
+| ------------------- | ------------------- | --------------------------- |
+| a session in `../<repo>-<id>` (after `session_move`) | the worktree | the item branch, inside the worktree — hence in the item's PR |
+| a session in a non-worktree checkout (the primary, or any clone) | that checkout | the branch checked out there |
+| no calling session (ambient/headless invocation) | the plugin instance's `ctx.location.directory` | that location's checked-out branch |
+| a session whose directory cannot be resolved | **refused**: `error.code: "SESSION_ROOT_UNRESOLVED"` | nothing is written |
+
+**Why the session's directory and not something else.** V2 hands a plugin tool
+no directory: the runtime builds the tool context as `{ sessionID, agent,
+messageID, id, progress, signal }`, so `sessionID` is the only per-call signal of
+where the session works, and `ctx.session.get({ sessionID })` →
+`Session.Info.location.directory` is what `session_move` updates. The three
+alternatives are all wrong for this model:
+
+- **`ctx.location.directory`** is the *plugin instance's* location — V2 documents
+  it as "the plugin instance's location, not the location of every session it can
+  access or event it receives". Captured at `setup`, it is stale by construction
+  after a move: that is exactly the defect
+  ([`bug-native-tools-commit-to-primary-checkout`](arggon-manager/opencode2-native/native-redesign/bug-native-tools-commit-to-primary-checkout.md)),
+  which put worker evidence commits on the primary's `main` instead of the item
+  branch and still answered `ok: true`.
+- **`process.cwd()`** is the host process's launch directory (a background
+  `opencode serve` carries its own), never the session's.
+- **The item's recorded `worktree_path`** is chicken-and-egg: reading it needs
+  the tracker root this step is resolving. It stays authoritative for *what
+  `start` attaches to*, not for *where a call resolves*.
+
+**Refusing beats guessing.** Once a session is known, an unresolvable directory
+raises a typed tool error instead of falling back to the plugin location: a
+silent `ok: true` on the wrong branch is the failure this rule exists to prevent,
+so the call is refused and nothing is written. The fallback to the plugin
+location applies only when there is no calling session at all (there is then
+nothing to disagree with) and when the host has no `ctx.session.get` (older
+runtime: the rule degrades to the pre-2.0 behavior rather than breaking).
+
+**`start` is unaffected in shape.** Its tracker root is the session's, but the
+worktree it creates or attaches is still placed next to the **canonical
+checkout** (`ctx.location.project.canonical`) at `../<canonical-basename>-<id>`,
+and the claim is still written into that worktree's copy. Claiming a second item
+from inside an existing worktree session therefore works exactly as before.
+
+Deterministic evidence: `opencode/plugins/arggon/tools.test.ts` →
+`"tracker-root resolution from the calling session"` runs `comment`, `handoff`,
+`update`, `create` and `branch` from a real linked worktree and asserts the
+commit's branch, its reachability from the pushed item branch, and a primary
+checkout that is byte-for-byte untouched; `"resolveToolCwd"` and
+`"plugin-context: session directory wiring"` pin the resolution order and the
+refusal. The real-runtime leg lives in `npm run smoke:opencode`.
+
 - **Permissions (W4)** — the generated seam adds minimal shell gates (deny
   `git commit --no-verify*`, `git push --force*`, `git push -f*`) that
   complement — never replace — the kernel invariants; the shipped agents add

@@ -11,15 +11,26 @@ created: 2026-09-24
 agent framework: make native `tools.arggon.start` produce a truthful,
 ready-to-run worktree and an explicit readiness result; then standardize
 low-context CLI/test tooling, use `codebase-memory-mcp` for code intelligence,
-and pilot the native V2 `opencode2-shell-tasks` plugin for long-running
-interactive smoke. Keep browser plugins secondary and do not add a hosted
-memory service, another tracker, or an agent execution framework to the
-product.
+and keep long-running interactive jobs on the existing `shell`/smoke path: the
+native V2 `opencode2-shell-tasks` plugin was piloted on 2026-09-28 and **failed**
+its exit gate (see [section A](#a--opencode2-shell-tasks-native-opencode-v2-background-jobs)).
+Keep browser plugins secondary and do not add a hosted memory service, another
+tracker, or an agent execution framework to the product.
 
 This is a research recommendation, not an adoption decision. No runtime
 dependency or product behavior changed in this exploration. A successful pilot
 should be followed by a small dev-only playbook/ADR decision; a failed pilot
 should be recorded here and closed without adding infrastructure.
+
+**Amendment (2026-09-28).** The `opencode2-shell-tasks` pilot this document
+proposed was run server-only in an isolated profile and failed its exit gate.
+Section A now records it as **pilot-FAIL** with the measured gate table. The
+correction changes that one third-party candidate's status only: the
+worktree-readiness recommendation (§0), the low-context CLI/test lane,
+`codebase-memory-mcp`, and the browser position are unchanged, and the failed
+pilot's own exit gate already named its fallback (keep the current `shell`/smoke
+path). Evidence: [`task-pilot-opencode2-shell-tasks-server-only`](../../arggon-manager/ui/ui-foundation/task-pilot-opencode2-shell-tasks-server-only.md),
+merged in [PR #423](https://github.com/Arggon/ArggonManager/pull/423).
 
 ## Scope and method
 
@@ -108,7 +119,7 @@ graph evidence is not used to claim that either document is complete.
 | `opencode-chromium` | `1.7.2` | npm release observed 2026-09-08; separate V2 export plus legacy-style default; security fix not yet released. |
 | `@playwright/mcp` | `0.0.82` | npm release observed 2026-09-18; opt-in secondary fallback whose published OpenCode snippet requires V2 translation/verification. |
 | `fast-check` | `4.10.2` | MIT; test-time dependency candidate. |
-| `opencode2-shell-tasks` | `0.1.1` | MIT; native V2, but state outside the repository. |
+| `opencode2-shell-tasks` | `0.1.1` | MIT; native V2, but state outside the repository. Piloted 2026-09-28 — **FAIL**, see section A. |
 | `opencode-planner` | `0.6.0` | MIT; dual V1/V2 adapter. |
 | `ast-grep-mcp` (npm) | `0.0.2` | MIT; a separate Node package from `spiritledsoftware`, not the Python project described below. |
 | `ast-grep/ast-grep-mcp` (Python) | `0.1.0` in `pyproject.toml` | MIT; experimental, Python >=3.13 and `uv` project. |
@@ -193,16 +204,22 @@ focused tools—`background_bash`, `background_tasks`, `background_output`, and
   dependency chain. Treat it as an experiment, not a stable dependency.
 - Task metadata and logs live outside the repository. They are mode-restricted
   by default, but can still contain command output and secrets; use an isolated
-  data root and do not commit or centralize them.
+  data root and do not commit or centralize them. The 2026-09-28 pilot measured
+  this as only partly true: job JSON and logs were `0600`, but the exit sidecar
+  was `0644` and the state directories were `0755`.
 - The child process inherits the environment and `workdir` can resolve outside
-  the session. `background_bash` needs an explicit `ask` permission and a
-  reviewer deny; ArggonManager's existing `shell` denies do not automatically
-  protect this new action.
+  the session. A reviewer `deny` is honored, but an `ask` approval is **not**:
+  the pilot measured 0 permission requests in 2/2 runs for `background_bash` at
+  `ask`, while a same-session `shell` control at `ask` did raise one.
+  ArggonManager's existing `shell` denies do not automatically protect this new
+  action.
 - The bundled `/tasks` TUI has evidence of theme/API drift. Server-only testing
   is safer than relying on the panel.
 - Its README currently requires a V2 beta runtime (`0.0.0-beta-*`); the local
   stable `v2.0.16` is not a proven target. Do not call the pilot compatible until
-  a package-supported runtime is identified and tested.
+  a package-supported runtime is identified and tested. (Pilot outcome: no
+  `0.0.0-beta-*` runtime exists on the measuring machine, so this precondition was
+  never met — see the pilot result below.)
 - It is an interactive aid, not a CI replacement. Do not use it unattended or
   wire it into the deterministic GitHub Actions smoke.
 
@@ -213,10 +230,49 @@ runtime registration on v2.0.16 therefore remains unverified. The package's
 own README requires a V2 beta runtime, so a compatible runtime is a precondition
 for the pilot rather than an assumption.
 
-**Verdict:** **Conditional, server-only pilot after the worktree fix.** If it
-proves useful, the likely durable ArggonManager change is a small internal
-background-task surface in the existing dependency-free plugin—not a permanent
-second plugin and not a new tracker.
+### Pilot result (2026-09-28) — **FAIL**
+
+The server-only pilot ran the gate this document specified. Four tools registered
+and the latency benefit was real and large, but the two criteria the pilot
+existed to test both failed. Measured 2026-09-28 on Linux, one machine, OpenCode
+`v2.0.18`, `opencode2-shell-tasks@0.1.1` in a disposable profile with all state
+outside this repository.
+
+| Gate | Criterion | Result |
+| --- | --- | --- |
+| G1 | 4/4 tools register on a **package-supported** runtime | **NO** — 4/4 registered, but the package declares `0.0.0-beta-*` and no such runtime exists, so every measurement is against stable `v2.0.18` |
+| G2 | Zero permission bypasses | **NO (blocking)** — `background_bash` at `ask` raised 0 permission requests in 2/2 runs, while a same-session `shell` at `ask` control did raise one; `deny` is honored |
+| G3 | Zero leaked process groups | YES — 16/16 tasks terminal, a 4-member detached group fully reaped on cancel, 0 leaks before and after teardown |
+| G4 | Zero duplicate wake-ups | YES — 16 tasks, 14 synthetic wake-ups, 0 duplicates |
+| G5 | Repeatable interactive benefit | PARTIAL — 9–18 ms time-to-next-action vs 5.5–33 s blocked in the foreground, but background wall time sometimes exceeded foreground |
+
+A same-session control arm rules out "the model simply never asked", so G2 is an
+unenforced boundary rather than a configuration mistake; and because `deny` is
+honored, `ask` is the one unsafe value and cannot be configured around. G5 is
+reported as measured, not upgraded to a pass.
+
+**Third-party package caveats** (observations on a package this repository has
+decided **not** to adopt — not defects in this repository — and observed without
+stress-testing):
+
+- The exit-code sidecar is created `0644` although the package claims `0600` for
+  its state, and the state directories are `0755`, so task ids and exit codes are
+  world-readable: weaker than the "mode-restricted by default" claim above.
+- Restart reconciliation is lazy. Nothing is reconciled at startup, so a job that
+  finishes while the session is down is corrected only on the next tool call, and
+  no wake-up fires for it (2 of 16 tasks).
+
+**Verdict:** **Pilot FAIL — do not adopt `opencode2-shell-tasks` for this
+repository.** The `ask` permission boundary is unenforced for `background_bash`
+and no package-supported runtime exists, so the plugin would hand every
+background job the user's full privileges, inherited environment and no workdir
+containment under the approval gate this exploration required. The primary path
+is unchanged and stays native: if a background-task surface is still wanted,
+internalize the minimal behavior in ArggonManager's existing dependency-free
+plugin, where permissions are first-class and reviewable — not a permanent second
+plugin and not a new tracker. The fallback is the current `shell`/smoke path,
+which the pilot's own exit gate named for the FAIL case. No ADR or playbook
+follows from a failed pilot.
 
 ### B — `opencode-chromium` (native OpenCode V2 browser agent)
 
@@ -467,9 +523,11 @@ a backend only after a use case and data boundary exist.
   More importantly, ArggonManager already ships generated coordinator/worker/
   reviewer agents and its own spec/ADR/exploration commands. A second planner
   would create a second plan source and duplicate methodology.
-- **`opencode2-shell-tasks`**: covered in section A. Its background-task state
-  is deliberately outside the repository, so it may be a dev-only execution aid
-  but must not become a second Arggon work-item store.
+- **`opencode2-shell-tasks`**: covered in section A, which now records it as
+  **pilot-FAIL** (the `ask` boundary is unenforced and no package-supported
+  runtime exists). Its background-task state is deliberately outside the
+  repository, so it was never more than a dev-only execution aid and must not
+  become a second Arggon work-item store.
 - **`opencode-pty`**: the richer PTY/web alternative is not a safe fallback yet.
   The published V2 entrypoint does not register its five tools; unreleased main
   fixes registration but lacks command permission enforcement, authenticated web
@@ -507,7 +565,7 @@ OpenCode V2 plugin, not merely an MCP server.
 | `fast-check` | Test library | Yes | MIT | Parser/state/race edge cases | No | Very low | **Adopt selectively** |
 | Playwright Test + axe + CLI | Existing dev/CI lane | Yes | Apache-2.0 / MPL-2.0 | Accessibility, live board, UI investigation | No | Low/medium | **Adopt lane** |
 | `codebase-memory-mcp` | MCP + local CLI | Yes; local binary/SQLite | MIT | Code navigation, impact, architecture | No | Medium; profile tools | **Adopt as dev standard** |
-| `opencode2-shell-tasks` | Native V2 plugin | Yes; local state outside repo | MIT | Long-running interactive jobs | **Yes** | Low/medium | **Conditional server-only pilot** |
+| `opencode2-shell-tasks` | Native V2 plugin | Yes; local state outside repo | MIT | Long-running interactive jobs | **Yes** | Low/medium | **Pilot FAIL 2026-09-28 — not adopted** |
 | `opencode-chromium` | Native/legacy browser plugin | Yes, with extension/host | MIT | Exploratory browser QA | Claimed, unverified on 2.0.16 | Low if four-tool surface is kept | **Hold for fixed release** |
 | `opencode-chrome-devtools` | Community direct-CDP plugin | Yes | MIT | Lightweight browser QA | Unverified | Low/medium | Personal fallback only |
 | `@playwright/mcp` | MCP | Yes | Apache-2.0 | Persistent exploratory browser QA | No | High | Opt-in secondary fallback after V2 verification |
@@ -536,10 +594,13 @@ OpenCode V2 plugin, not merely an MCP server.
    OpenCode environment, is local and MIT-licensed, and maps directly to the
    repository's architecture/impact questions. Keep its index outside the
    repository by default and use scoped tool profiles.
-4. **Pilot `opencode2-shell-tasks@0.1.1` server-only** for long-running
-   interactive tests/builds/smoke. It is the best native V2 *behavioral* fit,
-   but its beta dependency, 197-package install, outside-repository logs, and
-   permission boundary make it unsuitable as a default dependency.
+4. **Do not adopt `opencode2-shell-tasks@0.1.1`** — the server-only pilot this
+   exploration proposed was run on 2026-09-28 and **failed** its exit gate: the
+   `ask` permission boundary is unenforced for `background_bash` and no
+   package-supported runtime exists (measured gate and evidence in section A).
+   If a background-job surface is still wanted, internalize the minimal behavior
+   in this repository's own plugin, where permissions are first-class; until
+   then the existing `shell`/smoke path stands.
 5. **Hold `opencode-chromium@1.7.2`** until a fixed release clears the archive
    issue and an actual OpenCode v2.0.16 registration/browser run passes. It is a
    secondary browser candidate, not the primary native pilot.
@@ -556,9 +617,10 @@ OpenCode V2 plugin, not merely an MCP server.
 after the P1 readiness fix. It is local, MIT-licensed, adds no MCP schema to
 ordinary sessions, and can enforce ArggonManager's structural boundaries. Choose
 `codebase-memory-mcp` instead when the goal is faster code discovery/impact
-analysis; choose `opencode2-shell-tasks` only for an explicitly permission-gated
-interactive background-job pilot; keep `opencode-chromium` on hold until its
-fixed release and browser registration are proven.
+analysis; keep `opencode-chromium` on hold until its fixed release and browser
+registration are proven. `opencode2-shell-tasks` is no longer on this list: its
+pilot failed the permission-boundary criterion, so there is no configuration of
+it to choose (section A).
 
 ### Pilot 1 — native worktree readiness (do first)
 
@@ -578,7 +640,7 @@ Run a bounded 20-cold-start experiment against a disposable clone/worktree set:
 If the gate fails, keep the worktree for diagnosis and return a typed failure;
 do not mask it with an environment manager.
 
-### Pilot 2 — server-only `opencode2-shell-tasks` (seven days)
+### Pilot 2 — server-only `opencode2-shell-tasks` (run 2026-09-28: **FAIL**)
 
 1. Install exactly `opencode2-shell-tasks@0.1.1` in a disposable OpenCode
    profile on a V2 beta runtime explicitly supported by the package, with the
@@ -599,6 +661,17 @@ repeatable benefit for interactive long jobs. If the gate passes, internalize
 only the minimal behavior in ArggonManager's existing plugin; do not ship the
 third-party package by default. If it fails, remove the profile and retain the
 current shell/smoke path.
+
+**Outcome: FAIL** (measured gate and evidence in section A; recorded in
+[`task-pilot-opencode2-shell-tasks-server-only`](../../arggon-manager/ui/ui-foundation/task-pilot-opencode2-shell-tasks-server-only.md),
+merged in [PR #423](https://github.com/Arggon/ArggonManager/pull/423)). The plan
+above is kept for the record, with two deviations worth naming: no
+`0.0.0-beta-*` runtime existed on the measuring machine, so step 1's precondition
+was unsatisfiable and every measurement is against stable `v2.0.18`; and step 2's
+approval control came out inverted rather than confirmed — `deny` held, `ask` did
+not. The FAIL branch was taken as written: the disposable profile and plugin
+were removed, the negative result was recorded, no ADR/playbook was filed, and
+the existing `shell`/smoke path is retained.
 
 ### Pilot 3 — seven-day `opencode-chromium` browser review (hold until fixed)
 
@@ -659,13 +732,16 @@ Run `arggon board --serve` against a disposable fixture and have the agent:
 - Tool surface stays bounded; record native schema bytes and compare with the
   existing context budget.
 - Background jobs use an explicit `ask` permission, keep state/logs outside the
-  repository, and are never enabled for unattended CI.
+  repository, and are never enabled for unattended CI. Pilot 2 measured that
+  `ask` as **unenforced** for `background_bash`, which is the reason the
+  third-party candidate is not adopted (section A); any background-job surface
+  this repository builds itself must make the boundary first-class and testable.
 - Browser origin/file policy is restrictive and consequential actions require
   approval; `opencode-chromium@1.7.2` is not used before a fixed release.
 - The existing Playwright smoke and PTY TUI checks remain green; any new tool is
   exploratory review evidence, not a replacement for deterministic CI.
 - A failed or noisy pilot is documented and removed without weakening the
-  no-runtime-dependency rule.
+  no-runtime-dependency rule. Pilot 2 took that branch on 2026-09-28 (FAIL).
 
 ## Risks and unresolved questions
 
@@ -674,9 +750,11 @@ Run `arggon board --serve` against a disposable fixture and have the agent:
   memory, or orchestration tool should be treated as a substitute for reliable
   worktree preparation.
 - OpenCode's V2 plugin API is beta. `opencode2-shell-tasks` has a genuine V2
-  source shape but pins an old beta SDK; `opencode-chromium` has a separate V2
-  adapter behind a legacy-style default and an unfixed published security
-  issue. Neither compatibility nor security should be inferred from a README.
+  source shape but pins an old beta SDK, and its 2026-09-28 pilot measured both an
+  unenforced `ask` boundary and the absence of any supported runtime;
+  `opencode-chromium` has a separate V2 adapter behind a legacy-style default and
+  an unfixed published security issue. Neither compatibility nor security should
+  be inferred from a README.
 - A background-task pilot can improve interactive latency but cannot make
   model-free CI deterministic; keep CI on the existing scripts.
 - The current browser package's extension/native-host setup is a meaningful
@@ -703,6 +781,9 @@ small **dev-only tooling ADR/playbook** that records:
 - the context/schema budget measurement.
 
 Until that gate passes, the correct status is **pilot proposed**, not “adopted.”
+Pilot 2's gate did not pass (2026-09-28, FAIL), so `opencode2-shell-tasks` stays
+**not adopted** and no ADR/playbook follows from it; the remaining candidates are
+still at *pilot proposed*.
 
 ## Sources
 
@@ -717,6 +798,11 @@ Until that gate passes, the correct status is **pilot proposed**, not “adopted
   comparison.
 - [`ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-native-start-worktree-no-install.md`](../../arggon-manager/opencode2-native/native-redesign/bug-native-start-worktree-no-install.md)
   — recorded native-start failure evidence and acceptance contract.
+- [`ArggonManager/arggon-manager/ui/ui-foundation/task-pilot-opencode2-shell-tasks-server-only.md`](../../arggon-manager/ui/ui-foundation/task-pilot-opencode2-shell-tasks-server-only.md)
+  and [PR #423](https://github.com/Arggon/ArggonManager/pull/423) (merged as
+  `99b2c683`) — the 2026-09-28 isolated server-only pilot whose measured gate
+  (G1 NO, G2 NO blocking, G3 YES, G4 YES, G5 PARTIAL) is the evidence behind
+  section A's pilot-FAIL verdict and the package caveats recorded with it.
 - [`cli/src/board-serve.ts`](../../../cli/src/board-serve.ts) — loopback board
   server, live reload, PR overlay, bounded detail route, and kernel-mediated
   updates.

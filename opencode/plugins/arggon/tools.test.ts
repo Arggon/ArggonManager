@@ -55,6 +55,8 @@ import {
   PINNED_TOOL_NAMES,
   pluginTemplatesDir,
   registerArgonTools,
+  resolveToolCwd,
+  SESSION_ROOT_UNRESOLVED,
   sessionToken,
   type ArgonKernel,
   type ArgonToolDefinition,
@@ -553,6 +555,297 @@ describe("native tool outputs mirror the CLI --json envelopes", () => {
       expect(trackerSnapshot(toolDir)).toEqual(trackerSnapshot(cliDir));
     });
   }
+});
+
+/**
+ * Tracker-root resolution from the calling session
+ * (bug-native-tools-commit-to-primary-checkout).
+ *
+ * The regression: every native tool resolved the tracker from
+ * `ctx.location.directory` captured once at plugin `setup`. V2 documents that as
+ * "the plugin instance's location, not the location of every session it can
+ * access or event it receives", so a session that `session_move`d into an item
+ * worktree still read and committed to the PRIMARY checkout — twice in one
+ * coordinator session a worker's evidence commit landed on the primary's `main`
+ * instead of the item branch its PR is built from, and the tool still answered
+ * `ok: true` with a hash no reviewer of that PR would see.
+ *
+ * These tests drive the real committing tools from a real linked worktree, with
+ * the definitions bound to the PRIMARY location (exactly the value `setup` used
+ * to freeze) and the session resolving to the worktree, then assert the branch,
+ * the commit, reachability from the pushed item branch and an untouched primary.
+ * The refusal cases pin that an unresolvable session directory fails loudly
+ * instead of falling back to the plugin location.
+ */
+describe("tracker-root resolution from the calling session (bug-native-tools-commit-to-primary-checkout)", () => {
+  const SESSION = "ses_root123";
+  const ID = "task-rate-limit";
+  const BRANCH = `fix/${ID}`;
+
+  /**
+   * Primary checkout on its base branch plus a real linked worktree checked out
+   * on the item branch — what `arggon start --worktree` plus `session_move`
+   * leave behind. `defs` carries the stale-by-design `cwd: primary`, so every
+   * assertion below is about the per-call session resolution, not the fallback.
+   */
+  function scene(
+    sessionDirectory?: (sessionID: string) => Promise<string | undefined>,
+  ): {
+    primary: string;
+    worktree: string;
+    base: string;
+    head: string;
+    defs: ArgonToolDefinition[];
+    session: { sessionID?: unknown };
+  } {
+    const primary = seedGitTree();
+    const base = gitOut(primary, ["rev-parse", "--abbrev-ref", "HEAD"]);
+    const head = gitOut(primary, ["rev-parse", "HEAD"]);
+    const worktree = join(dirname(primary), `repo-${ID}`);
+    git(primary, ["worktree", "add", "-q", "-b", BRANCH, worktree]);
+    const defs = argonToolDefinitions(kernel, {
+      cwd: primary,
+      templatesDir: pluginTemplatesDir(),
+      sessionDirectory:
+        sessionDirectory ?? (async (sessionID) => (sessionID === SESSION ? worktree : undefined)),
+    });
+    return { primary, worktree, base, head, defs, session: { sessionID: SESSION } };
+  }
+
+  /** Item file bytes in one checkout (the tracker write under assertion). */
+  function itemBytes(root: string): string {
+    return readFileSync(
+      join(root, "ArggonManager", "launch-mvp", "auth", "story-login", `${ID}.md`),
+      "utf8",
+    );
+  }
+
+  /**
+   * The commit landed on the item branch INSIDE the worktree and the primary is
+   * byte-for-byte untouched. Returns the hash so reachability can be asserted.
+   */
+  function committedInWorktree(
+    ctx: { primary: string; worktree: string; head: string },
+    output: Record<string, unknown>,
+    name: string,
+    itemBefore: string,
+  ): string {
+    expect(output.ok, name).toBe(true);
+    const hash = String((output.commit as { hash?: unknown } | undefined)?.hash ?? "");
+    expect(hash.length, `${name}: a commit hash is reported`).toBeGreaterThan(0);
+    const head = gitOut(ctx.worktree, ["rev-parse", "HEAD"]);
+    expect(gitOut(ctx.worktree, ["branch", "--show-current"]), `${name}: branch`).toBe(BRANCH);
+    // The kernel reports an abbreviated hash; it is the worktree HEAD and it
+    // resolves as a commit inside the worktree.
+    expect(head.startsWith(hash), `${name}: the reported hash is the worktree HEAD`).toBe(true);
+    expect(gitOut(ctx.worktree, ["rev-parse", `${hash}^{commit}`]), `${name}: resolvable`).toBe(head);
+    // `--format` drops the `* ` current-branch marker the default listing adds.
+    expect(
+      gitOut(ctx.worktree, ["branch", "--contains", hash, "--format=%(refname:short)"]),
+      `${name}: the commit is on the item branch`,
+    ).toContain(BRANCH);
+    // The primary checkout: no commit, no staged/untracked byte, item unchanged.
+    expect(gitOut(ctx.primary, ["rev-parse", "HEAD"]), `${name}: primary HEAD`).toBe(ctx.head);
+    expect(gitOut(ctx.primary, ["status", "--porcelain"]), `${name}: primary tree`).toBe("");
+    expect(itemBytes(ctx.primary), `${name}: primary item bytes`).toBe(itemBefore);
+    return hash;
+  }
+
+  it("resolves the tracker root from the session's worktree for comment, handoff, update, create and branch", async () => {
+    const ctx = scene();
+    const itemBefore = itemBytes(ctx.primary);
+
+    // branch — records the convention branch on the item, inside the worktree.
+    const branched = await tool(ctx.defs, "branch").execute(
+      { id: ID, branch: BRANCH },
+      ctx.session,
+    );
+    committedInWorktree(ctx, branched.output as Record<string, unknown>, "branch", itemBefore);
+
+    // update — the claim the PR is built on.
+    const updated = await tool(ctx.defs, "update").execute(
+      { id: ID, status: "in_progress", assignee: "smoke" },
+      ctx.session,
+    );
+    committedInWorktree(ctx, updated.output as Record<string, unknown>, "update", itemBefore);
+
+    // A READ proves the root, not just the commit: the session sees the
+    // worktree copy, the primary copy is still `todo`.
+    const shown = await tool(ctx.defs, "show").execute({ id: ID, meta: true }, ctx.session);
+    expect((shown.output as { item?: Record<string, unknown> }).item).toMatchObject({
+      status: "in_progress",
+      assignee: "smoke",
+      branch: BRANCH,
+    });
+    expect(parseFrontmatter(itemBefore).data).toMatchObject({ status: "todo" });
+    expect(parseFrontmatter(itemBefore).data.branch).toBeUndefined();
+
+    const commented = await tool(ctx.defs, "comment").execute(
+      { id: ID, text: "worktree evidence", author: "worker" },
+      ctx.session,
+    );
+    committedInWorktree(ctx, commented.output as Record<string, unknown>, "comment", itemBefore);
+    expect(itemBytes(ctx.worktree)).toContain("worktree evidence");
+    expect(itemBytes(ctx.primary)).not.toContain("worktree evidence");
+
+    const handed = await tool(ctx.defs, "handoff").execute(
+      { id: ID, next: "open the PR", open_questions: "none" },
+      ctx.session,
+    );
+    committedInWorktree(ctx, handed.output as Record<string, unknown>, "handoff", itemBefore);
+
+    const created = await tool(ctx.defs, "create").execute(
+      { type: "task", title: "Worktree note", parent: "story-login" },
+      ctx.session,
+    );
+    const createdOutput = created.output as Record<string, unknown>;
+    committedInWorktree(ctx, createdOutput, "create", itemBefore);
+    // The new item exists in the worktree copy and NOT in the primary checkout.
+    const createdPath = String(createdOutput.path ?? "");
+    expect(createdPath.length).toBeGreaterThan(0);
+    expect(existsSync(join(ctx.worktree, createdPath))).toBe(true);
+    expect(existsSync(join(ctx.primary, createdPath))).toBe(false);
+  });
+
+  it("puts the worktree session's commit on the item branch the PR head is built from", async () => {
+    const ctx = scene();
+    const itemBefore = itemBytes(ctx.primary);
+    // A local bare `origin` stands in for GitHub: a PR head is the pushed tip
+    // of the item branch, so "reachable from it" is exactly this rev-parse.
+    const remote = join(dirname(ctx.primary), "origin.git");
+    git(ctx.primary, ["init", "-q", "--bare", remote]);
+    git(ctx.primary, ["remote", "add", "origin", remote]);
+
+    const commented = await tool(ctx.defs, "comment").execute(
+      { id: ID, text: "PR evidence" },
+      ctx.session,
+    );
+    const hash = committedInWorktree(ctx, commented.output as Record<string, unknown>, "comment", itemBefore);
+
+    git(ctx.worktree, ["push", "-q", "-u", "origin", BRANCH]);
+    expect(
+      gitOut(remote, ["rev-parse", BRANCH]).startsWith(hash),
+      "pushed item branch head carries the commit",
+    ).toBe(true);
+    // The primary's own branch never moved and carries none of it.
+    expect(gitOut(ctx.primary, ["rev-parse", ctx.base])).toBe(ctx.head);
+  });
+
+  it("never writes to the primary while the session works in a worktree, even for a non-base-branch worktree", async () => {
+    // The worktree above is a linked (non-main) worktree of the repo and the
+    // session is the only actor; pin that the whole primary working tree stays
+    // clean across every call, not just HEAD.
+    const ctx = scene();
+    const itemBefore = itemBytes(ctx.primary);
+    await tool(ctx.defs, "update").execute({ id: ID, status: "in_progress", assignee: "smoke" }, ctx.session);
+    await tool(ctx.defs, "comment").execute({ id: ID, text: "no primary writes" }, ctx.session);
+    expect(gitOut(ctx.primary, ["status", "--porcelain"])).toBe("");
+    // Still the one fixture commit: nothing of this session's work is in the
+    // primary's history, and no untracked/staged byte is waiting there either.
+    expect(gitOut(ctx.primary, ["rev-list", "--count", ctx.base]), "primary commits").toBe("1");
+    expect(gitOut(ctx.primary, ["rev-parse", ctx.base]), "primary base head").toBe(ctx.head);
+    expect(itemBytes(ctx.primary)).toBe(itemBefore);
+  });
+
+  it("refuses loudly instead of committing to the primary when the session directory is unresolvable", async () => {
+    const ctx = scene(async () => undefined);
+    const itemBefore = itemBytes(ctx.primary);
+    await expect(
+      tool(ctx.defs, "comment").execute({ id: ID, text: "must not land" }, ctx.session),
+    ).rejects.toMatchObject({ code: SESSION_ROOT_UNRESOLVED, command: "comment" });
+    // A refused call writes nothing at all — not a file, not a commit.
+    expect(gitOut(ctx.primary, ["status", "--porcelain"])).toBe("");
+    expect(gitOut(ctx.primary, ["rev-parse", "HEAD"])).toBe(ctx.head);
+    expect(itemBytes(ctx.primary)).toBe(itemBefore);
+  });
+
+  it("treats a failing session lookup as unresolvable rather than falling back", async () => {
+    const ctx = scene(async () => {
+      throw new Error("session store unavailable");
+    });
+    const itemBefore = itemBytes(ctx.primary);
+    await expect(
+      tool(ctx.defs, "handoff").execute({ id: ID, next: "must not land" }, ctx.session),
+    ).rejects.toMatchObject({ code: SESSION_ROOT_UNRESOLVED, command: "handoff" });
+    expect(gitOut(ctx.primary, ["status", "--porcelain"])).toBe("");
+    expect(itemBytes(ctx.primary)).toBe(itemBefore);
+  });
+
+  it("uses the session's own checkout when that checkout is not a worktree", async () => {
+    // Documented behavior for a session running from a plain checkout: the
+    // tracker resolves there and the commit lands on the branch checked out
+    // there — which is the pre-existing, unchanged path.
+    const primary = seedGitTree();
+    const head = gitOut(primary, ["rev-parse", "HEAD"]);
+    const defs = argonToolDefinitions(kernel, {
+      cwd: primary,
+      templatesDir: pluginTemplatesDir(),
+      sessionDirectory: async () => primary,
+    });
+    const output = (
+      await tool(defs, "comment").execute({ id: ID, text: "in the checkout" }, { sessionID: SESSION })
+    ).output as Record<string, unknown>;
+    expect(output.ok).toBe(true);
+    const hash = String((output.commit as { hash?: unknown }).hash);
+    expect(gitOut(primary, ["rev-parse", "HEAD"]).startsWith(hash)).toBe(true);
+    expect(gitOut(primary, ["rev-parse", "HEAD"])).not.toBe(head);
+    expect(itemBytes(primary)).toContain("in the checkout");
+  });
+
+  it("keeps the plugin location for a call that carries no calling session", async () => {
+    const primary = seedGitTree();
+    const defs = argonToolDefinitions(kernel, {
+      cwd: primary,
+      templatesDir: pluginTemplatesDir(),
+      sessionDirectory: async () => {
+        throw new Error("must not be consulted without a session");
+      },
+    });
+    const output = (
+      await tool(defs, "comment").execute({ id: ID, text: "ambient" })
+    ).output as Record<string, unknown>;
+    expect(output.ok).toBe(true);
+    expect(itemBytes(primary)).toContain("ambient");
+  });
+});
+
+describe("resolveToolCwd: per-call tracker root (bug-native-tools-commit-to-primary-checkout)", () => {
+  const options = {
+    cwd: "/primary",
+    sessionDirectory: async (sessionID: string) =>
+      sessionID === "ses_work" ? "/worktrees/repo-task-x" : undefined,
+  };
+
+  it("prefers the calling session's directory over the plugin location", async () => {
+    expect(await resolveToolCwd(kernel, "comment", options, { sessionID: "ses_work" })).toEqual({
+      cwd: "/worktrees/repo-task-x",
+    });
+  });
+
+  it("falls back to the plugin location without a session or without the resolver", async () => {
+    expect(await resolveToolCwd(kernel, "list", options)).toEqual({ cwd: "/primary" });
+    expect(await resolveToolCwd(kernel, "list", options, { sessionID: 42 })).toEqual({ cwd: "/primary" });
+    expect(await resolveToolCwd(kernel, "list", { cwd: "/primary" }, { sessionID: "ses_work" })).toEqual({
+      cwd: "/primary",
+    });
+  });
+
+  it("is a typed failure carrying the envelope, never a silent fallback", async () => {
+    const unresolved = await resolveToolCwd(kernel, "handoff", options, { sessionID: "ses_gone" });
+    expect("cwd" in unresolved).toBe(false);
+    const error = (unresolved as { error: ArgonToolError }).error;
+    expect(error).toBeInstanceOf(ArgonToolError);
+    expect(error.code).toBe(SESSION_ROOT_UNRESOLVED);
+    expect(error.command).toBe("handoff");
+    expect(error.envelope).toMatchObject({
+      ok: false,
+      command: "handoff",
+      error: { code: SESSION_ROOT_UNRESOLVED },
+    });
+    expect(String(error.envelope.error).length).toBeGreaterThan(0);
+    expect(JSON.stringify(error.envelope)).toContain("ses_gone");
+    expect(JSON.stringify(error.envelope)).toContain("/primary");
+  });
 });
 
 describe("kernel failures are typed tool errors and the session continues", () => {
