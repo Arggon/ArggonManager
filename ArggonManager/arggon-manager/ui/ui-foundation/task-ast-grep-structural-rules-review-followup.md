@@ -217,3 +217,7 @@ Lead-architect review is **PASS**. The FINAL APPROVE verdict is posted on this i
 Non-blocking authoring/receiver-scope gaps remain tracked as `task-ast-grep-authoring-and-receiver-scope` (filed on main, depends on this item); the smoke/reporting items on main are unrelated to this PR.
 
 No item is marked `done` and no merge was performed. Both items stay `in_progress` for post-merge completion by the coordinator.
+
+### handoff 2026-09-28 @ses_f2b15dcecffeuVmXo3s1RGiJBJ (session: ses_f2b15dcecffeuVmXo3s1RGiJBJ) — next: Coordinator: merge PR #418 at a7d6bb07 (MERGEABLE, CI 36484987621 green). Then post-merge completion; items stay in_progress until then.
+- branch: feat/task-ast-grep-structural-rules
+- open questions: None. Review PASS; one main-sync commit a7d6bb07 was needed to clear CONFLICTING so CI could run.
