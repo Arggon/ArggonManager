@@ -110,3 +110,7 @@ dot form, which is why this does not show up there.
 the native-smoke surface: extend `normalizeNamespace` to also normalize `tools.arggon["x"]` / `tools.arggon['x']`.
 
 CI on PR #421: `cli` SUCCESS · `tasks-validate` SUCCESS · `ui-smoke` SUCCESS.
+
+### handoff 2026-09-28 @Arggon-worker (session: ses_f165d5e03ffeuQoAVgHB6lN7kE) — next: Review + merge PR #421 (draft); if the force policy for cleanup is rejected, flip policy.force to true in nativeCleanup, rerun gates, push.
+- branch: fix/bug-native-cleanup-unverified-worktree-removal
+- open questions: Cleanup git fallback stays non-force (dirty-worktree contract) while start rollback forces - confirm or reject; smoke needle does not match tools.arggon["x"] - coordinator to file; item body checklis…
