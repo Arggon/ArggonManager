@@ -4,9 +4,18 @@ severity: error
 message: Tracker item move destinations must go through the shared @arggondev/lib kernel.
 note: |
   Rationale: a rename can create or relocate an item even when its source path is
-  neutral, so the destination argument is a separate mutation boundary. Only the
-  source/destination path argument is inspected; content arguments are never
-  scanned. ArggonManager/docs product paths are excluded.
+  neutral, so the destination argument is a separate mutation boundary.
+
+  This is a high-confidence structural guard, not semantic data-flow analysis.
+  Only the destination path argument is inspected; source, content, and options
+  arguments are never scanned. A destination counts as a tracker path only when it
+  carries a tracker identifier (itemPath, taskPath, ...), a *.filePath member, an
+  ArggonManager- or tasks-rooted path ending in a tracker item file, or a dynamic
+  path built from tasksDir. ArggonManager/docs and documentation paths are excluded.
+
+  Documented limitation: a bare leaf file name (renameSync(old, "story.md")) is
+  deliberately not a tracker signal, so neutral and product destinations stay valid.
+
   Scope and exceptions match tracker-mutations-use-kernel, including the narrow
   documented ADR-0012 root-migration suppression in cli/src/layout-migrate.ts.
 files:
@@ -36,6 +45,6 @@ constraints:
     regex: "^(rename|renameSync)$"
   PATH_DEST:
     all:
-      - regex: '(?i)(initiative|epic|story|task|tracker|item)(file|path|dir|id|move|source|dest)|\.filePath$|(^|[/"])(initiative|epic|story|task|bug)(-[^/" ]+)?\.md($|[/"])|(join|resolve)\([^)]*(ArggonManager|tasks)[^)]*(initiative|epic|story|task|bug)(-[^/)]*)?\.md|(join|resolve)\([^)]*tasksDir[^)]*\.md'
+      - regex: '(?i)(initiative|epic|story|task|tracker|item)(file|path|dir|id|move|source|dest)|\.filePath$|(ArggonManager|tasks)[^\n)]*(initiative|epic|story|task|bug)s?([-_][^\n)]*)?\.md|(join|resolve)\([^)]*tasksDir[^)]*\)'
       - not:
           regex: '(?i)(ArggonManager|tasks)[^\n)]*(docs|documentation)[^\n)]*'

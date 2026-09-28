@@ -5,10 +5,27 @@ message: Tracker item mutations must go through the shared @arggondev/lib kernel
 note: |
   Rationale: adapters must not compose or persist item frontmatter themselves. The
   kernel owns locking, status/claim rules, validation, cascades, and tracker commits.
-  Only path arguments are inspected: write/unlink/truncate use their first path,
-  while rename checks its source and destination paths. Content arguments are never
-  scanned. A bare filePath/outputPath is intentionally not a tracker signal, and
-  ArggonManager/docs product paths are explicitly excluded.
+
+  This is a high-confidence structural guard, not semantic data-flow analysis.
+
+  Path position only. Two-argument writers (write/append/rename) are inspected at
+  their first path argument, and single- and multi-argument removers
+  (rm/rmdir/unlink/truncate) are inspected at their first path argument. Content,
+  encoding, and options arguments are never scanned, so a tracker-shaped string or
+  member access in a content argument cannot trigger this rule.
+
+  A path argument counts as a tracker path only when it carries a tracker identifier
+  (taskPath, storyDir, itemId, ...), a *.filePath member, an ArggonManager- or
+  tasks-rooted path ending in a tracker item file (initiative/epic/story/task/bug),
+  or a dynamic path built from tasksDir. ArggonManager/docs and documentation paths
+  are explicitly excluded.
+
+  Documented limitations: a bare leaf file name (writeFileSync("story.md", ...)) is
+  deliberately not a tracker signal, so join(root,"docs","task-beta.md") and
+  join(root,"product","task-beta.md") stay valid; and a tracker path assembled from
+  unrelated variable fragments is not inferred. The kernel and the tracker CLI
+  remain authoritative.
+
   Scope: hand-authored TypeScript/TSX outside lib/src. Tests and fixture harnesses,
   generated or vendored plugin files, and the kernel itself are excluded.
   Exception: lib/src is the shared mutation kernel. cli/src/layout-migrate.ts has
@@ -42,22 +59,28 @@ rule:
             kind: import_specifier
             regex: '\bstringifyFrontmatter\b'
             stopBy: end
-    - pattern: stringifyFrontmatter($$$SERIALIZE_CALL_ARGS)
-    - pattern: $KERNEL_SERIALIZE.stringifyFrontmatter($$$SERIALIZE_MEMBER_ARGS)
-    - pattern: $WRITER_FIRST($PATH_FIRST, $$$REST_FIRST)
-    - pattern: $WRITER_ONE($PATH_ONE)
+    - all:
+        - kind: call_expression
+        - has:
+            field: function
+            regex: '(^|\.)stringifyFrontmatter$'
+    - pattern: $MUTATOR($PATH_MULTI, $$$REST_MUTATOR)
+    - pattern: $MUTATOR($PATH_ONE)
 constraints:
-  WRITER_FIRST:
-    regex: "^(writeFile|writeFileSync|appendFile|appendFileSync|writeFileAtomic|rename|renameSync)$"
-  WRITER_ONE:
-    regex: "^(rm|rmSync|unlink|unlinkSync|truncate|truncateSync)$"
-  PATH_FIRST:
+  MUTATOR:
+    regex: "^(writeFile|writeFileSync|appendFile|appendFileSync|writeFileAtomic|rename|renameSync|rm|rmSync|rmdir|rmdirSync|unlink|unlinkSync|truncate|truncateSync)$"
+  PATH_MULTI:
     all:
-      - regex: '(?i)(initiative|epic|story|task|tracker|item)(file|path|dir|id|move|source|dest)|\.filePath$|(^|[/"])(initiative|epic|story|task|bug)(-[^/" ]+)?\.md($|[/"])|(join|resolve)\([^)]*(ArggonManager|tasks)[^)]*(initiative|epic|story|task|bug)(-[^/)]*)?\.md|(join|resolve)\([^)]*tasksDir[^)]*\.md'
+      - regex: '(?i)(initiative|epic|story|task|tracker|item)(file|path|dir|id|move|source|dest)|\.filePath$|(ArggonManager|tasks)[^\n)]*(initiative|epic|story|task|bug)s?([-_][^\n)]*)?\.md|(join|resolve)\([^)]*tasksDir[^)]*\)'
       - not:
           regex: '(?i)(ArggonManager|tasks)[^\n)]*(docs|documentation)[^\n)]*'
   PATH_ONE:
     all:
-      - regex: '(?i)(initiative|epic|story|task|tracker|item)(file|path|dir|id|move|source|dest)|\.filePath$|(^|[/"])(initiative|epic|story|task|bug)(-[^/" ]+)?\.md($|[/"])|(join|resolve)\([^)]*(ArggonManager|tasks)[^)]*(initiative|epic|story|task|bug)(-[^/)]*)?\.md|(join|resolve)\([^)]*tasksDir[^)]*\.md'
+      - regex: '(?i)(initiative|epic|story|task|tracker|item)(file|path|dir|id|move|source|dest)|\.filePath$|(ArggonManager|tasks)[^\n)]*(initiative|epic|story|task|bug)s?([-_][^\n)]*)?\.md|(join|resolve)\([^)]*tasksDir[^)]*\)'
+      - not:
+          regex: '(?i)(ArggonManager|tasks)[^\n)]*(docs|documentation)[^\n)]*'
+  PATH_ONE:
+    all:
+      - regex: '(?i)(initiative|epic|story|task|tracker|item)(file|path|dir|id|move|source|dest)|\.filePath$|(ArggonManager|tasks)[^\n)]*(initiative|epic|story|task|bug)s?([-_][^\n)]*)?\.md|(join|resolve)\([^)]*tasksDir[^)]*\)'
       - not:
           regex: '(?i)(ArggonManager|tasks)[^\n)]*(docs|documentation)[^\n)]*'
