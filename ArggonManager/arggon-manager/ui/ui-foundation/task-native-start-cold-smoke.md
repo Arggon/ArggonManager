@@ -121,3 +121,7 @@ Then `git checkout -- lib/src/worktree.ts`, rebuild, re-run: 20/20 `ok`, exit 0.
 - The fixture's "project install" is synthesized (`node_modules/native-gate-dep` + `.package-lock.json`), not a real `npm install` — the gate needs one resolvable package, and a real install would only add network dependency and runtime.
 - One non-obvious git behavior worth knowing: git runs `pre-commit` even when there is nothing staged, so the re-run adds a second marker line and still exits non-zero ("nothing added to commit"). That is why "no duplicate claim commit" is asserted from `HEAD` + the claim-commit count + the `not-needed` receipt, not from the marker count.
 - The `installFingerprint` mtime is a coarse-clock signal (Linux stamps a directory from the current tick) and is only compared between fingerprints of the same path; the count and the entry-set digest are the load-bearing "was it emptied?" signals. Both limits are pinned by unit tests.
+
+### handoff 2026-09-28 @Arggon — next: Review the draft PR for feat/task-native-start-cold-smoke, then merge and flip the item to done.
+- branch: feat/task-native-start-cold-smoke
+- open questions: Wire the new smoke into a CI job or keep it maintainer-run?; Should smoke:opencode also cover the cold start once quota allows?
