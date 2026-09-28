@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-opencode-smoke-normalize-bracket-namespace
 title: OpenCode smoke namespace normalizer misses tools.arggon bracket-access calls
+assignee: Arggon
+branch: fix/bug-opencode-smoke-normalize-bracket-namespace
 parent: native-redesign
 labels: [opencode-seam, smoke, review-followup]
 priority: p1
 created: "2026-09-28"
 updated: "2026-09-28"
+claimed_at: "2026-09-28T21:44:24.716Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-opencode-smoke-normalize-bracket-namespace
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-opencode-smoke-normalize-bracket-namespace.md
@@ -24,13 +28,13 @@ PR #421's focused W4 smoke run exposed a harness false failure: the model emitte
 
 ## Acceptance
 
-- [ ] Normalize `tools.arggon["x"]` and `tools.arggon['x']` to the same canonical dot form already produced for `tools["arggon"].x`.
-- [ ] Preserve support for the existing nested/dot access forms and avoid rewriting unrelated bracket access.
-- [ ] Add focused unit coverage for double-quoted, single-quoted, and non-matching tool names.
-- [ ] Correct the `normalizeNamespace` doc comment that claims every valid namespace spelling is already handled.
-- [ ] Replace/rename the misleading `opencode-smoke.test.ts` case (“normalizes every bracket namespace spelling”) that currently asserts the un-normalized result and locks the gap in.
-- [ ] Re-run the affected W4 lifecycle smoke with a bounded model-independent fixture or transcript so the normalizer contract is verified without provider quota.
-- [ ] Full test, lint, build, `check:plugin`, and validate remain green.
+- [x] Normalize `tools.arggon["x"]` and `tools.arggon['x']` to the same canonical dot form already produced for `tools["arggon"].x`.
+- [x] Preserve support for the existing nested/dot access forms and avoid rewriting unrelated bracket access.
+- [x] Add focused unit coverage for double-quoted, single-quoted, and non-matching tool names.
+- [x] Correct the `normalizeNamespace` doc comment that claims every valid namespace spelling is already handled.
+- [x] Replace/rename the misleading `opencode-smoke.test.ts` case (“normalizes every bracket namespace spelling”) that currently asserts the un-normalized result and locks the gap in.
+- [x] Re-run the affected W4 lifecycle smoke with a bounded model-independent fixture or transcript so the normalizer contract is verified without provider quota.
+- [x] Full test, lint, build, `check:plugin`, and validate remain green.
 
 ## Notes
 
