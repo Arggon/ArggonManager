@@ -10,7 +10,6 @@ labels: [opencode-seam, worktree]
 priority: p1
 created: "2026-09-22"
 updated: "2026-09-28"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-native-start-worktree-no-install
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-native-start-worktree-no-install.md
