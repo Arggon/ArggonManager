@@ -10,7 +10,6 @@ labels: [tooling, architecture, ci]
 priority: p2
 created: "2026-09-24"
 updated: "2026-09-28"
-worktree_path: /home/arggon/Projects/ArggonManager-task-ast-grep-structural-rules
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-ast-grep-structural-rules.md
