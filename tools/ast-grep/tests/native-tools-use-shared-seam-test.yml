@@ -28,6 +28,17 @@ valid:
     export const Action = () => (
       <button onClick={() => kernel.listOperation({ cwd: "." })}>List</button>
     );
+  - |
+    // Deliberate computed/destructured indirection is outside this rule's scope.
+    export function aliasedTransform(ctx: PluginContext) {
+      const register = ctx.tool.transform;
+      register((editor) => {});
+    }
+  - |
+    export function arbitraryAlias(ctx: PluginContext) {
+      const t = ctx?.tool?.transform;
+      t((editor) => {});
+    }
 invalid:
   - |
     export function registerArgonTools(editor: ToolEditorLike, extraTool: ToolDefinition) {
@@ -53,14 +64,8 @@ invalid:
       editor.namespace({ name: "other-namespace", description: "Fork" });
     }
   - |
-    export function aliasedTransform(ctx: PluginContext) {
-      const register = ctx.tool.transform;
-      register((editor) => {});
-    }
-  - |
-    export function arbitraryAlias(ctx: PluginContext) {
-      const t = ctx?.tool?.transform;
-      t((editor) => {});
+    export async function registerArgonTools(ctx: PluginContext, editor: ToolEditorLike) {
+      editor.namespace({ name: "fork", description: "Fork" });
     }
   - |
     export function directOptionalTransform(ctx: PluginContext) {

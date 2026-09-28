@@ -36,7 +36,7 @@
     "smoke:tui-board": "tsx smoke/tui-board-smoke.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:structure": "ast-grep test --skip-snapshot-tests --color never",
+    "test:structure": "ast-grep test --skip-snapshot-tests --color never && ast-grep scan --threads 1 --report-style short --color never tools/ast-grep/tests/non-plugin-valid.tsx",
     "lint": "eslint .",
     "lint:structure": "ast-grep scan --threads 1 --report-style short --color never",
     "format": "prettier -w ."

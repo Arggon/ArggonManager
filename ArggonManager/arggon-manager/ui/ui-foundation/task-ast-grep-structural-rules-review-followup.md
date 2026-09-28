@@ -33,12 +33,12 @@ and must not be edited here.
 
 ## Acceptance
 
-- [x] Narrow the native-tool exception to the actual `argonToolDefinitions` → catalog definitions → `editor.add` flow, with adversarial tests for extra adds, alternate registration, and second transforms.
+- [ ] Narrow the native-tool exception to the actual `argonToolDefinitions` → catalog definitions → `editor.add` flow, with adversarial tests for extra adds, alternate registration, and second transforms.
 - [x] Cover hand-authored TSX with explicit ast-grep language configuration and positive/negative TSX tests, including `tui.tsx` scan evidence.
-- [x] Remove the bare `filePath` tracker false positive while adding destination/move and canonical literal/nested tracker-item positives.
-- [x] Document and scope the structural-root-migration exception for `cli/src/layout-migrate.ts` and reconcile `cli/src/test-tmp.ts` / `cli/src/pack-fixtures.ts` helper scope without opening a production bypass.
+- [ ] Remove the bare `filePath` tracker false positive while adding destination/move and canonical literal/nested tracker-item positives.
+- [ ] Document and scope the structural-root-migration exception for `cli/src/layout-migrate.ts` and reconcile `cli/src/test-tmp.ts` / `cli/src/pack-fixtures.ts` helper scope without opening a production bypass.
 - [x] Preserve the exact dev-only dependency, deterministic one-thread scan, existing CI wiring, no-rewrite behavior, and package allowlist.
-- [x] Record adversarial rule/probe evidence and green focused/full test, lint, build, plugin, validate, diff, and package-surface gates.
+- [ ] Record adversarial rule/probe evidence and green focused/full test, lint, build, plugin, validate, diff, and package-surface gates.
 
 ## Notes
 

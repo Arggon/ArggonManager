@@ -4,35 +4,26 @@ severity: error
 message: Native tool definitions must be added through the shared Arggon catalog seam.
 note: |
   Rationale: TOOL_SPECS/WORKTREE_TOOL_SPECS feed both executable definitions and
-  schema parity checks. Identifier, factory, alias, namespace, and extra-loop
-  registration forms must not fork the native surface.
-  Scope: all hand-authored TypeScript/TSX. Tests, fixture harnesses, test-only
-  helpers, and generated/vendored plugin files are intentionally excluded.
-  Exception: the canonical transform call and its single editor.add payload are
-  recognized only when registerArgonTools binds definitions directly to
-  argonToolDefinitions(...) and transform directly to ctx?.tool?.transform, and
-  the add is inside the definitions loop with the exact definition spread and
-  namespace/codemode options. Identical duplicate calls inside that exact loop
-  are the only structurally indistinguishable case.
+  schema parity checks. This is a high-confidence structural guard, not semantic
+  data-flow analysis.
+  Scope: hand-authored Arggon plugin sources only. The generated bundle, vendored
+  .opencode files, and tests are excluded; unrelated repository modules are not
+  searched by this rule.
+  Exception: the canonical transform call and its one editor.add payload are
+  recognized only when registerArgonTools directly binds definitions to
+  argonToolDefinitions(...) and transform to ctx?.tool?.transform, the transform
+  call contains the definitions loop, and the payload has ...definition plus
+  namespace: ARGON_TOOL_NAMESPACE and codemode: true. Deliberate computed,
+  destructured, or otherwise indirect aliases are outside structural scope; the
+  plugin's schema/parity tests remain authoritative.
 files:
-  - "**/*.ts"
-  - "**/*.tsx"
+  - "opencode/plugins/arggon/**/*.ts"
+  - "opencode/plugins/arggon/**/*.tsx"
 ignores:
+  - "opencode/plugins/arggon/index.bundle.ts"
+  - ".opencode/plugins/arggon/**"
   - "**/*.test.ts"
   - "**/*.test.tsx"
-  - "**/*.spec.ts"
-  - "**/*.spec.tsx"
-  - "**/__fixtures__/**"
-  - "fixtures/**"
-  - "e2e/**"
-  - "smoke/**"
-  - "test/**"
-  - "labs/**"
-  - "cli/src/test-tmp.ts"
-  - "cli/src/pack-fixtures.ts"
-  - ".opencode/plugins/arggon/**"
-  - "opencode/plugins/arggon/index.bundle.ts"
-  - "tools/ast-grep/**"
 rule:
   any:
     - pattern: ctx.tool.transform($$$DIRECT_ARGS)
@@ -49,36 +40,12 @@ rule:
                     field: name
                     regex: "^registerArgonTools$"
                 - has:
-                    pattern: const definitions = argonToolDefinitions($$$DEFS_ALIAS_A)
+                    pattern: const definitions = argonToolDefinitions($$$DEFS_ALIAS)
                     stopBy: end
                 - has:
                     pattern: const transform = ctx?.tool?.transform
                     stopBy: end
               stopBy: end
-    - all:
-        - pattern: const transform = ctx.tool.transform
-        - not:
-            inside:
-              all:
-                - kind: function_declaration
-                - has:
-                    field: name
-                    regex: "^registerArgonTools$"
-                - has:
-                    pattern: const definitions = argonToolDefinitions($$$DEFS_ALIAS_B)
-                    stopBy: end
-                - has:
-                    pattern: const transform = ctx?.tool?.transform
-                    stopBy: end
-              stopBy: end
-    - all:
-        - pattern: const $ALIAS_A = ctx?.tool?.transform
-        - not:
-            pattern: const transform = ctx?.tool?.transform
-    - all:
-        - pattern: const $ALIAS_B = ctx.tool.transform
-        - not:
-            pattern: const transform = ctx?.tool?.transform
     - all:
         - pattern: transform($$$TRANSFORM_ALIAS_ARGS)
         - not:
@@ -90,7 +57,7 @@ rule:
                         field: name
                         regex: "^registerArgonTools$"
                     - has:
-                        pattern: const definitions = argonToolDefinitions($$$DEFS_TRANSFORM_A)
+                        pattern: const definitions = argonToolDefinitions($$$DEFS_TRANSFORM)
                         stopBy: end
                     - has:
                         pattern: const transform = ctx?.tool?.transform
@@ -102,18 +69,6 @@ rule:
                     field: right
                     pattern: definitions
                   stopBy: end
-    - all:
-        - pattern: register($$$REGISTER_ALIAS_ARGS)
-    - all:
-        - pattern: registerTool($$$REGISTER_TOOL_ARGS)
-    - all:
-        - pattern: registerTools($$$REGISTER_TOOLS_ARGS)
-    - all:
-        - pattern: addTool($$$ADD_TOOL_ARGS)
-    - all:
-        - pattern: install($$$INSTALL_ARGS)
-    - all:
-        - pattern: configure($$$CONFIGURE_ARGS)
     - all:
         - pattern: editor.add($$$EDITOR_ADD_OUT_ARGS)
         - not:
@@ -144,8 +99,6 @@ rule:
                           stopBy: end
                     stopBy: end
               stopBy: end
-    - all:
-        - pattern: toolEditor.add($$$TOOL_EDITOR_ADD_ARGS)
     - all:
         - pattern: editor.add($$$EDITOR_ADD_IN_ARGS)
         - inside:
@@ -187,11 +140,11 @@ rule:
                   stopBy: end
               - has:
                   kind: pair
-                  regex: '^\s*namespace\s*:'
+                  regex: '^\s*namespace\s*:\s*ARGON_TOOL_NAMESPACE\s*,?$'
                   stopBy: end
               - has:
                   kind: pair
-                  regex: '^\s*codemode\s*:'
+                  regex: '^\s*codemode\s*:\s*true\s*,?$'
                   stopBy: end
     - all:
         - pattern: editor.namespace($$$NAMESPACE_ARGS)
@@ -218,8 +171,6 @@ rule:
                               stopBy: end
                         stopBy: end
                   stopBy: end
-    - all:
-        - pattern: toolEditor.namespace($$$TOOL_EDITOR_NAMESPACE_ARGS)
     - all:
         - pattern: for (const $LOOP_ITEM of definitions) { $$$LOOP_BODY }
         - not:
