@@ -33,6 +33,8 @@ Requires **Node.js 22.12+** (needed by vitest 5 in the dev toolchain; `engines` 
 - `npm run build`
 - `npm test`
 - `npm run lint`
+- `npm run test:structure`
+- `npm run lint:structure`
 
 Two npm packages make up this repo:
 
@@ -71,6 +73,42 @@ Rebuild after changing `lib/`: the worktree's spawned CLI and the tests that
 launch it resolve `@arggondev/lib` through `node_modules` → `lib/dist`
 (`npm run build --workspace @arggondev/lib`), and the flip means the worktree's own
 build is what runs.
+
+### Structural architecture checks (dev-only)
+
+The exact-pinned `@ast-grep/cli` devDependency is a **high-confidence
+structural guard** for two architecture seams that ESLint/TypeScript do not
+express: tracker item mutations must stay in the shared kernel, and native tool
+registration must stay on the shared catalog seam. Run its positive/negative rule
+tests and the deterministic repository scan with:
+
+- `npm run test:structure`
+- `npm run lint:structure`
+
+Both CI commands run in the existing `cli` job. The scan uses the `Tsx` superset
+parser for hand-authored `.ts`/`.tsx` files, so JSX production code such as
+`opencode/plugins/arggon/tui.tsx` is covered by the same rule IDs. The scan only
+reports violations; it never uses `--update-all` or rewrites source.
+
+What the guard does and does not claim:
+
+- **Tracker rules** are path-position only: multi-argument `rm`/`rmdir`/`unlink`/
+  `truncate` are inspected at their first path argument like the writers, and
+  content arguments are never scanned. A bare leaf file name is intentionally not
+  a tracker signal, so ordinary product writes such as
+  `join(root, "docs", "task-beta.md")` stay valid. Rename destinations have a
+  separate rule, and tracker root migration has one documented inline suppression.
+- **The native rule is scoped to the hand-authored Arggon plugin sources**
+  (`opencode/plugins/arggon/**/*.ts(x)`), not the whole repository, and its
+  exception is limited to the direct catalog-to-editor binding and exact payload.
+  Deliberate, computed, or destructured indirection is outside structural scope
+  and is not claimed to be covered; plugin schema/parity tests remain
+  authoritative for those shapes.
+
+These rules are not comprehensive semantic enforcement. Rule scope, the exact
+structural limitations, production exceptions, content/path decisions, and
+explicit test-helper exclusions are documented in
+[`tools/ast-grep/README.md`](tools/ast-grep/README.md).
 
 ### UI smoke tests (dev-only)
 

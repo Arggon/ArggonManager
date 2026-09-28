@@ -48,6 +48,8 @@ jobs:
         run: npm run check:plugin
       - run: npm run test
       - run: npm run lint
+      - run: npm run test:structure
+      - run: npm run lint:structure
 
   ui-smoke:
     # task-ui-browser-smoke-ci (ADR 0008 tier 2): the durable `@smoke` browser
