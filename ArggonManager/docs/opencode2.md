@@ -82,12 +82,19 @@ namespace:
   trimmed from the W4-era 12,182 B).
 - **Worktree lifecycle tools (W4)** — `tools.arggon.start`, `branch` and
   `cleanup` own the item worktree through the V2 worktree domain
-  (`ctx.worktree.create/list/remove`). `start` claims the item (kernel rules:
-  never steal) and creates `../<repo>-<id>` (name `<repo>-<id>`), creates the
-  convention branch inside it and records `branch` + `worktree_path` **in the
-  worktree copy**, so the claim commit lands on the feature branch and the
-  canonical checkout stays untouched — exactly like `arggon start --worktree`.
-  `cleanup` classifies with the **shared kernel rule** (the same
+  (`ctx.worktree.create/list/remove`). For a fresh worktree, `start` uses the
+  shared kernel dependency-preparation helper before the claim write, then
+  records `branch` + `worktree_path` **in the worktree copy** and performs an
+  explicit claim commit; a preparation or commit failure is a typed
+  `START_FAILED`, keeps the worktree for attach/retry, and never reports an
+  unqualified success. `worktree: false` is the plain CLI contract: it settles
+  branch ownership (preflight, then create/attach/switch) **before** the claim
+  write — so a failed switch leaves the item untouched — then records the
+  branch, commits the claim on that branch, reports `worktreePath: null` /
+  `worktreeCreated: false`, and pushes only when the claim commit or branch
+  creation makes the branch eligible. A claim refused after this run created a
+  branch rolls back only that owned branch (leaving it first, then restoring the
+  previous checkout). `cleanup` classifies with the **shared kernel rule** (the same
   `classifyCleanupEntry` the CLI uses), removes merged worktrees through the
   domain, deletes their branches and clears the records in one tracker commit.
   Push and the `gh` PR step stay explicit agent steps; the CLI
@@ -97,15 +104,24 @@ namespace:
   Payload contract (documented here; the output schemas stay loose to respect
   the ADR 0006 budget and the contract tests assert the envelopes):
 
-  | Tool      | Payload fields (beyond `ok`/`schemaVersion`/`conventionVersion`/`command`)                                                                                                                    |
-  | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `start`   | `id`, `branch`, `worktreePath` (`null` with `worktree: false`), `worktreeCreated`, `branchCreated`, `pushed`, `item` (the claimed contract item), `commit?` (tracker auto-commit)             |
-  | `branch`  | `id`, `branch`, `item`, `commit?`                                                                                                                                                             |
-  | `cleanup` | `base`, `candidates[]` (`id`, `status`, `branch`, `path`, `removable`, `reason`, `action`, `via?`), `pruned[]` (`id`, `action`, `error?`, `leftoverBranch?`, `via?`), `failures[]`, `commit?` |
+  | Tool      | Payload fields (beyond `ok`/`schemaVersion`/`conventionVersion`/`command`)                                                                                                                                                                                                                                                                       |
+  | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | `start`   | `id`, `branch`, `worktreePath` (`null` with `worktree: false`), `worktreeCreated`, `branchCreated`, `pushed`, `item`, `preparation?` (bounded `ready`/install/workspace receipt), `claimCommitted`, `claimCommit` (`committed`, `not-needed`, `failed`, or `not-attempted` with a bounded reason), `commit?`, and `rollback?` on a refused claim |
+  | `branch`  | `id`, `branch`, `item`, `commit?`                                                                                                                                                                                                                                                                                                                |
+  | `cleanup` | `base`, `candidates[]` (`id`, `status`, `branch`, `path`, `removable`, `reason`, `action`, `via?`), `pruned[]` (`id`, `action`, `error?`, `leftoverBranch?`, `via?`), `failures[]`, `commit?`                                                                                                                                                    |
 
-  Failures are typed tool errors carrying the code + envelope: `START_FAILED`,
-  `BRANCH_FAILED` and `CLEANUP_FAILED` (per-candidate prune failures stay in
-  `pruned`/`failures`, like the CLI).
+  Every pre-commit `start` failure carries `claimCommitted: false` and a
+  `claimCommit.status: "not-attempted"` receipt (with preparation/rollback
+  context when known). `rollback` reports observed `preparationRemoved`,
+  `worktreeRemoved`, and `branchDeleted` values; `branchDeleted: null` means
+  this invocation did not own a branch, and a plain-start rollback also reports
+  `restoredBranch` when the checkout was returned to its previous branch. A
+  commit or push failure after the claim commit — and an unexpected failure at
+  any later phase — reports the truthful committed outcome (status + hash)
+  instead. Failures are typed tool errors
+  carrying the code + envelope: `START_FAILED`, `BRANCH_FAILED` and
+  `CLEANUP_FAILED` (per-candidate prune failures stay in `pruned`/`failures`,
+  like the CLI).
 
 - **Permissions (W4)** — the generated seam adds minimal shell gates (deny
   `git commit --no-verify*`, `git push --force*`, `git push -f*`) that

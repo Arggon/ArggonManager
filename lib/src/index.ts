@@ -232,9 +232,15 @@ export {
   packageEntryExists,
   packageEntryPaths,
   pointWorkspaceAtLocal,
+  prepareWorktreeDependencies,
   unlinkNodeModulesLink,
 } from "./worktree.js";
-export type { LocalWorkspacePackage, WorkspaceBuildRunner } from "./worktree.js";
+export type {
+  LocalWorkspacePackage,
+  WorkspaceBuildRunner,
+  WorktreeDependencyPreparation,
+  WorktreeInstallState,
+} from "./worktree.js";
 export { runImportIssues } from "./import-issues.js";
 export type { GhExecutor, ImportIssuesOptions, ImportIssuesResult } from "./import-issues.js";
 export {
