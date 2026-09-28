@@ -2377,6 +2377,90 @@ describe("worktree domain tools (W4)", () => {
     expect(itemData(dir, "task-second").worktree_path).toBe(brokenPath);
   });
 
+  it("cleanup prune reports a branch-delete failure on both surfaces and keeps pruning", async () => {
+    // The reported defect (bug-native-cleanup-branch-delete-missing-failure):
+    // a branch delete that failed after the worktree was gone appeared in
+    // `pruned` but never in `failures`, so the flat list read as a clean run.
+    // No worktree domain at all here: both candidates carry a stale record
+    // (path already gone), which classification prunes without a removal, and
+    // the branch delete is the only failing step.
+    const dir = seedGitTree();
+    const base = gitOut(dir, ["rev-parse", "--abbrev-ref", "HEAD"]);
+    const missing = (id: string) => join(dirname(dir), `${basename(dir)}-${id}-gone`);
+    const branches = ["feat/task-rate-limit", "feat/task-second"] as const;
+    for (const branch of branches) {
+      git(dir, ["checkout", "-q", "-b", branch]);
+      writeFileSync(join(dir, `${branch.replace("/", "-")}.txt`), "work\n", "utf8");
+      git(dir, ["add", "-A"]);
+      git(dir, ["commit", "-qm", `feat: ${branch}`]);
+      git(dir, ["checkout", "-q", base]);
+      git(dir, ["merge", "--no-ff", branch, "-m", "Merge PR (stubbed)"]);
+    }
+    runCreate({ cwd: dir, type: "task", title: "Second task", parent: "story-login", id: "second" });
+    for (const [id, branch] of [
+      ["task-rate-limit", branches[0]],
+      ["task-second", branches[1]],
+    ] as const) {
+      runUpdate({ cwd: dir, id, status: "in_progress", assignee: "smoke" });
+      runUpdate({ cwd: dir, id, status: "done", branch, worktreePath: missing(id) });
+    }
+    // Deterministic branch-delete failure for ONE candidate (the race between
+    // classification and the delete, the case the record is cleared for): both
+    // primitives refuse, so the assertion holds for `-d` and the squash-merge
+    // `-D` alike. The other candidate still deletes, so continuation is real.
+    const refused = `refusing to delete branch: ${"detail ".repeat(120)}`;
+    const real = kernel.defaultCleanupGit();
+    const fails = (branch: string) => branch === "feat/task-rate-limit";
+    const failing = {
+      ...real,
+      deleteBranch: (cwd: string, branch: string) => {
+        if (fails(branch)) throw new Error(refused);
+        real.deleteBranch(cwd, branch);
+      },
+      deleteBranchForce: (cwd: string, branch: string) => {
+        if (fails(branch)) throw new Error(refused);
+        real.deleteBranchForce(cwd, branch);
+      },
+    };
+    const defs = argonToolDefinitions({ ...kernel, defaultCleanupGit: () => failing } as ArgonKernel, {
+      cwd: dir,
+      templatesDir: pluginTemplatesDir(),
+    });
+
+    const output = await tool(defs, "cleanup").execute({ prune: true, no_gh: true });
+    const envelope = output.output as Record<string, unknown>;
+    const actions = envelope.pruned as Array<Record<string, unknown>>;
+
+    // Both failure surfaces, same bounded message: the structured action (with
+    // the leftover branch named) and the flat `<id>: <error>` entry.
+    const failed = actions.find((action) => action.action === "failed")!;
+    expect(failed).toMatchObject({ id: "task-rate-limit", leftoverBranch: "feat/task-rate-limit" });
+    const message = String(failed.error);
+    expect(message).toContain("refusing to delete branch");
+    expect(message.length).toBe(500);
+    expect(envelope.failures).toEqual([`task-rate-limit: ${message}`]);
+    const flat = String((envelope.failures as string[])[0]);
+    expect(flat.length).toBeLessThanOrEqual(500 + "task-rate-limit: ".length);
+
+    // Continuation and record clearing are unchanged: the stale record of the
+    // failed candidate is still cleared (its worktree is gone) and the healthy
+    // candidate is pruned end to end, in ONE shared tracker commit.
+    // Candidates are processed in id order, so the run continues AFTER the
+    // failure instead of stopping on it.
+    expect(actions).toEqual([
+      { id: "task-rate-limit", action: "failed", error: message, leftoverBranch: "feat/task-rate-limit" },
+      { id: "task-rate-limit", action: "cleared worktree_path" },
+      { id: "task-second", action: "deleted branch feat/task-second" },
+      { id: "task-second", action: "cleared worktree_path" },
+    ]);
+    expect(envelope.commit).toMatchObject({ message: "chore(tasks): pruned task-rate-limit, task-second" });
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+    expect(itemData(dir, "task-second").worktree_path).toBeUndefined();
+    // The leftover branch survives for the next run; the deleted one does not.
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toContain("feat/task-rate-limit");
+    expect(gitOut(dir, ["branch", "--list", "feat/task-second"])).toBe("");
+  });
+
   it("cleanup without prune lists only and never touches the worktree", async () => {
     const dir = seedGitTree();
     const { worktreePath, defs, calls } = await completedWorktree(dir);
