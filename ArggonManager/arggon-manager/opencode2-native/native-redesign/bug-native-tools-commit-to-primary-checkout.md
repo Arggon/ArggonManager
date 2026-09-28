@@ -54,12 +54,12 @@ from `process.cwd()`.
 
 ## Acceptance
 
-- [ ] Every native `tools.arggon.*` call resolves the tracker root from the **session's** working directory (the worktree the session moved into), exactly like the CLI; verify `comment`, `handoff`, `update`, `create` and `branch`.
-- [ ] A commit produced from a worktree session lands on the **item's branch inside that worktree**, and its hash is reachable from the item's PR head.
-- [ ] The tool never writes tracker files or commits to the primary checkout while the session cwd is a worktree, even when the worktree is not the repository's `main` worktree.
-- [ ] Document the resolution rule in `ArggonManager/docs/opencode2.md` next to the worktree/start contract, and state what a session running from a non-worktree checkout does.
-- [ ] Add a deterministic regression test that runs a committing native tool from a disposable worktree and asserts the commit's branch and worktree path.
-- [ ] `npm test`, `npm run lint`, `npm run build`, `npm run check:plugin`, `npm run lint:structure`, `npm run test:structure` and `arggon validate` are green.
+- [x] Every native `tools.arggon.*` call resolves the tracker root from the **session's** working directory (the worktree the session moved into), exactly like the CLI; verify `comment`, `handoff`, `update`, `create` and `branch`.
+- [x] A commit produced from a worktree session lands on the **item's branch inside that worktree**, and its hash is reachable from the item's PR head.
+- [x] The tool never writes tracker files or commits to the primary checkout while the session cwd is a worktree, even when the worktree is not the repository's `main` worktree.
+- [x] Document the resolution rule in `ArggonManager/docs/opencode2.md` next to the worktree/start contract, and state what a session running from a non-worktree checkout does.
+- [x] Add a deterministic regression test that runs a committing native tool from a disposable worktree and asserts the commit's branch and worktree path.
+- [x] `npm test`, `npm run lint`, `npm run build`, `npm run check:plugin`, `npm run lint:structure`, `npm run test:structure` and `arggon validate` are green.
 
 ## Notes
 
@@ -113,3 +113,7 @@ Observed: `opencode/plugins/arggon/tools.test.ts` → `describe("tracker-root re
 `npm test` → **97 files / 1660 tests passed**; `npm run lint` → clean; `npm run build` → tsc + lib build + `build:plugin` clean; `npm run check:plugin` → bundle regenerated and committed (the only diff is the two new source constructs inlined); `npm run lint:structure` → ast-grep scan clean; `npm run test:structure` → 3/3 PASS (`native-tools-use-shared-seam`, `tracker-mutations-use-kernel`, `tracker-rename-destination-use-kernel`); `npm run arggon -- validate --json` → `{"ok":true,…,"errors":[],"warnings":[]}`.
 
 Not verified, honestly: the **real-runtime leg** (`npm run smoke:opencode`) was not run — `smoke/**` is owned by another worker in this wave, it is model-driven and timing-sensitive, and it must not run alongside a loaded machine. The in-process suite models the V2 tool context exactly (the runtime builds it as `{sessionID, agent, messageID, id, progress, signal}` — read out of the pinned 2.0.18 binary), so the only untested link is the host actually answering `ctx.session.get` with the moved session's `location.directory`.
+
+### handoff 2026-09-28 @Arggon — next: Review the diff, merge, then let the coordinator flip status: done. Next concrete step after merge: add a smoke:opencode leg that moves a session into the worktree and asserts the commit's branch (sm…
+- branch: fix/bug-native-tools-commit-to-primary-checkout
+- open questions: Does ctx.session.get answer correctly for a session that moved to another location, from a plugin instance bound to the old location? Untested against a real runtime; in-process tests model the V2 to…
