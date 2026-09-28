@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-harden-native-start-rollback-and-pathspec-handling
 title: Harden native start rollback and pathspec handling
 assignee: Arggon
@@ -8,8 +8,7 @@ parent: native-redesign
 labels: [opencode-seam, worktree, review]
 priority: p1
 created: "2026-09-24"
-updated: "2026-09-24"
-claimed_at: "2026-09-24T20:25:56.742Z"
+updated: "2026-09-28"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-harden-native-start-rollback-and-pathspec-handling.md
