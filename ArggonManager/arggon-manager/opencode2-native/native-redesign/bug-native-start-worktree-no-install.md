@@ -138,3 +138,28 @@ Head `30b380837d6436b63ba3518d8974688bdad22b92` — **all five prior blockers ar
 - Bounded receipts/messages hold on the new rollback and not-attempted paths (500-char rollback error, 2048-char error, 32×200 name caps).
 
 **Recommendation: NO-MERGE pending findings 1–3; re-review after the fix round.** (Non-blocking nit: the vendored plugin file otherwise omits semicolons; the remediation added a few — cosmetic only, lint is green.)
+
+### 2026-09-28 @ses_f2af667e6ffehT4bkVx6NvzwID
+## PROVISIONAL final re-review verdict (coordinator owns final)
+
+Head `038495550300047439b9d0009e55a58f27b1fa5f` — **PASS on the code as reviewed.** Both remaining in-scope findings are fixed and verified with fresh adversarial probes; the out-of-scope cleanup finding is correctly filed as `bug-native-cleanup-unverified-worktree-removal` (depends on this P1) and its source is unchanged from the prior reviewed head.
+
+### Fixes verified (fresh probes)
+
+- **Plain start settles branch ownership before the claim mutation.** A divergent recorded branch now switches first and commits on the branch (current == reported branch, clean tree). A genuine post-preflight switch failure (untracked file that checkout would overwrite) returns `claimCommitted:false` / `not-attempted` / `"the item was not modified"`, the item is **byte-identical and unclaimed**, and the checkout is unchanged. A claim refusal after this run created a branch rolls back **only that branch**, leaves it first, restores the prior checkout (`rollback {branchDeleted:true, restoredBranch:"master"}`), reports the observed state, and leaves the item byte-identical with a clean tree. Attach/re-run (worktree and plain) still report `not-needed` with no duplicate branch or commit.
+- **Unexpected throws after a landed claim commit are truthful.** A throw on the response path now reports `claimCommitted:true`, `claimCommit.status:"committed"` with the **real hash**, and a message stating the commit already landed. A pre-commit gate failure still reports `claimCommitted:false` / `failed` with the worktree kept.
+- **Bounded payload/schema hold:** native catalog 11,821 B <= 12,288 B; all new receipts/messages/rollback errors bounded.
+
+### Prior P1 findings still fixed (re-confirmed)
+
+worktree:false branch ownership/push; link-farm rollback with observed removal (incl. domain+git failure and lying-domain fallback); pathspec magic / absolute / cross-root rejection with literal staging; consistent bounded early `not-attempted` receipts; `opencode2.md` payload contract; fixtures use a tracked unique parent with `maintenance.auto=false` and leave no artifacts (a focused `tools.test.ts` run on this head created **0** leftover fixtures, GIT_TRACE2 recorded **0** maintenance children). `lib/` and `cli/` are untouched in this delta; native cleanup/prune source is unchanged.
+
+### Docs / acceptance / scope
+
+Docs (agents.md, playbooks/opencode.md, opencode2.md) match the implemented ordering, owned-branch rollback and post-claim receipt semantics. Original item acceptance and the follow-up `task-harden-native-start-rollback-and-pathspec-handling` are honest and ticked only after the new evidence. No GitHub comment/review on the PR; diff stays in scope; the cleanup follow-up is a separate item.
+
+### Gates (re-run on this head)
+
+`npm test` 97 files / 1,633 tests; `npm run lint`; `npm run build`; `npm run check:plugin` (bundle regenerated, no drift); `npm run arggon -- validate --json`; `git diff --check`; `npm run context:report -- --strict` — all green. Review worktree clean.
+
+**Recommendation: PASS on code. The open merge conflict is an integration step, not a code defect.** Required before merge: (1) merge current `main` (tracker review comments + the new cleanup bug) into the branch, resolving the tracker files; (2) re-run `npm run build:plugin` / `check:plugin` and confirm no bundle drift; (3) re-run `npm test`, lint, validate, and re-validate both tracker items; (4) rebase/merge normally (no squash) per the tracker-hygiene merge rule; (5) confirm CI is green on the merged head before marking the P1 and the follow-up done.
