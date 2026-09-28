@@ -60,3 +60,60 @@ opencode2-shell-tasks recommendation?"). Coordinator answer: yes — record the 
 keep the primary recommendation and its fallback intact. The exploration is dated research;
 correcting a measurement-falsified recommendation in place is the point of keeping it as a
 tracked doc.
+
+### 2026-09-28 @Arggon-coordinator
+## FINAL APPROVE — PR #425 (`0efcfe0c`)
+
+Docs-only correction of the exploration. I read the diff and the resulting §A rather than only
+the summary. **Merge authorized; this comment performs no merge and no `done` flip.**
+
+### What the correction gets right
+- The **falsification is stated at the point of decision**, not buried in an appendix: §A's Verdict
+  now leads with "Pilot FAIL — do not adopt opencode2-shell-tasks for this repository" and gives
+  both reasons (unenforced `ask` boundary, no package-supported runtime) in one sentence, which is
+  exactly acceptance box 2.
+- The two **§A risk bullets that measurement superseded were corrected rather than left to
+  contradict the new verdict** — the "mode-restricted by default" claim and the "needs an explicit
+  ask permission" prediction were the specific predictions the pilot falsified. Leaving them in
+  place would have made the document self-contradicting, and that is the failure mode that makes
+  research docs untrustworthy.
+- **Attribution is disciplined.** The `0644` sidecar mode and the lazy restart reconciliation are
+  recorded as *third-party package caveats* and explicitly "not defects in this repository". Good:
+  this repository does not adopt the package, so filing them as our bugs would be wrong.
+- The **primary path (native OpenCode V2 plugin) and the `shell`/smoke fallback are intact**, and
+  the new fallback pointer ("if a background-task surface is still wanted, internalize the minimal
+  behaviour in ArggonManager's own dependency-free plugin") is a strictly better disposition than
+  a permanent second plugin — it is the same conclusion the pilot worker's own note reached.
+- Cross-links are one hop: pilot item + merged PR #423, from the exploration.
+
+### Scope, verified
+`ArggonManager/docs/explorations/exploration-open-source-agent-tooling-013.md` only
+(+117/−31), plus this item's own file. No `package.json`, no `smoke/**`, no
+`opencode/plugins/arggon/**`, no generated config, no CI lane — the docs-only boundary the wave
+required. I confirmed the formatter churn the worker hit (OpenCode's `"formatter": true` in
+`opencode.jsonc` re-running prettier over the whole file) was **discarded** and the diff is the
+correction alone; the pre-existing non-prettier-clean tables are left as they were, which is the
+right call for a scoped correction — reformatting them would be an unrelated diff in a docs PR.
+
+### Two things I corrected on the coordinator side
+1. The PR also carries a **one-line deletion of the pilot item's stale `worktree_path`**. That is
+   correct content, but it is tracker bookkeeping, not part of this docs change. I pushed the prune
+   as its own commit on `main` (`a7c7838e`) and **trial-merged this branch against it first**:
+   the merge is clean, so the duplicate deletion collapses instead of conflicting. No wedged
+   auto-done risk.
+2. The worker's note that `lint:structure`/`test:structure` "are blocked in this environment by the
+   missing @ast-grep/cli" is now **stale** — I ran `npm install` in the primary after filing
+   `bug-worktree-readiness-misses-stale-primary-install`, so the guard runs for real locally. It is
+   exempt here (docs-only, and CI ran the guard green on this head), but future workers should not
+   inherit the excuse.
+
+### Gates
+`arggon validate --json` `ok:true` (0 errors, 0 warnings) · `cli/src/prose-format.test.ts` 3/3
+(the suite that actually covers this file) · `npm run lint` clean · pre-commit hook green, never
+`--no-verify`. CI on `0efcfe0c`: `cli` SUCCESS · `tasks-validate` SUCCESS · `ui-smoke` SUCCESS.
+
+### Open limitation carried forward
+The in-page anchor to section A was derived by hand to match the slug convention used elsewhere;
+nobody rendered GitHub to confirm it jumps. That is a docs nit, not a merge blocker, and I am not
+filing an item for a single anchor — if the slug is wrong the link still lands on the right
+document.
