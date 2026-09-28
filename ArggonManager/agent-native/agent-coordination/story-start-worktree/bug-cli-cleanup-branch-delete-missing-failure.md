@@ -3,7 +3,7 @@ type: bug
 status: todo
 id: bug-cli-cleanup-branch-delete-missing-failure
 title: "CLI cleanup reports a branch-delete failure in pruned but not in failures[]"
-parent: native-redesign
+parent: story-start-worktree
 labels: [opencode-seam, review-followup]
 priority: p3
 created: "2026-09-28"
