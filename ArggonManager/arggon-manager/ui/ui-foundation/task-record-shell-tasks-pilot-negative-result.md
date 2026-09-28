@@ -11,7 +11,6 @@ priority: p2
 created: "2026-09-28"
 updated: "2026-09-28"
 depends_on: [task-pilot-opencode2-shell-tasks-server-only]
-worktree_path: /home/arggon/Projects/ArggonManager-task-record-shell-tasks-pilot-negative-result
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-record-shell-tasks-pilot-negative-result.md
