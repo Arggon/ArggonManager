@@ -11,7 +11,6 @@ priority: p2
 created: "2026-09-24"
 updated: "2026-09-28"
 depends_on: [bug-native-start-worktree-no-install, task-ast-grep-structural-rules]
-worktree_path: /home/arggon/Projects/ArggonManager-task-native-start-cold-smoke
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-native-start-cold-smoke.md
