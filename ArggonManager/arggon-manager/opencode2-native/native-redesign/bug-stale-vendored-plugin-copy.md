@@ -64,3 +64,10 @@ Confirmed with `npm run arggon -- init --dry-run --json`: `.opencode/plugins/arg
 - `ArggonManager/.convention.yml` x-generated entry for `.opencode/plugins/arggon/index.ts`.
 - `git show df84e447:opencode/plugins/arggon/index.ts` + stamp = sha256 `325d10f9…` (stale on-disk bytes).
 - `git show 55e2638f:opencode/plugins/arggon/index.bundle.ts` + stamp = sha256 `988e2cd8…` (recorded state).
+
+### 2026-09-28 @Arggon-coordinator
+## Reproduced after the native-start P1 merge — 2026-09-28
+
+A fresh `tools.arggon.start({ id: "bug-native-cleanup-unverified-worktree-removal", worktree: true, push: true })` from this already-running OpenCode session still returned the OLD envelope shape (no `preparation`, `claimCommitted`, or `claimCommit`) and `commit.skipped: "git commit failed: sh: line 1: tsx: command not found"`, even though PR #419 is merged on `main` and its generated-bundle tests pass.
+
+This confirms the long-lived session is still running the pre-fix vendored `.opencode/plugins/arggon/index.ts` copy. The merged kernel/plugin source is correct; the running plugin is stale. Record the reload/regeneration boundary here: a new headless runtime must be used for cold-start evidence, and `arggon init`/doctor must make the vendored copy refresh or report its drift.
