@@ -106,3 +106,18 @@ Green gates: `npm test` (97 files / 1,630 tests), `npm run lint`, `npm run build
 ### handoff 2026-09-24 @ses_f2b1605beffe4ketLzfuVHnIWN (session: ses_f2b1605beffe4ketLzfuVHnIWN) — next: Coordinator: review pushed PR #419, run the required review smoke, merge normally, verify merge, then complete the original and follow-up items.
 - branch: fix/bug-native-start-worktree-no-install
 - open questions: Standalone cold-start/model smoke remains in task-native-start-cold-smoke; Windows drive/junction paths were not executable on this Linux host.
+
+### 2026-09-28 @ses_f2b1605beffe4ketLzfuVHnIWN
+## Re-review round 2 evidence — 2026-09-28
+
+Two in-scope gaps closed in `ea530234`; native `cleanup` deliberately untouched (finding 3 is `bug-native-cleanup-unverified-worktree-removal`, parent `native-redesign`, depends on this P1).
+
+1. **Plain-start ordering.** Branch ownership is now settled (ownership preflight → create/attach/switch) BEFORE the claim mutation, so a failed switch leaves the item byte-identical and unclaimed instead of claimed-and-dirty. If the claim update is refused after this run created a branch, the rollback leaves that branch first (`git switch <previous>` / `--detach`), deletes only the owned branch, and reports the observed receipt (`rollback { branchDeleted, restoredBranch }`; `null` when no branch was owned).
+2. **Truthful unexpected failures.** `nativeStart` now records a `NativeStartProgress` (stage, preparation, branch/worktree flags, claim receipt, push) and wraps every post-resolution phase. An unexpected throw reports the state observed so far, so a claim commit that already landed stays `claimCommitted: true` with its committed status/hash; only pre-commit failures carry `not-attempted`. `guarded`'s start catch now provably only covers pre-body throws, and a literal-envelope fallback exists if even the failure path throws.
+
+Reproducer evidence (3 new regressions, all green):
+- divergent recorded branch whose switch fails → item file byte-identical, still `todo`/unassigned, checkout unmoved, branch intact, `claimCommit.status: "not-attempted"`.
+- claim refused after this run created the branch → `rollback { branchDeleted: true, restoredBranch: <base> }`, owned branch deleted, checkout restored, existing owner claim intact.
+- `successEnvelope` throwing after a real claim commit → `claimCommitted: true`, `claimCommit.status: "committed"`, hash equal to `git rev-parse --short HEAD`.
+
+Gates: `npm test` 97 files / 1,633 tests; `npm run lint`; `npm run build`; `npm run check:plugin`; `npm run context:report -- --strict` (native catalog 11,821 B ≤ 12,288 B); `npm run arggon -- validate`; `tools.arggon.validate`; `git diff --check`; focused repro set 8 native + 5 tracker-commit; no fixture leftovers. Acceptance line 2 was un-ticked before the fix and re-ticked only after this evidence. PR body updated (no comment posted); draft, unmerged, item stays in_progress.
