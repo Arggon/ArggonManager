@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-ast-grep-structural-rules
 title: Adopt ast-grep structural architecture rules
 assignee: Arggon
@@ -9,8 +9,7 @@ parent: ui-foundation
 labels: [tooling, architecture, ci]
 priority: p2
 created: "2026-09-24"
-updated: "2026-09-24"
-claimed_at: "2026-09-24T15:36:11.442Z"
+updated: "2026-09-28"
 worktree_path: /home/arggon/Projects/ArggonManager-task-ast-grep-structural-rules
 ---
 <!--
