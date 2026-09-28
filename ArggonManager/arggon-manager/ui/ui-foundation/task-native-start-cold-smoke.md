@@ -125,3 +125,23 @@ Then `git checkout -- lib/src/worktree.ts`, rebuild, re-run: 20/20 `ok`, exit 0.
 ### handoff 2026-09-28 @Arggon — next: Review the draft PR for feat/task-native-start-cold-smoke, then merge and flip the item to done.
 - branch: feat/task-native-start-cold-smoke
 - open questions: Wire the new smoke into a CI job or keep it maintainer-run?; Should smoke:opencode also cover the cold start once quota allows?
+
+### 2026-09-28 @Arggon
+## CI evidence (final head `c4f8af3e`) and two flakes CI caught
+
+CI on PR #427, final run set (head `c4f8af3e`):
+
+| Job                                                                     | Workflow | Run / job                                                                                                     | Result      |
+| ----------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------- | ----------- |
+| `cli` (build, check:plugin, test, lint, test:structure, lint:structure) | CI       | [36497709487/109181044406](https://github.com/Arggon/ArggonManager/actions/runs/36497709487/job/109181044406) | **success** |
+| `ui-smoke` (Playwright @smoke + `smoke:tui-board`)                      | CI       | [36497709487/109181044186](https://github.com/Arggon/ArggonManager/actions/runs/36497709487/job/109181044186) | **success** |
+| `tasks-validate`                                                        | arggon   | [36497709488/109181044311](https://github.com/Arggon/ArggonManager/actions/runs/36497709488/job/109181044311) | **success** |
+
+Two earlier runs failed **on my own new unit test**, not on the product, and both are fixed (each got its own commit, no rebase/force-push):
+
+1. `d2e723ba` — `reports the emptied-install signature`: whether the kernel re-stamps a directory mtime on an unlink depends on the tick the removal lands in, so locally the drift list had 2 entries and on the runner 3 (`mtime 1790637146704.293 -> 1790637146704.8691`). Fixed by pinning the directory clock with `utimesSync` before comparing, so the test asserts the signal instead of the clock's luck.
+2. `c4f8af3e` — `reports a reified install`: the CI runner's filesystem stored `…431.999` where the test asked `utimesSync` for `…432`, so the expected string built from `later.getTime()` did not match the value read back. Fixed by building the expectation from the fingerprint read back and asserting the delta is ≥ 59 s, which is what the check is actually about.
+
+Both were real portability defects in my test, not flakes in the product or in the smoke. Locally after the fixes: `smoke/native-start-cold-smoke.test.ts` green 5/5 consecutive runs, full `npm test` 98 files / 1661 tests green, `npm run lint` clean, `npm run arggon -- validate --json` `ok:true`, `npm run smoke:native-start-cold` 20/20 `ok` (exit 0) re-run at the final head.
+
+The lesson worth keeping for the next fingerprint-style helper: a directory `mtime` is only ever a coarse-clock, precision-dependent signal — compare it read-back-to-read-back, never against a value you set, and never across two different directories (already asserted in `installDrift` and pinned by tests).
