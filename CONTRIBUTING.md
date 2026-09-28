@@ -35,6 +35,8 @@ Requires **Node.js 22.12+** (needed by vitest 5 in the dev toolchain; `engines` 
 - `npm run lint`
 - `npm run test:structure`
 - `npm run lint:structure`
+- `npm run smoke:native-start-cold` — cold-start smoke for the native
+  `tools.arggon.start` worktree path (below)
 
 Two npm packages make up this repo:
 
@@ -109,6 +111,40 @@ These rules are not comprehensive semantic enforcement. Rule scope, the exact
 structural limitations, production exceptions, content/path decisions, and
 explicit test-helper exclusions are documented in
 [`tools/ast-grep/README.md`](tools/ast-grep/README.md).
+
+### Native start cold-start smoke (dev-only)
+
+`npm run smoke:native-start-cold` (`smoke/native-start-cold-smoke.ts`) is the
+durable, **deterministic and model-free** regression gate for the native
+`tools.arggon.start` worktree path — the path that used to hand back a cold
+worktree whose dependency-requiring pre-commit gate could not run, with the
+claim commit silently absent. It needs no OpenCode runtime, no model and no
+quota, so it is safe to run beside anything; `npm run smoke:opencode` and
+`npm run smoke:opencode:wave` remain the **model-driven** evidence and are run
+on their own (see [OpenCode 2 notes](ArggonManager/docs/opencode2.md)).
+
+One run (`npm run build` first, so this checkout's kernel is built) builds a
+disposable git fixture under `$TMPDIR` — a primary checkout with an initialized
+tracker, a project install and a real executable `pre-commit` gate that
+resolves a dependency only that install carries — and then:
+
+1. proves the gate **fails** in a cold worktree (no `node_modules`), so the
+   scenario cannot pass by bypassing it;
+2. drives the **actual native tool** (this checkout's
+   `opencode/plugins/arggon/index.ts` plus a `ctx.worktree` domain double backed
+   by real `git worktree`) and requires an explicit, bounded readiness /
+   claim-commit receipt, a claim commit whose only path is the item file, and
+   the gate's marker written inside the worktree start prepared;
+3. re-runs `start` to prove a deterministic attach, no duplicate claim commit
+   and no mutation of either install — the fixture's and this repository's
+   canonical checkout, whose `node_modules` fingerprint (entry count, entry-set
+   digest, mtime) must be identical before and after;
+4. removes the worktree, its git registration and the whole disposable root, and
+   asserts this checkout's working tree is byte-identical to how it started.
+
+Exit codes: `0` passed, `1` a check failed (the fixture is kept for inspection),
+`2` the harness could not run. `ARGON_NATIVE_START_SMOKE_KEEP=1` keeps the
+fixture on success too.
 
 ### UI smoke tests (dev-only)
 

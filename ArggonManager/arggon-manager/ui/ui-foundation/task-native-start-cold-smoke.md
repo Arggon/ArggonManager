@@ -14,6 +14,7 @@ claimed_at: "2026-09-28T22:45:52.890Z"
 depends_on: [bug-native-start-worktree-no-install, task-ast-grep-structural-rules]
 worktree_path: /home/arggon/Projects/ArggonManager-task-native-start-cold-smoke
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-native-start-cold-smoke.md
   Leaves live only under a story. id is the filename stem: task-native-start-cold-smoke.
@@ -29,12 +30,12 @@ Add a durable cold-start smoke for the native worktree path after `bug-native-st
 
 ## Acceptance
 
-- [ ] Build a disposable git/OpenCode fixture whose primary checkout has a project install and whose fresh worktree starts without `node_modules`.
-- [ ] Install an executable dependency-requiring pre-commit gate and a marker proving the gate ran; never bypass it with `--no-verify`.
-- [ ] Invoke the actual native `tools.arggon.start` path and require an explicit readiness/claim-commit result, a present dependency preparation, and a claim commit containing only the item file.
-- [ ] Re-run start and prove deterministic attach, no duplicate claim commit, and no mutation or emptying of the primary checkout install.
-- [ ] Prove the smoke cleans every fixture/worktree process and writes only inside its disposable roots; any required `node_modules` report/receipt stays bounded.
-- [ ] Add a deterministic repository smoke command and document how maintainers run it; keep the model-driven wave smoke separate.
-- [ ] `npm test`, `npm run lint`, `npm run build`, `npm run check:plugin`, the new cold-start smoke, and `arggon validate` are green, with expected-vs-observed evidence in the PR.
+- [x] Build a disposable git/OpenCode fixture whose primary checkout has a project install and whose fresh worktree starts without `node_modules`.
+- [x] Install an executable dependency-requiring pre-commit gate and a marker proving the gate ran; never bypass it with `--no-verify`.
+- [x] Invoke the actual native `tools.arggon.start` path and require an explicit readiness/claim-commit result, a present dependency preparation, and a claim commit containing only the item file.
+- [x] Re-run start and prove deterministic attach, no duplicate claim commit, and no mutation or emptying of the primary checkout install.
+- [x] Prove the smoke cleans every fixture/worktree process and writes only inside its disposable roots; any required `node_modules` report/receipt stays bounded.
+- [x] Add a deterministic repository smoke command and document how maintainers run it; keep the model-driven wave smoke separate.
+- [x] `npm test`, `npm run lint`, `npm run build`, `npm run check:plugin`, the new cold-start smoke, and `arggon validate` are green, with expected-vs-observed evidence in the PR.
 
 ## Notes
