@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-native-tools-commit-to-primary-checkout
 title: Native arggon tools resolve the tracker from the primary checkout and commit to it while the session works in a worktree
+assignee: Arggon
+branch: fix/bug-native-tools-commit-to-primary-checkout
 parent: native-redesign
 labels: [opencode-seam, worktree, dogfood]
 priority: p1
 created: "2026-09-28"
 updated: "2026-09-28"
+claimed_at: "2026-09-28T22:45:55.079Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-native-tools-commit-to-primary-checkout
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-native-tools-commit-to-primary-checkout.md
@@ -50,12 +54,12 @@ from `process.cwd()`.
 
 ## Acceptance
 
-- [ ] Every native `tools.arggon.*` call resolves the tracker root from the **session's** working directory (the worktree the session moved into), exactly like the CLI; verify `comment`, `handoff`, `update`, `create` and `branch`.
-- [ ] A commit produced from a worktree session lands on the **item's branch inside that worktree**, and its hash is reachable from the item's PR head.
-- [ ] The tool never writes tracker files or commits to the primary checkout while the session cwd is a worktree, even when the worktree is not the repository's `main` worktree.
-- [ ] Document the resolution rule in `ArggonManager/docs/opencode2.md` next to the worktree/start contract, and state what a session running from a non-worktree checkout does.
-- [ ] Add a deterministic regression test that runs a committing native tool from a disposable worktree and asserts the commit's branch and worktree path.
-- [ ] `npm test`, `npm run lint`, `npm run build`, `npm run check:plugin`, `npm run lint:structure`, `npm run test:structure` and `arggon validate` are green.
+- [x] Every native `tools.arggon.*` call resolves the tracker root from the **session's** working directory (the worktree the session moved into), exactly like the CLI; verify `comment`, `handoff`, `update`, `create` and `branch`.
+- [x] A commit produced from a worktree session lands on the **item's branch inside that worktree**, and its hash is reachable from the item's PR head.
+- [x] The tool never writes tracker files or commits to the primary checkout while the session cwd is a worktree, even when the worktree is not the repository's `main` worktree.
+- [x] Document the resolution rule in `ArggonManager/docs/opencode2.md` next to the worktree/start contract, and state what a session running from a non-worktree checkout does.
+- [x] Add a deterministic regression test that runs a committing native tool from a disposable worktree and asserts the commit's branch and worktree path.
+- [x] `npm test`, `npm run lint`, `npm run build`, `npm run check:plugin`, `npm run lint:structure`, `npm run test:structure` and `arggon validate` are green.
 
 ## Notes
 
@@ -64,6 +68,55 @@ the native tracker tools and the worktree lifecycle were never covered by a test
 committing tool from inside a worktree. Related but distinct: `bug-stale-vendored-plugin-copy`
 (vendored copy under `init` re-runs).
 
+### 2026-09-28 @Arggon
+Root cause established with evidence, before any fix was written.
+
+**It was a captured/stale root, not an explicit primary-checkout path.** `opencode/plugins/arggon/index.ts` resolves the tracker directory once, in `definition.setup()`:
+
+    const directory = locationDirectory(ctx)          // === ctx.location.directory
+    await registerArgonTools(ctx, { cwd: directory, … })
+
+`ArgonToolOptions.cwd` is then frozen for the plugin instance's lifetime, and all 15 tool specs pass that value straight to the kernel (`cwd: options.cwd`), so `findTasksDir()` walks up from the checkout the plugin was LOADED in. OpenCode V2's own docs (`/build/plugins`, Context) call `ctx.location` "the plugin instance's location, **not** the location of every session it can access or event it receives" — so after `opencode.session_move` the captured value is stale by construction. There is no separate primary-checkout lookup anywhere in the plugin; `canonicalRoot()`/`options.worktree.canonical` is used only for `start`'s worktree placement and never as a tracker root.
+
+**Live reproduction, read-only, in the very session that owns this fix** (this worktree is `/home/arggon/Projects/ArggonManager-bug-native-tools-commit-to-primary-checkout`):
+
+| source | resolved tracker root | status | assignee | branch | worktree_path |
+| --- | --- | --- | --- | --- | --- |
+| `tools.arggon.show({ id, meta: true })` (native, session cwd = this worktree) | `/home/arggon/Projects/ArggonManager` (primary, on `main`) | `todo` | `null` | `null` | `null` |
+| `npm run arggon -- show bug-native-tools-commit-to-primary-checkout --meta --json` (same worktree) | this worktree | `in_progress` | `Arggon` | `fix/bug-native-tools-commit-to-primary-checkout` | `/home/…/ArggonManager-bug-…` |
+
+The native read already answers from the primary's `main` while the worker's cwd is the worktree; a committing tool from the same session therefore commits to `main` — which is exactly how `b65ef7c6`/`adacc20a` reached `main` and how `d24215b9` was produced.
+
+**Why the session's own directory is the right resolution rule.** The V2 tool context is built as `{ sessionID, agent, messageID, id, progress, signal }` — V2 hands a plugin tool **no directory**, so `sessionID` is the only per-call signal of where the session works, and `ctx.session.get({ sessionID })` → `Session.Info.location.directory` is what `session.move` updates. The candidates rejected: (a) `ctx.location.directory` — the plugin instance's location, stale after a move (the defect); (b) `process.cwd()` — the host process's launch directory, and a background `opencode serve` carries its own, never the session's; (c) the item's recorded `worktree_path` — chicken-and-egg, reading it needs the root being resolved (it stays authoritative for what `start` attaches to, not for where a call resolves). A session's directory is the one rule that matches one-branch-per-item: the branch the session moved onto is the branch its commit must land on, so the evidence is in the PR.
+
+**The failure is loud, not silent.** Once a session is known, an unresolvable directory raises a typed tool error (`error.code: SESSION_ROOT_UNRESOLVED`, an `ArgonToolError` with the envelope) rather than falling back to the plugin location — committing to the wrong checkout because a lookup failed is the failure being fixed. The plugin-location fallback applies only when there is no calling session at all, and when the host has no `ctx.session.get` (degrades to the pre-fix behavior instead of breaking).
+
+### 2026-09-28 @Arggon
+Acceptance evidence — expected vs observed, per box. Fix: `opencode/plugins/arggon/index.ts` only (+ regenerated bundle, tests, docs). No `lib/src` change: the kernel's `findTasksDir()` already walks up from the `cwd` it is handed (CLI parity), so the defect was entirely on the native side.
+
+**Box 1 — every native call resolves the tracker root from the session's directory; verify comment, handoff, update, create, branch.**
+Expected: all five read + commit the WORKTREE copy. Observed: `branch` → `update` → `comment` → `handoff` → `create` all report `ok: true` with a commit; after each, `git -C worktree branch --show-current` = `fix/task-rate-limit`, the worktree HEAD is the reported hash, and the primary's item bytes are unchanged. A read is asserted too: `show` from the session returns `{status: in_progress, assignee: smoke, branch: fix/task-rate-limit}` while the primary copy is still `todo` with no `branch`. The created item exists in the worktree and not in the primary. Test: `tools.test.ts` → `"resolves the tracker root from the session's worktree for comment, handoff, update, create and branch"`.
+
+**Box 2 — the commit lands on the item's branch inside that worktree and its hash is reachable from the item's PR head.**
+Expected: commit on `fix/<id>` in the worktree, present at the pushed item-branch tip. Observed: `git -C worktree branch --contains <hash> --format=%(refname:short)` → `fix/task-rate-limit`; `git -C worktree rev-parse <hash>^{commit}` == worktree HEAD; the branch is pushed to a local bare `origin` and `git -C origin.git rev-parse fix/task-rate-limit` carries the hash. Independently, in this very session, the CLI `comment` above committed `8eba33e3` on `fix/bug-native-tools-commit-to-primary-checkout` inside this worktree, `git branch --contains 8eba33e3` lists only that branch, and the primary is still on `main` at `3d40159d` with an item file containing none of this evidence.
+
+**Box 3 — never writes tracker files or commits to the primary while the session cwd is a worktree, even for a non-base-branch worktree.**
+Expected: primary HEAD unchanged, `git status --porcelain` empty, primary item bytes identical, base branch still one commit. Observed: all four hold after `update` + `comment`; the worktree under test is a real LINKED (non-main) worktree created with `git worktree add -b`. Two refusal cases pin the loud path: an unresolvable session directory and a *throwing* session lookup both reject with `ArgonToolError` `code: SESSION_ROOT_UNRESOLVED` and leave the primary with an empty `git status --porcelain` and an unchanged item file. Negative control: with the per-call resolution temporarily removed, 5 of the 7 behavioural tests fail — the 5-tool test on `branch: the reported hash is the worktree HEAD`, the primary-hygiene test on its base-branch commit count, and both refusal tests because the call resolved `ok: true` into the primary instead of rejecting. The 2 tests that still pass there are the two that pin deliberately unchanged behaviour (a session in a plain checkout; a call with no session).
+
+**Box 4 — the rule is documented in `ArggonManager/docs/opencode2.md` next to the worktree/start contract, including the non-worktree case.**
+Observed: new section `### Where every native tool resolves the tracker root`, placed between the worktree-lifecycle contract and the permissions bullet. It states the rule, a 4-row table (worktree session / non-worktree checkout / no calling session / unresolvable), why the three rejected candidates are wrong (with the V2 quote), why the failure is loud, that `start` still places the worktree next to the canonical checkout, and the test names that carry the evidence. Compatibility: the CLI rule is unchanged and still the single walk-up (`convention.md` §Detection, `json-output.md` untouched); `SESSION_ROOT_UNRESOLVED` is native-surface-only and documented here rather than in the CLI's code table, because the CLI resolves the same root from its own cwd and can never reach it.
+
+**Box 5 — a deterministic regression test that runs a committing native tool from a disposable worktree and asserts the commit's branch and worktree path.**
+Observed: `opencode/plugins/arggon/tools.test.ts` → `describe("tracker-root resolution from the calling session")`, 7 tests over a `seedGitTree()` primary + real `git worktree add -b` worktree, with the definitions bound to the PRIMARY location on purpose (so the assertions are about per-call resolution, not the fallback). Each asserts the branch, that the reported hash is the worktree HEAD and resolves there, and that the primary is byte-identical. Plus `describe("resolveToolCwd: per-call tracker root")` (3 pure tests: preference, both fallbacks, typed failure with envelope) and `index.test.ts` → `describe("plugin-context: session directory wiring")` (4 tests: `location.directory`, bare `directory`, non-string rejected, feature detection, id pass-through, throw propagation). All temporary; teardown removes the `mkdtemp` parent with the worktree inside it.
+
+**Box 6 — gates green (all re-run after the final edit, from this worktree).**
+`npm test` → **97 files / 1660 tests passed**; `npm run lint` → clean; `npm run build` → tsc + lib build + `build:plugin` clean; `npm run check:plugin` → bundle regenerated and committed (the only diff is the two new source constructs inlined); `npm run lint:structure` → ast-grep scan clean; `npm run test:structure` → 3/3 PASS (`native-tools-use-shared-seam`, `tracker-mutations-use-kernel`, `tracker-rename-destination-use-kernel`); `npm run arggon -- validate --json` → `{"ok":true,…,"errors":[],"warnings":[]}`.
+
+Not verified, honestly: the **real-runtime leg** (`npm run smoke:opencode`) was not run — `smoke/**` is owned by another worker in this wave, it is model-driven and timing-sensitive, and it must not run alongside a loaded machine. The in-process suite models the V2 tool context exactly (the runtime builds it as `{sessionID, agent, messageID, id, progress, signal}` — read out of the pinned 2.0.18 binary), so the only untested link is the host actually answering `ctx.session.get` with the moved session's `location.directory`.
+
+### handoff 2026-09-28 @Arggon — next: Review the diff, merge, then let the coordinator flip status: done. Next concrete step after merge: add a smoke:opencode leg that moves a session into the worktree and asserts the commit's branch (sm…
+- branch: fix/bug-native-tools-commit-to-primary-checkout
+- open questions: Does ctx.session.get answer correctly for a session that moved to another location, from a plugin instance bound to the old location? Untested against a real runtime; in-process tests model the V2 to…
 ### 2026-09-28 @Arggon-coordinator
 ## FINAL APPROVE — PR #426 (`72026ada`), P1
 

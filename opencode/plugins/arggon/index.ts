@@ -972,6 +972,29 @@ function locationDirectory(ctx: PluginContext): string | undefined {
   return asString(ctx.location?.directory)
 }
 
+/**
+ * `ArgonToolOptions.sessionDirectory` from the V2 plugin context: the calling
+ * session's own location directory, read through `ctx.session.get` (V2 gives a
+ * plugin tool no directory — only the session id, see
+ * {@link ArgonToolCallContext}). `Session.Info.location.directory` is what
+ * `session_move` updates, so this follows the session into a worktree; the bare
+ * `directory` field is accepted as a fallback for a host that reports it
+ * without the location wrapper. Feature-detected: a context without
+ * `ctx.session.get` yields undefined and every call keeps using `options.cwd`.
+ */
+export function sessionDirectoryResolver(
+  ctx: PluginContext,
+): ((sessionID: string) => Promise<string | undefined>) | undefined {
+  const get = ctx?.session?.get
+  if (typeof get !== "function") return undefined
+  return async (sessionID: string) => {
+    const session = (await get({ sessionID })) as
+      | { location?: { directory?: unknown }; directory?: unknown }
+      | undefined
+    return asString(session?.location?.directory) ?? asString(session?.directory)
+  }
+}
+
 /** No-op outside ArggonManager trees: no tracker root, nothing to do. */
 function hasTasksTree(directory: string): boolean {
   try {
@@ -1280,7 +1303,15 @@ const SESSION_TOKEN_MAX_CHARS = 64
 /** Kernel surface the native tools consume (the `@arggondev/lib` stable subset). */
 export type ArgonKernel = typeof import("@arggondev/lib")
 
-/** Second `execute` argument V2 passes to a tool (session correlation only). */
+/**
+ * Second `execute` argument V2 passes to a tool.
+ *
+ * The runtime builds it as `{ sessionID, agent, messageID, id, progress, signal }`
+ * — deliberately structural, like every other context type here. `sessionID` is
+ * BOTH the comment/handoff attribution token and the **tracker-root key**: V2 hands
+ * a plugin tool no directory, so the session id is the only per-call signal of
+ * where the calling session works (bug-native-tools-commit-to-primary-checkout).
+ */
 export type ArgonToolCallContext = { sessionID?: unknown }
 
 export type ArgonToolResult = { output: Record<string, unknown> }
@@ -1303,8 +1334,24 @@ export type ArgonToolRegistration = ArgonToolDefinition & {
 }
 
 export type ArgonToolOptions = {
-  /** Session/project directory every kernel call runs against. */
+  /**
+   * Fallback working directory for calls that carry no calling session: the
+   * plugin instance's own `ctx.location.directory`. A call made by a session
+   * never uses it — see {@link resolveToolCwd}.
+   */
   cwd: string
+  /**
+   * Resolve the **calling session's** own location directory (the worktree a
+   * `session_move` landed in) from the session id V2 hands every tool call.
+   * Feature-detected at setup: absent (a host without `ctx.session.get`) every
+   * call falls back to `cwd`. Resolving this per call is what keeps a committing
+   * tool off the primary checkout once the session has moved
+   * (bug-native-tools-commit-to-primary-checkout): V2 documents `ctx.location` as
+   * "the plugin instance's location, not the location of every session it can
+   * access or event it receives", so a value captured at `setup` is stale by
+   * construction after a move.
+   */
+  sessionDirectory?: (sessionID: string) => Promise<string | undefined>
   /**
    * Fallback item-templates dir for `create`/`import-issues` (ADR 0013: the
    * kernel embeds no templates). The repo's own `templates/` always wins.
@@ -1427,6 +1474,75 @@ export function sessionToken(value: unknown): string | undefined {
   const token = value.trim()
   if (token === "" || token.length > SESSION_TOKEN_MAX_CHARS) return undefined
   return /^[A-Za-z0-9._:-]+$/.test(token) ? token : undefined
+}
+
+/**
+ * `error.code` for a call whose session directory cannot be resolved
+ * (bug-native-tools-commit-to-primary-checkout). Native-surface only: the CLI
+ * resolves the same root by walking up from its own cwd, so it can never reach
+ * this. The code exists because the native seam has a caller-side root to
+ * resolve and must refuse rather than write to the wrong checkout.
+ */
+export const SESSION_ROOT_UNRESOLVED = "SESSION_ROOT_UNRESOLVED"
+
+/**
+ * Working directory for ONE native tool call. The tracker root is resolved from
+ * the **calling session's own directory**, re-read on every call, so a session
+ * that moved into a worktree commits there and never to the checkout the plugin
+ * instance was loaded from. The kernel then walks up from it exactly as the CLI
+ * walks up from its own cwd (one logic path, ADR 0011).
+ *
+ * The order, and why each rung is where it is:
+ *
+ *   1. a session that is known and resolvable \u2192 that session's directory. This
+ *      is the rule the repo's one-branch-per-item model needs: the branch the
+ *      session moved onto is the branch its commit must land on.
+ *   2. no session on the call (an ambient/headless invocation, or an `execute` the
+ *      host ran without one) \u2192 the plugin instance's location, the only directory
+ *      this file knows.
+ *   3. a session that is known but whose directory cannot be resolved \u2192 a typed
+ *      failure, deliberately NOT the case-2 fallback: committing to the primary
+ *      because a lookup failed is the exact defect this exists to stop, and a
+ *      silent `ok: true` on the wrong branch is worse than a refused call.
+ *
+ * `process.cwd()` is not a candidate: it is the host process's launch directory
+ * (a background `opencode serve` carries its own), never the session's. The
+ * item's recorded `worktree_path` cannot be one either — reading it needs the
+ * tracker root this function is resolving.
+ */
+export async function resolveToolCwd(
+  kernel: ArgonKernel,
+  command: string,
+  options: ArgonToolOptions,
+  tool?: ArgonToolCallContext,
+): Promise<{ cwd: string } | { error: ArgonToolError }> {
+  const sessionID = sessionToken(tool?.sessionID)
+  if (sessionID === undefined || options.sessionDirectory === undefined) {
+    return { cwd: options.cwd }
+  }
+  let directory: string | undefined
+  let failure: string | undefined
+  try {
+    directory = asString(await options.sessionDirectory(sessionID))
+  } catch (error) {
+    failure = detail(error)
+  }
+  if (directory === undefined) {
+    const cause = failure === undefined ? "" : ` (${boundedNativeText(failure, MAX_NATIVE_DETAIL_CHARS)})`
+    return {
+      error: new ArgonToolError(
+        kernel.failEnvelope({
+          command,
+          code: SESSION_ROOT_UNRESOLVED,
+          message:
+            `could not resolve the working directory of session ${sessionID}${cause}; refusing ` +
+            `to fall back to the plugin location ${options.cwd}, which would commit to the ` +
+            "checkout this plugin was loaded from instead of the session's own",
+        }),
+      ),
+    }
+  }
+  return { cwd: directory }
 }
 
 type ArgonToolSpec = {
@@ -3538,7 +3654,16 @@ export function argonToolDefinitions(
     input: spec.input,
     output: spec.output,
     execute: async (input, tool) => {
-      const outcome = await spec.run(kernel, input ?? {}, options, tool)
+      // The tracker root is resolved per CALL from the calling session, so a
+      // session that moved into a worktree reads and commits there. A value
+      // captured at setup would stay pinned to the plugin instance's location
+      // and land every commit on the primary checkout's branch
+      // (bug-native-tools-commit-to-primary-checkout).
+      const resolved = await resolveToolCwd(kernel, spec.name, options, tool)
+      if ("error" in resolved) throw resolved.error
+      const callOptions =
+        resolved.cwd === options.cwd ? options : { ...options, cwd: resolved.cwd }
+      const outcome = await spec.run(kernel, input ?? {}, callOptions, tool)
       const envelope = outcome.envelope as Record<string, unknown>
       if (!outcome.ok) throw new ArgonToolError(envelope)
       return { output: envelope }
@@ -3655,6 +3780,7 @@ const definition: PluginDefinition = {
       if (directory !== undefined) {
         await registerArgonTools(ctx, {
           cwd: directory,
+          sessionDirectory: sessionDirectoryResolver(ctx),
           templatesDir: pluginTemplatesDir(),
           worktree: worktreeOptions(ctx),
         })
