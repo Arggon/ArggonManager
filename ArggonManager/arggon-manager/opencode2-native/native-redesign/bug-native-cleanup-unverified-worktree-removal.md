@@ -224,3 +224,48 @@ Conditions:
 4. **S2 must be filed as a follow-up** by the coordinator — explicitly not in this diff.
 
 No blocking defects. The core primitive is correct, shared, well-observed, and documented; the acceptance evidence is honest apart from the one force-wording mismatch the worker disclosed proactively.
+
+### 2026-09-28 @Arggon-worker
+## Review conditions addressed — head `6417b627` — 2026-09-28
+
+**S1 (coverage) — closed.** Two explicit **throwing**-domain tests now sit beside the lying ones in
+`opencode/plugins/arggon/tools.test.ts`:
+
+- `cleanup prune falls back to git when the domain throws` — the domain rejects; the git fallback removes
+  end to end (3 prune actions, worktree gone from disk **and** `git worktree list`, branch deleted, record
+  cleared, one `chore(tasks): pruned task-rate-limit` commit, `failures: []`).
+- `cleanup prune keeps the record and the branch when a throwing domain and git both fail` — asserts the
+  observed `worktree domain removal failed: worktree domain unavailable` text, the observed
+  `git worktree removal failed` text, `worktree remains at <path>`, the ≤500-char bound, the single
+  `failures[]` entry, `leftoverPath`/`leftoverBranch`, `pruned: [failed]` only, no `commit`, and the
+  preserved worktree + branch + `worktree_path` record.
+
+The `cleanup prune` group is now 7 deterministic cases. Neither the inherited semicolon style nor the
+internal `via` name was touched; no behavior change — the code already handled the throwing path, S1 was
+coverage.
+
+**S3 (acceptance honesty) — closed in the item body.** Box 1 now states the upheld policy: the fallback is a
+literal `git worktree remove` when the domain call fails **or resolves without removing**, and `--force` is
+a policy input of that one shared primitive — `true` for the `start` rollback (discards the worktree it just
+created), `false` for the cleanup prune (git keeps refusing dirty worktrees, native/CLI parity preserved).
+All six boxes are ticked, with an evidence note appended under Notes. The reviewer's notes are byte-identical
+(verified: the only changed lines in the item file are the six box lines) — the prose gate does not cover
+tracker item files, so no formatter churn was introduced.
+
+**Out of scope, untouched as instructed:** S2/S7 are filed on main
+(`bug-opencode-smoke-normalize-bracket-namespace`, `bug-native-cleanup-branch-delete-missing-failure`);
+S5 (`via` naming) and S6 (semicolon style) unchanged.
+
+**Merge main** — `817e2516`, normal merge, no conflicts; the reviewer notes and both new items came in
+unchanged. Tracker notes only, no behavior change.
+
+**Gates on `6417b627`** — focused `worktree domain tools` 36/36 · `npm test` 97 files / **1640** tests
+(+2 from S1) · `lint` · `build` · `check:plugin` (bundle regenerated: **byte-identical**, 370347 bytes) ·
+`validate --json` `ok:true` · `smoke:tui-board` passed. CI on the new head: `cli` SUCCESS ·
+`tasks-validate` SUCCESS · `ui-smoke` SUCCESS. PR #421 marked **ready for review** (not draft), pushed
+normally, no force-push, no merge, no GitHub comment.
+
+**Review smoke, recorded honestly:** the reviewer's independent W4 run on this surface is **40/40 green**
+(including the cleanup round-trip through the real OpenCode worktree domain); the full 47-check harness stays
+quota-blocked on the pinned `opencode-go/deepseek-v4-flash` (`Go usage limit exceeded`) and was not re-run —
+a model-quota block, not a product signal for this non-model behavior.
