@@ -10,7 +10,6 @@ labels: [opencode-seam, worktree, dogfood]
 priority: p1
 created: "2026-09-28"
 updated: "2026-09-28"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-native-tools-commit-to-primary-checkout
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-native-tools-commit-to-primary-checkout.md
