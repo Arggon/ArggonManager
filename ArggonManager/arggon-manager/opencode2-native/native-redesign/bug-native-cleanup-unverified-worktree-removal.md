@@ -269,3 +269,7 @@ normally, no force-push, no merge, no GitHub comment.
 (including the cleanup round-trip through the real OpenCode worktree domain); the full 47-check harness stays
 quota-blocked on the pinned `opencode-go/deepseek-v4-flash` (`Go usage limit exceeded`) and was not re-run —
 a model-quota block, not a product signal for this non-model behavior.
+
+### handoff 2026-09-28 @Arggon-worker (session: ses_f165d5e03ffeuQoAVgHB6lN7kE) — next: Merge PR #421 (ready for review, CI green) then flip the item to done; acceptance boxes are already ticked with evidence in the body.
+- branch: fix/bug-native-cleanup-unverified-worktree-removal
+- open questions: Reviewer's doc-side force caveat (domain force:false is an external OpenCode contract) not coded per instruction - coordinator may want one sentence in opencode2.md; full 47-check smoke still quota-b…
