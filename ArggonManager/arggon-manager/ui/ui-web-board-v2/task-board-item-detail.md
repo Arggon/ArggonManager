@@ -9,8 +9,7 @@ parent: ui-web-board-v2
 labels: [viewer, board, ui]
 priority: p1
 created: "2026-09-22"
-updated: "2026-09-23"
-worktree_path: /home/arggon/Projects/ArggonManager-task-board-item-detail
+updated: "2026-09-28"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-item-detail.md
