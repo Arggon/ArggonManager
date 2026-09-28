@@ -17,6 +17,7 @@ import * as next from "./next.js";
 import * as relations from "./relations.js";
 import * as rules from "./rules.js";
 import * as status from "./status.js";
+import * as worktree from "./worktree.js";
 
 describe("kernel entry (@arggondev/lib)", () => {
   it("re-exports the kernel modules by identity (rules.ts stays the single source)", () => {
@@ -26,5 +27,6 @@ describe("kernel entry (@arggondev/lib)", () => {
     expect(entry.isClaimed).toBe(status.isClaimed);
     expect(entry.assertParentEdge).toBe(relations.assertParentEdge);
     expect(entry.runNext).toBe(next.runNext);
+    expect(entry.prepareWorktreeDependencies).toBe(worktree.prepareWorktreeDependencies);
   });
 });

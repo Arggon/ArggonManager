@@ -4,12 +4,12 @@ import { basename, join, relative, resolve, sep } from "node:path";
 import {
   LEGACY_TRACKER_DIR_NAME,
   TRACKER_DIR_NAME,
-  buildLocalWorkspaces,
   findTasksDir,
   itemsById,
   linkNodeModules,
   linkedWorkspacePackages,
   loadItems,
+  prepareWorktreeDependencies,
   readConventionConfig,
   repoRootFromTasks,
   resolveBranchName,
@@ -682,14 +682,12 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
   let linkedWorkspaces: string[] = [];
   let builtWorkspaces: string[] = [];
   try {
-    linkedNodeModules = linkNodeModules(root, worktreePath);
-    // Pre-build the worktree's own copies of the workspace packages the install
-    // shadows (task-start-worktree-lib-resolution): a fresh worktree has no
-    // build output, and without this the claim-commit gate would load the
-    // primary's kernel. Best-effort — a copy that could not be built stays on
-    // the primary's install and is reported by `linkedWorkspaces` below.
-    step = "building the worktree's workspace packages";
-    builtWorkspaces = buildLocalWorkspaces(root, worktreePath);
+    // The kernel owns the dependency-preparation orchestration shared with the
+    // native start surface. Git/domain lifecycle stays here in the CLI.
+    const prepared = prepareWorktreeDependencies(root, worktreePath);
+    linkedNodeModules = prepared.linkedNodeModules;
+    builtWorkspaces = prepared.builtWorkspaces;
+    linkedWorkspaces = prepared.linkedWorkspaces;
     // Resolution report (W6/PR-374 finding 2): recomputed at the end too, so a
     // post-start hook that reifies a local install is reflected in the returned
     // state (PR #384 review F2).

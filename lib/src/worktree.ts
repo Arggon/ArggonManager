@@ -540,6 +540,72 @@ export function buildLocalWorkspaces(
   return built;
 }
 
+/** What dependency preparation found (or created) in a worktree. */
+export type WorktreeInstallState = "linked" | "existing" | "missing" | "unavailable";
+
+/**
+ * Bounded-shape receipt for the shared pre-claim dependency preparation.
+ * `ready` means an install is present and no worktree-owned workspace package
+ * still resolves into the primary checkout. A false receipt is informative,
+ * not a blanket start failure: the CLI keeps its historical best-effort
+ * fallback, while native start surfaces it and still makes the claim-commit
+ * result authoritative.
+ */
+export type WorktreeDependencyPreparation = {
+  ready: boolean;
+  install: WorktreeInstallState;
+  linkedNodeModules: boolean;
+  builtWorkspaces: string[];
+  linkedWorkspaces: string[];
+};
+
+/**
+ * Prepare a worktree's project dependencies before its claim commit.
+ *
+ * This is the one kernel-level orchestration point shared by CLI and native
+ * `start`: it links the primary install (or reuses an existing one), builds
+ * worktree-owned workspace packages, and reports the final resolution. Git
+ * worktree creation, claim records, push and domain operations stay with their
+ * owning callers; the helper only touches dependency state in the two roots.
+ * All low-level steps remain best-effort, so a missing install or an
+ * unbuildable workspace is reported for the caller to act on rather than
+ * thrown from the kernel.
+ */
+export function prepareWorktreeDependencies(
+  primaryRoot: string,
+  worktreePath: string,
+  deps: { runBuild?: WorkspaceBuildRunner } = {},
+): WorktreeDependencyPreparation {
+  const worktreeModules = join(worktreePath, "node_modules");
+  const linkedNodeModules = linkNodeModules(primaryRoot, worktreePath);
+  const builtWorkspaces = buildLocalWorkspaces(primaryRoot, worktreePath, {
+    runBuild: deps.runBuild,
+  });
+  const linkedWorkspaces = linkedWorkspacePackages(primaryRoot, worktreePath);
+  const hasInstall = existsSync(worktreeModules);
+  const primaryHasInstall = existsSync(join(primaryRoot, "node_modules"));
+  // A symlink can be created successfully even when its target is already
+  // gone (or becomes unreadable during the handoff). Do not call that a ready
+  // linked install: the receipt must distinguish a usable link from a link
+  // whose dependency tree cannot actually be resolved.
+  const install: WorktreeInstallState = linkedNodeModules
+    ? hasInstall
+      ? "linked"
+      : "unavailable"
+    : hasInstall
+      ? "existing"
+      : primaryHasInstall
+        ? "unavailable"
+        : "missing";
+  return {
+    ready: hasInstall && linkedWorkspaces.length === 0,
+    install,
+    linkedNodeModules,
+    builtWorkspaces,
+    linkedWorkspaces,
+  };
+}
+
 /**
  * Workspace packages the worktree's install still resolves into the **primary**
  * checkout (W6/PR-374 finding 2).
