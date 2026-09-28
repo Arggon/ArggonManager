@@ -1,15 +1,18 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-native-tools-commit-to-primary-checkout
 title: Native arggon tools resolve the tracker from the primary checkout and commit to it while the session works in a worktree
+assignee: Arggon
+branch: fix/bug-native-tools-commit-to-primary-checkout
 parent: native-redesign
 labels: [opencode-seam, worktree, dogfood]
 priority: p1
 created: "2026-09-28"
 updated: "2026-09-28"
+claimed_at: "2026-09-28T22:45:55.079Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-native-tools-commit-to-primary-checkout
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-native-tools-commit-to-primary-checkout.md
   Leaves live only under a story. id is the filename stem: bug-native-tools-commit-to-primary-checkout.
