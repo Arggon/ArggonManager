@@ -313,13 +313,28 @@ focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
     needs an install (for example, a dependency-free project); the explicit
     commit outcome remains authoritative. A successful attach/no-op reports
     `claimCommitted: true` and `claimCommit.status: "not-needed"`, never an
-    invented second commit. The domain still does not run the
-    CLI-only `x-worktree.post-start` hook; an adopter that needs a full local
-    install must first remove the start-created link/farm (the CLI hook does
-    this automatically), then run its package-native bootstrap (`npm ci`,
-    `uv sync`, …) in the worktree. Never reify a package manager through a
-    link to the primary install. The CLI remains the full-featured fallback
-    when the domain is unavailable.
+    invented second commit.
+    - `worktree: false` follows the same ordering rule in the canonical
+      checkout: branch ownership (preflight, then create/attach/switch) is
+      settled BEFORE the claim write, so a failed switch leaves the item
+      untouched. If the claim is refused after this run created the branch, the
+      rollback leaves the branch first, deletes only that owned branch, restores
+      the previous checkout, and reports the observed `rollback` receipt
+      (`branchDeleted: null` when no branch was owned). Attach/re-run reports
+      `branchCreated: false` and `claimCommit.status: "not-needed"` without a
+      duplicate branch or commit, and pushes only when the claim commit or the
+      branch creation makes the branch eligible.
+    - an unexpected failure is reported with the state observed so far, so a
+      claim commit that already landed keeps `claimCommitted: true` with its
+      committed status/hash; only failures before the commit is attempted carry
+      `claimCommit.status: "not-attempted"`.
+    - The domain still does not run the
+      CLI-only `x-worktree.post-start` hook; an adopter that needs a full local
+      install must first remove the start-created link/farm (the CLI hook does
+      this automatically), then run its package-native bootstrap (`npm ci`,
+      `uv sync`, …) in the worktree. Never reify a package manager through a
+      link to the primary install. The CLI remains the full-featured fallback
+      when the domain is unavailable.
 - **Permission action names (W4 probes).** A native plugin tool is gated as
   `<namespace>_<tool>` (`arggon_update`, probe: a `deny` removes
   `tools.arggon.update` from the Code Mode catalog — the model gets

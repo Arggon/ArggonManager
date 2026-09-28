@@ -2213,12 +2213,17 @@ async function guarded(
   } catch (error) {
     logOnce(`worktree-${command}`, `${command} failed unexpectedly`, error)
     if (command === "start") {
+      // This catch only sees throws from BEFORE nativeStart's progress handler
+      // is installed (id/root/item/assignee resolution), where no claim commit
+      // can exist yet — a not-attempted receipt is truthful. Every phase after
+      // that is wrapped by nativeStart itself and reports its observed state,
+      // so a landed claim commit is never downgraded here (review R2).
       return startNotAttempted(
         kernel,
         detail(error),
         undefined,
         {},
-        "unexpected start failure",
+        "unexpected start failure before claim setup",
       )
     }
     return worktreeFail(kernel, command, code, detail(error))
@@ -2558,6 +2563,185 @@ async function preflightPlainBranch(
 }
 
 /**
+ * State observed SO FAR by a native start. Every phase records into this
+ * object, so an unexpected throw can report what actually happened instead of
+ * a blanket "nothing was attempted" — a claim commit that already landed must
+ * stay reported as committed (review R2).
+ */
+type NativeStartProgress = {
+  id: string
+  branch: string
+  version: number
+  /** Coarse phase label used in unexpected-failure messages. */
+  stage: string
+  worktreePath?: string
+  worktreeCreated: boolean
+  branchCreated: boolean
+  preparation?: NativePreparationReceipt
+  item?: unknown
+  claim?: { receipt: NativeClaimCommitReceipt; payload?: Record<string, unknown> }
+  pushed?: boolean
+}
+
+/** Bounded payload projection of the observed start state. */
+function startProgressPayload(progress: NativeStartProgress): Record<string, unknown> {
+  return {
+    id: progress.id,
+    branch: progress.branch,
+    worktreePath: progress.worktreePath ?? null,
+    worktreeCreated: progress.worktreeCreated,
+    branchCreated: progress.branchCreated,
+    ...(progress.preparation !== undefined ? { preparation: progress.preparation } : {}),
+    ...(progress.item !== undefined ? { item: progress.item } : {}),
+    ...(progress.claim !== undefined
+      ? { claimCommitted: progress.claim.receipt.committed, claimCommit: progress.claim.receipt }
+      : {}),
+    ...(progress.claim?.payload !== undefined ? { commit: progress.claim.payload } : {}),
+    ...(progress.pushed !== undefined ? { pushed: progress.pushed } : {}),
+  }
+}
+
+/**
+ * Unexpected throw inside the start body. Before the claim commit is attempted
+ * this keeps the not-attempted receipt; AFTER the commit landed it reports the
+ * real committed outcome (status + hash) so a late failure can never claim
+ * that no commit happened.
+ */
+function unexpectedStartFailure(
+  kernel: ArgonKernel,
+  error: unknown,
+  progress: NativeStartProgress,
+): { ok: false; envelope: Record<string, unknown> } {
+  const observed = startProgressPayload(progress)
+  const where = boundedNativeText(progress.stage, MAX_NATIVE_DETAIL_CHARS)
+  const cause = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)
+  if (progress.claim !== undefined) {
+    const committed = progress.claim.receipt.committed
+    return startFailure(
+      kernel,
+      committed
+        ? `start failed unexpectedly after ${where}, but the claim commit already landed ` +
+            `(${progress.claim.receipt.hash ?? "committed"}); the branch and claim were kept. ${cause}. ` +
+            "Re-run tools.arggon.start to attach and confirm the recorded state."
+        : `start failed unexpectedly after ${where}; the claim commit was attempted and did not land. ` +
+            `${cause}. Fix the reported cause, then re-run tools.arggon.start to attach and retry.`,
+      progress.version,
+      observed,
+    )
+  }
+  return startNotAttempted(
+    kernel,
+    `start failed unexpectedly after ${where}; no claim commit was attempted. ${cause}`,
+    progress.version,
+    observed,
+    `unexpected start failure after ${where}`,
+  )
+}
+
+/** Never-throwing wrapper: even a broken failure path still names the phase. */
+function safeUnexpectedStartFailure(
+  kernel: ArgonKernel,
+  error: unknown,
+  progress: NativeStartProgress | undefined,
+  fallback: { id: string; version: number },
+): { ok: false; envelope: Record<string, unknown> } {
+  const message = boundedNativeText(
+    `start failed unexpectedly: ${detail(error)}`,
+    MAX_NATIVE_ERROR_CHARS,
+  )
+  try {
+    if (progress === undefined) {
+      return startNotAttempted(
+        kernel,
+        message,
+        fallback.version,
+        { id: fallback.id },
+        "unexpected start failure before branch setup",
+      )
+    }
+    return unexpectedStartFailure(kernel, error, progress)
+  } catch {
+    return {
+      ok: false,
+      envelope: {
+        ok: false,
+        schemaVersion: 1,
+        conventionVersion: fallback.version,
+        command: "start",
+        error: { code: "START_FAILED", message },
+        id: fallback.id,
+        ...(progress === undefined
+          ? { claimCommitted: false, claimCommit: claimCommitNotAttempted("unexpected start failure") }
+          : startProgressPayload(progress)),
+      },
+    }
+  }
+}
+
+type PlainBranchRollback = {
+  /** null = this run did not create the branch, so nothing was owned. */
+  branchDeleted: boolean | null
+  restoredBranch?: string
+  error?: string
+}
+
+/**
+ * Roll back ONLY a branch this run created in the canonical checkout: leave the
+ * branch first (a checked-out branch cannot be deleted), then delete it. A
+ * pre-existing/attached branch is never touched, and both steps are observed so
+ * the caller never claims a rollback that did not happen (review R1).
+ */
+async function rollbackOwnedPlainBranch(
+  options: ArgonToolOptions,
+  branch: string,
+  branchCreated: boolean,
+  previousBranch: string | undefined,
+): Promise<PlainBranchRollback> {
+  if (!branchCreated) return { branchDeleted: null }
+  const errors: string[] = []
+  const detached = previousBranch === undefined || previousBranch === "HEAD"
+  const back = detached
+    ? await run("git", ["switch", "--detach"], options.cwd, 10_000)
+    : await run("git", ["switch", previousBranch], options.cwd, 10_000)
+  if (back.code !== 0) {
+    errors.push(
+      `could not leave branch ${branch}: ${back.stderr.trim() || `git switch exit ${back.code ?? "unknown"}`}`,
+    )
+  }
+  let branchDeleted = false
+  if (back.code === 0) {
+    const deleted = await run("git", ["branch", "-D", branch], options.cwd, 10_000)
+    branchDeleted = deleted.code === 0
+    if (!branchDeleted) {
+      errors.push(
+        `git branch deletion failed: ${deleted.stderr.trim() || `git exit ${deleted.code ?? "unknown"}`}`,
+      )
+    }
+  } else {
+    errors.push(`branch ${branch} was kept because the checkout could not leave it`)
+  }
+  return {
+    branchDeleted,
+    ...(back.code === 0 ? { restoredBranch: detached ? "HEAD" : previousBranch } : {}),
+    ...(errors.length > 0
+      ? { error: boundedNativeText(errors.join("; "), MAX_NATIVE_DETAIL_CHARS) }
+      : {}),
+  }
+}
+
+/** Human summary of a plain-branch rollback, never claiming more than observed. */
+function plainRollbackDescription(rollback: PlainBranchRollback, branch: string): string {
+  if (rollback.branchDeleted === null) return ""
+  if (rollback.branchDeleted) {
+    return (
+      "the branch created by this run was removed again and the checkout was restored to " +
+      `${rollback.restoredBranch ?? "its previous HEAD"}`
+    )
+  }
+  return `rollback incomplete: ${rollback.error ?? `the branch remains: ${branch}`}`
+}
+
+/**
  * `start` (native): claim + branch record + worktree through the domain, with
  * every rule enforced by the kernel (`updateOperation` with `agent: true` —
  * never steal a claim, never reopen). The claim/`branch`/`worktree_path`
@@ -2565,6 +2749,10 @@ async function preflightPlainBranch(
  * feature branch and the canonical checkout stays untouched, exactly like
  * `arggon start --worktree`. The PR step (`gh`) is deliberately not part of
  * the tool.
+ *
+ * Ordering: branch ownership is settled (create/attach/switch) BEFORE the claim
+ * mutation, so a failed switch leaves the item untouched; a later claim refusal
+ * rolls back only a branch this run created and reports what was observed.
  */
 async function nativeStart(
   kernel: ArgonKernel,
@@ -2610,7 +2798,36 @@ async function nativeStart(
       "assignee unavailable",
     )
   }
-  const branch = itemBranch(kernel, root, item, input.branch)
+  // Everything past this point runs under the progress handler: an unexpected
+  // throw reports the state observed so far, so a claim commit that already
+  // landed is never downgraded to "not attempted".
+  let progress: NativeStartProgress | undefined
+  try {
+    progress = {
+      id,
+      branch: itemBranch(kernel, root, item, input.branch),
+      version,
+      stage: "branch setup",
+      worktreeCreated: false,
+      branchCreated: false,
+    }
+    return await nativeStartBody(kernel, input, options, progress, item, root, assignee)
+  } catch (error) {
+    return safeUnexpectedStartFailure(kernel, error, progress, { id, version })
+  }
+}
+
+/** The claim/branch/worktree phases of native start, after item resolution. */
+async function nativeStartBody(
+  kernel: ArgonKernel,
+  input: Record<string, unknown>,
+  options: ArgonToolOptions,
+  progress: NativeStartProgress,
+  item: Record<string, unknown>,
+  root: string,
+  assignee: string,
+): Promise<{ ok: boolean; envelope: Record<string, unknown> }> {
+  const { id, branch, version } = progress
   const primaryRoot = canonicalRoot(options, root)
 
   const wantWorktree = input.worktree !== false
@@ -2621,17 +2838,12 @@ async function nativeStart(
   // start path, which never clears an unrelated worktree record implicitly.
   let worktreePath = wantWorktree ? asString(item.worktree_path) : undefined
   if (worktreePath !== undefined && !existsSync(worktreePath)) worktreePath = undefined
-  let worktreeCreated = false
-  let branchCreated = false
-  let preparation: NativePreparationReceipt | undefined
+  progress.worktreePath = worktreePath
+  /** Branch we were on before a plain start; needed to undo an owned branch. */
+  let plainPreviousBranch: string | undefined
 
   const context = (extra: Record<string, unknown> = {}): Record<string, unknown> => ({
-    id,
-    branch,
-    worktreePath: worktreePath ?? null,
-    worktreeCreated,
-    branchCreated,
-    ...(preparation !== undefined ? { preparation } : {}),
+    ...startProgressPayload(progress),
     ...extra,
   })
   const failBeforeClaim = (
@@ -2651,6 +2863,10 @@ async function nativeStart(
       const defaultPath = join(resolve(canonical, ".."), `${basename(canonical)}-${id}`)
       if (existsSync(defaultPath)) worktreePath = defaultPath
     }
+    // The canonical copy never sees the worktree record (it lives on the
+    // feature branch), so the deterministic attach path found above is the
+    // only place `worktreePath` becomes known for a re-run.
+    progress.worktreePath = worktreePath
     if (worktreePath !== undefined) {
       // Attach guard for BOTH paths (recorded `worktree_path` and the
       // deterministic default): a directory that is not a worktree of THIS
@@ -2672,7 +2888,8 @@ async function nativeStart(
         )
       }
       worktreePath = created.directory
-      worktreeCreated = true
+      progress.worktreePath = worktreePath
+      progress.worktreeCreated = true
       // The fresh worktree reflects HEAD; the canonical working tree may be
       // ahead (an uncommitted claim would be invisible here and the kernel
       // would re-claim a stale copy). Refuse instead of guessing.
@@ -2683,10 +2900,10 @@ async function nativeStart(
           kernel,
           primaryRoot,
           worktreePath,
-          worktreeCreated,
-          branchCreated,
+          progress.worktreeCreated,
+          progress.branchCreated,
           branch,
-          preparation,
+          progress.preparation,
         )
         const rollback = cleanup.discard !== undefined
           ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
@@ -2694,12 +2911,13 @@ async function nativeStart(
         return failBeforeClaim(
           `the canonical checkout has uncommitted tracker changes for '${id}' (${stale}); ` +
             "commit or discard them, or use the CLI fallback `arggon start --worktree`. " +
-            cleanupDescription(cleanup, worktreeCreated, worktreePath, branch),
+            cleanupDescription(cleanup, progress.worktreeCreated, worktreePath, branch),
           "stale canonical claim refused",
           rollback,
         )
       }
     }
+    progress.stage = "branch setup"
     const ensured = await ensureWorktreeBranch(worktreePath, branch)
     if (!ensured.ok) {
       // `ensured.created` is false whenever setup failed, so this run never
@@ -2709,27 +2927,27 @@ async function nativeStart(
         kernel,
         primaryRoot,
         worktreePath,
-        worktreeCreated,
+        progress.worktreeCreated,
         false,
         branch,
-        preparation,
+        progress.preparation,
       )
       const rollback = cleanup.discard !== undefined
         ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
         : { rollback: { preparationRemoved: cleanup.preparationRemoved } }
       return failBeforeClaim(
         `branch setup failed in ${worktreePath}: ${ensured.error ?? "unknown git error"}. ` +
-          cleanupDescription(cleanup, worktreeCreated, worktreePath, branch),
+          cleanupDescription(cleanup, progress.worktreeCreated, worktreePath, branch),
         "branch setup failed",
         rollback,
       )
     }
-    branchCreated = ensured.created
+    progress.branchCreated = ensured.created
   } else {
-    // Match the CLI plain-start ownership rule before the claim mutation: an
-    // existing generated branch with no matching recorded branch is a conflict,
-    // not an implicit attach. An explicit branch or a recorded matching branch
-    // may attach.
+    // Match the CLI plain-start ownership rule before any mutation: an existing
+    // generated branch with no matching recorded branch is a conflict, not an
+    // implicit attach. An explicit branch or a recorded matching branch may
+    // attach.
     const branchCheck = await run(
       "git",
       ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`],
@@ -2757,14 +2975,32 @@ async function nativeStart(
     if (preflight !== undefined) {
       return failBeforeClaim(preflight, "plain-start preflight failed")
     }
+    // Order matters: settle branch ownership (create/attach/switch) BEFORE the
+    // claim mutation. A switch that fails here therefore leaves the item
+    // untouched instead of a claimed-but-dirty file plus a not-attempted
+    // receipt (review R1).
+    const previous = await run("git", ["rev-parse", "--abbrev-ref", "HEAD"], options.cwd, 10_000)
+    plainPreviousBranch = previous.code === 0 ? previous.stdout.trim() || undefined : undefined
+    const ensured = await ensureWorktreeBranch(options.cwd, branch)
+    if (!ensured.ok) {
+      return failBeforeClaim(
+        `branch setup failed in ${options.cwd}: ${ensured.error ?? "unknown git error"}; ` +
+          "the item was not modified",
+        "branch setup failed",
+      )
+    }
+    progress.branchCreated = ensured.created
   }
 
   if (worktreePath !== undefined) {
+    progress.stage = "dependency preparation"
     try {
       // The shared kernel receipt runs before the claim write/commit. A false
       // `ready` value remains explicit; the claim commit below is the final
       // authority for whether a project gate actually required it.
-      preparation = boundedPreparation(kernel.prepareWorktreeDependencies(primaryRoot, worktreePath))
+      progress.preparation = boundedPreparation(
+        kernel.prepareWorktreeDependencies(primaryRoot, worktreePath),
+      )
     } catch (error) {
       const preparationError = boundedPreparation({
         ready: false,
@@ -2785,71 +3021,69 @@ async function nativeStart(
     }
   }
 
+  progress.stage = "claim update"
   const target = worktreePath ?? options.cwd
-  let update = kernel.updateOperation({
+  const update = kernel.updateOperation({
     cwd: target,
     id,
     status: "in_progress",
     assignee,
-    ...(wantWorktree ? { branch, worktreePath } : {}),
+    // The branch is always recorded by the same claim write now that plain
+    // start settles branch ownership first.
+    branch,
+    ...(wantWorktree ? { worktreePath } : {}),
     // The native surface commits the claim explicitly below so a failed
     // pre-commit gate cannot be hidden by updateOperation's best-effort commit.
     commit: false,
     agent: true,
   })
   if (!update.ok) {
-    const cleanup = await cleanupClaimArtifacts(
+    if (wantWorktree) {
+      const cleanup = await cleanupClaimArtifacts(
+        options,
+        kernel,
+        primaryRoot,
+        worktreePath,
+        progress.worktreeCreated,
+        progress.branchCreated,
+        branch,
+        progress.preparation,
+      )
+      const rollback = cleanup.discard !== undefined
+        ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
+        : { rollback: { preparationRemoved: cleanup.preparationRemoved } }
+      return failBeforeClaim(
+        `${envelopeMessage(update.envelope, "claim update failed")}. ` +
+          cleanupDescription(cleanup, progress.worktreeCreated, worktreePath, branch),
+        "claim update refused",
+        rollback,
+      )
+    }
+    // Plain start: roll back ONLY the branch this run created, restoring the
+    // checkout first, and report exactly what was observed.
+    const rollback = await rollbackOwnedPlainBranch(
       options,
-      kernel,
-      primaryRoot,
-      worktreePath,
-      worktreeCreated,
-      branchCreated,
       branch,
-      preparation,
+      progress.branchCreated,
+      plainPreviousBranch,
     )
-    const rollback = cleanup.discard !== undefined
-      ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
-      : { rollback: { preparationRemoved: cleanup.preparationRemoved } }
     return failBeforeClaim(
       `${envelopeMessage(update.envelope, "claim update failed")}. ` +
-        cleanupDescription(cleanup, worktreeCreated, worktreePath, branch),
+        plainRollbackDescription(rollback, branch),
       "claim update refused",
-      rollback,
+      { rollback },
     )
   }
+  progress.item = update.envelope.item
 
-  if (!wantWorktree) {
-    const ensured = await ensureWorktreeBranch(options.cwd, branch)
-    if (!ensured.ok) {
-      return failBeforeClaim(
-        `branch setup failed in ${options.cwd}: ${ensured.error ?? "unknown git error"}`,
-        "branch setup failed",
-      )
-    }
-    branchCreated = ensured.created
-    const branchUpdate = kernel.updateOperation({
-      cwd: options.cwd,
-      id,
-      branch,
-      commit: false,
-      agent: true,
-    })
-    if (!branchUpdate.ok) {
-      return failBeforeClaim(
-        envelopeMessage(branchUpdate.envelope, "branch record update failed"),
-        "branch record update failed",
-      )
-    }
-    update = branchUpdate
-  }
-
+  progress.stage = "claim commit"
   let claim: { receipt: NativeClaimCommitReceipt; payload?: Record<string, unknown> }
   try {
     claim = commitNativeClaim(kernel, target, id)
   } catch (error) {
     claim = { receipt: claimCommitFailure(detail(error)) }
   }
+  progress.claim = claim
   const claimPayload: Record<string, unknown> = {
     ...context(),
     item: update.envelope.item,
@@ -2873,11 +3107,13 @@ async function nativeStart(
     )
   }
 
+  progress.stage = "push"
   let pushed = false
-  const pushEligible = claim.receipt.status === "committed" || branchCreated
+  const pushEligible = claim.receipt.status === "committed" || progress.branchCreated
   if (input.push === true && pushEligible) {
     const push = await run("git", ["push", "-u", "origin", branch], target, 60_000)
     if (push.code !== 0) {
+      progress.pushed = false
       return startFailure(
         kernel,
         `push failed (${push.stderr.trim() || `git push exit ${push.code}`}); the branch and claim were kept`,
@@ -2887,7 +3123,11 @@ async function nativeStart(
     }
     pushed = true
   }
+  progress.pushed = pushed
 
+  // A throw here (e.g. a broken envelope builder) is caught by nativeStart and
+  // reported with the committed claim receipt intact.
+  progress.stage = "response"
   return {
     ok: true,
     envelope: kernel.successEnvelope("start", { ...claimPayload, pushed }, version),

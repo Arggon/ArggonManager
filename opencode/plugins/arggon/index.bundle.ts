@@ -7900,7 +7900,7 @@ async function guarded(kernel, command, code, body) {
     catch (error) {
         logOnce(`worktree-${command}`, `${command} failed unexpectedly`, error);
         if (command === "start") {
-            return startNotAttempted(kernel, detail(error), undefined, {}, "unexpected start failure");
+            return startNotAttempted(kernel, detail(error), undefined, {}, "unexpected start failure before claim setup");
         }
         return worktreeFail(kernel, command, code, detail(error));
     }
@@ -8115,6 +8115,101 @@ async function preflightPlainBranch(kernel, options, root, branch) {
     }
     return undefined;
 }
+function startProgressPayload(progress) {
+    return {
+        id: progress.id,
+        branch: progress.branch,
+        worktreePath: progress.worktreePath ?? null,
+        worktreeCreated: progress.worktreeCreated,
+        branchCreated: progress.branchCreated,
+        ...(progress.preparation !== undefined ? { preparation: progress.preparation } : {}),
+        ...(progress.item !== undefined ? { item: progress.item } : {}),
+        ...(progress.claim !== undefined
+            ? { claimCommitted: progress.claim.receipt.committed, claimCommit: progress.claim.receipt }
+            : {}),
+        ...(progress.claim?.payload !== undefined ? { commit: progress.claim.payload } : {}),
+        ...(progress.pushed !== undefined ? { pushed: progress.pushed } : {}),
+    };
+}
+function unexpectedStartFailure(kernel, error, progress) {
+    const observed = startProgressPayload(progress);
+    const where = boundedNativeText(progress.stage, MAX_NATIVE_DETAIL_CHARS);
+    const cause = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS);
+    if (progress.claim !== undefined) {
+        const committed = progress.claim.receipt.committed;
+        return startFailure(kernel, committed
+            ? `start failed unexpectedly after ${where}, but the claim commit already landed ` +
+                `(${progress.claim.receipt.hash ?? "committed"}); the branch and claim were kept. ${cause}. ` +
+                "Re-run tools.arggon.start to attach and confirm the recorded state."
+            : `start failed unexpectedly after ${where}; the claim commit was attempted and did not land. ` +
+                `${cause}. Fix the reported cause, then re-run tools.arggon.start to attach and retry.`, progress.version, observed);
+    }
+    return startNotAttempted(kernel, `start failed unexpectedly after ${where}; no claim commit was attempted. ${cause}`, progress.version, observed, `unexpected start failure after ${where}`);
+}
+function safeUnexpectedStartFailure(kernel, error, progress, fallback) {
+    const message = boundedNativeText(`start failed unexpectedly: ${detail(error)}`, MAX_NATIVE_ERROR_CHARS);
+    try {
+        if (progress === undefined) {
+            return startNotAttempted(kernel, message, fallback.version, { id: fallback.id }, "unexpected start failure before branch setup");
+        }
+        return unexpectedStartFailure(kernel, error, progress);
+    }
+    catch {
+        return {
+            ok: false,
+            envelope: {
+                ok: false,
+                schemaVersion: 1,
+                conventionVersion: fallback.version,
+                command: "start",
+                error: { code: "START_FAILED", message },
+                id: fallback.id,
+                ...(progress === undefined
+                    ? { claimCommitted: false, claimCommit: claimCommitNotAttempted("unexpected start failure") }
+                    : startProgressPayload(progress)),
+            },
+        };
+    }
+}
+async function rollbackOwnedPlainBranch(options, branch, branchCreated, previousBranch) {
+    if (!branchCreated)
+        return { branchDeleted: null };
+    const errors = [];
+    const detached = previousBranch === undefined || previousBranch === "HEAD";
+    const back = detached
+        ? await run("git", ["switch", "--detach"], options.cwd, 10_000)
+        : await run("git", ["switch", previousBranch], options.cwd, 10_000);
+    if (back.code !== 0) {
+        errors.push(`could not leave branch ${branch}: ${back.stderr.trim() || `git switch exit ${back.code ?? "unknown"}`}`);
+    }
+    let branchDeleted = false;
+    if (back.code === 0) {
+        const deleted = await run("git", ["branch", "-D", branch], options.cwd, 10_000);
+        branchDeleted = deleted.code === 0;
+        if (!branchDeleted) {
+            errors.push(`git branch deletion failed: ${deleted.stderr.trim() || `git exit ${deleted.code ?? "unknown"}`}`);
+        }
+    }
+    else {
+        errors.push(`branch ${branch} was kept because the checkout could not leave it`);
+    }
+    return {
+        branchDeleted,
+        ...(back.code === 0 ? { restoredBranch: detached ? "HEAD" : previousBranch } : {}),
+        ...(errors.length > 0
+            ? { error: boundedNativeText(errors.join("; "), MAX_NATIVE_DETAIL_CHARS) }
+            : {}),
+    };
+}
+function plainRollbackDescription(rollback, branch) {
+    if (rollback.branchDeleted === null)
+        return "";
+    if (rollback.branchDeleted) {
+        return ("the branch created by this run was removed again and the checkout was restored to " +
+            `${rollback.restoredBranch ?? "its previous HEAD"}`);
+    }
+    return `rollback incomplete: ${rollback.error ?? `the branch remains: ${branch}`}`;
+}
 async function nativeStart(kernel, input, options) {
     const id = asString(input.id);
     if (id === undefined) {
@@ -8137,22 +8232,33 @@ async function nativeStart(kernel, input, options) {
     if (assignee === undefined) {
         return startNotAttempted(kernel, "could not resolve assignee (pass assignee, or set GITHUB_USER/GITHUB_ACTOR, or authenticate gh)", version, { id }, "assignee unavailable");
     }
-    const branch = itemBranch(kernel, root, item, input.branch);
+    let progress;
+    try {
+        progress = {
+            id,
+            branch: itemBranch(kernel, root, item, input.branch),
+            version,
+            stage: "branch setup",
+            worktreeCreated: false,
+            branchCreated: false,
+        };
+        return await nativeStartBody(kernel, input, options, progress, item, root, assignee);
+    }
+    catch (error) {
+        return safeUnexpectedStartFailure(kernel, error, progress, { id, version });
+    }
+}
+async function nativeStartBody(kernel, input, options, progress, item, root, assignee) {
+    const { id, branch, version } = progress;
     const primaryRoot = canonicalRoot(options, root);
     const wantWorktree = input.worktree !== false;
     let worktreePath = wantWorktree ? asString(item.worktree_path) : undefined;
     if (worktreePath !== undefined && !(0, node_fs_1.existsSync)(worktreePath))
         worktreePath = undefined;
-    let worktreeCreated = false;
-    let branchCreated = false;
-    let preparation;
+    progress.worktreePath = worktreePath;
+    let plainPreviousBranch;
     const context = (extra = {}) => ({
-        id,
-        branch,
-        worktreePath: worktreePath ?? null,
-        worktreeCreated,
-        branchCreated,
-        ...(preparation !== undefined ? { preparation } : {}),
+        ...startProgressPayload(progress),
         ...extra,
     });
     const failBeforeClaim = (message, reason, extra = {}) => startNotAttempted(kernel, message, version, context(extra), reason);
@@ -8163,6 +8269,7 @@ async function nativeStart(kernel, input, options) {
             if ((0, node_fs_1.existsSync)(defaultPath))
                 worktreePath = defaultPath;
         }
+        progress.worktreePath = worktreePath;
         if (worktreePath !== undefined) {
             if (!(await isRegisteredWorktree(canonical, worktreePath))) {
                 return failBeforeClaim(`${worktreePath} exists but is not a git worktree of this repo ` +
@@ -8175,28 +8282,30 @@ async function nativeStart(kernel, input, options) {
                 return failBeforeClaim(created.error ?? "worktree creation failed", "worktree creation failed");
             }
             worktreePath = created.directory;
-            worktreeCreated = true;
+            progress.worktreePath = worktreePath;
+            progress.worktreeCreated = true;
             const stale = await staleClaimFields(kernel, options.cwd, worktreePath, id);
             if (stale !== undefined) {
-                const cleanup = await cleanupClaimArtifacts(options, kernel, primaryRoot, worktreePath, worktreeCreated, branchCreated, branch, preparation);
+                const cleanup = await cleanupClaimArtifacts(options, kernel, primaryRoot, worktreePath, progress.worktreeCreated, progress.branchCreated, branch, progress.preparation);
                 const rollback = cleanup.discard !== undefined
                     ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
                     : { rollback: { preparationRemoved: cleanup.preparationRemoved } };
                 return failBeforeClaim(`the canonical checkout has uncommitted tracker changes for '${id}' (${stale}); ` +
                     "commit or discard them, or use the CLI fallback `arggon start --worktree`. " +
-                    cleanupDescription(cleanup, worktreeCreated, worktreePath, branch), "stale canonical claim refused", rollback);
+                    cleanupDescription(cleanup, progress.worktreeCreated, worktreePath, branch), "stale canonical claim refused", rollback);
             }
         }
+        progress.stage = "branch setup";
         const ensured = await ensureWorktreeBranch(worktreePath, branch);
         if (!ensured.ok) {
-            const cleanup = await cleanupClaimArtifacts(options, kernel, primaryRoot, worktreePath, worktreeCreated, false, branch, preparation);
+            const cleanup = await cleanupClaimArtifacts(options, kernel, primaryRoot, worktreePath, progress.worktreeCreated, false, branch, progress.preparation);
             const rollback = cleanup.discard !== undefined
                 ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
                 : { rollback: { preparationRemoved: cleanup.preparationRemoved } };
             return failBeforeClaim(`branch setup failed in ${worktreePath}: ${ensured.error ?? "unknown git error"}. ` +
-                cleanupDescription(cleanup, worktreeCreated, worktreePath, branch), "branch setup failed", rollback);
+                cleanupDescription(cleanup, progress.worktreeCreated, worktreePath, branch), "branch setup failed", rollback);
         }
-        branchCreated = ensured.created;
+        progress.branchCreated = ensured.created;
     }
     else {
         const branchCheck = await run("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], options.cwd, 10_000);
@@ -8213,10 +8322,19 @@ async function nativeStart(kernel, input, options) {
         if (preflight !== undefined) {
             return failBeforeClaim(preflight, "plain-start preflight failed");
         }
+        const previous = await run("git", ["rev-parse", "--abbrev-ref", "HEAD"], options.cwd, 10_000);
+        plainPreviousBranch = previous.code === 0 ? previous.stdout.trim() || undefined : undefined;
+        const ensured = await ensureWorktreeBranch(options.cwd, branch);
+        if (!ensured.ok) {
+            return failBeforeClaim(`branch setup failed in ${options.cwd}: ${ensured.error ?? "unknown git error"}; ` +
+                "the item was not modified", "branch setup failed");
+        }
+        progress.branchCreated = ensured.created;
     }
     if (worktreePath !== undefined) {
+        progress.stage = "dependency preparation";
         try {
-            preparation = boundedPreparation(kernel.prepareWorktreeDependencies(primaryRoot, worktreePath));
+            progress.preparation = boundedPreparation(kernel.prepareWorktreeDependencies(primaryRoot, worktreePath));
         }
         catch (error) {
             const preparationError = boundedPreparation({
@@ -8233,42 +8351,33 @@ async function nativeStart(kernel, input, options) {
                     : "the worktree and any start-owned dependency link were kept"), "dependency preparation failed", { preparation: preparationError, rollback: { preparationRemoved } });
         }
     }
+    progress.stage = "claim update";
     const target = worktreePath ?? options.cwd;
-    let update = kernel.updateOperation({
+    const update = kernel.updateOperation({
         cwd: target,
         id,
         status: "in_progress",
         assignee,
-        ...(wantWorktree ? { branch, worktreePath } : {}),
+        branch,
+        ...(wantWorktree ? { worktreePath } : {}),
         commit: false,
         agent: true,
     });
     if (!update.ok) {
-        const cleanup = await cleanupClaimArtifacts(options, kernel, primaryRoot, worktreePath, worktreeCreated, branchCreated, branch, preparation);
-        const rollback = cleanup.discard !== undefined
-            ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
-            : { rollback: { preparationRemoved: cleanup.preparationRemoved } };
+        if (wantWorktree) {
+            const cleanup = await cleanupClaimArtifacts(options, kernel, primaryRoot, worktreePath, progress.worktreeCreated, progress.branchCreated, branch, progress.preparation);
+            const rollback = cleanup.discard !== undefined
+                ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
+                : { rollback: { preparationRemoved: cleanup.preparationRemoved } };
+            return failBeforeClaim(`${envelopeMessage(update.envelope, "claim update failed")}. ` +
+                cleanupDescription(cleanup, progress.worktreeCreated, worktreePath, branch), "claim update refused", rollback);
+        }
+        const rollback = await rollbackOwnedPlainBranch(options, branch, progress.branchCreated, plainPreviousBranch);
         return failBeforeClaim(`${envelopeMessage(update.envelope, "claim update failed")}. ` +
-            cleanupDescription(cleanup, worktreeCreated, worktreePath, branch), "claim update refused", rollback);
+            plainRollbackDescription(rollback, branch), "claim update refused", { rollback });
     }
-    if (!wantWorktree) {
-        const ensured = await ensureWorktreeBranch(options.cwd, branch);
-        if (!ensured.ok) {
-            return failBeforeClaim(`branch setup failed in ${options.cwd}: ${ensured.error ?? "unknown git error"}`, "branch setup failed");
-        }
-        branchCreated = ensured.created;
-        const branchUpdate = kernel.updateOperation({
-            cwd: options.cwd,
-            id,
-            branch,
-            commit: false,
-            agent: true,
-        });
-        if (!branchUpdate.ok) {
-            return failBeforeClaim(envelopeMessage(branchUpdate.envelope, "branch record update failed"), "branch record update failed");
-        }
-        update = branchUpdate;
-    }
+    progress.item = update.envelope.item;
+    progress.stage = "claim commit";
     let claim;
     try {
         claim = commitNativeClaim(kernel, target, id);
@@ -8276,6 +8385,7 @@ async function nativeStart(kernel, input, options) {
     catch (error) {
         claim = { receipt: claimCommitFailure(detail(error)) };
     }
+    progress.claim = claim;
     const claimPayload = {
         ...context(),
         item: update.envelope.item,
@@ -8293,15 +8403,19 @@ async function nativeStart(kernel, input, options) {
             `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
             "it attaches to the existing worktree and retries the claim commit.", version, claimPayload);
     }
+    progress.stage = "push";
     let pushed = false;
-    const pushEligible = claim.receipt.status === "committed" || branchCreated;
+    const pushEligible = claim.receipt.status === "committed" || progress.branchCreated;
     if (input.push === true && pushEligible) {
         const push = await run("git", ["push", "-u", "origin", branch], target, 60_000);
         if (push.code !== 0) {
+            progress.pushed = false;
             return startFailure(kernel, `push failed (${push.stderr.trim() || `git push exit ${push.code}`}); the branch and claim were kept`, version, { ...claimPayload, pushed: false });
         }
         pushed = true;
     }
+    progress.pushed = pushed;
+    progress.stage = "response";
     return {
         ok: true,
         envelope: kernel.successEnvelope("start", { ...claimPayload, pushed }, version),

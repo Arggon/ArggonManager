@@ -87,11 +87,14 @@ namespace:
   records `branch` + `worktree_path` **in the worktree copy** and performs an
   explicit claim commit; a preparation or commit failure is a typed
   `START_FAILED`, keeps the worktree for attach/retry, and never reports an
-  unqualified success. `worktree: false` is the plain CLI contract: it creates
-  or attaches the item branch in the canonical checkout, commits the claim on
-  that branch, reports `worktreePath: null`/`worktreeCreated: false`, and
-  pushes only when the claim commit or branch creation makes the branch
-  eligible. `cleanup` classifies with the **shared kernel rule** (the same
+  unqualified success. `worktree: false` is the plain CLI contract: it settles
+  branch ownership (preflight, then create/attach/switch) **before** the claim
+  write — so a failed switch leaves the item untouched — then records the
+  branch, commits the claim on that branch, reports `worktreePath: null` /
+  `worktreeCreated: false`, and pushes only when the claim commit or branch
+  creation makes the branch eligible. A claim refused after this run created a
+  branch rolls back only that owned branch (leaving it first, then restoring the
+  previous checkout). `cleanup` classifies with the **shared kernel rule** (the same
   `classifyCleanupEntry` the CLI uses), removes merged worktrees through the
   domain, deletes their branches and clears the records in one tracker commit.
   Push and the `gh` PR step stay explicit agent steps; the CLI
@@ -111,8 +114,11 @@ namespace:
   `claimCommit.status: "not-attempted"` receipt (with preparation/rollback
   context when known). `rollback` reports observed `preparationRemoved`,
   `worktreeRemoved`, and `branchDeleted` values; `branchDeleted: null` means
-  this invocation did not own a branch. A commit or push failure after the
-  claim commit reports the truthful committed outcome instead. Failures are typed tool errors
+  this invocation did not own a branch, and a plain-start rollback also reports
+  `restoredBranch` when the checkout was returned to its previous branch. A
+  commit or push failure after the claim commit — and an unexpected failure at
+  any later phase — reports the truthful committed outcome (status + hash)
+  instead. Failures are typed tool errors
   carrying the code + envelope: `START_FAILED`, `BRANCH_FAILED` and
   `CLEANUP_FAILED` (per-candidate prune failures stay in `pruned`/`failures`,
   like the CLI).

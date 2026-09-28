@@ -164,8 +164,19 @@ honest receipt, not by itself a failure: a project with no dependency-needing
 gate may still have no install and commit the claim. The commit outcome is the
 authority; `claimCommit.status: "not-needed"` means no second commit was needed,
 not that a commit was silently skipped. Re-running after fixing the gate
-retries a dirty claim instead of treating the no-op update as success. Native
-start does not run the CLI-only `x-worktree.post-start` hook; a project that
+retries a dirty claim instead of treating the no-op update as success.
+
+Ordering is part of that contract. Native start settles branch ownership
+(create/attach/switch) BEFORE the claim mutation: a switch that fails leaves the
+item byte-identical and unclaimed, and a claim refused after this run created a
+branch rolls back only that owned branch — the checkout returns to its previous
+branch first, the deletion is observed, and the result reports `rollback`
+(`branchDeleted: null` means no branch was owned). An unexpected failure after
+the phases above began is reported with the state observed so far, so a claim
+commit that already landed stays `claimCommitted: true` with its committed
+status/hash instead of being downgraded to "not attempted".
+
+Native start does not run the CLI-only `x-worktree.post-start` hook; a project that
 needs a full local install must first remove the start-created link/farm (the
 CLI hook does this automatically) and then run its package-native bootstrap in
 the returned worktree. Never run `npm ci` through a link to the primary

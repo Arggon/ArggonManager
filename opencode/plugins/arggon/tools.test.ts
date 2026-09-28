@@ -947,6 +947,160 @@ describe("worktree domain tools (W4)", () => {
     );
   });
 
+  it("leaves the item untouched when a divergent recorded branch cannot be switched to", async () => {
+    const dir = seedGitTree();
+    const branch = "feat/task-rate-limit";
+    // The item records a branch, and that branch exists — but checking it out
+    // cannot complete: the canonical checkout holds an UNTRACKED file with the
+    // same name as a file committed on the branch. `git switch` refuses, which
+    // is the reviewer's divergent-recorded-branch repro.
+    runUpdate({ cwd: dir, id: "task-rate-limit", branch });
+    if (gitOut(dir, ["status", "--porcelain"]) !== "") {
+      git(dir, ["add", "ArggonManager"]);
+      git(dir, ["commit", "-qm", "test: record item branch"]);
+    }
+    const base = gitOut(dir, ["branch", "--show-current"]);
+    git(dir, ["branch", branch]);
+    git(dir, ["switch", branch]);
+    writeFileSync(join(dir, "divergent.txt"), "committed on the item branch\n", "utf8");
+    git(dir, ["add", "divergent.txt"]);
+    git(dir, ["commit", "-qm", "test: branch-only file"]);
+    git(dir, ["switch", base]);
+    writeFileSync(join(dir, "divergent.txt"), "untracked in the canonical checkout\n", "utf8");
+    const itemPath = join(
+      dir,
+      "ArggonManager/launch-mvp/auth/story-login/task-rate-limit.md",
+    );
+    const before = readFileSync(itemPath, "utf8");
+
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({
+        id: "task-rate-limit",
+        assignee: "smoke",
+        worktree: false,
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    expect(String((typed.envelope.error as { message?: unknown }).message)).toContain(
+      "branch setup failed",
+    );
+    expect(typed.envelope.claimCommitted).toBe(false);
+    expect(typed.envelope.claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+      reason: "branch setup failed",
+    });
+    // The claim never ran: the item file is byte-identical and still unclaimed,
+    // and the failed switch left the canonical checkout where it was.
+    expect(readFileSync(itemPath, "utf8")).toBe(before);
+    expect(itemData(dir, "task-rate-limit")).toMatchObject({ status: "todo", branch });
+    expect(itemData(dir, "task-rate-limit").assignee).toBeUndefined();
+    expect(calls.create).toHaveLength(0);
+    expect(gitOut(dir, ["branch", "--show-current"])).toBe(base);
+    expect(gitOut(dir, ["branch", "--list", branch])).toContain(branch);
+    expect(gitOut(dir, ["status", "--porcelain"])).toContain("divergent.txt");
+  });
+
+  it("rolls back only the branch it created when the plain claim update is refused", async () => {
+    const dir = seedGitTree();
+    const branch = "feat/task-rate-limit";
+    const base = gitOut(dir, ["branch", "--show-current"]);
+    // Another agent already owns the claim, so our update is refused AFTER the
+    // branch has been created and checked out.
+    runUpdate({ cwd: dir, id: "task-rate-limit", status: "in_progress", assignee: "owner" });
+    if (gitOut(dir, ["status", "--porcelain"]) !== "") {
+      git(dir, ["add", "ArggonManager"]);
+      git(dir, ["commit", "-qm", "test: commit owner claim"]);
+    }
+
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({
+        id: "task-rate-limit",
+        assignee: "intruder",
+        worktree: false,
+      });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    expect(typed.envelope.claimCommitted).toBe(false);
+    expect(typed.envelope.claimCommit).toMatchObject({ status: "not-attempted", committed: false });
+    expect(typed.envelope.rollback).toMatchObject({ branchDeleted: true, restoredBranch: base });
+    expect(String((typed.envelope.error as { message?: unknown }).message)).toContain(
+      "the branch created by this run was removed again",
+    );
+    // Owned branch gone, checkout restored, and the existing claim untouched.
+    expect(gitOut(dir, ["branch", "--list", branch])).toBe("");
+    expect(gitOut(dir, ["branch", "--show-current"])).toBe(base);
+    expect(itemData(dir, "task-rate-limit")).toMatchObject({
+      status: "in_progress",
+      assignee: "owner",
+    });
+    expect(itemData(dir, "task-rate-limit").branch).toBeUndefined();
+    expect(gitOut(dir, ["status", "--porcelain"])).toBe("");
+  });
+
+  it("keeps the claim receipt truthful when successEnvelope throws after a real commit", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    // A kernel whose success-envelope builder throws: everything up to and
+    // including the claim commit runs for real, then the response blows up.
+    const throwingKernel = {
+      ...kernel,
+      successEnvelope: () => {
+        throw new Error("envelope builder exploded");
+      },
+    } as unknown as ArgonKernel;
+    const defs = argonToolDefinitions(throwingKernel, {
+      cwd: dir,
+      templatesDir: pluginTemplatesDir(),
+      worktree: { projectID: "project-id", canonical: dir, domain },
+    });
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    }
+
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    const claimCommit = typed.envelope.claimCommit as Record<string, unknown>;
+    // The commit really landed, so the receipt must say so — never not-attempted.
+    expect(typed.envelope.claimCommitted).toBe(true);
+    expect(claimCommit).toMatchObject({ status: "committed", committed: true });
+    expect(String(claimCommit.hash)).toMatch(/^[0-9a-f]+$/);
+    expect(String((typed.envelope.error as { message?: unknown }).message)).toContain(
+      "the claim commit already landed",
+    );
+    const worktreePath = String(typed.envelope.worktreePath);
+    // Git state corroborates the receipt: the claim commit is really in history.
+    expect(gitOut(worktreePath, ["log", "-1", "--pretty=%s"])).toBe(
+      "chore(tasks): claimed task-rate-limit",
+    );
+    expect(gitOut(worktreePath, ["rev-parse", "--short", "HEAD"])).toBe(String(claimCommit.hash));
+    expect(itemData(dir, "task-rate-limit", worktreePath)).toMatchObject({
+      status: "in_progress",
+      assignee: "smoke",
+    });
+  });
+
   it("returns a not-attempted receipt for a branch ownership conflict", async () => {
     const dir = seedGitTree();
     git(dir, ["branch", "feat/task-rate-limit"]);
