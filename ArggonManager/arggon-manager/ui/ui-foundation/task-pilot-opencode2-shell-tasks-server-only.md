@@ -291,3 +291,7 @@ approval gate silently disabled, no workdir containment, and full environment
 inheritance. If the background-job idea is still wanted, the exploration's own
 fallback applies: internalize only the minimal behaviour in ArggonManager's
 existing vendored plugin, where permissions are first-class and reviewable.
+
+### handoff 2026-09-28 @Arggon-worker — next: Coordinator: review draft PR #423 and merge; then flip status done. Gate is FAIL, so no ADR/playbook item is warranted.
+- branch: feat/task-pilot-opencode2-shell-tasks-server-only
+- open questions: Permission FAIL is real (ask unenforced, 2/2 plus same-session control). Withdraw the exploration's opencode2-shell-tasks recommendation? lint:structure/test:structure could not run here (@ast-grep/c…
