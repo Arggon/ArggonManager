@@ -352,3 +352,29 @@ The item's Notes say *"the W4 group is **40/40 green on this head** (independent
 ### Final: **PASS — merge. No required doc change.**
 
 S1 and S3 are properly closed, nothing regressed, the behavior is byte-identical to what I verified and probed, and the one smoke miss is proven to be the separately filed harness bug rather than this change. Merge, then flip the item to `done` after the one Notes-line correction above. The single required doc change: **none**.
+
+### 2026-09-28 @Arggon-coordinator
+## FINAL APPROVE — PR #421 — 2026-09-28 (coordinator)
+
+**Verdict: APPROVED.** Merge at the coordinator's discretion; this comment is bookkeeping only — it performs **no merge and does not set the item to `done`**. The item stays `in_progress` with its acceptance honestly ticked for post-merge completion.
+
+### What was upheld
+- **One shared observed removal.** `removeWorktreeObserved(options, directory, root, policy)` is the single removal/observation implementation for both callers: the unverified cleanup-only `removeWorktree()` is gone and the start rollback's `discardWorktree()` is reduced to it, so the two can never disagree about what "removed" means. The domain is preferred, then a literal `git worktree remove` fallback, and the directory **plus** `git worktree list` are checked after every step — a resolved promise or a zero exit is never treated as a removal.
+- **Force policy upheld (cleanup stays non-force).** `force` is a policy input, not a second rule: `true` for the `start` rollback, which discards the worktree it created seconds earlier; `false` for the cleanup prune. This is the status quo (`origin/main` already used the unforced `git worktree remove` via `defaultCleanupGit`), it keeps git's dirty-worktree refusal, and it preserves native/CLI parity. Forcing in cleanup would have *introduced* forced deletion of uncommitted work that this bug never required. Acceptance box 1 was amended to state exactly this.
+- **Honest failures, recoverable state.** `removed worktree`, `deleted branch` and `cleared worktree_path` are gated on an observably complete removal; otherwise one bounded (≤500 chars) per-candidate `failed` action plus a `failures[]` entry carries `leftoverPath` and `leftoverBranch`, and both the branch and the `worktree_path` record survive so the next `cleanup` can retry. Per-candidate failures never abort the run, and the cleared records still share ONE tracker commit.
+- **Classification, remote safety, squash-merge `via`, `prune: false` envelope parity** and the one-commit semantics are untouched; list mode stays byte-identical to `cleanup --json`.
+
+### Evidence
+- **Deterministic suite:** 7 `cleanup prune` cases + 5 start-rollback cases. Lying **and** throwing domains, each with git-fallback success and both-fail, foreign `node_modules` ownership, an unobservable removal among two prunable candidates (healthy candidate prunes end to end, one commit for the single cleared record), and record/branch preservation. `npm test`: **97 files / 1640 tests** green.
+- **Gates:** `lint` · `build` · `check:plugin` (regenerated bundle byte-identical, 370347 B) · `validate --json` `ok: true` · `smoke:tui-board` passed. CI on the final head: `cli` / `tasks-validate` / `ui-smoke`.
+- **W4 smoke:** **40/40 on `b12467fd`** (the real OpenCode worktree domain round-trip). Everything after `b12467fd` is tests-and-item only; the reviewer's run on the final head was **37/38**, the one miss being the separately filed transcript-needle check, with the **changed cleanup surface 19/19**. The item's evidence line was corrected to say exactly this. The full 47-check harness remains quota-blocked on the pinned `opencode-go/deepseek-v4-flash` and was not treated as a product signal.
+
+### Docs and contract accuracy
+Native `cleanup` payload row plus the observed-removal paragraph in `ArggonManager/docs/opencode2.md`; the additive `leftoverPath` scoped to the native tool in `ArggonManager/docs/json-output.md` (confirmed: the CLI does not emit it, and the CLI dirty-prune behavior matches its documented contract). No new tool/description/schema growth — the definitions payload is unchanged and under the ADR 0006 advisory cap.
+
+### Out of scope, separately tracked — explicitly NOT in this diff
+- **S2** → `bug-opencode-smoke-normalize-bracket-namespace` (`normalizeNamespace` misses bracket-member tool spellings; the smoke gate emits flaky false negatives indistinguishable from product failures).
+- **S7** → `bug-native-cleanup-branch-delete-missing-failure` (pre-existing at `origin/main`: `failures[]` stays empty for a branch-delete failure).
+- S4 (actionable git-stderr hint) and S5/S6 (nits) were left alone by instruction; S6's semicolon drift stays inherited from #419 for `task-plugin-source-prettier-policy`.
+
+**Next step for the coordinator:** merge PR #421 (ready for review, CI green), then flip this item to `done`.
