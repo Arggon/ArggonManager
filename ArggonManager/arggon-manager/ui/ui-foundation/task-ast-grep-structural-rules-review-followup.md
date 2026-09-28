@@ -11,7 +11,6 @@ priority: p1
 created: "2026-09-24"
 updated: "2026-09-24"
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-ast-grep-structural-rules-review-followup.md
   Leaves live only under a story. id is the filename stem: task-ast-grep-structural-rules-review-followup.
@@ -76,3 +75,36 @@ The second review's P1s are addressed in the same item/worktree; no new tracker 
 - Tooling root cause worth keeping: only the last `$$$ARGS` sibling in one `any` is effective in `@ast-grep/cli@0.45.3`; the rules now contain exactly one each, with the serializer call expressed relationally.
 - Probes: legitimate non-plugin probe → 0 findings; in-scope plugin probe → 37 findings across all three rule IDs, 18/18 bypass blocks detected, 0 findings in the valid region; probe files removed.
 - Full gates after the merge with `origin/main` (`4517a283`): `npm test` 95 files/1611 tests, `npm run lint`, `npm run test:structure`, `npm run lint:structure`, `npm run build`, `npm run check:plugin`, `arggon validate`, Prettier, `git diff --check`, and package-surface check all green. Exact dev-only `@ast-grep/cli@0.45.3`, one-thread scans, existing CI wiring, and no-rewrite behavior unchanged.
+
+### 2026-09-28 @ses_f2b15dcecffeuVmXo3s1RGiJBJ
+**Third re-review remediation — final SHA `ab31d2af`** (branch `feat/task-ast-grep-structural-rules`, PR #418).
+
+**Framing:** all three rules are now documented as **high-confidence structural guards**, not comprehensive semantic enforcement.
+
+**Commands run (expected → observed):**
+
+| Check | Expected | Observed |
+|---|---|---|
+| `npm run test:structure` | 3 rule suites + scope fixture scan pass | 3/3 PASS, scope scan clean |
+| `npm run lint:structure` | clean | exit 0 |
+| Full-config probe A (legitimate non-plugin code in `cli/src`) | 0 findings | **0 findings** |
+| Full-config probe B (in-scope bypasses in `opencode/plugins/arggon`) | every bypass detected, valid region clean | **37 findings / 18-of-18 bypass blocks detected, 0 findings in valid region** |
+| `npm test` | green | 95 files, 1611 tests |
+| `npm run lint` | green | exit 0 |
+| `npm run build` | green | exit 0 |
+| `npm run check:plugin` | bundle byte-identical | exit 0, `git diff --exit-code` clean on `index.bundle.ts` |
+| `npm run arggon -- validate --json` | ok | ok, 0 warnings, convention v5 |
+| Prettier / `git diff --check` | clean | clean |
+| package surface | no `sgconfig.yml`, no `tools/ast-grep/` | 109 files, neither present |
+
+**Native rule** is path-scoped to `opencode/plugins/arggon/**/*.ts(x)` only (bundle, vendored `.opencode`, tests ignored); the unconditional generic-name patterns (`register`, `install`, `configure`, `addTool`, generic loops/editors) are removed. Valid non-plugin regression cases (`register(router)`, `install(router)`, `configure(router)`, `editor.add(doc)`, `editor.namespace(...)`, generic `definitions` loop) live in the committed fixture `tools/ast-grep/tests/non-plugin-valid.tsx`, scanned by `test:structure` — because `ast-grep test` does not evaluate `files`/`ignores`. The exception now additionally requires `namespace: ARGON_TOOL_NAMESPACE` and `codemode: true`; `namespace: "fork"` is an explicit negative.
+
+**Tracker rules** are path-position only; single- and multi-argument `rm`/`rmdir`/`unlink`/`truncate` are inspected at their first path argument. Bare leaf file-name inference removed, so `join(root,"docs","task-beta.md")` and `join(root,"product","task-beta.md")` are valid; `item.filePath`, tracker/task identifiers, root-qualified `ArggonManager|tasks` paths, `tasksDir` dynamic paths, and rename source/destination are retained.
+
+**Root cause found (worth review attention):** in `@ast-grep/cli@0.45.3` only the **last** `$$$ARGS` pattern among siblings in one `any` is effective — the tracker rule had three, so one silently lost coverage. The rules now use exactly one each (unified writer/remover arity; serializer call expressed relationally). Documented under "Authoring notes" in `tools/ast-grep/README.md`.
+
+**Merge:** `origin/main` merged normally as `4517a283`; the only conflict was this item's Notes section, resolved by keeping both sides with no content dropped.
+
+**CI caveat — please confirm before merge:** GitHub has not created a run for `ab31d2af` after ~14 minutes of polling (`gh pr checks 418` reports no checks; the last PR run is for the previous SHA `72de1d17`). No force-push, PR comment, or issue was used to work around it. Locally, every step the `cli` CI job runs was executed green.
+
+Exact dev-only `@ast-grep/cli@0.45.3`, one-thread scans, existing CI wiring, and no-rewrite behavior are unchanged. No native plugin source or bundle path is in the diff.
