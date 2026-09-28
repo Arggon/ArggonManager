@@ -121,3 +121,7 @@ Reproducer evidence (3 new regressions, all green):
 - `successEnvelope` throwing after a real claim commit → `claimCommitted: true`, `claimCommit.status: "committed"`, hash equal to `git rev-parse --short HEAD`.
 
 Gates: `npm test` 97 files / 1,633 tests; `npm run lint`; `npm run build`; `npm run check:plugin`; `npm run context:report -- --strict` (native catalog 11,821 B ≤ 12,288 B); `npm run arggon -- validate`; `tools.arggon.validate`; `git diff --check`; focused repro set 8 native + 5 tracker-commit; no fixture leftovers. Acceptance line 2 was un-ticked before the fix and re-ticked only after this evidence. PR body updated (no comment posted); draft, unmerged, item stays in_progress.
+
+### handoff 2026-09-28 @ses_f2b1605beffe4ketLzfuVHnIWN (session: ses_f2b1605beffe4ketLzfuVHnIWN) — next: Coordinator: re-review PR #419 (body updated) for the plain-start ordering + post-claim receipt fixes, run the required review smoke, then merge normally and verify.
+- branch: fix/bug-native-start-worktree-no-install
+- open questions: Standalone cold-start/model smoke remains in task-native-start-cold-smoke; native cleanup finding is bug-native-cleanup-unverified-worktree-removal (untouched here).
