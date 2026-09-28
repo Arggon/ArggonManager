@@ -84,3 +84,7 @@ Not verified / disclosed:
 - The machine's real state is `satisfied` (the coordinator ran `npm install` in the primary), so the stale path is proven by fixtures, not by this machine: `inspectDeclaredDependencies(<this worktree>)` → `{"coverage":"satisfied","missing":[],"missingTotal":0}`. The stale case is reproduced deterministically in the fixture above, as the item asked.
 - `opencode/plugins/arggon/index.bundle.ts` is **regenerated** in this diff (the bundle inlines `@arggondev/lib`, so the kernel change appears there); no plugin source was edited. The worker owning the plugin in this wave will regenerate the same file — whoever merges second only needs `npm run build:plugin`.
 - The native payload does not yet carry the three new field names: `boundedPreparation` (plugin file, out of scope in this wave) projects fields explicitly, so it forwards `ready` but drops them. A native caller gets "not ready" without the names — filed as `task-native-preparation-names-stale-deps` (p3) with context and an acceptance checklist.
+
+### handoff 2026-09-28 @Arggon — next: Coordinator: review PR #429 and merge (do not squash); then update --status done. If a plugin PR also regenerated index.bundle.ts, re-run npm run build:plugin after the merge.
+- branch: fix/bug-worktree-readiness-misses-stale-primary-install
+- open questions: Should ready stay the conjunction, or split into a separate readiness field?; Is p3 right for the native payload projection follow-up?
