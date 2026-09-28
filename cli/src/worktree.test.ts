@@ -183,6 +183,17 @@ function startError(dir: string, id: string, assignee: string): string {
   }
 }
 
+/**
+ * Declare dependencies in the repo's own manifest — committed, because `start`
+ * refuses a dirty tree. The stand-in for a `package.json` whose install is
+ * stale (bug-worktree-readiness-misses-stale-primary-install).
+ */
+function setManifest(dir: string, manifest: Record<string, unknown>): void {
+  writeFileSync(join(dir, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  git(["add", "package.json"], dir);
+  git(["commit", "--quiet", "-m", "declare dependencies"], dir);
+}
+
 describe("start --worktree", () => {
   it("creates the worktree, records worktree_path, and commits the claim inside it", () => {
     const dir = initRepo();
@@ -378,7 +389,10 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     // The remediation the docs recommend, run as the post-start hook: it
     // reifies a real local install whose workspace link points at the
     // worktree's own copy.
-    setPostStart(dir, "mkdir -p node_modules/@arggondev && ln -s ../../lib node_modules/@arggondev/lib");
+    setPostStart(
+      dir,
+      "mkdir -p node_modules/@arggondev && ln -s ../../lib node_modules/@arggondev/lib",
+    );
 
     const result = runStart(
       { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
@@ -405,6 +419,58 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     expect(relinked.postStart?.ok).toBe(true);
     expect(relinked.linkedNodeModules).toBe(true);
     expect(relinked.linkedWorkspaces).toEqual(["@arggondev/lib"]);
+  });
+
+  it("names a declared dependency the mirrored primary install does not provide (bug-worktree-readiness-misses-stale-primary-install)", () => {
+    const dir = initRepo();
+    addFakeDependency(dir, "fake-gate-dep");
+    // The measured machine state, reproduced deterministically: a declared
+    // devDependency the primary's install (and therefore every link farm
+    // mirroring it) cannot resolve. Reported before this fix as `ready: true`,
+    // which is what cost two workers their structure gates.
+    setManifest(dir, {
+      name: "fixture-repo",
+      dependencies: { "fake-gate-dep": "^1.0.0" },
+      devDependencies: { "@ast-grep/cli": "0.45.3" },
+    });
+    const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    // Non-fatal, and still a usable worktree: the install is linked, the claim
+    // landed, nothing was rolled back.
+    expect(result.linkedNodeModules).toBe(true);
+    expect(result.committed).toBe(true);
+    expect(existsSync(join(expectedPath, "ArggonManager"))).toBe(true);
+    // The receipt distinguishes "a linked install is present" (unchanged, still
+    // true above) from "it satisfies what the manifest declares".
+    expect(result.manifestCoverage).toBe("stale");
+    expect(result.missingDependencies).toEqual(["@ast-grep/cli"]);
+    expect(result.missingDependenciesTotal).toBe(1);
+  });
+
+  it("reports a satisfied install again once a post-start hook installs locally", () => {
+    const dir = initRepo();
+    setManifest(dir, { name: "fixture-repo", devDependencies: { "hook-dep": "1.0.0" } });
+    // The documented remedy (an `npm ci` stand-in): the hook owns the
+    // worktree's install, and the report describes the state it is left in.
+    setPostStart(
+      dir,
+      "mkdir -p node_modules/hook-dep && echo '{}' > node_modules/hook-dep/package.json",
+    );
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    expect(result.postStart?.ok).toBe(true);
+    expect(result.manifestCoverage).toBe("satisfied");
+    expect(result.missingDependencies).toEqual([]);
+    expect(result.missingDependenciesTotal).toBe(0);
   });
 
   it("keeps the worktree, reports the failing step + remediation, and a re-run attaches", () => {
