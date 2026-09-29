@@ -73,3 +73,6 @@ to `implemented` when T2 (`task-zcode-plugin-seam`) lands the plugin seam — th
 spec's acceptance spans both waves.
 
 ## Notes
+
+### handoff 2026-09-29 @Arggon — next: Review + merge PR #436. After merge: merge origin/main into feat/task-zcode-plugin-seam before landing #437 (main carries a comment commit on this item file; expect a trivial item-file overlap, keep …
+- branch: feat/task-mcp-full-surface
