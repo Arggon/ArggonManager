@@ -19,10 +19,38 @@ updated: "2026-09-29"
 
 ## Context
 
-<!-- Why this task exists. -->
+ZCode has no code-mode tool mechanism, so `arggon mcp` IS the native tool
+surface for a ZCode-native seam (ADR 0014). Today it exposes only the core
+nine tools (`list/create/update/comment/handoff/show/next/report/validate`);
+the OpenCode V2 native surface additionally ships `priority`, `sync`,
+`import_issues` and the worktree lifecycle (`start`, `branch`, `cleanup`).
+A ZCode session cannot run the find → claim → worktree → PR loop through MCP
+alone. Decision (product owner, 2026-09-28): the MCP surface gains the six
+missing tools so both clients reach full parity.
+
+Design constraints: `priority`/`sync` call their existing kernel operations
+(`priorityOperation`/`syncOperation`) in-process; `import_issues`/`start`/
+`branch`/`cleanup` spawn the arggon CLI itself (argv array, no shell) and
+return the CLI's `--json` envelopes — one worktree/ergonomics implementation
+path, injection-safe by construction. Every tool schema property must keep the
+standing CLI ↔ MCP option-surface parity invariant (`mcp-parity.test.ts`).
 
 ## Acceptance
 
-- [ ] 
+- [ ] `arggon mcp` exposes 15 tools; the six new ones are `arggon_priority`,
+      `arggon_sync`, `arggon_import_issues`, `arggon_start`, `arggon_branch`,
+      `arggon_cleanup` with schemas mirroring the CLI options
+- [ ] `priority`/`sync` go through the shared kernel operations (envelope
+      parity with the CLI verified by a test)
+- [ ] `import_issues`/`start`/`branch`/`cleanup` spawn the CLI with an argv
+      array and return its `--json` envelope byte-parity (test with a spawned
+      CLI), with kernel failures surfacing as tool errors that never kill the
+      session
+- [ ] CLI ↔ MCP option-surface parity test extended to the six new tools
+- [ ] Agent playbook rules hold through MCP: no reopen of done/cancelled, no
+      claim steal (no `--force` surface anywhere)
+- [ ] `references/json-contract.md` MCP section updated (nine → fifteen tools)
+- [ ] Full test suite + lint/typecheck gates green; `arggon validate --json`
+      `ok:true` before every commit
 
 ## Notes
