@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-axe-core-browser-ci
 title: Add @axe-core/playwright to the existing browser CI lane
 assignee: Arggon
@@ -10,11 +10,9 @@ labels: [playwright, accessibility, ci, ui]
 priority: p2
 created: "2026-09-24"
 updated: "2026-09-29"
-claimed_at: "2026-09-29T01:43:14.629Z"
 depends_on: [task-ast-grep-structural-rules]
 worktree_path: /home/arggon/Projects/ArggonManager-task-axe-core-browser-ci
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-axe-core-browser-ci.md
   Leaves live only under a story. id is the filename stem: task-axe-core-browser-ci.
