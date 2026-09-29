@@ -389,6 +389,8 @@ Closing work is easy on containers too: when an update reaches a terminal state 
 
 Reconciles the tracker with the repo's open GitHub PRs: `--check` (default, CI-safe) reports matched/unmatched items and exits non-zero when sync is pending; `--write` fills **only empty** `branch` fields — never overwrites a set branch, never guesses an ambiguous match, never touches status. Flags: `--repo <owner/repo>`, `--json`. Failures: `SYNC_FAILED`.
 
+The `--json` envelope additively reports `verdicts` — a report-only review-verdict classification (`approved` / `changes-requested` / `none`) per item reconciled with an open PR, read from the item body's verdict comments (convention: `ArggonManager/docs/engineering.md` §Review bar → Review verdicts). It never affects matching or the exit code.
+
 ### `arggon spec`
 
 Validates and scaffolds feature specs (`ArggonManager/docs/specs/spec-<slug>-NNN.md`) and implementation plans (`docs/plans/plan-<slug>-NNN.md`) so agents can trust and check them. `spec validate` is a **pure read**: it checks frontmatter (`spec_id`/`plan_id` kebab-case, `title`, `status` (`proposed` | `implemented` | `superseded`), `created` as `YYYY-MM-DD`), required sections (Purpose or a non-empty intro, a Synopsis/Design/Model-of-data equivalent, Acceptance criteria — lenient about naming, including the Spanish sections of the existing specs, strict about acceptance), plans pointing at an existing spec file, and `spec_id` uniqueness across `docs/specs/`. Exits non-zero on errors.

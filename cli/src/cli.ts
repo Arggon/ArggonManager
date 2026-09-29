@@ -2792,6 +2792,13 @@ program
       for (const amb of result.ambiguous) {
         console.log(`  ambiguous: ${sanitizeHumanError(amb.id)} (PRs ${amb.prs.join(", ")})`);
       }
+      // Report-only verdict classification (task-review-verdict-checker):
+      // only the informative states print; `none` stays silent.
+      for (const [id, verdict] of Object.entries(result.verdicts)) {
+        if (verdict !== "none") {
+          console.log(`  verdict:   ${sanitizeHumanError(id)} -> ${sanitizeHumanError(verdict)}`);
+        }
+      }
       for (const [id, branch] of Object.entries(result.filled ?? {})) {
         console.log(`  filled:    ${sanitizeHumanError(id)} -> ${sanitizeHumanError(branch)}`);
       }

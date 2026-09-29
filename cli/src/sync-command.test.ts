@@ -508,4 +508,73 @@ describe("sync command", () => {
     expect(result.exit_code).toBe(1);
     expect(result.errors[0]).toMatch(/GitHub API error/);
   });
+
+  // Report-only review-verdict classification (task-review-verdict-checker):
+  // additive `verdicts` field, read from item bodies, no extra gh calls.
+  it("sync --check classifies review verdicts per PR-reconciled item", () => {
+    const dir = createTestRepo();
+    const approvedPath = createTask(dir, "task-approved", "feat/task-approved");
+    const changesPath = createTask(dir, "task-changes", "feat/task-changes");
+    const nonePath = createTask(dir, "task-unreviewed", "feat/task-unreviewed");
+    createTask(dir, "task-no-pr", "feat/task-no-pr"); // no open PR -> excluded
+
+    appendComment(approvedPath, "2026-09-28", "verdict: approve");
+    // Approve first, then a newer request-changes -> changes-requested.
+    appendComment(changesPath, "2026-09-27", "verdict: approve");
+    appendComment(changesPath, "2026-09-29", "verdict: request-changes (smoke evidence missing)");
+    appendComment(nonePath, "2026-09-28", "looks fine to me"); // no verdict header
+
+    const execGh = createGhMock([
+      {
+        number: 101,
+        title: "Approved PR",
+        headRefName: "feat/task-approved",
+        url: "https://github.com/test/test/pull/101",
+      },
+      {
+        number: 102,
+        title: "Changes PR",
+        headRefName: "feat/task-changes",
+        url: "https://github.com/test/test/pull/102",
+      },
+      {
+        number: 103,
+        title: "Unreviewed PR",
+        headRefName: "feat/task-unreviewed",
+        url: "https://github.com/test/test/pull/103",
+      },
+    ]);
+
+    const result = runSync(
+      { check: true, cwd: dir, repo: "test/test" },
+      execGh as unknown as typeof execFileSync,
+    );
+
+    expect(result.verdicts).toEqual({
+      "task-approved": "approved",
+      "task-changes": "changes-requested",
+      "task-unreviewed": "none",
+    });
+    // Report-only: the classification never gates matching or the exit code.
+    expect(result.exit_code).toBe(0);
+    expect(execGh).toHaveBeenCalledTimes(1);
+  });
+
+  it("sync --check emits no verdicts when nothing reconciles with a PR", () => {
+    const dir = createTestRepo();
+
+    const result = runSync(
+      { check: true, cwd: dir, repo: "test/test" },
+      createGhMock([]) as unknown as typeof execFileSync,
+    );
+
+    expect(result.verdicts).toEqual({});
+  });
 });
+
+/** Append a dated comment section exactly as `arggon comment` writes it. */
+function appendComment(path: string, date: string, line: string): void {
+  const raw = readFileSync(path, "utf8");
+  const base = raw.endsWith("\n") ? raw : `${raw}\n`;
+  writeFileSync(path, `${base}\n### ${date} @Reviewer\n${line}\n`);
+}

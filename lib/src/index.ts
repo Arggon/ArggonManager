@@ -216,6 +216,8 @@ export { HANDOFF_FIELD_CAP, HANDOFF_SESSION_CAP, runHandoff } from "./handoff.js
 export type { HandoffOptions, HandoffResult } from "./handoff.js";
 export { runSync } from "./sync-command.js";
 export type { SyncResult } from "./sync-types.js";
+export { classifyVerdicts, parseVerdicts } from "./verdict.js";
+export type { VerdictComment, VerdictState } from "./verdict.js";
 export {
   CLEANUP_TERMINAL_STATUSES,
   classifyCleanupEntry,
