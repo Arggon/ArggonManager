@@ -1,14 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-fast-check-invariant-properties
 title: "Add fast-check properties for parser, status, dependency, UTF-8, and worktree invariants"
+assignee: Arggon
+branch: feat/task-fast-check-invariant-properties
 parent: ui-foundation
 labels: [testing, property-based, kernel]
 priority: p2
 created: "2026-09-24"
-updated: "2026-09-24"
+updated: "2026-09-29"
+claimed_at: "2026-09-29T00:17:01.426Z"
 depends_on: [bug-native-start-worktree-no-install, task-ast-grep-structural-rules]
+worktree_path: /home/arggon/Projects/ArggonManager-task-fast-check-invariant-properties
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-fast-check-invariant-properties.md
