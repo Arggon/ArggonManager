@@ -73,8 +73,6 @@ ride in this PR per the methodology (paperwork with the change); spec/plan flip
 to `implemented` when T2 (`task-zcode-plugin-seam`) lands the plugin seam — the
 spec's acceptance spans both waves.
 
-## Notes
-
 ### handoff 2026-09-29 @Arggon — next: Review + merge PR #436. After merge: merge origin/main into feat/task-zcode-plugin-seam before landing #437 (main carries a comment commit on this item file; expect a trivial item-file overlap, keep …
 - branch: feat/task-mcp-full-surface
 
@@ -112,3 +110,6 @@ Findings:
 - P3: spawn args use str(x)! after an !== undefined check (cli/src/mcp-server.ts:751,756) — a non-string arg puts undefined in argv, surfacing an opaque spawnSync TypeError (caught, session survives); prefer a typeof check.
 - P3: 16 KiB advisory headroom is ~683 B — the next tool addition busts it; acceptable (advisory) but worth knowing.
 Acceptance ticks honest (tick 2 parenthetical slightly overstates sync envelope parity; tick 4 states the real coverage). Follow-up candidates: none beyond the P2 if fixed here.
+
+### 2026-09-29 @Arggon
+T1 implemented in worktree feat/task-mcp-full-surface, PR #436 open (not merged; item stays claimed until then). 15-tool MCP surface: priority/sync/import_issues in-process via kernel ops; start/branch/cleanup spawn the CLI (argv array) and return its --json envelope. Spawn spec derived from launch argv (cli.js / tsx) or injected; envelope-less children become tool errors, session survives. Parity invariant extended to 15 tools; envelope parity for priority/branch/cleanup. doctor --budget advisory cap 12 KiB -> 16 KiB (measured 15,701 B). Gates: 1710 vitest, eslint, tsc, validate all green. Gotcha for T2: spec/plan zcode-native-seam-012 + ADR 0014 live in THIS branch; flip spec/plan to implemented only when T2 lands.
