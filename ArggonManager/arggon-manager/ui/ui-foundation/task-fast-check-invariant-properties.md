@@ -80,3 +80,74 @@ Property suite merged-ready on `feat/task-fast-check-invariant-properties` (PR #
 ### handoff 2026-09-29 @Arggon — next: Review and merge draft PR #433; then land bug-dependency-cycle-chain-rotation-duplicates-a-node and bug-frontmatter-ambiguous-plain-scalar-loss and delete their canaries
 - branch: feat/task-fast-check-invariant-properties
 - open questions: Accept the partial cycle acceptance line, or block on the fix first?;Is the root-tsconfig test exclude in scope for this item?;Should the clip property move to labs/ instead of cli/src?
+
+### 2026-09-29 @Arggon
+Review round 1 addressed. One blocking finding (the root `tsconfig.json` exclude deleted the CLI test type gate) plus two questions answered below.
+
+## The blocking finding — fixed, and I found a second instance of it myself
+
+You were right, and the comment was worse than the regression. While verifying I found the same leak hit a **second** gate: `extends` inherits `exclude`, so `labs/tsconfig.json` (documented in `labs/README.md` as a type-check command) silently stopped checking `labs/torture.test.ts` and the CLI tests it covers. Probe: `tsc -p labs/tsconfig.json --noEmit` exit 0 before, exit 2 after.
+
+**Arrangement** — the pattern the repo already uses in `lib` (`lib/tsconfig.typecheck.json`): the build project only emits, a sibling `noEmit` project is the type gate.
+
+| file                            | change                                                                                      | why                                                                                                               |
+| ------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `tsconfig.typecheck.json` (new) | `noEmit`, `rootDir: "."`, `include: ["cli/src/**/*.ts", "test/**/*.ts"]`, **`exclude: []`** | the gate: `test/**/*.ts` puts the shared runner in the program, and `exclude: []` overrides the inherited exclude |
+| `package.json`                  | `build` = `… && tsc -p tsconfig.json && tsc -p tsconfig.typecheck.json`                     | mirrors `lib`'s build script, so CI keeps the gate                                                                |
+| `labs/tsconfig.json`            | added `exclude: []`                                                                         | un-disarms the lab project that the inherited exclude silently disarmed                                           |
+| `tsconfig.json`                 | comment rewritten, exclude kept                                                             | the comment now states what is true and names `tsconfig.typecheck.json`                                           |
+
+I chose the sibling project over wiring `labs` in because `labs` is dormant (no script), is documented as a _manual_ command, and does not cover `test/**`; the sibling is what `npm run build` can depend on.
+
+## A/B proof (probe: `const n: number = "definitely not a number"` in a `cli/src` test)
+
+| tree / project                       | command                                  | exit | catches?            |
+| ------------------------------------ | ---------------------------------------- | ---- | ------------------- |
+| `main` build project (no exclude)    | `npx tsc -p tsconfig.json`               | 2    | yes, `error TS2322` |
+| this branch, build project (emitter) | `npx tsc -p tsconfig.json`               | 0    | no, **by design**   |
+| this branch, sibling noEmit project  | `npx tsc -p tsconfig.typecheck.json`     | 2    | yes, `error TS2322` |
+| this branch, what CI runs            | `npm run build`                          | 2    | yes, `error TS2322` |
+| this branch, labs project            | `npx tsc -p labs/tsconfig.json --noEmit` | 2    | yes, `error TS2322` |
+
+`dist/`: **0** `dist/*.test.js` (81 on `main`) — nothing shipped changes, since `files` already dropped `**/*.test.*` from the tarball.
+
+## `lib/tsconfig.typecheck.json` `rootDir: ".."` — kept, guard verified
+
+Still needed: the kernel property tests import the shared runner from `test/`, outside `lib/`. I did not try to remove it by moving the runner into `lib/src/` — that would put a test-only, `fast-check`-importing file in the published package's source tree and need a build-exclude entry, and it would not help the CLI side (whose typecheck project also needs a root above `cli/src`).
+
+The build project's guard is verified, not assumed. Probe `lib/src/zz-probe-source.ts` importing `../../test/property-runner.js`:
+
+```
+$ npx tsc -p lib/tsconfig.json --noEmit
+lib/src/zz-probe-source.ts(1,24): error TS6059: File '…/test/property-runner.ts' is not
+  under 'rootDir' '…/lib/src'. 'rootDir' is expected to contain all source files.
+exit 2
+```
+
+## Q1 — the dependency-cycle box: my wording, and my honest reading
+
+Verbatim as it stands in the item body (tick + annotation):
+
+> - [x] Property: generated dependency graphs terminate and report the same canonical cycle set regardless of input traversal order. — **partially, and the gap is a filed kernel bug, not a narrowed test**: `lib/src/validate.property.test.ts` asserts unconditionally that the graphs terminate, that the cyclic/acyclic VERDICT is order independent, that completeness and absence of false positives both hold, and that every reported cycle is real, canonically anchored and deduped. The cycle _chain text_ and, for multi-cycle graphs, the _named cycle set_ are NOT order independent today: the rotation runs on the cycle array that already contains the closing node (`bug-dependency-cycle-chain-rotation-duplicates-a-node`). Both divergences are counted and logged per run and pinned as a canary, so the fix turns the suite red on purpose.
+
+**My reading: the box is not met as written.** The emitted chain text is not order-independent, so "report the same canonical cycle set regardless of input traversal order" does not hold. Your call — I have **not** reworded the box and have left the tick untouched so you can see exactly what I ticked. The one-line change if you want the waiver form is `- [ ]` plus a `WAIVED (see bug-…): …` note; say the word and I will apply it verbatim.
+
+## Q2 — the two canaries: what each asserts
+
+Both are **bug canaries that pin current buggy behaviour**, and both now say so in the comment alone (fixed this round — they previously did not distinguish the buggy rows from the correct ones).
+
+1. `frontmatter ambiguous scalar` — the table gained a `preserved` / `lost` verdict column, and the property **enforces** it (`preserved` rows must read back as the token, `lost` rows must not), so the table cannot lie about itself. `preserved` rows (`true`, `false`, `0`, `42`, `-7`) assert a **correct** invariant. `lost` rows (`null`, `~`, `00`, `-0`, `007`, `0123`, `-007`, `9007199254740993`, `12345678901234567890`) pin **today's wrong output** for `bug-frontmatter-ambiguous-plain-scalar-loss`; the comment says a fix flips them and turns the suite red first. Every row also asserts the correct part unconditionally: no throw, the loss is bounded to one normalization, the body is untouched.
+2. Cycle chain shape — the `else` branch is the **correct** contract (`a -> b -> … -> a`, every member once, closing on the anchor). The `if` branch, guarded by `isRotationWithOneDuplicate`, pins **today's malformed output** for `bug-dependency-cycle-chain-rotation-duplicates-a-node`; the comment at both the helper and the branch, and in the file header, states that the pinned shape is not the expected output and that any third shape fails both branches. The per-run divergence counter keeps the "which cycles get named" part measured.
+
+## Gates (real output, this worktree, head `ec95baaf`)
+
+- `npm test` — `Test Files 103 passed (103)`, `Tests 1701 passed (1701)`, 62.00 s
+- `npm run lint` — exit 0, no output
+- `npm run build` — exit 0 (`tsc -p tsconfig.json` + `tsc -p tsconfig.typecheck.json`), `dist/*.test.js` count 0
+- `npm run check:plugin` — exit 0, no diff to `opencode/plugins/arggon/index.bundle.ts`
+- `npm run lint:structure` — exit 0, no findings
+- `npm run test:structure` — `PASS` ×3, `test result: ok. 3 passed; 0 failed`
+- `npm run arggon -- validate --json` — `{"ok":true,…,"errors":[],"warnings":[]}`
+- extra: `npx tsc -p tsconfig.typecheck.json` exit 0, `npx tsc -p lib/tsconfig.typecheck.json` exit 0, `npx tsc -p labs/tsconfig.json` exit 0, `npm run test:property` → 5 files / 12 tests / 393 ms
+
+PR #433 body rewritten with the A/B table, the labs regression, the lib-guard probe and the canary labelling. Draft, still open; `status: in_progress` left as is.
