@@ -45,10 +45,21 @@ Findings to add:
 Thresholds as documented constants (pick sensible defaults, e.g. 30d explorations / 90d ADRs; no new flags unless trivial). Verification before opening the PR: the scanner run against **this repo** must flag exploration-007's pending decision and ADRs 0002/0003/0004 (findings only — do not fix them in this PR).
 
 ### Acceptance checklist
-- [ ] Spec first: scaffold `docs/specs/spec-analyze-decision-gaps-*.md` (`arggon spec new analyze-decision-gaps --plan`), purpose/finding taxonomy/thresholds/invariants (report-only, exit 0)/acceptance criteria; flip spec+plan status to `implemented` in this PR.
-- [ ] `spec analyze --json` emits the three finding types (file + reason), additive to the envelope (schemaVersion unchanged unless breaking).
-- [ ] Unit tests: ADR status-line parser, exploration Decision-link parser, plan↔spec drift; positive+negative fixture per finding type.
-- [ ] Human output lists findings; docs updated: README spec-analyze section, `ArggonManager/docs/json-output.md`, `ArggonManager/docs/agents.md` §Specs and plans mention.
-- [ ] Smoke evidence: `spec analyze` on a fixture seeded with all three gap types (expected vs observed) + on this repo (findings above present).
-- [ ] Full suite + lint/typecheck green; `arggon validate` ok.
-- [ ] Note: `task-done-gate-acceptance-waiver` also touches README + json-output.md — rebase on main before opening the PR if it merged first.
+- [x] Spec first: scaffold `docs/specs/spec-analyze-decision-gaps-*.md` (`arggon spec new analyze-decision-gaps --plan`), purpose/finding taxonomy/thresholds/invariants (report-only, exit 0)/acceptance criteria; flip spec+plan status to `implemented` in this PR.
+- [x] `spec analyze --json` emits the three finding types (file + reason), additive to the envelope (schemaVersion unchanged unless breaking).
+- [x] Unit tests: ADR status-line parser, exploration Decision-link parser, plan↔spec drift; positive+negative fixture per finding type.
+- [x] Human output lists findings; docs updated: README spec-analyze section, `ArggonManager/docs/json-output.md`, `ArggonManager/docs/agents.md` §Specs and plans mention.
+- [x] Smoke evidence: `spec analyze` on a fixture seeded with all three gap types (expected vs observed) + on this repo (findings above present).
+- [x] Full suite + lint/typecheck green; `arggon validate` ok.
+- [x] Note: `task-done-gate-acceptance-waiver` also touches README + json-output.md — rebase on main before opening the PR if it merged first.
+
+### 2026-09-29 @Arggon
+Evidence (implementation complete, review-ready):
+
+- Spec/plan: spec-analyze-decision-gaps-013 + plan-analyze-decision-gaps-013, both flipped to implemented in this PR. Thresholds are documented constants DECISION_PENDING_DAYS=7 / STALE_PROPOSED_DAYS=14 (cli/src/spec.ts) — NOT the 30d/90d example from the context: 30d/90d would flag nothing in this repo today (exploration-007 is 13d old, ADRs 0002/0003/0004 are 22d/18d/18d), and the item requires those findings. A finding fires only when ageDays > threshold (exactly-threshold is clean); ages are whole days to today UTC.
+- Envelope: findings.decisions is additive, schemaVersion stays 1; baselines include decisions in the flat findings array; decision pass skipped with --spec.
+- Tests: new cli/src/spec-decision-gaps.test.ts (20 tests: parsers + positive/negative fixture per kind + threshold boundary + never-writes + CLI --json/human contract). Full suite 1740/1740 green, eslint green, npm run build green, arggon validate ok:true.
+- Smoke, seeded fixture (/tmp/fixture-c3): all three kinds emitted, exit 0; clean fixture: decisions [].
+- Smoke, this repo: flagged exploration-adopter-upgrade-experience-007 (DECISION-PENDING-EXPLORATION, line 100) and ADRs 0002/0003/0004 (STALE-PROPOSED-ADR, line 3 each). Additional honest findings the detector surfaced (report-only; owned by other tasks): explorations 002/003/005/008 pending (008's Decision still holds the placeholder although ADR 0009 landed; 003/005 record a deliberate no-ADR decision, which the contract still reports as a gap). No SPEC-STATUS-DRIFT instance in this repo (spec-zcode-native-seam-012 and its plan are both proposed).
+- Deviation note: kind strings use the exact uppercase names from the work order (DECISION-PENDING-EXPLORATION / STALE-PROPOSED-ADR / SPEC-STATUS-DRIFT), unlike the lowercase kebab kinds of spec-analyze-004; kind is opaque in the contract and baselines sort deterministically.
+- Overlap check: PR #442 (task-done-gate-acceptance-waiver, README + json-output.md) is still open, so no rebase was needed; if it merges first, rebase before ready — different sentences/rows, conflict unlikely.
