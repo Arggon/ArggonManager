@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-review-verdict-checker
 title: review-verdict-checker
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-29"
 updated: "2026-09-29"
-claimed_at: "2026-09-29T23:05:06.453Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-review-verdict-checker
 ---
 <!--
