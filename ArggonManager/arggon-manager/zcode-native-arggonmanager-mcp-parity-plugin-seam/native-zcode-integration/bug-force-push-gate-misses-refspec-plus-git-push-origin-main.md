@@ -24,10 +24,10 @@ too — so this is a product-wide gate fix, not a ZCode-seam regression.
 
 ## Acceptance
 
-- [ ] Both gate surfaces deny `git push origin +main` (and `+<ref>` generally)
+- [x] Both gate surfaces deny `git push origin +main` (and `+<ref>` generally)
       while allowing ordinary pushes: `templates/docs/opencode.jsonc`
       permission pattern and `templates/docs/zcode/arggon/hooks/gate.mjs`
       GLOBAL_SHELL_GATES
-- [ ] `cli/src/init-zcode.test.ts` gains the `+main` case; the OpenCode seam
+- [x] `cli/src/init-zcode.test.ts` gains the `+main` case; the OpenCode seam
       side gets equivalent coverage wherever its gates are asserted
-- [ ] `arggon validate` + full gates green
+- [x] `arggon validate` + full gates green

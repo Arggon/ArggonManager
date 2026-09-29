@@ -75,7 +75,7 @@ const REVIEWER_SHELL_GATES = [
 
 /** Global gates: every session, every mode of work (W4 seam defaults). */
 const GLOBAL_SHELL_GATES = [
-  { re: /\bgit\b[^;&|]*\spush\b(?=[^;&|]*\s(?:--force\b|-f[a-z]*))/, why: "force push (git push --force / -f<letters>, incl. -fu)" },
+  { re: /\bgit\b[^;&|]*\spush\b(?=[^;&|]*\s(?:--force\b|-f[a-z]*|\+\S))/, why: "force push (git push --force / -f<letters>, incl. -fu / refspec-plus +ref)" },
   { re: /\bgit\b[^;&|]*\scommit\b[^;&|]*--no-verify\b/, why: "git commit --no-verify" },
 ];
 
