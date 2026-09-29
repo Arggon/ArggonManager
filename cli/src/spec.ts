@@ -394,6 +394,12 @@ export type SpecAnalyzeResult = {
   scanned: number;
   ambiguity: SpecFinding[];
   consistency: SpecFinding[];
+  /**
+   * Decision-pipeline gap findings (spec-analyze-decision-gaps-013): pending
+   * explorations, stale Proposed ADRs, spec/plan status drift. Corpus mode
+   * only (empty with `--spec <path>`).
+   */
+  decisions: SpecFinding[];
 };
 
 /** Deliberately small, documented checklist; deterministic, no AI. */
@@ -597,6 +603,239 @@ function consistencyFindings(root: string): SpecFinding[] {
   return findings;
 }
 
+/**
+ * Decision-pipeline gap findings (spec-analyze-decision-gaps-013, from
+ * exploration-014 C3): the explore → ADR → spec/plan pipeline leaks —
+ * explorations stay on a placeholder Decision for weeks, ADRs sit in
+ * `Proposed` indefinitely, and plans ship while their spec is still
+ * `proposed`. Three report-only kinds in the additive `decisions` bucket:
+ *
+ * - `DECISION-PENDING-EXPLORATION` — exploration whose Decision section
+ *   records no ADR after {@link DECISION_PENDING_DAYS} days.
+ * - `STALE-PROPOSED-ADR` — ADR whose `- Status:` line starts with `Proposed`
+ *   and whose `- Date:` is older than {@link STALE_PROPOSED_DAYS} days.
+ * - `SPEC-STATUS-DRIFT` — spec with `status: proposed` whose linked plan
+ *   (`spec:` resolving to the spec file) is `status: implemented`.
+ *
+ * Same contract as the rest of analyze: pure read, exit 0 with findings.
+ * Age is whole days from the document date to today UTC; a finding fires
+ * only when `ageDays > threshold`, and unparseable/missing dates are skipped
+ * (analyze never guesses — structural validators own format errors).
+ */
+
+/** A decision left pending longer than a week is a pipeline leak. */
+export const DECISION_PENDING_DAYS = 7;
+
+/** A Proposed ADR older than two weeks is either accepted or rejected. */
+export const STALE_PROPOSED_DAYS = 14;
+
+/** Whole days from a YYYY-MM-DD date to today (UTC); null when unparseable. */
+export function ageDaysFromTodayUtc(date: string | undefined): number | null {
+  if (date === undefined) return null;
+  const match = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const then = Date.UTC(year, month - 1, day);
+  if (!Number.isFinite(then)) return null;
+  const now = new Date();
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return Math.floor((today - then) / 86_400_000);
+}
+
+export type AdrStatusInfo = {
+  /** Trimmed Status value from the first `- Status:` list line, when present. */
+  status?: string;
+  /** 1-based full-file line number of that Status line. */
+  statusLine?: number;
+  /** Trimmed Date value from the first `- Date:` list line, when present. */
+  date?: string;
+};
+
+/**
+ * Parse an ADR's header list lines (`- Status: Proposed`, `- Date: YYYY-MM-DD`,
+ * list-item form, case-insensitive; first occurrence wins). Frontmatter and
+ * prose are deliberately ignored — the documented ADR format carries these as
+ * list items.
+ */
+export function parseAdrStatusAndDate(raw: string): AdrStatusInfo {
+  const info: AdrStatusInfo = {};
+  const lines = raw.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!;
+    const statusMatch = line.match(/^\s*[-*]\s+Status\s*:\s*(.+?)\s*$/i);
+    if (statusMatch && info.status === undefined) {
+      info.status = statusMatch[1];
+      info.statusLine = i + 1;
+      continue;
+    }
+    const dateMatch = line.match(/^\s*[-*]\s+Date\s*:\s*(\S+)\s*$/i);
+    if (dateMatch && info.date === undefined) info.date = dateMatch[1];
+  }
+  return info;
+}
+
+export type DecisionSection = {
+  /** 1-based full-file line of the Decision heading, when present. */
+  headingLine?: number;
+  /** Section text (heading excluded), HTML comments stripped. */
+  text?: string;
+};
+
+/**
+ * The Decision section of an exploration: the first `##` heading whose
+ * normalized text starts with "decision" (covers "Decision" and
+ * "Decision gate") through the next `##` heading or EOF. HTML comments are
+ * stripped from the section text so template placeholders
+ * (`<!-- ADR placeholder: … -->`) can never count as a recorded decision.
+ */
+export function parseDecisionSection(raw: string): DecisionSection {
+  const lines = raw.split(/\r?\n/);
+  let start = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const heading = lines[i]!.match(/^##\s+(.+?)\s*$/);
+    if (heading && normalizeHeading(heading[1]!).startsWith("decision")) {
+      start = i;
+      break;
+    }
+  }
+  if (start === -1) return {};
+  let end = lines.length;
+  for (let i = start + 1; i < lines.length; i++) {
+    if (/^##\s+/.test(lines[i]!)) {
+      end = i;
+      break;
+    }
+  }
+  const text = lines
+    .slice(start + 1, end)
+    .join("\n")
+    .replace(/<!--[\s\S]*?-->/g, "");
+  return { headingLine: start + 1, text };
+}
+
+/**
+ * Whether a Decision section text records an ADR: any `adr/<name>.md` path —
+ * markdown link target or bare text (`- ADR: docs/adr/0007-x.md`) — whose
+ * filename is numbered (`NNNN-…`) and not the `0000-<slug>` template
+ * placeholder. Comments are already stripped by {@link parseDecisionSection}.
+ */
+export function decisionSectionHasAdrRef(sectionText: string): boolean {
+  for (const match of sectionText.matchAll(/adr\/([A-Za-z0-9._<>-]+\.md)/g)) {
+    const name = match[1]!;
+    if (/^\d{3,}-/.test(name) && !name.startsWith("0000-") && !name.includes("<")) return true;
+  }
+  return false;
+}
+
+/** Corpus pass over explorations/, adr/ and the spec↔plan pairs. */
+function decisionFindings(root: string): SpecFinding[] {
+  const findings: SpecFinding[] = [];
+  const docsDir = docsDirForRoot(root);
+
+  for (const abs of listMarkdownDocs(join(docsDir, "explorations"))) {
+    const rel = posixRel(root, abs);
+    let raw: string;
+    try {
+      raw = readFileSync(abs, "utf8");
+    } catch {
+      continue; // structural read failures surface elsewhere; never crash the report
+    }
+    const data = parseDocFrontmatter(raw) ?? {};
+    const age = ageDaysFromTodayUtc(isTruthyFrontmatter(data.created));
+    if (age === null || age <= DECISION_PENDING_DAYS) continue;
+    const section = parseDecisionSection(raw);
+    if (section.text !== undefined && decisionSectionHasAdrRef(section.text)) continue;
+    findings.push(
+      finding(
+        rel,
+        "DECISION-PENDING-EXPLORATION",
+        "warn",
+        section.text === undefined
+          ? `no Decision section — no decision recorded after ${age} day(s) (threshold ${DECISION_PENDING_DAYS})`
+          : `Decision section records no ADR after ${age} day(s) (threshold ${DECISION_PENDING_DAYS}) — decide and link docs/adr/<NNNN>-<slug>.md, or supersede the exploration`,
+        section.headingLine,
+      ),
+    );
+  }
+
+  for (const abs of listMarkdownDocs(join(docsDir, "adr"))) {
+    const rel = posixRel(root, abs);
+    let raw: string;
+    try {
+      raw = readFileSync(abs, "utf8");
+    } catch {
+      continue;
+    }
+    const info = parseAdrStatusAndDate(raw);
+    if (info.status === undefined || !/^proposed\b/i.test(info.status)) continue;
+    const age = ageDaysFromTodayUtc(info.date);
+    if (age === null || age <= STALE_PROPOSED_DAYS) continue;
+    findings.push(
+      finding(
+        rel,
+        "STALE-PROPOSED-ADR",
+        "warn",
+        `ADR has been Proposed for ${age} day(s) (threshold ${STALE_PROPOSED_DAYS}) — accept, reject, or supersede it`,
+        info.statusLine,
+      ),
+    );
+  }
+
+  type DriftSpec = { rel: string; abs: string; specId?: string; status?: string };
+  const specs: DriftSpec[] = [];
+  for (const abs of listMarkdownDocs(join(docsDir, "specs"))) {
+    let raw: string;
+    try {
+      raw = readFileSync(abs, "utf8");
+    } catch {
+      continue;
+    }
+    const data = parseDocFrontmatter(raw) ?? {};
+    specs.push({
+      rel: posixRel(root, abs),
+      abs,
+      specId: isTruthyFrontmatter(data.spec_id),
+      status: isTruthyFrontmatter(data.status),
+    });
+  }
+  type DriftPlan = { rel: string; specAbs?: string; status?: string };
+  const plans: DriftPlan[] = [];
+  for (const abs of listMarkdownDocs(join(docsDir, "plans"))) {
+    let raw: string;
+    try {
+      raw = readFileSync(abs, "utf8");
+    } catch {
+      continue;
+    }
+    const data = parseDocFrontmatter(raw) ?? {};
+    const specPath = isTruthyFrontmatter(data.spec);
+    plans.push({
+      rel: posixRel(root, abs),
+      specAbs: specPath === undefined ? undefined : resolve(root, specPath),
+      status: isTruthyFrontmatter(data.status),
+    });
+  }
+  for (const spec of specs) {
+    if (spec.specId === undefined || spec.status !== "proposed") continue;
+    for (const plan of plans) {
+      if (plan.status !== "implemented" || plan.specAbs !== spec.abs) continue;
+      findings.push(
+        finding(
+          spec.rel,
+          "SPEC-STATUS-DRIFT",
+          "warn",
+          `spec '${spec.specId}' is proposed but plan '${plan.rel}' is implemented — the plan shipped without the spec status moving`,
+        ),
+      );
+    }
+  }
+
+  return findings;
+}
+
 export function runSpecAnalyze(opts: SpecAnalyzeOptions): SpecAnalyzeResult {
   const tasksDir = findTasksDir(opts.cwd);
   const root = repoRootFromTasks(tasksDir);
@@ -631,12 +870,14 @@ export function runSpecAnalyze(opts: SpecAnalyzeOptions): SpecAnalyzeResult {
   }
 
   const consistency = opts.spec ? [] : consistencyFindings(root);
+  const decisions = opts.spec ? [] : decisionFindings(root);
 
   const byFile = (a: SpecFinding, b: SpecFinding): number =>
     a.file.localeCompare(b.file) || a.kind.localeCompare(b.kind) || (a.line ?? 0) - (b.line ?? 0);
   ambiguity.sort(byFile);
   consistency.sort(byFile);
-  return { root, conventionVersion, scanned, ambiguity, consistency };
+  decisions.sort(byFile);
+  return { root, conventionVersion, scanned, ambiguity, consistency, decisions };
 }
 
 /**
@@ -653,13 +894,19 @@ export function formatSpecAnalyzeHuman(result: SpecAnalyzeResult): string {
       `${f.severity} ${sanitizeHumanError(f.file)}: ${sanitizeHumanError(f.message)} [${f.kind}]`,
     );
   }
+  for (const f of result.decisions) {
+    const at = f.line === undefined ? "" : `${f.line}:`;
+    lines.push(
+      `${f.severity} ${sanitizeHumanError(f.file)}:${at} ${sanitizeHumanError(f.message)} [${f.kind}]`,
+    );
+  }
   for (const f of result.ambiguity) {
     const at = f.line === undefined ? "" : `${f.line}:`;
     lines.push(
       `${f.severity} ${sanitizeHumanError(f.file)}:${at} ${sanitizeHumanError(f.message)} [${f.kind}]`,
     );
   }
-  const total = result.ambiguity.length + result.consistency.length;
+  const total = result.ambiguity.length + result.consistency.length + result.decisions.length;
   if (total === 0) {
     lines.push(`arggon spec analyze: clean (${result.scanned} spec(s) scanned)`);
   } else {
@@ -723,7 +970,11 @@ export function serializeSpecBaseline(snapshot: SpecBaselineSnapshot): string {
 }
 
 function snapshotFromResult(result: SpecAnalyzeResult): SpecBaselineSnapshot {
-  const findings = sortSpecFindings([...result.ambiguity, ...result.consistency]);
+  const findings = sortSpecFindings([
+    ...result.ambiguity,
+    ...result.consistency,
+    ...result.decisions,
+  ]);
   return {
     schemaVersion: SPEC_BASELINE_SCHEMA_VERSION,
     conventionVersion: result.conventionVersion,
@@ -829,7 +1080,7 @@ export function runSpecAnalyzeCompareBaseline(
   const baseline = readBaselineSnapshot(opts.file);
   const result = runSpecAnalyze({ cwd: opts.cwd, spec: opts.spec });
   const baselineKeys = new Set(baseline.findings.map(findingKey));
-  const current = [...result.ambiguity, ...result.consistency];
+  const current = [...result.ambiguity, ...result.consistency, ...result.decisions];
   const currentKeySet = new Set(current.map(findingKey));
   const unchanged: SpecFinding[] = [];
   const added: SpecFinding[] = [];
@@ -848,7 +1099,7 @@ export function runSpecAnalyzeCompareBaseline(
 }
 
 export function formatSpecBaselineSaveHuman(r: SpecBaselineSaveResult): string {
-  const total = r.result.ambiguity.length + r.result.consistency.length;
+  const total = r.result.ambiguity.length + r.result.consistency.length + r.result.decisions.length;
   return `arggon spec analyze: baseline written to ${sanitizeHumanError(r.file)} (${total} finding(s) across ${r.result.scanned} spec(s))\n`;
 }
 
