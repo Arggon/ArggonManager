@@ -47,3 +47,18 @@ Design:
 - [ ] README + `ArggonManager/docs/json-output.md` updated (additive fields noted).
 - [ ] Smoke: fixture item with request-changes newer than approve → `changes-requested`; approve-only → `approved`; no verdicts → `none` (expected vs observed).
 - [ ] Full suite + lint/typecheck green; `arggon validate` ok.
+
+### 2026-09-29 @Arggon
+Implementation + evidence (branch feat/task-review-verdict-checker, PR #440).
+
+- Convention: docs/engineering.md §Review bar → Review verdicts (bounded header line + evidence list; human prose, not schema).
+- Checker: lib/src/verdict.ts (parseVerdicts/classifyVerdicts) wired into runSync — additive 'verdicts' field in the sync envelope (matched/fillable/pending/ambiguous items only; never no_pr). No extra gh calls (bodies already loaded); matching/exit_code untouched; schemaVersion stays 1.
+- Tests: cli/src/verdict.test.ts (12: ordering by date then body order, case-insensitivity, scope capture, near-miss tokens, prose-only → none, first-line-per-comment) + 2 sync envelope integration tests.
+- Gates: npm test 1734/1734 green, npm run lint clean, npm run build ok, arggon validate ok:true.
+- Smoke (fixture /tmp/fixture-c2, fake gh on PATH — same technique as cli/src/sync-smoke.test.ts):
+  - approve 2026-09-28 → request-changes 2026-09-29 ⇒ changes-requested (expected) / changes-requested (observed)
+  - request-changes 2026-09-28 → approve 2026-09-29 ⇒ approved / approved
+  - newer approve 2026-09-30 appended after a request-changes ⇒ flip to approved / approved
+  - matched item without verdict comments ⇒ none / none
+  - branch+no-PR item ⇒ absent from verdicts / absent
+  - schemaVersion 1, exit_code 0 throughout.
