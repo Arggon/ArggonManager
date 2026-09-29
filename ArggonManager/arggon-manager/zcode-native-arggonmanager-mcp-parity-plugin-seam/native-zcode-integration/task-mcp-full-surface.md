@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-mcp-full-surface
 title: "MCP full tool surface: add the six missing tools"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: native-zcode-integration
 labels: []
 created: "2026-09-29"
 updated: "2026-09-29"
-claimed_at: "2026-09-29T10:38:40.231Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-mcp-full-surface
 ---
 <!--
