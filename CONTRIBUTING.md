@@ -173,17 +173,67 @@ browser gate stays the Playwright CLI drive described in
 `ArggonManager/docs/engineering.md` § Smoke test. Locally:
 
 - `npm run build` — both specs drive the **built** bin on a temp fixture
-- `npx playwright install chromium` — once per machine; `@playwright/test` is a
-  devDependency and never ships
+- `npx playwright install chromium` — once per machine; `@playwright/test` and
+  `@axe-core/playwright` are devDependencies and never ship
 - `npx playwright test --grep @smoke` — board smoke: `board --serve` renders one
   card per `arggon list` item, one status move round-trips through the UI and
-  persists (`arggon show`)
+  persists (`arggon show`), and the ready page carries no WCAG A/AA
+  accessibility violation
 - `npm run smoke:tui-board` — TUI frame check: `arggon board --tui` renders in a
   pty and the capture carries the five status headers plus a seeded item id
   (skips cleanly where util-linux `script` is unavailable)
 
 The Playwright specs live in `e2e/`, outside vitest's include globs, so
-`npm test` never picks them up.
+`npm test` never picks them up. The `@smoke` command is also the `ui-smoke` CI
+job's browser step, so a local green run is the evidence CI will reproduce.
+
+#### Accessibility gate (axe)
+
+The first `@smoke` test runs [axe](https://github.com/dequelabs/axe-core)
+(`@axe-core/playwright`, version-pinned, dev-only) against the **served** board,
+right after the board-load readiness assertion and before the card-parity and
+status-move tests move the page on. It is a gate, not a report: a violation
+fails the test.
+
+**What is asserted.** Every WCAG A/AA level axe can check automatically, across
+all three WCAG versions it ships rules for:
+
+```
+wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa
+```
+
+AAA is out of scope (axe automates almost nothing at that level) and
+`best-practice` is out of scope (it is not a conformance level).
+
+**The policy, in short: no blanket exclusions.** There is no `disableRules`, no
+`exclude`, no `include` and no narrowed rule list anywhere in
+`e2e/board.smoke.spec.ts`, and there are **zero accepted exceptions** today.
+Adding one means a comment at the call site naming the exact rule id, why the
+violation is not a defect a contributor can fix, and an owner (a person or a
+tracked item id) — plus a matching line in this section and in
+`ArggonManager/docs/engineering.md` § Smoke test. A real defect is fixed in the
+board's own CSS/HTML or filed as a linked tracker item; it is never excluded to
+get a green lane.
+
+**When the scan fails.** The failure message is the remediation surface: every
+violation is printed with its rule id, impact, the WCAG tags it carries, the
+offending node's selector and HTML, and a link to the rule's own remediation
+page. In practice:
+
+1. Read the rule id. `color-contrast` means a foreground/background pair in
+   `cli/src/board.ts` is below 4.5:1 at the size it renders; `label`,
+   `button-name` or `aria-*` means an element is missing an accessible name,
+   role or state.
+2. Reproduce it exactly as CI does — `npm run build`, then
+   `npx playwright test --grep @smoke` — and read the printed target selector.
+   That selector is a real element of the board page, so the fix belongs in
+   `cli/src/board.ts`, not in the spec.
+3. Fix the board and re-run. If the fix is bigger than the defect — a landmark
+   restructure, a keyboard-interaction change, a design question — file a `task`
+   carrying the rule id, the target selectors and the measured ratio, then
+   reference that item id in the call-site comment.
+4. Never add a `disableRules` entry to make the lane pass: that converts a
+   tracked defect into an invisible one.
 
 ## Propose schema / convention changes
 

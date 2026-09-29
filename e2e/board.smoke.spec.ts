@@ -3,10 +3,12 @@
  *
  * ADR 0008 tier 2: the review-time browser gate is the Playwright CLI; this
  * spec is the durable, deterministic regression net CI runs with
- * `npx playwright test --grep @smoke` (Chromium only; `@playwright/test` is a
- * devDependency and never ships). It covers what exists today — board renders,
- * one card per `arggon list` item, one legal status move round-trips and
- * persists. Later board features (e.g. filter lenses) add cases here.
+ * `npx playwright test --grep @smoke` (Chromium only; `@playwright/test` and
+ * `@axe-core/playwright` are devDependencies and never ship). It covers what
+ * exists today — board renders, one card per `arggon list` item, one legal
+ * status move round-trips and persists, and the ready page carries no
+ * WCAG-tagged automated accessibility violation. Later board features (e.g.
+ * filter lenses) add cases here.
  *
  * Fixture discipline mirrors `smoke/tui-smoke.ts`: a fresh temp repo with a
  * git identity, `arggon init`, then an initiative → epic → story → task chain
@@ -14,7 +16,8 @@
  * (`dist/cli.js board --serve --port 0`, an ephemeral free port) so the spec
  * exercises the shipped entry, not the TypeScript source.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -59,6 +62,64 @@ hostile <img src=x onerror="window.__xss=1"> text`;
 /** The `filter` value in a URL hash (null when the board is unfiltered). */
 function filterFromUrl(url: string): string | null {
   return new URLSearchParams(new URL(url).hash.replace(/^#/, "")).get("filter");
+}
+
+/**
+ * Accessibility policy for the `@smoke` lane (task-axe-core-browser-ci).
+ *
+ * The asserted tag set is **every WCAG A/AA level axe can check automatically**
+ * across WCAG 2.0, 2.1 and 2.2. It is written out rather than approximated by
+ * `withTags(["wcag2a", "wcag2aa"])`, because a tag list that silently omits
+ * 2.1/2.2 would let a new 2.1/2.2 AA rule pass unreported. AAA is deliberately
+ * out of scope (axe automates almost nothing there and the bar would be
+ * unmeetable), and `best-practice` is deliberately out of scope (it is not a
+ * conformance level; the one rule it would add here, `region`, is filed as
+ * `task-axe-board-drawer-and-lens-coverage` rather than silently asserted).
+ *
+ * The rules of this policy, all enforced by the `expect` in `axeScan`:
+ *
+ * 1. **No blanket exclusions.** No `exclude`, no `include`, no `disableRules`
+ *    and no `.withRules()` narrowing anywhere in this file. If a scan cannot be
+ *    made green on the whole ready page, the defect gets fixed or filed.
+ * 2. **An accepted exception is a comment, not a silent drop.** Zero exceptions
+ *    exist today. Adding one means a comment at the call site naming the exact
+ *    rule id, why the violation is not a defect a contributor can fix, and an
+ *    owner (a person or a tracked item id) — plus a matching line in
+ *    `CONTRIBUTING.md` § UI smoke tests and
+ *    `ArggonManager/docs/engineering.md` § Smoke test.
+ * 3. **The scan runs on the ready page, before interaction.** The detail
+ *    drawer, the static export and filtered/lens states render different DOM
+ *    and are covered by the follow-up item, not by a scan smuggled into a
+ *    test whose assertions have already moved the page on.
+ */
+const AXE_WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] as const;
+
+/**
+ * Assert the ready board carries no WCAG-tagged automated violation.
+ *
+ * The failure message is the remediation surface, so it names each rule, its
+ * impact, its WCAG tags, the offending node targets and axe's own remediation
+ * URL — a contributor should be able to fix the board from the CI log without
+ * opening this file. Throwing on a non-empty violation list is what makes the
+ * scan a gate rather than a report.
+ */
+async function axeScan(page: Page): Promise<void> {
+  const results = await new AxeBuilder({ page }).withTags([...AXE_WCAG_TAGS]).analyze();
+  expect(
+    results.violations.map(
+      (violation) =>
+        `${violation.id} (${violation.impact ?? "unknown"}; ${violation.tags
+          .filter((tag) => tag.startsWith("wcag"))
+          .join(", ")}): ${violation.help}\n` +
+        violation.nodes
+          .map((node) => `  ${node.target.join(" ")}\n    ${node.html.slice(0, 200)}`)
+          .join("\n") +
+        `\n  ${violation.helpUrl}`,
+    ),
+    "axe found WCAG-tagged automated accessibility violations on the ready board.\n" +
+      "Fix the board (contrast, names, roles) or file a follow-up item — do not " +
+      "exclude the rule. Policy: the comment above `AXE_WCAG_TAGS`.",
+  ).toEqual([]);
 }
 
 type ListedItem = { id: string; status: string };
@@ -277,7 +338,13 @@ test.describe("@smoke board --serve", () => {
 
   test("renders one card per tracker item", async ({ page }) => {
     await page.goto(server?.url ?? "");
+    // The h1 is the existing readiness signal for "the board is up and rendered"
+    // (no blind sleep): everything below — including the axe scan — is asserted
+    // against a settled page. The scan runs here, before the card-parity and
+    // round-trip tests move the page on, so a failure points at the static
+    // surface rather than at post-interaction state.
     await expect(page.locator("h1")).toContainText("arggon board");
+    await axeScan(page);
 
     const cards = page.locator(".board .card");
     await expect(cards).toHaveCount(listItems.length);
