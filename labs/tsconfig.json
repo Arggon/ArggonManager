@@ -4,5 +4,9 @@
     "noEmit": true,
     "rootDir": ".."
   },
-  "include": ["*.ts", "../cli/src/**/*.ts"]
+  "include": ["*.ts", "../cli/src/**/*.ts"],
+  // `extends` inherits the root BUILD project's `exclude: ["**/*.test.ts"]`,
+  // which would silently drop `labs/torture.test.ts` (and the CLI tests this
+  // project also covers) from the lab type-check. The tests stay in.
+  "exclude": []
 }

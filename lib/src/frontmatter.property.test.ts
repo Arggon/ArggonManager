@@ -429,37 +429,49 @@ describe("frontmatter round-trip (property)", () => {
   });
 
   /**
-   * Plain scalars the kernel's reader resolves to a NON-string: `null` / `~` →
-   * null, `true` / `false` → boolean, `/^-?\d+$/` → number (`parseValue`).
+   * Plain scalars the kernel's reader resolves to a NON-string: `null` / `~` ->
+   * null, `true` / `false` -> boolean, `/^-?\d+$/` -> number (`parseValue`).
    *
-   * `expectedText` is what the item model reports on the FIRST read, pinned per
-   * token. Rows whose text differs from the token are the loss filed as
-   * `bug-frontmatter-ambiguous-plain-scalar-loss`: a leading-zero, `-0` or
-   * > 2^53 integer loses its text, and `null` / `~` lose the field entirely
-   * (`arggon create task "0123"` then shows `123`, and the next write rewrites
-   * the file). This property is a CANARY for that bug, not a weaker model: it
-   * asserts today's exact mapping, so a fix in `parseValue` / `formatScalar`
-   * turns it red on purpose (flip the pinned value together with the fix) and
-   * any other change is caught immediately.
+   * THIS PROPERTY IS A BUG CANARY, and the `verdict` column says which row is
+   * which, so the distinction survives a skim:
+   *
+   * - `preserved` — a CORRECT invariant. The token's text comes back unchanged,
+   *   so the property asserts real contract here.
+   * - `lost` — CURRENT BUGGY BEHAVIOUR, pinned on purpose
+   *   (`bug-frontmatter-ambiguous-plain-scalar-loss`). A leading-zero, `-0` or
+   *   > 2^53 integer loses its text and `null` / `~` lose the field entirely:
+   *   `arggon create task "0123"` then shows `123`, and the next write bakes
+   *   `title: 123` into the file. The row asserts that wrong output so the
+   *   corruption cannot silently change shape or grow; when the bug is fixed
+   *   this property goes RED on purpose and the row is flipped to `preserved`
+   *   in the same change.
+   *
+   * `expectedText` is what the item model (`stringField`) reports on the FIRST
+   * read. Every row also asserts the correct part of the contract
+   * unconditionally: the writer and reader never throw, the loss is bounded to a
+   * single normalization (the third write is byte-identical to the second), and
+   * the body is never touched.
    */
   const AMBIGUOUS_SCALARS: ReadonlyArray<
-    readonly [token: string, expectedText: string | undefined]
+    readonly [token: string, expectedText: string | undefined, verdict: "preserved" | "lost"]
   > = [
-    ["null", undefined],
-    ["~", undefined],
-    ["true", "true"],
-    ["false", "false"],
-    ["0", "0"],
-    ["42", "42"],
-    ["-7", "-7"],
-    // lossy: the integer does not survive Number()
-    ["00", "0"],
-    ["-0", "0"],
-    ["007", "7"],
-    ["0123", "123"],
-    ["-007", "-7"],
-    ["9007199254740993", "9007199254740992"],
-    ["12345678901234567890", "12345678901234567000"],
+    // --- lost: the field itself disappears (bug canary) ---
+    ["null", undefined, "lost"],
+    ["~", undefined, "lost"],
+    // --- preserved: the text survives, so this is the real contract ---
+    ["true", "true", "preserved"],
+    ["false", "false", "preserved"],
+    ["0", "0", "preserved"],
+    ["42", "42", "preserved"],
+    ["-7", "-7", "preserved"],
+    // --- lost: the integer does not survive Number() (bug canary) ---
+    ["00", "0", "lost"],
+    ["-0", "0", "lost"],
+    ["007", "7", "lost"],
+    ["0123", "123", "lost"],
+    ["-007", "-7", "lost"],
+    ["9007199254740993", "9007199254740992", "lost"],
+    ["12345678901234567890", "12345678901234567000", "lost"],
   ];
 
   it("normalizes an ambiguous plain scalar exactly once, never throwing", () => {
@@ -472,7 +484,11 @@ describe("frontmatter round-trip (property)", () => {
         // `stringArrayField` and has its own table; deps.test.ts pins that
         // form example-based.)
         fc.constantFrom("title", "parent", "x-note"),
-        ([token, expectedText], carrier) => {
+        ([token, expectedText, verdict], carrier) => {
+          // The table is self-consistent: a `preserved` row really does read
+          // back as the token, a `lost` row really does not.
+          if (verdict === "preserved") expect(expectedText).toBe(token);
+          else expect(expectedText).not.toBe(token);
           const data: Frontmatter = { type: "task", status: "todo", id: "task-ambiguous" };
           data[carrier] = token;
           const raw1 = stringifyFrontmatter(data, "\nbody\n");

@@ -21,7 +21,7 @@
     "!dist/pack-fixtures.*"
   ],
   "scripts": {
-    "build": "npm run build --workspace @arggondev/lib && tsc -p tsconfig.json",
+    "build": "npm run build --workspace @arggondev/lib && tsc -p tsconfig.json && tsc -p tsconfig.typecheck.json",
     "build:plugin": "tsx cli/src/build-plugin.ts",
     "check:plugin": "npm run build:plugin && git diff --exit-code -- opencode/plugins/arggon/index.bundle.ts",
     "postbuild": "node cli/write-build-info.mjs && npm run build:plugin",

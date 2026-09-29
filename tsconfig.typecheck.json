@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    // This project emits nothing: it type-checks the surfaces the BUILD project
+    // excludes (`**/*.test.ts`) plus the shared vitest-only helpers in `test/`.
+    // `rootDir` is the repository root because those helpers live outside
+    // `cli/src` (the kernel property tests import them, see
+    // task-fast-check-invariant-properties). The BUILD project keeps
+    // `rootDir: "cli/src"`, so a real source file reaching outside the package
+    // still fails there.
+    "rootDir": "."
+  },
+  "include": ["cli/src/**/*.ts", "test/**/*.ts"],
+  // Overrides the BUILD project's `exclude`: without this the test surface would
+  // silently drop out of this project too (`extends` inherits `exclude`).
+  "exclude": []
+}

@@ -32,10 +32,13 @@
  * non-min member is printed with a member duplicated and a different traversal
  * of the same graph prints a different string — and, for a graph with several
  * cycles, a different traversal may close a different back edge and name a
- * different subset of them. Both are pinned/measured here and filed as
- * bug-dependency-cycle-chain-rotation-duplicates-a-node; the property still
- * asserts the load-bearing part unconditionally (the verdict, and that every
- * cycle named is real, anchored and deduped).
+ * different subset of them. Both are a BUG CANARY for
+ * bug-dependency-cycle-chain-rotation-duplicates-a-node: the malformed chain
+ * shape is recognised and pinned (see `isRotationWithOneDuplicate`) and the
+ * divergence is counted per run, while every load-bearing part is asserted
+ * unconditionally — the cyclic/acyclic verdict, and that every cycle named is
+ * real, canonically anchored and deduped. The pinned shape is NOT the expected
+ * output; the `else` branch of that `if` is.
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -138,10 +141,17 @@ function cycleSets(messages: readonly string[]): string[] {
 
 /**
  * True when `nodes` is a rotation of `members` with ONE member repeated right
- * after itself — the exact shape today's rotation produces (the rotation is
- * applied to the stack slice that already contains the closing node, so a
- * member is duplicated and the chain no longer closes). Pinned for
- * bug-dependency-cycle-chain-rotation-duplicates-a-node; delete with the fix.
+ * after itself.
+ *
+ * THIS IS THE BUG CANARY, and the shape it recognises is CURRENT BUGGY BEHAVIOUR,
+ * not the contract: the rotation in `checkDependencies` is applied to the stack
+ * slice that already contains the closing node, so a cycle entered at a
+ * non-min member is printed with a member duplicated and a chain that does not
+ * close (bug-dependency-cycle-chain-rotation-duplicates-a-node). Recognising it
+ * is what keeps the property green while the bug is open, and it makes any
+ * THIRD shape fail. Fixing the bug removes this helper and the branch that uses
+ * it in the same change; until then, a reader must not read the pinned shape as
+ * the expected output.
  */
 function isRotationWithOneDuplicate(nodes: readonly string[], members: readonly string[]): boolean {
   if (nodes.length !== members.length + 1) return false;
@@ -272,8 +282,13 @@ describe("dependency graph (property)", () => {
                   message.includes(`${CYCLE_PREFIX}${chain}`),
               ),
             ).toBe(true);
-            // The chain SHAPE: a simple closed cycle (the contract), or today's
-            // malformed rotation, pinned for the open bug. A third shape fails.
+            // The chain SHAPE. The CORRECT invariant is the `else`: a simple
+            // closed cycle, every member once, closing on the anchor. The `if`
+            // is the BUG CANARY — today's malformed rotation, pinned only so
+            // the gate stays green while
+            // bug-dependency-cycle-chain-rotation-duplicates-a-node is open;
+            // it asserts the duplicate's position, so the corruption cannot
+            // change shape silently. Any third shape fails both branches.
             if (isRotationWithOneDuplicate(nodes, members)) {
               expect(nodes.length).toBe(members.length + 1);
             } else {

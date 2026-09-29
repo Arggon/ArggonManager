@@ -12,9 +12,15 @@
     "resolveJsonModule": true
   },
   "include": ["cli/src/**/*.ts"],
-  // Tests are type-checked by vitest/`labs`, never shipped: `files` already
-  // drops `**/*.test.*` from the tarball, and keeping them out of the build
-  // project also keeps a test-only import (the shared property runner in
-  // `test/`, task-fast-check-invariant-properties) out of `dist/`.
+  // The BUILD project emits production sources only: the 81 CLI test files are
+  // not compiled into `dist/` (`files` already drops `**/*.test.*` from the
+  // tarball, so nothing shipped changes). They are still TYPE-CHECKED — by the
+  // sibling noEmit project `tsconfig.typecheck.json`, which this package's build
+  // script runs right after the emit, exactly as `lib` does with
+  // `lib/tsconfig.typecheck.json`. Excluding them here also keeps a test-only
+  // import (the shared property runner in `test/`,
+  // task-fast-check-invariant-properties) out of `dist/`.
+  // `extends` inherits this `exclude`, so any project that must keep checking
+  // tests has to say `"exclude": []` (see labs/tsconfig.json).
   "exclude": ["**/*.test.ts"]
 }
