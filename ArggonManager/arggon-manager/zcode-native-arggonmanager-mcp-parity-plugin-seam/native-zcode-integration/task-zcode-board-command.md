@@ -34,13 +34,13 @@ the documented substitute does not exist in the generated seam.
 
 ## Acceptance
 
-- [ ] `templates/docs/zcode/arggon/commands/arggon-board.md`: instructs the
+- [x] `templates/docs/zcode/arggon/commands/arggon-board.md`: instructs the
       agent to run `arggon board --serve` in the background, parse the
       one-shot serving envelope (`serving: true`, loopback `url`, `port`)
       and hand the user the URL as a markdown link; warns the server runs
       until stopped
-- [ ] Seam tests updated: 12 commands (`init-zcode.test.ts`), tier-1 exact
+- [x] Seam tests updated: 12 commands (`init-zcode.test.ts`), tier-1 exact
       set extended (`init.test.ts`)
-- [ ] `docs/agents.md` §ZCode and the ADR 0014 consequence updated
+- [x] `docs/agents.md` §ZCode and the ADR 0014 consequence updated
       (eleven → twelve; the substitute is shipped, not just promised)
-- [ ] Gates green; `arggon validate --json` ok:true before every commit
+- [x] Gates green; `arggon validate --json` ok:true before every commit

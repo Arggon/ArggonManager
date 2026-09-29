@@ -30,6 +30,7 @@ const PLUGIN_ROOT = `${MARKET_ROOT}/arggon`;
 const COMMANDS = [
   "adopt",
   "adr",
+  "board",
   "done",
   "explore",
   "handoff",
@@ -81,7 +82,7 @@ describe("zcode plugin seam generation", () => {
     ]) {
       expect(existsSync(join(dir, ...rel.split("/"))), rel).toBe(true);
     }
-    expect(readdirSync(join(dir, PLUGIN_ROOT, "commands"))).toHaveLength(11);
+    expect(readdirSync(join(dir, PLUGIN_ROOT, "commands"))).toHaveLength(12);
     expect(readdirSync(join(dir, PLUGIN_ROOT, "agents"))).toHaveLength(3);
   });
 
