@@ -54,3 +54,6 @@ side just closed. Native start is the surface where the bug was originally measu
 
 p3: the native surface is already honest (`ready: false` for a stale mirror); this only makes
 the remedy actionable there, as it now is on the CLI.
+
+### 2026-09-29 @Arggon
+Superseded by PR #429 (branch fix/bug-worktree-readiness-misses-stale-primary-install, commit 550f3575): the native `preparation` payload now projects `manifestCoverage`, `missingDependencies` (kernel-capped at 10) and `missingDependenciesTotal` from the shared kernel receipt, and `opencode2.md`/`agents.md`/`playbooks/opencode.md` document them. Nothing is left of this task's acceptance list except work that already landed, so it is redundant; left `todo` untouched for the coordinator to close as superseded with the reason recorded here. No claim taken, no other file touched.
