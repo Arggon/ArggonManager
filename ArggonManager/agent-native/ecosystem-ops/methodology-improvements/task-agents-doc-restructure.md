@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-agents-doc-restructure
 title: agents-doc-restructure
+assignee: Arggon
+branch: feat/task-agents-doc-restructure
 parent: methodology-improvements
 labels: []
 priority: p2
 created: "2026-09-29"
 updated: "2026-09-29"
+claimed_at: "2026-09-29T23:41:34.004Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-agents-doc-restructure
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-agents-doc-restructure.md
