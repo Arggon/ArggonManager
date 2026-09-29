@@ -52,9 +52,11 @@ platform requires.
 ## Acceptance
 
 - [x] Plugin source under `templates/docs/zcode/`: manifest (name `arggon`),
-      11 commands (tool-call references rewritten to `mcp__arggon__*`), 3
-      agents (frontmatter converted to ZCode form), `hooks/hooks.json` + the
-      `gate.mjs` script (global git gates + reviewer dispatch-scoped backstop)
+      11 commands (tool-call references normalized to the `mcp__arggon__*`
+      wire names in all eleven), 3 agents (frontmatter converted to ZCode
+      form), `hooks/hooks.json` + the `gate.mjs` script (global git gates +
+      reviewer dispatch-scoped backstop; force-push lookahead covers
+      `-f<letters>` variants, tracker-word gate matches quoted invocations)
 - [x] Reviewer backstop denies Write/Edit, mutating arggon shell calls and
       mutating `mcp__arggon__*` calls while a reviewer dispatch is active;
       unit-tested against the script contract (stdin JSON → exit codes:

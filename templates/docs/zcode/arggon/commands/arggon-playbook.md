@@ -14,7 +14,7 @@ playbook, details in `references/methodology.md` in the `arggon-cli` skill).
 3. Freshness: playbooks older than the threshold (default 90 days,
    `x-playbooks.max-age-days` in the tracker config) go stale — check the
    `researched` dates in the directory, and file one re-research task per stale
-   playbook with `arggon_create`.
+   playbook with `mcp__arggon__arggon_create`.
 4. After re-researching, update only the frontmatter — `version`, `researched`
    (today) and `status: current` — the body keeps the curated content.
 5. Report the path, the pinned version and the freshness state.

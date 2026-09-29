@@ -160,6 +160,7 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
     for (const command of [
       "git push --force origin main",
       "git push -f origin main",
+      "git push -fu origin main",
       "git push --force-with-lease origin main",
       "git commit --no-verify -m x",
     ]) {
@@ -203,6 +204,11 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
     ).toBe(2);
     expect(
       gate(dir, "pre", { session_id: session, tool_name: "Bash", tool_input: { command: "npm run arggon -- update task-x --status done" } }).status,
+    ).toBe(2);
+    // Quoted invocations mutate the tracker all the same (review finding:
+    // the old leading-character class let `sh -c "arggon update x"` through).
+    expect(
+      gate(dir, "pre", { session_id: session, tool_name: "Bash", tool_input: { command: 'sh -c "arggon update task-x --status done"' } }).status,
     ).toBe(2);
     expect(
       gate(dir, "pre", { session_id: session, tool_name: "Bash", tool_input: { command: "git commit -m wip" } }).status,

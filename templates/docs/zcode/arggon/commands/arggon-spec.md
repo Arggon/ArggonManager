@@ -18,6 +18,6 @@ Turn $ARGUMENTS into a reviewable spec following the pipeline in
    link back to the spec.
 4. Verify mechanically: re-read the created files against `templates/spec.md` /
    `templates/plan.md` (frontmatter + required sections) and keep
-   `arggon_validate` green; when the work lives in a tracked item, keep its
+   `mcp__arggon__arggon_validate` green; when the work lives in a tracked item, keep its
    acceptance checklist in sync with the spec.
 5. Report the created paths, the validate result and any open findings.

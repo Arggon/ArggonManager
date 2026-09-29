@@ -21,6 +21,17 @@
  *
  * State is a small JSON counter under the OS temp dir keyed by a hash of the
  * project dir + session id — never inside the repo, never a tracker file.
+ *
+ * Failure posture (deliberate): an unparseable or empty hook payload is
+ * fail-open (exit 0) — this gate is defense-in-depth behind the kernel
+ * invariants (no reopen, no steal), and deny-on-bad-payload would brick every
+ * gated tool on one malformed event. The marker counter is lock-free
+ * last-writer-wins: two truly-parallel dispatch hooks can lose an increment,
+ * worst case the window closes one dispatch early — bounded by the
+ * session-scoped key and the 2h TTL. If the client skips PostToolUse(Agent)
+ * for an errored dispatch, Stop (or the TTL) clears the marker; whether that
+ * skip happens at all is on the live-client checklist.
+ *
  * Output contract: exit 0 = allow (silent), exit 2 = deny (stderr is the
  * reason the client shows), anything else = hook error.
  */
@@ -52,7 +63,7 @@ const MUTATING_MCP_TOOLS = new Set([
  * `npx arggon-manager update …`, and the dist bin directly).
  */
 const MUTATING_ARGGON_WORDS =
-  /(?:^|[\s;&|(])(?:arggon|arggon-manager)\s+(?:--?[a-z-]+\s+)*(?:update|create|branch|start|cleanup|priority|sync|import-issues|migrate)\b/;
+  /\b(?:arggon|arggon-manager)\s+(?:--?[a-z-]+\s+)*(?:update|create|branch|start|cleanup|priority|sync|import-issues|migrate)\b/;
 
 /** Git history mutations the reviewer never runs (W4 reviewer shell gates). */
 const REVIEWER_SHELL_GATES = [
@@ -64,7 +75,7 @@ const REVIEWER_SHELL_GATES = [
 
 /** Global gates: every session, every mode of work (W4 seam defaults). */
 const GLOBAL_SHELL_GATES = [
-  { re: /\bgit\b[^;&|]*\spush\b(?=[^;&|]*\s(?:--force\b|--force-with-lease\b|-f\b))/, why: "force push (git push --force / -f)" },
+  { re: /\bgit\b[^;&|]*\spush\b(?=[^;&|]*\s(?:--force\b|-f[a-z]*))/, why: "force push (git push --force / -f<letters>, incl. -fu)" },
   { re: /\bgit\b[^;&|]*\scommit\b[^;&|]*--no-verify\b/, why: "git commit --no-verify" },
 ];
 

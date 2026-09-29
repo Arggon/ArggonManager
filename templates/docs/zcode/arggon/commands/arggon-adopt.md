@@ -8,7 +8,7 @@ following the adoption procedure in the `arggon-cli` skill §Adoption.
 1. Complete the bootstrap first with the headless adapter (no model needed):
    `npx arggon-manager init [--full]` — it never overwrites adopter files and
    records provenance; this is the one sanctioned CLI step.
-2. File the tracked migration task with the native tool — `arggon_create` with
+2. File the tracked migration task with the native tool — `mcp__arggon__arggon_create` with
    `type: "task"`, the story parent and the title "Adopt ArggonManager in this
    repo", carrying the checklist below as its acceptance body; create the
    initiative/epic/story chain first when the tree has none.
@@ -24,7 +24,7 @@ following the adoption procedure in the `arggon-cli` skill §Adoption.
      technology with dated research;
    - leave the `SECURITY.md` contact for a human, never invent it.
 4. Baseline sanctioned edits with `npx arggon-manager adopt --ack` (headless
-   adapter), then verify: `arggon_validate` green.
-5. Report on the adoption item with `arggon_comment` — extracted content,
+   adapter), then verify: `mcp__arggon__arggon_validate` green.
+5. Report on the adoption item with `mcp__arggon__arggon_comment` — extracted content,
    archived files, created playbooks — and hand it to the human for review
    before flipping it `done`.

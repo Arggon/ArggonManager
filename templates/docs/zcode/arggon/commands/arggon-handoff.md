@@ -3,7 +3,7 @@ description: Write a structured handoff for an in-flight item
 argument-hint: "<item-id>"
 ---
 
-Write a bounded handoff on $ARGUMENTS with the native tool `arggon_handoff`:
+Write a bounded handoff on $ARGUMENTS with the native tool `mcp__arggon__arggon_handoff`:
 
 - `next`: the first concrete step for the resuming agent (≤200 chars).
 - `open_questions`: unresolved questions, `;`-separated.

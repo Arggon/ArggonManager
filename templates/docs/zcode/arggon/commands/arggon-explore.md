@@ -12,5 +12,5 @@ Explore $ARGUMENTS as a recorded spike — not a chat summary.
    / recommendation sections.
 3. End with one recommendation and its trade-offs. If the decision is
    cross-cutting, the follow-up is an ADR (`/arggon-adr`) that links this
-   exploration; file any follow-up work as a tracked item with `arggon_create`.
+   exploration; file any follow-up work as a tracked item with `mcp__arggon__arggon_create`.
 4. Report the path, the recommendation and any follow-up work.
