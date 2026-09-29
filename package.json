@@ -21,7 +21,7 @@
     "!dist/pack-fixtures.*"
   ],
   "scripts": {
-    "build": "npm run build --workspace @arggondev/lib && tsc -p tsconfig.json",
+    "build": "npm run build --workspace @arggondev/lib && tsc -p tsconfig.json && tsc -p tsconfig.typecheck.json",
     "build:plugin": "tsx cli/src/build-plugin.ts",
     "check:plugin": "npm run build:plugin && git diff --exit-code -- opencode/plugins/arggon/index.bundle.ts",
     "postbuild": "node cli/write-build-info.mjs && npm run build:plugin",
@@ -36,6 +36,7 @@
     "smoke:tui": "tsx smoke/tui-smoke.ts",
     "smoke:tui-board": "tsx smoke/tui-board-smoke.ts",
     "test": "vitest run",
+    "test:property": "vitest run .property.test",
     "test:watch": "vitest",
     "test:structure": "ast-grep test --skip-snapshot-tests --color never && ast-grep scan --threads 1 --report-style short --color never tools/ast-grep/tests/non-plugin-valid.tsx",
     "lint": "eslint .",
@@ -54,6 +55,7 @@
     "@playwright/test": "^1.63.0",
     "@types/node": "^22.13.10",
     "eslint": "^9.22.0",
+    "fast-check": "4.10.2",
     "prettier": "^3.5.3",
     "tsx": "^4.19.3",
     "typescript": "^5.8.2",
