@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adr-adopter-upgrade-channel
 title: adr-adopter-upgrade-channel
+assignee: Arggon
+branch: feat/task-adr-adopter-upgrade-channel
 parent: methodology-improvements
 labels: []
 priority: p1
 created: "2026-09-29"
 updated: "2026-09-29"
+claimed_at: "2026-09-29T23:24:45.748Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-adr-adopter-upgrade-channel
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-adr-adopter-upgrade-channel.md
