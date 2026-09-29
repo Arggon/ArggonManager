@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-zcode-board-command
 title: Ship /arggon-board in the ZCode seam (ADR 0014 board substitute)
+assignee: Arggon
+branch: feat/task-zcode-board-command
 parent: native-zcode-integration
 labels: []
 created: "2026-09-29"
 updated: "2026-09-29"
+claimed_at: "2026-09-29T21:13:55.517Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-board-command
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/zcode-native-arggonmanager-mcp-parity-plugin-seam/native-zcode-integration/task-zcode-board-command.md
@@ -30,13 +34,13 @@ the documented substitute does not exist in the generated seam.
 
 ## Acceptance
 
-- [ ] `templates/docs/zcode/arggon/commands/arggon-board.md`: instructs the
+- [x] `templates/docs/zcode/arggon/commands/arggon-board.md`: instructs the
       agent to run `arggon board --serve` in the background, parse the
       one-shot serving envelope (`serving: true`, loopback `url`, `port`)
       and hand the user the URL as a markdown link; warns the server runs
       until stopped
-- [ ] Seam tests updated: 12 commands (`init-zcode.test.ts`), tier-1 exact
+- [x] Seam tests updated: 12 commands (`init-zcode.test.ts`), tier-1 exact
       set extended (`init.test.ts`)
-- [ ] `docs/agents.md` §ZCode and the ADR 0014 consequence updated
+- [x] `docs/agents.md` §ZCode and the ADR 0014 consequence updated
       (eleven → twelve; the substitute is shipped, not just promised)
-- [ ] Gates green; `arggon validate --json` ok:true before every commit
+- [x] Gates green; `arggon validate --json` ok:true before every commit

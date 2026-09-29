@@ -72,6 +72,7 @@ const TIER1_DOCS = [
   ".zcode-marketplace/arggon/agents/arggon-worker.md",
   ".zcode-marketplace/arggon/commands/arggon-adopt.md",
   ".zcode-marketplace/arggon/commands/arggon-adr.md",
+  ".zcode-marketplace/arggon/commands/arggon-board.md",
   ".zcode-marketplace/arggon/commands/arggon-done.md",
   ".zcode-marketplace/arggon/commands/arggon-explore.md",
   ".zcode-marketplace/arggon/commands/arggon-handoff.md",
