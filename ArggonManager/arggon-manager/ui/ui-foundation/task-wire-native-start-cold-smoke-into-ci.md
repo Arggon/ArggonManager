@@ -10,7 +10,6 @@ labels: [opencode-seam, smoke, ci]
 priority: p3
 created: "2026-09-28"
 updated: "2026-09-29"
-worktree_path: /home/arggon/Projects/ArggonManager-task-wire-native-start-cold-smoke-into-ci
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-wire-native-start-cold-smoke-into-ci.md
