@@ -9,7 +9,6 @@ parent: native-zcode-integration
 labels: []
 created: "2026-09-29"
 updated: "2026-09-29"
-worktree_path: /home/arggon/Projects/ArggonManager-task-mcp-full-surface
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/zcode-native-arggonmanager-mcp-parity-plugin-seam/native-zcode-integration/task-mcp-full-surface.md

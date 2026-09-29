@@ -9,7 +9,6 @@ parent: native-zcode-integration
 labels: []
 created: "2026-09-29"
 updated: "2026-09-29"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-force-push-gate-misses-refspec-plus-git-push-origin-main
 ---
 # Force-push gate misses refspec-plus (git push origin +main)
 

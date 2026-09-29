@@ -10,7 +10,6 @@ labels: []
 created: "2026-09-29"
 updated: "2026-09-29"
 depends_on: [task-mcp-full-surface]
-worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-plugin-seam
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/zcode-native-arggonmanager-mcp-parity-plugin-seam/native-zcode-integration/task-zcode-plugin-seam.md
