@@ -89,3 +89,26 @@ when this lands AFTER T1 (the spec files live in T1's branch).
 
 ### handoff 2026-09-29 @Arggon — next: Review + merge PR #437 AFTER #436 (docs reference the 15-tool MCP surface and ADR 0014/spec land there). Then: merge origin/main into this branch first (main carries the depends_on frontmatter update…
 - branch: feat/task-zcode-plugin-seam
+
+### 2026-09-29 @Arggon
+smoke: E2E evidence for PR #437 (ZCode plugin seam) — node v26.7.0, npm 12.0.2, built dist/cli.js v0.4.0 (`npm run build` ok). Fixture: throwaway git repo, built-bin `init` (plain tier-1) -> .zcode-marketplace/ generated with exactly 18 files (marketplace.json, arggon/.zcode-plugin/plugin.json, 11 commands, 3 agents, hooks/hooks.json, hooks/gate.mjs).
+
+Seam assertions over the generated tree — 25/25 PASS:
+- marketplace.json + plugin.json parse; no arggon:generated marker inside either JSON — PASS
+- plugin name "arggon" matches ^[a-z0-9][a-z0-9._-]{0,127}$ and equals the marketplace entry name — PASS
+- marketplace entry source "./arggon" resolves to the plugin dir — PASS
+- manifest component paths (commands, agents, hooks/hooks.json) all exist — PASS
+- mcpServers.arggon == {"command":"arggon","args":["mcp"]} exactly — PASS
+- no command body mentions tools.arggon. (OpenCode form) — PASS
+- `# arggon:generated` on line 2 (inside frontmatter) in all 14 .md files — PASS
+- gate.mjs line 1 is `// arggon:generated` — PASS
+- hooks.json registers PreToolUse/PostToolUse/Stop, process type, argv node ${CLAUDE_PLUGIN_ROOT}/hooks/gate.mjs (literal placeholder, as expected pre-ZCode) — PASS
+- DEVIATION (evidence, not judgment): literal `mcp__arggon__` appears in 1/11 command bodies only (arggon-next.md); the other 10 reference bare tool names (arggon_show, arggon_update, arggon_validate...), and arggon-adr.md names neither form.
+
+Gate probe on the GENERATED gate.mjs (env ZCODE_PROJECT_DIR=$FIX, stdin JSON):
+- pre Bash `git push --force origin main` -> exit 2, stderr "denied — force push" — PASS
+- pre Bash `git commit --no-verify -m x` -> exit 2, stderr "denied — --no-verify" — PASS
+- pre Bash `git push origin main` -> exit 0 — PASS
+- pre Agent {subagent_type arggon:arggon-reviewer} -> exit 0; then pre Write -> exit 2 ("reviewer dispatch in flight — read-only"); pre mcp__arggon__arggon_comment -> exit 0; post Agent -> pre Write -> exit 0 again — PASS
+
+Combined loop: this branch merged with feat/task-mcp-full-surface in a throwaway worktree, fresh npm ci + build: `init` vendors this seam AND the vendored `arggon mcp` tools/list = 15 tools. Full adopter loop (init -> seam -> MCP surface) green.
