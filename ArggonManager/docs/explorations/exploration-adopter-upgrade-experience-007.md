@@ -1,7 +1,7 @@
 ---
 exploration_id: adopter-upgrade-experience-007
 title: "Adopter upgrade experience: how template & methodology updates reach adopting repos"
-status: open
+status: decided
 created: 2026-09-16
 ---
 
@@ -99,4 +99,4 @@ update as the first merged proposal.
 
 ## Decision
 
-<!-- ADR placeholder: docs/adr/0009-adopter-upgrade-channel.md once decided. -->
+Adopted (staged, as recommended): [ADR 0014 — adopter upgrade channel](../adr/0014-adopter-upgrade-channel.md). Stages A–C shipped (`task-init-dry-run-plan`, `task-doctor-outdated-bucket`, `task-init-propose-acked-updates`, section backports per `spec-propose-section-backports-007`); stage D landed as version + tag + CHANGELOG discipline with `whatsnew` explicitly deferred; stage E (distribution) stays deferred behind its own ADR. The placeholder number `0009` was taken by item-priority in the meantime, so the decision landed as 0014.
