@@ -1,14 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-axe-core-browser-ci
 title: Add @axe-core/playwright to the existing browser CI lane
+assignee: Arggon
+branch: feat/task-axe-core-browser-ci
 parent: ui-foundation
 labels: [playwright, accessibility, ci, ui]
 priority: p2
 created: "2026-09-24"
-updated: "2026-09-24"
+updated: "2026-09-29"
+claimed_at: "2026-09-29T01:43:14.629Z"
 depends_on: [task-ast-grep-structural-rules]
+worktree_path: /home/arggon/Projects/ArggonManager-task-axe-core-browser-ci
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-axe-core-browser-ci.md
