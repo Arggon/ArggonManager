@@ -27,3 +27,49 @@ updated: "2026-09-29"
 - [ ] 
 
 ## Notes
+
+### 2026-09-29 @Arggon-coordinator
+## Context
+
+Found and diagnosed by the worker of `task-axe-core-browser-ci` (PR #435) on the **unmodified
+baseline**, then deliberately left unfiled there to keep that diff scoped. Filed here because it is
+p2: it degrades a **merge-blocking review bar**, not just developer convenience.
+
+`ArggonManager/docs/engineering.md` §Review bar requires the reviewer to drive a real browser
+against `arggon board --serve` for any UI change, using the Playwright CLI. Every reviewer in this
+repo works in a `../<repo>-<item>` worktree whose `node_modules` is a **link farm** pointing at the
+primary install. In that layout the Playwright runner (resolved through `node_modules/.bin`) and the
+spec files resolve Playwright through the symlink, so the process loads **two distinct Playwright
+module instances**. Playwright's own global registry then belongs to the other copy, and the run dies
+with:
+
+```
+Playwright Test did not expect test.describe() to be called here
+```
+
+Reproduction, confirmed on the untouched tree before any axe change:
+```
+npx playwright test --grep @smoke          # fails this way inside a worktree
+node --preserve-symlinks --preserve-symlinks-main node_modules/playwright/cli.js test --grep @smoke
+# -> 9 passed
+```
+
+Normal checkouts and CI are unaffected, which is exactly why this is easy to miss: **CI is green, so
+the defect only ever shows up for a human or an agent in a worktree** — and the people who hit it are
+the ones whose verdict depends on running the gate.
+
+## Acceptance
+
+- [ ] `npx playwright test --grep @smoke` (and the full `npx playwright test`) run from a worktree with a linked `node_modules`, with no `--preserve-symlinks` workaround.
+- [ ] Diagnose and state the root cause — whether it is the link farm, the `.bin` shim's resolution, or dual resolution of `@playwright/test` vs `playwright` — and fix it at the seam the worktree domain owns, not by a wrapper script.
+- [ ] Keep `prepareWorktreeDependencies`'s link-farm design intact (it is what makes the cold worktree's pre-commit gate work — `bug-native-start-worktree-no-install`). If a fix means a real install or a per-worktree Playwright browser path, say so and justify the cost.
+- [ ] Add a deterministic regression test or smoke leg that runs the Playwright lane from a disposable worktree and asserts the runner starts, so this cannot come back silently.
+- [ ] Document the supported way to run the browser lane from a worktree in the place a reviewer reads (`ArggonManager/docs/engineering.md` §Review bar, and/or the worktree section of `opencode2.md`), and remove the workaround from the axe item's notes once it is fixed.
+- [ ] If the honest answer is that the browser smoke cannot run from a worktree, say so explicitly and record the supported alternative — do not leave a merge-blocking gate that only works in one checkout shape.
+- [ ] `npm test`, `npm run lint`, `npm run build`, `npm run check:plugin`, `npx playwright test --grep @smoke` and `arggon validate` are green in a worktree, not only on the primary.
+
+## Notes
+
+Filed 2026-09-28 from the PR #435 review. Independent corroboration: the coordinator ran the
+`--preserve-symlinks` invocation in the same worktree and got 9 passed, which is how the diagnosis was
+confirmed rather than assumed. Not caused by PR #435 or by the axe's devDependency — it predates both.
