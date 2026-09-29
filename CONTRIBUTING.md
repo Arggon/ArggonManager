@@ -123,6 +123,23 @@ quota, so it is safe to run beside anything; `npm run smoke:opencode` and
 `npm run smoke:opencode:wave` remain the **model-driven** evidence and are run
 on their own (see [OpenCode 2 notes](ArggonManager/docs/opencode2.md)).
 
+**It runs in CI.** The `cli` job runs it as its last step
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)), after the
+`npm run build` it depends on and beside the other dev-only node gates
+(`test:structure`, `lint:structure`). The step is blocking — a non-zero exit
+fails the lane, so `0` is the only result that passes — and it deliberately
+carries no `continue-on-error`, no `|| true` and no advisory `if:`. It is
+offline, model-free and Chromium-free, so it belongs to `cli` and not to the
+`ui-smoke` job, and it needs no second install. A run costs well under a
+second (observed ~0.5s: five consecutive local runs at 0.47-0.48s, 20/20 checks
+each), which is why it gates every PR instead of sitting behind a label.
+
+What the CI lane does **not** claim: this is a deterministic, offline check of
+the native worktree/start path only. It does not replace the model-driven
+`smoke:opencode` transcript, which stays the runtime-level evidence and is
+still maintainer-run (and still quota-bound), and it proves dependency
+_resolution_ through a synthesized install, not npm's reifier.
+
 One run (`npm run build` first, so this checkout's kernel is built) builds a
 disposable git fixture under `$TMPDIR` — a primary checkout with an initialized
 tracker, a project install and a real executable `pre-commit` gate that
@@ -144,7 +161,9 @@ resolves a dependency only that install carries — and then:
 
 Exit codes: `0` passed, `1` a check failed (the fixture is kept for inspection),
 `2` the harness could not run. `ARGON_NATIVE_START_SMOKE_KEEP=1` keeps the
-fixture on success too.
+fixture on success too. In CI only `0` is green — `1` and `2` both fail the
+job — and the harness prints the plugin source and kernel build it resolved, so
+a red run names the runtime that produced it.
 
 ### UI smoke tests (dev-only)
 
