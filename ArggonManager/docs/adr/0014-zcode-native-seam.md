@@ -73,8 +73,8 @@ Meanwhile `arggon mcp` (ADR 0007 protocol, kernel through
   accepted, the surface parity is the point.
 - ZCode parity is **complete except the TUI board panel**, which has no
   ZCode equivalent (desktop app, no panel/`outputStyles` API — the manifest
-  records but does not execute them). The substitute is `arggon board
-  --serve` surfaced through a command. This is a platform limit, not a
+  records but does not execute them). The substitute is serving the board
+  over HTTP (`arggon board --serve`). This is a platform limit, not a
   backlog item.
 - Hook scripts are the only imperative code in the ZCode seam; they parse
   stdin JSON and exit 0/2. They must stay dependency-free (no runtime
