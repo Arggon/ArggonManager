@@ -50,6 +50,30 @@ jobs:
       - run: npm run lint
       - run: npm run test:structure
       - run: npm run lint:structure
+      - name: Native start cold-start smoke (tools.arggon.start worktree path)
+        # task-wire-native-start-cold-smoke-into-ci: the deterministic,
+        # MODEL-FREE gate for the native worktree/start path, run in this job
+        # beside the other dev-only node gates (`test:structure`,
+        # `lint:structure`) rather than as a lane of its own. It drives THIS
+        # checkout's plugin source and kernel build, so it needs `npm run build`
+        # above — it prints the two paths it resolved and exits 2 with an
+        # actionable `npm run build` line when the build is missing.
+        #
+        # Why `cli` and not `ui-smoke`: it is offline, needs no provider, no
+        # quota and no Chromium, and adds no second install. It is NOT the
+        # model-driven `smoke:opencode` transcript, which stays the
+        # runtime-level evidence and is run by maintainers (still quota-bound).
+        #
+        # Ordering is only constrained by the build above; the vitest `$TMPDIR`
+        # purge is age-gated (2h) and suite-start-gated, so it cannot reap this
+        # step's fixture even if it were ordered earlier. Cheap and last: a
+        # failing run keeps its fixture for inspection, with nothing after it.
+        # Observed runtime ~0.5s (5/5 local runs: 0.47-0.48s, 20/20 checks).
+        #
+        # BLOCKING on purpose: the job shell is `bash -e`, so a non-zero exit
+        # fails this step and the job. Deliberately no `continue-on-error`, no
+        # `|| true` and no advisory `if:` — that is what makes it a gate.
+        run: npm run smoke:native-start-cold
 
   ui-smoke:
     # task-ui-browser-smoke-ci (ADR 0008 tier 2): the durable `@smoke` browser

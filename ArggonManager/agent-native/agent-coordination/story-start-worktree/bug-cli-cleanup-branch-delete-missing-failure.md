@@ -55,3 +55,36 @@ Found while fixing `bug-native-cleanup-branch-delete-missing-failure`
 (2026-09-28). Nothing in the CLI was changed by that PR on purpose: the
 instructions for the native fix scope were "do not change what the CLI emits;
 file the gap instead".
+
+### 2026-09-29 @Arggon
+Sibling-surface note from the review of `bug-native-cleanup-worktree-failure-unbounded` (native plugin, PR #432). Not fixing the CLI here — this item is `todo` and unclaimed, and the native PR is scoped to the plugin.
+
+## The CLI `cleanup` outer per-candidate catch is unbounded too
+
+`cli/src/cleanup.ts:197`, the catch that wraps one prune candidate — the same surface `bug-native-cleanup-worktree-failure-unbounded` just bounded on the native side:
+
+```ts
+} catch (err) {
+  const message = err instanceof Error ? err.message : String(err)
+  failures.push(`${entry.id}: ${message}`)
+  pruned.push({ id: entry.id, action: "failed", error: message })
+}
+```
+
+No clip, no control-character stripping, and it feeds both failure surfaces — `failures[]` and `pruned[].error`. So an over-long `git` stderr or a domain rejection carrying a whole message reaches the `--json` envelope twice, unbounded.
+
+This is a **second, separate surface** from the branch-delete one this item already tracks, and it is worth knowing that the CLI is structurally further behind than the native path was: the native plugin had `boundedNativeText` + `MAX_NATIVE_DETAIL_CHARS` available and had simply not applied them on this catch, whereas the CLI has **no bound helper at all** here. Its nearest tools are `sanitizeHumanError` / `clipHumanValue` in `lib/src/sanitize.ts`, but those are the HUMAN-output path (`MAX_HUMAN_ERROR_CHARS` = 2000) — using them in the JSON envelope would import human-channel escaping into a machine surface, so the fix here is likely a small envelope-shaped clip (the CLI has no `boundedNativeText` equivalent).
+
+Two things confirmed while checking, both of which bear on this item's acceptance box 1:
+
+- `cli/src/cleanup.ts:176` (branch-delete catch) pushes to `pruned` only and never to `failures` — this item's headline defect, still open.
+- Both CLI messages are unbounded, so acceptance box 1's "a bounded `<id>: <error>` entry … with the SAME message on both surfaces" needs a bound that the outer catch (line 197) also uses, or the envelope stays mixed.
+
+## Consumer check for the CLI side
+
+- `cli/src/cli.ts:2405-2420` prints `action.error` and each `result.failures` entry through `sanitizeHumanError()`, which clips at 2000 chars and escapes control chars — the human display is already bounded above 500, so an envelope-level 500 cap cannot remove text a CLI reader currently sees. Truncation at 500 would be visible via the elision mark.
+- `cli/src/tui.ts` has no cleanup surface; `cli/src/board.ts` renders `worktree_path` as a tracker field and never a cleanup envelope.
+- `smoke/opencode-smoke.test.ts:252` asserts `cleanup?.failures` is empty (no text dependence).
+- Cleanup CLI/native parity is pinned for **list mode only** (`opencode/plugins/arggon/tools.test.ts:2130`), so bounding (or not bounding) the CLI prune messages breaks no parity test.
+
+No action taken on this item; recording the evidence so the next agent does not have to re-derive it.
