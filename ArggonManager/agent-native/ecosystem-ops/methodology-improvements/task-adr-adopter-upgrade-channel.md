@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adr-adopter-upgrade-channel
 title: adr-adopter-upgrade-channel
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p1
 created: "2026-09-29"
 updated: "2026-09-29"
-claimed_at: "2026-09-29T23:24:45.748Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr-adopter-upgrade-channel
 ---
 <!--
