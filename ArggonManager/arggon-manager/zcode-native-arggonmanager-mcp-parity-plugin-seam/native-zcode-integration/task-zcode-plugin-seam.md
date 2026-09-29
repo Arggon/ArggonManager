@@ -51,24 +51,38 @@ platform requires.
 
 ## Acceptance
 
-- [ ] Plugin source under `templates/docs/zcode/`: manifest (name `arggon`),
+- [x] Plugin source under `templates/docs/zcode/`: manifest (name `arggon`),
       11 commands (tool-call references rewritten to `mcp__arggon__*`), 3
-      agents (frontmatter converted to ZCode form), `hooks/hooks.json` + gate
-      scripts (global git gates + reviewer dispatch-scoped backstop)
-- [ ] Reviewer backstop denies Write/Edit, mutating arggon shell calls and
+      agents (frontmatter converted to ZCode form), `hooks/hooks.json` + the
+      `gate.mjs` script (global git gates + reviewer dispatch-scoped backstop)
+- [x] Reviewer backstop denies Write/Edit, mutating arggon shell calls and
       mutating `mcp__arggon__*` calls while a reviewer dispatch is active;
-      unit-tested against the script contract (stdin JSON → exit codes)
-- [ ] `arggon init --full` generates `.zcode-marketplace/` with provenance
-      headers, never overwrites modified files, and re-runs report skipped/
-      regenerated like the OpenCode seam (init tests extended)
-- [ ] Plugin manifest validates against the ZCode schema (name pattern,
-      component paths inside the plugin root)
-- [ ] `docs/agents.md` init section documents the ZCode seam (generation,
-      install step, hook semantics) in the same PR
-- [ ] Headless smoke: fresh-init tree + plugin files loadable (manifest JSON
-      parses, declared paths exist); documented checks that need a live ZCode
-      client are explicitly listed as pending
-- [ ] Full test suite + lint/typecheck gates green; `arggon validate --json`
+      unit-tested against the script contract (stdin JSON → exit codes:
+      marker lifecycle, parallel dispatches, Stop clearing, cross-session
+      isolation)
+- [x] `arggon init` generates `.zcode-marketplace/` (tier-1, matching the
+      OpenCode seam's tiering) with provenance headers, never overwrites
+      modified files, and re-runs report skipped/regenerated (init tests
+      extended: exact tier-1 set includes the 18 seam files)
+- [x] Plugin manifest validates against the ZCode schema (name pattern,
+      component paths inside the plugin root; marketplace entry name/source
+      consistency asserted)
+- [x] `docs/agents.md` init section documents the ZCode seam (generation,
+      the one manual marketplace-install step, hook semantics, platform gaps)
+      in the same PR
+- [x] Headless smoke: fresh-init tree + plugin files verified (manifest JSON
+      parses, declared paths exist, commands address only the MCP surface).
+      Pending live-client checks, documented on the PR: actual marketplace
+      add + plugin install + skill/command discovery + a hook firing in a
+      real session (needs the ZCode desktop app; unverified here)
+- [x] Full test suite + lint/typecheck gates green; `arggon validate --json`
       `ok:true` before every commit
+
+## Notes
+
+Branches off main, not T1's branch: the seam is declarative and shares no
+code with the T1 MCP change — merge order is T1 (#436) first, then this PR.
+Flipping `spec-zcode-native-seam-012` / the plan to `implemented` happens
+when this lands AFTER T1 (the spec files live in T1's branch).
 
 ## Notes
