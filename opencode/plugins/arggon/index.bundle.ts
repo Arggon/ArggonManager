@@ -70,6 +70,7 @@ __arggonEdges.set("lib/src/index.ts\u0000./tracker-commit.js", "lib/src/tracker-
 __arggonEdges.set("lib/src/index.ts\u0000./trend.js", "lib/src/trend.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./update.js", "lib/src/update.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./validate.js", "lib/src/validate.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./verdict.js", "lib/src/verdict.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./view-model.js", "lib/src/view-model.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./worktree.js", "lib/src/worktree.ts")
 __arggonEdges.set("lib/src/issue-roundtrip.ts\u0000./detect-repo.js", "lib/src/detect-repo.ts")
@@ -126,6 +127,7 @@ __arggonEdges.set("lib/src/sync-command.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./paths.js", "lib/src/paths.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./sync-types.js", "lib/src/sync-types.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./update.js", "lib/src/update.ts")
+__arggonEdges.set("lib/src/sync-command.ts\u0000./verdict.js", "lib/src/verdict.ts")
 __arggonEdges.set("lib/src/tracker-commit.ts\u0000./convention.js", "lib/src/convention.ts")
 __arggonEdges.set("lib/src/tracker-commit.ts\u0000./lock.js", "lib/src/lock.ts")
 __arggonEdges.set("lib/src/tracker-commit.ts\u0000./sanitize.js", "lib/src/sanitize.ts")
@@ -2193,8 +2195,8 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
 exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.MAX_MISSING_DEPENDENCIES = exports.unlinkNodeModulesLink = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.inspectDeclaredDependencies = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = void 0;
+exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.MAX_MISSING_DEPENDENCIES = exports.unlinkNodeModulesLink = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.inspectDeclaredDependencies = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2339,6 +2341,9 @@ Object.defineProperty(exports, "HANDOFF_SESSION_CAP", { enumerable: true, get: f
 Object.defineProperty(exports, "runHandoff", { enumerable: true, get: function () { return handoff_js_1.runHandoff; } });
 var sync_command_js_1 = require("./sync-command.js");
 Object.defineProperty(exports, "runSync", { enumerable: true, get: function () { return sync_command_js_1.runSync; } });
+var verdict_js_1 = require("./verdict.js");
+Object.defineProperty(exports, "classifyVerdicts", { enumerable: true, get: function () { return verdict_js_1.classifyVerdicts; } });
+Object.defineProperty(exports, "parseVerdicts", { enumerable: true, get: function () { return verdict_js_1.parseVerdicts; } });
 var cleanup_js_1 = require("./cleanup.js");
 Object.defineProperty(exports, "CLEANUP_TERMINAL_STATUSES", { enumerable: true, get: function () { return cleanup_js_1.CLEANUP_TERMINAL_STATUSES; } });
 Object.defineProperty(exports, "classifyCleanupEntry", { enumerable: true, get: function () { return cleanup_js_1.classifyCleanupEntry; } });
@@ -3378,6 +3383,7 @@ function syncOperation(opts) {
             ambiguous: result.ambiguous,
             suggestions: result.suggestions,
             filled: result.filled,
+            verdicts: result.verdicts,
             errors: result.errors,
             exit_code: result.exit_code,
         };
@@ -4043,6 +4049,7 @@ const paths_js_1 = require("./paths.js");
 const get_open_prs_js_1 = require("./get-open-prs.js");
 const sync_types_js_1 = require("./sync-types.js");
 const update_js_1 = require("./update.js");
+const verdict_js_1 = require("./verdict.js");
 function runSync(opts, execGh = node_child_process_1.execFileSync) {
     if (opts.check && opts.write) {
         throw new Error("pass either --check or --write, not both");
@@ -4088,7 +4095,14 @@ function runSync(opts, execGh = node_child_process_1.execFileSync) {
             }
         }
     }
-    return (0, sync_types_js_1.toSyncResult)(reported, mode, filled, updateErrors);
+    const verdicts = {};
+    for (const match of reported) {
+        if (match.status === "no_pr")
+            continue;
+        const item = byId.get(match.itemId);
+        verdicts[match.itemId] = (0, verdict_js_1.classifyVerdicts)(item.body);
+    }
+    return (0, sync_types_js_1.toSyncResult)(reported, mode, filled, updateErrors, verdicts);
 }
 })
 
@@ -4142,7 +4156,7 @@ function matchItem(item, prs) {
     }
     return { status: "pending", itemId: item.id };
 }
-function toSyncResult(matches, mode, filled = null, errors = []) {
+function toSyncResult(matches, mode, filled = null, errors = [], verdicts = {}) {
     const matched = [];
     const unmatched = [];
     const pending = [];
@@ -4182,6 +4196,7 @@ function toSyncResult(matches, mode, filled = null, errors = []) {
         ambiguous,
         suggestions,
         filled,
+        verdicts,
         errors,
         exit_code: mode === "check"
             ? (pending.length > 0 || ambiguous.length > 0 || errors.length > 0 ? 1 : 0)
@@ -5601,6 +5616,57 @@ function formatValidateHuman(result) {
         lines.push(`arggon validate: failed with ${result.errors.length} error(s), ${result.warnings.length} warning(s)`);
     }
     return `${lines.join("\n")}\n`;
+}
+})
+
+__arggonModules.set("lib/src/verdict.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.parseVerdicts = parseVerdicts;
+exports.classifyVerdicts = classifyVerdicts;
+const COMMENT_HEADING = /^###\s+(\d{4}-\d{2}-\d{2})\s+@/;
+const VERDICT_LINE = /^[ \t]*verdict:[ \t]*(approve|request-changes)(?=$|[ \t(])/i;
+function parseVerdicts(body) {
+    const verdicts = [];
+    let order = -1;
+    let currentDate = null;
+    let seenVerdictInComment = false;
+    for (const line of body.split("\n")) {
+        if (/^###\s/.test(line)) {
+            order++;
+            const heading = COMMENT_HEADING.exec(line);
+            currentDate = heading ? heading[1] : null;
+            seenVerdictInComment = false;
+            continue;
+        }
+        if (currentDate === null || seenVerdictInComment)
+            continue;
+        const match = VERDICT_LINE.exec(line);
+        if (!match)
+            continue;
+        const scope = line.slice(match.index + match[0].length).trim();
+        verdicts.push({
+            date: currentDate,
+            order,
+            value: match[1].toLowerCase(),
+            scope: scope.length > 0 ? scope : null,
+        });
+        seenVerdictInComment = true;
+    }
+    return verdicts;
+}
+function classifyVerdicts(body) {
+    let latest = null;
+    for (const verdict of parseVerdicts(body)) {
+        if (latest === null ||
+            verdict.date > latest.date ||
+            (verdict.date === latest.date && verdict.order > latest.order)) {
+            latest = verdict;
+        }
+    }
+    if (!latest)
+        return "none";
+    return latest.value === "approve" ? "approved" : "changes-requested";
 }
 })
 

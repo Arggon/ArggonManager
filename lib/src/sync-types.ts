@@ -1,4 +1,5 @@
 import type { WorkItem } from "./types.js";
+import type { VerdictState } from "./verdict.js";
 
 export type SyncMatchResult =
   | {
@@ -44,6 +45,14 @@ export type SyncResult = {
   suggestions: Array<{ id: string; branch: string; pr: number }>;
   /** Write mode: id -> branch actually written to disk. */
   filled: SyncFilled | null;
+  /**
+   * Report-only review-verdict classification (task-review-verdict-checker),
+   * per item this run reconciled with an open PR (matched / fillable /
+   * pending / ambiguous — never `no_pr` items). Read from the item body's
+   * verdict comments (`docs/engineering.md` §Review bar → Review verdicts);
+   * additive within schemaVersion 1 and never gates matching or exit_code.
+   */
+  verdicts: Record<string, VerdictState>;
   errors: string[];
   exit_code: 0 | 1;
 };
@@ -126,7 +135,8 @@ export function toSyncResult(
   matches: SyncMatchResult[],
   mode: "check" | "write",
   filled: SyncFilled | null = null,
-  errors: string[] = []
+  errors: string[] = [],
+  verdicts: Record<string, VerdictState> = {}
 ): SyncResult {
   const matched: string[] = [];
   const unmatched: string[] = [];
@@ -168,6 +178,7 @@ export function toSyncResult(
     ambiguous,
     suggestions,
     filled,
+    verdicts,
     errors,
     exit_code:
       mode === "check"

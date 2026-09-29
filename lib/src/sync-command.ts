@@ -4,6 +4,7 @@ import { findTasksDir } from "./paths.js";
 import { getOpenPRs } from "./get-open-prs.js";
 import { matchItem, toSyncResult, type SyncFilled, type SyncResult } from "./sync-types.js";
 import { runUpdate } from "./update.js";
+import { classifyVerdicts, type VerdictState } from "./verdict.js";
 
 /**
  * Reconcile the tracker with the repo's open GitHub PRs. Check mode (the default)
@@ -68,5 +69,19 @@ export function runSync(
     }
   }
 
-  return toSyncResult(reported, mode, filled, updateErrors);
+  // Report-only review-verdict classification (task-review-verdict-checker):
+  // every item this run reconciles with an open PR (matched / fillable /
+  // pending / ambiguous — anything except no_pr) gets its verdict state read
+  // from the body's verdict comments. Bodies are already in memory from
+  // loadItems, so this costs no additional gh calls, and the result never
+  // gates matching or exit_code (the blocking gate is explicitly out of
+  // scope until the report proves low-noise).
+  const verdicts: Record<string, VerdictState> = {};
+  for (const match of reported) {
+    if (match.status === "no_pr") continue;
+    const item = byId.get(match.itemId)!;
+    verdicts[match.itemId] = classifyVerdicts(item.body);
+  }
+
+  return toSyncResult(reported, mode, filled, updateErrors, verdicts);
 }
