@@ -26,7 +26,7 @@
  * about the kernel (file it as a bug), not a generator to narrow.
  */
 import fc from "fast-check";
-import type { IProperty, RandomGenerator } from "fast-check";
+import type { IProperty } from "fast-check";
 
 /** Env var that pins the generator seed for an exact replay. */
 export const PROPERTY_SEED_ENV = "ARGGON_PROPERTY_SEED";
@@ -108,8 +108,7 @@ export function checkProperty<Ts>(
 }
 
 /**
- * Re-export so test files do not need a second `fast-check` import: one place
- * owns the library surface the property suite is allowed to use.
+ * Re-exported so a test file needs one import: this module owns the library
+ * surface the property suite is allowed to use.
  */
 export { fc };
-export type { RandomGenerator };
