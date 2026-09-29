@@ -748,12 +748,12 @@ export function runMcpServer(opts: McpServerOptions): void {
       return toolResult(
         spawnedOutcome(opts, "start", [
           str(args.id) ?? "",
-          ...(args.assignee !== undefined ? ["--assignee", str(args.assignee)!] : []),
+          ...(typeof args.assignee === "string" ? ["--assignee", args.assignee] : []),
           ...(args.open_pr === true ? ["--open-pr"] : []),
           ...(args.worktree === true ? ["--worktree"] : []),
           ...(args.no_hook === true ? ["--no-hook"] : []),
-          ...(args.post_start_shell !== undefined
-            ? ["--post-start-shell", str(args.post_start_shell)!]
+          ...(typeof args.post_start_shell === "string"
+            ? ["--post-start-shell", args.post_start_shell]
             : []),
         ]),
       );
@@ -830,7 +830,7 @@ function str(value: unknown): string | undefined {
 
 /** Wall-clock budget for one spawned CLI flow (`start` pushes; PRs included). */
 const CLI_SPAWN_TIMEOUT_MS = 600_000;
-/** Envelope read-back bound; import-issues of large repos fit far below this. */
+/** Envelope read-back bound (only start/branch/cleanup spawn the CLI). */
 const CLI_SPAWN_MAX_BUFFER = 32 * 1024 * 1024;
 /** Tool-error message budget for a clipped child stderr tail. */
 const CLI_SPAWN_ERROR_CHARS = 500;
@@ -850,11 +850,11 @@ function clipTail(text: string, max = CLI_SPAWN_ERROR_CHARS): string {
  * Built bin: `arggon mcp` → `argv = [node, <root>/dist/cli.js, "mcp"]` —
  * re-spawn `[node, <root>/dist/cli.js]`. Source run: `npm run arggon -- mcp`
  * → `argv = [node, <tsx>/cli.mjs, <root>/cli/src/cli.ts, "mcp"]` — re-spawn
- * `[node, <tsx>/cli.mjs, <root>/cli/src/cli.ts]`. Anything else (the server
- * embedded in another runner — tests inject; vitest's own entry is a `cli.js`
- * lookalike trap this basename check deliberately rejects) returns undefined
- * and the spawn tools fail with the remediation message instead of re-spawning
- * an unrelated entry.
+ * `[node, <tsx>/cli.mjs, <root>/cli/src/cli.ts]`. Anything else returns
+ * undefined and the spawn tools fail with the remediation message instead of
+ * re-spawning an unrelated entry — tests inject; under vitest the check
+ * rejects the forks worker (`dist/workers/forks.js`, what argv[1] actually is
+ * there; the suffix check is deliberately narrow, not a basename claim).
  */
 function deriveDefaultCliSpawn(): CliSpawnSpec | undefined {
   const entry = process.argv[1];

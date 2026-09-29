@@ -49,7 +49,8 @@ schema property keeps the standing CLI ↔ MCP option-surface parity invariant
       `arggon_sync`, `arggon_import_issues`, `arggon_start`, `arggon_branch`,
       `arggon_cleanup` with schemas mirroring the CLI options
 - [x] `priority`/`sync` go through the shared kernel operations (envelope
-      parity with the CLI verified by a test)
+      parity with the CLI verified for `priority`; `sync` needs gh/network and
+      is option-surface-checked only)
 - [x] `start`/`branch`/`cleanup` spawn the CLI with an argv array and return
       its `--json` envelope parity (tested with a spawned CLI), with kernel
       failures and envelope-less children surfacing as tool errors that never

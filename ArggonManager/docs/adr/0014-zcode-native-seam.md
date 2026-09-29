@@ -35,8 +35,8 @@ Meanwhile `arggon mcp` (ADR 0007 protocol, kernel through
 ## Decision
 
 1. **MCP is a full-surface client adapter.** `arggon mcp` grows from nine to
-   **fifteen tools**: `priority`/`sync` call their kernel operations
-   in-process; `import_issues`/`start`/`branch`/`cleanup` spawn the arggon
+   **fifteen tools**: `priority`/`sync`/`import_issues` call their kernel
+   operations in-process; `start`/`branch`/`cleanup` spawn the arggon
    CLI itself (argv array, never a shell) and return the CLI's `--json`
    envelopes. One implementation path for worktree ergonomics (the CLI's
    link-farm `start --worktree`, `cleanup --prune`); injection-safe by

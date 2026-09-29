@@ -15,8 +15,8 @@ carries a verifiable acceptance criterion and links back to the spec.
 
 ### T1: MCP full tool surface — `task-mcp-full-surface` (this PR)
 
-- Add `arggon_priority`, `arggon_sync` (in-process kernel operations) and
-  `arggon_import_issues`, `arggon_start`, `arggon_branch`, `arggon_cleanup`
+- Add `arggon_priority`, `arggon_sync`, `arggon_import_issues` (in-process
+  kernel operations) and `arggon_start`, `arggon_branch`, `arggon_cleanup`
   (CLI spawn via argv array, `--json` envelopes) to `cli/src/mcp-server.ts`.
 - Extend `mcp-parity.test.ts` option-surface invariant to the six tools;
   envelope parity for `priority`/`sync`; dispatch tests for the spawn path

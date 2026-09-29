@@ -538,6 +538,15 @@ const TOOL_NAME: Record<string, string> = {
   "import-issues": "import_issues",
 };
 
+/**
+ * Envelope parity (the describe above) covers only tools runnable on an
+ * offline fixture: priority/branch/cleanup run both sides; sync and
+ * import_issues need `gh` + a GitHub remote and start pushes, so they get
+ * option-surface parity only — their kernel/CLI paths are the pre-existing,
+ * CI-smoked surfaces (`smoke:native-start-cold` drives start cold on every
+ * PR).
+ */
+
 function parityToolName(command: string): string {
   return `arggon_${TOOL_NAME[command] ?? command}`;
 }

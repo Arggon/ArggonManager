@@ -45,10 +45,11 @@ arggon mcp   # 15 tools: list create update comment handoff show next report val
 ```
 
 New tools: `arggon_priority {dry_run}`, `arggon_sync {check?, write?, repo?}`,
-`arggon_import_issues {repo?, dry_run, …}`, `arggon_start {id, assignee?,
-worktree?, open_pr?}`, `arggon_branch {id}`, `arggon_cleanup {prune?}` —
-the last four spawn the CLI (`arggon <command> --json …`) and return its
-envelope; kernel failures surface as tool errors, the session continues.
+`arggon_import_issues {repo?, parent?, dry_run, no_commit?}` (all three via
+their kernel operations, in-process), `arggon_start {id, assignee?, worktree?,
+open_pr?}`, `arggon_branch {id}`, `arggon_cleanup {prune?}` — the last three
+spawn the CLI (`arggon <command> --json …`) and return its envelope; kernel
+failures surface as tool errors, the session continues.
 
 Plugin (generated at `.zcode-marketplace/`): manifest + 11 commands
 (`/arggon-*` referencing `mcp__arggon__*` calls) + 3 agents + `hooks/`
@@ -59,9 +60,9 @@ dispatch-scoped reviewer backstop and global git gates.
 - [ ] `arggon mcp` exposes 15 tools; option-surface parity test covers all of
       them; envelope parity tests cover the new tools
 - [ ] `priority`/`sync` run in-process through the kernel operations
-- [ ] `import_issues`/`start`/`branch`/`cleanup` spawn the CLI with argv
-      arrays, bounded output, and a timeout; a killed child becomes a tool
-      error, never a dead session
+- [ ] `start`/`branch`/`cleanup` spawn the CLI with argv arrays, bounded
+      output, and a timeout; a killed child becomes a tool error, never a
+      dead session
 - [ ] Plugin seam generates with provenance, never overwrites, and its
       manifest paths stay inside the plugin root
 - [ ] Reviewer backstop denies mutations only while a reviewer dispatch is
