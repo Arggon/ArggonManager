@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adr-status-housekeeping
 title: adr-status-housekeeping
+assignee: Arggon
+branch: feat/task-adr-status-housekeeping
 parent: methodology-improvements
 labels: []
 priority: p3
 created: "2026-09-29"
 updated: "2026-09-29"
+claimed_at: "2026-09-29T23:27:20.106Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-adr-status-housekeeping
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-adr-status-housekeeping.md
