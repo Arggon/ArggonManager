@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-done-gate-acceptance-waiver
 title: done-gate-acceptance-waiver
+assignee: Arggon
+branch: feat/task-done-gate-acceptance-waiver
 parent: methodology-improvements
 labels: []
 priority: p1
 created: "2026-09-29"
 updated: "2026-09-29"
+claimed_at: "2026-09-29T23:07:55.661Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-done-gate-acceptance-waiver
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-done-gate-acceptance-waiver.md
