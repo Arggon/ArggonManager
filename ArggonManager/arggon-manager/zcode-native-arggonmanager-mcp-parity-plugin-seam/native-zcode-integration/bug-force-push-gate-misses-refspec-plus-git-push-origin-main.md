@@ -1,14 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-force-push-gate-misses-refspec-plus-git-push-origin-main
-title: "Force-push gate misses refspec-plus (git push origin +main)"
+title: Force-push gate misses refspec-plus (git push origin +main)
+assignee: Arggon
+branch: fix/bug-force-push-gate-misses-refspec-plus-git-push-origin-main
 parent: native-zcode-integration
 labels: []
 created: "2026-09-29"
 updated: "2026-09-29"
+claimed_at: "2026-09-29T21:02:45.843Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-force-push-gate-misses-refspec-plus-git-push-origin-main
 ---
-
 # Force-push gate misses refspec-plus (git push origin +main)
 
 ## Context
@@ -21,10 +24,10 @@ too — so this is a product-wide gate fix, not a ZCode-seam regression.
 
 ## Acceptance
 
-- [ ] Both gate surfaces deny `git push origin +main` (and `+<ref>` generally)
+- [x] Both gate surfaces deny `git push origin +main` (and `+<ref>` generally)
       while allowing ordinary pushes: `templates/docs/opencode.jsonc`
       permission pattern and `templates/docs/zcode/arggon/hooks/gate.mjs`
       GLOBAL_SHELL_GATES
-- [ ] `cli/src/init-zcode.test.ts` gains the `+main` case; the OpenCode seam
+- [x] `cli/src/init-zcode.test.ts` gains the `+main` case; the OpenCode seam
       side gets equivalent coverage wherever its gates are asserted
-- [ ] `arggon validate` + full gates green
+- [x] `arggon validate` + full gates green

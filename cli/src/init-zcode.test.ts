@@ -162,17 +162,21 @@ describe("zcode gate script (reviewer backstop + global git gates)", () => {
       "git push -f origin main",
       "git push -fu origin main",
       "git push --force-with-lease origin main",
+      "git push origin +main",
+      "git push origin +refs/heads/task-x:main",
       "git commit --no-verify -m x",
     ]) {
       const r = gate(dir, "pre", { session_id: "s1", tool_name: "Bash", tool_input: { command } });
       expect(r.status, command).toBe(2);
     }
-    const ok = gate(dir, "pre", {
-      session_id: "s1",
-      tool_name: "Bash",
-      tool_input: { command: "git push origin main" },
-    });
-    expect(ok.status).toBe(0);
+    for (const command of ["git push origin main", "git push origin main extra"]) {
+      const ok = gate(dir, "pre", {
+        session_id: "s1",
+        tool_name: "Bash",
+        tool_input: { command },
+      });
+      expect(ok.status, command).toBe(0);
+    }
   });
 
   it("keeps ordinary sessions unimpaired", () => {

@@ -197,6 +197,10 @@ describe("opencode seam: fresh init", () => {
       { action: "shell", resource: "git commit --no-verify*", effect: "deny" },
       { action: "shell", resource: "git push --force*", effect: "deny" },
       { action: "shell", resource: "git push -f*", effect: "deny" },
+      // bug-force-push-gate-misses-refspec-plus: `git push origin +main` is a
+      // force push in refspec spelling; mid-pattern glob, best-effort like
+      // its siblings.
+      { action: "shell", resource: "git push *+*", effect: "deny" },
     ]);
     // Non-breaking by construction: the base policy stays allow-all — a global
     // `ask`/deny-all would block ordinary and headless sessions.
