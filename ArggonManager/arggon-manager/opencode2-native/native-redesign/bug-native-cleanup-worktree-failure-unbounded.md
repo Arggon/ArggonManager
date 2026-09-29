@@ -28,7 +28,7 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-native-cleanup-worktree-f
 
 ## Acceptance
 
-- [ ] 
+- [x] 
 
 ## Notes
 
@@ -64,14 +64,19 @@ is not there.
 
 ## Acceptance
 
-- [ ] The outer per-candidate failure message is bounded with `boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)`, so both failure surfaces of a `cleanup` envelope carry the same bounded text for every failure kind.
-- [ ] Add a deterministic test that a worktree-removal failure with an over-cap message yields the capped text in BOTH `pruned[].error` and `failures[]`.
-- [ ] Assert the flat entry's total length is bounded too (`<id>` + separator + capped message), not just the message.
-- [ ] Confirm no consumer depends on the full unbounded text (the native TUI/board renderers and the CLI parity path), and say what you checked.
-- [ ] Check the CLI twin (`cli/src/cleanup.ts`, tracked as `bug-cli-cleanup-branch-delete-missing-failure`) for the same unbounded outer message; if it is unbounded too, note it there rather than fixing it in this PR.
-- [ ] `npm test`, `npm run lint`, `npm run build`, `npm run check:plugin`, `npm run lint:structure`, `npm run test:structure` and `arggon validate` are green.
+- [x] The outer per-candidate failure message is bounded with `boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)`, so both failure surfaces of a `cleanup` envelope carry the same bounded text for every failure kind.
+- [x] Add a deterministic test that a worktree-removal failure with an over-cap message yields the capped text in BOTH `pruned[].error` and `failures[]`.
+- [x] Assert the flat entry's total length is bounded too (`<id>` + separator + capped message), not just the message.
+- [x] Confirm no consumer depends on the full unbounded text (the native TUI/board renderers and the CLI parity path), and say what you checked.
+- [x] Check the CLI twin (`cli/src/cleanup.ts`, tracked as `bug-cli-cleanup-branch-delete-missing-failure`) for the same unbounded outer message; if it is unbounded too, note it there rather than fixing it in this PR.
+- [x] `npm test`, `npm run lint`, `npm run build`, `npm run check:plugin`, `npm run lint:structure`, `npm run test:structure` and `arggon validate` are green.
 
 ## Notes
+
+Fixed on `fix/bug-native-cleanup-worktree-failure-unbounded` — draft PR #432, head
+`d9eb40fb`. Evidence (the exact test inputs, the consumer check, the gate output, the
+expected-vs-observed failure without the fix) is in the dated worker comment above.
+`status` stays `in_progress`: `done` is the coordinator's call after merge.
 
 Found 2026-09-28 during the PR #428 review. Not a merge blocker for that PR — its scope is the
 branch-delete surface and it did that correctly; this is the sibling surface that PR's bounding made
