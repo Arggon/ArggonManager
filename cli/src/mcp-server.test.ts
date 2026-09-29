@@ -8,6 +8,8 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { HANDOFF_SESSION_CAP, conventionPathForRoot, runCreate } from "@arggondev/lib";
@@ -15,6 +17,14 @@ import { arggonVersion } from "./docs.js";
 
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
+
+/**
+ * CLI re-entry for the spawn tools (ADR 0014): tests inject the same tsx +
+ * cli.ts spec the parity harness uses to drive the real CLI.
+ */
+const repoRoot = join(dirname(fileURLToPath(import.meta.url)), "../..");
+const cliEntry = join(repoRoot, "cli/src/cli.ts");
+const tsxEntry = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -71,11 +81,12 @@ class McpTestClient {
 
   cwd = "";
 
-  start(): void {
+  start(serverOptions?: { cliSpawn?: { command: string; args: string[] } }): void {
     runMcpServer({
       cwd: this.cwd,
       input: this.serverInput,
       output: this.output,
+      ...serverOptions,
     });
   }
 
@@ -171,7 +182,7 @@ describe("mcp server", () => {
     expect(fallback.protocolVersion).toBe("2025-06-18");
   });
 
-  it("lists the nine tools with JSON-schema inputs", async () => {
+  it("lists the fifteen tools with JSON-schema inputs", async () => {
     const result = await client.request("tools/list");
     const tools = result.tools as Array<{ name: string; inputSchema: Record<string, unknown> }>;
     expect(tools.map((tool) => tool.name)).toEqual([
@@ -184,6 +195,12 @@ describe("mcp server", () => {
       "arggon_next",
       "arggon_report",
       "arggon_validate",
+      "arggon_priority",
+      "arggon_sync",
+      "arggon_import_issues",
+      "arggon_start",
+      "arggon_branch",
+      "arggon_cleanup",
     ]);
     for (const tool of tools) {
       expect(tool.inputSchema.type).toBe("object");
@@ -197,6 +214,99 @@ describe("mcp server", () => {
     const properties = update!.inputSchema.properties as Record<string, unknown>;
     expect(properties).not.toHaveProperty("steal");
     expect(properties).not.toHaveProperty("force");
+  });
+
+  it("exposes no force/steal surface on the spawn tools either", async () => {
+    const result = await client.request("tools/list");
+    const tools = result.tools as Array<{ name: string; inputSchema: Record<string, unknown> }>;
+    for (const name of ["arggon_start", "arggon_branch", "arggon_cleanup"]) {
+      const properties = tools.find((tool) => tool.name === name)!.inputSchema
+        .properties as Record<string, unknown>;
+      expect(properties, name).not.toHaveProperty("force");
+      expect(properties, name).not.toHaveProperty("steal");
+    }
+  });
+
+  it("arggon_priority plans a dry run through the shared kernel operation", async () => {
+    const result = await client.request("tools/call", {
+      name: "arggon_priority",
+      arguments: { dry_run: true },
+    });
+    expect(result.isError).toBeUndefined();
+    const envelope = textContent(result) as Record<string, unknown> & {
+      scanned?: number;
+      changed?: number;
+    };
+    expect(envelope).toMatchObject({ ok: true, command: "priority", dryRun: true });
+    expect(envelope.scanned).toBeGreaterThan(0);
+    // The primed tree carries no legacy pN labels: nothing to change.
+    expect(envelope.changed).toBe(0);
+  });
+
+  it("arggon_branch re-enters the CLI and returns the branch envelope", async () => {
+    // runBranch checks out with git: seed a repo before spawning the CLI.
+    const git = (args: string[]) =>
+      execFileSync(
+        "git",
+        ["-c", "user.name=test", "-c", "user.email=test@example.com", ...args],
+        { cwd: repoDir, stdio: ["ignore", "pipe", "pipe"] },
+      );
+    git(["init"]);
+    git(["commit", "--allow-empty", "-m", "seed"]);
+    await client.request("tools/call", {
+      name: "arggon_create",
+      arguments: {
+        type: "task",
+        title: "Add rate limiting",
+        parent: "story-login",
+        id: "rate-limit",
+      },
+    });
+    const spawned = new McpTestClient();
+    spawned.cwd = repoDir;
+    // A fresh client keeps the dispatch surface clean; the spawn spec drives
+    // the real CLI through tsx, exactly like the parity harness.
+    spawned.start({ cliSpawn: { command: process.execPath, args: [tsxEntry, cliEntry] } });
+    const result = await spawned.request("tools/call", {
+      name: "arggon_branch",
+      arguments: { id: "task-rate-limit" },
+    });
+    expect(result.isError).toBeUndefined();
+    const envelope = textContent(result) as Record<string, unknown>;
+    expect(envelope).toMatchObject({ ok: true, command: "branch", created: true });
+    expect(typeof envelope.branch).toBe("string");
+    expect((envelope.item as Record<string, unknown>).id).toBe("task-rate-limit");
+  });
+
+  it("arggon_branch surfaces a kernel failure as a tool error without killing the session", async () => {
+    const spawned = new McpTestClient();
+    spawned.cwd = repoDir;
+    spawned.start({ cliSpawn: { command: process.execPath, args: [tsxEntry, cliEntry] } });
+    const result = await spawned.request("tools/call", {
+      name: "arggon_branch",
+      arguments: { id: "task-missing" },
+    });
+    expect(result.isError).toBe(true);
+    const envelope = textContent(result) as Record<string, unknown>;
+    expect(envelope).toMatchObject({ ok: false, command: "branch" });
+    // The session continues: a follow-up call still answers.
+    const still = await spawned.request("tools/list");
+    expect(Array.isArray(still.tools)).toBe(true);
+  });
+
+  it("a spawn child without a JSON envelope becomes a tool error with a clipped tail", async () => {
+    const spawned = new McpTestClient();
+    spawned.cwd = repoDir;
+    // `echo` exits 0 but prints no envelope: the spawn path must throw a
+    // tool-level error (dispatch turns it into isError text), not hang or die.
+    spawned.start({ cliSpawn: { command: "echo", args: [] } });
+    const result = await spawned.request("tools/call", {
+      name: "arggon_branch",
+      arguments: { id: "task-rate-limit" },
+    });
+    expect(result.isError).toBe(true);
+    const text = (result.content as Array<{ type: string; text: string }>)[0]!.text;
+    expect(text).toContain("did not emit a JSON envelope");
   });
 
   it("create -> list -> update round trip returns the documented envelopes", async () => {

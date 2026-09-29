@@ -37,21 +37,24 @@ export const AGENTS_MD_BUDGET_BYTES = 2048;
 /**
  * MCP tool-schema budget (task-schema-budget). Live baseline measured
  * 2026-09-15 against the in-process tools/list: 9 tools, 9,040 B of tool
- * definitions (~2,260 tok at ~chars/4) — the item brief's "~4.7 KB" was an
- * early estimate; the LIVE surface is the baseline of record. Advisory cap at
- * 12 KiB: ~36% headroom over the baseline, enough for several new tools or
- * schema growth without letting the 50K-token bloat spiral (Towards AI 2026)
- * start unnoticed. Advisory (no hard cap): report-only budget section.
+ * definitions (~2,260 tok at ~chars/4 at the 2026-09-15 nine-tool baseline) —
+ * the item brief's "~4.7 KB" was an early estimate; the LIVE surface is the
+ * baseline of record. Advisory cap raised to 16 KiB with ADR 0014
+ * (task-mcp-full-surface): the full 15-tool surface measured 15,701 B, and the
+ * parity decision — ZCode has no other native tool surface — outweighs the
+ * bloat risk; the cap still keeps the surface inside ~4.1K tokens with modest
+ * headroom. Advisory (no hard cap): report-only budget section.
  */
-export const MCP_TOOLS_BUDGET_BYTES = 12_288;
+export const MCP_TOOLS_BUDGET_BYTES = 16_384;
 
 /**
- * Live tools/list bytes at baseline commit 5d6c504 (2026-09-15), reproduced
- * two ways: that commit's own `doctor --budget` and an independent stdio
- * `tools/list` sum of `JSON.stringify(tool)` lengths (both 9,040 B, 9 tools,
- * ~2,260 tok at ~chars/4).
+ * Live tools/list bytes, reproduced two ways: the commit's own
+ * `doctor --budget` and an independent stdio `tools/list` sum of
+ * `JSON.stringify(tool)` lengths. 9,040 B / 9 tools at baseline commit 5d6c504
+ * (2026-09-15); 15,701 B / 15 tools at the full-surface re-baseline
+ * (2026-09-29, ADR 0014).
  */
-export const MCP_TOOLS_BASELINE_BYTES = 9_040;
+export const MCP_TOOLS_BASELINE_BYTES = 15_701;
 
 export type McpToolBytes = {
   /** MCP tool name (e.g. arggon_update). */
@@ -336,7 +339,7 @@ export function evaluateBudget(m: BudgetResult): BudgetCheck[] {
       withinBudget: m.mcp.totalBytes <= MCP_TOOLS_BUDGET_BYTES,
       note:
         `${m.mcp.toolCount} tools, ~${m.mcp.tokenEstimate.toLocaleString("en-US")} tok (~chars/4); ` +
-        `advisory (task-schema-budget) — live baseline ${MCP_TOOLS_BASELINE_BYTES.toLocaleString("en-US")} B (2026-09-15)`,
+        `advisory (task-schema-budget) — live baseline ${MCP_TOOLS_BASELINE_BYTES.toLocaleString("en-US")} B (2026-09-29, ADR 0014 re-baseline)`,
     },
   ];
 }

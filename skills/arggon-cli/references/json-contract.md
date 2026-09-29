@@ -72,9 +72,21 @@ the session keeps running after a tool error.
 
 `arggon mcp` is the optional stdio MCP server — it is **not** part of the
 OpenCode V2 default path (the native tools replace it); agents that want it
-register it through their MCP client (`.mcp.json`), never by typing it. Nine tools: `arggon_list`, `arggon_create`, `arggon_update`, `arggon_comment`,
-`arggon_handoff`, `arggon_show`, `arggon_next`, `arggon_report`, `arggon_validate`.
+register it through their MCP client (`.mcp.json`), never by typing it. For
+clients with no code-mode tool API (ZCode, ADR 0014) it IS the native tool
+surface. **Fifteen tools**: the core nine `arggon_list`, `arggon_create`,
+`arggon_update`, `arggon_comment`, `arggon_handoff`, `arggon_show`,
+`arggon_next`, `arggon_report`, `arggon_validate`, plus `arggon_priority`,
+`arggon_sync`, `arggon_import_issues` (kernel operations, in-process) and the
+worktree lifecycle `arggon_start`, `arggon_branch`, `arggon_cleanup` (each
+spawns the arggon CLI — argv array, no shell — and returns its `--json`
+envelope; `start` pushes and may hit the network, with a 10-minute budget per
+spawned flow).
 Results are the documented `--json` envelopes serialized as text content; kernel
-failures surface as tool errors with the CLI's message text. An MCP caller cannot
+failures surface as tool errors with the CLI's message text, and a spawned
+child that dies without an envelope surfaces a tool error with a clipped
+stderr tail — the session keeps running either way. An MCP caller cannot
 reopen `done`/`cancelled` items and cannot steal a claim (there is no `force`
-parameter) — the CLI and MCP share one rules module.
+parameter anywhere on the surface) — the CLI and MCP share one rules module.
+Tool schemas mirror the CLI options both ways; the standing invariant is
+`mcp-parity.test.ts` (exceptions documented there, `--json` always excepted).

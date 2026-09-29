@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline";
 import type { Readable, Writable } from "node:stream";
 import { arggonVersion } from "./docs.js";
@@ -9,11 +10,14 @@ import {
   commentOperation,
   createOperation,
   handoffOperation,
+  importIssuesOperation,
   listOperation,
   nextOperation,
   parseCsvList,
+  priorityOperation,
   reportOperation,
   showOperation,
+  syncOperation,
   updateOperation,
   validateOperation,
   type CommandOutcome,
@@ -27,6 +31,19 @@ import {
  * envelope objects as tool text.
  * Agent playbook rules are enforced by passing `agent: true` to runUpdate —
  * the MCP layer cannot reopen done/cancelled items or steal claims.
+ *
+ * Full tool surface (ADR 0014, task-mcp-full-surface): ZCode has no code-mode
+ * tool API, so the MCP server is a client's complete native surface. Beyond
+ * the core nine it exposes `priority`/`sync`/`import_issues` through their
+ * kernel operations in-process, and `start`/`branch`/`cleanup` by spawning
+ * the arggon CLI itself (argv array, never a shell — injection-safe by
+ * construction) and returning the CLI's `--json` envelope. One implementation
+ * path keeps the worktree ergonomics (the CLI's link-farm `start --worktree`,
+ * `cleanup --prune`); the spawned CLI is the same path agents already use, so
+ * the kernel rules (no reopen, no steal — no `--force` surface anywhere) hold
+ * unchanged. Kernel failures surface as tool errors and never kill the
+ * session; a child that dies without an envelope (crash, timeout kill)
+ * throws a tool-level error carrying a clipped stderr tail.
  *
  * Session attribution (task-opencode-v2-mcp-meta): OpenCode V2 sends the
  * invoking session ID in `CallToolRequest.params._meta.sessionID` for calls
@@ -364,7 +381,162 @@ const TOOLS: ToolDefinition[] = [
       additionalProperties: false,
     },
   },
+  {
+    name: "arggon_priority",
+    description:
+      "Move legacy pN labels into the priority field on all items (highest label wins, all pN labels removed, non-priority labels kept; idempotent; never auto-commits — review and commit once). Returns the arggon `priority migrate --json` envelope: {ok, schemaVersion, conventionVersion, command, dryRun, scanned, changed, entries}.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        dry_run: {
+          type: "boolean",
+          description: "plan only: print the per-item changes and write NOTHING",
+          default: false,
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "arggon_sync",
+    description:
+      "Reconcile item branch fields with open GitHub PRs; check mode reports matches without modifying (default), write mode fills empty branch fields. Returns the arggon `sync --json` envelope: {ok, schemaVersion, conventionVersion, command, mode, matched, unmatched, pending, errors}.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        check: {
+          type: "boolean",
+          description: "check mode: report matches without modifying (default)",
+          default: false,
+        },
+        write: {
+          type: "boolean",
+          description: "write mode: fill empty branch fields from PRs",
+          default: false,
+        },
+        repo: {
+          type: "string",
+          description: "owner/name; default detected from the origin remote",
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "arggon_import_issues",
+    description:
+      "Import GitHub issues into the tracker as task/bug items (idempotent; x-import maps labels to types; `dry_run: true` plans without writing). Requires the `gh` CLI. Returns the arggon `import-issues --json` envelope: {ok, schemaVersion, conventionVersion, command, dryRun, story, entries, created, skipped, commit}.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        repo: {
+          type: "string",
+          description: "owner/name; default from gh's own resolution from the repo root",
+        },
+        parent: {
+          type: "string",
+          description:
+            "target story for imported tasks (default: story-imported-issues, created under the first epic when missing)",
+        },
+        dry_run: {
+          type: "boolean",
+          description: "print the mapping plan (would-create / would-skip) without writing",
+          default: false,
+        },
+        no_commit: {
+          type: "boolean",
+          description:
+            "keep the tracker dirty: skip the tracker auto-commit of the imported items (default: on; x-tracker.auto-commit: false opts out tree-wide)",
+          default: false,
+        },
+      },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "arggon_start",
+    description:
+      "Claim an item, check out its branch, commit, push, and optionally open a draft PR (`worktree: true` runs the flow inside a linked git worktree at ../<repo-name>-<id>, prepared before the claim commit and kept on failure). Spawns the arggon CLI; push and the PR step hit the network. Returns the arggon `start --json` envelope: {ok, schemaVersion, conventionVersion, command, item, branch, created, pushed, prUrl, worktreePath, linkedNodeModules, linkedWorkspaces, manifestCoverage, ...}.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "work item id" },
+        assignee: {
+          type: "string",
+          description: "claim as this login (default: GITHUB_USER / GITHUB_ACTOR)",
+        },
+        open_pr: {
+          type: "boolean",
+          description: "open a draft PR after pushing",
+          default: false,
+        },
+        worktree: {
+          type: "boolean",
+          description:
+            "run the flow inside a linked git worktree at ../<repo-name>-<id> (recorded on the item as worktree_path; the worktree is prepared before the claim commit and kept on failure)",
+          default: false,
+        },
+        no_hook: {
+          type: "boolean",
+          description: "skip the x-worktree.post-start hook (it only runs when a new worktree is created)",
+          default: false,
+        },
+        post_start_shell: {
+          type: "string",
+          enum: ["inherit", "login"],
+          description: 'shell for the x-worktree.post-start hook: "inherit" (default) or "login" ($SHELL -lc; overrides x-worktree.post-start-shell)',
+        },
+      },
+      required: ["id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "arggon_branch",
+    description:
+      "Check out the working branch for an item (generated from branch_patterns). Spawns the arggon CLI. Returns the arggon `branch --json` envelope: {ok, schemaVersion, conventionVersion, command, item, branch, created}.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "work item id" },
+      },
+      required: ["id"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "arggon_cleanup",
+    description:
+      "List worktrees of done/cancelled items whose branches are merged (`prune: true` removes them, deletes their merged branches, and clears the worktree_path records). Spawns the arggon CLI. Returns the arggon `cleanup --json` envelope: {ok, schemaVersion, conventionVersion, command, base, candidates, pruned, failures[, commit]}.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        prune: {
+          type: "boolean",
+          description:
+            "remove removable worktrees (git worktree remove), delete their merged branches, and clear the worktree_path records",
+          default: false,
+        },
+        no_commit: {
+          type: "boolean",
+          description:
+            "keep the tracker dirty: skip the tracker auto-commit of the cleared worktree_path records (default: on with prune; x-tracker.auto-commit: false opts out tree-wide)",
+          default: false,
+        },
+        no_gh: {
+          type: "boolean",
+          description:
+            "ancestry-only classification: skip the gh fallback that detects squash-merged PRs when the branch fails the ancestry check (offline/CI use)",
+          default: false,
+        },
+      },
+      additionalProperties: false,
+    },
+  },
 ];
+
+/** How the server re-invokes the arggon CLI (see `cliSpawn` below). */
+export type CliSpawnSpec = { command: string; args: string[] };
 
 /** One MCP server session bound to fixed streams and a fixed repo root. */
 export type McpServerOptions = {
@@ -374,6 +546,15 @@ export type McpServerOptions = {
   output: Writable;
   /** Called when the client closes its end (tests use this to finish). */
   onClose?: () => void;
+  /**
+   * How `arggon_start`/`arggon_branch`/`arggon_cleanup` re-enter the CLI.
+   * Default: derived from the running process — the built bin (`arggon mcp`
+   * → `argv = [node, <root>/dist/cli.js, "mcp"]`) and source runs
+   * (`npm run arggon -- mcp` → tsx + `cli.ts`) both re-enter themselves;
+   * anything else (embedding the server in another process) must inject the
+   * spec or the three spawn tools fail with a remediation message.
+   */
+  cliSpawn?: CliSpawnSpec;
 };
 
 export function runMcpServer(opts: McpServerOptions): void {
@@ -407,7 +588,7 @@ export function runMcpServer(opts: McpServerOptions): void {
    * that found problems) surfaces as a tool error without throwing through the
    * session; the session continues (failure isolation, ADR 0011).
    */
-  const toolResult = (outcome: CommandOutcome): Record<string, unknown> => ({
+  const toolResult = (outcome: { ok: boolean; envelope: unknown }): Record<string, unknown> => ({
     content: [{ type: "text", text: JSON.stringify(outcome.envelope) }],
     ...(outcome.ok ? {} : { isError: true }),
   });
@@ -531,6 +712,64 @@ export function runMcpServer(opts: McpServerOptions): void {
     if (name === "arggon_validate") {
       return toolResult(validateOperation({ cwd: opts.cwd }));
     }
+    if (name === "arggon_priority") {
+      return toolResult(
+        priorityOperation({
+          cwd: opts.cwd,
+          dryRun: args.dry_run === true,
+        }),
+      );
+    }
+    if (name === "arggon_sync") {
+      return toolResult(
+        syncOperation({
+          cwd: opts.cwd,
+          check: args.check === true,
+          write: args.write === true,
+          repo: str(args.repo),
+        }),
+      );
+    }
+    if (name === "arggon_import_issues") {
+      return toolResult(
+        importIssuesOperation({
+          cwd: opts.cwd,
+          repo: str(args.repo),
+          parent: str(args.parent),
+          dryRun: args.dry_run === true,
+          // Tracker auto-commit resolves like the CLI (`x-tracker.auto-commit`,
+          // default ON) so both entry points stay envelope-identical.
+          commit: args.no_commit === true ? false : undefined,
+          templatesDir: bundledTemplatesDir(),
+        }),
+      );
+    }
+    if (name === "arggon_start") {
+      return toolResult(
+        spawnedOutcome(opts, "start", [
+          str(args.id) ?? "",
+          ...(typeof args.assignee === "string" ? ["--assignee", args.assignee] : []),
+          ...(args.open_pr === true ? ["--open-pr"] : []),
+          ...(args.worktree === true ? ["--worktree"] : []),
+          ...(args.no_hook === true ? ["--no-hook"] : []),
+          ...(typeof args.post_start_shell === "string"
+            ? ["--post-start-shell", args.post_start_shell]
+            : []),
+        ]),
+      );
+    }
+    if (name === "arggon_branch") {
+      return toolResult(spawnedOutcome(opts, "branch", [str(args.id) ?? ""]));
+    }
+    if (name === "arggon_cleanup") {
+      return toolResult(
+        spawnedOutcome(opts, "cleanup", [
+          ...(args.prune === true ? ["--prune"] : []),
+          ...(args.no_commit === true ? ["--no-commit"] : []),
+          ...(args.no_gh === true ? ["--no-gh"] : []),
+        ]),
+      );
+    }
     throw new Error(`unknown tool "${String(name)}"`);
   };
 
@@ -587,6 +826,90 @@ export function runMcpServer(opts: McpServerOptions): void {
 
 function str(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+/** Wall-clock budget for one spawned CLI flow (`start` pushes; PRs included). */
+const CLI_SPAWN_TIMEOUT_MS = 600_000;
+/** Envelope read-back bound (only start/branch/cleanup spawn the CLI). */
+const CLI_SPAWN_MAX_BUFFER = 32 * 1024 * 1024;
+/** Tool-error message budget for a clipped child stderr tail. */
+const CLI_SPAWN_ERROR_CHARS = 500;
+
+/**
+ * Clip an error detail to the tool-error budget, keeping the TAIL (the failing
+ * line is usually last in a CLI's stderr).
+ */
+function clipTail(text: string, max = CLI_SPAWN_ERROR_CHARS): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= max) return trimmed;
+  return `…${trimmed.slice(trimmed.length - max)}`;
+}
+
+/**
+ * Derive the CLI re-entry spec from how this server process was launched.
+ * Built bin: `arggon mcp` → `argv = [node, <root>/dist/cli.js, "mcp"]` —
+ * re-spawn `[node, <root>/dist/cli.js]`. Source run: `npm run arggon -- mcp`
+ * → `argv = [node, <tsx>/cli.mjs, <root>/cli/src/cli.ts, "mcp"]` — re-spawn
+ * `[node, <tsx>/cli.mjs, <root>/cli/src/cli.ts]`. Anything else returns
+ * undefined and the spawn tools fail with the remediation message instead of
+ * re-spawning an unrelated entry — tests inject; under vitest the check
+ * rejects the forks worker (`dist/workers/forks.js`, what argv[1] actually is
+ * there; the suffix check is deliberately narrow, not a basename claim).
+ */
+function deriveDefaultCliSpawn(): CliSpawnSpec | undefined {
+  const entry = process.argv[1];
+  if (!entry) return undefined;
+  if (entry.endsWith("cli.js")) return { command: process.execPath, args: [entry] };
+  const source = process.argv[2];
+  if (entry.endsWith("cli.mjs") && typeof source === "string" && source.endsWith(".ts")) {
+    return { command: process.execPath, args: [entry, source] };
+  }
+  return undefined;
+}
+
+/**
+ * Run one CLI flow (`start`/`branch`/`cleanup`) and return its `--json`
+ * envelope as the tool outcome (ADR 0014). The child gets an argv array —
+ * never a shell — so tool arguments cannot inject commands. A child that
+ * exits with a parsable envelope (kernel failure, `ok: false` on stdout)
+ * becomes a tool error result; a child that dies without one (crash, timeout
+ * kill) throws a tool-level error carrying a clipped stderr tail — both keep
+ * the MCP session alive.
+ */
+function spawnedOutcome(
+  opts: { cwd: string; cliSpawn?: CliSpawnSpec },
+  command: string,
+  args: string[],
+): CommandOutcome {
+  const spec = opts.cliSpawn ?? deriveDefaultCliSpawn();
+  if (!spec) {
+    throw new Error(
+      `arggon_${command} spawns the arggon CLI; launch \`arggon mcp\` through the built bin ` +
+        `(or \`npm run arggon -- mcp\`), or inject options.cliSpawn (tests)`,
+    );
+  }
+  const proc = spawnSync(spec.command, [...spec.args, command, "--json", ...args], {
+    cwd: opts.cwd,
+    encoding: "utf8",
+    timeout: CLI_SPAWN_TIMEOUT_MS,
+    maxBuffer: CLI_SPAWN_MAX_BUFFER,
+  });
+  const stdout = typeof proc.stdout === "string" ? proc.stdout : "";
+  const stderr = typeof proc.stderr === "string" ? proc.stderr : "";
+  let envelope: unknown;
+  try {
+    envelope = JSON.parse(stdout);
+  } catch {
+    const why =
+      proc.error?.message ??
+      (proc.signal !== null ? `killed by ${proc.signal}` : `exit code ${proc.status ?? "unknown"}`);
+    throw new Error(
+      `arggon ${command} did not emit a JSON envelope (${why}): ${clipTail(stderr) || "no stderr"}`,
+    );
+  }
+  const ok = (envelope as { ok?: unknown }).ok === true;
+  if (ok) return { ok: true, envelope, exitCode: 0 } as CommandOutcome;
+  return { ok: false, envelope, exitCode: proc.status === 0 ? 1 : (proc.status ?? 1) } as CommandOutcome;
 }
 
 /**
