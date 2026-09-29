@@ -1,13 +1,13 @@
 ---
 type: task
-status: todo
+status: cancelled
 id: task-native-preparation-names-stale-deps
 title: "Native start preparation payload should name a stale install's missing dependencies"
 parent: native-redesign
 labels: [opencode-seam, worktree, install]
 priority: p3
 created: "2026-09-28"
-updated: "2026-09-28"
+updated: "2026-09-29"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-native-preparation-names-stale-deps.md
