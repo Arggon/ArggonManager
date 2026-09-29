@@ -169,3 +169,7 @@ Note the CLI twin is structurally one step behind on the bound (no `boundedNativ
 Files changed: `opencode/plugins/arggon/index.ts` (+3/-1), `opencode/plugins/arggon/index.bundle.ts` (+1/-1, regenerated), `opencode/plugins/arggon/tools.test.ts` (+132). Nothing outside those three (no `package.json`, `smoke/**`, `.github/workflows/**`, `lib/src/**`).
 
 Left `status: in_progress` — `done` is the coordinator's call after merge.
+
+### handoff 2026-09-29 @Arggon — next: Coordinator: review draft PR #432 (head b9929e05) and MERGE-merge it (never squash), then flip status to done.
+- branch: fix/bug-native-cleanup-worktree-failure-unbounded
+- open questions: CLI twin cli/src/cleanup.ts:197 is still unbounded (noted on bug-cli-cleanup-branch-delete-missing-failure, unfixed by design); should that item absorb the outer catch too?; At the 500 cap a short er…
