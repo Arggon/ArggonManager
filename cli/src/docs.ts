@@ -264,6 +264,10 @@ const DOC_PATH_MAP: Record<string, string> = {
  */
 const DOC_PREFIX_MAP: { prefix: string; dest: string }[] = [
   { prefix: "opencode/", dest: ".opencode/" },
+  // ZCode plugin seam (ADR 0014, task-zcode-plugin-seam): the marketplace
+  // catalog + the vendored declarative plugin land under one root the user
+  // adds as a local marketplace (the platform's one manual install step).
+  { prefix: "zcode/", dest: ".zcode-marketplace/" },
 ];
 
 /** Canonical (v5) destination of a template-relative path. */
@@ -300,12 +304,15 @@ function isJsonDestination(dest: string): boolean {
 }
 
 /**
- * TypeScript destinations (the bundled OpenCode plugin) take a `//` line
- * comment as their visible provenance marker; `//` is valid TS at any position
- * and keeps the first line syntactically inert.
+ * TypeScript/JavaScript destinations (the bundled OpenCode plugin, the ZCode
+ * gate script) take a `//` line comment as their visible provenance marker;
+ * `//` is valid TS/JS at any position and keeps the first line syntactically
+ * inert.
  */
 function isTypeScriptDestination(dest: string): boolean {
-  return dest.endsWith(".ts") || dest.endsWith(".tsx");
+  return (
+    dest.endsWith(".ts") || dest.endsWith(".tsx") || dest.endsWith(".mjs") || dest.endsWith(".js")
+  );
 }
 
 /**
@@ -319,11 +326,14 @@ function isYamlDestination(dest: string): boolean {
 
 /**
  * Markdown artifacts whose syntax requires YAML frontmatter on the first line
- * (OpenCode agents/commands): their visible marker is a `#` comment INSIDE the
- * frontmatter instead of a leading HTML comment.
+ * (OpenCode and ZCode agents/commands): their visible marker is a `#` comment
+ * INSIDE the frontmatter instead of a leading HTML comment.
  */
 function isFrontmatterDestination(dest: string): boolean {
-  return dest.startsWith(".opencode/") && dest.endsWith(".md");
+  return (
+    (dest.startsWith(".opencode/") || dest.startsWith(".zcode-marketplace/")) &&
+    dest.endsWith(".md")
+  );
 }
 
 /**
