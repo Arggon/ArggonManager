@@ -10,7 +10,6 @@ labels: [opencode-seam, worktree, install]
 priority: p2
 created: "2026-09-28"
 updated: "2026-09-29"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-worktree-readiness-misses-stale-primary-install
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-worktree-readiness-misses-stale-primary-install.md
