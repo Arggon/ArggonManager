@@ -63,3 +63,7 @@ Evidence (implementation complete, review-ready):
 - Smoke, this repo: flagged exploration-adopter-upgrade-experience-007 (DECISION-PENDING-EXPLORATION, line 100) and ADRs 0002/0003/0004 (STALE-PROPOSED-ADR, line 3 each). Additional honest findings the detector surfaced (report-only; owned by other tasks): explorations 002/003/005/008 pending (008's Decision still holds the placeholder although ADR 0009 landed; 003/005 record a deliberate no-ADR decision, which the contract still reports as a gap). No SPEC-STATUS-DRIFT instance in this repo (spec-zcode-native-seam-012 and its plan are both proposed).
 - Deviation note: kind strings use the exact uppercase names from the work order (DECISION-PENDING-EXPLORATION / STALE-PROPOSED-ADR / SPEC-STATUS-DRIFT), unlike the lowercase kebab kinds of spec-analyze-004; kind is opaque in the contract and baselines sort deterministically.
 - Overlap check: PR #442 (task-done-gate-acceptance-waiver, README + json-output.md) is still open, so no rebase was needed; if it merges first, rebase before ready — different sentences/rows, conflict unlikely.
+
+### handoff 2026-09-29 @Arggon — next: Coordinator review of PR #441 (ready): decisions bucket + 3 finding kinds, evidence on item + PR body. After merge: file follow-up tasks for the repo's own flagged decisions (explorations 002/003/005…
+- branch: feat/task-spec-analyze-decision-gaps
+- open questions: Thresholds 7d/14d deviate from the 30d/90d example (required for this repo's smoke); uppercase kind strings per work order
