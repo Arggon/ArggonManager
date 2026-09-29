@@ -54,3 +54,6 @@ standing CLI ↔ MCP option-surface parity invariant (`mcp-parity.test.ts`).
       `ok:true` before every commit
 
 ## Notes
+
+### 2026-09-29 @Arggon
+T1 implemented in worktree feat/task-mcp-full-surface, PR #436 open (not merged; item stays claimed until then). 15-tool MCP surface: priority/sync/import_issues in-process via kernel ops; start/branch/cleanup spawn the CLI (argv array) and return its --json envelope. Spawn spec derived from launch argv (cli.js / tsx) or injected; envelope-less children become tool errors, session survives. Parity invariant extended to 15 tools; envelope parity for priority/branch/cleanup. doctor --budget advisory cap 12 KiB -> 16 KiB (measured 15,701 B). Gates: 1710 vitest, eslint, tsc, validate all green. Gotcha for T2: spec/plan zcode-native-seam-012 + ADR 0014 live in THIS branch; flip spec/plan to implemented only when T2 lands.
