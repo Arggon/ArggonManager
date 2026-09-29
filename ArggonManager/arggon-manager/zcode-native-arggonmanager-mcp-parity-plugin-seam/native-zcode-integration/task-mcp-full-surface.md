@@ -76,3 +76,28 @@ spec's acceptance spans both waves.
 
 ### handoff 2026-09-29 @Arggon — next: Review + merge PR #436. After merge: merge origin/main into feat/task-zcode-plugin-seam before landing #437 (main carries a comment commit on this item file; expect a trivial item-file overlap, keep …
 - branch: feat/task-mcp-full-surface
+
+### 2026-09-29 @Arggon
+smoke: E2E evidence for PR #436 (MCP full tool surface) — node v26.7.0, npm 12.0.2, built dist/cli.js v0.4.0 (`npm run build` ok). Fixture: throwaway git repo; built bin `init` + create initiative/epic/story/task — all ok envelopes (l, a, story-login, task-rate-limit).
+
+MCP probes (spawn `node dist/cli.js mcp`, newline-delimited JSON-RPC):
+- initialize -> proto 2025-06-18, serverInfo {"name":"arggon","version":"0.4.0"} — PASS
+- tools/list -> exactly 15 tools: arggon_list, arggon_create, arggon_update, arggon_comment, arggon_handoff, arggon_show, arggon_next, arggon_report, arggon_validate, arggon_priority, arggon_sync, arggon_import_issues, arggon_start, arggon_branch, arggon_cleanup — PASS
+- arggon_list -> ok:true, 4 items incl task-rate-limit — PASS
+- arggon_next -> ok:true, suggestion task-rate-limit — PASS
+- arggon_create {task mcp-smoke @story-login} -> ok:true, id task-mcp-smoke — PASS
+- arggon_update {status in_progress, assignee smoke} -> ok:true, claimed_at set — PASS
+- arggon_branch {task-mcp-smoke} -> ok:true, branch feat/task-mcp-smoke, created:true — PASS
+- arggon_priority {dry_run:true} -> ok:true, scanned=5, changed=0 — PASS
+- arggon_cleanup {} -> ok:true, candidates=0 — PASS
+- arggon_show {task-rate-limit} -> ok:true, item + comments[] — PASS
+- arggon_validate -> ok:true, errors=0 — PASS
+
+Error isolation:
+- arggon_branch {id does-not-exist} -> isError:true, ok:false, code BRANCH_FAILED ("id not found"); follow-up tools/list -> 15 (session alive) — PASS
+- no reopen via MCP: arggon_update {status todo} on a done item -> isError:true, ok:false, UPDATE_FAILED "agents must not reopen done items"; item frontmatter stays status: done — PASS
+- arggon_update on missing id -> isError:true, UPDATE_FAILED — PASS
+
+Not smoked: arggon_start (would push to a remote; spawn path identical to arggon_branch/arggon_cleanup, both smoked live), arggon_sync + arggon_import_issues (need gh + network; option-surface parity tests cover them).
+
+Combined loop: this branch merged with feat/task-zcode-plugin-seam in a throwaway worktree (sole conflict: tracker item .md, resolved -X ours; zero code conflicts), fresh npm ci + build: init vendors the 18-file .zcode-marketplace seam AND `mcp` tools/list = 15. Full adopter loop green.
