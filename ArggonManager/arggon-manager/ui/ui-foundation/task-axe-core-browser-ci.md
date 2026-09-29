@@ -233,3 +233,7 @@ scope and I did not want to grow the diff.
 `npx prettier --check` clean on all six touched files.
 
 PR: **#435** (draft) — https://github.com/Arggon/ArggonManager/pull/435
+
+### handoff 2026-09-29 @Arggon — next: Review PR #435 (draft) and merge: axe is wired into the @smoke lane, the 35 color-contrast nodes are fixed, no rule is excluded
+- branch: feat/task-axe-core-browser-ci
+- open questions: is the dep-blocked muted-surface visual change acceptable?; browser lane needs --preserve-symlinks in link-farm worktrees - file under start-worktree-ergonomics?; is one axe scan on the ready page en…
