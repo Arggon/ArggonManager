@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-wire-native-start-cold-smoke-into-ci
 title: Decide and wire the native start cold-start smoke into a CI lane
+assignee: Arggon
+branch: feat/task-wire-native-start-cold-smoke-into-ci
 parent: ui-foundation
 labels: [opencode-seam, smoke, ci]
 priority: p3
 created: "2026-09-28"
-updated: "2026-09-28"
+updated: "2026-09-29"
+claimed_at: "2026-09-29T00:17:06.012Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-wire-native-start-cold-smoke-into-ci
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-wire-native-start-cold-smoke-into-ci.md
