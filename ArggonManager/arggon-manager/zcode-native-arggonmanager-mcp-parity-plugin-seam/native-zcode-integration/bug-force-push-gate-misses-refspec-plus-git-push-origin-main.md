@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-force-push-gate-misses-refspec-plus-git-push-origin-main
 title: Force-push gate misses refspec-plus (git push origin +main)
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: native-zcode-integration
 labels: []
 created: "2026-09-29"
 updated: "2026-09-29"
-claimed_at: "2026-09-29T21:02:45.843Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-force-push-gate-misses-refspec-plus-git-push-origin-main
 ---
 # Force-push gate misses refspec-plus (git push origin +main)
