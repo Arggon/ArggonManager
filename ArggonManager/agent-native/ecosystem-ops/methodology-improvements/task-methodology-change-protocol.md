@@ -1,14 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-methodology-change-protocol
 title: methodology-change-protocol
+assignee: Arggon
+branch: feat/task-methodology-change-protocol
 parent: methodology-improvements
 labels: []
 priority: p2
 created: "2026-09-29"
 updated: "2026-09-29"
+claimed_at: "2026-09-29T23:49:13.562Z"
 depends_on: [task-adr-adopter-upgrade-channel]
+worktree_path: /home/arggon/Projects/ArggonManager-task-methodology-change-protocol
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-methodology-change-protocol.md
