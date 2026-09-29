@@ -86,3 +86,6 @@ Flipping `spec-zcode-native-seam-012` / the plan to `implemented` happens
 when this lands AFTER T1 (the spec files live in T1's branch).
 
 ## Notes
+
+### handoff 2026-09-29 @Arggon — next: Review + merge PR #437 AFTER #436 (docs reference the 15-tool MCP surface and ADR 0014/spec land there). Then: merge origin/main into this branch first (main carries the depends_on frontmatter update…
+- branch: feat/task-zcode-plugin-seam
