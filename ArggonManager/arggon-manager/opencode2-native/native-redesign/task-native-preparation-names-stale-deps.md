@@ -57,3 +57,26 @@ the remedy actionable there, as it now is on the CLI.
 
 ### 2026-09-29 @Arggon
 Superseded by PR #429 (branch fix/bug-worktree-readiness-misses-stale-primary-install, commit 550f3575): the native `preparation` payload now projects `manifestCoverage`, `missingDependencies` (kernel-capped at 10) and `missingDependenciesTotal` from the shared kernel receipt, and `opencode2.md`/`agents.md`/`playbooks/opencode.md` document them. Nothing is left of this task's acceptance list except work that already landed, so it is redundant; left `todo` untouched for the coordinator to close as superseded with the reason recorded here. No claim taken, no other file touched.
+
+### 2026-09-29 @Arggon-coordinator
+## Superseded — delivered in PR #429 instead (2026-09-28)
+
+This item was filed by the worker of `bug-worktree-readiness-misses-stale-primary-install` as an
+honest "I cannot finish this inside my scope" disclosure: the native `preparation` receipt reported
+`ready`, but `boundedPreparation` dropped `manifestCoverage`, `missingDependencies` and
+`missingDependenciesTotal` — so a native caller could learn *that* the install was stale but not
+*which* dependency was missing.
+
+I did not let it sit as a p3. The defect was reported **against the native receipt** — a native caller
+is exactly who was misled — and the parent item's acceptance box 2 requires the names "so the fix is
+actionable without a diffing script". Shelling out to the CLI to find the missing package is the
+manual diffing the item exists to remove, so the fix was one step short of complete.
+
+The plugin's scope constraint was a wave artifact, not a real one: once PR #428 merged the plugin was
+unowned, and the same worker finished the loop inside PR #429 — the three fields are now projected
+into the native receipt (kernel cap respected, truncation folded into the shared `truncated` flag),
+with native tests for both the named case and the capped case, the `opencode2.md` payload table
+updated, and the tool schema byte-identical at 11 821 B (re-measured by the coordinator).
+
+Closing as **cancelled/superseded** rather than done: the work landed under the bug it belongs to, and
+this item never had independent content of its own.
