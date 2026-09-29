@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-zcode-board-command
 title: Ship /arggon-board in the ZCode seam (ADR 0014 board substitute)
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: native-zcode-integration
 labels: []
 created: "2026-09-29"
 updated: "2026-09-29"
-claimed_at: "2026-09-29T21:13:55.517Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-board-command
 ---
 <!--
