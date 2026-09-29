@@ -1,6 +1,7 @@
 # 0004 Convention v3: milestone + dependency graph
 
-- Status: Proposed
+- Status: Accepted
+> Status note (2026-09-29): accepted retroactively — the `depends_on` graph shipped with convention v3 and remains part of v5 (`docs/convention.md` cites this ADR); it sat `Proposed` without a recorded acceptance (task-adr-status-housekeeping).
 - Date: 2026-09-11
 - Deciders: Software Architect (author), Project Manager, Software Developer (aware)
 

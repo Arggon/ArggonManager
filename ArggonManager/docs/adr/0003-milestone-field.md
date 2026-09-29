@@ -1,6 +1,7 @@
 # 0003 Milestone field for convention v3
 
-- Status: Proposed
+- Status: Accepted
+> Status note (2026-09-29): accepted retroactively — the milestone field shipped with convention v3 and remains part of v5 (`docs/convention.md` cites this ADR for the field); it sat `Proposed` without a recorded acceptance (task-adr-status-housekeeping).
 - Date: 2026-09-11
 - Deciders: Software Architect (author), Project Manager, Software Developer (aware)
 
