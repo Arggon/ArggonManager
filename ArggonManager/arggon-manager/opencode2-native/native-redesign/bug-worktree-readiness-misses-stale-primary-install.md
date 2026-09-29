@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-worktree-readiness-misses-stale-primary-install
 title: "Worktree dependency prep reports ready: true while a declared devDependency is missing from the linked primary install"
 assignee: Arggon
@@ -9,8 +9,7 @@ parent: native-redesign
 labels: [opencode-seam, worktree, install]
 priority: p2
 created: "2026-09-28"
-updated: "2026-09-28"
-claimed_at: "2026-09-28T23:16:15.651Z"
+updated: "2026-09-29"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-worktree-readiness-misses-stale-primary-install
 ---
 <!--
