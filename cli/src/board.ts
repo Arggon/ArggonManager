@@ -182,12 +182,20 @@ export function runBoard(opts: BoardOptions): BoardResult {
     : { root, outPath, itemCount: items.length, prCount: overlay.size };
 }
 
+/**
+ * Type badge fills. The `.type` chip paints white 10px text on these, so every
+ * value is darkened from its original Tailwind-ish hue until white clears the
+ * WCAG 2.2 AA text threshold of 4.5:1 (task-axe-core-browser-ci; the
+ * `color-contrast` rule in the `@smoke` lane measures the rendered pair). The
+ * hues are unchanged — only their lightness moved: initiative 4.47 -> 4.60,
+ * epic 4.23 -> 4.60, story 2.77 -> 4.64, task 2.54 -> 4.64, bug 3.76 -> 4.60.
+ */
 const TYPE_COLORS: Record<WorkItem["type"], string> = {
-  initiative: "#6366f1",
-  epic: "#8b5cf6",
-  story: "#0ea5e9",
-  task: "#10b981",
-  bug: "#ef4444",
+  initiative: "#6264ed",
+  epic: "#8458ea",
+  story: "#0b7cb0",
+  task: "#0c855d",
+  bug: "#d53d3d",
 };
 
 export function escapeHtml(value: string): string {
@@ -1104,6 +1112,15 @@ export function renderBoardHtml(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>arggon board${repo}</title>
 <style>
+/* Contrast policy (task-axe-core-browser-ci): the @smoke lane runs axe
+   against this page and fails on any WCAG A/AA-tagged automated violation, so
+   every foreground/background pair here is chosen to clear 4.5:1 for body text
+   (WCAG 2.2 AA, 1.4.3) at the size it is actually rendered. The muted text grey
+   is a single value (#666a6f) rather than several near-identical ones, because
+   it has to clear the threshold on all three surfaces it appears on — the white
+   card (#fff, 5.45:1), the column (#ebecf0, 4.61:1) and the dep-blocked card
+   (#f6f7f9, 5.08:1). The two greys it replaced, #a0a6ad (2.46:1) and #8c919a
+   (3.17:1 on the card), failed. */
 :root { color-scheme: light; font-family: system-ui, sans-serif; }
 body { margin: 0; padding: 16px; background: #f4f5f7; color: #1f2328; }
 header { margin-bottom: 16px; }
@@ -1114,7 +1131,7 @@ header .meta { color: #59636e; font-size: 13px; }
 .column { background: #ebecf0; border-radius: 8px; padding: 10px; }
 .column h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #424a53; }
 .column .count { background: #d0d4da; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
-.column .empty { color: #8c919a; text-align: center; padding: 12px 0; }
+.column .empty { color: #666a6f; text-align: center; padding: 12px 0; }
 .card { background: #fff; border-radius: 6px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.1); padding: 10px; margin-bottom: 8px; font-size: 13px; }
 .card:last-child { margin-bottom: 0; }
 .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
@@ -1129,14 +1146,14 @@ header .meta { color: #59636e; font-size: 13px; }
 .parent { color: #59636e; font-size: 11px; margin-bottom: 4px; }
 .parent::before { content: "↳ "; }
 .assignee { color: #424a53; font-size: 12px; }
-.assignee.unassigned { color: #a0a6ad; }
+.assignee.unassigned { color: #666a6f; }
 .branch { color: #8250df; font-size: 12px; font-family: ui-monospace, monospace; }
 .pr { font-size: 12px; margin-top: 2px; }
 .pr a { color: inherit; text-decoration: none; }
 .pr a:hover { text-decoration: underline; }
 .pr a.diff { color: #0550ae; font-weight: 400; }
-.pr.nopr { color: #a0a6ad; }
-.pr.draft { color: #8c919a; }
+.pr.nopr { color: #666a6f; }
+.pr.draft { color: #666a6f; }
 .pr.open { color: #1a7f37; font-weight: 600; }
 .pr.merged { color: #8250df; }
 .pr.closed { color: #cf222e; }
@@ -1144,16 +1161,22 @@ header .meta { color: #59636e; font-size: 13px; }
 .label { background: #e7ebef; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
 .blocked-reason { margin-top: 6px; color: #9a3412; background: #fff1e7; border-radius: 4px; padding: 4px 6px; font-size: 12px; }
 .blocked-by { color: #9a3412; font-size: 11px; margin-top: 2px; overflow-wrap: anywhere; }
-.card.dep-blocked { opacity: 0.55; }
+/* A dep-blocked card reads as muted through its surface, not through a blanket
+   opacity: opacity composites every descendant against the column and took
+   the whole card to 1.5-2.7:1 (axe color-contrast on the title, id, parent,
+   branch, badges and labels — 13 nodes on the @smoke fixture). The muted fill
+   keeps the de-emphasis cue and leaves the text legible (#59636e on #f6f7f9 is
+   5.70:1). */
+.card.dep-blocked { background: #f6f7f9; }
 .card.dep-blocked .title { color: #59636e; }
 .blocked-badge { margin-left: auto; color: #9a3412; background: #fff1e7; border-radius: 10px; padding: 0 8px; font-size: 10px; font-weight: 600; white-space: nowrap; }
 .milestone { color: #0550ae; font-size: 12px; margin-top: 2px; }
 .mgroup-head { margin: 10px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #0550ae; }
 .mgroup-head:first-child { margin-top: 0; }
-.mgroup-head.none { color: #8c919a; }
+.mgroup-head.none { color: #666a6f; }
 .card[draggable="true"] { cursor: grab; }
 .card.dragging { opacity: 0.5; }
-.column.over { outline: 2px dashed #8c919a; outline-offset: -4px; }
+.column.over { outline: 2px dashed #666a6f; outline-offset: -4px; }
 #board-toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); max-width: 80%; background: #424a53; color: #fff; border-radius: 6px; padding: 8px 14px; font-size: 13px; display: none; z-index: 10; box-shadow: 0 2px 8px rgb(0 0 0 / 0.3); }
 #board-toast.show { display: block; }
 #board-toast.refused { background: #cf222e; }
