@@ -13,7 +13,6 @@ updated: "2026-09-29"
 claimed_at: "2026-09-29T00:17:06.012Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-wire-native-start-cold-smoke-into-ci
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-wire-native-start-cold-smoke-into-ci.md
   Leaves live only under a story. id is the filename stem: task-wire-native-start-cold-smoke-into-ci.
@@ -174,3 +173,7 @@ And the lane contract itself: the job shell is `bash -e` (no `defaults.run.shell
 Three files, +45/−1: `.github/workflows/ci.yml`, `CONTRIBUTING.md`, `ArggonManager/docs/engineering.md`. **No** `package.json` / `package-lock.json` change (the script already existed — no change was needed), **no** change under `opencode/plugins/arggon/**`, `smoke/**` or `lib/src/**`. The probe mutation was confined to the deleted throwaway copy.
 
 Draft PR #431, head `42843794`, left open and in draft for coordinator review. Item stays `in_progress`.
+
+### handoff 2026-09-29 @Arggon — next: Coordinator: review draft PR #431 and merge; the cli job's last step is the wired smoke and CI is the real proof
+- branch: feat/task-wire-native-start-cold-smoke-into-ci
+- open questions: Any ci.yml runner cost concern with the step, or accept as-is?; Should smoke:opencode also cover the cold start once quota allows?
