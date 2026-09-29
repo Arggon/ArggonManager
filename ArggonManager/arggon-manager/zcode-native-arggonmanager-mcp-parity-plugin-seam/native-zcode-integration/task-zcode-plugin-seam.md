@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-zcode-plugin-seam
 title: "ZCode plugin seam: vendored plugin, reviewer hook backstop, init generation"
+assignee: Arggon
+branch: feat/task-zcode-plugin-seam
 parent: native-zcode-integration
 labels: []
 created: "2026-09-29"
 updated: "2026-09-29"
+claimed_at: "2026-09-29T11:26:33.161Z"
 depends_on: [task-mcp-full-surface]
+worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-plugin-seam
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/zcode-native-arggonmanager-mcp-parity-plugin-seam/native-zcode-integration/task-zcode-plugin-seam.md
