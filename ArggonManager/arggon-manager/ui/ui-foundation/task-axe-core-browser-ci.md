@@ -14,6 +14,7 @@ claimed_at: "2026-09-29T01:43:14.629Z"
 depends_on: [task-ast-grep-structural-rules]
 worktree_path: /home/arggon/Projects/ArggonManager-task-axe-core-browser-ci
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-axe-core-browser-ci.md
   Leaves live only under a story. id is the filename stem: task-axe-core-browser-ci.
@@ -29,17 +30,25 @@ Add `@axe-core/playwright` to the existing Playwright Test browser lane so commo
 
 ## Acceptance
 
-- [ ] Add an exact/dev-only `@axe-core/playwright` dependency compatible with the pinned Playwright version; it must not enter production dependencies or the published package.
-- [ ] Run AxeBuilder against the real served board in the existing `@smoke` Chromium lane after the page is ready and before the interaction/round-trip assertions complete.
-- [ ] Assert WCAG-tagged automated checks with a stable, reviewed policy: no unexplained exclusions, disable-rules, or blanket exclusions; any accepted exception records the exact rule, reason, and owner.
-- [ ] Fix only accessibility defects exposed on the current smoke surface or file linked follow-ups before merge; preserve the existing card match, status move, persistence, TUI, and live behavior.
-- [ ] Keep the lane Chromium-only, one-worker, and deterministic on CI; no hosted accessibility service or personal browser profile.
-- [ ] Update contributor/CI/testing documentation with the exact local and CI commands and failure remediation.
-- [ ] Real-browser smoke evidence plus `npm test`, `npm run lint`, `npm run build`, `npm run check:plugin`, `npx playwright test --grep @smoke`, and `arggon validate` are green.
+- [x] Add an exact/dev-only `@axe-core/playwright` dependency compatible with the pinned Playwright version; it must not enter production dependencies or the published package.
+      — `4.13.0` pinned exact in `devDependencies` (peer `playwright-core >= 1.0.0`; the lane's pinned `@playwright/test` is 1.63.0). `dependencies` unchanged; both new lock nodes marked `"dev": true`; `npm pack --dry-run` → 109 files with no axe/playwright/`e2e` path.
+- [x] Run AxeBuilder against the real served board in the existing `@smoke` Chromium lane after the page is ready and before the interaction/round-trip assertions complete.
+      — One scan in `renders one card per tracker item`, right after the existing `h1` board-load assertion (the readiness signal reused, no sleep), before the card-parity and round-trip tests. No second spec, no second runner, no workflow change.
+- [x] Assert WCAG-tagged automated checks with a stable, reviewed policy: no unexplained exclusions, disable-rules, or blanket exclusions; any accepted exception records the exact rule, reason, and owner.
+      — `withTags(["wcag2a","wcag2aa","wcag21a","wcag21aa","wcag22aa"])`, asserted via a strict `toEqual([])`. Zero `disableRules`/`exclude`/`include`/narrowing; **zero accepted exceptions**. The exception rule (rule id + reason + owner at the call site, plus both docs) is written into the spec, `CONTRIBUTING.md` and `ArggonManager/docs/engineering.md`.
+- [x] Fix only accessibility defects exposed on the current smoke surface or file linked follow-ups before merge; preserve the existing card match, status move, persistence, TUI, and live behavior.
+      — The first scan reported one rule, `color-contrast` (wcag2aa), 35 nodes, two root causes; both fixed in `cli/src/board.ts` (badge/muted palette darkened; `.card.dep-blocked` blanket `opacity: 0.55` replaced by a muted surface). Fixed `bug` and the latent `.empty`/`.mgroup-head.none`/`.pr.draft` greys too. Filed instead of excluded: `task-axe-board-drawer-and-lens-coverage`, `task-board-non-text-contrast-and-drag-affordance`. Card match, status move, persistence, the TUI frame check and the live-reload test are unchanged and green.
+- [x] Keep the lane Chromium-only, one-worker, and deterministic on CI; no hosted accessibility service or personal browser profile.
+      — `playwright.config.ts` untouched (Chromium project, `workers: 1`, bounded retries). axe runs in-process against the local fixture server only: no hosted service, no network beyond localhost, no personal profile.
+- [x] Update contributor/CI/testing documentation with the exact local and CI commands and failure remediation.
+      — `CONTRIBUTING.md` § UI smoke tests (commands, tag set, policy, and a numbered failure-remediation procedure) and `ArggonManager/docs/engineering.md` § Smoke test (new a11y bullet with what the gate does _not_ claim) + the testing-expectations table row.
+- [x] Real-browser smoke evidence plus `npm test`, `npm run lint`, `npm run build`, `npm run check:plugin`, `npx playwright test --grep @smoke`, and `arggon validate` are green.
+      — Local: 9/9 in real Chromium; `npm test` 103 files / 1702 tests; lint, build, `check:plugin`, `lint:structure`, `test:structure` clean; `validate --json` `ok:true`. CI on PR #435: `cli` pass, `ui-smoke` pass (9/9 @smoke + TUI frame), `tasks-validate` pass. The gate was also proven to **fail** by reverting one colour (see the item comment).
 
 ## Notes
 
 ### 2026-09-29 @Arggon
+
 ## Evidence — @axe-core/playwright in the `@smoke` lane
 
 **Dependency.** `@axe-core/playwright` pinned **exact at 4.13.0** as a
@@ -48,6 +57,7 @@ Compatibility: its only peer is `playwright-core >= 1.0.0`; the lane's pinned
 `@playwright/test` is **1.63.0** (`node -p "require('@playwright/test/package.json').version"`).
 
 **Dev-only / not in the tarball — how it was checked**
+
 1. `dependencies` unchanged: `{"@arggondev/lib":"^0.4.0","commander":"^13.1.0"}`;
    `peerDependencies` and `optionalDependencies` absent. The entry is only under
    `devDependencies`.
@@ -89,13 +99,13 @@ The first scan reported exactly **one** rule — `color-contrast` (wcag2aa),
 **1. Type badge fills — white 10px `.type` text (5 values, all failing).** Fixed,
 hues unchanged, only lightness darkened to clear AA's 4.5:1:
 
-| type | before | ratio | after | ratio |
-| --- | --- | --- | --- | --- |
-| initiative | `#6366f1` | 4.47 | `#6264ed` | 4.60 |
-| epic | `#8b5cf6` | 4.23 | `#8458ea` | 4.60 |
-| story | `#0ea5e9` | 2.77 | `#0b7cb0` | 4.64 |
-| task | `#10b981` | 2.54 | `#0c855d` | 4.64 |
-| bug | `#ef4444` | 3.76 | `#d53d3d` | 4.60 |
+| type       | before    | ratio | after     | ratio |
+| ---------- | --------- | ----- | --------- | ----- |
+| initiative | `#6366f1` | 4.47  | `#6264ed` | 4.60  |
+| epic       | `#8b5cf6` | 4.23  | `#8458ea` | 4.60  |
+| story      | `#0ea5e9` | 2.77  | `#0b7cb0` | 4.64  |
+| task       | `#10b981` | 2.54  | `#0c855d` | 4.64  |
+| bug        | `#ef4444` | 3.76  | `#d53d3d` | 4.60  |
 
 `bug` is not in the smoke fixture, but it is the same rule on the same rendered
 element, so it was fixed rather than left to fail a future lane.
@@ -235,5 +245,6 @@ scope and I did not want to grow the diff.
 PR: **#435** (draft) — https://github.com/Arggon/ArggonManager/pull/435
 
 ### handoff 2026-09-29 @Arggon — next: Review PR #435 (draft) and merge: axe is wired into the @smoke lane, the 35 color-contrast nodes are fixed, no rule is excluded
+
 - branch: feat/task-axe-core-browser-ci
 - open questions: is the dep-blocked muted-surface visual change acceptable?; browser lane needs --preserve-symlinks in link-farm worktrees - file under start-worktree-ergonomics?; is one axe scan on the ready page en…
