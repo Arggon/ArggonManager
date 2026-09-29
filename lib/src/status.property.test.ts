@@ -146,7 +146,6 @@ describe("status transitions (property)", () => {
         fc.array(action, { minLength: 1, maxLength: 6 }),
         fc.constantFrom<CallerKind>("agent", "human"),
         (start, actions, caller) => {
-          const initial = start;
           let state = start;
           for (const request of actions) {
             const before = state;
@@ -164,9 +163,10 @@ describe("status transitions (property)", () => {
             if (request.status === undefined || request.status === before.status) {
               expect(state.status).toBe(before.status);
             }
-            // (2) Terminal is absorbing for the agent path.
-            if (TERMINAL.has(initial.status) && caller === "agent") {
-              expect(state.status).toBe(initial.status);
+            // (2) Terminal is absorbing for the agent path: a sequence that
+            // starts terminal can never leave it.
+            if (TERMINAL.has(start.status) && caller === "agent") {
+              expect(state.status).toBe(start.status);
             }
             // (3) The only way out of a terminal status is through `todo`.
             if (TERMINAL.has(before.status) && state.status !== before.status) {
@@ -187,12 +187,10 @@ describe("status transitions (property)", () => {
               request.assignee !== undefined &&
               request.assignee !== before.assignee
             ) {
+              // Accepted only with a human-only escape hatch: an agent may
+              // neither steal with --force nor take over with --steal.
               const escape = request.force === true || request.steal === true;
-              expect({ accepted: outcome.accepted, escape, caller }).toEqual({
-                accepted: caller === "human" && escape,
-                escape,
-                caller,
-              });
+              expect(outcome.accepted).toBe(caller === "human" && escape);
             }
           }
           // The state is always a member of the status enum.
