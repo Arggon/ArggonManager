@@ -3534,7 +3534,9 @@ async function nativeCleanup(
         clearedPaths.push(byId.get(entry.id)!.filePath)
         clearedIds.push(entry.id)
       } catch (error) {
-        const message = detail(error)
+        // Same bound as the branch-delete catch above, on BOTH surfaces
+        // (bug-native-cleanup-worktree-failure-unbounded).
+        const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)
         failures.push(`${entry.id}: ${message}`)
         pruned.push({ id: entry.id, action: "failed", error: message })
       }

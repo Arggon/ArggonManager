@@ -2538,6 +2538,138 @@ describe("worktree domain tools (W4)", () => {
     expect(gitOut(dir, ["branch", "--list", "feat/task-second"])).toBe("");
   });
 
+  it("cleanup prune bounds every per-candidate failure at the shared cap", async () => {
+    // The reported defect (bug-native-cleanup-worktree-failure-unbounded): the
+    // OUTER per-candidate catch pushed the raw `detail(error)`, so one cleanup
+    // envelope could carry the 500-char branch-delete message next to an
+    // arbitrarily long one on the sibling surface. Both failure surfaces of one
+    // envelope now carry the same bounded text, for every failure kind.
+    const dir = seedGitTree();
+    const { domain, calls } = fakeDomain(dir);
+    const lifecycle = worktreeDefinitions(dir, domain);
+    runCreate({ cwd: dir, type: "task", title: "Second task", parent: "story-login", id: "second" });
+
+    // Candidate A: removable end to end. Its removal is OBSERVED, and the step
+    // that follows (the branch lookup) has no catch of its own, so a failure
+    // there reaches the outer catch — the surface that was unbounded.
+    const started = await tool(lifecycle, "start").execute({
+      id: "task-rate-limit",
+      assignee: "smoke",
+    });
+    const removedPath = String((started.output as { worktreePath?: unknown }).worktreePath);
+    writeFileSync(join(removedPath, "work.txt"), "work\n", "utf8");
+    git(removedPath, ["add", "work.txt"]);
+    git(removedPath, ["commit", "-qm", "feat: work"]);
+    git(dir, ["merge", "--no-ff", "feat/task-rate-limit", "-m", "Merge PR (stubbed)"]);
+    await tool(lifecycle, "update").execute({ id: "task-rate-limit", status: "done" });
+
+    // Candidate B: recorded and terminal, but its removal is unobservable, so
+    // the worktree-REMOVAL surface reports the refusal instead.
+    const stuckPath = join(dirname(dir), `${basename(dir)}-task-second`);
+    git(dir, ["worktree", "add", "--detach", stuckPath]);
+    writeFileSync(join(stuckPath, "other.txt"), "other\n", "utf8");
+    git(stuckPath, ["add", "other.txt"]);
+    git(stuckPath, ["commit", "-qm", "feat: other work"]);
+    git(stuckPath, ["branch", "feat/task-second"]);
+    git(dir, ["merge", "--no-ff", "feat/task-second", "-m", "Merge PR (stubbed)"]);
+    runUpdate({ cwd: dir, id: "task-second", status: "in_progress", assignee: "smoke" });
+    runUpdate({
+      cwd: dir,
+      id: "task-second",
+      status: "done",
+      branch: "feat/task-second",
+      worktreePath: stuckPath,
+    });
+
+    // Over-cap but still plausible git/domain prose: a git listing failure that
+    // carries a whole ref-store diagnosis, and a domain rejection carrying a
+    // whole message (the two producers the item names).
+    const listingFailure =
+      "fatal: could not read from the repository: " +
+      "resolving refs/heads failed against a locked shared ref store; ".repeat(12);
+    const domainFailure =
+      "worktree domain unavailable: " +
+      "its registration outlived the worktree it names and git no longer lists it; ".repeat(11);
+    domain.remove = async (input) => {
+      calls.remove.push(input);
+      if (input.directory === stuckPath) {
+        // Break the registration so the git fallback fails too, then reject.
+        rmSync(join(input.directory, ".git"), { force: true });
+        throw new Error(domainFailure);
+      }
+      git(dir, ["worktree", "remove", input.directory]);
+    };
+    const real = kernel.defaultCleanupGit();
+    const failing = {
+      ...real,
+      branchExists: (cwd: string, branch: string) => {
+        if (branch === "feat/task-rate-limit") throw new Error(listingFailure);
+        return real.branchExists(cwd, branch);
+      },
+    };
+    const defs = argonToolDefinitions({ ...kernel, defaultCleanupGit: () => failing } as ArgonKernel, {
+      cwd: dir,
+      templatesDir: pluginTemplatesDir(),
+      worktree: { projectID: "project-id", canonical: dir, domain },
+    });
+
+    const output = await tool(defs, "cleanup").execute({ prune: true, no_gh: true });
+    const envelope = output.output as Record<string, unknown>;
+    const actions = envelope.pruned as Array<Record<string, unknown>>;
+    const failed = actions.filter((action) => action.action === "failed");
+    expect(failed).toHaveLength(2);
+
+    // A: the uncaught surface. Capped at the shared 500, and the truncation is
+    // VISIBLE (head kept, elision marked) so a reader can tell a clipped error
+    // from a short one. `pruned[].error` and `failures[]` carry the same text.
+    const listed = String(failed[0].error);
+    expect(listed).toContain("fatal: could not read from the repository:");
+    expect(listed.length).toBe(500);
+    expect(listed.endsWith("\u2026")).toBe(true);
+
+    // B: the worktree-removal surface, from the same over-cap prose. The joined
+    // refusal list is capped by the same helper, so B's head survives and the
+    // later steps in the join fall off the cap (unchanged: the join is what
+    // the inner catch has always bounded).
+    const stuck = String(failed[1].error);
+    expect(failed[1]).toMatchObject({
+      id: "task-second",
+      leftoverPath: stuckPath,
+      leftoverBranch: "feat/task-second",
+    });
+    expect(stuck).toContain("worktree domain removal failed: worktree domain unavailable");
+    expect(stuck.length).toBe(500);
+    expect(stuck.endsWith("\u2026")).toBe(true);
+
+    // Both flat entries are `<id>` + separator + the SAME capped text, so the
+    // whole entry is bounded too, not just the message.
+    const flat = envelope.failures as string[];
+    expect(flat).toEqual([`task-rate-limit: ${listed}`, `task-second: ${stuck}`]);
+    expect(flat[0].length).toBeLessThanOrEqual(500 + "task-rate-limit: ".length);
+    expect(flat[1].length).toBeLessThanOrEqual(500 + "task-second: ".length);
+
+    // The run continued past A's failure into B (id order), and A's worktree
+    // removal was observed before the throw, so the worktree is gone while the
+    // record and the branch survive: nothing is cleared, nothing is committed.
+    expect(actions).toEqual([
+      { id: "task-rate-limit", action: `removed worktree ${removedPath}` },
+      { id: "task-rate-limit", action: "failed", error: listed },
+      {
+        id: "task-second",
+        action: "failed",
+        error: stuck,
+        leftoverPath: stuckPath,
+        leftoverBranch: "feat/task-second",
+      },
+    ]);
+    expect(envelope.commit).toBeUndefined();
+    expect(existsSync(removedPath)).toBe(false);
+    expect(existsSync(stuckPath)).toBe(true);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toContain("feat/task-rate-limit");
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBe(removedPath);
+    expect(itemData(dir, "task-second").worktree_path).toBe(stuckPath);
+  });
+
   it("cleanup without prune lists only and never touches the worktree", async () => {
     const dir = seedGitTree();
     const { worktreePath, defs, calls } = await completedWorktree(dir);

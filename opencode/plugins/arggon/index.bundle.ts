@@ -8699,7 +8699,7 @@ async function nativeCleanup(kernel, input, options) {
                 clearedIds.push(entry.id);
             }
             catch (error) {
-                const message = detail(error);
+                const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS);
                 failures.push(`${entry.id}: ${message}`);
                 pruned.push({ id: entry.id, action: "failed", error: message });
             }
