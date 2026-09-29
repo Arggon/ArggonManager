@@ -11,5 +11,10 @@
     "declaration": true,
     "resolveJsonModule": true
   },
-  "include": ["cli/src/**/*.ts"]
+  "include": ["cli/src/**/*.ts"],
+  // Tests are type-checked by vitest/`labs`, never shipped: `files` already
+  // drops `**/*.test.*` from the tarball, and keeping them out of the build
+  // project also keeps a test-only import (the shared property runner in
+  // `test/`, task-fast-check-invariant-properties) out of `dist/`.
+  "exclude": ["**/*.test.ts"]
 }
