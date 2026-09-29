@@ -42,11 +42,11 @@ Design:
 - Checker (report-only): extend `arggon sync` (the PR reconciliation surface) — for each item with an open PR, classify verdict state from the item's body comments: `approved` (latest verdict = approve), `changes-requested` (a request-changes newer than the last approve), `none`. Additive envelope fields (schemaVersion unchanged); no extra gh calls beyond what sync already makes. If a different seam is clearly better, implement it and record the rationale in the PR.
 
 ### Acceptance checklist
-- [ ] `docs/engineering.md` verdict convention section (minimal + example).
-- [ ] `sync --json` emits additive verdict classification per matched/pending PR; unit tests for the parser (approve / request-changes / none; ordering by comment timestamp).
-- [ ] README + `ArggonManager/docs/json-output.md` updated (additive fields noted).
-- [ ] Smoke: fixture item with request-changes newer than approve → `changes-requested`; approve-only → `approved`; no verdicts → `none` (expected vs observed).
-- [ ] Full suite + lint/typecheck green; `arggon validate` ok.
+- [x] `docs/engineering.md` verdict convention section (minimal + example).
+- [x] `sync --json` emits additive verdict classification per matched/pending PR; unit tests for the parser (approve / request-changes / none; ordering by comment timestamp).
+- [x] README + `ArggonManager/docs/json-output.md` updated (additive fields noted).
+- [x] Smoke: fixture item with request-changes newer than approve → `changes-requested`; approve-only → `approved`; no verdicts → `none` (expected vs observed).
+- [x] Full suite + lint/typecheck green; `arggon validate` ok.
 
 ### 2026-09-29 @Arggon
 Implementation + evidence (branch feat/task-review-verdict-checker, PR #440).
