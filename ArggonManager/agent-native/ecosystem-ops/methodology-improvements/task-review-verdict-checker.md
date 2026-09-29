@@ -62,3 +62,7 @@ Implementation + evidence (branch feat/task-review-verdict-checker, PR #440).
   - matched item without verdict comments ⇒ none / none
   - branch+no-PR item ⇒ absent from verdicts / absent
   - schemaVersion 1, exit_code 0 throughout.
+
+### handoff 2026-09-29 @Arggon — next: Coordinator review of PR #440 against the review bar; merge after acceptance checklist tick
+- branch: feat/task-review-verdict-checker
+- open questions: None blocking; blocking merge gate deliberately out of scope per exploration-014 C2
