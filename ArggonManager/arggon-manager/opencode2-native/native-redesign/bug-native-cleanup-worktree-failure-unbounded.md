@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-native-cleanup-worktree-failure-unbounded
 title: Native cleanup worktree-removal failure message is unbounded while the branch-delete path is capped at 500 chars
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [opencode-seam, worktree, review-followup]
 priority: p2
 created: "2026-09-28"
 updated: "2026-09-29"
-claimed_at: "2026-09-29T00:17:03.674Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-native-cleanup-worktree-failure-unbounded
 ---
 <!--
