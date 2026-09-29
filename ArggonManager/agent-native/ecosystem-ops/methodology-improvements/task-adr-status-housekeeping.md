@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adr-status-housekeeping
 title: adr-status-housekeeping
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-29"
 updated: "2026-09-29"
-claimed_at: "2026-09-29T23:27:20.106Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr-status-housekeeping
 ---
 <!--
