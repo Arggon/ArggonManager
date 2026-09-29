@@ -13,6 +13,7 @@ updated: "2026-09-29"
 claimed_at: "2026-09-29T00:17:06.012Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-wire-native-start-cold-smoke-into-ci
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-wire-native-start-cold-smoke-into-ci.md
   Leaves live only under a story. id is the filename stem: task-wire-native-start-cold-smoke-into-ci.
@@ -26,13 +27,64 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-wire-native-start-cold-s
 
 <!-- Why this task exists. -->
 
+`smoke:native-start-cold` landed with PR #427 as a maintainer-run command; that PR
+deliberately left the CI lane undecided and filed this item to make the call
+explicit. Decision: **wire it** — it is deterministic, model-free, offline,
+Chromium-free, needs no provider or quota, and guards a P1 fix, so it belongs with
+the other dev-only node gates already in the `cli` job (`test:structure`,
+`lint:structure`). The browser/TUI `ui-smoke` job is explicitly the wrong home:
+this is not a UI gate, and installing Chromium for it would be wrong.
+
 ## Acceptance
 
-- [ ] 
+- [x] `npm run smoke:native-start-cold` runs in CI in the correct job, after the build it depends on, and a failure fails the lane.
+- [x] The observed runtime is recorded, and the placement is justified against the job's existing steps.
+- [x] No `continue-on-error`, no advisory `if:`, no browser dependency, no second install of the same gates.
+- [x] Docs state the gate runs in CI, what it proves, and that it does not replace the model-driven transcript smoke.
+- [x] A deliberately broken local run is demonstrated to exit non-zero (so the lane's failure mode is proven, not assumed) — show the command and its exit code.
+- [x] `npm run arggon -- validate --json` is green and the workflow YAML is valid.
 
 ## Notes
 
+### Decision and placement
+
+One additive step at the end of the `cli` job in `.github/workflows/ci.yml`, named
+`Native start cold-start smoke (tools.arggon.start worktree path)`, with a comment
+recording why. The job's `run` steps read as `npm ci` → `npm run build` →
+`npm run check:plugin` → `npm run test` → `npm run lint` → `npm run test:structure`
+→ `npm run lint:structure`; the smoke drives this checkout's plugin source and
+built kernel, so `npm run build` is its only hard ordering constraint and the step
+lands after it. `ui-smoke` untouched.
+
+### Observed runtime
+
+Five consecutive local runs: 0.476s, 0.476s, 0.469s, 0.474s, 0.476s — exit 0, 20/20
+checks each; 0.471s on the post-change tree. Sub-second, so every PR, not
+label-gated — no separate job or `workflow_dispatch` needed.
+
+### Failure mode proven, not assumed
+
+In a throwaway copy of the checkout (`/tmp/opencode/cold-mutation-probe`, fresh
+`git init`, own `node_modules/@arggondev/lib` link, deleted afterwards — no owned
+file touched in this worktree): exit **1** with the shipped bug shape
+(`preparation.ready=false`, `claimCommitted=false`, the gate's own stderr) after
+gating `linkNodeModules` to the pre-fix behaviour; exit **0** for the same binary
+with the mutation off; exit **2** with the actionable `npm run build` line when
+the build is missing. The step is blocking — the job shell is `bash -e`, no
+`continue-on-error`, no `|| true`, no advisory `if:`.
+
+### Validation
+
+`actionlint v1.7.12` exit 0 with no findings, plus a negative control proving it
+validates and a baseline run proving HEAD was already clean. Python `yaml.safe_load`
+asserted the step order and the absence of advisory keys.
+`npm run arggon -- validate --json` → `ok:true`. `npm run smoke:native-start-cold`
+20/20 exit 0. `lint:structure` and `test:structure` exit 0.
+
+Draft PR #431 (`42843794`), left open for coordinator review.
+
 ### 2026-09-29 @Arggon
+
 ## CI wiring — done; the open question from the #427 verdict is closed
 
 `task-native-start-cold-smoke`'s verdict left one decision open ("wire the new smoke into a CI job or keep it maintainer-run?"). **Decision: wire it.** It is deterministic, model-free, offline, needs no provider/quota/Chromium, and guards a P1 fix — and `lint:structure`/`test:structure` are already precedent for a dev-only node gate in the `cli` job. The `ui-smoke` job is explicitly the wrong home (not a UI gate; a browser install for it would be wrong).
@@ -74,7 +126,7 @@ One additive step. No reformatting, no reordering of unrelated steps, no `defaul
 
 The `cli` job's `run` steps are, in order: `npm ci` → `npm run build` → `npm run check:plugin` → `npm run test` → `npm run lint` → `npm run test:structure` → `npm run lint:structure` (plus the PR-only version guard). The smoke drives this checkout's plugin source and its built kernel, so **`npm run build` is its only hard ordering constraint**, and it is already satisfied before any gate runs. The step lands after that build and beside the other dev-only node gates, with no second install (`npm ci` is the only install step in the job, untouched).
 
-I checked the one ordering risk I could think of rather than assuming it away: could `npm run test` (vitest) reap the smoke's `$TMPDIR` fixture if the smoke ran first? No — `test/teardown-tmp.ts` is age-gated at 2h *and* suite-start-gated, so it cannot touch a fixture younger than either. So "last" is a grouping/readability choice, not a safety requirement, and I am not claiming the earlier slot would have broken. Last is also right operationally: a failing run keeps its fixture for inspection, and nothing runs after it.
+I checked the one ordering risk I could think of rather than assuming it away: could `npm run test` (vitest) reap the smoke's `$TMPDIR` fixture if the smoke ran first? No — `test/teardown-tmp.ts` is age-gated at 2h _and_ suite-start-gated, so it cannot touch a fixture younger than either. So "last" is a grouping/readability choice, not a safety requirement, and I am not claiming the earlier slot would have broken. Last is also right operationally: a failing run keeps its fixture for inspection, and nothing runs after it.
 
 ### Observed runtime
 
