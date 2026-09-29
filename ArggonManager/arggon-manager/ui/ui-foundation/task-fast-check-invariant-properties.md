@@ -76,3 +76,7 @@ Property suite merged-ready on `feat/task-fast-check-invariant-properties` (PR #
 - I could not control the DFS **start** order (it follows the filesystem walk); the deliberate perturbation is the `depends_on` edge-list order plus the file-write order, and the property header says so.
 
 `status: in_progress` left for the coordinator; the two bugs are `todo` under their topical stories.
+
+### handoff 2026-09-29 @Arggon — next: Review and merge draft PR #433; then land bug-dependency-cycle-chain-rotation-duplicates-a-node and bug-frontmatter-ambiguous-plain-scalar-loss and delete their canaries
+- branch: feat/task-fast-check-invariant-properties
+- open questions: Accept the partial cycle acceptance line, or block on the fix first?;Is the root-tsconfig test exclude in scope for this item?;Should the clip property move to labs/ instead of cli/src?
