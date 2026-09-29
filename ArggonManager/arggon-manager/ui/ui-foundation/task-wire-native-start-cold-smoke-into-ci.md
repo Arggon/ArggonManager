@@ -177,3 +177,29 @@ Draft PR #431, head `42843794`, left open and in draft for coordinator review. I
 ### handoff 2026-09-29 @Arggon — next: Coordinator: review draft PR #431 and merge; the cli job's last step is the wired smoke and CI is the real proof
 - branch: feat/task-wire-native-start-cold-smoke-into-ci
 - open questions: Any ci.yml runner cost concern with the step, or accept as-is?; Should smoke:opencode also cover the cold start once quota allows?
+
+### 2026-09-29 @Arggon
+## CI confirmation on the draft PR (head `42843794`) — the step is green on a real runner
+
+Run [36502860291](https://github.com/Arggon/ArggonManager/actions/runs/36502860291), all three jobs **success**:
+
+| Job             | Result | Note |
+| --------------- | ------ | ---- |
+| `cli`           | **success** | the new step ran as step 11 of 11, `conclusion: success` |
+| `ui-smoke`      | **success** | untouched — still 8 steps, no smoke reference added |
+| `tasks-validate`| **success** (36s) | |
+
+The step log ([job 109197513114](https://github.com/Arggon/ArggonManager/actions/runs/36502860291/job/109197513114)) is the strongest evidence in this item, because it settles three things at once on a real runner:
+
+1. **It is not vacuous and not the stale-copy failure mode.** The harness self-identified the runner's own checkout:
+   ```
+   runtime: plugin /home/runner/work/ArggonManager/ArggonManager/opencode/plugins/arggon/index.ts
+   runtime: kernel /home/runner/work/ArggonManager/ArggonManager/lib/dist/index.js
+   ```
+   All **20** checks `ok`, zero `FAILED`, ending `smoke:native-start-cold passed`.
+2. **The runner uses the real job shell `shell: /usr/bin/bash -e {0}`** — printed by the runner itself. That is the lane's contract in the runner's own words: no `-e` suppression anywhere, so a non-zero exit fails the step and the job. It is not inherited from my reading of the docs.
+3. **The observed runtime on the runner is ~0.6s** (00:27:14.936 start → 00:27:15.637 last check, 0.616s of logged work on a cold `npm ci`-then-build runner). That confirms the ~0.5s local figure and settles the "is this materially slow in the lane" question with data rather than assumption: it is not, so no separate job or `workflow_dispatch`/label gate is warranted.
+
+Ordering is confirmed by the step list too: `Run npm run build` (step 6 of the job) precedes `Native start cold-start smoke …` (step 11), with `check:plugin`, `test`, `lint`, `test:structure` and `lint:structure` in between — i.e. the build dependency the smoke documents is genuinely satisfied on the runner.
+
+Branch head is now `e35477d1` (the two tracker-comment commits on top of `42843794`); the workflow and docs content is unchanged since the green run. Draft PR #431 stays open for review.
