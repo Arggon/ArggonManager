@@ -41,7 +41,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { parseFrontmatter, runCreate, runUpdate } from "@arggondev/lib";
+import { MAX_MISSING_DEPENDENCIES, parseFrontmatter, runCreate, runUpdate } from "@arggondev/lib";
 import { runInit } from "../../../cli/src/init.js";
 import {
   ARGON_TOOL_NAMESPACE,
@@ -1022,6 +1022,17 @@ function addNativeGateDependency(dir: string): void {
   writeFileSync(join(dep, "index.js"), "module.exports = true;\n");
 }
 
+/**
+ * Commit a root `package.json` on top of the seeded tree (start refuses a dirty
+ * tree) — the declaration the shared preparation receipt checks
+ * (bug-worktree-readiness-misses-stale-primary-install).
+ */
+function addNativeManifest(dir: string, manifest: Record<string, unknown>): void {
+  writeFileSync(join(dir, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  git(dir, ["add", "package.json"]);
+  git(dir, ["commit", "-qm", "test: declare dependencies"]);
+}
+
 /** Install a real (never bypassed) dependency-requiring pre-commit gate. */
 function setNativePreCommitHook(dir: string, script: string): void {
   const hook = join(dir, ".git", "hooks", "pre-commit");
@@ -1538,6 +1549,72 @@ describe("worktree domain tools (W4)", () => {
     expect(gitOut(worktreePath, ["log", "-1", "--pretty=%s"])).toBe(
       "chore(tasks): claimed task-rate-limit",
     );
+    // ADR 0006: the coverage fields travel in the RESULT, not the catalog —
+    // the `start` definition gains no schema bytes and no description text.
+    const startSchema = JSON.stringify(nativeToolSchemas().find((schema) => schema.name === "start"));
+    expect(startSchema).not.toContain("manifestCoverage");
+    expect(startSchema).not.toContain("missingDependencies");
+  });
+
+  it("names the declared dependencies a stale mirrored install cannot provide (bug-worktree-readiness-misses-stale-primary-install)", async () => {
+    // The measured machine state, reproduced deterministically: the primary's
+    // install predates a merged devDependency, so the link farm (which mirrors
+    // it) cannot resolve that name. The receipt used to say `ready: true`.
+    const dir = seedGitTree();
+    addNativeGateDependency(dir);
+    addNativeManifest(dir, {
+      name: "fixture",
+      dependencies: { "native-gate-dep": "1.0.0" },
+      devDependencies: { "@ast-grep/cli": "0.45.3" },
+    });
+    setNativePreCommitHook(dir, "#!/bin/sh\nnode -e \"require('native-gate-dep')\" || exit 1\n");
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+
+    const started = await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    const output = started.output as Record<string, unknown>;
+    const preparation = output.preparation as Record<string, unknown>;
+
+    // The linked install is still there and still reported as linked...
+    expect(preparation).toMatchObject({ install: "linked", linkedNodeModules: true });
+    // ...but readiness is not silently claimed, and the reason is IN the
+    // payload: a native caller does not shell out to the CLI to learn which
+    // declared dependency the mirrored install is missing.
+    expect(preparation.ready).toBe(false);
+    expect(preparation.manifestCoverage).toBe("stale");
+    expect(preparation.missingDependencies).toEqual(["@ast-grep/cli"]);
+    expect(preparation.missingDependenciesTotal).toBe(1);
+    // Non-fatal here too: the gate ran and the claim commit landed.
+    expect(output.ok).toBe(true);
+    expect(output.claimCommitted).toBe(true);
+    expect(output.claimCommit).toMatchObject({ status: "committed", committed: true });
+  });
+
+  it("caps the native missing-dependency list and reports the total behind the cap", async () => {
+    const dir = seedGitTree();
+    addNativeGateDependency(dir);
+    const declared: Record<string, string> = {};
+    for (let index = 0; index < MAX_MISSING_DEPENDENCIES + 3; index += 1) {
+      declared[`absent-dep-${index}`] = "1.0.0";
+    }
+    addNativeManifest(dir, { name: "fixture", devDependencies: declared });
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+
+    const started = await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    const preparation = (started.output as Record<string, unknown>).preparation as Record<
+      string,
+      unknown
+    >;
+
+    expect(preparation.manifestCoverage).toBe("stale");
+    expect(preparation.ready).toBe(false);
+    // The kernel's cap is forwarded, not re-derived, and the total keeps the
+    // capped list from being read as the whole set.
+    expect(preparation.missingDependencies).toHaveLength(MAX_MISSING_DEPENDENCIES);
+    expect(preparation.missingDependenciesTotal).toBe(MAX_MISSING_DEPENDENCIES + 3);
+    expect(preparation.truncated).toBe(true);
+    expect(preparation.claimCommitted).toBeUndefined();
   });
 
   it("keeps the worktree and reports a skipped claim commit when the gate fails, then retries on attach", async () => {

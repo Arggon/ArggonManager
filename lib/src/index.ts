@@ -225,6 +225,7 @@ export {
 export type { ClassifyCleanupDeps, CleanupEntry, CleanupGit, MergedPr } from "./cleanup.js";
 export {
   buildLocalWorkspaces,
+  inspectDeclaredDependencies,
   linkNodeModules,
   linkedWorkspacePackages,
   localWorkspacePackages,
@@ -234,9 +235,12 @@ export {
   pointWorkspaceAtLocal,
   prepareWorktreeDependencies,
   unlinkNodeModulesLink,
+  MAX_MISSING_DEPENDENCIES,
 } from "./worktree.js";
 export type {
+  DeclaredDependencyReport,
   LocalWorkspacePackage,
+  ManifestCoverage,
   WorkspaceBuildRunner,
   WorktreeDependencyPreparation,
   WorktreeInstallState,

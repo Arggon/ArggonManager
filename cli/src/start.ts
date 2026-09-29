@@ -5,6 +5,7 @@ import {
   LEGACY_TRACKER_DIR_NAME,
   TRACKER_DIR_NAME,
   findTasksDir,
+  inspectDeclaredDependencies,
   itemsById,
   linkNodeModules,
   linkedWorkspacePackages,
@@ -17,6 +18,7 @@ import {
   runUpdate,
   unlinkNodeModulesLink,
   withItemLock,
+  type ManifestCoverage,
   type WorkItem,
 } from "@arggondev/lib";
 
@@ -28,6 +30,7 @@ import {
  */
 export {
   buildLocalWorkspaces,
+  inspectDeclaredDependencies,
   linkNodeModules,
   linkedWorkspacePackages,
   unlinkNodeModulesLink,
@@ -115,6 +118,29 @@ export type StartResult = {
    * importable, or when no local copy could be built.
    */
   builtWorkspaces: string[];
+  /**
+   * Whether the worktree's install provides what the worktree's own
+   * `package.json` declares (`dependencies` + `devDependencies`, presence only
+   * — see `lib/src/worktree.ts` `ManifestCoverage`):
+   * `"satisfied"` | `"stale"` | `"unknown"`. A linked install MIRRORS the
+   * primary's entries, so a dependency declared after the primary's last
+   * install is missing from the worktree too
+   * (bug-worktree-readiness-misses-stale-primary-install); `"unknown"` means
+   * nothing was compared (no install, an unreadable manifest, or no worktree —
+   * it is never reported as satisfied). Informational only: start never fails
+   * on it, and the remedy is the primary's re-install or a worktree-local one.
+   */
+  manifestCoverage: ManifestCoverage;
+  /**
+   * Declared dependency names the worktree's install does not provide (sorted,
+   * capped at `MAX_MISSING_DEPENDENCIES`; `missingDependenciesTotal` is the
+   * full count) — the actionable half of `manifestCoverage: "stale"`. Reported
+   * for the state the worktree is LEFT in, re-read after a configured
+   * `x-worktree.post-start` hook, so a hook that installs locally reports `[]`.
+   */
+  missingDependencies: string[];
+  /** Full count behind `missingDependencies`; they differ only when the list is capped. */
+  missingDependenciesTotal: number;
   /**
    * `x-worktree.post-start` outcome (task-start-post-hook): set only when a
    * new worktree was created, a hook is configured, and `--no-hook` was not
@@ -541,6 +567,11 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
       linkedNodeModules: false,
       linkedWorkspaces: [],
       builtWorkspaces: [],
+      // No worktree was prepared, so nothing was compared against a worktree
+      // manifest: the field is only meaningful with `--worktree`.
+      manifestCoverage: "unknown",
+      missingDependencies: [],
+      missingDependenciesTotal: 0,
       item: branch.item,
     };
   });
@@ -681,6 +712,9 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
   let linkedNodeModules = false;
   let linkedWorkspaces: string[] = [];
   let builtWorkspaces: string[] = [];
+  let manifestCoverage: ManifestCoverage = "unknown";
+  let missingDependencies: string[] = [];
+  let missingDependenciesTotal = 0;
   try {
     // The kernel owns the dependency-preparation orchestration shared with the
     // native start surface. Git/domain lifecycle stays here in the CLI.
@@ -688,6 +722,11 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     linkedNodeModules = prepared.linkedNodeModules;
     builtWorkspaces = prepared.builtWorkspaces;
     linkedWorkspaces = prepared.linkedWorkspaces;
+    // A mirrored install is only as current as the primary's; the receipt names
+    // what the worktree cannot resolve (bug-worktree-readiness-misses-stale-primary-install).
+    manifestCoverage = prepared.manifestCoverage;
+    missingDependencies = prepared.missingDependencies;
+    missingDependenciesTotal = prepared.missingDependenciesTotal;
     // Resolution report (W6/PR-374 finding 2): recomputed at the end too, so a
     // post-start hook that reifies a local install is reflected in the returned
     // state (PR #384 review F2).
@@ -782,6 +821,12 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     // in — the pre-hook value only ever described the claim-commit gate window
     // (PR #384 review F2).
     linkedWorkspaces = linkedWorkspacePackages(root, worktreePath);
+    // Same rule for the install's currency: a hook that reifies a local install
+    // also stops it being stale, and one that did not leaves the names visible.
+    const declared = inspectDeclaredDependencies(worktreePath);
+    manifestCoverage = declared.coverage;
+    missingDependencies = declared.missing;
+    missingDependenciesTotal = declared.missingTotal;
 
     return {
       id,
@@ -797,6 +842,9 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       linkedNodeModules,
       linkedWorkspaces,
       builtWorkspaces,
+      manifestCoverage,
+      missingDependencies,
+      missingDependenciesTotal,
       postStart,
       item: finalItem,
     };

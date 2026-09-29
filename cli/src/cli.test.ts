@@ -828,4 +828,53 @@ describe("CLI --json", () => {
     expect(existsSync(join(wt, "node_modules", "fake-gate-dep", "index.js"))).toBe(true);
     expect(runGit(["log", "--format=%s"], wt).stdout).toContain("claim: task-prepared");
   });
+
+  it("arggon start --worktree names the declared dependency a stale install does not provide", () => {
+    // bug-worktree-readiness-misses-stale-primary-install: the linked install
+    // mirrors the PRIMARY's entries, so a devDependency declared after that
+    // install ran is resolvable nowhere from the worktree. Reported by name
+    // (not silently as ready) and non-fatal — the claim still lands.
+    const { dir, env } = initStartTree(true);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Prepared", "--parent", "login"], dir).status).toBe(0);
+    mkdirSync(join(dir, "node_modules"), { recursive: true });
+    // Committed: `start` refuses a dirty tree.
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ name: "fixture", devDependencies: { "@ast-grep/cli": "0.45.3" } }, null, 2),
+    );
+    expect(runGit(["add", "package.json", "node_modules"], dir).status).toBe(0);
+    expect(runGit(["commit", "--quiet", "-m", "declare a devDependency"], dir).status).toBe(0);
+
+    const result = runCli(
+      ["start", "task-prepared", "--worktree", "--assignee", "arggon", "--json"],
+      dir,
+      env,
+    );
+
+    expect(result.status).toBe(0);
+    const body = parseStdout(result.stdout);
+    expect(body.ok).toBe(true);
+    // The linked install is still there and still reported as linked...
+    expect(body.linkedNodeModules).toBe(true);
+    // ...but it does not satisfy the manifest, and the receipt says which part.
+    expect(body.manifestCoverage).toBe("stale");
+    expect(body.missingDependencies).toEqual(["@ast-grep/cli"]);
+    expect(body.missingDependenciesTotal).toBe(1);
+    // Non-fatal: the worktree exists and the claim commit landed in it.
+    const wt = join(dirname(dir), "work-task-prepared");
+    expect(existsSync(join(wt, "package.json"))).toBe(true);
+    expect(runGit(["log", "--format=%s"], wt).stdout).toContain("claim: task-prepared");
+
+    // The human output names the remedy, not just the symptom.
+    const human = runCli(
+      ["start", "task-prepared", "--worktree", "--assignee", "arggon"],
+      dir,
+      env,
+    );
+    expect(human.status).toBe(0);
+    expect(human.stdout).toContain("@ast-grep/cli");
+    expect(human.stdout).toContain("npm ci");
+  });
 });

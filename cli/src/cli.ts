@@ -2253,6 +2253,9 @@ program
               worktreePath: result.worktreePath,
               linkedNodeModules: result.linkedNodeModules,
               linkedWorkspaces: result.linkedWorkspaces,
+              manifestCoverage: result.manifestCoverage,
+              missingDependencies: result.missingDependencies,
+              missingDependenciesTotal: result.missingDependenciesTotal,
               postStart: result.postStart,
             },
             readConventionVersion(result.root),
@@ -2282,6 +2285,21 @@ program
               `  note: ${result.linkedWorkspaces.map((name) => sanitizeHumanError(name)).join(", ")} ` +
                 `resolve(s) into the primary checkout through the linked install — build the worktree copy ` +
                 `or run \`npm ci\` in the worktree (e.g. \`x-worktree.post-start: npm ci\`) for worktree-local resolution`,
+            );
+          }
+          if (result.manifestCoverage === "stale") {
+            // A mirrored install is only as current as the primary's: name what
+            // the worktree cannot resolve instead of reporting it as ready
+            // (bug-worktree-readiness-misses-stale-primary-install).
+            const extra = result.missingDependenciesTotal - result.missingDependencies.length;
+            const named = result.missingDependencies
+              .map((name) => sanitizeHumanError(name))
+              .join(", ");
+            console.log(
+              `  note: the install in this worktree is missing ${sanitizeHumanError(named)}` +
+                `${extra > 0 ? ` (and ${extra} more)` : ""} ` +
+                `declared in package.json — re-install the primary checkout (\`npm install\` there) ` +
+                `or run \`npm ci\` in the worktree (e.g. \`x-worktree.post-start: npm ci\`) for a worktree-local install`,
             );
           }
         }
