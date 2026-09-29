@@ -1625,6 +1625,7 @@ spec
               findings: {
                 ambiguity: saved.result.ambiguity,
                 consistency: saved.result.consistency,
+                decisions: saved.result.decisions,
               },
               baseline: { file: saved.file, written: true, count: saved.snapshot.count },
             });
@@ -1649,7 +1650,11 @@ spec
               conventionVersion: cmp.result.conventionVersion,
               command: "spec",
               scanned: cmp.result.scanned,
-              findings: { ambiguity: cmp.result.ambiguity, consistency: cmp.result.consistency },
+              findings: {
+                ambiguity: cmp.result.ambiguity,
+                consistency: cmp.result.consistency,
+                decisions: cmp.result.decisions,
+              },
               baseline: {
                 file: cmp.file,
                 total: cmp.total,
@@ -1674,7 +1679,11 @@ spec
             conventionVersion: result.conventionVersion,
             command: "spec",
             scanned: result.scanned,
-            findings: { ambiguity: result.ambiguity, consistency: result.consistency },
+            findings: {
+              ambiguity: result.ambiguity,
+              consistency: result.consistency,
+              decisions: result.decisions,
+            },
           });
           return;
         }

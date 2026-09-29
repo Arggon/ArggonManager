@@ -251,12 +251,12 @@ Failures use `error.code: "SPEC_FAILED"` (invalid slug, refusing to overwrite, m
 
 `spec analyze [--spec <path>]` (report-only ambiguity scan + spec ↔ tracker/plans consistency; default scope `ArggonManager/docs/specs/*.md`, one file with `--spec`) — **findings never fail the run**: `ok` is always `true` on a completed scan, even with findings. Structural failures (unreadable file) use `error.code: "SPEC_FAILED"` and exit code 1.
 
-| Field      | Type             | Notes                                              |
-| ---------- | ---------------- | -------------------------------------------------- |
-| `scanned`  | `number`         | Spec documents scanned                             |
-| `findings` | `FindingsByArea` | `{ ambiguity: Finding[], consistency: Finding[] }` |
+| Field      | Type             | Notes                                                                                                                                                                      |
+| ---------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scanned`  | `number`         | Spec documents scanned                                                                                                                                                     |
+| `findings` | `FindingsByArea` | `{ ambiguity: Finding[], consistency: Finding[], decisions: Finding[] }` — `decisions` is additive (spec-analyze-decision-gaps-013) and empty in `--spec` single-file mode |
 
-`Finding` is `{ file, kind, line?, severity, message }` — `file` posix, repo-relative; `severity` is `"info"` or `"warn"`; `line` (1-based, present when the finding is tied to a line) is reported against the full file including frontmatter. Kinds: `vague-quantifier`, `todo-marker`, `no-error-path`, `no-acceptance`, `untestable-acceptance` (ambiguity); `spec-orphaned`, `plan-spec-missing` (consistency).
+`Finding` is `{ file, kind, line?, severity, message }` — `file` posix, repo-relative; `severity` is `"info"` or `"warn"`; `line` (1-based, present when the finding is tied to a line) is reported against the full file including frontmatter. Kinds: `vague-quantifier`, `todo-marker`, `no-error-path`, `no-acceptance`, `untestable-acceptance` (ambiguity); `spec-orphaned`, `plan-spec-missing` (consistency); `DECISION-PENDING-EXPLORATION` (exploration whose Decision section records no ADR after 7 days), `STALE-PROPOSED-ADR` (ADR `- Status:` starting with `Proposed` with a `- Date:` older than 14 days), `SPEC-STATUS-DRIFT` (a `proposed` spec whose linked plan is `implemented`) (decisions — report-only, corpus mode only; baseline snapshots include them in the flat `findings` array).
 
 `spec analyze --save-baseline <file>` behaves like a plain analyze run plus an additive `baseline` field; the snapshot written to `<file>` is deterministic, committable JSON (`{ schemaVersion, conventionVersion, count, findings }` with findings sorted by file/kind/line/severity/message — no timestamps, byte-identical over unchanged specs).
 
