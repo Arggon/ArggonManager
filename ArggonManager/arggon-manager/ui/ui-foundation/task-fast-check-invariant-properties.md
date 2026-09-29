@@ -151,3 +151,7 @@ Both are **bug canaries that pin current buggy behaviour**, and both now say so 
 - extra: `npx tsc -p tsconfig.typecheck.json` exit 0, `npx tsc -p lib/tsconfig.typecheck.json` exit 0, `npx tsc -p labs/tsconfig.json` exit 0, `npm run test:property` → 5 files / 12 tests / 393 ms
 
 PR #433 body rewritten with the A/B table, the labs regression, the lib-guard probe and the canary labelling. Draft, still open; `status: in_progress` left as is.
+
+### handoff 2026-09-29 @Arggon — next: Coordinator: decide the cycle acceptance box (waive vs tick) and re-run the A/B probe; then merge PR #433 and land the two filed bugs with their canaries
+- branch: feat/task-fast-check-invariant-properties
+- open questions: Waive box 4 or require the cycle fix first?;Is the labs/tsconfig.json exclude guard acceptable scope?;Should the shared runner move out of test/ to drop both rootDir relaxations?
