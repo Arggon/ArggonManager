@@ -11,7 +11,6 @@ priority: p2
 created: "2026-09-24"
 updated: "2026-09-29"
 depends_on: [bug-native-start-worktree-no-install, task-ast-grep-structural-rules]
-worktree_path: /home/arggon/Projects/ArggonManager-task-fast-check-invariant-properties
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-fast-check-invariant-properties.md
