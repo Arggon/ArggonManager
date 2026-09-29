@@ -8,6 +8,7 @@ labels: []
 priority: p2
 created: "2026-09-29"
 updated: "2026-09-29"
+depends_on: [task-adr-adopter-upgrade-channel]
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-methodology-change-protocol.md
