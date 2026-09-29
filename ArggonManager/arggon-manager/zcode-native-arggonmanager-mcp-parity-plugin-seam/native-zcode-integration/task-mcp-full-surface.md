@@ -32,29 +32,44 @@ A ZCode session cannot run the find → claim → worktree → PR loop through M
 alone. Decision (product owner, 2026-09-28): the MCP surface gains the six
 missing tools so both clients reach full parity.
 
-Design constraints: `priority`/`sync` call their existing kernel operations
-(`priorityOperation`/`syncOperation`) in-process; `import_issues`/`start`/
-`branch`/`cleanup` spawn the arggon CLI itself (argv array, no shell) and
-return the CLI's `--json` envelopes — one worktree/ergonomics implementation
-path, injection-safe by construction. Every tool schema property must keep the
-standing CLI ↔ MCP option-surface parity invariant (`mcp-parity.test.ts`).
+Design as landed: `priority`/`sync`/`import_issues` call their existing kernel
+operations (`priorityOperation`/`syncOperation`/`importIssuesOperation`)
+in-process; `start`/`branch`/`cleanup` spawn the arggon CLI itself (argv
+array, no shell) and return the CLI's `--json` envelopes — one
+worktree/ergonomics implementation path, injection-safe by construction. The
+default spawn spec is derived from the launch argv (built `cli.js` bin or the
+tsx source runner); embedded runners inject `options.cliSpawn`. Every tool
+schema property keeps the standing CLI ↔ MCP option-surface parity invariant
+(`mcp-parity.test.ts`), and the `doctor --budget` advisory cap moved
+12 KiB → 16 KiB with the measured re-baseline (15,701 B / 15 tools).
 
 ## Acceptance
 
-- [ ] `arggon mcp` exposes 15 tools; the six new ones are `arggon_priority`,
+- [x] `arggon mcp` exposes 15 tools; the six new ones are `arggon_priority`,
       `arggon_sync`, `arggon_import_issues`, `arggon_start`, `arggon_branch`,
       `arggon_cleanup` with schemas mirroring the CLI options
-- [ ] `priority`/`sync` go through the shared kernel operations (envelope
+- [x] `priority`/`sync` go through the shared kernel operations (envelope
       parity with the CLI verified by a test)
-- [ ] `import_issues`/`start`/`branch`/`cleanup` spawn the CLI with an argv
-      array and return its `--json` envelope byte-parity (test with a spawned
-      CLI), with kernel failures surfacing as tool errors that never kill the
-      session
-- [ ] CLI ↔ MCP option-surface parity test extended to the six new tools
-- [ ] Agent playbook rules hold through MCP: no reopen of done/cancelled, no
+- [x] `start`/`branch`/`cleanup` spawn the CLI with an argv array and return
+      its `--json` envelope parity (tested with a spawned CLI), with kernel
+      failures and envelope-less children surfacing as tool errors that never
+      kill the session
+- [x] CLI ↔ MCP option-surface parity test extended to the six new tools;
+      envelope parity added for `priority`/`branch`/`cleanup` (sync and
+      import-issues need `gh`/network, start needs a push — surface-checked
+      only)
+- [x] Agent playbook rules hold through MCP: no reopen of done/cancelled, no
       claim steal (no `--force` surface anywhere)
-- [ ] `references/json-contract.md` MCP section updated (nine → fifteen tools)
-- [ ] Full test suite + lint/typecheck gates green; `arggon validate --json`
-      `ok:true` before every commit
+- [x] Bundled `skills/arggon-cli/references/json-contract.md` MCP section
+      updated (nine → fifteen tools, spawn semantics)
+- [x] Full test suite + lint/typecheck gates green (1710 tests); `arggon
+      validate --json` `ok:true` before every commit
+
+## Notes
+
+ADR 0014 + spec/plan (`spec-zcode-native-seam-012`, `plan-zcode-native-seam-012`)
+ride in this PR per the methodology (paperwork with the change); spec/plan flip
+to `implemented` when T2 (`task-zcode-plugin-seam`) lands the plugin seam — the
+spec's acceptance spans both waves.
 
 ## Notes

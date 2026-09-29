@@ -54,10 +54,11 @@ async function mcpCall(
   cwd: string,
   name: string,
   args: Record<string, unknown>,
+  serverOptions?: { cliSpawn?: { command: string; args: string[] } },
 ): Promise<{ result: Envelope; isError: boolean }> {
   const input = new PassThrough();
   const output = new PassThrough();
-  runMcpServer({ cwd, input, output });
+  runMcpServer({ cwd, input, output, ...serverOptions });
   const responsePromise = new Promise<Envelope>((resolveResponse) => {
     output.on("data", (chunk: Buffer) => resolveResponse(JSON.parse(chunk.toString("utf8"))));
   });
@@ -107,6 +108,25 @@ const CREATE_ARGS = {
   parent: "story-login",
   id: "rate-limit",
 };
+
+/** Init a git repo with one empty commit (branch/cleanup parity needs git). */
+function gitInit(dir: string): void {
+  const git = (args: string[]) =>
+    spawnSync("git", ["-c", "user.name=parity", "-c", "user.email=parity@example.com", ...args], {
+      cwd: dir,
+      encoding: "utf8",
+    });
+  const init = git(["init"]);
+  expect(init.status, init.stderr).toBe(0);
+  expect(git(["commit", "--allow-empty", "-m", "seed"]).status).toBe(0);
+}
+
+/**
+ * The spawn tools (branch/cleanup/start) re-enter the CLI through the same
+ * spec the CLI side of these tests uses — inside vitest, the default argv
+ * derivation deliberately refuses to guess, so the spec is injected.
+ */
+const CLI_SPAWN = { cliSpawn: { command: process.execPath, args: [tsx, cli] } };
 
 describe("CLI <-> MCP parity", () => {
   it("create produces the same envelope through both entry points", async () => {
@@ -342,6 +362,40 @@ describe("CLI <-> MCP parity", () => {
     expect(mcpResult.result).toEqual(normalize(cliResult, cliDir));
   });
 
+  it("priority migrate --dry-run plans identically through both entry points", async () => {
+    const { cliDir, mcpDir } = twinTrees();
+    const cliResult = cliJson(["priority", "migrate", "--dry-run"], cliDir);
+    const mcpResult = await mcpCall(mcpDir, "arggon_priority", { dry_run: true });
+    expect(mcpResult.isError).toBe(false);
+    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+  });
+
+  it("branch checks out identically through both entry points", async () => {
+    const { cliDir, mcpDir } = twinTrees();
+    gitInit(cliDir);
+    gitInit(mcpDir);
+    cliJson(
+      ["create", "task", CREATE_ARGS.title, "--parent", CREATE_ARGS.parent, "--id", "rate-limit"],
+      cliDir,
+    );
+    await mcpCall(mcpDir, "arggon_create", CREATE_ARGS);
+    const cliResult = cliJson(["branch", "task-rate-limit"], cliDir);
+    const mcpResult = await mcpCall(mcpDir, "arggon_branch", { id: "task-rate-limit" }, CLI_SPAWN);
+    expect(mcpResult.isError).toBe(false);
+    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+    expect(cliResult.ok).toBe(true);
+  });
+
+  it("cleanup classifies an empty merged-worktree set identically through both entry points", async () => {
+    const { cliDir, mcpDir } = twinTrees();
+    gitInit(cliDir);
+    gitInit(mcpDir);
+    const cliResult = cliJson(["cleanup"], cliDir);
+    const mcpResult = await mcpCall(mcpDir, "arggon_cleanup", {}, CLI_SPAWN);
+    expect(mcpResult.isError).toBe(false);
+    expect(normalize(mcpResult.result, mcpDir)).toEqual(normalize(cliResult, cliDir));
+  });
+
   it("errors match: same message text and ok:false shape through both entry points", async () => {
     const { cliDir, mcpDir } = twinTrees();
     const cliProc = runCli(["update", "nope", "--status", "todo"], cliDir);
@@ -417,6 +471,24 @@ const PARITY_EXCEPTIONS: Record<string, Record<string, string>> = {
   validate: {
     "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
   },
+  priority: {
+    "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
+  },
+  sync: {
+    "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
+  },
+  "import-issues": {
+    "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
+  },
+  start: {
+    "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
+  },
+  branch: {
+    "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
+  },
+  cleanup: {
+    "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",
+  },
 };
 
 /** Positional CLI arguments and the MCP schema property each maps to. */
@@ -430,9 +502,20 @@ const POSITIONAL_MAP: Record<string, string[]> = {
   next: [],
   report: [],
   validate: [],
+  priority: [],
+  sync: [],
+  "import-issues": [],
+  start: ["id"],
+  branch: ["id"],
+  cleanup: [],
 };
 
-/** `.command("name")` blocks whose CLI surface must be mirrored by MCP. */
+/**
+ * `.command("name")` blocks whose CLI surface must be mirrored by MCP. The
+ * MCP tool is `arggon_${command}` unless TOOL_NAME overrides the suffix (the
+ * import tool keeps the underscore spelling the native OpenCode surface
+ * uses: arggon_import_issues).
+ */
 const PARITY_COMMANDS = [
   "list",
   "create",
@@ -443,7 +526,21 @@ const PARITY_COMMANDS = [
   "next",
   "report",
   "validate",
+  "priority",
+  "sync",
+  "import-issues",
+  "start",
+  "branch",
+  "cleanup",
 ] as const;
+
+const TOOL_NAME: Record<string, string> = {
+  "import-issues": "import_issues",
+};
+
+function parityToolName(command: string): string {
+  return `arggon_${TOOL_NAME[command] ?? command}`;
+}
 
 /** Extract the long flags of every `.option(...)` call in a command block. */
 function deriveCliOptions(command: string): string[] {
@@ -498,8 +595,8 @@ describe("CLI <-> MCP option-surface parity (task-mcp-cli-parity)", () => {
   it("every MCP tool schema property maps back to a CLI option, and vice versa", async () => {
     const tools = await mcpTools();
     for (const command of PARITY_COMMANDS) {
-      const tool = tools.find((t) => t.name === `arggon_${command}`);
-      if (!tool) throw new Error(`parity: MCP tool arggon_${command} is missing`);
+      const tool = tools.find((t) => t.name === parityToolName(command));
+      if (!tool) throw new Error(`parity: MCP tool ${parityToolName(command)} is missing`);
       const properties = Object.keys(
         (tool.inputSchema.properties ?? {}) as Record<string, unknown>,
       ).sort();
@@ -523,7 +620,7 @@ describe("CLI <-> MCP option-surface parity (task-mcp-cli-parity)", () => {
       const missing = [...expectedProperties].filter((p) => !properties.includes(p));
       expect(
         missing,
-        `CLI options of \`${command}\` missing from the arggon_${command} MCP schema ` +
+        `CLI options of \`${command}\` missing from the ${parityToolName(command)} MCP schema ` +
           `(add them to cli/src/mcp-server.ts, or document an exception in mcp-parity.test.ts)`,
       ).toEqual([]);
 
@@ -531,7 +628,7 @@ describe("CLI <-> MCP option-surface parity (task-mcp-cli-parity)", () => {
       const unmapped = properties.filter((p) => !expectedProperties.has(p));
       expect(
         unmapped,
-        `arggon_${command} MCP schema properties with no CLI counterpart ` +
+        `${parityToolName(command)} MCP schema properties with no CLI counterpart ` +
           `(remove them, or wire the CLI option up in cli/src/cli.ts)`,
       ).toEqual([]);
     }
