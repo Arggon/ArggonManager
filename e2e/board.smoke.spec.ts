@@ -589,4 +589,196 @@ test.describe("@smoke board --serve", () => {
     await expect(page.locator("#board-drawer")).toBeHidden();
     expect(errors).toEqual([]);
   });
+
+  test("arrow keys move the roving focus across columns; Home/End bound a column", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    await expect(page.locator("h1")).toContainText("arggon board");
+    // Exactly one roving anchor exists; focusing a card moves it there.
+    const todoCards = page.locator('.column[data-status="todo"] .card:not(.filtered-out)');
+    const first = todoCards.nth(0);
+    const second = todoCards.nth(1);
+    await first.focus();
+    await expect(first).toHaveAttribute("tabindex", "0");
+    await expect(second).toHaveAttribute("tabindex", "-1");
+
+    // Down: next visible card of the same column (it now carries the anchor).
+    await page.keyboard.press("ArrowDown");
+    await expect(second).toBeFocused();
+    await expect(second).toHaveAttribute("tabindex", "0");
+    await expect(first).toHaveAttribute("tabindex", "-1");
+
+    // Up: back; Right: crosses the empty columns into the next non-empty one.
+    await page.keyboard.press("ArrowUp");
+    await expect(first).toBeFocused();
+    await page.keyboard.press("ArrowRight");
+    const rightColumn = page.evaluate(() =>
+      (document.activeElement as HTMLElement).closest(".column")?.getAttribute("data-status"),
+    );
+    await expect(rightColumn).resolves.toBe("cancelled");
+    await expect(page.locator('.column[data-status="cancelled"] .card[tabindex="0"]')).toHaveCount(
+      1,
+    );
+    // Left returns to the same position in the todo column (index 0 here).
+    await page.keyboard.press("ArrowLeft");
+    await expect(first).toBeFocused();
+
+    // Home/End bound the column.
+    await second.focus();
+    await page.keyboard.press("Home");
+    await expect(first).toBeFocused();
+    await page.keyboard.press("End");
+    const lastTodo = todoCards.nth((await todoCards.count()) - 1);
+    await expect(lastTodo).toBeFocused();
+  });
+
+  test("a keyboard-only status move round-trips through the card action menu and persists", async ({
+    page,
+  }) => {
+    // Every successful move makes the server broadcast an SSE reload that
+    // location.reload()s the page; these menu flows assert focus and DOM state
+    // across several steps, so the event stream is muted (registered BEFORE
+    // goto — otherwise the page's initial EventSource connects unblocked).
+    // The reload behavior itself is covered by the live-reload test above.
+    await page.route("**/events", (route) => route.abort());
+    await page.goto(server?.url ?? "");
+    // This card sits in `cancelled` from the fixture setup (no other test
+    // moves it); from there exactly one transition is legal, so the menu must
+    // offer only `todo`.
+    const card = page.locator(`.card[data-id="${DETAIL_DONE_DEP_ID}"]`);
+    await expect(card).toHaveAttribute("data-status", "cancelled");
+
+    await card.focus();
+    await page.keyboard.press("m");
+    const menu = page.locator("#board-move-menu");
+    await expect(menu).toBeVisible();
+    await expect(menu.locator(".move-menu-title")).toHaveText(`move ${DETAIL_DONE_DEP_ID}`);
+    const targets = menu.locator(".move-menu-target");
+    await expect(targets).toHaveCount(1);
+    await expect(targets).toHaveText("move to todo");
+
+    // Enter activates the focused target; the dialog closes and focus returns
+    // to the card that opened the menu.
+    await page.keyboard.press("Enter");
+    await expect(menu).toBeHidden();
+    await expect(
+      page.locator(`.column[data-status="todo"] .card[data-id="${DETAIL_DONE_DEP_ID}"]`),
+    ).toHaveCount(1);
+    // The accessible name follows the move immediately (no stale status).
+    await expect(card).toHaveAttribute(
+      "aria-label",
+      "task task-board-detail-done-dep: Board detail done dep (todo)",
+    );
+    await expect(page.locator("#board-toast")).toContainText(`${DETAIL_DONE_DEP_ID} -> todo`);
+    await expect(card).toBeFocused();
+    await expect
+      .poll(() => cliJson<{ item: ListedItem }>(fixture, ["show", DETAIL_DONE_DEP_ID]).item.status)
+      .toBe("todo");
+  });
+
+  test("the action menu runs the claim and blocked-reason prompts (drag parity)", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    // Mute the SSE reload stream BEFORE goto: two moves land in this test and
+    // each would otherwise location.reload() the page mid-menu (see the
+    // keyboard test above).
+    await page.route("**/events", (route) => route.abort());
+    await page.goto(server?.url ?? "");
+    const card = page.locator(`.card[data-id="${DETAIL_DEP_ID}"]`);
+    await expect(card).toHaveAttribute("data-status", "todo");
+    // The flow's two prompts are answered from their message, exactly as a
+    // person would: the claim prompt takes the assignee, the blocked prompt
+    // the reason.
+    page.on("dialog", (dialog) => {
+      if (dialog.message().includes("--assignee")) void dialog.accept("smoke-user");
+      else if (dialog.message().includes("--blocked-reason")) {
+        void dialog.accept("waiting on upstream");
+      } else void dialog.dismiss();
+    });
+
+    // Tap affordance this time: the unassigned todo card offers in_progress
+    // (after the claim prompt) and cancelled — never done/blocked.
+    await card.locator(".card-move").click();
+    const menu = page.locator("#board-move-menu");
+    await expect(menu).toBeVisible();
+    await expect(menu.locator(".move-menu-target")).toHaveCount(2);
+    await expect(menu.locator('.move-menu-target[data-target="in_progress"]')).toHaveText(
+      "move to in_progress (claim first)",
+    );
+    await expect(menu.locator('.move-menu-target[data-target="done"]')).toHaveCount(0);
+    await menu.locator('.move-menu-target[data-target="in_progress"]').click();
+    await expect(
+      page.locator(`.column[data-status="in_progress"] .card[data-id="${DETAIL_DEP_ID}"]`),
+    ).toHaveCount(1);
+    // The optimistic move repaints the accessible name with status and claim.
+    await expect(card).toHaveAttribute(
+      "aria-label",
+      "task task-board-detail-dep: Board detail dep (in_progress, @smoke-user)",
+    );
+    await expect
+      .poll(
+        () =>
+          cliJson<{ item: { status: string; assignee: string | null } }>(fixture, [
+            "show",
+            DETAIL_DEP_ID,
+          ]).item,
+      )
+      .toEqual(expect.objectContaining({ status: "in_progress", assignee: "smoke-user" }));
+
+    // Keyboard path this time: in_progress -> blocked prompts --blocked-reason.
+    await card.focus();
+    await page.keyboard.press("m");
+    await expect(menu).toBeVisible();
+    await menu.locator('.move-menu-target[data-target="blocked"]').click();
+    await expect(
+      page.locator(`.column[data-status="blocked"] .card[data-id="${DETAIL_DEP_ID}"]`),
+    ).toHaveCount(1);
+    await expect(page.locator("#board-toast")).toContainText(`${DETAIL_DEP_ID} -> blocked`);
+    await expect
+      .poll(
+        () =>
+          cliJson<{ item: { status: string; blocked_reason: string | null } }>(fixture, [
+            "show",
+            DETAIL_DEP_ID,
+          ]).item,
+      )
+      .toEqual(
+        expect.objectContaining({ status: "blocked", blocked_reason: "waiting on upstream" }),
+      );
+  });
+
+  test("touch: tapping the move menu moves a card without drag (mobile fallback)", async ({
+    page,
+  }) => {
+    // HTML5 drag-and-drop never fires on touch screens; the phone-sized, touch
+    // context proves the tap affordance carries the same move flow.
+    const browser = page.context().browser();
+    const mobile = await browser!.newContext({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+    });
+    const touchPage = await mobile.newPage();
+    // Mute the SSE reload stream BEFORE goto (see the keyboard test above):
+    // the move here would otherwise reload the page between tap and assertion.
+    await touchPage.route("**/events", (route) => route.abort());
+    await touchPage.goto(server?.url ?? "");
+    await expect(touchPage.locator("h1")).toContainText("arggon board");
+    const card = touchPage.locator(`.card[data-id="${FILTER_ITEM_ID}"]`);
+    await expect(card).toHaveCount(1);
+
+    await card.locator(".card-move").tap();
+    const menu = touchPage.locator("#board-move-menu");
+    await expect(menu).toBeVisible();
+    await menu.locator('.move-menu-target[data-target="cancelled"]').tap();
+    await expect(
+      touchPage.locator(`.column[data-status="cancelled"] .card[data-id="${FILTER_ITEM_ID}"]`),
+    ).toHaveCount(1);
+    await expect(touchPage.locator("#board-toast")).toContainText(`${FILTER_ITEM_ID} -> cancelled`);
+    await expect
+      .poll(() => cliJson<{ item: ListedItem }>(fixture, ["show", FILTER_ITEM_ID]).item.status)
+      .toBe("cancelled");
+    await mobile.close();
+  });
 });
