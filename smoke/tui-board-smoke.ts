@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * task-ui-browser-smoke-ci / task-tui-detail-pane / task-tui-live-refresh /
- * task-tui-sort-ready-lens: model-free TUI frame check.
+ * task-tui-sort-ready-lens / task-tui-filter-language: model-free TUI frame
+ * check.
  *
  * `arggon board --tui` is interactive and no browser automation applies
  * (ADR 0008: the TUI smoke is a scripted pty render check). This harness runs
@@ -17,8 +18,12 @@
  * is split across stdin chunks (bug-tui-split-escape-sequences: the decoder
  * must reassemble it instead of leaking a phantom Esc that closes the pane
  * and clears the filter) → Esc returns to the board with the same selection
- * and filter → q. A regression net for the raw-ANSI renderer without a model
- * in the loop.
+ * and filter → Esc clears the lens → `v` applies the seeded saved view (the
+ * header names it, columns it empties carry the `(empty)` mark, the footer
+ * counts the matches) → `v` cycles back → an invalid filter expression is
+ * refused inline at the prompt (`status:bogus` stays unapplied with the
+ * kernel's error, task-tui-filter-language) → Esc cancels → q. A regression
+ * net for the raw-ANSI renderer without a model in the loop.
  *
  * Bounded by design. Exit codes: 0 — passed or `skipped:` (util-linux `script`
  * unavailable); 1 — a check failed (the fixture is kept).
@@ -66,6 +71,16 @@ export const SEEDED_BLOCKED_ITEM_ID = "task-chained";
 
 /** The footer freshness stamp the loop renders once data has been read. */
 export const FRESHNESS_STAMP_PATTERN = /updated \d{2}:\d{2}:\d{2}/;
+
+/**
+ * The saved view seeded into the fixture's tracker `.convention.yml`
+ * (task-tui-filter-language): the `v` cycle must apply it — the header names
+ * it with its expression, columns it empties carry the `(empty)` mark and the
+ * footer counts the matches (4 todo tasks of 7 items).
+ */
+export const SEEDED_VIEW_NAME = "open-tasks";
+export const SEEDED_VIEW_EXPR = "type:task status:todo";
+export const SEEDED_VIEW_MATCH = "4/7 match";
 
 /** The v0 statuses whose column headers the TUI must render. */
 export const TUI_STATUS_HEADERS = ["todo", "in_progress", "blocked", "done", "cancelled"];
@@ -212,6 +227,11 @@ function createFixture(): string {
   if (dep.status !== 0) {
     throw new Error(`arggon update (chained dep) failed: ${dep.stdout ?? ""}${dep.stderr ?? ""}`);
   }
+  // Saved views (task-tui-filter-language): the `v` cycle needs an x-views
+  // entry in the tracker .convention.yml — appended to the generated file.
+  const convention = findConventionFile(fixture);
+  if (convention === null) throw new Error("tracker .convention.yml not found in the fixture");
+  writeFileSync(convention, `x-views:\n  ${SEEDED_VIEW_NAME}: "${SEEDED_VIEW_EXPR}"\n`, "utf8");
   return fixture;
 }
 
@@ -225,6 +245,24 @@ function findItemFile(root: string, itemId: string): string | null {
       const full = join(dir, entry.name);
       if (entry.isDirectory()) stack.push(full);
       else if (entry.name === `${itemId}.md`) return full;
+    }
+  }
+  return null;
+}
+
+/** Recursively find the tracker `.convention.yml` in the fixture. */
+function findConventionFile(root: string): string | null {
+  const stack = [root];
+  while (stack.length > 0) {
+    const dir = stack.pop()!;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      // .convention.yml is a dotfile by name; everything else dotted (.git)
+      // stays out of the walk.
+      if (entry.name.startsWith(".") && entry.name !== ".convention.yml") continue;
+      if (entry.name === "node_modules") continue;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) stack.push(full);
+      else if (entry.name === ".convention.yml") return full;
     }
   }
   return null;
@@ -409,6 +447,52 @@ function runTui(fixture: string): Promise<{ capture: string; steps: StepResult[]
         until: (capture) =>
           isBoardFrame(lastFrame(capture), SEEDED_ITEM_ID) &&
           lastFrame(capture).includes(`filter: ${SEEDED_ITEM_ID}`),
+        send: "\x1b", // Esc: clear the lens (filter goes with it)
+      },
+      {
+        label: "esc clears the filter",
+        until: (capture) =>
+          lastFrame(capture).includes("arggon board --tui ·") &&
+          !lastFrame(capture).includes("filter:"),
+        send: "v", // apply the seeded saved view
+      },
+      {
+        label: "saved view applied: header names it, non-todo columns emptied, totals counted",
+        until: (capture) =>
+          lastFrame(capture).includes(`view: ${SEEDED_VIEW_NAME} (${SEEDED_VIEW_EXPR})`) &&
+          lastFrame(capture).includes(SEEDED_VIEW_MATCH),
+        send: "v", // cycle back to no view
+      },
+      {
+        label: "v cycles back to no view (full board again)",
+        until: (capture) =>
+          !lastFrame(capture).includes(`view: ${SEEDED_VIEW_NAME}`) &&
+          lastFrame(capture).includes("arggon board --tui · 7 item(s)"),
+        send: "/", // open the search prompt for the refusal check
+      },
+      {
+        label: "search prompt open",
+        until: (capture) => lastFrame(capture).includes("esc to cancel"),
+        send: "status:bogus", // an invalid enum value
+      },
+      {
+        label: "invalid draft typed at the prompt",
+        until: (capture) => lastFrame(capture).includes("/status:bogus█"),
+        send: "\r", // enter: the loop's verdict must refuse it
+      },
+      {
+        label: "invalid expression refused inline at the prompt",
+        until: (capture) =>
+          lastFrame(capture).includes("/status:bogus") &&
+          lastFrame(capture).includes('unknown status "bogus"'),
+        send: "\x1b", // cancel the prompt
+      },
+      {
+        label: "esc cancels the refused prompt, board unchanged",
+        until: (capture) =>
+          !lastFrame(capture).includes("esc to cancel") &&
+          !lastFrame(capture).includes("█") &&
+          !lastFrame(capture).includes("filter:"),
         send: "q", // quit
       },
     ];
@@ -534,6 +618,25 @@ async function main(): Promise<void> {
       "the priority/next sorts lead the todo column with the p1 card",
       sortStep?.ok === true,
       sortStep?.frame,
+    ) && passed;
+  const viewStep = steps.find((step) => step.label.startsWith("saved view applied"));
+  passed =
+    check(
+      "the saved view narrows the board, names itself in the header and counts the matches",
+      viewStep?.ok === true &&
+        viewStep.frame.includes("(empty)") && // non-todo columns emptied by the view
+        !viewStep.frame.includes("S entries") && // the story card is filtered out
+        !viewStep.frame.includes("I tui-smoke"), // the initiative card too
+      viewStep?.frame,
+    ) && passed;
+  const refusalStep = steps.find((step) => step.label.startsWith("invalid expression refused"));
+  passed =
+    check(
+      "an invalid filter expression is refused inline at the prompt (never applied)",
+      refusalStep?.ok === true &&
+        refusalStep.frame.includes("/status:bogus") &&
+        refusalStep.frame.includes('unknown status "bogus"'),
+      refusalStep?.frame,
     ) && passed;
   passed =
     check(
