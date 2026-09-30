@@ -39,6 +39,13 @@ valid:
       const t = ctx?.tool?.transform;
       t((editor) => {});
     }
+  - |
+    // A renamed but type-valid receiver is outside the rule's scope — the
+    // receiver names are structural anchors (documented native limitation;
+    // the plugin schema/parity tests own renamed receivers).
+    export function migrate(toolEditor: ToolEditorLike, extraTool: ToolDefinition) {
+      toolEditor.add(extraTool);
+    }
 invalid:
   - |
     export function registerArgonTools(editor: ToolEditorLike, extraTool: ToolDefinition) {

@@ -10,7 +10,6 @@ labels: [worktree, playwright, ci, review-gate]
 priority: p2
 created: "2026-09-29"
 updated: "2026-09-30"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-worktree-link-farm-breaks-playwright-runner
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/story-start-worktree/bug-worktree-link-farm-breaks-playwright-runner.md
