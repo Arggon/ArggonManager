@@ -1003,6 +1003,9 @@ export function wireBoardKeyboardNav(): { ensureAnchor(): void } {
     document.querySelectorAll(".column"),
   ) as HTMLElement[];
   function visibleCards(column: HTMLElement): HTMLElement[] {
+    // A collapsed column hides its cards (task-board-column-controls): the
+    // arrow keys must skip it exactly like an empty one.
+    if (column.classList.contains("collapsed")) return [];
     return Array.prototype.slice.call(
       column.querySelectorAll(".card:not(.filtered-out)"),
     ) as HTMLElement[];
@@ -1013,11 +1016,22 @@ export function wireBoardKeyboardNav(): { ensureAnchor(): void } {
       el.setAttribute("tabindex", el === card ? "0" : "-1");
     });
   }
+  function inCollapsedColumn(card: Element): boolean {
+    const column = card.closest(".column");
+    return column !== null && column.classList.contains("collapsed");
+  }
   function ensureAnchor(): void {
     const anchor = document.querySelector('.board .card[tabindex="0"]');
-    if (anchor && !anchor.classList.contains("filtered-out")) return;
-    const first = document.querySelector(".board .card:not(.filtered-out)");
-    if (first) setRoving(first as HTMLElement);
+    if (anchor && !anchor.classList.contains("filtered-out") && !inCollapsedColumn(anchor)) {
+      return;
+    }
+    const candidates = document.querySelectorAll(".board .card:not(.filtered-out)");
+    for (let i = 0; i < candidates.length; i++) {
+      if (!inCollapsedColumn(candidates[i])) {
+        setRoving(candidates[i] as HTMLElement);
+        return;
+      }
+    }
   }
   document.addEventListener("keydown", function (event) {
     const key = event.key;
@@ -1062,6 +1076,107 @@ export function wireBoardKeyboardNav(): { ensureAnchor(): void } {
     next.focus();
   });
   return { ensureAnchor: ensureAnchor };
+}
+
+/**
+ * Column controls (task-board-column-controls): per-column collapse toggles in
+ * the column headings and a filterbar pair — hide done/cancelled and reset
+ * layout. Embedded with `toString()` into EVERY board (static export and
+ * serve alike — both modes must behave the same), so it must stay
+ * self-contained: no module-scope references, no template literals.
+ *
+ * State persists in localStorage under `arggon-board-columns-v1`
+ * ({ collapsed: string[], terminalHidden: boolean }) — a documented choice:
+ * the layout is a per-browser view preference, not tracker data, so it never
+ * touches the git files that remain the source of truth. Missing, corrupt or
+ * unavailable storage degrades to the default layout on every load (a write
+ * failure just means the state does not persist). The reset button restores
+ * the default layout and writes it, so the reset itself persists.
+ *
+ * `ensureAnchor` is the roving-focus handle from `wireBoardKeyboardNav`
+ * (serve mode; null in the static export): every layout application re-seats
+ * the anchor, so collapsing the column that holds it never strands keyboard
+ * entry into the board.
+ */
+export function wireBoardColumns(ensureAnchor?: (() => void) | null): void {
+  const KEY = "arggon-board-columns-v1";
+  const TERMINAL = ["done", "cancelled"];
+  type Layout = { collapsed: string[]; terminalHidden: boolean };
+  function store(state: Layout): void {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(state));
+    } catch {
+      /* storage unavailable or full: layout just does not persist */
+    }
+  }
+  function load(): Layout {
+    try {
+      const raw = JSON.parse(localStorage.getItem(KEY) || "null") as Partial<Layout> | null;
+      if (raw === null || typeof raw !== "object" || !Array.isArray(raw.collapsed)) {
+        return { collapsed: [], terminalHidden: false };
+      }
+      return {
+        collapsed: raw.collapsed.filter((status) => typeof status === "string"),
+        terminalHidden: raw.terminalHidden === true,
+      };
+    } catch {
+      return { collapsed: [], terminalHidden: false };
+    }
+  }
+  function apply(state: Layout): void {
+    document.querySelectorAll(".column").forEach(function (column) {
+      const col = column as HTMLElement;
+      const status = col.getAttribute("data-status") || "";
+      const collapsed = state.collapsed.indexOf(status) !== -1;
+      col.classList.toggle("collapsed", collapsed);
+      col.classList.toggle(
+        "terminal-hidden",
+        state.terminalHidden && TERMINAL.indexOf(status) !== -1,
+      );
+      const button = col.querySelector(".col-toggle");
+      if (button) {
+        button.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        button.setAttribute(
+          "aria-label",
+          (collapsed ? "expand the " : "collapse the ") + status + " column",
+        );
+        button.textContent = collapsed ? "+" : "\u2013";
+      }
+    });
+    const toggle = document.getElementById("board-terminal-toggle");
+    if (toggle) {
+      toggle.setAttribute("aria-pressed", state.terminalHidden ? "true" : "false");
+      toggle.textContent = state.terminalHidden ? "show done/cancelled" : "hide done/cancelled";
+    }
+    if (ensureAnchor) ensureAnchor();
+  }
+  let state = load();
+  apply(state);
+  document.addEventListener("click", function (event) {
+    const target = event.target as Element | null;
+    if (!target || typeof target.closest !== "function") return;
+    const toggle = target.closest(".col-toggle") as HTMLElement | null;
+    if (toggle) {
+      const status = toggle.getAttribute("data-status") || "";
+      const index = state.collapsed.indexOf(status);
+      if (index === -1) state.collapsed.push(status);
+      else state.collapsed.splice(index, 1);
+      apply(state);
+      store(state);
+      return;
+    }
+    if (target.closest("#board-terminal-toggle")) {
+      state.terminalHidden = !state.terminalHidden;
+      apply(state);
+      store(state);
+      return;
+    }
+    if (target.closest("#board-layout-reset")) {
+      state = { collapsed: [], terminalHidden: false };
+      apply(state);
+      store(state);
+    }
+  });
 }
 
 /**
@@ -1233,6 +1348,13 @@ export function wireBoardMoveMenu(attemptMove: (card: HTMLElement, to: string) =
  * fetches `/api/item?id=<id>` (kernel bounded read) and renders it as DOM
  * text nodes. Without the flag the static export is byte-identical to the
  * pre-drawer output: no drawer markup, no endpoint wiring, no extra script.
+ * Column controls (task-board-column-controls) render on EVERY board — static
+ * and serve: a per-column collapse toggle in each heading (the count badge
+ * stays visible when collapsed), a filterbar toggle that hides the terminal
+ * done/cancelled columns, and a reset-layout button; the layout persists in
+ * localStorage (`arggon-board-columns-v1`, a per-browser view preference that
+ * never touches the tracker) and degrades to the default layout without it.
+ * Column headings are sticky while the board scrolls.
  */
 export function renderBoardHtml(
   items: WorkItem[],
@@ -1415,9 +1537,10 @@ export function renderBoardHtml(
     // Named landmark per column (task-board-keyboard-a11y): the section's
     // aria-labelledby points at its heading, so assistive tech announces
     // "todo, region/heading" instead of an anonymous group. Statuses are the
-    // unique id namespace.
+    // unique id namespace. The collapse toggle (task-board-column-controls)
+    // rides in the heading; the count badge stays visible when collapsed.
     return `<section class="column" data-status="${status}" aria-labelledby="board-column-${status}">
-  <h2 id="board-column-${status}">${status} <span class="count">${columnItems.length}</span></h2>
+  <h2 id="board-column-${status}">${status} <span class="count">${columnItems.length}</span><button type="button" class="col-toggle" data-status="${status}" aria-expanded="true" aria-label="collapse the ${status} column">&ndash;</button></h2>
   ${cards || '<div class="empty">—</div>'}
 </section>`;
   }).join("\n");
@@ -1455,9 +1578,22 @@ header .meta { color: #59636e; font-size: 13px; }
 .board { display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: 12px; align-items: start; }
 @media (max-width: 1100px) { .board { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); } }
 .column { background: #ebecf0; border-radius: 8px; padding: 10px; }
-.column h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #424a53; }
+/* Sticky column headers (task-board-column-controls): the header stays
+   visible while the board scrolls, pinned to the viewport top for as long as
+   its column is in view. The negative margins/padding extend the header over
+   the column's own padding so cards slide under an opaque surface instead of
+   peeking through the gutters; the radius matches the column's top corners.
+   Grid and responsive rules above are untouched. */
+.column h2 { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 6px; background: #ebecf0; border-radius: 8px 8px 0 0; margin: -10px -10px 10px; padding: 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #424a53; }
 .column .count { background: #d0d4da; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
 .column .empty { color: #666a6f; text-align: center; padding: 12px 0; }
+/* Column collapse (task-board-column-controls): a collapsed column keeps only
+   its header — the count badge stays visible, cards and group heads hide. */
+.column.collapsed .card, .column.collapsed .mgroup-head, .column.collapsed .empty { display: none; }
+.column.terminal-hidden { display: none; }
+.col-toggle { margin-left: auto; flex: 0 0 auto; border: 1px solid #d0d4da; background: #fff; color: #424a53; border-radius: 4px; width: 20px; height: 20px; font-size: 13px; line-height: 1; cursor: pointer; font-family: inherit; }
+.layout-toggle { border: 1px solid #d0d4da; background: #fff; border-radius: 12px; padding: 3px 10px; font-size: 12px; font-family: inherit; color: inherit; cursor: pointer; }
+.layout-toggle[aria-pressed="true"] { background: #0550ae; border-color: #0550ae; color: #fff; }
 .card { background: #fff; border-radius: 6px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.1); padding: 10px; margin-bottom: 8px; font-size: 13px; }
 .card:last-child { margin-bottom: 0; }
 .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
@@ -1534,6 +1670,8 @@ ${details ? DETAIL_CSS : ""}
   <span id="board-filter-count" class="filter-count">${sorted.length} item(s)</span>
   <span id="board-filter-error" class="filter-error" role="alert"></span>
   ${lensChips}
+  <button type="button" id="board-terminal-toggle" class="layout-toggle" aria-pressed="false">hide done/cancelled</button>
+  <button type="button" id="board-layout-reset" class="layout-toggle">reset layout</button>
 </div>
 <main class="board" aria-label="arggon board">
 ${columns}
@@ -1548,6 +1686,7 @@ ${evaluateDrop.toString()}
 ${applyBoardFilter.toString()}
 /* board-filter:end */
 ${dropNeedsClaimPrompt.toString()}
+${wireBoardColumns.toString()}
 ${details ? trapBoardFocus.toString() : ""}
 ${details ? renderBoardDetail.toString() : ""}
 ${details ? wireBoardDetail.toString() : ""}
@@ -1560,6 +1699,10 @@ ${details ? wireBoardMoveMenu.toString() : ""}
   // Roving focus anchor (serve mode): the filter re-seats the focusable card
   // when the current one gets hidden; null in the static export.
   var keyboardNav = ${details ? "wireBoardKeyboardNav()" : "null"};
+  // Column collapse/terminal-hide/reset (task-board-column-controls): every
+  // board — static and serve — restores the persisted layout at boot; in serve
+  // mode the roving anchor is re-seated after every layout change.
+  wireBoardColumns(keyboardNav ? keyboardNav.ensureAnchor : null);
   var filterInput = document.getElementById("board-filter-input");
   var filterError = document.getElementById("board-filter-error");
   var filterCount = document.getElementById("board-filter-count");
