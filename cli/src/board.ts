@@ -609,14 +609,17 @@ export type BoardDetailPayload = {
 const DETAIL_CSS = `
 .card[tabindex="0"] { cursor: pointer; }
 .card:focus-visible { outline: 2px solid #0550ae; outline-offset: 2px; }
-.card-move { margin-left: auto; border: 1px solid #d0d4da; background: #fff; color: #424a53; border-radius: 4px; padding: 0 6px; font-size: 10px; font-family: inherit; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; }
+.card-move { margin-left: auto; border: 1px solid #666a6f; background: #fff; color: #424a53; border-radius: 4px; padding: 0 6px; font-size: 10px; font-family: inherit; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; }
 .card-move:focus-visible { outline: 2px solid #0550ae; outline-offset: 2px; }
 body.drawer-open { overflow: hidden; }
 .drawer { position: fixed; inset: 0; z-index: 20; }
 .drawer[hidden] { display: none; }
 .drawer-backdrop { position: absolute; inset: 0; background: rgb(0 0 0 / 0.35); }
-.drawer-panel { position: absolute; top: 0; right: 0; bottom: 0; width: min(560px, 92vw); background: #fff; box-shadow: -4px 0 16px rgb(0 0 0 / 0.2); padding: 16px; overflow-y: auto; }
-.drawer-close { position: absolute; top: 8px; right: 10px; border: 1px solid #d0d4da; background: #fff; border-radius: 6px; width: 28px; height: 28px; font-size: 16px; line-height: 1; cursor: pointer; }
+/* The drawer's white fill sits on the 0.35 scrim (2.43:1) — below the 1.4.11
+   floor — so the identifying edge is the border against the fill (#666a6f on
+   #fff is 5.45:1). Same for the move menu below. */
+.drawer-panel { position: absolute; top: 0; right: 0; bottom: 0; width: min(560px, 92vw); background: #fff; border: 1px solid #666a6f; box-shadow: -4px 0 16px rgb(0 0 0 / 0.2); padding: 16px; overflow-y: auto; }
+.drawer-close { position: absolute; top: 8px; right: 10px; border: 1px solid #666a6f; background: #fff; border-radius: 6px; width: 28px; height: 28px; font-size: 16px; line-height: 1; cursor: pointer; }
 .drawer-title { margin: 0 34px 6px 0; font-size: 16px; overflow-wrap: anywhere; }
 .drawer-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
 .drawer-meta code { font-size: 11px; color: #59636e; }
@@ -639,12 +642,12 @@ body.drawer-open { overflow: hidden; }
 .move-menu { position: fixed; inset: 0; z-index: 30; }
 .move-menu[hidden] { display: none; }
 .move-menu-backdrop { position: absolute; inset: 0; background: rgb(0 0 0 / 0.35); }
-.move-menu-panel { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%); background: #fff; border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); padding: 14px; min-width: 260px; max-width: 92vw; }
+.move-menu-panel { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%); background: #fff; border: 1px solid #666a6f; border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); padding: 14px; min-width: 260px; max-width: 92vw; }
 .move-menu-title { font-weight: 600; font-size: 13px; margin-bottom: 8px; overflow-wrap: anywhere; }
 .move-menu-actions { display: flex; flex-direction: column; gap: 6px; }
-.move-menu-target { text-align: left; padding: 6px 10px; font-size: 13px; font-family: inherit; border: 1px solid #d0d4da; background: #fff; color: inherit; border-radius: 6px; cursor: pointer; }
+.move-menu-target { text-align: left; padding: 6px 10px; font-size: 13px; font-family: inherit; border: 1px solid #666a6f; background: #fff; color: inherit; border-radius: 6px; cursor: pointer; }
 .move-menu-note { color: #59636e; font-size: 12px; }
-.move-menu-cancel { margin-top: 10px; padding: 4px 10px; font-size: 12px; font-family: inherit; border: 1px solid #d0d4da; background: #fff; color: inherit; border-radius: 6px; cursor: pointer; }
+.move-menu-cancel { margin-top: 10px; padding: 4px 10px; font-size: 12px; font-family: inherit; border: 1px solid #666a6f; background: #fff; color: inherit; border-radius: 6px; cursor: pointer; }
 .move-menu-target:focus-visible, .move-menu-cancel:focus-visible { outline: 2px solid #0550ae; outline-offset: 2px; }
 `;
 
@@ -1447,7 +1450,20 @@ export function renderBoardHtml(
    it has to clear the threshold on all three surfaces it appears on — the white
    card (#fff, 5.45:1), the column (#ebecf0, 4.61:1) and the dep-blocked card
    (#f6f7f9, 5.08:1). The two greys it replaced, #a0a6ad (2.46:1) and #8c919a
-   (3.17:1 on the card), failed. */
+   (3.17:1 on the card), failed.
+
+   Non-text boundaries (WCAG 1.4.11, 3:1 — axe has no automated rule for this
+   criterion, so board.test.ts asserts the rendered CSS instead,
+   task-board-non-text-contrast-and-drag-affordance). Every interactive
+   control border and the drop-target outline use the same #666a6f grey, which
+   clears 3:1 on every surface a boundary touches: #fff 5.45:1, #ebecf0 4.61:1,
+   #f4f5f7 4.99:1. The count pill and the two dialog panels (drawer, move menu)
+   carry it as a 1px border because their fills sit against low-contrast
+   neighbours (#d0d4da on #ebecf0 is 1.26:1; #fff on the 0.35 scrim is
+   2.43:1), so the border against the fill is the identifying edge. There is
+   no opacity fade anywhere in this stylesheet: fading composites every
+   descendant against the surface below it (measured 1.5-2.7:1) and is never
+   used as a state cue. */
 :root { color-scheme: light; font-family: system-ui, sans-serif; }
 body { margin: 0; padding: 16px; background: #f4f5f7; color: #1f2328; }
 /* Visible keyboard focus everywhere (task-board-keyboard-a11y): one shared
@@ -1461,7 +1477,7 @@ header .meta { color: #59636e; font-size: 13px; }
 @media (max-width: 1100px) { .board { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); } }
 .column { background: #ebecf0; border-radius: 8px; padding: 10px; }
 .column h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #424a53; }
-.column .count { background: #d0d4da; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
+.column .count { background: #d0d4da; border: 1px solid #666a6f; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
 .column .empty { color: #666a6f; text-align: center; padding: 12px 0; }
 .card { background: #fff; border-radius: 6px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.1); padding: 10px; margin-bottom: 8px; font-size: 13px; }
 .card:last-child { margin-bottom: 0; }
@@ -1506,7 +1522,16 @@ header .meta { color: #59636e; font-size: 13px; }
 .mgroup-head:first-child { margin-top: 0; }
 .mgroup-head.none { color: #666a6f; }
 .card[draggable="true"] { cursor: grab; }
-.card.dragging { opacity: 0.5; }
+/* Mid-drag affordance (task-board-non-text-contrast-and-drag-affordance):
+   the dragged card lifts instead of fading. The old "opacity: 0.5" composited
+   every descendant to ~1.5-2.7:1 while the card was in flight; a keyboard or
+   screen-reader user never sees this state at all (they move cards through
+   the move dialog, which never sets .dragging), so the fade bought nothing
+   and cost legibility. Elevation plus a solid #0550ae outline — the focus
+   ring color — reads as "picked up" and stays distinct from the dashed
+   #666a6f drop-target outline on .column.over. Transient, fully legible, and
+   enforced by the no-opacity assertion in board.test.ts. */
+.card.dragging { box-shadow: 0 8px 20px rgb(0 0 0 / 0.3); outline: 2px solid #0550ae; outline-offset: 2px; }
 .column.over { outline: 2px dashed #666a6f; outline-offset: -4px; }
 #board-toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); max-width: 80%; background: #424a53; color: #fff; border-radius: 6px; padding: 8px 14px; font-size: 13px; display: none; z-index: 10; box-shadow: 0 2px 8px rgb(0 0 0 / 0.3); }
 #board-toast.show { display: block; }
@@ -1514,14 +1539,14 @@ header .meta { color: #59636e; font-size: 13px; }
 #board-toast.ok { background: #1a7f37; }
 .filterbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
 .filterbar label { font-size: 11px; color: #59636e; text-transform: uppercase; letter-spacing: 0.05em; }
-#board-filter-input { flex: 1 1 260px; max-width: 560px; padding: 6px 10px; font-size: 13px; font-family: inherit; border: 1px solid #d0d4da; border-radius: 6px; background: #fff; color: inherit; }
+#board-filter-input { flex: 1 1 260px; max-width: 560px; padding: 6px 10px; font-size: 13px; font-family: inherit; border: 1px solid #666a6f; border-radius: 6px; background: #fff; color: inherit; }
 #board-filter-input:focus { outline: 2px solid #0550ae; outline-offset: -1px; }
-#board-filter-clear { padding: 6px 10px; font-size: 12px; font-family: inherit; border: 1px solid #d0d4da; border-radius: 6px; background: #fff; cursor: pointer; }
+#board-filter-clear { padding: 6px 10px; font-size: 12px; font-family: inherit; border: 1px solid #666a6f; border-radius: 6px; background: #fff; cursor: pointer; }
 .filter-count { font-size: 12px; color: #59636e; }
 .filter-error { display: none; font-size: 12px; color: #cf222e; }
 .filter-error.show { display: inline; }
 .lenses { display: flex; flex-wrap: wrap; gap: 6px; }
-.lens { border: 1px solid #d0d4da; background: #fff; border-radius: 12px; padding: 3px 10px; font-size: 12px; font-family: inherit; color: inherit; cursor: pointer; }
+.lens { border: 1px solid #666a6f; background: #fff; border-radius: 12px; padding: 3px 10px; font-size: 12px; font-family: inherit; color: inherit; cursor: pointer; }
 .lens.active { background: #0550ae; border-color: #0550ae; color: #fff; }
 .card.filtered-out, .mgroup-head.filtered-out { display: none; }
 ${details ? DETAIL_CSS : ""}
