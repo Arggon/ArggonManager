@@ -18,6 +18,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCreate, runUpdate } from "@arggondev/lib";
 import { runInit } from "./init.js";
+import { tickAcceptance } from "../../test/acceptance.js";
 import {
   findItemStatus,
   gateReopen,
@@ -64,6 +65,9 @@ function primedTree(): { dir: string; id: string } {
     now: NOW,
   });
   runUpdate({ cwd: dir, id: task.id, status: "in_progress", assignee: "alice", now: NOW });
+  // Done gate (task-done-gate-acceptance-waiver, ADR 0015): tick the contract
+  // so the flip under test is the unwaived path.
+  tickAcceptance(dir, task.id);
   runUpdate({ cwd: dir, id: task.id, status: "done", now: NOW });
   return { dir, id: task.id };
 }

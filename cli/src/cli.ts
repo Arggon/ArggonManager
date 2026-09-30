@@ -938,6 +938,10 @@ program
   )
   .option("--reason <text>", "non-empty rationale for --steal, recorded in the item body")
   .option(
+    "--waive <reason>",
+    "record a dated waiver and flip a task/bug to done despite unchecked acceptance checkboxes (requires --status done and a non-empty reason; agents are refused)",
+  )
+  .option(
     "--no-cascade",
     "skip automatic container completion when this update closes the last open descendant",
   )
@@ -972,6 +976,7 @@ program
         force?: boolean;
         steal?: boolean;
         reason?: string;
+        waive?: string;
         cascade?: boolean;
         commit?: boolean;
         json?: boolean;
@@ -1020,6 +1025,7 @@ program
               force: Boolean(opts.force),
               steal: Boolean(opts.steal),
               reason: opts.reason,
+              waive: opts.waive,
               cascade: opts.cascade !== false,
               full: opts.full === true,
               commit: opts.commit,
@@ -1047,6 +1053,7 @@ program
             force: Boolean(opts.force),
             steal: Boolean(opts.steal),
             reason: opts.reason,
+            waive: opts.waive,
             cascade: opts.cascade !== false,
           });
           // Tracker hygiene (task-autocommit-update-import): auto-commit ALL

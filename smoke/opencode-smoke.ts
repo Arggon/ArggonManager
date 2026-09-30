@@ -144,7 +144,12 @@ const TOOL_PROMPT = [
   "Reply with only the raw JSON result.",
 ].join("\n");
 
-type RunResult = { status: number | null; signal: NodeJS.Signals | null; stdout: string; stderr: string };
+type RunResult = {
+  status: number | null;
+  signal: NodeJS.Signals | null;
+  stdout: string;
+  stderr: string;
+};
 
 type TranscriptPart = {
   type?: string;
@@ -157,7 +162,8 @@ const failures: string[] = [];
 const fixtures: Fixture[] = [];
 
 function check(name: string, ok: boolean, detail?: string): void {
-  const suffix = ok || detail === undefined ? "" : `\n      ${detail.split("\n").slice(0, 6).join("\n      ")}`;
+  const suffix =
+    ok || detail === undefined ? "" : `\n      ${detail.split("\n").slice(0, 6).join("\n      ")}`;
   console.log(`${ok ? "  ok  " : "  FAIL"} ${name}${suffix}`);
   if (!ok) failures.push(name);
 }
@@ -218,7 +224,12 @@ class Fixture {
       timeout: timeoutMs,
       maxBuffer: 64 * 1024 * 1024,
     });
-    return { status: proc.status, signal: proc.signal, stdout: proc.stdout ?? "", stderr: proc.stderr ?? "" };
+    return {
+      status: proc.status,
+      signal: proc.signal,
+      stdout: proc.stdout ?? "",
+      stderr: proc.stderr ?? "",
+    };
   }
 
   cli(args: string[]): RunResult {
@@ -290,17 +301,24 @@ class Fixture {
 
   itemId(result: RunResult): string | undefined {
     const item = this.json(result)?.item;
-    const id = item !== null && typeof item === "object" ? (item as { id?: unknown }).id : undefined;
+    const id =
+      item !== null && typeof item === "object" ? (item as { id?: unknown }).id : undefined;
     return typeof id === "string" ? id : undefined;
   }
 
   /** initiative → epic → story → task; returns the task id, story id and directory. */
   createTaskChain(): { id: string; story: string; directory: string } | undefined {
-    const initiative = this.itemId(this.cli(["create", "initiative", "Smoke Initiative", "--json"]));
+    const initiative = this.itemId(
+      this.cli(["create", "initiative", "Smoke Initiative", "--json"]),
+    );
     if (initiative === undefined) return undefined;
-    const epic = this.itemId(this.cli(["create", "epic", "Smoke Epic", "--parent", initiative, "--json"]));
+    const epic = this.itemId(
+      this.cli(["create", "epic", "Smoke Epic", "--parent", initiative, "--json"]),
+    );
     if (epic === undefined) return undefined;
-    const story = this.itemId(this.cli(["create", "story", "Smoke Story", "--parent", epic, "--json"]));
+    const story = this.itemId(
+      this.cli(["create", "story", "Smoke Story", "--parent", epic, "--json"]),
+    );
     if (story === undefined) return undefined;
     const task = this.json(this.cli(["create", "task", "Smoke Item", "--parent", story, "--json"]));
     const item = task?.item as { id?: unknown; path?: unknown } | undefined;
@@ -459,8 +477,7 @@ function executedCode(stdout: string, needle: string): boolean {
     if (event.type !== "tool_use" || event.part?.tool !== "execute") return false;
     const state = event.part.state;
     return (
-      state?.status === "completed" &&
-      normalizeNamespace(state.input?.code ?? "").includes(needle)
+      state?.status === "completed" && normalizeNamespace(state.input?.code ?? "").includes(needle)
     );
   });
 }
@@ -490,7 +507,9 @@ function sessionCompleted(result: RunResult, name: string): boolean {
 
 /** True when the transcript carries at least one assistant text/tool event. */
 function hasModelOutput(stdout: string): boolean {
-  return parseTranscript(stdout).some((event) => event.type === "text" || event.type === "tool_use");
+  return parseTranscript(stdout).some(
+    (event) => event.type === "text" || event.type === "tool_use",
+  );
 }
 
 /**
@@ -586,7 +605,10 @@ function renameLogged(stderr: string, id: string): boolean {
 }
 
 /** Fixture with an initialized tracker and a claimed item; `<id>` is undefined on failure. */
-function claimedItemFixture(name: string): { fixture: Fixture; item: { id: string; directory: string } | undefined } {
+function claimedItemFixture(name: string): {
+  fixture: Fixture;
+  item: { id: string; directory: string } | undefined;
+} {
   const fixture = new Fixture(name);
   fixture.bootstrap();
   const init = fixture.init();
@@ -625,15 +647,25 @@ function scenarioFreshInit(): void {
   );
   const session = f.opencode(TOOL_PROMPT);
   f.saveTranscript("fresh-init", session);
-  check("session runs in the fixture project", session.stderr.includes(`directory=${f.dir}`), runTail(session));
+  check(
+    "session runs in the fixture project",
+    session.stderr.includes(`directory=${f.dir}`),
+    runTail(session),
+  );
   check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
   check(
     "native tools register from the inlined kernel (12)",
-    session.stderr.includes('[arggon] tools: registered 15 native arggon tools (namespace="arggon":'),
+    session.stderr.includes(
+      '[arggon] tools: registered 15 native arggon tools (namespace="arggon":',
+    ),
     runTail(session),
   );
   check("no MCP server is registered by default", !mcpConnected(session), runTail(session));
-  check("model executed the native next tool successfully", successfulArggonNext(session.stdout), runTail(session));
+  check(
+    "model executed the native next tool successfully",
+    successfulArggonNext(session.stdout),
+    runTail(session),
+  );
 }
 
 function scenarioAdopterConfig(): void {
@@ -648,10 +680,16 @@ function scenarioAdopterConfig(): void {
   check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
   check(
     "plugin registers the fifteen native tools with no config entry",
-    session.stderr.includes('[arggon] tools: registered 15 native arggon tools (namespace="arggon":'),
+    session.stderr.includes(
+      '[arggon] tools: registered 15 native arggon tools (namespace="arggon":',
+    ),
     runTail(session),
   );
-  check("model executed the native next tool successfully", successfulArggonNext(session.stdout), runTail(session));
+  check(
+    "model executed the native next tool successfully",
+    successfulArggonNext(session.stdout),
+    runTail(session),
+  );
 }
 
 function scenarioNeverClobber(): void {
@@ -683,7 +721,9 @@ function scenarioNeverClobber(): void {
   check("adopter config bytes untouched", f.read("opencode.json") === config);
   check(
     "native tools still register alongside the adopter MCP server",
-    session.stderr.includes('[arggon] tools: registered 15 native arggon tools (namespace="arggon":'),
+    session.stderr.includes(
+      '[arggon] tools: registered 15 native arggon tools (namespace="arggon":',
+    ),
     runTail(session),
   );
 }
@@ -706,12 +746,15 @@ function scenarioFailureIsolation(): void {
   );
   check(
     "broken plugin failure is logged, not fatal",
-    session.stderr.includes("failed to load plugin") && session.stderr.includes("synthetic smoke failure"),
+    session.stderr.includes("failed to load plugin") &&
+      session.stderr.includes("synthetic smoke failure"),
     runTail(session),
   );
   check(
     "healthy arggon plugin still registers the native tools",
-    session.stderr.includes('[arggon] tools: registered 15 native arggon tools (namespace="arggon":'),
+    session.stderr.includes(
+      '[arggon] tools: registered 15 native arggon tools (namespace="arggon":',
+    ),
     runTail(session),
   );
   const next = f.cli(["next", "--json"]);
@@ -731,9 +774,17 @@ function scenarioPluginAbsent(): void {
     session.status === 0 && textContains(session.stdout, "PLUGIN_ABSENT"),
     runTail(session),
   );
-  check("no MCP server connects without the plugin (W3 default)", !mcpConnected(session), runTail(session));
+  check(
+    "no MCP server connects without the plugin (W3 default)",
+    !mcpConnected(session),
+    runTail(session),
+  );
   const next = f.cli(["next", "--json"]);
-  check("CLI unaffected without the plugin", next.status === 0 && next.stdout.includes('"ok":true'), runTail(next));
+  check(
+    "CLI unaffected without the plugin",
+    next.status === 0 && next.stdout.includes('"ok":true'),
+    runTail(next),
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -823,7 +874,9 @@ export function executeJson(stdout: string, needle: string): Record<string, unkn
 }
 
 function scenarioNativeTools(): void {
-  scenario("native tools (W3): every arggon tool runs in Code Mode from the dependency-less bundle");
+  scenario(
+    "native tools (W3): every arggon tool runs in Code Mode from the dependency-less bundle",
+  );
   const f = new Fixture("native-tools");
   f.bootstrap();
   const init = f.init();
@@ -967,7 +1020,11 @@ function scenarioContextBranch(): void {
     textContains(session.stdout, item.id),
     runTail(session),
   );
-  check("plugin logged the session rename", renameLogged(session.stderr, item.id), runTail(session));
+  check(
+    "plugin logged the session rename",
+    renameLogged(session.stderr, item.id),
+    runTail(session),
+  );
   check(
     "session title persisted by the server as the item id",
     f.sessionTitles().includes(item.id),
@@ -992,7 +1049,10 @@ function scenarioContextStorage(): void {
     ].join("\n"),
   );
   f.saveTranscript("context-storage", session);
-  check("branch does not match feat/fix", f.git(["branch", "--show-current"]).stdout.trim() === "smoke-base");
+  check(
+    "branch does not match feat/fix",
+    f.git(["branch", "--show-current"]).stdout.trim() === "smoke-base",
+  );
   const injections = contextInjections(session.stderr);
   const forItem = injections.filter((entry) => entry.id === item.id);
   check(
@@ -1048,7 +1108,9 @@ function scenarioContextEnv(): void {
 }
 
 function scenarioContextSilent(): void {
-  scenario("context: nothing resolves (tracker present, no claim/branch/env/observed call) is silent");
+  scenario(
+    "context: nothing resolves (tracker present, no claim/branch/env/observed call) is silent",
+  );
   const f = new Fixture("context-silent");
   f.bootstrap();
   f.init();
@@ -1063,7 +1125,11 @@ function scenarioContextSilent(): void {
     runTail(session),
   );
   check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
-  check("no item context injected", contextInjections(session.stderr).length === 0, runTail(session));
+  check(
+    "no item context injected",
+    contextInjections(session.stderr).length === 0,
+    runTail(session),
+  );
 }
 
 function scenarioContextOutside(): void {
@@ -1080,7 +1146,11 @@ function scenarioContextOutside(): void {
     runTail(session),
   );
   check("plugin loads in the runtime", pluginLoaded(session), runTail(session));
-  check("no item context injected", contextInjections(session.stderr).length === 0, runTail(session));
+  check(
+    "no item context injected",
+    contextInjections(session.stderr).length === 0,
+    runTail(session),
+  );
 }
 
 function scenarioHygiene(): void {
@@ -1321,7 +1391,6 @@ function scenarioCommands(only?: string): void {
   }
 }
 
-
 // ---------------------------------------------------------------------------
 // W4 — worktree lifecycle, invariants and permissions
 // ---------------------------------------------------------------------------
@@ -1454,6 +1523,13 @@ function scenarioWorktreeLifecycle(): void {
     `canonical status=${f.itemStatus(item.directory, item.id) ?? "?"}`,
   );
 
+  // Done gate (task-done-gate-acceptance-waiver, ADR 0015): the close session
+  // flips the item through the kernel, which refuses `-> done` while the body
+  // carries unchecked acceptance boxes. Tick the box first — the same manual
+  // step the wave smoke instructs the agent to perform.
+  const canonicalItem = `${item.directory}/${item.id}.md`;
+  f.write(canonicalItem, f.read(canonicalItem).replaceAll("- [ ]", "- [x]"));
+
   const closeSession = f.opencode(
     [
       "Use the execute tool with exactly this code:",
@@ -1509,7 +1585,9 @@ function scenarioWorktreeLifecycle(): void {
  * permissions — is what refuses both invariants.
  */
 function scenarioInvariants(): void {
-  scenario("invariants (W4): never-steal and no-reopen hold with permissions active (worker agent)");
+  scenario(
+    "invariants (W4): never-steal and no-reopen hold with permissions active (worker agent)",
+  );
   const f = new Fixture("invariants");
   f.bootstrap();
   const init = f.init();
@@ -1520,7 +1598,9 @@ function scenarioInvariants(): void {
     return;
   }
   check("fixture item claimed by smoke", f.claim(item.id).status === 0);
-  const other = f.itemId(f.cli(["create", "task", "Second item", "--parent", item.story, "--json"]));
+  const other = f.itemId(
+    f.cli(["create", "task", "Second item", "--parent", item.story, "--json"]),
+  );
   check("second item created", other !== undefined);
   if (other === undefined) return;
   f.claim(other);
@@ -1776,7 +1856,9 @@ function main(): void {
   }
 
   if (failures.length > 0) {
-    console.error(`\nsmoke:opencode FAILED — ${failures.length} check(s):\n${failures.map((f) => `- ${f}`).join("\n")}`);
+    console.error(
+      `\nsmoke:opencode FAILED — ${failures.length} check(s):\n${failures.map((f) => `- ${f}`).join("\n")}`,
+    );
     console.error(`fixtures kept for inspection:\n${fixtures.map((f) => `- ${f.dir}`).join("\n")}`);
     process.exit(1);
   }

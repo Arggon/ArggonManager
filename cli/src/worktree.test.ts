@@ -23,6 +23,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { defaultCleanupGit, runCleanup } from "./cleanup.js";
 import { parseFrontmatter, runCreate, runUpdate, runValidate } from "@arggondev/lib";
 
+import { tickAllAcceptance } from "../../test/acceptance.js";
+
 import { runInit } from "./init.js";
 import { defaultStartGit, runStart } from "./start.js";
 import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
@@ -91,6 +93,9 @@ function initRepo(): string {
   for (const id of ["task-alpha", "task-bravo", "task-charlie"]) {
     runCreate({ cwd: dir, type: "task", title: id, parent: "login", id, now: NOW });
   }
+  // Done gate (task-done-gate-acceptance-waiver, ADR 0015): these suites flip
+  // the leaves done for cleanup/worktree rules, so arrange satisfied contracts.
+  tickAllAcceptance(dir);
   // init now also generates AND auto-commits the governing docs; this is a
   // tolerant no-op when everything is already committed (tracker hygiene).
   commitAllIfDirty(dir, "init tasks");

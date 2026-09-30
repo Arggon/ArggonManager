@@ -79,7 +79,7 @@ One primary claimable id per branch when possible. Open a PR early; keep it smal
 
 An item is **done** when:
 
-1. Acceptance checklist in the Markdown body is complete (or explicitly waived in Notes with rationale).
+1. Acceptance checklist in the Markdown body is complete (or explicitly waived in Notes with rationale). This is kernel-enforced (ADR 0015): `update --status done` on a task/bug with unchecked boxes is refused — tick the boxes, or have a HUMAN pass `--waive "<reason>"` (records a dated `### Waiver` section in the body; agents cannot waive — the MCP/native tools expose no waive parameter).
 2. Frontmatter `status` is `done` via `arggon update <id> --status done`.
 3. `updated` date is refreshed (`arggon update` does this automatically).
 4. The PR referencing the work item id is merged (or the completing change is on the default branch).
@@ -93,7 +93,7 @@ Do **not** jump `todo` → `done` — claim first (`in_progress`), then complete
 The `auto-done` workflow (`.github/workflows/auto-done.yml`) mirrors `start` on the done side: when a PR referencing `task-*`/`bug-*` ids merges into `main`, it flips claimed items to `done` through `arggon update`, runs the test suite on the flip tree, and lands the change as a squashed `github-actions[bot]` PR (the workflow posts the required `cli` check on the flip commit itself — bot pushes/PRs don't trigger CI). Limits you must still cover yourself:
 
 - It only performs the legal `in_progress` → `done` transition. Items still `todo` or `blocked` when the PR merges are skipped with a warning annotation — claim before merging, or mark them manually.
-- It never edits acceptance checklists and never touches containers (story/epic/initiative) — tick the checklist in the item body before the PR merges.
+- It never edits acceptance checklists and never touches containers (story/epic/initiative) — tick the checklist in the item body before the PR merges. Since the done gate (ADR 0015), a flip refused for unchecked boxes is tolerated like the skipped-todo case: a warning annotation, and the item stays `in_progress` until a human ticks the checklist or waives (`arggon update <id> --status done --waive "<reason>"`).
 - Reference the item id in the PR title or body (the id is what the workflow greps for).
 
 **Why flip PRs can wedge:** merging several PRs rapidly triggers concurrent auto-done runs, and sibling main commits (other flips, review comments) make the open flip PRs out-of-date, so the bot's self-merge fails — and it cannot be repaired with `update-branch`, because a rebased bot head would lack the required `cli` check (bot pushes never trigger CI). The workflow is race-tolerant since task-autodone-flip-race: before each merge attempt it rebases the flip branch onto fresh `origin/main`, re-posts the `cli` check on the new head, and retries (3 attempts). If the rebase itself conflicts — possible since task-autodone-flip-wedge-3, when a coordinator `arggon comment` on a flipped item auto-commits the same item file to main mid-flight — the workflow instead redoes the flip on a fresh `origin/main` worktree (bounded, 2 attempts: re-run the idempotent `update --status done`, push a new flip branch, re-post the check, merge, delete the wedged branch). If it still fails, the only recovery is an admin merge of the flip PR — the run log names this in a `::warning::`.

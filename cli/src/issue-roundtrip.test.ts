@@ -20,6 +20,7 @@ import {
 } from "@arggondev/lib";
 
 import { runInit } from "./init.js";
+import { tickAcceptance } from "../../test/acceptance.js";
 
 // task-issue-roundtrip: done flips close the linked GitHub issue — opt-in via
 // tasks/.convention.yml `x-github.issue-roundtrip: true`, best effort (gh
@@ -77,6 +78,9 @@ function importedTask(dir: string): { id: string; path: string } {
   const { data, body } = parseFrontmatter(raw);
   writeFileSync(task.path, stringifyFrontmatter({ ...data, issue: 12 }, body), "utf8");
   runUpdate({ cwd: dir, id: task.id, status: "in_progress", assignee: "arggon", now: NOW });
+  // Done gate (task-done-gate-acceptance-waiver, ADR 0015): tick the contract
+  // so the flips under test exercise the round-trip, not the gate.
+  tickAcceptance(dir, task.id);
   return { id: task.id, path: task.path };
 }
 
@@ -281,6 +285,7 @@ describe("issue round-trip on done flips", () => {
       now: NOW,
     });
     runUpdate({ cwd: dir, id: task.id, status: "in_progress", assignee: "arggon", now: NOW });
+    tickAcceptance(dir, task.id);
     const execGh = vi.fn(() => "{}");
     const result = runUpdate({
       cwd: dir,

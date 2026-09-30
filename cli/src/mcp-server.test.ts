@@ -16,6 +16,7 @@ import { HANDOFF_SESSION_CAP, conventionPathForRoot, runCreate } from "@arggonde
 import { arggonVersion } from "./docs.js";
 
 import { runInit } from "./init.js";
+import { tickAcceptance } from "../../test/acceptance.js";
 import { runMcpServer } from "./mcp-server.js";
 
 /**
@@ -220,8 +221,10 @@ describe("mcp server", () => {
     const result = await client.request("tools/list");
     const tools = result.tools as Array<{ name: string; inputSchema: Record<string, unknown> }>;
     for (const name of ["arggon_start", "arggon_branch", "arggon_cleanup"]) {
-      const properties = tools.find((tool) => tool.name === name)!.inputSchema
-        .properties as Record<string, unknown>;
+      const properties = tools.find((tool) => tool.name === name)!.inputSchema.properties as Record<
+        string,
+        unknown
+      >;
       expect(properties, name).not.toHaveProperty("force");
       expect(properties, name).not.toHaveProperty("steal");
     }
@@ -246,11 +249,10 @@ describe("mcp server", () => {
   it("arggon_branch re-enters the CLI and returns the branch envelope", async () => {
     // runBranch checks out with git: seed a repo before spawning the CLI.
     const git = (args: string[]) =>
-      execFileSync(
-        "git",
-        ["-c", "user.name=test", "-c", "user.email=test@example.com", ...args],
-        { cwd: repoDir, stdio: ["ignore", "pipe", "pipe"] },
-      );
+      execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.com", ...args], {
+        cwd: repoDir,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
     git(["init"]);
     git(["commit", "--allow-empty", "-m", "seed"]);
     await client.request("tools/call", {
@@ -386,6 +388,10 @@ describe("mcp server", () => {
       arguments: { id: "task-rate-limit", status: "in_progress", assignee: "agent-x" },
     });
     expect(claim.isError).toBeUndefined();
+
+    // Done gate (task-done-gate-acceptance-waiver, ADR 0015): tick the
+    // contract so the flip under test succeeds through the tool.
+    tickAcceptance(repoDir, "task-rate-limit");
 
     const complete = await client.request("tools/call", {
       name: "arggon_update",
@@ -1051,6 +1057,10 @@ describe("mcp server additive update contract (task-native-kernel-lib-polish fin
       arguments: { id: "task-rate-limit", status: "in_progress", assignee: "agent-x" },
     });
     expect(claim.isError).toBeUndefined();
+
+    // Done gate (task-done-gate-acceptance-waiver, ADR 0015): tick the
+    // contract so the flip under test succeeds through the tool.
+    tickAcceptance(repoDir, "task-rate-limit");
 
     const done = await client.request("tools/call", {
       name: "arggon_update",

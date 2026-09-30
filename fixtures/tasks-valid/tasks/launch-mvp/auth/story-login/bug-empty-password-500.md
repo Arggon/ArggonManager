@@ -1,6 +1,6 @@
 ---
 type: bug
-status: todo
+status: done
 id: bug-empty-password-500
 title: Empty password returns HTTP 500
 parent: story-login
@@ -20,3 +20,12 @@ updated: "2026-09-03"
 ## Expected
 
 Return `400` with a field error: password is required.
+
+## Acceptance
+
+- [ ] Field error verified against the staging deployment
+
+### Waiver 2026-09-03
+
+closed as shipped: fix verified on production logs; the staging sweep is tracked
+in the follow-up bug. Recorded by `update --status done --waive "..."`.

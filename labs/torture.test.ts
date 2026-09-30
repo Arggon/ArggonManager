@@ -91,6 +91,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { runCreate, runUpdate } from "@arggondev/lib";
 import { runInit } from "../cli/src/init.js";
+import { tickAcceptance } from "../test/acceptance.js";
 import { removeFixtureTree } from "../cli/src/test-tmp.js";
 
 import { GENERATED_DOC_COUNT } from "../cli/src/docs.js";
@@ -222,6 +223,9 @@ describe("lab: mixed concurrent operations on one item family (suizo / bug-claim
     // in_progress up front; the spawned processes then close it (cascade
     // pressure on the shared containers).
     runUpdate({ cwd: dir, id: "task-sibling", status: "in_progress", assignee: "worker" });
+    // Done gate (task-done-gate-acceptance-waiver, ADR 0015): the spawned
+    // done-flip needs a satisfied acceptance contract.
+    tickAcceptance(dir, "task-sibling");
 
     const results = await spawnAll(dir, [
       // Claim contention on task-target: three different assignees + a same-assignee duplicate.
@@ -629,6 +633,8 @@ describe("lab: gate probes from every entry point (guardian/suizo)", () => {
     // v0 transitions: todo -> done goes through in_progress.
     runUpdate({ cwd: dir, id: "task-claimed", status: "in_progress", assignee: "alice" });
     runUpdate({ cwd: dir, id: "task-finished", status: "in_progress", assignee: "worker" });
+    // Done gate (task-done-gate-acceptance-waiver, ADR 0015).
+    tickAcceptance(dir, "task-finished");
     runUpdate({ cwd: dir, id: "task-finished", status: "done" });
     return { dir, doneId: "task-finished" };
   }

@@ -14,13 +14,7 @@ import { assertUpdateRules } from "./rules.js";
 import { formatDate, formatDateTime } from "./dates.js";
 import { assertBranchName, assertLabels } from "./ids.js";
 import { assertPriority } from "./priority.js";
-import {
-  acceptanceComplete,
-  itemsById,
-  loadItems,
-  tryLoadItem,
-  type WorkItem,
-} from "./items.js";
+import { acceptanceComplete, itemsById, loadItems, tryLoadItem, type WorkItem } from "./items.js";
 import { findTasksDir, newItemPath, repoRootFromTasks } from "./paths.js";
 import { assertParentEdge, expectedParentType } from "./relations.js";
 import {
@@ -106,8 +100,21 @@ export type UpdateOptions = {
   /** Non-empty rationale for `steal`, recorded in the item body. */
   reason?: string;
   /**
+   * Explicit waiver for the done gate (task-done-gate-acceptance-waiver,
+   * ADR 0015): the only way to flip a task/bug to `done` while its body still
+   * carries unchecked acceptance checkboxes. Requires a non-empty reason,
+   * which is recorded as a dated `### Waiver` section in the item body BEFORE
+   * the status flips. Refused when there is nothing to waive (no `--status
+   * done` flip, a container, or a complete checklist) — the flag exists solely
+   * for the gate. Agent callers never receive it (the MCP/native surfaces
+   * expose no waive parameter) and are refused at the kernel too: waivers are
+   * human judgment calls.
+   */
+  waive?: string;
+  /**
    * Agent-flagged caller (the MCP layer always sets this): playbook
-   * restrictions apply — no reopening done/cancelled, no claim steal.
+   * restrictions apply — no reopening done/cancelled, no claim steal, no
+   * done-gate waiver.
    */
   agent?: boolean;
   /**
@@ -211,7 +218,9 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
     throw new Error("pass either --assignee or --unassign, not both");
   }
   if (opts.steal && opts.force) {
-    throw new Error("--steal and --force are mutually exclusive (--steal already authorizes the takeover)");
+    throw new Error(
+      "--steal and --force are mutually exclusive (--steal already authorizes the takeover)",
+    );
   }
   let title: string | undefined;
   if (opts.title !== undefined) {
@@ -263,14 +272,18 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
       );
     }
     if (parentRequest !== undefined) {
-      throw new Error("pass either --type or --parent, not both (promotion derives the parent from the grandparent epic)");
+      throw new Error(
+        "pass either --type or --parent, not both (promotion derives the parent from the grandparent epic)",
+      );
     }
     typeRequest = trimmed;
   }
   let issueRequest: number | null | undefined;
   if (opts.issue !== undefined) {
     if (!Number.isInteger(opts.issue) || opts.issue < 0) {
-      throw new Error("issue must be a positive integer (the GitHub issue number), or 0 to clear it");
+      throw new Error(
+        "issue must be a positive integer (the GitHub issue number), or 0 to clear it",
+      );
     }
     issueRequest = opts.issue > 0 ? opts.issue : null;
   }
@@ -311,458 +324,515 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
   }
 
   const apply = (): UpdateResult => {
-  const tasksDir = findTasksDir(opts.cwd);
-  const byId = itemsById(loadItems(tasksDir));
-  const item = byId.get(id);
-  if (!item) {
-    throw new Error(`id '${id}' not found under the tracker`);
-  }
+    const tasksDir = findTasksDir(opts.cwd);
+    const byId = itemsById(loadItems(tasksDir));
+    const item = byId.get(id);
+    if (!item) {
+      throw new Error(`id '${id}' not found under the tracker`);
+    }
 
-  // Reparent validation (task-update-reparent): every refusal happens BEFORE
-  // any filesystem mutation, so an invalid edge leaves the tree untouched.
-  // Same parent is a documented no-op: no move, no `parent` change entry.
-  let reparentTo: WorkItem | undefined;
-  if (parentRequest !== undefined && parentRequest !== item.parent) {
-    if (expectedParentType(item.type) === null) {
-      throw new Error("initiative cannot have a parent");
-    }
-    const parentItem = byId.get(parentRequest);
-    if (!parentItem) {
-      throw new Error(`parent '${parentRequest}' not found under the tracker`);
-    }
-    // Cycle guard BEFORE the edge-type check so reparenting under one's own
-    // descendant always reports the cycle, never a confusing type mismatch.
-    // The new parent must not be the item itself or one of its descendants
-    // (validate re-checks the whole tree on every run, but the mutation must
-    // never be able to CREATE a cycle).
-    const descendants = new Set<string>([id]);
-    let grew = true;
-    while (grew) {
-      grew = false;
-      for (const candidate of byId.values()) {
-        if (
-          candidate.parent &&
-          descendants.has(candidate.parent) &&
-          !descendants.has(candidate.id)
-        ) {
-          descendants.add(candidate.id);
-          grew = true;
+    // Reparent validation (task-update-reparent): every refusal happens BEFORE
+    // any filesystem mutation, so an invalid edge leaves the tree untouched.
+    // Same parent is a documented no-op: no move, no `parent` change entry.
+    let reparentTo: WorkItem | undefined;
+    if (parentRequest !== undefined && parentRequest !== item.parent) {
+      if (expectedParentType(item.type) === null) {
+        throw new Error("initiative cannot have a parent");
+      }
+      const parentItem = byId.get(parentRequest);
+      if (!parentItem) {
+        throw new Error(`parent '${parentRequest}' not found under the tracker`);
+      }
+      // Cycle guard BEFORE the edge-type check so reparenting under one's own
+      // descendant always reports the cycle, never a confusing type mismatch.
+      // The new parent must not be the item itself or one of its descendants
+      // (validate re-checks the whole tree on every run, but the mutation must
+      // never be able to CREATE a cycle).
+      const descendants = new Set<string>([id]);
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const candidate of byId.values()) {
+          if (
+            candidate.parent &&
+            descendants.has(candidate.parent) &&
+            !descendants.has(candidate.id)
+          ) {
+            descendants.add(candidate.id);
+            grew = true;
+          }
         }
       }
-    }
-    if (descendants.has(parentRequest)) {
-      throw new Error(`cannot reparent '${id}' under '${parentRequest}' (own descendant — cycle)`);
-    }
-    assertParentEdge(item.type, parentItem.type);
-    reparentTo = parentItem;
-  }
-
-  // Promotion validation (task-promote-task-to-story): every refusal happens
-  // BEFORE any filesystem mutation. v1 supports exactly one conversion —
-  // task → story (--type story). The parse step already refused every other
-  // requested type; here we refuse the items it cannot apply to.
-  let promoteEpic: WorkItem | undefined;
-  let promoteNewPath: string | undefined;
-  let promoteNewId: string | undefined;
-  if (typeRequest !== undefined) {
-    if (item.type === "story") {
-      throw new Error(`cannot convert '${id}': it is already a story`);
-    }
-    if (item.type !== "task") {
-      throw new Error(
-        `--type story promotes tasks only (v1); '${id}' is a ${item.type} — refusing (create the story and move the work instead)`,
-      );
-    }
-    const parentStory = item.parent ? byId.get(item.parent) : undefined;
-    if (!parentStory || parentStory.type !== "story") {
-      throw new Error(
-        `task '${id}' has no parent story to derive the target epic from — create the epic first (arggon create epic <title> --parent <initiative-id>) and reparent '${id}' under a story below it`,
-      );
-    }
-    const epic = parentStory.parent ? byId.get(parentStory.parent) : undefined;
-    if (!epic) {
-      throw new Error(
-        `parent story '${parentStory.id}' has no parent epic — create the epic first and reparent '${parentStory.id}' under it (a story lives under an epic)`,
-      );
-    }
-    try {
-      assertParentEdge("story", epic.type);
-    } catch {
-      throw new Error(
-        `promoting '${id}' needs an epic target, but its grandparent '${epic.id}' is a ${epic.type} — create the epic first (arggon create epic <title> --parent <initiative-id>)`,
-      );
-    }
-    // A promoted story is a CONTAINER, and container ids must not start with
-    // task- or bug- (validate would reject the tree). Promoting therefore also
-    // renames the id: task-x -> story-x (ids without the task- prefix keep
-    // their id). References ride along: every depends_on entry pointing at the
-    // old id is rewritten tree-wide.
-    promoteNewId = id.startsWith("task-") ? `story-${id.slice("task-".length)}` : id;
-    if (promoteNewId !== id && byId.has(promoteNewId)) {
-      throw new Error(`cannot promote '${id}': target id '${promoteNewId}' is already taken`);
-    }
-    promoteEpic = epic;
-    promoteNewPath = newItemPath({
-      tasksDir,
-      type: "story",
-      id: promoteNewId,
-      parentContainerDir: epic.containerDir,
-    });
-  }
-
-  // depends_on (v3, ADR 0004): replace the list / append one id. Unknown ids
-  // fail here so the error is actionable at edit time; validate re-checks the
-  // whole graph (unknown, self, cycles) on every run.
-  let newDeps: string[] | undefined;
-  if (depsReplace !== undefined || depsAdd !== undefined) {
-    const base = depsReplace !== undefined ? depsReplace : item.dependsOn;
-    newDeps = depsAdd !== undefined && !base.includes(depsAdd) ? [...base, depsAdd] : [...base];
-    for (const dep of newDeps) {
-      if (!byId.has(dep)) {
-        throw new Error(`depends_on id '${dep}' does not resolve to an existing item`);
-      }
-    }
-  }
-
-  // (assertStatus above verified the enum; the cast survives the closure —
-  // property narrowing from the assertion does not cross the function boundary.)
-  const newStatus = (opts.status as Status | undefined) ?? item.status;
-  assertUpdateRules(
-    {
-      id,
-      type: item.type,
-      currentStatus: item.status,
-      currentAssignee: item.assignee ?? null,
-      requestedStatus: opts.status as Status | undefined,
-      requestedAssignee: opts.assignee,
-      force: opts.force,
-      steal: opts.steal,
-    },
-    opts.agent ? "agent" : "human",
-  );
-
-  // Supervised steal (human-only; agent refusal happened in assertUpdateRules):
-  // requires a non-empty reason (recorded in the body) and an existing claim
-  // to take over, and the caller becomes the assignee.
-  const stealReason = opts.steal ? (opts.reason?.trim() ?? null) : null;
-  if (opts.steal) {
-    if (!stealReason) {
-      throw new Error(
-        "--steal requires a non-empty --reason (the takeover is recorded in the item body)",
-      );
-    }
-    if (!isClaimed(item.type, item.status, item.assignee ?? null)) {
-      throw new Error(
-        `'${id}' is not currently claimed -- --steal takes over an existing claim (in_progress with an assignee); check \`arggon list --stale\``,
-      );
-    }
-    if (opts.assignee === undefined) {
-      throw new Error(`--steal requires --assignee <your-login> (you become the assignee of '${id}')`);
-    }
-  }
-
-  // Assignee: explicit > unassign > unclaim default (in_progress -> todo) > keep.
-  const currentAssignee = item.assignee ?? null;
-  let newAssignee: string | null;
-  if (opts.assignee !== undefined) {
-    newAssignee = opts.assignee;
-  } else if (opts.unassign) {
-    newAssignee = null;
-  } else if (newStatus === "todo" && item.status === "in_progress") {
-    newAssignee = null;
-  } else {
-    newAssignee = currentAssignee;
-  }
-
-  // Branch: explicit > unclaim default (in_progress -> todo) > keep.
-  const currentBranch = item.branch ?? null;
-  let newBranch: string | null;
-  if (branchRequest !== undefined) {
-    newBranch = branchRequest;
-  } else if (newStatus === "todo" && item.status === "in_progress") {
-    newBranch = null;
-  } else {
-    newBranch = currentBranch;
-  }
-
-  // blocked_reason: required when blocked, forbidden otherwise.
-  let newReason: string | null;
-  if (newStatus === "blocked") {
-    const explicit = opts.blockedReason?.trim() ? opts.blockedReason.trim() : null;
-    newReason = explicit ?? item.blockedReason ?? null;
-    if (!newReason) {
-      throw new Error("status blocked requires --blocked-reason");
-    }
-  } else {
-    if (opts.blockedReason !== undefined) {
-      throw new Error("blocked_reason is only valid when status is blocked");
-    }
-    newReason = null;
-  }
-
-  // claimed_at lease (reporting only — never gates a transition): set when a
-  // claim starts or the claimant changes, kept while the same claim continues
-  // (pre-lease claims stay without it), cleared when the item leaves the
-  // claimed state.
-  const now = opts.now ?? new Date();
-  const wasClaimed = isClaimed(item.type, item.status, currentAssignee);
-  const willBeClaimed = isClaimed(item.type, newStatus, newAssignee);
-  let newClaimedAt: string | null;
-  if (!willBeClaimed) {
-    newClaimedAt = null;
-  } else if (!opts.steal && wasClaimed && newAssignee === currentAssignee) {
-    newClaimedAt = item.claimedAt ?? null;
-  } else {
-    newClaimedAt = formatDateTime(now);
-  }
-
-  assertClaimAndBlocked({
-    type: item.type,
-    status: newStatus,
-    assignee: newAssignee,
-    blockedReason: newReason,
-  });
-
-  const data = { ...item.data };
-  const changed: string[] = [];
-  if (title !== undefined && title !== item.title) {
-    data.title = title;
-    changed.push("title");
-  }
-  if (opts.status !== undefined && newStatus !== item.status) {
-    data.status = newStatus;
-    changed.push("status");
-  }
-  if (newAssignee !== currentAssignee) {
-    data.assignee = newAssignee;
-    changed.push("assignee");
-  }
-  if (newBranch !== currentBranch) {
-    data.branch = newBranch;
-    changed.push("branch");
-  }
-  const currentWorktreePath = item.worktreePath ?? null;
-  if (worktreeRequest !== undefined && worktreeRequest !== currentWorktreePath) {
-    if (worktreeRequest === null) {
-      delete data.worktree_path;
-    } else {
-      data.worktree_path = worktreeRequest;
-    }
-    changed.push("worktree_path");
-  }
-  // issue (task-issue-field-cli): positive integer sets the field, 0 clears.
-  const currentIssue = item.issue ?? null;
-  if (issueRequest !== undefined && issueRequest !== currentIssue) {
-    if (issueRequest === null) {
-      delete data.issue;
-    } else {
-      data.issue = issueRequest;
-    }
-    changed.push("issue");
-  }
-  if (labels !== undefined && labels.join("\u0000") !== item.labels.join("\u0000")) {
-    data.labels = labels;
-    changed.push("labels");
-  }
-  // priority (v4, spec-priority-field-008): set with the enum value, clear by
-  // removing the key (absent stays absent — never an empty string or null).
-  const currentPriority = item.priority ?? null;
-  if (priorityRequest !== undefined && priorityRequest !== currentPriority) {
-    if (priorityRequest === null) {
-      delete data.priority;
-    } else {
-      data.priority = priorityRequest;
-    }
-    changed.push("priority");
-  }
-  if (newDeps !== undefined && newDeps.join("\u0000") !== item.dependsOn.join("\u0000")) {
-    data.depends_on = newDeps;
-    changed.push("depends_on");
-  }
-  const currentReason = item.blockedReason ?? null;
-  if (newReason !== currentReason) {
-    data.blocked_reason = newReason;
-    changed.push("blocked_reason");
-  }
-  const currentClaimedAt = item.claimedAt ?? null;
-  if (newClaimedAt !== currentClaimedAt) {
-    if (newClaimedAt === null) {
-      delete data.claimed_at;
-    } else {
-      data.claimed_at = newClaimedAt;
-    }
-    changed.push("claimed_at");
-  }
-
-  data.updated = formatDate(now);
-
-  // Supervised steal records the takeover in the item body as a dated note.
-  let newBody = item.body;
-  if (opts.steal && stealReason) {
-    const note = `> stolen ${formatDate(now)} by ${newAssignee}: ${stealReason}`;
-    newBody = `${item.body.endsWith("\n") || item.body.length === 0 ? item.body : `${item.body}\n`}${note}\n`;
-  }
-  // Reparent move (task-update-reparent): performed LAST, right before the
-  // frontmatter write, so every other validation (status transitions, claim
-  // rules, steal gates) has already passed — a refused update never moves
-  // anything. Leaves (task/bug) move as a FILE into the new story's
-  // directory; containers move their WHOLE directory (children's frontmatter
-  // is untouched — they reference the id, not a path). The old and new paths
-  // all ride into the tracker auto-commit so git history follows the move and
-  // the tree never ends dirty.
-  let targetPath = item.filePath;
-  let movedFrom: string | undefined;
-  let renamedFrom: string | undefined;
-  const movedOldPaths: string[] = [];
-  const movedNewPaths: string[] = [];
-  if (reparentTo) {
-    const newPath = newItemPath({
-      tasksDir,
-      type: item.type,
-      id,
-      parentContainerDir: reparentTo.containerDir,
-    });
-    if (newPath !== item.filePath) {
-      if (existsSync(newPath)) {
-        throw new Error(`reparent target already exists: ${newPath}`);
-      }
-      const isLeaf = item.type === "task" || item.type === "bug";
-      if (isLeaf) {
-        movedOldPaths.push(item.filePath);
-        movedNewPaths.push(newPath);
-        mkdirSync(dirname(newPath), { recursive: true });
-        renameSync(item.filePath, newPath);
-      } else {
-        const oldDir = item.containerDir;
-        const newDir = dirname(newPath);
-        for (const old of listFiles(oldDir)) {
-          if (old === item.filePath) continue;
-          movedOldPaths.push(old);
-          movedNewPaths.push(join(newDir, old.slice(oldDir.length + 1)));
-        }
-        movedOldPaths.push(item.filePath);
-        movedNewPaths.push(newPath);
-        mkdirSync(dirname(newDir), { recursive: true });
-        renameSync(oldDir, newDir);
-      }
-      movedFrom = isLeaf ? item.filePath : item.containerDir;
-    }
-    data.parent = reparentTo.id;
-    if (!changed.includes("parent")) changed.push("parent");
-    targetPath = newPath;
-  }
-
-  // Promotion move (task-promote-task-to-story): performed LAST like the
-  // reparent move, after every other validation has passed. The task file
-  // moves to the story layout under the grandparent epic
-  // (<epic>/<story-id>/<story-id>.md, exactly where `create story` places
-  // it), the type and parent flip, and the promoted story starts EMPTY of
-  // children. issue/labels/body ride along untouched in the same file.
-  if (promoteNewPath && promoteEpic && promoteNewId) {
-    if (existsSync(promoteNewPath)) {
-      throw new Error(`promotion target already exists: ${promoteNewPath}`);
-    }
-    mkdirSync(dirname(promoteNewPath), { recursive: true });
-    renameSync(item.filePath, promoteNewPath);
-    movedOldPaths.push(item.filePath);
-    movedNewPaths.push(promoteNewPath);
-    movedFrom = item.filePath;
-    data.type = "story";
-    changed.push("type");
-    data.parent = promoteEpic.id;
-    if (!changed.includes("parent")) changed.push("parent");
-    if (promoteNewId !== id) {
-      data.id = promoteNewId;
-      changed.push("id");
-      renamedFrom = id;
-      // Rewrite depends_on references to the old id tree-wide so the graph
-      // stays resolvable (validate re-checks on every run). These files ride
-      // into the auto-commit via movedNewPaths staging.
-      for (const other of byId.values()) {
-        if (other.id === id || !other.dependsOn.includes(id)) continue;
-        writeFileAtomic(
-          other.filePath,
-          stringifyFrontmatter(
-            {
-              ...other.data,
-              depends_on: other.dependsOn.map((dep) => (dep === id ? promoteNewId : dep)),
-              updated: formatDate(now),
-            },
-            other.body,
-          ),
+      if (descendants.has(parentRequest)) {
+        throw new Error(
+          `cannot reparent '${id}' under '${parentRequest}' (own descendant — cycle)`,
         );
-        movedNewPaths.push(other.filePath);
+      }
+      assertParentEdge(item.type, parentItem.type);
+      reparentTo = parentItem;
+    }
+
+    // Promotion validation (task-promote-task-to-story): every refusal happens
+    // BEFORE any filesystem mutation. v1 supports exactly one conversion —
+    // task → story (--type story). The parse step already refused every other
+    // requested type; here we refuse the items it cannot apply to.
+    let promoteEpic: WorkItem | undefined;
+    let promoteNewPath: string | undefined;
+    let promoteNewId: string | undefined;
+    if (typeRequest !== undefined) {
+      if (item.type === "story") {
+        throw new Error(`cannot convert '${id}': it is already a story`);
+      }
+      if (item.type !== "task") {
+        throw new Error(
+          `--type story promotes tasks only (v1); '${id}' is a ${item.type} — refusing (create the story and move the work instead)`,
+        );
+      }
+      const parentStory = item.parent ? byId.get(item.parent) : undefined;
+      if (!parentStory || parentStory.type !== "story") {
+        throw new Error(
+          `task '${id}' has no parent story to derive the target epic from — create the epic first (arggon create epic <title> --parent <initiative-id>) and reparent '${id}' under a story below it`,
+        );
+      }
+      const epic = parentStory.parent ? byId.get(parentStory.parent) : undefined;
+      if (!epic) {
+        throw new Error(
+          `parent story '${parentStory.id}' has no parent epic — create the epic first and reparent '${parentStory.id}' under it (a story lives under an epic)`,
+        );
+      }
+      try {
+        assertParentEdge("story", epic.type);
+      } catch {
+        throw new Error(
+          `promoting '${id}' needs an epic target, but its grandparent '${epic.id}' is a ${epic.type} — create the epic first (arggon create epic <title> --parent <initiative-id>)`,
+        );
+      }
+      // A promoted story is a CONTAINER, and container ids must not start with
+      // task- or bug- (validate would reject the tree). Promoting therefore also
+      // renames the id: task-x -> story-x (ids without the task- prefix keep
+      // their id). References ride along: every depends_on entry pointing at the
+      // old id is rewritten tree-wide.
+      promoteNewId = id.startsWith("task-") ? `story-${id.slice("task-".length)}` : id;
+      if (promoteNewId !== id && byId.has(promoteNewId)) {
+        throw new Error(`cannot promote '${id}': target id '${promoteNewId}' is already taken`);
+      }
+      promoteEpic = epic;
+      promoteNewPath = newItemPath({
+        tasksDir,
+        type: "story",
+        id: promoteNewId,
+        parentContainerDir: epic.containerDir,
+      });
+    }
+
+    // depends_on (v3, ADR 0004): replace the list / append one id. Unknown ids
+    // fail here so the error is actionable at edit time; validate re-checks the
+    // whole graph (unknown, self, cycles) on every run.
+    let newDeps: string[] | undefined;
+    if (depsReplace !== undefined || depsAdd !== undefined) {
+      const base = depsReplace !== undefined ? depsReplace : item.dependsOn;
+      newDeps = depsAdd !== undefined && !base.includes(depsAdd) ? [...base, depsAdd] : [...base];
+      for (const dep of newDeps) {
+        if (!byId.has(dep)) {
+          throw new Error(`depends_on id '${dep}' does not resolve to an existing item`);
+        }
       }
     }
-    targetPath = promoteNewPath;
-  }
 
-  // Atomic (bug-comment-torn-read audit): update is the other hot item writer;
-  // a non-locking reader (list/validate/MCP) must never see a torn item here
-  // either.
-  writeFileAtomic(targetPath, stringifyFrontmatter(data, newBody));
+    // (assertStatus above verified the enum; the cast survives the closure —
+    // property narrowing from the assertion does not cross the function boundary.)
+    const newStatus = (opts.status as Status | undefined) ?? item.status;
+    assertUpdateRules(
+      {
+        id,
+        type: item.type,
+        currentStatus: item.status,
+        currentAssignee: item.assignee ?? null,
+        requestedStatus: opts.status as Status | undefined,
+        requestedAssignee: opts.assignee,
+        force: opts.force,
+        steal: opts.steal,
+      },
+      opts.agent ? "agent" : "human",
+    );
 
-  const updated = tryLoadItem(targetPath);
-  if (!updated) {
-    throw new Error(`Updated item is unreadable: ${targetPath}`);
-  }
+    // Supervised steal (human-only; agent refusal happened in assertUpdateRules):
+    // requires a non-empty reason (recorded in the body) and an existing claim
+    // to take over, and the caller becomes the assignee.
+    const stealReason = opts.steal ? (opts.reason?.trim() ?? null) : null;
+    if (opts.steal) {
+      if (!stealReason) {
+        throw new Error(
+          "--steal requires a non-empty --reason (the takeover is recorded in the item body)",
+        );
+      }
+      if (!isClaimed(item.type, item.status, item.assignee ?? null)) {
+        throw new Error(
+          `'${id}' is not currently claimed -- --steal takes over an existing claim (in_progress with an assignee); check \`arggon list --stale\``,
+        );
+      }
+      if (opts.assignee === undefined) {
+        throw new Error(
+          `--steal requires --assignee <your-login> (you become the assignee of '${id}')`,
+        );
+      }
+    }
 
-  // Automatic container completion (task-container-auto-done): when an item
-  // reaches a terminal state and every sibling under a parent is terminal
-  // too, that parent completes, cascading up the chain. Off with cascade:false.
-  const { completed: completedContainers, skipped: cascadeSkipped } =
-    opts.cascade === false || (newStatus !== "done" && newStatus !== "cancelled")
-      ? { completed: [], skipped: [] }
-      : autoCompleteAncestors(tasksDir, item, opts.now ?? new Date());
-
-  // Issue round-trip (task-issue-roundtrip): when the update FLIPS the item to
-  // done and it carries the additive `issue` frontmatter number (written by
-  // `import-issues`), close the linked GitHub issue — opt-in, gated tree-wide
-  // by `x-github.issue-roundtrip` (default OFF, flips happen through bots too;
-  // a malformed config must never fail the flip, so the gate reads tolerantly
-  // like the tracker auto-commit). Best effort like the tracker commit: gh
-  // absent, unauthenticated, or failing degrade to a reported skip — reported
-  // in the payload AND as a stderr warning when enabled, never silent, never
-  // fatal. The flip flows through every caller (CLI, MCP) that uses runUpdate.
-  const root = repoRootFromTasks(tasksDir);
-  let issueRoundtrip: IssueRoundtripResult | undefined;
-  const issueNumber = updated.issue ?? null;
-  if (
-    changed.includes("status") &&
-    newStatus === "done" &&
-    issueNumber !== null &&
-    issueRoundtripEnabled(root)
-  ) {
-    issueRoundtrip = closeLinkedIssue(root, id, issueNumber, opts.execGh);
-    if (!issueRoundtrip.closed) {
-      // bug-validate-stdout-injection L2: the gh failure text embeds the
-      // repo-controlled slug/command (origin remote, item id), so the
-      // warning is display-sanitized; the payload keeps the raw skipped text.
-      process.stderr.write(
-        `arggon: warning: issue round-trip skipped: ${sanitizeHumanError(issueRoundtrip.skipped)}\n`,
+    // Done gate (task-done-gate-acceptance-waiver, ADR 0015): a claimable LEAF
+    // (task/bug) whose body still carries unchecked acceptance checkboxes cannot
+    // reach `done` without an explicit recorded waiver — "done = acceptance
+    // checklist complete (or explicitly waived in Notes with rationale)"
+    // (docs/agents.md §5) becomes kernel-enforced instead of prose. Containers
+    // (story/epic/initiative) are NOT gated here: their contract is the
+    // acceptance-aware cascade veto (task-cascade-acceptance-aware), so the same
+    // predicate is never enforced twice on one item. A body without any
+    // checklist (or with every box ticked) has no open acceptance contract and
+    // flips as before. The waiver never overrides the transition table — an
+    // illegal `→ done` transition (todo/blocked) is refused by the rules layer
+    // above, waive or not; the only legal path this gates is in_progress → done.
+    // Every refusal happens BEFORE any filesystem mutation.
+    const flippingToDone = newStatus === "done" && item.status !== "done";
+    const gatedLeaf = item.type === "task" || item.type === "bug";
+    const gated = flippingToDone && gatedLeaf && !acceptanceComplete(item.body);
+    // Trimmed once here and reused when the waiver section is recorded below;
+    // reaching the body-append block with a non-empty reason implies the gate
+    // validated the waiver (an empty reason or a non-gated request threw above).
+    const waiveReason = opts.waive !== undefined ? opts.waive.trim() : undefined;
+    if (opts.waive !== undefined) {
+      if (!waiveReason) {
+        throw new Error(
+          "--waive requires a non-empty reason (the waiver is recorded in the item body)",
+        );
+      }
+      if (opts.agent) {
+        throw new Error(
+          "agents must not waive the done gate; --waive is a human-only escape hatch (ArggonManager/docs/agents.md §5)",
+        );
+      }
+      if (!gated) {
+        throw new Error(
+          "--waive is only valid with --status done on a task/bug whose acceptance checklist still has unchecked boxes (nothing to waive)",
+        );
+      }
+    } else if (gated) {
+      throw new Error(
+        `cannot mark '${id}' done: the acceptance checklist in the item body still has unchecked boxes. Tick every box, or pass --waive "<reason>" to record a dated waiver`,
       );
     }
-  }
 
-  return {
-    id: updated.id,
-    path: targetPath,
-    root,
-    item: updated,
-    changed,
-    autoCompleted: completedContainers.map((container) => container.id),
-    cascadeLevels: completedContainers.map((container) => container.type),
-    cascadeSkipped,
-    changedPaths: [
-      targetPath,
-      ...movedNewPaths,
-      ...movedOldPaths,
-      ...completedContainers.map((container) => container.filePath),
-    ],
-    movedFrom,
-    ...(renamedFrom ? { renamedFrom } : {}),
-    ...(issueRoundtrip ? { issueRoundtrip } : {}),
-  };
+    // Assignee: explicit > unassign > unclaim default (in_progress -> todo) > keep.
+    const currentAssignee = item.assignee ?? null;
+    let newAssignee: string | null;
+    if (opts.assignee !== undefined) {
+      newAssignee = opts.assignee;
+    } else if (opts.unassign) {
+      newAssignee = null;
+    } else if (newStatus === "todo" && item.status === "in_progress") {
+      newAssignee = null;
+    } else {
+      newAssignee = currentAssignee;
+    }
+
+    // Branch: explicit > unclaim default (in_progress -> todo) > keep.
+    const currentBranch = item.branch ?? null;
+    let newBranch: string | null;
+    if (branchRequest !== undefined) {
+      newBranch = branchRequest;
+    } else if (newStatus === "todo" && item.status === "in_progress") {
+      newBranch = null;
+    } else {
+      newBranch = currentBranch;
+    }
+
+    // blocked_reason: required when blocked, forbidden otherwise.
+    let newReason: string | null;
+    if (newStatus === "blocked") {
+      const explicit = opts.blockedReason?.trim() ? opts.blockedReason.trim() : null;
+      newReason = explicit ?? item.blockedReason ?? null;
+      if (!newReason) {
+        throw new Error("status blocked requires --blocked-reason");
+      }
+    } else {
+      if (opts.blockedReason !== undefined) {
+        throw new Error("blocked_reason is only valid when status is blocked");
+      }
+      newReason = null;
+    }
+
+    // claimed_at lease (reporting only — never gates a transition): set when a
+    // claim starts or the claimant changes, kept while the same claim continues
+    // (pre-lease claims stay without it), cleared when the item leaves the
+    // claimed state.
+    const now = opts.now ?? new Date();
+    const wasClaimed = isClaimed(item.type, item.status, currentAssignee);
+    const willBeClaimed = isClaimed(item.type, newStatus, newAssignee);
+    let newClaimedAt: string | null;
+    if (!willBeClaimed) {
+      newClaimedAt = null;
+    } else if (!opts.steal && wasClaimed && newAssignee === currentAssignee) {
+      newClaimedAt = item.claimedAt ?? null;
+    } else {
+      newClaimedAt = formatDateTime(now);
+    }
+
+    assertClaimAndBlocked({
+      type: item.type,
+      status: newStatus,
+      assignee: newAssignee,
+      blockedReason: newReason,
+    });
+
+    const data = { ...item.data };
+    const changed: string[] = [];
+    if (title !== undefined && title !== item.title) {
+      data.title = title;
+      changed.push("title");
+    }
+    if (opts.status !== undefined && newStatus !== item.status) {
+      data.status = newStatus;
+      changed.push("status");
+    }
+    if (newAssignee !== currentAssignee) {
+      data.assignee = newAssignee;
+      changed.push("assignee");
+    }
+    if (newBranch !== currentBranch) {
+      data.branch = newBranch;
+      changed.push("branch");
+    }
+    const currentWorktreePath = item.worktreePath ?? null;
+    if (worktreeRequest !== undefined && worktreeRequest !== currentWorktreePath) {
+      if (worktreeRequest === null) {
+        delete data.worktree_path;
+      } else {
+        data.worktree_path = worktreeRequest;
+      }
+      changed.push("worktree_path");
+    }
+    // issue (task-issue-field-cli): positive integer sets the field, 0 clears.
+    const currentIssue = item.issue ?? null;
+    if (issueRequest !== undefined && issueRequest !== currentIssue) {
+      if (issueRequest === null) {
+        delete data.issue;
+      } else {
+        data.issue = issueRequest;
+      }
+      changed.push("issue");
+    }
+    if (labels !== undefined && labels.join("\u0000") !== item.labels.join("\u0000")) {
+      data.labels = labels;
+      changed.push("labels");
+    }
+    // priority (v4, spec-priority-field-008): set with the enum value, clear by
+    // removing the key (absent stays absent — never an empty string or null).
+    const currentPriority = item.priority ?? null;
+    if (priorityRequest !== undefined && priorityRequest !== currentPriority) {
+      if (priorityRequest === null) {
+        delete data.priority;
+      } else {
+        data.priority = priorityRequest;
+      }
+      changed.push("priority");
+    }
+    if (newDeps !== undefined && newDeps.join("\u0000") !== item.dependsOn.join("\u0000")) {
+      data.depends_on = newDeps;
+      changed.push("depends_on");
+    }
+    const currentReason = item.blockedReason ?? null;
+    if (newReason !== currentReason) {
+      data.blocked_reason = newReason;
+      changed.push("blocked_reason");
+    }
+    const currentClaimedAt = item.claimedAt ?? null;
+    if (newClaimedAt !== currentClaimedAt) {
+      if (newClaimedAt === null) {
+        delete data.claimed_at;
+      } else {
+        data.claimed_at = newClaimedAt;
+      }
+      changed.push("claimed_at");
+    }
+
+    data.updated = formatDate(now);
+
+    // Supervised steal records the takeover in the item body as a dated note.
+    let newBody = item.body;
+    if (opts.steal && stealReason) {
+      const note = `> stolen ${formatDate(now)} by ${newAssignee}: ${stealReason}`;
+      newBody = `${item.body.endsWith("\n") || item.body.length === 0 ? item.body : `${item.body}\n`}${note}\n`;
+    }
+    // Done-gate waiver (task-done-gate-acceptance-waiver, ADR 0015): the reason
+    // is recorded as a dated Notes-style section BEFORE the flip so the item's
+    // own history carries the rationale — "explicitly waived in Notes with
+    // rationale" (docs/agents.md §5) is what the kernel writes, not what the
+    // caller remembers to. Only the gated path reaches here (validated above);
+    // like the steal note, the body edit is not a `changed` field — the flip's
+    // `status` entry covers the auto-commit, which stages this same file.
+    if (waiveReason) {
+      const base = newBody.endsWith("\n") || newBody.length === 0 ? newBody : `${newBody}\n`;
+      newBody = `${base}\n### Waiver ${formatDate(now)}\n\n${waiveReason}\n`;
+    }
+    // Reparent move (task-update-reparent): performed LAST, right before the
+    // frontmatter write, so every other validation (status transitions, claim
+    // rules, steal gates) has already passed — a refused update never moves
+    // anything. Leaves (task/bug) move as a FILE into the new story's
+    // directory; containers move their WHOLE directory (children's frontmatter
+    // is untouched — they reference the id, not a path). The old and new paths
+    // all ride into the tracker auto-commit so git history follows the move and
+    // the tree never ends dirty.
+    let targetPath = item.filePath;
+    let movedFrom: string | undefined;
+    let renamedFrom: string | undefined;
+    const movedOldPaths: string[] = [];
+    const movedNewPaths: string[] = [];
+    if (reparentTo) {
+      const newPath = newItemPath({
+        tasksDir,
+        type: item.type,
+        id,
+        parentContainerDir: reparentTo.containerDir,
+      });
+      if (newPath !== item.filePath) {
+        if (existsSync(newPath)) {
+          throw new Error(`reparent target already exists: ${newPath}`);
+        }
+        const isLeaf = item.type === "task" || item.type === "bug";
+        if (isLeaf) {
+          movedOldPaths.push(item.filePath);
+          movedNewPaths.push(newPath);
+          mkdirSync(dirname(newPath), { recursive: true });
+          renameSync(item.filePath, newPath);
+        } else {
+          const oldDir = item.containerDir;
+          const newDir = dirname(newPath);
+          for (const old of listFiles(oldDir)) {
+            if (old === item.filePath) continue;
+            movedOldPaths.push(old);
+            movedNewPaths.push(join(newDir, old.slice(oldDir.length + 1)));
+          }
+          movedOldPaths.push(item.filePath);
+          movedNewPaths.push(newPath);
+          mkdirSync(dirname(newDir), { recursive: true });
+          renameSync(oldDir, newDir);
+        }
+        movedFrom = isLeaf ? item.filePath : item.containerDir;
+      }
+      data.parent = reparentTo.id;
+      if (!changed.includes("parent")) changed.push("parent");
+      targetPath = newPath;
+    }
+
+    // Promotion move (task-promote-task-to-story): performed LAST like the
+    // reparent move, after every other validation has passed. The task file
+    // moves to the story layout under the grandparent epic
+    // (<epic>/<story-id>/<story-id>.md, exactly where `create story` places
+    // it), the type and parent flip, and the promoted story starts EMPTY of
+    // children. issue/labels/body ride along untouched in the same file.
+    if (promoteNewPath && promoteEpic && promoteNewId) {
+      if (existsSync(promoteNewPath)) {
+        throw new Error(`promotion target already exists: ${promoteNewPath}`);
+      }
+      mkdirSync(dirname(promoteNewPath), { recursive: true });
+      renameSync(item.filePath, promoteNewPath);
+      movedOldPaths.push(item.filePath);
+      movedNewPaths.push(promoteNewPath);
+      movedFrom = item.filePath;
+      data.type = "story";
+      changed.push("type");
+      data.parent = promoteEpic.id;
+      if (!changed.includes("parent")) changed.push("parent");
+      if (promoteNewId !== id) {
+        data.id = promoteNewId;
+        changed.push("id");
+        renamedFrom = id;
+        // Rewrite depends_on references to the old id tree-wide so the graph
+        // stays resolvable (validate re-checks on every run). These files ride
+        // into the auto-commit via movedNewPaths staging.
+        for (const other of byId.values()) {
+          if (other.id === id || !other.dependsOn.includes(id)) continue;
+          writeFileAtomic(
+            other.filePath,
+            stringifyFrontmatter(
+              {
+                ...other.data,
+                depends_on: other.dependsOn.map((dep) => (dep === id ? promoteNewId : dep)),
+                updated: formatDate(now),
+              },
+              other.body,
+            ),
+          );
+          movedNewPaths.push(other.filePath);
+        }
+      }
+      targetPath = promoteNewPath;
+    }
+
+    // Atomic (bug-comment-torn-read audit): update is the other hot item writer;
+    // a non-locking reader (list/validate/MCP) must never see a torn item here
+    // either.
+    writeFileAtomic(targetPath, stringifyFrontmatter(data, newBody));
+
+    const updated = tryLoadItem(targetPath);
+    if (!updated) {
+      throw new Error(`Updated item is unreadable: ${targetPath}`);
+    }
+
+    // Automatic container completion (task-container-auto-done): when an item
+    // reaches a terminal state and every sibling under a parent is terminal
+    // too, that parent completes, cascading up the chain. Off with cascade:false.
+    const { completed: completedContainers, skipped: cascadeSkipped } =
+      opts.cascade === false || (newStatus !== "done" && newStatus !== "cancelled")
+        ? { completed: [], skipped: [] }
+        : autoCompleteAncestors(tasksDir, item, opts.now ?? new Date());
+
+    // Issue round-trip (task-issue-roundtrip): when the update FLIPS the item to
+    // done and it carries the additive `issue` frontmatter number (written by
+    // `import-issues`), close the linked GitHub issue — opt-in, gated tree-wide
+    // by `x-github.issue-roundtrip` (default OFF, flips happen through bots too;
+    // a malformed config must never fail the flip, so the gate reads tolerantly
+    // like the tracker auto-commit). Best effort like the tracker commit: gh
+    // absent, unauthenticated, or failing degrade to a reported skip — reported
+    // in the payload AND as a stderr warning when enabled, never silent, never
+    // fatal. The flip flows through every caller (CLI, MCP) that uses runUpdate.
+    const root = repoRootFromTasks(tasksDir);
+    let issueRoundtrip: IssueRoundtripResult | undefined;
+    const issueNumber = updated.issue ?? null;
+    if (
+      changed.includes("status") &&
+      newStatus === "done" &&
+      issueNumber !== null &&
+      issueRoundtripEnabled(root)
+    ) {
+      issueRoundtrip = closeLinkedIssue(root, id, issueNumber, opts.execGh);
+      if (!issueRoundtrip.closed) {
+        // bug-validate-stdout-injection L2: the gh failure text embeds the
+        // repo-controlled slug/command (origin remote, item id), so the
+        // warning is display-sanitized; the payload keeps the raw skipped text.
+        process.stderr.write(
+          `arggon: warning: issue round-trip skipped: ${sanitizeHumanError(issueRoundtrip.skipped)}\n`,
+        );
+      }
+    }
+
+    return {
+      id: updated.id,
+      path: targetPath,
+      root,
+      item: updated,
+      changed,
+      autoCompleted: completedContainers.map((container) => container.id),
+      cascadeLevels: completedContainers.map((container) => container.type),
+      cascadeSkipped,
+      changedPaths: [
+        targetPath,
+        ...movedNewPaths,
+        ...movedOldPaths,
+        ...completedContainers.map((container) => container.filePath),
+      ],
+      movedFrom,
+      ...(renamedFrom ? { renamedFrom } : {}),
+      ...(issueRoundtrip ? { issueRoundtrip } : {}),
+    };
   };
 
   // Hold the item lock across read → verify → write (bug-claim-race-no-lock).
@@ -801,11 +871,12 @@ export function maybeCommitUpdate(
 ): TrackerCommitResult | undefined {
   if (result.changed.length === 0 && result.autoCompleted.length === 0) return undefined;
   const statusChanged = result.changed.includes("status");
-  const verb = statusChanged && (result.item.status === "done" || result.item.status === "cancelled")
-    ? "done"
-    : statusChanged && result.item.status === "in_progress"
-      ? "claimed"
-      : "updated";
+  const verb =
+    statusChanged && (result.item.status === "done" || result.item.status === "cancelled")
+      ? "done"
+      : statusChanged && result.item.status === "in_progress"
+        ? "claimed"
+        : "updated";
   return commitTrackerMutation(result.root, result.changedPaths, {
     message: updateCommitMessage(verb, result.id, result.autoCompleted),
     commit: resolveAutoCommit(flag, readAutoCommitConfig(result.root)),
