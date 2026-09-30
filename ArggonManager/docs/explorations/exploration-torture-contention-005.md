@@ -126,6 +126,8 @@ assertion hole. B and C rejected as above.
 
 ## Decision
 
+No ADR required — bug-fix for a CI flake; no cross-cutting decision.
+
 Implemented in `fix/bug-torture-contention-flake3`:
 `cli/src/tracker-commit.ts` (`resolveCommonGitDir`, `trackerGitLockKey`,
 add+commit under `withItemLock`), `cli/src/tracker-commit.test.ts` (5 new

@@ -51,7 +51,14 @@ All three kinds live in the `decisions` bucket with the standard finding shape
   `<slug>` stub. HTML comments are stripped first, so template placeholders
   (`<!-- ADR placeholder: … -->`) never count as a decision. A missing
   Decision section counts as pending (no decision recorded). `line` is the
-  Decision heading when present.
+  Decision heading when present. A Decision section can also record an
+  explicit **no-ADR decision** (task-exploration-decision-records): a line
+  matching `No ADR required` + separator (`—`, `:` or `-`, an optional
+  leading `- `/`* ` list bullet is tolerated) + a **non-empty rationale** —
+  `No ADR required — bug-fix, no cross-cutting decision`. The rationale is
+  mandatory: a bare token, an empty reason, or the same text anywhere outside
+  the Decision section still counts as pending, so the marker cannot silence
+  the scanner without saying why.
 - **`STALE-PROPOSED-ADR`** — an ADR in `ArggonManager/docs/adr/*.md` whose
   `- Status:` line (list-item form, case-insensitive) starts with `Proposed`
   and whose `- Date:` is older than **14 days** (`STALE_PROPOSED_DAYS`).
