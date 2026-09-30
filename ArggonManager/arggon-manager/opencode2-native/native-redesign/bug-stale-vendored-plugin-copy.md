@@ -28,7 +28,6 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-stale-vendored-plugin-cop
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 
