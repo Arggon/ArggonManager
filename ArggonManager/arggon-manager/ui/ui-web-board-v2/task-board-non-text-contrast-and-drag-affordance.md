@@ -1,15 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-board-non-text-contrast-and-drag-affordance
 title: "Non-text contrast and the mid-drag fade: a design decision"
+assignee: Arggon
+branch: feat/task-board-non-text-contrast-and-drag-affordance
 parent: ui-web-board-v2
 labels: [accessibility, ui, board]
 priority: p2
 created: "2026-09-29"
-updated: "2026-09-29"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T16:30:57.156Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-board-non-text-contrast-and-drag-affordance
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-non-text-contrast-and-drag-affordance.md
   Leaves live only under a story. id is the filename stem: task-board-non-text-contrast-and-drag-affordance.
