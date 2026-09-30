@@ -159,7 +159,12 @@ true`: Code Mode calls them as `tools.arggon.<name>` and `search` finds the
   `setup` never runs; the session still exits 0). Since W3 the vendored artifact
   is the **generated single-file bundle**
   (`opencode/plugins/arggon/index.bundle.ts` → `.opencode/plugins/arggon/index.ts`),
-  built by `npm run build:plugin` from the source with `@arggondev/lib` inlined:
+  built by `npm run build:plugin` from the source with `@arggondev/lib` inlined.
+  The copy is a gitignored DERIVED artifact: an init re-run re-vendors it
+  whenever its bytes diverge from the recorded provenance
+  (bug-stale-vendored-plugin-copy — a stale copy is what breaks the TUI load
+  with a missing export) instead of reporting it adopter-modified.
+  Built with the TypeScript compiler
   every reachable module is transpiled to CommonJS with the TypeScript compiler
   API (no bundler dependency) and wrapped in a tiny ESM module registry, so the
   only bare import left is `node:module`. The plain `{ id, setup }` default

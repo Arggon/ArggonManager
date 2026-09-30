@@ -211,22 +211,27 @@ describe("init docs: no-overwrite guarantee", () => {
     expect(result.modified).toContain("ArggonManager/docs/engineering.md");
   });
 
-  it("generateDocs creates on the first run and treats stateless files as modified on the second", () => {
+  it("generateDocs creates on the first run; on the second, stateless docs are modified but derived plugin artifacts re-vendor", () => {
     const dir = tempDir();
     const first = generateDocs({ root: dir, full: true });
-    expect(first.created.length).toBe(GENERATED_DOC_COUNT); // generated docs (incl. .mcp.json) + bundled arggon-cli skill
+    expect(first.created.length).toBe(GENERATED_DOC_COUNT); // generated docs (incl. .mcp.json) + bundled skills + vendored plugin
     expect(first.created).toContain(".agents/skills/arggon-cli/SKILL.md");
     expect(first.skipped).toEqual([]);
     expect(first.updated).toEqual([]);
     expect(first.modified).toEqual([]);
     const second = generateDocs({ root: dir, full: true });
     expect(second.created).toEqual([]);
-    // No tasks/.convention.yml exists (bare generateDocs, no init): with no
-    // provenance state every on-disk file counts as adopter-modified and is
-    // skipped (never overwritten).
-    expect(second.updated).toEqual([]);
-    expect(second.modified.length).toBe(GENERATED_DOC_COUNT);
-    expect(second.skipped.length).toBe(GENERATED_DOC_COUNT);
+    // No provenance state exists (bare generateDocs, no init): with no state
+    // every on-disk doc counts as adopter-modified and is skipped (never
+    // overwritten) — EXCEPT the vendored plugin artifacts, which are derived
+    // per-checkout copies of the committed bundle and re-vendor regardless of
+    // state (bug-stale-vendored-plugin-copy).
+    expect(second.updated).toEqual([
+      ".opencode/plugins/arggon/index.ts",
+      ".opencode/plugins/arggon/tui.tsx",
+    ]);
+    expect(second.modified.length).toBe(GENERATED_DOC_COUNT - 2);
+    expect(second.skipped.length).toBe(GENERATED_DOC_COUNT - 2);
   });
 });
 

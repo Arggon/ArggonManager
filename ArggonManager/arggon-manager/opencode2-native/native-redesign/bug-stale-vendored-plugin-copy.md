@@ -56,11 +56,11 @@ Confirmed with `npm run arggon -- init --dry-run --json`: `.opencode/plugins/arg
 
 ## Acceptance
 
-- [ ] Semantics for derived (gitignored) destinations decided and documented: their x-generated checksum is shared across checkouts while their bytes are per-checkout, so "checksum vs state" cannot be the only signal. Options: exclude them from the tracked state and always compare on-disk bytes against the current render; or treat a state mismatch on these paths as "re-vendor the committed artifact"; or at minimum add a `doctor` check that reports the stale copy loudly.
-- [ ] Regression test: state generated in checkout A, derived copy generated in checkout B (the merge scenario) is detected or healed — no silent `modified-skip` for `.opencode/plugins/arggon/index.ts` / `tui.tsx`.
-- [ ] `arggon init` and/or `arggon doctor --json` surfaces a stale vendored plugin before OpenCode fails to load the TUI entry, without reading OpenCode logs.
-- [ ] Docs updated where init provenance is described (`ArggonManager/docs/playbooks/opencode.md`, `ArggonManager/docs/convention.md`), and the primary-checkout path is covered by `npm run smoke:tui` or an equivalent check.
-- [ ] `npm test`, `npm run check:plugin`, `npm run arggon -- validate --json` green.
+- [x] Semantics for derived (gitignored) destinations decided and documented: their x-generated checksum is shared across checkouts while their bytes are per-checkout, so "checksum vs state" cannot be the only signal. Options: exclude them from the tracked state and always compare on-disk bytes against the current render; or treat a state mismatch on these paths as "re-vendor the committed artifact"; or at minimum add a `doctor` check that reports the stale copy loudly.
+- [x] Regression test: state generated in checkout A, derived copy generated in checkout B (the merge scenario) is detected or healed — no silent `modified-skip` for `.opencode/plugins/arggon/index.ts` / `tui.tsx`.
+- [x] `arggon init` and/or `arggon doctor --json` surfaces a stale vendored plugin before OpenCode fails to load the TUI entry, without reading OpenCode logs.
+- [x] Docs updated where init provenance is described (`ArggonManager/docs/playbooks/opencode.md`, `ArggonManager/docs/convention.md`), and the primary-checkout path is covered by `npm run smoke:tui` or an equivalent check.
+- [x] `npm test`, `npm run check:plugin`, `npm run arggon -- validate --json` green.
 
 ## Evidence
 

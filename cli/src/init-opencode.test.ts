@@ -504,7 +504,7 @@ describe("opencode seam: bundled plugin (W2/W3)", () => {
     expect(readFileSync(join(dir, ...SEAM_PLUGIN.split("/")), "utf8")).toBe(expected);
   });
 
-  it("re-runs refresh the untouched plugin and skip the adopter-modified one", () => {
+  it("re-runs refresh the untouched plugin and re-vendor an edited one (derived artifact, bug-stale-vendored-plugin-copy)", () => {
     const dir = tempDir();
     runCli(["init", dir, "--json"]);
     const dest = join(dir, ...SEAM_PLUGIN.split("/"));
@@ -515,13 +515,22 @@ describe("opencode seam: bundled plugin (W2/W3)", () => {
     expect(secondBody.modified).toEqual([]);
     writeFileSync(dest, `${original}\n// adopter edit\n`, "utf8");
     const third = runCli(["init", dir, "--json"]);
-    const thirdBody = JSON.parse(third.stdout) as { modified: string[]; skipped: string[] };
-    expect(thirdBody.modified).toContain(SEAM_PLUGIN);
-    expect(thirdBody.skipped).toContain(SEAM_PLUGIN);
-    expect(readFileSync(dest, "utf8")).toBe(`${original}\n// adopter edit\n`);
+    const thirdBody = JSON.parse(third.stdout) as {
+      modified: string[];
+      skipped: string[];
+      updated: string[];
+    };
+    // The vendored plugin is a gitignored DERIVED copy of the committed
+    // bundle: a byte divergence re-vendors it (and refreshes its state)
+    // instead of reporting adopter-modified — a stale copy here is what broke
+    // the OpenCode TUI load with a missing export.
+    expect(thirdBody.updated).toContain(SEAM_PLUGIN);
+    expect(thirdBody.modified).not.toContain(SEAM_PLUGIN);
+    expect(thirdBody.skipped).not.toContain(SEAM_PLUGIN);
+    expect(readFileSync(dest, "utf8")).toBe(original);
   });
 
-  it("--backup archives and regenerates a modified plugin", () => {
+  it("--backup does not archive the plugin — it re-vendors like a plain run", () => {
     const dir = tempDir();
     runInit({ dir, force: false });
     const dest = join(dir, ...SEAM_PLUGIN.split("/"));
@@ -535,11 +544,9 @@ describe("opencode seam: bundled plugin (W2/W3)", () => {
       modified: string[];
       backedUp: string[];
     };
-    expect(body.modified).toContain(SEAM_PLUGIN);
-    expect(body.backedUp).toContain(SEAM_PLUGIN);
-    expect(body.updated).not.toContain(SEAM_PLUGIN);
-    const date = new Date().toISOString().slice(0, 10);
-    expect(readFileSync(join(dir, "backup", date, ...SEAM_PLUGIN.split("/")), "utf8")).toBe(edited);
+    expect(body.updated).toContain(SEAM_PLUGIN);
+    expect(body.modified).not.toContain(SEAM_PLUGIN);
+    expect(body.backedUp).not.toContain(SEAM_PLUGIN);
     expect(readFileSync(dest, "utf8")).toBe(original);
   });
 });
