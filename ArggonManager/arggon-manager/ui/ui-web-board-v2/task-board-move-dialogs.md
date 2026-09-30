@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-board-move-dialogs
 title: "Web board move dialogs: replace window.prompt, add undo affordance"
+assignee: Arggon
+branch: feat/task-board-move-dialogs
 parent: ui-web-board-v2
 labels: [viewer, board, a11y, ui]
 priority: p3
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T17:24:30.137Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-board-move-dialogs
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-move-dialogs.md
