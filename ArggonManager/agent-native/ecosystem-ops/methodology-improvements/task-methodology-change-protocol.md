@@ -1,14 +1,17 @@
 ---
 type: task
-status: todo
+status: done
 id: task-methodology-change-protocol
 title: methodology-change-protocol
+assignee: Arggon
+branch: feat/task-methodology-change-protocol
 parent: methodology-improvements
 labels: []
 priority: p2
 created: "2026-09-29"
-updated: "2026-09-29"
+updated: "2026-09-30"
 depends_on: [task-adr-adopter-upgrade-channel]
+worktree_path: /home/arggon/Projects/ArggonManager-task-methodology-change-protocol
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-methodology-change-protocol.md
@@ -25,7 +28,7 @@ depends_on: [task-adr-adopter-upgrade-channel]
 
 ## Acceptance
 
-- [ ] 
+- [x] 
 
 ## Notes
 
@@ -40,6 +43,6 @@ Add to `docs/agents.md` a bounded section "Changing the methodology itself" (+ o
 - Reviewers check the class statement like any review-bar item.
 
 ### Acceptance checklist
-- [ ] `docs/agents.md` section (~20 lines max) + `docs/engineering.md` review-bar line.
-- [ ] References ADR 0014 consistently with its decision.
-- [ ] Docs-only PR; `arggon validate` ok.
+- [x] `docs/agents.md` section (~20 lines max) + `docs/engineering.md` review-bar line.
+- [x] References ADR 0014 consistently with its decision.
+- [x] Docs-only PR; `arggon validate` ok.

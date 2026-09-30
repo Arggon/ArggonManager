@@ -1,13 +1,16 @@
 ---
 type: task
-status: todo
+status: done
 id: task-adr-adopter-upgrade-channel
 title: adr-adopter-upgrade-channel
+assignee: Arggon
+branch: feat/task-adr-adopter-upgrade-channel
 parent: methodology-improvements
 labels: []
 priority: p1
 created: "2026-09-29"
 updated: "2026-09-29"
+worktree_path: /home/arggon/Projects/ArggonManager-task-adr-adopter-upgrade-channel
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-adr-adopter-upgrade-channel.md
@@ -24,7 +27,7 @@ updated: "2026-09-29"
 
 ## Acceptance
 
-- [ ] 
+- [x] 
 
 ## Notes
 
@@ -36,7 +39,7 @@ exploration-adopter-upgrade-experience-007 recommended a staged adopter-upgrade 
 The ADR records the adopter-upgrade-channel decision: adopters receive methodology updates by re-running `arggon init` (untouched generated docs refresh silently; modified ones are never clobbered — reported, `--backup` archives); `arggon doctor` reports staleness/provenance as the visibility stage; any proposal-file stage (`init --propose`) from exploration-007 is recorded explicitly as accepted-now or deferred-with-rationale. Read exploration-007 in full first and align, or record the deviation with rationale.
 
 ### Acceptance checklist
-- [ ] `docs/adr/0014-adopter-upgrade-channel.md` — Status: Proposed → Accepted on merge; Date; Deciders; Context / Decision / Consequences / Alternatives considered.
-- [ ] Aligned with exploration-007's recommendation (or deviation recorded).
-- [ ] exploration-007 `## Decision` section links the ADR.
-- [ ] Docs-only PR; no code changes; `arggon validate` ok.
+- [x] `docs/adr/0014-adopter-upgrade-channel.md` — Status: Proposed → Accepted on merge; Date; Deciders; Context / Decision / Consequences / Alternatives considered.
+- [x] Aligned with exploration-007's recommendation (or deviation recorded).
+- [x] exploration-007 `## Decision` section links the ADR.
+- [x] Docs-only PR; no code changes; `arggon validate` ok.

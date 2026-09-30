@@ -96,6 +96,19 @@ Before a change is approved it is **smoked — executed end-to-end, not just uni
 
 The gate is repo-agnostic: adopting repos run the same bar against their own surface — UI-rich adopters (e.g. ArggonStores) are its primary beneficiaries.
 
+### Review verdicts (comment convention)
+
+Verdicts land **on the item** with `arggon comment <id>` — never as GitHub PR comments. A verdict comment starts with a bounded header line, `verdict: approve` or `verdict: request-changes` (optionally followed by a short scope), and then the evidence list: commands run, expected vs observed. This is documentation, not schema — human-written prose. `arggon sync --json` reads it report-only and classifies every item it reconciles with an open PR as `approved` (latest verdict is an approve), `changes-requested` (the latest verdict is a request-changes) or `none`; a later `verdict: approve` supersedes an earlier `verdict: request-changes`. A blocking merge gate is deliberately out of scope until the report proves low-noise.
+
+Example:
+
+```
+### 2026-09-29 @Reviewer
+verdict: request-changes (smoke evidence missing)
+- probed `arggon sync --json` on a fixture: expected `verdicts` per matched item, observed field absent
+- unit tests travel with the parser
+```
+
 ### UI (UI Tester)
 
 - When a PR touches UI, the **smoke-test bar above applies** (real-browser drive); UI QA ownership (UI Tester) remains as scoped in Phase 2.
@@ -104,6 +117,7 @@ The gate is repo-agnostic: adopting repos run the same bar against their own sur
 
 - User-facing behavior changes update README and/or convention/engineering as appropriate.
 - ADRs for stack, identity, and cross-cutting schema decisions (see below).
+- PRs touching the methodology carriers state their **methodology impact class** (advisory / behavioral, with an ADR 0014 reference when behavioral) — reviewers check it like any bar above; see `ArggonManager/docs/agents.md` §Changing the methodology itself.
 
 ---
 

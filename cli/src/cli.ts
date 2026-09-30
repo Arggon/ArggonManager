@@ -1632,6 +1632,7 @@ spec
               findings: {
                 ambiguity: saved.result.ambiguity,
                 consistency: saved.result.consistency,
+                decisions: saved.result.decisions,
               },
               baseline: { file: saved.file, written: true, count: saved.snapshot.count },
             });
@@ -1656,7 +1657,11 @@ spec
               conventionVersion: cmp.result.conventionVersion,
               command: "spec",
               scanned: cmp.result.scanned,
-              findings: { ambiguity: cmp.result.ambiguity, consistency: cmp.result.consistency },
+              findings: {
+                ambiguity: cmp.result.ambiguity,
+                consistency: cmp.result.consistency,
+                decisions: cmp.result.decisions,
+              },
               baseline: {
                 file: cmp.file,
                 total: cmp.total,
@@ -1681,7 +1686,11 @@ spec
             conventionVersion: result.conventionVersion,
             command: "spec",
             scanned: result.scanned,
-            findings: { ambiguity: result.ambiguity, consistency: result.consistency },
+            findings: {
+              ambiguity: result.ambiguity,
+              consistency: result.consistency,
+              decisions: result.decisions,
+            },
           });
           return;
         }
@@ -2798,6 +2807,13 @@ program
       }
       for (const amb of result.ambiguous) {
         console.log(`  ambiguous: ${sanitizeHumanError(amb.id)} (PRs ${amb.prs.join(", ")})`);
+      }
+      // Report-only verdict classification (task-review-verdict-checker):
+      // only the informative states print; `none` stays silent.
+      for (const [id, verdict] of Object.entries(result.verdicts)) {
+        if (verdict !== "none") {
+          console.log(`  verdict:   ${sanitizeHumanError(id)} -> ${sanitizeHumanError(verdict)}`);
+        }
       }
       for (const [id, branch] of Object.entries(result.filled ?? {})) {
         console.log(`  filled:    ${sanitizeHumanError(id)} -> ${sanitizeHumanError(branch)}`);

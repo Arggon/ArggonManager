@@ -251,12 +251,12 @@ Failures use `error.code: "SPEC_FAILED"` (invalid slug, refusing to overwrite, m
 
 `spec analyze [--spec <path>]` (report-only ambiguity scan + spec ↔ tracker/plans consistency; default scope `ArggonManager/docs/specs/*.md`, one file with `--spec`) — **findings never fail the run**: `ok` is always `true` on a completed scan, even with findings. Structural failures (unreadable file) use `error.code: "SPEC_FAILED"` and exit code 1.
 
-| Field      | Type             | Notes                                              |
-| ---------- | ---------------- | -------------------------------------------------- |
-| `scanned`  | `number`         | Spec documents scanned                             |
-| `findings` | `FindingsByArea` | `{ ambiguity: Finding[], consistency: Finding[] }` |
+| Field      | Type             | Notes                                                                                                                                                                      |
+| ---------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scanned`  | `number`         | Spec documents scanned                                                                                                                                                     |
+| `findings` | `FindingsByArea` | `{ ambiguity: Finding[], consistency: Finding[], decisions: Finding[] }` — `decisions` is additive (spec-analyze-decision-gaps-013) and empty in `--spec` single-file mode |
 
-`Finding` is `{ file, kind, line?, severity, message }` — `file` posix, repo-relative; `severity` is `"info"` or `"warn"`; `line` (1-based, present when the finding is tied to a line) is reported against the full file including frontmatter. Kinds: `vague-quantifier`, `todo-marker`, `no-error-path`, `no-acceptance`, `untestable-acceptance` (ambiguity); `spec-orphaned`, `plan-spec-missing` (consistency).
+`Finding` is `{ file, kind, line?, severity, message }` — `file` posix, repo-relative; `severity` is `"info"` or `"warn"`; `line` (1-based, present when the finding is tied to a line) is reported against the full file including frontmatter. Kinds: `vague-quantifier`, `todo-marker`, `no-error-path`, `no-acceptance`, `untestable-acceptance` (ambiguity); `spec-orphaned`, `plan-spec-missing` (consistency); `DECISION-PENDING-EXPLORATION` (exploration whose Decision section records no ADR after 7 days), `STALE-PROPOSED-ADR` (ADR `- Status:` starting with `Proposed` with a `- Date:` older than 14 days), `SPEC-STATUS-DRIFT` (a `proposed` spec whose linked plan is `implemented`) (decisions — report-only, corpus mode only; baseline snapshots include them in the flat `findings` array).
 
 `spec analyze --save-baseline <file>` behaves like a plain analyze run plus an additive `baseline` field; the snapshot written to `<file>` is deterministic, committable JSON (`{ schemaVersion, conventionVersion, count, findings }` with findings sorted by file/kind/line/severity/message — no timestamps, byte-identical over unchanged specs).
 
@@ -521,18 +521,21 @@ The served board also carries the **item detail drawer** (task-board-item-detail
 
 ### `sync`
 
-| Field         | Type                             | Notes                                                                 |
-| ------------- | -------------------------------- | --------------------------------------------------------------------- |
-| `mode`        | `"check" \| "write"`             | `--write` requested; check is the default                             |
-| `matched`     | `string[]`                       | Items whose branch matches an open PR (write: incl. filled)           |
-| `unmatched`   | `string[]`                       | Items with a recorded branch but no open PR on it                     |
-| `pending`     | `string[]`                       | Check mode: fill available (see `suggestions`) or candidates disagree |
-| `ambiguous`   | `{ id, branch, prs }[]`          | Multiple open PRs share one head branch — reported, never guessed     |
-| `suggestions` | `{ id, branch, pr }[]`           | Empty-branch leaves a `--write` run can (check) or did (write) fill   |
-| `filled`      | `Record<string, string> \| null` | Write mode: id -> branch actually written                             |
-| `exit_code`   | `0 \| 1`                         | Mirrors the process exit code                                         |
+| Field         | Type                                                          | Notes                                                                                                                                           |
+| ------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| `mode`        | `"check" \| "write"`                                          | `--write` requested; check is the default                                                                                                       |
+| `matched`     | `string[]`                                                    | Items whose branch matches an open PR (write: incl. filled)                                                                                     |
+| `unmatched`   | `string[]`                                                    | Items with a recorded branch but no open PR on it                                                                                               |
+| `pending`     | `string[]`                                                    | Check mode: fill available (see `suggestions`) or candidates disagree                                                                           |
+| `ambiguous`   | `{ id, branch, prs }[]`                                       | Multiple open PRs share one head branch — reported, never guessed                                                                               |
+| `suggestions` | `{ id, branch, pr }[]`                                        | Empty-branch leaves a `--write` run can (check) or did (write) fill                                                                             |
+| `filled`      | `Record<string, string> \| null`                              | Write mode: id -> branch actually written                                                                                                       |
+| `verdicts`    | `Record<string, "approved" \| "changes-requested" \| "none">` | Additive (task-review-verdict-checker): report-only review-verdict classification per item reconciled with an open PR; absent for `no_pr` items |
+| `exit_code`   | `0 \| 1`                                                      | Mirrors the process exit code                                                                                                                   |
 
 Matching: items with a `branch` reconcile by exact head-ref equality (any type); empty `branch` fields are fill candidates only for leaves (`task`/`bug`) whose id starts a branch path segment and is not immediately followed by a letter or digit. Trailing hyphen suffixes deliberately still match — `feat/task-1-work` references `task-1` (this is what makes `chore/{id}-{type}` patterns fillable) — while `feat/task-12` does not reference `task-1`, and a longer id is never matched by its hyphen prefix (`feat/task-1` does not reference `task-1-work`). `--write` fills only empty fields — it never overwrites a set branch, never touches `status`, and never resolves ambiguity.
+
+Verdict classification is additive within `schemaVersion: 1` and report-only: for every item the run reconciles with an open PR (matched / fillable / pending / ambiguous — never `no_pr` items), the item body's verdict comments (`verdict: approve | request-changes` header lines per `docs/engineering.md` §Review bar → Review verdicts) classify as `approved` (latest verdict is an approve), `changes-requested` (the latest verdict is a request-changes) or `none`. Classification reads item bodies already loaded by the run — no additional gh calls — and never affects matching or `exit_code`; a blocking merge gate is explicitly out of scope until the report proves low-noise.
 
 **Exit-code semantics (differs from `ok`):** the process exits non-zero when check mode finds sync needed (`pending`/`ambiguous`) or the run errored, so `arggon sync --check` works as a CI gate after `arggon sync --write`. `ok` stays `true` for those — it is `false` only when the sync itself failed. Failures use `error.code: "SYNC_FAILED"` (missing a tracker, conflicting flags, or gh unavailable).
 
