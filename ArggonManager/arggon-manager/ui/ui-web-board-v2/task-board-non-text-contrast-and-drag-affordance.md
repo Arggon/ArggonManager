@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-board-non-text-contrast-and-drag-affordance
 title: "Non-text contrast and the mid-drag fade: a design decision"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [accessibility, ui, board]
 priority: p2
 created: "2026-09-29"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T16:30:57.156Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-board-non-text-contrast-and-drag-affordance
 ---
 <!--
