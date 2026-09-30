@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-row-table-flake
 title: row-table-stdout-ci-flake
+assignee: Arggon
+branch: fix/bug-row-table-flake
 parent: ci-stability
 labels: []
 priority: p2
 created: "2026-09-30"
 updated: "2026-09-30"
+claimed_at: "2026-09-30T23:56:00.472Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-row-table-flake
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/bug-row-table-flake.md
