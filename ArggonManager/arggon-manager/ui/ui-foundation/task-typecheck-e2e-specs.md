@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-typecheck-e2e-specs
 title: "e2e/ is in no tsconfig project, so the browser spec that now gates CI is never type-checked"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [ci, playwright, tooling]
 priority: p3
 created: "2026-09-29"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T15:06:49.004Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-typecheck-e2e-specs
 ---
 <!--
