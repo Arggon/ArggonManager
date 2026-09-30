@@ -43,3 +43,13 @@ Pre-existing behavior (the original parser had the same per-chunk assumption), k
 - [x] Regression test: a PgDn (or Home/End) split across two `onData` chunks scrolls instead of clearing the filter; a lone `ESC` keeps its current semantics
 - [x] No regression in the existing key tests or the pty frame check (`npm run smoke:tui-board`)
 - [x] pty evidence in the verdict (split-key scenario reproduced before/after)
+
+### 2026-09-30 @Arggon
+Implemented on fix/bug-tui-split-escape-sequences, PR #469 (ready).
+
+Evidence:
+- Before (fix stashed, old dist, new smoke): pty step 'pane held open at row 1 while the CSI is incomplete' FAILed — partial \x1b[6 consumed as Esc, pane closed.
+- After: all 8 pty steps ok; split PgDn scrolled one page; board returned with filter intact (npm run smoke:tui-board).
+- Gates: npm test 107 files/1789 tests ok; lint clean; build clean; arggon validate ok:true.
+- New: createTuiKeyDecoder (stateful chunk splitter) + TUI_ESCAPE_FLUSH_MS=50 esc-flush timer in runTuiBoard; 6 decoder + 3 loop unit tests in cli/src/tui.test.ts.
+- Note: one pre-existing loop test's beat extended past the flush window (lone ESC is now held ~50ms by design); comment left in test.
