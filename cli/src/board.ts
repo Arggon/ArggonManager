@@ -836,6 +836,10 @@ export function wireBoardDetail(
     if (drawerEl.hidden) return;
     drawerEl.hidden = true;
     drawerEl.setAttribute("aria-hidden", "true");
+    // Live reload (task-board-live-reload-state): the reload client reads the
+    // open item from this attribute to reopen the drawer after the page
+    // reload; closed means absent, so a deleted item cannot be reopened.
+    drawerEl.removeAttribute("data-item-id");
     document.body.classList.remove("drawer-open");
     seq++;
     if (restoreFocus && lastCard && lastCard.isConnected) lastCard.focus();
@@ -848,6 +852,7 @@ export function wireBoardDetail(
     const current = ++seq;
     drawerEl.hidden = false;
     drawerEl.setAttribute("aria-hidden", "false");
+    drawerEl.setAttribute("data-item-id", id);
     document.body.classList.add("drawer-open");
     bodyEl.textContent = "loading …";
     if (closeButton) closeButton.focus();
