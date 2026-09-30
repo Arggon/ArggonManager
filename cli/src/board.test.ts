@@ -341,12 +341,12 @@ describe("evaluateDrop", () => {
 
 describe("applyBoardFilter (embedded board lens, task-board-filter-lenses)", () => {
   /**
-   * Supported-subset table (v1), asserted 1:1 with the kernel in
+   * Supported predicate table, asserted 1:1 with the kernel in
    * cli/src/board-parity.test.ts:
-   *   fields:    type, status, label, assignee, priority, ancestor
+   *   fields:    type, status, label, assignee, priority, ancestor,
+   *              parent, depends-on, blocked-by, ready
+   *              (task-board-filter-dep-predicates)
    *   free text: any token without ":" (case-insensitive id/title substring)
-   *   excluded:  parent, depends-on, blocked-by, ready (kernel-only; refused
-   *              with a pointer to `arggon list --filter`)
    */
   const lensItems: BoardLensItem[] = [
     {
@@ -368,6 +368,7 @@ describe("applyBoardFilter (embedded board lens, task-board-filter-lenses)", () 
       labels: ["core", "security"],
       parent: "launch",
       priority: null,
+      depends_on: ["ghost"],
     },
     {
       id: "story-a",
@@ -378,6 +379,7 @@ describe("applyBoardFilter (embedded board lens, task-board-filter-lenses)", () 
       labels: ["security"],
       parent: "epic-a",
       priority: "p2",
+      depends_on: ["task-one"],
     },
     {
       id: "task-one",
@@ -408,6 +410,7 @@ describe("applyBoardFilter (embedded board lens, task-board-filter-lenses)", () 
       labels: ["bug"],
       parent: "story-a",
       priority: "p0",
+      depends_on: ["task-two"],
     },
   ];
 
@@ -475,12 +478,77 @@ describe("applyBoardFilter (embedded board lens, task-board-filter-lenses)", () 
     expect(visible("label:@me", "alice")).toEqual([]);
   });
 
-  it("refuses the kernel-only dependency predicates with a pointer to list --filter", () => {
-    for (const expr of ["parent:story-a", "depends-on:task-one", "blocked-by:task-one"]) {
-      const message = errorOf(expr);
-      expect(message).toContain(`does not support "${expr.split(":")[0]}:"`);
-      expect(message).toContain("arggon list --filter");
-    }
+  it("supports the kernel dependency predicates (task-board-filter-dep-predicates)", () => {
+    // parent: exact match on the parent id; parentless items never match.
+    expect(visible("parent:launch")).toEqual(["epic-a"]);
+    expect(visible("parent:story-a")).toEqual(["task-one", "task-two", "bug-one"]);
+    expect(visible("!parent:story-a")).toEqual(["launch", "epic-a", "story-a"]);
+    expect(visible("parent:story-a !type:task")).toEqual(["bug-one"]);
+    // depends-on: membership in the item's own depends_on.
+    expect(visible("depends-on:task-one")).toEqual(["story-a"]);
+    expect(visible("depends-on:ghost")).toEqual(["epic-a"]);
+    expect(visible("!depends-on:task-one")).toEqual([
+      "launch",
+      "epic-a",
+      "task-one",
+      "task-two",
+      "bug-one",
+    ]);
+    // blocked-by: the computed inverse, indexed over the WHOLE input.
+    expect(visible("blocked-by:task-one")).toEqual(["story-a"]);
+    expect(visible("blocked-by:task-two")).toEqual(["bug-one"]);
+    expect(visible("blocked-by:nobody")).toEqual([]);
+    // readiness: every dep terminal (done/cancelled); an unknown dep is open.
+    expect(visible("ready:true")).toEqual(["launch", "task-one", "task-two", "bug-one"]);
+    expect(visible("ready:false")).toEqual(["epic-a", "story-a"]);
+    expect(visible("!ready:true")).toEqual(["epic-a", "story-a"]);
+    // ANDed with the older predicates, like every other field.
+    expect(visible("ready:true type:bug")).toEqual(["bug-one"]);
+  });
+
+  it("reads dependencies in the kernel precedence when both shapes ride along", () => {
+    // dependsOn wins when an item carries both (task-ui-viewmodel-contract-deps):
+    // item-a's kernel field hides the contract dep, item-b reads depends_on.
+    const dual = applyBoardFilter(
+      [
+        {
+          id: "task-a",
+          type: "task",
+          status: "todo",
+          labels: [],
+          dependsOn: ["task-done"],
+          depends_on: ["task-open"],
+        },
+        { id: "task-b", type: "task", status: "todo", labels: [], depends_on: ["task-open"] },
+        { id: "task-done", type: "task", status: "done", labels: [] },
+        { id: "task-open", type: "task", status: "todo", labels: [] },
+      ],
+      "blocked-by:task-open",
+      null,
+    );
+    expect(dual).toEqual({ ok: true, visible: ["task-b"] });
+    const ready = applyBoardFilter(
+      [
+        {
+          id: "task-a",
+          type: "task",
+          status: "todo",
+          labels: [],
+          dependsOn: ["task-done"],
+          depends_on: ["task-open"],
+        },
+        { id: "task-done", type: "task", status: "done", labels: [] },
+      ],
+      "ready:true",
+      null,
+    );
+    // task-a's kernel field hides the open contract dep; task-done itself has
+    // no deps, so it is ready too.
+    expect(ready).toEqual({ ok: true, visible: ["task-a", "task-done"] });
+  });
+
+  it("refuses an unknown readiness value", () => {
+    expect(errorOf("ready:bogus")).toBe('unknown readiness "bogus". Allowed: true, false');
   });
 
   it("mirrors parseFilter's syntax and enum errors", () => {
@@ -591,6 +659,90 @@ describe("renderBoardHtml drag-and-drop", () => {
     expect(html).toContain(
       '<span id="status-counts">todo: 1 · in_progress: 0 · blocked: 0 · done: 0 · cancelled: 0</span>',
     );
+  });
+});
+
+describe("renderBoardHtml non-text contrast (WCAG 1.4.11, task-board-non-text-contrast-and-drag-affordance)", () => {
+  // axe has no automated rule for 1.4.11, so the @smoke lane cannot catch a
+  // non-text regression. These assertions pin the decision on the rendered CSS
+  // instead: every interactive-control boundary clears 3:1 on the surfaces it
+  // touches, and no opacity fade exists anywhere in the stylesheet.
+  const html = renderBoardHtml([item({ id: "task-a", type: "task", status: "todo" })], {
+    generatedAt: GENERATED_AT,
+    details: true,
+  });
+  const css = (html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "").replace(
+    /\/\*[\s\S]*?\*\//g,
+    "",
+  );
+
+  /** Relative luminance per WCAG 2.x. */
+  function luminance(hex: string): number {
+    const [r, g, b] = [0, 2, 4].map((i) => {
+      const v = parseInt(hex.replace("#", "").slice(i, i + 2), 16) / 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+  /** WCAG contrast ratio between two hex colors. */
+  function ratio(fg: string, bg: string): number {
+    const [l1, l2] = [luminance(fg), luminance(bg)].sort((a, b) => b - a);
+    return (l1 + 0.05) / (l2 + 0.05);
+  }
+  /** The declarations of one rule from the rendered stylesheet. */
+  function rule(selector: string): string {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = css.match(new RegExp(`${escaped} \\{([^}]*)\\}`));
+    expect(match, `rule not found in rendered CSS: ${selector}`).toBeTruthy();
+    return match![1];
+  }
+
+  it("keeps every recorded non-text boundary at or above 3:1", () => {
+    // The pairs recorded in the item body: [what, foreground, background].
+    const boundaries: Array<[string, string, string]> = [
+      ["drop-target outline vs column", "#666a6f", "#ebecf0"], // 4.61
+      ["count pill border vs column", "#666a6f", "#ebecf0"], // 4.61
+      ["lens chip border vs page", "#666a6f", "#f4f5f7"], // 4.99
+      ["lens chip border vs chip fill", "#666a6f", "#ffffff"], // 5.45
+      ["lens.active fill vs page", "#0550ae", "#f4f5f7"], // 6.96
+      ["drawer border vs drawer fill", "#666a6f", "#ffffff"], // 5.45
+      ["move-menu border vs panel fill", "#666a6f", "#ffffff"], // 5.45
+    ];
+    for (const [what, fg, bg] of boundaries) {
+      expect(ratio(fg, bg), what).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("uses the boundary grey on every interactive control (never the 1.3:1 #d0d4da)", () => {
+    for (const selector of [
+      "#board-filter-input",
+      "#board-filter-clear",
+      ".lens",
+      ".col-toggle",
+      ".layout-toggle",
+      ".card-move",
+      ".drawer-close",
+      ".drawer-panel",
+      ".move-menu-panel",
+      ".move-menu-target",
+      ".move-menu-cancel",
+    ]) {
+      expect(rule(selector), selector).toContain("1px solid #666a6f");
+    }
+    // The count pill is a passive indicator: its muted fill stays, the pill
+    // edge is the recorded boundary, and its text pair (axe-enforced) is 6.04:1.
+    expect(rule(".column .count")).toContain("border: 1px solid #666a6f");
+    expect(ratio("#424a53", "#d0d4da")).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("affords the dragged card with a lift, never a fade", () => {
+    const dragging = rule(".card.dragging");
+    expect(dragging).toContain("box-shadow");
+    expect(dragging).toContain("outline: 2px solid #0550ae");
+    // No opacity declaration anywhere in the stylesheet: a fade composites
+    // every descendant against the surface below it (measured 1.5-2.7:1), so
+    // the state cue must come from surface, shadow and outline instead.
+    expect(css).not.toMatch(/\bopacity\s*:/);
   });
 });
 
