@@ -75,6 +75,13 @@ jobs:
         # `|| true` and no advisory `if:` — that is what makes it a gate.
         run: npm run smoke:native-start-cold
 
+      # bug-worktree-link-farm-breaks-playwright-runner: the review bar's
+      # Playwright lane must start from a start-style link-farm worktree (the
+      # layout every review worktree has). Model-free, offline, --list only;
+      # BLOCKING like the gate above.
+      - name: Playwright lane from a link-farm worktree
+        run: npm run smoke:worktree-playwright
+
   ui-smoke:
     # task-ui-browser-smoke-ci (ADR 0008 tier 2): the durable `@smoke` browser
     # spec plus the pty TUI frame check. Chromium-only and one worker; the
