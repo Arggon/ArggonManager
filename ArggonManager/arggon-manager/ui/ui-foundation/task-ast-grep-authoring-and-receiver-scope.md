@@ -32,10 +32,12 @@ Final review of PR #418 passed the high-confidence ast-grep guard and identified
 
 ## Acceptance
 
-- [ ] Reproduce the sibling `$$$` behavior with the pinned `@ast-grep/cli` and rewrite the authoring note with the exact supported constraint and a minimal example.
-- [ ] Document receiver-name sensitivity as an explicit limitation, or add a high-confidence rule/test for alternate canonical receiver names without reintroducing generic-name false positives.
-- [ ] Keep the high-confidence scope and documented limitations accurate; no exhaustive-semantic-enforcement claim.
-- [ ] Rule tests, `lint:structure`, full test/lint/build/`check:plugin`/validate remain green.
+<!-- Ticked against the PR branch 2026-09-30; evidence in the review comment. -->
+
+- [x] Reproduce the sibling `$$$` behavior with the pinned `@ast-grep/cli` and rewrite the authoring note with the exact supported constraint and a minimal example.
+- [x] Document receiver-name sensitivity as an explicit limitation, or add a high-confidence rule/test for alternate canonical receiver names without reintroducing generic-name false positives.
+- [x] Keep the high-confidence scope and documented limitations accurate; no exhaustive-semantic-enforcement claim.
+- [x] Rule tests, `lint:structure`, full test/lint/build/`check:plugin`/validate remain green.
 
 ## Notes
 
