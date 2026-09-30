@@ -50,7 +50,7 @@ Product-owner decision (2026-09-22): carry the commits to main and retire the br
 - [x] CI triggers no longer list `opencode2` in `.github/workflows/ci.yml` and `.github/workflows/arggon.yml` (template `templates/docs/github/workflows/arggon.yml` lands with the next release ref per the release runbook)
 - [x] Docs no longer present `opencode2` as a live surface (cross-ref `bug-docs-retired-opencode2-split`)
 - [x] Side-by-side installs section (`opencode2.md` §Side-by-side installs, `task-opencode2-side-by-side-installs`) marked historical or simplified
-- [ ] `arggon validate --json` green
+- [x] `arggon validate --json` green
 
 ### 2026-09-22 @ses_f34e96524ffeT4C9PcMAtYTyfx
 ### 2026-09-22 @Arggon (coordinator)
