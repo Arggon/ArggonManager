@@ -191,11 +191,18 @@ job's browser step, so a local green run is the evidence CI will reproduce.
 
 #### Accessibility gate (axe)
 
-The first `@smoke` test runs [axe](https://github.com/dequelabs/axe-core)
-(`@axe-core/playwright`, version-pinned, dev-only) against the **served** board,
-right after the board-load readiness assertion and before the card-parity and
-status-move tests move the page on. It is a gate, not a report: a violation
-fails the test.
+The `@smoke` lane runs [axe](https://github.com/dequelabs/axe-core)
+(`@axe-core/playwright`, version-pinned, dev-only) against four board states,
+each gated on its own deterministic readiness signal (an `expect` on a settled
+element — never a sleep, never a `networkidle` guess): the **served ready
+page** (first test, before any interaction — including a fixture-rendered
+**empty status column**, so the `.empty` placeholder's contrast is actually
+asserted), the **open detail drawer** (right after the acceptance-row count
+proves the async `/api/item` content has rendered), the **static `file://`
+export** (after its `h1`; a separate document, so an export-only regression is
+caught) and the **filtered/lens state** (after the narrowed-card count, with
+the `.empty` placeholders the filter creates). It is a gate, not a report: a
+violation fails the test.
 
 **What is asserted.** Every WCAG A/AA level axe can check automatically, across
 all three WCAG versions it ships rules for:
@@ -204,8 +211,17 @@ all three WCAG versions it ships rules for:
 wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa
 ```
 
-AAA is out of scope (axe automates almost nothing at that level) and
-`best-practice` is out of scope (it is not a conformance level).
+AAA is out of scope (axe automates almost nothing at that level).
+`best-practice` is out of scope by a recorded decision
+([task-axe-board-drawer-and-lens-coverage](ArggonManager/arggon-manager/ui/ui-foundation/task-axe-board-drawer-and-lens-coverage.md)):
+it is not a conformance level, and its rule surface has never been audited on
+this board, so asserting it wholesale would trade a green gate for an unaudited
+one. The one `best-practice` finding the ready page used to report — `region`
+on the filter bar — is **fixed**, not excluded: `#board-filterbar` carries
+`role="search"` (aria-label "board filters"), so the filter controls live in a
+landmark. Widening the tag set to `best-practice` is a deliberate follow-up:
+audit the current best-practice rule list against every scanned state above,
+fix or file each finding, and only then widen.
 
 **The policy, in short: no blanket exclusions.** There is no `disableRules`, no
 `exclude`, no `include` and no narrowed rule list anywhere in

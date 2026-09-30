@@ -1917,7 +1917,7 @@ ${details ? DETAIL_CSS : ""}
   <h1>arggon board${repo}</h1>
   <div class="meta">generated ${esc(opts.generatedAt)} · ${sorted.length} item(s) · <span id="status-counts">${counts}</span> · tracker files remain the source of truth; drops persist only against a live server (arggon board --serve)${live}</div>
 </header>
-<div class="filterbar" id="board-filterbar">
+<div class="filterbar" id="board-filterbar" role="search" aria-label="board filters">
   <label for="board-filter-input">filter</label>
   <input id="board-filter-input" type="search" autocomplete="off" spellcheck="false" placeholder="free text or field:value (type, status, label, assignee, priority, ancestor, parent, depends-on, blocked-by, ready)">
   <button type="button" id="board-filter-clear">clear</button>
