@@ -5,6 +5,7 @@ import type { AddressInfo } from "node:net";
 import {
   renderBoardHtml,
   defaultBoardGithub,
+  buildBoardSummary,
   buildBoardDetail,
   type BoardGithub,
   type PrInfo,
@@ -317,6 +318,9 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
         diffLinks: true,
         lenses,
         me,
+        // Summary header (task-board-progress-header): the kernel report
+        // aggregation over the already-loaded items — static and serve parity.
+        summary: buildBoardSummary(items),
         // Serve-only item detail drawer (task-board-item-detail): cards fetch
         // `/api/item` through the kernel bounded read. The static export never
         // sets this flag and stays lean.
