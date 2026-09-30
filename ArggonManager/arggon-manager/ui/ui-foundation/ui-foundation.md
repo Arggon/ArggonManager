@@ -1,6 +1,6 @@
 ---
 type: story
-status: in_progress
+status: done
 id: ui-foundation
 title: "UI foundation: shared board view-model and browser smoke gate"
 assignee: Arggon
@@ -9,7 +9,6 @@ labels: [ui, architecture, smoke]
 priority: p2
 created: "2026-09-22"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T22:49:43.725Z"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/ui-foundation.md (story index; required).
