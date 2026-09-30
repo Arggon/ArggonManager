@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { applyBoardFilter, evaluateDrop, renderBoardHtml, type BoardLensItem } from "./board.js";
-import { parseFilter, runList, runUpdate, visibleItems } from "@arggondev/lib";
+import { applyViewLens, parseFilter, runList, runUpdate, visibleItems } from "@arggondev/lib";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -250,10 +250,14 @@ describe("parity: TS evaluateDrop vs kernel runUpdate", () => {
 /**
  * Supported-subset parity table. Every expression here must keep the same ids
  * in the embedded board lens and the kernel (`runList --filter`): fields
- * `type`, `status`, `label`, `assignee`, `priority`, `ancestor`, `!` negation,
- * quoting and free text (id/title substring). The kernel-only dependency
- * predicates (`parent:`, `depends-on:`, `blocked-by:` — and readiness) are
- * asserted as an explicit, documented divergence below.
+ * `type`, `status`, `label`, `assignee`, `priority`, `ancestor` plus — since
+ * task-board-filter-dep-predicates — the kernel dependency predicates
+ * `parent:`, `depends-on:`, `blocked-by:` and the readiness lens spelled
+ * `ready:true`/`ready:false`. Free text on id/title is a board extension
+ * compared against the shared `visibleItems` helper; `ready:` is a board
+ * extension compared against `applyViewLens({ ready })` (the kernel filter
+ * language has no ready field). Quoting, `!` negation and enum errors mirror
+ * the kernel parser.
  */
 const LENS_PARITY_EXPRESSIONS = [
   "",
@@ -272,9 +276,25 @@ const LENS_PARITY_EXPRESSIONS = [
   "ancestor:epic-a",
   "ancestor:task-one",
   "!ancestor:epic-a",
+  "parent:launch",
+  "parent:story-a",
+  "!parent:story-a",
+  "depends-on:task-one",
+  "!depends-on:task-one",
+  "blocked-by:task-one",
+  "blocked-by:ghost-dep",
+  "!blocked-by:task-one",
+  "status:todo blocked-by:task-one",
   "status:todo label:security",
   "type:task !status:done",
 ] as const;
+
+/**
+ * Readiness spellings. The kernel filter language has no `ready` field, so
+ * these are proved 1:1 against `applyViewLens({ ready })` below instead of
+ * `runList --filter`.
+ */
+const LENS_READY_EXPRESSIONS = ["ready:true", "ready:false", "!ready:true"] as const;
 
 /**
  * Free-text cases (a board extension: the kernel parser refuses bare tokens).
@@ -309,6 +329,7 @@ const LENS_SANDBOX_ITEMS: BoardLensItem[] = [
     labels: ["core", "security"],
     parent: "launch",
     priority: null,
+    depends_on: ["ghost-dep"],
   },
   {
     id: "story-a",
@@ -319,6 +340,7 @@ const LENS_SANDBOX_ITEMS: BoardLensItem[] = [
     labels: ["security"],
     parent: "epic-a",
     priority: "p2",
+    depends_on: ["task-one"],
   },
   {
     id: "task-one",
@@ -349,6 +371,7 @@ const LENS_SANDBOX_ITEMS: BoardLensItem[] = [
     labels: ["bug"],
     parent: "story-a",
     priority: "p0",
+    depends_on: ["task-two"],
   },
 ];
 
@@ -362,6 +385,7 @@ function lensItemFile(fields: {
   assignee?: string;
   labels?: string[];
   priority?: string;
+  depends_on?: string[];
 }): string {
   const lines = [
     "---",
@@ -373,6 +397,9 @@ function lensItemFile(fields: {
     `assignee: ${fields.assignee ?? "null"}`,
     `labels: [${(fields.labels ?? []).map((label) => `"${label}"`).join(", ")}]`,
     ...(fields.priority ? [`priority: ${fields.priority}`] : []),
+    ...(fields.depends_on
+      ? [`depends_on: [${fields.depends_on.map((dep) => `"${dep}"`).join(", ")}]`]
+      : []),
     'created: "2026-09-22"',
     'updated: "2026-09-22"',
     "---",
@@ -412,6 +439,7 @@ function newLensTree(): string {
     title: "Auth epic",
     parent: "launch",
     labels: ["core", "security"],
+    depends_on: ["ghost-dep"],
   });
   write("tasks/launch/epic-a/story-a/story-a.md", {
     type: "story",
@@ -422,6 +450,7 @@ function newLensTree(): string {
     labels: ["security"],
     assignee: "alice",
     priority: "p2",
+    depends_on: ["task-one"],
   });
   write("tasks/launch/epic-a/story-a/task-one.md", {
     type: "task",
@@ -450,6 +479,7 @@ function newLensTree(): string {
     parent: "story-a",
     labels: ["bug"],
     priority: "p0",
+    depends_on: ["task-two"],
   });
   return root;
 }
@@ -463,8 +493,8 @@ describe("parity: embedded board lens vs kernel filter", () => {
     const embedded = embeddedBoardLens();
     const expressions = [
       ...LENS_PARITY_EXPRESSIONS,
+      ...LENS_READY_EXPRESSIONS,
       ...LENS_FREE_TEXT_EXPRESSIONS,
-      "parent:story-a",
       "status:",
       "!login",
     ];
@@ -516,17 +546,25 @@ describe("parity: embedded board lens vs kernel filter", () => {
     });
   });
 
-  it("refuses the kernel-only dependency predicates the kernel accepts (documented v1 divergence)", () => {
+  it("agrees with the kernel readiness lens on the same fixture (board `ready:` spelling)", () => {
     const root = newLensTree();
     const all = runList({ cwd: root }).items;
-    for (const expr of ["parent:story-a", "depends-on:task-one", "blocked-by:task-one"]) {
-      // The kernel accepts these (possibly matching nothing); board v1 refuses
-      // them instead of silently dropping the dependency semantics.
-      expect(() => runList({ cwd: root, filter: expr })).not.toThrow();
+    // applyViewLens reads either dependency shape and sorts by id; the board
+    // lens preserves input order, so both sides are compared as sorted id sets.
+    const readyKernel = applyViewLens(all, { ready: true }).map((entry) => entry.id);
+    const notReadyKernel = all.map((entry) => entry.id).filter((id) => !readyKernel.includes(id));
+    function visibleSorted(expr: string): string[] {
       const board = applyBoardFilter(all, expr, null);
-      expect(board.ok, `board must refuse "${expr}"`).toBe(false);
-      if (!board.ok) expect(board.error).toContain("arggon list --filter");
+      expect(board.ok, `board refused "${expr}": ${board.ok ? "" : board.error}`).toBe(true);
+      return board.ok ? [...board.visible].sort() : [];
     }
+    expect(visibleSorted("ready:true")).toEqual([...readyKernel].sort());
+    expect(visibleSorted("ready:false")).toEqual([...notReadyKernel].sort());
+    expect(visibleSorted("!ready:true")).toEqual([...notReadyKernel].sort());
+    // The fixture actually exercises all three dep states: open (task-one is
+    // in_progress), closed (task-two is done) and unknown (ghost-dep).
+    expect([...readyKernel].sort()).toEqual(["bug-one", "launch", "task-one", "task-two"]);
+    expect([...notReadyKernel].sort()).toEqual(["epic-a", "story-a"]);
   });
 
   it("refuses malformed expressions exactly where the kernel parser does", () => {
