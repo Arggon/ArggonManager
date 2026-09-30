@@ -4,6 +4,8 @@ import {
   buildBlockedByIndex,
   matchesPredicate,
   parseFilter,
+  splitFilterTokens,
+  unquoteFilterValue,
   type FilterableItem,
 } from "./filter.js";
 
@@ -122,12 +124,42 @@ describe("dependency predicates (spec-deps-001)", () => {
       { id: "task-c", dependsOn: [] },
     ]);
     expect(index.get("task-x")).toEqual(["task-a", "bug-b"]);
-    expect(matchesPredicate(item({ id: "task-a" }), { field: "blocked-by", value: "task-x", negated: false }, index)).toBe(true);
-    expect(matchesPredicate(item({ id: "bug-b" }), { field: "blocked-by", value: "task-x", negated: false }, index)).toBe(true);
-    expect(matchesPredicate(item({ id: "task-c" }), { field: "blocked-by", value: "task-x", negated: false }, index)).toBe(false);
-    expect(matchesPredicate(item({ id: "task-c" }), { field: "blocked-by", value: "task-x", negated: true }, index)).toBe(true);
+    expect(
+      matchesPredicate(
+        item({ id: "task-a" }),
+        { field: "blocked-by", value: "task-x", negated: false },
+        index,
+      ),
+    ).toBe(true);
+    expect(
+      matchesPredicate(
+        item({ id: "bug-b" }),
+        { field: "blocked-by", value: "task-x", negated: false },
+        index,
+      ),
+    ).toBe(true);
+    expect(
+      matchesPredicate(
+        item({ id: "task-c" }),
+        { field: "blocked-by", value: "task-x", negated: false },
+        index,
+      ),
+    ).toBe(false);
+    expect(
+      matchesPredicate(
+        item({ id: "task-c" }),
+        { field: "blocked-by", value: "task-x", negated: true },
+        index,
+      ),
+    ).toBe(true);
     // Unknown blocker id: nothing is blocked by it.
-    expect(matchesPredicate(item({ id: "task-a" }), { field: "blocked-by", value: "nope", negated: false }, index)).toBe(false);
+    expect(
+      matchesPredicate(
+        item({ id: "task-a" }),
+        { field: "blocked-by", value: "nope", negated: false },
+        index,
+      ),
+    ).toBe(false);
   });
 
   it("composes with AND and ! like the existing predicates", () => {
@@ -151,8 +183,11 @@ describe("ancestor predicate (task-ancestor-filter)", () => {
 
   const pred = (value: string, negated = false) => ({ field: "ancestor" as const, value, negated });
   // matchesPredicate signature: (item, pred, blockedByIndex, ancestorIndex)
-  const match = (it: FilterableItem, p: ReturnType<typeof pred>, index: ReturnType<typeof buildAncestorIndex>) =>
-    matchesPredicate(it, p, undefined, index);
+  const match = (
+    it: FilterableItem,
+    p: ReturnType<typeof pred>,
+    index: ReturnType<typeof buildAncestorIndex>,
+  ) => matchesPredicate(it, p, undefined, index);
 
   it("parses ancestor: like the other fields, including negation and composition", () => {
     expect(parseFilter("ancestor:init-d !ancestor:epic-z status:todo")).toEqual([
@@ -224,5 +259,24 @@ describe("ancestor predicate (task-ancestor-filter)", () => {
     expect(preds.every((p) => matchesPredicate(subject, p, undefined, index))).toBe(true);
     const bug = item({ id: "task-z", parent: "other", status: "todo", type: "bug" });
     expect(preds.every((p) => matchesPredicate(bug, p, undefined, index))).toBe(false);
+  });
+});
+
+describe("splitFilterTokens / unquoteFilterValue (task-tui-filter-language)", () => {
+  it("tokenizes on whitespace outside quotes — the rule applyViewFilter shares", () => {
+    expect(splitFilterTokens("status:todo type:bug")).toEqual(["status:todo", "type:bug"]);
+    expect(splitFilterTokens('  assignee:"Jane Doe"  bare ')).toEqual([
+      'assignee:"Jane Doe"',
+      "bare",
+    ]);
+    expect(splitFilterTokens("'single quoted'")).toEqual(["'single quoted'"]);
+    expect(splitFilterTokens("   ")).toEqual([]);
+  });
+
+  it("strips one matching quote pair and rejects stray quotes (kernel messages)", () => {
+    expect(unquoteFilterValue('"a b"', "e")).toBe("a b");
+    expect(unquoteFilterValue("'a'", "e")).toBe("a");
+    expect(unquoteFilterValue("plain", "e")).toBe("plain");
+    expect(() => unquoteFilterValue('a"b', "e")).toThrow(/mismatched quotes/);
   });
 });
