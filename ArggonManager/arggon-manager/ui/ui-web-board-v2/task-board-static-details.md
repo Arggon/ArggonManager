@@ -52,3 +52,7 @@ Evidence (PR #493, branch feat/task-board-static-details):
 - file:// real-browser evidence: static export of this repo's tracker opened the drawer offline (screenshot /tmp/evidence-static-details-drawer.png); drawer title, deps, acceptance and body render from the embedded snapshot.
 - Measured payload on this repo's tracker (368 items, 2026-09-30): page 383,706 -> 2,256,263 bytes; embedded JSON 1,806,619 bytes (~4.9 KiB/item avg); documented in README + ArggonManager/docs/json-output.md (envelope gains details + detailBytes).
 - Note: one full npm test run mid-work showed a single show/runShow-related assertion failure that never reproduced on the two consecutive clean full runs before push; treating as environment flake, flagging here for the reviewer.
+
+### handoff 2026-09-30 @Arggon — next: Coordinator: review PR #493 (verify byte-identity tests + measured payload figures); merge with the tracker commits on the branch
+- branch: feat/task-board-static-details
+- open questions: Static --details moves always refuse offline (by design, same as drag); should the move menu hide on no-endpoint exports? filed here as a note, not an item
