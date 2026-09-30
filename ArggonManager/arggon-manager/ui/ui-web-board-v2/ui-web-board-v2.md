@@ -34,7 +34,7 @@ The CLI already owns the query language (`lib/src/filter.ts`, `list --filter`, `
 
 ## Acceptance
 
-- [ ] Child tasks/bugs done with their checklists honest
+- [x] Child tasks/bugs done with their checklists honest (12/12 — theme-density landed via #504 after the empty #501)
 - [x] The output stays a single self-contained HTML file (no runtime deps, ADR 0002); features degrade gracefully without `--serve`
 - [x] Every change carries unit tests + a Playwright-CLI smoke driven against `arggon board --serve` (ADR 0008)
 - [x] README board section and docs/json-output.md updated in the same PRs
