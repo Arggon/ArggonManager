@@ -1,15 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-axe-board-drawer-and-lens-coverage
 title: "Extend the axe gate to the drawer, static export and lens states"
+assignee: Arggon
+branch: feat/task-axe-board-drawer-and-lens-coverage
 parent: ui-foundation
 labels: [accessibility, playwright, ci, ui]
 priority: p2
 created: "2026-09-29"
-updated: "2026-09-29"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T20:49:25.638Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-axe-board-drawer-and-lens-coverage
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-axe-board-drawer-and-lens-coverage.md
   Leaves live only under a story. id is the filename stem: task-axe-board-drawer-and-lens-coverage.
