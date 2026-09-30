@@ -10,7 +10,6 @@ labels: [ci, playwright, tooling]
 priority: p3
 created: "2026-09-29"
 updated: "2026-09-30"
-worktree_path: /home/arggon/Projects/ArggonManager-task-typecheck-e2e-specs
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-typecheck-e2e-specs.md
