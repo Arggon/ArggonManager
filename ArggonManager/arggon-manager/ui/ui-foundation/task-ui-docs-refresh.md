@@ -1,13 +1,16 @@
 ---
 type: task
-status: todo
+status: done
 id: task-ui-docs-refresh
 title: "Docs refresh after waves 1-2: /api/item note and the current smoke:tui-board steps"
+assignee: Arggon
+branch: feat/task-ui-docs-refresh
 parent: ui-foundation
 labels: [ui, docs]
 priority: p3
 created: "2026-09-23"
-updated: "2026-09-23"
+updated: "2026-09-30"
+worktree_path: /home/arggon/Projects/ArggonManager-task-ui-docs-refresh
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-ui-docs-refresh.md
@@ -24,7 +27,6 @@ updated: "2026-09-23"
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 
@@ -38,7 +40,7 @@ Two doc drifts found during wave-2 reviews:
 
 ## Acceptance
 
-- [ ] `cli/README.md` board paragraph documents `/api/item` (serve-only, kernel bounded read, read-only, `?id=` contract)
-- [ ] `ArggonManager/docs/engineering.md` §Smoke test + `CONTRIBUTING.md` UI-smoke section describe the current `smoke:tui-board` steps and assertions
-- [ ] Grep the changed phrases across `README.md`, `docs/`, `cli/README.md` — no other statement becomes false
-- [ ] Docs-only PR; `cli` check green
+- [x] `cli/README.md` board paragraph documents `/api/item` (serve-only, kernel bounded read, read-only, `?id=` contract)
+- [x] `ArggonManager/docs/engineering.md` §Smoke test + `CONTRIBUTING.md` UI-smoke section describe the current `smoke:tui-board` steps and assertions
+- [x] Grep the changed phrases across `README.md`, `docs/`, `cli/README.md` — no other statement becomes false
+- [x] Docs-only PR; `cli` check green

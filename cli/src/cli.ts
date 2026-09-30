@@ -3,7 +3,7 @@ import { Command } from "commander";
 import { relative, sep } from "node:path";
 import { formatAdoptAckReport, formatAdoptReport, runAdopt, runAdoptAck } from "./adopt.js";
 import { displayPath, runBoard } from "./board.js";
-import { startBoardServer } from "./board-serve.js";
+import { openInBrowser, startBoardServer } from "./board-serve.js";
 import { runBranch } from "./branch.js";
 import {
   DEFAULT_TAIL_COMMENTS,
@@ -2478,6 +2478,11 @@ program
   )
   .option("--port <port>", "port for --serve (default: a free ephemeral port)")
   .option(
+    "--open",
+    "open the served board in the default browser after listen (with --serve; best-effort)",
+    false,
+  )
+  .option(
     "--tui",
     "interactive read-only terminal kanban (raw ANSI, q quits; not combinable with --json)",
     false,
@@ -2491,6 +2496,7 @@ program
       details?: boolean;
       serve?: boolean;
       port?: string;
+      open?: boolean;
       tui?: boolean;
       json?: boolean;
     }) => {
@@ -2508,6 +2514,10 @@ program
         printHumanError("arggon board", message);
         process.exitCode = 1;
       };
+      if (opts.open && !opts.serve) {
+        jsonFailed("--open requires --serve (the static export has nothing to open)");
+        return;
+      }
       if (opts.tui) {
         if (opts.serve) {
           jsonFailed("cannot combine --tui with --serve (both are interactive modes)");
@@ -2563,14 +2573,27 @@ program
             if (json) {
               successJson(
                 "board",
-                { serving: true, url: handle.url, port: handle.port },
+                {
+                  serving: true,
+                  url: handle.url,
+                  port: handle.port,
+                  ...(opts.open ? { open: true } : {}),
+                },
                 readConventionVersion(handle.root),
               );
-              return;
+            } else {
+              console.log(
+                `arggon board: serving ${sanitizeHumanError(displayPath(handle.root, process.cwd()))} on ${sanitizeHumanError(handle.url)} (binds 127.0.0.1 only, Ctrl-C to stop)`,
+              );
             }
-            console.log(
-              `arggon board: serving ${sanitizeHumanError(displayPath(handle.root, process.cwd()))} on ${sanitizeHumanError(handle.url)} (binds 127.0.0.1 only, Ctrl-C to stop)`,
-            );
+            // --open (task-board-serve-hardening): best-effort launch after
+            // listen; a missing opener never breaks the running server.
+            if (opts.open) {
+              const opened = openInBrowser(handle.url);
+              if (!json && !opened) {
+                console.log("arggon board: could not launch a browser (serving anyway)");
+              }
+            }
           });
         } catch (err) {
           jsonFailed(err instanceof Error ? err.message : String(err));
