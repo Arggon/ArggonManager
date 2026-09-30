@@ -93,3 +93,7 @@ Decision and measurements (PR #480)
 **Check:** board.test.ts "renderBoardHtml non-text contrast" asserts the rendered CSS — every recorded boundary pair >= 3:1 via a WCAG ratio helper, every interactive control on the boundary grey, and zero opacity declarations in the stylesheet. CONTRIBUTING.md § Accessibility gate now states that the axe gate is silent on 1.4.11 by construction and that npm test is the 1.4.11 gate.
 
 **Gates (merged with origin/main 95d664d5):** npm test 1807 passed / 107 files; npm run lint clean; npm run build green; npm run check:plugin green; arggon validate ok; npx playwright test --grep @smoke 19 passed, zero exclusions. Real-browser evidence (headless chromium against arggon board --serve on this worktree): computed border-color of #board-filter-input, #board-filter-clear, .column .count, .drawer-panel, .col-toggle, .layout-toggle = rgb(102,106,111) = #666a6f; a card with .dragging applied (exactly as the dragstart handler does) computes opacity 1, outline rgb(5,80,174) solid 2px, shadow rgba(0,0,0,0.3) 0px 8px 20px; screenshots of the default board, the mid-drag card and the open drawer visually confirm.
+
+### handoff 2026-09-30 @Arggon — next: PR #480 ready for review/merge; item stays in_progress until the coordinator flips it done after merge
+- branch: feat/task-board-non-text-contrast-and-drag-affordance
+- open questions: scope note: policy generalized to sibling #d0d4da control borders and batch-1 col/layout toggles (same boundary class, flagged in PR)
