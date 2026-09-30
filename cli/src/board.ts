@@ -338,6 +338,10 @@ export type BoardLensItem = {
   labels?: string[];
   parent?: string | null;
   priority?: string | null;
+  /** JSON-contract alias of `dependsOn`; read only when `dependsOn` is absent. */
+  depends_on?: string[];
+  /** Kernel field shape; wins over `depends_on` when an item carries both. */
+  dependsOn?: string[];
 };
 
 /** Board lens verdict: the visible ids, or the actionable refusal message. */
@@ -359,21 +363,37 @@ export type BoardLensResult = { ok: true; visible: string[] } | { ok: false; err
  * through the caller-passed `me` (the same rule as `runList`: `@me` is the
  * caller's job) and fails loudly when it cannot be resolved.
  *
- * The kernel's `parent:`, `depends-on:` and `blocked-by:` predicates (and the
- * `ready` lens) are NOT in the v1 board subset: the board renders contract
- * WorkItems (`depends_on`) while the kernel lens reads `dependsOn` — that
- * shape resolution lives in task-ui-viewmodel-contract-deps — so the board
- * refuses them with a pointer to `arggon list` instead of silently dropping
- * the dependency semantics. That divergence is asserted in
- * cli/src/board-parity.test.ts.
+ * The kernel's `parent:`, `depends-on:` and `blocked-by:` predicates are in
+ * with the same semantics as `lib/src/filter.ts` (task-board-filter-dep-predicates):
+ * `parent:` is an exact match on the parent id (items without a parent never
+ * match), `depends-on:<id>` matches items whose `depends_on` contains `<id>`,
+ * and `blocked-by:<id>` is the computed inverse — items that list `<id>` in
+ * `depends_on`, indexed over the WHOLE input so a filtered-out dependency can
+ * never look unknown. Dependencies are read in either accepted shape with the
+ * kernel precedence rule (`dependsOn ?? depends_on ?? []`,
+ * task-ui-viewmodel-contract-deps), so contract items behave exactly like
+ * kernel-shaped ones. `ready:true` / `ready:false` is the board spelling of
+ * the kernel readiness lens (`applyViewLens({ ready })`): an item is ready
+ * when every dependency is terminal (`done`/`cancelled`) — an unknown dep id
+ * counts as open, exactly like the kernel's `isReady`.
  */
 export function applyBoardFilter(
   items: BoardLensItem[],
   expr: string,
   me?: string | null,
 ): BoardLensResult {
-  const BOARD_FIELDS = ["type", "status", "label", "assignee", "priority", "ancestor"];
-  const KERNEL_ONLY_FIELDS = ["parent", "depends-on", "blocked-by"];
+  const BOARD_FIELDS = [
+    "type",
+    "status",
+    "label",
+    "assignee",
+    "priority",
+    "ancestor",
+    "parent",
+    "depends-on",
+    "blocked-by",
+    "ready",
+  ];
   const TYPES = ["initiative", "epic", "story", "task", "bug"];
   const STATUSES = ["todo", "in_progress", "blocked", "done", "cancelled"];
   const PRIORITIES = ["p0", "p1", "p2", "p3"];
@@ -454,17 +474,6 @@ export function applyBoardFilter(
         continue;
       }
       const field = rest.slice(0, colon);
-      if (KERNEL_ONLY_FIELDS.indexOf(field) !== -1) {
-        return {
-          ok: false,
-          error:
-            'the board lens does not support "' +
-            field +
-            ':" (v1 subset: ' +
-            BOARD_FIELDS.join(", ") +
-            " plus free text on id/title; use `arggon list --filter` for parent:, depends-on: and blocked-by:)",
-        };
-      }
       if (BOARD_FIELDS.indexOf(field) === -1) {
         return {
           ok: false,
@@ -494,6 +503,9 @@ export function applyBoardFilter(
           ok: false,
           error: 'unknown priority "' + value + '". Allowed: ' + PRIORITIES.join(", ") + ", none",
         };
+      }
+      if (field === "ready" && value !== "true" && value !== "false") {
+        return { ok: false, error: 'unknown readiness "' + value + '". Allowed: true, false' };
       }
       if (field === "assignee" && value === "@me") {
         if (me === undefined || me === null || me === "") {
@@ -529,6 +541,39 @@ export function applyBoardFilter(
       ancestors.set(items[a].id, chain);
     }
 
+    // Dependency views over the WHOLE input (like the kernel's applyViewLens):
+    // the inverse depends_on index feeds blocked-by:, the id->status lookup
+    // feeds the readiness rule; both must see every edge, so a filtered-out
+    // dependency can never look unknown. Dependencies are read in either
+    // accepted shape with the kernel precedence rule: dependsOn wins when the
+    // item carries both (task-ui-viewmodel-contract-deps).
+    function depsOf(item: BoardLensItem): string[] {
+      if (item.dependsOn !== undefined && item.dependsOn !== null) return item.dependsOn;
+      return item.depends_on || [];
+    }
+    const blockedBy = new Map<string, string[]>();
+    for (let b = 0; b < items.length; b++) {
+      const deps = depsOf(items[b]);
+      for (let d = 0; d < deps.length; d++) {
+        const depId = deps[d];
+        const bucket = blockedBy.get(depId);
+        if (bucket) bucket.push(items[b].id);
+        else blockedBy.set(depId, [items[b].id]);
+      }
+    }
+    const statusById = new Map<string, string>();
+    for (let s = 0; s < items.length; s++) statusById.set(items[s].id, items[s].status);
+    const TERMINAL_STATUSES = ["done", "cancelled"];
+    /** Kernel isReady rule: unknown dep ids count as open. */
+    function isDepReady(item: BoardLensItem): boolean {
+      const deps = depsOf(item);
+      for (let o = 0; o < deps.length; o++) {
+        const depStatus = statusById.get(deps[o]);
+        if (!depStatus || TERMINAL_STATUSES.indexOf(depStatus) === -1) return false;
+      }
+      return true;
+    }
+
     function predicateHits(
       item: BoardLensItem,
       pred: { field: string; value: string; negated: boolean },
@@ -540,6 +585,14 @@ export function applyBoardFilter(
       else if (pred.field === "label") hit = (item.labels || []).indexOf(pred.value) !== -1;
       else if (pred.field === "priority") {
         hit = nullable(item.priority) === (pred.value === "none" ? null : pred.value);
+      } else if (pred.field === "parent") {
+        hit = nullable(item.parent) === pred.value;
+      } else if (pred.field === "depends-on") {
+        hit = depsOf(item).indexOf(pred.value) !== -1;
+      } else if (pred.field === "blocked-by") {
+        hit = (blockedBy.get(pred.value) || []).indexOf(item.id) !== -1;
+      } else if (pred.field === "ready") {
+        hit = pred.value === "true" ? isDepReady(item) : !isDepReady(item);
       } else {
         hit = (ancestors.get(item.id) || []).indexOf(pred.value) !== -1;
       }
@@ -1576,6 +1629,7 @@ export function renderBoardHtml(
     labels: item.labels,
     parent: item.parent,
     priority: item.priority,
+    depends_on: item.depends_on,
   }));
 
   // Saved views (x-views) as lens chips. Tooltip = name + expression, so the
@@ -1865,7 +1919,7 @@ ${details ? DETAIL_CSS : ""}
 </header>
 <div class="filterbar" id="board-filterbar">
   <label for="board-filter-input">filter</label>
-  <input id="board-filter-input" type="search" autocomplete="off" spellcheck="false" placeholder="free text or field:value (type, status, label, assignee, priority, ancestor)">
+  <input id="board-filter-input" type="search" autocomplete="off" spellcheck="false" placeholder="free text or field:value (type, status, label, assignee, priority, ancestor, parent, depends-on, blocked-by, ready)">
   <button type="button" id="board-filter-clear">clear</button>
   <span id="board-filter-count" class="filter-count">${sorted.length} item(s)</span>
   <span id="board-filter-error" class="filter-error" role="alert"></span>
