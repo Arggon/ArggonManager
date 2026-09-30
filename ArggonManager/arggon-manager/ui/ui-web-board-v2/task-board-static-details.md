@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-board-static-details
 title: "Static board export: optional bounded item details (--details)"
+assignee: Arggon
+branch: feat/task-board-static-details
 parent: ui-web-board-v2
 labels: [viewer, board, ui]
 priority: p3
 created: "2026-09-23"
-updated: "2026-09-23"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T19:27:25.322Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-board-static-details
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-static-details.md
