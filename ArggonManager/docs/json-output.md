@@ -498,20 +498,23 @@ Human output supports `--format table` (default) and `--format markdown` (standu
 
 ### `board`
 
-| Field       | Type      | Notes                                                                   |
-| ----------- | --------- | ----------------------------------------------------------------------- |
-| `path`      | `string`  | Output HTML path (display form); absent with `--serve`                  |
-| `itemCount` | `number`  | Items rendered                                                          |
-| `groupBy`   | `string`  | Present with `--group-by` (`milestone`, or `story`)                     |
-| `serving`   | `boolean` | Present and `true` only with `--serve`                                  |
-| `url`       | `string`  | `--serve` only: loopback base URL (`http://127.0.0.1:<port>`)           |
-| `port`      | `number`  | `--serve` only: bound port                                              |
-| `github`    | `boolean` | Present and `true` only with `--github` (not combinable with `--serve`) |
-| `prCount`   | `number`  | PRs matched to card branches; present only with `--github`              |
+| Field       | Type      | Notes                                                                          |
+| ----------- | --------- | ------------------------------------------------------------------------------ |
+| `path`      | `string`  | Output HTML path (display form); absent with `--serve`                         |
+| `itemCount` | `number`  | Items rendered                                                                 |
+| `groupBy`   | `string`  | Present with `--group-by` (`milestone`, or `story`)                            |
+| `serving`   | `boolean` | Present and `true` only with `--serve`                                         |
+| `url`       | `string`  | `--serve` only: loopback base URL (`http://127.0.0.1:<port>`)                  |
+| `port`      | `number`  | `--serve` only: bound port                                                     |
+| `open`      | `boolean` | `--serve --open` only: present and `true` after the best-effort browser launch |
+| `github`    | `boolean` | Present and `true` only with `--github` (not combinable with `--serve`)        |
+| `prCount`   | `number`  | PRs matched to card branches; present only with `--github`                     |
 
 With `--github` the board overlays live PR state (number, draft/ready, checks) on cards with a `branch`, matched by head ref name; cards without a branch or PR get a neutral badge. Without the flag the board is a fully offline snapshot. Failures use `error.code: "BOARD_FAILED"` (missing a tracker, or without gh auth — run plain `board` for the offline snapshot).
 
-`--serve` is combinable with `--json` (unlike `--github`/`--tui`, which fail with `BOARD_FAILED` under `--serve`): it is a one-shot programmatic server-start signal — the standard `board` envelope is emitted exactly once, with `serving: true`, the loopback `url` and the bound `port`, and then the process keeps serving; nothing further is written to stdout by the CLI itself.
+`--serve` is combinable with `--json` (unlike `--github`/`--tui`, which fail with `BOARD_FAILED` under `--serve`): it is a one-shot programmatic server-start signal — the standard `board` envelope is emitted exactly once, with `serving: true`, the loopback `url` and the bound `port`, and then the process keeps serving; nothing further is written to stdout by the CLI itself. `--open` (requires `--serve`, combinable with `--json`) best-effort launches the default browser after listen — `xdg-open`/`open`/`cmd start` per platform; a failed launch never stops the server (human output reports it, the JSON envelope records the additive `open: true`).
+
+**The mutating route's accepted-request contract** (task-board-serve-hardening): `POST /api/update` runs the kernel write path only for requests whose `Host` is the served loopback host and port (`127.0.0.1:<port>`, `localhost:<port>`, `[::1]:<port>`); a `Sec-Fetch-Site: cross-site` header is refused; and when the client sends an `Origin` header it must parse to that same loopback origin (http scheme, same port — the literal `null` origin and DNS names that merely resolve to 127.0.0.1 are refused). Everything else answers `403` with the standard JSON error shape before the kernel is touched. Non-browser clients (curl, scripts) send no `Origin`/`Sec-Fetch-Site` and are held to the `Host` check only. The read routes (`/`, `/events`, `/api/item`, `/favicon.ico`) are unaffected: they never write.
 
 `--tui` is an interactive read-only terminal kanban (story-tui-board), **not a data format**: it is not combinable with `--json` (fails with `error.code: "BOARD_FAILED"`) and emits no envelope — it renders ANSI frames until you press `q`. It also fails with `BOARD_FAILED` when stdout is not a TTY (piped output). It performs no writes: it re-reads the tree over the same kernel read path as `list`/`board` after every keypress.
 

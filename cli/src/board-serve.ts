@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import { watch, type FSWatcher } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
@@ -45,6 +46,14 @@ import {
  * match, and the served page opens it on card click/Enter. Serve-only: the
  * static export stays lean and has no drawer. Read-only — the route never
  * touches the tracker.
+ *
+ * Hardening (task-board-serve-hardening): the one mutating route,
+ * `POST /api/update`, gates on `isAllowedMutatingOrigin` — loopback Host with
+ * the served port, no cross-site `Sec-Fetch-Site`, and (when the client sends
+ * one) a loopback `Origin` — and answers 403 otherwise; `GET /favicon.ico`
+ * serves a minimal SVG glyph so the browser console stays clean, linked from
+ * the served page only; `--open` best-effort launches the default browser
+ * after listen (`openInBrowser`). The static export gains none of this.
  */
 
 /**
@@ -195,6 +204,60 @@ export function clipDetailText(
   return { text: clipped, truncated: true };
 }
 
+/**
+ * Mutating-request gate for the serve endpoints (task-board-serve-hardening).
+ * The server binds 127.0.0.1 only, but any local process or web page reachable
+ * from the same machine can still knock on the port; the mutating route
+ * therefore re-checks that the request really comes from the served origin
+ * before the kernel write path runs:
+ *
+ * - `Host` must be the served loopback host with the served port
+ *   (`127.0.0.1:<port>` / `localhost:<port>` / `[::1]:<port>`). This is the
+ *   only check a non-browser client (curl, scripts) is held to.
+ * - `Sec-Fetch-Site`, when the client sends it, must not be `cross-site`.
+ * - `Origin`, when the client sends it, must parse to the served loopback
+ *   origin — same scheme (http), same loopback host, same port. A missing or
+ *   empty Origin is accepted (non-browser clients never send it); a literal
+ *   `null` origin (sandboxed iframe, redirect chains) is refused.
+ *
+ * Every refusal answers 403 with a JSON error body; the request never reaches
+ * `runUpdate`. DNS names that resolve to 127.0.0.1 do NOT pass — only the
+ * literal loopback hostnames are accepted (a rebound hosts-file entry must not
+ * become an origin).
+ */
+export function isAllowedMutatingOrigin(
+  headers: { origin?: string; host?: string; secFetchSite?: string },
+  port: number,
+): boolean {
+  const loopbackHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]);
+  if (!headers.host || !loopbackHosts.has(headers.host)) return false;
+  if (
+    headers.secFetchSite &&
+    !["same-origin", "same-site", "none"].includes(headers.secFetchSite)
+  ) {
+    return false;
+  }
+  if (headers.origin === undefined || headers.origin === "") return true;
+  try {
+    const parsed = new URL(headers.origin);
+    return parsed.protocol === "http:" && loopbackHosts.has(parsed.host);
+  } catch {
+    return false; // includes the literal `null` origin
+  }
+}
+
+/**
+ * Minimal board favicon (task-board-serve-hardening): a 16x16 kanban glyph so
+ * the browser tab request stops 404-ing — it was the only console error in the
+ * 2026-09-22 drive. Serve-mode only; the static export is untouched.
+ */
+export const FAVICON_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">' +
+  '<rect width="16" height="16" rx="3" fill="#424a53"/>' +
+  '<rect x="3" y="3" width="3.5" height="10" rx="1" fill="#ffffff"/>' +
+  '<rect x="9" y="3" width="3.5" height="6.5" rx="1" fill="#1a7f37"/>' +
+  "</svg>";
+
 /** Read-only acceptance rows: `- [ ]`/`- [x]` lines of the item prose. */
 export function parseAcceptanceRows(prose: string): Array<{ text: string; checked: boolean }> {
   const rows: Array<{ text: string; checked: boolean }> = [];
@@ -339,9 +402,11 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
         details: true,
       },
     );
-    // Live-reload client, injected only in serve mode; the static export
-    // stays byte-identical to the plain `arggon board` output.
-    return html.replace("</body>", `${RELOAD_SCRIPT}</body>`);
+    // Serve-only favicon link (task-board-serve-hardening): points at the
+    // /favicon.ico route below; the static export stays byte-identical.
+    return html
+      .replace("<head>", '<head><link rel="icon" href="/favicon.ico">')
+      .replace("</body>", `${RELOAD_SCRIPT}</body>`);
   };
 
   const broadcastReload = (): void => {
@@ -389,7 +454,38 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
       req.on("close", () => clients.delete(res));
       return;
     }
+    // Board favicon (task-board-serve-hardening): keeps the browser console
+    // clean; the static export has no such route or link.
+    if (req.method === "GET" && url.pathname === "/favicon.ico") {
+      res.writeHead(200, { "Content-Type": "image/svg+xml", "Cache-Control": "max-age=3600" });
+      res.end(FAVICON_SVG);
+      return;
+    }
     if (req.method === "POST" && url.pathname === "/api/update") {
+      // Mutating-route origin gate (task-board-serve-hardening): anything that
+      // is not the served loopback origin is refused before the kernel write
+      // path runs. Defense in depth on top of the 127.0.0.1-only binding.
+      const header = (name: string): string | undefined => {
+        const value = req.headers[name];
+        return Array.isArray(value) ? value[0] : value;
+      };
+      if (
+        !isAllowedMutatingOrigin(
+          {
+            origin: header("origin"),
+            host: header("host"),
+            secFetchSite: header("sec-fetch-site"),
+          },
+          port(),
+        )
+      ) {
+        sendUpdateError(
+          res,
+          403,
+          "cross-site update refused (this server mutates for loopback clients only)",
+        );
+        return;
+      }
       const body = await readBody(req);
       let payload: Record<string, unknown>;
       try {
@@ -493,4 +589,31 @@ function readBody(req: IncomingMessage, limit = 1024 * 1024): Promise<string> {
     req.on("end", () => resolve(chunks.join("")));
     req.on("error", reject);
   });
+}
+
+/**
+ * Best-effort default-browser launch for `board --serve --open`
+ * (task-board-serve-hardening). `xdg-open` / `open` / `cmd start` per platform,
+ * detached, stdio discarded; spawn errors (missing binary, no desktop session)
+ * are swallowed — the server keeps serving either way, which is what
+ * "best-effort" means here. The launcher is injectable for tests.
+ */
+export function openInBrowser(
+  url: string,
+  platform: string = process.platform,
+  spawnFn: typeof spawn = spawn,
+): boolean {
+  try {
+    const child =
+      platform === "darwin"
+        ? spawnFn("open", [url], { stdio: "ignore", detached: true })
+        : platform === "win32"
+          ? spawnFn("cmd", ["/c", "start", "", url], { stdio: "ignore", detached: true })
+          : spawnFn("xdg-open", [url], { stdio: "ignore", detached: true });
+    child.on("error", () => {}); // best-effort: a failed launch never breaks serving
+    child.unref();
+    return true;
+  } catch {
+    return false;
+  }
 }
