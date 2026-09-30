@@ -28,8 +28,6 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-board-progress-header
 
 ## Acceptance
 
-- [ ] 
-
 ## Notes
 
 ### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
@@ -39,7 +37,7 @@ The board shows per-column counts only; progress per epic/story, blocked items w
 
 ## Acceptance
 
-- [ ] A summary panel computes from the kernel report/aggregation (single source, no copied rules): per-epic completion (done+cancelled/total), blocked count with reasons, in_progress (WIP) count and priority mix
-- [ ] With `--group-by story`, group headers show a completion fraction
-- [ ] Payload stays bounded (computed at render, no per-item bloat); static + serve parity; tests
-- [ ] README + docs/json-output.md updated
+- [x] A summary panel computes from the kernel report/aggregation (single source, no copied rules): per-epic completion (done+cancelled/total), blocked count with reasons, in_progress (WIP) count and priority mix
+- [x] With `--group-by story`, group headers show a completion fraction
+- [x] Payload stays bounded (computed at render, no per-item bloat); static + serve parity; tests
+- [x] README + docs/json-output.md updated
