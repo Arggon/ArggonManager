@@ -730,6 +730,23 @@ export function decisionSectionHasAdrRef(sectionText: string): boolean {
   return false;
 }
 
+/**
+ * Whether a Decision section records an explicit "no ADR needed" decision
+ * (task-exploration-decision-records): a line starting with the exact token
+ * `No ADR required` followed by an em dash, colon or hyphen separator and a
+ * non-empty rationale (`No ADR required — bug-fix, no cross-cutting
+ * decision`). The rationale is mandatory — a bare token or a missing reason
+ * still counts as a pending decision, so the marker cannot be used to
+ * silence the scanner without saying why. Like ADR links, this counts as a
+ * recorded decision for {@link decisionFindings}. Comments are already
+ * stripped by {@link parseDecisionSection}.
+ */
+export function decisionSectionHasNoAdrMarker(sectionText: string): boolean {
+  return sectionText
+    .split(/\r?\n/)
+    .some((line) => /^(?:[-*]\s+)?No ADR required\s*[—:-]\s*\S/.test(line.trim()));
+}
+
 /** Corpus pass over explorations/, adr/ and the spec↔plan pairs. */
 function decisionFindings(root: string): SpecFinding[] {
   const findings: SpecFinding[] = [];
@@ -747,7 +764,11 @@ function decisionFindings(root: string): SpecFinding[] {
     const age = ageDaysFromTodayUtc(isTruthyFrontmatter(data.created));
     if (age === null || age <= DECISION_PENDING_DAYS) continue;
     const section = parseDecisionSection(raw);
-    if (section.text !== undefined && decisionSectionHasAdrRef(section.text)) continue;
+    if (
+      section.text !== undefined &&
+      (decisionSectionHasAdrRef(section.text) || decisionSectionHasNoAdrMarker(section.text))
+    )
+      continue;
     findings.push(
       finding(
         rel,
@@ -755,7 +776,7 @@ function decisionFindings(root: string): SpecFinding[] {
         "warn",
         section.text === undefined
           ? `no Decision section — no decision recorded after ${age} day(s) (threshold ${DECISION_PENDING_DAYS})`
-          : `Decision section records no ADR after ${age} day(s) (threshold ${DECISION_PENDING_DAYS}) — decide and link docs/adr/<NNNN>-<slug>.md, or supersede the exploration`,
+          : `Decision section records no decision after ${age} day(s) (threshold ${DECISION_PENDING_DAYS}) — link docs/adr/<NNNN>-<slug>.md, record "No ADR required — <reason>", or supersede the exploration`,
         section.headingLine,
       ),
     );

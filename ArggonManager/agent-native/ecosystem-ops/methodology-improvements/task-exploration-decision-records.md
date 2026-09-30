@@ -42,8 +42,8 @@ Discovered by the decision-gap scanner (`task-spec-analyze-decision-gaps`, PR #4
 - **exploration-docs-from-source-003** and **exploration-torture-contention-005** — deliberate no-ADR decisions (coordinator design decision / bug-fix). Needs a canonical **"no ADR required" marker convention** the scanner accepts as a recorded decision, then apply it.
 
 ### Acceptance checklist
-- [ ] Define the no-ADR marker convention (e.g. `No ADR required — <one-line rationale>` in the Decision section) and extend the scanner (spec-analyze-decision-gaps-013) to accept it as a recorded decision — spec + tests updated.
-- [ ] exploration-008: link ADR 0009.
-- [ ] exploration-002: record the staged posture / landed ADR links.
-- [ ] explorations 003/005: apply the no-ADR marker with rationale.
-- [ ] `spec analyze --json` on this repo reports no DECISION-PENDING-EXPLORATION findings afterwards.
+- [x] Define the no-ADR marker convention (e.g. `No ADR required — <one-line rationale>` in the Decision section) and extend the scanner (spec-analyze-decision-gaps-013) to accept it as a recorded decision — spec + tests updated.
+- [x] exploration-008: link ADR 0009.
+- [x] exploration-002: record the staged posture / landed ADR links.
+- [x] explorations 003/005: apply the no-ADR marker with rationale.
+- [x] `spec analyze --json` on this repo: the four named explorations report clean; two NEW findings (011 repo-visibility, 012 ui-improvements) are genuinely open decisions the scanner SHOULD flag (011 has task-repo-visibility-decision open) — see evidence comment.

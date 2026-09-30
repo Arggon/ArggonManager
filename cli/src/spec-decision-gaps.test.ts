@@ -15,6 +15,7 @@ import {
   STALE_PROPOSED_DAYS,
   ageDaysFromTodayUtc,
   decisionSectionHasAdrRef,
+  decisionSectionHasNoAdrMarker,
   parseAdrStatusAndDate,
   parseDecisionSection,
   runSpecAnalyze,
@@ -147,6 +148,63 @@ describe("decision-gap parsers", () => {
     expect(decisionSectionHasAdrRef("See [readme](../adr/README.md) and [plan](plan.md).")).toBe(
       false,
     );
+  });
+
+  it("decisionSectionHasNoAdrMarker: true for the canonical marker with a rationale", () => {
+    expect(
+      decisionSectionHasNoAdrMarker("No ADR required — bug-fix, no cross-cutting decision."),
+    ).toBe(true);
+    expect(decisionSectionHasNoAdrMarker("No ADR required: coordinator design decision.")).toBe(
+      true,
+    );
+    expect(
+      decisionSectionHasNoAdrMarker("- No ADR required - superseded by the spec pipeline."),
+    ).toBe(true);
+  });
+
+  it("decisionSectionHasNoAdrMarker: false without the token, the rationale, or line placement", () => {
+    expect(decisionSectionHasNoAdrMarker("No separate ADR — bug fix.")).toBe(false);
+    expect(decisionSectionHasNoAdrMarker("No ADR required")).toBe(false);
+    expect(decisionSectionHasNoAdrMarker("No ADR required —")).toBe(false);
+    expect(decisionSectionHasNoAdrMarker("no adr required — lowercase token does not match")).toBe(
+      false,
+    );
+    expect(decisionSectionHasNoAdrMarker("prose mentioning No ADR required mid-line — no")).toBe(
+      false,
+    );
+  });
+
+  it("does not flag an exploration whose Decision records the no-ADR marker", () => {
+    const dir = makeRepo();
+    writeExploration(
+      dir,
+      "exploration-marked-001.md",
+      daysAgo(30),
+      "No ADR required — deliberate design decision recorded on the task.",
+    );
+    const result = runSpecAnalyze({ cwd: dir });
+    expect(result.decisions.filter((f) => f.kind === "DECISION-PENDING-EXPLORATION")).toEqual([]);
+  });
+
+  it("still flags a marker without a rationale or outside the Decision section", () => {
+    const dir = makeRepo();
+    writeExploration(dir, "exploration-bare-001.md", daysAgo(30), "No ADR required");
+    writeExploration(dir, "exploration-outside-001.md", daysAgo(30), "pending decision here");
+    const path = join(dir, "docs", "explorations", "exploration-outside-001.md");
+    writeFileSync(
+      path,
+      `${readFileSync(path, "utf8")}\n## Notes\n\nNo ADR required — wrong section, still pending.\n`,
+      "utf8",
+    );
+    const result = runSpecAnalyze({ cwd: dir });
+    const files = result.decisions
+      .filter((f) => f.kind === "DECISION-PENDING-EXPLORATION")
+      .map((f) => f.file)
+      .sort();
+    expect(files).toEqual([
+      "docs/explorations/exploration-bare-001.md",
+      "docs/explorations/exploration-outside-001.md",
+    ]);
   });
 
   it("ageDaysFromTodayUtc: whole days to today UTC, null on missing/malformed", () => {

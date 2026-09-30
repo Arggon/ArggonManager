@@ -1,7 +1,7 @@
 ---
 exploration_id: product-discovery-002
 title: "Product discovery: ecosystem survey and ranked feature candidates"
-status: open
+status: decided
 created: 2026-09-15
 ---
 
@@ -29,25 +29,25 @@ What "better" means for ArggonManager, weighted:
 
 ## Candidates (landscape)
 
-| Tool / practice | Quadrant | One-line differentiator | Dated source |
-| --- | --- | --- | --- |
-| Beads (`bd`) | Agent-native tracker | Git-backed SQL/Dolt issue tracker pitched as agent *memory* with an enforced dependency graph ("ready work" computation) | steve-yegge.medium.com (accessed 2026-09-15); beads.gascity.com |
-| Backlog.md | Agent-native tracker | In-repo Markdown tasks + bundled Claude Code agent that writes implementation plans and notes back into tasks | gorannikolovski.com/blog (2026-09-15) |
-| claude-task-master | Agent-native tracker | PRD-driven: generates a dependency-ordered task list from a product-requirements doc | github.com/eyaltoledano/claude-task-master (2026-09-15) |
-| Linear × Copilot cloud agent | Agent-native tracker | Assign a hosted issue to a coding agent; agent opens a draft PR; issue→PR association is first-class | github.blog changelog 2026-07-23 |
-| GitHub Issues + coding agents | Agent-native tracker | Agents assigned from GitHub Issues, Azure Boards, Jira; planning context travels with the agent | github.com/features/copilot/agents (2026-09-15) |
-| Vibe Kanban | Worktree orchestration | Kanban orchestrator: parallelize agents across git worktrees, review agent diffs before merge | vibekanban.com (via search, 2026-09-15) |
-| Conductor | Worktree orchestration | macOS UI: one worktree+branch per Claude Code/Codex agent, dashboard + diff-first review | madewithlove.com/blog (2026-09-15) |
-| Claude Squad / CodeAgentSwarm | Worktree orchestration | Terminal-native worktree orchestration; agents read/update the board via MCP | codeagentswarm.com (2026-09-15) |
-| Terragon | Worktree orchestration | Cloud execution: agents run remotely instead of on local worktrees | nimbalyst.com/blog (2026-09-15) |
-| GitHub Spec Kit | Spec-driven kit | Phase-gated SDD: constitution → specify → **clarify** → plan → tasks → implement → analyze (cross-artifact consistency) | github.com/github/spec-kit (2026-09-15) |
-| OpenSpec | Spec-driven kit | Lightweight **change proposals**: proposal + spec deltas + tasks per change, archived back into source-of-truth specs | github.com/Fission-AI/openspec (2026-09-15) |
-| Kiro | Spec-driven kit | Purpose-built IDE where specs are referenceable documents steering the agent (vs in-repo markdown) | dev.to/filiksyos (2026-09-15) |
-| llms.txt | Context engineering | Site-level agent-readable doc index; still a community convention, contested value for LLM providers | llmstxt.org; buildwithfern.com May 2026 guide (accessed 2026-09-15) |
-| AGENTS.md convention | Context engineering | De facto repo-level agent-instructions standard; complementary to llms.txt | quattr.com comparison (2026-09-15) |
-| MCP progress notifications | Context engineering | Long-running MCP tools emit async progress events; real-world adoption issues documented | ACM dl.acm.org/doi/10.1145/3786161.3788462 (2026-09-15) |
-| MCP context-overload design | Context engineering | Server design guidance: minimize context surfaced per tool call; reranking/filtering clients | itential.com; contextual.ai/blog (2026-09-15) |
-| Agent memory / compaction | Context engineering | Structured persistent memory replacing ad-hoc PLAN.md files; agents resume exactly where they left off | beads docs + ANU comp4020 task-tracking notes (2026-09-15) |
+| Tool / practice               | Quadrant               | One-line differentiator                                                                                                  | Dated source                                                        |
+| ----------------------------- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------- |
+| Beads (`bd`)                  | Agent-native tracker   | Git-backed SQL/Dolt issue tracker pitched as agent _memory_ with an enforced dependency graph ("ready work" computation) | steve-yegge.medium.com (accessed 2026-09-15); beads.gascity.com     |
+| Backlog.md                    | Agent-native tracker   | In-repo Markdown tasks + bundled Claude Code agent that writes implementation plans and notes back into tasks            | gorannikolovski.com/blog (2026-09-15)                               |
+| claude-task-master            | Agent-native tracker   | PRD-driven: generates a dependency-ordered task list from a product-requirements doc                                     | github.com/eyaltoledano/claude-task-master (2026-09-15)             |
+| Linear × Copilot cloud agent  | Agent-native tracker   | Assign a hosted issue to a coding agent; agent opens a draft PR; issue→PR association is first-class                     | github.blog changelog 2026-07-23                                    |
+| GitHub Issues + coding agents | Agent-native tracker   | Agents assigned from GitHub Issues, Azure Boards, Jira; planning context travels with the agent                          | github.com/features/copilot/agents (2026-09-15)                     |
+| Vibe Kanban                   | Worktree orchestration | Kanban orchestrator: parallelize agents across git worktrees, review agent diffs before merge                            | vibekanban.com (via search, 2026-09-15)                             |
+| Conductor                     | Worktree orchestration | macOS UI: one worktree+branch per Claude Code/Codex agent, dashboard + diff-first review                                 | madewithlove.com/blog (2026-09-15)                                  |
+| Claude Squad / CodeAgentSwarm | Worktree orchestration | Terminal-native worktree orchestration; agents read/update the board via MCP                                             | codeagentswarm.com (2026-09-15)                                     |
+| Terragon                      | Worktree orchestration | Cloud execution: agents run remotely instead of on local worktrees                                                       | nimbalyst.com/blog (2026-09-15)                                     |
+| GitHub Spec Kit               | Spec-driven kit        | Phase-gated SDD: constitution → specify → **clarify** → plan → tasks → implement → analyze (cross-artifact consistency)  | github.com/github/spec-kit (2026-09-15)                             |
+| OpenSpec                      | Spec-driven kit        | Lightweight **change proposals**: proposal + spec deltas + tasks per change, archived back into source-of-truth specs    | github.com/Fission-AI/openspec (2026-09-15)                         |
+| Kiro                          | Spec-driven kit        | Purpose-built IDE where specs are referenceable documents steering the agent (vs in-repo markdown)                       | dev.to/filiksyos (2026-09-15)                                       |
+| llms.txt                      | Context engineering    | Site-level agent-readable doc index; still a community convention, contested value for LLM providers                     | llmstxt.org; buildwithfern.com May 2026 guide (accessed 2026-09-15) |
+| AGENTS.md convention          | Context engineering    | De facto repo-level agent-instructions standard; complementary to llms.txt                                               | quattr.com comparison (2026-09-15)                                  |
+| MCP progress notifications    | Context engineering    | Long-running MCP tools emit async progress events; real-world adoption issues documented                                 | ACM dl.acm.org/doi/10.1145/3786161.3788462 (2026-09-15)             |
+| MCP context-overload design   | Context engineering    | Server design guidance: minimize context surfaced per tool call; reranking/filtering clients                             | itential.com; contextual.ai/blog (2026-09-15)                       |
+| Agent memory / compaction     | Context engineering    | Structured persistent memory replacing ad-hoc PLAN.md files; agents resume exactly where they left off                   | beads docs + ANU comp4020 task-tracking notes (2026-09-15)          |
 
 ## Findings
 
@@ -57,7 +57,7 @@ Facts learned, each with a dated source (all accessed 2026-09-15):
   Backlog.md, HN debate on Markdown trackers) — ArggonManager's core bet is
   now mainstream, not contrarian. (news.ycombinator.com/item?id=46487580)
 - **Dependency graphs are table stakes.** Beads' core pitch is an enforced
-  "depends on" tree so agents always know what is *ready*; ArggonManager has
+  "depends on" tree so agents always know what is _ready_; ArggonManager has
   `depends_on` + `next --ready` but dependencies are advisory and the
   `next` suggestion is lexicographic, not graph-ranked. (steve-yegge.medium.com)
 - **The "tracker as agent memory" framing** (ephemeral working memory vs the
@@ -65,7 +65,7 @@ Facts learned, each with a dated source (all accessed 2026-09-15):
   "one tracker for both". (comp.anu.edu.au task-tracking)
 - **Issue→agent→PR association is a product surface** (Linear+Copilot GA
   2026-07-23): assign → analyze → draft PR, with status flowing back.
-  ArggonManager has `import-issues` + `Closes #N` but no *live* issue
+  ArggonManager has `import-issues` + `Closes #N` but no _live_ issue
   assignment or status round-trip. (github.blog 2026-07-23)
 - **Spec-kit's phase gates include a machine-driven clarify step and
   cross-artifact consistency analysis** (`/clarify`, `/analyze`);
@@ -74,7 +74,7 @@ Facts learned, each with a dated source (all accessed 2026-09-15):
   (github.com/github/spec-kit quickstart)
 - **OpenSpec's change-proposal pattern** (per-change folder: proposal, spec
   deltas, tasks, then archive) maps closely onto ArggonManager's
-  story→task tree plus `spec new`, but OpenSpec versions *spec deltas* per
+  story→task tree plus `spec new`, but OpenSpec versions _spec deltas_ per
   change — ArggonManager specs are single-file, no delta/supersede workflow
   beyond a `superseded` status. (github.com/Fission-AI/openspec)
 - **Orchestration tools differentiate on review UX** (diff-first review,
@@ -108,20 +108,20 @@ Facts learned, each with a dated source (all accessed 2026-09-15):
 
 Rank = (evidence strength) × (principle alignment) ÷ (effort). Surfaces: docs / CLI / MCP / board.
 
-| # | Candidate | Problem solved | Evidence (dated) | Effort | Principle / ADR | Surface |
-| --- | --- | --- | --- | --- | --- | --- |
-| 1 | **MCP tool parity: `next`, `show`, `report`, `validate`** | MCP-only agents fall back to raw file reads (unbounded context) or cannot get a suggestion at all — the ADR-0006 win of `next`-first guidance stops at the CLI | Board/orchestrator tools ship MCP board access as the agent surface (codeagentswarm.com, 2026-09-15); ADR 0006 measured MCP at 4 tools | M | token-context (ADR 0006) | MCP (+CLI parity tests) |
-| 2 | **Dependency-weighted `next` ranking** | Lexicographic-first `next` ignores graph shape; agents pick arbitrary ready work instead of unblocking the most downstream items | Beads' core differentiator is enforced ready-work computation (steve-yegge.medium.com, 2026-09-15) | S | architecture-first; token-context (one right answer) | CLI |
-| 3 | **Spec clarify / consistency check (`spec analyze`)** | Specs pass structural validation yet stay ambiguous; agents implement guesses. A checklist-driven ambiguity scan + spec↔tasks cross-check closes the loop Spec Kit proven valuable | Spec Kit `/clarify` + `/analyze` (github.com/github/spec-kit, 2026-09-15) | M | architecture-first | CLI |
-| 4 | **Spec deltas / supersede workflow** | Changing a spec silently rewrites the file; no record of what changed per work item. OpenSpec's per-change proposal+delta+archive keeps source-of-truth specs versioned by change | github.com/Fission-AI/openspec (2026-09-15) | M | architecture-first; repo-is-truth | CLI (docs/specs layout) |
-| 5 | **PRD/epic → task-tree generation** | Greenfield epics need manual task decomposition; a PRD file → draft dependency-ordered task tree (status `todo`, human/agent reviews then claims) removes a repetitive planning step | claude-task-master's core workflow (github.com/eyaltoledano/claude-task-master, 2026-09-15) | M | architecture-first; same-rules (draft is reviewable in git) | CLI |
-| 6 | **Board review surface: per-item PR status + diff link** | Cards show PR badge only with `--github`; a standing `--serve` board with PR state, checks, and diff links makes the board the review cockpit orchestration tools compete on | Vibe Kanban / Conductor diff-first review (vibekanban.com, madewithlove.com, 2026-09-15) | M | cheap-infra (reuse gh read path) | board |
-| 7 | **GitHub issue round-trip (`sync` deepening)** | `import-issues` is one-shot; items can't push status back to a linked issue on `done` (`gh issue close` via the recorded `issue` field), so dual-tracker teams drift | Linear×Copilot issue→PR→status flow (github.blog, 2026-07-23) | S | same-rules; repo-is-truth (issue id already in frontmatter) | CLI |
-| 8 | **`arggon handoff` structured resume note** | Session end loses working state; a command that appends a structured handoff comment (current branch, next step, open questions) makes Beads-style "resume exactly where you left off" a tracker feature | Beads memory framing (beads.gascity.com, 2026-09-15); ArggonManager `comment` is freeform only | S | token-context (bounded, structured vs prose) | CLI + MCP |
-| 9 | **Board/TUI dependency rendering + `--group-by story`** | Board cards show deps as text lines but no visual blocking (greyed-out blocked cards); TUI has no dependency awareness at all | Agent Kanban dependency visuals (agent-kanban.dev, 2026-09-15) | S | cheap-infra | board / TUI |
-| 10 | **`arggon doctor --budget` re-measure + ADR 0006 verify** | ADR 0006 promised re-measurement after directions 1–4 land; without a repeatable measurement command the budget claim can drift | ADR 0006 consequences (2026-09-14); context-overload design guidance (itential.com, 2026-09-15) | S | token-context (ADR 0006) | CLI |
-| 11 | **Generated `llms.txt`-style docs index** | Adopter repos have 10+ generated docs; a one-page index (path × audience × size) helps both agents and humans route reads. Low priority: AGENTS.md already serves the repo-level role and llms.txt itself is contested | llms.txt status (llmstxt.org + cdp.com, 2026-09-15) | S | token-context | docs/CLI (init output) |
-| 12 | **Cloud/remote execution hook** | Terragon-style remote agents need a way to record "this item runs elsewhere"; a `worktree_path`-like remote URL field + cleanup awareness | Terragon cloud execution (nimbalyst.com, 2026-09-15) | M | cheap-infra (still files-in-git) | CLI |
+| #   | Candidate                                                 | Problem solved                                                                                                                                                                                                         | Evidence (dated)                                                                                                                       | Effort | Principle / ADR                                             | Surface                 |
+| --- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------ | ----------------------------------------------------------- | ----------------------- |
+| 1   | **MCP tool parity: `next`, `show`, `report`, `validate`** | MCP-only agents fall back to raw file reads (unbounded context) or cannot get a suggestion at all — the ADR-0006 win of `next`-first guidance stops at the CLI                                                         | Board/orchestrator tools ship MCP board access as the agent surface (codeagentswarm.com, 2026-09-15); ADR 0006 measured MCP at 4 tools | M      | token-context (ADR 0006)                                    | MCP (+CLI parity tests) |
+| 2   | **Dependency-weighted `next` ranking**                    | Lexicographic-first `next` ignores graph shape; agents pick arbitrary ready work instead of unblocking the most downstream items                                                                                       | Beads' core differentiator is enforced ready-work computation (steve-yegge.medium.com, 2026-09-15)                                     | S      | architecture-first; token-context (one right answer)        | CLI                     |
+| 3   | **Spec clarify / consistency check (`spec analyze`)**     | Specs pass structural validation yet stay ambiguous; agents implement guesses. A checklist-driven ambiguity scan + spec↔tasks cross-check closes the loop Spec Kit proven valuable                                     | Spec Kit `/clarify` + `/analyze` (github.com/github/spec-kit, 2026-09-15)                                                              | M      | architecture-first                                          | CLI                     |
+| 4   | **Spec deltas / supersede workflow**                      | Changing a spec silently rewrites the file; no record of what changed per work item. OpenSpec's per-change proposal+delta+archive keeps source-of-truth specs versioned by change                                      | github.com/Fission-AI/openspec (2026-09-15)                                                                                            | M      | architecture-first; repo-is-truth                           | CLI (docs/specs layout) |
+| 5   | **PRD/epic → task-tree generation**                       | Greenfield epics need manual task decomposition; a PRD file → draft dependency-ordered task tree (status `todo`, human/agent reviews then claims) removes a repetitive planning step                                   | claude-task-master's core workflow (github.com/eyaltoledano/claude-task-master, 2026-09-15)                                            | M      | architecture-first; same-rules (draft is reviewable in git) | CLI                     |
+| 6   | **Board review surface: per-item PR status + diff link**  | Cards show PR badge only with `--github`; a standing `--serve` board with PR state, checks, and diff links makes the board the review cockpit orchestration tools compete on                                           | Vibe Kanban / Conductor diff-first review (vibekanban.com, madewithlove.com, 2026-09-15)                                               | M      | cheap-infra (reuse gh read path)                            | board                   |
+| 7   | **GitHub issue round-trip (`sync` deepening)**            | `import-issues` is one-shot; items can't push status back to a linked issue on `done` (`gh issue close` via the recorded `issue` field), so dual-tracker teams drift                                                   | Linear×Copilot issue→PR→status flow (github.blog, 2026-07-23)                                                                          | S      | same-rules; repo-is-truth (issue id already in frontmatter) | CLI                     |
+| 8   | **`arggon handoff` structured resume note**               | Session end loses working state; a command that appends a structured handoff comment (current branch, next step, open questions) makes Beads-style "resume exactly where you left off" a tracker feature               | Beads memory framing (beads.gascity.com, 2026-09-15); ArggonManager `comment` is freeform only                                         | S      | token-context (bounded, structured vs prose)                | CLI + MCP               |
+| 9   | **Board/TUI dependency rendering + `--group-by story`**   | Board cards show deps as text lines but no visual blocking (greyed-out blocked cards); TUI has no dependency awareness at all                                                                                          | Agent Kanban dependency visuals (agent-kanban.dev, 2026-09-15)                                                                         | S      | cheap-infra                                                 | board / TUI             |
+| 10  | **`arggon doctor --budget` re-measure + ADR 0006 verify** | ADR 0006 promised re-measurement after directions 1–4 land; without a repeatable measurement command the budget claim can drift                                                                                        | ADR 0006 consequences (2026-09-14); context-overload design guidance (itential.com, 2026-09-15)                                        | S      | token-context (ADR 0006)                                    | CLI                     |
+| 11  | **Generated `llms.txt`-style docs index**                 | Adopter repos have 10+ generated docs; a one-page index (path × audience × size) helps both agents and humans route reads. Low priority: AGENTS.md already serves the repo-level role and llms.txt itself is contested | llms.txt status (llmstxt.org + cdp.com, 2026-09-15)                                                                                    | S      | token-context                                               | docs/CLI (init output)  |
+| 12  | **Cloud/remote execution hook**                           | Terragon-style remote agents need a way to record "this item runs elsewhere"; a `worktree_path`-like remote URL field + cleanup awareness                                                                              | Terragon cloud execution (nimbalyst.com, 2026-09-15)                                                                                   | M      | cheap-infra (still files-in-git)                            | CLI                     |
 
 ## Evaluated and rejected
 
@@ -129,14 +129,14 @@ Scope discipline is part of this deliverable:
 
 - **Hosted tracker/SaaS board (multi-tenant, accounts, server state)** —
   rejected: violates README principle "repo is source of truth" and the
-  cheap-infra principle (ADR 0005); the whole field is moving *toward*
+  cheap-infra principle (ADR 0005); the whole field is moving _toward_
   files-in-git, away from this.
 - **Agent execution engine (spawn/manage coding agents, like Conductor or
   Vibe Kanban's runners)** — rejected: out of scope for a tracker; heavy,
   platform-specific, and duplicated by Claude Squad/Vibe Kanban.
   ArggonManager's lane is the shared tracker those tools can read.
 - **Cloud remote execution service (Terragon-style)** — rejected as a
-  product; candidate 12 covers only the *tracker-side record* of remote work.
+  product; candidate 12 covers only the _tracker-side record_ of remote work.
 - **Kiro-style purpose-built IDE / GUI app** — rejected: contradicts
   cheap-infra and the CLI-first architecture; the board HTML already covers
   visual needs at zero infra.
@@ -153,7 +153,7 @@ Scope discipline is part of this deliverable:
   (ACM, 2026-09-15) suggest waiting until a genuinely long-running tool
   exists.
 - **SQL/database-backed tracker (Beads-style Dolt store)** — rejected:
-  markdown files *are* the audit trail and the differentiator; a binary DB
+  markdown files _are_ the audit trail and the differentiator; a binary DB
   breaks diffability, review, and "files over forms".
 
 ## Next-cycle candidates (file first, in order)
@@ -181,7 +181,9 @@ list above as the standing scope boundary for future discovery passes.
 
 ## Decision
 
-ADR placeholder: docs/adr/0000-<slug>.md (this is a research item — the
-coordinator files follow-up items after review; no ADR is required for the
-research itself, but any candidate that becomes an accepted direction
-deserves one).
+No ADR required — this exploration is a staged research backlog, not a single
+decision; the coordinator files follow-up items after review, and each adopted
+candidate lands its own ADR. ADRs adopted from this line so far:
+[ADR 0005](../adr/0005-cheap-path-to-prod.md) (deployment guidance),
+[ADR 0006](../adr/0006-token-context-efficiency.md) (token/context budget),
+[ADR 0007](../adr/0007-mcp-2026-07-28-adoption.md) (MCP posture).
