@@ -28,7 +28,6 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-ui-docs-refresh
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 
@@ -42,7 +41,7 @@ Two doc drifts found during wave-2 reviews:
 
 ## Acceptance
 
-- [ ] `cli/README.md` board paragraph documents `/api/item` (serve-only, kernel bounded read, read-only, `?id=` contract)
-- [ ] `ArggonManager/docs/engineering.md` §Smoke test + `CONTRIBUTING.md` UI-smoke section describe the current `smoke:tui-board` steps and assertions
-- [ ] Grep the changed phrases across `README.md`, `docs/`, `cli/README.md` — no other statement becomes false
-- [ ] Docs-only PR; `cli` check green
+- [x] `cli/README.md` board paragraph documents `/api/item` (serve-only, kernel bounded read, read-only, `?id=` contract)
+- [x] `ArggonManager/docs/engineering.md` §Smoke test + `CONTRIBUTING.md` UI-smoke section describe the current `smoke:tui-board` steps and assertions
+- [x] Grep the changed phrases across `README.md`, `docs/`, `cli/README.md` — no other statement becomes false
+- [x] Docs-only PR; `cli` check green
