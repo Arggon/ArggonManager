@@ -1,13 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-native-panel-refresh-filter
 title: "OpenCode panel: live refresh, fold/filter and paging"
+assignee: Arggon
 parent: ui-native-panel-v2
 labels: [opencode-seam, tui, ui]
 priority: p3
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T20:26:26.146Z"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-native-panel-v2/task-native-panel-refresh-filter.md
