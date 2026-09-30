@@ -16,6 +16,10 @@ note: |
   namespace: ARGON_TOOL_NAMESPACE and codemode: true. Deliberate computed,
   destructured, or otherwise indirect aliases are outside structural scope; the
   plugin's schema/parity tests remain authoritative.
+  Receiver names are structural anchors with the same limitation: a renamed but
+  type-valid receiver (toolEditor.add beside a real ToolEditor) is not covered,
+  because generic $X.add shapes would reintroduce generic-name false positives.
+  Plugin schema/parity tests remain the authoritative check there too.
 files:
   - "opencode/plugins/arggon/**/*.ts"
   - "opencode/plugins/arggon/**/*.tsx"
