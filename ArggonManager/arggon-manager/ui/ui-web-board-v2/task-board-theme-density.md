@@ -1,13 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-board-theme-density
 title: Web board dark mode and density toggle
+assignee: Arggon
 parent: ui-web-board-v2
 labels: [viewer, board, ui]
 priority: p2
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T20:26:23.183Z"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-theme-density.md
