@@ -8,9 +8,12 @@
  * `smoke/tui-smoke.ts`) and drives a bounded scripted session: the board frame
  * (five status headers + the seeded item id) → `/` filter down to the seeded
  * task → Enter opens its read-only detail pane (acceptance rows + body) →
- * PgDn scrolls the pane → Esc returns to the board with the same selection and
- * filter → q. A regression net for the raw-ANSI renderer without a model in
- * the loop.
+ * PgDn scrolls the pane, DELIVERED AS TWO PTY WRITES so the escape sequence
+ * is split across stdin chunks (bug-tui-split-escape-sequences: the decoder
+ * must reassemble it instead of leaking a phantom Esc that closes the pane
+ * and clears the filter) → Esc returns to the board with the same selection
+ * and filter → q. A regression net for the raw-ANSI renderer without a model
+ * in the loop.
  *
  * Bounded by design. Exit codes: 0 — passed or `skipped:` (util-linux `script`
  * unavailable); 1 — a check failed (the fixture is kept).
@@ -205,6 +208,11 @@ type TuiStep = {
   label: string;
   until: (capture: string) => boolean;
   send: string;
+  /**
+   * Optional snapshot taken at send time (before the bytes hit the pty), so a
+   * later step can predicate on frames drawn after this write.
+   */
+  onSend?: (capture: string) => void;
 };
 
 type StepResult = {
@@ -216,7 +224,9 @@ type StepResult = {
 
 /**
  * Drive `board --tui` in a PTY through the seeded session: board frame →
- * filter down to the seeded task → open the pane → page it → Esc back with the
+ * filter down to the seeded task → open the pane → PgDn SPLIT ACROSS TWO PTY
+ * WRITES (bug-tui-split-escape-sequences: the partial `\x1b[6` must be held,
+ * not consumed as Esc) → the split PgDn pages the pane → Esc back with the
  * selection and filter intact → quit. Returns the raw capture plus one result
  * per step; a timeout marks that step failed.
  */
@@ -238,6 +248,13 @@ function runTui(fixture: string): Promise<{ capture: string; steps: StepResult[]
       },
     );
     const steps: StepResult[] = [];
+    // Frames the TUI has drawn so far: the loop re-renders after EVERY stdin
+    // chunk (even one that holds no complete key), so a frame drawn after the
+    // partial write proves the pty delivered it as its own chunk — that is
+    // what makes the split-PgDn steps below a real split, not a coalesced
+    // write that would exercise the whole-sequence path instead.
+    const countFrames = (capture: string): number => capture.split("\x1b[H\x1b[2J").length - 1;
+    let framesAtSplit = -1;
     const stepDefs: TuiStep[] = [
       {
         label: "board frame (five status headers + seeded item)",
@@ -262,10 +279,24 @@ function runTui(fixture: string): Promise<{ capture: string; steps: StepResult[]
       {
         label: "detail pane (acceptance rows + body)",
         until: (capture) => missingDetailMarkers(lastFrame(capture), SEEDED_ITEM_ID).length === 0,
-        send: "\x1b[6~", // PgDn: one pane page
+        // PgDn split across pty writes: intro + parameter byte only, no final
+        // byte. The decoder must hold it, not consume the ESC as Esc (which
+        // would close the pane — and a second Esc would clear the filter).
+        onSend: (capture) => {
+          framesAtSplit = countFrames(capture);
+        },
+        send: "\x1b[6",
       },
       {
-        label: "pane scrolled one page",
+        label: "pane held open at row 1 while the CSI is incomplete",
+        until: (capture) =>
+          countFrames(capture) > framesAtSplit &&
+          lastFrame(capture).includes("arggon detail") &&
+          panePosition(lastFrame(capture))?.row === 1,
+        send: "~", // second half: completes the PgDn
+      },
+      {
+        label: "pane scrolled one page by the split PgDn",
         until: (capture) => (panePosition(lastFrame(capture))?.row ?? 0) > 1,
         send: "\x1b", // Esc: back to the board
       },
@@ -302,6 +333,7 @@ function runTui(fixture: string): Promise<{ capture: string; steps: StepResult[]
         steps.push({ label: active.label, ok: true, frame: lastFrame(capture) });
         stepIndex += 1;
         stepDeadline = Date.now() + STEP_TIMEOUT_MS;
+        active.onSend?.(capture);
         child.stdin.write(active.send);
       }
     };

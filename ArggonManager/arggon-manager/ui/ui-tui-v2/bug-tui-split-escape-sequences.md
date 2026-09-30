@@ -28,8 +28,6 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-tui-split-escape-sequence
 
 ## Acceptance
 
-- [ ] 
-
 ## Notes
 
 ### 2026-09-23 @ses_f34ba048bffeDqO6XhG0C62Nw6
@@ -41,7 +39,7 @@ Pre-existing behavior (the original parser had the same per-chunk assumption), k
 
 ## Acceptance
 
-- [ ] A stateful decoder buffers an incomplete trailing escape sequence across chunks instead of consuming it as Esc; a genuinely lone `ESC` still acts as Esc when no continuation follows
-- [ ] Regression test: a PgDn (or Home/End) split across two `onData` chunks scrolls instead of clearing the filter; a lone `ESC` keeps its current semantics
-- [ ] No regression in the existing key tests or the pty frame check (`npm run smoke:tui-board`)
-- [ ] pty evidence in the verdict (split-key scenario reproduced before/after)
+- [x] A stateful decoder buffers an incomplete trailing escape sequence across chunks instead of consuming it as Esc; a genuinely lone `ESC` still acts as Esc when no continuation follows
+- [x] Regression test: a PgDn (or Home/End) split across two `onData` chunks scrolls instead of clearing the filter; a lone `ESC` keeps its current semantics
+- [x] No regression in the existing key tests or the pty frame check (`npm run smoke:tui-board`)
+- [x] pty evidence in the verdict (split-key scenario reproduced before/after)
