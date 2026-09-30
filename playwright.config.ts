@@ -9,6 +9,14 @@ import { defineConfig } from "@playwright/test";
  */
 export default defineConfig({
   testDir: "e2e",
+  // bug-worktree-link-farm-breaks-playwright-runner: in a `start --worktree`
+  // checkout node_modules is a link farm, and node's default resolution
+  // realpaths the symlinked packages so the runner and the specs' import of
+  // @playwright/test load two distinct module instances ("Playwright Test did
+  // not expect test.describe() to be called here"). preserveSymlinks keeps
+  // every resolution on the worktree's own paths — one instance everywhere —
+  // and is a no-op in normal checkouts and CI.
+  preserveSymlinks: true,
   timeout: 60_000,
   expect: { timeout: 10_000 },
   retries: process.env.CI ? 1 : 0,

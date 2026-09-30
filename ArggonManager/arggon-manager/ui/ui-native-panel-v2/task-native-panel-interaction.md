@@ -3,6 +3,7 @@ type: task
 status: in_progress
 id: task-native-panel-interaction
 title: "OpenCode panel: selection, detail and next/active jumps"
+assignee: Arggon
 parent: ui-native-panel-v2
 labels: [opencode-seam, tui, ui]
 priority: p2
