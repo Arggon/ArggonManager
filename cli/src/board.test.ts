@@ -21,6 +21,7 @@ import {
   summarizeChecks,
   trapBoardFocus,
   wireBoardDetail,
+  wireBoardColumns,
   wireBoardKeyboardNav,
   wireBoardMoveMenu,
   type BoardLensItem,
@@ -1069,5 +1070,71 @@ describe("runBoard --group-by story (task-board-dependency-visuals)", () => {
     expect(() => runBoard({ cwd: dir, groupBy: "priority" })).toThrow(
       /unknown --group-by field 'priority' \(supported: milestone, story\)/,
     );
+  });
+});
+
+describe("column controls (task-board-column-controls)", () => {
+  // Static and serve must behave the same, so the assertions run on both
+  // renders: the plain static export and the serve-mode (details) page.
+  const renders = () => [
+    ["static", renderBoardHtml([], { generatedAt: GENERATED_AT })] as const,
+    [
+      "serve",
+      renderBoardHtml([], { generatedAt: GENERATED_AT, details: true, live: true }),
+    ] as const,
+  ];
+
+  it("renders a collapse toggle in every column heading, count badge beside it", () => {
+    for (const [mode, html] of renders()) {
+      for (const status of ["todo", "in_progress", "blocked", "done", "cancelled"]) {
+        const heading = `<h2 id="board-column-${status}">${status}`;
+        expect(html, mode).toContain(heading);
+        expect(html, mode).toContain(
+          `<button type="button" class="col-toggle" data-status="${status}" aria-expanded="true" aria-label="collapse the ${status} column">&ndash;</button>`,
+        );
+      }
+      // The count badge stays inside the heading: visible when collapsed.
+      expect(html, mode).toMatch(
+        /<span class="count">\d+<\/span><button type="button" class="col-toggle"/,
+      );
+    }
+  });
+
+  it("renders the terminal-column toggle and the layout reset in the filterbar", () => {
+    for (const [mode, html] of renders()) {
+      expect(html, mode).toContain(
+        '<button type="button" id="board-terminal-toggle" class="layout-toggle" aria-pressed="false">hide done/cancelled</button>',
+      );
+      expect(html, mode).toContain(
+        '<button type="button" id="board-layout-reset" class="layout-toggle">reset layout</button>',
+      );
+    }
+  });
+
+  it("keeps headers sticky and pins the collapsed/terminal-hidden CSS", () => {
+    for (const [mode, html] of renders()) {
+      expect(html, mode).toContain("position: sticky; top: 0; z-index: 5;");
+      expect(html, mode).toContain(".column.collapsed .card");
+      expect(html, mode).toContain(".column.terminal-hidden { display: none; }");
+    }
+  });
+
+  it("embeds wireBoardColumns and calls it in every board's script", () => {
+    for (const [mode, html] of renders()) {
+      expect(html, mode).toContain(wireBoardColumns.toString());
+      expect(html, mode).toContain(
+        "wireBoardColumns(keyboardNav ? keyboardNav.ensureAnchor : null);",
+      );
+    }
+  });
+
+  it("pins the localStorage key and the corrupt-storage default fallback", () => {
+    const source = wireBoardColumns.toString();
+    expect(source).toContain('"arggon-board-columns-v1"');
+    expect(source).toContain("localStorage.getItem");
+    expect(source).toContain("localStorage.setItem");
+    // Corrupt or missing storage degrades to the default layout. Whitespace
+    // varies between the tsc build and the tsx test transform, so match loose.
+    expect(source).toMatch(/collapsed:\s*\[\],\s*terminalHidden:\s*false/);
   });
 });
