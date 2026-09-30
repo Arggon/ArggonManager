@@ -615,6 +615,9 @@ test.describe("@smoke board --serve", () => {
     // dependency states and the hostile body line as literal text.
     await expect(drawer.locator(".drawer-acceptance .drawer-check")).toHaveCount(2);
     await expect(drawer.locator(".drawer-acceptance .drawer-check input:checked")).toHaveCount(1);
+    // The drawer-over-embedded-snapshot state is scanned too (the acceptance
+    // row count above is the readiness signal) — same gate, file:// document.
+    await axeScan(page);
     await expect(drawer.locator(".drawer-deps .drawer-dep.open")).toHaveText(
       `${DETAIL_DEP_ID} · todo`,
     );
