@@ -10,7 +10,6 @@ labels: [accessibility, ui, board]
 priority: p2
 created: "2026-09-29"
 updated: "2026-09-30"
-worktree_path: /home/arggon/Projects/ArggonManager-task-board-non-text-contrast-and-drag-affordance
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-non-text-contrast-and-drag-affordance.md

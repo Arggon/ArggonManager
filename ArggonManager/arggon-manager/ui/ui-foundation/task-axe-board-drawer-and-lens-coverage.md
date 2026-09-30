@@ -10,7 +10,6 @@ labels: [accessibility, playwright, ci, ui]
 priority: p2
 created: "2026-09-29"
 updated: "2026-09-30"
-worktree_path: /home/arggon/Projects/ArggonManager-task-axe-board-drawer-and-lens-coverage
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-axe-board-drawer-and-lens-coverage.md

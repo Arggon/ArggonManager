@@ -11,7 +11,6 @@ priority: p3
 created: "2026-09-28"
 updated: "2026-09-30"
 depends_on: [task-ast-grep-structural-rules]
-worktree_path: /home/arggon/Projects/ArggonManager-task-ast-grep-authoring-and-receiver-scope
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/task-ast-grep-authoring-and-receiver-scope.md

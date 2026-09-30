@@ -10,7 +10,6 @@ labels: [viewer, board, security, ui]
 priority: p3
 created: "2026-09-22"
 updated: "2026-09-30"
-worktree_path: /home/arggon/Projects/ArggonManager-task-board-serve-hardening
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-serve-hardening.md

@@ -10,7 +10,6 @@ labels: [tui, ui]
 priority: p3
 created: "2026-09-22"
 updated: "2026-09-30"
-worktree_path: /home/arggon/Projects/ArggonManager-task-tui-help-vim-keys
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-tui-v2/task-tui-help-vim-keys.md
