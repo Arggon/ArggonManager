@@ -1,16 +1,22 @@
 #!/usr/bin/env node
 /**
- * task-ui-browser-smoke-ci / task-tui-detail-pane: model-free TUI frame check.
+ * task-ui-browser-smoke-ci / task-tui-detail-pane / task-tui-live-refresh:
+ * model-free TUI frame check.
  *
  * `arggon board --tui` is interactive and no browser automation applies
  * (ADR 0008: the TUI smoke is a scripted pty render check). This harness runs
  * the built CLI in a real PTY (util-linux `script`, the same bridge as
  * `smoke/tui-smoke.ts`) and drives a bounded scripted session: the board frame
- * (five status headers + the seeded item id) → `/` filter down to the seeded
+ * (five status headers + the seeded item id + the footer freshness stamp) →
+ * a new item created BEHIND the running board (no keypress — the debounced
+ * tree watcher must repaint it in place) → `/` filter down to the seeded
  * task → Enter opens its read-only detail pane (acceptance rows + body) →
- * PgDn scrolls the pane → Esc returns to the board with the same selection and
- * filter → q. A regression net for the raw-ANSI renderer without a model in
- * the loop.
+ * PgDn scrolls the pane, DELIVERED AS TWO PTY WRITES so the escape sequence
+ * is split across stdin chunks (bug-tui-split-escape-sequences: the decoder
+ * must reassemble it instead of leaking a phantom Esc that closes the pane
+ * and clears the filter) → Esc returns to the board with the same selection
+ * and filter → q. A regression net for the raw-ANSI renderer without a model
+ * in the loop.
  *
  * Bounded by design. Exit codes: 0 — passed or `skipped:` (util-linux `script`
  * unavailable); 1 — a check failed (the fixture is kept).
@@ -40,6 +46,15 @@ const STEP_TIMEOUT_MS = Number(process.env.ARGON_TUI_BOARD_STEP_TIMEOUT_MS ?? 10
 const KEEP = process.env.ARGON_TUI_BOARD_KEEP === "1";
 /** Item created in the fixture; its id must appear in the rendered frame. */
 const SEEDED_ITEM_ID = "task-board-task";
+
+/**
+ * Item created WHILE the TUI is running (task-tui-live-refresh): the board
+ * must pick it up through the debounced tree watcher without any keypress.
+ */
+export const SEEDED_LIVE_ITEM_ID = "task-live-refresh";
+
+/** The footer freshness stamp the loop renders once data has been read. */
+export const FRESHNESS_STAMP_PATTERN = /updated \d{2}:\d{2}:\d{2}/;
 
 /** The v0 statuses whose column headers the TUI must render. */
 export const TUI_STATUS_HEADERS = ["todo", "in_progress", "blocked", "done", "cancelled"];
@@ -205,6 +220,11 @@ type TuiStep = {
   label: string;
   until: (capture: string) => boolean;
   send: string;
+  /**
+   * Optional snapshot taken at send time (before the bytes hit the pty), so a
+   * later step can predicate on frames drawn after this write.
+   */
+  onSend?: (capture: string) => void;
 };
 
 type StepResult = {
@@ -215,10 +235,14 @@ type StepResult = {
 };
 
 /**
- * Drive `board --tui` in a PTY through the seeded session: board frame →
- * filter down to the seeded task → open the pane → page it → Esc back with the
- * selection and filter intact → quit. Returns the raw capture plus one result
- * per step; a timeout marks that step failed.
+ * Drive `board --tui` in a PTY through the seeded session: board frame (with
+ * the footer freshness stamp) → create a new item BEHIND the running board
+ * and wait for the debounced watcher to repaint it with NO keypress
+ * (task-tui-live-refresh) → filter down to the seeded task → open the pane →
+ * PgDn SPLIT ACROSS TWO PTY WRITES (bug-tui-split-escape-sequences: the
+ * partial `\x1b[6` must be held, not consumed as Esc) → the split PgDn pages
+ * the pane → Esc back with the selection and filter intact → quit. Returns
+ * the raw capture plus one result per step; a timeout marks that step failed.
  */
 function runTui(fixture: string): Promise<{ capture: string; steps: StepResult[] }> {
   return new Promise((resolveCapture) => {
@@ -238,10 +262,40 @@ function runTui(fixture: string): Promise<{ capture: string; steps: StepResult[]
       },
     );
     const steps: StepResult[] = [];
+    // Another session's write path (task-tui-live-refresh): the live item is
+    // created through the real CLI while the board runs, so the watcher sees
+    // exactly what a concurrent agent's tracker mutation looks like.
+    const createLiveItem = (): void => {
+      const result = spawnSync(
+        process.execPath,
+        [cli, "create", "task", "Live refresh", "--parent", "entries", "--json"],
+        { cwd: fixture, encoding: "utf8", timeout: 60_000 },
+      );
+      if (result.status !== 0) {
+        throw new Error(
+          `arggon create (live item) failed: ${result.stdout ?? ""}${result.stderr ?? ""}`,
+        );
+      }
+    };
+    // Frames the TUI has drawn so far: the loop re-renders after EVERY stdin
+    // chunk (even one that holds no complete key), so a frame drawn after the
+    // partial write proves the pty delivered it as its own chunk — that is
+    // what makes the split-PgDn steps below a real split, not a coalesced
+    // write that would exercise the whole-sequence path instead.
+    const countFrames = (capture: string): number => capture.split("\x1b[H\x1b[2J").length - 1;
+    let framesAtSplit = -1;
     const stepDefs: TuiStep[] = [
       {
-        label: "board frame (five status headers + seeded item)",
-        until: (capture) => missingFrameMarkers(lastFrame(capture), SEEDED_ITEM_ID).length === 0,
+        label: "board frame (five status headers + seeded item + freshness stamp)",
+        until: (capture) =>
+          missingFrameMarkers(lastFrame(capture), SEEDED_ITEM_ID).length === 0 &&
+          FRESHNESS_STAMP_PATTERN.test(lastFrame(capture)),
+        onSend: createLiveItem,
+        send: "", // NO keypress: only the watcher may produce the next frame
+      },
+      {
+        label: "live refresh: item created behind the board appears without a keypress",
+        until: (capture) => lastFrame(capture).includes(`T ${SEEDED_LIVE_ITEM_ID}`),
         send: "/", // open the search prompt
       },
       {
@@ -262,10 +316,24 @@ function runTui(fixture: string): Promise<{ capture: string; steps: StepResult[]
       {
         label: "detail pane (acceptance rows + body)",
         until: (capture) => missingDetailMarkers(lastFrame(capture), SEEDED_ITEM_ID).length === 0,
-        send: "\x1b[6~", // PgDn: one pane page
+        // PgDn split across pty writes: intro + parameter byte only, no final
+        // byte. The decoder must hold it, not consume the ESC as Esc (which
+        // would close the pane — and a second Esc would clear the filter).
+        onSend: (capture) => {
+          framesAtSplit = countFrames(capture);
+        },
+        send: "\x1b[6",
       },
       {
-        label: "pane scrolled one page",
+        label: "pane held open at row 1 while the CSI is incomplete",
+        until: (capture) =>
+          countFrames(capture) > framesAtSplit &&
+          lastFrame(capture).includes("arggon detail") &&
+          panePosition(lastFrame(capture))?.row === 1,
+        send: "~", // second half: completes the PgDn
+      },
+      {
+        label: "pane scrolled one page by the split PgDn",
         until: (capture) => (panePosition(lastFrame(capture))?.row ?? 0) > 1,
         send: "\x1b", // Esc: back to the board
       },
@@ -302,6 +370,7 @@ function runTui(fixture: string): Promise<{ capture: string; steps: StepResult[]
         steps.push({ label: active.label, ok: true, frame: lastFrame(capture) });
         stepIndex += 1;
         stepDeadline = Date.now() + STEP_TIMEOUT_MS;
+        active.onSend?.(capture);
         child.stdin.write(active.send);
       }
     };
@@ -377,6 +446,19 @@ async function main(): Promise<void> {
       "the detail pane renders the seeded acceptance rows and the body",
       detailStep?.ok === true,
       detailStep?.frame,
+    ) && passed;
+  const liveStep = steps.find((step) => step.label.startsWith("live refresh"));
+  passed =
+    check(
+      "the watcher repaints an item created behind the board without a keypress",
+      liveStep?.ok === true,
+      liveStep?.frame,
+    ) && passed;
+  passed =
+    check(
+      "the board footer carries the freshness stamp of the rendered data",
+      FRESHNESS_STAMP_PATTERN.test(lastFrame(capture)),
+      lastFrame(capture),
     ) && passed;
 
   if (passed) {

@@ -22,6 +22,7 @@ import {
   type BoardServeHandle,
 } from "./board-serve.js";
 import type { BoardDetailPayload, BoardGithub, PrInfo } from "./board.js";
+import { renderBoardHtml } from "./board.js";
 import { runInit } from "./init.js";
 import { runCreate, runShow, runUpdate } from "@arggondev/lib";
 import { removeFixtureTree } from "./test-tmp.js";
@@ -71,6 +72,36 @@ describe("board --serve", () => {
     expect(html).toContain('EventSource("/events")');
     // Static export must stay untouched: no reload script without serve.
     expect(html).not.toBe(undefined);
+  });
+
+  it("injects the live-reload state client and connection banner (task-board-live-reload-state)", async () => {
+    const html = await (await fetch(`${handle.url}/`)).text();
+    // Connection banner: role=status + aria-live so transitions announce, and
+    // the three states the banner moves through.
+    expect(html).toContain('banner.id = "board-conn"');
+    expect(html).toContain('"role", "status"');
+    expect(html).toContain('"aria-live", "polite"');
+    expect(html).toContain('"connecting"');
+    expect(html).toContain('"live"');
+    expect(html).toContain('"reconnecting"');
+    // State snapshot/restore around the reload: sessionStorage key, scroll,
+    // filter and the open drawer id.
+    expect(html).toContain('"board-live-state"');
+    expect(html).toContain("sessionStorage.setItem");
+    expect(html).toContain("window.scrollX");
+    expect(html).toContain("window.scrollY");
+    expect(html).toContain("data-item-id");
+    // The drawer id attribute the snapshot reads is set/cleared by the drawer
+    // wiring embedded from board.ts.
+    expect(html).toContain('drawerEl.setAttribute("data-item-id", id)');
+    expect(html).toContain('drawerEl.removeAttribute("data-item-id")');
+  });
+
+  it("keeps the serve-only reload client out of the static render", () => {
+    const html = renderBoardHtml([], { generatedAt: "2026-09-30T00:00:00.000Z" });
+    expect(html).not.toContain('EventSource("/events")');
+    expect(html).not.toContain("board-conn");
+    expect(html).not.toContain("board-live-state");
   });
 
   it("routes drag-and-drop edits through the kernel update path", async () => {

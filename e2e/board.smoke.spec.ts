@@ -17,7 +17,13 @@
  * exercises the shipped entry, not the TypeScript source.
  */
 import { expect, test, type Page } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
+// Named import, not default: under `module: NodeNext` the package's `types`
+// condition resolves the CJS-paired index.d.ts, where `AxeBuilder as default`
+// is not honored and esModuleInterop synthesizes the module namespace as the
+// default — so `new AxeBuilder(...)` is TS2351 under tsc (invisible until
+// task-typecheck-e2e-specs added this type-check; Playwright's transpiler
+// never checked it). The named export is the constructable class.
+import { AxeBuilder } from "@axe-core/playwright";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -780,5 +786,179 @@ test.describe("@smoke board --serve", () => {
       .poll(() => cliJson<{ item: ListedItem }>(fixture, ["show", FILTER_ITEM_ID]).item.status)
       .toBe("cancelled");
     await mobile.close();
+  });
+
+  test("the connection banner reports a live stream (task-board-live-reload-state)", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    const banner = page.locator("#board-conn");
+    // role=status + aria-live=polite: a drop to reconnecting announces itself.
+    await expect(banner).toHaveAttribute("role", "status");
+    await expect(banner).toHaveAttribute("aria-live", "polite");
+    await expect(banner).toHaveClass(/live/);
+    await expect(banner).toHaveText("live");
+  });
+
+  test("marks the board stale when the SSE stream drops", async ({ page }) => {
+    // Abort the event stream BEFORE the navigation, exactly as a dead server
+    // would behave: the EventSource errors and the pill flips to the stale
+    // marker while the (possibly outdated) board stays readable.
+    await page.route("**/events", (route) => route.abort());
+    await page.goto(server?.url ?? "");
+    await expect(page.locator("h1")).toContainText("arggon board");
+    const banner = page.locator("#board-conn");
+    await expect(banner).toHaveClass(/reconnecting/);
+    await expect(banner).toHaveText("reconnecting — board may be stale");
+  });
+
+  test("a live reload preserves the filter, the open drawer and the scroll position", async ({
+    page,
+  }) => {
+    // A short viewport makes the board taller than the screen, so the
+    // preserved scroll offset is a real, non-zero value.
+    await page.setViewportSize({ width: 900, height: 320 });
+    await page.goto(server?.url ?? "");
+    await expect(page.locator("#board-conn.live")).toHaveText("live");
+
+    // The reload trigger is a throwaway item created through the CLI. Its
+    // create-write fires an SSE reload of its own, so wait for that reload to
+    // settle (the new card only exists on the page after it) before setup —
+    // otherwise the reload would land mid-setup and wipe the state under test.
+    const created = cliJson<{ item: { id: string } }>(fixture, [
+      "create",
+      "task",
+      "Board preserve task",
+      "--parent",
+      "entries",
+      "--json",
+    ]);
+    const preserveId = created.item.id;
+    await expect(page.locator(`.card[data-id="${preserveId}"]`)).toHaveCount(1);
+
+    // State under test: a non-zero scroll offset, a lens filter, and the
+    // detail drawer open on the one card the filter keeps visible. Scroll
+    // first, while the unfiltered board is tall.
+    await page.locator("#board-filter-input").fill("label:detail");
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
+    await page.locator(`.card[data-id="${DETAIL_ITEM_ID}"]`).click();
+    await expect(page.locator("#board-drawer")).toBeVisible();
+    await expect(page.locator("#board-drawer .drawer-title")).toHaveText("Board detail task");
+    // The offset to preserve is whatever the page actually sits at after the
+    // drawer-opening click (Playwright scrolls the card into view, so it is
+    // not the scrollTo above) — non-zero, and restored EXACTLY.
+    const scrollBefore = await page.evaluate(() => window.scrollY);
+    expect(scrollBefore).toBeGreaterThan(0);
+
+    // Marker on the CURRENT page: undefined after the reload proves the page
+    // was really replaced, so the preservation assertions cannot pass against
+    // the pre-reload DOM.
+    await page.evaluate(() => {
+      (window as unknown as { marker?: number }).marker = 42;
+    });
+
+    // External tracker write (not through this page) fires the SSE reload.
+    runCli(fixture, ["update", preserveId, "--status", "cancelled", "--json"]);
+
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { marker?: number }).marker), {
+        timeout: 15_000,
+      })
+      .toBeUndefined();
+
+    await expect(page.locator("#board-filter-input")).toHaveValue("label:detail");
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
+    await expect(page.locator("#board-drawer .drawer-title")).toHaveText("Board detail task");
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBefore);
+
+    // The preserved drawer is a real drawer: Esc closes it and focus returns
+    // to the (still filtered-visible) card that opened it.
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#board-drawer")).toBeHidden();
+    await expect(page.locator(`.card[data-id="${DETAIL_ITEM_ID}"]`)).toBeFocused();
+  });
+
+  test("columns collapse, terminal columns hide, and the layout persists (task-board-column-controls)", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    const todo = page.locator('.column[data-status="todo"]');
+    const todoCards = todo.locator(".card");
+    await expect(todoCards.first()).toBeVisible();
+
+    // Collapse todo: cards hide, the heading (with its count) stays visible,
+    // and the toggle flips to the expanded announcement.
+    await todo.locator('.col-toggle[data-status="todo"]').click();
+    await expect(todo).toHaveClass(/collapsed/);
+    await expect(todo.locator(".col-toggle")).toHaveAttribute("aria-expanded", "false");
+    await expect(todo.locator(".col-toggle")).toHaveAttribute(
+      "aria-label",
+      "expand the todo column",
+    );
+    await expect(todoCards.first()).toBeHidden();
+    await expect(todo.locator(".count")).toBeVisible();
+
+    // Hide the terminal columns through the filterbar toggle.
+    const terminalToggle = page.locator("#board-terminal-toggle");
+    await terminalToggle.click();
+    await expect(terminalToggle).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('.column[data-status="done"]')).toBeHidden();
+    await expect(page.locator('.column[data-status="cancelled"]')).toBeHidden();
+
+    // The layout persists in localStorage across a reload.
+    await page.reload();
+    await expect(page.locator('.column[data-status="todo"]')).toHaveClass(/collapsed/);
+    await expect(page.locator('.column[data-status="done"]')).toBeHidden();
+
+    // The controls undo themselves (expand + show), then reset restores the
+    // default layout and the reset persists too.
+    await page.locator('.col-toggle[data-status="todo"]').click();
+    await expect(page.locator('.column[data-status="todo"]')).not.toHaveClass(/collapsed/);
+    await page.locator("#board-layout-reset").click();
+    await expect(terminalToggle).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator('.column[data-status="done"]')).toBeVisible();
+    await page.reload();
+    await expect(page.locator('.column[data-status="todo"]')).not.toHaveClass(/collapsed/);
+    await expect(page.locator('.column[data-status="done"]')).toBeVisible();
+  });
+
+  test("collapsing the column that holds the roving anchor re-seats it", async ({ page }) => {
+    await page.goto(server?.url ?? "");
+    const todo = page.locator('.column[data-status="todo"]');
+    // The server seeds the anchor on the first todo card.
+    await expect(todo.locator('.card[tabindex="0"]')).toHaveCount(1);
+    await todo.locator('.col-toggle[data-status="todo"]').click();
+    await expect(todo).toHaveClass(/collapsed/);
+    // The anchor moved out of the collapsed column: keyboard entry survives.
+    const anchor = page.locator('.board .card[tabindex="0"]');
+    await expect(anchor).toHaveCount(1);
+    const anchorColumn = await anchor.evaluate((card) =>
+      card.closest(".column")?.getAttribute("data-status"),
+    );
+    expect(anchorColumn).not.toBe("todo");
+  });
+
+  test("column headers stick to the viewport top while the board scrolls", async ({ page }) => {
+    // A tall column is what makes stickiness observable: fill todo through the
+    // CLI (each create fires a reload, so the page is only loaded afterwards).
+    for (let i = 1; i <= 12; i++) {
+      runCli(fixture, ["create", "task", `Board filler ${i}`, "--parent", "entries", "--json"]);
+    }
+    await page.setViewportSize({ width: 900, height: 400 });
+    await page.goto(server?.url ?? "");
+    const filler = page.locator(".card .title", { hasText: "Board filler 12" });
+    await expect(filler).toBeVisible();
+
+    const column = page.locator('.column[data-status="todo"]');
+    const header = page.locator("#board-column-todo");
+    // Unstuck at load: the header sits at its natural in-column position.
+    const natural = await header.evaluate((el) => el.getBoundingClientRect().top);
+    expect(natural).toBeGreaterThan(0);
+    // Scroll into the middle of the tall column: the header pins to the top.
+    await page.evaluate(
+      (offset) => window.scrollTo(0, offset),
+      (await column.evaluate((el) => el.getBoundingClientRect().top + window.scrollY)) + 100,
+    );
+    await expect.poll(() => header.evaluate((el) => el.getBoundingClientRect().top)).toBe(0);
   });
 });
