@@ -333,14 +333,14 @@ function runTui(fixture: string): Promise<{ capture: string; steps: StepResult[]
       {
         label: "live refresh: item created behind the board appears without a keypress",
         until: (capture) => lastFrame(capture).includes(`T ${SEEDED_LIVE_ITEM_ID}`),
-        send: "l", // toggle the ready-only lens
+        send: "L", // toggle the ready-only lens
       },
       {
         label: "ready lens: header shows ready-only, the blocked card is hidden",
         until: (capture) =>
           lastFrame(capture).includes("ready-only") &&
           !lastFrame(capture).includes(`T ${SEEDED_BLOCKED_ITEM_ID}`),
-        send: "l", // lens off again
+        send: "L", // lens off again
       },
       {
         label: "lens off: the blocked card is back (with its ⌫ marker)",
@@ -408,6 +408,26 @@ function runTui(fixture: string): Promise<{ capture: string; steps: StepResult[]
         label: "board restored, same selection and filter",
         until: (capture) =>
           isBoardFrame(lastFrame(capture), SEEDED_ITEM_ID) &&
+          lastFrame(capture).includes(`filter: ${SEEDED_ITEM_ID}`),
+        send: "j", // vim down: the selection moves within the column
+      },
+      {
+        label: "vim j moved the selection (the filtered board has one card: still on it)",
+        until: (capture) => isBoardFrame(lastFrame(capture), SEEDED_ITEM_ID),
+        send: "?", // help overlay
+      },
+      {
+        label: "help overlay: grouped key list over the board",
+        until: (capture) =>
+          lastFrame(capture).includes("arggon board --tui — keys") &&
+          lastFrame(capture).includes("navigation") &&
+          lastFrame(capture).includes("quit"),
+        send: "\x1b", // esc closes the overlay
+      },
+      {
+        label: "esc closed the overlay, board back with the same filter",
+        until: (capture) =>
+          !lastFrame(capture).includes("arggon board --tui — keys") &&
           lastFrame(capture).includes(`filter: ${SEEDED_ITEM_ID}`),
         send: "q", // quit
       },

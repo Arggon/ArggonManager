@@ -29,10 +29,12 @@ import {
   loadTuiItems,
   nextTuiSort,
   renderTui,
+  renderTuiHelp,
   renderTuiDetail,
   renderTuiScreen,
   runTuiBoard,
   selectedTuiItem,
+  TUI_HELP,
   TUI_DETAIL_MAX_BODY_LINES,
   TUI_DETAIL_MAX_LINES,
   TUI_DETAIL_NARROW_WIDTH,
@@ -1083,7 +1085,7 @@ describe("renderTui sort + lens frame (task-tui-sort-ready-lens)", () => {
   it("a lens toggle re-clamps the selection against the narrowed columns", () => {
     // card 2 (gamma in id order) under the ready lens: the todo column
     // shrinks to two cards, so the post-toggle clamp pulls the index back.
-    const state = handleKey({ ...initialTuiState(200, 12), card: 2 }, "l");
+    const state = handleKey({ ...initialTuiState(200, 12), card: 2 }, "L");
     expect(state.readyOnly).toBe(true);
     const counts = tuiColumnCounts(SORT_SET, "", state.readyOnly);
     expect(clampTuiState(state, counts).card).toBe(1);
@@ -1091,25 +1093,25 @@ describe("renderTui sort + lens frame (task-tui-sort-ready-lens)", () => {
 });
 
 describe("handleKey sort + lens keys (task-tui-sort-ready-lens)", () => {
-  it("s cycles the sort, l toggles the lens (board mode)", () => {
+  it("s cycles the sort, L toggles the lens (board mode; l is the vim right motion)", () => {
     let state = handleKey(initialTuiState(), "s");
     expect(state.sort).toBe("priority");
     state = handleKey(state, "s");
     expect(state.sort).toBe("next");
     state = handleKey(state, "s");
     expect(state.sort).toBe("id");
-    state = handleKey(state, "l");
+    state = handleKey(state, "L");
     expect(state.readyOnly).toBe(true);
-    state = handleKey(state, "l");
+    state = handleKey(state, "L");
     expect(state.readyOnly).toBe(false);
   });
 
-  it("s and l type into the search prompt like any other key", () => {
+  it("s and L type into the search prompt like any other key", () => {
     let state = handleKey(initialTuiState(), "/");
     state = handleKey(state, "s");
-    state = handleKey(state, "l");
+    state = handleKey(state, "L");
     expect(state.searching).toBe(true);
-    expect(state.filter).toBe("sl");
+    expect(state.filter).toBe("sL");
     expect(state.sort).toBe("id");
     expect(state.readyOnly).toBe(false);
   });
@@ -1135,7 +1137,7 @@ describe("runTuiBoard sort + lens keys (task-tui-sort-ready-lens)", () => {
     await wait(30);
     term.input.write("s"); // sort: next
     await wait(30);
-    term.input.write("l"); // ready-only lens
+    term.input.write("L"); // ready-only lens
     await wait(30);
     term.input.write("q");
     await done;
@@ -1176,6 +1178,13 @@ describe("arggon board --tui (CLI)", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("board --tui requires an interactive terminal");
     expect(result.stdout).not.toContain("<html");
+  });
+
+  it("parses --no-color (the TTY failure is unchanged with the flag present)", () => {
+    const root = newTree();
+    const result = runCli(["board", "--tui", "--no-color"], root);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("board --tui requires an interactive terminal");
   });
 
   it("refuses --tui combined with --json (BOARD_FAILED), even before the TTY check", () => {
@@ -1774,5 +1783,172 @@ describe("detail pane: runTuiBoard loop", () => {
     term.input.write("q");
     await done;
     expect(term.outputText()).toContain("item task-rate-limit is not in the tree anymore");
+  });
+});
+
+// ---------- help overlay + vim keys (task-tui-help-vim-keys) ----------
+
+describe("vim motions and g/G (task-tui-help-vim-keys)", () => {
+  it("h/l move columns and j/k move cards, like the arrows", () => {
+    let state = handleKey(initialTuiState(), "l"); // right
+    expect(state.column).toBe(1);
+    state = handleKey(state, "h"); // left
+    expect(state.column).toBe(0);
+    state = handleKey(state, "j"); // down
+    expect(state.card).toBe(1);
+    state = handleKey(state, "k"); // up
+    expect(state.card).toBe(0);
+    // Same clamping as the arrows (counts context).
+    const clamped = handleKey({ ...initialTuiState(), card: 5 }, "j", {
+      counts: [2, 1, 0, 0, 0],
+    });
+    expect(clamped.card).toBe(1);
+  });
+
+  it("g/G jump to the first/last card of the column (home/end)", () => {
+    let state = handleKey(initialTuiState(), "G", { counts: [10, 0, 0, 0, 0] });
+    expect(state.card).toBe(9);
+    state = handleKey(state, "g");
+    expect(state.card).toBe(0);
+  });
+
+  it("j/k/g/G scroll the detail pane with the same clamps", () => {
+    let state: TuiState = { ...initialTuiState(80, 8), detail: { id: "x", scroll: 0 } };
+    state = handleKey(state, "j", { detailLines: 40 });
+    expect(state.detail?.scroll).toBe(1);
+    state = handleKey(state, "G", { detailLines: 40 });
+    expect(state.detail?.scroll).toBe(34); // 40 lines - 6 body rows
+    state = handleKey(state, "g", { detailLines: 40 });
+    expect(state.detail?.scroll).toBe(0);
+    state = handleKey(state, "k", { detailLines: 40 });
+    expect(state.detail?.scroll).toBe(0); // clamped at the top
+  });
+
+  it("the ready-only lens moved to L (lowercase l is the vim right motion)", () => {
+    const lensed = handleKey(initialTuiState(), "L");
+    expect(lensed.readyOnly).toBe(true);
+    const moved = handleKey(initialTuiState(), "l", {});
+    expect(moved.readyOnly).toBe(false);
+    expect(moved.column).toBe(1);
+  });
+});
+
+describe("help overlay (task-tui-help-vim-keys)", () => {
+  it("? opens it, esc and ? close it, the board state behind is untouched", () => {
+    let state: TuiState = { ...initialTuiState(), sort: "next", readyOnly: true, card: 2 };
+    state = handleKey(state, "?");
+    expect(state.help).toBe(true);
+    state = handleKey(state, "x"); // inert inside the overlay
+    expect(state.help).toBe(true);
+    state = handleKey(state, "\x1b");
+    expect(state.help).toBe(false);
+    expect(state.sort).toBe("next");
+    expect(state.readyOnly).toBe(true);
+    expect(state.card).toBe(2);
+    state = handleKey(state, "?");
+    state = handleKey(state, "?"); // toggles closed too
+    expect(state.help).toBe(false);
+  });
+
+  it("Ctrl-C quits from the overlay", () => {
+    let state = handleKey(initialTuiState(), "?");
+    state = handleKey(state, "\x03");
+    expect(state.quit).toBe(true);
+  });
+
+  it("renders the grouped key list and stays readable without color", () => {
+    const frame = renderTuiHelp({ ...initialTuiState(80, 24), help: true }, { color: false });
+    const got = lines(frame);
+    expect(got[0]).toContain("arggon board --tui — keys");
+    for (const group of TUI_HELP) expect(frame).toContain(group.title);
+    // Every documented key surfaces in the overlay.
+    for (const key of [
+      "←/→ · h/l",
+      "↑/↓ · j/k",
+      "PgUp/PgDn",
+      "g/G · home/end",
+      "/",
+      "esc",
+      "enter",
+      "s",
+      "L",
+      "r",
+      "q · Ctrl-C",
+      "?",
+    ]) {
+      expect(frame).toContain(key);
+    }
+    expect(got).toHaveLength(24);
+    for (const line of got) expect(line).toHaveLength(80);
+    // Color off: no SGR COLOR sequences anywhere (the leading clear-home is
+    // not an SGR and stays).
+    expect(frame).not.toMatch(/\x1b\[[0-9;]*m/);
+    // Color on: the header is bold.
+    expect(renderTuiHelp({ ...initialTuiState(80, 24), help: true }, { color: true })).toContain(
+      "\x1b[1marggon board --tui — keys",
+    );
+  });
+
+  it("renderTuiScreen dispatches the overlay over the board", () => {
+    const state = { ...initialTuiState(80, 24), help: true };
+    expect(renderTuiScreen(THREE, state, new Map(), { color: false })).toContain(
+      "arggon board --tui — keys",
+    );
+  });
+
+  it("the footer help names the overlay and the moved lens key", () => {
+    const footer = lines(renderTui(THREE, initialTuiState(400, 8), { color: false }))[7];
+    expect(footer).toContain("? help");
+    expect(footer).toContain("L ready");
+    expect(footer).not.toContain("l ready");
+  });
+
+  it("every TUI_HELP key group survives the reducer round-trip (content stays in sync)", () => {
+    // The overlay content is data; this pins the groups the acceptance names.
+    expect(TUI_HELP.map((group) => group.title)).toEqual(["navigation", "filter", "view", "quit"]);
+  });
+});
+
+describe("TUI color control (task-tui-help-vim-keys)", () => {
+  it("runTuiBoard color: false renders a plain frame (no SGR)", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    const done = runTuiBoard({ cwd: root, input: term.input, output: term.output, color: false });
+    const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+    await wait(30);
+    term.input.write("q");
+    await done;
+    expect(term.outputText()).not.toMatch(/\x1b\[[0-9;]*m/); // no SGR colors
+    expect(term.outputText()).toContain("arggon board --tui ·");
+  });
+
+  it("NO_COLOR disables colors by default; explicit color wins over the env", async () => {
+    const root = newTree();
+    const previous = process.env.NO_COLOR;
+    process.env.NO_COLOR = "1";
+    try {
+      const term = fakeTerminal();
+      const done = runTuiBoard({ cwd: root, input: term.input, output: term.output });
+      const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+      await wait(30);
+      term.input.write("q");
+      await done;
+      expect(term.outputText()).not.toMatch(/\x1b\[[0-9;]*m/);
+
+      const term2 = fakeTerminal();
+      const done2 = runTuiBoard({
+        cwd: root,
+        input: term2.input,
+        output: term2.output,
+        color: true,
+      });
+      await wait(30);
+      term2.input.write("q");
+      await done2;
+      expect(term2.outputText()).toMatch(/\x1b\[7m/); // SGR colors back on
+    } finally {
+      if (previous === undefined) delete process.env.NO_COLOR;
+      else process.env.NO_COLOR = previous;
+    }
   });
 });

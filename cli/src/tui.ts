@@ -168,6 +168,12 @@ export type TuiState = {
    * Read-only: the pane has no update path, it only reads the loaded items.
    */
   detail: TuiDetailState | null;
+  /**
+   * Help overlay (`?`, task-tui-help-vim-keys): a modal frame listing every
+   * key grouped by purpose. `esc` (or `?` again) closes it; the board state
+   * behind it is untouched.
+   */
+  help: boolean;
   /** Set by `q` / Ctrl-C; the loop exits when true. */
   quit: boolean;
 };
@@ -189,6 +195,7 @@ export function initialTuiState(
     message: null,
     updatedAt: null,
     detail: null,
+    help: false,
     quit: false,
   };
 }
@@ -564,8 +571,14 @@ export type TuiKeyContext = {
  * mutates the input state.
  */
 export function handleKey(state: TuiState, key: string, ctx: TuiKeyContext = {}): TuiState {
-  // Ctrl-C quits from anywhere, pane and search prompt included.
+  // Ctrl-C quits from anywhere, pane, search prompt and help overlay included.
   if (key === CTRL_C) return { ...state, quit: true };
+  // The help overlay is modal (task-tui-help-vim-keys): esc or ? closes it,
+  // nothing else reaches the board.
+  if (state.help) {
+    if (key === ESC || key === "?") return { ...state, help: false };
+    return state;
+  }
   if (state.detail !== null) return handleDetailKey(state, key, ctx.detailLines ?? 0);
 
   const counts = ctx.counts ?? [];
@@ -592,11 +605,15 @@ export function handleKey(state: TuiState, key: string, ctx: TuiKeyContext = {})
       // next -> id. The card index keeps its value; the post-key sync clamps
       // it against the re-sorted column.
       return { ...state, sort: nextTuiSort(state.sort), message: null };
-    case "l":
+    case "L":
       // Toggle the ready-only lens (task-tui-sort-ready-lens): pullable work
       // only. The post-key sync clamps the selection against the narrowed
-      // columns.
+      // columns. (Shift-L since task-tui-help-vim-keys: lowercase `l` is the
+      // vim right motion.)
       return { ...state, readyOnly: !state.readyOnly, message: null };
+    case "?":
+      // Help overlay (task-tui-help-vim-keys): every key, grouped.
+      return { ...state, help: true, message: null };
     case "r":
       // Forced refresh (task-tui-live-refresh): the reducer stays pure — the
       // loop re-reads the tree after every key batch, so acknowledging the key
@@ -615,17 +632,28 @@ export function handleKey(state: TuiState, key: string, ctx: TuiKeyContext = {})
       }
       return { ...state, message: "(no item selected)" };
     case ARROW_LEFT:
+    case "h":
+      // Vim motions ride the same rules as the arrows
+      // (task-tui-help-vim-keys): h/l columns, j/k cards.
       return moveColumn(state, -1, counts);
     case ARROW_RIGHT:
+    case "l":
       return moveColumn(state, 1, counts);
     case ARROW_UP:
+    case "k":
       return moveCard(state, -1, counts);
     case ARROW_DOWN:
+    case "j":
       return moveCard(state, 1, counts);
     case PAGE_UP:
       return moveCard(state, -pageStep(state), counts);
     case PAGE_DOWN:
       return moveCard(state, pageStep(state), counts);
+    case "g":
+      // Vim first/last (task-tui-help-vim-keys), same as home/end.
+      return selectCard(state, 0, counts);
+    case "G":
+      return selectCard(state, "last", counts);
     default:
       if (HOME_KEYS.has(key)) return selectCard(state, 0, counts);
       if (END_KEYS.has(key)) return selectCard(state, "last", counts);
@@ -658,13 +686,20 @@ function handleDetailKey(state: TuiState, key: string, lines: number): TuiState 
     case "q":
       return { ...state, quit: true };
     case ARROW_UP:
+    case "k":
+      // Vim motions scroll the pane too (task-tui-help-vim-keys).
       return scrollTo(detail.scroll - 1);
     case ARROW_DOWN:
+    case "j":
       return scrollTo(detail.scroll + 1);
     case PAGE_UP:
       return scrollTo(detail.scroll - page);
     case PAGE_DOWN:
       return scrollTo(detail.scroll + page);
+    case "g":
+      return scrollTo(0);
+    case "G":
+      return scrollTo(lines);
     default:
       if (HOME_KEYS.has(key)) return scrollTo(0);
       if (END_KEYS.has(key)) return scrollTo(lines);
@@ -846,7 +881,7 @@ export function renderTui(
     // "(no item selected)" hint): escape before rendering.
     footer = `${position} · ${sanitizeHumanTextUncapped(state.message)}`;
   } else {
-    footer = `${position}${stamp} · ←/→ column · ↑/↓ card · PgUp/PgDn page · home/end · / search · enter detail · r refresh · s sort · l ready · q quit`;
+    footer = `${position}${stamp} · ←/→ column · ↑/↓ card · PgUp/PgDn page · home/end · / search · enter detail · r refresh · s sort · L ready · ? help · q quit`;
   }
   lines.push(padEndTo(clipLine(footer, width), width));
 
@@ -1131,8 +1166,93 @@ export function renderTuiDetail(
 }
 
 /**
- * The frame the loop draws (task-tui-detail-pane): the board, or the read-only
- * detail pane when `state.detail` is set. Pure; `details` carries the bodies
+ * One help overlay row: the keys and what they do. The overlay's content is
+ * data (task-tui-help-vim-keys) so the renderer stays a dumb loop and the
+ * groups render in this order: navigation, filter, view, quit.
+ */
+export type TuiHelpGroup = { title: string; rows: Array<[string, string]> };
+
+/**
+ * The help overlay content (task-tui-help-vim-keys): EVERY board key, grouped
+ * — navigation (arrows + the vim motions), filter, view, quit. Kept beside
+ * the keymap; the golden test pins that every `handleKey`-documented key
+ * appears here.
+ */
+export const TUI_HELP: readonly TuiHelpGroup[] = [
+  {
+    title: "navigation",
+    rows: [
+      ["←/→ · h/l", "move the selected column (v0 status order)"],
+      ["↑/↓ · j/k", "move the selected card within the column"],
+      ["PgUp/PgDn", "move the selection one body page up/down"],
+      ["g/G · home/end", "jump to the first/last card of the column"],
+      ["enter", "open the read-only detail pane (esc/enter back)"],
+    ],
+  },
+  {
+    title: "filter",
+    rows: [
+      ["/", "filter prompt: free text + kernel predicates (status:todo …)"],
+      ["esc", "clear the active filter"],
+    ],
+  },
+  {
+    title: "view",
+    rows: [
+      ["s", "cycle the card order: id → priority → next"],
+      ["L", "toggle the ready-only lens (pullable work only)"],
+      ["r", "force a refresh (re-read the tree now)"],
+    ],
+  },
+  {
+    title: "quit",
+    rows: [
+      ["q · Ctrl-C", "quit, restoring the screen (works from any prompt)"],
+      ["?", "toggle this help"],
+    ],
+  },
+];
+
+/**
+ * Pure help-overlay frame renderer (task-tui-help-vim-keys): exactly `height`
+ * lines padded to `width` (the board's no-ghosting rule), the grouped key list
+ * centered in the content area, a header and an `esc closes` footer. With
+ * `color: false` no SGR sequences are emitted.
+ */
+export function renderTuiHelp(state: TuiState, opts: { color?: boolean } = {}): string {
+  const color = opts.color !== false;
+  const width = Math.max(1, Math.floor(state.width));
+  const height = Math.max(1, Math.floor(state.height));
+  const rows: string[] = ["arggon board --tui — keys (? or esc closes)"];
+  for (const group of TUI_HELP) {
+    rows.push("");
+    rows.push(`${group.title}`);
+    for (const [keys, description] of group.rows) {
+      rows.push(`  ${padEndTo(clipLine(keys, 18), 18)} ${description}`);
+    }
+  }
+  const footer = "esc closes · q quits";
+  const out: string[] = [];
+  for (let i = 0; i < height; i++) {
+    if (i === 0) {
+      const header = clipLine(rows[0] ?? "", width);
+      out.push(padEndTo(color ? `\x1b[1m${header}\x1b[0m` : header, width));
+      continue;
+    }
+    if (i === height - 1) {
+      out.push(padEndTo(clipLine(footer, width), width));
+      continue;
+    }
+    const row = rows[i] ?? "";
+    out.push(padEndTo(clipLine(row, width), width));
+  }
+  return `\x1b[H\x1b[2J${out.slice(0, height).join("\n")}`;
+}
+
+/**
+ * The frame the loop draws (task-tui-detail-pane, task-tui-help-vim-keys): the
+ * help overlay when `state.help` is set, else the read-only detail pane when
+ * `state.detail` is set, else the board. Pure; `details` carries the bodies
  * loaded beside the contract items (loadTuiItems).
  */
 export function renderTuiScreen(
@@ -1141,6 +1261,7 @@ export function renderTuiScreen(
   details: ReadonlyMap<string, TuiDetailSource> = new Map(),
   opts: { color?: boolean } = {},
 ): string {
+  if (state.help) return renderTuiHelp(state, opts);
   if (state.detail === null) return renderTui(items, state, opts);
   return renderTuiDetail(items, state.detail, details, state, opts);
 }
@@ -1181,6 +1302,14 @@ export type TuiLoopOptions = {
   watch?: TuiWatchFactory;
   /** Watcher debounce override (tests); defaults to TUI_REFRESH_DEBOUNCE_MS. */
   refreshDebounceMs?: number;
+  /**
+   * Emit SGR colors (task-tui-help-vim-keys). Default: the `NO_COLOR` env
+   * convention — colors ON unless `NO_COLOR` is set in the environment; the
+   * CLI's `--no-color` passes `false` (the flag wins over the env). With
+   * colors off the frame is plain text: the selection rides the `>` marker
+   * and the inverted header/column marks drop out.
+   */
+  color?: boolean;
 };
 
 /**
@@ -1205,6 +1334,9 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
     );
   }
   const escapeFlushMs = Math.max(0, Math.floor(opts.escapeFlushMs ?? TUI_ESCAPE_FLUSH_MS));
+  // Color resolution (task-tui-help-vim-keys): the explicit option wins; the
+  // default honors the NO_COLOR convention (colors unless NO_COLOR is set).
+  const color = opts.color ?? process.env.NO_COLOR === undefined;
   const watchFactory = opts.watch ?? fsWatchTuiWatcher;
   const refreshDebounceMs = Math.max(
     0,
@@ -1251,7 +1383,7 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
     };
 
     const render = (): void => {
-      output.write(renderTuiScreen(items, current, details));
+      output.write(renderTuiScreen(items, current, details, { color }));
     };
 
     // Reduce decoded keys against the live state; false once the loop quit.
