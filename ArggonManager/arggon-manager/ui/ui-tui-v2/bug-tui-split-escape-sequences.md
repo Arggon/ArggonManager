@@ -53,3 +53,6 @@ Evidence:
 - Gates: npm test 107 files/1789 tests ok; lint clean; build clean; arggon validate ok:true.
 - New: createTuiKeyDecoder (stateful chunk splitter) + TUI_ESCAPE_FLUSH_MS=50 esc-flush timer in runTuiBoard; 6 decoder + 3 loop unit tests in cli/src/tui.test.ts.
 - Note: one pre-existing loop test's beat extended past the flush window (lone ESC is now held ~50ms by design); comment left in test.
+
+### handoff 2026-09-30 @Arggon — next: Review+merge PR #469 (merge, never squash). Then task-tui-live-refresh will touch the same loop in cli/src/tui.ts (re-read/sync helpers).
+- branch: fix/bug-tui-split-escape-sequences
