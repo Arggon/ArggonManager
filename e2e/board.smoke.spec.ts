@@ -520,7 +520,7 @@ test.describe("@smoke board --serve", () => {
     // crosses columns by nearest non-empty neighbour, which the in_progress
     // occupancy would change (todo -> in_progress instead of todo -> cancelled).
     runCli(fixture, ["update", DIALOG_ITEM_ID, "--status", "cancelled", "--json"]);
-
+  });
 
   test("dependency predicates narrow by deps and readiness (task-board-filter-dep-predicates)", async ({
     page,
