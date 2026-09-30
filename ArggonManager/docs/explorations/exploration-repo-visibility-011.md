@@ -1,7 +1,7 @@
 ---
 exploration_id: repo-visibility-011
 title: Repository visibility: public vs private impact and main/opencode2 parity
-status: open
+status: decided
 created: 2026-09-22
 ---
 
@@ -168,6 +168,20 @@ local git history on **2026-09-22**; platform facts cite the linked docs
 
 ## Decision
 
-Pending — tracked in `task-repo-visibility-decision` (record as an ADR or an
-item comment when made). Branch retirement and CI-recipe follow-ups are filed
-and linked above.
+No ADR required — ops/visibility decision recorded on
+`task-repo-visibility-decision`; no schema, stack or architecture contract
+changes.
+
+**Stay public** (recorded 2026-09-30 in `task-repo-visibility-decision`, per
+this exploration's measured recommendation). Rationale in brief: Actions burn
+(~2,800 wall-minutes / 18 days) is free and unlimited on public runners but
+budgeted and slower on private; main's required `cli` check and the
+strict/linear-history/conversation gates need Pro+ once private; secret
+scanning and push protection are free only while public; npm provenance and
+artifact attestations are impossible from a private repo; and the MIT tarballs
+plus the public git history are already distributed — going private protects
+only future source at material cost. The two readiness follow-ups this
+exploration filed landed: `task-retire-opencode2` (branch retired, CI triggers
+trimmed) and `task-ci-recipe-published-one-liner` (generated recipe installs
+the published npm pin — no clone, so a future visibility change cannot break
+adopters' CI). No further action.

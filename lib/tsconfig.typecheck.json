@@ -2,7 +2,15 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
-    "declaration": false
+    "declaration": false,
+    // This project emits nothing and deliberately type-checks the sources the
+    // build excludes (`src/**/*.test.ts`), so `rootDir` carries no meaning here.
+    // It is rooted one level up so the kernel property tests can import the
+    // shared vitest-only runner from the repository's `test/` directory
+    // (task-fast-check-invariant-properties). The BUILD project keeps
+    // `rootDir: "src"`, so a real source file reaching outside the package
+    // still fails there.
+    "rootDir": ".."
   },
   "include": ["src/**/*.ts"],
   "exclude": []

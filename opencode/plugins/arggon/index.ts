@@ -81,7 +81,7 @@
 
 import { execFile } from "node:child_process"
 import { existsSync } from "node:fs"
-import { basename, dirname, join, resolve } from "node:path"
+import { basename, dirname, join, relative, resolve, sep } from "node:path"
 import { fileURLToPath } from "node:url"
 
 /** Minimal structural typing: the generated file must not import plugin types. */
@@ -192,6 +192,10 @@ const ITEM_MARKER = "<arggon-item>"
 const STORAGE_PREFIX = "arggon/session/"
 const MAX_CLI_OUTPUT = 256 * 1024
 const MAX_VALUE_CHARS = 200
+const MAX_NATIVE_PREPARATION_NAMES = 32
+const MAX_NATIVE_PREPARATION_VALUE_CHARS = 200
+const MAX_NATIVE_DETAIL_CHARS = 500
+const MAX_NATIVE_ERROR_CHARS = 2048
 
 // ---------------------------------------------------------------------------
 // Pure helpers (unit-tested; no I/O)
@@ -203,6 +207,12 @@ function asString(value: unknown): string | undefined {
 
 function clip(value: string, max: number): string {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value
+}
+
+/** Bound and flatten untrusted git/package text before it enters a receipt. */
+function boundedNativeText(value: unknown, max: number): string {
+  const text = typeof value === "string" ? value : String(value)
+  return clip(text.replace(/[\u0000-\u001f\u007f]/g, " "), max)
 }
 
 function byteLength(text: string): number {
@@ -962,6 +972,29 @@ function locationDirectory(ctx: PluginContext): string | undefined {
   return asString(ctx.location?.directory)
 }
 
+/**
+ * `ArgonToolOptions.sessionDirectory` from the V2 plugin context: the calling
+ * session's own location directory, read through `ctx.session.get` (V2 gives a
+ * plugin tool no directory — only the session id, see
+ * {@link ArgonToolCallContext}). `Session.Info.location.directory` is what
+ * `session_move` updates, so this follows the session into a worktree; the bare
+ * `directory` field is accepted as a fallback for a host that reports it
+ * without the location wrapper. Feature-detected: a context without
+ * `ctx.session.get` yields undefined and every call keeps using `options.cwd`.
+ */
+export function sessionDirectoryResolver(
+  ctx: PluginContext,
+): ((sessionID: string) => Promise<string | undefined>) | undefined {
+  const get = ctx?.session?.get
+  if (typeof get !== "function") return undefined
+  return async (sessionID: string) => {
+    const session = (await get({ sessionID })) as
+      | { location?: { directory?: unknown }; directory?: unknown }
+      | undefined
+    return asString(session?.location?.directory) ?? asString(session?.directory)
+  }
+}
+
 /** No-op outside ArggonManager trees: no tracker root, nothing to do. */
 function hasTasksTree(directory: string): boolean {
   try {
@@ -1270,7 +1303,15 @@ const SESSION_TOKEN_MAX_CHARS = 64
 /** Kernel surface the native tools consume (the `@arggondev/lib` stable subset). */
 export type ArgonKernel = typeof import("@arggondev/lib")
 
-/** Second `execute` argument V2 passes to a tool (session correlation only). */
+/**
+ * Second `execute` argument V2 passes to a tool.
+ *
+ * The runtime builds it as `{ sessionID, agent, messageID, id, progress, signal }`
+ * — deliberately structural, like every other context type here. `sessionID` is
+ * BOTH the comment/handoff attribution token and the **tracker-root key**: V2 hands
+ * a plugin tool no directory, so the session id is the only per-call signal of
+ * where the calling session works (bug-native-tools-commit-to-primary-checkout).
+ */
 export type ArgonToolCallContext = { sessionID?: unknown }
 
 export type ArgonToolResult = { output: Record<string, unknown> }
@@ -1293,8 +1334,24 @@ export type ArgonToolRegistration = ArgonToolDefinition & {
 }
 
 export type ArgonToolOptions = {
-  /** Session/project directory every kernel call runs against. */
+  /**
+   * Fallback working directory for calls that carry no calling session: the
+   * plugin instance's own `ctx.location.directory`. A call made by a session
+   * never uses it — see {@link resolveToolCwd}.
+   */
   cwd: string
+  /**
+   * Resolve the **calling session's** own location directory (the worktree a
+   * `session_move` landed in) from the session id V2 hands every tool call.
+   * Feature-detected at setup: absent (a host without `ctx.session.get`) every
+   * call falls back to `cwd`. Resolving this per call is what keeps a committing
+   * tool off the primary checkout once the session has moved
+   * (bug-native-tools-commit-to-primary-checkout): V2 documents `ctx.location` as
+   * "the plugin instance's location, not the location of every session it can
+   * access or event it receives", so a value captured at `setup` is stale by
+   * construction after a move.
+   */
+  sessionDirectory?: (sessionID: string) => Promise<string | undefined>
   /**
    * Fallback item-templates dir for `create`/`import-issues` (ADR 0013: the
    * kernel embeds no templates). The repo's own `templates/` always wins.
@@ -1417,6 +1474,75 @@ export function sessionToken(value: unknown): string | undefined {
   const token = value.trim()
   if (token === "" || token.length > SESSION_TOKEN_MAX_CHARS) return undefined
   return /^[A-Za-z0-9._:-]+$/.test(token) ? token : undefined
+}
+
+/**
+ * `error.code` for a call whose session directory cannot be resolved
+ * (bug-native-tools-commit-to-primary-checkout). Native-surface only: the CLI
+ * resolves the same root by walking up from its own cwd, so it can never reach
+ * this. The code exists because the native seam has a caller-side root to
+ * resolve and must refuse rather than write to the wrong checkout.
+ */
+export const SESSION_ROOT_UNRESOLVED = "SESSION_ROOT_UNRESOLVED"
+
+/**
+ * Working directory for ONE native tool call. The tracker root is resolved from
+ * the **calling session's own directory**, re-read on every call, so a session
+ * that moved into a worktree commits there and never to the checkout the plugin
+ * instance was loaded from. The kernel then walks up from it exactly as the CLI
+ * walks up from its own cwd (one logic path, ADR 0011).
+ *
+ * The order, and why each rung is where it is:
+ *
+ *   1. a session that is known and resolvable \u2192 that session's directory. This
+ *      is the rule the repo's one-branch-per-item model needs: the branch the
+ *      session moved onto is the branch its commit must land on.
+ *   2. no session on the call (an ambient/headless invocation, or an `execute` the
+ *      host ran without one) \u2192 the plugin instance's location, the only directory
+ *      this file knows.
+ *   3. a session that is known but whose directory cannot be resolved \u2192 a typed
+ *      failure, deliberately NOT the case-2 fallback: committing to the primary
+ *      because a lookup failed is the exact defect this exists to stop, and a
+ *      silent `ok: true` on the wrong branch is worse than a refused call.
+ *
+ * `process.cwd()` is not a candidate: it is the host process's launch directory
+ * (a background `opencode serve` carries its own), never the session's. The
+ * item's recorded `worktree_path` cannot be one either — reading it needs the
+ * tracker root this function is resolving.
+ */
+export async function resolveToolCwd(
+  kernel: ArgonKernel,
+  command: string,
+  options: ArgonToolOptions,
+  tool?: ArgonToolCallContext,
+): Promise<{ cwd: string } | { error: ArgonToolError }> {
+  const sessionID = sessionToken(tool?.sessionID)
+  if (sessionID === undefined || options.sessionDirectory === undefined) {
+    return { cwd: options.cwd }
+  }
+  let directory: string | undefined
+  let failure: string | undefined
+  try {
+    directory = asString(await options.sessionDirectory(sessionID))
+  } catch (error) {
+    failure = detail(error)
+  }
+  if (directory === undefined) {
+    const cause = failure === undefined ? "" : ` (${boundedNativeText(failure, MAX_NATIVE_DETAIL_CHARS)})`
+    return {
+      error: new ArgonToolError(
+        kernel.failEnvelope({
+          command,
+          code: SESSION_ROOT_UNRESOLVED,
+          message:
+            `could not resolve the working directory of session ${sessionID}${cause}; refusing ` +
+            `to fall back to the plugin location ${options.cwd}, which would commit to the ` +
+            "checkout this plugin was loaded from instead of the session's own",
+        }),
+      ),
+    }
+  }
+  return { cwd: directory }
 }
 
 type ArgonToolSpec = {
@@ -1982,6 +2108,246 @@ function worktreeFail(
   }
 }
 
+/** A start failure with the bounded preparation/commit receipt attached. */
+function startFailure(
+  kernel: ArgonKernel,
+  message: string,
+  conventionVersion: number | undefined,
+  payload: Record<string, unknown>,
+): { ok: false; envelope: Record<string, unknown> } {
+  const failure = worktreeFail(
+    kernel,
+    "start",
+    "START_FAILED",
+    boundedNativeText(message, MAX_NATIVE_ERROR_CHARS),
+    conventionVersion,
+  )
+  return { ...failure, envelope: { ...failure.envelope, ...payload } }
+}
+
+/** Failure before a claim commit is attempted, with a consistent receipt. */
+function startNotAttempted(
+  kernel: ArgonKernel,
+  message: string,
+  conventionVersion: number | undefined,
+  payload: Record<string, unknown>,
+  reason: string,
+): { ok: false; envelope: Record<string, unknown> } {
+  return startFailure(kernel, message, conventionVersion, {
+    ...payload,
+    claimCommitted: false,
+    claimCommit: claimCommitNotAttempted(reason),
+  })
+}
+
+/** The kernel's coverage union (`ManifestCoverage` in `lib/src/worktree.ts`). */
+type NativeManifestCoverage = "satisfied" | "stale" | "unknown"
+
+type NativePreparationReceipt = {
+  ready: boolean
+  install: string
+  linkedNodeModules: boolean
+  builtWorkspaces: string[]
+  linkedWorkspaces: string[]
+  /**
+   * Whether the install provides what the worktree's own `package.json`
+   * declares, and which declared names it does not provide
+   * (bug-worktree-readiness-misses-stale-primary-install). Forwarded from the
+   * kernel receipt, which owns the check and the list cap: a native caller
+   * reading only `ready: false` would have to shell out to the CLI to learn
+   * WHICH declared dependency the mirrored install is missing.
+   */
+  manifestCoverage: NativeManifestCoverage
+  missingDependencies: string[]
+  missingDependenciesTotal: number
+  truncated?: boolean
+}
+
+type NativeClaimCommitReceipt = {
+  status: "committed" | "already-committed" | "not-needed" | "not-attempted" | "failed"
+  committed: boolean
+  hash?: string
+  message?: string
+  skipped?: string
+  reason?: string
+  ignored?: string[]
+}
+
+type NativeCommitResult = {
+  committed: boolean
+  skipReason?: string
+  hash?: string
+  message?: string
+  ignored?: string[]
+}
+
+/**
+ * Keep a receipt bounded even when an install or git error is attacker-shaped.
+ *
+ * The dependency-coverage fields are PROJECTED, never re-derived: the kernel
+ * receipt (`prepareWorktreeDependencies`) owns the manifest check and already
+ * caps `missingDependencies` at `MAX_MISSING_DEPENDENCIES` (10) — below this
+ * function's own list cap, so there is nothing left to re-slice. Only the
+ * per-name character bound is re-applied, like every other name in the receipt,
+ * and a kernel-side truncation is folded into the shared `truncated` flag so a
+ * capped list is never passed off as the whole set.
+ */
+function boundedPreparation(input: {
+  ready: boolean
+  install: string
+  linkedNodeModules: boolean
+  builtWorkspaces: string[]
+  linkedWorkspaces: string[]
+  manifestCoverage: NativeManifestCoverage
+  missingDependencies: string[]
+  missingDependenciesTotal: number
+}): NativePreparationReceipt {
+  const built = input.builtWorkspaces
+    .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+    .map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS))
+  const linked = input.linkedWorkspaces
+    .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+    .map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS))
+  const missing = input.missingDependencies.map((name) =>
+    boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+  )
+  const truncated =
+    input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
+    input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
+    input.missingDependenciesTotal > input.missingDependencies.length ||
+    built.some((name, index) => name !== input.builtWorkspaces[index]) ||
+    linked.some((name, index) => name !== input.linkedWorkspaces[index]) ||
+    missing.some((name, index) => name !== input.missingDependencies[index])
+  return {
+    ready: input.ready,
+    install: input.install,
+    linkedNodeModules: input.linkedNodeModules,
+    builtWorkspaces: built,
+    linkedWorkspaces: linked,
+    manifestCoverage: input.manifestCoverage,
+    missingDependencies: missing,
+    missingDependenciesTotal: input.missingDependenciesTotal,
+    ...(truncated ? { truncated: true } : {}),
+  }
+}
+
+function boundedNames(names: string[] | undefined): string[] | undefined {
+  if (names === undefined) return undefined
+  return names
+    .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+    .map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS))
+}
+
+/** Project the shared commit result into a bounded native `commit` payload. */
+function boundedCommitPayload(result: NativeCommitResult): Record<string, unknown> {
+  const ignored = boundedNames(result.ignored)
+  if (result.committed) {
+    return {
+      ...(result.hash !== undefined
+        ? { hash: boundedNativeText(result.hash, MAX_NATIVE_DETAIL_CHARS) }
+        : {}),
+      ...(result.message !== undefined
+        ? { message: boundedNativeText(result.message, MAX_NATIVE_DETAIL_CHARS) }
+        : {}),
+      ...(ignored !== undefined ? { ignored } : {}),
+    }
+  }
+  return {
+    skipped: boundedNativeText(result.skipReason ?? "skipped", MAX_NATIVE_DETAIL_CHARS),
+    ...(ignored !== undefined ? { ignored } : {}),
+  }
+}
+
+function claimCommitFailure(skipped: string): NativeClaimCommitReceipt {
+  return {
+    status: "failed",
+    committed: false,
+    skipped: boundedNativeText(skipped || "claim commit failed", MAX_NATIVE_DETAIL_CHARS),
+  }
+}
+
+function claimCommitNotAttempted(reason: string): NativeClaimCommitReceipt {
+  return {
+    status: "not-attempted",
+    committed: false,
+    reason: boundedNativeText(reason, MAX_NATIVE_DETAIL_CHARS),
+  }
+}
+
+function envelopeMessage(envelope: Record<string, unknown>, fallback: string): string {
+  const error =
+    envelope.error !== null && typeof envelope.error === "object"
+      ? (envelope.error as Record<string, unknown>)
+      : undefined
+  return boundedNativeText(asString(error?.message) ?? fallback, MAX_NATIVE_DETAIL_CHARS)
+}
+
+/**
+ * Commit the claim file explicitly after the kernel update writes its fields.
+ * `updateOperation`'s generic auto-commit is intentionally disabled here: it is
+ * best-effort, and a failed pre-commit hook would otherwise be hidden behind an
+ * `ok:true` update envelope. The tracker-commit helper still owns surgical
+ * staging and the normal git/pre-commit path; native start owns when it runs.
+ */
+function commitNativeClaim(
+  kernel: ArgonKernel,
+  cwd: string,
+  id: string,
+): {
+  receipt: NativeClaimCommitReceipt
+  payload?: Record<string, unknown>
+} {
+  const shown = kernel.showOperation({ cwd, id, meta: true })
+  if (!shown.ok) {
+    return { receipt: claimCommitNotAttempted(envelopeMessage(shown.envelope, "claim item lookup failed")) }
+  }
+  const path = asString(shown.envelope.path)
+  if (path === undefined) return { receipt: claimCommitNotAttempted("claim item path unavailable") }
+
+  const result = kernel.commitTrackerMutation(cwd, [resolve(cwd, path)], {
+    // Keep the native tracker convention used by updateOperation; only the
+    // explicitness and failure handling change here.
+    message: kernel.trackerCommitMessage("claimed", [id]),
+    commit: true,
+  })
+  const ignored = boundedNames(result.ignored)
+  if (result.committed) {
+    return {
+      receipt: {
+        status: "committed",
+        committed: true,
+        ...(result.hash !== undefined
+          ? { hash: boundedNativeText(result.hash, MAX_NATIVE_DETAIL_CHARS) }
+          : {}),
+        ...(result.message !== undefined
+          ? { message: boundedNativeText(result.message, MAX_NATIVE_DETAIL_CHARS) }
+          : {}),
+        ...(ignored !== undefined ? { ignored } : {}),
+      },
+      payload: boundedCommitPayload(result),
+    }
+  }
+  if (result.skipReason === "nothing to commit") {
+    // The item was already committed (or this invocation was a true no-op).
+    // No second commit is claimed, and the kernel's benign skip is not exposed
+    // as a misleading `commit` payload.
+    return {
+      receipt: {
+        status: "not-needed",
+        committed: true,
+        ...(ignored !== undefined ? { ignored } : {}),
+      },
+    }
+  }
+  return {
+    receipt: {
+      ...claimCommitFailure(result.skipReason ?? "git commit failed"),
+      ...(ignored !== undefined ? { ignored } : {}),
+    },
+    payload: boundedCommitPayload(result),
+  }
+}
+
 /**
  * Run a worktree tool body with the plugin's failure-isolation contract: an
  * unexpected exception (a kernel throw, a broken domain promise) becomes a
@@ -1997,6 +2363,20 @@ async function guarded(
     return await body()
   } catch (error) {
     logOnce(`worktree-${command}`, `${command} failed unexpectedly`, error)
+    if (command === "start") {
+      // This catch only sees throws from BEFORE nativeStart's progress handler
+      // is installed (id/root/item/assignee resolution), where no claim commit
+      // can exist yet — a not-attempted receipt is truthful. Every phase after
+      // that is wrapped by nativeStart itself and reports its observed state,
+      // so a landed claim commit is never downgraded here (review R2).
+      return startNotAttempted(
+        kernel,
+        detail(error),
+        undefined,
+        {},
+        "unexpected start failure before claim setup",
+      )
+    }
     return worktreeFail(kernel, command, code, detail(error))
   }
 }
@@ -2085,32 +2465,193 @@ async function createItemWorktree(
   }
 }
 
+/** The one observed removal rule every worktree remover in this plugin shares. */
+type WorktreeRemovalObservation = {
+  /**
+   * True only when the directory is gone AND `git worktree list` no longer
+   * reports it. Never inferred from a resolved promise or a zero exit code.
+   */
+  removed: boolean;
+  /** Which step actually removed it (null when nothing did). */
+  via: "domain" | "git" | null;
+  /** Why the removal did not complete (empty when it did). */
+  errors: string[];
+};
+
 /**
- * Remove a worktree this run created (claim refused / branch setup failed) and
- * — only when this run also created the branch — delete it, so a lost race
- * leaves nothing behind without ever destroying a pre-existing branch.
- * Best-effort by design: a rollback failure is logged, never thrown, and never
- * hides the original error.
+ * Force policy for a removal attempt chain. It is a policy input, not a second
+ * rule: the observation below is identical for every caller, so the start
+ * rollback and the cleanup prune can never disagree what "removed" means.
+ */
+type WorktreeRemovalPolicy = {
+  /**
+   * Applies to the domain call AND the git fallback. The start rollback forces
+   * (it discards a worktree this run just created); the cleanup prune does not,
+   * so git keeps refusing dirty worktrees exactly like `arggon cleanup --prune`.
+   */
+  force: boolean;
+};
+
+/**
+ * Remove one worktree and OBSERVE the result — the single removal/observation
+ * implementation shared by the native `start` rollback ({@link discardWorktree})
+ * and the native `cleanup` prune ({@link nativeCleanup}).
+ *
+ * The domain is the preferred path, but a resolved promise is not a removal: a
+ * domain that fails, or that leaves the worktree in place, falls through to the
+ * literal `git worktree remove` fallback, and the directory plus the git
+ * inventory are checked after every step. Callers gate every consequential
+ * action (branch deletion, `worktree_path` clearing) on `removed`.
+ */
+async function removeWorktreeObserved(
+  options: ArgonToolOptions,
+  directory: string,
+  root: string,
+  policy: WorktreeRemovalPolicy,
+): Promise<WorktreeRemovalObservation> {
+  const errors: string[] = [];
+  const domain = options.worktree?.domain;
+  const projectID = asString(options.worktree?.projectID);
+  // Physical state AND git inventory: a removal is complete only when both agree.
+  const gone = async (): Promise<boolean> =>
+    !existsSync(directory) && !(await isRegisteredWorktree(root, directory));
+  let via: WorktreeRemovalObservation["via"] = null;
+
+  if (domain?.remove !== undefined && projectID !== undefined) {
+    try {
+      await domain.remove({ projectID, directory, force: policy.force });
+      if (await gone()) via = "domain";
+      else errors.push("the worktree domain resolved without removing the worktree");
+    } catch (error) {
+      errors.push(`worktree domain removal failed: ${detail(error)}`);
+    }
+  }
+
+  if (via === null) {
+    const removed = await run(
+      "git",
+      ["worktree", "remove", ...(policy.force ? ["--force"] : []), directory],
+      root,
+      30_000,
+    );
+    if (removed.code !== 0) {
+      errors.push(
+        `git worktree removal failed: ${removed.stderr.trim() || `exit ${removed.code ?? "unknown"}`}`,
+      );
+    } else if (await gone()) {
+      via = "git";
+    } else {
+      // A zero exit is not proof either: report the leftover, not the success.
+      errors.push(`git worktree remove exited 0 but the worktree remains at ${directory}`);
+    }
+  }
+
+  const removed = via !== null;
+  if (!removed) errors.push(`worktree remains at ${directory}`);
+  return { removed, via, errors };
+}
+
+type DiscardWorktreeResult = {
+  worktreeRemoved: boolean;
+  /** null means this run did not own a branch, so no branch deletion was due. */
+  branchDeleted: boolean | null;
+  error?: string;
+};
+
+/**
+ * Remove a worktree this run created and observe the result with the same
+ * primitive the cleanup prune uses (forced: the worktree is seconds old and
+ * holds nothing but this run's scaffolding). The directory and git inventory
+ * are checked before a branch is deleted: a rollback is never described as
+ * successful from an unobserved promise.
  */
 async function discardWorktree(
   options: ArgonToolOptions,
   directory: string,
   branch?: string,
-): Promise<void> {
-  const domain = options.worktree?.domain
-  const projectID = asString(options.worktree?.projectID)
-  if (domain?.remove !== undefined && projectID !== undefined) {
-    try {
-      await domain.remove({ projectID, directory, force: true })
-    } catch (error) {
-      logOnce("worktree-rollback", "worktree domain rollback failed", error)
-    }
-  } else {
-    await run("git", ["worktree", "remove", "--force", directory], options.cwd, 30_000)
-  }
+): Promise<DiscardWorktreeResult> {
+  const canonical = canonicalRoot(options, options.cwd);
+  const observation = await removeWorktreeObserved(options, directory, canonical, { force: true });
+  const errors = [...observation.errors];
+  const worktreeRemoved = observation.removed;
+
+  let branchDeleted: boolean | null = branch === undefined ? null : false;
   if (branch !== undefined) {
-    await run("git", ["branch", "-D", branch], options.cwd, 10_000)
+    // Never delete the branch until the worktree is observably gone.
+    if (!worktreeRemoved) {
+      errors.push(`branch ${branch} was kept because its worktree remains`);
+    } else {
+      const deleted = await run("git", ["branch", "-D", branch], canonical, 10_000);
+      branchDeleted = deleted.code === 0;
+      if (!branchDeleted) {
+        errors.push(
+          `git branch deletion failed: ${deleted.stderr.trim() || `exit ${deleted.code ?? "unknown"}`}`,
+        );
+      }
+    }
   }
+
+  return {
+    worktreeRemoved,
+    branchDeleted,
+    ...(errors.length > 0
+      ? { error: boundedNativeText(errors.join("; "), MAX_NATIVE_DETAIL_CHARS) }
+      : {}),
+  };
+}
+
+type ClaimCleanupResult = {
+  preparationRemoved: boolean;
+  discard?: DiscardWorktreeResult;
+};
+
+async function cleanupClaimArtifacts(
+  options: ArgonToolOptions,
+  kernel: ArgonKernel,
+  primaryRoot: string,
+  worktreePath: string | undefined,
+  worktreeCreated: boolean,
+  branchCreated: boolean,
+  branch: string,
+  preparation: NativePreparationReceipt | undefined,
+): Promise<ClaimCleanupResult> {
+  const preparationRemoved =
+    preparation?.linkedNodeModules !== true || worktreePath === undefined
+      ? true
+      : kernel.unlinkNodeModulesLink(primaryRoot, worktreePath);
+  const discard =
+    worktreeCreated && worktreePath !== undefined
+      ? await discardWorktree(options, worktreePath, branchCreated ? branch : undefined)
+      : undefined;
+  return { preparationRemoved, ...(discard !== undefined ? { discard } : {}) };
+}
+
+function cleanupDescription(
+  cleanup: ClaimCleanupResult,
+  worktreeCreated: boolean,
+  worktreePath: string | undefined,
+  branch: string,
+): string {
+  if (!worktreeCreated) {
+    return cleanup.preparationRemoved
+      ? ""
+      : `the start-owned dependency link could not be removed from ${worktreePath ?? "the worktree"}`;
+  }
+  const discard = cleanup.discard;
+  if (
+    cleanup.preparationRemoved &&
+    discard?.worktreeRemoved === true &&
+    (discard.branchDeleted === true || discard.branchDeleted === null)
+  ) {
+    return "the worktree created by this run was removed again";
+  }
+  const details = [
+    cleanup.preparationRemoved ? undefined : "the start-owned dependency link remains",
+    discard?.worktreeRemoved === false ? `the worktree remains at ${worktreePath ?? "the created path"}` : undefined,
+    discard?.branchDeleted === false ? `the branch remains: ${branch}` : undefined,
+    discard?.error,
+  ].filter((value): value is string => value !== undefined);
+  return `rollback incomplete: ${details.join("; ")}`;
 }
 
 /**
@@ -2185,6 +2726,227 @@ async function staleClaimFields(
   return differing.length === 0 ? undefined : differing.join(", ")
 }
 
+/** Preflight the branch switch and clean-tree conditions for plain start. */
+async function preflightPlainBranch(
+  kernel: ArgonKernel,
+  options: ArgonToolOptions,
+  root: string,
+  branch: string,
+): Promise<string | undefined> {
+  const ref = await run("git", ["check-ref-format", "--branch", branch], options.cwd, 10_000)
+  if (ref.code !== 0) {
+    return `branch '${branch}' is not a valid git branch (${ref.stderr.trim() || `git exit ${ref.code ?? "unknown"}`})`
+  }
+  const worktrees = await run("git", ["worktree", "list", "--porcelain"], options.cwd, 10_000)
+  if (worktrees.code !== 0) {
+    return `could not inspect git worktrees before branch setup (${worktrees.stderr.trim() || `git exit ${worktrees.code ?? "unknown"}`})`
+  }
+  let worktreePath: string | undefined
+  for (const line of worktrees.stdout.split("\n")) {
+    if (line.startsWith("worktree ")) {
+      worktreePath = line.slice("worktree ".length).trim()
+    } else if (line.trim() === `branch refs/heads/${branch}`) {
+      if (worktreePath !== undefined && resolve(worktreePath) !== resolve(options.cwd)) {
+        return `branch '${branch}' is already checked out at ${worktreePath}; detach it before plain start`
+      }
+    }
+  }
+  const status = await run("git", ["status", "--porcelain", "--untracked-files=all"], options.cwd, 10_000)
+  if (status.code !== 0) {
+    return `could not inspect the canonical working tree before branch setup (${status.stderr.trim() || `git exit ${status.code ?? "unknown"}`})`
+  }
+  const tracker = relative(root, kernel.findTasksDir(root)).split(sep).join("/")
+  const blocked = status.stdout.split("\n").filter((line) => {
+    if (line.trim().length === 0) return false
+    const code = line.slice(0, 2)
+    const path = line.slice(3).replace(/^"|"$/g, "")
+    return !(code === "??" && !path.startsWith(`${tracker}/`))
+  })
+  if (blocked.length > 0) {
+    return "the canonical working tree has tracked or tracker changes; commit/stash them before plain start"
+  }
+  return undefined
+}
+
+/**
+ * State observed SO FAR by a native start. Every phase records into this
+ * object, so an unexpected throw can report what actually happened instead of
+ * a blanket "nothing was attempted" — a claim commit that already landed must
+ * stay reported as committed (review R2).
+ */
+type NativeStartProgress = {
+  id: string
+  branch: string
+  version: number
+  /** Coarse phase label used in unexpected-failure messages. */
+  stage: string
+  worktreePath?: string
+  worktreeCreated: boolean
+  branchCreated: boolean
+  preparation?: NativePreparationReceipt
+  item?: unknown
+  claim?: { receipt: NativeClaimCommitReceipt; payload?: Record<string, unknown> }
+  pushed?: boolean
+}
+
+/** Bounded payload projection of the observed start state. */
+function startProgressPayload(progress: NativeStartProgress): Record<string, unknown> {
+  return {
+    id: progress.id,
+    branch: progress.branch,
+    worktreePath: progress.worktreePath ?? null,
+    worktreeCreated: progress.worktreeCreated,
+    branchCreated: progress.branchCreated,
+    ...(progress.preparation !== undefined ? { preparation: progress.preparation } : {}),
+    ...(progress.item !== undefined ? { item: progress.item } : {}),
+    ...(progress.claim !== undefined
+      ? { claimCommitted: progress.claim.receipt.committed, claimCommit: progress.claim.receipt }
+      : {}),
+    ...(progress.claim?.payload !== undefined ? { commit: progress.claim.payload } : {}),
+    ...(progress.pushed !== undefined ? { pushed: progress.pushed } : {}),
+  }
+}
+
+/**
+ * Unexpected throw inside the start body. Before the claim commit is attempted
+ * this keeps the not-attempted receipt; AFTER the commit landed it reports the
+ * real committed outcome (status + hash) so a late failure can never claim
+ * that no commit happened.
+ */
+function unexpectedStartFailure(
+  kernel: ArgonKernel,
+  error: unknown,
+  progress: NativeStartProgress,
+): { ok: false; envelope: Record<string, unknown> } {
+  const observed = startProgressPayload(progress)
+  const where = boundedNativeText(progress.stage, MAX_NATIVE_DETAIL_CHARS)
+  const cause = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)
+  if (progress.claim !== undefined) {
+    const committed = progress.claim.receipt.committed
+    return startFailure(
+      kernel,
+      committed
+        ? `start failed unexpectedly after ${where}, but the claim commit already landed ` +
+            `(${progress.claim.receipt.hash ?? "committed"}); the branch and claim were kept. ${cause}. ` +
+            "Re-run tools.arggon.start to attach and confirm the recorded state."
+        : `start failed unexpectedly after ${where}; the claim commit was attempted and did not land. ` +
+            `${cause}. Fix the reported cause, then re-run tools.arggon.start to attach and retry.`,
+      progress.version,
+      observed,
+    )
+  }
+  return startNotAttempted(
+    kernel,
+    `start failed unexpectedly after ${where}; no claim commit was attempted. ${cause}`,
+    progress.version,
+    observed,
+    `unexpected start failure after ${where}`,
+  )
+}
+
+/** Never-throwing wrapper: even a broken failure path still names the phase. */
+function safeUnexpectedStartFailure(
+  kernel: ArgonKernel,
+  error: unknown,
+  progress: NativeStartProgress | undefined,
+  fallback: { id: string; version: number },
+): { ok: false; envelope: Record<string, unknown> } {
+  const message = boundedNativeText(
+    `start failed unexpectedly: ${detail(error)}`,
+    MAX_NATIVE_ERROR_CHARS,
+  )
+  try {
+    if (progress === undefined) {
+      return startNotAttempted(
+        kernel,
+        message,
+        fallback.version,
+        { id: fallback.id },
+        "unexpected start failure before branch setup",
+      )
+    }
+    return unexpectedStartFailure(kernel, error, progress)
+  } catch {
+    return {
+      ok: false,
+      envelope: {
+        ok: false,
+        schemaVersion: 1,
+        conventionVersion: fallback.version,
+        command: "start",
+        error: { code: "START_FAILED", message },
+        id: fallback.id,
+        ...(progress === undefined
+          ? { claimCommitted: false, claimCommit: claimCommitNotAttempted("unexpected start failure") }
+          : startProgressPayload(progress)),
+      },
+    }
+  }
+}
+
+type PlainBranchRollback = {
+  /** null = this run did not create the branch, so nothing was owned. */
+  branchDeleted: boolean | null
+  restoredBranch?: string
+  error?: string
+}
+
+/**
+ * Roll back ONLY a branch this run created in the canonical checkout: leave the
+ * branch first (a checked-out branch cannot be deleted), then delete it. A
+ * pre-existing/attached branch is never touched, and both steps are observed so
+ * the caller never claims a rollback that did not happen (review R1).
+ */
+async function rollbackOwnedPlainBranch(
+  options: ArgonToolOptions,
+  branch: string,
+  branchCreated: boolean,
+  previousBranch: string | undefined,
+): Promise<PlainBranchRollback> {
+  if (!branchCreated) return { branchDeleted: null }
+  const errors: string[] = []
+  const detached = previousBranch === undefined || previousBranch === "HEAD"
+  const back = detached
+    ? await run("git", ["switch", "--detach"], options.cwd, 10_000)
+    : await run("git", ["switch", previousBranch], options.cwd, 10_000)
+  if (back.code !== 0) {
+    errors.push(
+      `could not leave branch ${branch}: ${back.stderr.trim() || `git switch exit ${back.code ?? "unknown"}`}`,
+    )
+  }
+  let branchDeleted = false
+  if (back.code === 0) {
+    const deleted = await run("git", ["branch", "-D", branch], options.cwd, 10_000)
+    branchDeleted = deleted.code === 0
+    if (!branchDeleted) {
+      errors.push(
+        `git branch deletion failed: ${deleted.stderr.trim() || `git exit ${deleted.code ?? "unknown"}`}`,
+      )
+    }
+  } else {
+    errors.push(`branch ${branch} was kept because the checkout could not leave it`)
+  }
+  return {
+    branchDeleted,
+    ...(back.code === 0 ? { restoredBranch: detached ? "HEAD" : previousBranch } : {}),
+    ...(errors.length > 0
+      ? { error: boundedNativeText(errors.join("; "), MAX_NATIVE_DETAIL_CHARS) }
+      : {}),
+  }
+}
+
+/** Human summary of a plain-branch rollback, never claiming more than observed. */
+function plainRollbackDescription(rollback: PlainBranchRollback, branch: string): string {
+  if (rollback.branchDeleted === null) return ""
+  if (rollback.branchDeleted) {
+    return (
+      "the branch created by this run was removed again and the checkout was restored to " +
+      `${rollback.restoredBranch ?? "its previous HEAD"}`
+    )
+  }
+  return `rollback incomplete: ${rollback.error ?? `the branch remains: ${branch}`}`
+}
+
 /**
  * `start` (native): claim + branch record + worktree through the domain, with
  * every rule enforced by the kernel (`updateOperation` with `agent: true` —
@@ -2193,6 +2955,10 @@ async function staleClaimFields(
  * feature branch and the canonical checkout stays untouched, exactly like
  * `arggon start --worktree`. The PR step (`gh`) is deliberately not part of
  * the tool.
+ *
+ * Ordering: branch ownership is settled (create/attach/switch) BEFORE the claim
+ * mutation, so a failed switch leaves the item untouched; a later claim refusal
+ * rolls back only a branch this run created and reports what was observed.
  */
 async function nativeStart(
   kernel: ArgonKernel,
@@ -2200,37 +2966,101 @@ async function nativeStart(
   options: ArgonToolOptions,
 ): Promise<{ ok: boolean; envelope: Record<string, unknown> }> {
   const id = asString(input.id)
-  if (id === undefined) return worktreeFail(kernel, "start", "START_FAILED", "id is required")
+  if (id === undefined) {
+    return startNotAttempted(kernel, "id is required", undefined, {}, "invalid id")
+  }
   let root: string
   try {
     root = sessionRoot(kernel, options.cwd)
   } catch (error) {
-    return worktreeFail(kernel, "start", "START_FAILED", detail(error))
+    return startNotAttempted(
+      kernel,
+      detail(error),
+      undefined,
+      { id },
+      "session root unavailable",
+    )
   }
   const version = kernel.readConventionVersion(root)
   const show = kernel.showOperation({ cwd: options.cwd, id, meta: true })
-  if (!show.ok) return remapFailure(show.envelope, "start", "START_FAILED")
+  if (!show.ok) {
+    return startNotAttempted(
+      kernel,
+      envelopeMessage(show.envelope, "item lookup failed"),
+      version,
+      { id },
+      "item lookup failed",
+    )
+  }
   const item = (show.envelope.item ?? {}) as Record<string, unknown>
   const assignee =
     asString(input.assignee) ?? asString(kernel.resolveCurrentLogin()) ?? undefined
   if (assignee === undefined) {
-    return worktreeFail(
+    return startNotAttempted(
       kernel,
-      "start",
-      "START_FAILED",
       "could not resolve assignee (pass assignee, or set GITHUB_USER/GITHUB_ACTOR, or authenticate gh)",
       version,
+      { id },
+      "assignee unavailable",
     )
   }
-  const branch = itemBranch(kernel, root, item, input.branch)
+  // Everything past this point runs under the progress handler: an unexpected
+  // throw reports the state observed so far, so a claim commit that already
+  // landed is never downgraded to "not attempted".
+  let progress: NativeStartProgress | undefined
+  try {
+    progress = {
+      id,
+      branch: itemBranch(kernel, root, item, input.branch),
+      version,
+      stage: "branch setup",
+      worktreeCreated: false,
+      branchCreated: false,
+    }
+    return await nativeStartBody(kernel, input, options, progress, item, root, assignee)
+  } catch (error) {
+    return safeUnexpectedStartFailure(kernel, error, progress, { id, version })
+  }
+}
+
+/** The claim/branch/worktree phases of native start, after item resolution. */
+async function nativeStartBody(
+  kernel: ArgonKernel,
+  input: Record<string, unknown>,
+  options: ArgonToolOptions,
+  progress: NativeStartProgress,
+  item: Record<string, unknown>,
+  root: string,
+  assignee: string,
+): Promise<{ ok: boolean; envelope: Record<string, unknown> }> {
+  const { id, branch, version } = progress
+  const primaryRoot = canonicalRoot(options, root)
 
   const wantWorktree = input.worktree !== false
-  let worktreePath = asString(item.worktree_path)
+  // `worktree: false` is an explicit branch-only mode. Do not attach to (or
+  // prepare) a stale `worktree_path` left by an earlier run; the canonical
+  // checkout is the target and the result must report no worktree for this
+  // invocation. The existing record is preserved, matching the CLI's plain
+  // start path, which never clears an unrelated worktree record implicitly.
+  let worktreePath = wantWorktree ? asString(item.worktree_path) : undefined
   if (worktreePath !== undefined && !existsSync(worktreePath)) worktreePath = undefined
-  let worktreeCreated = false
-  let branchCreated = false
+  progress.worktreePath = worktreePath
+  /** Branch we were on before a plain start; needed to undo an owned branch. */
+  let plainPreviousBranch: string | undefined
+
+  const context = (extra: Record<string, unknown> = {}): Record<string, unknown> => ({
+    ...startProgressPayload(progress),
+    ...extra,
+  })
+  const failBeforeClaim = (
+    message: string,
+    reason: string,
+    extra: Record<string, unknown> = {},
+  ): { ok: false; envelope: Record<string, unknown> } =>
+    startNotAttempted(kernel, message, version, context(extra), reason)
+
   if (wantWorktree) {
-    const canonical = canonicalRoot(options, root)
+    const canonical = primaryRoot
     if (worktreePath === undefined) {
       // Deterministic attach (CLI parity): a previous start's records live on
       // its feature branch, so the canonical copy cannot see them — the fixed
@@ -2239,119 +3069,279 @@ async function nativeStart(
       const defaultPath = join(resolve(canonical, ".."), `${basename(canonical)}-${id}`)
       if (existsSync(defaultPath)) worktreePath = defaultPath
     }
+    // The canonical copy never sees the worktree record (it lives on the
+    // feature branch), so the deterministic attach path found above is the
+    // only place `worktreePath` becomes known for a re-run.
+    progress.worktreePath = worktreePath
     if (worktreePath !== undefined) {
       // Attach guard for BOTH paths (recorded `worktree_path` and the
       // deterministic default): a directory that is not a worktree of THIS
       // repo is never adopted — otherwise `start` would create/switch branches
       // inside a foreign repository that happens to sit at that path.
       if (!(await isRegisteredWorktree(canonical, worktreePath))) {
-        return worktreeFail(
-          kernel,
-          "start",
-          "START_FAILED",
+        return failBeforeClaim(
           `${worktreePath} exists but is not a git worktree of this repo ` +
             "(move or remove the path first, or use the CLI fallback `arggon start --worktree`)",
-          version,
+          "foreign worktree refused",
         )
       }
     } else {
       const created = await createItemWorktree(options, root, id)
       if (created.directory === undefined) {
-        return worktreeFail(kernel, "start", "START_FAILED", created.error ?? "worktree creation failed", version)
+        return failBeforeClaim(
+          created.error ?? "worktree creation failed",
+          "worktree creation failed",
+        )
       }
       worktreePath = created.directory
-      worktreeCreated = true
+      progress.worktreePath = worktreePath
+      progress.worktreeCreated = true
       // The fresh worktree reflects HEAD; the canonical working tree may be
       // ahead (an uncommitted claim would be invisible here and the kernel
       // would re-claim a stale copy). Refuse instead of guessing.
       const stale = await staleClaimFields(kernel, options.cwd, worktreePath, id)
       if (stale !== undefined) {
-        // The branch was not created yet (no `ensureWorktreeBranch`): the
-        // rollback removes only the worktree this run created.
-        await discardWorktree(options, worktreePath)
-        return worktreeFail(
+        const cleanup = await cleanupClaimArtifacts(
+          options,
           kernel,
-          "start",
-          "START_FAILED",
+          primaryRoot,
+          worktreePath,
+          progress.worktreeCreated,
+          progress.branchCreated,
+          branch,
+          progress.preparation,
+        )
+        const rollback = cleanup.discard !== undefined
+          ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
+          : { rollback: { preparationRemoved: cleanup.preparationRemoved } }
+        return failBeforeClaim(
           `the canonical checkout has uncommitted tracker changes for '${id}' (${stale}); ` +
-            "commit or discard them, or use the CLI fallback `arggon start --worktree` " +
-            "(the worktree created by this run was removed again)",
-          version,
+            "commit or discard them, or use the CLI fallback `arggon start --worktree`. " +
+            cleanupDescription(cleanup, progress.worktreeCreated, worktreePath, branch),
+          "stale canonical claim refused",
+          rollback,
         )
       }
     }
+    progress.stage = "branch setup"
     const ensured = await ensureWorktreeBranch(worktreePath, branch)
     if (!ensured.ok) {
       // `ensured.created` is false whenever setup failed, so this run never
       // created the branch: never delete it on rollback.
-      if (worktreeCreated) await discardWorktree(options, worktreePath)
-      return worktreeFail(
+      const cleanup = await cleanupClaimArtifacts(
+        options,
         kernel,
-        "start",
-        "START_FAILED",
-        `branch setup failed in ${worktreePath}: ${ensured.error ?? "unknown git error"}`,
-        version,
+        primaryRoot,
+        worktreePath,
+        progress.worktreeCreated,
+        false,
+        branch,
+        progress.preparation,
+      )
+      const rollback = cleanup.discard !== undefined
+        ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
+        : { rollback: { preparationRemoved: cleanup.preparationRemoved } }
+      return failBeforeClaim(
+        `branch setup failed in ${worktreePath}: ${ensured.error ?? "unknown git error"}. ` +
+          cleanupDescription(cleanup, progress.worktreeCreated, worktreePath, branch),
+        "branch setup failed",
+        rollback,
       )
     }
-    branchCreated = ensured.created
+    progress.branchCreated = ensured.created
+  } else {
+    // Match the CLI plain-start ownership rule before any mutation: an existing
+    // generated branch with no matching recorded branch is a conflict, not an
+    // implicit attach. An explicit branch or a recorded matching branch may
+    // attach.
+    const branchCheck = await run(
+      "git",
+      ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`],
+      options.cwd,
+      10_000,
+    )
+    if (branchCheck.code !== 0 && branchCheck.code !== 1) {
+      return failBeforeClaim(
+        `could not inspect branch '${branch}': ${branchCheck.stderr.trim() || `git exit ${branchCheck.code ?? "unknown"}`}`,
+        "branch ownership preflight failed",
+      )
+    }
+    if (
+      branchCheck.code === 0 &&
+      asString(input.branch) === undefined &&
+      asString(item.branch) !== branch
+    ) {
+      return failBeforeClaim(
+        `branch '${branch}' already exists but the item has no matching recorded branch; ` +
+          "record it explicitly or choose another branch",
+        "branch ownership conflict",
+      )
+    }
+    const preflight = await preflightPlainBranch(kernel, options, root, branch)
+    if (preflight !== undefined) {
+      return failBeforeClaim(preflight, "plain-start preflight failed")
+    }
+    // Order matters: settle branch ownership (create/attach/switch) BEFORE the
+    // claim mutation. A switch that fails here therefore leaves the item
+    // untouched instead of a claimed-but-dirty file plus a not-attempted
+    // receipt (review R1).
+    const previous = await run("git", ["rev-parse", "--abbrev-ref", "HEAD"], options.cwd, 10_000)
+    plainPreviousBranch = previous.code === 0 ? previous.stdout.trim() || undefined : undefined
+    const ensured = await ensureWorktreeBranch(options.cwd, branch)
+    if (!ensured.ok) {
+      return failBeforeClaim(
+        `branch setup failed in ${options.cwd}: ${ensured.error ?? "unknown git error"}; ` +
+          "the item was not modified",
+        "branch setup failed",
+      )
+    }
+    progress.branchCreated = ensured.created
   }
 
+  if (worktreePath !== undefined) {
+    progress.stage = "dependency preparation"
+    try {
+      // The shared kernel receipt runs before the claim write/commit. A false
+      // `ready` value remains explicit; the claim commit below is the final
+      // authority for whether a project gate actually required it.
+      progress.preparation = boundedPreparation(
+        kernel.prepareWorktreeDependencies(primaryRoot, worktreePath),
+      )
+    } catch (error) {
+      const preparationError = boundedPreparation({
+        ready: false,
+        install: "unavailable",
+        linkedNodeModules: false,
+        builtWorkspaces: [],
+        linkedWorkspaces: [],
+        // A preparation that threw was never compared against the manifest:
+        // `unknown`, never a `satisfied` claim (same rule as the kernel).
+        manifestCoverage: "unknown",
+        missingDependencies: [],
+        missingDependenciesTotal: 0,
+      })
+      const preparationRemoved = kernel.unlinkNodeModulesLink(primaryRoot, worktreePath)
+      return failBeforeClaim(
+        `dependency preparation failed in ${worktreePath}: ${boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)}; ` +
+          (preparationRemoved
+            ? "the start-owned dependency link was removed and the worktree was kept"
+            : "the worktree and any start-owned dependency link were kept"),
+        "dependency preparation failed",
+        { preparation: preparationError, rollback: { preparationRemoved } },
+      )
+    }
+  }
+
+  progress.stage = "claim update"
   const target = worktreePath ?? options.cwd
   const update = kernel.updateOperation({
     cwd: target,
     id,
     status: "in_progress",
     assignee,
+    // The branch is always recorded by the same claim write now that plain
+    // start settles branch ownership first.
     branch,
-    ...(worktreePath !== undefined ? { worktreePath } : {}),
+    ...(wantWorktree ? { worktreePath } : {}),
+    // The native surface commits the claim explicitly below so a failed
+    // pre-commit gate cannot be hidden by updateOperation's best-effort commit.
+    commit: false,
     agent: true,
   })
   if (!update.ok) {
-    // A lost race must not leave the worktree this run created behind: the
-    // native domain has no item record to reap it from later. Only a branch
-    // THIS run created is deleted — a pre-existing branch (an attach) survives.
-    if (worktreeCreated && worktreePath !== undefined) {
-      await discardWorktree(options, worktreePath, branchCreated ? branch : undefined)
+    if (wantWorktree) {
+      const cleanup = await cleanupClaimArtifacts(
+        options,
+        kernel,
+        primaryRoot,
+        worktreePath,
+        progress.worktreeCreated,
+        progress.branchCreated,
+        branch,
+        progress.preparation,
+      )
+      const rollback = cleanup.discard !== undefined
+        ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
+        : { rollback: { preparationRemoved: cleanup.preparationRemoved } }
+      return failBeforeClaim(
+        `${envelopeMessage(update.envelope, "claim update failed")}. ` +
+          cleanupDescription(cleanup, progress.worktreeCreated, worktreePath, branch),
+        "claim update refused",
+        rollback,
+      )
     }
-    const failure = remapFailure(update.envelope, "start", "START_FAILED")
-    if (worktreeCreated && worktreePath !== undefined) {
-      const error = failure.envelope.error as Record<string, unknown>
-      error.message = `${String(error.message)} (the worktree created by this run was removed again)`
-    }
-    return failure
+    // Plain start: roll back ONLY the branch this run created, restoring the
+    // checkout first, and report exactly what was observed.
+    const rollback = await rollbackOwnedPlainBranch(
+      options,
+      branch,
+      progress.branchCreated,
+      plainPreviousBranch,
+    )
+    return failBeforeClaim(
+      `${envelopeMessage(update.envelope, "claim update failed")}. ` +
+        plainRollbackDescription(rollback, branch),
+      "claim update refused",
+      { rollback },
+    )
+  }
+  progress.item = update.envelope.item
+
+  progress.stage = "claim commit"
+  let claim: { receipt: NativeClaimCommitReceipt; payload?: Record<string, unknown> }
+  try {
+    claim = commitNativeClaim(kernel, target, id)
+  } catch (error) {
+    claim = { receipt: claimCommitFailure(detail(error)) }
+  }
+  progress.claim = claim
+  const claimPayload: Record<string, unknown> = {
+    ...context(),
+    item: update.envelope.item,
+    claimCommitted: claim.receipt.committed,
+    claimCommit: claim.receipt,
+    ...(claim.payload !== undefined ? { commit: claim.payload } : {}),
+  }
+  if (!claim.receipt.committed) {
+    const reason = claim.receipt.skipped ?? "claim commit failed"
+    const kept = worktreePath !== undefined
+      ? `the worktree was kept at ${worktreePath} (nothing was rolled back)`
+      : "the claim file was left in place for inspection"
+    return startFailure(
+      kernel,
+      `start failed while committing the claim; ${kept}. ` +
+        `${reason}. Fix the project gate/dependency cause, then re-run ` +
+        `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
+        "it attaches to the existing worktree and retries the claim commit.",
+      version,
+      claimPayload,
+    )
   }
 
+  progress.stage = "push"
   let pushed = false
-  if (input.push === true && worktreePath !== undefined) {
-    const push = await run("git", ["push", "-u", "origin", branch], worktreePath, 60_000)
+  const pushEligible = claim.receipt.status === "committed" || progress.branchCreated
+  if (input.push === true && pushEligible) {
+    const push = await run("git", ["push", "-u", "origin", branch], target, 60_000)
     if (push.code !== 0) {
-      return worktreeFail(
+      progress.pushed = false
+      return startFailure(
         kernel,
-        "start",
-        "START_FAILED",
-        `push failed (${push.stderr.trim() || `git push exit ${push.code}`}); the worktree was kept at ${worktreePath}`,
+        `push failed (${push.stderr.trim() || `git push exit ${push.code}`}); the branch and claim were kept`,
         version,
+        { ...claimPayload, pushed: false },
       )
     }
     pushed = true
   }
+  progress.pushed = pushed
 
+  // A throw here (e.g. a broken envelope builder) is caught by nativeStart and
+  // reported with the committed claim receipt intact.
+  progress.stage = "response"
   return {
     ok: true,
-    envelope: kernel.successEnvelope(
-      "start",
-      {
-        id,
-        branch,
-        worktreePath: worktreePath ?? null,
-        worktreeCreated,
-        branchCreated,
-        pushed,
-        item: update.envelope.item,
-        ...(update.envelope.commit !== undefined ? { commit: update.envelope.commit } : {}),
-      },
-      version,
-    ),
+    envelope: kernel.successEnvelope("start", { ...claimPayload, pushed }, version),
   }
 }
 
@@ -2408,31 +3398,14 @@ async function domainWorktrees(options: ArgonToolOptions): Promise<string[]> {
   }
 }
 
-/** Remove one worktree: the domain when available, `git worktree remove` as the compatibility fallback. */
-async function removeWorktree(
-  kernel: ArgonKernel,
-  options: ArgonToolOptions,
-  root: string,
-  directory: string,
-): Promise<void> {
-  const domain = options.worktree?.domain
-  const projectID = asString(options.worktree?.projectID)
-  if (domain?.remove !== undefined && projectID !== undefined) {
-    try {
-      await domain.remove({ projectID, directory, force: false })
-      return
-    } catch (error) {
-      logOnce("worktree-remove", "worktree domain remove failed; falling back to git", error)
-    }
-  }
-  kernel.defaultCleanupGit().removeWorktree(root, directory)
-}
-
 /**
  * `cleanup` (native): classify every item with a `worktree_path` record with
  * the shared kernel rule (`classifyCleanupEntry`, the same one the CLI uses)
- * and, with `prune: true`, remove removable worktrees through the domain,
- * delete their merged branches and clear the records in ONE tracker commit.
+ * and, with `prune: true`, remove removable worktrees through the domain
+ * (observed, with a git fallback — the same primitive the start rollback uses),
+ * then delete their merged branches and clear the records in ONE tracker commit.
+ * A removal that is not observably complete reports a per-candidate failure
+ * and preserves both the branch and the record.
  * Skips (non-terminal item, unmerged branch, missing/foreign path) are
  * reported, never touched.
  */
@@ -2494,7 +3467,28 @@ async function nativeCleanup(
           if (resolve(canonical) !== resolve(root)) {
             kernel.unlinkNodeModulesLink(root, entry.path)
           }
-          await removeWorktree(kernel, options, root, entry.path)
+          // The SAME observed removal the start rollback uses, without its force
+          // policy: a dirty worktree must still be refused by git (bug-native-
+          // cleanup-unverified-worktree-removal).
+          const removal = await removeWorktreeObserved(options, entry.path, root, {
+            force: false,
+          })
+          if (!removal.removed) {
+            // A domain that resolves without removing (or a failing domain plus
+            // a failing git fallback) is never reported as a removal: keep the
+            // branch, keep the record, and name the leftover path.
+            const message = boundedNativeText(removal.errors.join("; "), MAX_NATIVE_DETAIL_CHARS)
+            failures.push(`${entry.id}: ${message}`)
+            pruned.push({
+              id: entry.id,
+              action: "failed",
+              error: message,
+              leftoverPath: entry.path,
+              ...(entry.branch !== null ? { leftoverBranch: entry.branch } : {}),
+              ...(entry.via !== undefined ? { via: entry.via } : {}),
+            })
+            continue
+          }
           pruned.push({
             id: entry.id,
             action: `removed worktree ${entry.path}`,
@@ -2513,10 +3507,17 @@ async function nativeCleanup(
               ...(entry.via !== undefined ? { via: entry.via } : {}),
             })
           } catch (error) {
+            // A branch delete that fails after the worktree is gone is still a
+            // failure the caller must see, on BOTH surfaces: the structured
+            // `pruned` action AND the flat `failures` list, which would
+            // otherwise read as a clean run
+            // (bug-native-cleanup-branch-delete-missing-failure).
+            const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)
+            failures.push(`${entry.id}: ${message}`)
             pruned.push({
               id: entry.id,
               action: "failed",
-              error: detail(error),
+              error: message,
               leftoverBranch: entry.branch,
             })
           }
@@ -2533,7 +3534,9 @@ async function nativeCleanup(
         clearedPaths.push(byId.get(entry.id)!.filePath)
         clearedIds.push(entry.id)
       } catch (error) {
-        const message = detail(error)
+        // Same bound as the branch-delete catch above, on BOTH surfaces
+        // (bug-native-cleanup-worktree-failure-unbounded).
+        const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)
         failures.push(`${entry.id}: ${message}`)
         pruned.push({ id: entry.id, action: "failed", error: message })
       }
@@ -2581,7 +3584,9 @@ function kernelError(envelope: Record<string, unknown>): string {
 /**
  * Worktree-domain tools (W4): `start`, `branch`, `cleanup`. Inputs mirror the
  * CLI surface where the native path supports it; outputs are `--json`-shaped
- * envelopes with the native fields documented in `ArggonManager/docs/opencode2.md`.
+ * envelopes with the native fields documented in the agent playbook and
+ * OpenCode playbook (the dependency contract in `ArggonManager/docs/agents.md`
+ * and `ArggonManager/docs/playbooks/opencode.md`).
  */
 const WORKTREE_TOOL_SPECS: ArgonToolSpec[] = [
   {
@@ -2604,8 +3609,8 @@ const WORKTREE_TOOL_SPECS: ArgonToolSpec[] = [
     // ADR 0006 advisory bound (`context:report --strict`) and the runtime drops
     // catalog entries past its own ~2000-token budget, so the three worktree
     // tools stay as lean as their contract allows. Their payload fields are
-    // documented in ArggonManager/docs/opencode2.md and asserted by the
-    // contract tests; the loose envelope never rejects a valid payload.
+    // documented in ArggonManager/docs/agents.md + playbooks/opencode.md and
+    // asserted by the contract tests; the loose envelope never rejects a valid payload.
     output: OBJECT,
     run: (kernel, input, options) =>
       guarded(kernel, "start", "START_FAILED", () => nativeStart(kernel, input, options)),
@@ -2698,7 +3703,16 @@ export function argonToolDefinitions(
     input: spec.input,
     output: spec.output,
     execute: async (input, tool) => {
-      const outcome = await spec.run(kernel, input ?? {}, options, tool)
+      // The tracker root is resolved per CALL from the calling session, so a
+      // session that moved into a worktree reads and commits there. A value
+      // captured at setup would stay pinned to the plugin instance's location
+      // and land every commit on the primary checkout's branch
+      // (bug-native-tools-commit-to-primary-checkout).
+      const resolved = await resolveToolCwd(kernel, spec.name, options, tool)
+      if ("error" in resolved) throw resolved.error
+      const callOptions =
+        resolved.cwd === options.cwd ? options : { ...options, cwd: resolved.cwd }
+      const outcome = await spec.run(kernel, input ?? {}, callOptions, tool)
       const envelope = outcome.envelope as Record<string, unknown>
       if (!outcome.ok) throw new ArgonToolError(envelope)
       return { output: envelope }
@@ -2815,6 +3829,7 @@ const definition: PluginDefinition = {
       if (directory !== undefined) {
         await registerArgonTools(ctx, {
           cwd: directory,
+          sessionDirectory: sessionDirectoryResolver(ctx),
           templatesDir: pluginTemplatesDir(),
           worktree: worktreeOptions(ctx),
         })

@@ -33,6 +33,10 @@ Requires **Node.js 22.12+** (needed by vitest 5 in the dev toolchain; `engines` 
 - `npm run build`
 - `npm test`
 - `npm run lint`
+- `npm run test:structure`
+- `npm run lint:structure`
+- `npm run smoke:native-start-cold` — cold-start smoke for the native
+  `tools.arggon.start` worktree path (below)
 
 Two npm packages make up this repo:
 
@@ -72,6 +76,95 @@ launch it resolve `@arggondev/lib` through `node_modules` → `lib/dist`
 (`npm run build --workspace @arggondev/lib`), and the flip means the worktree's own
 build is what runs.
 
+### Structural architecture checks (dev-only)
+
+The exact-pinned `@ast-grep/cli` devDependency is a **high-confidence
+structural guard** for two architecture seams that ESLint/TypeScript do not
+express: tracker item mutations must stay in the shared kernel, and native tool
+registration must stay on the shared catalog seam. Run its positive/negative rule
+tests and the deterministic repository scan with:
+
+- `npm run test:structure`
+- `npm run lint:structure`
+
+Both CI commands run in the existing `cli` job. The scan uses the `Tsx` superset
+parser for hand-authored `.ts`/`.tsx` files, so JSX production code such as
+`opencode/plugins/arggon/tui.tsx` is covered by the same rule IDs. The scan only
+reports violations; it never uses `--update-all` or rewrites source.
+
+What the guard does and does not claim:
+
+- **Tracker rules** are path-position only: multi-argument `rm`/`rmdir`/`unlink`/
+  `truncate` are inspected at their first path argument like the writers, and
+  content arguments are never scanned. A bare leaf file name is intentionally not
+  a tracker signal, so ordinary product writes such as
+  `join(root, "docs", "task-beta.md")` stay valid. Rename destinations have a
+  separate rule, and tracker root migration has one documented inline suppression.
+- **The native rule is scoped to the hand-authored Arggon plugin sources**
+  (`opencode/plugins/arggon/**/*.ts(x)`), not the whole repository, and its
+  exception is limited to the direct catalog-to-editor binding and exact payload.
+  Deliberate, computed, or destructured indirection is outside structural scope
+  and is not claimed to be covered; plugin schema/parity tests remain
+  authoritative for those shapes.
+
+These rules are not comprehensive semantic enforcement. Rule scope, the exact
+structural limitations, production exceptions, content/path decisions, and
+explicit test-helper exclusions are documented in
+[`tools/ast-grep/README.md`](tools/ast-grep/README.md).
+
+### Native start cold-start smoke (dev-only)
+
+`npm run smoke:native-start-cold` (`smoke/native-start-cold-smoke.ts`) is the
+durable, **deterministic and model-free** regression gate for the native
+`tools.arggon.start` worktree path — the path that used to hand back a cold
+worktree whose dependency-requiring pre-commit gate could not run, with the
+claim commit silently absent. It needs no OpenCode runtime, no model and no
+quota, so it is safe to run beside anything; `npm run smoke:opencode` and
+`npm run smoke:opencode:wave` remain the **model-driven** evidence and are run
+on their own (see [OpenCode 2 notes](ArggonManager/docs/opencode2.md)).
+
+**It runs in CI.** The `cli` job runs it as its last step
+([`.github/workflows/ci.yml`](.github/workflows/ci.yml)), after the
+`npm run build` it depends on and beside the other dev-only node gates
+(`test:structure`, `lint:structure`). The step is blocking — a non-zero exit
+fails the lane, so `0` is the only result that passes — and it deliberately
+carries no `continue-on-error`, no `|| true` and no advisory `if:`. It is
+offline, model-free and Chromium-free, so it belongs to `cli` and not to the
+`ui-smoke` job, and it needs no second install. A run costs well under a
+second (observed ~0.5s: five consecutive local runs at 0.47-0.48s, 20/20 checks
+each), which is why it gates every PR instead of sitting behind a label.
+
+What the CI lane does **not** claim: this is a deterministic, offline check of
+the native worktree/start path only. It does not replace the model-driven
+`smoke:opencode` transcript, which stays the runtime-level evidence and is
+still maintainer-run (and still quota-bound), and it proves dependency
+_resolution_ through a synthesized install, not npm's reifier.
+
+One run (`npm run build` first, so this checkout's kernel is built) builds a
+disposable git fixture under `$TMPDIR` — a primary checkout with an initialized
+tracker, a project install and a real executable `pre-commit` gate that
+resolves a dependency only that install carries — and then:
+
+1. proves the gate **fails** in a cold worktree (no `node_modules`), so the
+   scenario cannot pass by bypassing it;
+2. drives the **actual native tool** (this checkout's
+   `opencode/plugins/arggon/index.ts` plus a `ctx.worktree` domain double backed
+   by real `git worktree`) and requires an explicit, bounded readiness /
+   claim-commit receipt, a claim commit whose only path is the item file, and
+   the gate's marker written inside the worktree start prepared;
+3. re-runs `start` to prove a deterministic attach, no duplicate claim commit
+   and no mutation of either install — the fixture's and this repository's
+   canonical checkout, whose `node_modules` fingerprint (entry count, entry-set
+   digest, mtime) must be identical before and after;
+4. removes the worktree, its git registration and the whole disposable root, and
+   asserts this checkout's working tree is byte-identical to how it started.
+
+Exit codes: `0` passed, `1` a check failed (the fixture is kept for inspection),
+`2` the harness could not run. `ARGON_NATIVE_START_SMOKE_KEEP=1` keeps the
+fixture on success too. In CI only `0` is green — `1` and `2` both fail the
+job — and the harness prints the plugin source and kernel build it resolved, so
+a red run names the runtime that produced it.
+
 ### UI smoke tests (dev-only)
 
 The `ui-smoke` CI job runs the durable smoke net for the board and the TUI
@@ -80,17 +173,67 @@ browser gate stays the Playwright CLI drive described in
 `ArggonManager/docs/engineering.md` § Smoke test. Locally:
 
 - `npm run build` — both specs drive the **built** bin on a temp fixture
-- `npx playwright install chromium` — once per machine; `@playwright/test` is a
-  devDependency and never ships
+- `npx playwright install chromium` — once per machine; `@playwright/test` and
+  `@axe-core/playwright` are devDependencies and never ship
 - `npx playwright test --grep @smoke` — board smoke: `board --serve` renders one
   card per `arggon list` item, one status move round-trips through the UI and
-  persists (`arggon show`)
+  persists (`arggon show`), and the ready page carries no WCAG A/AA
+  accessibility violation
 - `npm run smoke:tui-board` — TUI frame check: `arggon board --tui` renders in a
   pty and the capture carries the five status headers plus a seeded item id
   (skips cleanly where util-linux `script` is unavailable)
 
 The Playwright specs live in `e2e/`, outside vitest's include globs, so
-`npm test` never picks them up.
+`npm test` never picks them up. The `@smoke` command is also the `ui-smoke` CI
+job's browser step, so a local green run is the evidence CI will reproduce.
+
+#### Accessibility gate (axe)
+
+The first `@smoke` test runs [axe](https://github.com/dequelabs/axe-core)
+(`@axe-core/playwright`, version-pinned, dev-only) against the **served** board,
+right after the board-load readiness assertion and before the card-parity and
+status-move tests move the page on. It is a gate, not a report: a violation
+fails the test.
+
+**What is asserted.** Every WCAG A/AA level axe can check automatically, across
+all three WCAG versions it ships rules for:
+
+```
+wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa
+```
+
+AAA is out of scope (axe automates almost nothing at that level) and
+`best-practice` is out of scope (it is not a conformance level).
+
+**The policy, in short: no blanket exclusions.** There is no `disableRules`, no
+`exclude`, no `include` and no narrowed rule list anywhere in
+`e2e/board.smoke.spec.ts`, and there are **zero accepted exceptions** today.
+Adding one means a comment at the call site naming the exact rule id, why the
+violation is not a defect a contributor can fix, and an owner (a person or a
+tracked item id) — plus a matching line in this section and in
+`ArggonManager/docs/engineering.md` § Smoke test. A real defect is fixed in the
+board's own CSS/HTML or filed as a linked tracker item; it is never excluded to
+get a green lane.
+
+**When the scan fails.** The failure message is the remediation surface: every
+violation is printed with its rule id, impact, the WCAG tags it carries, the
+offending node's selector and HTML, and a link to the rule's own remediation
+page. In practice:
+
+1. Read the rule id. `color-contrast` means a foreground/background pair in
+   `cli/src/board.ts` is below 4.5:1 at the size it renders; `label`,
+   `button-name` or `aria-*` means an element is missing an accessible name,
+   role or state.
+2. Reproduce it exactly as CI does — `npm run build`, then
+   `npx playwright test --grep @smoke` — and read the printed target selector.
+   That selector is a real element of the board page, so the fix belongs in
+   `cli/src/board.ts`, not in the spec.
+3. Fix the board and re-run. If the fix is bigger than the defect — a landmark
+   restructure, a keyboard-interaction change, a design question — file a `task`
+   carrying the rule id, the target selectors and the measured ratio, then
+   reference that item id in the call-site comment.
+4. Never add a `disableRules` entry to make the lane pass: that converts a
+   tracked defect into an invisible one.
 
 ## Propose schema / convention changes
 

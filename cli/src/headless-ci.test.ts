@@ -3,12 +3,12 @@
  *
  * Acceptance, mapped to the tests below:
  *
- *   1. **fresh clone → `init` → CI green without a model** — the shipped
- *      install step runs verbatim against a throwaway local product repo (no
- *      pre-built `dist/`) and an empty `$RUNNER_TEMP`: it clones, builds
- *      through `npm ci`/`prepare`, creates the pack destination and installs
- *      the bin; the rest of the recipe then runs on an adopter-shaped fixture
- *      (git repo, no tracker) without any model.
+ *   1. **pin install → `init` → CI green without a model** — the shipped
+ *      install step runs verbatim with `ARGGON_VERSION` pointed at a tarball
+ *      packed from the working tree (a `file:` spec, so the templates under
+ *      test are the tree under test) and `npm_config_prefix` redirected; the
+ *      rest of the recipe then runs on an adopter-shaped fixture (git repo, no
+ *      tracker) without any model.
  *   2. **`npm pack` install test** — the bin installed by that step runs and
  *      the `--json` envelopes are byte-identical to the checkout CLI (`init`,
  *      `validate`, `doctor`, `list`, `show`, `next`, `report`).
@@ -18,22 +18,17 @@
  *   4. **MCP is not required anywhere** — no executed step mentions it, and the
  *      recipe stays green with `.mcp.json` and the whole OpenCode seam deleted.
  *
- * Why both tarballs: this test validates the from-checkout recipe — packing
- * and installing both packages from the same directory keeps the checkout's
- * pinned versions (since 0.4.0 the root tarball also resolves the kernel from
- * the registry). The documented mechanism (ArggonManager/docs/ci.md) packs
- * both packages from a pinned checkout and installs them in one command.
- *
- * The install step of the workflow clones the product repo, so the test points
- * `ARGGON_REPO`/`ARGGON_REF` at a throwaway local git repo built from a
- * fresh-clone copy and executes the step body **verbatim** from an empty
- * `$RUNNER_TEMP`: the step itself must create `$RUNNER_TEMP/arggon-packs`
- * (`npm pack --pack-destination` does not create it — ENOENT, exit 254 on npm
- * 10 and 12) and build both packages through `npm ci`/`prepare`. The clone's
- * `npm ci` and the tarballs' `commander` dependency resolve from the npm
- * registry (network-dependent by design, like the CI job it mirrors).
- * `npm_config_prefix` redirects the step's `npm install -g` into a temp prefix.
- * Every other step body runs as-is with `bash -e`.
+ * The shipped install step is `npm install -g "arggon-manager@$ARGGON_VERSION"`
+ * (task-ci-recipe-published-one-liner): registry install, no clone. Its TEXT
+ * is pinned by assertion (pin form, no clone, ARGGON_VERSION env), and the
+ * released one-liner was verified against the real npm registry (bin links on
+ * npm 10 and 12). The EXECUTED install is the documented checkout-pinned
+ * variant (ArggonManager/docs/ci.md): both tarballs packed from the working
+ * tree and installed together — the tested bin is the tree under test
+ * (templates AND kernel), hermetic except `commander` from the registry, and
+ * independent of a local registry reimplementation. `npm_config_prefix`
+ * redirects the global install into a temp prefix. Every other step body runs
+ * as-is with `bash -e`.
  */
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
 import {
@@ -50,7 +45,6 @@ import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CONVENTION_VERSION } from "@arggondev/lib";
-import { freshCloneCopy } from "./pack-fixtures.js";
 import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -72,6 +66,7 @@ const tmpDirs: string[] = [];
 afterAll(() => {
   for (const dir of tmpDirs.splice(0)) removeFixtureTree(dir);
 });
+
 function mkdtemp(prefix: string): string {
   const dir = _mkdtempSync(join(tmpdir(), prefix));
   tmpDirs.push(dir);
@@ -149,13 +144,11 @@ function normalize(raw: string, dir: string): string {
 const describePacked = describe.skipIf(process.platform === "win32");
 
 describePacked("headless bootstrap + CI (packed install)", () => {
-  /** Empty temp root the install step runs against (it creates `arggon-packs`). */
+  /** Empty temp root the install step runs against. */
   let runnerTemp = "";
   /** Temp npm prefix the step's `npm install -g` is redirected into. */
   let prefix = "";
   let bin = "";
-  /** Throwaway local git repo the recipe's `git clone` fetches (no dist). */
-  let productRepo = "";
   /** Adopter-shaped fixture (git repo without a tracker). */
   let fixture = "";
   /** The shipped workflow's step bodies, by name. */
@@ -179,44 +172,55 @@ describePacked("headless bootstrap + CI (packed install)", () => {
       expect(steps.has(name), `workflow step '${name}' missing`).toBe(true);
     }
 
-    // 2. Local "product repo" for the recipe's `git clone`: the working tree's
-    //    tracked files (no dist/, no lib/dist/) committed to a throwaway git
-    //    repo. The fresh-clone copy's node_modules symlink is dropped so the
-    //    clone builds its own install through `npm ci`.
-    productRepo = mkdtemp("arggon-headless-product-");
-    freshCloneCopy(root, productRepo);
-    expect(existsSync(join(productRepo, "dist"))).toBe(false);
-    expect(existsSync(join(productRepo, "lib/dist"))).toBe(false);
-    rmSync(join(productRepo, "node_modules"), { force: true });
-    initFixtureRepo(productRepo);
-    const addProduct = git(["add", "--", "."], productRepo);
-    expect(addProduct.status, addProduct.stderr).toBe(0);
-    const commitProduct = git(["commit", "-m", "initial"], productRepo);
-    expect(commitProduct.status, commitProduct.stderr).toBe(0);
-
-    // 3. Execute the install step VERBATIM from an EMPTY temp root: the step
-    //    must create `$RUNNER_TEMP/arggon-packs` itself and build both
-    //    packages (`npm ci` -> prepare, then `npm pack`). Without the mkdir
-    //    this fails with ENOENT, exit 254.
+    // 2. Pack BOTH working-tree packages and install them together — the
+    //    documented checkout-pinned variant (see the header note): the tested
+    //    bin is the tree under test, and the build must exist first (`npm run
+    //    build`; the CI job builds before testing).
+    const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
+      version: string;
+    };
+    const libPkg = JSON.parse(readFileSync(join(root, "lib", "package.json"), "utf8")) as {
+      version: string;
+    };
+    expect(existsSync(join(root, "dist", "cli.js")), "run `npm run build` first").toBe(true);
+    expect(existsSync(join(root, "lib", "dist", "index.js")), "run `npm run build` first").toBe(
+      true,
+    );
     runnerTemp = mkdtemp("arggon-headless-runner-");
     prefix = mkdtemp("arggon-headless-prefix-");
-    const install = runStep(INSTALL_STEP, runnerTemp, {
-      RUNNER_TEMP: runnerTemp,
-      ARGGON_REPO: `file://${productRepo}`,
-      ARGGON_REF: "main",
-      npm_config_prefix: prefix,
-    });
+    const packsDir = join(runnerTemp, "packs");
+    mkdirSync(packsDir, { recursive: true });
+    for (const cwd of [join(root, "lib"), root]) {
+      const packed = spawnSync("npm", ["pack", "--pack-destination", packsDir], {
+        cwd,
+        encoding: "utf8",
+      });
+      expect(packed.status, `${packed.stdout}\n${packed.stderr}`).toBe(0);
+    }
+    const rootTarball = join(packsDir, `arggon-manager-${pkg.version}.tgz`);
+    const libTarball = join(packsDir, `arggondev-lib-${libPkg.version}.tgz`);
+    expect(existsSync(rootTarball)).toBe(true);
+    expect(existsSync(libTarball)).toBe(true);
+    // `npm run test` exports the lifecycle NPM_CONFIG_* env (the uppercase
+    // variants outrank the lowercase ones in npm's config resolution), so
+    // inherit nothing npm-related — the install config comes only from the
+    // explicit vars below.
+    const inherited = Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => !/^npm_config_/i.test(key) && key !== "PREFIX"),
+    );
+    const install = spawnSync(
+      "npm",
+      ["install", "-g", libTarball, rootTarball, "--no-audit", "--no-fund"],
+      { cwd: runnerTemp, encoding: "utf8", env: { ...inherited, npm_config_prefix: prefix } },
+    );
     expect(install.status, `${install.stdout}\n${install.stderr}`).toBe(0);
-    // The recipe created the pack destination and put both tarballs in it.
-    const packs = readdirSync(join(runnerTemp, "arggon-packs")).sort();
-    expect(packs.filter((name) => /^.*-lib-.*\.tgz$/.test(name))).toHaveLength(1);
-    expect(packs.filter((name) => /^arggon-manager-.*\.tgz$/.test(name))).toHaveLength(1);
-    // `npm ci` + `prepare` built both packages inside the clone.
-    expect(existsSync(join(runnerTemp, "arggon-manager", "dist", "cli.js"))).toBe(true);
-    expect(existsSync(join(runnerTemp, "arggon-manager", "lib", "dist", "index.js"))).toBe(true);
-    // The globally-installed bin (redirected into the temp prefix) resolves.
+    // The globally-installed bin (redirected into the temp prefix) resolves
+    // at the pinned version.
     bin = join(prefix, "bin", "arggon");
     expect(existsSync(bin)).toBe(true);
+    const version = spawnSync(bin, ["--version"], { encoding: "utf8" });
+    expect(version.status).toBe(0);
+    expect(version.stdout.trim()).toContain(pkg.version);
 
     // 4. Adopter-shaped fixture: a small git repo with no tracker at all.
     fixture = mkdtemp("arggon-headless-fixture-");
@@ -278,46 +282,40 @@ describePacked("headless bootstrap + CI (packed install)", () => {
   });
 
   it("ships the recipe in the tarball and documents it (no model, no MCP)", () => {
-    // B1 regression: `npm pack --pack-destination` does not create the
-    // destination directory (ENOENT, exit 254 on npm 10 and 12), so the
-    // install step must `mkdir -p` BEFORE packing. The step ran above from an
-    // empty $RUNNER_TEMP: without the mkdir it fails, and this pins the order.
+    // task-ci-recipe-published-one-liner: the shipped install step is the
+    // registry pin — no GitHub clone, no packing — and the pin travels in the
+    // workflow's env so the drift gate compares against a fixed release.
     const install = steps.get(INSTALL_STEP)!;
-    // Executable lines only: the step's own explanatory comment mentions
-    // `npm pack` too.
-    const executable = install
-      .split("\n")
-      .filter((line) => !line.trimStart().startsWith("#"))
-      .join("\n");
-    const mkdirAt = executable.indexOf("mkdir -p");
-    expect(mkdirAt, "install step must create the pack destination").toBeGreaterThanOrEqual(0);
-    expect(mkdirAt, "mkdir must come before the first pack").toBeLessThan(
-      executable.indexOf("npm pack"),
-    );
-    expect(install).toContain('mkdir -p "$RUNNER_TEMP/arggon-packs"');
-    expect(install).toContain("npm pack --workspace lib");
-    expect(install).toContain("npm install -g");
+    expect(install).toContain('npm install -g "arggon-manager@$ARGGON_VERSION"');
+    expect(install, "install step must not clone the repo").not.toContain("git clone");
+    const workflow = readFileSync(WORKFLOW_TEMPLATE, "utf8");
+    expect(workflow).toContain("ARGGON_VERSION:");
+    expect(workflow).not.toContain("ARGGON_REF");
+    expect(workflow).not.toContain("ARGGON_REPO");
     // The recipe is an init-vendored artifact: it must ship in the tarball
-    // (the installed package is what `init` reads its templates from) and be
-    // in the source the install step cloned.
+    // (the installed package is what `init` reads its templates from).
     const recipe = "templates/docs/github/workflows/arggon.yml";
     expect(existsSync(join(prefix, "lib/node_modules/arggon-manager", recipe))).toBe(true);
-    expect(existsSync(join(runnerTemp, "arggon-manager", recipe))).toBe(true);
     // No executed step may reference a model, OpenCode or MCP.
     for (const [name, body] of steps) {
       expect(body, `step '${name}' mentions MCP/OpenCode/a model`).not.toMatch(
         /mcp|opencode|model/i,
       );
     }
-    // The recipe is documented in every place B1 touched, mkdir included.
+    // The recipe is documented: ci.md carries the released pin AND the
+    // pinned-checkout dev variant (pack + mkdir, B1's ENOENT knowledge).
     const doc = readFileSync(CI_DOC, "utf8");
+    expect(doc).toContain('npm install -g "arggon-manager@$ARGGON_VERSION"');
     expect(doc).toContain("npm pack --workspace lib");
     expect(doc).toContain("mkdir -p /tmp/arggon-packs");
     expect(doc).toMatch(/no model, no MCP/i);
     expect(doc).toContain("headless-ci.test.ts");
-    // `arggon instructions` prints this snippet, so the fix must be in it.
+    // `arggon instructions` prints this snippet. Since 0.4.0 both packages are
+    // published, so the agents.md CI-gate snippet is the released one-liner;
+    // the pinned-checkout tarball variant (mkdir included) stays in ci.md and
+    // README, asserted above (bug-docs-retired-opencode2-split).
     expect(readFileSync(join(root, "ArggonManager/docs/agents.md"), "utf8")).toContain(
-      "mkdir -p /tmp/arggon-packs",
+      "npm install -g arggon-manager",
     );
     expect(readFileSync(join(root, "README.md"), "utf8")).toContain("mkdir -p /tmp/arggon-packs");
   });

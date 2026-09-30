@@ -1,0 +1,35 @@
+id: tracker-rename-destination-use-kernel
+valid:
+  - |
+    renameSync(oldPath, outputPath);
+    renameSync(oldPath, join(root, "ArggonManager", "docs", "story.md"));
+  - |
+    // A bare leaf file name is not a tracker signal, so neutral and product
+    // destinations that happen to use a tracker-shaped leaf stay valid.
+    renameSync(oldPath, "story.md");
+    renameSync(oldPath, join(root, "docs", "task-beta.md"));
+    renameSync(oldPath, join(root, "product", "task-beta.md"));
+  - |
+    const content = "task-item.md";
+    renameSync(oldPath, destinationAsset);
+  - |
+    // Only the destination is inspected; tracker shapes in the source argument
+    // are handled by tracker-mutations-use-kernel.
+    renameSync(itemPath, outputPath);
+invalid:
+  - |
+    renameSync(oldPath, itemPath);
+  - |
+    renameSync(oldPath, value.filePath);
+  - |
+    renameSync(oldPath, join(root, "tasks", "story-alpha", "task-beta.md"));
+  - |
+    renameSync(oldPath, "ArggonManager/story.md");
+  - |
+    renameSync(oldPath, "ArggonManager/story-alpha/task-beta.md");
+  - |
+    renameSync(oldPath, join(root, "ArggonManager", "story", "epic", "story.md"));
+  - |
+    renameSync(oldPath, join(tasksDir, id + ".md"));
+  - |
+    renameSync(oldPath, join(tasksDir, name));

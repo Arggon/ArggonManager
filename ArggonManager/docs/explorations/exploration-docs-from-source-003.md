@@ -1,7 +1,7 @@
 ---
 exploration_id: docs-from-source-003
 title: docs-from-source — keeping CLI reference docs generated from the live CLI
-status: open
+status: decided
 created: 2026-09-15
 ---
 
@@ -66,6 +66,9 @@ harness uses) instead of scraping `--help` text, and by guarding the net with a
 cross-check that every user-facing command is documented somewhere.
 
 ## Decision
+
+No ADR required — implementation-level doc-generation choice, recorded as the
+coordinator's design decision on task-skill-generated-command-reference.
 
 Covered by the coordinator's design decision on task-skill-generated-command-reference
 (marker regions, generator in cli/src/sync-skills.ts); no separate ADR — this

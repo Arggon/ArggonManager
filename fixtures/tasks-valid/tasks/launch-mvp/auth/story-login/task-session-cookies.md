@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-session-cookies
 title: Secure session cookies
 parent: story-login
@@ -18,5 +18,5 @@ Sessions should use HttpOnly, Secure, SameSite cookies with a sane TTL.
 
 ## Acceptance
 
-- [ ] Cookie flags set correctly in production
-- [ ] Logout clears the session cookie
+- [x] Cookie flags set correctly in production
+- [x] Logout clears the session cookie

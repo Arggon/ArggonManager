@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { runComment, runCreate, runUpdate, runValidate } from "@arggondev/lib";
 
 import { runInit } from "./init.js";
+import { tickAcceptance } from "../../test/acceptance.js";
 import { runMcpServer } from "./mcp-server.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
@@ -128,6 +129,7 @@ describe("comment", () => {
   it("works on done/cancelled items (history, not a reopen)", () => {
     const { dir, id, path } = primedTask();
     runUpdate({ cwd: dir, id, status: "in_progress", assignee: "arggon", now: NOW });
+    tickAcceptance(dir, id);
     runUpdate({ cwd: dir, id, status: "done", now: LATER });
     const before = raw(path);
     const result = runComment({

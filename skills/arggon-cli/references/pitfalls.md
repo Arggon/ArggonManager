@@ -19,6 +19,15 @@ agents in this codebase — read before mutating the tracker or merging.
   y/N confirmation. Agents coordinate instead of stealing.
 - `update --status blocked` requires `--blocked-reason`; `blocked_reason` is
   forbidden otherwise.
+- **Done gate** (task-done-gate-acceptance-waiver, ADR 0015): `update --status
+done` on a task/bug whose body still has unchecked acceptance boxes is
+  REFUSED — tick every box first (the honest path), or pass
+  `--waive "<reason>"` (non-empty; records a dated `### Waiver` section in the
+  item body, then flips). The waiver is HUMAN-only: the `arggon_update`
+  MCP/native tool has no waive parameter, the kernel refuses `agent` callers,
+  and the flag refuses to fire when there is nothing to waive (no done flip, a
+  container, a complete checklist). Containers are not gated — their contract
+  is the acceptance-aware cascade below.
 - **Cascade:** a terminal status (done/cancelled) auto-completes ancestor
   containers whose whole subtree is terminal — up to the initiative. Opt out with
   `--no-cascade`; flipped ids come back as `autoCompleted`. It is

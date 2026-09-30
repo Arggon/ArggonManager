@@ -48,6 +48,16 @@ import { dirname, join, relative, resolve, sep } from "node:path";
  * of ours to flip, or a reified install already resolving that copy, never a
  * bare symlink left over on an attach) and only when the build exits 0, so a
  * failed build falls back to the primary's copy visibly (PR #388 findings 1/3).
+ *
+ * A linked install MIRRORS the primary's, so it is only as current as that
+ * install: a dependency added to `package.json` after the primary's last install
+ * is missing from every worktree until the primary is re-installed, and the
+ * mirrored install used to be reported as ready anyway
+ * (bug-worktree-readiness-misses-stale-primary-install).
+ * `inspectDeclaredDependencies` compares the declared top-level dependency names
+ * against what the worktree can actually resolve, and the preparation receipt
+ * names the missing ones — without turning start into a package manager (no
+ * version solving, no transitive walk, no install it runs itself).
  */
 
 /**
@@ -538,6 +548,227 @@ export function buildLocalWorkspaces(
     }
   }
   return built;
+}
+
+/**
+ * Cap on the missing-dependency names a bounded report carries: enough to name
+ * a stale install's usual one or two devDependencies without letting a large
+ * manifest (or an attacker-shaped `package.json`) inflate the receipt.
+ */
+export const MAX_MISSING_DEPENDENCIES = 10;
+
+/**
+ * Whether the worktree's install actually provides what the worktree's own
+ * `package.json` declares — the half of readiness a link farm cannot know,
+ * because a farm mirrors the PRIMARY's entries: a dependency merged after that
+ * install ran is simply absent, and every worktree stays broken until the
+ * primary is re-installed (bug-worktree-readiness-misses-stale-primary-install).
+ *
+ * - `satisfied`: every declared top-level `dependencies`/`devDependencies`
+ *   name resolves through the install on the worktree's resolution path — or
+ *   the worktree declares none at all.
+ * - `stale`: at least one does not; the report names them.
+ * - `unknown`: nothing was compared — there is no install on the resolution
+ *   path, or the manifest is not readable as a JSON object (what npm itself
+ *   rejects with `EJSONPARSE`, plus a non-object root). Never reported as
+ *   satisfied, and `ready` follows it to false.
+ *
+ * What `satisfied` does NOT claim. It is a **presence** check over the declared
+ * top-level set, not an install verification: installed versions are never
+ * compared against the declared ranges (an outdated-but-present package
+ * counts as provided), and transitive, peer and bundled dependencies are never
+ * inspected. `optionalDependencies` are excluded deliberately — being absent is
+ * what that field allows. "Present" is a directory named after the dependency
+ * on the resolution path, which is the same presence npm's own hoisting aims
+ * for, not a simulated module resolution.
+ */
+export type ManifestCoverage = "satisfied" | "stale" | "unknown";
+
+/** Bounded result of `inspectDeclaredDependencies`. */
+export type DeclaredDependencyReport = {
+  coverage: ManifestCoverage;
+  /** Missing dependency names, sorted and capped at `MAX_MISSING_DEPENDENCIES`. */
+  missing: string[];
+  /** Full count of missing names — `missing` is capped below it when they differ. */
+  missingTotal: number;
+};
+
+/**
+ * Top-level `dependencies` + `devDependencies` names a manifest declares, or
+ * null when `package.json` is present but not readable as a JSON object.
+ *
+ * The three outcomes map onto the receipt one-for-one: no `package.json` means
+ * the tree declares NOTHING (an empty set, never a stale verdict — a
+ * dependency-free project must keep its readiness); a manifest that is not
+ * readable as an object means NOTHING WAS COMPARED (`unknown` — the verdict
+ * never guesses, and `ready` follows it to false); a readable one yields its
+ * declared names.
+ *
+ * npm's own tolerance is the bar, and the one place they differ is the UTF-8
+ * BOM: `json-parse-even-better-errors` (behind `read-package-json`) strips it,
+ * so a BOM-ed `package.json` installs fine and must not be called unreadable
+ * here. Everything npm rejects with `EJSONPARSE` — comments, trailing commas,
+ * truncation, an empty file, a non-object root — is rejected identically by
+ * `JSON.parse`, so `unknown` there matches npm instead of out-strictifying it.
+ * The shared `packageManifest` helper is deliberately left strict: it feeds the
+ * link farm's entry detection, where silently accepting a workspace manifest
+ * would change which copy resolves.
+ */
+function declaredDependencyNames(pkgDir: string): string[] | null {
+  const path = join(pkgDir, "package.json");
+  if (!existsSync(path)) return [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf8").replace(/^\uFEFF/, ""));
+  } catch {
+    return null;
+  }
+  if (parsed === null || typeof parsed !== "object") return null;
+  const manifest = parsed as Record<string, unknown>;
+  const names = new Set<string>();
+  for (const field of ["dependencies", "devDependencies"]) {
+    const section = manifest[field];
+    if (section === null || typeof section !== "object" || Array.isArray(section)) continue;
+    for (const name of Object.keys(section)) {
+      if (name.length > 0) names.add(name);
+    }
+  }
+  return [...names].sort();
+}
+
+/**
+ * The `node_modules` directories Node consults for a bare specifier required
+ * from `fromDir`: its own, then each parent's, up to the filesystem root. A
+ * start-created link farm or a bare symlink to the primary install is found
+ * here like any other install; empty when the path has no install at all.
+ */
+function installResolutionPath(fromDir: string): string[] {
+  const roots: string[] = [];
+  let dir = resolve(fromDir);
+  for (;;) {
+    const modules = join(dir, "node_modules");
+    if (existsSync(modules)) roots.push(modules);
+    const parent = dirname(dir);
+    if (parent === dir) return roots;
+    dir = parent;
+  }
+}
+
+/**
+ * Report whether the install a worktree resolves through provides what that
+ * worktree's own manifest declares (bug-worktree-readiness-misses-stale-primary-install).
+ *
+ * Cheap and read-only: one `existsSync` per declared name per install on the
+ * resolution path — top-level manifests declare tens of names, not thousands.
+ * Never throws and never guesses: an unreadable manifest or an install-free
+ * resolution path is `unknown`, not `satisfied`, so a caller can never read a
+ * `satisfied` verdict as "the install is complete".
+ */
+export function inspectDeclaredDependencies(worktreePath: string): DeclaredDependencyReport {
+  const declared = declaredDependencyNames(worktreePath);
+  if (declared === null) return { coverage: "unknown", missing: [], missingTotal: 0 };
+  if (declared.length === 0) return { coverage: "satisfied", missing: [], missingTotal: 0 };
+  const roots = installResolutionPath(worktreePath);
+  // Nothing to compare against: `install` already reports the absent install,
+  // and naming every declared dependency here would only restate it.
+  if (roots.length === 0) return { coverage: "unknown", missing: [], missingTotal: 0 };
+  const missing = declared.filter((name) => {
+    const segments = name.split("/");
+    return !roots.some((root) => existsSync(join(root, ...segments)));
+  });
+  return {
+    coverage: missing.length === 0 ? "satisfied" : "stale",
+    missing: missing.slice(0, MAX_MISSING_DEPENDENCIES),
+    missingTotal: missing.length,
+  };
+}
+
+/** What dependency preparation found (or created) in a worktree. */
+export type WorktreeInstallState = "linked" | "existing" | "missing" | "unavailable";
+
+/**
+ * Bounded-shape receipt for the shared pre-claim dependency preparation.
+ *
+ * `ready` means all three of: an install is present, no worktree-owned
+ * workspace package still resolves into the primary checkout, AND the install
+ * provides what the worktree's own manifest declares (`manifestCoverage:
+ * "satisfied"`). It grew the third clause deliberately
+ * (bug-worktree-readiness-misses-stale-primary-install): a link farm mirrors the
+ * primary's entries, so a devDependency merged since that install ran was
+ * invisible here and the receipt claimed readiness a gate could not use. The
+ * verdict is the conjunction; `manifestCoverage` + `missingDependencies` say
+ * WHICH clause failed, so `ready: false` is always actionable without a diffing
+ * script. A false receipt is informative, not a blanket start failure: the CLI
+ * keeps its historical best-effort fallback, while native start surfaces it and
+ * still makes the claim-commit result authoritative.
+ */
+export type WorktreeDependencyPreparation = {
+  ready: boolean;
+  install: WorktreeInstallState;
+  linkedNodeModules: boolean;
+  builtWorkspaces: string[];
+  linkedWorkspaces: string[];
+  /** Whether the install provides the worktree's declared dependencies. */
+  manifestCoverage: ManifestCoverage;
+  /** Declared dependency names the install does not provide (sorted, capped). */
+  missingDependencies: string[];
+  /** Full count behind `missingDependencies`; the two differ only when capped. */
+  missingDependenciesTotal: number;
+};
+
+/**
+ * Prepare a worktree's project dependencies before its claim commit.
+ *
+ * This is the one kernel-level orchestration point shared by CLI and native
+ * `start`: it links the primary install (or reuses an existing one), builds
+ * worktree-owned workspace packages, and reports the final resolution. Git
+ * worktree creation, claim records, push and domain operations stay with their
+ * owning callers; the helper only touches dependency state in the two roots.
+ * All low-level steps remain best-effort, so a missing install or an
+ * unbuildable workspace is reported for the caller to act on rather than
+ * thrown from the kernel.
+ */
+export function prepareWorktreeDependencies(
+  primaryRoot: string,
+  worktreePath: string,
+  deps: { runBuild?: WorkspaceBuildRunner } = {},
+): WorktreeDependencyPreparation {
+  const worktreeModules = join(worktreePath, "node_modules");
+  const linkedNodeModules = linkNodeModules(primaryRoot, worktreePath);
+  const builtWorkspaces = buildLocalWorkspaces(primaryRoot, worktreePath, {
+    runBuild: deps.runBuild,
+  });
+  const linkedWorkspaces = linkedWorkspacePackages(primaryRoot, worktreePath);
+  const hasInstall = existsSync(worktreeModules);
+  const primaryHasInstall = existsSync(join(primaryRoot, "node_modules"));
+  // A symlink can be created successfully even when its target is already
+  // gone (or becomes unreadable during the handoff). Do not call that a ready
+  // linked install: the receipt must distinguish a usable link from a link
+  // whose dependency tree cannot actually be resolved.
+  const install: WorktreeInstallState = linkedNodeModules
+    ? hasInstall
+      ? "linked"
+      : "unavailable"
+    : hasInstall
+      ? "existing"
+      : primaryHasInstall
+        ? "unavailable"
+        : "missing";
+  // Staleness of the install the worktree will actually resolve through
+  // (bug-worktree-readiness-misses-stale-primary-install): a link farm can only
+  // mirror what the primary has, so a declared-but-uninstalled dependency is
+  // reported by name instead of being read as a ready worktree.
+  const declared = inspectDeclaredDependencies(worktreePath);
+  return {
+    ready: hasInstall && linkedWorkspaces.length === 0 && declared.coverage === "satisfied",
+    install,
+    linkedNodeModules,
+    builtWorkspaces,
+    linkedWorkspaces,
+    manifestCoverage: declared.coverage,
+    missingDependencies: declared.missing,
+    missingDependenciesTotal: declared.missingTotal,
+  };
 }
 
 /**

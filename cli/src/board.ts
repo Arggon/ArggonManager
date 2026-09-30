@@ -182,12 +182,20 @@ export function runBoard(opts: BoardOptions): BoardResult {
     : { root, outPath, itemCount: items.length, prCount: overlay.size };
 }
 
+/**
+ * Type badge fills. The `.type` chip paints white 10px text on these, so every
+ * value is darkened from its original Tailwind-ish hue until white clears the
+ * WCAG 2.2 AA text threshold of 4.5:1 (task-axe-core-browser-ci; the
+ * `color-contrast` rule in the `@smoke` lane measures the rendered pair). The
+ * hues are unchanged — only their lightness moved: initiative 4.47 -> 4.60,
+ * epic 4.23 -> 4.60, story 2.77 -> 4.64, task 2.54 -> 4.64, bug 3.76 -> 4.60.
+ */
 const TYPE_COLORS: Record<WorkItem["type"], string> = {
-  initiative: "#6366f1",
-  epic: "#8b5cf6",
-  story: "#0ea5e9",
-  task: "#10b981",
-  bug: "#ef4444",
+  initiative: "#6264ed",
+  epic: "#8458ea",
+  story: "#0b7cb0",
+  task: "#0c855d",
+  bug: "#d53d3d",
 };
 
 export function escapeHtml(value: string): string {
@@ -601,6 +609,8 @@ export type BoardDetailPayload = {
 const DETAIL_CSS = `
 .card[tabindex="0"] { cursor: pointer; }
 .card:focus-visible { outline: 2px solid #0550ae; outline-offset: 2px; }
+.card-move { margin-left: auto; border: 1px solid #d0d4da; background: #fff; color: #424a53; border-radius: 4px; padding: 0 6px; font-size: 10px; font-family: inherit; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; }
+.card-move:focus-visible { outline: 2px solid #0550ae; outline-offset: 2px; }
 body.drawer-open { overflow: hidden; }
 .drawer { position: fixed; inset: 0; z-index: 20; }
 .drawer[hidden] { display: none; }
@@ -626,6 +636,16 @@ body.drawer-open { overflow: hidden; }
 .drawer-comment { margin-top: 8px; }
 .drawer-who { color: #59636e; font-size: 11px; }
 .drawer-panel a { color: #0550ae; }
+.move-menu { position: fixed; inset: 0; z-index: 30; }
+.move-menu[hidden] { display: none; }
+.move-menu-backdrop { position: absolute; inset: 0; background: rgb(0 0 0 / 0.35); }
+.move-menu-panel { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%); background: #fff; border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); padding: 14px; min-width: 260px; max-width: 92vw; }
+.move-menu-title { font-weight: 600; font-size: 13px; margin-bottom: 8px; overflow-wrap: anywhere; }
+.move-menu-actions { display: flex; flex-direction: column; gap: 6px; }
+.move-menu-target { text-align: left; padding: 6px 10px; font-size: 13px; font-family: inherit; border: 1px solid #d0d4da; background: #fff; color: inherit; border-radius: 6px; cursor: pointer; }
+.move-menu-note { color: #59636e; font-size: 12px; }
+.move-menu-cancel { margin-top: 10px; padding: 4px 10px; font-size: 12px; font-family: inherit; border: 1px solid #d0d4da; background: #fff; color: inherit; border-radius: 6px; cursor: pointer; }
+.move-menu-target:focus-visible, .move-menu-cancel:focus-visible { outline: 2px solid #0550ae; outline-offset: 2px; }
 `;
 
 const DRAWER_MARKUP = `<div id="board-drawer" class="drawer" hidden aria-hidden="true">
@@ -634,6 +654,20 @@ const DRAWER_MARKUP = `<div id="board-drawer" class="drawer" hidden aria-hidden=
     <button type="button" class="drawer-close" id="board-drawer-close" aria-label="close item detail">×</button>
     <div id="board-drawer-body" class="drawer-body"></div>
   </aside>
+</div>`;
+
+/**
+ * Serve-only card action menu shell (task-board-keyboard-a11y). One dialog for
+ * the whole board; `wireBoardMoveMenu` populates it per card. Hidden at load,
+ * so the ready-page axe scan never sees it.
+ */
+const MOVE_MENU_MARKUP = `<div id="board-move-menu" class="move-menu" hidden aria-hidden="true">
+  <div class="move-menu-backdrop" id="board-move-menu-backdrop"></div>
+  <div class="move-menu-panel" role="dialog" aria-modal="true" aria-label="move card">
+    <div class="move-menu-title" id="board-move-menu-title"></div>
+    <div class="move-menu-actions" id="board-move-menu-actions"></div>
+    <button type="button" class="move-menu-cancel" id="board-move-menu-cancel">cancel</button>
+  </div>
 </div>`;
 
 /**
@@ -780,7 +814,9 @@ export function renderBoardDetail(container: HTMLElement, payload: BoardDetailPa
  * as `wireBoardDetail(toast, renderBoardDetail)`; the two dependencies are
  * parameters so the function stays self-contained. Esc is captured on
  * `document` and stopped while the drawer is open, so it closes the drawer
- * before the filter input's own Escape-to-clear can run.
+ * before the filter input's own Escape-to-clear can run. Tab is trapped inside
+ * the panel while the drawer is open (task-board-keyboard-a11y) and focus
+ * returns to the opening card on close.
  */
 export function wireBoardDetail(
   toast: (message: string, kind?: string) => void,
@@ -888,8 +924,272 @@ export function wireBoardDetail(
     true,
   );
 
+  document.addEventListener(
+    "keydown",
+    function (event) {
+      if (drawerEl.hidden) return;
+      if (event.key !== "Tab") return;
+      const panel = drawerEl.querySelector(".drawer-panel") as HTMLElement | null;
+      if (panel) trapBoardFocus(panel, event);
+    },
+    true,
+  );
+
   if (closeButton) {
     closeButton.addEventListener("click", function () {
+      close(true);
+    });
+  }
+  if (backdrop) {
+    backdrop.addEventListener("click", function () {
+      close(true);
+    });
+  }
+}
+
+/**
+ * The one client-side claim-prompt classification, shared by the drag flow
+ * (attemptMove) and the card move menu (task-board-keyboard-a11y): a verdict
+ * that only fails for the missing --assignee is legal once the flow's claim
+ * prompt answers it. Every other refusal is final. Lives beside evaluateDrop
+ * so both callers run the identical rule — there is no second legality
+ * implementation on the page.
+ */
+export function dropNeedsClaimPrompt(verdict: { ok: boolean; reason: string }): boolean {
+  return !verdict.ok && verdict.reason.indexOf("requires --assignee") !== -1;
+}
+
+/**
+ * Focus trap for the serve-mode dialogs (detail drawer, card move menu).
+ * Embedded with `toString()` (like `wireBoardDetail`), so it must stay
+ * self-contained: no module-scope references, no template literals. Cycles Tab
+ * (and Shift+Tab) inside `container`; pulls focus back in when it escaped.
+ */
+export function trapBoardFocus(container: HTMLElement, event: Event): void {
+  const focusables = container.querySelectorAll(
+    'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  );
+  if (focusables.length === 0) return;
+  const active = document.activeElement;
+  const first = focusables[0] as HTMLElement;
+  const last = focusables[focusables.length - 1] as HTMLElement;
+  const inside = active !== null && container.contains(active);
+  if (!inside) {
+    event.preventDefault();
+    first.focus();
+    return;
+  }
+  if (event instanceof KeyboardEvent && event.shiftKey && active === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (event instanceof KeyboardEvent && !event.shiftKey && active === last) {
+    event.preventDefault();
+    first.focus();
+  }
+}
+
+/**
+ * Roving-tabindex arrow navigation over the board's cards
+ * (task-board-keyboard-a11y, serve-only). Embedded with `toString()`; must
+ * stay self-contained. Up/Down move within the focused card's column, Left/
+ * Right to the nearest non-empty column in that direction (keeping the row
+ * position), Home/End to the first/last visible card of the column. Focus
+ * moves the roving anchor with it, so Tab re-enters the board on the same
+ * card. Filtered-out cards are skipped everywhere. Returns the handle the
+ * filter code uses to re-seat the anchor when it gets hidden.
+ */
+export function wireBoardKeyboardNav(): { ensureAnchor(): void } {
+  const columns: HTMLElement[] = Array.prototype.slice.call(
+    document.querySelectorAll(".column"),
+  ) as HTMLElement[];
+  function visibleCards(column: HTMLElement): HTMLElement[] {
+    return Array.prototype.slice.call(
+      column.querySelectorAll(".card:not(.filtered-out)"),
+    ) as HTMLElement[];
+  }
+  function setRoving(card: HTMLElement): void {
+    document.querySelectorAll(".board .card").forEach(function (element) {
+      const el = element as HTMLElement;
+      el.setAttribute("tabindex", el === card ? "0" : "-1");
+    });
+  }
+  function ensureAnchor(): void {
+    const anchor = document.querySelector('.board .card[tabindex="0"]');
+    if (anchor && !anchor.classList.contains("filtered-out")) return;
+    const first = document.querySelector(".board .card:not(.filtered-out)");
+    if (first) setRoving(first as HTMLElement);
+  }
+  document.addEventListener("keydown", function (event) {
+    const key = event.key;
+    if (
+      key !== "ArrowDown" &&
+      key !== "ArrowUp" &&
+      key !== "ArrowLeft" &&
+      key !== "ArrowRight" &&
+      key !== "Home" &&
+      key !== "End"
+    ) {
+      return;
+    }
+    const target = event.target as Element | null;
+    if (!target || typeof target.closest !== "function") return;
+    // Never hijack the arrows of a control inside the card.
+    if (target.closest("a, button, input, select, textarea")) return;
+    const card = target.closest(".card") as HTMLElement | null;
+    if (!card) return;
+    const column = card.closest(".column") as HTMLElement | null;
+    if (!column) return;
+    const list = visibleCards(column);
+    const index = list.indexOf(card);
+    let next: HTMLElement | null = null;
+    if (key === "ArrowDown") next = list[index + 1] || card;
+    else if (key === "ArrowUp") next = list[index - 1] || card;
+    else if (key === "Home") next = list[0] || card;
+    else if (key === "End") next = list[list.length - 1] || card;
+    else {
+      const step = key === "ArrowRight" ? 1 : -1;
+      for (let c = columns.indexOf(column) + step; c >= 0 && c < columns.length; c += step) {
+        const others = visibleCards(columns[c]);
+        if (others.length > 0) {
+          next = others[Math.min(Math.max(index, 0), others.length - 1)];
+          break;
+        }
+      }
+    }
+    if (!next || next === card) return;
+    event.preventDefault();
+    setRoving(next);
+    next.focus();
+  });
+  return { ensureAnchor: ensureAnchor };
+}
+
+/**
+ * The card action menu (task-board-keyboard-a11y, serve-only): the keyboard
+ * and touch alternative to drag-and-drop. Embedded with `toString()`; must
+ * stay self-contained. A tap/click on a card's `move` button — or the `m` key
+ * on a focused card — opens a dialog listing ONLY the legal status transitions
+ * for that card, as classified by the same `evaluateDrop` parity path drag
+ * uses (a transition that `dropNeedsClaimPrompt` accepts counts, because
+ * `attemptMove` completes it through the same claim prompt). Picking a target
+ * runs `attemptMove` — the identical flow as a drop, prompts included. Focus
+ * is trapped in the dialog and restored to the opener on close.
+ */
+export function wireBoardMoveMenu(attemptMove: (card: HTMLElement, to: string) => void): void {
+  const menu = document.getElementById("board-move-menu");
+  const title = document.getElementById("board-move-menu-title");
+  const actions = document.getElementById("board-move-menu-actions");
+  const cancelButton = document.getElementById("board-move-menu-cancel");
+  const backdrop = document.getElementById("board-move-menu-backdrop");
+  if (!menu || !title || !actions) return;
+  const menuEl: HTMLElement = menu;
+  const titleEl: HTMLElement = title;
+  const actionsEl: HTMLElement = actions;
+  let opener: HTMLElement | null = null;
+  let card: HTMLElement | null = null;
+
+  function close(restoreFocus: boolean): void {
+    if (menuEl.hidden) return;
+    menuEl.hidden = true;
+    menuEl.setAttribute("aria-hidden", "true");
+    if (restoreFocus && opener && opener.isConnected) opener.focus();
+    opener = null;
+    card = null;
+  }
+
+  function open(target: HTMLElement, by: HTMLElement): void {
+    const id = target.getAttribute("data-id") || "";
+    if (!id) return;
+    opener = by;
+    card = target;
+    titleEl.textContent = "move " + id;
+    actionsEl.textContent = "";
+    let offered = 0;
+    // Candidates are the rendered columns; legality is evaluateDrop's verdict
+    // plus the shared claim-prompt case. Nothing else decides what is offered.
+    document.querySelectorAll(".column").forEach(function (column) {
+      const to = (column as HTMLElement).getAttribute("data-status") || "";
+      const cardData = {
+        id: id,
+        type: target.getAttribute("data-type") || "",
+        status: target.getAttribute("data-status") || "",
+        assignee: target.getAttribute("data-assignee"),
+      };
+      const verdict = evaluateDrop(cardData, to, {});
+      if (!verdict.ok && !dropNeedsClaimPrompt(verdict)) return;
+      offered++;
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "move-menu-target";
+      button.setAttribute("data-target", to);
+      button.textContent = "move to " + to + (verdict.ok ? "" : " (claim first)");
+      button.addEventListener("click", function () {
+        const moved = card;
+        close(true);
+        if (moved) attemptMove(moved, to);
+      });
+      actionsEl.appendChild(button);
+    });
+    if (offered === 0) {
+      const note = document.createElement("div");
+      note.className = "move-menu-note";
+      note.textContent = "no legal status transitions for " + id;
+      actionsEl.appendChild(note);
+    }
+    menuEl.hidden = false;
+    menuEl.setAttribute("aria-hidden", "false");
+    const firstTarget = actionsEl.querySelector("button");
+    if (firstTarget) (firstTarget as HTMLElement).focus();
+    else if (cancelButton) cancelButton.focus();
+  }
+
+  document.addEventListener("click", function (event) {
+    const target = event.target as Element | null;
+    if (!target || typeof target.closest !== "function") return;
+    const button = target.closest(".card-move");
+    if (!button) return;
+    const cardEl = button.closest(".card") as HTMLElement | null;
+    if (cardEl) open(cardEl, button as HTMLElement);
+  });
+
+  document.addEventListener("keydown", function (event) {
+    if (event.key !== "m" && event.key !== "M") return;
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    if (!menuEl.hidden) return;
+    const target = event.target as Element | null;
+    if (!target || typeof target.closest !== "function") return;
+    if (target.closest("a, button, input, select, textarea")) return;
+    const cardEl = target.closest(".card") as HTMLElement | null;
+    if (!cardEl) return;
+    event.preventDefault();
+    open(cardEl, target as HTMLElement);
+  });
+
+  document.addEventListener(
+    "keydown",
+    function (event) {
+      if (menuEl.hidden) return;
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      close(true);
+    },
+    true,
+  );
+
+  document.addEventListener(
+    "keydown",
+    function (event) {
+      if (menuEl.hidden) return;
+      if (event.key !== "Tab") return;
+      const panel = menuEl.querySelector(".move-menu-panel") as HTMLElement | null;
+      if (panel) trapBoardFocus(panel, event);
+    },
+    true,
+  );
+
+  if (cancelButton) {
+    cancelButton.addEventListener("click", function () {
       close(true);
     });
   }
@@ -954,6 +1254,13 @@ export function renderBoardHtml(
      * `/api/item?id=<id>` (kernel bounded read) and renders the payload as DOM
      * text nodes. Serve-only, like `diffLinks`: the static export stays lean
      * and byte-identical without the flag.
+     *
+     * Serve-mode keyboard/touch surface (task-board-keyboard-a11y): the cards
+     * carry a roving tabindex (arrow/Home/End navigation, one Tab stop for the
+     * whole board), a per-card `move` button opens the card action menu (the
+     * keyboard/touch alternative to drag; `m` works from a focused card), and
+     * both dialogs trap focus and restore it on close. Every board — static
+     * export included — renders named column landmarks and labeled cards.
      */
     details?: boolean;
   } = {
@@ -1019,6 +1326,13 @@ export function renderBoardHtml(
     : (item: WorkItem): string | null => milestoneOf(item);
   const noGroupLabel = groupByStory ? "no story" : "no milestone";
 
+  // Roving tabindex (task-board-keyboard-a11y, serve mode): exactly one card
+  // carries tabindex="0" and the rest -1, so Tab reaches the board once and the
+  // arrow keys (wired by wireBoardKeyboardNav) move between cards. The server
+  // seeds the anchor on the first rendered card; the client script re-seats it
+  // whenever a filter change hides it.
+  let rovingAssigned = false;
+
   const columns = STATUSES.map((status) => {
     const columnItems = sorted.filter((item) => item.status === status);
     const renderCard = (item: WorkItem): string => {
@@ -1053,8 +1367,20 @@ export function renderBoardHtml(
       const priorityChip = item.priority
         ? `<span class="priority ${esc(item.priority)}">${esc(item.priority)}</span>`
         : "";
-      return `<div class="card${blocked.length ? " dep-blocked" : ""}" draggable="true"${details ? ' tabindex="0"' : ""} data-id="${esc(item.id)}" data-type="${esc(item.type)}" data-status="${esc(item.status)}"${item.assignee ? ` data-assignee="${esc(item.assignee)}"` : ""}${milestoneOf(item) ? ` data-milestone="${esc(milestoneOf(item)!)}"` : ""}>
-  <div class="card-head"><span class="type" data-type="${esc(item.type)}" style="--type-color: ${TYPE_COLORS[item.type]}">${esc(item.type)}</span>${priorityChip}<code>${esc(item.id)}</code>${blockedBadge}</div>
+      // Accessible name (task-board-keyboard-a11y): a card is announced as
+      // "type id: title (status, @assignee)" — the same fields the eye gets,
+      // bounded to what is already on the card. Hostile values go through esc.
+      const cardLabel = `${item.type} ${item.id}: ${item.title ?? item.id} (${item.status}${item.assignee ? `, @${item.assignee}` : ""})`;
+      // Serve-only roving tabindex (see rovingAssigned above) and the tap/click
+      // affordance for the move menu: the static export stays lean (no
+      // tabindex, no button) and byte-identical apart from the ARIA labels.
+      const rovingTabindex = details ? (rovingAssigned ? ' tabindex="-1"' : ' tabindex="0"') : "";
+      if (details) rovingAssigned = true;
+      const moveButton = details
+        ? `<button type="button" class="card-move" aria-label="move ${esc(item.id)}">move</button>`
+        : "";
+      return `<div class="card${blocked.length ? " dep-blocked" : ""}" role="group" aria-label="${esc(cardLabel)}" draggable="true"${rovingTabindex} data-id="${esc(item.id)}" data-type="${esc(item.type)}" data-status="${esc(item.status)}"${item.assignee ? ` data-assignee="${esc(item.assignee)}"` : ""}${milestoneOf(item) ? ` data-milestone="${esc(milestoneOf(item)!)}"` : ""}>
+  <div class="card-head"><span class="type" data-type="${esc(item.type)}" style="--type-color: ${TYPE_COLORS[item.type]}">${esc(item.type)}</span>${priorityChip}<code>${esc(item.id)}</code>${blockedBadge}${moveButton}</div>
   <div class="title">${title}</div>
   ${breadcrumb}
   ${assignee}
@@ -1086,8 +1412,12 @@ export function renderBoardHtml(
         return `<div class="${cls}">${label}</div>\n${body}`;
       })
       .join("\n");
-    return `<section class="column" data-status="${status}">
-  <h2>${status} <span class="count">${columnItems.length}</span></h2>
+    // Named landmark per column (task-board-keyboard-a11y): the section's
+    // aria-labelledby points at its heading, so assistive tech announces
+    // "todo, region/heading" instead of an anonymous group. Statuses are the
+    // unique id namespace.
+    return `<section class="column" data-status="${status}" aria-labelledby="board-column-${status}">
+  <h2 id="board-column-${status}">${status} <span class="count">${columnItems.length}</span></h2>
   ${cards || '<div class="empty">—</div>'}
 </section>`;
   }).join("\n");
@@ -1104,8 +1434,21 @@ export function renderBoardHtml(
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>arggon board${repo}</title>
 <style>
+/* Contrast policy (task-axe-core-browser-ci): the @smoke lane runs axe
+   against this page and fails on any WCAG A/AA-tagged automated violation, so
+   every foreground/background pair here is chosen to clear 4.5:1 for body text
+   (WCAG 2.2 AA, 1.4.3) at the size it is actually rendered. The muted text grey
+   is a single value (#666a6f) rather than several near-identical ones, because
+   it has to clear the threshold on all three surfaces it appears on — the white
+   card (#fff, 5.45:1), the column (#ebecf0, 4.61:1) and the dep-blocked card
+   (#f6f7f9, 5.08:1). The two greys it replaced, #a0a6ad (2.46:1) and #8c919a
+   (3.17:1 on the card), failed. */
 :root { color-scheme: light; font-family: system-ui, sans-serif; }
 body { margin: 0; padding: 16px; background: #f4f5f7; color: #1f2328; }
+/* Visible keyboard focus everywhere (task-board-keyboard-a11y): one shared
+   rule for every button on the page (filter clear, lens chips, serve-mode card
+   and dialog buttons), matching the card focus ring. */
+button:focus-visible { outline: 2px solid #0550ae; outline-offset: 2px; }
 header { margin-bottom: 16px; }
 header h1 { margin: 0 0 4px; font-size: 20px; }
 header .meta { color: #59636e; font-size: 13px; }
@@ -1114,7 +1457,7 @@ header .meta { color: #59636e; font-size: 13px; }
 .column { background: #ebecf0; border-radius: 8px; padding: 10px; }
 .column h2 { margin: 0 0 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #424a53; }
 .column .count { background: #d0d4da; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
-.column .empty { color: #8c919a; text-align: center; padding: 12px 0; }
+.column .empty { color: #666a6f; text-align: center; padding: 12px 0; }
 .card { background: #fff; border-radius: 6px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.1); padding: 10px; margin-bottom: 8px; font-size: 13px; }
 .card:last-child { margin-bottom: 0; }
 .card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
@@ -1129,14 +1472,14 @@ header .meta { color: #59636e; font-size: 13px; }
 .parent { color: #59636e; font-size: 11px; margin-bottom: 4px; }
 .parent::before { content: "↳ "; }
 .assignee { color: #424a53; font-size: 12px; }
-.assignee.unassigned { color: #a0a6ad; }
+.assignee.unassigned { color: #666a6f; }
 .branch { color: #8250df; font-size: 12px; font-family: ui-monospace, monospace; }
 .pr { font-size: 12px; margin-top: 2px; }
 .pr a { color: inherit; text-decoration: none; }
 .pr a:hover { text-decoration: underline; }
 .pr a.diff { color: #0550ae; font-weight: 400; }
-.pr.nopr { color: #a0a6ad; }
-.pr.draft { color: #8c919a; }
+.pr.nopr { color: #666a6f; }
+.pr.draft { color: #666a6f; }
 .pr.open { color: #1a7f37; font-weight: 600; }
 .pr.merged { color: #8250df; }
 .pr.closed { color: #cf222e; }
@@ -1144,16 +1487,22 @@ header .meta { color: #59636e; font-size: 13px; }
 .label { background: #e7ebef; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
 .blocked-reason { margin-top: 6px; color: #9a3412; background: #fff1e7; border-radius: 4px; padding: 4px 6px; font-size: 12px; }
 .blocked-by { color: #9a3412; font-size: 11px; margin-top: 2px; overflow-wrap: anywhere; }
-.card.dep-blocked { opacity: 0.55; }
+/* A dep-blocked card reads as muted through its surface, not through a blanket
+   opacity: opacity composites every descendant against the column and took
+   the whole card to 1.5-2.7:1 (axe color-contrast on the title, id, parent,
+   branch, badges and labels — 13 nodes on the @smoke fixture). The muted fill
+   keeps the de-emphasis cue and leaves the text legible (#59636e on #f6f7f9 is
+   5.70:1). */
+.card.dep-blocked { background: #f6f7f9; }
 .card.dep-blocked .title { color: #59636e; }
 .blocked-badge { margin-left: auto; color: #9a3412; background: #fff1e7; border-radius: 10px; padding: 0 8px; font-size: 10px; font-weight: 600; white-space: nowrap; }
 .milestone { color: #0550ae; font-size: 12px; margin-top: 2px; }
 .mgroup-head { margin: 10px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #0550ae; }
 .mgroup-head:first-child { margin-top: 0; }
-.mgroup-head.none { color: #8c919a; }
+.mgroup-head.none { color: #666a6f; }
 .card[draggable="true"] { cursor: grab; }
 .card.dragging { opacity: 0.5; }
-.column.over { outline: 2px dashed #8c919a; outline-offset: -4px; }
+.column.over { outline: 2px dashed #666a6f; outline-offset: -4px; }
 #board-toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); max-width: 80%; background: #424a53; color: #fff; border-radius: 6px; padding: 8px 14px; font-size: 13px; display: none; z-index: 10; box-shadow: 0 2px 8px rgb(0 0 0 / 0.3); }
 #board-toast.show { display: block; }
 #board-toast.refused { background: #cf222e; }
@@ -1186,23 +1535,31 @@ ${details ? DETAIL_CSS : ""}
   <span id="board-filter-error" class="filter-error" role="alert"></span>
   ${lensChips}
 </div>
-<main class="board">
+<main class="board" aria-label="arggon board">
 ${columns}
 </main>
 <div id="board-toast" role="status" aria-live="polite"></div>
 ${details ? DRAWER_MARKUP : ""}
+${details ? MOVE_MENU_MARKUP : ""}
 <script>
 'use strict';
 ${evaluateDrop.toString()}
 /* board-filter:start */
 ${applyBoardFilter.toString()}
 /* board-filter:end */
+${dropNeedsClaimPrompt.toString()}
+${details ? trapBoardFocus.toString() : ""}
 ${details ? renderBoardDetail.toString() : ""}
 ${details ? wireBoardDetail.toString() : ""}
+${details ? wireBoardKeyboardNav.toString() : ""}
+${details ? wireBoardMoveMenu.toString() : ""}
 (function () {
   var ENDPOINT = document.body.getAttribute("data-update-endpoint") || "/api/update";
   var BOARD_ITEMS = ${embedJson(lensItems)};
   var BOARD_ME = ${embedJson(me)};
+  // Roving focus anchor (serve mode): the filter re-seats the focusable card
+  // when the current one gets hidden; null in the static export.
+  var keyboardNav = ${details ? "wireBoardKeyboardNav()" : "null"};
   var filterInput = document.getElementById("board-filter-input");
   var filterError = document.getElementById("board-filter-error");
   var filterCount = document.getElementById("board-filter-count");
@@ -1217,6 +1574,16 @@ ${details ? wireBoardDetail.toString() : ""}
   }
   function columnFor(status) {
     return document.querySelector('.column[data-status="' + status + '"]');
+  }
+  // Same shape the renderer bakes into role="group" aria-label; rebuilt from
+  // live DOM state so a moved card keeps announcing its current status/claim.
+  function cardAriaLabel(card, status) {
+    var id = card.getAttribute("data-id") || "";
+    var type = card.getAttribute("data-type") || "";
+    var titleEl = card.querySelector(".title");
+    var title = titleEl && titleEl.textContent ? titleEl.textContent : id;
+    var assignee = card.getAttribute("data-assignee");
+    return type + " " + id + ": " + title + " (" + status + (assignee ? ", @" + assignee : "") + ")";
   }
   function currentExpr() {
     return filterInput ? filterInput.value : "";
@@ -1294,6 +1661,7 @@ ${details ? wireBoardDetail.toString() : ""}
     normalizeEmpties();
     refreshGroupHeads();
     refreshFilterCount();
+    if (keyboardNav) keyboardNav.ensureAnchor();
   }
   function hashFilter() {
     var match = /[#&]filter=([^&]*)/.exec(window.location.hash);
@@ -1384,7 +1752,7 @@ ${details ? wireBoardDetail.toString() : ""}
     };
     var edit = {};
     var verdict = evaluateDrop(cardData, to, edit);
-    if (!verdict.ok && verdict.reason.indexOf("requires --assignee") !== -1) {
+    if (dropNeedsClaimPrompt(verdict)) {
       // Claim via board: prompt for the login, then re-run the rule with it.
       var login = window.prompt("--assignee required to claim " + id + " (GitHub login or agent id):");
       if (!login || !login.trim()) {
@@ -1408,13 +1776,27 @@ ${details ? wireBoardDetail.toString() : ""}
       reason = reason.trim();
     }
     var anchor = card.nextSibling;
+    var prevAssignee = card.getAttribute("data-assignee");
+    // Reparenting a focused element drops focus to <body> (Chromium), so the
+    // keyboard/touch move flow keeps it: whatever inside the card held focus
+    // (the card itself, or its move button) is re-focused after the move.
+    var focusHeld = null;
+    if (document.activeElement && (document.activeElement === card || card.contains(document.activeElement))) {
+      focusHeld = document.activeElement;
+    }
     // Never includes force: the update path must reject claim steals itself.
     var body = { id: id, status: to };
     if (reason) body.blocked_reason = reason;
     if (edit.assignee) body.assignee = edit.assignee;
     // Optimistic move; the catch below reverts it when the update call fails.
+    // The accessible name moves with the card (task-board-keyboard-a11y):
+    // assistive tech must announce the new status/claim immediately, not after
+    // the next server render.
     card.setAttribute("data-status", to);
+    if (edit.assignee) card.setAttribute("data-assignee", edit.assignee);
+    card.setAttribute("aria-label", cardAriaLabel(card, to));
     columnFor(to).appendChild(card);
+    if (focusHeld) focusHeld.focus();
     setFilterState(currentExpr());
     toast("… arggon update " + id + " --status " + to, "pending");
     fetch(ENDPOINT, {
@@ -1436,9 +1818,15 @@ ${details ? wireBoardDetail.toString() : ""}
       })
       .catch(function (err) {
         card.setAttribute("data-status", from);
+        if (edit.assignee) {
+          if (prevAssignee) card.setAttribute("data-assignee", prevAssignee);
+          else card.removeAttribute("data-assignee");
+        }
+        card.setAttribute("aria-label", cardAriaLabel(card, from));
         var col = columnFor(from);
         if (anchor && anchor.parentNode === col) col.insertBefore(card, anchor);
         else col.appendChild(card);
+        if (focusHeld && focusHeld.isConnected) focusHeld.focus();
         setFilterState(currentExpr());
         var message = err && err.message ? err.message : "update failed";
         if (message === "Failed to fetch") {
@@ -1447,7 +1835,7 @@ ${details ? wireBoardDetail.toString() : ""}
         toast("✗ " + id + " not moved — " + message + " (run: arggon update " + id + " --status " + to + ")", "refused");
       });
   }
-  ${details ? "wireBoardDetail(toast, renderBoardDetail);" : ""}
+  ${details ? "wireBoardDetail(toast, renderBoardDetail); wireBoardMoveMenu(attemptMove);" : ""}
 })();
 </script>
 </body>

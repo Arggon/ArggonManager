@@ -938,6 +938,10 @@ program
   )
   .option("--reason <text>", "non-empty rationale for --steal, recorded in the item body")
   .option(
+    "--waive <reason>",
+    "record a dated waiver and flip a task/bug to done despite unchecked acceptance checkboxes (requires --status done and a non-empty reason; agents are refused)",
+  )
+  .option(
     "--no-cascade",
     "skip automatic container completion when this update closes the last open descendant",
   )
@@ -972,6 +976,7 @@ program
         force?: boolean;
         steal?: boolean;
         reason?: string;
+        waive?: string;
         cascade?: boolean;
         commit?: boolean;
         json?: boolean;
@@ -1020,6 +1025,7 @@ program
               force: Boolean(opts.force),
               steal: Boolean(opts.steal),
               reason: opts.reason,
+              waive: opts.waive,
               cascade: opts.cascade !== false,
               full: opts.full === true,
               commit: opts.commit,
@@ -1047,6 +1053,7 @@ program
             force: Boolean(opts.force),
             steal: Boolean(opts.steal),
             reason: opts.reason,
+            waive: opts.waive,
             cascade: opts.cascade !== false,
           });
           // Tracker hygiene (task-autocommit-update-import): auto-commit ALL
@@ -1625,6 +1632,7 @@ spec
               findings: {
                 ambiguity: saved.result.ambiguity,
                 consistency: saved.result.consistency,
+                decisions: saved.result.decisions,
               },
               baseline: { file: saved.file, written: true, count: saved.snapshot.count },
             });
@@ -1649,7 +1657,11 @@ spec
               conventionVersion: cmp.result.conventionVersion,
               command: "spec",
               scanned: cmp.result.scanned,
-              findings: { ambiguity: cmp.result.ambiguity, consistency: cmp.result.consistency },
+              findings: {
+                ambiguity: cmp.result.ambiguity,
+                consistency: cmp.result.consistency,
+                decisions: cmp.result.decisions,
+              },
               baseline: {
                 file: cmp.file,
                 total: cmp.total,
@@ -1674,7 +1686,11 @@ spec
             conventionVersion: result.conventionVersion,
             command: "spec",
             scanned: result.scanned,
-            findings: { ambiguity: result.ambiguity, consistency: result.consistency },
+            findings: {
+              ambiguity: result.ambiguity,
+              consistency: result.consistency,
+              decisions: result.decisions,
+            },
           });
           return;
         }
@@ -2253,6 +2269,9 @@ program
               worktreePath: result.worktreePath,
               linkedNodeModules: result.linkedNodeModules,
               linkedWorkspaces: result.linkedWorkspaces,
+              manifestCoverage: result.manifestCoverage,
+              missingDependencies: result.missingDependencies,
+              missingDependenciesTotal: result.missingDependenciesTotal,
               postStart: result.postStart,
             },
             readConventionVersion(result.root),
@@ -2282,6 +2301,21 @@ program
               `  note: ${result.linkedWorkspaces.map((name) => sanitizeHumanError(name)).join(", ")} ` +
                 `resolve(s) into the primary checkout through the linked install — build the worktree copy ` +
                 `or run \`npm ci\` in the worktree (e.g. \`x-worktree.post-start: npm ci\`) for worktree-local resolution`,
+            );
+          }
+          if (result.manifestCoverage === "stale") {
+            // A mirrored install is only as current as the primary's: name what
+            // the worktree cannot resolve instead of reporting it as ready
+            // (bug-worktree-readiness-misses-stale-primary-install).
+            const extra = result.missingDependenciesTotal - result.missingDependencies.length;
+            const named = result.missingDependencies
+              .map((name) => sanitizeHumanError(name))
+              .join(", ");
+            console.log(
+              `  note: the install in this worktree is missing ${sanitizeHumanError(named)}` +
+                `${extra > 0 ? ` (and ${extra} more)` : ""} ` +
+                `declared in package.json — re-install the primary checkout (\`npm install\` there) ` +
+                `or run \`npm ci\` in the worktree (e.g. \`x-worktree.post-start: npm ci\`) for a worktree-local install`,
             );
           }
         }
@@ -2773,6 +2807,13 @@ program
       }
       for (const amb of result.ambiguous) {
         console.log(`  ambiguous: ${sanitizeHumanError(amb.id)} (PRs ${amb.prs.join(", ")})`);
+      }
+      // Report-only verdict classification (task-review-verdict-checker):
+      // only the informative states print; `none` stays silent.
+      for (const [id, verdict] of Object.entries(result.verdicts)) {
+        if (verdict !== "none") {
+          console.log(`  verdict:   ${sanitizeHumanError(id)} -> ${sanitizeHumanError(verdict)}`);
+        }
       }
       for (const [id, branch] of Object.entries(result.filled ?? {})) {
         console.log(`  filled:    ${sanitizeHumanError(id)} -> ${sanitizeHumanError(branch)}`);

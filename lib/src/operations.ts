@@ -437,6 +437,8 @@ export type SyncPayload = {
   ambiguous: SyncResult["ambiguous"];
   suggestions: SyncResult["suggestions"];
   filled: SyncFilled | null;
+  /** Additive, report-only review-verdict classification (task-review-verdict-checker). */
+  verdicts: SyncResult["verdicts"];
   errors: string[];
   exit_code: 0 | 1;
 };
@@ -452,6 +454,7 @@ export function syncOperation(opts: SyncOperationOptions): CommandOutcome<SyncPa
       ambiguous: result.ambiguous,
       suggestions: result.suggestions,
       filled: result.filled,
+      verdicts: result.verdicts,
       errors: result.errors,
       exit_code: result.exit_code,
     };

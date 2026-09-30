@@ -64,6 +64,27 @@ const TIER1_DOCS = [
   ".opencode/plugins/arggon/index.ts",
   // W5 task-native-tui: the TUI board/status entry is vendored beside it.
   ".opencode/plugins/arggon/tui.tsx",
+  // ADR 0014 (task-zcode-plugin-seam): the ZCode plugin seam is tier-1 —
+  // marketplace catalog + the vendored declarative plugin.
+  ".zcode-marketplace/arggon/.zcode-plugin/plugin.json",
+  ".zcode-marketplace/arggon/agents/arggon-coordinator.md",
+  ".zcode-marketplace/arggon/agents/arggon-reviewer.md",
+  ".zcode-marketplace/arggon/agents/arggon-worker.md",
+  ".zcode-marketplace/arggon/commands/arggon-adopt.md",
+  ".zcode-marketplace/arggon/commands/arggon-adr.md",
+  ".zcode-marketplace/arggon/commands/arggon-board.md",
+  ".zcode-marketplace/arggon/commands/arggon-done.md",
+  ".zcode-marketplace/arggon/commands/arggon-explore.md",
+  ".zcode-marketplace/arggon/commands/arggon-handoff.md",
+  ".zcode-marketplace/arggon/commands/arggon-next.md",
+  ".zcode-marketplace/arggon/commands/arggon-playbook.md",
+  ".zcode-marketplace/arggon/commands/arggon-review.md",
+  ".zcode-marketplace/arggon/commands/arggon-spec.md",
+  ".zcode-marketplace/arggon/commands/arggon-start.md",
+  ".zcode-marketplace/arggon/commands/arggon-status.md",
+  ".zcode-marketplace/arggon/hooks/gate.mjs",
+  ".zcode-marketplace/arggon/hooks/hooks.json",
+  ".zcode-marketplace/marketplace.json",
   "AGENTS.md",
   "ArggonManager/docs/tracking.md",
   "CLAUDE.md",
@@ -357,6 +378,44 @@ describe("init --dry-run", () => {
     expect(readFileSync(join(dir, "AGENTS.md"), "utf8")).toBe(`${agentsBefore}\nadopter edit\n`);
     expect(existsSync(join(dir, "backup"))).toBe(false);
     expect(snapshot(dir)).toEqual(before);
+  });
+
+  it("re-vendors a stale vendored plugin artifact instead of modified-skip (bug-stale-vendored-plugin-copy)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-dry-"));
+    runInit({ dir, force: false, full: true, now: new Date("2026-09-14T12:00:00Z") });
+    const pluginDest = join(dir, ".opencode", "plugins", "arggon", "index.ts");
+    const vendored = readFileSync(pluginDest, "utf8");
+    // Merge scenario: the on-disk derived copy comes from ANOTHER checkout's
+    // vendoring (pre-bundle raw source), while the tracked x-generated state —
+    // shared across checkouts — records this checkout's stamp.
+    writeFileSync(pluginDest, `// stale cross-checkout copy\n${vendored}`, "utf8");
+
+    const dry = dryRunInit({ dir, force: false, full: true });
+    const byDest = new Map(dry.plan.map((e) => [e.dest, e]));
+    expect(byDest.get(".opencode/plugins/arggon/index.ts")?.decision).toBe("updated");
+    expect(byDest.get(".opencode/plugins/arggon/index.ts")?.reason).toMatch(/re-vendored/);
+
+    // The real run heals the artifact and refreshes its state entry: bytes
+    // back to the committed bundle, and a follow-up dry run reports the
+    // untouched-regenerated path (the trap is gone, not re-flagged).
+    const real = runInit({ dir, force: false, full: true, now: new Date("2026-09-14T12:00:00Z") });
+    expect(real.updated).toContain(".opencode/plugins/arggon/index.ts");
+    expect(readFileSync(pluginDest, "utf8")).toBe(vendored);
+    const dry2 = dryRunInit({ dir, force: false, full: true });
+    expect(
+      new Map(dry2.plan.map((e) => [e.dest, e])).get(".opencode/plugins/arggon/index.ts")?.reason,
+    ).toMatch(/untouched since last generation/);
+  });
+
+  it("keeps modified-skip for a diverged skill copy — the re-vendor clause is plugin-scoped (bug-stale-vendored-plugin-copy)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-init-dry-"));
+    runInit({ dir, force: false, full: true, now: new Date("2026-09-14T12:00:00Z") });
+    const skillDest = join(dir, ".agents", "skills", "arggon-cli", "SKILL.md");
+    writeFileSync(skillDest, `${readFileSync(skillDest, "utf8")}\nadopter edit\n`, "utf8");
+    const dry = dryRunInit({ dir, force: false, full: true });
+    expect(
+      new Map(dry.plan.map((e) => [e.dest, e])).get(".agents/skills/arggon-cli/SKILL.md")?.decision,
+    ).toBe("modified-skip");
   });
 
   it("plan buckets match a subsequent real run 1:1 (plan-then-run equivalence)", () => {

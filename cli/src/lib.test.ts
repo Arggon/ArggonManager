@@ -20,6 +20,7 @@ import { runCreate } from "@arggondev/lib";
 import { runInit } from "./init.js";
 import * as lib from "@arggondev/lib";
 import { removeFixtureTree } from "./test-tmp.js";
+import { tickAcceptance } from "../../test/acceptance.js";
 
 /**
  * The kernel entrypoints the tools need, by category (ADR 0011 §4 / plan
@@ -236,6 +237,9 @@ describe("operations", () => {
         agent: true,
       }),
     );
+    // Done gate (task-done-gate-acceptance-waiver, ADR 0015): agents complete
+    // ticked checklists — only the waiver is human-only.
+    tickAcceptance(dir, "task-rate-limit");
     success(lib.updateOperation({ cwd: dir, id: "task-rate-limit", status: "done", agent: true }));
     // Reopening a done item is refused by rules.ts regardless of the surface.
     const reopen = failure(

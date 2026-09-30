@@ -1,0 +1,412 @@
+---
+type: bug
+status: done
+id: bug-native-cleanup-unverified-worktree-removal
+title: "Native cleanup prune can report a worktree removed while the worktree, branch, and worktree_path record remain"
+assignee: Arggon
+branch: fix/bug-native-cleanup-unverified-worktree-removal
+parent: native-redesign
+labels: [opencode-seam, worktree, review-followup]
+priority: p1
+created: "2026-09-28"
+updated: "2026-09-28"
+depends_on: [bug-native-start-worktree-no-install]
+---
+<!--
+  Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-native-cleanup-unverified-worktree-removal.md
+  Leaves live only under a story. id is the filename stem: bug-native-cleanup-unverified-worktree-removal.
+  CLI `arggon create bug native-cleanup-unverified-worktree-removal` adds the bug- prefix (do not pass it twice).
+  parent MUST be the story id. Omit assignee when unassigned. Omit blocked_reason unless status is blocked.
+-->
+
+# Native cleanup prune can report a worktree removed while the worktree, branch, and worktree_path record remain
+
+## Context
+
+Lead-architect re-review of [PR #419](https://github.com/Arggon/ArggonManager/pull/419) on 2026-09-28 found that native `tools.arggon.cleanup({ prune: true })` trusts a successful `ctx.worktree.remove` call without observing the result. A domain that resolves while leaving the worktree in place produces `pruned: [{ action: "removed worktree <path>" }, { action: "failed", leftoverBranch }, { action: "cleared worktree_path" }]` with no top-level failure: the worktree and branch still exist but the canonical record is cleared, so the state becomes unrecoverable through the normal cleanup path.
+
+This is a pre-existing native cleanup defect, not part of the P1 start-readiness change. It is tracked separately so PR #419 stays scoped; the fix depends on that P1 merge to avoid concurrent edits to the vendored plugin.
+
+## Acceptance
+
+- [x] Verify worktree removal physically and through `git worktree list` after the domain call; fall back to a literal `git worktree remove` whenever the domain call fails or resolves without removing the worktree. `--force` is a **policy input of that one shared primitive**, not a second rule: `true` for the `start` rollback, which discards the worktree it just created, and `false` for the cleanup prune, so git keeps refusing dirty worktrees and the native tool keeps byte-compatible with `arggon cleanup --prune` (upheld by the PR #421 review — `origin/main`'s cleanup path was already the unforced `git worktree remove`, and forcing natively would introduce forced deletion of uncommitted work that this bug never required).
+- [x] Never emit `removed worktree`, delete a branch, or clear `worktree_path` unless removal is observably complete.
+- [x] A failed removal reports a bounded per-candidate failure with the remaining path and `leftoverBranch`, preserves the record, and keeps the rest of the cleanup run honest.
+- [x] Reuse one shared removal/observation implementation with native start rollback; do not duplicate the rules.
+- [x] Add deterministic tests for a lying/failing domain, git fallback success, both domain+git failure, foreign `node_modules` ownership, and record/branch preservation.
+- [x] Update the native cleanup payload contract and `npm test`, lint, build, `check:plugin`, validate, and review smoke are green.
+
+## Notes
+
+Review verdict: PR #419 re-review, 2026-09-28, finding 3.
+
+### 2026-09-28 @Arggon-worker — acceptance evidence (ticked after the PR #421 review)
+
+**Deterministic suite** (worktree `npm ci` bootstrap, branch `fix/bug-native-cleanup-unverified-worktree-removal`):
+`npm test` 97 files green, 7 `cleanup prune` cases — lying domain + git fallback success, lying domain + both fail,
+throwing domain + git fallback success, throwing domain + both fail (asserts the observed
+`worktree domain removal failed: …` and `git worktree removal failed` text, the ≤500-char bound, `failures[]`,
+`leftoverPath`/`leftoverBranch`, the preserved record/branch and the absence of a clear commit), foreign
+`node_modules` ownership, and one unobservable removal among two prunable candidates (healthy candidate still
+prunes end to end, one commit for the single cleared record). Start rollback reuses the same primitive: the
+existing refusal rollback test plus a lying-domain rollback that recovers through `git worktree remove --force`.
+
+**Gates:** `npm run lint` · `npm run build` · `npm run check:plugin` (bundle regenerated and committed) ·
+`npm run arggon -- validate --json` → `ok: true` · `npm run smoke:tui-board` passed.
+
+**Review smoke (corrected — the 40/40 run was on `b12467fd`, not on the final head):** the independent W4
+review run was **40/40 green on `b12467fd`**, including the cleanup round-trip through the **real** OpenCode
+worktree domain. Every commit after `b12467fd` is a **tests-and-item delta only** (S1 coverage plus the
+acceptance boxes) — no behavior, no contract, no docs change. The reviewer's run on the final head was
+**37/38**, the single miss being the transcript-needle check that
+[`bug-opencode-smoke-normalize-bracket-namespace`](../bug-opencode-smoke-normalize-bracket-namespace.md) tracks
+(model-spelling dependent, not a product signal), while the **changed cleanup surface was 19/19**. The full
+47-check harness was not re-run: the pinned `opencode-go/deepseek-v4-flash` is quota-blocked
+(`Go usage limit exceeded`), and removal observation cannot be driven adversarially through a live,
+well-behaved domain — that is what the deterministic cases above are for. Box 1's force wording is amended to
+the upheld policy (see above).
+
+### 2026-09-28 @Arggon-worker
+## Implementation — PR #421 (draft) — 2026-09-28
+
+Claim was already `in_progress` in-process but the claim commit was skipped by the stale
+vendored plugin (`tsx: command not found`, `bug-stale-vendored-plugin-copy`). Bootstrapped the
+worktree with `npm ci` and made the explicit commit `claim: bug-native-cleanup-unverified-worktree-removal`
+(4b38b698, pushed) before touching code.
+
+**Design.** One shared removal/observation primitive in `opencode/plugins/arggon/index.ts`:
+`removeWorktreeObserved(options, directory, root, policy)` replaced the unverified cleanup-only
+`removeWorktree()` (deleted) and the body of the start rollback's `discardWorktree()`. Domain first,
+literal `git worktree remove` fallback, and the directory **plus** `git worktree list` are checked
+after every step (`gone()`); a resolved promise or a zero exit is never a removal.
+`nativeCleanup` now gates `removed worktree`, `deleted branch` and `cleared worktree_path` on
+`removed === true`; otherwise one bounded per-candidate `failed` action + `failures[]` entry with
+the new additive `leftoverPath` and `leftoverBranch`, and both the branch and the `worktree_path`
+record are preserved so the next `cleanup` can retry.
+
+**One deliberate deviation from the acceptance wording** (reviewer call): the git fallback force flag
+is a *policy input* of the shared primitive, not a forked rule. Start rollback passes `force: true`
+(`git worktree remove --force`, the seconds-old worktree it created); cleanup passes `force: false`,
+because `arggon cleanup --prune` is documented as "git refuses dirty worktrees" and a forced prune
+would silently delete uncommitted work in a done item's worktree. Observation rules are byte-for-byte
+identical; only the caller's force policy differs. Say the word and I flip cleanup to `force: true`.
+
+**Tests added** (`opencode/plugins/arggon/tools.test.ts`, all deterministic, no network):
+- lying domain (resolves without removing) + git fallback success → reported once, observed via disk + `git worktree list`
+- lying domain + broken git registration (both fail) → only `failed`, `leftoverPath`/`leftoverBranch`, ≤500-char error, `failures[]`, no commit, worktree+branch+record preserved
+- foreign `node_modules` (real dir start never created) → never removed, git refuses, record preserved
+- one unobservable removal among two prunable candidates → the healthy one still prunes end to end, ONE commit for the single cleared record
+- start rollback with a lying domain → same primitive, `--force` fallback, `rollback.worktreeRemoved`/`branchDeleted` true only after the observation
+
+**Gates** (worktree, after `npm ci`): `npm test` 1638 passed / 97 files · `npm run lint` · `npm run build` · `npm run check:plugin` · `npm run arggon -- validate --json` → `ok:true` · `npm run smoke:tui-board` passed. `origin/main` merged normally (b12467fd).
+
+**`npm run smoke:opencode` is environmentally blocked, not a regression.** The full harness failed
+47/47 checks, including trivially unrelated ones ("session still succeeds", "/next: session completes"),
+and the cause is the pinned smoke model: `opencode run --model opencode-go/deepseek-v4-flash "Reply with only the word OK"`
+→ `Error: Go usage limit exceeded`. Re-running the W4 group (worktree lifecycle + invariants +
+permissions) with `OPENCODE_SMOKE_MODEL=opencode/space-bunny-free` instead; result appended here.
+
+### 2026-09-28 @Arggon-worker
+## Headless smoke evidence (W4) — 2026-09-28
+
+The full `npm run smoke:opencode` harness is blocked by the pinned model's quota, not by this change:
+`opencode run --model opencode-go/deepseek-v4-flash "Reply with only the word OK"` → `Error: Go usage limit exceeded`,
+so all 47 checks failed, including ones with nothing to do with this item ("session still succeeds", "/next: session completes").
+
+Re-ran the W4 group with a working model: `OPENCODE_SMOKE_ONLY=w4 OPENCODE_SMOKE_MODEL=opencode/space-bunny-free npm run smoke:opencode`.
+
+- `invariants (W4)` — 13/13 ok (never-steal, no-reopen, permissions active).
+- `permissions (W4)` — 11/11 ok (reviewer catalog is the read-only set, shell gate denies `git push`, session not broken).
+- `worktree lifecycle (W4)` — 4 ok, then `FAIL model executed the native start tool`.
+
+**That one failure is a harness transcript-needle mismatch, not a product failure.** The transcript
+(`/tmp/arggon-smoke-lifecycle-UJ7M3z/.smoke-evidence/worktree-lifecycle-start.stdout.jsonl`, kept fixture) shows the
+tool call itself **completed** with a correct envelope:
+
+- frame 1: `tool_use execute completed`, code `return await tools.arggon["start"]({ id: "task-smoke-item", assignee: "smoke" })`
+- output: `{"ok": true, "command": "start", "id": "task-smoke-item", "branch": "feat/task-smoke-item",
+  "worktreePath": "/tmp/arggon-smoke-lifecycle-UJ7M3z-task-smoke-item", "worktreeCreated": true, "branchCreated": true, ...}`
+
+so the native `start` tool ran through the real OpenCode worktree domain from the dependency-less vendored bundle.
+The check missed it because `normalizeNamespace()` (smoke/opencode-smoke.ts:415) rewrites `tools["arggon"].x` →
+`tools.arggon.x` but not the equally valid `tools.arggon["x"]` form, so the needle `tools.arggon.start`
+(`smoke/opencode-smoke.ts:1383`) did not match the model's bracket-notation call. The pinned smoke model writes the
+dot form, which is why this does not show up there.
+
+**Not fixed here on purpose** — the harness is out of this item's scope and the coordinator owns filing
+(`references/orchestration.md`: findings go back to the coordinator, not into this diff). Suggested follow-up for
+the native-smoke surface: extend `normalizeNamespace` to also normalize `tools.arggon["x"]` / `tools.arggon['x']`.
+
+CI on PR #421: `cli` SUCCESS · `tasks-validate` SUCCESS · `ui-smoke` SUCCESS.
+
+### handoff 2026-09-28 @Arggon-worker (session: ses_f165d5e03ffeuQoAVgHB6lN7kE) — next: Review + merge PR #421 (draft); if the force policy for cleanup is rejected, flip policy.force to true in nativeCleanup, rerun gates, push.
+- branch: fix/bug-native-cleanup-unverified-worktree-removal
+- open questions: Cleanup git fallback stays non-force (dirty-worktree contract) while start rollback forces - confirm or reject; smoke needle does not match tools.arggon["x"] - coordinator to file; item body checklis…
+
+### 2026-09-28 @ses_f1646c3bcffeDF9jjDx7e6Uxpi
+## Review — PR #421 (`b12467fd`) — provisional verdict: **PASS, merge recommended**
+
+Reviewer: reviewer subagent, read-only. Head `b12467fd`, base `main`. CI rollup read: `cli` SUCCESS · `tasks-validate` SUCCESS · `ui-smoke` SUCCESS. No graph-negative claims — I read current source directly (generation predates this branch).
+
+### What I verified myself (all re-run on this head, not taken on trust)
+
+| Gate | Result |
+| --- | --- |
+| `npm run build` | pass |
+| `npm run check:plugin` | pass — regenerated bundle **byte-identical** to the committed `index.bundle.ts` |
+| `npm run lint` | pass |
+| `npm test` | **97 files / 1638 tests passed** (matches the worker's count exactly) |
+| `npm run arggon -- validate --json` | `{"ok":true,"errors":[],"warnings":[]}` |
+| `npm run smoke:tui-board` | pass |
+| `OPENCODE_SMOKE_ONLY=w4 … smoke:opencode` (substitute model) | **3 scenarios / 40 checks / 0 failures** |
+| pinned-model quota block | **reproduced independently** |
+
+Worktree left clean by me (`git status --porcelain` empty).
+
+### Findings, severity order
+
+**S1 · Medium · test gap against the item's own acceptance wording — recommend landing with the PR.**
+Acceptance box 5 asks for "a lying/**failing** domain". The added tests only drive a *lying* domain (resolves without removing). The *throwing* path is exercised only as a side effect: the fake domain throws because its own internal `git worktree remove` failed (`tools.test.ts:779-787`) inside the foreign-`node_modules` test, and that test asserts only `"git worktree removal failed"` — never the `worktree domain removal failed:` text. So neither "domain throws → git fallback prunes end to end" nor "domain throws → git fails" is asserted. **The behavior is correct** (I proved both by probe), so this is coverage, not a defect — but it is an incomplete acceptance box, and it is ~15 lines to close.
+
+**S2 · Medium · SEPARATE, PRE-EXISTING defect — must be filed, must NOT be fixed in this diff.**
+The harness normalization gap the worker hit is **real**, and it is worse than "one missed check":
+
+- `normalizeNamespace()` (`smoke/opencode-smoke.ts:415`) only rewrites `tools["arggon"]` → `tools.arggon`. It never normalizes bracket *member* access, so **3 of 5 valid Code Mode spellings** miss the `tools.arggon.<name>` needles. Deterministic probe:
+
+```
+MATCH    tools.arggon.start({ id: "x" })
+MATCH    tools["arggon"].start({ id: "x" })
+NOMATCH  tools['arggon']['start']({ id: "x" })   -> tools.arggon['start']({ id: "x" })
+NOMATCH  tools.arggon["start"]({ id: "x" })
+NOMATCH  tools.arggon['start']({ id: "x" })
+```
+
+- `executeJson()` (`smoke/opencode-smoke.ts:789-802`) is the affected path, so **every** native-tool transcript check is model-spelling-dependent — not just W4. The smoke gate therefore emits **flaky false negatives that are indistinguishable from product failures**. That is exactly what happened here, and I proved the flakiness: the **same head** failed that check for the worker and **passed it** for me.
+- The codebase already has the correct pattern one screen away: `executedTool()` (`smoke/opencode-smoke.ts:448-457`) matches `tools.arggon.x`, `tools.arggon["x"]` and `tools.arggon['x']`. `executeJson` was simply never brought in line.
+- Two claims in the tree are **wrong and must change with any fix**: the doc comment says it accepts "every valid form (observed in the bounded command sessions, W4)", and `smoke/opencode-smoke.test.ts:144-148` is *named* `"normalizes every bracket namespace spelling"` while **asserting** the un-normalized result `tools["arggon"]["next"]` → `tools.arggon["next"]`. That test currently locks the gap in.
+
+→ **Coordinator: file this as a follow-up under the native-smoke surface** (the worker deferred it to you and that was the right call). Suggested: *"opencode-smoke: transcript needles miss bracket-member tool spellings"* — `normalizeNamespace` normalizes `tools.arggon["x"]`/`tools.arggon['x']`/`tools["arggon"]["x"]` (mirror `executedTool`'s three patterns or extend the regex), fix the doc comment, and update the misnamed assertion. Out of scope for #421.
+
+**S3 · Low · the item's acceptance text contradicts the shipped code; the deviation is recorded only in a comment and the PR body.**
+Box 1 literally says "fall back to a literal `git worktree remove --force`". Cleanup ships the fallback **without** `--force`. The reasoning is correct (see verdict below) and it is disclosed in the PR body and the worker comment — but the item body still reads as if `--force` shipped, and `docs/agents.md` §5 makes the checklist the definition of done. → **Amend box 1** (e.g. "…`git worktree remove` fallback — forced only for the `start` rollback, which owns the worktree it created; cleanup keeps git's dirty-worktree refusal, matching `arggon cleanup --prune`") before ticking it. This is the honest record; the deviation is real and defensible.
+
+**S4 · Low · the error text tells the user to do the one thing this tool refuses to do.**
+Probe (native P6 and CLI B both surface it verbatim): `…fatal: '<path>' contains modified or untracked files, use --force to delete it`. With `force:false` as the deliberate policy, the actionable next step is "commit/stash or remove the files yourself, then re-run cleanup". A hint appended in the primitive would make it actionable. Non-blocking.
+
+**S5 · Nit · `via` is overloaded across two layers.**
+`WorktreeRemovalObservation.via` is `"domain" | "git" | null`; `entry.via` in the payload is `"squash-merged PR #N"`. The new `failed` block spreads `entry.via`, which is **correct** and consistent with the other three `pruned.push` sites (I checked all four) — but a reader inside that block cannot tell which concept `via` is. Renaming the observation field to `channel` removes the trap. Non-blocking.
+
+**S6 · Nit · inherited style inconsistency, not introduced by this PR.**
+The new code is semicolon-terminated (36 semicolon lines in the 2310-2450 range). `origin/main`'s `index.ts` already had 35 — all inside the `discardWorktree` block this PR replaced — and the other ~3,700 lines have none, while `.prettierignore` documents a deliberate semicolon-free policy for `opencode/plugins/arggon/`. The new code matches its immediate predecessor but not the file. Drift inherited from #419; worth one normalization pass under `task-plugin-source-prettier-policy`.
+
+**S7 · Observation · pre-existing, NOT a regression — `failures[]` is empty for a branch-delete failure.**
+Probe P4 (recorded path missing on disk): `pruned: [failed(leftoverBranch), cleared worktree_path]`, `failures: []`, and the cleared record is still committed. Verified **byte-identical at `origin/main`** (`git show origin/main:opencode/plugins/arggon/index.ts`), so #421 neither introduced nor fixed it. `json-output.md` ("…appear in `pruned` … and `failures`") is loose. Out of scope; note it if the docs get tightened.
+
+### Verified properties (no action)
+
+- **`leftoverPath` is accurate in every reachable failure state.** I tried to construct the imprecision case and could not: a physical delete with a *stale* registration is repaired by the git fallback (success, both signals agree); with a *destroyed* registration the observation sees no registration either (success); the failure states that remain all have the directory genuinely on disk. Probe P3c (domain deletes the worktree but leaves an untracked dir) reports `leftoverPath` at a path that really does still exist.
+- **Bounded errors.** `boundedNativeText(..., MAX_NATIVE_DETAIL_CHARS=500)` and `clip()` respect the bound — measured 297 / 420 / 436 chars across probes. `failures[]` is one entry per failed candidate, so it is bounded by candidates (ADR 0006 spirit).
+- **Exactly one tracker commit.** Probe P11 (two candidates, one unobservable): repo commit count `7 → 8`, a single `chore(tasks): pruned task-rate-limit` for the one cleared record, while the failed candidate kept worktree + branch + record. Verified at the **repo** level, not just the envelope.
+- **`prune: false` envelope parity.** Keys are exactly `[ok, schemaVersion, conventionVersion, command, base, candidates, pruned, failures]`, `pruned: []`, `failures: []`, no `commit`, candidate keys unchanged, 0 domain calls, worktree/branch/record untouched. The diff does not touch that region.
+- **Squash-merge `via`.** The new `failed` site uses the same `...(entry.via !== undefined ? { via: entry.via } : {})` spread as the other three, so the annotation is consistent by construction.
+- **Security.** `run()` uses `execFile` with an **args array** (`index.ts:952-963`) — the recorded path cannot shell-inject. The foreign-path guard means `git worktree remove` only ever targets a path git reports as a worktree of this repo (probe P9b: `removable:false`, `reason:"path exists but is not a git worktree of this repo"`, `domain.remove` calls **0**, precious file intact).
+- **Unlink ownership.** `unlinkNodeModulesLink` (`lib/src/worktree.ts:361`) unlinks only a symlink whose resolved target is the canonical install. Probe P6: a real `node_modules/foreign-dep` **directory** survives intact.
+- **Schema budget.** `nativeToolsCatalogBytes()` = **11,821** bytes — unchanged and equal to the figure documented at `opencode2.md:101`, under the 12,288 advisory cap. No tool/description/schema growth.
+- **Docs accuracy.** `json-output.md` scopes `leftoverPath` to the native tool; my CLI probe confirms the CLI does **not** emit it, and CLI dirty-prune produces `pruned: [failed]` + `failures` + **no commit**, exactly as documented. `skills/` does not mirror the cleanup payload table, so no `skills:sync` obligation.
+- **Scope.** 6 files: plugin source, its bundle, its test, 2 docs, and the item file (claim bookkeeping only). `lib/src/cleanup.ts` and the CLI are untouched. No ADR warranted (additive `schemaVersion: 1` field, no new package, no reserved-namespace change), no new runtime dependency.
+- **Start rollback is strictly safer, not regressed.** The refactor now requires the observation *after each step* rather than only at the end, so a domain that removed the directory but left a stale registration now falls through to the git fallback (which prunes it) instead of being accepted-then-rejected at origin/main. The git fallback runs on exactly the same condition as before.
+
+### Force-policy verdict: **uphold `force: false` for cleanup**
+
+It is not a deviation from the status quo — it **is** the status quo, which is the strongest argument. At `origin/main` the cleanup path called `kernel.defaultCleanupGit().removeWorktree(root, directory)` = `git worktree remove <path>`, **no force** (`lib/src/cleanup.ts:160-162`). Honoring box 1 verbatim would have *introduced* forced deletion of uncommitted work into a maintenance command — a riskier change than the bug required.
+
+Evidence:
+1. **Raw git asymmetry** — `git worktree remove <dirty>` → `fatal: … contains modified or untracked files, use --force to delete it`, exit 128, dir intact. `git worktree remove --force <dirty>` → exit 0, **uncommitted file destroyed**.
+2. **CLI parity probe** (`arggon cleanup --prune --no-gh --json` on a fixture, record hand-set): clean → 3 prune actions, worktree gone, branch deleted, record cleared, one commit. **Dirty** → `pruned:[{action:"failed"}]`, `failures:["task-rate-limit: …"]`, **no commit**, worktree + branch + record intact, uncommitted file survives. That is the documented contract, and the CLI is the **documented fallback** for the native tool (`opencode2.md`). Forcing natively would make the two surfaces disagree on the same action — precisely what `lib/src/cleanup.ts:12-17` exists to prevent.
+3. **Native probe P6** — the domain is called with `force:false`, both the domain and the git fallback refuse, and work/branch/record are all preserved.
+4. **Start rollback keeps `force:true`** (it discards a worktree it created seconds earlier), and because `force` is a *policy input* to one shared primitive, the two callers can never disagree about what "removed" means. That separation is the right design and is what acceptance box 4 asked for.
+
+**Caveat to record, not to code around:** the *domain* call also receives `force:false`, and whether OpenCode's domain honours it is an external contract this repo types structurally only (`WorktreeDomainLike`, `index.ts:104-115`). The dirty-worktree protection is therefore verified at the git fallback, not provably at the domain layer. Same as `origin/main`, which also passed `force:false`. One doc sentence would close the record.
+
+### Smoke / gate assessment: **amend the item, do not block on it**
+
+The blocking smoke bar is satisfiable, and I satisfied it. I independently reproduced the environmental block — `opencode run --model opencode-go/deepseek-v4-flash "Reply with only the word OK"` → `Error: Go usage limit exceeded`, no output. That is the *model's* quota, not this change. Substituting a working model, the W4 group is **40/40 green on this head**, including `cleanup reports the removable candidate and the three prune actions`, `cleanup committed the cleared record`, `worktree removed through the domain and gone from disk`, `merged branch deleted`, `item is done with worktree_path cleared` — i.e. the refactored primitive works through the **real** OpenCode worktree domain end to end.
+
+Deterministic evidence is **sufficient** for this item's behavior, and the PR already has the right split. The change's whole surface is the removal-observation rule, which a smoke harness cannot reach through a real, well-behaved domain — you cannot make a live domain lie from the outside. So: deterministic vitest for the adversarial branches + the model-driven W4 harness for the real-domain happy path. My probes covered the residual gaps (throwing domain, stale/foreign inventory, unprunable registration, one-commit-at-repo-level, prune:false parity).
+
+Neither the quota failure nor the harness needle failure is a product signal, and blocking on either would be blocking on an unrelated failure. **Recommendation:** check the boxes with the W4-group evidence and the model substitution noted; amend box 1 for the force policy (S3) and box 5 for the failing-domain test (S1).
+
+### What I could NOT verify (disclosed)
+
+- I did **not** run the full 47-check `npm run smoke:opencode`; the pinned model is quota-blocked and a substitute model is not equivalent to the pinned configuration. I ran the W4 group, which is the group that exercises the changed surface.
+- I could not inspect the real `ctx.worktree.remove` implementation — it is an external OpenCode contract, not a dependency of this repo, so its `force` semantics stay unverified (see the force caveat).
+- Squash-merge `via` on the **new failure** path was checked by code reading only: `nativeCleanup` injects no `gh` executor, so a squash-merged candidate reaching that path calls the real `gh`; I did not drive it end to end. Consistency is by construction (all four push sites share the spread).
+- CI was read from the PR rollup, not re-run.
+
+### Merge recommendation: **PASS — merge**
+
+Conditions:
+1. Mark PR #421 **ready** — it is still a `draft`.
+2. **S1** (throwing-domain tests) recommended to land with the PR; if the coordinator prefers not to wait, the honest alternative is to amend box 5 to say "lying domain" and file the throwing-domain test as a follow-up — not to check a box that does not match the tests.
+3. **S3** (amend box 1 for the force policy) before the item flips `done`.
+4. **S2 must be filed as a follow-up** by the coordinator — explicitly not in this diff.
+
+No blocking defects. The core primitive is correct, shared, well-observed, and documented; the acceptance evidence is honest apart from the one force-wording mismatch the worker disclosed proactively.
+
+### 2026-09-28 @Arggon-worker
+## Review conditions addressed — head `6417b627` — 2026-09-28
+
+**S1 (coverage) — closed.** Two explicit **throwing**-domain tests now sit beside the lying ones in
+`opencode/plugins/arggon/tools.test.ts`:
+
+- `cleanup prune falls back to git when the domain throws` — the domain rejects; the git fallback removes
+  end to end (3 prune actions, worktree gone from disk **and** `git worktree list`, branch deleted, record
+  cleared, one `chore(tasks): pruned task-rate-limit` commit, `failures: []`).
+- `cleanup prune keeps the record and the branch when a throwing domain and git both fail` — asserts the
+  observed `worktree domain removal failed: worktree domain unavailable` text, the observed
+  `git worktree removal failed` text, `worktree remains at <path>`, the ≤500-char bound, the single
+  `failures[]` entry, `leftoverPath`/`leftoverBranch`, `pruned: [failed]` only, no `commit`, and the
+  preserved worktree + branch + `worktree_path` record.
+
+The `cleanup prune` group is now 7 deterministic cases. Neither the inherited semicolon style nor the
+internal `via` name was touched; no behavior change — the code already handled the throwing path, S1 was
+coverage.
+
+**S3 (acceptance honesty) — closed in the item body.** Box 1 now states the upheld policy: the fallback is a
+literal `git worktree remove` when the domain call fails **or resolves without removing**, and `--force` is
+a policy input of that one shared primitive — `true` for the `start` rollback (discards the worktree it just
+created), `false` for the cleanup prune (git keeps refusing dirty worktrees, native/CLI parity preserved).
+All six boxes are ticked, with an evidence note appended under Notes. The reviewer's notes are byte-identical
+(verified: the only changed lines in the item file are the six box lines) — the prose gate does not cover
+tracker item files, so no formatter churn was introduced.
+
+**Out of scope, untouched as instructed:** S2/S7 are filed on main
+(`bug-opencode-smoke-normalize-bracket-namespace`, `bug-native-cleanup-branch-delete-missing-failure`);
+S5 (`via` naming) and S6 (semicolon style) unchanged.
+
+**Merge main** — `817e2516`, normal merge, no conflicts; the reviewer notes and both new items came in
+unchanged. Tracker notes only, no behavior change.
+
+**Gates on `6417b627`** — focused `worktree domain tools` 36/36 · `npm test` 97 files / **1640** tests
+(+2 from S1) · `lint` · `build` · `check:plugin` (bundle regenerated: **byte-identical**, 370347 bytes) ·
+`validate --json` `ok:true` · `smoke:tui-board` passed. CI on the new head: `cli` SUCCESS ·
+`tasks-validate` SUCCESS · `ui-smoke` SUCCESS. PR #421 marked **ready for review** (not draft), pushed
+normally, no force-push, no merge, no GitHub comment.
+
+**Review smoke, recorded honestly:** the reviewer's independent W4 run on this surface is **40/40 green**
+(including the cleanup round-trip through the real OpenCode worktree domain); the full 47-check harness stays
+quota-blocked on the pinned `opencode-go/deepseek-v4-flash` (`Go usage limit exceeded`) and was not re-run —
+a model-quota block, not a product signal for this non-model behavior.
+
+### handoff 2026-09-28 @Arggon-worker (session: ses_f165d5e03ffeuQoAVgHB6lN7kE) — next: Merge PR #421 (ready for review, CI green) then flip the item to done; acceptance boxes are already ticked with evidence in the body.
+- branch: fix/bug-native-cleanup-unverified-worktree-removal
+- open questions: Reviewer's doc-side force caveat (domain force:false is an external OpenCode contract) not coded per instruction - coordinator may want one sentence in opencode2.md; full 47-check smoke still quota-b…
+
+### 2026-09-28 @ses_f1646c3bcffeDF9jjDx7e6Uxpi
+## Final re-review — PR #421 at `6417b627` — provisional verdict: **PASS, merge**
+
+Reviewer: reviewer subagent, read-only. Head `6417b627a0368fceb6545fda354bfc4936d80ad6` (= PR head, CI `cli`/`tasks-validate`/`ui-smoke` SUCCESS, `isDraft: false`). Worktree left clean; no pushes, merges or GitHub comments from me.
+
+### S1 and S3 are closed
+
+**S1 — the two throwing-domain tests are exactly what I asked for.** `tools.test.ts` +78 lines, two new cases:
+
+- `cleanup prune falls back to git when the domain throws` — asserts the domain receives `force: false`, the git fallback's removal is **observed** (dir gone **and** absent from `git worktree list --porcelain`), the three prune actions, branch gone, record cleared, one `chore(tasks): pruned task-rate-limit` commit.
+- `cleanup prune keeps the record and the branch when a throwing domain and git both fail` — pins the assertion that was actually missing: `"worktree domain removal failed: worktree domain unavailable"`, plus `"git worktree removal failed"`, plus `"worktree remains at <path>"`, the ≤500-char bound, `failures[]`, `leftoverPath`/`leftoverBranch`, **no** commit, and worktree + branch + record preserved.
+
+Test count moved **1638 → 1640, exactly +2**, still 97 files. No filler added.
+
+**S3 — acceptance box 1 is amended honestly and precisely.** The fallback trigger now reads "whenever the domain call fails **or** resolves without removing the worktree" (matches the code exactly), `--force` is recorded as "a **policy input of that one shared primitive**, not a second rule: `true` for the `start` rollback … and `false` for the cleanup prune", and the rationale cites the upheld review including the strongest argument — that `origin/main`'s cleanup path was already the unforced `git worktree remove`, so forcing natively would have *introduced* forced deletion of uncommitted work. The deviation is now in the canonical acceptance text, not just a comment. All six boxes now match the code and the tests.
+
+*Prose nit (not worth a round-trip):* "so git keeps refusing dirty worktrees and the native tool keeps byte-compatible with `arggon cleanup --prune`" — "keeps byte-compatible" is missing a verb ("stays/remains byte-compatible"). Fix whenever the sentence is next touched.
+
+### No behavior or docs regression
+
+Blob SHAs prove it: `opencode/plugins/arggon/index.ts`, `index.bundle.ts`, `ArggonManager/docs/opencode2.md` and `ArggonManager/docs/json-output.md` are all **byte-identical to `b12467fd`**. The delta `b12467fd..6417b627` is exactly: 2 test cases + the target item + the 2 filed follow-ups. Nothing else moved.
+
+Gates re-run by me **at this head**: `npm run build` ✅ · `npm run check:plugin` ✅ (regenerated bundle byte-identical to the committed one) · `npm run lint` ✅ · `npm run arggon -- validate --json` → `{"ok":true,"errors":[],"warnings":[]}` ✅ · `npm run smoke:tui-board` ✅ · `npm test` → **97 files / 1640 tests** ✅.
+
+**Review smoke at this head: 37/38.** `worktree lifecycle (W4)` **19/19** — the whole changed surface green, including all six cleanup checks (three prune actions, the cleared-record commit, worktree gone from disk *and* from `git worktree list`, branch deleted, item done with the record cleared) through the **real** OpenCode worktree domain. `permissions (W4)` 11/11. `invariants (W4)` 7 ok + **1 FAIL**.
+
+### The single failure is the filed S2 bug — proven from the transcript, not assumed
+
+`invariants.stdout.jsonl`: the `execute` tool_use **completed**, and the model wrote the bracket-member form `tools.arggon["update"]` / `tools.arggon["start"]`. `normalizeNamespace()` leaves those unchanged, so the needle `tools.arggon.update` misses. The product in that very transcript was **fully correct**:
+
+- `stealError`: `UPDATE_FAILED: claim conflict: 'task-smoke-item' is claimed by 'smoke'` → never-steal via `update`
+- `startError`: `START_FAILED: claim conflict … the worktree created by this run was removed again` → never-steal via `start` — and that rollback ran **through the refactored shared primitive** with `force: true`, and cleaned up correctly
+- `reopenError`: `agents must not reopen done items` → no-reopen
+- fixture state: `task-smoke-item` still `in_progress`/`smoke`, `task-second-item` still `done` → both invariants hold
+
+So all four downstream invariant checks were unmeasurable **purely because of the needle**; the invariants themselves hold. Not a product signal, not a reason to hold this PR.
+
+**This raises my confidence in the severity of `bug-opencode-smoke-normalize-bracket-namespace`**: it fired in the *lifecycle* scenario on the worker's run and in the *invariants* scenario on mine — two different scenarios, two runs. The gate's false-negative rate is material. → **Coordinator: treat that item as at least p1, and add two acceptance rows it currently lacks** — correcting the overclaiming doc comment at `smoke/opencode-smoke.ts:410-413` ("accept every valid form"), and updating the misnamed assertion at `smoke/opencode-smoke.test.ts:144-148` (titled *"normalizes every bracket namespace spelling"* while **asserting** the un-normalized `tools["arggon"]["next"]` → `tools.arggon["next"]`, i.e. it currently locks the gap in). A regex-only fix would leave both claims false.
+
+### S7 remains correctly out of scope
+
+`bug-native-cleanup-branch-delete-missing-failure` (p3, `todo`) is accurately scoped: "This predates PR #421 and is not absorbed into that scoped PR", with acceptance that preserves the record-clearing semantics and adds a domain-free test. Nothing in this diff touches that behavior.
+
+### Force caveat: **no doc change required before merge**
+
+The residual uncertainty is whether OpenCode's domain honours `force: false`. I probed the worst case directly — **a domain that ignores `force: false` and force-removes a dirty worktree**:
+
+- we send `force: false` (policy correct at our layer)
+- the tool reports `removed worktree`, and the worktree **is** genuinely gone (dir gone, `git worktree list` clean), branch deleted, record cleared, one commit
+
+**The report stays honest.** The data loss happens at the domain layer, not as a misreport — so the unverified third-party conformance **cannot reintroduce the bug class this item fixed** (an unverified removal reported as verified). That is the decisive property, and it is why this is a dependency-conformance note rather than a gap in this PR's contract docs.
+
+The existing `opencode2.md:113-124` text states the policy (correct and provable: the tool never itself issues a forced removal), the mechanism (the unforced git fallback, which is where refusal is actually guaranteed) and the outcome at the layer we control. The only unproven link is a third party's conformance with a flag we pass it — and singling out `force` would be inconsistent, since the identical argument applies to `ctx.worktree.create/list/refresh`, none of which carry such caveats, in a doc already operating under the ADR 0006 byte budget.
+
+**Optional, not a merge condition** — if the coordinator is doing a docs pass anyway, this one clause closes the record: *"the dirty-worktree refusal is guaranteed by the unforced `git worktree remove` fallback; a domain that ignores `force: false` is still observed and reported truthfully."*
+
+### Invariants re-confirmed at `6417b627`
+
+- **Shared observation** — one primitive, both callers. P1 (domain throws → git fallback → observed removal → 3 actions, 1 commit), P2 (both fail → one bounded `failed`, 297 chars, `failures[]`, no commit), P3 (physical delete + stale `git worktree list` → the git fallback prunes the registration, honest success), plus the start-rollback tests reusing the same primitive with `force: true`.
+- **Record / branch preservation** — P2: dir kept, branch kept, record kept, nothing committed. P11: the unobservable candidate keeps worktree + branch + record while its healthy peer prunes end to end. Foreign/non-worktree path: `removable: false`, `domain.remove` calls **0**, nothing touched.
+- **One-commit semantics** — verified at the **repo** level, not just the envelope: commit count `7 → 8`, a single `chore(tasks): pruned task-rate-limit` for the one cleared record.
+- **`prune: false` parity** and **`leftoverPath` accuracy** — unchanged (source byte-identical; re-probed).
+- **Schema budget** — `nativeToolsCatalogBytes()` = **11,821**, unchanged and equal to `opencode2.md:101`. No growth.
+
+### One bookkeeping correction before the item flips `done`
+
+The item's Notes say *"the W4 group is **40/40 green on this head** (independent review run)"*. That was true for `b12467fd` — I verified 40/40 there, and since the plugin source is byte-identical the behavior is identical, so it is a stale head reference rather than an overclaim. At `6417b627` the group is **37/38**, the single miss being the filed S2 false negative (transcript-verified product-correct, above). Worth amending that one line so box 6's evidence trail stays exact. Bookkeeping, not a merge blocker.
+
+### What I could NOT verify (disclosed)
+
+- The **full 47-check** `npm run smoke:opencode` — the pinned `opencode-go/deepseek-v4-flash` is still quota-blocked (`Go usage limit exceeded`, reproduced by me), and a substitute model is not equivalent to the pinned configuration. I ran the W4 group, which covers the changed surface.
+- The real `ctx.worktree.remove` implementation — an external OpenCode contract, not a dependency of this repo, hence the force caveat above.
+- Squash-merge `via` on the failure path: code reading only (`nativeCleanup` injects no `gh` executor); consistent by construction across all four `pruned.push` sites.
+- CI was read from the PR rollup, not re-run. No graph-derived claims were made.
+
+### Final: **PASS — merge. No required doc change.**
+
+S1 and S3 are properly closed, nothing regressed, the behavior is byte-identical to what I verified and probed, and the one smoke miss is proven to be the separately filed harness bug rather than this change. Merge, then flip the item to `done` after the one Notes-line correction above. The single required doc change: **none**.
+
+### 2026-09-28 @Arggon-coordinator
+## FINAL APPROVE — PR #421 — 2026-09-28 (coordinator)
+
+**Verdict: APPROVED.** Merge at the coordinator's discretion; this comment is bookkeeping only — it performs **no merge and does not set the item to `done`**. The item stays `in_progress` with its acceptance honestly ticked for post-merge completion.
+
+### What was upheld
+- **One shared observed removal.** `removeWorktreeObserved(options, directory, root, policy)` is the single removal/observation implementation for both callers: the unverified cleanup-only `removeWorktree()` is gone and the start rollback's `discardWorktree()` is reduced to it, so the two can never disagree about what "removed" means. The domain is preferred, then a literal `git worktree remove` fallback, and the directory **plus** `git worktree list` are checked after every step — a resolved promise or a zero exit is never treated as a removal.
+- **Force policy upheld (cleanup stays non-force).** `force` is a policy input, not a second rule: `true` for the `start` rollback, which discards the worktree it created seconds earlier; `false` for the cleanup prune. This is the status quo (`origin/main` already used the unforced `git worktree remove` via `defaultCleanupGit`), it keeps git's dirty-worktree refusal, and it preserves native/CLI parity. Forcing in cleanup would have *introduced* forced deletion of uncommitted work that this bug never required. Acceptance box 1 was amended to state exactly this.
+- **Honest failures, recoverable state.** `removed worktree`, `deleted branch` and `cleared worktree_path` are gated on an observably complete removal; otherwise one bounded (≤500 chars) per-candidate `failed` action plus a `failures[]` entry carries `leftoverPath` and `leftoverBranch`, and both the branch and the `worktree_path` record survive so the next `cleanup` can retry. Per-candidate failures never abort the run, and the cleared records still share ONE tracker commit.
+- **Classification, remote safety, squash-merge `via`, `prune: false` envelope parity** and the one-commit semantics are untouched; list mode stays byte-identical to `cleanup --json`.
+
+### Evidence
+- **Deterministic suite:** 7 `cleanup prune` cases + 5 start-rollback cases. Lying **and** throwing domains, each with git-fallback success and both-fail, foreign `node_modules` ownership, an unobservable removal among two prunable candidates (healthy candidate prunes end to end, one commit for the single cleared record), and record/branch preservation. `npm test`: **97 files / 1640 tests** green.
+- **Gates:** `lint` · `build` · `check:plugin` (regenerated bundle byte-identical, 370347 B) · `validate --json` `ok: true` · `smoke:tui-board` passed. CI on the final head: `cli` / `tasks-validate` / `ui-smoke`.
+- **W4 smoke:** **40/40 on `b12467fd`** (the real OpenCode worktree domain round-trip). Everything after `b12467fd` is tests-and-item only; the reviewer's run on the final head was **37/38**, the one miss being the separately filed transcript-needle check, with the **changed cleanup surface 19/19**. The item's evidence line was corrected to say exactly this. The full 47-check harness remains quota-blocked on the pinned `opencode-go/deepseek-v4-flash` and was not treated as a product signal.
+
+### Docs and contract accuracy
+Native `cleanup` payload row plus the observed-removal paragraph in `ArggonManager/docs/opencode2.md`; the additive `leftoverPath` scoped to the native tool in `ArggonManager/docs/json-output.md` (confirmed: the CLI does not emit it, and the CLI dirty-prune behavior matches its documented contract). No new tool/description/schema growth — the definitions payload is unchanged and under the ADR 0006 advisory cap.
+
+### Out of scope, separately tracked — explicitly NOT in this diff
+- **S2** → `bug-opencode-smoke-normalize-bracket-namespace` (`normalizeNamespace` misses bracket-member tool spellings; the smoke gate emits flaky false negatives indistinguishable from product failures).
+- **S7** → `bug-native-cleanup-branch-delete-missing-failure` (pre-existing at `origin/main`: `failures[]` stays empty for a branch-delete failure).
+- S4 (actionable git-stderr hint) and S5/S6 (nits) were left alone by instruction; S6's semicolon drift stays inherited from #419 for `task-plugin-source-prettier-policy`.
+
+**Next step for the coordinator:** merge PR #421 (ready for review, CI green), then flip this item to `done`.
+
+### handoff 2026-09-28 @Arggon-coordinator (session: ses_f165d5e03ffeuQoAVgHB6lN7kE) — next: Merge PR #421 (final head d60b8341, CI green) and flip the item to done; FINAL APPROVE verdict is on the item as Arggon-coordinator.
+- branch: fix/bug-native-cleanup-unverified-worktree-removal
+- open questions: None blocking. Tracker comment commits (b32c7e88 final verdict) sit local on main in the primary checkout, unpushed - coordinator to push with main.

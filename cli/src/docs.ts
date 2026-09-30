@@ -230,6 +230,18 @@ const BUNDLED_PLUGINS = [
 /** Everything init bundles from a package-root source into an adopter destination. */
 const BUNDLED_SOURCES = [...BUNDLED_SKILLS, ...BUNDLED_PLUGINS];
 
+/**
+ * Is this destination one of the vendored OpenCode plugin artifacts
+ * (bug-stale-vendored-plugin-copy)? They are gitignored, derived per-checkout
+ * copies of the committed bundle — never adopter-owned content — so a
+ * provenance mismatch re-vendors instead of modified-skip. Skill copies are
+ * excluded: `.agents/skills/**` is tracked and follows the normal provenance
+ * decisions.
+ */
+function isBundledPluginDest(dest: string): boolean {
+  return BUNDLED_PLUGINS.some((p) => p.dest === dest);
+}
+
 /** Is this template id one of the bundled (package-root source) artifacts? */
 function isBundledSource(templateRel: string): boolean {
   return BUNDLED_SOURCES.some((s) => s.source === templateRel);
@@ -264,6 +276,10 @@ const DOC_PATH_MAP: Record<string, string> = {
  */
 const DOC_PREFIX_MAP: { prefix: string; dest: string }[] = [
   { prefix: "opencode/", dest: ".opencode/" },
+  // ZCode plugin seam (ADR 0014, task-zcode-plugin-seam): the marketplace
+  // catalog + the vendored declarative plugin land under one root the user
+  // adds as a local marketplace (the platform's one manual install step).
+  { prefix: "zcode/", dest: ".zcode-marketplace/" },
 ];
 
 /** Canonical (v5) destination of a template-relative path. */
@@ -300,12 +316,15 @@ function isJsonDestination(dest: string): boolean {
 }
 
 /**
- * TypeScript destinations (the bundled OpenCode plugin) take a `//` line
- * comment as their visible provenance marker; `//` is valid TS at any position
- * and keeps the first line syntactically inert.
+ * TypeScript/JavaScript destinations (the bundled OpenCode plugin, the ZCode
+ * gate script) take a `//` line comment as their visible provenance marker;
+ * `//` is valid TS/JS at any position and keeps the first line syntactically
+ * inert.
  */
 function isTypeScriptDestination(dest: string): boolean {
-  return dest.endsWith(".ts") || dest.endsWith(".tsx");
+  return (
+    dest.endsWith(".ts") || dest.endsWith(".tsx") || dest.endsWith(".mjs") || dest.endsWith(".js")
+  );
 }
 
 /**
@@ -319,11 +338,14 @@ function isYamlDestination(dest: string): boolean {
 
 /**
  * Markdown artifacts whose syntax requires YAML frontmatter on the first line
- * (OpenCode agents/commands): their visible marker is a `#` comment INSIDE the
- * frontmatter instead of a leading HTML comment.
+ * (OpenCode and ZCode agents/commands): their visible marker is a `#` comment
+ * INSIDE the frontmatter instead of a leading HTML comment.
  */
 function isFrontmatterDestination(dest: string): boolean {
-  return dest.startsWith(".opencode/") && dest.endsWith(".md");
+  return (
+    (dest.startsWith(".opencode/") || dest.startsWith(".zcode-marketplace/")) &&
+    dest.endsWith(".md")
+  );
 }
 
 /**
@@ -913,6 +935,26 @@ export function planGenerateDocs(opts: GenerateDocsOptions): DocsPlan {
         dest,
         decision: "updated",
         reason: "untouched since last generation — regenerated from the current template",
+        write: content,
+        entry,
+      };
+    }
+    // Derived vendored plugin artifact (bug-stale-vendored-plugin-copy): the
+    // x-generated checksum is shared across checkouts while the file bytes are
+    // per-checkout gitignored copies, so a mismatch means the recorded state
+    // cannot describe THIS checkout (a merge from another worktree, or a
+    // pre-bundle raw-source vendoring). The committed bundle is the source of
+    // truth and is drift-gated upstream (cli/src/plugin-copy.test.ts,
+    // `check:plugin`), so the artifact is re-vendored — with its state entry
+    // refreshed — instead of degrading to modified-skip, which is what left a
+    // stale copy behind and broke the OpenCode TUI load with a missing export.
+    // Acknowledged state never reaches this line (handled above).
+    if (isBundledPluginDest(dest)) {
+      return {
+        dest,
+        decision: "updated",
+        reason:
+          "derived vendored artifact — bytes diverge from the recorded state (cross-checkout merge or stale copy); re-vendored from the committed bundle",
         write: content,
         entry,
       };

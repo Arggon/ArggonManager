@@ -1,17 +1,13 @@
 ---
 type: task
-status: in_progress
+status: todo
 id: task-native-panel-interaction
 title: "OpenCode panel: selection, detail and next/active jumps"
-assignee: Arggon
-branch: feat/task-native-panel-interaction
 parent: ui-native-panel-v2
 labels: [opencode-seam, tui, ui]
 priority: p2
 created: "2026-09-22"
-updated: "2026-09-23"
-claimed_at: "2026-09-23T01:09:45.579Z"
-worktree_path: /home/arggon/Projects/ArggonManager-task-native-panel-interaction
+updated: "2026-09-22"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-native-panel-v2/task-native-panel-interaction.md
@@ -44,46 +40,13 @@ The W5 panel renders flat tree lines (header + counts + up to 200 lines) and onl
 - [ ] Width-aware clipping and sanitization preserved; no slot crash on a corrupt tracker (existing P1 guard)
 - [ ] `npm run smoke:tui` extended with a selection capture; docs/opencod2 TUI section updated
 
-### 2026-09-23 @ses_f343321cdffeKlIPKIsESUxF4P
-## Evidence — task-native-panel-interaction (PR #411)
+### 2026-09-28 @Arggon-coordinator
+## Coordinator state note — 2026-09-28
 
-**Branch** `feat/task-native-panel-interaction` · **head before this comment** `6035c8a9be354901bfb03de01a267a834943b690` · PR https://github.com/Arggon/ArggonManager/pull/411 (base main, MERGEABLE, CI: cli pass, tasks-validate pass, ui-smoke pass).
+This item is **unclaimed (`todo`)** but PR #411 (`feat/task-native-panel-interaction`) has been open since 2026-09-23 with real work on it. Recording the exact state so it is not lost:
 
-### What shipped
-- Selection cursor over the flattened tree: `j`/`k` (+ `↓`/`↑`), `PgUp`/`PgDn` (fixed 10-row page — the host passes no height), `g`/`Home`, `G`/`End`; `❯` gutter on every line; `r` resolves the cursor by id (survives reload while the item exists, clamps otherwise); the tree window follows the cursor past the 200-line cap (tail `… N more item(s)` preserved).
-- `Enter` toggles a bounded inline detail block under the selected line: acceptance rows `[ ]`/`[x]` + prose through the kernel `runShow` path, sanitized (controls escaped) and bounded (16 rows, 200 chars/row, width clip); `Esc` closes the block first, then the panel.
-- `n` jumps to the kernel `next` suggestion, `a` to the session's active item (ARGON_ITEM / feat|fix branch); toast when there is no target. Header totals + counts line unchanged.
-- P1 guarantees kept: corrupt tracker → error header, no slot crash; sanitization; esc/f/r; display-only (no tracker writes; the purity test now also covers the detail read).
+- Remote branch head: `73c03c80`; the local worktree `/home/arggon/Projects/ArggonManager-task-native-panel-interaction` is stale at `21a49f1d` (22 commits behind the remote, 4 local-only tracker commits). Any resumption must work from a fresh worktree off the **remote** branch, not the existing directory.
+- Diff against `main` at that head: ~1416 insertions across `opencode/plugins/arggon/board.ts`, `board.test.ts`, `tui.tsx`, `tui.test.ts`, `index.ts`, `index.bundle.ts` and `smoke/tui-smoke.ts`. No acceptance box in the body is ticked and no review verdict is on the item, so this PR has **never been reviewed against the engineering review bar**.
+- Not in the current wave: the active backlog is the P1 smoke normalizer, the shell-tasks pilot, the native start cold-start smoke, fast-check properties and axe-core CI. The panel PR also collides with the now-merged ast-grep native guard scope (`opencode/plugins/arggon/**`) and the `smoke/` module, so it needs its own wave.
 
-### Scope note (plumbing files beyond the listed set)
-`tui.tsx` needs five new board exports, and `cli/src/plugin-copy.test.ts` pins tui imports == `BUNDLE_EXPORTS`, so two small plumbing edits were unavoidable: `cli/src/plugin-bundle.ts` (allowlist) and `opencode/plugins/arggon/index.ts` (re-export block). Neither is owned by the sibling wave-2 items. Bundle regenerated: `index.bundle.ts` 345,469 → 354,216 B (+8,747 B, +2.5%).
-
-### Claim-commit workaround (bug-native-start-worktree-no-install)
-`start --worktree` skipped the claim commit (`tsx: command not found`); ran `npm ci` in the worktree and committed manually `chore(tasks): started task-native-panel-interaction` (dfef2442), then pushed.
-
-### Gates (all in the worktree)
-- `npm test`: 95 files / 1581 tests pass.
-- `npm run lint`: clean. `npx prettier --check` on every touched file: clean.
-- `npm run build`: clean (postbuild regenerates the identical bundle).
-- `npm run check:plugin`: exit 0 after the commit.
-- `npx tsc -p cli/tsconfig.plugin.json` (strict plugin gate, also in `typecheck.test.ts`): exit 0.
-- `npm run arggon -- validate --json`: `ok:true`, 0 warnings.
-- `npm run smoke:tui`: 18/18 checks ok, exit 0. New interaction checks: cursor on `I tui-smoke`, `j` → `E core`, `n` → `T task-board-task`, `a` → `▶· S story`, `Enter` → `┌ argon detail · story — Story`. Capture excerpt (replayed screen frames, `ARGON_TUI_SMOKE_SCREEN=1`):
-```
-❯ · I tui-smoke — TUI smoke
-❯   · E core — Core
-❯       · T task-board-task — Board task
-❯    ▶· S story — Story
-❯    ▶· S story — Story
-  ┌ argon detail · story — Story
-```
-- Unit coverage: `board.test.ts` (selection seed/move/clamp/jump/reload-by-id, window-follow, detail acceptance rows/hostile bytes/row+char bounds/error degradation) and `tui.test.ts` (`createBoardController` navigation, jump toasts, detail toggle, esc detail-first, pinned keymap id→bind table).
-
-### Open questions
-1. Only `j`/`n`/`a`/Enter are exercised in the PTY smoke; `PgUp/PgDn/g/G/Home/End` binds are pinned by unit tests using documented key names but not driven on the real runtime (extending the smoke is cheap if the coordinator wants it).
-2. The smoke's screen replay implements the CSI subset OpenTUI emitted on 2.0.14; a runtime change to new sequences would fail loudly (never silently pass).
-3. The `a` jump depends on ARGON_ITEM or the convention branch; the smoke pins `ARGON_ITEM=story` because the fixture is not a git repo.
-
-### handoff 2026-09-23 @ses_f343321cdffeKlIPKIsESUxF4P (session: ses_f343321cdffeKlIPKIsESUxF4P) — next: Coordinator review of PR #411 (head 6035c8a + tracker comment commit); after merge verify main and flip the item done; resume in ../ArggonManager-task-native-panel-interaction if changes are requeste…
-- branch: feat/task-native-panel-interaction
-- open questions: PgUp/PgDn/g/G unit-pinned only (not PTY-driven); smoke screen replay covers the CSI subset seen on opencode 2.0.14; bundle forwards 5 new board exports via BUNDLE_EXPORTS.
+Next coordinator action when a wave frees up: claim the item properly, rebase/verify the branch against current `main` (the P1 shared worktree prep and the cleanup-observation fix both landed in the plugin since), run `npm run lint:structure`/`test:structure` plus the TUI smoke, review against the bar, and post the verdict here.

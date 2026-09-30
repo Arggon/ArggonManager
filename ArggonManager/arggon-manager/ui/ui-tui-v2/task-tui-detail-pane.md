@@ -144,3 +144,14 @@ row 1/112 · ↑/↓ line · PgUp/PgDn p…
 1. `tools.arggon.start` skipped the claim commit in the fresh worktree (known bug `bug-native-start-worktree-no-install`: no `node_modules` -> pre-commit `npm run arggon -- validate` fails with `tsx: command not found`). Remediation applied: `npm ci` + `npm run build --workspace @arggondev/lib` in the worktree, then the claim committed manually as `6719188a` ("chore(tasks): started task-tui-detail-pane") and pushed.
 2. The tracker auto-commits for this evidence comment + the handoff landed on **main** in the primary checkout (`c3c45614`, `d0304094`) because the native tools resolve the tracker root from the session cwd, not from the item worktree; main was pushed immediately after each mutation per docs/agents.md §0. The item file in the worktree/branch still carries only the claim, so the merge of the branch into main edits frontmatter (branch) and body (comments) in disjoint hunks — verified clean with `git merge-tree` (exit 0).
 3. PR #410 head stays `f833ea09` (implementation + tests + README + smoke); the CI results quoted above are for that exact sha (they were already green before this note).
+
+### 2026-09-23 @ses_f34ba048bffeDqO6XhG0C62Nw6
+## Coordinator review — PASS (lead architect) + merge verification
+
+Merged via PR #414 (auto-done #415). Note: the original PR #410 was **closed unmerged** — its README conflict resolution merged `main` into the branch, which makes GitHub's rebase-merge refuse it ("This branch can't be rebased"); #414 carries the identical, already-resolved content rebased linearly onto main (no merge commits), and #410 is recorded as superseded.
+
+**Independent verification.** `npx vitest run cli/src/tui.test.ts` → 66 passed; `npm run smoke:tui-board` passed with the new detail-pane assertion (board → filter → open pane → PgDn → Esc → same selection/filter). Code review: the pane is built from pure exported pieces (`wrapTuiLine`, `tuiAcceptanceRows`, `tuiDependencySummary`, `buildTuiDetailLines`, `clampTuiDetailScroll`, `renderTuiDetail`/`renderTuiScreen`); `runTuiBoard` stays wiring-only; caps documented (400 source lines / 1000 rendered, each truncation named); below 40 columns the stacked fallback wraps values instead of clipping; every value and body line goes through the human-text sanitizer; read-only; the board selection/filter/scroll window are preserved on return.
+
+**Acceptance verified:** Enter opens the read-only pane with the item body, acceptance rows, deps with statuses, labels, milestone, branch/worktree/path; Esc/Enter returns; narrow fallback documented; golden tests + real pty captures (200×40 and 35×20) in the item evidence; README keybinding table split board/pane.
+
+**Follow-up filed:** `task-ui-docs-refresh` (p3) — `smoke:tui-board` is still described as "sends q, asserts headers + seeded id" in engineering.md/CONTRIBUTING.md; the harness now drives the pane.

@@ -1,9 +1,10 @@
 # OpenCode2: native OpenCode V2 integration for ArggonManager
 
-> **Status:** shipped on the **`opencode2`** branch. `main` is untouched by
-> product decision — adopters who want the native OpenCode V2 experience use
-> `opencode2`. This document is the entry point; the program record lives in
-> the links at the bottom.
+> **Status:** shipped — the native OpenCode V2 integration released in
+> **0.4.0** and lives on **`main`**. The `opencode2` branch is retired (it was
+> merged for the release and has since been deleted from the remote). This
+> document is the entry point; the program record lives in the links at the
+> bottom.
 
 ## What it is
 
@@ -23,8 +24,9 @@ never forks them.
 ## Quickstart
 
 ```bash
-# 1. Get this branch (from an ArggonManager checkout)
-git fetch origin && git checkout opencode2     # or: git worktree add ../AM-opencode2 opencode2
+# 1. Get the source (main carries the integration since 0.4.0)
+git clone --depth 1 https://github.com/Arggon/ArggonManager /tmp/arggon-src
+cd /tmp/arggon-src
 npm ci && npm run build                        # the `arggon` bin lives in dist/
 
 # 2. Prepare YOUR repo (any repo, existing or new)
@@ -82,12 +84,19 @@ namespace:
   trimmed from the W4-era 12,182 B).
 - **Worktree lifecycle tools (W4)** — `tools.arggon.start`, `branch` and
   `cleanup` own the item worktree through the V2 worktree domain
-  (`ctx.worktree.create/list/remove`). `start` claims the item (kernel rules:
-  never steal) and creates `../<repo>-<id>` (name `<repo>-<id>`), creates the
-  convention branch inside it and records `branch` + `worktree_path` **in the
-  worktree copy**, so the claim commit lands on the feature branch and the
-  canonical checkout stays untouched — exactly like `arggon start --worktree`.
-  `cleanup` classifies with the **shared kernel rule** (the same
+  (`ctx.worktree.create/list/remove`). For a fresh worktree, `start` uses the
+  shared kernel dependency-preparation helper before the claim write, then
+  records `branch` + `worktree_path` **in the worktree copy** and performs an
+  explicit claim commit; a preparation or commit failure is a typed
+  `START_FAILED`, keeps the worktree for attach/retry, and never reports an
+  unqualified success. `worktree: false` is the plain CLI contract: it settles
+  branch ownership (preflight, then create/attach/switch) **before** the claim
+  write — so a failed switch leaves the item untouched — then records the
+  branch, commits the claim on that branch, reports `worktreePath: null` /
+  `worktreeCreated: false`, and pushes only when the claim commit or branch
+  creation makes the branch eligible. A claim refused after this run created a
+  branch rolls back only that owned branch (leaving it first, then restoring the
+  previous checkout). `cleanup` classifies with the **shared kernel rule** (the same
   `classifyCleanupEntry` the CLI uses), removes merged worktrees through the
   domain, deletes their branches and clears the records in one tracker commit.
   Push and the `gh` PR step stay explicit agent steps; the CLI
@@ -97,15 +106,97 @@ namespace:
   Payload contract (documented here; the output schemas stay loose to respect
   the ADR 0006 budget and the contract tests assert the envelopes):
 
-  | Tool      | Payload fields (beyond `ok`/`schemaVersion`/`conventionVersion`/`command`)                                                                                                                    |
-  | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | `start`   | `id`, `branch`, `worktreePath` (`null` with `worktree: false`), `worktreeCreated`, `branchCreated`, `pushed`, `item` (the claimed contract item), `commit?` (tracker auto-commit)             |
-  | `branch`  | `id`, `branch`, `item`, `commit?`                                                                                                                                                             |
-  | `cleanup` | `base`, `candidates[]` (`id`, `status`, `branch`, `path`, `removable`, `reason`, `action`, `via?`), `pruned[]` (`id`, `action`, `error?`, `leftoverBranch?`, `via?`), `failures[]`, `commit?` |
+  | Tool      | Payload fields (beyond `ok`/`schemaVersion`/`conventionVersion`/`command`)                                                                                                                                                                                                                                             |
+  | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `start`   | `id`, `branch`, `worktreePath` (`null` with `worktree: false`), `worktreeCreated`, `branchCreated`, `pushed`, `item`, `preparation?` (bounded `ready`/install/workspace/dependency-coverage receipt: `ready`, `install`, `linkedNodeModules`, `builtWorkspaces`, `linkedWorkspaces`, `manifestCoverage` (`"satisfied"` | `"stale"` | `"unknown"`), `missingDependencies` (kernel-capped at 10 names) and `missingDependenciesTotal`, plus `truncated` when a list was capped; `ready` is the conjunction of "an install is present", "no worktree-owned package resolves into the primary" and "the install provides the worktree's declared `dependencies`/`devDependencies`", so a stale primary mirror is reported as `ready: false` **with the missing names in the payload** instead of a bare readiness claim — see [`agents.md`](./agents.md) §4 for the remedy), `claimCommitted`, `claimCommit` (`committed`, `not-needed`, `failed`, or `not-attempted` with a bounded reason), `commit?`, and `rollback?` on a refused claim |
+  | `branch`  | `id`, `branch`, `item`, `commit?`                                                                                                                                                                                                                                                                                      |
+  | `cleanup` | `base`, `candidates[]` (`id`, `status`, `branch`, `path`, `removable`, `reason`, `action`, `via?`), `pruned[]` (`id`, `action`, `error?`, `leftoverPath?`, `leftoverBranch?`, `via?`), `failures[]`, `commit?`                                                                                                         |
 
-  Failures are typed tool errors carrying the code + envelope: `START_FAILED`,
-  `BRANCH_FAILED` and `CLEANUP_FAILED` (per-candidate prune failures stay in
-  `pruned`/`failures`, like the CLI).
+  `cleanup` prune removal is **observed**, never assumed: the domain removal is
+  checked against the directory and `git worktree list` before anything else
+  happens, and a domain that resolves without removing (or fails) falls through
+  to the literal `git worktree remove` fallback — the same primitive the `start`
+  rollback uses, without its force policy, so git keeps refusing dirty
+  worktrees. `removed worktree`, `deleted branch` and `cleared worktree_path`
+  are reported only when the removal is observably complete; otherwise the
+  candidate reports one bounded `failed` action plus a `failures[]` entry
+  carrying `leftoverPath` (the worktree that is still there) and
+  `leftoverBranch`, and both the branch and the `worktree_path` record are
+  preserved so the next `cleanup` can retry. Per-candidate failures never abort
+  the run and the cleared records still share ONE tracker commit.
+
+  Every pre-commit `start` failure carries `claimCommitted: false` and a
+  `claimCommit.status: "not-attempted"` receipt (with preparation/rollback
+  context when known). `rollback` reports observed `preparationRemoved`,
+  `worktreeRemoved`, and `branchDeleted` values; `branchDeleted: null` means
+  this invocation did not own a branch, and a plain-start rollback also reports
+  `restoredBranch` when the checkout was returned to its previous branch. A
+  commit or push failure after the claim commit — and an unexpected failure at
+  any later phase — reports the truthful committed outcome (status + hash)
+  instead. Failures are typed tool errors
+  carrying the code + envelope: `START_FAILED`, `BRANCH_FAILED` and
+  `CLEANUP_FAILED` (per-candidate prune failures stay in `pruned`/`failures`,
+  like the CLI).
+
+### Where every native tool resolves the tracker root
+
+**The rule: a `tools.arggon.*` call resolves the tracker root from the _calling
+session's_ own directory, re-read on every call.** The kernel then walks up from
+it looking for `ArggonManager/.convention.yml` (legacy `tasks/`) exactly as the
+CLI walks up from its own cwd — one logic path, ADR 0011. So a session working in
+`../<repo>-<id>` reads and **commits in that worktree, on that worktree's
+branch**, and a session working in a plain checkout commits in that checkout on
+whatever branch it has checked out. Both are the CLI's behavior by construction,
+not a second rule.
+
+| the call comes from                                              | the tracker root is                                  | a `comment` commit lands on                                   |
+| ---------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------- |
+| a session in `../<repo>-<id>` (after `session_move`)             | the worktree                                         | the item branch, inside the worktree — hence in the item's PR |
+| a session in a non-worktree checkout (the primary, or any clone) | that checkout                                        | the branch checked out there                                  |
+| no calling session (ambient/headless invocation)                 | the plugin instance's `ctx.location.directory`       | that location's checked-out branch                            |
+| a session whose directory cannot be resolved                     | **refused**: `error.code: "SESSION_ROOT_UNRESOLVED"` | nothing is written                                            |
+
+**Why the session's directory and not something else.** V2 hands a plugin tool
+no directory: the runtime builds the tool context as `{ sessionID, agent,
+messageID, id, progress, signal }`, so `sessionID` is the only per-call signal of
+where the session works, and `ctx.session.get({ sessionID })` →
+`Session.Info.location.directory` is what `session_move` updates. The three
+alternatives are all wrong for this model:
+
+- **`ctx.location.directory`** is the _plugin instance's_ location — V2 documents
+  it as "the plugin instance's location, not the location of every session it can
+  access or event it receives". Captured at `setup`, it is stale by construction
+  after a move: that is exactly the defect
+  ([`bug-native-tools-commit-to-primary-checkout`](arggon-manager/opencode2-native/native-redesign/bug-native-tools-commit-to-primary-checkout.md)),
+  which put worker evidence commits on the primary's `main` instead of the item
+  branch and still answered `ok: true`.
+- **`process.cwd()`** is the host process's launch directory (a background
+  `opencode serve` carries its own), never the session's.
+- **The item's recorded `worktree_path`** is chicken-and-egg: reading it needs
+  the tracker root this step is resolving. It stays authoritative for _what
+  `start` attaches to_, not for _where a call resolves_.
+
+**Refusing beats guessing.** Once a session is known, an unresolvable directory
+raises a typed tool error instead of falling back to the plugin location: a
+silent `ok: true` on the wrong branch is the failure this rule exists to prevent,
+so the call is refused and nothing is written. The fallback to the plugin
+location applies only when there is no calling session at all (there is then
+nothing to disagree with) and when the host has no `ctx.session.get` (older
+runtime: the rule degrades to the pre-2.0 behavior rather than breaking).
+
+**`start` is unaffected in shape.** Its tracker root is the session's, but the
+worktree it creates or attaches is still placed next to the **canonical
+checkout** (`ctx.location.project.canonical`) at `../<canonical-basename>-<id>`,
+and the claim is still written into that worktree's copy. Claiming a second item
+from inside an existing worktree session therefore works exactly as before.
+
+Deterministic evidence: `opencode/plugins/arggon/tools.test.ts` →
+`"tracker-root resolution from the calling session"` runs `comment`, `handoff`,
+`update`, `create` and `branch` from a real linked worktree and asserts the
+commit's branch, its reachability from the pushed item branch, and a primary
+checkout that is byte-for-byte untouched; `"resolveToolCwd"` and
+`"plugin-context: session directory wiring"` pin the resolution order and the
+refusal. The real-runtime leg lives in `npm run smoke:opencode`.
 
 - **Permissions (W4)** — the generated seam adds minimal shell gates (deny
   `git commit --no-verify*`, `git push --force*`, `git push -f*`) that
@@ -207,6 +298,7 @@ is no target. Nothing in the panel writes to the tracker.
 npm test                      # 1438+ tests
 npm run smoke:opencode        # headless scenarios on a real OpenCode runtime: dependency-less bundle, one session per native command, the W4 worktree lifecycle + invariants + permissions
 npm run smoke:opencode:wave   # scripted coordinator/worker/reviewer wave (2 fixtures)
+npm run smoke:native-start-cold  # deterministic + model-free: the native tools.arggon.start cold worktree (dependency-requiring pre-commit gate, bounded readiness/claim-commit receipt, claim commit with only the item file, re-run attach, untouched installs)
 npm run smoke:tui             # TUI evidence on a real runtime: init seam, plugin discovery, PTY run, /arggon-board opens and renders the tree
 npm run context:report --strict   # context budgets: AGENTS.md, MCP schemas, item block, keep.tokens
 ```
@@ -216,18 +308,27 @@ sensitive**: run them on their own, without a concurrent test suite or another
 headless harness (a loaded machine can stall a provider call past the per-command
 timeout and leave a scenario half-done). The deterministic gates (`npm test`,
 lint/build/`check:plugin`, `validate`) are safe to run in parallel; `smoke:tui`
-is model-free and cheap.
+and `smoke:native-start-cold` are model-free and cheap — the latter needs
+`npm run build` first, because it drives the native tool against **this
+checkout's** plugin source and kernel build, not a vendored or primary-copy
+build.
 
 ## Side-by-side installs
 
-Both branches declare the same `arggon` bin (`package.json` → `./dist/cli.js`),
+> Written while the integration lived on the `opencode2` branch (retired after
+> the 0.4.0 merge). The technique below is branch-agnostic and still applies
+> whenever a development checkout must coexist with an installed release: two
+> checkouts of the same package collide on the same `arggon` bin shim, and the
+> fix is a second name resolved per project.
+
+Both checkouts declare the same `arggon` bin (`package.json` → `./dist/cli.js`),
 so two `npm link` installs collide: the last one wins and the global shim
-silently points at whichever checkout linked last. To keep `main` as bare
-`arggon` and still drive the OpenCode2 build from this checkout, give the oc2
-build a second name and let each project resolve it locally.
+silently points at whichever checkout linked last. To keep the installed
+release as bare `arggon` and still drive a development checkout's build, give
+the dev build a second name and let each project resolve it locally.
 
 **Option A (recommended): named shim + per-project PATH.** Leave `arggon` →
-`main`; add a wrapper for the oc2 checkout:
+the installed release; add a wrapper for the dev checkout:
 
 ```bash
 npm ci && npm run build        # dist/ is gitignored; build before shimming
@@ -379,8 +480,9 @@ in and CI has no model). `arggon init` vendors the adopter workflow to
 `arggon init --no-commit` → `arggon validate --json` (plus `doctor`/`list`
 diagnostics), with an optional drift gate on the committed seam. Nothing in
 that flow touches OpenCode, a model or MCP: the tracker and the bin are enough.
-Full recipe, install variants (the two packages are still `private`) and the
-fixture that exercises it: [`ArggonManager/docs/ci.md`](ci.md).
+Full recipe, install variants (both packages are published since 0.4.0 — the
+released install is `npm install -g arggon-manager`) and the fixture that
+exercises it: [`ArggonManager/docs/ci.md`](ci.md).
 
 ## Upgrading
 
@@ -410,8 +512,9 @@ is never touched; the vendored plugin still delivers the native `arggon` tools.
 If your config carries an `arggon` MCP stanza, `arggon doctor` reports it as
 optional (the native tools do not need it; keep it only for other clients).
 
-**Why is `main` untouched?** Product decision: this integration ships from
-`opencode2`, which receives `main` merges as needed.
+**Where does the integration ship?** On `main`, since 0.4.0 — the `opencode2`
+branch was merged for the release and then retired (deleted from the remote);
+this document describes what ships, not a parallel branch.
 
 **Something looks wrong in a session.** Run `arggon doctor` (OpenCode section),
 and check the playbook's troubleshooting notes; file findings as tracker

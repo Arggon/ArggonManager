@@ -216,6 +216,8 @@ export { HANDOFF_FIELD_CAP, HANDOFF_SESSION_CAP, runHandoff } from "./handoff.js
 export type { HandoffOptions, HandoffResult } from "./handoff.js";
 export { runSync } from "./sync-command.js";
 export type { SyncResult } from "./sync-types.js";
+export { classifyVerdicts, parseVerdicts } from "./verdict.js";
+export type { VerdictComment, VerdictState } from "./verdict.js";
 export {
   CLEANUP_TERMINAL_STATUSES,
   classifyCleanupEntry,
@@ -225,6 +227,7 @@ export {
 export type { ClassifyCleanupDeps, CleanupEntry, CleanupGit, MergedPr } from "./cleanup.js";
 export {
   buildLocalWorkspaces,
+  inspectDeclaredDependencies,
   linkNodeModules,
   linkedWorkspacePackages,
   localWorkspacePackages,
@@ -232,9 +235,18 @@ export {
   packageEntryExists,
   packageEntryPaths,
   pointWorkspaceAtLocal,
+  prepareWorktreeDependencies,
   unlinkNodeModulesLink,
+  MAX_MISSING_DEPENDENCIES,
 } from "./worktree.js";
-export type { LocalWorkspacePackage, WorkspaceBuildRunner } from "./worktree.js";
+export type {
+  DeclaredDependencyReport,
+  LocalWorkspacePackage,
+  ManifestCoverage,
+  WorkspaceBuildRunner,
+  WorktreeDependencyPreparation,
+  WorktreeInstallState,
+} from "./worktree.js";
 export { runImportIssues } from "./import-issues.js";
 export type { GhExecutor, ImportIssuesOptions, ImportIssuesResult } from "./import-issues.js";
 export {

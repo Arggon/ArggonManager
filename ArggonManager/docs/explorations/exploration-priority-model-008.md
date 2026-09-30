@@ -1,7 +1,7 @@
 ---
 exploration_id: priority-model-008
 title: "Priority model: first-class priority on all item types + orchestrator ranking"
-status: open
+status: decided
 created: 2026-09-17
 ---
 
@@ -113,4 +113,4 @@ prioritization mistake is visible in every suggestion.
 
 ## Decision
 
-<!-- ADR placeholder: docs/adr/0009-item-priority-and-orchestrator-ranking.md once decided. -->
+Adopted: [ADR 0009 — item priority and orchestrator ranking](../adr/0009-item-priority-and-orchestrator-ranking.md).

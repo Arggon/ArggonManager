@@ -1,0 +1,87 @@
+id: tracker-mutations-use-kernel
+valid:
+  - |
+    import { createOperation, updateOperation } from "@arggondev/lib";
+    export const mutate = () => createOperation({ cwd: process.cwd() });
+  - |
+    import { writeFileAtomic } from "@arggondev/lib";
+    writeFileAtomic(join(root, "docs", "notes.md"), body);
+    writeFileAtomic(join(root, "ArggonManager", "docs", "notes.md"), body);
+  - |
+    import { stringifyFrontmatter } from "./frontmatter.js";
+  - |
+    writeFileSync(filePath, body, "utf8");
+    writeFileSync(filePath, "task-beta.md", "utf8");
+    writeFileSync(path, taskFileContent);
+    writeFileSync(outputPath, value.filePath);
+    writeFileSync(join(root, "ArggonManager", "docs", "story.md"), body);
+    writeFileSync("ArggonManager/docs/story.md", body);
+    renameSync(sourceAsset, destinationAsset);
+  - |
+    // A bare leaf file name is not a tracker signal, so ordinary product and
+    // documentation writes that happen to use a tracker-shaped leaf stay valid.
+    writeFileSync("story.md", body);
+    writeFileSync(join(root, "docs", "task-beta.md"), body);
+    writeFileSync(join(root, "product", "task-beta.md"), body);
+  - |
+    // Content arguments are never scanned, even when they carry tracker shapes.
+    writeFileSync(outputPath, "ArggonManager/story-alpha/task-beta.md", "utf8");
+    writeFileSync(outputPath, taskFileContent, "utf8");
+  - |
+    export function Panel({ itemPath }: Props) {
+      const raw = readFileSync(itemPath, "utf8");
+      return <pre>{raw}</pre>;
+    }
+  - |
+    export const Action = () => (
+      <button onClick={() => kernel.listOperation({ cwd: "." })}>List</button>
+    );
+invalid:
+  - |
+    import { runCreate, stringifyFrontmatter } from "@arggondev/lib";
+    writeFileAtomic(item.filePath, stringifyFrontmatter(data, body));
+  - |
+    import { stringifyFrontmatter as serializeItem } from "@arggondev/lib";
+    writeFileSync(item.filePath, serializeItem(data, body));
+  - |
+    import * as kernel from "@arggondev/lib";
+    writeFileSync(item.filePath, kernel.stringifyFrontmatter(data, body));
+  - |
+    writeFileSync(item.filePath, body, "utf8");
+  - |
+    writeFileSync(value.filePath, body, "utf8");
+  - |
+    writeFileSync(join(tasksDir, id + ".md"), body);
+  - |
+    writeFileSync(join(tasksDir, name), body);
+  - |
+    writeFileSync(join(root, "tasks", "story.md"), body);
+  - |
+    writeFileSync(join(root, "ArggonManager", "initiative", "initiative.md"), body);
+  - |
+    writeFileSync(join(root, "ArggonManager", "story", "epic", "story.md"), body);
+  - |
+    unlink(value.filePath);
+  - |
+    writeFileSync(join(root, "ArggonManager", "arggon-manager", "ui", "story-alpha", "task-beta.md"), body);
+  - |
+    writeFileSync(join(root, "tasks", "story-alpha", "task-beta.md"), body);
+  - |
+    writeFileSync("ArggonManager/story-alpha/task-beta.md", body);
+  - |
+    writeFileAtomic(trackerPath, serialize(body));
+  - |
+    appendFileSync(taskFile, note, "utf8");
+  - |
+    rmSync(taskPath, { recursive: true, force: true });
+  - |
+    rmdir(join(tasksDir, name), { recursive: true });
+  - |
+    unlink(item.filePath, callback);
+  - |
+    truncate(taskFile, 0);
+  - |
+    export function Panel({ item, body }: Props) {
+      writeFileSync(item.filePath, body, "utf8");
+      return <div>mutated</div>;
+    }

@@ -70,6 +70,7 @@ __arggonEdges.set("lib/src/index.ts\u0000./tracker-commit.js", "lib/src/tracker-
 __arggonEdges.set("lib/src/index.ts\u0000./trend.js", "lib/src/trend.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./update.js", "lib/src/update.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./validate.js", "lib/src/validate.ts")
+__arggonEdges.set("lib/src/index.ts\u0000./verdict.js", "lib/src/verdict.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./view-model.js", "lib/src/view-model.ts")
 __arggonEdges.set("lib/src/index.ts\u0000./worktree.js", "lib/src/worktree.ts")
 __arggonEdges.set("lib/src/issue-roundtrip.ts\u0000./detect-repo.js", "lib/src/detect-repo.ts")
@@ -126,6 +127,7 @@ __arggonEdges.set("lib/src/sync-command.ts\u0000./items.js", "lib/src/items.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./paths.js", "lib/src/paths.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./sync-types.js", "lib/src/sync-types.ts")
 __arggonEdges.set("lib/src/sync-command.ts\u0000./update.js", "lib/src/update.ts")
+__arggonEdges.set("lib/src/sync-command.ts\u0000./verdict.js", "lib/src/verdict.ts")
 __arggonEdges.set("lib/src/tracker-commit.ts\u0000./convention.js", "lib/src/convention.ts")
 __arggonEdges.set("lib/src/tracker-commit.ts\u0000./lock.js", "lib/src/lock.ts")
 __arggonEdges.set("lib/src/tracker-commit.ts\u0000./sanitize.js", "lib/src/sanitize.ts")
@@ -2154,7 +2156,16 @@ function runImportIssues(opts) {
                     assignee: IMPORT_CLAIMANT,
                     now,
                 });
-                const closed = (0, update_js_1.runUpdate)({ cwd: opts.cwd, id, status: "done", unassign: true, now });
+                const needsWaive = !(0, items_js_1.acceptanceComplete)(createdItem.item.body) &&
+                    (createdItem.item.type === "task" || createdItem.item.type === "bug");
+                const closed = (0, update_js_1.runUpdate)({
+                    cwd: opts.cwd,
+                    id,
+                    status: "done",
+                    unassign: true,
+                    ...(needsWaive ? { waive: `imported as closed from GitHub issue #${number}` } : {}),
+                    now,
+                });
                 writtenPaths.push(...closed.changedPaths);
             }
         }
@@ -2193,8 +2204,8 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
 exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.unlinkNodeModulesLink = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = void 0;
+exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.MAX_MISSING_DEPENDENCIES = exports.unlinkNodeModulesLink = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.inspectDeclaredDependencies = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2339,6 +2350,9 @@ Object.defineProperty(exports, "HANDOFF_SESSION_CAP", { enumerable: true, get: f
 Object.defineProperty(exports, "runHandoff", { enumerable: true, get: function () { return handoff_js_1.runHandoff; } });
 var sync_command_js_1 = require("./sync-command.js");
 Object.defineProperty(exports, "runSync", { enumerable: true, get: function () { return sync_command_js_1.runSync; } });
+var verdict_js_1 = require("./verdict.js");
+Object.defineProperty(exports, "classifyVerdicts", { enumerable: true, get: function () { return verdict_js_1.classifyVerdicts; } });
+Object.defineProperty(exports, "parseVerdicts", { enumerable: true, get: function () { return verdict_js_1.parseVerdicts; } });
 var cleanup_js_1 = require("./cleanup.js");
 Object.defineProperty(exports, "CLEANUP_TERMINAL_STATUSES", { enumerable: true, get: function () { return cleanup_js_1.CLEANUP_TERMINAL_STATUSES; } });
 Object.defineProperty(exports, "classifyCleanupEntry", { enumerable: true, get: function () { return cleanup_js_1.classifyCleanupEntry; } });
@@ -2346,6 +2360,7 @@ Object.defineProperty(exports, "defaultCleanupGit", { enumerable: true, get: fun
 Object.defineProperty(exports, "findMergedPr", { enumerable: true, get: function () { return cleanup_js_1.findMergedPr; } });
 var worktree_js_1 = require("./worktree.js");
 Object.defineProperty(exports, "buildLocalWorkspaces", { enumerable: true, get: function () { return worktree_js_1.buildLocalWorkspaces; } });
+Object.defineProperty(exports, "inspectDeclaredDependencies", { enumerable: true, get: function () { return worktree_js_1.inspectDeclaredDependencies; } });
 Object.defineProperty(exports, "linkNodeModules", { enumerable: true, get: function () { return worktree_js_1.linkNodeModules; } });
 Object.defineProperty(exports, "linkedWorkspacePackages", { enumerable: true, get: function () { return worktree_js_1.linkedWorkspacePackages; } });
 Object.defineProperty(exports, "localWorkspacePackages", { enumerable: true, get: function () { return worktree_js_1.localWorkspacePackages; } });
@@ -2353,7 +2368,9 @@ Object.defineProperty(exports, "packageBuildScript", { enumerable: true, get: fu
 Object.defineProperty(exports, "packageEntryExists", { enumerable: true, get: function () { return worktree_js_1.packageEntryExists; } });
 Object.defineProperty(exports, "packageEntryPaths", { enumerable: true, get: function () { return worktree_js_1.packageEntryPaths; } });
 Object.defineProperty(exports, "pointWorkspaceAtLocal", { enumerable: true, get: function () { return worktree_js_1.pointWorkspaceAtLocal; } });
+Object.defineProperty(exports, "prepareWorktreeDependencies", { enumerable: true, get: function () { return worktree_js_1.prepareWorktreeDependencies; } });
 Object.defineProperty(exports, "unlinkNodeModulesLink", { enumerable: true, get: function () { return worktree_js_1.unlinkNodeModulesLink; } });
+Object.defineProperty(exports, "MAX_MISSING_DEPENDENCIES", { enumerable: true, get: function () { return worktree_js_1.MAX_MISSING_DEPENDENCIES; } });
 var import_issues_js_1 = require("./import-issues.js");
 Object.defineProperty(exports, "runImportIssues", { enumerable: true, get: function () { return import_issues_js_1.runImportIssues; } });
 var import_issues_js_2 = require("./import-issues.js");
@@ -3375,6 +3392,7 @@ function syncOperation(opts) {
             ambiguous: result.ambiguous,
             suggestions: result.suggestions,
             filled: result.filled,
+            verdicts: result.verdicts,
             errors: result.errors,
             exit_code: result.exit_code,
         };
@@ -4040,6 +4058,7 @@ const paths_js_1 = require("./paths.js");
 const get_open_prs_js_1 = require("./get-open-prs.js");
 const sync_types_js_1 = require("./sync-types.js");
 const update_js_1 = require("./update.js");
+const verdict_js_1 = require("./verdict.js");
 function runSync(opts, execGh = node_child_process_1.execFileSync) {
     if (opts.check && opts.write) {
         throw new Error("pass either --check or --write, not both");
@@ -4085,7 +4104,14 @@ function runSync(opts, execGh = node_child_process_1.execFileSync) {
             }
         }
     }
-    return (0, sync_types_js_1.toSyncResult)(reported, mode, filled, updateErrors);
+    const verdicts = {};
+    for (const match of reported) {
+        if (match.status === "no_pr")
+            continue;
+        const item = byId.get(match.itemId);
+        verdicts[match.itemId] = (0, verdict_js_1.classifyVerdicts)(item.body);
+    }
+    return (0, sync_types_js_1.toSyncResult)(reported, mode, filled, updateErrors, verdicts);
 }
 })
 
@@ -4139,7 +4165,7 @@ function matchItem(item, prs) {
     }
     return { status: "pending", itemId: item.id };
 }
-function toSyncResult(matches, mode, filled = null, errors = []) {
+function toSyncResult(matches, mode, filled = null, errors = [], verdicts = {}) {
     const matched = [];
     const unmatched = [];
     const pending = [];
@@ -4179,6 +4205,7 @@ function toSyncResult(matches, mode, filled = null, errors = []) {
         ambiguous,
         suggestions,
         filled,
+        verdicts,
         errors,
         exit_code: mode === "check"
             ? (pending.length > 0 || ambiguous.length > 0 || errors.length > 0 ? 1 : 0)
@@ -4270,20 +4297,50 @@ function runGit(args, cwd, input) {
     }
 }
 function firstLine(text) {
-    return text.split("\n").find((line) => line.trim().length > 0)?.trim() ?? "git failed";
+    return (text
+        .split("\n")
+        .find((line) => line.trim().length > 0)
+        ?.trim() ?? "git failed");
 }
 function findIgnoredPaths(root, paths) {
-    const run = runGit(["check-ignore", "--stdin", "-z"], root, `${paths.join("\0")}\0`);
-    if (run.missing)
-        return null;
-    if (run.code === 1)
-        return [];
-    if (run.code !== 0)
-        return null;
-    return run.out.split("\0").filter((p) => p.length > 0);
+    const ignored = [];
+    for (const path of paths) {
+        const run = runGit(["check-ignore", "--stdin", "-z"], root, `${path}\0`);
+        if (run.missing)
+            return null;
+        if (run.code === 0) {
+            if (run.out.split("\0").includes(path))
+                ignored.push(path);
+        }
+        else if (run.code !== 1)
+            return null;
+    }
+    return ignored;
 }
 function rootRelativePaths(root, paths) {
     return paths.map((p) => (0, node_path_1.relative)(root, (0, node_path_1.resolve)(root, p)).split(node_path_1.sep).join("/")).sort();
+}
+function normalizeTrackerPaths(root, filePaths) {
+    const rootAbs = (0, node_path_1.resolve)(root);
+    const paths = [];
+    for (const input of filePaths) {
+        if (input.length === 0)
+            continue;
+        if (input.startsWith(":"))
+            return { paths: [], error: "pathspec magic" };
+        const absolute = (0, node_path_1.resolve)(rootAbs, input);
+        const rel = (0, node_path_1.relative)(rootAbs, absolute);
+        if (rel === "" || (0, node_path_1.isAbsolute)(rel))
+            return { paths: [], error: "outside-root" };
+        if (rel === ".." || rel.startsWith(`..${node_path_1.sep}`) || rel.startsWith("../")) {
+            return { paths: [], error: "outside-root" };
+        }
+        const normalized = rel.split(node_path_1.sep).join("/");
+        if (normalized.startsWith(":"))
+            return { paths: [], error: "pathspec magic" };
+        paths.push(normalized);
+    }
+    return { paths: [...new Set(paths)].sort() };
 }
 function resolveCommonGitDir(root) {
     const abs = runGit(["rev-parse", "--path-format=absolute", "--git-common-dir"], root);
@@ -4301,7 +4358,14 @@ function commitTrackerMutation(root, filePaths, opts) {
     if (opts.commit === false) {
         return { committed: false, skipReason: "auto-commit disabled" };
     }
-    const paths = [...new Set(rootRelativePaths(root, filePaths.filter((p) => p.length > 0)))];
+    const normalized = normalizeTrackerPaths(root, filePaths);
+    if (normalized.error === "pathspec magic") {
+        return { committed: false, skipReason: "pathspec magic is not allowed" };
+    }
+    if (normalized.error === "outside-root") {
+        return { committed: false, skipReason: "mutated path escapes repository root" };
+    }
+    const paths = normalized.paths;
     if (paths.length === 0) {
         return { committed: false, skipReason: "no mutated files" };
     }
@@ -4333,7 +4397,7 @@ function commitTrackerMutation(root, filePaths, opts) {
         for (let attempt = 1;; attempt++) {
             if (attempt > 1)
                 sleepSync(Math.min(exports.COMMIT_RETRY_MS * (attempt - 1), COMMIT_RETRY_MAX_SLEEP_MS));
-            add = runGit(["add", "--", ...stagePaths], root);
+            add = runGit(["--literal-pathspecs", "add", "--", ...stagePaths], root);
             if (add.code !== 0) {
                 if (isIndexLockContention(add)) {
                     locked = "git index locked";
@@ -4342,14 +4406,17 @@ function commitTrackerMutation(root, filePaths, opts) {
                     continue;
                 }
                 warnGitSkip(`git add failed: ${firstLine(add.err || add.out)}`);
-                result = { committed: false, skipReason: `git add failed: ${firstLine(add.err || add.out)}` };
+                result = {
+                    committed: false,
+                    skipReason: `git add failed: ${firstLine(add.err || add.out)}`,
+                };
                 return;
             }
-            commit = runGit(["commit", "-m", opts.message], root);
+            commit = runGit(["--literal-pathspecs", "commit", "--only", "-m", opts.message, "--", ...stagePaths], root);
             if (commit.code !== 0) {
                 const detail = `${commit.out}\n${commit.err}`;
                 if (/nothing to commit|nothing added/.test(detail)) {
-                    const residue = runGit(["status", "--porcelain", "--", ...stagePaths], root);
+                    const residue = runGit(["--literal-pathspecs", "status", "--porcelain", "--", ...stagePaths], root);
                     if (residue.code === 0 && residue.out.trim().length > 0) {
                         const lost = "nothing to commit (staged entry lost under contention)";
                         warnGitSkip(lost);
@@ -4906,6 +4973,24 @@ function runUpdate(opts) {
                 throw new Error(`--steal requires --assignee <your-login> (you become the assignee of '${id}')`);
             }
         }
+        const flippingToDone = newStatus === "done" && item.status !== "done";
+        const gatedLeaf = item.type === "task" || item.type === "bug";
+        const gated = flippingToDone && gatedLeaf && !(0, items_js_1.acceptanceComplete)(item.body);
+        const waiveReason = opts.waive !== undefined ? opts.waive.trim() : undefined;
+        if (opts.waive !== undefined) {
+            if (!waiveReason) {
+                throw new Error("--waive requires a non-empty reason (the waiver is recorded in the item body)");
+            }
+            if (opts.agent) {
+                throw new Error("agents must not waive the done gate; --waive is a human-only escape hatch (ArggonManager/docs/agents.md §5)");
+            }
+            if (!gated) {
+                throw new Error("--waive is only valid with --status done on a task/bug whose acceptance checklist still has unchecked boxes (nothing to waive)");
+            }
+        }
+        else if (gated) {
+            throw new Error(`cannot mark '${id}' done: the acceptance checklist in the item body still has unchecked boxes. Tick every box, or pass --waive "<reason>" to record a dated waiver`);
+        }
         const currentAssignee = item.assignee ?? null;
         let newAssignee;
         if (opts.assignee !== undefined) {
@@ -5040,6 +5125,10 @@ function runUpdate(opts) {
         if (opts.steal && stealReason) {
             const note = `> stolen ${(0, dates_js_1.formatDate)(now)} by ${newAssignee}: ${stealReason}`;
             newBody = `${item.body.endsWith("\n") || item.body.length === 0 ? item.body : `${item.body}\n`}${note}\n`;
+        }
+        if (waiveReason) {
+            const base = newBody.endsWith("\n") || newBody.length === 0 ? newBody : `${newBody}\n`;
+            newBody = `${base}\n### Waiver ${(0, dates_js_1.formatDate)(now)}\n\n${waiveReason}\n`;
         }
         let targetPath = item.filePath;
         let movedFrom;
@@ -5561,6 +5650,57 @@ function formatValidateHuman(result) {
 }
 })
 
+__arggonModules.set("lib/src/verdict.ts", (exports, require, module) => {
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.parseVerdicts = parseVerdicts;
+exports.classifyVerdicts = classifyVerdicts;
+const COMMENT_HEADING = /^###\s+(\d{4}-\d{2}-\d{2})\s+@/;
+const VERDICT_LINE = /^[ \t]*verdict:[ \t]*(approve|request-changes)(?=$|[ \t(])/i;
+function parseVerdicts(body) {
+    const verdicts = [];
+    let order = -1;
+    let currentDate = null;
+    let seenVerdictInComment = false;
+    for (const line of body.split("\n")) {
+        if (/^###\s/.test(line)) {
+            order++;
+            const heading = COMMENT_HEADING.exec(line);
+            currentDate = heading ? heading[1] : null;
+            seenVerdictInComment = false;
+            continue;
+        }
+        if (currentDate === null || seenVerdictInComment)
+            continue;
+        const match = VERDICT_LINE.exec(line);
+        if (!match)
+            continue;
+        const scope = line.slice(match.index + match[0].length).trim();
+        verdicts.push({
+            date: currentDate,
+            order,
+            value: match[1].toLowerCase(),
+            scope: scope.length > 0 ? scope : null,
+        });
+        seenVerdictInComment = true;
+    }
+    return verdicts;
+}
+function classifyVerdicts(body) {
+    let latest = null;
+    for (const verdict of parseVerdicts(body)) {
+        if (latest === null ||
+            verdict.date > latest.date ||
+            (verdict.date === latest.date && verdict.order > latest.order)) {
+            latest = verdict;
+        }
+    }
+    if (!latest)
+        return "none";
+    return latest.value === "approve" ? "approved" : "changes-requested";
+}
+})
+
 __arggonModules.set("lib/src/view-model.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
@@ -5711,6 +5851,7 @@ function applyViewLens(items, lens = {}) {
 __arggonModules.set("lib/src/worktree.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.MAX_MISSING_DEPENDENCIES = void 0;
 exports.packageEntryPaths = packageEntryPaths;
 exports.packageEntryExists = packageEntryExists;
 exports.packageBuildScript = packageBuildScript;
@@ -5719,6 +5860,8 @@ exports.linkNodeModules = linkNodeModules;
 exports.unlinkNodeModulesLink = unlinkNodeModulesLink;
 exports.pointWorkspaceAtLocal = pointWorkspaceAtLocal;
 exports.buildLocalWorkspaces = buildLocalWorkspaces;
+exports.inspectDeclaredDependencies = inspectDeclaredDependencies;
+exports.prepareWorktreeDependencies = prepareWorktreeDependencies;
 exports.linkedWorkspacePackages = linkedWorkspacePackages;
 const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
@@ -6056,6 +6199,95 @@ function buildLocalWorkspaces(primaryRoot, worktreePath, deps = {}) {
         }
     }
     return built;
+}
+exports.MAX_MISSING_DEPENDENCIES = 10;
+function declaredDependencyNames(pkgDir) {
+    const path = (0, node_path_1.join)(pkgDir, "package.json");
+    if (!(0, node_fs_1.existsSync)(path))
+        return [];
+    let parsed;
+    try {
+        parsed = JSON.parse((0, node_fs_1.readFileSync)(path, "utf8").replace(/^\uFEFF/, ""));
+    }
+    catch {
+        return null;
+    }
+    if (parsed === null || typeof parsed !== "object")
+        return null;
+    const manifest = parsed;
+    const names = new Set();
+    for (const field of ["dependencies", "devDependencies"]) {
+        const section = manifest[field];
+        if (section === null || typeof section !== "object" || Array.isArray(section))
+            continue;
+        for (const name of Object.keys(section)) {
+            if (name.length > 0)
+                names.add(name);
+        }
+    }
+    return [...names].sort();
+}
+function installResolutionPath(fromDir) {
+    const roots = [];
+    let dir = (0, node_path_1.resolve)(fromDir);
+    for (;;) {
+        const modules = (0, node_path_1.join)(dir, "node_modules");
+        if ((0, node_fs_1.existsSync)(modules))
+            roots.push(modules);
+        const parent = (0, node_path_1.dirname)(dir);
+        if (parent === dir)
+            return roots;
+        dir = parent;
+    }
+}
+function inspectDeclaredDependencies(worktreePath) {
+    const declared = declaredDependencyNames(worktreePath);
+    if (declared === null)
+        return { coverage: "unknown", missing: [], missingTotal: 0 };
+    if (declared.length === 0)
+        return { coverage: "satisfied", missing: [], missingTotal: 0 };
+    const roots = installResolutionPath(worktreePath);
+    if (roots.length === 0)
+        return { coverage: "unknown", missing: [], missingTotal: 0 };
+    const missing = declared.filter((name) => {
+        const segments = name.split("/");
+        return !roots.some((root) => (0, node_fs_1.existsSync)((0, node_path_1.join)(root, ...segments)));
+    });
+    return {
+        coverage: missing.length === 0 ? "satisfied" : "stale",
+        missing: missing.slice(0, exports.MAX_MISSING_DEPENDENCIES),
+        missingTotal: missing.length,
+    };
+}
+function prepareWorktreeDependencies(primaryRoot, worktreePath, deps = {}) {
+    const worktreeModules = (0, node_path_1.join)(worktreePath, "node_modules");
+    const linkedNodeModules = linkNodeModules(primaryRoot, worktreePath);
+    const builtWorkspaces = buildLocalWorkspaces(primaryRoot, worktreePath, {
+        runBuild: deps.runBuild,
+    });
+    const linkedWorkspaces = linkedWorkspacePackages(primaryRoot, worktreePath);
+    const hasInstall = (0, node_fs_1.existsSync)(worktreeModules);
+    const primaryHasInstall = (0, node_fs_1.existsSync)((0, node_path_1.join)(primaryRoot, "node_modules"));
+    const install = linkedNodeModules
+        ? hasInstall
+            ? "linked"
+            : "unavailable"
+        : hasInstall
+            ? "existing"
+            : primaryHasInstall
+                ? "unavailable"
+                : "missing";
+    const declared = inspectDeclaredDependencies(worktreePath);
+    return {
+        ready: hasInstall && linkedWorkspaces.length === 0 && declared.coverage === "satisfied",
+        install,
+        linkedNodeModules,
+        builtWorkspaces,
+        linkedWorkspaces,
+        manifestCoverage: declared.coverage,
+        missingDependencies: declared.missing,
+        missingDependenciesTotal: declared.missingTotal,
+    };
 }
 function linkedWorkspacePackages(primaryRoot, worktreePath) {
     const names = [];
@@ -6495,7 +6727,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
+exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
 exports.isArggonItemId = isArggonItemId;
 exports.parseArggonItemFromCommand = parseArggonItemFromCommand;
 exports.parseArggonItemFromCode = parseArggonItemFromCode;
@@ -6505,11 +6737,13 @@ exports.looksLikeCommitCommand = looksLikeCommitCommand;
 exports.buildItemBlock = buildItemBlock;
 exports.boundText = boundText;
 exports.parseValidateFailure = parseValidateFailure;
+exports.sessionDirectoryResolver = sessionDirectoryResolver;
 exports.itemCacheKey = itemCacheKey;
 exports.setBounded = setBounded;
 exports.onToolAfter = onToolAfter;
 exports.csvList = csvList;
 exports.sessionToken = sessionToken;
+exports.resolveToolCwd = resolveToolCwd;
 exports.worktreeOptions = worktreeOptions;
 exports.nativeToolSchemas = nativeToolSchemas;
 exports.nativeToolsCatalogBytes = nativeToolsCatalogBytes;
@@ -6531,11 +6765,19 @@ const ITEM_MARKER = "<arggon-item>";
 const STORAGE_PREFIX = "arggon/session/";
 const MAX_CLI_OUTPUT = 256 * 1024;
 const MAX_VALUE_CHARS = 200;
+const MAX_NATIVE_PREPARATION_NAMES = 32;
+const MAX_NATIVE_PREPARATION_VALUE_CHARS = 200;
+const MAX_NATIVE_DETAIL_CHARS = 500;
+const MAX_NATIVE_ERROR_CHARS = 2048;
 function asString(value) {
     return typeof value === "string" && value.trim() !== "" ? value.trim() : undefined;
 }
 function clip(value, max) {
     return value.length > max ? `${value.slice(0, max - 1)}…` : value;
+}
+function boundedNativeText(value, max) {
+    const text = typeof value === "string" ? value : String(value);
+    return clip(text.replace(/[\u0000-\u001f\u007f]/g, " "), max);
 }
 function byteLength(text) {
     return new TextEncoder().encode(text).length;
@@ -7078,6 +7320,15 @@ function run(bin, args, cwd, timeout) {
 function locationDirectory(ctx) {
     return asString(ctx.location?.directory);
 }
+function sessionDirectoryResolver(ctx) {
+    const get = ctx?.session?.get;
+    if (typeof get !== "function")
+        return undefined;
+    return async (sessionID) => {
+        const session = (await get({ sessionID }));
+        return asString(session?.location?.directory) ?? asString(session?.directory);
+    };
+}
 function hasTasksTree(directory) {
     try {
         return (0, node_fs_1.existsSync)((0, node_path_1.join)(directory, "ArggonManager")) || (0, node_fs_1.existsSync)((0, node_path_1.join)(directory, "tasks"));
@@ -7388,6 +7639,34 @@ function sessionToken(value) {
     if (token === "" || token.length > SESSION_TOKEN_MAX_CHARS)
         return undefined;
     return /^[A-Za-z0-9._:-]+$/.test(token) ? token : undefined;
+}
+exports.SESSION_ROOT_UNRESOLVED = "SESSION_ROOT_UNRESOLVED";
+async function resolveToolCwd(kernel, command, options, tool) {
+    const sessionID = sessionToken(tool?.sessionID);
+    if (sessionID === undefined || options.sessionDirectory === undefined) {
+        return { cwd: options.cwd };
+    }
+    let directory;
+    let failure;
+    try {
+        directory = asString(await options.sessionDirectory(sessionID));
+    }
+    catch (error) {
+        failure = detail(error);
+    }
+    if (directory === undefined) {
+        const cause = failure === undefined ? "" : ` (${boundedNativeText(failure, MAX_NATIVE_DETAIL_CHARS)})`;
+        return {
+            error: new ArgonToolError(kernel.failEnvelope({
+                command,
+                code: exports.SESSION_ROOT_UNRESOLVED,
+                message: `could not resolve the working directory of session ${sessionID}${cause}; refusing ` +
+                    `to fall back to the plugin location ${options.cwd}, which would commit to the ` +
+                    "checkout this plugin was loaded from instead of the session's own",
+            })),
+        };
+    }
+    return { cwd: directory };
 }
 const ID = { type: "string" };
 const STRINGS = { type: "array", items: { type: "string" } };
@@ -7854,12 +8133,143 @@ function worktreeFail(kernel, command, code, message, conventionVersion) {
         }),
     };
 }
+function startFailure(kernel, message, conventionVersion, payload) {
+    const failure = worktreeFail(kernel, "start", "START_FAILED", boundedNativeText(message, MAX_NATIVE_ERROR_CHARS), conventionVersion);
+    return { ...failure, envelope: { ...failure.envelope, ...payload } };
+}
+function startNotAttempted(kernel, message, conventionVersion, payload, reason) {
+    return startFailure(kernel, message, conventionVersion, {
+        ...payload,
+        claimCommitted: false,
+        claimCommit: claimCommitNotAttempted(reason),
+    });
+}
+function boundedPreparation(input) {
+    const built = input.builtWorkspaces
+        .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+        .map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS));
+    const linked = input.linkedWorkspaces
+        .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+        .map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS));
+    const missing = input.missingDependencies.map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS));
+    const truncated = input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
+        input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
+        input.missingDependenciesTotal > input.missingDependencies.length ||
+        built.some((name, index) => name !== input.builtWorkspaces[index]) ||
+        linked.some((name, index) => name !== input.linkedWorkspaces[index]) ||
+        missing.some((name, index) => name !== input.missingDependencies[index]);
+    return {
+        ready: input.ready,
+        install: input.install,
+        linkedNodeModules: input.linkedNodeModules,
+        builtWorkspaces: built,
+        linkedWorkspaces: linked,
+        manifestCoverage: input.manifestCoverage,
+        missingDependencies: missing,
+        missingDependenciesTotal: input.missingDependenciesTotal,
+        ...(truncated ? { truncated: true } : {}),
+    };
+}
+function boundedNames(names) {
+    if (names === undefined)
+        return undefined;
+    return names
+        .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+        .map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS));
+}
+function boundedCommitPayload(result) {
+    const ignored = boundedNames(result.ignored);
+    if (result.committed) {
+        return {
+            ...(result.hash !== undefined
+                ? { hash: boundedNativeText(result.hash, MAX_NATIVE_DETAIL_CHARS) }
+                : {}),
+            ...(result.message !== undefined
+                ? { message: boundedNativeText(result.message, MAX_NATIVE_DETAIL_CHARS) }
+                : {}),
+            ...(ignored !== undefined ? { ignored } : {}),
+        };
+    }
+    return {
+        skipped: boundedNativeText(result.skipReason ?? "skipped", MAX_NATIVE_DETAIL_CHARS),
+        ...(ignored !== undefined ? { ignored } : {}),
+    };
+}
+function claimCommitFailure(skipped) {
+    return {
+        status: "failed",
+        committed: false,
+        skipped: boundedNativeText(skipped || "claim commit failed", MAX_NATIVE_DETAIL_CHARS),
+    };
+}
+function claimCommitNotAttempted(reason) {
+    return {
+        status: "not-attempted",
+        committed: false,
+        reason: boundedNativeText(reason, MAX_NATIVE_DETAIL_CHARS),
+    };
+}
+function envelopeMessage(envelope, fallback) {
+    const error = envelope.error !== null && typeof envelope.error === "object"
+        ? envelope.error
+        : undefined;
+    return boundedNativeText(asString(error?.message) ?? fallback, MAX_NATIVE_DETAIL_CHARS);
+}
+function commitNativeClaim(kernel, cwd, id) {
+    const shown = kernel.showOperation({ cwd, id, meta: true });
+    if (!shown.ok) {
+        return { receipt: claimCommitNotAttempted(envelopeMessage(shown.envelope, "claim item lookup failed")) };
+    }
+    const path = asString(shown.envelope.path);
+    if (path === undefined)
+        return { receipt: claimCommitNotAttempted("claim item path unavailable") };
+    const result = kernel.commitTrackerMutation(cwd, [(0, node_path_1.resolve)(cwd, path)], {
+        message: kernel.trackerCommitMessage("claimed", [id]),
+        commit: true,
+    });
+    const ignored = boundedNames(result.ignored);
+    if (result.committed) {
+        return {
+            receipt: {
+                status: "committed",
+                committed: true,
+                ...(result.hash !== undefined
+                    ? { hash: boundedNativeText(result.hash, MAX_NATIVE_DETAIL_CHARS) }
+                    : {}),
+                ...(result.message !== undefined
+                    ? { message: boundedNativeText(result.message, MAX_NATIVE_DETAIL_CHARS) }
+                    : {}),
+                ...(ignored !== undefined ? { ignored } : {}),
+            },
+            payload: boundedCommitPayload(result),
+        };
+    }
+    if (result.skipReason === "nothing to commit") {
+        return {
+            receipt: {
+                status: "not-needed",
+                committed: true,
+                ...(ignored !== undefined ? { ignored } : {}),
+            },
+        };
+    }
+    return {
+        receipt: {
+            ...claimCommitFailure(result.skipReason ?? "git commit failed"),
+            ...(ignored !== undefined ? { ignored } : {}),
+        },
+        payload: boundedCommitPayload(result),
+    };
+}
 async function guarded(kernel, command, code, body) {
     try {
         return await body();
     }
     catch (error) {
         logOnce(`worktree-${command}`, `${command} failed unexpectedly`, error);
+        if (command === "start") {
+            return startNotAttempted(kernel, detail(error), undefined, {}, "unexpected start failure before claim setup");
+        }
         return worktreeFail(kernel, command, code, detail(error));
     }
 }
@@ -7916,23 +8326,95 @@ async function createItemWorktree(options, repoRoot, id) {
         return { error: `worktree domain create failed for '${name}': ${detail(error)}` };
     }
 }
-async function discardWorktree(options, directory, branch) {
+async function removeWorktreeObserved(options, directory, root, policy) {
+    const errors = [];
     const domain = options.worktree?.domain;
     const projectID = asString(options.worktree?.projectID);
+    const gone = async () => !(0, node_fs_1.existsSync)(directory) && !(await isRegisteredWorktree(root, directory));
+    let via = null;
     if (domain?.remove !== undefined && projectID !== undefined) {
         try {
-            await domain.remove({ projectID, directory, force: true });
+            await domain.remove({ projectID, directory, force: policy.force });
+            if (await gone())
+                via = "domain";
+            else
+                errors.push("the worktree domain resolved without removing the worktree");
         }
         catch (error) {
-            logOnce("worktree-rollback", "worktree domain rollback failed", error);
+            errors.push(`worktree domain removal failed: ${detail(error)}`);
         }
     }
-    else {
-        await run("git", ["worktree", "remove", "--force", directory], options.cwd, 30_000);
+    if (via === null) {
+        const removed = await run("git", ["worktree", "remove", ...(policy.force ? ["--force"] : []), directory], root, 30_000);
+        if (removed.code !== 0) {
+            errors.push(`git worktree removal failed: ${removed.stderr.trim() || `exit ${removed.code ?? "unknown"}`}`);
+        }
+        else if (await gone()) {
+            via = "git";
+        }
+        else {
+            errors.push(`git worktree remove exited 0 but the worktree remains at ${directory}`);
+        }
     }
+    const removed = via !== null;
+    if (!removed)
+        errors.push(`worktree remains at ${directory}`);
+    return { removed, via, errors };
+}
+async function discardWorktree(options, directory, branch) {
+    const canonical = canonicalRoot(options, options.cwd);
+    const observation = await removeWorktreeObserved(options, directory, canonical, { force: true });
+    const errors = [...observation.errors];
+    const worktreeRemoved = observation.removed;
+    let branchDeleted = branch === undefined ? null : false;
     if (branch !== undefined) {
-        await run("git", ["branch", "-D", branch], options.cwd, 10_000);
+        if (!worktreeRemoved) {
+            errors.push(`branch ${branch} was kept because its worktree remains`);
+        }
+        else {
+            const deleted = await run("git", ["branch", "-D", branch], canonical, 10_000);
+            branchDeleted = deleted.code === 0;
+            if (!branchDeleted) {
+                errors.push(`git branch deletion failed: ${deleted.stderr.trim() || `exit ${deleted.code ?? "unknown"}`}`);
+            }
+        }
     }
+    return {
+        worktreeRemoved,
+        branchDeleted,
+        ...(errors.length > 0
+            ? { error: boundedNativeText(errors.join("; "), MAX_NATIVE_DETAIL_CHARS) }
+            : {}),
+    };
+}
+async function cleanupClaimArtifacts(options, kernel, primaryRoot, worktreePath, worktreeCreated, branchCreated, branch, preparation) {
+    const preparationRemoved = preparation?.linkedNodeModules !== true || worktreePath === undefined
+        ? true
+        : kernel.unlinkNodeModulesLink(primaryRoot, worktreePath);
+    const discard = worktreeCreated && worktreePath !== undefined
+        ? await discardWorktree(options, worktreePath, branchCreated ? branch : undefined)
+        : undefined;
+    return { preparationRemoved, ...(discard !== undefined ? { discard } : {}) };
+}
+function cleanupDescription(cleanup, worktreeCreated, worktreePath, branch) {
+    if (!worktreeCreated) {
+        return cleanup.preparationRemoved
+            ? ""
+            : `the start-owned dependency link could not be removed from ${worktreePath ?? "the worktree"}`;
+    }
+    const discard = cleanup.discard;
+    if (cleanup.preparationRemoved &&
+        discard?.worktreeRemoved === true &&
+        (discard.branchDeleted === true || discard.branchDeleted === null)) {
+        return "the worktree created by this run was removed again";
+    }
+    const details = [
+        cleanup.preparationRemoved ? undefined : "the start-owned dependency link remains",
+        discard?.worktreeRemoved === false ? `the worktree remains at ${worktreePath ?? "the created path"}` : undefined,
+        discard?.branchDeleted === false ? `the branch remains: ${branch}` : undefined,
+        discard?.error,
+    ].filter((value) => value !== undefined);
+    return `rollback incomplete: ${details.join("; ")}`;
 }
 async function ensureWorktreeBranch(worktreePath, branch) {
     const exists = await run("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], worktreePath, 10_000);
@@ -7975,69 +8457,283 @@ async function staleClaimFields(kernel, canonicalCwd, worktreePath, id) {
     });
     return differing.length === 0 ? undefined : differing.join(", ");
 }
+async function preflightPlainBranch(kernel, options, root, branch) {
+    const ref = await run("git", ["check-ref-format", "--branch", branch], options.cwd, 10_000);
+    if (ref.code !== 0) {
+        return `branch '${branch}' is not a valid git branch (${ref.stderr.trim() || `git exit ${ref.code ?? "unknown"}`})`;
+    }
+    const worktrees = await run("git", ["worktree", "list", "--porcelain"], options.cwd, 10_000);
+    if (worktrees.code !== 0) {
+        return `could not inspect git worktrees before branch setup (${worktrees.stderr.trim() || `git exit ${worktrees.code ?? "unknown"}`})`;
+    }
+    let worktreePath;
+    for (const line of worktrees.stdout.split("\n")) {
+        if (line.startsWith("worktree ")) {
+            worktreePath = line.slice("worktree ".length).trim();
+        }
+        else if (line.trim() === `branch refs/heads/${branch}`) {
+            if (worktreePath !== undefined && (0, node_path_1.resolve)(worktreePath) !== (0, node_path_1.resolve)(options.cwd)) {
+                return `branch '${branch}' is already checked out at ${worktreePath}; detach it before plain start`;
+            }
+        }
+    }
+    const status = await run("git", ["status", "--porcelain", "--untracked-files=all"], options.cwd, 10_000);
+    if (status.code !== 0) {
+        return `could not inspect the canonical working tree before branch setup (${status.stderr.trim() || `git exit ${status.code ?? "unknown"}`})`;
+    }
+    const tracker = (0, node_path_1.relative)(root, kernel.findTasksDir(root)).split(node_path_1.sep).join("/");
+    const blocked = status.stdout.split("\n").filter((line) => {
+        if (line.trim().length === 0)
+            return false;
+        const code = line.slice(0, 2);
+        const path = line.slice(3).replace(/^"|"$/g, "");
+        return !(code === "??" && !path.startsWith(`${tracker}/`));
+    });
+    if (blocked.length > 0) {
+        return "the canonical working tree has tracked or tracker changes; commit/stash them before plain start";
+    }
+    return undefined;
+}
+function startProgressPayload(progress) {
+    return {
+        id: progress.id,
+        branch: progress.branch,
+        worktreePath: progress.worktreePath ?? null,
+        worktreeCreated: progress.worktreeCreated,
+        branchCreated: progress.branchCreated,
+        ...(progress.preparation !== undefined ? { preparation: progress.preparation } : {}),
+        ...(progress.item !== undefined ? { item: progress.item } : {}),
+        ...(progress.claim !== undefined
+            ? { claimCommitted: progress.claim.receipt.committed, claimCommit: progress.claim.receipt }
+            : {}),
+        ...(progress.claim?.payload !== undefined ? { commit: progress.claim.payload } : {}),
+        ...(progress.pushed !== undefined ? { pushed: progress.pushed } : {}),
+    };
+}
+function unexpectedStartFailure(kernel, error, progress) {
+    const observed = startProgressPayload(progress);
+    const where = boundedNativeText(progress.stage, MAX_NATIVE_DETAIL_CHARS);
+    const cause = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS);
+    if (progress.claim !== undefined) {
+        const committed = progress.claim.receipt.committed;
+        return startFailure(kernel, committed
+            ? `start failed unexpectedly after ${where}, but the claim commit already landed ` +
+                `(${progress.claim.receipt.hash ?? "committed"}); the branch and claim were kept. ${cause}. ` +
+                "Re-run tools.arggon.start to attach and confirm the recorded state."
+            : `start failed unexpectedly after ${where}; the claim commit was attempted and did not land. ` +
+                `${cause}. Fix the reported cause, then re-run tools.arggon.start to attach and retry.`, progress.version, observed);
+    }
+    return startNotAttempted(kernel, `start failed unexpectedly after ${where}; no claim commit was attempted. ${cause}`, progress.version, observed, `unexpected start failure after ${where}`);
+}
+function safeUnexpectedStartFailure(kernel, error, progress, fallback) {
+    const message = boundedNativeText(`start failed unexpectedly: ${detail(error)}`, MAX_NATIVE_ERROR_CHARS);
+    try {
+        if (progress === undefined) {
+            return startNotAttempted(kernel, message, fallback.version, { id: fallback.id }, "unexpected start failure before branch setup");
+        }
+        return unexpectedStartFailure(kernel, error, progress);
+    }
+    catch {
+        return {
+            ok: false,
+            envelope: {
+                ok: false,
+                schemaVersion: 1,
+                conventionVersion: fallback.version,
+                command: "start",
+                error: { code: "START_FAILED", message },
+                id: fallback.id,
+                ...(progress === undefined
+                    ? { claimCommitted: false, claimCommit: claimCommitNotAttempted("unexpected start failure") }
+                    : startProgressPayload(progress)),
+            },
+        };
+    }
+}
+async function rollbackOwnedPlainBranch(options, branch, branchCreated, previousBranch) {
+    if (!branchCreated)
+        return { branchDeleted: null };
+    const errors = [];
+    const detached = previousBranch === undefined || previousBranch === "HEAD";
+    const back = detached
+        ? await run("git", ["switch", "--detach"], options.cwd, 10_000)
+        : await run("git", ["switch", previousBranch], options.cwd, 10_000);
+    if (back.code !== 0) {
+        errors.push(`could not leave branch ${branch}: ${back.stderr.trim() || `git switch exit ${back.code ?? "unknown"}`}`);
+    }
+    let branchDeleted = false;
+    if (back.code === 0) {
+        const deleted = await run("git", ["branch", "-D", branch], options.cwd, 10_000);
+        branchDeleted = deleted.code === 0;
+        if (!branchDeleted) {
+            errors.push(`git branch deletion failed: ${deleted.stderr.trim() || `git exit ${deleted.code ?? "unknown"}`}`);
+        }
+    }
+    else {
+        errors.push(`branch ${branch} was kept because the checkout could not leave it`);
+    }
+    return {
+        branchDeleted,
+        ...(back.code === 0 ? { restoredBranch: detached ? "HEAD" : previousBranch } : {}),
+        ...(errors.length > 0
+            ? { error: boundedNativeText(errors.join("; "), MAX_NATIVE_DETAIL_CHARS) }
+            : {}),
+    };
+}
+function plainRollbackDescription(rollback, branch) {
+    if (rollback.branchDeleted === null)
+        return "";
+    if (rollback.branchDeleted) {
+        return ("the branch created by this run was removed again and the checkout was restored to " +
+            `${rollback.restoredBranch ?? "its previous HEAD"}`);
+    }
+    return `rollback incomplete: ${rollback.error ?? `the branch remains: ${branch}`}`;
+}
 async function nativeStart(kernel, input, options) {
     const id = asString(input.id);
-    if (id === undefined)
-        return worktreeFail(kernel, "start", "START_FAILED", "id is required");
+    if (id === undefined) {
+        return startNotAttempted(kernel, "id is required", undefined, {}, "invalid id");
+    }
     let root;
     try {
         root = sessionRoot(kernel, options.cwd);
     }
     catch (error) {
-        return worktreeFail(kernel, "start", "START_FAILED", detail(error));
+        return startNotAttempted(kernel, detail(error), undefined, { id }, "session root unavailable");
     }
     const version = kernel.readConventionVersion(root);
     const show = kernel.showOperation({ cwd: options.cwd, id, meta: true });
-    if (!show.ok)
-        return remapFailure(show.envelope, "start", "START_FAILED");
+    if (!show.ok) {
+        return startNotAttempted(kernel, envelopeMessage(show.envelope, "item lookup failed"), version, { id }, "item lookup failed");
+    }
     const item = (show.envelope.item ?? {});
     const assignee = asString(input.assignee) ?? asString(kernel.resolveCurrentLogin()) ?? undefined;
     if (assignee === undefined) {
-        return worktreeFail(kernel, "start", "START_FAILED", "could not resolve assignee (pass assignee, or set GITHUB_USER/GITHUB_ACTOR, or authenticate gh)", version);
+        return startNotAttempted(kernel, "could not resolve assignee (pass assignee, or set GITHUB_USER/GITHUB_ACTOR, or authenticate gh)", version, { id }, "assignee unavailable");
     }
-    const branch = itemBranch(kernel, root, item, input.branch);
+    let progress;
+    try {
+        progress = {
+            id,
+            branch: itemBranch(kernel, root, item, input.branch),
+            version,
+            stage: "branch setup",
+            worktreeCreated: false,
+            branchCreated: false,
+        };
+        return await nativeStartBody(kernel, input, options, progress, item, root, assignee);
+    }
+    catch (error) {
+        return safeUnexpectedStartFailure(kernel, error, progress, { id, version });
+    }
+}
+async function nativeStartBody(kernel, input, options, progress, item, root, assignee) {
+    const { id, branch, version } = progress;
+    const primaryRoot = canonicalRoot(options, root);
     const wantWorktree = input.worktree !== false;
-    let worktreePath = asString(item.worktree_path);
+    let worktreePath = wantWorktree ? asString(item.worktree_path) : undefined;
     if (worktreePath !== undefined && !(0, node_fs_1.existsSync)(worktreePath))
         worktreePath = undefined;
-    let worktreeCreated = false;
-    let branchCreated = false;
+    progress.worktreePath = worktreePath;
+    let plainPreviousBranch;
+    const context = (extra = {}) => ({
+        ...startProgressPayload(progress),
+        ...extra,
+    });
+    const failBeforeClaim = (message, reason, extra = {}) => startNotAttempted(kernel, message, version, context(extra), reason);
     if (wantWorktree) {
-        const canonical = canonicalRoot(options, root);
+        const canonical = primaryRoot;
         if (worktreePath === undefined) {
             const defaultPath = (0, node_path_1.join)((0, node_path_1.resolve)(canonical, ".."), `${(0, node_path_1.basename)(canonical)}-${id}`);
             if ((0, node_fs_1.existsSync)(defaultPath))
                 worktreePath = defaultPath;
         }
+        progress.worktreePath = worktreePath;
         if (worktreePath !== undefined) {
             if (!(await isRegisteredWorktree(canonical, worktreePath))) {
-                return worktreeFail(kernel, "start", "START_FAILED", `${worktreePath} exists but is not a git worktree of this repo ` +
-                    "(move or remove the path first, or use the CLI fallback `arggon start --worktree`)", version);
+                return failBeforeClaim(`${worktreePath} exists but is not a git worktree of this repo ` +
+                    "(move or remove the path first, or use the CLI fallback `arggon start --worktree`)", "foreign worktree refused");
             }
         }
         else {
             const created = await createItemWorktree(options, root, id);
             if (created.directory === undefined) {
-                return worktreeFail(kernel, "start", "START_FAILED", created.error ?? "worktree creation failed", version);
+                return failBeforeClaim(created.error ?? "worktree creation failed", "worktree creation failed");
             }
             worktreePath = created.directory;
-            worktreeCreated = true;
+            progress.worktreePath = worktreePath;
+            progress.worktreeCreated = true;
             const stale = await staleClaimFields(kernel, options.cwd, worktreePath, id);
             if (stale !== undefined) {
-                await discardWorktree(options, worktreePath);
-                return worktreeFail(kernel, "start", "START_FAILED", `the canonical checkout has uncommitted tracker changes for '${id}' (${stale}); ` +
-                    "commit or discard them, or use the CLI fallback `arggon start --worktree` " +
-                    "(the worktree created by this run was removed again)", version);
+                const cleanup = await cleanupClaimArtifacts(options, kernel, primaryRoot, worktreePath, progress.worktreeCreated, progress.branchCreated, branch, progress.preparation);
+                const rollback = cleanup.discard !== undefined
+                    ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
+                    : { rollback: { preparationRemoved: cleanup.preparationRemoved } };
+                return failBeforeClaim(`the canonical checkout has uncommitted tracker changes for '${id}' (${stale}); ` +
+                    "commit or discard them, or use the CLI fallback `arggon start --worktree`. " +
+                    cleanupDescription(cleanup, progress.worktreeCreated, worktreePath, branch), "stale canonical claim refused", rollback);
             }
         }
+        progress.stage = "branch setup";
         const ensured = await ensureWorktreeBranch(worktreePath, branch);
         if (!ensured.ok) {
-            if (worktreeCreated)
-                await discardWorktree(options, worktreePath);
-            return worktreeFail(kernel, "start", "START_FAILED", `branch setup failed in ${worktreePath}: ${ensured.error ?? "unknown git error"}`, version);
+            const cleanup = await cleanupClaimArtifacts(options, kernel, primaryRoot, worktreePath, progress.worktreeCreated, false, branch, progress.preparation);
+            const rollback = cleanup.discard !== undefined
+                ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
+                : { rollback: { preparationRemoved: cleanup.preparationRemoved } };
+            return failBeforeClaim(`branch setup failed in ${worktreePath}: ${ensured.error ?? "unknown git error"}. ` +
+                cleanupDescription(cleanup, progress.worktreeCreated, worktreePath, branch), "branch setup failed", rollback);
         }
-        branchCreated = ensured.created;
+        progress.branchCreated = ensured.created;
     }
+    else {
+        const branchCheck = await run("git", ["rev-parse", "--verify", "--quiet", `refs/heads/${branch}`], options.cwd, 10_000);
+        if (branchCheck.code !== 0 && branchCheck.code !== 1) {
+            return failBeforeClaim(`could not inspect branch '${branch}': ${branchCheck.stderr.trim() || `git exit ${branchCheck.code ?? "unknown"}`}`, "branch ownership preflight failed");
+        }
+        if (branchCheck.code === 0 &&
+            asString(input.branch) === undefined &&
+            asString(item.branch) !== branch) {
+            return failBeforeClaim(`branch '${branch}' already exists but the item has no matching recorded branch; ` +
+                "record it explicitly or choose another branch", "branch ownership conflict");
+        }
+        const preflight = await preflightPlainBranch(kernel, options, root, branch);
+        if (preflight !== undefined) {
+            return failBeforeClaim(preflight, "plain-start preflight failed");
+        }
+        const previous = await run("git", ["rev-parse", "--abbrev-ref", "HEAD"], options.cwd, 10_000);
+        plainPreviousBranch = previous.code === 0 ? previous.stdout.trim() || undefined : undefined;
+        const ensured = await ensureWorktreeBranch(options.cwd, branch);
+        if (!ensured.ok) {
+            return failBeforeClaim(`branch setup failed in ${options.cwd}: ${ensured.error ?? "unknown git error"}; ` +
+                "the item was not modified", "branch setup failed");
+        }
+        progress.branchCreated = ensured.created;
+    }
+    if (worktreePath !== undefined) {
+        progress.stage = "dependency preparation";
+        try {
+            progress.preparation = boundedPreparation(kernel.prepareWorktreeDependencies(primaryRoot, worktreePath));
+        }
+        catch (error) {
+            const preparationError = boundedPreparation({
+                ready: false,
+                install: "unavailable",
+                linkedNodeModules: false,
+                builtWorkspaces: [],
+                linkedWorkspaces: [],
+                manifestCoverage: "unknown",
+                missingDependencies: [],
+                missingDependenciesTotal: 0,
+            });
+            const preparationRemoved = kernel.unlinkNodeModulesLink(primaryRoot, worktreePath);
+            return failBeforeClaim(`dependency preparation failed in ${worktreePath}: ${boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)}; ` +
+                (preparationRemoved
+                    ? "the start-owned dependency link was removed and the worktree was kept"
+                    : "the worktree and any start-owned dependency link were kept"), "dependency preparation failed", { preparation: preparationError, rollback: { preparationRemoved } });
+        }
+    }
+    progress.stage = "claim update";
     const target = worktreePath ?? options.cwd;
     const update = kernel.updateOperation({
         cwd: target,
@@ -8045,40 +8741,66 @@ async function nativeStart(kernel, input, options) {
         status: "in_progress",
         assignee,
         branch,
-        ...(worktreePath !== undefined ? { worktreePath } : {}),
+        ...(wantWorktree ? { worktreePath } : {}),
+        commit: false,
         agent: true,
     });
     if (!update.ok) {
-        if (worktreeCreated && worktreePath !== undefined) {
-            await discardWorktree(options, worktreePath, branchCreated ? branch : undefined);
+        if (wantWorktree) {
+            const cleanup = await cleanupClaimArtifacts(options, kernel, primaryRoot, worktreePath, progress.worktreeCreated, progress.branchCreated, branch, progress.preparation);
+            const rollback = cleanup.discard !== undefined
+                ? { rollback: { preparationRemoved: cleanup.preparationRemoved, ...cleanup.discard } }
+                : { rollback: { preparationRemoved: cleanup.preparationRemoved } };
+            return failBeforeClaim(`${envelopeMessage(update.envelope, "claim update failed")}. ` +
+                cleanupDescription(cleanup, progress.worktreeCreated, worktreePath, branch), "claim update refused", rollback);
         }
-        const failure = remapFailure(update.envelope, "start", "START_FAILED");
-        if (worktreeCreated && worktreePath !== undefined) {
-            const error = failure.envelope.error;
-            error.message = `${String(error.message)} (the worktree created by this run was removed again)`;
-        }
-        return failure;
+        const rollback = await rollbackOwnedPlainBranch(options, branch, progress.branchCreated, plainPreviousBranch);
+        return failBeforeClaim(`${envelopeMessage(update.envelope, "claim update failed")}. ` +
+            plainRollbackDescription(rollback, branch), "claim update refused", { rollback });
     }
+    progress.item = update.envelope.item;
+    progress.stage = "claim commit";
+    let claim;
+    try {
+        claim = commitNativeClaim(kernel, target, id);
+    }
+    catch (error) {
+        claim = { receipt: claimCommitFailure(detail(error)) };
+    }
+    progress.claim = claim;
+    const claimPayload = {
+        ...context(),
+        item: update.envelope.item,
+        claimCommitted: claim.receipt.committed,
+        claimCommit: claim.receipt,
+        ...(claim.payload !== undefined ? { commit: claim.payload } : {}),
+    };
+    if (!claim.receipt.committed) {
+        const reason = claim.receipt.skipped ?? "claim commit failed";
+        const kept = worktreePath !== undefined
+            ? `the worktree was kept at ${worktreePath} (nothing was rolled back)`
+            : "the claim file was left in place for inspection";
+        return startFailure(kernel, `start failed while committing the claim; ${kept}. ` +
+            `${reason}. Fix the project gate/dependency cause, then re-run ` +
+            `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
+            "it attaches to the existing worktree and retries the claim commit.", version, claimPayload);
+    }
+    progress.stage = "push";
     let pushed = false;
-    if (input.push === true && worktreePath !== undefined) {
-        const push = await run("git", ["push", "-u", "origin", branch], worktreePath, 60_000);
+    const pushEligible = claim.receipt.status === "committed" || progress.branchCreated;
+    if (input.push === true && pushEligible) {
+        const push = await run("git", ["push", "-u", "origin", branch], target, 60_000);
         if (push.code !== 0) {
-            return worktreeFail(kernel, "start", "START_FAILED", `push failed (${push.stderr.trim() || `git push exit ${push.code}`}); the worktree was kept at ${worktreePath}`, version);
+            progress.pushed = false;
+            return startFailure(kernel, `push failed (${push.stderr.trim() || `git push exit ${push.code}`}); the branch and claim were kept`, version, { ...claimPayload, pushed: false });
         }
         pushed = true;
     }
+    progress.pushed = pushed;
+    progress.stage = "response";
     return {
         ok: true,
-        envelope: kernel.successEnvelope("start", {
-            id,
-            branch,
-            worktreePath: worktreePath ?? null,
-            worktreeCreated,
-            branchCreated,
-            pushed,
-            item: update.envelope.item,
-            ...(update.envelope.commit !== undefined ? { commit: update.envelope.commit } : {}),
-        }, version),
+        envelope: kernel.successEnvelope("start", { ...claimPayload, pushed }, version),
     };
 }
 function nativeBranch(kernel, input, options) {
@@ -8130,20 +8852,6 @@ async function domainWorktrees(options) {
         return [];
     }
 }
-async function removeWorktree(kernel, options, root, directory) {
-    const domain = options.worktree?.domain;
-    const projectID = asString(options.worktree?.projectID);
-    if (domain?.remove !== undefined && projectID !== undefined) {
-        try {
-            await domain.remove({ projectID, directory, force: false });
-            return;
-        }
-        catch (error) {
-            logOnce("worktree-remove", "worktree domain remove failed; falling back to git", error);
-        }
-    }
-    kernel.defaultCleanupGit().removeWorktree(root, directory);
-}
 async function nativeCleanup(kernel, input, options) {
     let root;
     try {
@@ -8188,7 +8896,22 @@ async function nativeCleanup(kernel, input, options) {
                     if ((0, node_path_1.resolve)(canonical) !== (0, node_path_1.resolve)(root)) {
                         kernel.unlinkNodeModulesLink(root, entry.path);
                     }
-                    await removeWorktree(kernel, options, root, entry.path);
+                    const removal = await removeWorktreeObserved(options, entry.path, root, {
+                        force: false,
+                    });
+                    if (!removal.removed) {
+                        const message = boundedNativeText(removal.errors.join("; "), MAX_NATIVE_DETAIL_CHARS);
+                        failures.push(`${entry.id}: ${message}`);
+                        pruned.push({
+                            id: entry.id,
+                            action: "failed",
+                            error: message,
+                            leftoverPath: entry.path,
+                            ...(entry.branch !== null ? { leftoverBranch: entry.branch } : {}),
+                            ...(entry.via !== undefined ? { via: entry.via } : {}),
+                        });
+                        continue;
+                    }
                     pruned.push({
                         id: entry.id,
                         action: `removed worktree ${entry.path}`,
@@ -8208,10 +8931,12 @@ async function nativeCleanup(kernel, input, options) {
                         });
                     }
                     catch (error) {
+                        const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS);
+                        failures.push(`${entry.id}: ${message}`);
                         pruned.push({
                             id: entry.id,
                             action: "failed",
-                            error: detail(error),
+                            error: message,
                             leftoverBranch: entry.branch,
                         });
                     }
@@ -8230,7 +8955,7 @@ async function nativeCleanup(kernel, input, options) {
                 clearedIds.push(entry.id);
             }
             catch (error) {
-                const message = detail(error);
+                const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS);
                 failures.push(`${entry.id}: ${message}`);
                 pruned.push({ id: entry.id, action: "failed", error: message });
             }
@@ -8333,7 +9058,11 @@ function argonToolDefinitions(kernel, options) {
         input: spec.input,
         output: spec.output,
         execute: async (input, tool) => {
-            const outcome = await spec.run(kernel, input ?? {}, options, tool);
+            const resolved = await resolveToolCwd(kernel, spec.name, options, tool);
+            if ("error" in resolved)
+                throw resolved.error;
+            const callOptions = resolved.cwd === options.cwd ? options : { ...options, cwd: resolved.cwd };
+            const outcome = await spec.run(kernel, input ?? {}, callOptions, tool);
             const envelope = outcome.envelope;
             if (!outcome.ok)
                 throw new ArgonToolError(envelope);
@@ -8407,6 +9136,7 @@ const definition = {
             if (directory !== undefined) {
                 await registerArgonTools(ctx, {
                     cwd: directory,
+                    sessionDirectory: sessionDirectoryResolver(ctx),
                     templatesDir: pluginTemplatesDir(),
                     worktree: worktreeOptions(ctx),
                 });
