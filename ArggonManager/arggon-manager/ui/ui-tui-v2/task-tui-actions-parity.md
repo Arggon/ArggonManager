@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-tui-actions-parity
 title: TUI actions (claim/status) through the kernel update path — spec first
+assignee: Arggon
+branch: feat/task-tui-actions-parity
 parent: ui-tui-v2
 labels: [tui, ui]
 priority: p3
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T18:14:23.671Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-tui-actions-parity
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-tui-v2/task-tui-actions-parity.md
