@@ -15,11 +15,14 @@
  * `clampTuiDetailScroll` (the two scroll windows), `wrapTuiLine`,
  * `tuiAcceptanceRows`, `tuiDependencySummary`, `tuiBodyRows` +
  * `tuiDetailBodyRows` (frame geometry), `loadTuiItems` (shared data path,
- * detail bodies included) and `createTuiKeyDecoder` (the stateful stdin
- * splitter, bug-tui-split-escape-sequences). `runTuiBoard` only wires raw
- * mode, keypress events and resize to the pure pieces; it performs no writes
- * anywhere.
+ * detail bodies included), `createTuiKeyDecoder` (the stateful stdin
+ * splitter, bug-tui-split-escape-sequences), `formatTuiClock` (the footer
+ * freshness stamp) and `fsWatchTuiWatcher` (the default tracker watcher,
+ * task-tui-live-refresh). `runTuiBoard` only wires raw mode, keypress events,
+ * resize and the debounced tree watcher to the pure pieces; it performs no
+ * writes anywhere.
  */
+import { watch } from "node:fs";
 import {
   STATUSES,
   buildStatusIndex,
@@ -126,6 +129,13 @@ export type TuiState = {
   /** Transient footer line (e.g. "(no item selected)" after Enter). */
   message: string | null;
   /**
+   * Epoch ms of the tracker read behind the rendered frame — the footer
+   * freshness stamp (`updated HH:MM:SS`, task-tui-live-refresh). `null` before
+   * the first read (tests build states without a clock); the loop stamps every
+   * re-read, keypress- or watcher-triggered alike.
+   */
+  updatedAt: number | null;
+  /**
    * Open detail pane (`null` = the board is the view) — task-tui-detail-pane.
    * Read-only: the pane has no update path, it only reads the loaded items.
    */
@@ -147,6 +157,7 @@ export function initialTuiState(
     filter: "",
     searching: false,
     message: null,
+    updatedAt: null,
     detail: null,
     quit: false,
   };
@@ -157,10 +168,13 @@ export function initialTuiState(
  * lexicographically by id (same rule as renderBoardHtml / list), through the
  * shared view-model — plus the raw bodies the detail pane reads
  * (task-tui-detail-pane), keyed by id. Both come from the same `loadItems`
- * pass, so the board and the pane can never disagree about an item.
+ * pass, so the board and the pane can never disagree about an item. The
+ * resolved tracker dir travels along so the loop can watch it
+ * (task-tui-live-refresh) without a second `findTasksDir` walk.
  */
 export function loadTuiItems(cwd: string): {
   root: string;
+  tasksDir: string;
   items: WorkItem[];
   details: Map<string, TuiDetailSource>;
 } {
@@ -171,7 +185,70 @@ export function loadTuiItems(cwd: string): {
   const details = new Map<string, TuiDetailSource>(
     kernelItems.map((item) => [item.id, { id: item.id, body: item.body }]),
   );
-  return { root, items, details };
+  return { root, tasksDir, items, details };
+}
+
+/**
+ * Local `HH:MM:SS` for the footer freshness stamp (task-tui-live-refresh).
+ * Non-finite input renders as `--:--:--` so a broken clock degrades the stamp,
+ * never the frame.
+ */
+export function formatTuiClock(ms: number): string {
+  if (!Number.isFinite(ms)) return "--:--:--";
+  const date = new Date(ms);
+  const pad = (value: number): string => String(value).padStart(2, "0");
+  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+/** Minimal watcher handle the loop needs (fs.watch's FSWatcher satisfies it). */
+export type TuiTreeWatcher = { close(): void };
+
+/**
+ * Opens a watcher on the tracker dir; `onEvent` fires (possibly many times)
+ * per file change burst and the loop debounces the re-read. Returns `null`
+ * when watching is unavailable (platform or filesystem limitation) — the loop
+ * then degrades transparently to per-keypress reads.
+ */
+export type TuiWatchFactory = (
+  tasksDir: string,
+  onEvent: () => void,
+) => TuiTreeWatcher | null;
+
+/**
+ * How long a watcher burst must stay quiet before the loop re-reads the tree
+ * (task-tui-live-refresh). Same value as `board --serve`'s reload debounce —
+ * the pattern this reuses.
+ */
+export const TUI_REFRESH_DEBOUNCE_MS = 100;
+
+/**
+ * The default tracker watcher (task-tui-live-refresh): a recursive
+ * `fs.watch` on the tracker dir. A watcher that cannot be opened returns
+ * `null`; one that fails later (its `error` event) closes itself — either way
+ * the loop falls back to per-keypress reads without ever crashing or exiting.
+ * Watch callbacks are guarded: a failing callback must not kill the loop.
+ */
+export function fsWatchTuiWatcher(tasksDir: string, onEvent: () => void): TuiTreeWatcher | null {
+  try {
+    const watcher = watch(tasksDir, { recursive: true }, () => {
+      try {
+        onEvent();
+      } catch {
+        // A refresh failure is never fatal (the next event retries); the loop
+        // keeps reading on keypresses regardless.
+      }
+    });
+    watcher.on("error", () => {
+      try {
+        watcher.close();
+      } catch {
+        // Already closed.
+      }
+    });
+    return watcher;
+  } catch {
+    return null; // recursive watch unavailable here: transparent degradation
+  }
 }
 
 /** Case-insensitive substring match on id or title (empty filter matches all). */
@@ -433,6 +510,12 @@ export function handleKey(state: TuiState, key: string, ctx: TuiKeyContext = {})
       return { ...state, quit: true };
     case "/":
       return { ...state, searching: true, message: null };
+    case "r":
+      // Forced refresh (task-tui-live-refresh): the reducer stays pure — the
+      // loop re-reads the tree after every key batch, so acknowledging the key
+      // (and clearing a stale transient message) is all the state change
+      // needed for the next frame to carry fresh data.
+      return { ...state, message: null };
     case ESC:
       // Esc clears the filter (and any transient message), keeps the view.
       return { ...state, filter: "", message: null };
@@ -654,9 +737,12 @@ export function renderTui(
   }
 
   // Footer: the position (selected row over the selected column's size)
-  // always leads, then the search prompt > transient message > key help — so
-  // a narrow terminal clips the help instead of the position.
+  // always leads, then the freshness stamp of the rendered data
+  // (task-tui-live-refresh), then the search prompt > transient message > key
+  // help — so a narrow terminal clips the help instead of the position.
   const position = `row ${selectedCount === 0 ? 0 : selectedCard + 1}/${selectedCount}`;
+  const stamp =
+    state.updatedAt === null ? "" : ` · updated ${formatTuiClock(state.updatedAt)}`;
   let footer: string;
   if (state.searching) {
     footer = `${position} · /${state.filter}█ — enter to apply, esc to cancel`;
@@ -665,7 +751,7 @@ export function renderTui(
     // "(no item selected)" hint): escape before rendering.
     footer = `${position} · ${sanitizeHumanTextUncapped(state.message)}`;
   } else {
-    footer = `${position} · ←/→ column · ↑/↓ card · PgUp/PgDn page · home/end · / search · enter detail · q quit`;
+    footer = `${position}${stamp} · ←/→ column · ↑/↓ card · PgUp/PgDn page · home/end · / search · enter detail · r refresh · q quit`;
   }
   lines.push(padEndTo(clipLine(footer, width), width));
 
@@ -992,17 +1078,28 @@ export type TuiLoopOptions = {
    * Defaults to TUI_ESCAPE_FLUSH_MS.
    */
   escapeFlushMs?: number;
+  /**
+   * Watcher factory override (tests); defaults to fsWatchTuiWatcher (recursive
+   * fs.watch on the tracker dir). Returning null or throwing degrades the loop
+   * to per-keypress reads (task-tui-live-refresh).
+   */
+  watch?: TuiWatchFactory;
+  /** Watcher debounce override (tests); defaults to TUI_REFRESH_DEBOUNCE_MS. */
+  refreshDebounceMs?: number;
 };
 
 /**
  * Interactive loop for `arggon board --tui`. Read-only: it re-reads the tree
- * after every keypress (cheap at v0 scale) and never writes. Enter opens the
- * read-only detail pane; Esc/Enter return to the board. Key bytes go through
- * the stateful decoder (bug-tui-split-escape-sequences): a CSI sequence split
- * across stdin chunks reassembles instead of leaking a phantom Esc, and a
- * genuinely lone Esc is flushed by the TUI_ESCAPE_FLUSH_MS timeout. Fails
- * with an actionable error when stdout is not a TTY (piped output cannot
- * render).
+ * after every keypress and, whenever the tracker dir changes, after a short
+ * debounce (task-tui-live-refresh) — so an idle board repaints in place while
+ * other agents/sessions write. A watcher that cannot open or fails later
+ * degrades transparently to per-keypress reads (never crashes, never exits).
+ * Enter opens the read-only detail pane; Esc/Enter return to the board; `r`
+ * forces a refresh. Key bytes go through the stateful decoder
+ * (bug-tui-split-escape-sequences): a CSI sequence split across stdin chunks
+ * reassembles instead of leaking a phantom Esc, and a genuinely lone Esc is
+ * flushed by the TUI_ESCAPE_FLUSH_MS timeout. Fails with an actionable error
+ * when stdout is not a TTY (piped output cannot render).
  */
 export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
   const output: TuiOutput = opts.output ?? process.stdout;
@@ -1013,6 +1110,11 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
     );
   }
   const escapeFlushMs = Math.max(0, Math.floor(opts.escapeFlushMs ?? TUI_ESCAPE_FLUSH_MS));
+  const watchFactory = opts.watch ?? fsWatchTuiWatcher;
+  const refreshDebounceMs = Math.max(
+    0,
+    Math.floor(opts.refreshDebounceMs ?? TUI_REFRESH_DEBOUNCE_MS),
+  );
   const initial = loadTuiItems(opts.cwd);
   const size = (value: number | undefined, fallback: number): number =>
     typeof value === "number" && value > 0 ? value : fallback;
@@ -1024,10 +1126,12 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     let items = initial.items;
     let details = initial.details;
-    let current = state;
+    let current: TuiState = { ...state, updatedAt: Date.now() };
     let settled = false;
     const decoder = createTuiKeyDecoder();
     let escTimer: ReturnType<typeof setTimeout> | null = null;
+    let watchDebounce: ReturnType<typeof setTimeout> | null = null;
+    let treeWatcher: TuiTreeWatcher | null = null;
 
     // Alternate screen + hidden cursor; restored on any exit path.
     output.write("\x1b[?1049h\x1b[?25l");
@@ -1077,17 +1181,40 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
       return true;
     };
 
-    // Re-read before clamping: the tree is the source of truth and may have
-    // changed while we were idle (no file watcher in v0); the clamp then uses
-    // the fresh counts, keeping the scroll window valid. The detail pane
-    // re-derives its own window per frame from the fresh bodies, so a body
-    // that shrank while open still renders valid.
+    // Re-read the tree, stamp the freshness time and repaint. Shared by the
+    // keypress path and the debounced watcher path (task-tui-live-refresh):
+    // the tree is the source of truth and may have changed while we were
+    // idle; the clamp then uses the fresh counts, keeping the scroll window
+    // valid, and the selection/filter survive (clampTuiState keeps them, only
+    // pulling both back into bounds). The detail pane re-derives its own
+    // window per frame from the fresh bodies, so a body that shrank while
+    // open still renders valid.
     const sync = (): void => {
       const fresh = loadTuiItems(opts.cwd);
       items = fresh.items;
       details = fresh.details;
-      current = clampTuiState(current, tuiColumnCounts(items, current.filter));
+      current = {
+        ...clampTuiState(current, tuiColumnCounts(items, current.filter)),
+        updatedAt: Date.now(),
+      };
       render();
+    };
+
+    // Watcher events debounce into one re-read (the `board --serve` reload
+    // pattern): events keep rescheduling while the tree is being written, and
+    // the quiet gap fires exactly one sync. A failing sync is swallowed —
+    // the tree may be mid-write, and the next event (or keypress) retries.
+    const scheduleRefresh = (): void => {
+      if (watchDebounce !== null) clearTimeout(watchDebounce);
+      watchDebounce = setTimeout(() => {
+        watchDebounce = null;
+        try {
+          sync();
+        } catch {
+          // Degrade transparently: the per-keypress reads keep working.
+        }
+      }, refreshDebounceMs);
+      watchDebounce.unref?.();
     };
 
     // A chunk that ends inside an escape sequence holds the tail: if no
@@ -1151,6 +1278,18 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
         clearTimeout(escTimer);
         escTimer = null;
       }
+      if (watchDebounce !== null) {
+        clearTimeout(watchDebounce);
+        watchDebounce = null;
+      }
+      if (treeWatcher !== null) {
+        try {
+          treeWatcher.close();
+        } catch {
+          // The watcher may already be gone; the screen restore matters more.
+        }
+        treeWatcher = null;
+      }
       if (typeof output.removeListener === "function") output.removeListener("resize", onResize);
       if (typeof rawCapable.setRawMode === "function") {
         try {
@@ -1162,6 +1301,14 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
     };
 
     try {
+      // Watch the tracker dir so an idle board repaints while other agents /
+      // sessions write (task-tui-live-refresh). Unavailable or failing
+      // watchers degrade to the per-keypress reads — never crash, never exit.
+      try {
+        treeWatcher = watchFactory(initial.tasksDir, scheduleRefresh);
+      } catch {
+        treeWatcher = null;
+      }
       if (typeof rawCapable.setRawMode === "function") rawCapable.setRawMode(true);
       if (typeof input.resume === "function") input.resume();
       input.on("data", onData);
