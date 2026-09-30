@@ -1,13 +1,15 @@
 ---
 type: story
-status: todo
+status: in_progress
 id: ui-tui-v2
 title: "Terminal board v2: scroll, detail, filters and live view"
+assignee: Arggon
 parent: ui
 labels: [tui, ui]
 priority: p2
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T22:49:39.695Z"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-tui-v2/ui-tui-v2.md (story index; required).
