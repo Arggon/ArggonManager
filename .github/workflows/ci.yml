@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main, opencode2]
+    branches: [main]
   pull_request:
-    branches: [main, opencode2]
+    branches: [main]
 
 jobs:
   cli:
