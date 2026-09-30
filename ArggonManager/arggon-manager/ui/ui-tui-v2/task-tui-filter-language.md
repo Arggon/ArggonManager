@@ -60,3 +60,7 @@ Evidence, expected vs observed:
 - Unit loop test drives the same refusal through runTuiBoard with fake streams.
 
 Deviations: none. Notes: (1) the prompt also accepts free-text tokens on id/title (kept from the old substring behavior, same as the web board lens); (2) an invalid view can wedge the v-cycle until Esc clears (documented in README) — stateless refusal, no extra state field.
+
+### handoff 2026-09-30 @Arggon — next: Coordinator review of PR #484; merge (no squash) then auto-done flips the item.
+- branch: feat/task-tui-filter-language
+- open questions: None blocking
