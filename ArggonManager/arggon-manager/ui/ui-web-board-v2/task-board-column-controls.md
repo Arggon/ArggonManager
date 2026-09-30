@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-board-column-controls
 title: "Web board column controls: collapse, hide terminal columns, sticky headers"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [viewer, board, ui]
 priority: p2
 created: "2026-09-22"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T15:53:14.657Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-typecheck-e2e-specs-task-board-live-reload-state-task-board-column-controls
 ---
 <!--
