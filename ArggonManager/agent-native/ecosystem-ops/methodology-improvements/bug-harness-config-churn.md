@@ -27,3 +27,18 @@ updated: "2026-09-30"
 - [ ] 
 
 ## Notes
+
+### 2026-09-30 @Arggon
+### Repro + evidence (this session, 2026-09-29)
+
+`.zcode/config.json` is a **tracked** file that the ZCode harness rewrites during sessions (session state). `arggon start`'s clean-tree precondition refuses to run while it is dirty — three separate agent sessions today had to `git stash push .zcode/config.json` → `start` → `stash pop` before claiming an item (worker on `task-review-verdict-checker`, coordinator twice). A pushed-after-stash dance is exactly the manual tracker git work the tooling exists to remove, and a naive agent will instead commit harness state or `--force` its way through (both worse).
+
+### Candidate fixes (triage needed)
+- Untrack + gitignore `.zcode/` (it is per-machine harness state, not repo config) — check whether any tracked content is genuinely shared.
+- Or: make the clean-tree precondition tolerate a configurable dirty-path allowlist (`x-tracker.clean-allowlist`?) so generated/harness churn doesn't block claims.
+- Or: document the stash dance in the pitfalls reference (weakest fix).
+
+### Acceptance checklist
+- [ ] Decide the fix (untrack vs allowlist vs docs) — ADR not needed if untracking (no contract change).
+- [ ] Implement + test (clean-tree precondition keeps protecting real edits).
+- [ ] Verify a `start --worktree` succeeds with a dirty `.zcode/config.json` afterwards.
