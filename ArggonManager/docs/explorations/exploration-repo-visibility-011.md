@@ -168,6 +168,10 @@ local git history on **2026-09-22**; platform facts cite the linked docs
 
 ## Decision
 
+No ADR required — ops/visibility decision recorded on
+`task-repo-visibility-decision`; no schema, stack or architecture contract
+changes.
+
 **Stay public** (recorded 2026-09-30 in `task-repo-visibility-decision`, per
 this exploration's measured recommendation). Rationale in brief: Actions burn
 (~2,800 wall-minutes / 18 days) is free and unlimited on public runners but
