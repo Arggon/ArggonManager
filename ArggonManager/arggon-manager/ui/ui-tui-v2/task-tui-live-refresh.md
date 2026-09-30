@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-tui-live-refresh
 title: "TUI live refresh: watch the tracker and repaint in place"
+assignee: Arggon
+branch: feat/task-tui-live-refresh
 parent: ui-tui-v2
 labels: [tui, ui]
 priority: p2
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T15:29:57.754Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-tui-live-refresh
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-tui-v2/task-tui-live-refresh.md
