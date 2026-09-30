@@ -1,13 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-native-panel-interaction
 title: "OpenCode panel: selection, detail and next/active jumps"
+assignee: Arggon
 parent: ui-native-panel-v2
 labels: [opencode-seam, tui, ui]
 priority: p2
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T15:13:07.362Z"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-native-panel-v2/task-native-panel-interaction.md
