@@ -43,3 +43,10 @@ The sidebar snapshot is created on mount with no setter (never refreshes) and th
 - [x] Fold/hide: collapse subtrees, hide `done`/`cancelled`, and a text filter on id/title; state kept per session
 - [x] Paging beyond the 200-line cap (or an explicit, navigable "more" affordance)
 - [x] Tests + a filtered/folded smoke capture; docs updated
+
+### 2026-09-30 @Arggon
+Implementation verdict (2026-09-30, @Arggon): all four acceptance boxes ticked on the PR branch (commit 006e4bff). Deviations from a literal reading of the work order, recorded for review: (1) live refresh is timer-based (10s, ARGON_BOARD_REFRESH_MS override) rather than session-event-based — the TUI plugin context exposes no tracker-change event, and the tick is one in-process kernel read; (2) per-session view state is in-memory (survives panel close/reopen, isolated per session) rather than durable host storage — the TUI context has no storage contract; (3) the text filter edits via plain-letter binds (s + letters + backspace + Enter) because the panel keymap layer only receives bound keys — digits/dash/dot/slash/backspace sit in a separate best-effort keymap layer so an unknown name on a host cannot kill the panel keys; (4) paging builds on PR #411's window-follow (this branch is stacked on feat/task-native-panel-interaction, PR base is that branch until it merges) and adds the explicit (PgDn pages)/(PgUp) hints.
+
+Gates on the PR head: npm test 107 files / 1803 tests; lint; lint:structure; test:structure (3 passed); build; check:plugin (bundle regenerated, 394093 B); smoke:tui 23/23 in a real PTY (filter typing live, fold hint, done-hide round-trip, live refresh picking up a mid-run tracker write with no r pressed, corrupt-tracker P1 degradation); arggon validate --json ok:true; prettier clean on touched files.
+
+Docs updated: docs/opencode2.md § TUI (prose + checklist rows) and docs/playbooks/opencode.md § Testing.
