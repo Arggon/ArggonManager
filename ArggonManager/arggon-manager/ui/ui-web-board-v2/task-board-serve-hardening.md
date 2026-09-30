@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-board-serve-hardening
 title: "board --serve hardening: origin checks, favicon, optional --open"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [viewer, board, security, ui]
 priority: p3
 created: "2026-09-22"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T18:28:51.586Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-board-serve-hardening
 ---
 <!--
