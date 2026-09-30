@@ -351,16 +351,10 @@ tasks-validate:
     - uses: actions/setup-node@v4
       with:
         node-version: 22
-    # Pre-release (packages still private): pack BOTH tarballs from a pinned
-    # checkout. After release this line is `npm install -g arggon-manager`.
+    # Both packages are published since 0.4.0; full recipe and the
+    # pinned-checkout variant live in ArggonManager/docs/ci.md.
     - name: Install arggon
-      run: |
-        git clone --depth 1 --branch opencode2 https://github.com/Arggon/ArggonManager /tmp/arggon-src
-        cd /tmp/arggon-src && npm ci
-        mkdir -p /tmp/arggon-packs
-        npm pack --workspace lib --pack-destination /tmp/arggon-packs
-        npm pack --pack-destination /tmp/arggon-packs
-        npm install -g /tmp/arggon-packs/*-lib-*.tgz /tmp/arggon-packs/arggon-manager-*.tgz
+      run: npm install -g arggon-manager
     - run: arggon init --no-commit
     - run: arggon validate --json
 ```

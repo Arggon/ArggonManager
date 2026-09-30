@@ -103,7 +103,7 @@ Exact v0 fields are documented in [`ArggonManager/docs/convention.md`](ArggonMan
 - [Task convention](ArggonManager/docs/convention.md) — folder layout, frontmatter schema, statuses (v0 locked)
 - [Agent playbook](ArggonManager/docs/agents.md) — find, claim, create, PR loop for humans and agents
 - [OpenCode V2 playbook](ArggonManager/docs/playbooks/opencode.md) — V2 setup, conventions, testing and upgrade policy (pinned 2.0.12)
-- [OpenCode2 native integration](ArggonManager/docs/opencode2.md) — what the `opencode2` branch adds, how to adopt it, and the guarantees
+- [OpenCode2 native integration](ArggonManager/docs/opencode2.md) — the native OpenCode V2 experience (shipped in 0.4.0, on `main`), how to adopt it, and the guarantees
 - [Headless bootstrap and CI](ArggonManager/docs/ci.md) — the packaged `arggon` bin for bootstrap + CI (no model, no MCP), and the adopter workflow `init` vendors
 - [Claim / concurrency](ArggonManager/docs/claim.md) — claim definition, conflict/`--force`, unclaim recovery
 - [Engineering conventions](ArggonManager/docs/engineering.md) — repo structure, review bar, testing, ADRs (Phase 1)
@@ -153,7 +153,7 @@ A checkout installs directly in this order: `npm install` first (its root `prepa
 
 The bin is `dist/cli.js` and the build sets its executable bit, so a plain `ln -s <checkout>/dist/cli.js ~/.local/bin/arggon` also works (a manual symlink used to fail with `Permission denied`).
 
-`arggon --version` prints the package version plus the build's git sha and branch when one can be determined — `0.3.0 (abc1234, opencode2)` from a checkout, the recorded build metadata after installation, or the bare version when there is no git — so parallel installs of different branches stay distinguishable. Running `main` and `opencode2` side by side is documented in [ArggonManager/docs/opencode2.md](ArggonManager/docs/opencode2.md).
+`arggon --version` prints the package version plus the build's git sha and branch when one can be determined — `0.3.0 (abc1234, opencode2)` from a checkout, the recorded build metadata after installation, or the bare version when there is no git — so parallel installs of different branches stay distinguishable. Running a development checkout side by side with an installed release is documented in [ArggonManager/docs/opencode2.md](ArggonManager/docs/opencode2.md).
 
 ## CLI (Phase 1)
 

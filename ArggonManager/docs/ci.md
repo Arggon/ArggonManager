@@ -32,7 +32,7 @@ from the registry since 0.4.0. `npm pack
 both exit 254 with `ENOENT`), so create it first:
 
 ```bash
-git clone --depth 1 --branch opencode2 https://github.com/Arggon/ArggonManager /tmp/arggon-src
+git clone --depth 1 https://github.com/Arggon/ArggonManager /tmp/arggon-src
 cd /tmp/arggon-src
 npm ci                                                        # prepare builds lib/dist + dist
 mkdir -p /tmp/arggon-packs                                    # npm pack does not create it
@@ -79,7 +79,7 @@ instructions` prints — lives in
 
 **When it runs (scoped on purpose).** `pull_request` always runs the job so a
 stale seam is caught before merge, while `push` is limited to the long-lived
-branches (`branches: [main, opencode2]` in the shipped recipe — adjust to your
+branches (`branches: [main]` in the shipped recipe — adjust to your
 default branch(es)). The job is cheap (~30–60 s) but the drift gate compares the
 committed seam against the pinned `ARGGON_REF`, so running it on every
 topic-branch push or tracker auto-commit would only re-check a comparison that

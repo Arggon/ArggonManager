@@ -1,9 +1,10 @@
 # OpenCode2: native OpenCode V2 integration for ArggonManager
 
-> **Status:** shipped on the **`opencode2`** branch. `main` is untouched by
-> product decision — adopters who want the native OpenCode V2 experience use
-> `opencode2`. This document is the entry point; the program record lives in
-> the links at the bottom.
+> **Status:** shipped — the native OpenCode V2 integration released in
+> **0.4.0** and lives on **`main`**. The `opencode2` branch is retired (it was
+> merged for the release and has since been deleted from the remote). This
+> document is the entry point; the program record lives in the links at the
+> bottom.
 
 ## What it is
 
@@ -23,8 +24,9 @@ never forks them.
 ## Quickstart
 
 ```bash
-# 1. Get this branch (from an ArggonManager checkout)
-git fetch origin && git checkout opencode2     # or: git worktree add ../AM-opencode2 opencode2
+# 1. Get the source (main carries the integration since 0.4.0)
+git clone --depth 1 https://github.com/Arggon/ArggonManager /tmp/arggon-src
+cd /tmp/arggon-src
 npm ci && npm run build                        # the `arggon` bin lives in dist/
 
 # 2. Prepare YOUR repo (any repo, existing or new)
@@ -104,11 +106,11 @@ namespace:
   Payload contract (documented here; the output schemas stay loose to respect
   the ADR 0006 budget and the contract tests assert the envelopes):
 
-  | Tool      | Payload fields (beyond `ok`/`schemaVersion`/`conventionVersion`/`command`)                                                                                                                                                                                                                                                                       |
-  | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | Tool      | Payload fields (beyond `ok`/`schemaVersion`/`conventionVersion`/`command`)                                                                                                                                                                                                                                             |
+  | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
   | `start`   | `id`, `branch`, `worktreePath` (`null` with `worktree: false`), `worktreeCreated`, `branchCreated`, `pushed`, `item`, `preparation?` (bounded `ready`/install/workspace/dependency-coverage receipt: `ready`, `install`, `linkedNodeModules`, `builtWorkspaces`, `linkedWorkspaces`, `manifestCoverage` (`"satisfied"` | `"stale"` | `"unknown"`), `missingDependencies` (kernel-capped at 10 names) and `missingDependenciesTotal`, plus `truncated` when a list was capped; `ready` is the conjunction of "an install is present", "no worktree-owned package resolves into the primary" and "the install provides the worktree's declared `dependencies`/`devDependencies`", so a stale primary mirror is reported as `ready: false` **with the missing names in the payload** instead of a bare readiness claim — see [`agents.md`](./agents.md) §4 for the remedy), `claimCommitted`, `claimCommit` (`committed`, `not-needed`, `failed`, or `not-attempted` with a bounded reason), `commit?`, and `rollback?` on a refused claim |
-  | `branch`  | `id`, `branch`, `item`, `commit?`                                                                                                                                                                                                                                                                                                                |
-  | `cleanup` | `base`, `candidates[]` (`id`, `status`, `branch`, `path`, `removable`, `reason`, `action`, `via?`), `pruned[]` (`id`, `action`, `error?`, `leftoverPath?`, `leftoverBranch?`, `via?`), `failures[]`, `commit?`                                                                                                                                   |
+  | `branch`  | `id`, `branch`, `item`, `commit?`                                                                                                                                                                                                                                                                                      |
+  | `cleanup` | `base`, `candidates[]` (`id`, `status`, `branch`, `path`, `removable`, `reason`, `action`, `via?`), `pruned[]` (`id`, `action`, `error?`, `leftoverPath?`, `leftoverBranch?`, `via?`), `failures[]`, `commit?`                                                                                                         |
 
   `cleanup` prune removal is **observed**, never assumed: the domain removal is
   checked against the directory and `git worktree list` before anything else
@@ -147,12 +149,12 @@ branch**, and a session working in a plain checkout commits in that checkout on
 whatever branch it has checked out. Both are the CLI's behavior by construction,
 not a second rule.
 
-| the call comes from | the tracker root is | a `comment` commit lands on |
-| ------------------- | ------------------- | --------------------------- |
-| a session in `../<repo>-<id>` (after `session_move`) | the worktree | the item branch, inside the worktree — hence in the item's PR |
-| a session in a non-worktree checkout (the primary, or any clone) | that checkout | the branch checked out there |
-| no calling session (ambient/headless invocation) | the plugin instance's `ctx.location.directory` | that location's checked-out branch |
-| a session whose directory cannot be resolved | **refused**: `error.code: "SESSION_ROOT_UNRESOLVED"` | nothing is written |
+| the call comes from                                              | the tracker root is                                  | a `comment` commit lands on                                   |
+| ---------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------- |
+| a session in `../<repo>-<id>` (after `session_move`)             | the worktree                                         | the item branch, inside the worktree — hence in the item's PR |
+| a session in a non-worktree checkout (the primary, or any clone) | that checkout                                        | the branch checked out there                                  |
+| no calling session (ambient/headless invocation)                 | the plugin instance's `ctx.location.directory`       | that location's checked-out branch                            |
+| a session whose directory cannot be resolved                     | **refused**: `error.code: "SESSION_ROOT_UNRESOLVED"` | nothing is written                                            |
 
 **Why the session's directory and not something else.** V2 hands a plugin tool
 no directory: the runtime builds the tool context as `{ sessionID, agent,
@@ -161,7 +163,7 @@ where the session works, and `ctx.session.get({ sessionID })` →
 `Session.Info.location.directory` is what `session_move` updates. The three
 alternatives are all wrong for this model:
 
-- **`ctx.location.directory`** is the *plugin instance's* location — V2 documents
+- **`ctx.location.directory`** is the _plugin instance's_ location — V2 documents
   it as "the plugin instance's location, not the location of every session it can
   access or event it receives". Captured at `setup`, it is stale by construction
   after a move: that is exactly the defect
@@ -171,8 +173,8 @@ alternatives are all wrong for this model:
 - **`process.cwd()`** is the host process's launch directory (a background
   `opencode serve` carries its own), never the session's.
 - **The item's recorded `worktree_path`** is chicken-and-egg: reading it needs
-  the tracker root this step is resolving. It stays authoritative for *what
-  `start` attaches to*, not for *where a call resolves*.
+  the tracker root this step is resolving. It stays authoritative for _what
+  `start` attaches to_, not for _where a call resolves_.
 
 **Refusing beats guessing.** Once a session is known, an unresolvable directory
 raises a typed tool error instead of falling back to the plugin location: a
@@ -296,14 +298,20 @@ build.
 
 ## Side-by-side installs
 
-Both branches declare the same `arggon` bin (`package.json` → `./dist/cli.js`),
+> Written while the integration lived on the `opencode2` branch (retired after
+> the 0.4.0 merge). The technique below is branch-agnostic and still applies
+> whenever a development checkout must coexist with an installed release: two
+> checkouts of the same package collide on the same `arggon` bin shim, and the
+> fix is a second name resolved per project.
+
+Both checkouts declare the same `arggon` bin (`package.json` → `./dist/cli.js`),
 so two `npm link` installs collide: the last one wins and the global shim
-silently points at whichever checkout linked last. To keep `main` as bare
-`arggon` and still drive the OpenCode2 build from this checkout, give the oc2
-build a second name and let each project resolve it locally.
+silently points at whichever checkout linked last. To keep the installed
+release as bare `arggon` and still drive a development checkout's build, give
+the dev build a second name and let each project resolve it locally.
 
 **Option A (recommended): named shim + per-project PATH.** Leave `arggon` →
-`main`; add a wrapper for the oc2 checkout:
+the installed release; add a wrapper for the dev checkout:
 
 ```bash
 npm ci && npm run build        # dist/ is gitignored; build before shimming
@@ -455,8 +463,9 @@ in and CI has no model). `arggon init` vendors the adopter workflow to
 `arggon init --no-commit` → `arggon validate --json` (plus `doctor`/`list`
 diagnostics), with an optional drift gate on the committed seam. Nothing in
 that flow touches OpenCode, a model or MCP: the tracker and the bin are enough.
-Full recipe, install variants (the two packages are still `private`) and the
-fixture that exercises it: [`ArggonManager/docs/ci.md`](ci.md).
+Full recipe, install variants (both packages are published since 0.4.0 — the
+released install is `npm install -g arggon-manager`) and the fixture that
+exercises it: [`ArggonManager/docs/ci.md`](ci.md).
 
 ## Upgrading
 
@@ -486,8 +495,9 @@ is never touched; the vendored plugin still delivers the native `arggon` tools.
 If your config carries an `arggon` MCP stanza, `arggon doctor` reports it as
 optional (the native tools do not need it; keep it only for other clients).
 
-**Why is `main` untouched?** Product decision: this integration ships from
-`opencode2`, which receives `main` merges as needed.
+**Where does the integration ship?** On `main`, since 0.4.0 — the `opencode2`
+branch was merged for the release and then retired (deleted from the remote);
+this document describes what ships, not a parallel branch.
 
 **Something looks wrong in a session.** Run `arggon doctor` (OpenCode section),
 and check the playbook's troubleshooting notes; file findings as tracker
