@@ -157,6 +157,7 @@ __arggonEdges.set("lib/src/validate.ts\u0000./relations.js", "lib/src/relations.
 __arggonEdges.set("lib/src/validate.ts\u0000./sanitize.js", "lib/src/sanitize.ts")
 __arggonEdges.set("lib/src/validate.ts\u0000./status.js", "lib/src/status.ts")
 __arggonEdges.set("lib/src/view-model.ts\u0000./filter.js", "lib/src/filter.ts")
+__arggonEdges.set("lib/src/view-model.ts\u0000./ids.js", "lib/src/ids.ts")
 __arggonEdges.set("lib/src/view-model.ts\u0000./next.js", "lib/src/next.ts")
 __arggonEdges.set("lib/src/view-model.ts\u0000./priority.js", "lib/src/priority.ts")
 __arggonEdges.set("lib/src/view-model.ts\u0000./status.js", "lib/src/status.ts")
@@ -1301,6 +1302,8 @@ __arggonModules.set("lib/src/filter.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FILTER_FIELDS = void 0;
+exports.splitFilterTokens = splitFilterTokens;
+exports.unquoteFilterValue = unquoteFilterValue;
 exports.parseFilter = parseFilter;
 exports.buildBlockedByIndex = buildBlockedByIndex;
 exports.buildAncestorIndex = buildAncestorIndex;
@@ -1319,7 +1322,7 @@ exports.FILTER_FIELDS = [
 function isFilterField(field) {
     return exports.FILTER_FIELDS.includes(field);
 }
-function splitTokens(expr) {
+function splitFilterTokens(expr) {
     const tokens = [];
     let current = "";
     let quote = null;
@@ -1349,7 +1352,7 @@ function splitTokens(expr) {
         tokens.push(current);
     return tokens;
 }
-function unquote(value, expr) {
+function unquoteFilterValue(value, expr) {
     if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
         return value.slice(1, -1);
     }
@@ -1362,7 +1365,7 @@ function unquote(value, expr) {
     return value;
 }
 function parseFilter(expr) {
-    const tokens = splitTokens(expr.trim());
+    const tokens = splitFilterTokens(expr.trim());
     return tokens.map((token) => {
         let negated = false;
         let rest = token;
@@ -1378,7 +1381,7 @@ function parseFilter(expr) {
         if (!isFilterField(field)) {
             throw new Error(`unknown filter field "${field}". Allowed: ${exports.FILTER_FIELDS.join(", ")}`);
         }
-        const value = unquote(rest.slice(colon + 1), expr);
+        const value = unquoteFilterValue(rest.slice(colon + 1), expr);
         if (!value)
             throw new Error(`empty value in filter token "${token}"`);
         return { field, value, negated };
@@ -2203,9 +2206,9 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
-exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.MAX_MISSING_DEPENDENCIES = exports.unlinkNodeModulesLink = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.inspectDeclaredDependencies = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = void 0;
+exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
+exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.MAX_MISSING_DEPENDENCIES = exports.unlinkNodeModulesLink = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.inspectDeclaredDependencies = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2280,6 +2283,8 @@ Object.defineProperty(exports, "buildAncestorIndex", { enumerable: true, get: fu
 Object.defineProperty(exports, "buildBlockedByIndex", { enumerable: true, get: function () { return filter_js_1.buildBlockedByIndex; } });
 Object.defineProperty(exports, "matchesPredicate", { enumerable: true, get: function () { return filter_js_1.matchesPredicate; } });
 Object.defineProperty(exports, "parseFilter", { enumerable: true, get: function () { return filter_js_1.parseFilter; } });
+Object.defineProperty(exports, "splitFilterTokens", { enumerable: true, get: function () { return filter_js_1.splitFilterTokens; } });
+Object.defineProperty(exports, "unquoteFilterValue", { enumerable: true, get: function () { return filter_js_1.unquoteFilterValue; } });
 var next_js_1 = require("./next.js");
 Object.defineProperty(exports, "downstreamWeight", { enumerable: true, get: function () { return next_js_1.downstreamWeight; } });
 Object.defineProperty(exports, "isReady", { enumerable: true, get: function () { return next_js_1.isReady; } });
@@ -2299,6 +2304,7 @@ Object.defineProperty(exports, "isPriority", { enumerable: true, get: function (
 Object.defineProperty(exports, "priorityRank", { enumerable: true, get: function () { return priority_js_1.priorityRank; } });
 Object.defineProperty(exports, "runPriorityMigrate", { enumerable: true, get: function () { return priority_js_1.runPriorityMigrate; } });
 var view_model_js_1 = require("./view-model.js");
+Object.defineProperty(exports, "applyViewFilter", { enumerable: true, get: function () { return view_model_js_1.applyViewFilter; } });
 Object.defineProperty(exports, "applyViewLens", { enumerable: true, get: function () { return view_model_js_1.applyViewLens; } });
 Object.defineProperty(exports, "buildStatusIndex", { enumerable: true, get: function () { return view_model_js_1.buildStatusIndex; } });
 Object.defineProperty(exports, "groupItemsBy", { enumerable: true, get: function () { return view_model_js_1.groupItemsBy; } });
@@ -5739,7 +5745,9 @@ exports.treeEntries = treeEntries;
 exports.isReadyTodo = isReadyTodo;
 exports.readyTodoCount = readyTodoCount;
 exports.applyViewLens = applyViewLens;
+exports.applyViewFilter = applyViewFilter;
 const filter_js_1 = require("./filter.js");
+const ids_js_1 = require("./ids.js");
 const next_js_1 = require("./next.js");
 const priority_js_1 = require("./priority.js");
 const status_js_1 = require("./status.js");
@@ -5890,6 +5898,102 @@ function applyViewLens(items, lens = {}) {
         return predicates.every((pred) => (0, filter_js_1.matchesPredicate)(kernelItem, pred, blockedByIndex, ancestorIndex));
     });
     return lens.sort === "priority" ? sortByPriority(kept) : sortById(kept);
+}
+function applyViewFilter(items, expr, opts = {}) {
+    const trimmed = expr.trim();
+    if (trimmed === "")
+        return { ok: true, items: [...items] };
+    const messageOf = (err) => (err instanceof Error ? err.message : String(err));
+    let tokens;
+    try {
+        tokens = (0, filter_js_1.splitFilterTokens)(trimmed);
+    }
+    catch (err) {
+        return { ok: false, error: messageOf(err) };
+    }
+    const needles = [];
+    const predicates = [];
+    for (const token of tokens) {
+        let negated = false;
+        let rest = token;
+        if (rest.startsWith("!")) {
+            negated = true;
+            rest = rest.slice(1);
+        }
+        if (rest.indexOf(":") <= 0) {
+            if (negated) {
+                return {
+                    ok: false,
+                    error: `bad filter token "${token}" (negation applies to field:value predicates; free text matches id/title as-is)`,
+                };
+            }
+            try {
+                const text = (0, filter_js_1.unquoteFilterValue)(rest, trimmed);
+                if (!text)
+                    return { ok: false, error: `empty value in filter token "${token}"` };
+                needles.push(text.toLowerCase());
+            }
+            catch (err) {
+                return { ok: false, error: messageOf(err) };
+            }
+            continue;
+        }
+        try {
+            predicates.push(...(0, filter_js_1.parseFilter)(token));
+        }
+        catch (err) {
+            return { ok: false, error: messageOf(err) };
+        }
+    }
+    for (const pred of predicates) {
+        if (pred.field === "type" && !(0, ids_js_1.isItemType)(pred.value)) {
+            return {
+                ok: false,
+                error: `unknown type "${pred.value}". Allowed: ${ids_js_1.ITEM_TYPES.join(", ")}`,
+            };
+        }
+        if (pred.field === "status" && !(0, status_js_1.isStatus)(pred.value)) {
+            return {
+                ok: false,
+                error: `unknown status "${pred.value}". Allowed: ${status_js_1.STATUSES.join(", ")}`,
+            };
+        }
+        if (pred.field === "priority" && pred.value !== "none" && !(0, priority_js_1.isPriority)(pred.value)) {
+            return {
+                ok: false,
+                error: `unknown priority "${pred.value}". Allowed: ${priority_js_1.PRIORITIES.join(", ")}, none`,
+            };
+        }
+        if (pred.field === "assignee" && pred.value === "@me") {
+            const login = opts.me !== undefined ? opts.me : (opts.resolveMe?.() ?? null);
+            if (login === null || login === "") {
+                return {
+                    ok: false,
+                    error: "could not resolve @me (set GITHUB_USER or GITHUB_ACTOR, or authenticate gh: gh api user)",
+                };
+            }
+            pred.value = login;
+        }
+    }
+    const kernelItems = items.map((item) => ({
+        ...item,
+        dependsOn: [...(item.dependsOn ?? item.depends_on ?? [])],
+    }));
+    const blockedByIndex = (0, filter_js_1.buildBlockedByIndex)(kernelItems);
+    const ancestorIndex = (0, filter_js_1.buildAncestorIndex)(items);
+    const kept = items.filter((item, index) => {
+        const kernelItem = kernelItems[index];
+        for (const pred of predicates) {
+            if (!(0, filter_js_1.matchesPredicate)(kernelItem, pred, blockedByIndex, ancestorIndex))
+                return false;
+        }
+        for (const needle of needles) {
+            if (!matchesSubstringFilter(item, needle))
+                return false;
+        }
+        return true;
+    });
+    return { ok: true, items: kept };
 }
 })
 

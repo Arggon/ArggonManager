@@ -18,22 +18,33 @@
  * detail bodies included), `createTuiKeyDecoder` (the stateful stdin
  * splitter, bug-tui-split-escape-sequences), `formatTuiClock` (the footer
  * freshness stamp), `fsWatchTuiWatcher` (the default tracker watcher,
- * task-tui-live-refresh) and `tuiViewItems` / `applyTuiSort` / `nextTuiSort`
- * (the sort + ready-only lens, task-tui-sort-ready-lens). `runTuiBoard` only
- * wires raw mode, keypress events, resize and the debounced tree watcher to
- * the pure pieces; it performs no writes anywhere.
+ * task-tui-live-refresh), `tuiViewItems` / `applyTuiSort` / `nextTuiSort`
+ * (the sort + ready-only lens, task-tui-sort-ready-lens), `tuiLensFilter` /
+ * `tuiViewOptions` (the filter prompt over the kernel filter language and the
+ * `x-views` saved views, task-tui-filter-language) and `tuiActionVerdict` /
+ * `tuiLegalMoves` / `handleActionKey` (the claim/move action flows,
+ * task-tui-actions-parity). `runTuiBoard` wires raw mode, keypress events,
+ * resize and the debounced tree watcher to the pure pieces; its ONLY write is
+ * the one kernel `runUpdate` call per finished action flow — never force,
+ * never steal (spec-tui-actions-014).
  */
 import { watch } from "node:fs";
 import {
   STATUSES,
+  applyViewFilter,
   buildStatusIndex,
+  canTransition,
   findTasksDir,
   hasOpenDependencies,
+  isClaimable,
   isReadyTodo,
   itemsForStatus,
   loadItems,
   matchesSubstringFilter,
+  readConventionConfig,
   repoRootFromTasks,
+  resolveCurrentLogin,
+  runUpdate,
   sanitizeHumanTextUncapped,
   sortById,
   sortByNextRank,
@@ -124,6 +135,66 @@ export type TuiDetailState = {
   scroll: number;
 };
 
+/**
+ * One action flow (task-tui-actions-parity): the selected item, the pending
+ * write and the prompt stage. The reducer builds it purely; the loop executes
+ * it exactly once at the `apply` stage through the kernel `runUpdate` and then
+ * clears it. `esc` cancels from any stage with nothing written.
+ */
+export type TuiActionState = {
+  /** Item id the flow acts on. */
+  id: string;
+  type: WorkItem["type"];
+  /** Status the item had when the flow opened (the kernel re-checks at apply). */
+  from: WorkItem["status"];
+  /** Claim holder at flow open (null = unclaimed). */
+  claimedBy: string | null;
+  /** True when the flow started from `c` (claim wording in the messages). */
+  claim: boolean;
+  stage: "move" | "reason" | "assignee" | "confirm" | "apply";
+  /** Target status (in_progress for a claim). */
+  status: WorkItem["status"];
+  /** Decided assignee (null = the write carries none). */
+  assignee: string | null;
+  /** Decided blocked reason (blocked moves only). */
+  blockedReason: string | null;
+  /** Cursor over the legal-target menu (move stage). */
+  cursor: number;
+  /** Input draft for the reason/assignee prompts. */
+  draft: string;
+  /** Inline refusal inside the flow (e.g. an empty reason). */
+  error: string | null;
+};
+
+/**
+ * An active saved view (task-tui-filter-language): the `x-views` view name and
+ * the resolved expression it stands for. The expression rides in the state so
+ * the pure renderer and reducer never need the convention file; the loop
+ * refreshes it per sync like every other tracker read.
+ */
+export type TuiView = {
+  /** View name in the tracker `.convention.yml` `x-views` map. */
+  name: string;
+  /** The view's filter expression. */
+  expr: string;
+};
+
+/**
+ * One saved view as the keymap sees it (task-tui-filter-language): the view
+ * pre-validated against the loaded tree (`applyViewFilter`). An invalid view
+ * (a malformed expression, an unknown enum value, an unresolvable `@me`) is
+ * refused with its `error` as an inline hint instead of crashing the frame or
+ * silently matching nothing.
+ */
+export type TuiViewOption = TuiView & {
+  ok: boolean;
+  /** Refusal message when `ok` is false. */
+  error?: string;
+};
+
+/** Verdict of the search prompt draft, computed by the loop against the tree. */
+export type TuiFilterVerdict = { ok: true } | { ok: false; error: string };
+
 export type TuiState = {
   width: number;
   height: number;
@@ -138,10 +209,21 @@ export type TuiState = {
    * while the column has items; see `followTuiScroll`.
    */
   scroll: number;
-  /** Active search filter (substring, case-insensitive, on id/title). */
+  /** Active search filter (free text + kernel predicates; see tuiLensFilter). */
   filter: string;
   /** Whether the `/` search prompt is open. */
   searching: boolean;
+  /**
+   * Inline refusal for the prompt draft (task-tui-filter-language): shown at
+   * the prompt until the draft changes or Esc/Enter resolves it. An invalid
+   * expression never replaces the active filter.
+   */
+  filterError: string | null;
+  /**
+   * Active saved view (`v` cycles the tracker `x-views`, task-tui-filter-language).
+   * Its expression ANDs with the manual filter (like `list --view` + `--filter`).
+   */
+  view: TuiView | null;
   /**
    * Card order within each column (task-tui-sort-ready-lens): `s` cycles
    * `id` -> `priority` -> `next` (ready first, ADR 0009 tier, downstream
@@ -168,6 +250,18 @@ export type TuiState = {
    * Read-only: the pane has no update path, it only reads the loaded items.
    */
   detail: TuiDetailState | null;
+  /**
+   * Help overlay (`?`, task-tui-help-vim-keys): a modal frame listing every
+   * key grouped by purpose. `esc` (or `?` again) closes it; the board state
+   * behind it is untouched.
+   */
+  help: boolean;
+  /**
+   * Open action flow (`c` claim / `m` move, task-tui-actions-parity).
+   * `null` = the board is view-only. Modal: no board key reaches the board
+   * while a flow is open, and `esc` cancels with nothing written.
+   */
+  action: TuiActionState | null;
   /** Set by `q` / Ctrl-C; the loop exits when true. */
   quit: boolean;
 };
@@ -184,11 +278,15 @@ export function initialTuiState(
     scroll: 0,
     filter: "",
     searching: false,
+    filterError: null,
+    view: null,
     sort: "id",
     readyOnly: false,
     message: null,
     updatedAt: null,
     detail: null,
+    help: false,
+    action: null,
     quit: false,
   };
 }
@@ -216,6 +314,38 @@ export function loadTuiItems(cwd: string): {
     kernelItems.map((item) => [item.id, { id: item.id, body: item.body }]),
   );
   return { root, tasksDir, items, details };
+}
+
+/**
+ * The tracker's saved views (`x-views` in `.convention.yml`), name-sorted for
+ * deterministic `v` cycling, each pre-validated against the loaded tree with
+ * the display filter (task-tui-filter-language). A missing or malformed
+ * convention file degrades to no views (the board stays usable — the same
+ * transparent degradation as the watcher); an individual invalid expression
+ * comes back as `ok: false` with the kernel's error so `v` can show it inline
+ * instead of crashing or silently matching nothing. `@me` resolves lazily
+ * through `resolveMe` (the caller memoizes; the kernel rule).
+ */
+export function tuiViewOptions(
+  root: string,
+  items: WorkItem[],
+  resolveMe?: () => string | null,
+): TuiViewOption[] {
+  let views: Record<string, string>;
+  try {
+    ({ views } = readConventionConfig(root));
+  } catch {
+    return []; // no/malformed convention: no views, everything else unchanged
+  }
+  return Object.keys(views)
+    .sort()
+    .map((name) => {
+      const expr = views[name]!;
+      const verdict = applyViewFilter(items, expr, { resolveMe });
+      return verdict.ok
+        ? { name, expr, ok: true }
+        : { name, expr, ok: false, error: verdict.error };
+    });
 }
 
 /**
@@ -294,16 +424,49 @@ export function tuiColumnItems(items: WorkItem[], filter: string, status: string
 }
 
 /**
- * The board's card set for one lens (task-tui-sort-ready-lens): the filtered
- * items, narrowed to pullable work when the ready-only lens is on. Readiness
- * is the kernel `isReadyTodo` rule computed over the WHOLE tree (a
- * filtered-out dependency must not look unknown — the `applyViewLens` rule),
- * so a search filter cannot change what counts as ready. Unsorted (the
- * caller orders).
+ * The display lens the board renders through (task-tui-sort-ready-lens plus
+ * task-tui-filter-language): the manual filter expression, the active saved
+ * view, the card order and the ready-only toggle. `TuiState` satisfies it
+ * structurally; the pure helpers take it so tests can drive the lens without
+ * a full state.
  */
-function tuiLensItems(items: WorkItem[], filter: string, readyOnly: boolean): WorkItem[] {
-  const visible = visibleItems(items, filter);
-  if (!readyOnly) return visible;
+export type TuiLens = {
+  filter: string;
+  view?: TuiView | null;
+  sort: TuiSort;
+  readyOnly: boolean;
+};
+
+/**
+ * The lens' full filter expression: the active saved view ANDed with the
+ * manual filter — the same semantics as `list --view <name> --filter <expr>`
+ * (predicates and free-text needles AND; tokens stay whitespace-separated, so
+ * concatenating the two expressions is exactly the conjunction).
+ */
+export function tuiLensFilter(lens: Pick<TuiLens, "filter" | "view">): string {
+  return [lens.view?.expr ?? "", lens.filter]
+    .map((expr) => expr.trim())
+    .filter((expr) => expr !== "")
+    .join(" ");
+}
+
+/**
+ * The board's card set for one lens (task-tui-sort-ready-lens +
+ * task-tui-filter-language): the filter expression — view AND manual — through
+ * the kernel parser (`applyViewFilter`, computed indexes over the whole tree),
+ * narrowed to pullable work when the ready-only lens is on. Readiness is the
+ * kernel `isReadyTodo` rule computed over the WHOLE tree (a filtered-out
+ * dependency must not look unknown — the `applyViewLens` rule), so a filter
+ * cannot change what counts as ready. Id-ordered (the caller sorts further).
+ */
+function tuiLensItems(items: WorkItem[], lens: TuiLens): WorkItem[] {
+  const sorted = sortById(items);
+  const verdict = applyViewFilter(sorted, tuiLensFilter(lens));
+  // A lens state that bypassed validation (never produced by the keymap) must
+  // not crash the frame: it degrades to no filter, the prompt path is where
+  // refusals surface.
+  const visible = verdict.ok ? verdict.items : sorted;
+  if (!lens.readyOnly) return visible;
   const byId = buildStatusIndex(items);
   return visible.filter((item) => isReadyTodo(item, byId));
 }
@@ -315,11 +478,8 @@ function tuiLensItems(items: WorkItem[], filter: string, readyOnly: boolean): Wo
  * The order applies per column: columns are status slices of this array, so
  * sorting the whole set once orders every column the same way.
  */
-export function tuiViewItems(
-  items: WorkItem[],
-  lens: Pick<TuiState, "filter" | "sort" | "readyOnly">,
-): WorkItem[] {
-  return applyTuiSort(tuiLensItems(items, lens.filter, lens.readyOnly), lens.sort);
+export function tuiViewItems(items: WorkItem[], lens: TuiLens): WorkItem[] {
+  return applyTuiSort(tuiLensItems(items, lens), lens.sort);
 }
 
 /**
@@ -344,11 +504,12 @@ export function tuiDepBlocked(items: WorkItem[], item: WorkItem): boolean {
 
 /**
  * Visible card count per status, aligned with STATUSES (for key clamping).
- * With the ready-only lens on (task-tui-sort-ready-lens), counts reflect the
- * narrowed columns — clamping and rendering see the same card set.
+ * Reflects the full lens (task-tui-sort-ready-lens + task-tui-filter-language):
+ * the saved view, the filter expression and the ready-only toggle — clamping
+ * and rendering see the same card set.
  */
-export function tuiColumnCounts(items: WorkItem[], filter: string, readyOnly = false): number[] {
-  const counts = statusCounts(tuiLensItems(items, filter, readyOnly));
+export function tuiColumnCounts(items: WorkItem[], lens: TuiLens): number[] {
+  const counts = statusCounts(tuiLensItems(items, lens));
   return STATUSES.map((status) => counts[status]);
 }
 
@@ -545,39 +706,87 @@ export function createTuiKeyDecoder(): TuiKeyDecoder {
  * `selectedId` is the board card under the cursor (Enter opens its pane);
  * `detailLines` is the open pane's total display line count (without it the
  * pane reducer cannot clamp the window, so PgUp/PgDn fall back to unbounded
- * moves for pure tests).
+ * moves for pure tests). `views` are the pre-validated saved views
+ * (tuiViewOptions; only computed for `v` presses) and `filterVerdict` the
+ * prompt draft's verdict against the tree (only computed while searching);
+ * without them `v` reports no views and Enter applies the draft unvalidated —
+ * the pure-reducer test path.
  */
 export type TuiKeyContext = {
   counts?: number[];
   selectedId?: string | null;
   detailLines?: number;
+  /** The full selected item (`c`/`m` read it; null when its column is empty). */
+  selected?: WorkItem | null;
+  /** Prefill for assignee prompts: the loop's resolved login (may be null). */
+  suggestedAssignee?: string | null;
+  views?: readonly TuiViewOption[];
+  filterVerdict?: TuiFilterVerdict;
 };
 
 /**
- * Pure keypress reducer (board and detail pane). Board: Enter opens the
- * read-only detail pane for the selected item (task-tui-detail-pane), Esc
- * clears the filter, `s` cycles the card order and `l` toggles the ready-only
- * lens (task-tui-sort-ready-lens), card moves keep the scroll window
- * following the selection whenever `counts` carries the selected column.
+ * Pure keypress reducer (board, detail pane and action flow). Board: Enter
+ * opens the read-only detail pane for the selected item (task-tui-detail-pane),
+ * Esc clears the filter and the saved view, `s` cycles the card order and `l`
+ * toggles the ready-only lens (task-tui-sort-ready-lens), `v` cycles the
+ * tracker's saved views (task-tui-filter-language), `c` opens the claim flow
+ * and `m` the legal-move flow (task-tui-actions-parity), card moves keep the
+ * scroll window following the selection whenever `counts` carries the selected
+ * column. The `/` prompt applies its draft through the loop's verdict: an
+ * invalid expression stays at the prompt with the kernel's error inline.
  * Detail pane: Esc and Enter return to the board with every board field
- * untouched, ↑/↓ and PgUp/PgDn/Home/End scroll the pane, q quits. Never
- * mutates the input state.
+ * untouched, ↑/↓ and PgUp/PgDn/Home/End scroll the pane, q quits. The action
+ * flow is modal: the reducer only advances its stages, the loop performs the
+ * single runUpdate at the `apply` stage. Never mutates the input state.
  */
 export function handleKey(state: TuiState, key: string, ctx: TuiKeyContext = {}): TuiState {
-  // Ctrl-C quits from anywhere, pane and search prompt included.
+  // Ctrl-C quits from anywhere: pane, search prompt, help overlay and action
+  // flow included.
   if (key === CTRL_C) return { ...state, quit: true };
+  // The help overlay is modal (task-tui-help-vim-keys): esc or ? closes it,
+  // nothing else reaches the board.
+  if (state.help) {
+    if (key === ESC || key === "?") return { ...state, help: false };
+    return state;
+  }
   if (state.detail !== null) return handleDetailKey(state, key, ctx.detailLines ?? 0);
+  // The action flow is modal (task-tui-actions-parity): no board key reaches
+  // the board while it is open.
+  if (state.action !== null) {
+    return handleActionKey(state, key, ctx.suggestedAssignee ?? null);
+  }
 
   const counts = ctx.counts ?? [];
 
   if (state.searching) {
-    if (key === ESC) return { ...state, searching: false, filter: "" };
-    if (key === ENTER || key === "\n") return { ...state, searching: false };
+    if (key === ESC) {
+      // Cancel the prompt and clear the lens with it (task-tui-filter-language):
+      // the draft dies, and the applied filter/view go too (Esc clears the
+      // filter/view).
+      return {
+        ...state,
+        searching: false,
+        filter: "",
+        view: null,
+        filterError: null,
+        message: null,
+      };
+    }
+    if (key === ENTER || key === "\n") {
+      // Apply the draft — unless the loop's verdict refused it: an invalid
+      // expression stays at the prompt with the kernel's error inline, and
+      // the previous lens stays active (never a crash, never a silent
+      // match-nothing; task-tui-filter-language).
+      if (ctx.filterVerdict !== undefined && !ctx.filterVerdict.ok) {
+        return { ...state, filterError: ctx.filterVerdict.error };
+      }
+      return { ...state, searching: false, filterError: null };
+    }
     if (key === BACKSPACE || key === "\b") {
-      return { ...state, filter: state.filter.slice(0, -1) };
+      return { ...state, filter: state.filter.slice(0, -1), filterError: null };
     }
     if (key.length === 1 && key >= " ") {
-      return { ...state, filter: state.filter + key };
+      return { ...state, filter: state.filter + key, filterError: null };
     }
     return state;
   }
@@ -592,11 +801,28 @@ export function handleKey(state: TuiState, key: string, ctx: TuiKeyContext = {})
       // next -> id. The card index keeps its value; the post-key sync clamps
       // it against the re-sorted column.
       return { ...state, sort: nextTuiSort(state.sort), message: null };
-    case "l":
+    case "L":
       // Toggle the ready-only lens (task-tui-sort-ready-lens): pullable work
       // only. The post-key sync clamps the selection against the narrowed
-      // columns.
+      // columns. (Shift-L since task-tui-help-vim-keys: lowercase `l` is the
+      // vim right motion.)
       return { ...state, readyOnly: !state.readyOnly, message: null };
+    case "?":
+      // Help overlay (task-tui-help-vim-keys): every key, grouped.
+      return { ...state, help: true, message: null };
+    case "c":
+      // Claim the selected item (task-tui-actions-parity): the assignee prompt
+      // opens only when the kernel rules allow the claim; the loop applies it
+      // through runUpdate.
+      return openClaimAction(state, ctx.selected ?? null, ctx.suggestedAssignee ?? null);
+    case "m":
+      // Move the selected item (task-tui-actions-parity): menu of kernel-legal
+      // targets, prompts, confirmation — one runUpdate at the apply stage.
+      return openMoveAction(state, ctx.selected ?? null);
+    case "v":
+      // Cycle the saved views (task-tui-filter-language): the view expression
+      // ANDs with the manual filter; the post-key sync clamps the selection.
+      return cycleTuiView(state, ctx.views ?? []);
     case "r":
       // Forced refresh (task-tui-live-refresh): the reducer stays pure — the
       // loop re-reads the tree after every key batch, so acknowledging the key
@@ -604,8 +830,9 @@ export function handleKey(state: TuiState, key: string, ctx: TuiKeyContext = {})
       // needed for the next frame to carry fresh data.
       return { ...state, message: null };
     case ESC:
-      // Esc clears the filter (and any transient message), keeps the view.
-      return { ...state, filter: "", message: null };
+      // Esc clears the lens (filter AND saved view, task-tui-filter-language)
+      // and any transient message, keeps the rest of the view.
+      return { ...state, filter: "", view: null, filterError: null, message: null };
     case ENTER:
     case "\n":
       if (ctx.selectedId) {
@@ -615,17 +842,28 @@ export function handleKey(state: TuiState, key: string, ctx: TuiKeyContext = {})
       }
       return { ...state, message: "(no item selected)" };
     case ARROW_LEFT:
+    case "h":
+      // Vim motions ride the same rules as the arrows
+      // (task-tui-help-vim-keys): h/l columns, j/k cards.
       return moveColumn(state, -1, counts);
     case ARROW_RIGHT:
+    case "l":
       return moveColumn(state, 1, counts);
     case ARROW_UP:
+    case "k":
       return moveCard(state, -1, counts);
     case ARROW_DOWN:
+    case "j":
       return moveCard(state, 1, counts);
     case PAGE_UP:
       return moveCard(state, -pageStep(state), counts);
     case PAGE_DOWN:
       return moveCard(state, pageStep(state), counts);
+    case "g":
+      // Vim first/last (task-tui-help-vim-keys), same as home/end.
+      return selectCard(state, 0, counts);
+    case "G":
+      return selectCard(state, "last", counts);
     default:
       if (HOME_KEYS.has(key)) return selectCard(state, 0, counts);
       if (END_KEYS.has(key)) return selectCard(state, "last", counts);
@@ -658,13 +896,20 @@ function handleDetailKey(state: TuiState, key: string, lines: number): TuiState 
     case "q":
       return { ...state, quit: true };
     case ARROW_UP:
+    case "k":
+      // Vim motions scroll the pane too (task-tui-help-vim-keys).
       return scrollTo(detail.scroll - 1);
     case ARROW_DOWN:
+    case "j":
       return scrollTo(detail.scroll + 1);
     case PAGE_UP:
       return scrollTo(detail.scroll - page);
     case PAGE_DOWN:
       return scrollTo(detail.scroll + page);
+    case "g":
+      return scrollTo(0);
+    case "G":
+      return scrollTo(lines);
     default:
       if (HOME_KEYS.has(key)) return scrollTo(0);
       if (END_KEYS.has(key)) return scrollTo(lines);
@@ -672,9 +917,293 @@ function handleDetailKey(state: TuiState, key: string, lines: number): TuiState 
   }
 }
 
+/** Shape `tuiActionVerdict` reads: the fields a board card carries. */
+export type TuiActionItem = {
+  id: string;
+  type: WorkItem["type"];
+  status: WorkItem["status"];
+  assignee?: string | null;
+};
+
+/** Edit the action flow can carry. `force` exists only to be refused. */
+export type TuiActionEdit = {
+  assignee?: string | null;
+  blockedReason?: string | null;
+  force?: boolean;
+};
+
+/** Action verdict: the board's `{ ok, reason }` drop-rule shape. */
+export type TuiActionVerdict = { ok: boolean; reason: string };
+
+/**
+ * The embedded legality rule for TUI actions (task-tui-actions-parity): a
+ * 1:1 mirror of the served board's `evaluateDrop` (cli/src/board.ts) — the
+ * kernel TRANSITIONS table, the same-status refusal, the claim-conflict
+ * refusal and the in_progress-requires-assignee claim rule — kept as a
+ * deliberate mirror rather than an import so the parity suite pins THREE
+ * implementations (TUI mirror, board mirror, kernel table + runUpdate) to
+ * each other. `force` is refused on sight exactly like `evaluateDrop`: the
+ * TUI never constructs a force edit (no key, prompt or flag could carry
+ * one), so a future caller cannot smuggle a steal through either. The
+ * kernel stays the second gate: `runUpdate` re-checks everything against
+ * the disk truth at apply time. Pure.
+ */
+export function tuiActionVerdict(
+  item: TuiActionItem,
+  to: string,
+  edit: TuiActionEdit = {},
+): TuiActionVerdict {
+  // The same transition table lib/src/status.ts ships, mirrored for the pure
+  // reducer (evaluateDrop's precedent) — the parity suite asserts equality.
+  const transitions: Record<string, readonly string[]> = {
+    todo: ["in_progress", "cancelled"],
+    in_progress: ["blocked", "done", "cancelled", "todo"],
+    blocked: ["in_progress", "cancelled"],
+    done: ["todo"],
+    cancelled: ["todo"],
+  };
+  const claimable = ["story", "task", "bug"];
+  if (edit.force) {
+    return {
+      ok: false,
+      reason: "--force is CLI-only: TUI actions route through the update path without force",
+    };
+  }
+  const allowed = transitions[item.status];
+  if (!allowed) return { ok: false, reason: `unknown status '${item.status}'` };
+  if (to === item.status) {
+    return { ok: false, reason: `${item.id} is already in that column` };
+  }
+  if (!allowed.includes(to)) {
+    return {
+      ok: false,
+      reason: `cannot transition ${item.status} -> ${to} (allowed: ${allowed.join(", ")})`,
+    };
+  }
+  // Claim steal guard, 1:1 with evaluateDrop and runUpdate: a claimed
+  // claimable item cannot be reassigned from the board.
+  if (
+    item.assignee &&
+    claimable.includes(item.type) &&
+    item.status === "in_progress" &&
+    edit.assignee !== undefined &&
+    edit.assignee !== item.assignee
+  ) {
+    return {
+      ok: false,
+      reason: `claim conflict: '${item.id}' is claimed by '${item.assignee}' (status in_progress). Unclaim first (arggon update ${item.id} --status todo) or coordinate.`,
+    };
+  }
+  const effectiveAssignee = edit.assignee !== undefined ? edit.assignee : (item.assignee ?? null);
+  if (to === "in_progress" && claimable.includes(item.type) && !effectiveAssignee) {
+    return {
+      ok: false,
+      reason: `${item.type} '${item.id}' with status in_progress requires --assignee (claim first: arggon update ${item.id} --assignee <login>)`,
+    };
+  }
+  return { ok: true, reason: "" };
+}
+
+/**
+ * Legal move targets for the `m` menu (task-tui-actions-parity): the kernel
+ * transition table minus the current status, in v0 status enum order. The
+ * prompts the flow may still need (reason/assignee) are flow UI — a target
+ * listed here is kernel-legal once its prompt answers.
+ */
+export function tuiLegalMoves(item: TuiActionItem): WorkItem["status"][] {
+  return STATUSES.filter((status) => status !== item.status && canTransition(item.status, status));
+}
+
+/**
+ * Open the claim flow for the selected item (`c`, task-tui-actions-parity):
+ * claimable types only, unclaimed only, and the transition to in_progress
+ * must be kernel-legal — refusals come back as footer messages and never
+ * open a flow. `suggestedAssignee` prefills the prompt (the loop's resolved
+ * login). Pure: returns the next state.
+ */
+function openClaimAction(
+  state: TuiState,
+  item: WorkItem | null,
+  suggestedAssignee: string | null,
+): TuiState {
+  if (item === null) return { ...state, message: "(no item selected)" };
+  if (!isClaimable(item.type)) {
+    return {
+      ...state,
+      message: `${item.type} '${item.id}' is not claimable (story/task/bug only)`,
+    };
+  }
+  // Never steal: a claimed item refuses with the claim-conflict wording
+  // before any prompt opens (the kernel would refuse the reassignment too).
+  if (item.assignee !== null && item.assignee !== undefined) {
+    return {
+      ...state,
+      message: `claim conflict: '${item.id}' is claimed by '${item.assignee}'. Unclaim first (arggon update ${item.id} --status todo) or coordinate.`,
+    };
+  }
+  const verdict = tuiActionVerdict(item, "in_progress", { assignee: suggestedAssignee });
+  if (!verdict.ok) return { ...state, message: verdict.reason };
+  return {
+    ...state,
+    message: null,
+    action: {
+      id: item.id,
+      type: item.type,
+      from: item.status,
+      claimedBy: item.assignee ?? null,
+      claim: true,
+      stage: "assignee",
+      status: "in_progress",
+      assignee: null,
+      blockedReason: null,
+      cursor: 0,
+      draft: suggestedAssignee ?? "",
+      error: null,
+    },
+  };
+}
+
+/**
+ * Open the move flow for the selected item (`m`, task-tui-actions-parity):
+ * the menu lists kernel-legal targets only. Pure.
+ */
+function openMoveAction(state: TuiState, item: WorkItem | null): TuiState {
+  if (item === null) return { ...state, message: "(no item selected)" };
+  if (tuiLegalMoves(item).length === 0) {
+    return { ...state, message: `no legal transition from '${item.status}'` };
+  }
+  return {
+    ...state,
+    message: null,
+    action: {
+      id: item.id,
+      type: item.type,
+      from: item.status,
+      claimedBy: item.assignee ?? null,
+      claim: false,
+      stage: "move",
+      status: item.status,
+      assignee: null,
+      blockedReason: null,
+      cursor: 0,
+      draft: "",
+      error: null,
+    },
+  };
+}
+
+/**
+ * Reducer branch for the modal action flow (task-tui-actions-parity): the
+ * menu takes number keys, the prompts take text with Enter, the confirm takes
+ * y; `esc` cancels from any stage with nothing written and `Ctrl-C` (handled
+ * before this branch) always quits. The flow never mutates the board state
+ * behind it. The `apply` stage is a pure hand-off: the loop sees it after the
+ * reducer returns and performs the single `runUpdate` call.
+ */
+function handleActionKey(state: TuiState, key: string, suggestedAssignee: string | null): TuiState {
+  const action = state.action;
+  if (action === null) return state;
+
+  if (key === ESC) return { ...state, action: null };
+  if (action.stage === "move") {
+    const moves = tuiLegalMoves({
+      id: action.id,
+      type: action.type,
+      status: action.from,
+      assignee: action.claimedBy,
+    });
+    const index = Number(key) - 1;
+    if (!Number.isInteger(index) || index < 0 || index >= moves.length) return state;
+    const status = moves[index]!;
+    // Stage transitions: blocked asks for its reason, an unclaimed claimable
+    // moving to in_progress asks for the assignee (the kernel claim rule),
+    // everything else goes straight to the confirmation.
+    if (status === "blocked") {
+      return {
+        ...state,
+        action: { ...action, stage: "reason", status, draft: "", error: null },
+      };
+    }
+    if (status === "in_progress" && isClaimable(action.type) && action.claimedBy === null) {
+      return {
+        ...state,
+        action: {
+          ...action,
+          stage: "assignee",
+          status,
+          draft: suggestedAssignee ?? "",
+          error: null,
+        },
+      };
+    }
+    return { ...state, action: { ...action, stage: "confirm", status } };
+  }
+  if (action.stage === "reason" || action.stage === "assignee") {
+    if (key === ENTER || key === "\n") {
+      const value = action.draft.trim();
+      if (action.stage === "reason" && value === "") {
+        return {
+          ...state,
+          action: { ...action, error: "a blocked move needs a non-empty reason" },
+        };
+      }
+      // An empty assignee keeps the prefill (the prompt's default answer).
+      const assignee = action.stage === "assignee" ? value || null : action.assignee;
+      return {
+        ...state,
+        action: {
+          ...action,
+          stage: "confirm",
+          assignee,
+          blockedReason: action.stage === "reason" ? value : action.blockedReason,
+          error: null,
+        },
+      };
+    }
+    if (key === BACKSPACE || key === "\b") {
+      return { ...state, action: { ...action, draft: action.draft.slice(0, -1), error: null } };
+    }
+    if (key.length === 1 && key >= " ") {
+      return { ...state, action: { ...action, draft: action.draft + key, error: null } };
+    }
+    return state;
+  }
+  if (action.stage === "confirm") {
+    if (key === "y" || key === "Y") {
+      return { ...state, action: { ...action, stage: "apply", error: null } };
+    }
+    // Anything else cancels: nothing is written, the board is unchanged.
+    return { ...state, action: null };
+  }
+  return state; // "apply": the loop owns the execution
+}
+
 /** Cards a PgUp/PgDn moves: one body page, at least one row. */
 function pageStep(state: TuiState): number {
   return Math.max(1, tuiBodyRows(state.height));
+}
+
+/**
+ * Cycle the saved views with `v` (task-tui-filter-language): no view → first
+ * view → … → last view → no view. A view that failed validation (malformed
+ * expression, unknown enum value, unresolvable `@me`) is refused with its
+ * error as the transient message — the inline hint — and the previous lens
+ * stays active. A stale active name (the convention file changed under it)
+ * cycles from the first view. The card index keeps its value; the post-key
+ * sync clamps it against the re-filtered columns.
+ */
+function cycleTuiView(state: TuiState, views: readonly TuiViewOption[]): TuiState {
+  if (views.length === 0) {
+    return { ...state, message: "(no saved views: x-views in the tracker .convention.yml)" };
+  }
+  const currentIndex =
+    state.view === null ? -1 : views.findIndex((option) => option.name === state.view?.name);
+  const next = views[currentIndex + 1];
+  if (next === undefined) return { ...state, view: null, message: null };
+  if (!next.ok) {
+    return { ...state, message: `${next.name}: ${next.error ?? "invalid view expression"}` };
+  }
+  return { ...state, view: { name: next.name, expr: next.expr }, filterError: null, message: null };
 }
 
 function moveColumn(state: TuiState, delta: number, counts: number[]): TuiState {
@@ -712,6 +1241,53 @@ function selectCard(state: TuiState, position: 0 | "last", counts: number[]): Tu
   const card = position === "last" ? last : Math.min(position, last);
   const scroll = followTuiScroll(card, state.scroll, count, tuiBodyRows(state.height));
   return { ...state, card, scroll, message: null };
+}
+
+/**
+ * The footer line for an open action flow (task-tui-actions-parity): one
+ * prompt per stage — the legal-target menu, the reason/assignee inputs (with
+ * the inline refusal), the y/N confirmation naming the exact write. Pure;
+ * every repo-controlled value is escaped like the rest of the frame.
+ */
+function tuiActionFooter(action: TuiActionState, position: string): string {
+  const id = sanitizeHumanTextUncapped(action.id);
+  const error = action.error === null ? "" : ` — ${sanitizeHumanTextUncapped(action.error)}`;
+  if (action.stage === "move") {
+    const moves = tuiLegalMoves({
+      id: action.id,
+      type: action.type,
+      status: action.from,
+      assignee: action.claimedBy,
+    });
+    const menu = moves.map((status, i) => `[${i + 1}] ${status}`).join(" ");
+    return `${position} · move ${id} (${action.from}): ${menu} · number selects, esc cancels`;
+  }
+  if (action.stage === "reason") {
+    return `${position} · blocked reason for ${id}: ${action.draft}█ — enter to set, esc cancels${error}`;
+  }
+  if (action.stage === "assignee") {
+    return `${position} · ${action.claim ? "claim" : "assignee for"} ${id}: ${action.draft}█ — enter to apply, esc cancels${error}`;
+  }
+  if (action.stage === "confirm") {
+    const assignee =
+      action.assignee === null ? "" : ` (assignee ${sanitizeHumanTextUncapped(action.assignee)})`;
+    const reason =
+      action.blockedReason === null
+        ? ""
+        : ` (reason: ${sanitizeHumanTextUncapped(action.blockedReason)})`;
+    return `${position} · apply ${id}: ${action.from} -> ${action.status}${assignee}${reason}? y applies · anything else cancels`;
+  }
+  return `${position} · applying ${id}…`;
+}
+
+/**
+ * Sanitized footer text for a refused action (task-tui-actions-parity): the
+ * kernel's error message, escaped like every repo-controlled value — a
+ * hostile message cannot forge a footer line or emit a control sequence.
+ */
+function tuiActionError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  return sanitizeHumanTextUncapped(message);
 }
 
 /** Clip a single-line string to n visible columns, marking a cut with an ellipsis. */
@@ -767,7 +1343,7 @@ export function renderTui(
   // column counts and the card rows always describe the same set
   // (task-tui-sort-ready-lens).
   const visible = tuiViewItems(items, state);
-  const counts = tuiColumnCounts(items, state.filter, state.readyOnly);
+  const counts = tuiColumnCounts(items, state);
   const cardRows = tuiBodyRows(height);
   const selectedCount = counts[state.column] ?? 0;
   // The frame is always valid even with a stale state: the window is
@@ -779,10 +1355,14 @@ export function renderTui(
 
   const lines: string[] = [];
 
-  // Header: title, totals, active sort + lens + filter.
+  // Header: title, totals, active sort + lens + saved view + filter.
   const total = visible.length;
   let header = `arggon board --tui · ${total} item(s) · sort: ${state.sort}`;
   if (state.readyOnly) header += " · ready-only";
+  if (state.view !== null) {
+    // File-sourced values: escaped like every other repo-controlled field.
+    header += ` · view: ${sanitizeHumanTextUncapped(state.view.name)} (${sanitizeHumanTextUncapped(state.view.expr)})`;
+  }
   if (state.filter !== "") header += ` · filter: ${state.filter}`;
   lines.push(padEndTo(clipLine(header, width), width));
 
@@ -802,7 +1382,7 @@ export function renderTui(
   const statusById = buildStatusIndex(items);
   const columnCards = STATUSES.map((status, i) => {
     const start = i === state.column ? scroll : 0;
-    return visible
+    const cards = visible
       .filter((item) => item.status === status)
       .slice(start, start + cardRows)
       .map((item, j) => {
@@ -818,6 +1398,15 @@ export function renderTui(
         if (!color) return line;
         return isSelected ? `\x1b[7m${line}\x1b[0m` : line;
       });
+    // A column the lens empties stays informative (task-tui-filter-language):
+    // its header count reads 0 and the first body row carries an empty mark
+    // (dimmed with color on) instead of a blank strip. Visible width is
+    // pre-padded before the SGR wrap (bug-tui-column-shift).
+    if (cards.length === 0 && counts[i] === 0 && cardRows > 0) {
+      const mark = padEndTo(clipLine("  (empty)", colWidth), colWidth);
+      cards.push(color ? `\x1b[2m${mark}\x1b[0m` : mark);
+    }
+    return cards;
   });
   for (let row = 0; row < cardRows; row++) {
     let line = "";
@@ -834,19 +1423,36 @@ export function renderTui(
 
   // Footer: the position (selected row over the selected column's size)
   // always leads, then the freshness stamp of the rendered data
-  // (task-tui-live-refresh), then the search prompt > transient message > key
-  // help — so a narrow terminal clips the help instead of the position.
+  // (task-tui-live-refresh), then the search prompt (with the draft's refusal
+  // inline, task-tui-filter-language) > transient message > the active lens
+  // with the matched totals > key help — so a narrow terminal clips the help
+  // instead of the position.
   const position = `row ${selectedCount === 0 ? 0 : selectedCard + 1}/${selectedCount}`;
   const stamp = state.updatedAt === null ? "" : ` · updated ${formatTuiClock(state.updatedAt)}`;
   let footer: string;
   if (state.searching) {
-    footer = `${position} · /${state.filter}█ — enter to apply, esc to cancel`;
+    footer =
+      state.filterError !== null
+        ? `${position} · /${state.filter}█ — ${sanitizeHumanTextUncapped(state.filterError)}`
+        : `${position} · /${state.filter}█ — enter to apply, esc to cancel`;
+  } else if (state.action !== null) {
+    // The modal action flow owns the footer (task-tui-actions-parity): the
+    // stage prompt (with the inline refusal when present) replaces message
+    // and help. Item ids/statuses are repo-controlled: escaped.
+    footer = tuiActionFooter(state.action, position);
   } else if (state.message !== null) {
     // Transient messages are repo-controlled text (an old path message, the
     // "(no item selected)" hint): escape before rendering.
     footer = `${position} · ${sanitizeHumanTextUncapped(state.message)}`;
   } else {
-    footer = `${position}${stamp} · ←/→ column · ↑/↓ card · PgUp/PgDn page · home/end · / search · enter detail · r refresh · s sort · l ready · q quit`;
+    // The active lens rides the footer with the matched totals
+    // (task-tui-filter-language): view, filter, K/M over the loaded tree.
+    const lensBits: string[] = [];
+    if (state.view !== null) lensBits.push(`view: ${sanitizeHumanTextUncapped(state.view.name)}`);
+    if (state.filter !== "") lensBits.push(`filter: ${state.filter}`);
+    if (lensBits.length > 0) lensBits.push(`${visible.length}/${items.length} match`);
+    const lens = lensBits.length > 0 ? ` · ${lensBits.join(" · ")}` : "";
+    footer = `${position}${stamp}${lens} · ←/→ column · ↑/↓ card · PgUp/PgDn page · home/end · / search · v views · enter detail · r refresh · s sort · L ready · ? help · q quit`;
   }
   lines.push(padEndTo(clipLine(footer, width), width));
 
@@ -1131,8 +1737,101 @@ export function renderTuiDetail(
 }
 
 /**
- * The frame the loop draws (task-tui-detail-pane): the board, or the read-only
- * detail pane when `state.detail` is set. Pure; `details` carries the bodies
+ * One help overlay row: the keys and what they do. The overlay's content is
+ * data (task-tui-help-vim-keys) so the renderer stays a dumb loop and the
+ * groups render in this order: navigation, filter, view, quit.
+ */
+export type TuiHelpGroup = { title: string; rows: Array<[string, string]> };
+
+/**
+ * The help overlay content (task-tui-help-vim-keys): EVERY board key, grouped
+ * — navigation (arrows + the vim motions), filter, view, actions (the kernel
+ * write path, task-tui-actions-parity) and quit. Kept beside the keymap; the
+ * golden test pins that every `handleKey`-documented key appears here.
+ */
+export const TUI_HELP: readonly TuiHelpGroup[] = [
+  {
+    title: "navigation",
+    rows: [
+      ["←/→ · h/l", "move the selected column (v0 status order)"],
+      ["↑/↓ · j/k", "move the selected card within the column"],
+      ["PgUp/PgDn", "move the selection one body page up/down"],
+      ["g/G · home/end", "jump to the first/last card of the column"],
+      ["enter", "open the read-only detail pane (esc/enter back)"],
+    ],
+  },
+  {
+    title: "filter",
+    rows: [
+      ["/", "filter prompt: free text + kernel predicates (status:todo …)"],
+      ["esc", "clear the active filter and the saved view"],
+    ],
+  },
+  {
+    title: "view",
+    rows: [
+      ["v", "cycle the saved views (x-views): the view ANDs with the filter"],
+      ["s", "cycle the card order: id → priority → next"],
+      ["L", "toggle the ready-only lens (pullable work only)"],
+      ["r", "force a refresh (re-read the tree now)"],
+    ],
+  },
+  {
+    title: "actions",
+    rows: [
+      ["c", "claim the selected item (assignee prompt, one kernel runUpdate)"],
+      ["m", "move the selected item: kernel-legal targets, prompts, y/N confirm"],
+    ],
+  },
+  {
+    title: "quit",
+    rows: [
+      ["q · Ctrl-C", "quit, restoring the screen (works from any prompt)"],
+      ["?", "toggle this help"],
+    ],
+  },
+];
+
+/**
+ * Pure help-overlay frame renderer (task-tui-help-vim-keys): exactly `height`
+ * lines padded to `width` (the board's no-ghosting rule), the grouped key list
+ * centered in the content area, a header and an `esc closes` footer. Groups
+ * render back-to-back (the titles separate them): the union keymap must fit a
+ * standard 24-row terminal. With `color: false` no SGR sequences are emitted.
+ */
+export function renderTuiHelp(state: TuiState, opts: { color?: boolean } = {}): string {
+  const color = opts.color !== false;
+  const width = Math.max(1, Math.floor(state.width));
+  const height = Math.max(1, Math.floor(state.height));
+  const rows: string[] = ["arggon board --tui — keys (? or esc closes)"];
+  for (const group of TUI_HELP) {
+    rows.push(`${group.title}`);
+    for (const [keys, description] of group.rows) {
+      rows.push(`  ${padEndTo(clipLine(keys, 18), 18)} ${description}`);
+    }
+  }
+  const footer = "esc closes · q quits";
+  const out: string[] = [];
+  for (let i = 0; i < height; i++) {
+    if (i === 0) {
+      const header = clipLine(rows[0] ?? "", width);
+      out.push(padEndTo(color ? `\x1b[1m${header}\x1b[0m` : header, width));
+      continue;
+    }
+    if (i === height - 1) {
+      out.push(padEndTo(clipLine(footer, width), width));
+      continue;
+    }
+    const row = rows[i] ?? "";
+    out.push(padEndTo(clipLine(row, width), width));
+  }
+  return `\x1b[H\x1b[2J${out.slice(0, height).join("\n")}`;
+}
+
+/**
+ * The frame the loop draws (task-tui-detail-pane, task-tui-help-vim-keys): the
+ * help overlay when `state.help` is set, else the read-only detail pane when
+ * `state.detail` is set, else the board. Pure; `details` carries the bodies
  * loaded beside the contract items (loadTuiItems).
  */
 export function renderTuiScreen(
@@ -1141,6 +1840,7 @@ export function renderTuiScreen(
   details: ReadonlyMap<string, TuiDetailSource> = new Map(),
   opts: { color?: boolean } = {},
 ): string {
+  if (state.help) return renderTuiHelp(state, opts);
   if (state.detail === null) return renderTui(items, state, opts);
   return renderTuiDetail(items, state.detail, details, state, opts);
 }
@@ -1181,16 +1881,35 @@ export type TuiLoopOptions = {
   watch?: TuiWatchFactory;
   /** Watcher debounce override (tests); defaults to TUI_REFRESH_DEBOUNCE_MS. */
   refreshDebounceMs?: number;
+  /**
+   * Emit SGR colors (task-tui-help-vim-keys). Default: the `NO_COLOR` env
+   * convention — colors ON unless `NO_COLOR` is set in the environment; the
+   * CLI's `--no-color` passes `false` (the flag wins over the env). With
+   * colors off the frame is plain text: the selection rides the `>` marker
+   * and the inverted header/column marks drop out.
+   */
+  color?: boolean;
+  /**
+   * Write path override (tests, task-tui-actions-parity): defaults to the
+   * kernel `runUpdate`. The loop performs exactly ONE call per finished flow
+   * — never with `force` or `steal` (the flows cannot construct them).
+   */
+  runUpdate?: typeof runUpdate;
 };
 
 /**
- * Interactive loop for `arggon board --tui`. Read-only: it re-reads the tree
- * after every keypress and, whenever the tracker dir changes, after a short
- * debounce (task-tui-live-refresh) — so an idle board repaints in place while
- * other agents/sessions write. A watcher that cannot open or fails later
+ * Interactive loop for `arggon board --tui`. It re-reads the tree after every
+ * keypress and, whenever the tracker dir changes, after a short debounce
+ * (task-tui-live-refresh) — so an idle board repaints in place while other
+ * agents/sessions write. The only write is a finished action flow's single
+ * kernel `runUpdate` (task-tui-actions-parity): a failure surfaces as footer
+ * text and the loop keeps running. A watcher that cannot open or fails later
  * degrades transparently to per-keypress reads (never crashes, never exits).
  * Enter opens the read-only detail pane; Esc/Enter return to the board; `r`
- * forces a refresh. Key bytes go through the stateful decoder
+ * forces a refresh; `/` filters through the kernel filter language plus free
+ * text on id/title (an invalid expression is refused inline, never applied)
+ * and `v` cycles the tracker's saved views (task-tui-filter-language). Key bytes
+ * go through the stateful decoder
  * (bug-tui-split-escape-sequences): a CSI sequence split across stdin chunks
  * reassembles instead of leaking a phantom Esc, and a genuinely lone Esc is
  * flushed by the TUI_ESCAPE_FLUSH_MS timeout. Fails with an actionable error
@@ -1205,7 +1924,11 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
     );
   }
   const escapeFlushMs = Math.max(0, Math.floor(opts.escapeFlushMs ?? TUI_ESCAPE_FLUSH_MS));
+  // Color resolution (task-tui-help-vim-keys): the explicit option wins; the
+  // default honors the NO_COLOR convention (colors unless NO_COLOR is set).
+  const color = opts.color ?? process.env.NO_COLOR === undefined;
   const watchFactory = opts.watch ?? fsWatchTuiWatcher;
+  const applyUpdate = opts.runUpdate ?? runUpdate;
   const refreshDebounceMs = Math.max(
     0,
     Math.floor(opts.refreshDebounceMs ?? TUI_REFRESH_DEBOUNCE_MS),
@@ -1221,12 +1944,23 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     let items = initial.items;
     let details = initial.details;
+    let currentRoot = initial.root;
     let current: TuiState = { ...state, updatedAt: Date.now() };
     let settled = false;
     const decoder = createTuiKeyDecoder();
     let escTimer: ReturnType<typeof setTimeout> | null = null;
     let watchDebounce: ReturnType<typeof setTimeout> | null = null;
     let treeWatcher: TuiTreeWatcher | null = null;
+    // Login memoization: `assignee:@me` resolution (task-tui-filter-language)
+    // and the assignee-prompt prefill (task-tui-actions-parity) resolve the
+    // login lazily on the first use and memoize it for the session — a gh
+    // lookup must never run per keystroke. An unresolvable login stays a
+    // refusal (the prompt shows the kernel's error).
+    let me: string | null | undefined;
+    const resolveMe = (): string | null => {
+      if (me === undefined) me = resolveCurrentLogin() ?? null;
+      return me;
+    };
 
     // Alternate screen + hidden cursor; restored on any exit path.
     output.write("\x1b[?1049h\x1b[?25l");
@@ -1251,7 +1985,7 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
     };
 
     const render = (): void => {
-      output.write(renderTuiScreen(items, current, details));
+      output.write(renderTuiScreen(items, current, details, { color }));
     };
 
     // Reduce decoded keys against the live state; false once the loop quit.
@@ -1260,18 +1994,65 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
         // Context is re-derived per key: a chunk may open the pane, scroll
         // it and close it again, and each key must be reduced against the
         // state (and the data) the previous one left behind.
-        const counts = tuiColumnCounts(items, current.filter, current.readyOnly);
+        const counts = tuiColumnCounts(items, current);
         const selected = selectedTuiItem(items, current);
         const detailLines =
           current.detail === null
             ? 0
             : tuiDetailLinesFor(items, details, current.detail, current.width).length;
+        // Saved views only for `v` presses and the prompt verdict only while
+        // searching (task-tui-filter-language): both read the convention file
+        // / re-filter the tree, so keys that cannot touch them skip the cost.
+        const views = key === "v" ? tuiViewOptions(currentRoot, items, resolveMe) : undefined;
+        let filterVerdict: TuiFilterVerdict | undefined;
+        if (current.searching) {
+          const verdict = applyViewFilter(items, current.filter, { resolveMe });
+          filterVerdict = verdict.ok ? { ok: true } : verdict;
+        }
         current = handleKey(current, key, {
           counts,
           selectedId: selected?.id ?? null,
           detailLines,
+          selected,
+          suggestedAssignee: resolveMe(),
+          views,
+          filterVerdict,
         });
         if (current.quit) return false;
+        // A finished flow (task-tui-actions-parity): exactly ONE kernel
+        // runUpdate per flow, then the sync below repaints the move. A
+        // refusal (the tree moved under the flow, a claim conflict, any
+        // kernel rule) is footer text — the board stays open and consistent,
+        // and the alternate-screen lifecycle is untouched.
+        const action = current.action;
+        if (action !== null && action.stage === "apply") {
+          current = { ...current, action: null };
+          try {
+            const result = applyUpdate({
+              cwd: opts.cwd,
+              id: action.id,
+              status: action.status,
+              ...(action.assignee !== null ? { assignee: action.assignee } : {}),
+              ...(action.blockedReason !== null ? { blockedReason: action.blockedReason } : {}),
+            });
+            const assignee = action.assignee === null ? "" : ` (assignee ${action.assignee})`;
+            const cascade =
+              result.autoCompleted.length > 0
+                ? ` (cascade: ${result.autoCompleted.join(", ")})`
+                : "";
+            current = {
+              ...current,
+              message: action.claim
+                ? `claimed ${action.id} (${action.status})${cascade}`
+                : `${action.id}: ${action.from} -> ${action.status}${assignee}${cascade}`,
+            };
+          } catch (err) {
+            current = {
+              ...current,
+              message: tuiActionError(err),
+            };
+          }
+        }
       }
       return true;
     };
@@ -1288,8 +2069,9 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
       const fresh = loadTuiItems(opts.cwd);
       items = fresh.items;
       details = fresh.details;
+      currentRoot = fresh.root;
       current = {
-        ...clampTuiState(current, tuiColumnCounts(items, current.filter, current.readyOnly)),
+        ...clampTuiState(current, tuiColumnCounts(items, current)),
         updatedAt: Date.now(),
       };
       render();
@@ -1359,7 +2141,7 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
         };
         // A resize changes the body height: re-derive the window so it stays
         // valid and the selected card stays visible.
-        current = clampTuiState(current, tuiColumnCounts(items, current.filter, current.readyOnly));
+        current = clampTuiState(current, tuiColumnCounts(items, current));
         render();
       } catch (err) {
         fail(err);

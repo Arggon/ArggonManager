@@ -2484,9 +2484,10 @@ program
   )
   .option(
     "--tui",
-    "interactive read-only terminal kanban (raw ANSI, q quits; not combinable with --json)",
+    "interactive terminal kanban (raw ANSI, q quits; not combinable with --json)",
     false,
   )
+  .option("--no-color", "disable SGR colors in --tui (the NO_COLOR env works too)")
   .option("--json", "emit one JSON object on stdout (agent contract)", false)
   .action(
     (opts: {
@@ -2498,6 +2499,7 @@ program
       port?: string;
       open?: boolean;
       tui?: boolean;
+      color?: boolean;
       json?: boolean;
     }) => {
       const json = jsonEnabled(opts);
@@ -2541,7 +2543,13 @@ program
           );
           return;
         }
-        runTuiBoard({ cwd: process.cwd() }).catch((err: unknown) => {
+        // `--no-color` is the only value the flag can carry (commander's
+        // `--no-` form defaults `color` to true): pass false ONLY when the
+        // flag was given, else undefined so the loop's NO_COLOR default holds.
+        runTuiBoard({
+          cwd: process.cwd(),
+          color: opts.color === false ? false : undefined,
+        }).catch((err: unknown) => {
           jsonFailed(err instanceof Error ? err.message : String(err));
         });
         return;

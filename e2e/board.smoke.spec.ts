@@ -90,9 +90,16 @@ function screenshotPath(name: string): string {
  * `withTags(["wcag2a", "wcag2aa"])`, because a tag list that silently omits
  * 2.1/2.2 would let a new 2.1/2.2 AA rule pass unreported. AAA is deliberately
  * out of scope (axe automates almost nothing there and the bar would be
- * unmeetable), and `best-practice` is deliberately out of scope (it is not a
- * conformance level; the one rule it would add here, `region`, is filed as
- * `task-axe-board-drawer-and-lens-coverage` rather than silently asserted).
+ * unmeetable). `best-practice` is deliberately out of scope by a recorded
+ * decision (task-axe-board-drawer-and-lens-coverage): it is not a conformance
+ * level, and its rule surface has never been audited on this board, so
+ * asserting it wholesale would trade a green gate for an unaudited one. The
+ * one `best-practice` finding the ready page used to report — `region` on the
+ * filter bar — is FIXED: `#board-filterbar` is a `role="search"` landmark.
+ * Widening the tag set is a deliberate follow-up (audit the current
+ * best-practice rule list against every scanned state, fix or file each
+ * finding, then widen); the reason is recorded in CONTRIBUTING.md § UI smoke
+ * tests, not silently dropped.
  *
  * The rules of this policy, all enforced by the `expect` in `axeScan`:
  *
@@ -105,10 +112,13 @@ function screenshotPath(name: string): string {
  *    owner (a person or a tracked item id) — plus a matching line in
  *    `CONTRIBUTING.md` § UI smoke tests and
  *    `ArggonManager/docs/engineering.md` § Smoke test.
- * 3. **The scan runs on the ready page, before interaction.** The detail
- *    drawer, the static export and filtered/lens states render different DOM
- *    and are covered by the follow-up item, not by a scan smuggled into a
- *    test whose assertions have already moved the page on.
+ * 3. **Every scanned state gets its own deterministic readiness signal before
+ *    its scan** (task-axe-board-drawer-and-lens-coverage): the ready page
+ *    (first test), the open detail drawer (after an `expect` on its async
+ *    `/api/item` content), the static `file://` export (after its h1) and the
+ *    filtered/lens states (after the narrowed-card count) are each scanned at
+ *    a settled point — never a sleep, never a `networkidle` guess, never a
+ *    scan smuggled in after unrelated assertions have moved the page on.
  */
 const AXE_WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] as const;
 
@@ -368,6 +378,11 @@ test.describe("@smoke board --serve", () => {
     // round-trip tests move the page on, so a failure points at the static
     // surface rather than at post-interaction state.
     await expect(page.locator("h1")).toContainText("arggon board");
+    // The fixture renders an EMPTY done column at generation time, so the scan
+    // below actually asserts the .empty placeholder's contrast (the parent
+    // item darkened it for exactly this state; without this expect a fixture
+    // change could silently stop covering it).
+    await expect(page.locator('.column[data-status="done"] .empty')).toHaveCount(1);
     await axeScan(page);
 
     const cards = page.locator(".board .card");
@@ -400,6 +415,11 @@ test.describe("@smoke board --serve", () => {
     );
     await expect(page.locator("#board-filter-input")).toHaveValue("label:smoke");
     expect(filterFromUrl(page.url())).toBe("label:smoke");
+    // The filtered/lens state is a scanned surface of its own
+    // (task-axe-board-drawer-and-lens-coverage): one visible card, every other
+    // column showing its .empty placeholder. The count assertion above is the
+    // readiness signal.
+    await axeScan(page);
 
     // Reload/share/copy: the URL hash restores the lens.
     await page.reload();
@@ -565,6 +585,11 @@ test.describe("@smoke board --serve", () => {
     const boardFile = join(fixture, "static-board.html");
     runCli(fixture, ["board", "--out", boardFile]);
     await page.goto(`file://${boardFile}`);
+    // The static export is its own document and its own scanned surface
+    // (task-axe-board-drawer-and-lens-coverage): same markup, separate scan,
+    // h1 as the deterministic readiness signal.
+    await expect(page.locator("h1")).toContainText("arggon board");
+    await axeScan(page);
     await expect(page.locator("#board-lenses .lens")).toHaveCount(2);
 
     await page.locator('#board-lenses .lens[data-name="smoke"]').click();
@@ -626,6 +651,9 @@ test.describe("@smoke board --serve", () => {
     // dependency states and the hostile body line as literal text.
     await expect(drawer.locator(".drawer-acceptance .drawer-check")).toHaveCount(2);
     await expect(drawer.locator(".drawer-acceptance .drawer-check input:checked")).toHaveCount(1);
+    // The drawer-over-embedded-snapshot state is scanned too (the acceptance
+    // row count above is the readiness signal) — same gate, file:// document.
+    await axeScan(page);
     await expect(drawer.locator(".drawer-deps .drawer-dep.open")).toHaveText(
       `${DETAIL_DEP_ID} · todo`,
     );
@@ -714,6 +742,12 @@ test.describe("@smoke board --serve", () => {
     await expect(drawer.locator(".drawer-acceptance .drawer-check").nth(1)).toContainText(
       "open row",
     );
+    // The drawer is a scanned surface of its own
+    // (task-axe-board-drawer-and-lens-coverage). The acceptance-row count
+    // above is the deterministic readiness signal for the async `/api/item`
+    // content: the fetch has settled and the checklist is rendered, so the
+    // scan cannot race it (no sleep, no networkidle).
+    await axeScan(page);
     // Dependencies carry their kernel status (open vs terminal).
     await expect(drawer.locator(".drawer-deps .drawer-dep.open")).toHaveText(
       `${DETAIL_DEP_ID} · todo`,
@@ -1194,18 +1228,36 @@ test.describe("@smoke board --serve", () => {
         { intervals: [50], timeout: 10_000 },
       )
       .toBe(true);
-
-    const column = page.locator('.column[data-status="todo"]');
-    const header = page.locator("#board-column-todo");
-    // Unstuck at load: the header sits at its natural in-column position.
-    const natural = await header.evaluate((el) => el.getBoundingClientRect().top);
-    expect(natural).toBeGreaterThan(0);
-    // Scroll into the middle of the tall column: the header pins to the top.
-    await page.evaluate(
-      (offset) => window.scrollTo(0, offset),
-      (await column.evaluate((el) => el.getBoundingClientRect().top + window.scrollY)) + 100,
-    );
-    await expect.poll(() => header.evaluate((el) => el.getBoundingClientRect().top)).toBe(0);
+    const measure = async (): Promise<void> => {
+      await page.goto(server?.url ?? "");
+      const filler = page.locator(".card .title", { hasText: "Board filler 12" });
+      await expect(filler).toBeVisible();
+      const column = page.locator('.column[data-status="todo"]');
+      const header = page.locator("#board-column-todo");
+      // Unstuck at load: the header sits at its natural in-column position.
+      const natural = await header.evaluate((el) => el.getBoundingClientRect().top);
+      expect(natural).toBeGreaterThan(0);
+      // Scroll into the middle of the tall column: the header pins to the top.
+      await page.evaluate(
+        (offset) => window.scrollTo(0, offset),
+        (await column.evaluate((el) => el.getBoundingClientRect().top + window.scrollY)) + 100,
+      );
+      await expect.poll(() => header.evaluate((el) => el.getBoundingClientRect().top)).toBe(0);
+    };
+    // The creates above each arm the server's debounced SSE reload, and one
+    // can still land after this page's EventSource connects — destroying the
+    // execution context mid-measure ("Execution context was destroyed"). The
+    // reload lands on the same board with no further writes queued, so the
+    // whole measurement retries through it, bounded.
+    for (let attempt = 1; ; attempt++) {
+      try {
+        await measure();
+        break;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (attempt >= 2 || !message.includes("Execution context was destroyed")) throw err;
+      }
+    }
   });
 
   test("the theme toggle cycles auto/light/dark and persists across a reload (task-board-theme-density)", async ({

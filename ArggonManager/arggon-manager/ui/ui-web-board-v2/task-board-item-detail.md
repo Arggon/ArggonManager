@@ -26,7 +26,6 @@ updated: "2026-09-28"
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 

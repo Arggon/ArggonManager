@@ -726,6 +726,22 @@ describe("renderBoardHtml drag-and-drop", () => {
   });
 });
 
+describe("renderBoardHtml search landmark (task-axe-board-drawer-and-lens-coverage)", () => {
+  it("carries the filter bar as a named search landmark on every board", () => {
+    const html = renderBoardHtml(
+      [item({ id: "task-a", type: "task", status: "todo", title: "A" })],
+      { generatedAt: GENERATED_AT },
+    );
+    // The axe gate's `region` fix: the filter bar (label, input, count) sits in
+    // a role="search" landmark, so the page content is fully landmarked. The
+    // unit pin keeps a refactor from silently dropping the attribute between
+    // browser runs.
+    expect(html).toContain(
+      '<div class="filterbar" id="board-filterbar" role="search" aria-label="board filters">',
+    );
+  });
+});
+
 describe("renderBoardHtml non-text contrast (WCAG 1.4.11, task-board-non-text-contrast-and-drag-affordance)", () => {
   // axe has no automated rule for 1.4.11, so the @smoke lane cannot catch a
   // non-text regression. These assertions pin the decision on the rendered CSS
