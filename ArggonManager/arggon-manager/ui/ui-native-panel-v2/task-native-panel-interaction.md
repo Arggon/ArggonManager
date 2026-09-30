@@ -24,7 +24,7 @@ updated: "2026-09-22"
 
 ## Acceptance
 
-- [ ] 
+<!-- Ticked against the merged-with-main PR branch 2026-09-30; evidence in the review verdict comment. -->
 
 ## Notes
 
@@ -35,10 +35,10 @@ The W5 panel renders flat tree lines (header + counts + up to 200 lines) and onl
 
 ## Acceptance
 
-- [ ] j/k (and PgUp/PgDn/g/G) move a visible selection over the tree; Enter opens the selected item (file path or an inline detail block with body/checklist), Esc returns
-- [ ] `n` jumps to the `next` suggestion and `a` to the active session item; the header keeps totals and the counts line
-- [ ] Width-aware clipping and sanitization preserved; no slot crash on a corrupt tracker (existing P1 guard)
-- [ ] `npm run smoke:tui` extended with a selection capture; docs/opencod2 TUI section updated
+- [x] j/k (and PgUp/PgDn/g/G) move a visible selection over the tree; Enter opens the selected item (file path or an inline detail block with body/checklist), Esc returns
+- [x] `n` jumps to the `next` suggestion and `a` to the active session item; the header keeps totals and the counts line
+- [x] Width-aware clipping and sanitization preserved; no slot crash on a corrupt tracker (existing P1 guard)
+- [x] `npm run smoke:tui` extended with a selection capture; docs/opencod2 TUI section updated
 
 ### 2026-09-28 @Arggon-coordinator
 ## Coordinator state note — 2026-09-28
