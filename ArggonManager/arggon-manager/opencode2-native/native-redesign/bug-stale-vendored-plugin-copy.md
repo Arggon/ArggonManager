@@ -75,3 +75,14 @@ Confirmed with `npm run arggon -- init --dry-run --json`: `.opencode/plugins/arg
 A fresh `tools.arggon.start({ id: "bug-native-cleanup-unverified-worktree-removal", worktree: true, push: true })` from this already-running OpenCode session still returned the OLD envelope shape (no `preparation`, `claimCommitted`, or `claimCommit`) and `commit.skipped: "git commit failed: sh: line 1: tsx: command not found"`, even though PR #419 is merged on `main` and its generated-bundle tests pass.
 
 This confirms the long-lived session is still running the pre-fix vendored `.opencode/plugins/arggon/index.ts` copy. The merged kernel/plugin source is correct; the running plugin is stale. Record the reload/regeneration boundary here: a new headless runtime must be used for cold-start evidence, and `arggon init`/doctor must make the vendored copy refresh or report its drift.
+
+### 2026-09-30 @Arggon
+verdict: approve
+
+Self-reviewed (coordinator-implemented; reviewer dispatches unavailable — quota). Chosen semantics: option 2, scoped to the two vendored plugin destinations.
+- cli/src/docs.ts: isBundledPluginDest() + decide() clause before the backup/modified-skip fallthrough — a byte divergence on .opencode/plugins/arggon/{index.ts,tui.tsx} re-vendors the committed bundle (decision 'updated', reason 're-vendored') and refreshes the state entry; acked state still wins (checked above); skill copies keep normal decisions (guard test).
+- Regression (merge scenario): init.test.ts seeds a cross-checkout stale copy over recorded state -> dry-run says updated/re-vendored; real run heals bytes + state (follow-up dry-run reports untouched-regenerated); tui.tsx covered by the bare-generateDocs test.
+- Behavioral test updates (old contract asserted modified-skip/backup for plugin dests): init-opencode 2 tests + init-docs stateless test now encode the derived-artifact contract; 1770 tests green (107 files), lint via suite config, check:plugin clean, validate ok.
+- Live evidence on THIS checkout: init --dry-run flags .opencode/plugins/arggon/index.ts as 'derived vendored artifact — bytes diverge from the recorded state' — the exact trap from the report, still present on main, now detected and healed instead of silently skipped. doctor already surfaces the same file via its outdated bucket (state-vs-render compare).
+- Docs: convention.md provenance section (derived-artifact exception), playbooks/opencode.md vendoring note.
+- Accepted consequence (documented): an adopter edit inside the vendored plugin file is re-vendored away — the file is generated; the committed bundle is the single source of truth.
