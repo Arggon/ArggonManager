@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-ci-recipe-published-one-liner
 title: "Generated CI recipe: install the published npm package instead of cloning the repo"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [ci, packaging]
 priority: p2
 created: "2026-09-22"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T13:46:22.190Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-ci-recipe-published-one-liner
 ---
 <!--
