@@ -564,6 +564,10 @@ ${"y".repeat(MAX_DETAIL_COMMENT_BYTES + 512)}`,
     expect(html).toContain('id="board-drawer"');
     expect(html).toContain('data-detail-endpoint="/api/item"');
     expect(html).toContain('tabindex="0"');
-    expect(html).toContain("wireBoardDetail(toast, renderBoardDetail);");
+    // Serve mode embeds no snapshot map (BOARD_DETAILS = null): the drawer
+    // fetches /api/item — the static --details export is the map's consumer
+    // (task-board-static-details).
+    expect(html).toContain("var BOARD_DETAILS = null;");
+    expect(html).toContain("wireBoardDetail(toast, renderBoardDetail, BOARD_DETAILS);");
   });
 });

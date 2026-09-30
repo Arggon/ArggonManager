@@ -24,9 +24,10 @@ import {
   wireBoardColumns,
   wireBoardKeyboardNav,
   wireBoardMoveMenu,
+  MAX_DETAIL_PROSE_BYTES,
   type BoardLensItem,
 } from "./board.js";
-import type { BoardGithub, PrInfo } from "./board.js";
+import type { BoardDetailPayload, BoardGithub, PrInfo } from "./board.js";
 import { type ContractWorkItem as WorkItem } from "@arggondev/lib";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
@@ -828,7 +829,10 @@ describe("renderBoardHtml item detail drawer (task-board-item-detail, serve-only
     expect(html).toContain('tabindex="0"');
     expect(html).toContain(renderBoardDetail.toString());
     expect(html).toContain(wireBoardDetail.toString());
-    expect(html).toContain("wireBoardDetail(toast, renderBoardDetail);");
+    // Serve mode embeds no snapshot map: BOARD_DETAILS is null and the drawer
+    // keeps the /api/item fetch path (task-board-static-details).
+    expect(html).toContain("var BOARD_DETAILS = null;");
+    expect(html).toContain("wireBoardDetail(toast, renderBoardDetail, BOARD_DETAILS);");
   });
 
   it("seeds the roving tabindex on exactly the first card (task-board-keyboard-a11y)", () => {
@@ -916,6 +920,156 @@ describe("renderBoardHtml item detail drawer (task-board-item-detail, serve-only
     expect(renderBoardDetail.toString()).toContain("textContent");
     // PR links are only wired for absolute http(s) URLs.
     expect(renderBoardDetail.toString()).toContain("/^https?:\\/\\//");
+  });
+});
+
+describe("static export --details (task-board-static-details)", () => {
+  const items = [item({ id: "task-a", type: "task", status: "todo", title: "A" })];
+
+  function detailPayload(
+    overrides: Partial<BoardDetailPayload["detail"]> = {},
+    itemOverrides: Partial<WorkItem> = {},
+  ): BoardDetailPayload {
+    return {
+      ok: true,
+      item: item({ id: "task-a", type: "task", status: "todo", title: "A", ...itemOverrides }),
+      detail: {
+        prose: "body",
+        prose_truncated: false,
+        acceptance: [],
+        comments: [],
+        hidden_comments: 0,
+        dependencies: [],
+        pr: null,
+        ...overrides,
+      },
+    };
+  }
+
+  /** Extract and parse the embedded `var BOARD_DETAILS = {...};` snapshot. */
+  function embeddedDetails(html: string): Record<string, BoardDetailPayload> {
+    const line = html.split("\n").find((candidate) => candidate.includes("var BOARD_DETAILS = "));
+    expect(line).toBeDefined();
+    const json = line!.replace(/^.*var BOARD_DETAILS = /, "").replace(/;$/, "");
+    return JSON.parse(json) as Record<string, BoardDetailPayload>;
+  }
+
+  it("embeds the snapshot map and wires the drawer to it instead of the fetch", () => {
+    const html = renderBoardHtml(items, {
+      generatedAt: GENERATED_AT,
+      details: true,
+      staticDetails: { "task-a": detailPayload() },
+    });
+    expect(html).toContain('id="board-drawer"');
+    expect(html).toContain('tabindex="0"');
+    expect(html).toContain('var BOARD_DETAILS = {"task-a":');
+    expect(html).toContain("wireBoardDetail(toast, renderBoardDetail, BOARD_DETAILS);");
+    // The map's payload round-trips verbatim.
+    const parsed = embeddedDetails(html);
+    expect(parsed["task-a"].detail.prose).toBe("body");
+    // The client renders the snapshot without a server: no fetch endpoint is
+    // needed (the body attribute stays for the serve path only).
+    expect(wireBoardDetail.toString()).toContain("embeddedDetails[id]");
+  });
+
+  it("keeps the export byte-identical without the flag — even when a map is passed", () => {
+    const plain = renderBoardHtml(items, { generatedAt: GENERATED_AT });
+    const explicitOff = renderBoardHtml(items, { generatedAt: GENERATED_AT, details: false });
+    const mapWithoutFlag = renderBoardHtml(items, {
+      generatedAt: GENERATED_AT,
+      staticDetails: { "task-a": detailPayload() },
+    });
+    expect(explicitOff).toBe(plain);
+    expect(mapWithoutFlag).toBe(plain);
+    expect(plain).not.toContain("BOARD_DETAILS");
+    expect(plain).not.toContain("board-drawer");
+  });
+
+  it("embeds hostile detail text script-safely", () => {
+    const hostile = "</script><script>alert(1)</script>";
+    const html = renderBoardHtml(items, {
+      generatedAt: GENERATED_AT,
+      details: true,
+      staticDetails: {
+        "task-a": detailPayload({
+          prose: hostile,
+          comments: [{ date: "2026-09-07", author: '"><script>', text: hostile, truncated: false }],
+        }),
+      },
+    });
+    expect(html).not.toContain("<script>alert(1)");
+    const parsed = embeddedDetails(html);
+    expect(parsed["task-a"].detail.prose).toBe(hostile);
+    expect(parsed["task-a"].detail.comments[0].author).toBe('"><script>');
+  });
+
+  it("runBoard --details embeds clipped prose, the 3-comment tail and acceptance rows", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-details-"));
+    const { taskMd } = writeBranchedTree(dir);
+    const padded = "x".repeat(9 * 1024); // past MAX_DETAIL_PROSE_BYTES
+    const comments = [1, 2, 3, 4, 5]
+      .map((n) => `### 2026-09-0${n} @user${n}\ncomment ${n}\n`)
+      .join("\n");
+    const previous = readFileSync(taskMd, "utf8");
+    const frontmatterEnd = previous.indexOf("---", 1);
+    writeFileSync(
+      taskMd,
+      `${previous.slice(0, frontmatterEnd + 3)}\n\n# Task One\n\n## Acceptance\n\n- [x] done row\n- [ ] open row\n\n${padded}\n\n${comments}`,
+      "utf8",
+    );
+    const result = runBoard({
+      cwd: dir,
+      out: "out.html",
+      generatedAt: GENERATED_AT,
+      me: null,
+      details: true,
+    });
+    expect(result.detailBytes).toBeGreaterThan(0);
+    const html = readFileSync(result.outPath, "utf8");
+    expect(html).toContain('id="board-drawer"');
+    const payloads = embeddedDetails(html);
+    // Every rendered item gets a payload — initiatives and stories included.
+    expect(Object.keys(payloads).sort()).toEqual(["launch", "story-a", "task-one"]);
+    const detail = payloads["task-one"].detail;
+    // Prose is clipped at the documented per-item cap...
+    expect(detail.prose_truncated).toBe(true);
+    expect(Buffer.byteLength(detail.prose, "utf8")).toBeLessThanOrEqual(MAX_DETAIL_PROSE_BYTES);
+    // ...acceptance rows are parsed from the clipped prose...
+    expect(detail.acceptance).toEqual([
+      { text: "done row", checked: true },
+      { text: "open row", checked: false },
+    ]);
+    // ...and comments are the kernel tail (last 3 of 5).
+    expect(detail.comments.map((comment) => comment.text)).toEqual([
+      "comment 3",
+      "comment 4",
+      "comment 5",
+    ]);
+    expect(detail.hidden_comments).toBe(2);
+    expect(detail.pr).toBeNull();
+    // detailBytes is the exact embedded JSON size (the README payload figure).
+    const line = html.split("\n").find((candidate) => candidate.includes("var BOARD_DETAILS = "));
+    const json = line!.replace(/^.*var BOARD_DETAILS = /, "").replace(/;$/, "");
+    expect(result.detailBytes).toBe(Buffer.byteLength(json, "utf8"));
+  });
+
+  it("runBoard without --details keeps the export drawer-free and byte-identical (regression)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-nodetails-"));
+    writeBranchedTree(dir);
+    const plain = runBoard({ cwd: dir, out: "plain.html", generatedAt: GENERATED_AT, me: null });
+    const explicit = runBoard({
+      cwd: dir,
+      out: "explicit.html",
+      generatedAt: GENERATED_AT,
+      me: null,
+      details: false,
+    });
+    expect(readFileSync(explicit.outPath, "utf8")).toBe(readFileSync(plain.outPath, "utf8"));
+    expect(plain.detailBytes).toBeUndefined();
+    const html = readFileSync(plain.outPath, "utf8");
+    expect(html).not.toContain("BOARD_DETAILS");
+    expect(html).not.toContain("board-drawer");
+    expect(html).not.toContain("/api/item");
   });
 });
 
