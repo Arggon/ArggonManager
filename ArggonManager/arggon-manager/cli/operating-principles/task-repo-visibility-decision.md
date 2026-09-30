@@ -28,7 +28,6 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-repo-visibility-decision
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 
@@ -44,10 +43,10 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-repo-visibility-decision
 
 ## Acceptance
 
-- [ ] Decision recorded (ADR or item comment): stay public or go private, with rationale
+- [x] Decision recorded (ADR or item comment): stay public or go private, with rationale
 - [ ] If private: account plan checked (Pro needed to keep branch protection/rulesets on main)
 - [ ] If private: Actions budget / trigger reduction decided (e.g. `paths-ignore` for tracker-only commits on `ci.yml`)
 - [ ] If private: secret scanning + push protection enabled while still public (free), or accepted as unavailable
 - [ ] If private: npm metadata (`repository`/`homepage`) + trusted publishing/provenance decided while public (impossible after)
 - [ ] If private: `task-ci-recipe-published-one-liner` and `task-retire-opencode2` landed first
-- [ ] If stay public: close with the recorded rationale (no further action)
+- [x] If stay public: close with the recorded rationale (no further action)
