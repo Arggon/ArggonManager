@@ -17,10 +17,11 @@
  * `tuiDetailBodyRows` (frame geometry), `loadTuiItems` (shared data path,
  * detail bodies included), `createTuiKeyDecoder` (the stateful stdin
  * splitter, bug-tui-split-escape-sequences), `formatTuiClock` (the footer
- * freshness stamp) and `fsWatchTuiWatcher` (the default tracker watcher,
- * task-tui-live-refresh). `runTuiBoard` only wires raw mode, keypress events,
- * resize and the debounced tree watcher to the pure pieces; it performs no
- * writes anywhere.
+ * freshness stamp), `fsWatchTuiWatcher` (the default tracker watcher,
+ * task-tui-live-refresh) and `tuiViewItems` / `applyTuiSort` / `nextTuiSort`
+ * (the sort + ready-only lens, task-tui-sort-ready-lens). `runTuiBoard` only
+ * wires raw mode, keypress events, resize and the debounced tree watcher to
+ * the pure pieces; it performs no writes anywhere.
  */
 import { watch } from "node:fs";
 import {
@@ -28,12 +29,15 @@ import {
   buildStatusIndex,
   findTasksDir,
   hasOpenDependencies,
+  isReadyTodo,
   itemsForStatus,
   loadItems,
   matchesSubstringFilter,
   repoRootFromTasks,
   sanitizeHumanTextUncapped,
   sortById,
+  sortByNextRank,
+  sortByPriority,
   statusCounts,
   toContractWorkItem,
   visibleItems,
@@ -43,6 +47,18 @@ import {
 /** Default geometry when the terminal size cannot be queried. */
 export const TUI_DEFAULT_WIDTH = 80;
 export const TUI_DEFAULT_HEIGHT = 24;
+
+/** Board card order, cycled with `s` (task-tui-sort-ready-lens). */
+export type TuiSort = "id" | "priority" | "next";
+
+/** The sort cycle order: id -> priority -> next -> id. */
+export const TUI_SORTS: readonly TuiSort[] = ["id", "priority", "next"];
+
+/** The next sort in the cycle (`s` key). Pure. */
+export function nextTuiSort(sort: TuiSort): TuiSort {
+  const index = TUI_SORTS.indexOf(sort);
+  return TUI_SORTS[(index + 1) % TUI_SORTS.length]!;
+}
 
 /**
  * Narrow-terminal threshold for the detail pane (task-tui-detail-pane). At or
@@ -126,6 +142,18 @@ export type TuiState = {
   filter: string;
   /** Whether the `/` search prompt is open. */
   searching: boolean;
+  /**
+   * Card order within each column (task-tui-sort-ready-lens): `s` cycles
+   * `id` -> `priority` -> `next` (ready first, ADR 0009 tier, downstream
+   * weight, id on ties).
+   */
+  sort: TuiSort;
+  /**
+   * Ready-only lens (task-tui-sort-ready-lens): `l` shows only pullable work
+   * — claimable unclaimed todo with terminal dependencies (the kernel
+   * `isReadyTodo` rule) — hiding everything else in every column.
+   */
+  readyOnly: boolean;
   /** Transient footer line (e.g. "(no item selected)" after Enter). */
   message: string | null;
   /**
@@ -156,6 +184,8 @@ export function initialTuiState(
     scroll: 0,
     filter: "",
     searching: false,
+    sort: "id",
+    readyOnly: false,
     message: null,
     updatedAt: null,
     detail: null,
@@ -209,10 +239,7 @@ export type TuiTreeWatcher = { close(): void };
  * when watching is unavailable (platform or filesystem limitation) — the loop
  * then degrades transparently to per-keypress reads.
  */
-export type TuiWatchFactory = (
-  tasksDir: string,
-  onEvent: () => void,
-) => TuiTreeWatcher | null;
+export type TuiWatchFactory = (tasksDir: string, onEvent: () => void) => TuiTreeWatcher | null;
 
 /**
  * How long a watcher burst must stay quiet before the loop re-reads the tree
@@ -267,6 +294,46 @@ export function tuiColumnItems(items: WorkItem[], filter: string, status: string
 }
 
 /**
+ * The board's card set for one lens (task-tui-sort-ready-lens): the filtered
+ * items, narrowed to pullable work when the ready-only lens is on. Readiness
+ * is the kernel `isReadyTodo` rule computed over the WHOLE tree (a
+ * filtered-out dependency must not look unknown — the `applyViewLens` rule),
+ * so a search filter cannot change what counts as ready. Unsorted (the
+ * caller orders).
+ */
+function tuiLensItems(items: WorkItem[], filter: string, readyOnly: boolean): WorkItem[] {
+  const visible = visibleItems(items, filter);
+  if (!readyOnly) return visible;
+  const byId = buildStatusIndex(items);
+  return visible.filter((item) => isReadyTodo(item, byId));
+}
+
+/**
+ * The cards the board renders for one lens, in the lens' sort order
+ * (task-tui-sort-ready-lens): `id` (lexicographic), `priority` (ADR 0009
+ * tier, id on ties) or `next` (ready first, tier, downstream weight, id).
+ * The order applies per column: columns are status slices of this array, so
+ * sorting the whole set once orders every column the same way.
+ */
+export function tuiViewItems(
+  items: WorkItem[],
+  lens: Pick<TuiState, "filter" | "sort" | "readyOnly">,
+): WorkItem[] {
+  return applyTuiSort(tuiLensItems(items, lens.filter, lens.readyOnly), lens.sort);
+}
+
+/**
+ * One sort applied on its own (public for tests): `id` restores the
+ * canonical lexicographic order, `priority` and `next` delegate to the
+ * kernel orderings. Pure; copies.
+ */
+export function applyTuiSort<T extends WorkItem>(items: readonly T[], sort: TuiSort): T[] {
+  if (sort === "priority") return sortByPriority(items);
+  if (sort === "next") return sortByNextRank(items);
+  return sortById(items);
+}
+
+/**
  * True when the item has open dependencies (dep not done/cancelled; unknown
  * dep ids count as open — the shared view-model rule, ADR 0004).
  */
@@ -275,9 +342,13 @@ export function tuiDepBlocked(items: WorkItem[], item: WorkItem): boolean {
   return hasOpenDependencies(item.depends_on, buildStatusIndex(items));
 }
 
-/** Visible card count per status, aligned with STATUSES (for key clamping). */
-export function tuiColumnCounts(items: WorkItem[], filter: string): number[] {
-  const counts = statusCounts(visibleItems(items, filter));
+/**
+ * Visible card count per status, aligned with STATUSES (for key clamping).
+ * With the ready-only lens on (task-tui-sort-ready-lens), counts reflect the
+ * narrowed columns — clamping and rendering see the same card set.
+ */
+export function tuiColumnCounts(items: WorkItem[], filter: string, readyOnly = false): number[] {
+  const counts = statusCounts(tuiLensItems(items, filter, readyOnly));
   return STATUSES.map((status) => counts[status]);
 }
 
@@ -358,7 +429,11 @@ export function clampTuiState(state: TuiState, counts: number[]): TuiState {
 
 /** Currently selected item, or null when its column is empty/filtered out. */
 export function selectedTuiItem(items: WorkItem[], state: TuiState): WorkItem | null {
-  const columnItems = tuiColumnItems(items, state.filter, STATUSES[state.column]);
+  // The same lens + sort the frame renders (task-tui-sort-ready-lens): the
+  // card under the cursor must be the card the column draws.
+  const columnItems = tuiViewItems(items, state).filter(
+    (item) => item.status === STATUSES[state.column],
+  );
   return columnItems[state.card] ?? null;
 }
 
@@ -481,10 +556,12 @@ export type TuiKeyContext = {
 /**
  * Pure keypress reducer (board and detail pane). Board: Enter opens the
  * read-only detail pane for the selected item (task-tui-detail-pane), Esc
- * clears the filter, card moves keep the scroll window following the
- * selection whenever `counts` carries the selected column. Detail pane: Esc
- * and Enter return to the board with every board field untouched, ↑/↓ and
- * PgUp/PgDn/Home/End scroll the pane, q quits. Never mutates the input state.
+ * clears the filter, `s` cycles the card order and `l` toggles the ready-only
+ * lens (task-tui-sort-ready-lens), card moves keep the scroll window
+ * following the selection whenever `counts` carries the selected column.
+ * Detail pane: Esc and Enter return to the board with every board field
+ * untouched, ↑/↓ and PgUp/PgDn/Home/End scroll the pane, q quits. Never
+ * mutates the input state.
  */
 export function handleKey(state: TuiState, key: string, ctx: TuiKeyContext = {}): TuiState {
   // Ctrl-C quits from anywhere, pane and search prompt included.
@@ -510,6 +587,16 @@ export function handleKey(state: TuiState, key: string, ctx: TuiKeyContext = {})
       return { ...state, quit: true };
     case "/":
       return { ...state, searching: true, message: null };
+    case "s":
+      // Cycle the card order (task-tui-sort-ready-lens): id -> priority ->
+      // next -> id. The card index keeps its value; the post-key sync clamps
+      // it against the re-sorted column.
+      return { ...state, sort: nextTuiSort(state.sort), message: null };
+    case "l":
+      // Toggle the ready-only lens (task-tui-sort-ready-lens): pullable work
+      // only. The post-key sync clamps the selection against the narrowed
+      // columns.
+      return { ...state, readyOnly: !state.readyOnly, message: null };
     case "r":
       // Forced refresh (task-tui-live-refresh): the reducer stays pure — the
       // loop re-reads the tree after every key batch, so acknowledging the key
@@ -649,7 +736,12 @@ function cardLine(item: WorkItem, selected: boolean, depBlocked: boolean): strin
   // task-board-dependency-visuals: dependency-blocked items carry a `⌫` tag
   // (open deps = deps not done/cancelled; same rule as the HTML board).
   const blockedTag = depBlocked ? " ⌫" : "";
-  return `${marker} ${badge} ${sanitizeHumanTextUncapped(item.id)}${blockedTag} ${title}`;
+  // task-tui-sort-ready-lens: the priority tier and the owner ride on the
+  // card, so the board answers "what should I pull?" without opening the
+  // pane. Repo-controlled values: escaped like every other field.
+  const priorityTag = item.priority ? ` ${sanitizeHumanTextUncapped(item.priority)}` : "";
+  const assigneeTag = item.assignee ? ` @${sanitizeHumanTextUncapped(item.assignee)}` : "";
+  return `${marker} ${badge} ${sanitizeHumanTextUncapped(item.id)}${blockedTag}${priorityTag}${assigneeTag} ${title}`;
 }
 
 /**
@@ -671,8 +763,11 @@ export function renderTui(
   const width = Math.max(1, Math.floor(state.width));
   const height = Math.max(1, Math.floor(state.height));
   const colWidth = Math.max(1, Math.floor(width / STATUSES.length));
-  const visible = visibleTuiItems(items, state.filter);
-  const counts = tuiColumnCounts(items, state.filter);
+  // One lens + sort pass feeds the cards AND the counts, so the header, the
+  // column counts and the card rows always describe the same set
+  // (task-tui-sort-ready-lens).
+  const visible = tuiViewItems(items, state);
+  const counts = tuiColumnCounts(items, state.filter, state.readyOnly);
   const cardRows = tuiBodyRows(height);
   const selectedCount = counts[state.column] ?? 0;
   // The frame is always valid even with a stale state: the window is
@@ -684,9 +779,10 @@ export function renderTui(
 
   const lines: string[] = [];
 
-  // Header: title, totals, active filter.
+  // Header: title, totals, active sort + lens + filter.
   const total = visible.length;
-  let header = `arggon board --tui · ${total} item(s)`;
+  let header = `arggon board --tui · ${total} item(s) · sort: ${state.sort}`;
+  if (state.readyOnly) header += " · ready-only";
   if (state.filter !== "") header += ` · filter: ${state.filter}`;
   lines.push(padEndTo(clipLine(header, width), width));
 
@@ -741,8 +837,7 @@ export function renderTui(
   // (task-tui-live-refresh), then the search prompt > transient message > key
   // help — so a narrow terminal clips the help instead of the position.
   const position = `row ${selectedCount === 0 ? 0 : selectedCard + 1}/${selectedCount}`;
-  const stamp =
-    state.updatedAt === null ? "" : ` · updated ${formatTuiClock(state.updatedAt)}`;
+  const stamp = state.updatedAt === null ? "" : ` · updated ${formatTuiClock(state.updatedAt)}`;
   let footer: string;
   if (state.searching) {
     footer = `${position} · /${state.filter}█ — enter to apply, esc to cancel`;
@@ -751,7 +846,7 @@ export function renderTui(
     // "(no item selected)" hint): escape before rendering.
     footer = `${position} · ${sanitizeHumanTextUncapped(state.message)}`;
   } else {
-    footer = `${position}${stamp} · ←/→ column · ↑/↓ card · PgUp/PgDn page · home/end · / search · enter detail · r refresh · q quit`;
+    footer = `${position}${stamp} · ←/→ column · ↑/↓ card · PgUp/PgDn page · home/end · / search · enter detail · r refresh · s sort · l ready · q quit`;
   }
   lines.push(padEndTo(clipLine(footer, width), width));
 
@@ -1165,7 +1260,7 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
         // Context is re-derived per key: a chunk may open the pane, scroll
         // it and close it again, and each key must be reduced against the
         // state (and the data) the previous one left behind.
-        const counts = tuiColumnCounts(items, current.filter);
+        const counts = tuiColumnCounts(items, current.filter, current.readyOnly);
         const selected = selectedTuiItem(items, current);
         const detailLines =
           current.detail === null
@@ -1194,7 +1289,7 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
       items = fresh.items;
       details = fresh.details;
       current = {
-        ...clampTuiState(current, tuiColumnCounts(items, current.filter)),
+        ...clampTuiState(current, tuiColumnCounts(items, current.filter, current.readyOnly)),
         updatedAt: Date.now(),
       };
       render();
@@ -1264,7 +1359,7 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
         };
         // A resize changes the body height: re-derive the window so it stays
         // valid and the selected card stays visible.
-        current = clampTuiState(current, tuiColumnCounts(items, current.filter));
+        current = clampTuiState(current, tuiColumnCounts(items, current.filter, current.readyOnly));
         render();
       } catch (err) {
         fail(err);
