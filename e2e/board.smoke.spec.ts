@@ -877,4 +877,88 @@ test.describe("@smoke board --serve", () => {
     await expect(page.locator("#board-drawer")).toBeHidden();
     await expect(page.locator(`.card[data-id="${DETAIL_ITEM_ID}"]`)).toBeFocused();
   });
+
+  test("columns collapse, terminal columns hide, and the layout persists (task-board-column-controls)", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    const todo = page.locator('.column[data-status="todo"]');
+    const todoCards = todo.locator(".card");
+    await expect(todoCards.first()).toBeVisible();
+
+    // Collapse todo: cards hide, the heading (with its count) stays visible,
+    // and the toggle flips to the expanded announcement.
+    await todo.locator('.col-toggle[data-status="todo"]').click();
+    await expect(todo).toHaveClass(/collapsed/);
+    await expect(todo.locator(".col-toggle")).toHaveAttribute("aria-expanded", "false");
+    await expect(todo.locator(".col-toggle")).toHaveAttribute(
+      "aria-label",
+      "expand the todo column",
+    );
+    await expect(todoCards.first()).toBeHidden();
+    await expect(todo.locator(".count")).toBeVisible();
+
+    // Hide the terminal columns through the filterbar toggle.
+    const terminalToggle = page.locator("#board-terminal-toggle");
+    await terminalToggle.click();
+    await expect(terminalToggle).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('.column[data-status="done"]')).toBeHidden();
+    await expect(page.locator('.column[data-status="cancelled"]')).toBeHidden();
+
+    // The layout persists in localStorage across a reload.
+    await page.reload();
+    await expect(page.locator('.column[data-status="todo"]')).toHaveClass(/collapsed/);
+    await expect(page.locator('.column[data-status="done"]')).toBeHidden();
+
+    // The controls undo themselves (expand + show), then reset restores the
+    // default layout and the reset persists too.
+    await page.locator('.col-toggle[data-status="todo"]').click();
+    await expect(page.locator('.column[data-status="todo"]')).not.toHaveClass(/collapsed/);
+    await page.locator("#board-layout-reset").click();
+    await expect(terminalToggle).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator('.column[data-status="done"]')).toBeVisible();
+    await page.reload();
+    await expect(page.locator('.column[data-status="todo"]')).not.toHaveClass(/collapsed/);
+    await expect(page.locator('.column[data-status="done"]')).toBeVisible();
+  });
+
+  test("collapsing the column that holds the roving anchor re-seats it", async ({ page }) => {
+    await page.goto(server?.url ?? "");
+    const todo = page.locator('.column[data-status="todo"]');
+    // The server seeds the anchor on the first todo card.
+    await expect(todo.locator('.card[tabindex="0"]')).toHaveCount(1);
+    await todo.locator('.col-toggle[data-status="todo"]').click();
+    await expect(todo).toHaveClass(/collapsed/);
+    // The anchor moved out of the collapsed column: keyboard entry survives.
+    const anchor = page.locator('.board .card[tabindex="0"]');
+    await expect(anchor).toHaveCount(1);
+    const anchorColumn = await anchor.evaluate((card) =>
+      card.closest(".column")?.getAttribute("data-status"),
+    );
+    expect(anchorColumn).not.toBe("todo");
+  });
+
+  test("column headers stick to the viewport top while the board scrolls", async ({ page }) => {
+    // A tall column is what makes stickiness observable: fill todo through the
+    // CLI (each create fires a reload, so the page is only loaded afterwards).
+    for (let i = 1; i <= 12; i++) {
+      runCli(fixture, ["create", "task", `Board filler ${i}`, "--parent", "entries", "--json"]);
+    }
+    await page.setViewportSize({ width: 900, height: 400 });
+    await page.goto(server?.url ?? "");
+    const filler = page.locator(".card .title", { hasText: "Board filler 12" });
+    await expect(filler).toBeVisible();
+
+    const column = page.locator('.column[data-status="todo"]');
+    const header = page.locator("#board-column-todo");
+    // Unstuck at load: the header sits at its natural in-column position.
+    const natural = await header.evaluate((el) => el.getBoundingClientRect().top);
+    expect(natural).toBeGreaterThan(0);
+    // Scroll into the middle of the tall column: the header pins to the top.
+    await page.evaluate(
+      (offset) => window.scrollTo(0, offset),
+      (await column.evaluate((el) => el.getBoundingClientRect().top + window.scrollY)) + 100,
+    );
+    await expect.poll(() => header.evaluate((el) => el.getBoundingClientRect().top)).toBe(0);
+  });
 });
