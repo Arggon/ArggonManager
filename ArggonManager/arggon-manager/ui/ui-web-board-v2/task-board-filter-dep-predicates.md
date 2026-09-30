@@ -28,7 +28,6 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-board-filter-dep-predica
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 

@@ -26,7 +26,6 @@ claimed_at: "2026-09-30T20:26:26.146Z"
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 
@@ -37,7 +36,7 @@ The sidebar snapshot is created on mount with no setter (never refreshes) and th
 
 ## Acceptance
 
-- [ ] Panel and sidebar refresh on tracker changes (or session events) instead of mount-only; `r` remains a manual reload
-- [ ] Fold/hide: collapse subtrees, hide `done`/`cancelled`, and a text filter on id/title; state kept per session
-- [ ] Paging beyond the 200-line cap (or an explicit, navigable "more" affordance)
-- [ ] Tests + a filtered/folded smoke capture; docs updated
+- [x] Panel and sidebar refresh on tracker changes (or session events) instead of mount-only; `r` remains a manual reload
+- [x] Fold/hide: collapse subtrees, hide `done`/`cancelled`, and a text filter on id/title; state kept per session
+- [x] Paging beyond the 200-line cap (or an explicit, navigable "more" affordance)
+- [x] Tests + a filtered/folded smoke capture; docs updated
