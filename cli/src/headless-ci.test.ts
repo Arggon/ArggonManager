@@ -315,9 +315,12 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     expect(doc).toContain("mkdir -p /tmp/arggon-packs");
     expect(doc).toMatch(/no model, no MCP/i);
     expect(doc).toContain("headless-ci.test.ts");
-    // `arggon instructions` prints this snippet, so the fix must be in it.
+    // `arggon instructions` prints this snippet. Since 0.4.0 both packages are
+    // published, so the agents.md CI-gate snippet is the released one-liner;
+    // the pinned-checkout tarball variant (mkdir included) stays in ci.md and
+    // README, asserted above (bug-docs-retired-opencode2-split).
     expect(readFileSync(join(root, "ArggonManager/docs/agents.md"), "utf8")).toContain(
-      "mkdir -p /tmp/arggon-packs",
+      "npm install -g arggon-manager",
     );
     expect(readFileSync(join(root, "README.md"), "utf8")).toContain("mkdir -p /tmp/arggon-packs");
   });
