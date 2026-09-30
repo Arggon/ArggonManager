@@ -1,21 +1,20 @@
+import { spawn } from "node:child_process";
 import { watch, type FSWatcher } from "node:fs";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import {
   renderBoardHtml,
   defaultBoardGithub,
-  type BoardDetailPayload,
+  buildBoardDetail,
   type BoardGithub,
   type PrInfo,
 } from "./board.js";
 import {
-  buildStatusIndex,
   findTasksDir,
   loadItems,
   readConventionConfig,
   repoRootFromTasks,
   resolveCurrentLogin,
-  runShow,
   runUpdate,
   toContractWorkItem,
 } from "@arggondev/lib";
@@ -44,6 +43,14 @@ import {
  * match, and the served page opens it on card click/Enter. Serve-only: the
  * static export stays lean and has no drawer. Read-only — the route never
  * touches the tracker.
+ *
+ * Hardening (task-board-serve-hardening): the one mutating route,
+ * `POST /api/update`, gates on `isAllowedMutatingOrigin` — loopback Host with
+ * the served port, no cross-site `Sec-Fetch-Site`, and (when the client sends
+ * one) a loopback `Origin` — and answers 403 otherwise; `GET /favicon.ico`
+ * serves a minimal SVG glyph so the browser console stays clean, linked from
+ * the served page only; `--open` best-effort launches the default browser
+ * after listen (`openInBrowser`). The static export gains none of this.
  */
 
 /**
@@ -167,92 +174,73 @@ export type BoardServeHandle = {
 };
 
 /**
- * Per-item byte caps for the serve-mode detail drawer (task-board-item-detail):
- * the item body is prose that grows with the corpus, so the route clips it
- * before it reaches the browser (ADR 0006 spirit). The prose cap also bounds
- * the acceptance rows parsed from it; the comment cap applies per comment in
- * the kernel tail (DEFAULT_TAIL_COMMENTS entries). `prose_truncated` /
- * `comments[].truncated` tell the drawer to point at the item file.
+ * Detail-drawer payload surface (task-board-item-detail, moved to board.ts by
+ * task-board-static-details so the static `--details` embedding shares it):
+ * the byte caps, the clippers, the acceptance-row parser and the per-item
+ * payload builder live beside `BoardDetailPayload` now. Re-exported here so
+ * the serve surface keeps its import path.
  */
-export const MAX_DETAIL_PROSE_BYTES = 8 * 1024;
-export const MAX_DETAIL_COMMENT_BYTES = 4 * 1024;
+export {
+  MAX_DETAIL_COMMENT_BYTES,
+  MAX_DETAIL_PROSE_BYTES,
+  buildBoardDetail,
+  clipDetailText,
+  parseAcceptanceRows,
+} from "./board.js";
 
-/** Clip `text` to at most `maxBytes` UTF-8 bytes without splitting a code point. */
-export function clipDetailText(
-  text: string,
-  maxBytes: number,
-): { text: string; truncated: boolean } {
-  if (Buffer.byteLength(text, "utf8") <= maxBytes) return { text, truncated: false };
-  let bytes = 0;
-  let clipped = "";
-  for (const ch of text) {
-    const size = Buffer.byteLength(ch, "utf8");
-    if (bytes + size > maxBytes) break;
-    clipped += ch;
-    bytes += size;
+/**
+ * Mutating-request gate for the serve endpoints (task-board-serve-hardening).
+ * The server binds 127.0.0.1 only, but any local process or web page reachable
+ * from the same machine can still knock on the port; the mutating route
+ * therefore re-checks that the request really comes from the served origin
+ * before the kernel write path runs:
+ *
+ * - `Host` must be the served loopback host with the served port
+ *   (`127.0.0.1:<port>` / `localhost:<port>` / `[::1]:<port>`). This is the
+ *   only check a non-browser client (curl, scripts) is held to.
+ * - `Sec-Fetch-Site`, when the client sends it, must not be `cross-site`.
+ * - `Origin`, when the client sends it, must parse to the served loopback
+ *   origin — same scheme (http), same loopback host, same port. A missing or
+ *   empty Origin is accepted (non-browser clients never send it); a literal
+ *   `null` origin (sandboxed iframe, redirect chains) is refused.
+ *
+ * Every refusal answers 403 with a JSON error body; the request never reaches
+ * `runUpdate`. DNS names that resolve to 127.0.0.1 do NOT pass — only the
+ * literal loopback hostnames are accepted (a rebound hosts-file entry must not
+ * become an origin).
+ */
+export function isAllowedMutatingOrigin(
+  headers: { origin?: string; host?: string; secFetchSite?: string },
+  port: number,
+): boolean {
+  const loopbackHosts = new Set([`127.0.0.1:${port}`, `localhost:${port}`, `[::1]:${port}`]);
+  if (!headers.host || !loopbackHosts.has(headers.host)) return false;
+  if (
+    headers.secFetchSite &&
+    !["same-origin", "same-site", "none"].includes(headers.secFetchSite)
+  ) {
+    return false;
   }
-  return { text: clipped, truncated: true };
-}
-
-/** Read-only acceptance rows: `- [ ]`/`- [x]` lines of the item prose. */
-export function parseAcceptanceRows(prose: string): Array<{ text: string; checked: boolean }> {
-  const rows: Array<{ text: string; checked: boolean }> = [];
-  for (const line of prose.split("\n")) {
-    const match = /^\s*[-*]\s+\[([ xX])\]\s+(.*)$/.exec(line);
-    if (match) rows.push({ text: match[2].trim(), checked: match[1].toLowerCase() === "x" });
+  if (headers.origin === undefined || headers.origin === "") return true;
+  try {
+    const parsed = new URL(headers.origin);
+    return parsed.protocol === "http:" && loopbackHosts.has(parsed.host);
+  } catch {
+    return false; // includes the literal `null` origin
   }
-  return rows;
 }
 
 /**
- * Assemble the `/api/item` payload through the kernel bounded read path:
- * `runShow` (ADR 0006 — prose + the last `DEFAULT_TAIL_COMMENTS` comments,
- * never the full body) plus the shared status index for dependency states
- * (the ADR 0004 open/terminal rule; unknown ids count as open, exactly like
- * the card's blocked-by line). Pure read: no writes, no locks, no commit.
- * `id` not found throws `runShow`'s message (the route maps it to 404).
- * Cost: two kernel reads per request (O(n) over the tracker — `runShow` for
- * the item, `loadItems` for the dependency index); the route is triggered by a
- * user opening one drawer, never by the poll loop.
+ * Minimal board favicon (task-board-serve-hardening): a 16x16 kanban glyph so
+ * the browser tab request stops 404-ing — it was the only console error in the
+ * 2026-09-22 drive. Serve-mode only; the static export is untouched.
  */
-export function buildBoardDetail(opts: {
-  cwd: string;
-  id: string;
-  /** Live PR overlay snapshot (branch -> PrInfo); absent = no PR data. */
-  prs?: Map<string, PrInfo>;
-}): BoardDetailPayload {
-  const shown = runShow({ cwd: opts.cwd, id: opts.id });
-  const statusById = buildStatusIndex(loadItems(findTasksDir(opts.cwd)));
-  const item = toContractWorkItem(shown.item, shown.root);
-  const prose = clipDetailText(shown.prose, MAX_DETAIL_PROSE_BYTES);
-  const comments = shown.comments.map((comment) => {
-    const clipped = clipDetailText(comment.lines.join("\n"), MAX_DETAIL_COMMENT_BYTES);
-    return {
-      date: comment.date,
-      author: comment.author,
-      text: clipped.text,
-      truncated: clipped.truncated,
-    };
-  });
-  const dependencies = shown.item.dependsOn.map((depId) => {
-    const entry = statusById.get(depId);
-    const status = entry ? entry.status : null;
-    return { id: depId, status, terminal: status === "done" || status === "cancelled" };
-  });
-  return {
-    ok: true,
-    item,
-    detail: {
-      prose: prose.text,
-      prose_truncated: prose.truncated,
-      acceptance: parseAcceptanceRows(prose.text),
-      comments,
-      hidden_comments: shown.allComments.length - shown.comments.length,
-      dependencies,
-      pr: item.branch ? (opts.prs?.get(item.branch) ?? null) : null,
-    },
-  };
-}
+export const FAVICON_SVG =
+  '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16">' +
+  '<rect width="16" height="16" rx="3" fill="#424a53"/>' +
+  '<rect x="3" y="3" width="3.5" height="10" rx="1" fill="#ffffff"/>' +
+  '<rect x="9" y="3" width="3.5" height="6.5" rx="1" fill="#1a7f37"/>' +
+  "</svg>";
 
 export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
   const tasksDir = findTasksDir(opts.cwd);
@@ -335,9 +323,11 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
         details: true,
       },
     );
-    // Live-reload client, injected only in serve mode; the static export
-    // stays byte-identical to the plain `arggon board` output.
-    return html.replace("</body>", `${RELOAD_SCRIPT}</body>`);
+    // Serve-only favicon link (task-board-serve-hardening): points at the
+    // /favicon.ico route below; the static export stays byte-identical.
+    return html
+      .replace("<head>", '<head><link rel="icon" href="/favicon.ico">')
+      .replace("</body>", `${RELOAD_SCRIPT}</body>`);
   };
 
   const broadcastReload = (): void => {
@@ -385,7 +375,38 @@ export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
       req.on("close", () => clients.delete(res));
       return;
     }
+    // Board favicon (task-board-serve-hardening): keeps the browser console
+    // clean; the static export has no such route or link.
+    if (req.method === "GET" && url.pathname === "/favicon.ico") {
+      res.writeHead(200, { "Content-Type": "image/svg+xml", "Cache-Control": "max-age=3600" });
+      res.end(FAVICON_SVG);
+      return;
+    }
     if (req.method === "POST" && url.pathname === "/api/update") {
+      // Mutating-route origin gate (task-board-serve-hardening): anything that
+      // is not the served loopback origin is refused before the kernel write
+      // path runs. Defense in depth on top of the 127.0.0.1-only binding.
+      const header = (name: string): string | undefined => {
+        const value = req.headers[name];
+        return Array.isArray(value) ? value[0] : value;
+      };
+      if (
+        !isAllowedMutatingOrigin(
+          {
+            origin: header("origin"),
+            host: header("host"),
+            secFetchSite: header("sec-fetch-site"),
+          },
+          port(),
+        )
+      ) {
+        sendUpdateError(
+          res,
+          403,
+          "cross-site update refused (this server mutates for loopback clients only)",
+        );
+        return;
+      }
       const body = await readBody(req);
       let payload: Record<string, unknown>;
       try {
@@ -489,4 +510,31 @@ function readBody(req: IncomingMessage, limit = 1024 * 1024): Promise<string> {
     req.on("end", () => resolve(chunks.join("")));
     req.on("error", reject);
   });
+}
+
+/**
+ * Best-effort default-browser launch for `board --serve --open`
+ * (task-board-serve-hardening). `xdg-open` / `open` / `cmd start` per platform,
+ * detached, stdio discarded; spawn errors (missing binary, no desktop session)
+ * are swallowed — the server keeps serving either way, which is what
+ * "best-effort" means here. The launcher is injectable for tests.
+ */
+export function openInBrowser(
+  url: string,
+  platform: string = process.platform,
+  spawnFn: typeof spawn = spawn,
+): boolean {
+  try {
+    const child =
+      platform === "darwin"
+        ? spawnFn("open", [url], { stdio: "ignore", detached: true })
+        : platform === "win32"
+          ? spawnFn("cmd", ["/c", "start", "", url], { stdio: "ignore", detached: true })
+          : spawnFn("xdg-open", [url], { stdio: "ignore", detached: true });
+    child.on("error", () => {}); // best-effort: a failed launch never breaks serving
+    child.unref();
+    return true;
+  } catch {
+    return false;
+  }
 }
