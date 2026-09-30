@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-methodology-change-protocol
 title: methodology-change-protocol
 assignee: Arggon
@@ -9,8 +9,7 @@ parent: methodology-improvements
 labels: []
 priority: p2
 created: "2026-09-29"
-updated: "2026-09-29"
-claimed_at: "2026-09-29T23:49:13.562Z"
+updated: "2026-09-30"
 depends_on: [task-adr-adopter-upgrade-channel]
 worktree_path: /home/arggon/Projects/ArggonManager-task-methodology-change-protocol
 ---
