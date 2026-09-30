@@ -41,8 +41,22 @@ Consumption form (from the merged item): pass contract items straight into `appl
 
 ## Acceptance
 
-- [ ] The board's embedded `applyBoardFilter` mirror drops the v1 refusal for `parent:`, `depends-on:`, `blocked-by:` and the readiness lens, reading contract items (`depends_on`) with the same precedence rule; kernel-only refusal test replaced by a parity case
-- [ ] `cli/src/board-parity.test.ts` extends the expression table (blocked-by open/closed/unknown dep, depends-on, parent chain, readiness) with 1:1 `runList`/`applyViewLens` proof
-- [ ] `e2e/board.smoke.spec.ts` gets a dep-predicate case; README board section + `docs/json-output.md` board note updated (remove the "refused" wording)
-- [ ] Filtered counts/URL state behave like the existing predicates; no `lib/**` change expected (dual shape is already there), no new CLI flags
-- [ ] Unit + browser smoke evidence in the verdict; `npm test` / lint / build / `validate` green
+- [x] The board's embedded `applyBoardFilter` mirror drops the v1 refusal for `parent:`, `depends-on:`, `blocked-by:` and the readiness lens, reading contract items (`depends_on`) with the same precedence rule; kernel-only refusal test replaced by a parity case
+- [x] `cli/src/board-parity.test.ts` extends the expression table (blocked-by open/closed/unknown dep, depends-on, parent chain, readiness) with 1:1 `runList`/`applyViewLens` proof
+- [x] `e2e/board.smoke.spec.ts` gets a dep-predicate case; README board section + `docs/json-output.md` board note updated (remove the "refused" wording)
+- [x] Filtered counts/URL state behave like the existing predicates; no `lib/**` change expected (dual shape is already there), no new CLI flags
+- [x] Unit + browser smoke evidence in the verdict; `npm test` / lint / build / `validate` green
+
+### 2026-09-30 @Arggon
+Verdict (PR #483)
+
+Implemented exactly per the consumption form: the v1 refusal (KERNEL_ONLY_FIELDS) is gone. `applyBoardFilter` now carries `parent:` (exact match, parentless items never match), `depends-on:` (membership), `blocked-by:` (inverse index over the WHOLE input, so a filtered-out dependency can never look unknown) — all reading either dependency shape with the kernel precedence `dependsOn ?? depends_on ?? []` — plus `ready:true`/`ready:false` as the board spelling of the kernel readiness lens (every dep terminal done/cancelled; unknown dep id counts as open, per kernel isReady). The kernel filter language has no ready field, so readiness is pinned against `applyViewLens({ ready: true })` instead of runList; everything else is pinned against `runList --filter` on a real tracker with an open dep (in_progress), a closed dep (done) and an unknown dep (ghost-dep) in the fixture.
+
+Evidence:
+- board.test.ts: refusal test replaced by positive kernel-semantics tests incl. a dual-shape precedence case (dependsOn hides the contract dep) and the ready:bogus refusal ('unknown readiness "bogus". Allowed: true, false').
+- board-parity.test.ts: parity table grew from 18 to 27 expressions (parent chain, !parent, depends-on +/-, blocked-by open/closed/unknown, ANDed combos); sandbox embedded-vs-TS verdict loop covers all of them + readiness; real-tracker runList parity over the whole table; new applyViewLens readiness proof (ready 4 / not-ready 2 on the fixture, all three dep states exercised).
+- e2e @smoke: new 'dependency predicates narrow by deps and readiness' — blocked-by:<open dep> narrows to the detail fixture, ready:false matches exactly it (its other dep is cancelled), URL-hash round-trip after reload. Lane: 20 passed, zero exclusions.
+- Real-browser evidence (headless chromium against board --serve on this worktree's 367-item tracker): 'blocked-by:bug-native-start-worktree-no-install' narrows to the same 4 ids runList returns (first card bug-native-cleanup-unverified-worktree-removal); 'ready:true' leaves 367/367 — exactly applyViewLens' count for the same tracker; hash restores after reload. Screenshots taken.
+- README + docs/json-output.md refusal wording removed; filter placeholder lists the new fields.
+
+Gates (after merging origin/main 624a4259): npm test 1834 passed / 107 files; lint clean; build green; check:plugin green; arggon validate ok; playwright @smoke 20 passed.
