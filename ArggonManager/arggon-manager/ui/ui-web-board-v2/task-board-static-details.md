@@ -28,8 +28,6 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-board-static-details
 
 ## Acceptance
 
-- [ ] 
-
 ## Notes
 
 ### 2026-09-23 @ses_f34ba048bffeDqO6XhG0C62Nw6
@@ -39,8 +37,8 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-board-static-details
 
 ## Acceptance
 
-- [ ] Optional `--details` flag on `arggon board` (static) embedding a bounded per-item detail — documented per-item cap (prose bytes) and a measured payload statement on this repo's 316-item tracker in README
-- [ ] The static page reuses the serve drawer client with the embedded payload instead of the fetch; works from `file://` with no server; no runtime dependencies
-- [ ] Without the flag the static export stays byte-identical to today (regression test)
-- [ ] Tests: unit (embedding/caps/escaping) + an `@smoke` case for the static-with-details export; payload-size evidence in the verdict
-- [ ] README board section + `ArggonManager/docs/json-output.md` board section updated (flag + payload contract); `cli/README.md` note aligned with `task-ui-docs-refresh`
+- [x] Optional `--details` flag on `arggon board` (static) embedding a bounded per-item detail — documented per-item cap (prose bytes) and a measured payload statement on this repo's tracker in README (measured at 368 items: the tracker grew past the 316 the item quoted)
+- [x] The static page reuses the serve drawer client with the embedded payload instead of the fetch; works from `file://` with no server; no runtime dependencies
+- [x] Without the flag the static export stays byte-identical to today (regression test)
+- [x] Tests: unit (embedding/caps/escaping) + an `@smoke` case for the static-with-details export; payload-size evidence in the verdict
+- [x] README board section + `ArggonManager/docs/json-output.md` board section updated (flag + payload contract); `cli/README.md` note aligned with `task-ui-docs-refresh`
