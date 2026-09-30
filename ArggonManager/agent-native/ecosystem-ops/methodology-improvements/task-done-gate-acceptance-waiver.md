@@ -75,3 +75,7 @@ Evidence for review (all commands run in the worktree; fixture probes against di
   5. --waive on a done item (nothing to waive) -> exit 1 — as expected. validate --json ok on the fixture.
 - Blast radius handled in-PR: ~60 existing done-flip call sites across 13 test files arrange ticked checklists via the shared helper test/acceptance.ts (no test-only kernel bypass); import-issues self-waives closed-issue flips with reason 'imported as closed from GitHub issue #<n>' (body may carry task lists); opencode-smoke ticks the box before its close session; auto-done.yml tolerates the refusal in BOTH the flip loop and redo_flip with a ::warning:: annotation.
 - MCP: arggon_update has NO waive property (parity exception documented in cli/src/mcp-parity.test.ts); kernel also refuses agent callers as defense in depth. schemaVersion unchanged.
+
+### handoff 2026-09-30 @Arggon — next: Coordinator review: verify ADR 0015 acceptance, run the fixture probes in the evidence comment if desired, then merge (MERGE, never squash). Rebase first if task-spec-analyze-decision-gaps landed on …
+- branch: feat/task-done-gate-acceptance-waiver
+- open questions: Waiver section heading format (### Waiver <date>) and the strict nothing-to-waive refusal are ADR 0015 semantics — flag in review if the product owner wants laxer waive handling
