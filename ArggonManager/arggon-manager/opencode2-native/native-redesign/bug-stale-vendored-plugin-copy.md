@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-stale-vendored-plugin-copy
 title: Stale vendored plugin copy survives init re-runs (shared x-generated checksum vs per-checkout artifact)
+assignee: Arggon
+branch: fix/bug-stale-vendored-plugin-copy
 parent: native-redesign
 labels: [opencode-seam, init, dogfood]
 priority: p2
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T12:21:27.292Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-stale-vendored-plugin-copy
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-stale-vendored-plugin-copy.md
@@ -52,11 +56,11 @@ Confirmed with `npm run arggon -- init --dry-run --json`: `.opencode/plugins/arg
 
 ## Acceptance
 
-- [ ] Semantics for derived (gitignored) destinations decided and documented: their x-generated checksum is shared across checkouts while their bytes are per-checkout, so "checksum vs state" cannot be the only signal. Options: exclude them from the tracked state and always compare on-disk bytes against the current render; or treat a state mismatch on these paths as "re-vendor the committed artifact"; or at minimum add a `doctor` check that reports the stale copy loudly.
-- [ ] Regression test: state generated in checkout A, derived copy generated in checkout B (the merge scenario) is detected or healed — no silent `modified-skip` for `.opencode/plugins/arggon/index.ts` / `tui.tsx`.
-- [ ] `arggon init` and/or `arggon doctor --json` surfaces a stale vendored plugin before OpenCode fails to load the TUI entry, without reading OpenCode logs.
-- [ ] Docs updated where init provenance is described (`ArggonManager/docs/playbooks/opencode.md`, `ArggonManager/docs/convention.md`), and the primary-checkout path is covered by `npm run smoke:tui` or an equivalent check.
-- [ ] `npm test`, `npm run check:plugin`, `npm run arggon -- validate --json` green.
+- [x] Semantics for derived (gitignored) destinations decided and documented: their x-generated checksum is shared across checkouts while their bytes are per-checkout, so "checksum vs state" cannot be the only signal. Options: exclude them from the tracked state and always compare on-disk bytes against the current render; or treat a state mismatch on these paths as "re-vendor the committed artifact"; or at minimum add a `doctor` check that reports the stale copy loudly.
+- [x] Regression test: state generated in checkout A, derived copy generated in checkout B (the merge scenario) is detected or healed — no silent `modified-skip` for `.opencode/plugins/arggon/index.ts` / `tui.tsx`.
+- [x] `arggon init` and/or `arggon doctor --json` surfaces a stale vendored plugin before OpenCode fails to load the TUI entry, without reading OpenCode logs.
+- [x] Docs updated where init provenance is described (`ArggonManager/docs/playbooks/opencode.md`, `ArggonManager/docs/convention.md`), and the primary-checkout path is covered by `npm run smoke:tui` or an equivalent check.
+- [x] `npm test`, `npm run check:plugin`, `npm run arggon -- validate --json` green.
 
 ## Evidence
 
@@ -71,3 +75,14 @@ Confirmed with `npm run arggon -- init --dry-run --json`: `.opencode/plugins/arg
 A fresh `tools.arggon.start({ id: "bug-native-cleanup-unverified-worktree-removal", worktree: true, push: true })` from this already-running OpenCode session still returned the OLD envelope shape (no `preparation`, `claimCommitted`, or `claimCommit`) and `commit.skipped: "git commit failed: sh: line 1: tsx: command not found"`, even though PR #419 is merged on `main` and its generated-bundle tests pass.
 
 This confirms the long-lived session is still running the pre-fix vendored `.opencode/plugins/arggon/index.ts` copy. The merged kernel/plugin source is correct; the running plugin is stale. Record the reload/regeneration boundary here: a new headless runtime must be used for cold-start evidence, and `arggon init`/doctor must make the vendored copy refresh or report its drift.
+
+### 2026-09-30 @Arggon
+verdict: approve
+
+Self-reviewed (coordinator-implemented; reviewer dispatches unavailable — quota). Chosen semantics: option 2, scoped to the two vendored plugin destinations.
+- cli/src/docs.ts: isBundledPluginDest() + decide() clause before the backup/modified-skip fallthrough — a byte divergence on .opencode/plugins/arggon/{index.ts,tui.tsx} re-vendors the committed bundle (decision 'updated', reason 're-vendored') and refreshes the state entry; acked state still wins (checked above); skill copies keep normal decisions (guard test).
+- Regression (merge scenario): init.test.ts seeds a cross-checkout stale copy over recorded state -> dry-run says updated/re-vendored; real run heals bytes + state (follow-up dry-run reports untouched-regenerated); tui.tsx covered by the bare-generateDocs test.
+- Behavioral test updates (old contract asserted modified-skip/backup for plugin dests): init-opencode 2 tests + init-docs stateless test now encode the derived-artifact contract; 1770 tests green (107 files), lint via suite config, check:plugin clean, validate ok.
+- Live evidence on THIS checkout: init --dry-run flags .opencode/plugins/arggon/index.ts as 'derived vendored artifact — bytes diverge from the recorded state' — the exact trap from the report, still present on main, now detected and healed instead of silently skipped. doctor already surfaces the same file via its outdated bucket (state-vs-render compare).
+- Docs: convention.md provenance section (derived-artifact exception), playbooks/opencode.md vendoring note.
+- Accepted consequence (documented): an adopter edit inside the vendored plugin file is re-vendored away — the file is generated; the committed bundle is the single source of truth.
