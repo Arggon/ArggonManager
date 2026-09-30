@@ -1,0 +1,25 @@
+{
+  "extends": "./tsconfig.typecheck.json",
+  "compilerOptions": {
+    // Inheritance: `tsconfig.typecheck.json` already provides the shape this
+    // project needs — `noEmit` (task-typecheck-e2e-specs: e2e must never emit;
+    // the emitting BUILD project keeps `rootDir: "cli/src"` and must not be
+    // widened to reach e2e) and `rootDir: "."` (e2e lives at the repository
+    // root). Only the standard library differs.
+    //
+    // Why a sibling and not another include line in `tsconfig.typecheck.json`:
+    // the e2e spec drives a browser, so its `page.evaluate` callbacks reference
+    // `window`, `document` and `HTMLElement` — which need the `DOM` standard
+    // library. `tsconfig.typecheck.json` checks `cli/src` and `test/` (kernel
+    // and node-only surfaces) WITHOUT DOM globals, and adding DOM there would
+    // silently widen what those files are checked against (e.g. a stray
+    // `document` in kernel code would stop being an error). This sibling scopes
+    // `lib: ["ES2022", "DOM"]` to the browser surface only.
+    "lib": ["ES2022", "DOM"]
+  },
+  // Only the Playwright surface. `playwright.config.ts` (repository root,
+  // outside `e2e/`) is linted but intentionally out of scope here — this
+  // project exists to type-check the spec files under `e2e/` that the CI
+  // `@smoke` gate executes (task-typecheck-e2e-specs).
+  "include": ["e2e/**/*.ts"]
+}
