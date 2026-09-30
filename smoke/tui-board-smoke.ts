@@ -23,9 +23,10 @@
  * counts the matches) → `v` cycles back → an invalid filter expression is
  * refused inline at the prompt (`status:bogus` stays unapplied with the
  * kernel's error, task-tui-filter-language) → Esc cancels → the WRITE actions
- * (task-tui-actions-parity): `c` claims the seeded task through the assignee
- * prompt (the applied frame names the claim) and `m` moves it through the
- * legal-target menu + `y/N` confirm (the applied frame names the transition)
+ * (task-tui-actions-parity): the filter re-pins the seeded task and `c` claims
+ * it through the assignee prompt (the applied frame names the claim) and `m`
+ * moves it through the legal-target menu + `y/N` confirm (the applied frame
+ * names the transition)
  * — both through the kernel `runUpdate` on the real fixture files → q. A
  * regression net for the raw-ANSI renderer without a model in the loop.
  *
@@ -497,7 +498,24 @@ function runTui(fixture: string): Promise<{ capture: string; steps: StepResult[]
           !lastFrame(capture).includes("esc to cancel") &&
           !lastFrame(capture).includes("█") &&
           !lastFrame(capture).includes("filter:"),
-        send: "c", // claim flow for the still-selected seeded task
+        send: "/", // re-open the filter prompt to pin the claim target
+      },
+      {
+        label: "filter prompt open for the claim target",
+        until: (capture) => lastFrame(capture).includes("esc to cancel"),
+        send: "task-board-task", // free-text token on the seeded id
+      },
+      {
+        label: "claim-target filter draft typed",
+        until: (capture) => lastFrame(capture).includes("/task-board-task█"),
+        send: "\r", // apply: the seeded task is the only visible card again
+      },
+      {
+        label: "claim target re-filtered (selection pinned to the seeded task)",
+        until: (capture) =>
+          isBoardFrame(lastFrame(capture), SEEDED_ITEM_ID) &&
+          lastFrame(capture).includes(`filter: ${SEEDED_ITEM_ID}`),
+        send: "c", // claim flow for the selected (and filtered) seeded task
       },
       {
         label: "claim prompt open with the assignee field",
