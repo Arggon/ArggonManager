@@ -62,3 +62,7 @@ Verified against the acceptance checklist (all four boxes ticked honestly):
 Gates on the merged branch (all green): npm test 107 files / 1791 tests; npm run lint; npm run build; npm run check:plugin (bundle matches sources); npm run lint:structure; npm run test:structure (3 passed); npm run smoke:tui 18/18 incl. j-cursor, n-next, a-active, enter-detail; npm run arggon -- validate --json ok:true. Prettier clean on all touched files.
 
 Item left in_progress; PR #411 marked ready with an updated description. Completion is the coordinator's call after merge.
+
+### handoff 2026-09-30 @Arggon — next: Coordinator: review the review-verdict comment (2026-09-30) and merge PR #411; flip the item to done after merge.
+- branch: feat/task-native-panel-interaction
+- open questions: Bundle size grew to 389154 B after merging main's native-prep code; fine per check:plugin
