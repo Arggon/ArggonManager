@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-repo-visibility-decision
 title: Decide repo visibility (public vs private) and execute the readiness checklist if private
+assignee: Arggon
+branch: feat/task-repo-visibility-decision
 parent: operating-principles
 labels: [process]
 priority: p1
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T14:35:14.310Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-repo-visibility-decision
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/operating-principles/task-repo-visibility-decision.md
