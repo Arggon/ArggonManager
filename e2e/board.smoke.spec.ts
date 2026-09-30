@@ -410,6 +410,36 @@ test.describe("@smoke board --serve", () => {
     await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
   });
 
+  test("dependency predicates narrow by deps and readiness (task-board-filter-dep-predicates)", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    const visible = page.locator(".card:not(.filtered-out)");
+
+    // blocked-by:<id> is the computed inverse: exactly one fixture item waits
+    // on the open detail dep.
+    await page.locator("#board-filter-input").fill(`blocked-by:${DETAIL_DEP_ID}`);
+    await expect(visible).toHaveCount(1);
+    await expect(page.locator(`.card:not(.filtered-out)[data-id="${DETAIL_ITEM_ID}"]`)).toHaveCount(
+      1,
+    );
+    expect(filterFromUrl(page.url())).toBe(`blocked-by:${DETAIL_DEP_ID}`);
+
+    // ready:false — the detail task is the only item with an open dependency
+    // (its other dep is cancelled, i.e. terminal, so ready:true excludes just it).
+    await page.locator("#board-filter-input").fill("ready:false");
+    await expect(visible).toHaveCount(1);
+    await expect(page.locator(`.card:not(.filtered-out)[data-id="${DETAIL_ITEM_ID}"]`)).toHaveCount(
+      1,
+    );
+
+    // The hash restores the dep predicate after a reload, like every filter.
+    await page.locator("#board-filter-input").fill(`blocked-by:${DETAIL_DEP_ID}`);
+    await page.reload();
+    await expect(page.locator("#board-filter-input")).toHaveValue(`blocked-by:${DETAIL_DEP_ID}`);
+    await expect(visible).toHaveCount(1);
+  });
+
   test("the static export filters offline through the same URL hash", async ({ page }) => {
     const boardFile = join(fixture, "static-board.html");
     runCli(fixture, ["board", "--out", boardFile]);
