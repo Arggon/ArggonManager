@@ -9,8 +9,15 @@
  * assert the resulting behavior, not a private re-implementation.
  */
 import { describe, expect, it } from "vitest";
+import {
+  buildAncestorIndex,
+  buildBlockedByIndex,
+  matchesPredicate,
+  parseFilter,
+} from "./filter.js";
 import type { WorkItem as ContractWorkItem } from "./types.js";
 import {
+  applyViewFilter,
   applyViewLens,
   buildStatusIndex,
   groupItemsBy,
@@ -605,5 +612,182 @@ describe("contract-shaped items (depends_on)", () => {
     expect(applyViewLens(items)[0]).toBe(items[0]);
     expect("dependsOn" in items[0]!).toBe(false);
     expect(items[0]!.depends_on).toEqual(["task-b"]);
+  });
+});
+
+describe("applyViewFilter (task-tui-filter-language)", () => {
+  const base = [
+    item({
+      id: "task-a",
+      status: "todo",
+      labels: ["security"],
+      priority: "p2",
+      title: "Harden login",
+      assignee: "mia",
+      dependsOn: ["task-blocker"],
+    }),
+    item({ id: "task-b", status: "todo", priority: "p0", title: "Ship it" }),
+    item({ id: "task-blocker", status: "in_progress" }),
+    item({ id: "bug-c", type: "bug", status: "done", labels: [] }),
+    item({ id: "story-d", type: "story", status: "todo", parent: "epic-x", title: "kanban" }),
+    item({ id: "epic-x", type: "epic", status: "in_progress" }),
+  ];
+
+  /** The items the raw kernel parser+matcher keep for one expression. */
+  function kernelKept(expr: string): string[] {
+    const preds = parseFilter(expr);
+    const normalized = base.map((entry) => ({
+      ...entry,
+      dependsOn: entry.dependsOn ?? [],
+    }));
+    const blockedBy = buildBlockedByIndex(normalized);
+    const ancestors = buildAncestorIndex(base);
+    return base
+      .filter((entry, index) =>
+        preds.every((pred) => matchesPredicate(normalized[index]!, pred, blockedBy, ancestors)),
+      )
+      .map((entry) => entry.id);
+  }
+
+  it("an empty/blank expression matches everything (copy, input order)", () => {
+    const verdict = applyViewFilter(base, "  ");
+    expect(verdict.ok).toBe(true);
+    if (verdict.ok) {
+      expect(verdict.items).toEqual(base);
+      expect(verdict.items[0]).toBe(base[0]);
+    }
+  });
+
+  it("predicate expressions select exactly what parseFilter+matchesPredicate keep (parity)", () => {
+    const expressions = [
+      "status:todo",
+      "type:task",
+      "label:security",
+      "!status:todo",
+      "status:todo priority:p0",
+      "assignee:mia",
+      "priority:none",
+      "ancestor:epic-x",
+      "depends-on:task-blocker",
+      "blocked-by:task-blocker",
+      "parent:epic-x",
+      "status:todo !label:security",
+    ];
+    for (const expr of expressions) {
+      const verdict = applyViewFilter(base, expr);
+      expect(verdict.ok, expr).toBe(true);
+      if (verdict.ok)
+        expect(
+          verdict.items.map((entry) => entry.id),
+          expr,
+        ).toEqual(kernelKept(expr));
+    }
+  });
+
+  it("keeps the kernel parser's exact error messages", () => {
+    expect(applyViewFilter(base, "unknown:value")).toEqual({
+      ok: false,
+      error:
+        'unknown filter field "unknown". Allowed: status, type, assignee, label, parent, depends-on, blocked-by, ancestor, priority',
+    });
+    // A colon-less bare token is free text (the board-lens extension), not a
+    // parse error: it matches nothing here and stays ok.
+    expect(applyViewFilter(base, "status")).toEqual({ ok: true, items: [] });
+    expect(applyViewFilter(base, 'assignee:"unclosed')).toEqual({
+      ok: false,
+      error: 'unterminated quote in filter expression: assignee:"unclosed',
+    });
+    expect(applyViewFilter(base, "status:")).toMatchObject({
+      ok: false,
+      error: 'empty value in filter token "status:"',
+    });
+  });
+
+  it("validates type/status/priority enums like runList", () => {
+    expect(applyViewFilter(base, "type:snippet")).toEqual({
+      ok: false,
+      error: 'unknown type "snippet". Allowed: initiative, epic, story, task, bug',
+    });
+    expect(applyViewFilter(base, "status:done-ish")).toEqual({
+      ok: false,
+      error: 'unknown status "done-ish". Allowed: todo, in_progress, blocked, done, cancelled',
+    });
+    expect(applyViewFilter(base, "priority:urgent")).toEqual({
+      ok: false,
+      error: 'unknown priority "urgent". Allowed: p0, p1, p2, p3, none',
+    });
+  });
+
+  it("treats colon-less tokens as free text on id/title, ANDed with predicates", () => {
+    // "kanban" only appears in story-d's title.
+    const verdict = applyViewFilter(base, "kanban");
+    expect(verdict.ok).toBe(true);
+    if (verdict.ok) expect(verdict.items.map((entry) => entry.id)).toEqual(["story-d"]);
+    // Free text ANDs with predicates: todo + the title needle.
+    const both = applyViewFilter(base, "status:todo kanban");
+    expect(both.ok).toBe(true);
+    if (both.ok) expect(both.items.map((entry) => entry.id)).toEqual(["story-d"]);
+    // Case-insensitive on id and title.
+    const idNeedle = applyViewFilter(base, "TASK-B");
+    expect(idNeedle.ok).toBe(true);
+    if (idNeedle.ok)
+      expect(idNeedle.items.map((entry) => entry.id)).toEqual(["task-b", "task-blocker"]); // substring
+    // Quoted free text with spaces stays one needle.
+    const quoted = applyViewFilter(base, '"ship it"');
+    expect(quoted.ok).toBe(true);
+    if (quoted.ok) expect(quoted.items.map((entry) => entry.id)).toEqual(["task-b"]);
+  });
+
+  it("refuses a negated bare token instead of silently matching nothing", () => {
+    expect(applyViewFilter(base, "!kanban")).toEqual({
+      ok: false,
+      error:
+        'bad filter token "!kanban" (negation applies to field:value predicates; free text matches id/title as-is)',
+    });
+  });
+
+  it("resolves assignee:@me lazily like runList and refuses when unresolvable", () => {
+    const resolved = applyViewFilter(base, "assignee:@me", { resolveMe: () => "mia" });
+    expect(resolved.ok).toBe(true);
+    if (resolved.ok) expect(resolved.items.map((entry) => entry.id)).toEqual(["task-a"]);
+    const preResolved = applyViewFilter(base, "assignee:@me", { me: "mia" });
+    expect(preResolved.ok).toBe(true);
+    if (preResolved.ok) expect(preResolved.items.map((entry) => entry.id)).toEqual(["task-a"]);
+    // The resolver is only called when @me actually appears.
+    let calls = 0;
+    applyViewFilter(base, "status:todo", {
+      resolveMe: () => {
+        calls += 1;
+        return null;
+      },
+    });
+    expect(calls).toBe(0);
+    expect(applyViewFilter(base, "assignee:@me", { resolveMe: () => null })).toEqual({
+      ok: false,
+      error:
+        "could not resolve @me (set GITHUB_USER or GITHUB_ACTOR, or authenticate gh: gh api user)",
+    });
+  });
+
+  it("reads dependencies in the contract shape (depends_on) and never mutates the input", () => {
+    const contract = [
+      contractItem({ id: "task-open", depends_on: ["task-done"] }),
+      contractItem({ id: "task-done", status: "done" }),
+    ];
+    const verdict = applyViewFilter(contract, "depends-on:task-done");
+    expect(verdict.ok).toBe(true);
+    if (verdict.ok) {
+      expect(verdict.items.map((entry) => entry.id)).toEqual(["task-open"]);
+      expect(verdict.items[0]).toBe(contract[0]);
+    }
+    expect("dependsOn" in contract[0]!).toBe(false);
+  });
+
+  it("computes blocked-by/ancestor over the WHOLE input (a filtered-out dep stays known)", () => {
+    // task-blocker is excluded by the type predicate, but task-a's blocked-by
+    // and depends-on edges are computed over all six items.
+    const verdict = applyViewFilter(base, "type:task blocked-by:task-blocker");
+    expect(verdict.ok).toBe(true);
+    if (verdict.ok) expect(verdict.items.map((entry) => entry.id)).toEqual(["task-a"]);
   });
 });

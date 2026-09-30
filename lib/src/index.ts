@@ -129,6 +129,8 @@ export {
   buildBlockedByIndex,
   matchesPredicate,
   parseFilter,
+  splitFilterTokens,
+  unquoteFilterValue,
 } from "./filter.js";
 export type {
   AncestorIndex,
@@ -160,6 +162,7 @@ export type {
 // --- Board view-model (derived display data shared by web/TUI/panel) --------
 
 export {
+  applyViewFilter,
   applyViewLens,
   buildStatusIndex,
   groupItemsBy,
@@ -177,7 +180,13 @@ export {
   treeEntries,
   visibleItems,
 } from "./view-model.js";
-export type { ViewGroup, ViewItem, ViewLens, ViewTreeEntry } from "./view-model.js";
+export type {
+  ViewGroup,
+  ViewItem,
+  ViewLens,
+  ViewFilterVerdict,
+  ViewTreeEntry,
+} from "./view-model.js";
 
 // --- Envelopes (the `--json` contract) --------------------------------------
 
