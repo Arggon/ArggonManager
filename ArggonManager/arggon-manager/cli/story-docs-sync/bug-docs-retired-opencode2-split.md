@@ -10,7 +10,6 @@ labels: [docs]
 priority: p2
 created: "2026-09-22"
 updated: "2026-09-30"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-docs-retired-opencode2-split
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-docs-sync/bug-docs-retired-opencode2-split.md
