@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-tui-sort-ready-lens
 title: "TUI sort and ready lens: priority/next rank, ready-only view"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [tui, ui]
 priority: p2
 created: "2026-09-22"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T15:57:32.705Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-tui-sort-ready-lens
 ---
 <!--
