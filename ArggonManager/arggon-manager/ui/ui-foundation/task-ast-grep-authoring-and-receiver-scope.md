@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-ast-grep-authoring-and-receiver-scope
 title: Clarify ast-grep authoring constraints and receiver-name scope
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [tooling, architecture, review-followup]
 priority: p3
 created: "2026-09-28"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T16:20:03.919Z"
 depends_on: [task-ast-grep-structural-rules]
 worktree_path: /home/arggon/Projects/ArggonManager-task-ast-grep-authoring-and-receiver-scope
 ---
