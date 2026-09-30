@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-board-progress-header
 title: "Web board progress header: per-epic rollup, blocked and priority mix"
+assignee: Arggon
+branch: feat/task-board-progress-header
 parent: ui-web-board-v2
 labels: [viewer, board, ui]
 priority: p3
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T20:04:24.697Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-board-progress-header
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-progress-header.md
