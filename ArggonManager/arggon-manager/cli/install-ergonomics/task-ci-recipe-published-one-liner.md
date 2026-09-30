@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-ci-recipe-published-one-liner
 title: "Generated CI recipe: install the published npm package instead of cloning the repo"
+assignee: Arggon
+branch: feat/task-ci-recipe-published-one-liner
 parent: install-ergonomics
 labels: [ci, packaging]
 priority: p2
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T13:46:22.190Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-ci-recipe-published-one-liner
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/install-ergonomics/task-ci-recipe-published-one-liner.md
