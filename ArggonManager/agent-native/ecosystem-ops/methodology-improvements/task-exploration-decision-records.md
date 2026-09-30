@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-exploration-decision-records
 title: exploration-decision-records-cleanup
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-29"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T12:11:42.385Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-exploration-decision-records
 ---
 <!--
