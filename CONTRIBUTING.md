@@ -179,8 +179,10 @@ browser gate stays the Playwright CLI drive described in
   card per `arggon list` item, one status move round-trips through the UI and
   persists (`arggon show`), and the ready page carries no WCAG A/AA
   accessibility violation
-- `npm run smoke:tui-board` — TUI frame check: `arggon board --tui` renders in a
-  pty and the capture carries the five status headers plus a seeded item id
+- `npm run smoke:tui-board` — TUI scripted pty session: `arggon board --tui`
+  renders, then 14 scripted steps drive it (live refresh without a keypress,
+  ready lens on/off, priority/next sorts, `/` filter, detail pane, split-PgDn
+  paging with the pane held open, board restored) before quitting with `q`
   (skips cleanly where util-linux `script` is unavailable)
 
 The Playwright specs live in `e2e/`, outside vitest's include globs, so
