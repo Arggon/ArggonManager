@@ -28,8 +28,6 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-tui-live-refresh
 
 ## Acceptance
 
-- [ ] 
-
 ## Notes
 
 ### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
@@ -39,7 +37,7 @@ The TUI re-reads the tree after every keypress only (`runTuiBoard`), so an idle 
 
 ## Acceptance
 
-- [ ] A debounced fs watcher on the tracker dir re-reads and repaints without a keypress, preserving selection/filter when the item still exists; `r` forces a refresh
-- [ ] Watcher unavailable or failing degrades transparently to per-keypress reads (never crashes, never exits)
-- [ ] Footer carries a freshness stamp (e.g. `updated 12:03:44`)
-- [ ] Tests with an injected watcher; pty evidence; README note updated
+- [x] A debounced fs watcher on the tracker dir re-reads and repaints without a keypress, preserving selection/filter when the item still exists; `r` forces a refresh
+- [x] Watcher unavailable or failing degrades transparently to per-keypress reads (never crashes, never exits)
+- [x] Footer carries a freshness stamp (e.g. `updated 12:03:44`)
+- [x] Tests with an injected watcher; pty evidence; README note updated
