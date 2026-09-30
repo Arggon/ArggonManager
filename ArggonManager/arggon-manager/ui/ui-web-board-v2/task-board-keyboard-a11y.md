@@ -63,3 +63,7 @@ Findings fixed in passing (not filed separately, they were blocking correctness 
 Test-infra note: the menu e2e tests mute the SSE stream with page.route('**/events') registered BEFORE goto; registered after goto the initial EventSource connects unblocked and each successful move location.reload()s the page mid-flow (found via trace). Reload behavior itself stays covered by the existing live-reload test.
 
 Docs: README board section gained a keyboard-and-touch bullet documenting the HTML5 DnD touch limitation and the menu fallback.
+
+### handoff 2026-09-30 @Arggon — next: Review PR #462 (ready): smoke evidence table is in the PR description; reviewer should re-run npx playwright test --grep @smoke and drive the board per docs/engineering.md UI bar. Status flip to done…
+- branch: feat/task-board-keyboard-a11y
+- open questions: Should the claim/blocked-reason window.prompt flows grow proper dialogs in a follow-up (kept for strict drag parity here)?
