@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-done-gate-acceptance-waiver
 title: done-gate-acceptance-waiver
 assignee: Arggon
@@ -9,8 +9,7 @@ parent: methodology-improvements
 labels: []
 priority: p1
 created: "2026-09-29"
-updated: "2026-09-29"
-claimed_at: "2026-09-29T23:07:55.661Z"
+updated: "2026-09-30"
 worktree_path: /home/arggon/Projects/ArggonManager-task-done-gate-acceptance-waiver
 ---
 <!--
