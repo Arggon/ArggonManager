@@ -51,3 +51,7 @@ Evidence, expected vs observed:
 DELIBERATE KEY CHANGE (merge-order note): the ready-only lens moved from l to L — the work order requires lowercase l as the vim right motion. Footer/README/overlay all say 'L ready'. PRs #484 (v views) and #489 (c/m) document their own keys; the TUI_HELP data structure, the footer string and the README table are the three conflict points when those merge — the overlay content is data, so conflicts localize.
 
 Deviations: none.
+
+### handoff 2026-09-30 @Arggon — next: Coordinator review of PR #492; when merging with #484/#489 resolve the three localized key-doc conflict points (TUI_HELP data, footer string, README table).
+- branch: feat/task-tui-help-vim-keys
+- open questions: None blocking
