@@ -50,3 +50,15 @@ This item is **unclaimed (`todo`)** but PR #411 (`feat/task-native-panel-interac
 - Not in the current wave: the active backlog is the P1 smoke normalizer, the shell-tasks pilot, the native start cold-start smoke, fast-check properties and axe-core CI. The panel PR also collides with the now-merged ast-grep native guard scope (`opencode/plugins/arggon/**`) and the `smoke/` module, so it needs its own wave.
 
 Next coordinator action when a wave frees up: claim the item properly, rebase/verify the branch against current `main` (the P1 shared worktree prep and the cleanup-observation fix both landed in the plugin since), run `npm run lint:structure`/`test:structure` plus the TUI smoke, review against the bar, and post the verdict here.
+
+### 2026-09-30 @Arggon
+Review verdict (adoption wave 2026-09-30, @Arggon): adopted PR #411 after a week of main drift (459 commits since the old merge-base). The branch was updated by MERGING origin/main (2f14d652), not rebasing: the branch history is already pushed, a rebase would need a force-push (forbidden); merge-update is this repo's precedent (8130395d, a00ba235). Conflicts resolved: item body (took main: coordinator note + claim), index.bundle.ts (regenerated via build:plugin from merged sources, 389154 B).
+
+Verified against the acceptance checklist (all four boxes ticked honestly):
+- Keymap pins j/k + arrows, PgUp/PgDn, g/G + Home/End, Enter detail, n/a jumps, r/f/esc (tui.tsx arggon.board.* bindings).
+- Board selection is a clamped, id-resolving state machine; detail rows bounded (16 rows x 200 chars) and control-escaped before the width clip (board.ts).
+- Corrupt tracker degrades to the unreadable header (P1 guard) — smoke check passes.
+
+Gates on the merged branch (all green): npm test 107 files / 1791 tests; npm run lint; npm run build; npm run check:plugin (bundle matches sources); npm run lint:structure; npm run test:structure (3 passed); npm run smoke:tui 18/18 incl. j-cursor, n-next, a-active, enter-detail; npm run arggon -- validate --json ok:true. Prettier clean on all touched files.
+
+Item left in_progress; PR #411 marked ready with an updated description. Completion is the coordinator's call after merge.
