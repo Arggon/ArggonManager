@@ -28,7 +28,6 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-ci-recipe-published-one-
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 
@@ -41,9 +40,9 @@ Impact: if the repo ever goes private, the unauthenticated clone fails in this r
 
 ## Acceptance
 
-- [ ] Template install step uses the published package pinned to the release (`npm install -g arggon-manager@<version>` or equivalent), no GitHub clone
-- [ ] Committed `.github/workflows/arggon.yml` regenerated to match (drift gate)
-- [ ] `agents.md` §CI gate snippet + `ci.md` updated; no "packages still private" text remains
-- [ ] `cli/src/headless-ci.test.ts` updated and green (install → init → drift gate → validate)
-- [ ] Release runbook step 6 (pin `ARGGON_REF`) updated for the new install form
-- [ ] CI green on the PR; no behavior change to validate/doctor/list
+- [x] Template install step uses the published package pinned to the release (`npm install -g arggon-manager@<version>` or equivalent), no GitHub clone
+- [x] Committed `.github/workflows/arggon.yml` regenerated to match (drift gate)
+- [x] `agents.md` §CI gate snippet + `ci.md` updated; no "packages still private" text remains
+- [x] `cli/src/headless-ci.test.ts` updated and green (install → init → drift gate → validate)
+- [x] Release runbook step 6 (pin `ARGGON_REF`) updated for the new install form
+- [x] CI green on the PR; no behavior change to validate/doctor/list

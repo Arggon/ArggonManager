@@ -64,10 +64,12 @@ is the first wave that publishes the packages.
 5. **Publish the two packages, in dependency order** (owner-run; see
    § Publishing to npm).
 6. Post-release, in a follow-up PR: pin the generated CI recipe to the released
-   seam — set `ARGGON_REF: vX.Y.Z` in
+   seam — set `ARGGON_VERSION: "X.Y.Z"` in
    `templates/docs/github/workflows/arggon.yml` and regenerate the committed
    `.github/workflows/arggon.yml` (`arggon init`) so adopters' drift gates
-   compare against a fixed release instead of the moving branch ref.
+   compare against the released package instead of a moving pin
+   (task-ci-recipe-published-one-liner: the recipe installs from the registry,
+   no GitHub clone).
 
 ## Publishing to npm
 
