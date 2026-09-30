@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-tui-live-refresh
 title: "TUI live refresh: watch the tracker and repaint in place"
+assignee: Arggon
+branch: feat/task-tui-live-refresh
 parent: ui-tui-v2
 labels: [tui, ui]
 priority: p2
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T15:29:57.754Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-tui-live-refresh
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-tui-v2/task-tui-live-refresh.md
@@ -24,8 +28,6 @@ updated: "2026-09-22"
 
 ## Acceptance
 
-- [ ] 
-
 ## Notes
 
 ### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
@@ -35,7 +37,18 @@ The TUI re-reads the tree after every keypress only (`runTuiBoard`), so an idle 
 
 ## Acceptance
 
-- [ ] A debounced fs watcher on the tracker dir re-reads and repaints without a keypress, preserving selection/filter when the item still exists; `r` forces a refresh
-- [ ] Watcher unavailable or failing degrades transparently to per-keypress reads (never crashes, never exits)
-- [ ] Footer carries a freshness stamp (e.g. `updated 12:03:44`)
-- [ ] Tests with an injected watcher; pty evidence; README note updated
+- [x] A debounced fs watcher on the tracker dir re-reads and repaints without a keypress, preserving selection/filter when the item still exists; `r` forces a refresh
+- [x] Watcher unavailable or failing degrades transparently to per-keypress reads (never crashes, never exits)
+- [x] Footer carries a freshness stamp (e.g. `updated 12:03:44`)
+- [x] Tests with an injected watcher; pty evidence; README note updated
+
+### 2026-09-30 @Arggon
+Implemented on feat/task-tui-live-refresh, PR #472 (ready). Rebased on post-#469 main; watcher shares sync() with the escape decoder path; smoke composes both scenarios in one pty session.
+
+Evidence:
+- pty: harness runs 'arggon create task' against the fixture WHILE the board is open, sends NO key, and the frame gains the new card (step 'live refresh: item created behind the board appears without a keypress'); board frame pins 'updated HH:MM:SS'. All 9 pty steps ok (npm run smoke:tui-board).
+- Unit: injected watcher (repaint w/o keypress, selection preserved, watcher dir == tasksDir, closed on quit); 3-event burst -> exactly one re-read; 'r' forces refresh; null/throwing factory + throwing close() degrade cleanly.
+- Gates: npm test 107 files/1797 tests ok; lint clean; build clean; validate ok:true; README --tui section updated.
+
+### handoff 2026-09-30 @Arggon — next: Review+merge PR #472 (merge, never squash). task-tui-sort-ready-lens touches the same board surface (sort comparator + ready lens).
+- branch: feat/task-tui-live-refresh

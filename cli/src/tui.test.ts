@@ -22,6 +22,7 @@ import {
   clipLine,
   createTuiKeyDecoder,
   followTuiScroll,
+  formatTuiClock,
   handleKey,
   initialTuiState,
   loadTuiItems,
@@ -43,7 +44,7 @@ import {
   visibleTuiItems,
   wrapTuiLine,
 } from "./tui.js";
-import type { TuiDetailInput, TuiDetailSource, TuiState } from "./tui.js";
+import type { TuiDetailInput, TuiDetailSource, TuiState, TuiWatchFactory } from "./tui.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -781,6 +782,197 @@ describe("runTuiBoard split escape sequence (bug-tui-split-escape-sequences)", (
     term.input.write("\x1b"); // lone Esc (held)
     term.input.write("q"); // unrelated byte: releases the Esc, then quits
     await done; // resolves: the loop exited cleanly
+    expect(term.outputText().endsWith("\x1b[?25h\x1b[?1049l")).toBe(true);
+  });
+});
+
+// ---------- live refresh (task-tui-live-refresh) ----------
+
+/** Counts the frames the loop has drawn (every render starts with a clear). */
+const frameCount = (text: string): number => text.split("\x1b[H\x1b[2J").length - 1;
+
+/** Injectable watcher double: records the watched dir and fires on demand. */
+function fakeWatchFactory(): {
+  factory: TuiWatchFactory;
+  watchers: Array<{ dir: string; onEvent: () => void; closed: boolean }>;
+  fire: (index: number) => void;
+} {
+  const watchers: Array<{ dir: string; onEvent: () => void; closed: boolean; close(): void }> = [];
+  const factory: TuiWatchFactory = (dir, onEvent) => {
+    const watcher = {
+      dir,
+      onEvent,
+      closed: false,
+      close(): void {
+        watcher.closed = true;
+      },
+    };
+    watchers.push(watcher);
+    return watcher;
+  };
+  return {
+    factory,
+    watchers,
+    fire: (index) => watchers[index]!.onEvent(),
+  };
+}
+
+describe("tui freshness stamp (task-tui-live-refresh)", () => {
+  it("formatTuiClock renders local HH:MM:SS and degrades a broken clock", () => {
+    expect(formatTuiClock(new Date(2026, 8, 30, 12, 3, 44).getTime())).toBe("12:03:44");
+    expect(formatTuiClock(new Date(2026, 8, 30, 7, 5, 9).getTime())).toBe("07:05:09");
+    expect(formatTuiClock(Number.NaN)).toBe("--:--:--");
+  });
+
+  it("the footer carries the stamp when the data is stamped, nothing before", () => {
+    const items = visibleTuiItems(loadTuiItems(newTree()).items, "");
+    const stamped = renderTui(
+      items,
+      { ...initialTuiState(120, 10), updatedAt: new Date(2026, 8, 30, 12, 3, 44).getTime() },
+      { color: false },
+    );
+    expect(stamped).toContain("updated 12:03:44");
+    expect(stamped).toContain("r refresh");
+    const unstamped = renderTui(items, initialTuiState(120, 10), { color: false });
+    expect(unstamped).not.toContain("updated ");
+    expect(unstamped).toContain("q quit");
+  });
+});
+
+describe("runTuiBoard live refresh (task-tui-live-refresh)", () => {
+  it("repaints a tracker change without a keypress and preserves the selection", async () => {
+    const root = newTree();
+    const inject = fakeWatchFactory();
+    const term = fakeTerminal();
+    term.output.columns = 200;
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      watch: inject.factory,
+      refreshDebounceMs: 20,
+    });
+    term.input.write("\x1b[B"); // select card 2 (task-rate-limit, todo)
+    term.input.write("\x1b[B");
+    await wait(30);
+    const before = term.outputText();
+    expect(before).toContain("\x1b[7m> T task-rate-limit");
+    // Another session writes a new item while the board is idle... (its id
+    // sorts AFTER the selected one, so the index-stable selection must not
+    // move — an item sorted before it would shift the card window instead).
+    writeItem(root, "tasks/launch/epic-a/story-login/task-z-live.md", {
+      type: "task",
+      status: "todo",
+      id: "task-z-live",
+      parent: "story-login",
+      title: "Written behind the board's back",
+    });
+    // ...the watcher fires, the loop re-reads and repaints — no key pressed.
+    inject.fire(0);
+    await wait(120);
+    term.input.write("q");
+    await done;
+    const text = term.outputText();
+    expect(frameCount(text)).toBeGreaterThan(frameCount(before)); // a repaint happened
+    expect(text).toContain("T task-z-live"); // the new card is on the board
+    expect(text).toContain("\x1b[7m> T task-rate-limit"); // selection preserved
+    expect(text.endsWith("\x1b[?25h\x1b[?1049l")).toBe(true);
+    // The watcher watched the tracker dir (not the repo root or cwd) and quit
+    // closed it.
+    expect(inject.watchers[0]?.dir).toBe(loadTuiItems(root).tasksDir);
+    expect(inject.watchers[0]?.closed).toBe(true);
+  });
+
+  it("a watcher burst debounces into exactly one re-read", async () => {
+    const root = newTree();
+    const inject = fakeWatchFactory();
+    const term = fakeTerminal();
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      watch: inject.factory,
+      refreshDebounceMs: 40,
+    });
+    await wait(30);
+    const before = frameCount(term.outputText());
+    inject.fire(0);
+    inject.fire(0);
+    inject.fire(0); // three events inside the debounce window
+    await wait(150);
+    term.input.write("q");
+    await done;
+    expect(frameCount(term.outputText())).toBe(before + 1);
+  });
+
+  it("`r` forces a refresh without any watcher event", async () => {
+    const root = newTree();
+    const inject = fakeWatchFactory();
+    const term = fakeTerminal();
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      watch: inject.factory,
+      refreshDebounceMs: 20,
+    });
+    await wait(30);
+    const before = frameCount(term.outputText());
+    term.input.write("r");
+    await wait(60);
+    term.input.write("q");
+    await done;
+    expect(frameCount(term.outputText())).toBe(before + 1);
+  });
+
+  it("a watcher that cannot open (null or throwing) degrades to keypress reads", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      watch: () => null,
+    });
+    term.input.write("\x1b[C"); // column move proves the loop keeps working
+    await wait(30);
+    term.input.write("q");
+    await done;
+    expect(term.outputText()).toContain("\x1b[1;7min_progress (1)");
+  });
+
+  it("a throwing watcher factory never reaches the loop", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      watch: () => {
+        throw new Error("no inotify for you");
+      },
+    });
+    term.input.write("q");
+    await done; // resolves: the loop booted without a watcher
+    expect(term.outputText()).toContain("arggon board --tui");
+  });
+
+  it("a watcher whose close fails still quits cleanly, and quit closes the watcher", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    const failingClose = (): { close(): void } => ({
+      close(): void {
+        throw new Error("already closed");
+      },
+    });
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      watch: failingClose,
+    });
+    term.input.write("q");
+    await done;
     expect(term.outputText().endsWith("\x1b[?25h\x1b[?1049l")).toBe(true);
   });
 });
