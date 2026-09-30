@@ -2467,6 +2467,11 @@ program
     "group cards within each column by milestone (ADR 0003) or parent story (story)",
   )
   .option(
+    "--details",
+    "static export: embed a bounded per-item detail (8 KiB prose, 4 KiB per comment, last 3 comments) so the drawer works offline from file://; the page grows per item accordingly",
+    false,
+  )
+  .option(
     "--serve",
     "serve the board locally (127.0.0.1) with live reload; edits go through the update path",
     false,
@@ -2488,6 +2493,7 @@ program
       out?: string;
       github?: boolean;
       groupBy?: string;
+      details?: boolean;
       serve?: boolean;
       port?: string;
       open?: boolean;
@@ -2523,6 +2529,12 @@ program
           );
           return;
         }
+        if (opts.details) {
+          jsonFailed(
+            "cannot combine --tui with --details (--details embeds item details in the static HTML export; the TUI has no drawer)",
+          );
+          return;
+        }
         if (json) {
           jsonFailed(
             "--tui is an interactive view and cannot be combined with --json (use plain `arggon list --json` for data)",
@@ -2538,6 +2550,12 @@ program
         if (opts.github) {
           jsonFailed(
             "cannot combine --serve with --github (the served board renders fresh per request)",
+          );
+          return;
+        }
+        if (opts.details) {
+          jsonFailed(
+            "cannot combine --details with --serve (the served drawer always fetches /api/item; --details is the static export's opt-in)",
           );
           return;
         }
@@ -2588,6 +2606,7 @@ program
           out: opts.out,
           github: opts.github,
           groupBy: opts.groupBy,
+          details: opts.details,
         });
         if (json) {
           successJson(
@@ -2597,13 +2616,14 @@ program
               itemCount: result.itemCount,
               ...(result.groupBy ? { groupBy: result.groupBy } : {}),
               ...(opts.github ? { github: true, prCount: result.prCount } : {}),
+              ...(opts.details ? { details: true, detailBytes: result.detailBytes } : {}),
             },
             readConventionVersion(result.root),
           );
           return;
         }
         console.log(
-          `arggon board: wrote ${sanitizeHumanError(displayPath(result.outPath, process.cwd()))} (${result.itemCount} item(s)${result.groupBy ? `, grouped by ${result.groupBy}` : ""}${opts.github ? `, ${result.prCount} PR(s) linked` : ""})`,
+          `arggon board: wrote ${sanitizeHumanError(displayPath(result.outPath, process.cwd()))} (${result.itemCount} item(s)${result.groupBy ? `, grouped by ${result.groupBy}` : ""}${opts.github ? `, ${result.prCount} PR(s) linked` : ""}${result.detailBytes !== undefined ? `, details embedded (${result.detailBytes} bytes)` : ""})`,
         );
         console.log(
           "  Open it in a browser. Re-run after tree changes — the tracker remains the source of truth.",
