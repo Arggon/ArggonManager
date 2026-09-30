@@ -44,7 +44,7 @@ import {
   parseFilter,
 } from "./filter.js";
 import type { ItemType } from "./ids.js";
-import { isReady, openDependencies } from "./next.js";
+import { downstreamWeight, isReady, openDependencies } from "./next.js";
 import { isPriority, priorityRank } from "./priority.js";
 import { isClaimable, STATUSES, type Status } from "./status.js";
 
@@ -107,6 +107,50 @@ export function sortByPriority<T extends { id: string; priority?: string | null 
     (a, b) =>
       priorityTier(a.priority) - priorityTier(b.priority) ||
       (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+  );
+}
+
+/**
+ * DISPLAY next-rank order (task-tui-sort-ready-lens): ready items first, then
+ * the ADR 0009 priority-major ordering (tier via `priorityTier`, unprioritized
+ * with the p3 tier), then higher downstream weight — how many items become
+ * ready once this one completes (`downstreamWeight`, the same atom `next`
+ * ranks its pool with) — lexicographic id on ties. Deterministic. Composed
+ * entirely from kernel atoms (`isReadyTodo`, `priorityTier`,
+ * `downstreamWeight`); nothing here restates a kernel rule.
+ *
+ * This is the board surfaces' display order, deliberately not `runNext`'s
+ * pool construction: `next` keeps its documented semantics (ready pool ranked
+ * priority-major, blocked items appended in lexicographic order), while the
+ * boards show EVERY item of a column in one total rank. Readiness is computed
+ * against the full item set the caller passes — narrow the set only AFTER
+ * ranking (a filtered-out dependency must not look unknown). Pure; copies.
+ */
+export function sortByNextRank<
+  T extends {
+    id: string;
+    type: ItemType;
+    status: Status;
+    priority?: string | null;
+    assignee?: string | null;
+    dependsOn?: string[];
+    depends_on?: string[];
+  },
+>(items: readonly T[]): T[] {
+  const byId = buildStatusIndex(items);
+  const blockedByIndex = buildBlockedByIndex(
+    items.map((item) => ({ id: item.id, dependsOn: viewItemDependencies(item) })),
+  );
+  const ready = (item: T): boolean => isReadyTodo(item, byId);
+  const tier = (item: T): number => priorityTier(item.priority);
+  const weight = (item: T): number => downstreamWeight(item.id, blockedByIndex);
+  const lexicographic = (a: T, b: T): number => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+  return [...items].sort(
+    (a, b) =>
+      Number(ready(b)) - Number(ready(a)) ||
+      tier(a) - tier(b) ||
+      weight(b) - weight(a) ||
+      lexicographic(a, b),
   );
 }
 
@@ -242,6 +286,32 @@ function viewItemDependencies(item: {
 }
 
 /**
+ * The ready-todo predicate: claimable, unclaimed `todo` whose dependencies are
+ * all terminal — the kernel composition (`isClaimable` + the `todo`/`assignee`
+ * field rules + kernel `isReady`) that the ready surfaces share
+ * (task-tui-sort-ready-lens uses it for the board's ready-only lens). An
+ * absent dependency field means no dependencies; both the kernel `dependsOn`
+ * and the JSON-contract `depends_on` are accepted (see `ViewItem`). Pure.
+ */
+export function isReadyTodo<
+  T extends {
+    id: string;
+    type: ItemType;
+    status: Status;
+    assignee?: string | null;
+    dependsOn?: string[];
+    depends_on?: string[];
+  },
+>(item: T, byId: ReadonlyMap<string, { status: Status }>): boolean {
+  return (
+    isClaimable(item.type) &&
+    item.status === "todo" &&
+    (item.assignee ?? null) === null &&
+    isReady({ ...item, dependsOn: viewItemDependencies(item) }, byId)
+  );
+}
+
+/**
  * Count of claimable, unclaimed `todo` items whose dependencies are all
  * terminal — the kernel composition (`isClaimable` + `isReady`) the native
  * panel surfaces as "N ready". An absent dependency field means no
@@ -259,13 +329,7 @@ export function readyTodoCount<
   },
 >(items: readonly T[]): number {
   const byId = buildStatusIndex(items);
-  return items.filter(
-    (item) =>
-      isClaimable(item.type) &&
-      item.status === "todo" &&
-      (item.assignee ?? null) === null &&
-      isReady({ ...item, dependsOn: viewItemDependencies(item) }, byId),
-  ).length;
+  return items.filter((item) => isReadyTodo(item, byId)).length;
 }
 
 /**

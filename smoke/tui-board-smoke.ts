@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * task-ui-browser-smoke-ci / task-tui-detail-pane / task-tui-live-refresh:
- * model-free TUI frame check.
+ * task-ui-browser-smoke-ci / task-tui-detail-pane / task-tui-live-refresh /
+ * task-tui-sort-ready-lens: model-free TUI frame check.
  *
  * `arggon board --tui` is interactive and no browser automation applies
  * (ADR 0008: the TUI smoke is a scripted pty render check). This harness runs
@@ -9,8 +9,10 @@
  * `smoke/tui-smoke.ts`) and drives a bounded scripted session: the board frame
  * (five status headers + the seeded item id + the footer freshness stamp) →
  * a new item created BEHIND the running board (no keypress — the debounced
- * tree watcher must repaint it in place) → `/` filter down to the seeded
- * task → Enter opens its read-only detail pane (acceptance rows + body) →
+ * tree watcher must repaint it in place) → the ready-only lens hides the
+ * seeded blocked card (`l` … `l`) and `s` cycles the card order (priority,
+ * then next: the p1 card leads the todo column) → `/` filter down to the
+ * seeded task → Enter opens its read-only detail pane (acceptance rows + body) →
  * PgDn scrolls the pane, DELIVERED AS TWO PTY WRITES so the escape sequence
  * is split across stdin chunks (bug-tui-split-escape-sequences: the decoder
  * must reassemble it instead of leaking a phantom Esc that closes the pane
@@ -52,6 +54,15 @@ const SEEDED_ITEM_ID = "task-board-task";
  * must pick it up through the debounced tree watcher without any keypress.
  */
 export const SEEDED_LIVE_ITEM_ID = "task-live-refresh";
+
+/**
+ * Cards seeding the sort + ready lens check (task-tui-sort-ready-lens): the
+ * prioritized card must lead the todo column under the priority/next sorts;
+ * the chained card carries a ⌫ marker and must vanish under the ready-only
+ * lens.
+ */
+export const SEEDED_PRIORITY_ITEM_ID = "task-heavy-priority";
+export const SEEDED_BLOCKED_ITEM_ID = "task-chained";
 
 /** The footer freshness stamp the loop renders once data has been read. */
 export const FRESHNESS_STAMP_PATTERN = /updated \d{2}:\d{2}:\d{2}/;
@@ -175,6 +186,32 @@ function createFixture(): string {
       throw new Error(`arggon create ${type} failed: ${result.stdout ?? ""}${result.stderr ?? ""}`);
     }
   }
+  // Sort/lens fodder (task-tui-sort-ready-lens): a prioritized card the next
+  // sort must lead with, and a card chained onto the seeded one whose ⌫
+  // marker the ready-only lens must hide.
+  const heavy = run([
+    "create",
+    "task",
+    "Heavy priority",
+    "--parent",
+    "entries",
+    "--priority",
+    "p1",
+    "--json",
+  ]);
+  if (heavy.status !== 0) {
+    throw new Error(`arggon create (heavy) failed: ${heavy.stdout ?? ""}${heavy.stderr ?? ""}`);
+  }
+  const chained = run(["create", "task", "Chained", "--parent", "entries", "--json"]);
+  if (chained.status !== 0) {
+    throw new Error(
+      `arggon create (chained) failed: ${chained.stdout ?? ""}${chained.stderr ?? ""}`,
+    );
+  }
+  const dep = run(["update", SEEDED_BLOCKED_ITEM_ID, "--add-depends-on", SEEDED_ITEM_ID, "--json"]);
+  if (dep.status !== 0) {
+    throw new Error(`arggon update (chained dep) failed: ${dep.stdout ?? ""}${dep.stderr ?? ""}`);
+  }
   return fixture;
 }
 
@@ -296,6 +333,36 @@ function runTui(fixture: string): Promise<{ capture: string; steps: StepResult[]
       {
         label: "live refresh: item created behind the board appears without a keypress",
         until: (capture) => lastFrame(capture).includes(`T ${SEEDED_LIVE_ITEM_ID}`),
+        send: "l", // toggle the ready-only lens
+      },
+      {
+        label: "ready lens: header shows ready-only, the blocked card is hidden",
+        until: (capture) =>
+          lastFrame(capture).includes("ready-only") &&
+          !lastFrame(capture).includes(`T ${SEEDED_BLOCKED_ITEM_ID}`),
+        send: "l", // lens off again
+      },
+      {
+        label: "lens off: the blocked card is back (with its ⌫ marker)",
+        until: (capture) =>
+          !lastFrame(capture).includes("ready-only") &&
+          lastFrame(capture).includes(`${SEEDED_BLOCKED_ITEM_ID} ⌫`),
+        send: "s", // sort: priority
+      },
+      {
+        label: "priority sort: the p1 card leads the todo column",
+        until: (capture) =>
+          lastFrame(capture).includes("sort: priority") &&
+          lastFrame(capture).indexOf(`T ${SEEDED_PRIORITY_ITEM_ID}`) <
+            lastFrame(capture).indexOf(`T ${SEEDED_ITEM_ID}`),
+        send: "s", // sort: next
+      },
+      {
+        label: "next sort: ready-first rank keeps the p1 card in the lead",
+        until: (capture) =>
+          lastFrame(capture).includes("sort: next") &&
+          lastFrame(capture).indexOf(`T ${SEEDED_PRIORITY_ITEM_ID}`) <
+            lastFrame(capture).indexOf(`T ${SEEDED_ITEM_ID}`),
         send: "/", // open the search prompt
       },
       {
@@ -453,6 +520,20 @@ async function main(): Promise<void> {
       "the watcher repaints an item created behind the board without a keypress",
       liveStep?.ok === true,
       liveStep?.frame,
+    ) && passed;
+  const sortStep = steps.find((step) => step.label.startsWith("next sort"));
+  const lensStep = steps.find((step) => step.label.startsWith("ready lens"));
+  passed =
+    check(
+      "the ready-only lens hides the blocked card and the header names it",
+      lensStep?.ok === true,
+      lensStep?.frame,
+    ) && passed;
+  passed =
+    check(
+      "the priority/next sorts lead the todo column with the p1 card",
+      sortStep?.ok === true,
+      sortStep?.frame,
     ) && passed;
   passed =
     check(

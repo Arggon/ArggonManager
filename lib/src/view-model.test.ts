@@ -15,12 +15,14 @@ import {
   buildStatusIndex,
   groupItemsBy,
   hasOpenDependencies,
+  isReadyTodo,
   itemsForStatus,
   matchesSubstringFilter,
   openDependencyIds,
   priorityTier,
   readyTodoCount,
   sortById,
+  sortByNextRank,
   sortByPriority,
   statusCounts,
   treeEntries,
@@ -332,6 +334,81 @@ describe("readyTodoCount", () => {
     // task-waits/unknown-dep are blocked, the rest are not claimable+unclaimed+todo.
     expect(readyTodoCount(items)).toBe(4);
     expect(readyTodoCount([])).toBe(0);
+  });
+});
+
+describe("isReadyTodo (task-tui-sort-ready-lens)", () => {
+  it("is exactly readyTodoCount's composition, item by item", () => {
+    const items = [
+      item({ id: "task-ready", dependsOn: [] }),
+      item({ id: "task-waits", dependsOn: ["task-ready"] }),
+      item({ id: "task-claimed", assignee: "Arggon" }),
+      item({ id: "task-active", status: "in_progress" }),
+      item({ id: "epic-a", type: "epic" }),
+      item({ id: "story-b", type: "story" }),
+    ];
+    const byId = buildStatusIndex(items);
+    expect(isReadyTodo(items[0]!, byId)).toBe(true);
+    expect(isReadyTodo(items[1]!, byId)).toBe(false); // open dependency
+    expect(isReadyTodo(items[2]!, byId)).toBe(false); // claimed
+    expect(isReadyTodo(items[3]!, byId)).toBe(false); // not todo
+    expect(isReadyTodo(items[4]!, byId)).toBe(false); // not claimable
+    expect(isReadyTodo(items[5]!, byId)).toBe(true); // stories are claimable
+    // The count is the predicate applied to the set (one rule, two surfaces).
+    expect(items.filter((entry) => isReadyTodo(entry, byId)).length).toBe(readyTodoCount(items));
+  });
+});
+
+describe("sortByNextRank (task-tui-sort-ready-lens)", () => {
+  it("ranks ready first, then priority tier, then downstream weight, id on ties", () => {
+    const items = [
+      item({ id: "z-blocked-p0", priority: "p0", dependsOn: ["gate"] }),
+      item({ id: "m-ready-p1", priority: "p1" }),
+      item({ id: "a-ready-p3-unblocks", priority: "p3", dependsOn: [] }),
+      item({ id: "b-ready-p3-plain" }),
+      item({ id: "gate", status: "in_progress" }),
+      item({ id: "downstream-a", dependsOn: ["a-ready-p3-unblocks"] }),
+      item({ id: "downstream-b", dependsOn: ["a-ready-p3-unblocks"] }),
+    ];
+    // Ready before blocked (z-blocked-p0's p0 cannot buy it past readiness);
+    // among ready: tier (p1 before the p3s), then weight (the unblocks item
+    // before the weightless p3), then lexicographic id. In the blocked tail
+    // the tier still orders (z-blocked-p0 before the unprioritized gate),
+    // then weight (gate unblocks z-blocked-p0), then id — the downstream
+    // pair waits on a todo item, so they are blocked too.
+    expect(sortByNextRank(items).map((entry) => entry.id)).toEqual([
+      "m-ready-p1",
+      "a-ready-p3-unblocks",
+      "b-ready-p3-plain",
+      "z-blocked-p0",
+      "gate",
+      "downstream-a",
+      "downstream-b",
+    ]);
+  });
+
+  it("is deterministic and copies (the input is untouched)", () => {
+    const items = [item({ id: "task-b", priority: "p2" }), item({ id: "task-a", priority: "p2" })];
+    const sorted = sortByNextRank(items);
+    expect(sorted.map((entry) => entry.id)).toEqual(["task-a", "task-b"]);
+    expect(items.map((entry) => entry.id)).toEqual(["task-b", "task-a"]);
+    expect(sorted).not.toBe(items);
+    expect(sortByNextRank(sorted).map((entry) => entry.id)).toEqual(["task-a", "task-b"]);
+  });
+
+  it("reads contract-shaped depends_on exactly like dependsOn", () => {
+    const kernelShape = sortByNextRank([
+      item({ id: "task-waits", dependsOn: ["gate"] }),
+      item({ id: "task-free" }),
+      item({ id: "gate", status: "in_progress" }),
+    ]).map((entry) => entry.id);
+    const contractShape = sortByNextRank([
+      item({ id: "task-waits", depends_on: ["gate"] }),
+      item({ id: "task-free" }),
+      item({ id: "gate", status: "in_progress" }),
+    ]).map((entry) => entry.id);
+    expect(contractShape).toEqual(kernelShape);
+    expect(kernelShape).toEqual(["task-free", "gate", "task-waits"]);
   });
 });
 
