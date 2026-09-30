@@ -781,4 +781,94 @@ test.describe("@smoke board --serve", () => {
       .toBe("cancelled");
     await mobile.close();
   });
+
+  test("the connection banner reports a live stream (task-board-live-reload-state)", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    const banner = page.locator("#board-conn");
+    // role=status + aria-live=polite: a drop to reconnecting announces itself.
+    await expect(banner).toHaveAttribute("role", "status");
+    await expect(banner).toHaveAttribute("aria-live", "polite");
+    await expect(banner).toHaveClass(/live/);
+    await expect(banner).toHaveText("live");
+  });
+
+  test("marks the board stale when the SSE stream drops", async ({ page }) => {
+    // Abort the event stream BEFORE the navigation, exactly as a dead server
+    // would behave: the EventSource errors and the pill flips to the stale
+    // marker while the (possibly outdated) board stays readable.
+    await page.route("**/events", (route) => route.abort());
+    await page.goto(server?.url ?? "");
+    await expect(page.locator("h1")).toContainText("arggon board");
+    const banner = page.locator("#board-conn");
+    await expect(banner).toHaveClass(/reconnecting/);
+    await expect(banner).toHaveText("reconnecting — board may be stale");
+  });
+
+  test("a live reload preserves the filter, the open drawer and the scroll position", async ({
+    page,
+  }) => {
+    // A short viewport makes the board taller than the screen, so the
+    // preserved scroll offset is a real, non-zero value.
+    await page.setViewportSize({ width: 900, height: 320 });
+    await page.goto(server?.url ?? "");
+    await expect(page.locator("#board-conn.live")).toHaveText("live");
+
+    // The reload trigger is a throwaway item created through the CLI. Its
+    // create-write fires an SSE reload of its own, so wait for that reload to
+    // settle (the new card only exists on the page after it) before setup —
+    // otherwise the reload would land mid-setup and wipe the state under test.
+    const created = cliJson<{ item: { id: string } }>(fixture, [
+      "create",
+      "task",
+      "Board preserve task",
+      "--parent",
+      "entries",
+      "--json",
+    ]);
+    const preserveId = created.item.id;
+    await expect(page.locator(`.card[data-id="${preserveId}"]`)).toHaveCount(1);
+
+    // State under test: a non-zero scroll offset, a lens filter, and the
+    // detail drawer open on the one card the filter keeps visible. Scroll
+    // first, while the unfiltered board is tall.
+    await page.locator("#board-filter-input").fill("label:detail");
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
+    await page.locator(`.card[data-id="${DETAIL_ITEM_ID}"]`).click();
+    await expect(page.locator("#board-drawer")).toBeVisible();
+    await expect(page.locator("#board-drawer .drawer-title")).toHaveText("Board detail task");
+    // The offset to preserve is whatever the page actually sits at after the
+    // drawer-opening click (Playwright scrolls the card into view, so it is
+    // not the scrollTo above) — non-zero, and restored EXACTLY.
+    const scrollBefore = await page.evaluate(() => window.scrollY);
+    expect(scrollBefore).toBeGreaterThan(0);
+
+    // Marker on the CURRENT page: undefined after the reload proves the page
+    // was really replaced, so the preservation assertions cannot pass against
+    // the pre-reload DOM.
+    await page.evaluate(() => {
+      (window as unknown as { marker?: number }).marker = 42;
+    });
+
+    // External tracker write (not through this page) fires the SSE reload.
+    runCli(fixture, ["update", preserveId, "--status", "cancelled", "--json"]);
+
+    await expect
+      .poll(() => page.evaluate(() => (window as unknown as { marker?: number }).marker), {
+        timeout: 15_000,
+      })
+      .toBeUndefined();
+
+    await expect(page.locator("#board-filter-input")).toHaveValue("label:detail");
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
+    await expect(page.locator("#board-drawer .drawer-title")).toHaveText("Board detail task");
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBefore);
+
+    // The preserved drawer is a real drawer: Esc closes it and focus returns
+    // to the (still filtered-visible) card that opened it.
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#board-drawer")).toBeHidden();
+    await expect(page.locator(`.card[data-id="${DETAIL_ITEM_ID}"]`)).toBeFocused();
+  });
 });
