@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-agents-doc-restructure
 title: agents-doc-restructure
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-29"
 updated: "2026-09-29"
-claimed_at: "2026-09-29T23:41:34.004Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-agents-doc-restructure
 ---
 <!--
