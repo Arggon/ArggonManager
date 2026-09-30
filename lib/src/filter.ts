@@ -25,8 +25,13 @@ function isFilterField(field: string): field is FilterField {
   return (FILTER_FIELDS as readonly string[]).includes(field);
 }
 
-/** Split on whitespace outside single/double quotes (quotes are kept for now). */
-function splitTokens(expr: string): string[] {
+/**
+ * Split on whitespace outside single/double quotes (quotes are kept for now).
+ * Exported grammar atom: display surfaces that extend the language with free
+ * text (`applyViewFilter`) tokenize with the SAME rule, so a quoted value
+ * never splits mid-token there either.
+ */
+export function splitFilterTokens(expr: string): string[] {
   const tokens: string[] = [];
   let current = "";
   let quote: string | null = null;
@@ -51,7 +56,12 @@ function splitTokens(expr: string): string[] {
   return tokens;
 }
 
-function unquote(value: string, expr: string): string {
+/**
+ * Strip one matching pair of surrounding quotes; reject stray quotes with the
+ * kernel's mismatched-quotes error. Exported grammar atom for the same
+ * callers as `splitFilterTokens` (free text may be quoted too).
+ */
+export function unquoteFilterValue(value: string, expr: string): string {
   if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
     return value.slice(1, -1);
   }
@@ -72,7 +82,7 @@ function unquote(value: string, expr: string): string {
  * with the caller, which owns the same predicates as the flags.
  */
 export function parseFilter(expr: string): FilterPredicate[] {
-  const tokens = splitTokens(expr.trim());
+  const tokens = splitFilterTokens(expr.trim());
   return tokens.map((token) => {
     let negated = false;
     let rest = token;
@@ -90,7 +100,7 @@ export function parseFilter(expr: string): FilterPredicate[] {
     if (!isFilterField(field)) {
       throw new Error(`unknown filter field "${field}". Allowed: ${FILTER_FIELDS.join(", ")}`);
     }
-    const value = unquote(rest.slice(colon + 1), expr);
+    const value = unquoteFilterValue(rest.slice(colon + 1), expr);
     if (!value) throw new Error(`empty value in filter token "${token}"`);
     return { field, value, negated };
   });
