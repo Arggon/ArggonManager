@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-worktree-link-farm-breaks-playwright-runner
 title: "A worktree's node_modules link farm makes `npx playwright test` fail by loading two Playwright module instances"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [worktree, playwright, ci, review-gate]
 priority: p2
 created: "2026-09-29"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T15:06:51.272Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-worktree-link-farm-breaks-playwright-runner
 ---
 <!--
