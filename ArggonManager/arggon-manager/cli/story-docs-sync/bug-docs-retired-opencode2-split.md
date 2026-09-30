@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-docs-retired-opencode2-split
 title: Docs still claim the retired pre-0.4.0 main/opencode2 split
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [docs]
 priority: p2
 created: "2026-09-22"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T12:07:47.587Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-docs-retired-opencode2-split
 ---
 <!--
