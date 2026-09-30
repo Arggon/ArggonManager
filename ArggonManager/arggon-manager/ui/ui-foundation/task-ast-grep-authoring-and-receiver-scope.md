@@ -53,3 +53,7 @@ The repro is permanent: cli/src/ast-grep-authoring.test.ts shells out to the pin
 Receiver-name scope: documented as an explicit limitation (README § Documented native limitations + the rule's note field) — generic $X.add shapes would reintroduce the generic-name false positives the guard exists to avoid — and pinned by a toolEditor.add case in the rule suite's valid snippets. No exhaustive-semantic-enforcement claim; schema/parity tests stay authoritative.
 
 Gates: test:structure 3/3, lint:structure clean, npm test 108 files / 1784 tests, lint, build, check:plugin (no drift), validate ok:true, prettier clean. Deviation note: the remote branch received a main-merge (030be998) mid-flight from another session; merged cleanly (adde8fca), no force-push.
+
+### handoff 2026-09-30 @Arggon — next: Coordinator: review/merge PR #479 (docs+tests only); flip the item to done after merge.
+- branch: feat/task-ast-grep-authoring-and-receiver-scope
+- open questions: Equality-unification semantics now pinned by test; if ast-grep is upgraded past 0.45.3, re-run cli/src/ast-grep-authoring.test.ts first
