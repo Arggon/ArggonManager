@@ -61,3 +61,17 @@ Design constraints:
 - [x] Smoke evidence on a fixture repo: refuse / waive / complete paths probed with expected vs observed (deterministic `--json`).
 - [x] Full suite + lint/typecheck green; `arggon validate` ok.
 - [x] Merge-order note: this PR and `task-spec-analyze-decision-gaps` both touch README + json-output.md — rebase before opening if the other merged first.
+
+### 2026-09-30 @Arggon
+Evidence for review (all commands run in the worktree; fixture probes against dist/cli.js built from this branch):
+
+- Full suite: npm test -> 105 files / 1734 tests passed. Lint: npm run lint -> clean. Build: npm run build -> ok (lib + typecheck + plugin bundle rebuilt). Tracker gate: npm run arggon -- validate --json -> {ok:true, errors:[], warnings:[]}.
+- New suite cli/src/done-gate.test.ts (14 tests) pins every gate rule: refusal naming --waive, transition-table precedence (todo/blocked -> done refused even with --waive), empty/whitespace reason, nothing-to-waive (no flip / container / complete checklist), agent refusal, waiver section format, waived body stays unchecked, containers unaffected, cascade unchanged, UPDATE_FAILED envelope.
+- Fixture probes (/tmp/fixture-c1, deterministic --json, expected vs observed):
+  1. update task-rate-limit --status done (in_progress, unchecked template box) -> exit 1, {ok:false, code:UPDATE_FAILED, message names --waive "<reason>"} — as expected.
+  2. --waive "" -> exit 1, '--waive requires a non-empty reason' — as expected.
+  3. --waive 'accepted as-is by coordinator' -> exit 0, status done; show --body displays '### Waiver <date>' + reason; body boxes remain unticked — as expected.
+  4. task-cookies with fully-ticked checklist flips WITHOUT the flag -> exit 0 — as expected.
+  5. --waive on a done item (nothing to waive) -> exit 1 — as expected. validate --json ok on the fixture.
+- Blast radius handled in-PR: ~60 existing done-flip call sites across 13 test files arrange ticked checklists via the shared helper test/acceptance.ts (no test-only kernel bypass); import-issues self-waives closed-issue flips with reason 'imported as closed from GitHub issue #<n>' (body may carry task lists); opencode-smoke ticks the box before its close session; auto-done.yml tolerates the refusal in BOTH the flip loop and redo_flip with a ::warning:: annotation.
+- MCP: arggon_update has NO waive property (parity exception documented in cli/src/mcp-parity.test.ts); kernel also refuses agent callers as defense in depth. schemaVersion unchanged.
