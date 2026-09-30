@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-docs-retired-opencode2-split
 title: Docs still claim the retired pre-0.4.0 main/opencode2 split
+assignee: Arggon
+branch: fix/bug-docs-retired-opencode2-split
 parent: story-docs-sync
 labels: [docs]
 priority: p2
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T12:07:47.587Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-docs-retired-opencode2-split
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-docs-sync/bug-docs-retired-opencode2-split.md
@@ -24,7 +28,7 @@ updated: "2026-09-22"
 
 ## Acceptance
 
-- [ ] 
+- [x] 
 
 ## Notes
 
@@ -45,8 +49,8 @@ Release 0.4.0 (tag `v0.4.0` = `394654f5` on main) shipped the native-first OpenC
 
 ## Acceptance
 
-- [ ] `opencode2.md` reflects reality: integration shipped in 0.4.0 and lives on main; add a short branch-retirement note; remove "main is untouched" claims
-- [ ] `README.md:106` wording no longer presents `opencode2` as a live surface
-- [ ] `agents.md` §CI gate snippet updated (published install; coordinate with `task-ci-recipe-published-one-liner`) and the "packages still private" note removed
-- [ ] `ci.md` dev-checkout clone targets main or the pinned release tag, not `opencode2`
-- [ ] `git grep -n opencode2` shows only historical/retirement references; `arggon validate --json` green
+- [x] `opencode2.md` reflects reality: integration shipped in 0.4.0 and lives on main; add a short branch-retirement note; remove "main is untouched" claims
+- [x] `README.md:106` wording no longer presents `opencode2` as a live surface
+- [x] `agents.md` §CI gate snippet updated (published install; coordinate with `task-ci-recipe-published-one-liner`) and the "packages still private" note removed
+- [x] `ci.md` dev-checkout clone targets main or the pinned release tag, not `opencode2`
+- [x] `git grep -n opencode2` shows only historical/retirement references; `arggon validate --json` green
