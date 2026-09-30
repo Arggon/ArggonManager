@@ -28,8 +28,6 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-tui-sort-ready-lens
 
 ## Acceptance
 
-- [ ] 
-
 ## Notes
 
 ### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
@@ -39,7 +37,7 @@ Cards are sorted lexicographically by id; the kernel's priority field and `next`
 
 ## Acceptance
 
-- [ ] `s` cycles sort: id | priority | next-rank (deterministic tie-breaks), applied per column
-- [ ] `r` toggles a ready-only lens using the kernel `isReady`/claim rules (no copied predicate)
-- [ ] Rows surface priority, assignee and blocked markers; the header shows the active sort/lens
-- [ ] Golden tests + pty evidence; README keybindings updated
+- [x] `s` cycles sort: id | priority | next-rank (deterministic tie-breaks), applied per column
+- [x] The ready-only lens toggles with `l` (key moved from the work order's `r`: PR #472's live refresh ships `r` = force refresh first; see the comment below) using the kernel `isReadyTodo`/claim rules (no copied predicate)
+- [x] Rows surface priority, assignee and blocked markers; the header shows the active sort/lens
+- [x] Golden tests + pty evidence; README keybindings updated
