@@ -23,7 +23,7 @@
  * plugin type gate).
  */
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { dirname } from "node:path";
@@ -32,7 +32,31 @@ import { afterEach, describe, expect, it } from "vitest";
 import { removeFixtureTree } from "./test-tmp.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const astGreps = join(root, "node_modules/@ast-grep/cli/ast-grep");
+
+/**
+ * The `ast-grep` entry under @ast-grep/cli differs by install shape: a node
+ * dispatcher script on some installs, the raw platform binary on others (CI's
+ * optional-dep layout) — executing it via `process.execPath` only works for
+ * the former (bug found on CI, PR #479). Resolve a DIRECTLY-executable entry
+ * once: the platform packages first, then the cli entry; null => the tests
+ * skip cleanly (same contract as smoke:tui-board where `script` is absent).
+ */
+function resolveAstGrep(): string | null {
+  const candidates = [
+    "cli-linux-x64-gnu",
+    "cli-linux-arm64-gnu",
+    "cli-darwin-arm64",
+    "cli-darwin-x64",
+  ].map((platform) => join(root, "node_modules/@ast-grep", platform, "ast-grep"));
+  candidates.push(join(root, "node_modules/@ast-grep/cli/ast-grep"));
+  for (const candidate of candidates) {
+    if (!existsSync(candidate)) continue;
+    const probe = spawnSync(candidate, ["--version"], { encoding: "utf8", timeout: 30_000 });
+    if (probe.status === 0 && String(probe.stdout).trim().length > 0) return candidate;
+  }
+  return null;
+}
+const astGreps = resolveAstGrep();
 
 const tmpDirs: string[] = [];
 afterEach(() => {
@@ -64,7 +88,7 @@ function rule(dir: string, body: string): void {
 
 /** Run the pinned binary and return the fixture lines every match reports. */
 function scanLines(dir: string): { status: number; lines: string[]; output: string } {
-  const proc = spawnSync(process.execPath, [astGreps, "scan", "-c", "sgconfig.yml", "fixture.ts"], {
+  const proc = spawnSync(astGreps!, ["scan", "-c", "sgconfig.yml", "fixture.ts"], {
     cwd: dir,
     encoding: "utf8",
     timeout: 120_000,
@@ -78,7 +102,7 @@ function scanLines(dir: string): { status: number; lines: string[]; output: stri
   return { status: proc.status ?? -1, lines, output: `${proc.stdout ?? ""}${proc.stderr ?? ""}` };
 }
 
-describe("ast-grep authoring constraints (pinned @ast-grep/cli)", () => {
+describe.skipIf(astGreps === null)("ast-grep authoring constraints (pinned @ast-grep/cli)", () => {
   it("fires every distinct sibling $$$ pattern in one any (no one-$$$-per-rule limit)", () => {
     const dir = scratch("alpha(1, 2);\nbeta(3);\ngamma(4);\n");
     rule(
