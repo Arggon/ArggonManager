@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-board-live-reload-state
 title: Web board live reload preserves view state + connection banner
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [viewer, board, ui]
 priority: p2
 created: "2026-09-22"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T15:28:32.453Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-typecheck-e2e-specs-task-board-live-reload-state
 ---
 <!--
