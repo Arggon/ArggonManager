@@ -54,3 +54,6 @@ Evidence:
 - Unit: sort cycle, three sort orders, lens composition + whole-tree readiness, clamp after toggle, search-prompt typing, loop-level s/s/l repaint; kernel tests for both new exports.
 - Gates: npm test 107 files/1816 tests (row-table-stdout 18/18, run twice); lint clean; build clean (plugin bundle committed); validate ok:true.
 - CI row-table flag from the coordinator: does NOT reproduce on the rebased branch (the flagged run predates the rebase onto post-#472 main; no row-table code touched). Watching the fresh CI run on this push.
+
+### handoff 2026-09-30 @Arggon — next: Review+merge PR #475 (merge, never squash). If CI flags row-table-stdout again, pull the CI log - it does not reproduce locally on the rebased branch.
+- branch: feat/task-tui-sort-ready-lens
