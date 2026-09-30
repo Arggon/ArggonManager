@@ -24,9 +24,12 @@ import {
  * `arggon board --serve` (task-board-serve): serve the static board locally
  * with live reload. Binds 127.0.0.1 only. The browser page is the same static
  * board (rendered fresh per request) plus a tiny SSE client that reloads the
- * tab whenever any tracker file changes. Edits posted by drag-and-drop
- * go through the kernel update path (runUpdate) — never raw file writes from
- * the browser, keeping "git files under the tracker are the source of truth".
+ * tab whenever any tracker file changes — preserving scroll, the filter
+ * expression and an open drawer across the reload, with a connecting/live/
+ * reconnecting banner on the SSE stream (task-board-live-reload-state). Edits
+ * posted by drag-and-drop go through the kernel update path (runUpdate) —
+ * never raw file writes from the browser, keeping "git files under the
+ * tracker are the source of truth".
  *
  * Review surface (task-board-review-surface): the served board overlays live
  * PR state (open/draft/merged + checks) and per-PR diff links on cards with a
@@ -43,8 +46,96 @@ import {
  * touches the tracker.
  */
 
-const RELOAD_SCRIPT =
-  '<script>(function(){var es=new EventSource("/events");es.onmessage=function(e){if(e.data==="reload")location.reload();};})();</script>';
+/**
+ * Serve-mode live-reload client (task-board-live-reload-state). Injected only
+ * in serve mode — the static export stays byte-identical. Three jobs:
+ *
+ * 1. **Connection banner** (`#board-conn`, role=status aria-live=polite):
+ *    `connecting …` until the first EventSource `onopen`, `live` while the
+ *    stream is up, `reconnecting — board may be stale` on `onerror` (the
+ *    visual stale marker; EventSource keeps retrying on the server's
+ *    `retry: 1000` and `onopen` flips the pill back to `live`). The pill's
+ *    three background/text pairs (#59636e, #1a7f37, #cf222e with #fff) all
+ *    clear WCAG AA 4.5:1 — the axe scan in the `@smoke` lane measures the
+ *    rendered pair. It floats over the drawer's top-right corner, where the
+ *    close button lives, so it is strictly passive (`pointer-events: none`) —
+ *    a status pill must never intercept a click (the `@smoke` drawer test
+ *    caught exactly that before the flag was added).
+ * 2. **State snapshot** before every reload and **restore** after it: scroll
+ *    position, the filter expression (belt and braces — the URL hash already
+ *    round-trips it) and the open drawer's item id (read from the drawer's
+ *    `data-item-id`, set/cleared by `wireBoardDetail`). State travels through
+ *    sessionStorage (per tab, survives the reload, gone afterwards). A drawer
+ *    whose card no longer exists is simply not reopened — the delete test
+ *    pins that the drawer closes gracefully. Collapsed columns have no state
+ *    to preserve yet (no collapse feature on the board; the upcoming column
+ *    controls keep theirs in localStorage, which survives reload natively).
+ * 3. **The reload itself**: still a full `location.reload()` on the SSE
+ *    `reload` message — the server render stays authoritative; the snapshot
+ *    is what makes it non-destructive.
+ */
+const RELOAD_SCRIPT = `<script>
+(function () {
+  'use strict';
+  var KEY = "board-live-state";
+  var style = document.createElement("style");
+  style.textContent = "#board-conn{position:fixed;top:10px;right:10px;z-index:40;pointer-events:none;border-radius:10px;padding:2px 10px;font-size:12px;color:#fff;background:#59636e;box-shadow:0 1px 4px rgb(0 0 0 / 0.25)}#board-conn.live{background:#1a7f37}#board-conn.reconnecting{background:#cf222e}";
+  document.head.appendChild(style);
+  var banner = document.createElement("div");
+  banner.id = "board-conn";
+  banner.setAttribute("role", "status");
+  banner.setAttribute("aria-live", "polite");
+  banner.className = "connecting";
+  banner.textContent = "connecting …";
+  document.body.appendChild(banner);
+  function setBanner(state, text) {
+    banner.className = state;
+    banner.textContent = text;
+  }
+  function snapshot() {
+    try {
+      var drawer = document.getElementById("board-drawer");
+      var input = document.getElementById("board-filter-input");
+      sessionStorage.setItem(KEY, JSON.stringify({
+        x: window.scrollX,
+        y: window.scrollY,
+        filter: input ? input.value : "",
+        drawer: drawer && !drawer.hidden ? drawer.getAttribute("data-item-id") || "" : ""
+      }));
+    } catch (e) { /* storage unavailable: reload without restore */ }
+  }
+  function restore() {
+    var state = null;
+    try { state = JSON.parse(sessionStorage.getItem(KEY)); } catch (e) { /* ignore */ }
+    try { sessionStorage.removeItem(KEY); } catch (e) { /* ignore */ }
+    if (!state) return;
+    var input = document.getElementById("board-filter-input");
+    if (state.filter && input && input.value !== state.filter) {
+      input.value = state.filter;
+      input.dispatchEvent(new Event("input"));
+    }
+    window.scrollTo(state.x || 0, state.y || 0);
+    if (state.drawer) {
+      var cards = document.querySelectorAll(".card[data-id]");
+      for (var i = 0; i < cards.length; i++) {
+        if (cards[i].getAttribute("data-id") === state.drawer) {
+          cards[i].click(); /* the user's own open path: fetch + render */
+          break;
+        }
+      }
+    }
+  }
+  restore();
+  var es = new EventSource("/events");
+  es.onopen = function () { setBanner("live", "live"); };
+  es.onerror = function () { setBanner("reconnecting", "reconnecting — board may be stale"); };
+  es.onmessage = function (e) {
+    if (e.data !== "reload") return;
+    snapshot();
+    location.reload();
+  };
+})();
+</script>`;
 
 export type BoardServeOptions = {
   cwd: string;
