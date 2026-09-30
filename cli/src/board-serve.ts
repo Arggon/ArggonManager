@@ -6,18 +6,16 @@ import {
   renderBoardHtml,
   defaultBoardGithub,
   buildBoardSummary,
-  type BoardDetailPayload,
+  buildBoardDetail,
   type BoardGithub,
   type PrInfo,
 } from "./board.js";
 import {
-  buildStatusIndex,
   findTasksDir,
   loadItems,
   readConventionConfig,
   repoRootFromTasks,
   resolveCurrentLogin,
-  runShow,
   runUpdate,
   toContractWorkItem,
 } from "@arggondev/lib";
@@ -177,32 +175,19 @@ export type BoardServeHandle = {
 };
 
 /**
- * Per-item byte caps for the serve-mode detail drawer (task-board-item-detail):
- * the item body is prose that grows with the corpus, so the route clips it
- * before it reaches the browser (ADR 0006 spirit). The prose cap also bounds
- * the acceptance rows parsed from it; the comment cap applies per comment in
- * the kernel tail (DEFAULT_TAIL_COMMENTS entries). `prose_truncated` /
- * `comments[].truncated` tell the drawer to point at the item file.
+ * Detail-drawer payload surface (task-board-item-detail, moved to board.ts by
+ * task-board-static-details so the static `--details` embedding shares it):
+ * the byte caps, the clippers, the acceptance-row parser and the per-item
+ * payload builder live beside `BoardDetailPayload` now. Re-exported here so
+ * the serve surface keeps its import path.
  */
-export const MAX_DETAIL_PROSE_BYTES = 8 * 1024;
-export const MAX_DETAIL_COMMENT_BYTES = 4 * 1024;
-
-/** Clip `text` to at most `maxBytes` UTF-8 bytes without splitting a code point. */
-export function clipDetailText(
-  text: string,
-  maxBytes: number,
-): { text: string; truncated: boolean } {
-  if (Buffer.byteLength(text, "utf8") <= maxBytes) return { text, truncated: false };
-  let bytes = 0;
-  let clipped = "";
-  for (const ch of text) {
-    const size = Buffer.byteLength(ch, "utf8");
-    if (bytes + size > maxBytes) break;
-    clipped += ch;
-    bytes += size;
-  }
-  return { text: clipped, truncated: true };
-}
+export {
+  MAX_DETAIL_COMMENT_BYTES,
+  MAX_DETAIL_PROSE_BYTES,
+  buildBoardDetail,
+  clipDetailText,
+  parseAcceptanceRows,
+} from "./board.js";
 
 /**
  * Mutating-request gate for the serve endpoints (task-board-serve-hardening).
@@ -257,66 +242,6 @@ export const FAVICON_SVG =
   '<rect x="3" y="3" width="3.5" height="10" rx="1" fill="#ffffff"/>' +
   '<rect x="9" y="3" width="3.5" height="6.5" rx="1" fill="#1a7f37"/>' +
   "</svg>";
-
-/** Read-only acceptance rows: `- [ ]`/`- [x]` lines of the item prose. */
-export function parseAcceptanceRows(prose: string): Array<{ text: string; checked: boolean }> {
-  const rows: Array<{ text: string; checked: boolean }> = [];
-  for (const line of prose.split("\n")) {
-    const match = /^\s*[-*]\s+\[([ xX])\]\s+(.*)$/.exec(line);
-    if (match) rows.push({ text: match[2].trim(), checked: match[1].toLowerCase() === "x" });
-  }
-  return rows;
-}
-
-/**
- * Assemble the `/api/item` payload through the kernel bounded read path:
- * `runShow` (ADR 0006 — prose + the last `DEFAULT_TAIL_COMMENTS` comments,
- * never the full body) plus the shared status index for dependency states
- * (the ADR 0004 open/terminal rule; unknown ids count as open, exactly like
- * the card's blocked-by line). Pure read: no writes, no locks, no commit.
- * `id` not found throws `runShow`'s message (the route maps it to 404).
- * Cost: two kernel reads per request (O(n) over the tracker — `runShow` for
- * the item, `loadItems` for the dependency index); the route is triggered by a
- * user opening one drawer, never by the poll loop.
- */
-export function buildBoardDetail(opts: {
-  cwd: string;
-  id: string;
-  /** Live PR overlay snapshot (branch -> PrInfo); absent = no PR data. */
-  prs?: Map<string, PrInfo>;
-}): BoardDetailPayload {
-  const shown = runShow({ cwd: opts.cwd, id: opts.id });
-  const statusById = buildStatusIndex(loadItems(findTasksDir(opts.cwd)));
-  const item = toContractWorkItem(shown.item, shown.root);
-  const prose = clipDetailText(shown.prose, MAX_DETAIL_PROSE_BYTES);
-  const comments = shown.comments.map((comment) => {
-    const clipped = clipDetailText(comment.lines.join("\n"), MAX_DETAIL_COMMENT_BYTES);
-    return {
-      date: comment.date,
-      author: comment.author,
-      text: clipped.text,
-      truncated: clipped.truncated,
-    };
-  });
-  const dependencies = shown.item.dependsOn.map((depId) => {
-    const entry = statusById.get(depId);
-    const status = entry ? entry.status : null;
-    return { id: depId, status, terminal: status === "done" || status === "cancelled" };
-  });
-  return {
-    ok: true,
-    item,
-    detail: {
-      prose: prose.text,
-      prose_truncated: prose.truncated,
-      acceptance: parseAcceptanceRows(prose.text),
-      comments,
-      hidden_comments: shown.allComments.length - shown.comments.length,
-      dependencies,
-      pr: item.branch ? (opts.prs?.get(item.branch) ?? null) : null,
-    },
-  };
-}
 
 export function startBoardServer(opts: BoardServeOptions): BoardServeHandle {
   const tasksDir = findTasksDir(opts.cwd);

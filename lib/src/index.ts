@@ -194,7 +194,7 @@ export { runCreate } from "./create.js";
 export type { CreateOptions, CreateResult } from "./create.js";
 export { runList } from "./list.js";
 export type { ListOptions, ListResult } from "./list.js";
-export { runShow } from "./show.js";
+export { runShow, showBoundedParts } from "./show.js";
 export type { ShowComment, ShowOptions, ShowResult } from "./show.js";
 export { aggregateReport, completedOf, runReport } from "./report.js";
 export type {
