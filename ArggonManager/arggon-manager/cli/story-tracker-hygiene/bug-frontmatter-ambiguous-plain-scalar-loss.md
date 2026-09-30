@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-frontmatter-ambiguous-plain-scalar-loss
 title: Frontmatter loses YAML-ambiguous plain scalars
+assignee: Arggon
+branch: fix/bug-frontmatter-ambiguous-plain-scalar-loss
 parent: story-tracker-hygiene
 labels: [testing, kernel, property-based]
 priority: p2
 created: "2026-09-29"
-updated: "2026-09-29"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T23:56:00.008Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-frontmatter-ambiguous-plain-scalar-loss
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/bug-frontmatter-ambiguous-plain-scalar-loss.md
