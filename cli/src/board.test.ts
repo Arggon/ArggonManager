@@ -13,6 +13,7 @@ import {
   displayPath,
   escapeHtml,
   applyBoardFilter,
+  bootBoardTheme,
   dropNeedsClaimPrompt,
   evaluateDrop,
   renderBoardDetail,
@@ -25,6 +26,7 @@ import {
   wireBoardKeyboardNav,
   wireBoardMoveMenu,
   wireBoardMovePrompt,
+  wireBoardTheme,
   buildBoardSummary,
   MAX_DETAIL_PROSE_BYTES,
   type BoardLensItem,
@@ -775,8 +777,10 @@ describe("renderBoardHtml non-text contrast (WCAG 1.4.11, task-board-non-text-co
     return match![1];
   }
 
-  it("keeps every recorded non-text boundary at or above 3:1", () => {
+  it("keeps every recorded non-text boundary at or above 3:1 (light)", () => {
     // The pairs recorded in the item body: [what, foreground, background].
+    // The stylesheet names these colors through custom properties; the table
+    // pins the values the light `:root` block binds (asserted verbatim below).
     const boundaries: Array<[string, string, string]> = [
       ["drop-target outline vs column", "#666a6f", "#ebecf0"], // 4.61
       ["count pill border vs column", "#666a6f", "#ebecf0"], // 4.61
@@ -791,7 +795,67 @@ describe("renderBoardHtml non-text contrast (WCAG 1.4.11, task-board-non-text-co
     }
   });
 
-  it("uses the boundary grey on every interactive control (never the 1.3:1 #d0d4da)", () => {
+  it("keeps every dark-theme text pair at or above 4.5:1 (WCAG 1.4.3)", () => {
+    // The dark `:root[data-theme="dark"]` block swaps values only; these are
+    // its bindings, paired with every surface each value is painted on.
+    const textPairs: Array<[string, string, string]> = [
+      ["body text vs page", "#e6edf3", "#0d1117"], // 16.02
+      ["body text vs column", "#e6edf3", "#161b22"], // 14.64
+      ["body text vs card", "#e6edf3", "#22272e"], // 12.72
+      ["body text vs dep-blocked card", "#e6edf3", "#1d232b"], // 13.39
+      ["heading/assignee vs column", "#c9d1d9", "#161b22"], // 11.21
+      ["heading/assignee vs card", "#c9d1d9", "#22272e"], // 9.73
+      ["meta text vs card", "#8b949e", "#22272e"], // 4.88
+      ["meta text vs dep-blocked card", "#8b949e", "#1d232b"], // 5.14
+      ["meta text vs page", "#8b949e", "#0d1117"], // 6.15
+      ["muted text vs column", "#9ea7b3", "#161b22"], // 7.11
+      ["muted text vs card", "#9ea7b3", "#22272e"], // 6.18
+      ["count text vs pill", "#c9d1d9", "#3d444d"], // 6.38
+      ["label text vs chip", "#e6edf3", "#37414b"], // 8.80
+      ["accent text vs card", "#4493f8", "#22272e"], // 4.85
+      ["accent text vs column", "#4493f8", "#161b22"], // 5.58
+      ["white on accent fill (p2/lens.active/confirm)", "#ffffff", "#1f6feb"], // 4.63
+      ["white on p0 chip", "#ffffff", "#cf222e"], // 5.36
+      ["white on p1 chip", "#ffffff", "#bc4c00"], // 5.03
+      ["white on p3 chip", "#ffffff", "#59636e"], // 6.11
+      ["white on toast", "#ffffff", "#424a53"], // 8.99
+      ["open-pr green vs card", "#3fb950", "#22272e"], // 5.91
+      ["closed/error red vs card", "#ff6a69", "#22272e"], // 5.38
+      ["branch/merged purple vs card", "#ab7df8", "#22272e"], // 5.02
+      ["blocked text vs blocked wash", "#f2a65a", "#3a2b1d"], // 6.72
+      ["white on task type chip", "#ffffff", "#0c855d"], // 4.64
+    ];
+    for (const [what, fg, bg] of textPairs) {
+      expect(ratio(fg, bg), what).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("keeps every dark-theme non-text boundary at or above 3:1 (WCAG 1.4.11)", () => {
+    const boundaries: Array<[string, string, string]> = [
+      ["drop-target outline vs page", "#9ea7b3", "#0d1117"], // 7.78
+      ["drop-target outline vs column", "#9ea7b3", "#161b22"], // 7.11
+      ["count pill / drawer / move-menu border vs card", "#9ea7b3", "#22272e"], // 6.18
+      ["lens chip border vs page", "#9ea7b3", "#0d1117"], // 7.78
+      ["lens.active fill vs page", "#1f6feb", "#0d1117"], // 4.08
+      ["lens.active fill vs column", "#1f6feb", "#161b22"], // 3.73
+      ["lens.active fill vs card", "#1f6feb", "#22272e"], // 3.24
+      ["focus ring / dragged outline vs card", "#4493f8", "#22272e"], // 4.85
+    ];
+    for (const [what, fg, bg] of boundaries) {
+      expect(ratio(fg, bg), what).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("binds the boundary grey through --muted in both themes (never the 1.3:1 #d0d4da light / 1.5:1 #30363d dark)", () => {
+    // The light bindings: the recorded policy values.
+    const lightRoot = rule(":root");
+    expect(lightRoot).toContain("--muted: #666a6f");
+    expect(lightRoot).toContain("--card: #fff");
+    // The dark bindings.
+    const darkRoot = css.match(/\[data-theme="dark"\] \{([^}]*)\}/)?.[1] ?? "";
+    expect(darkRoot).not.toBe("");
+    expect(darkRoot).toContain("--muted: #9ea7b3");
+    expect(darkRoot).toContain("--card: #22272e");
     for (const selector of [
       "#board-filter-input",
       "#board-filter-clear",
@@ -805,22 +869,128 @@ describe("renderBoardHtml non-text contrast (WCAG 1.4.11, task-board-non-text-co
       ".move-menu-target",
       ".move-menu-cancel",
     ]) {
-      expect(rule(selector), selector).toContain("1px solid #666a6f");
+      expect(rule(selector), selector).toContain("1px solid var(--muted)");
     }
     // The count pill is a passive indicator: its muted fill stays, the pill
-    // edge is the recorded boundary, and its text pair (axe-enforced) is 6.04:1.
-    expect(rule(".column .count")).toContain("border: 1px solid #666a6f");
+    // edge is the recorded boundary, and its text pair (axe-enforced) is
+    // 6.04:1 light / 6.38:1 dark.
+    expect(rule(".column .count")).toContain("border: 1px solid var(--muted)");
     expect(ratio("#424a53", "#d0d4da")).toBeGreaterThanOrEqual(4.5);
+    expect(ratio("#c9d1d9", "#3d444d")).toBeGreaterThanOrEqual(4.5);
   });
 
   it("affords the dragged card with a lift, never a fade", () => {
     const dragging = rule(".card.dragging");
     expect(dragging).toContain("box-shadow");
-    expect(dragging).toContain("outline: 2px solid #0550ae");
+    expect(dragging).toContain("outline: 2px solid var(--accent)");
     // No opacity declaration anywhere in the stylesheet: a fade composites
     // every descendant against the surface below it (measured 1.5-2.7:1), so
     // the state cue must come from surface, shadow and outline instead.
     expect(css).not.toMatch(/\bopacity\s*:/);
+  });
+});
+
+describe("renderBoardHtml theme and density (task-board-theme-density)", () => {
+  const renders = () => [
+    ["static", renderBoardHtml([], { generatedAt: GENERATED_AT })] as const,
+    [
+      "serve",
+      renderBoardHtml([], { generatedAt: GENERATED_AT, details: true, live: true }),
+    ] as const,
+  ];
+
+  it("sets color-scheme per theme on the root so native controls match", () => {
+    for (const [mode, html] of renders()) {
+      expect(html, mode).toMatch(/:root \{[^}]*color-scheme: light/s);
+      expect(html, mode).toMatch(/\[data-theme="dark"\] \{[^}]*color-scheme: dark/s);
+    }
+  });
+
+  it("applies the theme/density before first paint (boot script in <head>)", () => {
+    for (const [mode, html] of renders()) {
+      const headEnd = html.indexOf("</head>");
+      const boot = html.indexOf(bootBoardTheme.toString());
+      expect(boot, mode).toBeGreaterThan(0);
+      expect(boot, mode).toBeLessThan(headEnd);
+      // The resolved attributes land on <html>, which the head script can
+      // reach while the body is still empty.
+      expect(html, mode).toContain("document.documentElement");
+    }
+  });
+
+  it("renders the toggle pair in the filterbar of every board", () => {
+    for (const [mode, html] of renders()) {
+      expect(html, mode).toContain(
+        '<button type="button" id="board-theme-toggle" class="layout-toggle">theme: auto</button>',
+      );
+      expect(html, mode).toContain(
+        '<button type="button" id="board-density-toggle" class="layout-toggle" aria-pressed="false">compact density</button>',
+      );
+    }
+  });
+
+  it("embeds wireBoardTheme and calls it in every board's script", () => {
+    for (const [mode, html] of renders()) {
+      expect(html, mode).toContain(wireBoardTheme.toString());
+      expect(html, mode).toContain("wireBoardTheme();");
+    }
+  });
+
+  it("pins the localStorage keys and the corrupt-storage default fallback", () => {
+    const boot = bootBoardTheme.toString();
+    expect(boot).toContain('"arggon-board-theme-v1"');
+    expect(boot).toContain('"arggon-board-density-v1"');
+    expect(boot).toContain("prefers-color-scheme");
+    expect(boot).toContain("localStorage.getItem");
+    // Corrupt or missing storage degrades to auto/comfortable. Whitespace
+    // varies between the tsc build and the tsx test transform, so match loose.
+    expect(boot).toMatch(/theme\s*=\s*"auto"/);
+    expect(boot).toMatch(/density\s*=\s*"comfortable"/);
+    const wire = wireBoardTheme.toString();
+    expect(wire).toContain("localStorage.setItem");
+    // The theme cycle and the density flip drive the two buttons.
+    expect(wire).toContain('"board-theme-toggle"');
+    expect(wire).toContain('"board-density-toggle"');
+  });
+
+  it("swaps values only: dark and compact override custom properties, never rules", () => {
+    for (const [mode, html] of renders()) {
+      const css = (html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "").replace(
+        /\/\*[\s\S]*?\*\//g,
+        "",
+      );
+      // The dark block declares only custom properties (+ color-scheme).
+      const dark = css.match(/\[data-theme="dark"\] \{([^}]*)\}/)?.[1] ?? "";
+      expect(dark, mode).not.toBe("");
+      for (const line of dark.split(";").filter((d) => d.trim() !== "")) {
+        expect(line.trim(), mode).toMatch(/^(color-scheme|--[a-z-]+):/);
+      }
+      // Same for the compact block.
+      const compact = css.match(/\[data-density="compact"\] \{([^}]*)\}/)?.[1] ?? "";
+      expect(compact, mode).not.toBe("");
+      for (const line of compact.split(";").filter((d) => d.trim() !== "")) {
+        expect(line.trim(), mode).toMatch(/^--[a-z-]+:/);
+      }
+    }
+  });
+
+  it("keeps the density geometry var-driven and the card text readable", () => {
+    for (const [mode, html] of renders()) {
+      const css = (html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "").replace(
+        /\/\*[\s\S]*?\*\//g,
+        "",
+      );
+      const card = css.match(/\.card \{([^}]*)\}/)?.[1] ?? "";
+      expect(card, mode).toContain("background: var(--card)");
+      expect(card, mode).toContain("padding: var(--card-pad)");
+      expect(card, mode).toContain("font-size: var(--card-font)");
+      // Compact never drops the body text below 12px.
+      expect(css).toMatch(/\[data-density="compact"\] \{[^}]*--card-font: 12px/s);
+      // The grid itself is untouched by density: the column tracks and the
+      // responsive fallback stay byte-identical.
+      expect(css).toContain("grid-template-columns: repeat(5, minmax(220px, 1fr))");
+      expect(css).toContain("grid-template-columns: repeat(auto-fit, minmax(240px, 1fr))");
+    }
   });
 });
 

@@ -844,47 +844,48 @@ export function buildBoardDetailMap(opts: {
  */
 const DETAIL_CSS = `
 .card[tabindex="0"] { cursor: pointer; }
-.card:focus-visible { outline: 2px solid #0550ae; outline-offset: 2px; }
-.card-move { margin-left: auto; border: 1px solid #666a6f; background: #fff; color: #424a53; border-radius: 4px; padding: 0 6px; font-size: 10px; font-family: inherit; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; }
-.card-move:focus-visible { outline: 2px solid #0550ae; outline-offset: 2px; }
+.card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card-move { margin-left: auto; border: 1px solid var(--muted); background: var(--card); color: var(--fg-soft); border-radius: 4px; padding: 0 6px; font-size: 10px; font-family: inherit; text-transform: uppercase; letter-spacing: 0.04em; cursor: pointer; }
+.card-move:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 body.drawer-open { overflow: hidden; }
 .drawer { position: fixed; inset: 0; z-index: 20; }
 .drawer[hidden] { display: none; }
-.drawer-backdrop { position: absolute; inset: 0; background: rgb(0 0 0 / 0.35); }
-/* The drawer's white fill sits on the 0.35 scrim (2.43:1) — below the 1.4.11
-   floor — so the identifying edge is the border against the fill (#666a6f on
-   #fff is 5.45:1). Same for the move menu below. */
-.drawer-panel { position: absolute; top: 0; right: 0; bottom: 0; width: min(560px, 92vw); background: #fff; border: 1px solid #666a6f; box-shadow: -4px 0 16px rgb(0 0 0 / 0.2); padding: 16px; overflow-y: auto; }
-.drawer-close { position: absolute; top: 8px; right: 10px; border: 1px solid #666a6f; background: #fff; border-radius: 6px; width: 28px; height: 28px; font-size: 16px; line-height: 1; cursor: pointer; }
+.drawer-backdrop { position: absolute; inset: 0; background: var(--scrim); }
+/* The drawer's card fill sits on the scrim (light 0.35: 2.43:1; dark 0.55
+   over #0d1117: ~1.3:1) — below the 1.4.11 floor in both themes — so the
+   identifying edge is the border against the fill (boundary grey on the
+   card: light 5.45:1, dark 6.18:1). Same for the move menu below. */
+.drawer-panel { position: absolute; top: 0; right: 0; bottom: 0; width: min(560px, 92vw); background: var(--card); border: 1px solid var(--muted); box-shadow: -4px 0 16px rgb(0 0 0 / 0.2); padding: 16px; overflow-y: auto; }
+.drawer-close { position: absolute; top: 8px; right: 10px; border: 1px solid var(--muted); background: var(--card); border-radius: 6px; width: 28px; height: 28px; font-size: 16px; line-height: 1; cursor: pointer; }
 .drawer-title { margin: 0 34px 6px 0; font-size: 16px; overflow-wrap: anywhere; }
 .drawer-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 10px; }
-.drawer-meta code { font-size: 11px; color: #59636e; }
+.drawer-meta code { font-size: 11px; color: var(--meta); }
 .drawer-row { display: flex; gap: 8px; font-size: 12px; margin-top: 3px; }
-.drawer-k { color: #59636e; min-width: 84px; }
+.drawer-k { color: var(--meta); min-width: 84px; }
 .drawer-v { overflow-wrap: anywhere; }
-.drawer-section { margin-top: 14px; border-top: 1px solid #e7ebef; padding-top: 10px; }
-.drawer-section h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #424a53; }
-.drawer-body-text { white-space: pre-wrap; font-size: 13px; overflow-wrap: anywhere; }
-.drawer-check { display: flex; gap: 6px; align-items: flex-start; font-size: 13px; margin: 2px 0; }
+.drawer-section { margin-top: 14px; border-top: 1px solid var(--separator); padding-top: 10px; }
+.drawer-section h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-soft); }
+.drawer-body-text { white-space: pre-wrap; font-size: var(--card-font); overflow-wrap: anywhere; }
+.drawer-check { display: flex; gap: 6px; align-items: flex-start; font-size: var(--card-font); margin: 2px 0; }
 .drawer-check input { margin-top: 2px; }
 .drawer-dep { font-size: 12px; font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
-.drawer-dep.open { color: #9a3412; }
-.drawer-dep.terminal { color: #1a7f37; }
-.drawer-dep.missing { color: #cf222e; }
-.drawer-note { color: #59636e; font-size: 11px; margin-top: 4px; }
+.drawer-dep.open { color: var(--blocked-fg); }
+.drawer-dep.terminal { color: var(--green); }
+.drawer-dep.missing { color: var(--red); }
+.drawer-note { color: var(--meta); font-size: 11px; margin-top: 4px; }
 .drawer-comment { margin-top: 8px; }
-.drawer-who { color: #59636e; font-size: 11px; }
-.drawer-panel a { color: #0550ae; }
+.drawer-who { color: var(--meta); font-size: 11px; }
+.drawer-panel a { color: var(--accent); }
 .move-menu { position: fixed; inset: 0; z-index: 30; }
 .move-menu[hidden] { display: none; }
-.move-menu-backdrop { position: absolute; inset: 0; background: rgb(0 0 0 / 0.35); }
-.move-menu-panel { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%); background: #fff; border: 1px solid #666a6f; border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); padding: 14px; min-width: 260px; max-width: 92vw; }
+.move-menu-backdrop { position: absolute; inset: 0; background: var(--scrim); }
+.move-menu-panel { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%); background: var(--card); border: 1px solid var(--muted); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); padding: 14px; min-width: 260px; max-width: 92vw; }
 .move-menu-title { font-weight: 600; font-size: 13px; margin-bottom: 8px; overflow-wrap: anywhere; }
 .move-menu-actions { display: flex; flex-direction: column; gap: 6px; }
-.move-menu-target { text-align: left; padding: 6px 10px; font-size: 13px; font-family: inherit; border: 1px solid #666a6f; background: #fff; color: inherit; border-radius: 6px; cursor: pointer; }
-.move-menu-note { color: #59636e; font-size: 12px; }
-.move-menu-cancel { margin-top: 10px; padding: 4px 10px; font-size: 12px; font-family: inherit; border: 1px solid #666a6f; background: #fff; color: inherit; border-radius: 6px; cursor: pointer; }
-.move-menu-target:focus-visible, .move-menu-cancel:focus-visible { outline: 2px solid #0550ae; outline-offset: 2px; }
+.move-menu-target { text-align: left; padding: 6px 10px; font-size: 13px; font-family: inherit; border: 1px solid var(--muted); background: var(--card); color: inherit; border-radius: 6px; cursor: pointer; }
+.move-menu-note { color: var(--meta); font-size: 12px; }
+.move-menu-cancel { margin-top: 10px; padding: 4px 10px; font-size: 12px; font-family: inherit; border: 1px solid var(--muted); background: var(--card); color: inherit; border-radius: 6px; cursor: pointer; }
+.move-menu-target:focus-visible, .move-menu-cancel:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 `;
 
 const DRAWER_MARKUP = `<div id="board-drawer" class="drawer" hidden aria-hidden="true">
@@ -1470,6 +1471,150 @@ export function wireBoardColumns(ensureAnchor?: (() => void) | null): void {
 }
 
 /**
+ * Theme/density boot (task-board-theme-density): resolves the persisted view
+ * preferences and sets `data-theme`/`data-density` on the `<html>` element
+ * BEFORE first paint. It is embedded into `<head>` and runs synchronously
+ * while the document is still empty, so a dark-mode user never sees a light
+ * flash: the stylesheet's custom properties cascade from these attributes
+ * (see the `:root` blocks in `renderBoardHtml`). `theme: "auto"` (the
+ * default) follows `prefers-color-scheme` via `matchMedia`. Missing, corrupt
+ * or unavailable storage degrades to the defaults (auto / comfortable) — the
+ * same contract as the column layout state. Self-contained by construction
+ * (embedded with `toString()`): no module-scope references, no template
+ * literals.
+ */
+export function bootBoardTheme(): void {
+  const THEME_KEY = "arggon-board-theme-v1";
+  const DENSITY_KEY = "arggon-board-density-v1";
+  let theme: string = "auto";
+  let density: string = "comfortable";
+  try {
+    const t = JSON.parse(localStorage.getItem(THEME_KEY) || "null") as { theme?: unknown } | null;
+    if (t && (t.theme === "light" || t.theme === "dark" || t.theme === "auto")) theme = t.theme;
+  } catch {
+    /* corrupt or unavailable storage: default */
+  }
+  try {
+    const d = JSON.parse(localStorage.getItem(DENSITY_KEY) || "null") as {
+      density?: unknown;
+    } | null;
+    if (d && (d.density === "comfortable" || d.density === "compact")) density = d.density;
+  } catch {
+    /* corrupt or unavailable storage: default */
+  }
+  const dark =
+    theme === "dark" ||
+    (theme === "auto" &&
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const root = document.documentElement;
+  root.setAttribute("data-theme", dark ? "dark" : "light");
+  root.setAttribute("data-density", density);
+}
+
+/**
+ * Theme and density controls (task-board-theme-density): a `theme: auto`
+ * cycle button (auto -> light -> dark -> auto) and a compact-density
+ * `aria-pressed` toggle in the filterbar, embedded with `toString()` into
+ * EVERY board (static export and serve alike), so it must stay
+ * self-contained: no module-scope references, no template literals.
+ *
+ * State persists in localStorage under `arggon-board-theme-v1`
+ * (`{ theme: "auto"|"light"|"dark" }`) and `arggon-board-density-v1`
+ * (`{ density: "comfortable"|"compact" }`) — the same per-browser view
+ * preference choice as the column layout: never tracker data, so it never
+ * touches the git files that remain the source of truth. The boot script
+ * (`bootBoardTheme`, <head>) has already applied the same state before first
+ * paint; this re-applies it (idempotent) and owns the interactions. In
+ * `auto` the resolved theme follows a live `prefers-color-scheme` change.
+ */
+export function wireBoardTheme(): void {
+  const THEME_KEY = "arggon-board-theme-v1";
+  const DENSITY_KEY = "arggon-board-density-v1";
+  type Prefs = { theme: string; density: string };
+  function storeTheme(theme: string): void {
+    try {
+      localStorage.setItem(THEME_KEY, JSON.stringify({ theme }));
+    } catch {
+      /* storage unavailable or full: the choice just does not persist */
+    }
+  }
+  function storeDensity(density: string): void {
+    try {
+      localStorage.setItem(DENSITY_KEY, JSON.stringify({ density }));
+    } catch {
+      /* storage unavailable or full: the choice just does not persist */
+    }
+  }
+  function loadPrefs(): Prefs {
+    let theme = "auto";
+    let density = "comfortable";
+    try {
+      const t = JSON.parse(localStorage.getItem(THEME_KEY) || "null") as { theme?: unknown } | null;
+      if (t && (t.theme === "light" || t.theme === "dark" || t.theme === "auto")) theme = t.theme;
+    } catch {
+      /* corrupt or unavailable storage: default */
+    }
+    try {
+      const d = JSON.parse(localStorage.getItem(DENSITY_KEY) || "null") as {
+        density?: unknown;
+      } | null;
+      if (d && (d.density === "comfortable" || d.density === "compact")) density = d.density;
+    } catch {
+      /* corrupt or unavailable storage: default */
+    }
+    return { theme, density };
+  }
+  function darkPrefers(): boolean {
+    return (
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-color-scheme: dark)").matches
+    );
+  }
+  function apply(prefs: Prefs): void {
+    const dark = prefs.theme === "dark" || (prefs.theme === "auto" && darkPrefers());
+    document.documentElement.setAttribute("data-theme", dark ? "dark" : "light");
+    document.documentElement.setAttribute("data-density", prefs.density);
+    const themeButton = document.getElementById("board-theme-toggle");
+    if (themeButton) themeButton.textContent = "theme: " + prefs.theme;
+    const densityButton = document.getElementById("board-density-toggle");
+    if (densityButton) {
+      const compact = prefs.density === "compact";
+      densityButton.setAttribute("aria-pressed", compact ? "true" : "false");
+      densityButton.textContent = compact ? "comfortable density" : "compact density";
+    }
+  }
+  const prefs = loadPrefs();
+  apply(prefs);
+  document.addEventListener("click", function (event) {
+    const target = event.target as Element | null;
+    if (!target || typeof target.closest !== "function") return;
+    if (target.closest("#board-theme-toggle")) {
+      prefs.theme = prefs.theme === "auto" ? "light" : prefs.theme === "light" ? "dark" : "auto";
+      apply(prefs);
+      storeTheme(prefs.theme);
+      return;
+    }
+    if (target.closest("#board-density-toggle")) {
+      prefs.density = prefs.density === "compact" ? "comfortable" : "compact";
+      apply(prefs);
+      storeDensity(prefs.density);
+    }
+  });
+  // Auto tracks the OS while the page stays open (manual overrides win until
+  // the user cycles back to auto).
+  if (typeof window.matchMedia === "function") {
+    const query = window.matchMedia("(prefers-color-scheme: dark)");
+    const onSchemeChange = function () {
+      if (prefs.theme === "auto") apply(prefs);
+    };
+    if (typeof query.addEventListener === "function") {
+      query.addEventListener("change", onSchemeChange);
+    }
+  }
+}
+
+/**
  * The card action menu (task-board-keyboard-a11y, serve-only): the keyboard
  * and touch alternative to drag-and-drop. Embedded with `toString()`; must
  * stay self-contained. A tap/click on a card's `move` button — or the `m` key
@@ -1855,6 +2000,16 @@ export function buildBoardSummary(items: KernelWorkItem[]): BoardSummary {
  * localStorage (`arggon-board-columns-v1`, a per-browser view preference that
  * never touches the tracker) and degrades to the default layout without it.
  * Column headings are sticky while the board scrolls.
+ * Theme and density (task-board-theme-density) ride the same contract: a
+ * filterbar pair — `theme: auto` cycling auto/light/dark and an
+ * `aria-pressed` compact-density toggle — persisted under
+ * `arggon-board-theme-v1` / `arggon-board-density-v1`; `auto` follows
+ * `prefers-color-scheme`, and a `<head>` boot script (`bootBoardTheme`)
+ * resolves the attributes before first paint, so there is no light flash and
+ * `color-scheme` always matches the painted surface. Every color is a custom
+ * property: the dark block swaps values only (contrast asserted in
+ * board.test.ts, same 4.5:1 text / 3:1 boundary bars), and the compact block
+ * shrinks spacing while the 12px card text keeps the board readable.
  * The drop flow's value collection is an in-page dialog (task-board-move-dialogs)
  * on EVERY board — claiming into `in_progress` asks the assignee, moving to
  * `blocked` asks the reason; Esc/cancel aborts, focus is trapped and restored,
@@ -2144,79 +2299,184 @@ export function renderBoardHtml(
    no opacity fade anywhere in this stylesheet: fading composites every
    descendant against the surface below it (measured 1.5-2.7:1) and is never
    used as a state cue. */
-:root { color-scheme: light; font-family: system-ui, sans-serif; }
-body { margin: 0; padding: 16px; background: #f4f5f7; color: #1f2328; }
+/* Contrast policy (task-axe-core-browser-ci): the @smoke lane runs axe
+   against this page and fails on any WCAG A/AA-tagged automated violation, so
+   every foreground/background pair here is chosen to clear 4.5:1 for body text
+   (WCAG 2.2 AA, 1.4.3) at the size it is actually rendered. The muted text grey
+   is a single value (#666a6f) rather than several near-identical ones, because
+   it has to clear the threshold on all three surfaces it appears on — the white
+   card (#fff, 5.45:1), the column (#ebecf0, 4.61:1) and the dep-blocked card
+   (#f6f7f9, 5.08:1). The two greys it replaced, #a0a6ad (2.46:1) and #8c919a
+   (3.17:1 on the card), failed.
+
+   Non-text boundaries (WCAG 1.4.11, 3:1 — axe has no automated rule for this
+   criterion, so board.test.ts asserts the rendered CSS instead,
+   task-board-non-text-contrast-and-drag-affordance). Every interactive
+   control border and the drop-target outline use the same #666a6f grey, which
+   clears 3:1 on every surface a boundary touches: #fff 5.45:1, #ebecf0 4.61:1,
+   #f4f5f7 4.99:1. The count pill and the two dialog panels (drawer, move menu)
+   carry it as a 1px border because their fills sit against low-contrast
+   neighbours (#d0d4da on #ebecf0 is 1.26:1; #fff on the 0.35 scrim is
+   2.43:1), so the border against the fill is the identifying edge. There is
+   no opacity fade anywhere in this stylesheet: fading composites every
+   descendant against the surface below it (measured 1.5-2.7:1) and is never
+   used as a state cue.
+
+   Theme (task-board-theme-density): every color above is a custom property in
+   the light :root block; the dark :root[data-theme="dark"] block swaps
+   values only, never rules, so the two themes share one geometry. The dark
+   palette holds the same bars — text >= 4.5:1 (worst pair 4.63:1, white on
+   the dark accent fill #1f6feb) and boundaries >= 3:1 (worst pair 3.24:1,
+   #1f6feb on the dark card) — asserted in board.test.ts against these exact
+   hex values. bootBoardTheme (head script) resolves the persisted or
+   OS-preferred theme into data-theme before first paint, so there is no
+   light flash and color-scheme always matches the painted surface (native
+   controls follow).
+
+   Density (task-board-theme-density): the spacing/font custom properties in
+   the same blocks; :root[data-density="compact"] swaps values only. Compact
+   keeps the 12px card body text and the var-driven grid, so card content
+   stays readable and the columns never re-wrap. */
+:root {
+  color-scheme: light;
+  font-family: system-ui, sans-serif;
+  --bg: #f4f5f7;
+  --fg: #1f2328;
+  --fg-soft: #424a53;
+  --meta: #59636e;
+  --muted: #666a6f;
+  --col: #ebecf0;
+  --card: #fff;
+  --card-dim: #f6f7f9;
+  --pill: #d0d4da;
+  --chip: #e7ebef;
+  --separator: #e7ebef;
+  --accent: #0550ae;
+  --accent-fill: #0550ae;
+  --green: #1a7f37;
+  --red: #cf222e;
+  --purple: #8250df;
+  --blocked-fg: #9a3412;
+  --blocked-bg: #fff1e7;
+  --scrim: rgb(0 0 0 / 0.35);
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.1);
+  --card-font: 13px;
+  --card-code-font: 11px;
+  --card-pad: 10px;
+  --card-gap: 8px;
+  --head-gap: 8px;
+  --head-mb: 4px;
+  --title-mb: 4px;
+  --board-gap: 12px;
+  --col-pad: 10px;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0d1117;
+  --fg: #e6edf3;
+  --fg-soft: #c9d1d9;
+  --meta: #8b949e;
+  --muted: #9ea7b3;
+  --col: #161b22;
+  --card: #22272e;
+  --card-dim: #1d232b;
+  --pill: #3d444d;
+  --chip: #37414b;
+  --separator: #3d444d;
+  --accent: #4493f8;
+  --accent-fill: #1f6feb;
+  --green: #3fb950;
+  --red: #ff6a69;
+  --purple: #ab7df8;
+  --blocked-fg: #f2a65a;
+  --blocked-bg: #3a2b1d;
+  --scrim: rgb(0 0 0 / 0.55);
+  --card-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
+}
+:root[data-density="compact"] {
+  --card-font: 12px;
+  --card-code-font: 10px;
+  --card-pad: 6px;
+  --card-gap: 5px;
+  --head-gap: 6px;
+  --head-mb: 3px;
+  --title-mb: 2px;
+  --board-gap: 8px;
+  --col-pad: 8px;
+}
+body { margin: 0; padding: 16px; background: var(--bg); color: var(--fg); }
 /* Visible keyboard focus everywhere (task-board-keyboard-a11y): one shared
    rule for every button on the page (filter clear, lens chips, serve-mode card
    and dialog buttons), matching the card focus ring. */
-button:focus-visible { outline: 2px solid #0550ae; outline-offset: 2px; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 header { margin-bottom: 16px; }
 header h1 { margin: 0 0 4px; font-size: 20px; }
-header .meta { color: #59636e; font-size: 13px; }
-.board { display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: 12px; align-items: start; }
+header .meta { color: var(--meta); font-size: 13px; }
+.board { display: grid; grid-template-columns: repeat(5, minmax(220px, 1fr)); gap: var(--board-gap); align-items: start; }
 @media (max-width: 1100px) { .board { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); } }
-.column { background: #ebecf0; border-radius: 8px; padding: 10px; }
+.column { background: var(--col); border-radius: 8px; padding: var(--col-pad); }
 /* Sticky column headers (task-board-column-controls): the header stays
    visible while the board scrolls, pinned to the viewport top for as long as
    its column is in view. The negative margins/padding extend the header over
    the column's own padding so cards slide under an opaque surface instead of
    peeking through the gutters; the radius matches the column's top corners.
    Grid and responsive rules above are untouched. */
-.column h2 { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 6px; background: #ebecf0; border-radius: 8px 8px 0 0; margin: -10px -10px 10px; padding: 10px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: #424a53; }
-.column .count { background: #d0d4da; border: 1px solid #666a6f; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
-.column .empty { color: #666a6f; text-align: center; padding: 12px 0; }
+.column h2 { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 6px; background: var(--col); border-radius: 8px 8px 0 0; margin: calc(var(--col-pad) * -1) calc(var(--col-pad) * -1) 10px; padding: var(--col-pad); font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--fg-soft); }
+.column .count { background: var(--pill); border: 1px solid var(--muted); border-radius: 10px; padding: 1px 8px; font-size: 11px; }
+.column .empty { color: var(--muted); text-align: center; padding: 12px 0; }
 /* Column collapse (task-board-column-controls): a collapsed column keeps only
    its header — the count badge stays visible, cards and group heads hide. */
 .column.collapsed .card, .column.collapsed .mgroup-head, .column.collapsed .empty { display: none; }
 .column.terminal-hidden { display: none; }
-.col-toggle { margin-left: auto; flex: 0 0 auto; border: 1px solid #666a6f; background: #fff; color: #424a53; border-radius: 4px; width: 20px; height: 20px; font-size: 13px; line-height: 1; cursor: pointer; font-family: inherit; }
-.layout-toggle { border: 1px solid #666a6f; background: #fff; border-radius: 12px; padding: 3px 10px; font-size: 12px; font-family: inherit; color: inherit; cursor: pointer; }
-.layout-toggle[aria-pressed="true"] { background: #0550ae; border-color: #0550ae; color: #fff; }
-.card { background: #fff; border-radius: 6px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.1); padding: 10px; margin-bottom: 8px; font-size: 13px; }
+.col-toggle { margin-left: auto; flex: 0 0 auto; border: 1px solid var(--muted); background: var(--card); color: var(--fg-soft); border-radius: 4px; width: 20px; height: 20px; font-size: 13px; line-height: 1; cursor: pointer; font-family: inherit; }
+.layout-toggle { border: 1px solid var(--muted); background: var(--card); border-radius: 12px; padding: 3px 10px; font-size: 12px; font-family: inherit; color: inherit; cursor: pointer; }
+.layout-toggle[aria-pressed="true"] { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
+.card { background: var(--card); border-radius: 6px; box-shadow: var(--card-shadow); padding: var(--card-pad); margin-bottom: var(--card-gap); font-size: var(--card-font); }
 .card:last-child { margin-bottom: 0; }
-.card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
-.card code { font-size: 11px; color: #59636e; }
+.card-head { display: flex; align-items: center; gap: var(--head-gap); margin-bottom: var(--head-mb); }
+.card code { font-size: var(--card-code-font); color: var(--meta); }
 .type { background: var(--type-color); color: #fff; border-radius: 4px; padding: 1px 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
 .priority { color: #fff; border-radius: 4px; padding: 1px 6px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; }
 .priority.p0 { background: #cf222e; }
 .priority.p1 { background: #bc4c00; }
-.priority.p2 { background: #0550ae; }
+.priority.p2 { background: var(--accent-fill); }
 .priority.p3 { background: #59636e; }
-.title { font-weight: 600; margin-bottom: 4px; overflow-wrap: anywhere; }
-.parent { color: #59636e; font-size: 11px; margin-bottom: 4px; }
+.title { font-weight: 600; margin-bottom: var(--title-mb); overflow-wrap: anywhere; }
+.parent { color: var(--meta); font-size: var(--card-code-font); margin-bottom: var(--title-mb); }
 .parent::before { content: "↳ "; }
-.assignee { color: #424a53; font-size: 12px; }
-.assignee.unassigned { color: #666a6f; }
-.branch { color: #8250df; font-size: 12px; font-family: ui-monospace, monospace; }
+.assignee { color: var(--fg-soft); font-size: 12px; }
+.assignee.unassigned { color: var(--muted); }
+.branch { color: var(--purple); font-size: 12px; font-family: ui-monospace, monospace; }
 .pr { font-size: 12px; margin-top: 2px; }
 .pr a { color: inherit; text-decoration: none; }
 .pr a:hover { text-decoration: underline; }
-.pr a.diff { color: #0550ae; font-weight: 400; }
-.pr.nopr { color: #666a6f; }
-.pr.draft { color: #666a6f; }
-.pr.open { color: #1a7f37; font-weight: 600; }
-.pr.merged { color: #8250df; }
-.pr.closed { color: #cf222e; }
-.labels { margin-top: 4px; display: flex; flex-wrap: wrap; gap: 4px; }
-.label { background: #e7ebef; border-radius: 10px; padding: 1px 8px; font-size: 11px; }
-.blocked-reason { margin-top: 6px; color: #9a3412; background: #fff1e7; border-radius: 4px; padding: 4px 6px; font-size: 12px; }
-.blocked-by { color: #9a3412; font-size: 11px; margin-top: 2px; overflow-wrap: anywhere; }
+.pr a.diff { color: var(--accent); font-weight: 400; }
+.pr.nopr { color: var(--muted); }
+.pr.draft { color: var(--muted); }
+.pr.open { color: var(--green); font-weight: 600; }
+.pr.merged { color: var(--purple); }
+.pr.closed { color: var(--red); }
+.labels { margin-top: var(--title-mb); display: flex; flex-wrap: wrap; gap: 4px; }
+.label { background: var(--chip); border-radius: 10px; padding: 1px 8px; font-size: 11px; }
+.blocked-reason { margin-top: 6px; color: var(--blocked-fg); background: var(--blocked-bg); border-radius: 4px; padding: 4px 6px; font-size: 12px; }
+.blocked-by { color: var(--blocked-fg); font-size: 11px; margin-top: 2px; overflow-wrap: anywhere; }
 /* A dep-blocked card reads as muted through its surface, not through a blanket
    opacity: opacity composites every descendant against the column and took
    the whole card to 1.5-2.7:1 (axe color-contrast on the title, id, parent,
    branch, badges and labels — 13 nodes on the @smoke fixture). The muted fill
    keeps the de-emphasis cue and leaves the text legible (#59636e on #f6f7f9 is
-   5.70:1). */
-.card.dep-blocked { background: #f6f7f9; }
-.card.dep-blocked .title { color: #59636e; }
-.blocked-badge { margin-left: auto; color: #9a3412; background: #fff1e7; border-radius: 10px; padding: 0 8px; font-size: 10px; font-weight: 600; white-space: nowrap; }
-.milestone { color: #0550ae; font-size: 12px; margin-top: 2px; }
-.mgroup-head { margin: 10px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #0550ae; }
+   5.70:1; dark: #8b949e on #1d232b is 5.14:1). */
+.card.dep-blocked { background: var(--card-dim); }
+.card.dep-blocked .title { color: var(--meta); }
+.blocked-badge { margin-left: auto; color: var(--blocked-fg); background: var(--blocked-bg); border-radius: 10px; padding: 0 8px; font-size: 10px; font-weight: 600; white-space: nowrap; }
+.milestone { color: var(--accent); font-size: 12px; margin-top: 2px; }
+.mgroup-head { margin: 10px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); }
 .mgroup-head:first-child { margin-top: 0; }
-.mgroup-head.none { color: #666a6f; }
+.mgroup-head.none { color: var(--muted); }
 /* Story completion fraction on group heads (task-board-progress-header): the
-   head's own #0550ae at normal weight, so the number reads as data, not as a
-   new category. #0550ae on #ebecf0 is the pair the head already renders. */
+   head's own accent at normal weight, so the number reads as data, not as a
+   new category. Light: #0550ae on #ebecf0; dark: #4493f8 on #161b22 (5.58:1).
+   */
 .mgroup-head .completion { font-weight: 400; letter-spacing: 0; }
 .card[draggable="true"] { cursor: grab; }
 /* Mid-drag affordance (task-board-non-text-contrast-and-drag-affordance):
@@ -2224,12 +2484,12 @@ header .meta { color: #59636e; font-size: 13px; }
    every descendant to ~1.5-2.7:1 while the card was in flight; a keyboard or
    screen-reader user never sees this state at all (they move cards through
    the move dialog, which never sets .dragging), so the fade bought nothing
-   and cost legibility. Elevation plus a solid #0550ae outline — the focus
+   and cost legibility. Elevation plus a solid accent outline — the focus
    ring color — reads as "picked up" and stays distinct from the dashed
-   #666a6f drop-target outline on .column.over. Transient, fully legible, and
+   boundary drop-target outline on .column.over. Transient, fully legible, and
    enforced by the no-opacity assertion in board.test.ts. */
-.card.dragging { box-shadow: 0 8px 20px rgb(0 0 0 / 0.3); outline: 2px solid #0550ae; outline-offset: 2px; }
-.column.over { outline: 2px dashed #666a6f; outline-offset: -4px; }
+.card.dragging { box-shadow: 0 8px 20px rgb(0 0 0 / 0.3); outline: 2px solid var(--accent); outline-offset: 2px; }
+.column.over { outline: 2px dashed var(--muted); outline-offset: -4px; }
 #board-toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); max-width: 80%; background: #424a53; color: #fff; border-radius: 6px; padding: 8px 14px; font-size: 13px; display: none; z-index: 10; box-shadow: 0 2px 8px rgb(0 0 0 / 0.3); }
 #board-toast.show { display: block; }
 #board-toast.refused { background: #cf222e; }
@@ -2240,41 +2500,50 @@ header .meta { color: #59636e; font-size: 13px; }
    board, because the drop flow is. The input carries the boundary grey. */
 .move-prompt { position: fixed; inset: 0; z-index: 30; }
 .move-prompt[hidden] { display: none; }
-.move-prompt-backdrop { position: absolute; inset: 0; background: rgb(0 0 0 / 0.35); }
-.move-prompt-panel { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%); background: #fff; border: 1px solid #666a6f; border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); padding: 14px; min-width: 300px; max-width: 92vw; }
+.move-prompt-backdrop { position: absolute; inset: 0; background: var(--scrim); }
+.move-prompt-panel { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%); background: var(--card); border: 1px solid var(--muted); border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); padding: 14px; min-width: 300px; max-width: 92vw; }
 .move-prompt-title { font-weight: 600; font-size: 13px; margin-bottom: 8px; overflow-wrap: anywhere; }
-.move-prompt-panel input { width: 100%; box-sizing: border-box; padding: 6px 10px; font-size: 13px; font-family: inherit; border: 1px solid #666a6f; border-radius: 6px; background: #fff; color: inherit; }
-.move-prompt-error { display: none; margin-top: 6px; font-size: 12px; color: #cf222e; }
+.move-prompt-panel input { width: 100%; box-sizing: border-box; padding: 6px 10px; font-size: 13px; font-family: inherit; border: 1px solid var(--muted); border-radius: 6px; background: var(--card); color: inherit; }
+.move-prompt-error { display: none; margin-top: 6px; font-size: 12px; color: var(--red); }
 .move-prompt-error.show { display: block; }
 .move-prompt-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px; }
-.move-prompt-cancel { padding: 4px 10px; font-size: 12px; font-family: inherit; border: 1px solid #666a6f; background: #fff; color: inherit; border-radius: 6px; cursor: pointer; }
-.move-prompt-confirm { padding: 4px 10px; font-size: 12px; font-family: inherit; border: 1px solid #0550ae; background: #0550ae; color: #fff; border-radius: 6px; cursor: pointer; }
-.move-prompt-cancel:focus-visible, .move-prompt-confirm:focus-visible { outline: 2px solid #0550ae; outline-offset: 2px; }
+.move-prompt-cancel { padding: 4px 10px; font-size: 12px; font-family: inherit; border: 1px solid var(--muted); background: var(--card); color: inherit; border-radius: 6px; cursor: pointer; }
+.move-prompt-confirm { padding: 4px 10px; font-size: 12px; font-family: inherit; border: 1px solid var(--accent-fill); background: var(--accent-fill); color: #fff; border-radius: 6px; cursor: pointer; }
+.move-prompt-cancel:focus-visible, .move-prompt-confirm:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .filterbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
-.filterbar label { font-size: 11px; color: #59636e; text-transform: uppercase; letter-spacing: 0.05em; }
-#board-filter-input { flex: 1 1 260px; max-width: 560px; padding: 6px 10px; font-size: 13px; font-family: inherit; border: 1px solid #666a6f; border-radius: 6px; background: #fff; color: inherit; }
-#board-filter-input:focus { outline: 2px solid #0550ae; outline-offset: -1px; }
-#board-filter-clear { padding: 6px 10px; font-size: 12px; font-family: inherit; border: 1px solid #666a6f; border-radius: 6px; background: #fff; cursor: pointer; }
-.filter-count { font-size: 12px; color: #59636e; }
+.filterbar label { font-size: 11px; color: var(--meta); text-transform: uppercase; letter-spacing: 0.05em; }
+#board-filter-input { flex: 1 1 260px; max-width: 560px; padding: 6px 10px; font-size: 13px; font-family: inherit; border: 1px solid var(--muted); border-radius: 6px; background: var(--card); color: inherit; }
+#board-filter-input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+#board-filter-clear { padding: 6px 10px; font-size: 12px; font-family: inherit; border: 1px solid var(--muted); border-radius: 6px; background: var(--card); cursor: pointer; }
+.filter-count { font-size: 12px; color: var(--meta); }
 /* Summary header (task-board-progress-header): the compact progress panel. It
-   sits on a white card against the body fill; the identifying edge is the
-   #666a6f border (#666a6f on #f4f5f7 is 4.99:1, the documented boundary
-   grey). Labels reuse the header's #59636e on #fff (5.45:1); values render in
-   the body text colour. No opacity, no interactive elements. */
-.summary { display: flex; flex-wrap: wrap; gap: 4px 22px; margin-top: 10px; padding: 8px 12px; background: #fff; border: 1px solid #666a6f; border-radius: 8px; font-size: 12px; }
+   sits on a card against the body fill; the identifying edge is the boundary
+   border (#666a6f on #f4f5f7 is 4.99:1; dark: #9ea7b3 on #0d1117 is 7.78:1).
+   Labels reuse the header's meta grey on the card (light 5.45:1, dark
+   4.88:1); values render in the body text colour. No opacity, no interactive
+   elements. */
+.summary { display: flex; flex-wrap: wrap; gap: 4px 22px; margin-top: 10px; padding: 8px 12px; background: var(--card); border: 1px solid var(--muted); border-radius: 8px; font-size: 12px; }
 .summary-row { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
-.summary-k { color: #59636e; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; flex: 0 0 auto; }
-.summary-v { color: #1f2328; overflow-wrap: anywhere; }
+.summary-k { color: var(--meta); text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; flex: 0 0 auto; }
+.summary-v { color: var(--fg); overflow-wrap: anywhere; }
 .summary-v .epic { margin-right: 10px; }
-.summary-v .sep { color: #59636e; }
-.filter-error { display: none; font-size: 12px; color: #cf222e; }
+.summary-v .sep { color: var(--meta); }
+.filter-error { display: none; font-size: 12px; color: var(--red); }
 .filter-error.show { display: inline; }
 .lenses { display: flex; flex-wrap: wrap; gap: 6px; }
-.lens { border: 1px solid #666a6f; background: #fff; border-radius: 12px; padding: 3px 10px; font-size: 12px; font-family: inherit; color: inherit; cursor: pointer; }
-.lens.active { background: #0550ae; border-color: #0550ae; color: #fff; }
+.lens { border: 1px solid var(--muted); background: var(--card); border-radius: 12px; padding: 3px 10px; font-size: 12px; font-family: inherit; color: inherit; cursor: pointer; }
+.lens.active { background: var(--accent-fill); border-color: var(--accent-fill); color: #fff; }
 .card.filtered-out, .mgroup-head.filtered-out { display: none; }
 ${details ? DETAIL_CSS : ""}
 </style>
+<script>
+'use strict';
+/* Theme/density boot (task-board-theme-density): runs in <head>, while the
+   document is still empty, so the resolved theme/density attributes are in
+   place BEFORE first paint — no light flash for a dark user. */
+${bootBoardTheme.toString()}
+bootBoardTheme();
+</script>
 </head>
 <body${details ? ' data-detail-endpoint="/api/item"' : ""}>
 <header>
@@ -2289,6 +2558,8 @@ ${details ? DETAIL_CSS : ""}
   <span id="board-filter-count" class="filter-count">${sorted.length} item(s)</span>
   <span id="board-filter-error" class="filter-error" role="alert"></span>
   ${lensChips}
+  <button type="button" id="board-theme-toggle" class="layout-toggle">theme: auto</button>
+  <button type="button" id="board-density-toggle" class="layout-toggle" aria-pressed="false">compact density</button>
   <button type="button" id="board-terminal-toggle" class="layout-toggle" aria-pressed="false">hide done/cancelled</button>
   <button type="button" id="board-layout-reset" class="layout-toggle">reset layout</button>
 </div>
@@ -2307,6 +2578,7 @@ ${applyBoardFilter.toString()}
 /* board-filter:end */
 ${dropNeedsClaimPrompt.toString()}
 ${wireBoardColumns.toString()}
+${wireBoardTheme.toString()}
 ${trapBoardFocus.toString()}
 ${wireBoardMovePrompt.toString()}
 ${details ? renderBoardDetail.toString() : ""}
@@ -2324,6 +2596,9 @@ ${details ? wireBoardMoveMenu.toString() : ""}
   // board — static and serve — restores the persisted layout at boot; in serve
   // mode the roving anchor is re-seated after every layout change.
   wireBoardColumns(keyboardNav ? keyboardNav.ensureAnchor : null);
+  // Theme/density (task-board-theme-density): the <head> boot script already
+  // applied the persisted state before first paint; this owns the buttons.
+  wireBoardTheme();
   var filterInput = document.getElementById("board-filter-input");
   var filterError = document.getElementById("board-filter-error");
   var filterCount = document.getElementById("board-filter-count");
