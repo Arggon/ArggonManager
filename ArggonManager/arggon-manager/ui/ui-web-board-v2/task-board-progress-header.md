@@ -41,3 +41,12 @@ The board shows per-column counts only; progress per epic/story, blocked items w
 - [x] With `--group-by story`, group headers show a completion fraction
 - [x] Payload stays bounded (computed at render, no per-item bloat); static + serve parity; tests
 - [x] README + docs/json-output.md updated
+
+### 2026-09-30 @Arggon
+Evidence (PR #495, branch feat/task-board-progress-header):
+
+- Single source: report.ts now exports aggregateReport (runReport's aggregation over already-loaded items; parity test pins viaPure.groups/blocked == runReport's) and completedOf (the done+cancelled rule, now used by formatReportMarkdown too); view-model.ts adds priorityCounts (exact tokens; unset/invalid -> none). No rule is restated anywhere in the board.
+- Gates: npm test 1854/1854, npm run lint, npm run build, npm run check:plugin exit 0 (bundle regenerated — report/view-model are inlined), arggon validate --json ok:true, npx playwright test --grep @smoke 25/25 (23 pre-existing + 2 new; the lane's axe scan now covers the panel — zero exclusions, still green).
+- Panel renders: epics one row each (this repo: agent-coordination 19/20 ... ui 27/40), wip 3, priority mix 'p0 0 · p1 0 · p2 11 · p3 13 · none 2', blocked 0. Screenshot /tmp/evidence-summary-header.png (file://, 368-item tracker); grouped export head renders '⚑ arggon-manager 3/5'.
+- Bounded: no per-item payload — one row per epic, one entry per blocked leaf, five buckets; computed at render via buildBoardSummary from the already-loaded items.
+- Without the summary option (direct renderBoardHtml callers) the output is unchanged (unit-pinned); runBoard and serve always pass it (static + serve parity, @smoke-asserted on the serve page and a grouped static export).
