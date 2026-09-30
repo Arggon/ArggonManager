@@ -25,11 +25,18 @@ import {
   wireBoardKeyboardNav,
   wireBoardMoveMenu,
   wireBoardMovePrompt,
+  buildBoardSummary,
   MAX_DETAIL_PROSE_BYTES,
   type BoardLensItem,
+  type BoardSummary,
 } from "./board.js";
 import type { BoardDetailPayload, BoardGithub, PrInfo } from "./board.js";
-import { type ContractWorkItem as WorkItem } from "@arggondev/lib";
+import {
+  findTasksDir,
+  loadItems,
+  type ContractWorkItem as WorkItem,
+  type KernelWorkItem,
+} from "@arggondev/lib";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -1380,8 +1387,10 @@ describe("renderBoardHtml --group-by story (task-board-dependency-visuals)", () 
       ],
       { generatedAt: GENERATED_AT, groupBy: "story" },
     );
-    expect(html).toContain('<div class="mgroup-head">⚑ story-a</div>');
-    expect(html).toContain('<div class="mgroup-head">⚑ story-b</div>');
+    // Group heads carry the story completion fraction (task-board-progress-header):
+    // story-a 0/2 (two todo cards), story-b 1/2 (done task-z counts, done card + todo).
+    expect(html).toContain('⚑ story-a <span class="completion">0/2</span>');
+    expect(html).toContain('⚑ story-b <span class="completion">1/2</span>');
     expect(html.indexOf("⚑ story-a")).toBeLessThan(html.indexOf("⚑ story-b"));
     expect(html).toContain('<div class="mgroup-head none">no story</div>');
     // "no story" renders last within its column.
@@ -1407,6 +1416,119 @@ describe("renderBoardHtml --group-by story (task-board-dependency-visuals)", () 
     );
     expect(html).toContain("⚑ &quot;&gt;&lt;script&gt;");
     expect(html).not.toContain('"><script>');
+  });
+
+  it("shows the report's completion fraction on story group heads (task-board-progress-header)", () => {
+    const html = renderBoardHtml(
+      [
+        item({ id: "task-a", type: "task", status: "done", parent: "story-a" }),
+        item({ id: "task-b", type: "task", status: "cancelled", parent: "story-a" }),
+        item({ id: "task-c", type: "task", status: "todo", parent: "story-a" }),
+        item({ id: "task-d", type: "task", status: "in_progress", parent: "story-b" }),
+        item({ id: "task-e", type: "task", status: "todo" }),
+      ],
+      { generatedAt: GENERATED_AT, groupBy: "story" },
+    );
+    // done + cancelled over the whole group (the kernel report's rule): story-a
+    // 2/3, story-b 0/1. Fractions count cards across ALL columns.
+    expect(html).toContain('⚑ story-a <span class="completion">2/3</span>');
+    expect(html).toContain('⚑ story-b <span class="completion">0/1</span>');
+    // The key-less head carries no fraction.
+    expect(html).toContain('<div class="mgroup-head none">no story</div>');
+  });
+
+  it("renders no fraction under milestone grouping (fraction is a story-group feature)", () => {
+    const html = renderBoardHtml(
+      [
+        item({ id: "task-a", type: "task", status: "done", parent: "story-a", milestone: "M1" }),
+        item({ id: "task-b", type: "task", status: "todo", parent: "story-a", milestone: "M1" }),
+      ],
+      { generatedAt: GENERATED_AT, groupBy: "milestone" },
+    );
+    expect(html).toContain('<div class="mgroup-head">⚑ M1</div>');
+    expect(html).not.toContain('class="completion"');
+  });
+});
+
+describe("renderBoardHtml summary header (task-board-progress-header)", () => {
+  const items = [item({ id: "task-a", type: "task", status: "todo", title: "A" })];
+  const summary: BoardSummary = {
+    epics: [{ id: "epic-a", title: "Epic A", done: 3, total: 7 }],
+    wip: 2,
+    blockedTotal: 1,
+    blocked: [{ id: "bug-b", reason: "Waiting on OAuth credentials" }],
+    priorities: { p0: 1, p1: 0, p2: 2, p3: 4, none: 30 },
+  };
+
+  it("renders the rollup panel: per-epic completion, WIP, priority mix, blocked with reasons", () => {
+    const html = renderBoardHtml(items, { generatedAt: GENERATED_AT, summary });
+    expect(html).toContain(
+      '<section class="summary" id="board-summary" aria-label="progress summary">',
+    );
+    expect(html).toContain('<span class="epic" title="Epic A">epic-a 3/7</span>');
+    expect(html).toContain('id="board-summary-wip">2</span>');
+    expect(html).toContain("p0 1");
+    expect(html).toContain('id="board-summary-priorities">p0 1<span class="sep"> · </span>p1 0');
+    expect(html).toContain("none 30");
+    // Blocked: the count and the reason text (what the card already shows).
+    expect(html).toContain(
+      'id="board-summary-blocked">1 — bug-b: Waiting on OAuth credentials</span>',
+    );
+  });
+
+  it("escapes hostile epic ids/titles and blocked reasons", () => {
+    const hostile: BoardSummary = {
+      epics: [{ id: "<script>", title: "</script><script>alert(1)</script>", done: 0, total: 1 }],
+      wip: 0,
+      blockedTotal: 1,
+      blocked: [{ id: "bug-x", reason: '" onmouseover="alert(1)' }],
+      priorities: { p0: 0, p1: 0, p2: 0, p3: 0, none: 1 },
+    };
+    const html = renderBoardHtml(items, { generatedAt: GENERATED_AT, summary: hostile });
+    expect(html).not.toContain("<script>alert(1)");
+    expect(html).not.toContain('" onmouseover=');
+    expect(html).toContain("&lt;script&gt; 0/1");
+    expect(html).toContain("bug-x: &quot; onmouseover=&quot;alert(1)");
+  });
+
+  it("degrades to zeros/none for an empty tracker and stays out without the option", () => {
+    const empty: BoardSummary = {
+      epics: [],
+      wip: 0,
+      blockedTotal: 0,
+      blocked: [],
+      priorities: { p0: 0, p1: 0, p2: 0, p3: 0, none: 0 },
+    };
+    const html = renderBoardHtml([], { generatedAt: GENERATED_AT, summary: empty });
+    expect(html).toContain('id="board-summary-epics"><span class="sep">none</span>');
+    expect(html).toContain('id="board-summary-blocked">0</span>');
+
+    const plain = renderBoardHtml([], { generatedAt: GENERATED_AT });
+    expect(plain).not.toContain("board-summary");
+    expect(plain).not.toContain('class="summary"');
+  });
+
+  it("buildBoardSummary computes from the kernel aggregation on a fixture tree", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-summary-"));
+    writeBranchedTree(dir);
+    // writeBranchedTree: launch (initiative) -> story-a (in_progress) -> task-one
+    // (in_progress, claimable). Both claimable items are open and unprioritized;
+    // the tree has no epic, so the epics row degrades to none.
+    const summary = buildBoardSummary(loadItems(findTasksDir(dir)) as KernelWorkItem[]);
+    expect(summary.epics).toEqual([]);
+    expect(summary.wip).toBe(2);
+    expect(summary.blockedTotal).toBe(0);
+    expect(summary.blocked).toEqual([]);
+    expect(summary.priorities).toEqual({ p0: 0, p1: 0, p2: 0, p3: 0, none: 2 });
+  });
+
+  it("runBoard renders the summary panel on the static export (static + serve parity)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-summary-static-"));
+    writeBranchedTree(dir);
+    const result = runBoard({ cwd: dir, out: "out.html", generatedAt: GENERATED_AT, me: null });
+    const html = readFileSync(result.outPath, "utf8");
+    expect(html).toContain('id="board-summary"');
+    expect(html).toContain('id="board-summary-wip">2</span>');
   });
 });
 

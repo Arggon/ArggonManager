@@ -2206,9 +2206,9 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
-exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.MAX_MISSING_DEPENDENCIES = exports.unlinkNodeModulesLink = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.inspectDeclaredDependencies = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = void 0;
+exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
+exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.MAX_MISSING_DEPENDENCIES = exports.unlinkNodeModulesLink = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.inspectDeclaredDependencies = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2313,6 +2313,7 @@ Object.defineProperty(exports, "isReadyTodo", { enumerable: true, get: function 
 Object.defineProperty(exports, "itemsForStatus", { enumerable: true, get: function () { return view_model_js_1.itemsForStatus; } });
 Object.defineProperty(exports, "matchesSubstringFilter", { enumerable: true, get: function () { return view_model_js_1.matchesSubstringFilter; } });
 Object.defineProperty(exports, "openDependencyIds", { enumerable: true, get: function () { return view_model_js_1.openDependencyIds; } });
+Object.defineProperty(exports, "priorityCounts", { enumerable: true, get: function () { return view_model_js_1.priorityCounts; } });
 Object.defineProperty(exports, "priorityTier", { enumerable: true, get: function () { return view_model_js_1.priorityTier; } });
 Object.defineProperty(exports, "readyTodoCount", { enumerable: true, get: function () { return view_model_js_1.readyTodoCount; } });
 Object.defineProperty(exports, "sortById", { enumerable: true, get: function () { return view_model_js_1.sortById; } });
@@ -2336,6 +2337,8 @@ var show_js_1 = require("./show.js");
 Object.defineProperty(exports, "runShow", { enumerable: true, get: function () { return show_js_1.runShow; } });
 Object.defineProperty(exports, "showBoundedParts", { enumerable: true, get: function () { return show_js_1.showBoundedParts; } });
 var report_js_1 = require("./report.js");
+Object.defineProperty(exports, "aggregateReport", { enumerable: true, get: function () { return report_js_1.aggregateReport; } });
+Object.defineProperty(exports, "completedOf", { enumerable: true, get: function () { return report_js_1.completedOf; } });
 Object.defineProperty(exports, "runReport", { enumerable: true, get: function () { return report_js_1.runReport; } });
 var trend_js_1 = require("./trend.js");
 Object.defineProperty(exports, "runTrend", { enumerable: true, get: function () { return trend_js_1.runTrend; } });
@@ -3648,7 +3651,9 @@ __arggonModules.set("lib/src/report.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.emptyCounts = emptyCounts;
+exports.aggregateReport = aggregateReport;
 exports.runReport = runReport;
+exports.completedOf = completedOf;
 exports.formatReportTable = formatReportTable;
 exports.formatReportMarkdown = formatReportMarkdown;
 const items_js_1 = require("./items.js");
@@ -3661,10 +3666,7 @@ function emptyCounts() {
 function titleOf(item) {
     return item.title ?? item.id;
 }
-function runReport(opts) {
-    const tasksDir = (0, paths_js_1.findTasksDir)(opts.cwd);
-    const root = (0, paths_js_1.repoRootFromTasks)(tasksDir);
-    const items = (0, items_js_1.loadItems)(tasksDir);
+function aggregateReport(items) {
     const byId = (0, items_js_1.itemsById)(items);
     const children = new Map();
     for (const item of items) {
@@ -3728,7 +3730,16 @@ function runReport(opts) {
             blockedReason: leaf.blockedReason,
         };
     });
+    return { groups, blocked };
+}
+function runReport(opts) {
+    const tasksDir = (0, paths_js_1.findTasksDir)(opts.cwd);
+    const root = (0, paths_js_1.repoRootFromTasks)(tasksDir);
+    const { groups, blocked } = aggregateReport((0, items_js_1.loadItems)(tasksDir));
     return { root, groups, blocked };
+}
+function completedOf(counts) {
+    return counts.done + counts.cancelled;
 }
 function formatReportTable(groups) {
     const lines = [];
@@ -3760,7 +3771,7 @@ function formatReportMarkdown(result, opts = {}) {
             continue;
         }
         for (const c of group.containers) {
-            const done = c.counts.done + c.counts.cancelled;
+            const done = completedOf(c.counts);
             const id = (0, sanitize_js_1.sanitizeHumanTextUncapped)(c.id);
             const title = (0, sanitize_js_1.sanitizeHumanTextUncapped)(c.title);
             const line = c.empty
@@ -3768,7 +3779,7 @@ function formatReportMarkdown(result, opts = {}) {
                 : `- **${id}** — ${title}: ${done}/${c.counts.total} complete (${c.counts.in_progress} in progress, ${c.counts.blocked} blocked)`;
             lines.push(line);
         }
-        const totalDone = group.totals.done + group.totals.cancelled;
+        const totalDone = completedOf(group.totals);
         lines.push("", `- **totals**: ${totalDone}/${group.totals.total} complete`, "");
     }
     lines.push("## Blocked", "");
@@ -5728,6 +5739,7 @@ exports.matchesSubstringFilter = matchesSubstringFilter;
 exports.visibleItems = visibleItems;
 exports.itemsForStatus = itemsForStatus;
 exports.statusCounts = statusCounts;
+exports.priorityCounts = priorityCounts;
 exports.groupItemsBy = groupItemsBy;
 exports.treeEntries = treeEntries;
 exports.isReadyTodo = isReadyTodo;
@@ -5790,6 +5802,15 @@ function statusCounts(items) {
         counts[status] = 0;
     for (const item of items)
         counts[item.status] += 1;
+    return counts;
+}
+function priorityCounts(items) {
+    const counts = { p0: 0, p1: 0, p2: 0, p3: 0, none: 0 };
+    for (const item of items) {
+        counts[item.priority !== null && item.priority !== undefined && (0, priority_js_1.isPriority)(item.priority)
+            ? item.priority
+            : "none"] += 1;
+    }
     return counts;
 }
 function groupItemsBy(items, keyOf) {

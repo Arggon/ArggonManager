@@ -10,7 +10,16 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { formatReportMarkdown, formatReportTable, runReport } from "@arggondev/lib";
+import {
+  aggregateReport,
+  completedOf,
+  findTasksDir,
+  formatReportMarkdown,
+  formatReportTable,
+  loadItems,
+  priorityCounts,
+  runReport,
+} from "@arggondev/lib";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -120,6 +129,35 @@ describe("runReport", () => {
   it("throws outside a tasks/ tree", () => {
     const root = mkdtempSync(join(tmpdir(), "arggon-report-naked-"));
     expect(() => runReport({ cwd: root })).toThrow(/No ArggonManager\/ convention/);
+  });
+});
+
+describe("aggregateReport / completedOf / priorityCounts (task-board-progress-header)", () => {
+  it("aggregateReport is runReport's aggregation over already-loaded items", () => {
+    const root = makeTree();
+    const viaRun = runReport({ cwd: root });
+    const viaPure = aggregateReport(loadItems(findTasksDir(root)));
+    expect(viaPure.groups).toEqual(viaRun.groups);
+    expect(viaPure.blocked).toEqual(viaRun.blocked);
+  });
+
+  it("completedOf is the report's done+cancelled completion rule", () => {
+    expect(completedOf({ todo: 1, in_progress: 2, blocked: 0, done: 3, cancelled: 1 })).toBe(4);
+    expect(completedOf({ todo: 0, in_progress: 0, blocked: 0, done: 0, cancelled: 0 })).toBe(0);
+  });
+
+  it("priorityCounts buckets by exact token; unset and invalid land in none", () => {
+    expect(
+      priorityCounts([
+        { priority: "p0" },
+        { priority: "p0" },
+        { priority: "p2" },
+        { priority: "p3" },
+        { priority: null },
+        { priority: undefined },
+        { priority: "urgent" },
+      ]),
+    ).toEqual({ p0: 2, p1: 0, p2: 1, p3: 1, none: 3 });
   });
 });
 
