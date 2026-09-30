@@ -10,7 +10,6 @@ labels: [ci, docs]
 priority: p2
 created: "2026-09-22"
 updated: "2026-09-30"
-worktree_path: /home/arggon/Projects/ArggonManager-task-retire-opencode2
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-retire-opencode2.md

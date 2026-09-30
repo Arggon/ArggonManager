@@ -10,7 +10,6 @@ labels: [opencode-seam, init, dogfood]
 priority: p2
 created: "2026-09-22"
 updated: "2026-09-30"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-stale-vendored-plugin-copy
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-stale-vendored-plugin-copy.md

@@ -10,7 +10,6 @@ labels: [process]
 priority: p1
 created: "2026-09-22"
 updated: "2026-09-30"
-worktree_path: /home/arggon/Projects/ArggonManager-task-repo-visibility-decision
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/operating-principles/task-repo-visibility-decision.md
