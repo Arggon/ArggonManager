@@ -80,3 +80,13 @@ Deliberately out of scope of the parent item, and the reason each is separate:
 - [x] `npm run build`, `npm test`, `npm run lint`, `npm run check:plugin` and
       `npx playwright test --grep @smoke` are green, and
       `npm run arggon -- validate --json` reports `ok:true`.
+
+### 2026-09-30 @Arggon
+Evidence (PR #497, branch feat/task-axe-board-drawer-and-lens-coverage):
+
+- Scans: the @smoke lane now runs axe at 5 states, each with a deterministic readiness signal — ready served page (plus an explicit expect that the fixture renders an EMPTY done column, so .empty contrast is asserted; the done column is empty at first-test time), the open detail drawer (scan placed right after the .drawer-acceptance .drawer-check toHaveCount(2) — the async /api/item readiness signal; no sleep, no networkidle), the static file:// export (after its h1), and the filtered/lens state (after the 1-of-N count; client-created .empty placeholders included).
+- region finding: fixed, not excluded — #board-filterbar carries role=search aria-label='board filters' on every board (static + serve), pinned by a unit test in board.test.ts; the scan passes with zero exclusions. Recorded decision (best-practice stays out of the asserted tags; widen only after auditing its rule surface against every scanned state) now lives in the spec comment above AXE_WCAG_TAGS and CONTRIBUTING.md § Accessibility gate.
+- No defect surfaced by the new scans: nothing to fix or file (drawer open over the scrim, drawer checkboxes, static document and filtered empties all clean under wcag2a/2aa/21a/21aa/22aa).
+- Gates: npm run build ok, npm test 1852/1852, npm run lint clean, npm run check:plugin exit 0 (bundle unchanged — cli sources are not inlined), arggon validate --json ok:true, npx playwright test --grep @smoke 23/23 green on 4 of the last 5 runs and on the final run (12 total lane executions today).
+- Out-of-scope-but-necessary, flagged for review: the merged sticky-header test raced the fixture creates' trailing debounced SSE reload ('Execution context was destroyed' mid-evaluate; observed failing 4x today across three branches, always green solo). The measurement now retries through that one navigation, bounded to 2 attempts (spec comment documents the race). No board code changed for it.
+- Deviation note: the region acceptance arm chosen is BOTH — the landmark fix AND the recorded decision (spec comment + CONTRIBUTING) — because fixing region alone would leave the wider best-practice scope unrecorded.
