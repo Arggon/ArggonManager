@@ -18,6 +18,7 @@ import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { runAdopt } from "./adopt.js";
 import { runCleanup } from "./cleanup.js";
+import { tickAcceptance } from "../../test/acceptance.js";
 import {
   commitPayload,
   commitTrackerMutation,
@@ -684,6 +685,9 @@ describe("tracker auto-commit on cleanup --prune", () => {
       },
     );
     const wt = started.worktreePath!;
+    // Done gate (task-done-gate-acceptance-waiver, ADR 0015): the worktree
+    // copy carries the item file — tick its contract there before the flip.
+    tickAcceptance(wt, "task-rate-limit");
     runUpdate({ cwd: wt, id: "task-rate-limit", status: "done", now: NOW });
     git(["add", "ArggonManager"], wt);
     git(["commit", "--quiet", "-m", "close task-rate-limit"], wt);
@@ -740,6 +744,9 @@ describe("tracker auto-commit on update", () => {
       "ArggonManager/launch/launch.md",
       "ArggonManager/launch/auth/auth.md",
       "ArggonManager/launch/auth/login/login.md",
+      // The leaf itself: the done gate (task-done-gate-acceptance-waiver,
+      // ADR 0015) refuses the flip while its own body has an unchecked box.
+      "ArggonManager/launch/auth/login/task-rate-limit.md",
     ]) {
       const full = join(dir, rel);
       writeFileSync(

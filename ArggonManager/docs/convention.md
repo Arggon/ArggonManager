@@ -240,6 +240,8 @@ Body content after frontmatter is free-form Markdown (context, acceptance criter
 
 Intentional gaps: **`todo` ↛ `done`** and **`todo` ↛ `blocked`** — completing or blocking requires a claim first.
 
+**Done gate (task-done-gate-acceptance-waiver, ADR 0015):** for the claimable leaves `task`/`bug`, the `→ done` transition additionally requires the body's acceptance checklist to be complete (no unchecked `- [ ]` boxes; a body with no checklist has no acceptance contract). The kernel refuses the flip unless the caller passes an explicit waiver — `update --status done --waive "<reason>"` with a non-empty reason, recorded as a dated `### Waiver <date>` section in the item body before the status changes. Agents are refused waivers (the MCP/native surfaces expose no waive parameter); containers are exempt here — their contract is the acceptance-aware cascade. The gate is a kernel rule on the transition, never a `validate` error: hand-edited files still validate either way.
+
 Changing status means editing frontmatter and committing (or opening a PR). Agents follow the same transitions except where playbook forbids reopen.
 
 ### Claim rule
@@ -593,8 +595,8 @@ Independent of children — **no rollup** in v0.
 
 Copy-paste stubs for each v0 work-item type live in [`templates/`](../../templates/). Fill placeholders and place the file under the tracker root per [Folder layout](#folder-layout). Future CLI `arggon create` should copy from these templates.
 
-| Type       | Template                                                |
-| ---------- | ------------------------------------------------------- |
+| Type       | Template                                                   |
+| ---------- | ---------------------------------------------------------- |
 | Initiative | [`templates/initiative.md`](../../templates/initiative.md) |
 | Epic       | [`templates/epic.md`](../../templates/epic.md)             |
 | Story      | [`templates/story.md`](../../templates/story.md)           |

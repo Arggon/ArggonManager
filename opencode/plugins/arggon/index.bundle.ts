@@ -2156,7 +2156,16 @@ function runImportIssues(opts) {
                     assignee: IMPORT_CLAIMANT,
                     now,
                 });
-                const closed = (0, update_js_1.runUpdate)({ cwd: opts.cwd, id, status: "done", unassign: true, now });
+                const needsWaive = !(0, items_js_1.acceptanceComplete)(createdItem.item.body) &&
+                    (createdItem.item.type === "task" || createdItem.item.type === "bug");
+                const closed = (0, update_js_1.runUpdate)({
+                    cwd: opts.cwd,
+                    id,
+                    status: "done",
+                    unassign: true,
+                    ...(needsWaive ? { waive: `imported as closed from GitHub issue #${number}` } : {}),
+                    now,
+                });
                 writtenPaths.push(...closed.changedPaths);
             }
         }
@@ -4964,6 +4973,24 @@ function runUpdate(opts) {
                 throw new Error(`--steal requires --assignee <your-login> (you become the assignee of '${id}')`);
             }
         }
+        const flippingToDone = newStatus === "done" && item.status !== "done";
+        const gatedLeaf = item.type === "task" || item.type === "bug";
+        const gated = flippingToDone && gatedLeaf && !(0, items_js_1.acceptanceComplete)(item.body);
+        const waiveReason = opts.waive !== undefined ? opts.waive.trim() : undefined;
+        if (opts.waive !== undefined) {
+            if (!waiveReason) {
+                throw new Error("--waive requires a non-empty reason (the waiver is recorded in the item body)");
+            }
+            if (opts.agent) {
+                throw new Error("agents must not waive the done gate; --waive is a human-only escape hatch (ArggonManager/docs/agents.md §5)");
+            }
+            if (!gated) {
+                throw new Error("--waive is only valid with --status done on a task/bug whose acceptance checklist still has unchecked boxes (nothing to waive)");
+            }
+        }
+        else if (gated) {
+            throw new Error(`cannot mark '${id}' done: the acceptance checklist in the item body still has unchecked boxes. Tick every box, or pass --waive "<reason>" to record a dated waiver`);
+        }
         const currentAssignee = item.assignee ?? null;
         let newAssignee;
         if (opts.assignee !== undefined) {
@@ -5098,6 +5125,10 @@ function runUpdate(opts) {
         if (opts.steal && stealReason) {
             const note = `> stolen ${(0, dates_js_1.formatDate)(now)} by ${newAssignee}: ${stealReason}`;
             newBody = `${item.body.endsWith("\n") || item.body.length === 0 ? item.body : `${item.body}\n`}${note}\n`;
+        }
+        if (waiveReason) {
+            const base = newBody.endsWith("\n") || newBody.length === 0 ? newBody : `${newBody}\n`;
+            newBody = `${base}\n### Waiver ${(0, dates_js_1.formatDate)(now)}\n\n${waiveReason}\n`;
         }
         let targetPath = item.filePath;
         let movedFrom;

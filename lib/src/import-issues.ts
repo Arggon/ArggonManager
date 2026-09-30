@@ -3,7 +3,7 @@ import { readConventionConfig } from "./convention.js";
 import { runCreate } from "./create.js";
 import { parseRepoSlug } from "./get-open-prs.js";
 import { itemId, slugify } from "./ids.js";
-import { itemsById, loadItems } from "./items.js";
+import { acceptanceComplete, itemsById, loadItems } from "./items.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
 import {
   commitTrackerMutation,
@@ -403,7 +403,24 @@ export function runImportIssues(opts: ImportIssuesOptions): ImportIssuesResult {
           assignee: IMPORT_CLAIMANT,
           now,
         });
-        const closed = runUpdate({ cwd: opts.cwd, id, status: "done", unassign: true, now });
+        // Done gate (task-done-gate-acceptance-waiver, ADR 0015): the flip
+        // records a GitHub state ("this issue was closed"), not a completion
+        // claim, so an imported body with unchecked task-list checkboxes (an
+        // acceptance contract by shape only) waives the gate with the reason
+        // recorded in the item body. The waiver is passed ONLY when the gate
+        // would fire — the kernel refuses --waive when there is nothing to
+        // waive.
+        const needsWaive =
+          !acceptanceComplete(createdItem.item.body) &&
+          (createdItem.item.type === "task" || createdItem.item.type === "bug");
+        const closed = runUpdate({
+          cwd: opts.cwd,
+          id,
+          status: "done",
+          unassign: true,
+          ...(needsWaive ? { waive: `imported as closed from GitHub issue #${number}` } : {}),
+          now,
+        });
         // The container cascade may write ancestors in the same run — their
         // paths ride in the run-level commit too.
         writtenPaths.push(...closed.changedPaths);

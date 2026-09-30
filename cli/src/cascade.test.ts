@@ -89,6 +89,7 @@ function chainTree(): { dir: string; tasks: string[]; bug: string } {
     now: NOW,
   });
   for (const container of ["launch", "epic-a", "story-a"]) stripChecklist(dir, container);
+  for (const leaf of [t1.id, t2.id, bug.id]) tickChecklist(dir, leaf);
   return { dir, tasks: [t1.id, t2.id], bug: bug.id };
 }
 
@@ -113,6 +114,29 @@ function stripChecklist(dir: string, id: string): void {
     .filter((line) => !/^[ \t]*[-*] \[( |x|X)\]/.test(line))
     .join("\n");
   writeFileSync(file, stripped, "utf8");
+}
+
+/**
+ * Tick every unchecked acceptance checkbox in ONE item's body. The done gate
+ * (task-done-gate-acceptance-waiver, ADR 0015) refuses the `-> done` flip of
+ * a task/bug with unchecked boxes, so cascade fixtures tick their LEAF
+ * contracts at seed time and keep exercising the unwaived flip; containers
+ * are not gated (their contract is the acceptance-aware cascade veto).
+ */
+function tickChecklist(dir: string, id: string): void {
+  const tasksDir = join(dir, "ArggonManager");
+  const walk = (current: string): string[] =>
+    readdirSync(current, { withFileTypes: true }).flatMap((entry) => {
+      const full = join(current, entry.name);
+      return entry.isDirectory() ? walk(full) : full;
+    });
+  const file = walk(tasksDir).find((f) => f.endsWith(`/${id}.md`));
+  if (!file) throw new Error(`tickChecklist: '${id}' not found under ${tasksDir}`);
+  writeFileSync(
+    file,
+    readFileSync(file, "utf8").replace(/^([ \t]*[-*] \[) (\])/gm, "$1x]"),
+    "utf8",
+  );
 }
 
 function claimAndDone(dir: string, id: string): void {
@@ -251,6 +275,7 @@ describe("automatic container completion", () => {
       now: NOW,
     });
     for (const container of ["launch", "epic-a", "story-a"]) stripChecklist(dir, container);
+    for (const leaf of ["task-one", "task-two"]) tickChecklist(dir, leaf);
     claimAndDone(dir, "task-one");
     runUpdate({ cwd: dir, id: "task-two", status: "in_progress", assignee: "worker", now: NOW });
     const result = runUpdate({ cwd: dir, id: "task-two", status: "done", now: NOW });
@@ -356,6 +381,7 @@ describe("cascade notice in human output", () => {
       now: NOW,
     });
     for (const container of ["launch", "epic-a", "story-a"]) stripChecklist(dir, container);
+    for (const leaf of ["task-one", "task-two"]) tickChecklist(dir, leaf);
     claimAndDone(dir, "task-one");
     runUpdate({ cwd: dir, id: "task-two", status: "in_progress", assignee: "worker", now: NOW });
     const res = runCli(["update", "task-two", "--status", "done"], dir);

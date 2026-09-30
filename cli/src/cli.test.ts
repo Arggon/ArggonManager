@@ -20,6 +20,7 @@ import {
   runNext,
   runUpdate,
 } from "@arggondev/lib";
+import { tickAcceptance } from "../../test/acceptance.js";
 
 import { runInit } from "./init.js";
 
@@ -619,6 +620,9 @@ describe("CLI --json", () => {
     expect(
       runCli(["update", "task-work", "--status", "in_progress", "--assignee", "bob"], dir).status,
     ).toBe(0);
+    // Done gate (task-done-gate-acceptance-waiver, ADR 0015): tick the contract
+    // so the flip through the real CLI succeeds.
+    tickAcceptance(dir, "task-work");
     expect(runCli(["update", "task-work", "--status", "done"], dir).status).toBe(0);
     const human = runCli(["report"], dir);
     expect(human.status).toBe(0);

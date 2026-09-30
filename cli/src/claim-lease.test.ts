@@ -12,6 +12,7 @@ import {
 } from "@arggondev/lib";
 
 import { runInit } from "./init.js";
+import { tickAcceptance } from "../../test/acceptance.js";
 
 import { runStart, type StartGit } from "./start.js";
 
@@ -126,6 +127,7 @@ describe("claimed_at lifecycle", () => {
   it("clears claimed_at when the claim closes as done", () => {
     const { dir, ids } = primedTree();
     runUpdate({ cwd: dir, id: ids[0]!, status: "in_progress", assignee: "alice", now: NOW });
+    tickAcceptance(dir, ids[0]!);
     const result = runUpdate({ cwd: dir, id: ids[0]!, status: "done", now: LATER });
     expect(result.item.claimedAt).toBeNull();
     const { data } = fm(result.path);
@@ -219,6 +221,7 @@ describe("stale detection (list --stale --older-than)", () => {
   it("excludes unclaimed and non-claimed items", () => {
     const { dir, ids } = primedTree(1);
     runUpdate({ cwd: dir, id: ids[0]!, status: "in_progress", assignee: "alice", now: NOW });
+    tickAcceptance(dir, ids[0]!);
     runUpdate({ cwd: dir, id: ids[0]!, status: "done", now: LATER });
     const stale = runList({
       cwd: dir,

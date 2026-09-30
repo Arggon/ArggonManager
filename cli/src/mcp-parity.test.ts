@@ -442,6 +442,8 @@ const PARITY_EXCEPTIONS: Record<string, Record<string, string>> = {
       "human-only supervised takeover (TTY-gated); agents are refused by the shared rules layer",
     "--reason":
       "rationale recorded only by the human-only --steal takeover; meaningless without it",
+    "--waive":
+      "human-only recorded waiver for the done gate (ADR 0015, task-done-gate-acceptance-waiver); the arggon_update schema has no waive property, so agent callers receive the gate refusal and coordinate with a human",
   },
   comment: {
     "--json": "the agent-contract output switch itself; MCP tool text is always the JSON envelope",

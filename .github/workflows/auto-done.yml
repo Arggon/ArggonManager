@@ -5,7 +5,10 @@ name: auto-done
 # flips those items to done through the CLI update path and commits the status
 # change to main. Only the legal in_progress -> done transition is performed;
 # anything else (unclaimed items, containers, unknown ids) is skipped with a
-# warning annotation. Acceptance checklists stay a human/agent responsibility.
+# warning annotation. The done gate (task-done-gate-acceptance-waiver, ADR
+# 0015) refuses the flip for an item whose acceptance checklist still has
+# unchecked boxes — tolerated the same way: a warning annotation and continue,
+# never a red flip run. Acceptance checklists stay a human/agent responsibility.
 # Context: ArggonManager/arggon-manager/cli/story-github/task-auto-done-on-merge.md
 
 on:
@@ -84,6 +87,13 @@ jobs:
                   skipped="$(printf '%s' "$out" | jq -r '(.cascadeSkipped // []) | map("\(.id):\(.reason)") | join(",")' 2>/dev/null || true)"
                   echo "$id (PR #$PR): in_progress -> done (cascade: ${cascade:-none}${skipped:+; skipped: $skipped})"
                   changed=1
+                elif printf '%s' "$out" | grep -q "unchecked boxes"; then
+                  # Done gate (task-done-gate-acceptance-waiver, ADR 0015): the
+                  # kernel refuses the flip while the item body carries unchecked
+                  # acceptance checkboxes. Tolerate it like the skipped-todo case
+                  # below — a warning annotation for a human (tick the checklist
+                  # or waive), never a red flip run for an unticked checklist.
+                  echo "::warning::$id: flip refused by the done gate — the acceptance checklist in the item body still has unchecked boxes (tick them, or mark done manually with arggon update $id --status done --waive \"<reason>\")"
                 else
                   echo "::warning::$id: update failed unexpectedly (output: ${out:-empty})"
                 fi
@@ -163,14 +173,16 @@ jobs:
                     rstatus="$(node dist/cli.js list --json | jq -r --arg id "$rid" '.items[] | select(.id == $id) | .status')"
                     case "$rstatus" in
                       in_progress)
-                        if out2="$(node dist/cli.js update "$rid" --status done --json)"; then
-                          cascade2="$(printf '%s' "$out2" | jq -r '(.autoCompleted // []) | join(",")' 2>/dev/null || true)"
-                          skipped2="$(printf '%s' "$out2" | jq -r '(.cascadeSkipped // []) | map("\(.id):\(.reason)") | join(",")' 2>/dev/null || true)"
-                          echo "$rid (redo, PR #$PR): in_progress -> done (cascade: ${cascade2:-none}${skipped2:+; skipped: $skipped2})"
-                          changed2=1
-                        else
-                          echo "::warning::$rid: redo update failed unexpectedly (output: ${out2:-empty})"
-                        fi
+                      if out2="$(node dist/cli.js update "$rid" --status done --json)"; then
+                        cascade2="$(printf '%s' "$out2" | jq -r '(.autoCompleted // []) | join(",")' 2>/dev/null || true)"
+                        skipped2="$(printf '%s' "$out2" | jq -r '(.cascadeSkipped // []) | map("\(.id):\(.reason)") | join(",")' 2>/dev/null || true)"
+                        echo "$rid (redo, PR #$PR): in_progress -> done (cascade: ${cascade2:-none}${skipped2:+; skipped: $skipped2})"
+                        changed2=1
+                      elif printf '%s' "$out2" | grep -q "unchecked boxes"; then
+                        echo "::warning::$rid (redo): flip refused by the done gate — the acceptance checklist in the item body still has unchecked boxes (tick them, or mark done manually with arggon update $rid --status done --waive \"<reason>\")"
+                      else
+                        echo "::warning::$rid: redo update failed unexpectedly (output: ${out2:-empty})"
+                      fi
                         ;;
                       done|cancelled)
                         echo "skip $rid (redo): already $rstatus"

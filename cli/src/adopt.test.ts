@@ -35,6 +35,7 @@ import { arggonVersion, checksumOf, GENERATED_DOC_COUNT } from "./docs.js";
 import { runDoctor } from "./doctor.js";
 
 import { runInit } from "./init.js";
+import { tickAcceptance } from "../../test/acceptance.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -182,6 +183,7 @@ describe("runAdopt: task creation", () => {
     const dir = seedTree();
     runAdopt({ cwd: dir });
     runUpdate({ cwd: dir, id: ADOPT_TASK_ID, status: "in_progress", assignee: "adopt-bot" });
+    tickAcceptance(dir, ADOPT_TASK_ID);
     runUpdate({ cwd: dir, id: ADOPT_TASK_ID, status: "done", unassign: true });
     expect(() => runAdopt({ cwd: dir })).toThrow(/already exists \(done\)/);
   });
@@ -722,6 +724,7 @@ describe("runAdoptAck: x-generated baseline refresh (task-adopt-checksum-refresh
     const dir = seedTree();
     runAdopt({ cwd: dir });
     runUpdate({ cwd: dir, id: ADOPT_TASK_ID, status: "in_progress", assignee: "adopt-bot" });
+    tickAcceptance(dir, ADOPT_TASK_ID);
     runUpdate({ cwd: dir, id: ADOPT_TASK_ID, status: "done", unassign: true });
     const result = runAdoptAck({ cwd: dir });
     expect(result.count).toBe(GENERATED_DOC_COUNT);
