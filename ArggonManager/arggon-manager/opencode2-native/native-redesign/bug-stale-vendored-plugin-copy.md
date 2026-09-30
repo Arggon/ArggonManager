@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-stale-vendored-plugin-copy
 title: Stale vendored plugin copy survives init re-runs (shared x-generated checksum vs per-checkout artifact)
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [opencode-seam, init, dogfood]
 priority: p2
 created: "2026-09-22"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T12:21:27.292Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-stale-vendored-plugin-copy
 ---
 <!--
