@@ -90,3 +90,7 @@ Evidence (PR #497, branch feat/task-axe-board-drawer-and-lens-coverage):
 - Gates: npm run build ok, npm test 1852/1852, npm run lint clean, npm run check:plugin exit 0 (bundle unchanged — cli sources are not inlined), arggon validate --json ok:true, npx playwright test --grep @smoke 23/23 green on 4 of the last 5 runs and on the final run (12 total lane executions today).
 - Out-of-scope-but-necessary, flagged for review: the merged sticky-header test raced the fixture creates' trailing debounced SSE reload ('Execution context was destroyed' mid-evaluate; observed failing 4x today across three branches, always green solo). The measurement now retries through that one navigation, bounded to 2 attempts (spec comment documents the race). No board code changed for it.
 - Deviation note: the region acceptance arm chosen is BOTH — the landmark fix AND the recorded decision (spec comment + CONTRIBUTING) — because fixing region alone would leave the wider best-practice scope unrecorded.
+
+### handoff 2026-09-30 @Arggon — next: Coordinator: review PR #497; if the sticky-header retry fix should be its own follow-up instead, split it before merge — the rest of the diff is scan/landmark only
+- branch: feat/task-axe-board-drawer-and-lens-coverage
+- open questions: Widen to best-practice? Needs an audit item per the recorded decision; region itself is fixed
