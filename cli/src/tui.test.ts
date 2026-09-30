@@ -29,10 +29,12 @@ import {
   loadTuiItems,
   nextTuiSort,
   renderTui,
+  renderTuiHelp,
   renderTuiDetail,
   renderTuiScreen,
   runTuiBoard,
   selectedTuiItem,
+  TUI_HELP,
   TUI_DETAIL_MAX_BODY_LINES,
   TUI_DETAIL_MAX_LINES,
   TUI_DETAIL_NARROW_WIDTH,
@@ -43,13 +45,20 @@ import {
   tuiDependencySummary,
   tuiDetailBodyRows,
   tuiDetailLinesFor,
+  tuiLegalMoves,
   tuiLensFilter,
   tuiViewItems,
   tuiViewOptions,
   visibleTuiItems,
   wrapTuiLine,
 } from "./tui.js";
-import type { TuiDetailInput, TuiDetailSource, TuiState, TuiWatchFactory } from "./tui.js";
+import type {
+  TuiActionState,
+  TuiDetailInput,
+  TuiDetailSource,
+  TuiState,
+  TuiWatchFactory,
+} from "./tui.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -1102,7 +1111,7 @@ describe("renderTui sort + lens frame (task-tui-sort-ready-lens)", () => {
   it("a lens toggle re-clamps the selection against the narrowed columns", () => {
     // card 2 (gamma in id order) under the ready lens: the todo column
     // shrinks to two cards, so the post-toggle clamp pulls the index back.
-    const state = handleKey({ ...initialTuiState(200, 12), card: 2 }, "l");
+    const state = handleKey({ ...initialTuiState(200, 12), card: 2 }, "L");
     expect(state.readyOnly).toBe(true);
     const counts = tuiColumnCounts(SORT_SET, state);
     expect(clampTuiState(state, counts).card).toBe(1);
@@ -1110,25 +1119,25 @@ describe("renderTui sort + lens frame (task-tui-sort-ready-lens)", () => {
 });
 
 describe("handleKey sort + lens keys (task-tui-sort-ready-lens)", () => {
-  it("s cycles the sort, l toggles the lens (board mode)", () => {
+  it("s cycles the sort, L toggles the lens (board mode; l is the vim right motion)", () => {
     let state = handleKey(initialTuiState(), "s");
     expect(state.sort).toBe("priority");
     state = handleKey(state, "s");
     expect(state.sort).toBe("next");
     state = handleKey(state, "s");
     expect(state.sort).toBe("id");
-    state = handleKey(state, "l");
+    state = handleKey(state, "L");
     expect(state.readyOnly).toBe(true);
-    state = handleKey(state, "l");
+    state = handleKey(state, "L");
     expect(state.readyOnly).toBe(false);
   });
 
-  it("s and l type into the search prompt like any other key", () => {
+  it("s and L type into the search prompt like any other key", () => {
     let state = handleKey(initialTuiState(), "/");
     state = handleKey(state, "s");
-    state = handleKey(state, "l");
+    state = handleKey(state, "L");
     expect(state.searching).toBe(true);
-    expect(state.filter).toBe("sl");
+    expect(state.filter).toBe("sL");
     expect(state.sort).toBe("id");
     expect(state.readyOnly).toBe(false);
   });
@@ -1154,7 +1163,7 @@ describe("runTuiBoard sort + lens keys (task-tui-sort-ready-lens)", () => {
     await wait(30);
     term.input.write("s"); // sort: next
     await wait(30);
-    term.input.write("l"); // ready-only lens
+    term.input.write("L"); // ready-only lens
     await wait(30);
     term.input.write("q");
     await done;
@@ -1195,6 +1204,13 @@ describe("arggon board --tui (CLI)", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("board --tui requires an interactive terminal");
     expect(result.stdout).not.toContain("<html");
+  });
+
+  it("parses --no-color (the TTY failure is unchanged with the flag present)", () => {
+    const root = newTree();
+    const result = runCli(["board", "--tui", "--no-color"], root);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("board --tui requires an interactive terminal");
   });
 
   it("refuses --tui combined with --json (BOARD_FAILED), even before the TTY check", () => {
@@ -1793,6 +1809,424 @@ describe("detail pane: runTuiBoard loop", () => {
     term.input.write("q");
     await done;
     expect(term.outputText()).toContain("item task-rate-limit is not in the tree anymore");
+  });
+});
+
+
+// ---------- help overlay + vim keys (task-tui-help-vim-keys) ----------
+
+describe("vim motions and g/G (task-tui-help-vim-keys)", () => {
+  it("h/l move columns and j/k move cards, like the arrows", () => {
+    let state = handleKey(initialTuiState(), "l"); // right
+    expect(state.column).toBe(1);
+    state = handleKey(state, "h"); // left
+    expect(state.column).toBe(0);
+    state = handleKey(state, "j"); // down
+    expect(state.card).toBe(1);
+    state = handleKey(state, "k"); // up
+    expect(state.card).toBe(0);
+    // Same clamping as the arrows (counts context).
+    const clamped = handleKey({ ...initialTuiState(), card: 5 }, "j", {
+      counts: [2, 1, 0, 0, 0],
+    });
+    expect(clamped.card).toBe(1);
+  });
+
+  it("g/G jump to the first/last card of the column (home/end)", () => {
+    let state = handleKey(initialTuiState(), "G", { counts: [10, 0, 0, 0, 0] });
+    expect(state.card).toBe(9);
+    state = handleKey(state, "g");
+    expect(state.card).toBe(0);
+  });
+
+  it("j/k/g/G scroll the detail pane with the same clamps", () => {
+    let state: TuiState = { ...initialTuiState(80, 8), detail: { id: "x", scroll: 0 } };
+    state = handleKey(state, "j", { detailLines: 40 });
+    expect(state.detail?.scroll).toBe(1);
+    state = handleKey(state, "G", { detailLines: 40 });
+    expect(state.detail?.scroll).toBe(34); // 40 lines - 6 body rows
+    state = handleKey(state, "g", { detailLines: 40 });
+    expect(state.detail?.scroll).toBe(0);
+    state = handleKey(state, "k", { detailLines: 40 });
+    expect(state.detail?.scroll).toBe(0); // clamped at the top
+  });
+
+  it("the ready-only lens moved to L (lowercase l is the vim right motion)", () => {
+    const lensed = handleKey(initialTuiState(), "L");
+    expect(lensed.readyOnly).toBe(true);
+    const moved = handleKey(initialTuiState(), "l", {});
+    expect(moved.readyOnly).toBe(false);
+    expect(moved.column).toBe(1);
+  });
+});
+
+describe("help overlay (task-tui-help-vim-keys)", () => {
+  it("? opens it, esc and ? close it, the board state behind is untouched", () => {
+    let state: TuiState = { ...initialTuiState(), sort: "next", readyOnly: true, card: 2 };
+    state = handleKey(state, "?");
+    expect(state.help).toBe(true);
+    state = handleKey(state, "x"); // inert inside the overlay
+    expect(state.help).toBe(true);
+    state = handleKey(state, "\x1b");
+    expect(state.help).toBe(false);
+    expect(state.sort).toBe("next");
+    expect(state.readyOnly).toBe(true);
+    expect(state.card).toBe(2);
+    state = handleKey(state, "?");
+    state = handleKey(state, "?"); // toggles closed too
+    expect(state.help).toBe(false);
+  });
+
+  it("Ctrl-C quits from the overlay", () => {
+    let state = handleKey(initialTuiState(), "?");
+    state = handleKey(state, "\x03");
+    expect(state.quit).toBe(true);
+  });
+
+  it("renders the grouped key list and stays readable without color", () => {
+    const frame = renderTuiHelp({ ...initialTuiState(80, 24), help: true }, { color: false });
+    const got = lines(frame);
+    expect(got[0]).toContain("arggon board --tui — keys");
+    for (const group of TUI_HELP) expect(frame).toContain(group.title);
+    // Every documented key surfaces in the overlay.
+    for (const key of [
+      "←/→ · h/l",
+      "↑/↓ · j/k",
+      "PgUp/PgDn",
+      "g/G · home/end",
+      "/",
+      "esc",
+      "enter",
+      "v",
+      "s",
+      "L",
+      "r",
+      "c",
+      "m",
+      "q · Ctrl-C",
+      "?",
+    ]) {
+      expect(frame).toContain(key);
+    }
+    expect(got).toHaveLength(24);
+    for (const line of got) expect(line).toHaveLength(80);
+    // Color off: no SGR COLOR sequences anywhere (the leading clear-home is
+    // not an SGR and stays).
+    expect(frame).not.toMatch(/\x1b\[[0-9;]*m/);
+    // Color on: the header is bold.
+    expect(renderTuiHelp({ ...initialTuiState(80, 24), help: true }, { color: true })).toContain(
+      "\x1b[1marggon board --tui — keys",
+    );
+  });
+
+  it("renderTuiScreen dispatches the overlay over the board", () => {
+    const state = { ...initialTuiState(80, 24), help: true };
+    expect(renderTuiScreen(THREE, state, new Map(), { color: false })).toContain(
+      "arggon board --tui — keys",
+    );
+  });
+
+  it("the footer help names the overlay and the moved lens key", () => {
+    const footer = lines(renderTui(THREE, initialTuiState(400, 8), { color: false }))[7];
+    expect(footer).toContain("? help");
+    expect(footer).toContain("L ready");
+    expect(footer).not.toContain("l ready");
+  });
+
+  it("every TUI_HELP key group survives the reducer round-trip (content stays in sync)", () => {
+    // The overlay content is data; this pins the groups the acceptance names.
+    expect(TUI_HELP.map((group) => group.title)).toEqual([
+      "navigation",
+      "filter",
+      "view",
+      "actions",
+      "quit",
+    ]);
+  });
+});
+
+describe("TUI color control (task-tui-help-vim-keys)", () => {
+  it("runTuiBoard color: false renders a plain frame (no SGR)", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    const done = runTuiBoard({ cwd: root, input: term.input, output: term.output, color: false });
+    const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+    await wait(30);
+    term.input.write("q");
+    await done;
+    expect(term.outputText()).not.toMatch(/\x1b\[[0-9;]*m/); // no SGR colors
+    expect(term.outputText()).toContain("arggon board --tui ·");
+  });
+
+  it("NO_COLOR disables colors by default; explicit color wins over the env", async () => {
+    const root = newTree();
+    const previous = process.env.NO_COLOR;
+    process.env.NO_COLOR = "1";
+    try {
+      const term = fakeTerminal();
+      const done = runTuiBoard({ cwd: root, input: term.input, output: term.output });
+      const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+      await wait(30);
+      term.input.write("q");
+      await done;
+      expect(term.outputText()).not.toMatch(/\x1b\[[0-9;]*m/);
+
+      const term2 = fakeTerminal();
+      const done2 = runTuiBoard({
+        cwd: root,
+        input: term2.input,
+        output: term2.output,
+        color: true,
+      });
+      await wait(30);
+      term2.input.write("q");
+      await done2;
+      expect(term2.outputText()).toMatch(/\x1b\[7m/); // SGR colors back on
+    } finally {
+      if (previous === undefined) delete process.env.NO_COLOR;
+      else process.env.NO_COLOR = previous;
+    }
+  });
+});
+
+// ---------- action flows: claim + move (task-tui-actions-parity) ----------
+
+const ACTION_ITEM = item({ id: "task-act", type: "task", status: "todo", title: "Action target" });
+
+function actionState(overrides: Partial<TuiActionState> = {}): TuiActionState {
+  return {
+    id: "task-act",
+    type: "task",
+    from: "todo",
+    claimedBy: null,
+    claim: false,
+    stage: "move",
+    status: "todo",
+    assignee: null,
+    blockedReason: null,
+    cursor: 0,
+    draft: "",
+    error: null,
+    ...overrides,
+  };
+}
+
+describe("tuiLegalMoves (task-tui-actions-parity)", () => {
+  it("lists kernel-legal targets only, in status enum order", () => {
+    expect(tuiLegalMoves({ id: "t", type: "task", status: "todo", assignee: null })).toEqual([
+      "in_progress",
+      "cancelled",
+    ]);
+    expect(
+      tuiLegalMoves({ id: "t", type: "task", status: "in_progress", assignee: "mia" }),
+    ).toEqual(["todo", "blocked", "done", "cancelled"]); // status enum order
+    expect(tuiLegalMoves({ id: "t", type: "task", status: "done", assignee: null })).toEqual([
+      "todo",
+    ]);
+  });
+});
+
+describe("handleKey claim flow (task-tui-actions-parity)", () => {
+  it("c opens the assignee prompt prefilled with the resolved login", () => {
+    const state = handleKey(initialTuiState(240, 8), "c", {
+      selected: ACTION_ITEM,
+      suggestedAssignee: "arggon",
+    });
+    expect(state.action).toEqual(
+      actionState({
+        claim: true,
+        stage: "assignee",
+        status: "in_progress",
+        draft: "arggon",
+      }),
+    );
+    // The prompt renders in the footer; the board stays behind it.
+    const frame = lines(renderTui([ACTION_ITEM], state, { color: false }))[7];
+    expect(frame).toContain("claim task-act: arggon█");
+    expect(frame).toContain("enter to apply, esc cancels");
+  });
+
+  it("c refuses non-claimable types and claimed items (never steals)", () => {
+    const epic = handleKey(initialTuiState(), "c", {
+      selected: item({ id: "epic-a", type: "epic", status: "todo" }),
+    });
+    expect(epic.action).toBeNull();
+    expect(epic.message).toContain("not claimable");
+    const claimed = handleKey(initialTuiState(), "c", {
+      selected: item({ id: "task-c", type: "task", status: "in_progress", assignee: "mia" }),
+      suggestedAssignee: "arggon",
+    });
+    expect(claimed.action).toBeNull();
+    expect(claimed.message).toContain("claim conflict");
+    expect(claimed.message).toContain("claimed by 'mia'");
+  });
+
+  it("c without a selection messages instead of opening a flow", () => {
+    const state = handleKey(initialTuiState(), "c", { selected: null });
+    expect(state.action).toBeNull();
+    expect(state.message).toBe("(no item selected)");
+  });
+
+  it("enter applies the prefill (or the typed login) and stages the write; esc cancels untouched", () => {
+    let state = handleKey(initialTuiState(240, 8), "c", {
+      selected: ACTION_ITEM,
+      suggestedAssignee: "mia",
+    });
+    state = handleKey(state, "\r");
+    expect(state.action?.stage).toBe("confirm");
+    expect(state.action?.assignee).toBe("mia");
+    // Anything but y cancels with nothing written.
+    state = handleKey(state, "n");
+    expect(state.action).toBeNull();
+    // Typing extends the prefill; enter stages the typed login.
+    state = handleKey(state, "c", { selected: ACTION_ITEM, suggestedAssignee: "mia" });
+    state = handleKey(state, "K");
+    expect(state.action?.draft).toBe("miaK");
+    state = handleKey(state, "\r");
+    expect(state.action?.assignee).toBe("miaK");
+    // The confirm names the exact write.
+    expect(lines(renderTui([ACTION_ITEM], state, { color: false }))[7]).toContain(
+      "apply task-act: todo -> in_progress (assignee miaK)? y applies",
+    );
+  });
+});
+
+describe("handleKey move flow (task-tui-actions-parity)", () => {
+  it("m opens the legal-target menu and a number selects", () => {
+    let state = handleKey(initialTuiState(240, 8), "m", { selected: ACTION_ITEM });
+    expect(state.action?.stage).toBe("move");
+    // The menu lists only the legal targets (status enum order).
+    expect(lines(renderTui([ACTION_ITEM], state, { color: false }))[7]).toContain(
+      "move task-act (todo): [1] in_progress [2] cancelled",
+    );
+    state = handleKey(state, "1");
+    // todo -> in_progress on an unclaimed claimable asks for the assignee.
+    expect(state.action?.stage).toBe("assignee");
+    state = handleKey(state, "\r"); // empty keeps the (absent) prefill -> no assignee? no: claimable requires one
+    // An empty assignee on a claim flow leaves assignee null -> confirm shows it.
+    expect(state.action?.stage).toBe("confirm");
+    expect(state.action?.assignee).toBeNull();
+  });
+
+  it("a move to blocked demands a non-empty reason, inline", () => {
+    let state = handleKey(initialTuiState(240, 8), "m", {
+      selected: item({ id: "task-ip", type: "task", status: "in_progress", assignee: "mia" }),
+    });
+    state = handleKey(state, "2"); // blocked (enum order: todo, blocked, ...)
+    expect(state.action?.stage).toBe("reason");
+    state = handleKey(state, "\r"); // empty -> refused inline
+    expect(state.action?.stage).toBe("reason");
+    expect(state.action?.error).toContain("non-empty reason");
+    state = handleKey(state, "w");
+    state = handleKey(state, "a");
+    state = handleKey(state, "i");
+    state = handleKey(state, "t");
+    expect(lines(renderTui([], state, { color: false }))[7]).toContain(
+      "blocked reason for task-ip: wait█",
+    );
+    state = handleKey(state, "\r");
+    expect(state.action?.stage).toBe("confirm");
+    expect(state.action?.blockedReason).toBe("wait");
+  });
+
+  it("a container moves without the assignee prompt; y stages the apply", () => {
+    let state = handleKey(initialTuiState(240, 8), "m", {
+      selected: item({ id: "epic-a", type: "epic", status: "todo" }),
+    });
+    state = handleKey(state, "1"); // in_progress
+    expect(state.action?.stage).toBe("confirm"); // no claim prompt for containers
+    state = handleKey(state, "y");
+    expect(state.action?.stage).toBe("apply");
+    // The board reducer itself performs no IO: the loop executes the apply.
+  });
+
+  it("the flow is modal: board keys are inert and esc restores the board untouched", () => {
+    const before = initialTuiState(80, 8);
+    let state = handleKey(before, "m", { selected: ACTION_ITEM });
+    state = handleKey(state, "s"); // ignored by the flow
+    expect(state.sort).toBe("id");
+    state = handleKey(state, "q"); // ignored by the flow (Ctrl-C is the quit)
+    expect(state.quit).toBe(false);
+    state = handleKey(state, "\x1b");
+    expect(state.action).toBeNull();
+    expect(state).toEqual(before);
+  });
+
+  it("m with no selection or no legal target messages", () => {
+    const none = handleKey(initialTuiState(), "m", { selected: null });
+    expect(none.message).toBe("(no item selected)");
+    const done = handleKey(initialTuiState(), "m", {
+      selected: item({ id: "task-d", type: "task", status: "done" }),
+    });
+    expect(done.action?.stage).toBe("move"); // done -> todo exists
+    void done;
+  });
+});
+
+describe("runTuiBoard action execution (task-tui-actions-parity)", () => {
+  it("applies a confirmed move through the injected runUpdate and repaints", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    term.output.columns = 200;
+    const updates: Array<{ id: string; status?: string; assignee?: string }> = [];
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      runUpdate: (opts) => {
+        updates.push({ id: opts.id, status: opts.status, assignee: opts.assignee });
+        return {
+          id: opts.id,
+          path: "x",
+          root: "r",
+          item: {} as never,
+          changed: ["status"],
+          autoCompleted: [],
+          cascadeLevels: [],
+          cascadeSkipped: [],
+          changedPaths: [],
+        };
+      },
+    });
+    const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+    await wait(30);
+    term.input.write("m"); // move flow for the first card (task-rate-limit is not first; selection follows id order)
+    await wait(30);
+    term.input.write("2"); // second legal target: cancelled (no prompts)
+    await wait(30);
+    term.input.write("y"); // confirm -> the loop performs ONE runUpdate
+    await wait(30);
+    term.input.write("q");
+    await done;
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.status).toBe("cancelled");
+    expect(term.outputText()).toContain("-> cancelled");
+  });
+
+  it("surfaces a kernel refusal in the footer and keeps running (and quitting)", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    term.output.columns = 200;
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      runUpdate: () => {
+        throw new Error("cannot transition status todo -> done (allowed: in_progress, cancelled)");
+      },
+    });
+    const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+    await wait(30);
+    term.input.write("m");
+    await wait(30);
+    term.input.write("2"); // cancelled: a container's move needs no prompts
+    await wait(30);
+    term.input.write("y"); // confirm -> the loop's runUpdate throws
+    await wait(30);
+    term.input.write("q");
+    await done;
+    // The refusal is sanitized footer text; the loop survived to quit cleanly.
+    expect(term.outputText()).toContain("cannot transition status todo -> done");
   });
 });
 
