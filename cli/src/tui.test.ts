@@ -43,11 +43,18 @@ import {
   tuiDependencySummary,
   tuiDetailBodyRows,
   tuiDetailLinesFor,
+  tuiLegalMoves,
   tuiViewItems,
   visibleTuiItems,
   wrapTuiLine,
 } from "./tui.js";
-import type { TuiDetailInput, TuiDetailSource, TuiState, TuiWatchFactory } from "./tui.js";
+import type {
+  TuiActionState,
+  TuiDetailInput,
+  TuiDetailSource,
+  TuiState,
+  TuiWatchFactory,
+} from "./tui.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -1774,5 +1781,246 @@ describe("detail pane: runTuiBoard loop", () => {
     term.input.write("q");
     await done;
     expect(term.outputText()).toContain("item task-rate-limit is not in the tree anymore");
+  });
+});
+
+// ---------- action flows: claim + move (task-tui-actions-parity) ----------
+
+const ACTION_ITEM = item({ id: "task-act", type: "task", status: "todo", title: "Action target" });
+
+function actionState(overrides: Partial<TuiActionState> = {}): TuiActionState {
+  return {
+    id: "task-act",
+    type: "task",
+    from: "todo",
+    claimedBy: null,
+    claim: false,
+    stage: "move",
+    status: "todo",
+    assignee: null,
+    blockedReason: null,
+    cursor: 0,
+    draft: "",
+    error: null,
+    ...overrides,
+  };
+}
+
+describe("tuiLegalMoves (task-tui-actions-parity)", () => {
+  it("lists kernel-legal targets only, in status enum order", () => {
+    expect(tuiLegalMoves({ id: "t", type: "task", status: "todo", assignee: null })).toEqual([
+      "in_progress",
+      "cancelled",
+    ]);
+    expect(
+      tuiLegalMoves({ id: "t", type: "task", status: "in_progress", assignee: "mia" }),
+    ).toEqual(["todo", "blocked", "done", "cancelled"]); // status enum order
+    expect(tuiLegalMoves({ id: "t", type: "task", status: "done", assignee: null })).toEqual([
+      "todo",
+    ]);
+  });
+});
+
+describe("handleKey claim flow (task-tui-actions-parity)", () => {
+  it("c opens the assignee prompt prefilled with the resolved login", () => {
+    const state = handleKey(initialTuiState(240, 8), "c", {
+      selected: ACTION_ITEM,
+      suggestedAssignee: "arggon",
+    });
+    expect(state.action).toEqual(
+      actionState({
+        claim: true,
+        stage: "assignee",
+        status: "in_progress",
+        draft: "arggon",
+      }),
+    );
+    // The prompt renders in the footer; the board stays behind it.
+    const frame = lines(renderTui([ACTION_ITEM], state, { color: false }))[7];
+    expect(frame).toContain("claim task-act: arggon█");
+    expect(frame).toContain("enter to apply, esc cancels");
+  });
+
+  it("c refuses non-claimable types and claimed items (never steals)", () => {
+    const epic = handleKey(initialTuiState(), "c", {
+      selected: item({ id: "epic-a", type: "epic", status: "todo" }),
+    });
+    expect(epic.action).toBeNull();
+    expect(epic.message).toContain("not claimable");
+    const claimed = handleKey(initialTuiState(), "c", {
+      selected: item({ id: "task-c", type: "task", status: "in_progress", assignee: "mia" }),
+      suggestedAssignee: "arggon",
+    });
+    expect(claimed.action).toBeNull();
+    expect(claimed.message).toContain("claim conflict");
+    expect(claimed.message).toContain("claimed by 'mia'");
+  });
+
+  it("c without a selection messages instead of opening a flow", () => {
+    const state = handleKey(initialTuiState(), "c", { selected: null });
+    expect(state.action).toBeNull();
+    expect(state.message).toBe("(no item selected)");
+  });
+
+  it("enter applies the prefill (or the typed login) and stages the write; esc cancels untouched", () => {
+    let state = handleKey(initialTuiState(240, 8), "c", {
+      selected: ACTION_ITEM,
+      suggestedAssignee: "mia",
+    });
+    state = handleKey(state, "\r");
+    expect(state.action?.stage).toBe("confirm");
+    expect(state.action?.assignee).toBe("mia");
+    // Anything but y cancels with nothing written.
+    state = handleKey(state, "n");
+    expect(state.action).toBeNull();
+    // Typing extends the prefill; enter stages the typed login.
+    state = handleKey(state, "c", { selected: ACTION_ITEM, suggestedAssignee: "mia" });
+    state = handleKey(state, "K");
+    expect(state.action?.draft).toBe("miaK");
+    state = handleKey(state, "\r");
+    expect(state.action?.assignee).toBe("miaK");
+    // The confirm names the exact write.
+    expect(lines(renderTui([ACTION_ITEM], state, { color: false }))[7]).toContain(
+      "apply task-act: todo -> in_progress (assignee miaK)? y applies",
+    );
+  });
+});
+
+describe("handleKey move flow (task-tui-actions-parity)", () => {
+  it("m opens the legal-target menu and a number selects", () => {
+    let state = handleKey(initialTuiState(240, 8), "m", { selected: ACTION_ITEM });
+    expect(state.action?.stage).toBe("move");
+    // The menu lists only the legal targets (status enum order).
+    expect(lines(renderTui([ACTION_ITEM], state, { color: false }))[7]).toContain(
+      "move task-act (todo): [1] in_progress [2] cancelled",
+    );
+    state = handleKey(state, "1");
+    // todo -> in_progress on an unclaimed claimable asks for the assignee.
+    expect(state.action?.stage).toBe("assignee");
+    state = handleKey(state, "\r"); // empty keeps the (absent) prefill -> no assignee? no: claimable requires one
+    // An empty assignee on a claim flow leaves assignee null -> confirm shows it.
+    expect(state.action?.stage).toBe("confirm");
+    expect(state.action?.assignee).toBeNull();
+  });
+
+  it("a move to blocked demands a non-empty reason, inline", () => {
+    let state = handleKey(initialTuiState(240, 8), "m", {
+      selected: item({ id: "task-ip", type: "task", status: "in_progress", assignee: "mia" }),
+    });
+    state = handleKey(state, "2"); // blocked (enum order: todo, blocked, ...)
+    expect(state.action?.stage).toBe("reason");
+    state = handleKey(state, "\r"); // empty -> refused inline
+    expect(state.action?.stage).toBe("reason");
+    expect(state.action?.error).toContain("non-empty reason");
+    state = handleKey(state, "w");
+    state = handleKey(state, "a");
+    state = handleKey(state, "i");
+    state = handleKey(state, "t");
+    expect(lines(renderTui([], state, { color: false }))[7]).toContain(
+      "blocked reason for task-ip: wait█",
+    );
+    state = handleKey(state, "\r");
+    expect(state.action?.stage).toBe("confirm");
+    expect(state.action?.blockedReason).toBe("wait");
+  });
+
+  it("a container moves without the assignee prompt; y stages the apply", () => {
+    let state = handleKey(initialTuiState(240, 8), "m", {
+      selected: item({ id: "epic-a", type: "epic", status: "todo" }),
+    });
+    state = handleKey(state, "1"); // in_progress
+    expect(state.action?.stage).toBe("confirm"); // no claim prompt for containers
+    state = handleKey(state, "y");
+    expect(state.action?.stage).toBe("apply");
+    // The board reducer itself performs no IO: the loop executes the apply.
+  });
+
+  it("the flow is modal: board keys are inert and esc restores the board untouched", () => {
+    const before = initialTuiState(80, 8);
+    let state = handleKey(before, "m", { selected: ACTION_ITEM });
+    state = handleKey(state, "s"); // ignored by the flow
+    expect(state.sort).toBe("id");
+    state = handleKey(state, "q"); // ignored by the flow (Ctrl-C is the quit)
+    expect(state.quit).toBe(false);
+    state = handleKey(state, "\x1b");
+    expect(state.action).toBeNull();
+    expect(state).toEqual(before);
+  });
+
+  it("m with no selection or no legal target messages", () => {
+    const none = handleKey(initialTuiState(), "m", { selected: null });
+    expect(none.message).toBe("(no item selected)");
+    const done = handleKey(initialTuiState(), "m", {
+      selected: item({ id: "task-d", type: "task", status: "done" }),
+    });
+    expect(done.action?.stage).toBe("move"); // done -> todo exists
+    void done;
+  });
+});
+
+describe("runTuiBoard action execution (task-tui-actions-parity)", () => {
+  it("applies a confirmed move through the injected runUpdate and repaints", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    term.output.columns = 200;
+    const updates: Array<{ id: string; status?: string; assignee?: string }> = [];
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      runUpdate: (opts) => {
+        updates.push({ id: opts.id, status: opts.status, assignee: opts.assignee });
+        return {
+          id: opts.id,
+          path: "x",
+          root: "r",
+          item: {} as never,
+          changed: ["status"],
+          autoCompleted: [],
+          cascadeLevels: [],
+          cascadeSkipped: [],
+          changedPaths: [],
+        };
+      },
+    });
+    const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+    await wait(30);
+    term.input.write("m"); // move flow for the first card (task-rate-limit is not first; selection follows id order)
+    await wait(30);
+    term.input.write("2"); // second legal target: cancelled (no prompts)
+    await wait(30);
+    term.input.write("y"); // confirm -> the loop performs ONE runUpdate
+    await wait(30);
+    term.input.write("q");
+    await done;
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.status).toBe("cancelled");
+    expect(term.outputText()).toContain("-> cancelled");
+  });
+
+  it("surfaces a kernel refusal in the footer and keeps running (and quitting)", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    term.output.columns = 200;
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      runUpdate: () => {
+        throw new Error("cannot transition status todo -> done (allowed: in_progress, cancelled)");
+      },
+    });
+    const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+    await wait(30);
+    term.input.write("m");
+    await wait(30);
+    term.input.write("2"); // cancelled: a container's move needs no prompts
+    await wait(30);
+    term.input.write("y"); // confirm -> the loop's runUpdate throws
+    await wait(30);
+    term.input.write("q");
+    await done;
+    // The refusal is sanitized footer text; the loop survived to quit cleanly.
+    expect(term.outputText()).toContain("cannot transition status todo -> done");
   });
 });

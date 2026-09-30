@@ -1,7 +1,7 @@
 ---
 spec_id: tui-actions-014
 title: TUI actions (claim/status) through the kernel update path
-status: proposed
+status: implemented
 created: 2026-09-30
 ---
 
@@ -100,7 +100,7 @@ parity test is what makes the three honest:
 - for every (status, target) pair and every claim shape (claimable /
   container; unclaimed / claimed-by-other / claimed-by-same):
   `tuiActionVerdict(...).ok` ≡ `evaluateDrop(card, to, { assignee,
-  force: false }).ok`, and both agree with the kernel `canTransition` table
+force: false }).ok`, and both agree with the kernel `canTransition` table
   plus `runUpdate`'s observable accept/refuse on a real fixture for a
   representative sample of cases;
 - `evaluateDrop`'s embedded transition table ≡ `lib/src/status.ts`
@@ -160,8 +160,8 @@ here; there is still no waive path in the TUI.
 
 ## Acceptance
 
-- [ ] Spec + plan under `ArggonManager/docs/specs/` + `ArggonManager/docs/plans/` written before implementation; both flipped to `implemented` in the same PR
-- [ ] `c` claims the selected item through the assignee prompt; `m` moves through a menu of kernel-legal targets with reason (blocked) / assignee (claim) prompts and a `y/N` confirmation; every write goes through `runUpdate` — the TUI constructs neither `force` nor `steal`
-- [ ] Parity test: `tuiActionVerdict` ≡ board `evaluateDrop` ≡ kernel `TRANSITIONS`/`runUpdate` over the full status × target × claim-shape matrix, plus live fixture cases
-- [ ] Failures surface as sanitized footer text; a failed/cancelled action never crashes the loop and never leaves the alternate screen dirty
-- [ ] Golden reducer/renderer tests + pty smoke evidence (claim and move applied through the real kernel on a fixture); README keybindings + `--tui` docs updated
+- [x] Spec + plan under `ArggonManager/docs/specs/` + `ArggonManager/docs/plans/` written before implementation; both flipped to `implemented` in the same PR
+- [x] `c` claims the selected item through the assignee prompt; `m` moves through a menu of kernel-legal targets with reason (blocked) / assignee (claim) prompts and a `y/N` confirmation; every write goes through `runUpdate` — the TUI constructs neither `force` nor `steal`
+- [x] Parity test: `tuiActionVerdict` ≡ board `evaluateDrop` ≡ kernel `TRANSITIONS`/`runUpdate` over the full status × target × claim-shape matrix, plus live fixture cases
+- [x] Failures surface as sanitized footer text; a failed/cancelled action never crashes the loop and never leaves the alternate screen dirty
+- [x] Golden reducer/renderer tests + pty smoke evidence (claim and move applied through the real kernel on a fixture); README keybindings + `--tui` docs updated

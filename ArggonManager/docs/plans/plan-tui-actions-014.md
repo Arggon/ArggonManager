@@ -2,7 +2,7 @@
 plan_id: tui-actions-014
 title: Plan for TUI actions (claim/status) through the kernel update path
 spec: ArggonManager/docs/specs/spec-tui-actions-014.md
-status: proposed
+status: implemented
 created: 2026-09-30
 ---
 
@@ -14,7 +14,7 @@ verifiable acceptance criterion and links back to the spec.
 ## T1: Embedded legality rules (pure, cli/src/tui.ts)
 
 - `tuiLegalMoves(item)` (kernel-legal targets only) and `tuiActionVerdict(item,
-  to, edit)` — the mirror of `evaluateDrop` (transitions, same-status,
+to, edit)` — the mirror of `evaluateDrop` (transitions, same-status,
   claim-conflict, in_progress-requires-assignee, force refused on sight) plus
   the blocked-reason requirement; `TuiActionState` stage machine (move →
   reason/assignee → confirm) and the reducer branch in `handleKey` (`c`, `m`,

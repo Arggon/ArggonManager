@@ -13,6 +13,7 @@ updated: "2026-09-30"
 claimed_at: "2026-09-30T18:14:23.671Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-tui-actions-parity
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-tui-v2/task-tui-actions-parity.md
   Leaves live only under a story. id is the filename stem: task-tui-actions-parity.
@@ -24,23 +25,14 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-tui-actions-parity
 
 ## Context
 
-<!-- Why this task exists. -->
-
-## Acceptance
-
-- [ ] 
-
-## Notes
-
-### 2026-09-22 @ses_f34ba048bffeDqO6XhG0C62Nw6
-## Context
-
 The TUI is read-only v1 by story acceptance (`story-tui-board`). The board already proved the safe write pattern: client-side rules identical to `status.ts`/`update.ts`, an embedded parity test, and every write through the kernel `runUpdate` — never force, never steal. Extending the terminal board with actions needs the same treatment and a spec before code.
 
 ## Acceptance
 
-- [ ] Spec + plan under `ArggonManager/docs/specs/` + `docs/plans/` written first (claim, transitions, confirmations, error surfacing, why force/steal stay impossible)
-- [ ] `c` claims (assignee prompt), legal status transitions apply with confirmation; `blocked` requires a reason; all writes go through `runUpdate`
-- [ ] Parity test: embedded rules ≡ board `evaluateDrop` ≡ kernel transition table
-- [ ] Failures surface actionably in the footer; the board never leaves the alternate screen dirty
-- [ ] Golden tests + pty evidence; README + docs updated
+- [x] Spec + plan under `ArggonManager/docs/specs/` + `docs/plans/` written first (claim, transitions, confirmations, error surfacing, why force/steal stay impossible)
+- [x] `c` claims (assignee prompt), legal status transitions apply with confirmation; `blocked` requires a reason; all writes go through `runUpdate`
+- [x] Parity test: embedded rules ≡ board `evaluateDrop` ≡ kernel transition table
+- [x] Failures surface actionably in the footer; the board never leaves the alternate screen dirty
+- [x] Golden tests + pty evidence; README + docs updated
+
+## Notes

@@ -19,21 +19,28 @@
  * splitter, bug-tui-split-escape-sequences), `formatTuiClock` (the footer
  * freshness stamp), `fsWatchTuiWatcher` (the default tracker watcher,
  * task-tui-live-refresh) and `tuiViewItems` / `applyTuiSort` / `nextTuiSort`
- * (the sort + ready-only lens, task-tui-sort-ready-lens). `runTuiBoard` only
- * wires raw mode, keypress events, resize and the debounced tree watcher to
- * the pure pieces; it performs no writes anywhere.
+ * (the sort + ready-only lens, task-tui-sort-ready-lens) and `tuiActionVerdict` /
+ * `tuiLegalMoves` / `handleActionKey` (the claim/move action flows,
+ * task-tui-actions-parity). `runTuiBoard` wires raw mode, keypress events,
+ * resize and the debounced tree watcher to the pure pieces; its ONLY write is
+ * the one kernel `runUpdate` call per finished action flow — never force,
+ * never steal (spec-tui-actions-014).
  */
 import { watch } from "node:fs";
 import {
   STATUSES,
   buildStatusIndex,
+  canTransition,
   findTasksDir,
   hasOpenDependencies,
+  isClaimable,
   isReadyTodo,
   itemsForStatus,
   loadItems,
   matchesSubstringFilter,
   repoRootFromTasks,
+  resolveCurrentLogin,
+  runUpdate,
   sanitizeHumanTextUncapped,
   sortById,
   sortByNextRank,
@@ -124,6 +131,37 @@ export type TuiDetailState = {
   scroll: number;
 };
 
+/**
+ * One action flow (task-tui-actions-parity): the selected item, the pending
+ * write and the prompt stage. The reducer builds it purely; the loop executes
+ * it exactly once at the `apply` stage through the kernel `runUpdate` and then
+ * clears it. `esc` cancels from any stage with nothing written.
+ */
+export type TuiActionState = {
+  /** Item id the flow acts on. */
+  id: string;
+  type: WorkItem["type"];
+  /** Status the item had when the flow opened (the kernel re-checks at apply). */
+  from: WorkItem["status"];
+  /** Claim holder at flow open (null = unclaimed). */
+  claimedBy: string | null;
+  /** True when the flow started from `c` (claim wording in the messages). */
+  claim: boolean;
+  stage: "move" | "reason" | "assignee" | "confirm" | "apply";
+  /** Target status (in_progress for a claim). */
+  status: WorkItem["status"];
+  /** Decided assignee (null = the write carries none). */
+  assignee: string | null;
+  /** Decided blocked reason (blocked moves only). */
+  blockedReason: string | null;
+  /** Cursor over the legal-target menu (move stage). */
+  cursor: number;
+  /** Input draft for the reason/assignee prompts. */
+  draft: string;
+  /** Inline refusal inside the flow (e.g. an empty reason). */
+  error: string | null;
+};
+
 export type TuiState = {
   width: number;
   height: number;
@@ -168,6 +206,12 @@ export type TuiState = {
    * Read-only: the pane has no update path, it only reads the loaded items.
    */
   detail: TuiDetailState | null;
+  /**
+   * Open action flow (`c` claim / `m` move, task-tui-actions-parity).
+   * `null` = the board is view-only. Modal: no board key reaches the board
+   * while a flow is open, and `esc` cancels with nothing written.
+   */
+  action: TuiActionState | null;
   /** Set by `q` / Ctrl-C; the loop exits when true. */
   quit: boolean;
 };
@@ -189,6 +233,7 @@ export function initialTuiState(
     message: null,
     updatedAt: null,
     detail: null,
+    action: null,
     quit: false,
   };
 }
@@ -551,22 +596,34 @@ export type TuiKeyContext = {
   counts?: number[];
   selectedId?: string | null;
   detailLines?: number;
+  /** The full selected item (`c`/`m` read it; null when its column is empty). */
+  selected?: WorkItem | null;
+  /** Prefill for assignee prompts: the loop's resolved login (may be null). */
+  suggestedAssignee?: string | null;
 };
 
 /**
- * Pure keypress reducer (board and detail pane). Board: Enter opens the
- * read-only detail pane for the selected item (task-tui-detail-pane), Esc
- * clears the filter, `s` cycles the card order and `l` toggles the ready-only
- * lens (task-tui-sort-ready-lens), card moves keep the scroll window
- * following the selection whenever `counts` carries the selected column.
- * Detail pane: Esc and Enter return to the board with every board field
- * untouched, ↑/↓ and PgUp/PgDn/Home/End scroll the pane, q quits. Never
- * mutates the input state.
+ * Pure keypress reducer (board, detail pane and action flow). Board: Enter
+ * opens the read-only detail pane for the selected item (task-tui-detail-pane),
+ * Esc clears the filter, `s` cycles the card order and `l` toggles the
+ * ready-only lens (task-tui-sort-ready-lens), `c` opens the claim flow and `m`
+ * the legal-move flow (task-tui-actions-parity), card moves keep the scroll
+ * window following the selection whenever `counts` carries the selected
+ * column. Detail pane: Esc and Enter return to the board with every board
+ * field untouched, ↑/↓ and PgUp/PgDn/Home/End scroll the pane, q quits. The
+ * action flow is modal: the reducer only advances its stages, the loop
+ * performs the single runUpdate at the `apply` stage. Never mutates the input
+ * state.
  */
 export function handleKey(state: TuiState, key: string, ctx: TuiKeyContext = {}): TuiState {
-  // Ctrl-C quits from anywhere, pane and search prompt included.
+  // Ctrl-C quits from anywhere: pane, search prompt and action flow included.
   if (key === CTRL_C) return { ...state, quit: true };
   if (state.detail !== null) return handleDetailKey(state, key, ctx.detailLines ?? 0);
+  // The action flow is modal (task-tui-actions-parity): no board key reaches
+  // the board while it is open.
+  if (state.action !== null) {
+    return handleActionKey(state, key, ctx.suggestedAssignee ?? null);
+  }
 
   const counts = ctx.counts ?? [];
 
@@ -597,6 +654,15 @@ export function handleKey(state: TuiState, key: string, ctx: TuiKeyContext = {})
       // only. The post-key sync clamps the selection against the narrowed
       // columns.
       return { ...state, readyOnly: !state.readyOnly, message: null };
+    case "c":
+      // Claim the selected item (task-tui-actions-parity): the assignee prompt
+      // opens only when the kernel rules allow the claim; the loop applies it
+      // through runUpdate.
+      return openClaimAction(state, ctx.selected ?? null, ctx.suggestedAssignee ?? null);
+    case "m":
+      // Move the selected item (task-tui-actions-parity): menu of kernel-legal
+      // targets, prompts, confirmation — one runUpdate at the apply stage.
+      return openMoveAction(state, ctx.selected ?? null);
     case "r":
       // Forced refresh (task-tui-live-refresh): the reducer stays pure — the
       // loop re-reads the tree after every key batch, so acknowledging the key
@@ -672,6 +738,267 @@ function handleDetailKey(state: TuiState, key: string, lines: number): TuiState 
   }
 }
 
+/** Shape `tuiActionVerdict` reads: the fields a board card carries. */
+export type TuiActionItem = {
+  id: string;
+  type: WorkItem["type"];
+  status: WorkItem["status"];
+  assignee?: string | null;
+};
+
+/** Edit the action flow can carry. `force` exists only to be refused. */
+export type TuiActionEdit = {
+  assignee?: string | null;
+  blockedReason?: string | null;
+  force?: boolean;
+};
+
+/** Action verdict: the board's `{ ok, reason }` drop-rule shape. */
+export type TuiActionVerdict = { ok: boolean; reason: string };
+
+/**
+ * The embedded legality rule for TUI actions (task-tui-actions-parity): a
+ * 1:1 mirror of the served board's `evaluateDrop` (cli/src/board.ts) — the
+ * kernel TRANSITIONS table, the same-status refusal, the claim-conflict
+ * refusal and the in_progress-requires-assignee claim rule — kept as a
+ * deliberate mirror rather than an import so the parity suite pins THREE
+ * implementations (TUI mirror, board mirror, kernel table + runUpdate) to
+ * each other. `force` is refused on sight exactly like `evaluateDrop`: the
+ * TUI never constructs a force edit (no key, prompt or flag could carry
+ * one), so a future caller cannot smuggle a steal through either. The
+ * kernel stays the second gate: `runUpdate` re-checks everything against
+ * the disk truth at apply time. Pure.
+ */
+export function tuiActionVerdict(
+  item: TuiActionItem,
+  to: string,
+  edit: TuiActionEdit = {},
+): TuiActionVerdict {
+  // The same transition table lib/src/status.ts ships, mirrored for the pure
+  // reducer (evaluateDrop's precedent) — the parity suite asserts equality.
+  const transitions: Record<string, readonly string[]> = {
+    todo: ["in_progress", "cancelled"],
+    in_progress: ["blocked", "done", "cancelled", "todo"],
+    blocked: ["in_progress", "cancelled"],
+    done: ["todo"],
+    cancelled: ["todo"],
+  };
+  const claimable = ["story", "task", "bug"];
+  if (edit.force) {
+    return {
+      ok: false,
+      reason: "--force is CLI-only: TUI actions route through the update path without force",
+    };
+  }
+  const allowed = transitions[item.status];
+  if (!allowed) return { ok: false, reason: `unknown status '${item.status}'` };
+  if (to === item.status) {
+    return { ok: false, reason: `${item.id} is already in that column` };
+  }
+  if (!allowed.includes(to)) {
+    return {
+      ok: false,
+      reason: `cannot transition ${item.status} -> ${to} (allowed: ${allowed.join(", ")})`,
+    };
+  }
+  // Claim steal guard, 1:1 with evaluateDrop and runUpdate: a claimed
+  // claimable item cannot be reassigned from the board.
+  if (
+    item.assignee &&
+    claimable.includes(item.type) &&
+    item.status === "in_progress" &&
+    edit.assignee !== undefined &&
+    edit.assignee !== item.assignee
+  ) {
+    return {
+      ok: false,
+      reason: `claim conflict: '${item.id}' is claimed by '${item.assignee}' (status in_progress). Unclaim first (arggon update ${item.id} --status todo) or coordinate.`,
+    };
+  }
+  const effectiveAssignee = edit.assignee !== undefined ? edit.assignee : (item.assignee ?? null);
+  if (to === "in_progress" && claimable.includes(item.type) && !effectiveAssignee) {
+    return {
+      ok: false,
+      reason: `${item.type} '${item.id}' with status in_progress requires --assignee (claim first: arggon update ${item.id} --assignee <login>)`,
+    };
+  }
+  return { ok: true, reason: "" };
+}
+
+/**
+ * Legal move targets for the `m` menu (task-tui-actions-parity): the kernel
+ * transition table minus the current status, in v0 status enum order. The
+ * prompts the flow may still need (reason/assignee) are flow UI — a target
+ * listed here is kernel-legal once its prompt answers.
+ */
+export function tuiLegalMoves(item: TuiActionItem): WorkItem["status"][] {
+  return STATUSES.filter((status) => status !== item.status && canTransition(item.status, status));
+}
+
+/**
+ * Open the claim flow for the selected item (`c`, task-tui-actions-parity):
+ * claimable types only, unclaimed only, and the transition to in_progress
+ * must be kernel-legal — refusals come back as footer messages and never
+ * open a flow. `suggestedAssignee` prefills the prompt (the loop's resolved
+ * login). Pure: returns the next state.
+ */
+function openClaimAction(
+  state: TuiState,
+  item: WorkItem | null,
+  suggestedAssignee: string | null,
+): TuiState {
+  if (item === null) return { ...state, message: "(no item selected)" };
+  if (!isClaimable(item.type)) {
+    return {
+      ...state,
+      message: `${item.type} '${item.id}' is not claimable (story/task/bug only)`,
+    };
+  }
+  // Never steal: a claimed item refuses with the claim-conflict wording
+  // before any prompt opens (the kernel would refuse the reassignment too).
+  if (item.assignee !== null && item.assignee !== undefined) {
+    return {
+      ...state,
+      message: `claim conflict: '${item.id}' is claimed by '${item.assignee}'. Unclaim first (arggon update ${item.id} --status todo) or coordinate.`,
+    };
+  }
+  const verdict = tuiActionVerdict(item, "in_progress", { assignee: suggestedAssignee });
+  if (!verdict.ok) return { ...state, message: verdict.reason };
+  return {
+    ...state,
+    message: null,
+    action: {
+      id: item.id,
+      type: item.type,
+      from: item.status,
+      claimedBy: item.assignee ?? null,
+      claim: true,
+      stage: "assignee",
+      status: "in_progress",
+      assignee: null,
+      blockedReason: null,
+      cursor: 0,
+      draft: suggestedAssignee ?? "",
+      error: null,
+    },
+  };
+}
+
+/**
+ * Open the move flow for the selected item (`m`, task-tui-actions-parity):
+ * the menu lists kernel-legal targets only. Pure.
+ */
+function openMoveAction(state: TuiState, item: WorkItem | null): TuiState {
+  if (item === null) return { ...state, message: "(no item selected)" };
+  if (tuiLegalMoves(item).length === 0) {
+    return { ...state, message: `no legal transition from '${item.status}'` };
+  }
+  return {
+    ...state,
+    message: null,
+    action: {
+      id: item.id,
+      type: item.type,
+      from: item.status,
+      claimedBy: item.assignee ?? null,
+      claim: false,
+      stage: "move",
+      status: item.status,
+      assignee: null,
+      blockedReason: null,
+      cursor: 0,
+      draft: "",
+      error: null,
+    },
+  };
+}
+
+/**
+ * Reducer branch for the modal action flow (task-tui-actions-parity): the
+ * menu takes number keys, the prompts take text with Enter, the confirm takes
+ * y; `esc` cancels from any stage with nothing written and `Ctrl-C` (handled
+ * before this branch) always quits. The flow never mutates the board state
+ * behind it. The `apply` stage is a pure hand-off: the loop sees it after the
+ * reducer returns and performs the single `runUpdate` call.
+ */
+function handleActionKey(state: TuiState, key: string, suggestedAssignee: string | null): TuiState {
+  const action = state.action;
+  if (action === null) return state;
+
+  if (key === ESC) return { ...state, action: null };
+  if (action.stage === "move") {
+    const moves = tuiLegalMoves({
+      id: action.id,
+      type: action.type,
+      status: action.from,
+      assignee: action.claimedBy,
+    });
+    const index = Number(key) - 1;
+    if (!Number.isInteger(index) || index < 0 || index >= moves.length) return state;
+    const status = moves[index]!;
+    // Stage transitions: blocked asks for its reason, an unclaimed claimable
+    // moving to in_progress asks for the assignee (the kernel claim rule),
+    // everything else goes straight to the confirmation.
+    if (status === "blocked") {
+      return {
+        ...state,
+        action: { ...action, stage: "reason", status, draft: "", error: null },
+      };
+    }
+    if (status === "in_progress" && isClaimable(action.type) && action.claimedBy === null) {
+      return {
+        ...state,
+        action: {
+          ...action,
+          stage: "assignee",
+          status,
+          draft: suggestedAssignee ?? "",
+          error: null,
+        },
+      };
+    }
+    return { ...state, action: { ...action, stage: "confirm", status } };
+  }
+  if (action.stage === "reason" || action.stage === "assignee") {
+    if (key === ENTER || key === "\n") {
+      const value = action.draft.trim();
+      if (action.stage === "reason" && value === "") {
+        return {
+          ...state,
+          action: { ...action, error: "a blocked move needs a non-empty reason" },
+        };
+      }
+      // An empty assignee keeps the prefill (the prompt's default answer).
+      const assignee = action.stage === "assignee" ? value || null : action.assignee;
+      return {
+        ...state,
+        action: {
+          ...action,
+          stage: "confirm",
+          assignee,
+          blockedReason: action.stage === "reason" ? value : action.blockedReason,
+          error: null,
+        },
+      };
+    }
+    if (key === BACKSPACE || key === "\b") {
+      return { ...state, action: { ...action, draft: action.draft.slice(0, -1), error: null } };
+    }
+    if (key.length === 1 && key >= " ") {
+      return { ...state, action: { ...action, draft: action.draft + key, error: null } };
+    }
+    return state;
+  }
+  if (action.stage === "confirm") {
+    if (key === "y" || key === "Y") {
+      return { ...state, action: { ...action, stage: "apply", error: null } };
+    }
+    // Anything else cancels: nothing is written, the board is unchanged.
+    return { ...state, action: null };
+  }
+  return state; // "apply": the loop owns the execution
+}
+
 /** Cards a PgUp/PgDn moves: one body page, at least one row. */
 function pageStep(state: TuiState): number {
   return Math.max(1, tuiBodyRows(state.height));
@@ -712,6 +1039,53 @@ function selectCard(state: TuiState, position: 0 | "last", counts: number[]): Tu
   const card = position === "last" ? last : Math.min(position, last);
   const scroll = followTuiScroll(card, state.scroll, count, tuiBodyRows(state.height));
   return { ...state, card, scroll, message: null };
+}
+
+/**
+ * The footer line for an open action flow (task-tui-actions-parity): one
+ * prompt per stage — the legal-target menu, the reason/assignee inputs (with
+ * the inline refusal), the y/N confirmation naming the exact write. Pure;
+ * every repo-controlled value is escaped like the rest of the frame.
+ */
+function tuiActionFooter(action: TuiActionState, position: string): string {
+  const id = sanitizeHumanTextUncapped(action.id);
+  const error = action.error === null ? "" : ` — ${sanitizeHumanTextUncapped(action.error)}`;
+  if (action.stage === "move") {
+    const moves = tuiLegalMoves({
+      id: action.id,
+      type: action.type,
+      status: action.from,
+      assignee: action.claimedBy,
+    });
+    const menu = moves.map((status, i) => `[${i + 1}] ${status}`).join(" ");
+    return `${position} · move ${id} (${action.from}): ${menu} · number selects, esc cancels`;
+  }
+  if (action.stage === "reason") {
+    return `${position} · blocked reason for ${id}: ${action.draft}█ — enter to set, esc cancels${error}`;
+  }
+  if (action.stage === "assignee") {
+    return `${position} · ${action.claim ? "claim" : "assignee for"} ${id}: ${action.draft}█ — enter to apply, esc cancels${error}`;
+  }
+  if (action.stage === "confirm") {
+    const assignee =
+      action.assignee === null ? "" : ` (assignee ${sanitizeHumanTextUncapped(action.assignee)})`;
+    const reason =
+      action.blockedReason === null
+        ? ""
+        : ` (reason: ${sanitizeHumanTextUncapped(action.blockedReason)})`;
+    return `${position} · apply ${id}: ${action.from} -> ${action.status}${assignee}${reason}? y applies · anything else cancels`;
+  }
+  return `${position} · applying ${id}…`;
+}
+
+/**
+ * Sanitized footer text for a refused action (task-tui-actions-parity): the
+ * kernel's error message, escaped like every repo-controlled value — a
+ * hostile message cannot forge a footer line or emit a control sequence.
+ */
+function tuiActionError(err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  return sanitizeHumanTextUncapped(message);
 }
 
 /** Clip a single-line string to n visible columns, marking a cut with an ellipsis. */
@@ -841,6 +1215,11 @@ export function renderTui(
   let footer: string;
   if (state.searching) {
     footer = `${position} · /${state.filter}█ — enter to apply, esc to cancel`;
+  } else if (state.action !== null) {
+    // The modal action flow owns the footer (task-tui-actions-parity): the
+    // stage prompt (with the inline refusal when present) replaces message
+    // and help. Item ids/statuses are repo-controlled: escaped.
+    footer = tuiActionFooter(state.action, position);
   } else if (state.message !== null) {
     // Transient messages are repo-controlled text (an old path message, the
     // "(no item selected)" hint): escape before rendering.
@@ -1181,13 +1560,21 @@ export type TuiLoopOptions = {
   watch?: TuiWatchFactory;
   /** Watcher debounce override (tests); defaults to TUI_REFRESH_DEBOUNCE_MS. */
   refreshDebounceMs?: number;
+  /**
+   * Write path override (tests, task-tui-actions-parity): defaults to the
+   * kernel `runUpdate`. The loop performs exactly ONE call per finished flow
+   * — never with `force` or `steal` (the flows cannot construct them).
+   */
+  runUpdate?: typeof runUpdate;
 };
 
 /**
- * Interactive loop for `arggon board --tui`. Read-only: it re-reads the tree
- * after every keypress and, whenever the tracker dir changes, after a short
- * debounce (task-tui-live-refresh) — so an idle board repaints in place while
- * other agents/sessions write. A watcher that cannot open or fails later
+ * Interactive loop for `arggon board --tui`. It re-reads the tree after every
+ * keypress and, whenever the tracker dir changes, after a short debounce
+ * (task-tui-live-refresh) — so an idle board repaints in place while other
+ * agents/sessions write. The only write is a finished action flow's single
+ * kernel `runUpdate` (task-tui-actions-parity): a failure surfaces as footer
+ * text and the loop keeps running. A watcher that cannot open or fails later
  * degrades transparently to per-keypress reads (never crashes, never exits).
  * Enter opens the read-only detail pane; Esc/Enter return to the board; `r`
  * forces a refresh. Key bytes go through the stateful decoder
@@ -1206,6 +1593,7 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
   }
   const escapeFlushMs = Math.max(0, Math.floor(opts.escapeFlushMs ?? TUI_ESCAPE_FLUSH_MS));
   const watchFactory = opts.watch ?? fsWatchTuiWatcher;
+  const applyUpdate = opts.runUpdate ?? runUpdate;
   const refreshDebounceMs = Math.max(
     0,
     Math.floor(opts.refreshDebounceMs ?? TUI_REFRESH_DEBOUNCE_MS),
@@ -1227,6 +1615,14 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
     let escTimer: ReturnType<typeof setTimeout> | null = null;
     let watchDebounce: ReturnType<typeof setTimeout> | null = null;
     let treeWatcher: TuiTreeWatcher | null = null;
+    // Assignee-prompt prefill (task-tui-actions-parity): the login resolves
+    // lazily on the first prompt that needs it and is memoized for the
+    // session (a gh lookup must never run per keystroke).
+    let me: string | null | undefined;
+    const resolveMe = (): string | null => {
+      if (me === undefined) me = resolveCurrentLogin() ?? null;
+      return me;
+    };
 
     // Alternate screen + hidden cursor; restored on any exit path.
     output.write("\x1b[?1049h\x1b[?25l");
@@ -1270,8 +1666,44 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
           counts,
           selectedId: selected?.id ?? null,
           detailLines,
+          selected,
+          suggestedAssignee: resolveMe(),
         });
         if (current.quit) return false;
+        // A finished flow (task-tui-actions-parity): exactly ONE kernel
+        // runUpdate per flow, then the sync below repaints the move. A
+        // refusal (the tree moved under the flow, a claim conflict, any
+        // kernel rule) is footer text — the board stays open and consistent,
+        // and the alternate-screen lifecycle is untouched.
+        const action = current.action;
+        if (action !== null && action.stage === "apply") {
+          current = { ...current, action: null };
+          try {
+            const result = applyUpdate({
+              cwd: opts.cwd,
+              id: action.id,
+              status: action.status,
+              ...(action.assignee !== null ? { assignee: action.assignee } : {}),
+              ...(action.blockedReason !== null ? { blockedReason: action.blockedReason } : {}),
+            });
+            const assignee = action.assignee === null ? "" : ` (assignee ${action.assignee})`;
+            const cascade =
+              result.autoCompleted.length > 0
+                ? ` (cascade: ${result.autoCompleted.join(", ")})`
+                : "";
+            current = {
+              ...current,
+              message: action.claim
+                ? `claimed ${action.id} (${action.status})${cascade}`
+                : `${action.id}: ${action.from} -> ${action.status}${assignee}${cascade}`,
+            };
+          } catch (err) {
+            current = {
+              ...current,
+              message: tuiActionError(err),
+            };
+          }
+        }
       }
       return true;
     };
