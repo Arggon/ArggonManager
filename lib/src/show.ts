@@ -86,6 +86,27 @@ export function parseComments(body: string): { prose: string; comments: ShowComm
   return { prose, comments };
 }
 
+/**
+ * Bounded read of an ALREADY-LOADED item: the `runShow` compact-view math
+ * (comment split plus the tail rule) without the disk walk. Exported so
+ * callers that already hold the whole item list — the board's static detail
+ * embedding (task-board-static-details) — reuse the exact same bounded-read
+ * rule instead of re-walking the tracker per item (runShow is O(n) per call;
+ * a per-item walk over a full board would be O(n²) file reads). Always the
+ * compact view: the `meta`/`full` views are runShow-only concerns.
+ */
+export function showBoundedParts(
+  item: WorkItem,
+  tailComments: number = DEFAULT_TAIL_COMMENTS,
+): { prose: string; allComments: ShowComment[]; comments: ShowComment[] } {
+  const { prose, comments } = parseComments(item.body);
+  return {
+    prose,
+    allComments: comments,
+    comments: comments.slice(Math.max(0, comments.length - tailComments)),
+  };
+}
+
 export function runShow(opts: ShowOptions): ShowResult {
   const id = opts.id.trim();
   if (!id) throw new Error("id is required");
@@ -96,23 +117,18 @@ export function runShow(opts: ShowOptions): ShowResult {
     throw new Error(`id '${id}' not found under the tracker`);
   }
 
-  const { prose, comments } = parseComments(item.body);
   const meta = opts.meta === true;
   const full = !meta && opts.body === true;
-  const tail = opts.tailComments ?? DEFAULT_TAIL_COMMENTS;
-  const included = meta
-    ? []
-    : full
-      ? comments
-      : comments.slice(Math.max(0, comments.length - tail));
+  const bounded = showBoundedParts(item, opts.tailComments ?? DEFAULT_TAIL_COMMENTS);
+  const included = meta ? [] : full ? bounded.allComments : bounded.comments;
 
   return {
     id,
     path: item.filePath,
     root: repoRootFromTasks(tasksDir),
     item,
-    prose,
-    allComments: comments,
+    prose: bounded.prose,
+    allComments: bounded.allComments,
     comments: included,
     includeBody: !meta,
   };
