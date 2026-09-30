@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-ui-docs-refresh
 title: "Docs refresh after waves 1-2: /api/item note and the current smoke:tui-board steps"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [ui, docs]
 priority: p3
 created: "2026-09-23"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T19:47:26.850Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-ui-docs-refresh
 ---
 <!--
