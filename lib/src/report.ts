@@ -51,14 +51,18 @@ function titleOf(item: WorkItem): string {
 }
 
 /**
- * Aggregate leaf (task/bug) statuses up the tree for display only.
- * Grouped by epic; every story gets a row (zeros when leafless);
- * cancelled leaves have their own explicit column. Never writes.
+ * Aggregate leaf (task/bug) statuses up the tree for display only, from
+ * ALREADY-LOADED items. Grouped by epic; every story gets a row (zeros when
+ * leafless); cancelled leaves have their own explicit column. Pure: no reads,
+ * no writes. Exported so surfaces that already hold the item list (the web
+ * board's summary header, task-board-progress-header) reuse the exact report
+ * aggregation instead of re-walking the tracker or copying its rules;
+ * `runReport` is this plus the disk walk.
  */
-export function runReport(opts: { cwd: string }): ReportResult {
-  const tasksDir = findTasksDir(opts.cwd);
-  const root = repoRootFromTasks(tasksDir);
-  const items = loadItems(tasksDir);
+export function aggregateReport(items: WorkItem[]): {
+  groups: ReportGroup[];
+  blocked: ReportBlocked[];
+} {
   const byId = itemsById(items);
 
   const children = new Map<string, WorkItem[]>();
@@ -129,7 +133,30 @@ export function runReport(opts: { cwd: string }): ReportResult {
       };
     });
 
+  return { groups, blocked };
+}
+
+/**
+ * Aggregate leaf (task/bug) statuses up the tree for display only.
+ * Grouped by epic; every story gets a row (zeros when leafless);
+ * cancelled leaves have their own explicit column. Never writes.
+ */
+export function runReport(opts: { cwd: string }): ReportResult {
+  const tasksDir = findTasksDir(opts.cwd);
+  const root = repoRootFromTasks(tasksDir);
+  const { groups, blocked } = aggregateReport(loadItems(tasksDir));
   return { root, groups, blocked };
+}
+
+/**
+ * Completed leaves for one report counts row: `done + cancelled` — the
+ * report's completion definition (`formatReportMarkdown`'s `N/M complete`).
+ * Exported as the single source so the board's summary header and story
+ * fractions quote the same rule instead of restating it
+ * (task-board-progress-header). Pure.
+ */
+export function completedOf(counts: Record<Status, number>): number {
+  return counts.done + counts.cancelled;
 }
 
 /** Human-readable table. The --json payload mirrors these rows exactly. */
@@ -183,7 +210,7 @@ export function formatReportMarkdown(result: ReportResult, opts: { date?: string
       continue;
     }
     for (const c of group.containers) {
-      const done = c.counts.done + c.counts.cancelled;
+      const done = completedOf(c.counts);
       const id = sanitizeHumanTextUncapped(c.id);
       const title = sanitizeHumanTextUncapped(c.title);
       const line = c.empty
@@ -191,7 +218,7 @@ export function formatReportMarkdown(result: ReportResult, opts: { date?: string
         : `- **${id}** — ${title}: ${done}/${c.counts.total} complete (${c.counts.in_progress} in progress, ${c.counts.blocked} blocked)`;
       lines.push(line);
     }
-    const totalDone = group.totals.done + group.totals.cancelled;
+    const totalDone = completedOf(group.totals);
     lines.push("", `- **totals**: ${totalDone}/${group.totals.total} complete`, "");
   }
 

@@ -22,7 +22,6 @@ updated: "2026-09-22"
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 
@@ -36,6 +35,6 @@ The CLI already owns the query language (`lib/src/filter.ts`, `list --filter`, `
 ## Acceptance
 
 - [ ] Child tasks/bugs done with their checklists honest
-- [ ] The output stays a single self-contained HTML file (no runtime deps, ADR 0002); features degrade gracefully without `--serve`
-- [ ] Every change carries unit tests + a Playwright-CLI smoke driven against `arggon board --serve` (ADR 0008)
-- [ ] README board section and docs/json-output.md updated in the same PRs
+- [x] The output stays a single self-contained HTML file (no runtime deps, ADR 0002); features degrade gracefully without `--serve`
+- [x] Every change carries unit tests + a Playwright-CLI smoke driven against `arggon board --serve` (ADR 0008)
+- [x] README board section and docs/json-output.md updated in the same PRs

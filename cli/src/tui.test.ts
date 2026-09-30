@@ -29,10 +29,12 @@ import {
   loadTuiItems,
   nextTuiSort,
   renderTui,
+  renderTuiHelp,
   renderTuiDetail,
   renderTuiScreen,
   runTuiBoard,
   selectedTuiItem,
+  TUI_HELP,
   TUI_DETAIL_MAX_BODY_LINES,
   TUI_DETAIL_MAX_LINES,
   TUI_DETAIL_NARROW_WIDTH,
@@ -43,11 +45,20 @@ import {
   tuiDependencySummary,
   tuiDetailBodyRows,
   tuiDetailLinesFor,
+  tuiLegalMoves,
+  tuiLensFilter,
   tuiViewItems,
+  tuiViewOptions,
   visibleTuiItems,
   wrapTuiLine,
 } from "./tui.js";
-import type { TuiDetailInput, TuiDetailSource, TuiState, TuiWatchFactory } from "./tui.js";
+import type {
+  TuiActionState,
+  TuiDetailInput,
+  TuiDetailSource,
+  TuiState,
+  TuiWatchFactory,
+} from "./tui.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -105,14 +116,14 @@ describe("renderTui golden (80x8, color off)", () => {
         "blocked (0)     " +
         "done (0)        " +
         "cancelled (0)   ",
-      "> B bug-beta Lo…" + "  S story-gamma…" + " ".repeat(48),
+      "> B bug-beta Lo…" + "  S story-gamma…" + "  (empty)         (empty)         (empty)       ",
       "  T task-alpha …" + " ".repeat(64),
       " ".repeat(80),
       " ".repeat(80),
       " ".repeat(80),
       // The position leads (bug-tui-selection-offscreen); at 80 columns the
       // tail of the key help is clipped, never the position.
-      "row 1/2 · ←/→ column · ↑/↓ card · PgUp/PgDn page · home/end · / search · enter …",
+      "row 1/2 · ←/→ column · ↑/↓ card · PgUp/PgDn page · home/end · / search · v view…",
     ]);
   });
 
@@ -166,9 +177,14 @@ describe("renderTui golden (80x8, color off)", () => {
     state = handleKey(state, "b");
     expect(lines(renderTui(THREE, state, { color: false }))[7]).toContain("/b█");
     state = handleKey(state, "\r");
-    // After applying the filter the footer is the position + help again (the
-    // help tail clips at 80 columns); Enter with no selection only messages.
-    expect(lines(renderTui(THREE, state, { color: false }))[7]).toContain("row 1/1 · ←/→ column");
+    // After applying the filter the footer carries the lens (filter + matched
+    // totals, task-tui-filter-language) before the help tail (clipped at 80
+    // columns); Enter with no selection only messages.
+    expect(lines(renderTui(THREE, state, { color: false }))[7]).toContain(
+      // bug-beta (id) and story-gamma (title "Terminal UI kanban") match the
+      // needle; the todo column shows one of them.
+      "row 1/1 · filter: b · 2/3 match",
+    );
     const noItem = handleKey(initialTuiState(80, 8), "\r", { counts: [2, 1, 0, 0, 0] });
     expect(lines(renderTui(THREE, noItem, { color: false }))[7]).toBe(
       "row 1/2 · (no item selected)".padEnd(80, " "),
@@ -316,8 +332,12 @@ describe("clampTuiState and selection helpers", () => {
   });
 
   it("tuiColumnCounts aligns with STATUSES", () => {
-    expect(tuiColumnCounts(THREE, "")).toEqual([2, 1, 0, 0, 0]);
-    expect(tuiColumnCounts(THREE, "alpha")).toEqual([1, 0, 0, 0, 0]);
+    expect(tuiColumnCounts(THREE, { filter: "", sort: "id", readyOnly: false })).toEqual([
+      2, 1, 0, 0, 0,
+    ]);
+    expect(tuiColumnCounts(THREE, { filter: "alpha", sort: "id", readyOnly: false })).toEqual([
+      1, 0, 0, 0, 0,
+    ]);
   });
 });
 
@@ -363,7 +383,7 @@ describe("tuiBodyRows / followTuiScroll", () => {
 
 describe("TUI scroll window (bug-tui-selection-offscreen)", () => {
   it("renders the highlighted row when the selection is at the bottom of a long column", () => {
-    const counts = tuiColumnCounts(LONG, "");
+    const counts = tuiColumnCounts(LONG, { filter: "", sort: "id", readyOnly: false });
     let state = initialTuiState(200, 24); // 21 body rows
     for (let i = 0; i < 29; i++) state = handleKey(state, "\x1b[B", { counts });
     expect(state.card).toBe(29);
@@ -378,7 +398,7 @@ describe("TUI scroll window (bug-tui-selection-offscreen)", () => {
   });
 
   it("keeps the 80x24 repro frame on the selected card (no stale top-of-column window)", () => {
-    const counts = tuiColumnCounts(LONG, "");
+    const counts = tuiColumnCounts(LONG, { filter: "", sort: "id", readyOnly: false });
     let state = initialTuiState(80, 24);
     for (let i = 0; i < 25; i++) state = handleKey(state, "\x1b[B", { counts });
     expect(state.card).toBe(25);
@@ -391,7 +411,7 @@ describe("TUI scroll window (bug-tui-selection-offscreen)", () => {
   });
 
   it("PgDn/PgUp/Home/End page the column without overshoot or empty pages", () => {
-    const counts = tuiColumnCounts(LONG, "");
+    const counts = tuiColumnCounts(LONG, { filter: "", sort: "id", readyOnly: false });
     let state = initialTuiState(200, 24); // page = 21 rows
     state = handleKey(state, "\x1b[6~", { counts }); // PgDn
     expect(state.card).toBe(21);
@@ -423,7 +443,7 @@ describe("TUI scroll window (bug-tui-selection-offscreen)", () => {
   });
 
   it("keeps the window valid after a resize (both directions)", () => {
-    const counts = tuiColumnCounts(LONG, "");
+    const counts = tuiColumnCounts(LONG, { filter: "", sort: "id", readyOnly: false });
     let state = initialTuiState(200, 24);
     for (let i = 0; i < 29; i++) state = handleKey(state, "\x1b[B", { counts });
     expect(state.scroll).toBe(9);
@@ -446,12 +466,16 @@ describe("TUI scroll window (bug-tui-selection-offscreen)", () => {
   });
 
   it("keeps the window valid after a filter shrinks the column", () => {
-    const counts = tuiColumnCounts(LONG, "");
+    const counts = tuiColumnCounts(LONG, { filter: "", sort: "id", readyOnly: false });
     let state = initialTuiState(200, 24);
     for (let i = 0; i < 29; i++) state = handleKey(state, "\x1b[B", { counts });
     expect(state.scroll).toBe(9);
 
-    const filteredCounts = tuiColumnCounts(LONG, "demo-2"); // demo-20..demo-29
+    const filteredCounts = tuiColumnCounts(LONG, {
+      filter: "demo-2",
+      sort: "id",
+      readyOnly: false,
+    }); // demo-20..demo-29
     expect(filteredCounts[0]).toBe(10);
     const next = clampTuiState({ ...state, filter: "demo-2" }, filteredCounts);
     expect(next.card).toBe(9);
@@ -463,7 +487,7 @@ describe("TUI scroll window (bug-tui-selection-offscreen)", () => {
   });
 
   it("shows the position in the footer and follows the selection", () => {
-    const counts = tuiColumnCounts(LONG, "");
+    const counts = tuiColumnCounts(LONG, { filter: "", sort: "id", readyOnly: false });
     let state = initialTuiState(200, 24);
     expect(lines(renderTui(LONG, state, { color: false }))[23]).toContain("row 1/30");
     for (let i = 0; i < 29; i++) state = handleKey(state, "\x1b[B", { counts });
@@ -656,7 +680,11 @@ function longTree(): string {
 describe("runTuiBoard scroll window (bug-tui-selection-offscreen)", () => {
   it("pages with PgDn/End (CSI keys) and keeps the window valid across a resize", async () => {
     const root = longTree();
-    const todoCount = tuiColumnCounts(loadTuiItems(root).items, "")[0]!;
+    const todoCount = tuiColumnCounts(loadTuiItems(root).items, {
+      filter: "",
+      sort: "id",
+      readyOnly: false,
+    })[0]!;
     const term = fakeTerminal();
     term.output.columns = 200; // wide: card ids render unclipped
     term.output.rows = 24; // 21 body rows
@@ -1083,33 +1111,33 @@ describe("renderTui sort + lens frame (task-tui-sort-ready-lens)", () => {
   it("a lens toggle re-clamps the selection against the narrowed columns", () => {
     // card 2 (gamma in id order) under the ready lens: the todo column
     // shrinks to two cards, so the post-toggle clamp pulls the index back.
-    const state = handleKey({ ...initialTuiState(200, 12), card: 2 }, "l");
+    const state = handleKey({ ...initialTuiState(200, 12), card: 2 }, "L");
     expect(state.readyOnly).toBe(true);
-    const counts = tuiColumnCounts(SORT_SET, "", state.readyOnly);
+    const counts = tuiColumnCounts(SORT_SET, state);
     expect(clampTuiState(state, counts).card).toBe(1);
   });
 });
 
 describe("handleKey sort + lens keys (task-tui-sort-ready-lens)", () => {
-  it("s cycles the sort, l toggles the lens (board mode)", () => {
+  it("s cycles the sort, L toggles the lens (board mode; l is the vim right motion)", () => {
     let state = handleKey(initialTuiState(), "s");
     expect(state.sort).toBe("priority");
     state = handleKey(state, "s");
     expect(state.sort).toBe("next");
     state = handleKey(state, "s");
     expect(state.sort).toBe("id");
-    state = handleKey(state, "l");
+    state = handleKey(state, "L");
     expect(state.readyOnly).toBe(true);
-    state = handleKey(state, "l");
+    state = handleKey(state, "L");
     expect(state.readyOnly).toBe(false);
   });
 
-  it("s and l type into the search prompt like any other key", () => {
+  it("s and L type into the search prompt like any other key", () => {
     let state = handleKey(initialTuiState(), "/");
     state = handleKey(state, "s");
-    state = handleKey(state, "l");
+    state = handleKey(state, "L");
     expect(state.searching).toBe(true);
-    expect(state.filter).toBe("sl");
+    expect(state.filter).toBe("sL");
     expect(state.sort).toBe("id");
     expect(state.readyOnly).toBe(false);
   });
@@ -1135,7 +1163,7 @@ describe("runTuiBoard sort + lens keys (task-tui-sort-ready-lens)", () => {
     await wait(30);
     term.input.write("s"); // sort: next
     await wait(30);
-    term.input.write("l"); // ready-only lens
+    term.input.write("L"); // ready-only lens
     await wait(30);
     term.input.write("q");
     await done;
@@ -1176,6 +1204,13 @@ describe("arggon board --tui (CLI)", () => {
     expect(result.status).toBe(1);
     expect(result.stderr).toContain("board --tui requires an interactive terminal");
     expect(result.stdout).not.toContain("<html");
+  });
+
+  it("parses --no-color (the TTY failure is unchanged with the flag present)", () => {
+    const root = newTree();
+    const result = runCli(["board", "--tui", "--no-color"], root);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("board --tui requires an interactive terminal");
   });
 
   it("refuses --tui combined with --json (BOARD_FAILED), even before the TTY check", () => {
@@ -1774,5 +1809,706 @@ describe("detail pane: runTuiBoard loop", () => {
     term.input.write("q");
     await done;
     expect(term.outputText()).toContain("item task-rate-limit is not in the tree anymore");
+  });
+});
+
+
+// ---------- help overlay + vim keys (task-tui-help-vim-keys) ----------
+
+describe("vim motions and g/G (task-tui-help-vim-keys)", () => {
+  it("h/l move columns and j/k move cards, like the arrows", () => {
+    let state = handleKey(initialTuiState(), "l"); // right
+    expect(state.column).toBe(1);
+    state = handleKey(state, "h"); // left
+    expect(state.column).toBe(0);
+    state = handleKey(state, "j"); // down
+    expect(state.card).toBe(1);
+    state = handleKey(state, "k"); // up
+    expect(state.card).toBe(0);
+    // Same clamping as the arrows (counts context).
+    const clamped = handleKey({ ...initialTuiState(), card: 5 }, "j", {
+      counts: [2, 1, 0, 0, 0],
+    });
+    expect(clamped.card).toBe(1);
+  });
+
+  it("g/G jump to the first/last card of the column (home/end)", () => {
+    let state = handleKey(initialTuiState(), "G", { counts: [10, 0, 0, 0, 0] });
+    expect(state.card).toBe(9);
+    state = handleKey(state, "g");
+    expect(state.card).toBe(0);
+  });
+
+  it("j/k/g/G scroll the detail pane with the same clamps", () => {
+    let state: TuiState = { ...initialTuiState(80, 8), detail: { id: "x", scroll: 0 } };
+    state = handleKey(state, "j", { detailLines: 40 });
+    expect(state.detail?.scroll).toBe(1);
+    state = handleKey(state, "G", { detailLines: 40 });
+    expect(state.detail?.scroll).toBe(34); // 40 lines - 6 body rows
+    state = handleKey(state, "g", { detailLines: 40 });
+    expect(state.detail?.scroll).toBe(0);
+    state = handleKey(state, "k", { detailLines: 40 });
+    expect(state.detail?.scroll).toBe(0); // clamped at the top
+  });
+
+  it("the ready-only lens moved to L (lowercase l is the vim right motion)", () => {
+    const lensed = handleKey(initialTuiState(), "L");
+    expect(lensed.readyOnly).toBe(true);
+    const moved = handleKey(initialTuiState(), "l", {});
+    expect(moved.readyOnly).toBe(false);
+    expect(moved.column).toBe(1);
+  });
+});
+
+describe("help overlay (task-tui-help-vim-keys)", () => {
+  it("? opens it, esc and ? close it, the board state behind is untouched", () => {
+    let state: TuiState = { ...initialTuiState(), sort: "next", readyOnly: true, card: 2 };
+    state = handleKey(state, "?");
+    expect(state.help).toBe(true);
+    state = handleKey(state, "x"); // inert inside the overlay
+    expect(state.help).toBe(true);
+    state = handleKey(state, "\x1b");
+    expect(state.help).toBe(false);
+    expect(state.sort).toBe("next");
+    expect(state.readyOnly).toBe(true);
+    expect(state.card).toBe(2);
+    state = handleKey(state, "?");
+    state = handleKey(state, "?"); // toggles closed too
+    expect(state.help).toBe(false);
+  });
+
+  it("Ctrl-C quits from the overlay", () => {
+    let state = handleKey(initialTuiState(), "?");
+    state = handleKey(state, "\x03");
+    expect(state.quit).toBe(true);
+  });
+
+  it("renders the grouped key list and stays readable without color", () => {
+    const frame = renderTuiHelp({ ...initialTuiState(80, 24), help: true }, { color: false });
+    const got = lines(frame);
+    expect(got[0]).toContain("arggon board --tui — keys");
+    for (const group of TUI_HELP) expect(frame).toContain(group.title);
+    // Every documented key surfaces in the overlay.
+    for (const key of [
+      "←/→ · h/l",
+      "↑/↓ · j/k",
+      "PgUp/PgDn",
+      "g/G · home/end",
+      "/",
+      "esc",
+      "enter",
+      "v",
+      "s",
+      "L",
+      "r",
+      "c",
+      "m",
+      "q · Ctrl-C",
+      "?",
+    ]) {
+      expect(frame).toContain(key);
+    }
+    expect(got).toHaveLength(24);
+    for (const line of got) expect(line).toHaveLength(80);
+    // Color off: no SGR COLOR sequences anywhere (the leading clear-home is
+    // not an SGR and stays).
+    expect(frame).not.toMatch(/\x1b\[[0-9;]*m/);
+    // Color on: the header is bold.
+    expect(renderTuiHelp({ ...initialTuiState(80, 24), help: true }, { color: true })).toContain(
+      "\x1b[1marggon board --tui — keys",
+    );
+  });
+
+  it("renderTuiScreen dispatches the overlay over the board", () => {
+    const state = { ...initialTuiState(80, 24), help: true };
+    expect(renderTuiScreen(THREE, state, new Map(), { color: false })).toContain(
+      "arggon board --tui — keys",
+    );
+  });
+
+  it("the footer help names the overlay and the moved lens key", () => {
+    const footer = lines(renderTui(THREE, initialTuiState(400, 8), { color: false }))[7];
+    expect(footer).toContain("? help");
+    expect(footer).toContain("L ready");
+    expect(footer).not.toContain("l ready");
+  });
+
+  it("every TUI_HELP key group survives the reducer round-trip (content stays in sync)", () => {
+    // The overlay content is data; this pins the groups the acceptance names.
+    expect(TUI_HELP.map((group) => group.title)).toEqual([
+      "navigation",
+      "filter",
+      "view",
+      "actions",
+      "quit",
+    ]);
+  });
+});
+
+describe("TUI color control (task-tui-help-vim-keys)", () => {
+  it("runTuiBoard color: false renders a plain frame (no SGR)", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    const done = runTuiBoard({ cwd: root, input: term.input, output: term.output, color: false });
+    const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+    await wait(30);
+    term.input.write("q");
+    await done;
+    expect(term.outputText()).not.toMatch(/\x1b\[[0-9;]*m/); // no SGR colors
+    expect(term.outputText()).toContain("arggon board --tui ·");
+  });
+
+  it("NO_COLOR disables colors by default; explicit color wins over the env", async () => {
+    const root = newTree();
+    const previous = process.env.NO_COLOR;
+    process.env.NO_COLOR = "1";
+    try {
+      const term = fakeTerminal();
+      const done = runTuiBoard({ cwd: root, input: term.input, output: term.output });
+      const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+      await wait(30);
+      term.input.write("q");
+      await done;
+      expect(term.outputText()).not.toMatch(/\x1b\[[0-9;]*m/);
+
+      const term2 = fakeTerminal();
+      const done2 = runTuiBoard({
+        cwd: root,
+        input: term2.input,
+        output: term2.output,
+        color: true,
+      });
+      await wait(30);
+      term2.input.write("q");
+      await done2;
+      expect(term2.outputText()).toMatch(/\x1b\[7m/); // SGR colors back on
+    } finally {
+      if (previous === undefined) delete process.env.NO_COLOR;
+      else process.env.NO_COLOR = previous;
+    }
+  });
+});
+
+// ---------- action flows: claim + move (task-tui-actions-parity) ----------
+
+const ACTION_ITEM = item({ id: "task-act", type: "task", status: "todo", title: "Action target" });
+
+function actionState(overrides: Partial<TuiActionState> = {}): TuiActionState {
+  return {
+    id: "task-act",
+    type: "task",
+    from: "todo",
+    claimedBy: null,
+    claim: false,
+    stage: "move",
+    status: "todo",
+    assignee: null,
+    blockedReason: null,
+    cursor: 0,
+    draft: "",
+    error: null,
+    ...overrides,
+  };
+}
+
+describe("tuiLegalMoves (task-tui-actions-parity)", () => {
+  it("lists kernel-legal targets only, in status enum order", () => {
+    expect(tuiLegalMoves({ id: "t", type: "task", status: "todo", assignee: null })).toEqual([
+      "in_progress",
+      "cancelled",
+    ]);
+    expect(
+      tuiLegalMoves({ id: "t", type: "task", status: "in_progress", assignee: "mia" }),
+    ).toEqual(["todo", "blocked", "done", "cancelled"]); // status enum order
+    expect(tuiLegalMoves({ id: "t", type: "task", status: "done", assignee: null })).toEqual([
+      "todo",
+    ]);
+  });
+});
+
+describe("handleKey claim flow (task-tui-actions-parity)", () => {
+  it("c opens the assignee prompt prefilled with the resolved login", () => {
+    const state = handleKey(initialTuiState(240, 8), "c", {
+      selected: ACTION_ITEM,
+      suggestedAssignee: "arggon",
+    });
+    expect(state.action).toEqual(
+      actionState({
+        claim: true,
+        stage: "assignee",
+        status: "in_progress",
+        draft: "arggon",
+      }),
+    );
+    // The prompt renders in the footer; the board stays behind it.
+    const frame = lines(renderTui([ACTION_ITEM], state, { color: false }))[7];
+    expect(frame).toContain("claim task-act: arggon█");
+    expect(frame).toContain("enter to apply, esc cancels");
+  });
+
+  it("c refuses non-claimable types and claimed items (never steals)", () => {
+    const epic = handleKey(initialTuiState(), "c", {
+      selected: item({ id: "epic-a", type: "epic", status: "todo" }),
+    });
+    expect(epic.action).toBeNull();
+    expect(epic.message).toContain("not claimable");
+    const claimed = handleKey(initialTuiState(), "c", {
+      selected: item({ id: "task-c", type: "task", status: "in_progress", assignee: "mia" }),
+      suggestedAssignee: "arggon",
+    });
+    expect(claimed.action).toBeNull();
+    expect(claimed.message).toContain("claim conflict");
+    expect(claimed.message).toContain("claimed by 'mia'");
+  });
+
+  it("c without a selection messages instead of opening a flow", () => {
+    const state = handleKey(initialTuiState(), "c", { selected: null });
+    expect(state.action).toBeNull();
+    expect(state.message).toBe("(no item selected)");
+  });
+
+  it("enter applies the prefill (or the typed login) and stages the write; esc cancels untouched", () => {
+    let state = handleKey(initialTuiState(240, 8), "c", {
+      selected: ACTION_ITEM,
+      suggestedAssignee: "mia",
+    });
+    state = handleKey(state, "\r");
+    expect(state.action?.stage).toBe("confirm");
+    expect(state.action?.assignee).toBe("mia");
+    // Anything but y cancels with nothing written.
+    state = handleKey(state, "n");
+    expect(state.action).toBeNull();
+    // Typing extends the prefill; enter stages the typed login.
+    state = handleKey(state, "c", { selected: ACTION_ITEM, suggestedAssignee: "mia" });
+    state = handleKey(state, "K");
+    expect(state.action?.draft).toBe("miaK");
+    state = handleKey(state, "\r");
+    expect(state.action?.assignee).toBe("miaK");
+    // The confirm names the exact write.
+    expect(lines(renderTui([ACTION_ITEM], state, { color: false }))[7]).toContain(
+      "apply task-act: todo -> in_progress (assignee miaK)? y applies",
+    );
+  });
+});
+
+describe("handleKey move flow (task-tui-actions-parity)", () => {
+  it("m opens the legal-target menu and a number selects", () => {
+    let state = handleKey(initialTuiState(240, 8), "m", { selected: ACTION_ITEM });
+    expect(state.action?.stage).toBe("move");
+    // The menu lists only the legal targets (status enum order).
+    expect(lines(renderTui([ACTION_ITEM], state, { color: false }))[7]).toContain(
+      "move task-act (todo): [1] in_progress [2] cancelled",
+    );
+    state = handleKey(state, "1");
+    // todo -> in_progress on an unclaimed claimable asks for the assignee.
+    expect(state.action?.stage).toBe("assignee");
+    state = handleKey(state, "\r"); // empty keeps the (absent) prefill -> no assignee? no: claimable requires one
+    // An empty assignee on a claim flow leaves assignee null -> confirm shows it.
+    expect(state.action?.stage).toBe("confirm");
+    expect(state.action?.assignee).toBeNull();
+  });
+
+  it("a move to blocked demands a non-empty reason, inline", () => {
+    let state = handleKey(initialTuiState(240, 8), "m", {
+      selected: item({ id: "task-ip", type: "task", status: "in_progress", assignee: "mia" }),
+    });
+    state = handleKey(state, "2"); // blocked (enum order: todo, blocked, ...)
+    expect(state.action?.stage).toBe("reason");
+    state = handleKey(state, "\r"); // empty -> refused inline
+    expect(state.action?.stage).toBe("reason");
+    expect(state.action?.error).toContain("non-empty reason");
+    state = handleKey(state, "w");
+    state = handleKey(state, "a");
+    state = handleKey(state, "i");
+    state = handleKey(state, "t");
+    expect(lines(renderTui([], state, { color: false }))[7]).toContain(
+      "blocked reason for task-ip: wait█",
+    );
+    state = handleKey(state, "\r");
+    expect(state.action?.stage).toBe("confirm");
+    expect(state.action?.blockedReason).toBe("wait");
+  });
+
+  it("a container moves without the assignee prompt; y stages the apply", () => {
+    let state = handleKey(initialTuiState(240, 8), "m", {
+      selected: item({ id: "epic-a", type: "epic", status: "todo" }),
+    });
+    state = handleKey(state, "1"); // in_progress
+    expect(state.action?.stage).toBe("confirm"); // no claim prompt for containers
+    state = handleKey(state, "y");
+    expect(state.action?.stage).toBe("apply");
+    // The board reducer itself performs no IO: the loop executes the apply.
+  });
+
+  it("the flow is modal: board keys are inert and esc restores the board untouched", () => {
+    const before = initialTuiState(80, 8);
+    let state = handleKey(before, "m", { selected: ACTION_ITEM });
+    state = handleKey(state, "s"); // ignored by the flow
+    expect(state.sort).toBe("id");
+    state = handleKey(state, "q"); // ignored by the flow (Ctrl-C is the quit)
+    expect(state.quit).toBe(false);
+    state = handleKey(state, "\x1b");
+    expect(state.action).toBeNull();
+    expect(state).toEqual(before);
+  });
+
+  it("m with no selection or no legal target messages", () => {
+    const none = handleKey(initialTuiState(), "m", { selected: null });
+    expect(none.message).toBe("(no item selected)");
+    const done = handleKey(initialTuiState(), "m", {
+      selected: item({ id: "task-d", type: "task", status: "done" }),
+    });
+    expect(done.action?.stage).toBe("move"); // done -> todo exists
+    void done;
+  });
+});
+
+describe("runTuiBoard action execution (task-tui-actions-parity)", () => {
+  it("applies a confirmed move through the injected runUpdate and repaints", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    term.output.columns = 200;
+    const updates: Array<{ id: string; status?: string; assignee?: string }> = [];
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      runUpdate: (opts) => {
+        updates.push({ id: opts.id, status: opts.status, assignee: opts.assignee });
+        return {
+          id: opts.id,
+          path: "x",
+          root: "r",
+          item: {} as never,
+          changed: ["status"],
+          autoCompleted: [],
+          cascadeLevels: [],
+          cascadeSkipped: [],
+          changedPaths: [],
+        };
+      },
+    });
+    const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+    await wait(30);
+    term.input.write("m"); // move flow for the first card (task-rate-limit is not first; selection follows id order)
+    await wait(30);
+    term.input.write("2"); // second legal target: cancelled (no prompts)
+    await wait(30);
+    term.input.write("y"); // confirm -> the loop performs ONE runUpdate
+    await wait(30);
+    term.input.write("q");
+    await done;
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.status).toBe("cancelled");
+    expect(term.outputText()).toContain("-> cancelled");
+  });
+
+  it("surfaces a kernel refusal in the footer and keeps running (and quitting)", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    term.output.columns = 200;
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      runUpdate: () => {
+        throw new Error("cannot transition status todo -> done (allowed: in_progress, cancelled)");
+      },
+    });
+    const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+    await wait(30);
+    term.input.write("m");
+    await wait(30);
+    term.input.write("2"); // cancelled: a container's move needs no prompts
+    await wait(30);
+    term.input.write("y"); // confirm -> the loop's runUpdate throws
+    await wait(30);
+    term.input.write("q");
+    await done;
+    // The refusal is sanitized footer text; the loop survived to quit cleanly.
+    expect(term.outputText()).toContain("cannot transition status todo -> done");
+  });
+});
+
+// ---------- filter language + saved views (task-tui-filter-language) ----------
+
+describe("tuiLensFilter + tuiViewItems saved views (task-tui-filter-language)", () => {
+  const VIEWS_SET: WorkItem[] = [
+    ...SORT_SET,
+    item({ id: "story-e", type: "story", status: "in_progress", assignee: "kim" }),
+  ];
+
+  it("tuiLensFilter ANDs the active view expression with the manual filter", () => {
+    expect(tuiLensFilter({ filter: "" })).toBe("");
+    expect(tuiLensFilter({ filter: "alpha", view: null })).toBe("alpha");
+    expect(tuiLensFilter({ filter: "  ", view: { name: "v", expr: "type:task" } })).toBe(
+      "type:task",
+    );
+    expect(tuiLensFilter({ filter: "alpha", view: { name: "v", expr: "status:todo" } })).toBe(
+      "status:todo alpha",
+    );
+  });
+
+  it("the active view filters the cards through the kernel parser", () => {
+    const view = tuiViewItems(VIEWS_SET, {
+      filter: "",
+      view: { name: "tasks", expr: "type:task" },
+      sort: "id",
+      readyOnly: false,
+    });
+    expect(view.map((i) => i.id)).toEqual(["alpha", "beta", "delta"]);
+    // The view ANDs with the manual filter.
+    const both = tuiViewItems(VIEWS_SET, {
+      filter: "gam",
+      view: { name: "bugs", expr: "type:bug" },
+      sort: "id",
+      readyOnly: false,
+    });
+    expect(both.map((i) => i.id)).toEqual(["gamma"]);
+  });
+});
+
+describe("tuiViewOptions (task-tui-filter-language)", () => {
+  it("loads x-views name-sorted, pre-validated against the loaded tree", () => {
+    const root = newTree();
+    writeFileSync(
+      join(root, "tasks/.convention.yml"),
+      'version: 0\nx-views:\n  open-bugs: "type:bug status:todo"\n  mine: "assignee:arggon"\n',
+      "utf8",
+    );
+    const { items } = loadTuiItems(root);
+    const options = tuiViewOptions(root, items);
+    expect(options.map((o) => o.name)).toEqual(["mine", "open-bugs"]); // name-sorted cycle
+    const bugs = options.find((o) => o.name === "open-bugs")!;
+    expect(bugs.ok).toBe(true);
+    expect(bugs.expr).toBe("type:bug status:todo");
+    const mine = options.find((o) => o.name === "mine")!;
+    expect(mine.ok).toBe(true); // story-login is claimed by arggon
+  });
+
+  it("an invalid view expression carries the kernel error instead of crashing", () => {
+    const root = newTree();
+    writeFileSync(
+      join(root, "tasks/.convention.yml"),
+      'version: 0\nx-views:\n  bad: "status:bogus"\n',
+      "utf8",
+    );
+    const { items } = loadTuiItems(root);
+    const options = tuiViewOptions(root, items);
+    expect(options).toHaveLength(1);
+    expect(options[0]!.ok).toBe(false);
+    expect(options[0]!.error).toContain('unknown status "bogus"');
+  });
+
+  it("a missing or malformed convention degrades to no views", () => {
+    const root = newTree();
+    expect(tuiViewOptions(root, loadTuiItems(root).items)).toEqual([]);
+    writeFileSync(
+      join(root, "tasks/.convention.yml"),
+      "version: 0\nx-views:\n  just-a-word\n",
+      "utf8",
+    );
+    expect(tuiViewOptions(root, loadTuiItems(root).items)).toEqual([]);
+  });
+});
+
+describe("handleKey saved views (task-tui-filter-language)", () => {
+  const views = [
+    { name: "a", expr: "type:task", ok: true },
+    { name: "b", expr: "type:bug status:todo", ok: true },
+    {
+      name: "bad",
+      expr: "status:nope",
+      ok: false,
+      error: 'unknown status "nope". Allowed: todo, in_progress, blocked, done, cancelled',
+    },
+  ];
+
+  it("v cycles no view -> first -> last -> no view (valid views only)", () => {
+    const valid = [views[0]!, views[1]!];
+    let state = handleKey(initialTuiState(), "v", { views: valid });
+    expect(state.view).toEqual({ name: "a", expr: "type:task" });
+    expect(state.message).toBeNull();
+    state = handleKey(state, "v", { views: valid });
+    expect(state.view).toEqual({ name: "b", expr: "type:bug status:todo" });
+    state = handleKey(state, "v", { views: valid });
+    expect(state.view).toBeNull();
+  });
+
+  it("v with no saved views messages instead of crashing", () => {
+    const state = handleKey(initialTuiState(), "v");
+    expect(state.view).toBeNull();
+    expect(state.message).toContain("no saved views");
+  });
+
+  it("an invalid view is refused with an inline hint, the previous lens stays", () => {
+    let state = handleKey(initialTuiState(), "v", { views }); // a
+    state = handleKey(state, "v", { views }); // b
+    state = handleKey(state, "v", { views }); // bad -> refused
+    expect(state.view).toEqual({ name: "b", expr: "type:bug status:todo" });
+    expect(state.message).toContain("bad: unknown status");
+    // Esc exits the (stuck) cycle and clears the lens.
+    state = handleKey(state, "\x1b");
+    expect(state.view).toBeNull();
+    expect(state.message).toBeNull();
+  });
+
+  it("a stale active name (convention changed under it) cycles from the first view", () => {
+    const state = { ...initialTuiState(), view: { name: "gone", expr: "type:task" } };
+    const next = handleKey(state, "v", { views });
+    expect(next.view).toEqual({ name: "a", expr: "type:task" });
+  });
+
+  it("v types into the search prompt like any other key", () => {
+    let state = handleKey(initialTuiState(), "/");
+    state = handleKey(state, "v");
+    expect(state.searching).toBe(true);
+    expect(state.filter).toBe("v");
+    expect(state.view).toBeNull();
+  });
+});
+
+describe("handleKey filter prompt verdict (task-tui-filter-language)", () => {
+  it("enter with a refused draft stays at the prompt with the error inline", () => {
+    let state = handleKey(initialTuiState(), "/");
+    state = handleKey(state, "s");
+    state = handleKey(state, "x");
+    expect(state.filter).toBe("sx");
+    state = handleKey(state, "\r", {
+      filterVerdict: { ok: false, error: 'unknown filter field "x"' },
+    });
+    expect(state.searching).toBe(true); // stays at the prompt
+    expect(state.filter).toBe("sx"); // draft kept for editing
+    expect(state.filterError).toBe('unknown filter field "x"');
+    // Editing the draft clears the stale error.
+    state = handleKey(state, "\x7f");
+    expect(state.filterError).toBeNull();
+    expect(state.filter).toBe("s");
+    // A passing verdict applies the draft.
+    state = handleKey(state, "\r", { filterVerdict: { ok: true } });
+    expect(state.searching).toBe(false);
+    expect(state.filter).toBe("s");
+    expect(state.filterError).toBeNull();
+  });
+
+  it("enter without a verdict applies the draft (pure-reducer path)", () => {
+    let state = handleKey(initialTuiState(), "/");
+    state = handleKey(state, "z");
+    state = handleKey(state, "\r");
+    expect(state.searching).toBe(false);
+    expect(state.filter).toBe("z");
+  });
+
+  it("esc at the prompt cancels the draft and clears the filter and view", () => {
+    let state: TuiState = {
+      ...initialTuiState(),
+      filter: "old",
+      view: { name: "a", expr: "type:task" },
+    };
+    state = handleKey(state, "/");
+    state = handleKey(state, "n");
+    state = handleKey(state, "\x1b");
+    expect(state.searching).toBe(false);
+    expect(state.filter).toBe("");
+    expect(state.view).toBeNull();
+    expect(state.filterError).toBeNull();
+  });
+
+  it("esc on the board clears the filter and the view", () => {
+    let state: TuiState = {
+      ...initialTuiState(),
+      filter: "old",
+      view: { name: "a", expr: "type:task" },
+    };
+    state = handleKey(state, "\x1b");
+    expect(state.filter).toBe("");
+    expect(state.view).toBeNull();
+  });
+});
+
+describe("renderTui saved view frame (task-tui-filter-language)", () => {
+  it("the header names the active view with its expression and the cards follow it", () => {
+    const state = {
+      ...initialTuiState(200, 12),
+      view: { name: "open-tasks", expr: "type:task status:todo" },
+    };
+    const got = lines(renderTui(THREE, state, { color: false }));
+    expect(got[0]).toContain("view: open-tasks (type:task status:todo)");
+    expect(got[1]).toContain("todo (1)");
+    expect(got[1]).toContain("in_progress (0)");
+    expect(got.join("\n")).toContain("task-alpha");
+    expect(got.join("\n")).not.toContain("bug-beta");
+    expect(got.join("\n")).not.toContain("story-gamma");
+  });
+
+  it("the footer carries the view, the filter and the matched totals", () => {
+    const state = {
+      ...initialTuiState(240, 12),
+      filter: "alpha",
+      view: { name: "tasks", expr: "type:task" },
+    };
+    const footer = lines(renderTui(THREE, state, { color: false }))[11];
+    expect(footer).toContain("view: tasks");
+    expect(footer).toContain("filter: alpha");
+    expect(footer).toContain("1/3 match");
+  });
+
+  it("columns the lens empties render an (empty) mark under a 0 count", () => {
+    const state = { ...initialTuiState(200, 12), filter: "alpha" };
+    const got = lines(renderTui(THREE, state, { color: false }));
+    expect(got[1]).toContain("in_progress (0)");
+    expect(got[2]).toContain("(empty)");
+    // With color the mark is dim-wrapped (still pre-padded to the column width).
+    const colored = renderTui(THREE, state, { color: true });
+    expect(colored).toContain("\x1b[2m  (empty)");
+  });
+});
+
+describe("runTuiBoard saved views + filter verdict (task-tui-filter-language)", () => {
+  it("v applies the saved view, the prompt refuses an invalid expression inline", async () => {
+    const root = newTree();
+    writeFileSync(
+      join(root, "tasks/.convention.yml"),
+      'version: 0\nx-views:\n  open-tasks: "type:task status:todo"\n',
+      "utf8",
+    );
+    const term = fakeTerminal();
+    term.output.columns = 200;
+    const done = runTuiBoard({ cwd: root, input: term.input, output: term.output });
+    const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+    await wait(30);
+    term.input.write("v"); // saved view on
+    await wait(30);
+    term.input.write("v"); // saved view off again
+    await wait(30);
+    term.input.write("/"); // prompt
+    await wait(30);
+    term.input.write("status:bogus");
+    await wait(30);
+    term.input.write("\r"); // refused inline
+    await wait(60);
+    term.input.write("\x1b"); // cancel (past the 50ms esc-flush)
+    await wait(60);
+    term.input.write("r"); // repaint the cleared board (the reducer stays pure)
+    await wait(30);
+    term.input.write("q");
+    await done;
+    const text = term.outputText();
+    expect(text).toContain("view: open-tasks (type:task status:todo)");
+    const frames = text.split("\x1b[H\x1b[2J");
+    const viewFrame = frames.find((f) => f.includes("view: open-tasks")) ?? "";
+    expect(viewFrame).toContain("(empty)"); // in_progress emptied by the view
+    expect(viewFrame).toContain("T task-rate-limit");
+    expect(viewFrame).not.toContain("S story-login");
+    expect(viewFrame).toContain("1/6 match");
+    // The invalid expression is refused at the prompt with the kernel's error.
+    expect(text).toContain('unknown status "bogus"');
+    const refusalFrame = frames.find((f) => f.includes('unknown status "bogus"')) ?? "";
+    expect(refusalFrame).toContain("/status:bogus");
+    // Esc cancelled the prompt: the last frame is the plain board, no lens.
+    const last = frames[frames.length - 1] ?? "";
+    expect(last).not.toContain("esc to cancel");
+    expect(last).not.toContain("filter:");
+    expect(last).not.toContain("view: open-tasks");
   });
 });

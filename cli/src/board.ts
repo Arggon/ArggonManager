@@ -2,19 +2,28 @@ import { writeFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import {
   STATUSES,
+  aggregateReport,
   buildStatusIndex,
+  completedOf,
   findTasksDir,
   ghPrListJson,
   groupItemsBy,
+  isClaimable,
   loadItems,
   openDependencyIds,
+  priorityCounts,
   readConventionConfig,
   repoRootFromTasks,
   resolveCurrentLogin,
+  runShow,
+  showBoundedParts,
   sortById,
   statusCounts,
   toContractWorkItem,
   type ContractWorkItem as WorkItem,
+  type KernelWorkItem,
+  type PriorityCounts,
+  type ShowComment,
 } from "@arggondev/lib";
 
 export const DEFAULT_BOARD_FILE = "board.html";
@@ -37,6 +46,15 @@ export type BoardOptions = {
    * subprocess-free renders.
    */
   me?: string | null;
+  /**
+   * Static-export opt-in (task-board-static-details): embed a bounded
+   * per-item detail payload for every card, so the detail drawer works from
+   * the shared `board.html` artifact (`file://`, no server). Caps are the
+   * serve drawer's (`MAX_DETAIL_PROSE_BYTES` / `MAX_DETAIL_COMMENT_BYTES`,
+   * kernel comment tail) — see `buildBoardDetailMap`. Off by default: without
+   * the flag the export stays byte-identical and drawer-free.
+   */
+  details?: boolean;
 };
 
 export type BoardResult = {
@@ -47,6 +65,8 @@ export type BoardResult = {
   prCount: number;
   /** Set when the board was rendered grouped ("milestone" prototype, or "story"). */
   groupBy?: "milestone" | "story";
+  /** Embedded detail payload size in UTF-8 bytes (`--details` only). */
+  detailBytes?: number;
 };
 
 /** Live PR state for one branch, matched by head ref name. */
@@ -164,22 +184,37 @@ export function runBoard(opts: BoardOptions): BoardResult {
     lenses = {};
   }
   const me = opts.me !== undefined ? opts.me : (resolveCurrentLogin() ?? null);
-  const html = renderBoardHtml(
-    items.map((item) => toContractWorkItem(item, root)),
-    {
-      generatedAt: opts.generatedAt ?? new Date().toISOString(),
-      prs: overlay,
-      live: opts.github === true,
-      groupBy,
-      lenses,
-      me,
-    },
-  );
+  const contractItems = items.map((item) => toContractWorkItem(item, root));
+  // --details (task-board-static-details): one bounded payload per item, built
+  // from the ALREADY-LOADED items (kernel bounded read via showBoundedParts —
+  // no per-item tracker walk). The embedded JSON byte count is the measured
+  // payload figure the README quotes.
+  const detailMap = opts.details ? buildBoardDetailMap({ root, items, prs: overlay }) : undefined;
+  const detailBytes =
+    detailMap !== undefined ? Buffer.byteLength(embedJson(detailMap), "utf8") : undefined;
+  const html = renderBoardHtml(contractItems, {
+    generatedAt: opts.generatedAt ?? new Date().toISOString(),
+    prs: overlay,
+    live: opts.github === true,
+    groupBy,
+    lenses,
+    me,
+    // Summary header (task-board-progress-header): the kernel report
+    // aggregation over the already-loaded items — static and serve parity.
+    summary: buildBoardSummary(items),
+    details: opts.details === true,
+    staticDetails: detailMap,
+  });
   const outPath = opts.out ? resolve(opts.cwd, opts.out) : resolve(root, DEFAULT_BOARD_FILE);
   writeFileSync(outPath, html, "utf8");
-  return groupBy
-    ? { root, outPath, itemCount: items.length, prCount: overlay.size, groupBy }
-    : { root, outPath, itemCount: items.length, prCount: overlay.size };
+  return {
+    root,
+    outPath,
+    itemCount: items.length,
+    prCount: overlay.size,
+    ...(groupBy ? { groupBy } : {}),
+    ...(detailBytes !== undefined ? { detailBytes } : {}),
+  };
 }
 
 /**
@@ -656,8 +691,156 @@ export type BoardDetailPayload = {
 };
 
 /**
- * Serve-only drawer chrome (task-board-item-detail). Rendered only with
- * `details: true`; the static export stays lean and byte-identical without it.
+ * Per-item byte caps for the detail drawer (task-board-item-detail): the item
+ * body is prose that grows with the corpus, so it is clipped before it reaches
+ * the browser (ADR 0006 spirit). The prose cap also bounds the acceptance rows
+ * parsed from it; the comment cap applies per comment in the kernel tail
+ * (DEFAULT_TAIL_COMMENTS entries). `prose_truncated` / `comments[].truncated`
+ * tell the drawer to point at the item file. Both the serve route and the
+ * static `--details` embedding use these same caps.
+ */
+export const MAX_DETAIL_PROSE_BYTES = 8 * 1024;
+export const MAX_DETAIL_COMMENT_BYTES = 4 * 1024;
+
+/** Clip `text` to at most `maxBytes` UTF-8 bytes without splitting a code point. */
+export function clipDetailText(
+  text: string,
+  maxBytes: number,
+): { text: string; truncated: boolean } {
+  if (Buffer.byteLength(text, "utf8") <= maxBytes) return { text, truncated: false };
+  let bytes = 0;
+  let clipped = "";
+  for (const ch of text) {
+    const size = Buffer.byteLength(ch, "utf8");
+    if (bytes + size > maxBytes) break;
+    clipped += ch;
+    bytes += size;
+  }
+  return { text: clipped, truncated: true };
+}
+
+/** Read-only acceptance rows: `- [ ]`/`- [x]` lines of the item prose. */
+export function parseAcceptanceRows(prose: string): Array<{ text: string; checked: boolean }> {
+  const rows: Array<{ text: string; checked: boolean }> = [];
+  for (const line of prose.split("\n")) {
+    const match = /^\s*[-*]\s+\[([ xX])\]\s+(.*)$/.exec(line);
+    if (match) rows.push({ text: match[2].trim(), checked: match[1].toLowerCase() === "x" });
+  }
+  return rows;
+}
+
+/** Bounded read parts of one item, in the kernel `show` shape. */
+type BoundedParts = { prose: string; allComments: ShowComment[]; comments: ShowComment[] };
+
+/**
+ * The one detail-payload assembly, shared by the serve route and the static
+ * embedding (task-board-static-details): clip the bounded prose, clip each
+ * tail comment, parse the acceptance rows from the CLIPPED prose, map
+ * dependencies through the shared status index (the ADR 0004 open/terminal
+ * rule; unknown ids count as open, exactly like the card's blocked-by line)
+ * and match the PR overlay snapshot. Pure: no reads beyond the inputs, no
+ * writes.
+ */
+function detailPayloadOf(
+  kernelItem: KernelWorkItem,
+  contractItem: WorkItem,
+  bounded: BoundedParts,
+  statusById: ReturnType<typeof buildStatusIndex>,
+  prs?: Map<string, PrInfo>,
+): BoardDetailPayload {
+  const prose = clipDetailText(bounded.prose, MAX_DETAIL_PROSE_BYTES);
+  const comments = bounded.comments.map((comment) => {
+    const clipped = clipDetailText(comment.lines.join("\n"), MAX_DETAIL_COMMENT_BYTES);
+    return {
+      date: comment.date,
+      author: comment.author,
+      text: clipped.text,
+      truncated: clipped.truncated,
+    };
+  });
+  const dependencies = kernelItem.dependsOn.map((depId) => {
+    const entry = statusById.get(depId);
+    const status = entry ? entry.status : null;
+    return { id: depId, status, terminal: status === "done" || status === "cancelled" };
+  });
+  return {
+    ok: true,
+    item: contractItem,
+    detail: {
+      prose: prose.text,
+      prose_truncated: prose.truncated,
+      acceptance: parseAcceptanceRows(prose.text),
+      comments,
+      hidden_comments: bounded.allComments.length - bounded.comments.length,
+      dependencies,
+      pr: contractItem.branch ? (prs?.get(contractItem.branch) ?? null) : null,
+    },
+  };
+}
+
+/**
+ * Assemble the `/api/item` payload through the kernel bounded read path:
+ * `runShow` (ADR 0006 — prose + the last `DEFAULT_TAIL_COMMENTS` comments,
+ * never the full body) plus the shared status index for dependency states.
+ * Pure read: no writes, no locks, no commit. `id` not found throws `runShow`'s
+ * message (the route maps it to 404). Cost: two kernel reads per request
+ * (O(n) over the tracker — `runShow` for the item, `loadItems` for the
+ * dependency index); the route is triggered by a user opening one drawer,
+ * never by the poll loop.
+ */
+export function buildBoardDetail(opts: {
+  cwd: string;
+  id: string;
+  /** Live PR overlay snapshot (branch -> PrInfo); absent = no PR data. */
+  prs?: Map<string, PrInfo>;
+}): BoardDetailPayload {
+  const shown = runShow({ cwd: opts.cwd, id: opts.id });
+  const statusById = buildStatusIndex(loadItems(findTasksDir(opts.cwd)));
+  return detailPayloadOf(
+    shown.item,
+    toContractWorkItem(shown.item, shown.root),
+    shown,
+    statusById,
+    opts.prs,
+  );
+}
+
+/**
+ * Detail payloads for EVERY item in one pass (task-board-static-details,
+ * `arggon board --details`): the same bounded payloads the serve route builds
+ * per drawer open, but assembled from the ALREADY-LOADED items through the
+ * kernel's `showBoundedParts` (the runShow compact math) so the export never
+ * re-walks the tracker per item. Same caps, same acceptance parsing, same
+ * dependency rule; `pr` comes from the caller's overlay snapshot (empty
+ * without `--github`, so the drawer's PR section degrades to the neutral
+ * badge). Pure: takes the loaded items, returns the embedded map.
+ */
+export function buildBoardDetailMap(opts: {
+  root: string;
+  /** Kernel items as returned by `loadItems` (each carries `dependsOn`, `body`). */
+  items: KernelWorkItem[];
+  /** PR overlay snapshot (branch -> PrInfo); absent = no PR data. */
+  prs?: Map<string, PrInfo>;
+}): Record<string, BoardDetailPayload> {
+  const statusById = buildStatusIndex(opts.items);
+  const map: Record<string, BoardDetailPayload> = {};
+  for (const kernelItem of opts.items) {
+    map[kernelItem.id] = detailPayloadOf(
+      kernelItem,
+      toContractWorkItem(kernelItem, opts.root),
+      showBoundedParts(kernelItem),
+      statusById,
+      opts.prs,
+    );
+  }
+  return map;
+}
+
+/**
+ * Drawer chrome (task-board-item-detail). Rendered only with `details: true`
+ * (`--serve`, or the static export's `--details` opt-in,
+ * task-board-static-details); the plain static export stays lean and
+ * byte-identical without it.
  */
 const DETAIL_CSS = `
 .card[tabindex="0"] { cursor: pointer; }
@@ -886,16 +1069,25 @@ export function renderBoardDetail(container: HTMLElement, payload: BoardDetailPa
 
 /**
  * Event wiring for the detail drawer. Embedded with `toString()` and invoked
- * as `wireBoardDetail(toast, renderBoardDetail)`; the two dependencies are
- * parameters so the function stays self-contained. Esc is captured on
- * `document` and stopped while the drawer is open, so it closes the drawer
- * before the filter input's own Escape-to-clear can run. Tab is trapped inside
- * the panel while the drawer is open (task-board-keyboard-a11y) and focus
- * returns to the opening card on close.
+ * as `wireBoardDetail(toast, renderBoardDetail, BOARD_DETAILS)`; the
+ * dependencies are parameters so the function stays self-contained. Esc is
+ * captured on `document` and stopped while the drawer is open, so it closes
+ * the drawer before the filter input's own Escape-to-clear can run. Tab is
+ * trapped inside the panel while the drawer is open
+ * (task-board-keyboard-a11y) and focus returns to the opening card on close.
+ *
+ * `embeddedDetails` is the static export's snapshot
+ * (task-board-static-details): when non-null the drawer renders the
+ * pre-embedded payload instead of fetching `/api/item`, so it works from
+ * `file://` with no server. An id missing from the snapshot (the card's item
+ * was deleted between export and view, or the export predates it) closes the
+ * drawer with a toast instead of a fetch error. Serve mode passes null and
+ * keeps the fetch path.
  */
 export function wireBoardDetail(
   toast: (message: string, kind?: string) => void,
   renderDetail: (container: HTMLElement, payload: BoardDetailPayload) => void,
+  embeddedDetails?: Record<string, BoardDetailPayload> | null,
 ): void {
   const drawer = document.getElementById("board-drawer");
   const body = document.getElementById("board-drawer-body");
@@ -929,8 +1121,26 @@ export function wireBoardDetail(
     drawerEl.setAttribute("aria-hidden", "false");
     drawerEl.setAttribute("data-item-id", id);
     document.body.classList.add("drawer-open");
-    bodyEl.textContent = "loading …";
     if (closeButton) closeButton.focus();
+    if (embeddedDetails) {
+      // Static snapshot (--details): the payload for every rendered card was
+      // embedded at generation time; there is no server to ask. Synchronous,
+      // so no stale-sequence race — but keep the guard for symmetry with the
+      // fetch path below.
+      if (current !== seq || drawerEl.hidden) return;
+      const payload = embeddedDetails[id];
+      if (payload) {
+        renderDetail(bodyEl, payload);
+        return;
+      }
+      close(true);
+      toast(
+        "item " + id + " is not in this static snapshot — re-run arggon board --details",
+        "refused",
+      );
+      return;
+    }
+    bodyEl.textContent = "loading …";
     const endpoint = document.body.getAttribute("data-detail-endpoint") || "/api/item";
     fetch(endpoint + "?id=" + encodeURIComponent(id))
       .then(function (res) {
@@ -1525,6 +1735,69 @@ export function wireBoardMovePrompt(): (
   return ask;
 }
 
+/** One epic row of the board summary: the report's per-epic completion. */
+export type BoardSummaryEpic = {
+  id: string;
+  title: string;
+  /** Completed leaves (kernel `completedOf`: done + cancelled). */
+  done: number;
+  /** All leaves under the epic's stories. */
+  total: number;
+};
+
+/** One blocked leaf of the board summary (kernel report's blocked list). */
+export type BoardSummaryBlocked = { id: string; reason: string };
+
+/**
+ * The summary header's payload (task-board-progress-header). Everything is
+ * computed at render from the already-loaded items through the kernel
+ * aggregation — the report's own `aggregateReport` (per-epic completion,
+ * blocked leaves with reasons), `statusCounts` (WIP) and `priorityCounts`
+ * (priority mix) — so no rule is copied. Bounded by construction: one row per
+ * epic, one entry per blocked leaf (reasons are the same strings the blocked
+ * cards already render), five priority buckets, two scalars. No per-item
+ * payload is embedded.
+ */
+export type BoardSummary = {
+  epics: BoardSummaryEpic[];
+  /** Claimable items (story/task/bug) in `in_progress`. */
+  wip: number;
+  blockedTotal: number;
+  blocked: BoardSummaryBlocked[];
+  /**
+   * Priority mix over OPEN claimable items (not todo/in_progress/blocked
+   * terminals): completed work's priority is not actionable. Buckets are the
+   * exact `p0`–`p3` tokens; unset and invalid tokens land in `none`
+   * (kernel `priorityCounts`).
+   */
+  priorities: PriorityCounts;
+};
+
+/**
+ * Compute the board summary from kernel items in one pass (static export and
+ * `--serve` alike — both callers hold the loaded items). Pure: reads nothing
+ * but the input.
+ */
+export function buildBoardSummary(items: KernelWorkItem[]): BoardSummary {
+  const { groups, blocked } = aggregateReport(items);
+  const claimable = items.filter((item) => isClaimable(item.type));
+  const openClaimable = claimable.filter(
+    (item) => item.status !== "done" && item.status !== "cancelled",
+  );
+  return {
+    epics: groups.map((group) => ({
+      id: group.epic.id,
+      title: group.epic.title,
+      done: completedOf(group.totals),
+      total: group.totals.total,
+    })),
+    wip: statusCounts(claimable).in_progress,
+    blockedTotal: blocked.length,
+    blocked: blocked.map((leaf) => ({ id: leaf.id, reason: leaf.blockedReason })),
+    priorities: priorityCounts(openClaimable),
+  };
+}
+
 /**
  * Pure renderer for the static board. Columns are the v0 statuses in enum
  * order; every card shows its own status (no rollup). All dynamic text is
@@ -1535,7 +1808,10 @@ export function wireBoardMovePrompt(): (
  * also has milestone items, so milestone-less columns render as before.
  * With `groupBy: "story"` (task-board-dependency-visuals) cards group under
  * parent-story headers sorted ascending; parent-less cards render last under
- * a "no story" header only when the column also has parent groups.
+ * a "no story" header only when the column also has parent groups. With
+ * `summary` (task-board-progress-header) each story group head also carries
+ * its completion fraction (done + cancelled over the group's cards, the
+ * kernel report's rule via `completedOf`).
  * With `live: true` (GitHub overlay) cards with a `branch` also render a PR
  * badge: state (open/draft/merged/closed) + checks summary; with
  * `diffLinks: true` (task-board-review-surface, --serve only) a second link
@@ -1553,11 +1829,25 @@ export function wireBoardMovePrompt(): (
  * caller resolves it, like `runList`). Both options are additive: without
  * `lenses` the chips container is absent and the board degrades to the plain
  * export plus the filter box.
- * With `details` (task-board-item-detail, serve-only) cards become focusable
- * (`tabindex`) and the page carries the drawer shell + client script that
- * fetches `/api/item?id=<id>` (kernel bounded read) and renders it as DOM
- * text nodes. Without the flag the static export is byte-identical to the
- * pre-drawer output: no drawer markup, no endpoint wiring, no extra script.
+ * With `summary` (task-board-progress-header) the header carries a compact
+ * rollup panel computed at render (kernel report aggregation — single source,
+ * no copied rules): per-epic completion (`done + cancelled`/total leaves),
+ * blocked count with reasons, the WIP count (claimable in `in_progress`) and
+ * the priority mix over open claimable items. Bounded: one row per epic, one
+ * entry per blocked leaf, five priority buckets — no per-item payload. It
+ * rolls up the WHOLE tracker at generation time; the lens filters cards, not
+ * the summary. `static + serve` parity: both callers always pass it. Without
+ * the option (direct renderBoardHtml callers) the panel is absent and the
+ * output is unchanged.
+ * With `details` (task-board-item-detail) cards become focusable (`tabindex`)
+ * and the page carries the drawer shell + client script that renders the item
+ * detail. Serve mode (`--serve`) fetches `/api/item?id=<id>` (kernel bounded
+ * read); the static export opts in with `--details` (task-board-static-details)
+ * and passes `staticDetails` — the same bounded payloads embedded at
+ * generation time (`buildBoardDetailMap`), so the drawer works from `file://`
+ * with no server. Without either flag the static export is byte-identical to
+ * the pre-drawer output: no drawer markup, no endpoint wiring, no extra
+ * script.
  * Column controls (task-board-column-controls) render on EVERY board — static
  * and serve: a per-column collapse toggle in each heading (the count badge
  * stays visible when collapsed), a filterbar toggle that hides the terminal
@@ -1600,6 +1890,24 @@ export function renderBoardHtml(
      * export included — renders named column landmarks and labeled cards.
      */
     details?: boolean;
+    /**
+     * Summary header (task-board-progress-header): the compact rollup panel
+     * (per-epic completion, blocked with reasons, WIP, priority mix) computed
+     * at render by `buildBoardSummary` from the kernel report aggregation.
+     * Static and serve pass it alike; without it (direct callers) the panel
+     * is absent and the output is unchanged.
+     */
+    summary?: BoardSummary;
+    /**
+     * Static-export detail payloads (`arggon board --details`,
+     * task-board-static-details): one bounded payload per rendered item from
+     * `buildBoardDetailMap`. When set together with `details`, the drawer
+     * renders the embedded snapshot instead of fetching `/api/item`, so the
+     * drawer works from `file://` with no server and no runtime dependencies.
+     * Serve mode passes no map (`BOARD_DETAILS = null`) and keeps the fetch.
+     * Without `details` the map is ignored and the export stays byte-identical.
+     */
+    staticDetails?: Record<string, BoardDetailPayload>;
   } = {
     generatedAt: "",
   },
@@ -1663,6 +1971,27 @@ export function renderBoardHtml(
         typeof item.parent === "string" && item.parent !== "" ? item.parent : NO_GROUP
     : (item: WorkItem): string | null => milestoneOf(item);
   const noGroupLabel = groupByStory ? "no story" : "no milestone";
+
+  // Story completion fractions (--group-by story, task-board-progress-header):
+  // per parent key over the WHOLE board (a story's cards span columns),
+  // through the kernel report's completion rule (completedOf: done +
+  // cancelled) — the same numbers `arggon report` prints, never a restated one.
+  const completionByParent = new Map<string, { done: number; total: number }>();
+  if (groupByStory) {
+    const byParent = new Map<string, WorkItem[]>();
+    for (const item of sorted) {
+      if (!item.parent) continue;
+      const list = byParent.get(item.parent) ?? [];
+      list.push(item);
+      byParent.set(item.parent, list);
+    }
+    for (const [parent, children] of byParent) {
+      completionByParent.set(parent, {
+        done: completedOf(statusCounts(children)),
+        total: children.length,
+      });
+    }
+  }
 
   // Roving tabindex (task-board-keyboard-a11y, serve mode): exactly one card
   // carries tabindex="0" and the rest -1, so Tab reaches the board once and the
@@ -1747,7 +2076,13 @@ export function renderBoardHtml(
         if (key === NO_GROUP && groups.length === 1) return body;
         const label = key === NO_GROUP ? noGroupLabel : `⚑ ${esc(key)}`;
         const cls = key === NO_GROUP ? "mgroup-head none" : "mgroup-head";
-        return `<div class="${cls}">${label}</div>\n${body}`;
+        // Completion fraction on story group heads only (task-board-progress-header):
+        // the report's done+cancelled over every card with that parent.
+        const fraction =
+          groupByStory && key !== NO_GROUP
+            ? ` <span class="completion">${completionByParent.get(key)?.done ?? 0}/${completionByParent.get(key)?.total ?? 0}</span>`
+            : "";
+        return `<div class="${cls}">${label}${fraction}</div>\n${body}`;
       })
       .join("\n");
     // Named landmark per column (task-board-keyboard-a11y): the section's
@@ -1765,6 +2100,20 @@ export function renderBoardHtml(
   const counts = STATUSES.map((status) => `${status}: ${statusTotals[status]}`).join(" · ");
   const repo = opts.repoName ? ` — ${esc(opts.repoName)}` : "";
   const live = showPr ? ` · live GitHub overlay (${prs.size} PR(s))` : "";
+
+  // Summary header (task-board-progress-header): one compact panel, every
+  // value escaped, no interactive elements (it is pure read-only rollup).
+  // Direct callers without `summary` skip the panel entirely — the plain
+  // render stays byte-identical.
+  const summary = opts.summary;
+  const summaryPanel = summary
+    ? `<section class="summary" id="board-summary" aria-label="progress summary">
+  <div class="summary-row"><span class="summary-k">epics</span><span class="summary-v" id="board-summary-epics">${summary.epics.length > 0 ? summary.epics.map((epic) => `<span class="epic" title="${esc(epic.title)}">${esc(epic.id)} ${epic.done}/${epic.total}</span>`).join("") : '<span class="sep">none</span>'}</span></div>
+  <div class="summary-row"><span class="summary-k">wip</span><span class="summary-v" id="board-summary-wip">${summary.wip}</span></div>
+  <div class="summary-row"><span class="summary-k">priority mix</span><span class="summary-v" id="board-summary-priorities">${(["p0", "p1", "p2", "p3", "none"] as const).map((bucket) => `${bucket} ${summary.priorities[bucket]}`).join('<span class="sep"> · </span>')}</span></div>
+  <div class="summary-row"><span class="summary-k">blocked</span><span class="summary-v" id="board-summary-blocked">${summary.blockedTotal}${summary.blocked.length > 0 ? ` — ${summary.blocked.map((entry) => `${esc(entry.id)}: ${esc(entry.reason)}`).join('<span class="sep"> · </span>')}` : ""}</span></div>
+</section>`
+    : "";
 
   return `<!doctype html>
 <html lang="en">
@@ -1865,6 +2214,10 @@ header .meta { color: #59636e; font-size: 13px; }
 .mgroup-head { margin: 10px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #0550ae; }
 .mgroup-head:first-child { margin-top: 0; }
 .mgroup-head.none { color: #666a6f; }
+/* Story completion fraction on group heads (task-board-progress-header): the
+   head's own #0550ae at normal weight, so the number reads as data, not as a
+   new category. #0550ae on #ebecf0 is the pair the head already renders. */
+.mgroup-head .completion { font-weight: 400; letter-spacing: 0; }
 .card[draggable="true"] { cursor: grab; }
 /* Mid-drag affordance (task-board-non-text-contrast-and-drag-affordance):
    the dragged card lifts instead of fading. The old "opacity: 0.5" composited
@@ -1903,6 +2256,17 @@ header .meta { color: #59636e; font-size: 13px; }
 #board-filter-input:focus { outline: 2px solid #0550ae; outline-offset: -1px; }
 #board-filter-clear { padding: 6px 10px; font-size: 12px; font-family: inherit; border: 1px solid #666a6f; border-radius: 6px; background: #fff; cursor: pointer; }
 .filter-count { font-size: 12px; color: #59636e; }
+/* Summary header (task-board-progress-header): the compact progress panel. It
+   sits on a white card against the body fill; the identifying edge is the
+   #666a6f border (#666a6f on #f4f5f7 is 4.99:1, the documented boundary
+   grey). Labels reuse the header's #59636e on #fff (5.45:1); values render in
+   the body text colour. No opacity, no interactive elements. */
+.summary { display: flex; flex-wrap: wrap; gap: 4px 22px; margin-top: 10px; padding: 8px 12px; background: #fff; border: 1px solid #666a6f; border-radius: 8px; font-size: 12px; }
+.summary-row { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.summary-k { color: #59636e; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; flex: 0 0 auto; }
+.summary-v { color: #1f2328; overflow-wrap: anywhere; }
+.summary-v .epic { margin-right: 10px; }
+.summary-v .sep { color: #59636e; }
 .filter-error { display: none; font-size: 12px; color: #cf222e; }
 .filter-error.show { display: inline; }
 .lenses { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -1916,8 +2280,9 @@ ${details ? DETAIL_CSS : ""}
 <header>
   <h1>arggon board${repo}</h1>
   <div class="meta">generated ${esc(opts.generatedAt)} · ${sorted.length} item(s) · <span id="status-counts">${counts}</span> · tracker files remain the source of truth; drops persist only against a live server (arggon board --serve)${live}</div>
+  ${summaryPanel}
 </header>
-<div class="filterbar" id="board-filterbar">
+<div class="filterbar" id="board-filterbar" role="search" aria-label="board filters">
   <label for="board-filter-input">filter</label>
   <input id="board-filter-input" type="search" autocomplete="off" spellcheck="false" placeholder="free text or field:value (type, status, label, assignee, priority, ancestor, parent, depends-on, blocked-by, ready)">
   <button type="button" id="board-filter-clear">clear</button>
@@ -1951,7 +2316,7 @@ ${details ? wireBoardMoveMenu.toString() : ""}
 (function () {
   var ENDPOINT = document.body.getAttribute("data-update-endpoint") || "/api/update";
   var BOARD_ITEMS = ${embedJson(lensItems)};
-  var BOARD_ME = ${embedJson(me)};
+  var BOARD_ME = ${embedJson(me)};${details ? `\n  var BOARD_DETAILS = ${embedJson(opts.staticDetails ?? null)};` : ""}
   // Roving focus anchor (serve mode): the filter re-seats the focusable card
   // when the current one gets hidden; null in the static export.
   var keyboardNav = ${details ? "wireBoardKeyboardNav()" : "null"};
@@ -2297,7 +2662,7 @@ ${details ? wireBoardMoveMenu.toString() : ""}
     }
     runMove(null);
   }
-  ${details ? "wireBoardDetail(toast, renderBoardDetail); wireBoardMoveMenu(attemptMove);" : ""}
+  ${details ? "wireBoardDetail(toast, renderBoardDetail, BOARD_DETAILS); wireBoardMoveMenu(attemptMove);" : ""}
   var askMoveValue = wireBoardMovePrompt();
 })();
 </script>

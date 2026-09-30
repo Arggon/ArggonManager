@@ -25,10 +25,18 @@ import {
   wireBoardKeyboardNav,
   wireBoardMoveMenu,
   wireBoardMovePrompt,
+  buildBoardSummary,
+  MAX_DETAIL_PROSE_BYTES,
   type BoardLensItem,
+  type BoardSummary,
 } from "./board.js";
-import type { BoardGithub, PrInfo } from "./board.js";
-import { type ContractWorkItem as WorkItem } from "@arggondev/lib";
+import type { BoardDetailPayload, BoardGithub, PrInfo } from "./board.js";
+import {
+  findTasksDir,
+  loadItems,
+  type ContractWorkItem as WorkItem,
+  type KernelWorkItem,
+} from "@arggondev/lib";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -716,6 +724,22 @@ describe("renderBoardHtml drag-and-drop", () => {
   });
 });
 
+describe("renderBoardHtml search landmark (task-axe-board-drawer-and-lens-coverage)", () => {
+  it("carries the filter bar as a named search landmark on every board", () => {
+    const html = renderBoardHtml(
+      [item({ id: "task-a", type: "task", status: "todo", title: "A" })],
+      { generatedAt: GENERATED_AT },
+    );
+    // The axe gate's `region` fix: the filter bar (label, input, count) sits in
+    // a role="search" landmark, so the page content is fully landmarked. The
+    // unit pin keeps a refactor from silently dropping the attribute between
+    // browser runs.
+    expect(html).toContain(
+      '<div class="filterbar" id="board-filterbar" role="search" aria-label="board filters">',
+    );
+  });
+});
+
 describe("renderBoardHtml non-text contrast (WCAG 1.4.11, task-board-non-text-contrast-and-drag-affordance)", () => {
   // axe has no automated rule for 1.4.11, so the @smoke lane cannot catch a
   // non-text regression. These assertions pin the decision on the rendered CSS
@@ -882,7 +906,10 @@ describe("renderBoardHtml item detail drawer (task-board-item-detail, serve-only
     expect(html).toContain('tabindex="0"');
     expect(html).toContain(renderBoardDetail.toString());
     expect(html).toContain(wireBoardDetail.toString());
-    expect(html).toContain("wireBoardDetail(toast, renderBoardDetail);");
+    // Serve mode embeds no snapshot map: BOARD_DETAILS is null and the drawer
+    // keeps the /api/item fetch path (task-board-static-details).
+    expect(html).toContain("var BOARD_DETAILS = null;");
+    expect(html).toContain("wireBoardDetail(toast, renderBoardDetail, BOARD_DETAILS);");
   });
 
   it("seeds the roving tabindex on exactly the first card (task-board-keyboard-a11y)", () => {
@@ -973,6 +1000,156 @@ describe("renderBoardHtml item detail drawer (task-board-item-detail, serve-only
     expect(renderBoardDetail.toString()).toContain("textContent");
     // PR links are only wired for absolute http(s) URLs.
     expect(renderBoardDetail.toString()).toContain("/^https?:\\/\\//");
+  });
+});
+
+describe("static export --details (task-board-static-details)", () => {
+  const items = [item({ id: "task-a", type: "task", status: "todo", title: "A" })];
+
+  function detailPayload(
+    overrides: Partial<BoardDetailPayload["detail"]> = {},
+    itemOverrides: Partial<WorkItem> = {},
+  ): BoardDetailPayload {
+    return {
+      ok: true,
+      item: item({ id: "task-a", type: "task", status: "todo", title: "A", ...itemOverrides }),
+      detail: {
+        prose: "body",
+        prose_truncated: false,
+        acceptance: [],
+        comments: [],
+        hidden_comments: 0,
+        dependencies: [],
+        pr: null,
+        ...overrides,
+      },
+    };
+  }
+
+  /** Extract and parse the embedded `var BOARD_DETAILS = {...};` snapshot. */
+  function embeddedDetails(html: string): Record<string, BoardDetailPayload> {
+    const line = html.split("\n").find((candidate) => candidate.includes("var BOARD_DETAILS = "));
+    expect(line).toBeDefined();
+    const json = line!.replace(/^.*var BOARD_DETAILS = /, "").replace(/;$/, "");
+    return JSON.parse(json) as Record<string, BoardDetailPayload>;
+  }
+
+  it("embeds the snapshot map and wires the drawer to it instead of the fetch", () => {
+    const html = renderBoardHtml(items, {
+      generatedAt: GENERATED_AT,
+      details: true,
+      staticDetails: { "task-a": detailPayload() },
+    });
+    expect(html).toContain('id="board-drawer"');
+    expect(html).toContain('tabindex="0"');
+    expect(html).toContain('var BOARD_DETAILS = {"task-a":');
+    expect(html).toContain("wireBoardDetail(toast, renderBoardDetail, BOARD_DETAILS);");
+    // The map's payload round-trips verbatim.
+    const parsed = embeddedDetails(html);
+    expect(parsed["task-a"].detail.prose).toBe("body");
+    // The client renders the snapshot without a server: no fetch endpoint is
+    // needed (the body attribute stays for the serve path only).
+    expect(wireBoardDetail.toString()).toContain("embeddedDetails[id]");
+  });
+
+  it("keeps the export byte-identical without the flag — even when a map is passed", () => {
+    const plain = renderBoardHtml(items, { generatedAt: GENERATED_AT });
+    const explicitOff = renderBoardHtml(items, { generatedAt: GENERATED_AT, details: false });
+    const mapWithoutFlag = renderBoardHtml(items, {
+      generatedAt: GENERATED_AT,
+      staticDetails: { "task-a": detailPayload() },
+    });
+    expect(explicitOff).toBe(plain);
+    expect(mapWithoutFlag).toBe(plain);
+    expect(plain).not.toContain("BOARD_DETAILS");
+    expect(plain).not.toContain("board-drawer");
+  });
+
+  it("embeds hostile detail text script-safely", () => {
+    const hostile = "</script><script>alert(1)</script>";
+    const html = renderBoardHtml(items, {
+      generatedAt: GENERATED_AT,
+      details: true,
+      staticDetails: {
+        "task-a": detailPayload({
+          prose: hostile,
+          comments: [{ date: "2026-09-07", author: '"><script>', text: hostile, truncated: false }],
+        }),
+      },
+    });
+    expect(html).not.toContain("<script>alert(1)");
+    const parsed = embeddedDetails(html);
+    expect(parsed["task-a"].detail.prose).toBe(hostile);
+    expect(parsed["task-a"].detail.comments[0].author).toBe('"><script>');
+  });
+
+  it("runBoard --details embeds clipped prose, the 3-comment tail and acceptance rows", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-details-"));
+    const { taskMd } = writeBranchedTree(dir);
+    const padded = "x".repeat(9 * 1024); // past MAX_DETAIL_PROSE_BYTES
+    const comments = [1, 2, 3, 4, 5]
+      .map((n) => `### 2026-09-0${n} @user${n}\ncomment ${n}\n`)
+      .join("\n");
+    const previous = readFileSync(taskMd, "utf8");
+    const frontmatterEnd = previous.indexOf("---", 1);
+    writeFileSync(
+      taskMd,
+      `${previous.slice(0, frontmatterEnd + 3)}\n\n# Task One\n\n## Acceptance\n\n- [x] done row\n- [ ] open row\n\n${padded}\n\n${comments}`,
+      "utf8",
+    );
+    const result = runBoard({
+      cwd: dir,
+      out: "out.html",
+      generatedAt: GENERATED_AT,
+      me: null,
+      details: true,
+    });
+    expect(result.detailBytes).toBeGreaterThan(0);
+    const html = readFileSync(result.outPath, "utf8");
+    expect(html).toContain('id="board-drawer"');
+    const payloads = embeddedDetails(html);
+    // Every rendered item gets a payload — initiatives and stories included.
+    expect(Object.keys(payloads).sort()).toEqual(["launch", "story-a", "task-one"]);
+    const detail = payloads["task-one"].detail;
+    // Prose is clipped at the documented per-item cap...
+    expect(detail.prose_truncated).toBe(true);
+    expect(Buffer.byteLength(detail.prose, "utf8")).toBeLessThanOrEqual(MAX_DETAIL_PROSE_BYTES);
+    // ...acceptance rows are parsed from the clipped prose...
+    expect(detail.acceptance).toEqual([
+      { text: "done row", checked: true },
+      { text: "open row", checked: false },
+    ]);
+    // ...and comments are the kernel tail (last 3 of 5).
+    expect(detail.comments.map((comment) => comment.text)).toEqual([
+      "comment 3",
+      "comment 4",
+      "comment 5",
+    ]);
+    expect(detail.hidden_comments).toBe(2);
+    expect(detail.pr).toBeNull();
+    // detailBytes is the exact embedded JSON size (the README payload figure).
+    const line = html.split("\n").find((candidate) => candidate.includes("var BOARD_DETAILS = "));
+    const json = line!.replace(/^.*var BOARD_DETAILS = /, "").replace(/;$/, "");
+    expect(result.detailBytes).toBe(Buffer.byteLength(json, "utf8"));
+  });
+
+  it("runBoard without --details keeps the export drawer-free and byte-identical (regression)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-nodetails-"));
+    writeBranchedTree(dir);
+    const plain = runBoard({ cwd: dir, out: "plain.html", generatedAt: GENERATED_AT, me: null });
+    const explicit = runBoard({
+      cwd: dir,
+      out: "explicit.html",
+      generatedAt: GENERATED_AT,
+      me: null,
+      details: false,
+    });
+    expect(readFileSync(explicit.outPath, "utf8")).toBe(readFileSync(plain.outPath, "utf8"));
+    expect(plain.detailBytes).toBeUndefined();
+    const html = readFileSync(plain.outPath, "utf8");
+    expect(html).not.toContain("BOARD_DETAILS");
+    expect(html).not.toContain("board-drawer");
+    expect(html).not.toContain("/api/item");
   });
 });
 
@@ -1226,8 +1403,10 @@ describe("renderBoardHtml --group-by story (task-board-dependency-visuals)", () 
       ],
       { generatedAt: GENERATED_AT, groupBy: "story" },
     );
-    expect(html).toContain('<div class="mgroup-head">⚑ story-a</div>');
-    expect(html).toContain('<div class="mgroup-head">⚑ story-b</div>');
+    // Group heads carry the story completion fraction (task-board-progress-header):
+    // story-a 0/2 (two todo cards), story-b 1/2 (done task-z counts, done card + todo).
+    expect(html).toContain('⚑ story-a <span class="completion">0/2</span>');
+    expect(html).toContain('⚑ story-b <span class="completion">1/2</span>');
     expect(html.indexOf("⚑ story-a")).toBeLessThan(html.indexOf("⚑ story-b"));
     expect(html).toContain('<div class="mgroup-head none">no story</div>');
     // "no story" renders last within its column.
@@ -1253,6 +1432,119 @@ describe("renderBoardHtml --group-by story (task-board-dependency-visuals)", () 
     );
     expect(html).toContain("⚑ &quot;&gt;&lt;script&gt;");
     expect(html).not.toContain('"><script>');
+  });
+
+  it("shows the report's completion fraction on story group heads (task-board-progress-header)", () => {
+    const html = renderBoardHtml(
+      [
+        item({ id: "task-a", type: "task", status: "done", parent: "story-a" }),
+        item({ id: "task-b", type: "task", status: "cancelled", parent: "story-a" }),
+        item({ id: "task-c", type: "task", status: "todo", parent: "story-a" }),
+        item({ id: "task-d", type: "task", status: "in_progress", parent: "story-b" }),
+        item({ id: "task-e", type: "task", status: "todo" }),
+      ],
+      { generatedAt: GENERATED_AT, groupBy: "story" },
+    );
+    // done + cancelled over the whole group (the kernel report's rule): story-a
+    // 2/3, story-b 0/1. Fractions count cards across ALL columns.
+    expect(html).toContain('⚑ story-a <span class="completion">2/3</span>');
+    expect(html).toContain('⚑ story-b <span class="completion">0/1</span>');
+    // The key-less head carries no fraction.
+    expect(html).toContain('<div class="mgroup-head none">no story</div>');
+  });
+
+  it("renders no fraction under milestone grouping (fraction is a story-group feature)", () => {
+    const html = renderBoardHtml(
+      [
+        item({ id: "task-a", type: "task", status: "done", parent: "story-a", milestone: "M1" }),
+        item({ id: "task-b", type: "task", status: "todo", parent: "story-a", milestone: "M1" }),
+      ],
+      { generatedAt: GENERATED_AT, groupBy: "milestone" },
+    );
+    expect(html).toContain('<div class="mgroup-head">⚑ M1</div>');
+    expect(html).not.toContain('class="completion"');
+  });
+});
+
+describe("renderBoardHtml summary header (task-board-progress-header)", () => {
+  const items = [item({ id: "task-a", type: "task", status: "todo", title: "A" })];
+  const summary: BoardSummary = {
+    epics: [{ id: "epic-a", title: "Epic A", done: 3, total: 7 }],
+    wip: 2,
+    blockedTotal: 1,
+    blocked: [{ id: "bug-b", reason: "Waiting on OAuth credentials" }],
+    priorities: { p0: 1, p1: 0, p2: 2, p3: 4, none: 30 },
+  };
+
+  it("renders the rollup panel: per-epic completion, WIP, priority mix, blocked with reasons", () => {
+    const html = renderBoardHtml(items, { generatedAt: GENERATED_AT, summary });
+    expect(html).toContain(
+      '<section class="summary" id="board-summary" aria-label="progress summary">',
+    );
+    expect(html).toContain('<span class="epic" title="Epic A">epic-a 3/7</span>');
+    expect(html).toContain('id="board-summary-wip">2</span>');
+    expect(html).toContain("p0 1");
+    expect(html).toContain('id="board-summary-priorities">p0 1<span class="sep"> · </span>p1 0');
+    expect(html).toContain("none 30");
+    // Blocked: the count and the reason text (what the card already shows).
+    expect(html).toContain(
+      'id="board-summary-blocked">1 — bug-b: Waiting on OAuth credentials</span>',
+    );
+  });
+
+  it("escapes hostile epic ids/titles and blocked reasons", () => {
+    const hostile: BoardSummary = {
+      epics: [{ id: "<script>", title: "</script><script>alert(1)</script>", done: 0, total: 1 }],
+      wip: 0,
+      blockedTotal: 1,
+      blocked: [{ id: "bug-x", reason: '" onmouseover="alert(1)' }],
+      priorities: { p0: 0, p1: 0, p2: 0, p3: 0, none: 1 },
+    };
+    const html = renderBoardHtml(items, { generatedAt: GENERATED_AT, summary: hostile });
+    expect(html).not.toContain("<script>alert(1)");
+    expect(html).not.toContain('" onmouseover=');
+    expect(html).toContain("&lt;script&gt; 0/1");
+    expect(html).toContain("bug-x: &quot; onmouseover=&quot;alert(1)");
+  });
+
+  it("degrades to zeros/none for an empty tracker and stays out without the option", () => {
+    const empty: BoardSummary = {
+      epics: [],
+      wip: 0,
+      blockedTotal: 0,
+      blocked: [],
+      priorities: { p0: 0, p1: 0, p2: 0, p3: 0, none: 0 },
+    };
+    const html = renderBoardHtml([], { generatedAt: GENERATED_AT, summary: empty });
+    expect(html).toContain('id="board-summary-epics"><span class="sep">none</span>');
+    expect(html).toContain('id="board-summary-blocked">0</span>');
+
+    const plain = renderBoardHtml([], { generatedAt: GENERATED_AT });
+    expect(plain).not.toContain("board-summary");
+    expect(plain).not.toContain('class="summary"');
+  });
+
+  it("buildBoardSummary computes from the kernel aggregation on a fixture tree", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-summary-"));
+    writeBranchedTree(dir);
+    // writeBranchedTree: launch (initiative) -> story-a (in_progress) -> task-one
+    // (in_progress, claimable). Both claimable items are open and unprioritized;
+    // the tree has no epic, so the epics row degrades to none.
+    const summary = buildBoardSummary(loadItems(findTasksDir(dir)) as KernelWorkItem[]);
+    expect(summary.epics).toEqual([]);
+    expect(summary.wip).toBe(2);
+    expect(summary.blockedTotal).toBe(0);
+    expect(summary.blocked).toEqual([]);
+    expect(summary.priorities).toEqual({ p0: 0, p1: 0, p2: 0, p3: 0, none: 2 });
+  });
+
+  it("runBoard renders the summary panel on the static export (static + serve parity)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-summary-static-"));
+    writeBranchedTree(dir);
+    const result = runBoard({ cwd: dir, out: "out.html", generatedAt: GENERATED_AT, me: null });
+    const html = readFileSync(result.outPath, "utf8");
+    expect(html).toContain('id="board-summary"');
+    expect(html).toContain('id="board-summary-wip">2</span>');
   });
 });
 

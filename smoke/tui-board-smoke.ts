@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * task-ui-browser-smoke-ci / task-tui-detail-pane / task-tui-live-refresh /
- * task-tui-sort-ready-lens: model-free TUI frame check.
+ * task-tui-sort-ready-lens / task-tui-filter-language: model-free TUI frame
+ * check.
  *
  * `arggon board --tui` is interactive and no browser automation applies
  * (ADR 0008: the TUI smoke is a scripted pty render check). This harness runs
@@ -10,15 +11,26 @@
  * (five status headers + the seeded item id + the footer freshness stamp) →
  * a new item created BEHIND the running board (no keypress — the debounced
  * tree watcher must repaint it in place) → the ready-only lens hides the
- * seeded blocked card (`l` … `l`) and `s` cycles the card order (priority,
+ * seeded blocked card (`L` … `L`) and `s` cycles the card order (priority,
  * then next: the p1 card leads the todo column) → `/` filter down to the
  * seeded task → Enter opens its read-only detail pane (acceptance rows + body) →
  * PgDn scrolls the pane, DELIVERED AS TWO PTY WRITES so the escape sequence
  * is split across stdin chunks (bug-tui-split-escape-sequences: the decoder
  * must reassemble it instead of leaking a phantom Esc that closes the pane
  * and clears the filter) → Esc returns to the board with the same selection
- * and filter → q. A regression net for the raw-ANSI renderer without a model
- * in the loop.
+ * and filter → `j` moves the selection like the arrow (task-tui-help-vim-keys)
+ * → `?` opens the help overlay (every key, grouped) and Esc closes it →
+ * Esc clears the lens → `v` applies the seeded saved view (the
+ * header names it, columns it empties carry the `(empty)` mark, the footer
+ * counts the matches) → `v` cycles back → an invalid filter expression is
+ * refused inline at the prompt (`status:bogus` stays unapplied with the
+ * kernel's error, task-tui-filter-language) → Esc cancels → the WRITE actions
+ * (task-tui-actions-parity): the filter re-pins the seeded task and `c` claims
+ * it through the assignee prompt (the applied frame names the claim) and `m`
+ * moves it through the legal-target menu + `y/N` confirm (the applied frame
+ * names the transition) — both through the kernel `runUpdate` on the real
+ * fixture files → q. A regression net for the raw-ANSI renderer without a
+ * model in the loop.
  *
  * Bounded by design. Exit codes: 0 — passed or `skipped:` (util-linux `script`
  * unavailable); 1 — a check failed (the fixture is kept).
@@ -66,6 +78,16 @@ export const SEEDED_BLOCKED_ITEM_ID = "task-chained";
 
 /** The footer freshness stamp the loop renders once data has been read. */
 export const FRESHNESS_STAMP_PATTERN = /updated \d{2}:\d{2}:\d{2}/;
+
+/**
+ * The saved view seeded into the fixture's tracker `.convention.yml`
+ * (task-tui-filter-language): the `v` cycle must apply it — the header names
+ * it with its expression, columns it empties carry the `(empty)` mark and the
+ * footer counts the matches (4 todo tasks of 7 items).
+ */
+export const SEEDED_VIEW_NAME = "open-tasks";
+export const SEEDED_VIEW_EXPR = "type:task status:todo";
+export const SEEDED_VIEW_MATCH = "4/7 match";
 
 /** The v0 statuses whose column headers the TUI must render. */
 export const TUI_STATUS_HEADERS = ["todo", "in_progress", "blocked", "done", "cancelled"];
@@ -212,6 +234,11 @@ function createFixture(): string {
   if (dep.status !== 0) {
     throw new Error(`arggon update (chained dep) failed: ${dep.stdout ?? ""}${dep.stderr ?? ""}`);
   }
+  // Saved views (task-tui-filter-language): the `v` cycle needs an x-views
+  // entry in the tracker .convention.yml — appended to the generated file.
+  const convention = findConventionFile(fixture);
+  if (convention === null) throw new Error("tracker .convention.yml not found in the fixture");
+  writeFileSync(convention, `x-views:\n  ${SEEDED_VIEW_NAME}: "${SEEDED_VIEW_EXPR}"\n`, "utf8");
   return fixture;
 }
 
@@ -225,6 +252,24 @@ function findItemFile(root: string, itemId: string): string | null {
       const full = join(dir, entry.name);
       if (entry.isDirectory()) stack.push(full);
       else if (entry.name === `${itemId}.md`) return full;
+    }
+  }
+  return null;
+}
+
+/** Recursively find the tracker `.convention.yml` in the fixture. */
+function findConventionFile(root: string): string | null {
+  const stack = [root];
+  while (stack.length > 0) {
+    const dir = stack.pop()!;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      // .convention.yml is a dotfile by name; everything else dotted (.git)
+      // stays out of the walk.
+      if (entry.name.startsWith(".") && entry.name !== ".convention.yml") continue;
+      if (entry.name === "node_modules") continue;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) stack.push(full);
+      else if (entry.name === ".convention.yml") return full;
     }
   }
   return null;
@@ -333,14 +378,14 @@ function runTui(fixture: string): Promise<{ capture: string; steps: StepResult[]
       {
         label: "live refresh: item created behind the board appears without a keypress",
         until: (capture) => lastFrame(capture).includes(`T ${SEEDED_LIVE_ITEM_ID}`),
-        send: "l", // toggle the ready-only lens
+        send: "L", // toggle the ready-only lens
       },
       {
         label: "ready lens: header shows ready-only, the blocked card is hidden",
         until: (capture) =>
           lastFrame(capture).includes("ready-only") &&
           !lastFrame(capture).includes(`T ${SEEDED_BLOCKED_ITEM_ID}`),
-        send: "l", // lens off again
+        send: "L", // lens off again
       },
       {
         label: "lens off: the blocked card is back (with its ⌫ marker)",
@@ -409,6 +454,159 @@ function runTui(fixture: string): Promise<{ capture: string; steps: StepResult[]
         until: (capture) =>
           isBoardFrame(lastFrame(capture), SEEDED_ITEM_ID) &&
           lastFrame(capture).includes(`filter: ${SEEDED_ITEM_ID}`),
+        send: "j", // vim down: the selection moves within the column
+      },
+      {
+        label: "vim j moved the selection (the filtered board has one card: still on it)",
+        until: (capture) => isBoardFrame(lastFrame(capture), SEEDED_ITEM_ID),
+        send: "?", // help overlay
+      },
+      {
+        label: "help overlay: grouped key list over the board",
+        until: (capture) =>
+          lastFrame(capture).includes("arggon board --tui — keys") &&
+          lastFrame(capture).includes("navigation") &&
+          lastFrame(capture).includes("quit"),
+        send: "\x1b", // esc closes the overlay
+      },
+      {
+        label: "esc closed the overlay, board back with the same filter",
+        until: (capture) =>
+          !lastFrame(capture).includes("arggon board --tui — keys") &&
+          lastFrame(capture).includes(`filter: ${SEEDED_ITEM_ID}`),
+        send: "\x1b", // Esc: clear the lens (filter goes with it)
+      },
+      {
+        label: "esc clears the filter",
+        until: (capture) =>
+          lastFrame(capture).includes("arggon board --tui ·") &&
+          !lastFrame(capture).includes("filter:"),
+        send: "v", // apply the seeded saved view
+      },
+      {
+        label: "saved view applied: header names it, non-todo columns emptied, totals counted",
+        until: (capture) =>
+          lastFrame(capture).includes(`view: ${SEEDED_VIEW_NAME} (${SEEDED_VIEW_EXPR})`) &&
+          lastFrame(capture).includes(SEEDED_VIEW_MATCH),
+        send: "v", // cycle back to no view
+      },
+      {
+        label: "v cycles back to no view (full board again)",
+        until: (capture) =>
+          !lastFrame(capture).includes(`view: ${SEEDED_VIEW_NAME}`) &&
+          lastFrame(capture).includes("arggon board --tui · 7 item(s)"),
+        send: "/", // open the search prompt for the refusal check
+      },
+      {
+        label: "search prompt open",
+        until: (capture) => lastFrame(capture).includes("esc to cancel"),
+        send: "status:bogus", // an invalid enum value
+      },
+      {
+        label: "invalid draft typed at the prompt",
+        until: (capture) => lastFrame(capture).includes("/status:bogus█"),
+        send: "\r", // enter: the loop's verdict must refuse it
+      },
+      {
+        label: "invalid expression refused inline at the prompt",
+        until: (capture) =>
+          lastFrame(capture).includes("/status:bogus") &&
+          lastFrame(capture).includes('unknown status "bogus"'),
+        send: "\x1b", // cancel the prompt
+      },
+      {
+        label: "esc cancels the refused prompt, board unchanged",
+        until: (capture) =>
+          !lastFrame(capture).includes("esc to cancel") &&
+          !lastFrame(capture).includes("█") &&
+          !lastFrame(capture).includes("filter:"),
+        send: "/", // re-open the filter prompt to pin the claim target
+      },
+      {
+        label: "filter prompt open for the claim target",
+        until: (capture) => lastFrame(capture).includes("esc to cancel"),
+        send: "task-board-task", // free-text token on the seeded id
+      },
+      {
+        label: "claim-target filter draft typed",
+        until: (capture) => lastFrame(capture).includes("/task-board-task█"),
+        send: "\r", // apply: the seeded task is the only visible card again
+      },
+      {
+        label: "claim target re-filtered (selection pinned to the seeded task)",
+        until: (capture) =>
+          isBoardFrame(lastFrame(capture), SEEDED_ITEM_ID) &&
+          lastFrame(capture).includes(`filter: ${SEEDED_ITEM_ID}`),
+        send: "c", // claim flow for the selected (and filtered) seeded task
+      },
+      {
+        label: "claim prompt open with the assignee field",
+        until: (capture) => lastFrame(capture).includes("claim task-"),
+        // Clear the environment-dependent prefill for a deterministic login.
+        send: "\x7f".repeat(64),
+      },
+      {
+        label: "prefill cleared",
+        until: (capture) => lastFrame(capture).includes("claim task-board-task: █"),
+        send: "smoke", // a login for the fixture
+      },
+      {
+        label: "claim typed",
+        until: (capture) => lastFrame(capture).includes(": smoke█"),
+        send: "\r", // stage the write
+      },
+      {
+        label: "claim confirm names the exact write",
+        until: (capture) =>
+          lastFrame(capture).includes("apply task-") &&
+          lastFrame(capture).includes("-> in_progress (assignee smoke)"),
+        send: "y", // apply through the kernel
+      },
+      {
+        label: "claim applied: the card shows the @smoke owner",
+        until: (capture) =>
+          lastFrame(capture).includes("claimed ") && lastFrame(capture).includes("@smoke"),
+        // The write moved the card to the in_progress column; follow it.
+        send: "\x1b[C",
+      },
+      {
+        label: "selection follows the claimed card into in_progress",
+        until: (capture) => lastFrame(capture).includes("\x1b[1;7min_progress (1)"),
+        send: "m", // move flow for the (now claimed) task
+      },
+      {
+        label: "move menu lists the legal targets of in_progress",
+        until: (capture) => lastFrame(capture).includes("(in_progress): [1] todo"),
+        send: "2", // second legal target: blocked (enum order todo, blocked, ...)
+      },
+      {
+        label: "blocked move demands a reason",
+        until: (capture) => lastFrame(capture).includes("blocked reason for task-"),
+        send: "waiting on the smoke fixture",
+      },
+      {
+        label: "reason typed",
+        until: (capture) => lastFrame(capture).includes(": waiting on the smoke fixture█"),
+        send: "\r",
+      },
+      {
+        label: "move confirm names the exact write",
+        until: (capture) =>
+          lastFrame(capture).includes("-> blocked") &&
+          lastFrame(capture).includes("(reason: waiting on the smoke fixture)"),
+        send: "y", // apply through the kernel
+      },
+      {
+        label: "move applied: the board re-read the item into the blocked column",
+        until: (capture) =>
+          lastFrame(capture).includes("-> blocked") && lastFrame(capture).includes("blocked (1)"),
+        send: "r", // refresh: clears the message and repaints with the stamp
+      },
+      {
+        label: "refresh repaints the moved board (freshness stamp of the post-write read)",
+        until: (capture) =>
+          FRESHNESS_STAMP_PATTERN.test(lastFrame(capture)) &&
+          lastFrame(capture).includes("blocked (1)"),
         send: "q", // quit
       },
     ];
@@ -534,6 +732,25 @@ async function main(): Promise<void> {
       "the priority/next sorts lead the todo column with the p1 card",
       sortStep?.ok === true,
       sortStep?.frame,
+    ) && passed;
+  const viewStep = steps.find((step) => step.label.startsWith("saved view applied"));
+  passed =
+    check(
+      "the saved view narrows the board, names itself in the header and counts the matches",
+      viewStep?.ok === true &&
+        viewStep.frame.includes("(empty)") && // non-todo columns emptied by the view
+        !viewStep.frame.includes("S entries") && // the story card is filtered out
+        !viewStep.frame.includes("I tui-smoke"), // the initiative card too
+      viewStep?.frame,
+    ) && passed;
+  const refusalStep = steps.find((step) => step.label.startsWith("invalid expression refused"));
+  passed =
+    check(
+      "an invalid filter expression is refused inline at the prompt (never applied)",
+      refusalStep?.ok === true &&
+        refusalStep.frame.includes("/status:bogus") &&
+        refusalStep.frame.includes('unknown status "bogus"'),
+      refusalStep?.frame,
     ) && passed;
   passed =
     check(

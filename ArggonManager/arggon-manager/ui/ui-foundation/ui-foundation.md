@@ -1,13 +1,14 @@
 ---
 type: story
-status: todo
+status: done
 id: ui-foundation
 title: "UI foundation: shared board view-model and browser smoke gate"
+assignee: Arggon
 parent: ui
 labels: [ui, architecture, smoke]
 priority: p2
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/ui-foundation.md (story index; required).
@@ -22,7 +23,6 @@ updated: "2026-09-22"
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 
@@ -35,7 +35,7 @@ Separately, ADR 0008 tier 2 (an optional CI `@smoke` Playwright spec) was decide
 
 ## Acceptance
 
-- [ ] `task-ui-shared-viewmodel` done: one pure view-model consumed by all three surfaces, no behavior change
-- [ ] `task-ui-browser-smoke-ci` done: `@smoke`-tagged browser spec runs in CI (Chromium-only, dev-only dependency)
-- [ ] No new runtime dependency; a cross-cutting lib contract change would need an ADR (none expected here)
-- [ ] `npm run check:plugin` + `npm test` green
+- [x] `task-ui-shared-viewmodel` done: one pure view-model consumed by all three surfaces, no behavior change
+- [x] `task-ui-browser-smoke-ci` done: `@smoke`-tagged browser spec runs in CI (Chromium-only, dev-only dependency)
+- [x] No new runtime dependency; a cross-cutting lib contract change would need an ADR (none expected here)
+- [x] `npm run check:plugin` + `npm test` green

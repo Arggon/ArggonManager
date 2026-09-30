@@ -1,13 +1,14 @@
 ---
 type: story
-status: todo
+status: done
 id: ui-native-panel-v2
 title: "OpenCode board panel v2: interactive and live"
+assignee: Arggon
 parent: ui
 labels: [opencode-seam, tui, ui]
 priority: p2
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-native-panel-v2/ui-native-panel-v2.md (story index; required).
@@ -22,7 +23,6 @@ updated: "2026-09-22"
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 
@@ -33,7 +33,7 @@ updated: "2026-09-22"
 
 ## Acceptance
 
-- [ ] Child tasks done with their checklists honest
-- [ ] The panel stays display-only except where a spec authorizes actions; any action goes through the kernel rules (no write path bypass)
-- [ ] `npm run smoke:tui` extended for the new interactions (slot crash isolation preserved)
-- [ ] docs/playbooks/opencode.md § TUI and the manual checklist updated
+- [x] Child tasks done with their checklists honest
+- [x] The panel stays display-only except where a spec authorizes actions; any action goes through the kernel rules (no write path bypass)
+- [x] `npm run smoke:tui` extended for the new interactions (slot crash isolation preserved)
+- [x] docs/playbooks/opencode.md § TUI and the manual checklist updated

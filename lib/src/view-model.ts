@@ -42,11 +42,14 @@ import {
   buildBlockedByIndex,
   matchesPredicate,
   parseFilter,
+  splitFilterTokens,
+  unquoteFilterValue,
+  type FilterPredicate,
 } from "./filter.js";
-import type { ItemType } from "./ids.js";
+import { isItemType, ITEM_TYPES, type ItemType } from "./ids.js";
 import { downstreamWeight, isReady, openDependencies } from "./next.js";
-import { isPriority, priorityRank } from "./priority.js";
-import { isClaimable, STATUSES, type Status } from "./status.js";
+import { isPriority, PRIORITIES, priorityRank, type Priority } from "./priority.js";
+import { isClaimable, isStatus, STATUSES, type Status } from "./status.js";
 
 /**
  * Id → status lookup the dependency and readiness rules consume
@@ -190,6 +193,32 @@ export function statusCounts<T extends { status: Status }>(
   const counts = {} as Record<Status, number>;
   for (const status of STATUSES) counts[status] = 0;
   for (const item of items) counts[item.status] += 1;
+  return counts;
+}
+
+/** Item counts per priority bucket, every bucket present (zero-filled). */
+export type PriorityCounts = Record<Priority | "none", number>;
+
+/**
+ * Item counts per priority bucket (the board summary's priority mix,
+ * task-board-progress-header): `p0`–`p3` by exact frontmatter token, every
+ * other value — unset or a hand-edited invalid token (validate flags it as
+ * `PRIORITY_INVALID`) — lands in `none`. Deliberately not `priorityTier`'s
+ * ordering rule (invalid orders with `p3` there): a mix answers "how is the
+ * work prioritized", so an unprioritized/invalid item must not inflate p3.
+ * Zero-filled and pure.
+ */
+export function priorityCounts<T extends { priority?: string | null }>(
+  items: readonly T[],
+): PriorityCounts {
+  const counts: PriorityCounts = { p0: 0, p1: 0, p2: 0, p3: 0, none: 0 };
+  for (const item of items) {
+    counts[
+      item.priority !== null && item.priority !== undefined && isPriority(item.priority)
+        ? item.priority
+        : "none"
+    ] += 1;
+  }
   return counts;
 }
 
@@ -407,4 +436,132 @@ export function applyViewLens<T extends ViewItem>(items: readonly T[], lens: Vie
     );
   });
   return lens.sort === "priority" ? sortByPriority(kept) : sortById(kept);
+}
+
+/** Verdict of one display-filter expression: the kept items, or the refusal message. */
+export type ViewFilterVerdict<T> = { ok: true; items: T[] } | { ok: false; error: string };
+
+/**
+ * One display-filter expression over already-loaded items — the interactive
+ * surface of the filter language (the TUI board prompt, task-tui-filter-language):
+ * the kernel grammar (`parseFilter`/`matchesPredicate`, ALL documented
+ * predicates — the caller holds whole-tree contract items, so `parent:`,
+ * `depends-on:` and `blocked-by:` work here) extended with free text: a token
+ * without a `field:` prefix is a case-insensitive substring on id/title, ANDed
+ * with the predicates (the same extension the HTML board lens documents). A
+ * `!`-prefixed bare token is refused, like the board lens.
+ *
+ * Per-token parse through the kernel parser (`parseFilter(token)`), so quoting,
+ * negation, unknown fields and empty values carry the kernel's exact error
+ * messages; type/status/priority values are validated like `runList` (same
+ * messages), and `assignee:@me` resolves through `opts.me` (pre-resolved) or
+ * `opts.resolveMe` (lazy), runList's "@me is the caller's job" rule — an
+ * unresolvable `@me` is a refusal, never a silent match-all.
+ *
+ * Unlike `parseFilter` this never throws: any refusal comes back as
+ * `{ ok: false, error }` so an interactive prompt can show it inline. The
+ * `blocked-by:`/`ancestor:` indexes are computed over the WHOLE input (same
+ * rule as `applyViewLens`/`runList`); the input order is preserved (the caller
+ * sorts). Empty/blank expressions match everything. Pure.
+ */
+export function applyViewFilter<T extends ViewItem>(
+  items: readonly T[],
+  expr: string,
+  opts: { me?: string | null; resolveMe?: () => string | null } = {},
+): ViewFilterVerdict<T> {
+  const trimmed = expr.trim();
+  if (trimmed === "") return { ok: true, items: [...items] };
+  const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+  let tokens: string[];
+  try {
+    tokens = splitFilterTokens(trimmed);
+  } catch (err) {
+    return { ok: false, error: messageOf(err) };
+  }
+  const needles: string[] = [];
+  const predicates: FilterPredicate[] = [];
+  for (const token of tokens) {
+    let negated = false;
+    let rest = token;
+    if (rest.startsWith("!")) {
+      negated = true;
+      rest = rest.slice(1);
+    }
+    if (rest.indexOf(":") <= 0) {
+      // Free text (the board-lens extension): no field prefix (or a leading
+      // colon, which no field name can produce). Negation is predicate-only.
+      if (negated) {
+        return {
+          ok: false,
+          error: `bad filter token "${token}" (negation applies to field:value predicates; free text matches id/title as-is)`,
+        };
+      }
+      try {
+        const text = unquoteFilterValue(rest, trimmed);
+        if (!text) return { ok: false, error: `empty value in filter token "${token}"` };
+        needles.push(text.toLowerCase());
+      } catch (err) {
+        return { ok: false, error: messageOf(err) };
+      }
+      continue;
+    }
+    // Predicate token: the kernel parser owns the grammar and the messages.
+    try {
+      predicates.push(...parseFilter(token));
+    } catch (err) {
+      return { ok: false, error: messageOf(err) };
+    }
+  }
+  // Value validation, runList's rules and messages verbatim.
+  for (const pred of predicates) {
+    if (pred.field === "type" && !isItemType(pred.value)) {
+      return {
+        ok: false,
+        error: `unknown type "${pred.value}". Allowed: ${ITEM_TYPES.join(", ")}`,
+      };
+    }
+    if (pred.field === "status" && !isStatus(pred.value)) {
+      return {
+        ok: false,
+        error: `unknown status "${pred.value}". Allowed: ${STATUSES.join(", ")}`,
+      };
+    }
+    if (pred.field === "priority" && pred.value !== "none" && !isPriority(pred.value)) {
+      return {
+        ok: false,
+        error: `unknown priority "${pred.value}". Allowed: ${PRIORITIES.join(", ")}, none`,
+      };
+    }
+    if (pred.field === "assignee" && pred.value === "@me") {
+      const login = opts.me !== undefined ? opts.me : (opts.resolveMe?.() ?? null);
+      if (login === null || login === "") {
+        return {
+          ok: false,
+          error:
+            "could not resolve @me (set GITHUB_USER or GITHUB_ACTOR, or authenticate gh: gh api user)",
+        };
+      }
+      pred.value = login;
+    }
+  }
+  // The computed predicates see the WHOLE input (runList's rule): a filtered-out
+  // dependency must not look unknown. One normalization pass shared by every
+  // dependency reader (see applyViewLens).
+  const kernelItems = items.map((item) => ({
+    ...item,
+    dependsOn: [...(item.dependsOn ?? item.depends_on ?? [])],
+  }));
+  const blockedByIndex = buildBlockedByIndex(kernelItems);
+  const ancestorIndex = buildAncestorIndex(items);
+  const kept = items.filter((item, index) => {
+    const kernelItem = kernelItems[index]!;
+    for (const pred of predicates) {
+      if (!matchesPredicate(kernelItem, pred, blockedByIndex, ancestorIndex)) return false;
+    }
+    for (const needle of needles) {
+      if (!matchesSubstringFilter(item, needle)) return false;
+    }
+    return true;
+  });
+  return { ok: true, items: kept };
 }

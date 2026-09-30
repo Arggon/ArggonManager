@@ -129,6 +129,8 @@ export {
   buildBlockedByIndex,
   matchesPredicate,
   parseFilter,
+  splitFilterTokens,
+  unquoteFilterValue,
 } from "./filter.js";
 export type {
   AncestorIndex,
@@ -160,6 +162,7 @@ export type {
 // --- Board view-model (derived display data shared by web/TUI/panel) --------
 
 export {
+  applyViewFilter,
   applyViewLens,
   buildStatusIndex,
   groupItemsBy,
@@ -168,6 +171,7 @@ export {
   itemsForStatus,
   matchesSubstringFilter,
   openDependencyIds,
+  priorityCounts,
   priorityTier,
   readyTodoCount,
   sortById,
@@ -177,7 +181,14 @@ export {
   treeEntries,
   visibleItems,
 } from "./view-model.js";
-export type { ViewGroup, ViewItem, ViewLens, ViewTreeEntry } from "./view-model.js";
+export type {
+  PriorityCounts,
+  ViewGroup,
+  ViewItem,
+  ViewLens,
+  ViewFilterVerdict,
+  ViewTreeEntry,
+} from "./view-model.js";
 
 // --- Envelopes (the `--json` contract) --------------------------------------
 
@@ -193,9 +204,9 @@ export { runCreate } from "./create.js";
 export type { CreateOptions, CreateResult } from "./create.js";
 export { runList } from "./list.js";
 export type { ListOptions, ListResult } from "./list.js";
-export { runShow } from "./show.js";
+export { runShow, showBoundedParts } from "./show.js";
 export type { ShowComment, ShowOptions, ShowResult } from "./show.js";
-export { runReport } from "./report.js";
+export { aggregateReport, completedOf, runReport } from "./report.js";
 export type {
   ReportBlocked,
   ReportContainer,

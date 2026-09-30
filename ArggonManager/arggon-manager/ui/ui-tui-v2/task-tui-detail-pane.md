@@ -27,7 +27,6 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-tui-detail-pane
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 
