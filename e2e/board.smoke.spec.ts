@@ -40,6 +40,9 @@ const MOVED_ITEM_ID = "task-board-task";
 /** The labelled task the lens cases narrow to; id derives from `Board filter task`. */
 const FILTER_ITEM_ID = "task-board-filter-task";
 
+/** The unclaimed task the move-dialog cases drive; id derives from `Board dialog task`. */
+const DIALOG_ITEM_ID = "task-board-dialog-task";
+
 /**
  * Detail-drawer fixture (task-board-item-detail): a task with a body,
  * acceptance rows, a hostile line, a branch and two dependencies (one open,
@@ -215,6 +218,9 @@ function createFixture(): string {
     "smoke",
     "--json",
   ]);
+  // Move-dialog fixture (task-board-move-dialogs): an unclaimed task the
+  // dialog cases claim, block and undo. Never touched by the other tests.
+  runCli(fixture, ["create", "task", "Board dialog task", "--parent", "entries", "--json"]);
   // Detail-drawer fixture (task-board-item-detail). The detail and reload
   // tasks sit in `cancelled` (not `todo`) so the todo column stays short
   // enough that the status-move test's drag needs no mid-drag scroll:
@@ -289,6 +295,9 @@ function startBoardServer(fixture: string): Promise<{ child: ChildProcess; url: 
     child.stdout?.on("data", onData);
     child.stderr?.on("data", (chunk: Buffer) => {
       output += chunk.toString("utf8");
+      // TEMP DIAGNOSTIC: surface the server's stderr (POST log) in the report.
+      if (chunk.toString("utf8").includes("[DIAG]"))
+        process.stderr.write("[SRV] " + chunk.toString("utf8"));
     });
     child.on("error", (err) => {
       clearTimeout(timer);
@@ -408,6 +417,109 @@ test.describe("@smoke board --serve", () => {
     await page.reload();
     await expect(page.locator("#board-filter-input")).toHaveValue("filter task");
     await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
+  });
+
+  test("a claim drop collects the assignee through the in-page dialog (task-board-move-dialogs)", async ({
+    page,
+  }) => {
+    // Each dialog case resets its own state through the CLI, so the tests are
+    // order-independent (the update endpoint runs the same kernel rules). The
+    // SSE stream is muted like the keyboard test's: the reset writes each
+    // broadcast a reload, and a reload between mousedown and the first move
+    // makes Chromium drop the drag under a stale pointer (see the fixture
+    // note above) — and would close an open value dialog mid-flow.
+    await page.route("**/events", (route) => route.abort());
+    runCli(fixture, ["update", DIALOG_ITEM_ID, "--status", "todo", "--json"]);
+    await page.goto(server?.url ?? "");
+    const card = page.locator(`.card[data-id="${DIALOG_ITEM_ID}"]`);
+    await expect(card).toHaveAttribute("data-status", "todo");
+
+    // todo -> in_progress on an unclaimed task needs --assignee: the dialog.
+    await card.dragTo(page.locator('.column[data-status="in_progress"]'));
+    await expect(page.locator(".move-prompt-panel")).toBeVisible();
+    await expect(page.locator("#board-move-prompt-title")).toHaveText(
+      `--assignee required to claim ${DIALOG_ITEM_ID} (GitHub login or agent id):`,
+    );
+
+    // Esc cancels: no dialog value, no server write, card stays in todo.
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".move-prompt-panel")).toBeHidden();
+    await expect(card).toHaveAttribute("data-status", "todo");
+    expect(
+      cliJson<{ item: { status: string } }>(fixture, ["show", DIALOG_ITEM_ID, "--json"]).item
+        .status,
+    ).toBe("todo");
+  });
+
+  test("the claim dialog validates inline and a confirmed claim persists", async ({ page }) => {
+    // Muted SSE + CLI reset: see the claim-drop test above.
+    await page.route("**/events", (route) => route.abort());
+    runCli(fixture, ["update", DIALOG_ITEM_ID, "--status", "todo", "--json"]);
+    await page.goto(server?.url ?? "");
+    const card = page.locator(`.card[data-id="${DIALOG_ITEM_ID}"]`);
+    await expect(card).toHaveAttribute("data-status", "todo");
+
+    await card.dragTo(page.locator('.column[data-status="in_progress"]'));
+    await expect(page.locator(".move-prompt-panel")).toBeVisible();
+    // Confirming whitespace-only input keeps the dialog open with the error.
+    await page.locator("#board-move-prompt-input").fill("   ");
+    await page.locator("#board-move-prompt-confirm").click();
+    await expect(page.locator("#board-move-prompt-error")).toBeVisible();
+    await expect(page.locator(".move-prompt-panel")).toBeVisible();
+
+    // A real login confirms: the card moves and the claim persists.
+    await page.locator("#board-move-prompt-input").fill("board-smoke");
+    await page.locator("#board-move-prompt-confirm").click();
+    await expect(page.locator(".move-prompt-panel")).toBeHidden();
+    await expect(card).toHaveAttribute("data-status", "in_progress");
+    expect(
+      cliJson<{ item: { status: string; assignee: string } }>(fixture, [
+        "show",
+        DIALOG_ITEM_ID,
+        "--json",
+      ]).item,
+    ).toMatchObject({ status: "in_progress", assignee: "board-smoke" });
+  });
+
+  test("a blocked move asks for the reason and the toast offers a working undo", async ({
+    page,
+  }) => {
+    // Start from a claimed in_progress card: undo returns to where the card
+    // came from, and the claim survives the round-trip (never force/steal).
+    // Muted SSE + CLI resets: see the claim-drop test above.
+    await page.route("**/events", (route) => route.abort());
+    runCli(fixture, ["update", DIALOG_ITEM_ID, "--status", "todo", "--json"]);
+    runCli(fixture, ["update", DIALOG_ITEM_ID, "--assignee", "board-smoke", "--json"]);
+    runCli(fixture, ["update", DIALOG_ITEM_ID, "--status", "in_progress", "--json"]);
+    await page.goto(server?.url ?? "");
+    const card = page.locator(`.card[data-id="${DIALOG_ITEM_ID}"]`);
+    await expect(card).toHaveAttribute("data-status", "in_progress");
+
+    // in_progress -> blocked collects --blocked-reason through the same dialog.
+    await card.dragTo(page.locator('.column[data-status="blocked"]'));
+    await expect(page.locator(".move-prompt-panel")).toBeVisible();
+    await page.locator("#board-move-prompt-input").fill("smoke reason");
+    await page.locator("#board-move-prompt-confirm").click();
+    await expect(page.locator(".move-prompt-panel")).toBeHidden();
+    await expect(card).toHaveAttribute("data-status", "blocked");
+
+    // The success toast carries Undo (blocked -> in_progress is legal for a
+    // claimed card); clicking it re-enters the move flow and persists.
+    const undo = page.locator("#board-toast .toast-action", { hasText: "Undo" });
+    await expect(undo).toBeVisible();
+    await undo.click();
+    await expect(card).toHaveAttribute("data-status", "in_progress");
+    const shown = cliJson<{ item: { status: string; blocked_reason: string | null } }>(fixture, [
+      "show",
+      DIALOG_ITEM_ID,
+      "--json",
+    ]).item;
+    expect(shown.status).toBe("in_progress");
+    expect(shown.blocked_reason).toBeNull();
+    // Park the dialog item in a terminal column: the roving-focus test below
+    // crosses columns by nearest non-empty neighbour, which the in_progress
+    // occupancy would change (todo -> in_progress instead of todo -> cancelled).
+    runCli(fixture, ["update", DIALOG_ITEM_ID, "--status", "cancelled", "--json"]);
   });
 
   test("dependency predicates narrow by deps and readiness (task-board-filter-dep-predicates)", async ({
@@ -724,18 +836,18 @@ test.describe("@smoke board --serve", () => {
     await page.goto(server?.url ?? "");
     const card = page.locator(`.card[data-id="${DETAIL_DEP_ID}"]`);
     await expect(card).toHaveAttribute("data-status", "todo");
-    // The flow's two prompts are answered from their message, exactly as a
-    // person would: the claim prompt takes the assignee, the blocked prompt
-    // the reason.
-    page.on("dialog", (dialog) => {
-      if (dialog.message().includes("--assignee")) void dialog.accept("smoke-user");
-      else if (dialog.message().includes("--blocked-reason")) {
-        void dialog.accept("waiting on upstream");
-      } else void dialog.dismiss();
-    });
+    // The flow's two value prompts are the in-page move dialog now
+    // (task-board-move-dialogs): answered exactly as a person would — the
+    // claim dialog takes the assignee, the blocked dialog the reason.
+    const answerDialog = async (value: string): Promise<void> => {
+      await expect(page.locator(".move-prompt-panel")).toBeVisible();
+      await page.locator("#board-move-prompt-input").fill(value);
+      await page.locator("#board-move-prompt-confirm").click();
+      await expect(page.locator(".move-prompt-panel")).toBeHidden();
+    };
 
     // Tap affordance this time: the unassigned todo card offers in_progress
-    // (after the claim prompt) and cancelled — never done/blocked.
+    // (after the claim dialog) and cancelled — never done/blocked.
     await card.locator(".card-move").click();
     const menu = page.locator("#board-move-menu");
     await expect(menu).toBeVisible();
@@ -745,6 +857,7 @@ test.describe("@smoke board --serve", () => {
     );
     await expect(menu.locator('.move-menu-target[data-target="done"]')).toHaveCount(0);
     await menu.locator('.move-menu-target[data-target="in_progress"]').click();
+    await answerDialog("smoke-user");
     await expect(
       page.locator(`.column[data-status="in_progress"] .card[data-id="${DETAIL_DEP_ID}"]`),
     ).toHaveCount(1);
@@ -768,6 +881,7 @@ test.describe("@smoke board --serve", () => {
     await page.keyboard.press("m");
     await expect(menu).toBeVisible();
     await menu.locator('.move-menu-target[data-target="blocked"]').click();
+    await answerDialog("waiting on upstream");
     await expect(
       page.locator(`.column[data-status="blocked"] .card[data-id="${DETAIL_DEP_ID}"]`),
     ).toHaveCount(1);
