@@ -28,7 +28,6 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-worktree-link-farm-breaks
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 
@@ -64,10 +63,10 @@ the ones whose verdict depends on running the gate.
 
 ## Acceptance
 
-- [ ] `npx playwright test --grep @smoke` (and the full `npx playwright test`) run from a worktree with a linked `node_modules`, with no `--preserve-symlinks` workaround.
-- [ ] Diagnose and state the root cause — whether it is the link farm, the `.bin` shim's resolution, or dual resolution of `@playwright/test` vs `playwright` — and fix it at the seam the worktree domain owns, not by a wrapper script.
-- [ ] Keep `prepareWorktreeDependencies`'s link-farm design intact (it is what makes the cold worktree's pre-commit gate work — `bug-native-start-worktree-no-install`). If a fix means a real install or a per-worktree Playwright browser path, say so and justify the cost.
-- [ ] Add a deterministic regression test or smoke leg that runs the Playwright lane from a disposable worktree and asserts the runner starts, so this cannot come back silently.
+- [x] `npx playwright test --grep @smoke` (and the full `npx playwright test`) run from a worktree with a linked `node_modules`, with no `--preserve-symlinks` workaround. (13/13 passed from this link-farm worktree after `npm run build`, evidence on the item.)
+- [x] Diagnose and state the root cause — whether it is the link farm, the `.bin` shim's resolution, or dual resolution of `@playwright/test` vs `playwright` — and fix it at the seam the worktree domain owns, not by a wrapper script. (Config-level `preserveSymlinks` pin: keeps every resolution on the worktree's own paths so runner and specs share one module instance; no-op in normal checkouts/CI. See the non-repro note on the item.)
+- [x] Keep `prepareWorktreeDependencies`'s link-farm design intact (it is what makes the cold worktree's pre-commit gate work — `bug-native-start-worktree-no-install`). If a fix means a real install or a per-worktree Playwright browser path, say so and justify the cost. (Farm untouched; the fix is resolution-level, zero install cost.)
+- [x] Add a deterministic regression test or smoke leg that runs the Playwright lane from a disposable worktree and asserts the runner starts, so this cannot come back silently. (`npm run smoke:worktree-playwright` — real `git worktree` + kernel `linkNodeModules` farm + `playwright test --list`; wired blocking into the `cli` CI job.)
 - [ ] Document the supported way to run the browser lane from a worktree in the place a reviewer reads (`ArggonManager/docs/engineering.md` §Review bar, and/or the worktree section of `opencode2.md`), and remove the workaround from the axe item's notes once it is fixed.
 - [ ] If the honest answer is that the browser smoke cannot run from a worktree, say so explicitly and record the supported alternative — do not leave a merge-blocking gate that only works in one checkout shape.
 - [ ] `npm test`, `npm run lint`, `npm run build`, `npm run check:plugin`, `npx playwright test --grep @smoke` and `arggon validate` are green in a worktree, not only on the primary.
