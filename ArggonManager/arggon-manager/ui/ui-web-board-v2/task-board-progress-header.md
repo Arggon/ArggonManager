@@ -50,3 +50,6 @@ Evidence (PR #495, branch feat/task-board-progress-header):
 - Panel renders: epics one row each (this repo: agent-coordination 19/20 ... ui 27/40), wip 3, priority mix 'p0 0 · p1 0 · p2 11 · p3 13 · none 2', blocked 0. Screenshot /tmp/evidence-summary-header.png (file://, 368-item tracker); grouped export head renders '⚑ arggon-manager 3/5'.
 - Bounded: no per-item payload — one row per epic, one entry per blocked leaf, five buckets; computed at render via buildBoardSummary from the already-loaded items.
 - Without the summary option (direct renderBoardHtml callers) the output is unchanged (unit-pinned); runBoard and serve always pass it (static + serve parity, @smoke-asserted on the serve page and a grouped static export).
+
+### handoff 2026-09-30 @Arggon — next: Coordinator: review PR #495; note the panel is covered by the @smoke axe scan (test 1) — keep that ordering when refactoring the spec
+- branch: feat/task-board-progress-header
