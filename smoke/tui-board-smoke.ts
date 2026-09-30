@@ -24,8 +24,13 @@
  * header names it, columns it empties carry the `(empty)` mark, the footer
  * counts the matches) → `v` cycles back → an invalid filter expression is
  * refused inline at the prompt (`status:bogus` stays unapplied with the
- * kernel's error, task-tui-filter-language) → Esc cancels → q. A regression
- * net for the raw-ANSI renderer without a model in the loop.
+ * kernel's error, task-tui-filter-language) → Esc cancels → the WRITE actions
+ * (task-tui-actions-parity): the filter re-pins the seeded task and `c` claims
+ * it through the assignee prompt (the applied frame names the claim) and `m`
+ * moves it through the legal-target menu + `y/N` confirm (the applied frame
+ * names the transition) — both through the kernel `runUpdate` on the real
+ * fixture files → q. A regression net for the raw-ANSI renderer without a
+ * model in the loop.
  *
  * Bounded by design. Exit codes: 0 — passed or `skipped:` (util-linux `script`
  * unavailable); 1 — a check failed (the fixture is kept).
@@ -515,6 +520,93 @@ function runTui(fixture: string): Promise<{ capture: string; steps: StepResult[]
           !lastFrame(capture).includes("esc to cancel") &&
           !lastFrame(capture).includes("█") &&
           !lastFrame(capture).includes("filter:"),
+        send: "/", // re-open the filter prompt to pin the claim target
+      },
+      {
+        label: "filter prompt open for the claim target",
+        until: (capture) => lastFrame(capture).includes("esc to cancel"),
+        send: "task-board-task", // free-text token on the seeded id
+      },
+      {
+        label: "claim-target filter draft typed",
+        until: (capture) => lastFrame(capture).includes("/task-board-task█"),
+        send: "\r", // apply: the seeded task is the only visible card again
+      },
+      {
+        label: "claim target re-filtered (selection pinned to the seeded task)",
+        until: (capture) =>
+          isBoardFrame(lastFrame(capture), SEEDED_ITEM_ID) &&
+          lastFrame(capture).includes(`filter: ${SEEDED_ITEM_ID}`),
+        send: "c", // claim flow for the selected (and filtered) seeded task
+      },
+      {
+        label: "claim prompt open with the assignee field",
+        until: (capture) => lastFrame(capture).includes("claim task-"),
+        // Clear the environment-dependent prefill for a deterministic login.
+        send: "\x7f".repeat(64),
+      },
+      {
+        label: "prefill cleared",
+        until: (capture) => lastFrame(capture).includes("claim task-board-task: █"),
+        send: "smoke", // a login for the fixture
+      },
+      {
+        label: "claim typed",
+        until: (capture) => lastFrame(capture).includes(": smoke█"),
+        send: "\r", // stage the write
+      },
+      {
+        label: "claim confirm names the exact write",
+        until: (capture) =>
+          lastFrame(capture).includes("apply task-") &&
+          lastFrame(capture).includes("-> in_progress (assignee smoke)"),
+        send: "y", // apply through the kernel
+      },
+      {
+        label: "claim applied: the card shows the @smoke owner",
+        until: (capture) =>
+          lastFrame(capture).includes("claimed ") && lastFrame(capture).includes("@smoke"),
+        // The write moved the card to the in_progress column; follow it.
+        send: "\x1b[C",
+      },
+      {
+        label: "selection follows the claimed card into in_progress",
+        until: (capture) => lastFrame(capture).includes("\x1b[1;7min_progress (1)"),
+        send: "m", // move flow for the (now claimed) task
+      },
+      {
+        label: "move menu lists the legal targets of in_progress",
+        until: (capture) => lastFrame(capture).includes("(in_progress): [1] todo"),
+        send: "2", // second legal target: blocked (enum order todo, blocked, ...)
+      },
+      {
+        label: "blocked move demands a reason",
+        until: (capture) => lastFrame(capture).includes("blocked reason for task-"),
+        send: "waiting on the smoke fixture",
+      },
+      {
+        label: "reason typed",
+        until: (capture) => lastFrame(capture).includes(": waiting on the smoke fixture█"),
+        send: "\r",
+      },
+      {
+        label: "move confirm names the exact write",
+        until: (capture) =>
+          lastFrame(capture).includes("-> blocked") &&
+          lastFrame(capture).includes("(reason: waiting on the smoke fixture)"),
+        send: "y", // apply through the kernel
+      },
+      {
+        label: "move applied: the board re-read the item into the blocked column",
+        until: (capture) =>
+          lastFrame(capture).includes("-> blocked") && lastFrame(capture).includes("blocked (1)"),
+        send: "r", // refresh: clears the message and repaints with the stamp
+      },
+      {
+        label: "refresh repaints the moved board (freshness stamp of the post-write read)",
+        until: (capture) =>
+          FRESHNESS_STAMP_PATTERN.test(lastFrame(capture)) &&
+          lastFrame(capture).includes("blocked (1)"),
         send: "q", // quit
       },
     ];
