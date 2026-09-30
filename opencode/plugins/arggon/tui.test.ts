@@ -14,13 +14,16 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
+import { boardSnapshot, emptyBoardSnapshot } from "./board.js";
 import {
   ARGON_BOARD_BIND,
   ARGON_BOARD_COMMAND,
   ARGON_BOARD_SLASH,
+  createBoardController,
   registerArgonTui,
   type ArgonTuiContext,
   type ArgonTuiSlot,
+  type BoardControllerOptions,
 } from "./tui.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -41,8 +44,8 @@ function fixture(): string {
   tmpDirs.push(root);
   write(root, "ArggonManager/.convention.yml", "version: 5\n");
   const base = "ArggonManager/arggon-manager";
-  const item = (id: string, fields: string, title = id): string =>
-    `---\ntype: task\nstatus: todo\nid: ${id}\ntitle: ${title}\n${fields}---\n\n# ${title}\n`;
+  const item = (id: string, fields: string, title = id, body?: string): string =>
+    `---\ntype: task\nstatus: todo\nid: ${id}\ntitle: ${title}\n${fields}---\n\n${body ?? `# ${title}\n`}`;
   write(
     root,
     `${base}/launch/launch.md`,
@@ -57,7 +60,22 @@ function fixture(): string {
   write(
     root,
     `${base}/launch/core/story-a/task-one.md`,
-    item("task-one", "parent: story-a\n", "First task"),
+    item(
+      "task-one",
+      "parent: story-a\n",
+      "First task",
+      [
+        "# First task",
+        "",
+        "## Acceptance",
+        "",
+        "- [ ] ship it",
+        "- [x] done row",
+        "",
+        "Context for the panel detail block.",
+        "",
+      ].join("\n"),
+    ),
   );
   write(
     root,
@@ -225,12 +243,13 @@ describe("TUI entry wiring (registerArgonTui)", () => {
     expect(lines[0]).toMatch(/^arggon board · 5 item\(s\) · next: task-o/);
     expect(lines[0].endsWith("…")).toBe(true);
     expect(lines[1].endsWith("…")).toBe(true);
+    // Every line carries the selection gutter; the cursor seeds on line one.
     expect(lines.slice(2)).toEqual([
-      " ▸ I launch — Launch",
-      "   · E core — Core",
-      "     · S story-a — Story A",
-      "       ▸ B bug-two @Arggon — Open bug",
-      "      ▶· T task-one — First task",
+      "❯ ▸ I launch — Launch",
+      "    · E core — Core",
+      "      · S story-a — Story A",
+      "        ▸ B bug-two @Arggon — Open bug",
+      "       ▶· T task-one — First task",
     ]);
     for (const line of lines) expect(line.length).toBeLessThanOrEqual(40);
     expect(text).toContain("▶");
@@ -306,5 +325,142 @@ describe("TUI entry wiring (registerArgonTui)", () => {
     registerArgonTui(context);
     const panel = slots.find((entry) => entry.slot.append === "session.panel")!;
     expect(render(panel.render({ name: "arggon.board" }))).toContain("arggon board · 5 item(s)");
+  });
+});
+
+describe("board panel controller (selection, jumps, detail)", () => {
+  function controllerFor(root: string, overrides: Partial<BoardControllerOptions> = {}) {
+    return createBoardController({
+      cwd: root,
+      readSnapshot: () => boardSnapshot(root, { envItem: null }),
+      width: () => 60,
+      ...overrides,
+    });
+  }
+
+  it("navigates the flattened tree and keeps the selection across a reload", () => {
+    const root = fixture();
+    const controller = controllerFor(root);
+    const lines = () => controller.lines();
+    expect(controller.selection()).toEqual({ index: 0, id: "launch" });
+    expect(lines()[2]?.startsWith("❯")).toBe(true);
+    expect(lines()[2]).toContain("I launch");
+
+    controller.move("down");
+    expect(controller.selection()).toEqual({ index: 1, id: "core" });
+    expect(lines()[3]?.startsWith("❯")).toBe(true);
+    expect(lines()[2]?.startsWith("❯")).toBe(false);
+
+    controller.move("page-down"); // clamps at the last row
+    expect(controller.selection()).toEqual({ index: 4, id: "task-one" });
+    controller.move("first");
+    expect(controller.selection()).toEqual({ index: 0, id: "launch" });
+    controller.move("last");
+    expect(controller.selection()).toEqual({ index: 4, id: "task-one" });
+
+    // Reload with the item still present: the cursor stays on the same item.
+    controller.move("up");
+    controller.reload();
+    expect(controller.selection()).toEqual({ index: 3, id: "bug-two" });
+
+    // The item disappears: the previous index clamps into the new tree.
+    rmSync(join(root, "ArggonManager/arggon-manager/launch/core/story-a/bug-two.md"));
+    controller.reload();
+    expect(controller.selection()).toEqual({ index: 3, id: "task-one" });
+  });
+
+  it("jumps to the kernel next suggestion and the active session item", () => {
+    const root = fixture();
+    const toasts: string[] = [];
+    const controller = controllerFor(root, {
+      readSnapshot: () => boardSnapshot(root, { envItem: "bug-two" }),
+      toast: (message) => toasts.push(message),
+    });
+    controller.jumpNext();
+    expect(controller.selection()).toEqual({ index: 4, id: "task-one" });
+    controller.jumpActive();
+    expect(controller.selection()).toEqual({ index: 3, id: "bug-two" });
+    expect(toasts).toEqual([]);
+
+    // No targets (error snapshot): the jumps toast and leave the cursor alone.
+    const empty = createBoardController({
+      cwd: root,
+      readSnapshot: () => emptyBoardSnapshot("no tracker"),
+      toast: (message) => toasts.push(message),
+    });
+    empty.jumpNext();
+    empty.jumpActive();
+    expect(toasts).toEqual([
+      "arggon board: no next suggestion",
+      "arggon board: no active item",
+    ]);
+    expect(empty.selection()).toEqual({ index: -1, id: null });
+    expect(empty.lines()).toEqual(["arggon board · no tracker"]);
+  });
+
+  it("toggles the detail block; esc closes it before the panel", () => {
+    const root = fixture();
+    const closes: number[] = [];
+    const controller = controllerFor(root, { close: () => closes.push(1) });
+    controller.escape();
+    expect(closes).toHaveLength(1); // no block open: esc closes the panel
+
+    controller.jump("task-one", "test");
+    controller.toggleDetail();
+    expect(controller.detail()?.id).toBe("task-one");
+    const text = controller.lines().join("\n");
+    expect(text).toContain("┌ argon detail · task-one — First task");
+    expect(text).toContain("│ [ ] ship it");
+    expect(text).toContain("│ [x] done row");
+    expect(text).toContain("└ 1/2 acceptance");
+
+    controller.escape(); // block open: esc returns to the tree
+    expect(controller.detail()).toBeNull();
+    expect(closes).toHaveLength(1);
+    controller.escape();
+    expect(closes).toHaveLength(2);
+
+    // Movement returns to the tree as well, and Enter toggles the block off.
+    controller.toggleDetail();
+    expect(controller.detail()).not.toBeNull();
+    controller.move("up");
+    expect(controller.detail()).toBeNull();
+    controller.toggleDetail();
+    controller.toggleDetail();
+    expect(controller.detail()).toBeNull();
+  });
+
+  it("binds the documented panel keys through the panel key layer", () => {
+    const root = fixture();
+    const { context, slots, layers } = fakeContext(root);
+    registerArgonTui(context, { cwd: root, envItem: null });
+    const panel = slots.find((entry) => entry.slot.append === "session.panel")!;
+    render(panel.render({ name: "arggon.board", width: 60 }));
+    const panelLayer = layers.find((factory) => {
+      const definition = factory() as { commands?: CommandShape[] };
+      return (definition.commands ?? []).some((command) => command.id.startsWith("arggon.board."));
+    });
+    expect(panelLayer, "panel key layer registered").toBeDefined();
+    const commands = (panelLayer!() as { commands: CommandShape[] }).commands;
+    expect(Object.fromEntries(commands.map((command) => [command.id, command.bind]))).toEqual({
+      "arggon.board.down": "j",
+      "arggon.board.down.arrow": "down",
+      "arggon.board.up": "k",
+      "arggon.board.up.arrow": "up",
+      "arggon.board.page-down": "pagedown",
+      "arggon.board.page-up": "pageup",
+      "arggon.board.first": "g",
+      "arggon.board.first.home": "home",
+      "arggon.board.last": "shift+g",
+      "arggon.board.last.end": "end",
+      "arggon.board.detail": "return",
+      "arggon.board.next": "n",
+      "arggon.board.active": "a",
+      "arggon.board.fullscreen": "f",
+      "arggon.board.reload": "r",
+      "arggon.board.close": "escape",
+    });
+    // Every action is inert-safe without a host panel (no throws).
+    for (const command of commands) expect(() => command.run()).not.toThrow();
   });
 });
