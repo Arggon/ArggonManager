@@ -17,7 +17,13 @@
  * exercises the shipped entry, not the TypeScript source.
  */
 import { expect, test, type Page } from "@playwright/test";
-import AxeBuilder from "@axe-core/playwright";
+// Named import, not default: under `module: NodeNext` the package's `types`
+// condition resolves the CJS-paired index.d.ts, where `AxeBuilder as default`
+// is not honored and esModuleInterop synthesizes the module namespace as the
+// default — so `new AxeBuilder(...)` is TS2351 under tsc (invisible until
+// task-typecheck-e2e-specs added this type-check; Playwright's transpiler
+// never checked it). The named export is the constructable class.
+import { AxeBuilder } from "@axe-core/playwright";
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
