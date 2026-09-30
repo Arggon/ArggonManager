@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-board-keyboard-a11y
 title: "Web board keyboard and accessibility: focus, move menu, ARIA"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [viewer, board, a11y, ui]
 priority: p1
 created: "2026-09-22"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T13:07:42.710Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-board-keyboard-a11y
 ---
 <!--
