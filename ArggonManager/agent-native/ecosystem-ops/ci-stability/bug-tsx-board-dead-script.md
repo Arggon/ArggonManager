@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-tsx-board-dead-script
 title: tsx-rendered-board-dead-script
+assignee: Arggon
+branch: fix/bug-tsx-board-dead-script
 parent: ci-stability
 labels: []
 priority: p1
 created: "2026-09-30"
 updated: "2026-09-30"
+claimed_at: "2026-09-30T23:56:07.824Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-tsx-board-dead-script
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/ci-stability/bug-tsx-board-dead-script.md
