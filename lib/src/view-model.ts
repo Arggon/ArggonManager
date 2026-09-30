@@ -48,7 +48,7 @@ import {
 } from "./filter.js";
 import { isItemType, ITEM_TYPES, type ItemType } from "./ids.js";
 import { downstreamWeight, isReady, openDependencies } from "./next.js";
-import { isPriority, PRIORITIES, priorityRank } from "./priority.js";
+import { isPriority, PRIORITIES, priorityRank, type Priority } from "./priority.js";
 import { isClaimable, isStatus, STATUSES, type Status } from "./status.js";
 
 /**
@@ -193,6 +193,32 @@ export function statusCounts<T extends { status: Status }>(
   const counts = {} as Record<Status, number>;
   for (const status of STATUSES) counts[status] = 0;
   for (const item of items) counts[item.status] += 1;
+  return counts;
+}
+
+/** Item counts per priority bucket, every bucket present (zero-filled). */
+export type PriorityCounts = Record<Priority | "none", number>;
+
+/**
+ * Item counts per priority bucket (the board summary's priority mix,
+ * task-board-progress-header): `p0`–`p3` by exact frontmatter token, every
+ * other value — unset or a hand-edited invalid token (validate flags it as
+ * `PRIORITY_INVALID`) — lands in `none`. Deliberately not `priorityTier`'s
+ * ordering rule (invalid orders with `p3` there): a mix answers "how is the
+ * work prioritized", so an unprioritized/invalid item must not inflate p3.
+ * Zero-filled and pure.
+ */
+export function priorityCounts<T extends { priority?: string | null }>(
+  items: readonly T[],
+): PriorityCounts {
+  const counts: PriorityCounts = { p0: 0, p1: 0, p2: 0, p3: 0, none: 0 };
+  for (const item of items) {
+    counts[
+      item.priority !== null && item.priority !== undefined && isPriority(item.priority)
+        ? item.priority
+        : "none"
+    ] += 1;
+  }
   return counts;
 }
 
