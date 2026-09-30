@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adr-number-collision
 title: adr-number-collision-fix
+assignee: Arggon
+branch: feat/task-adr-number-collision
 parent: methodology-improvements
 labels: []
 priority: p1
 created: "2026-09-30"
 updated: "2026-09-30"
+claimed_at: "2026-09-30T00:32:45.309Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-adr-number-collision
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-adr-number-collision.md
