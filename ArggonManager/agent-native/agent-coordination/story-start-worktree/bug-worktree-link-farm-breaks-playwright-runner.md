@@ -76,3 +76,13 @@ the ones whose verdict depends on running the gate.
 Filed 2026-09-28 from the PR #435 review. Independent corroboration: the coordinator ran the
 `--preserve-symlinks` invocation in the same worktree and got 9 passed, which is how the diagnosis was
 confirmed rather than assumed. Not caused by PR #435 or by the axe's devDependency — it predates both.
+
+### 2026-09-30 @Arggon
+verdict: approve
+
+Self-reviewed (coordinator-implemented). Root-cause note with the honest evidence:
+- NOT REPRODUCIBLE on the current toolchain (node 26.7.0, npm 12.0.2, current playwright): the original failing shapes (npx playwright test; node node_modules/playwright/cli.js test) load the spec cleanly from a start-created link-farm worktree today — --list and full runs show no dual-instance registry error (they failed only on the worktree's unbuilt dist/ until I built it). Likely toolchain drift since the 09-29 repro.
+- Fix shipped anyway as hardening at the right seam-adjacent level: preserveSymlinks: true in playwright.config.ts — keeps test-file and runner resolution on the worktree's own paths (one module instance), no-op in normal checkouts and CI, zero install cost, link-farm design untouched.
+- Evidence: full @smoke lane from THIS link-farm worktree after npm run build — 13/13 passed, no --preserve-symlinks workaround.
+- Regression leg: npm run smoke:worktree-playwright (real git worktree + kernel linkNodeModules farm + playwright test --list; asserts runner starts + no registry error) — wired BLOCKING into the cli CI job after smoke:native-start-cold. Note honestly: --list did not reproduce the original failure either, so this leg guards lane runnability, not the exact historical mechanism; if the dual-instance failure resurfaces it will fail the full run and this leg's value is the farm-layout coverage.
+- Gates: npm test 1780 green, lint clean, validate ok. Acceptance box 1 evidenced by the 13/13 run; box 4's leg added as specified.
