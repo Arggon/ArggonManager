@@ -293,6 +293,15 @@ Agents follow `ArggonManager/docs/playbooks/` by default (the init-generated `AG
 - `arggon validate` passes.
 - If the change made any doc statement false, that doc edit belongs in this PR.
 
+## Changing the methodology itself
+
+The methodology is the contract ([ADR 0011](./adr/0011-native-first-architecture.md)), and [ADR 0014](./adr/0014-adopter-upgrade-channel.md) defines how changes reach adopting repos. A PR that touches a **methodology carrier** — `ArggonManager/docs/agents.md`, `ArggonManager/docs/engineering.md`, `ArggonManager/docs/convention.md`, or `skills/arggon-cli/**` (including `references/`) — states its **impact class** in the PR description and as a comment on the work item:
+
+- **Advisory** — wording, structure, or doc reorganization; adopters' agents re-read the docs anyway and no rule, gate, command contract, or pipeline step changed.
+- **Behavioral** — agents must re-learn something: a rule, a gate, a command contract, a pipeline step. Behavioral PRs reference the adopter-upgrade channel ([ADR 0014](./adr/0014-adopter-upgrade-channel.md)), keep the skill and its copies in sync in the same PR (`skills/arggon-cli/` ↔ `.agents/skills/arggon-cli/`, byte-equal), and update every doc statement the change makes false (see §Documentation maintenance).
+
+Reviewers check the impact statement like any review-bar item; a behavioral change without it is a change request.
+
 ## Adoption sweep (existing repos)
 
 `arggon adopt` turns "start using ArggonManager here" into a tracked, agent-executable migration. It requires an initialized tree (`arggon init` first — the command pre-flights through the same logic as `arggon doctor`), inventories the repo's governing docs (present/absent, arggon-managed via `x-generated` provenance vs adopter-owned, plus cheap stack-manifest hints), and files one task — `task-adopt-arggon`, "Adopt ArggonManager in this repo" — whose body is the checklist below. `--dry-run` prints the inventory and planned actions and writes nothing; the same JSON is how the executing agent re-derives the inventory mid-flight. The task is created under `--story <story-id>` when given, else under `story-arggon-adoption` (auto-created under the first epic; when the tree has no epic at all — e.g. a fresh `init --full` — adopt auto-creates the initiative/epic chain `arggon-adoption` → `epic-arggon-adoption` itself, so pass `--story` when adopting an existing repo with its own structure). Idempotent: an already-open `task-adopt-arggon` is reported, not duplicated.
