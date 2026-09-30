@@ -9,8 +9,7 @@ parent: methodology-improvements
 labels: []
 priority: p3
 created: "2026-09-29"
-updated: "2026-09-29"
-worktree_path: /home/arggon/Projects/ArggonManager-task-adr-status-housekeeping
+updated: "2026-09-30"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-adr-status-housekeeping.md

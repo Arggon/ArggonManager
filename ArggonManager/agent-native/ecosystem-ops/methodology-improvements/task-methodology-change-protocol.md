@@ -11,7 +11,6 @@ priority: p2
 created: "2026-09-29"
 updated: "2026-09-30"
 depends_on: [task-adr-adopter-upgrade-channel]
-worktree_path: /home/arggon/Projects/ArggonManager-task-methodology-change-protocol
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-methodology-change-protocol.md

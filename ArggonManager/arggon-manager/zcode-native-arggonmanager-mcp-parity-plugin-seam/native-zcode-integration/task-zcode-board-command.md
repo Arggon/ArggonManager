@@ -8,8 +8,7 @@ branch: feat/task-zcode-board-command
 parent: native-zcode-integration
 labels: []
 created: "2026-09-29"
-updated: "2026-09-29"
-worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-board-command
+updated: "2026-09-30"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/zcode-native-arggonmanager-mcp-parity-plugin-seam/native-zcode-integration/task-zcode-board-command.md

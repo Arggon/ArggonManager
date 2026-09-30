@@ -10,7 +10,6 @@ labels: []
 priority: p1
 created: "2026-09-30"
 updated: "2026-09-30"
-worktree_path: /home/arggon/Projects/ArggonManager-task-adr-number-collision
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-adr-number-collision.md
