@@ -28,6 +28,6 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-adr-number-collision
 
 ## Acceptance
 
-- [ ] 
+- [x] 
 
 ## Notes

@@ -295,10 +295,10 @@ Agents follow `ArggonManager/docs/playbooks/` by default (the init-generated `AG
 
 ## Changing the methodology itself
 
-The methodology is the contract ([ADR 0011](./adr/0011-native-first-architecture.md)), and [ADR 0014](./adr/0014-adopter-upgrade-channel.md) defines how changes reach adopting repos. A PR that touches a **methodology carrier** — `ArggonManager/docs/agents.md`, `ArggonManager/docs/engineering.md`, `ArggonManager/docs/convention.md`, or `skills/arggon-cli/**` (including `references/`) — states its **impact class** in the PR description and as a comment on the work item:
+The methodology is the contract ([ADR 0011](./adr/0011-native-first-architecture.md)), and [ADR 0016](./adr/0016-adopter-upgrade-channel.md) defines how changes reach adopting repos. A PR that touches a **methodology carrier** — `ArggonManager/docs/agents.md`, `ArggonManager/docs/engineering.md`, `ArggonManager/docs/convention.md`, or `skills/arggon-cli/**` (including `references/`) — states its **impact class** in the PR description and as a comment on the work item:
 
 - **Advisory** — wording, structure, or doc reorganization; adopters' agents re-read the docs anyway and no rule, gate, command contract, or pipeline step changed.
-- **Behavioral** — agents must re-learn something: a rule, a gate, a command contract, a pipeline step. Behavioral PRs reference the adopter-upgrade channel ([ADR 0014](./adr/0014-adopter-upgrade-channel.md)), keep the skill and its copies in sync in the same PR (`skills/arggon-cli/` ↔ `.agents/skills/arggon-cli/`, byte-equal), and update every doc statement the change makes false (see §Documentation maintenance).
+- **Behavioral** — agents must re-learn something: a rule, a gate, a command contract, a pipeline step. Behavioral PRs reference the adopter-upgrade channel ([ADR 0016](./adr/0016-adopter-upgrade-channel.md)), keep the skill and its copies in sync in the same PR (`skills/arggon-cli/` ↔ `.agents/skills/arggon-cli/`, byte-equal), and update every doc statement the change makes false (see §Documentation maintenance).
 
 Reviewers check the impact statement like any review-bar item; a behavioral change without it is a change request.
 
