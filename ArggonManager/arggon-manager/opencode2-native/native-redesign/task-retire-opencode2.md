@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-retire-opencode2
 title: "Retire opencode2 after the 0.4.0 merge (carry the bug, docs, CI triggers, branch)"
+assignee: Arggon
+branch: feat/task-retire-opencode2
 parent: native-redesign
 labels: [ci, docs]
 priority: p2
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T13:42:23.147Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-retire-opencode2
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-retire-opencode2.md
