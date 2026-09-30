@@ -1,13 +1,13 @@
 ---
 type: epic
-status: todo
+status: done
 id: ui
 title: "UI surfaces: web board, terminal TUI and OpenCode panel"
 parent: arggon-manager
 labels: [ui, viewer, tui]
 priority: p2
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui.md (epic index; required).
