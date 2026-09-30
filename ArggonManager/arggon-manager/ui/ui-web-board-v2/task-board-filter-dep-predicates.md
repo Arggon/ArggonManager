@@ -60,3 +60,6 @@ Evidence:
 - README + docs/json-output.md refusal wording removed; filter placeholder lists the new fields.
 
 Gates (after merging origin/main 624a4259): npm test 1834 passed / 107 files; lint clean; build green; check:plugin green; arggon validate ok; playwright @smoke 20 passed.
+
+### handoff 2026-09-30 @Arggon — next: PR #483 ready for review/merge; item stays in_progress until the coordinator flips it after merge
+- branch: feat/task-board-filter-dep-predicates
