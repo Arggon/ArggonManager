@@ -1,6 +1,6 @@
 ---
 type: story
-status: in_progress
+status: done
 id: ui-native-panel-v2
 title: "OpenCode board panel v2: interactive and live"
 assignee: Arggon
@@ -9,7 +9,6 @@ labels: [opencode-seam, tui, ui]
 priority: p2
 created: "2026-09-22"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T22:49:35.819Z"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-native-panel-v2/ui-native-panel-v2.md (story index; required).
