@@ -61,22 +61,22 @@ Deliberately out of scope of the parent item, and the reason each is separate:
 
 ## Acceptance
 
-- [ ] The drawer is scanned after a **deterministic** readiness signal for its
+- [x] The drawer is scanned after a **deterministic** readiness signal for its
       async `/api/item` content (an `expect(...)` on a drawer element, never a
       sleep or a `networkidle` guess), still in the existing `@smoke` Chromium
       lane and still with the same WCAG A/AA tag set and the no-exclusion policy.
-- [ ] The static export (`file://`) and at least one filtered/lens state are
+- [x] The static export (`file://`) and at least one filtered/lens state are
       scanned, each with its own readiness signal.
-- [ ] A fixture renders an **empty status column**, so the `.empty` /
+- [x] A fixture renders an **empty status column**, so the `.empty` /
       `mgroup-head.none` contrast fix carried by the parent item is actually
       asserted by the gate.
-- [ ] The `region` finding is resolved: either the filter bar is wrapped in a
+- [x] The `region` finding is resolved: either the filter bar is wrapped in a
       landmark, or the decision to leave `best-practice` out of the asserted tag
       set is recorded in the spec comment and in `CONTRIBUTING.md` with a reason.
       Widening the tag set without fixing the reported rules is not an option.
-- [ ] Any defect surfaced by the new scans is fixed in the board or filed as a
+- [x] Any defect surfaced by the new scans is fixed in the board or filed as a
       linked item with the rule id, target selector and measured ratio — never
       excluded.
-- [ ] `npm run build`, `npm test`, `npm run lint`, `npm run check:plugin` and
+- [x] `npm run build`, `npm test`, `npm run lint`, `npm run check:plugin` and
       `npx playwright test --grep @smoke` are green, and
       `npm run arggon -- validate --json` reports `ok:true`.
