@@ -57,3 +57,7 @@ Verdict (PR #487)
 **Gates (after merging origin/main c02cca17 — PR #480 merged, CSS carried intact):** npm test 1842 passed / 108 files; lint clean; build green; check:plugin green; arggon validate ok; npx playwright test --grep @smoke 22 passed (19 + 3 new), zero exclusions, run twice for stability.
 
 **Docs.** README --serve bullet documents dialog + undo; docs/json-output.md gains a move-dialog paragraph; the keyboard/touch bullet now says every dialog traps focus.
+
+### handoff 2026-09-30 @Arggon — next: PR #487 ready for review/merge; item stays in_progress until the coordinator flips it after merge
+- branch: feat/task-board-move-dialogs
+- open questions: note: test 773 rewritten to drive the in-page dialog (native prompt handler removed with window.prompt)
