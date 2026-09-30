@@ -74,6 +74,15 @@ function filterFromUrl(url: string): string | null {
 }
 
 /**
+ * Absolute path for a screenshot under Playwright's `test-results/` output
+ * (gitignored build artifact): visual evidence for theme/density review
+ * (task-board-theme-density) — never a committed fixture.
+ */
+function screenshotPath(name: string): string {
+  return join("test-results", name);
+}
+
+/**
  * Accessibility policy for the `@smoke` lane (task-axe-core-browser-ci).
  *
  * The asserted tag set is **every WCAG A/AA level axe can check automatically**
@@ -1170,6 +1179,21 @@ test.describe("@smoke board --serve", () => {
     await page.goto(server?.url ?? "");
     const filler = page.locator(".card .title", { hasText: "Board filler 12" });
     await expect(filler).toBeVisible();
+    // The 12 creates above each arm the serve watcher's reload debounce
+    // (100ms); its trailing broadcast can navigate while this test measures
+    // and destroy the execution context. Two timeOrigin samples one debounce
+    // window apart prove the reload storm has settled — re-armed debounces
+    // (the auto-commit writes) are covered by the poll retry.
+    await expect
+      .poll(
+        async () => {
+          const before = await page.evaluate(() => performance.timeOrigin);
+          await page.waitForTimeout(120);
+          return (await page.evaluate(() => performance.timeOrigin)) === before;
+        },
+        { intervals: [50], timeout: 10_000 },
+      )
+      .toBe(true);
 
     const column = page.locator('.column[data-status="todo"]');
     const header = page.locator("#board-column-todo");
@@ -1182,5 +1206,110 @@ test.describe("@smoke board --serve", () => {
       (await column.evaluate((el) => el.getBoundingClientRect().top + window.scrollY)) + 100,
     );
     await expect.poll(() => header.evaluate((el) => el.getBoundingClientRect().top)).toBe(0);
+  });
+
+  test("the theme toggle cycles auto/light/dark and persists across a reload (task-board-theme-density)", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    const root = page.locator("html");
+    const themeToggle = page.locator("#board-theme-toggle");
+    // The emulated OS here is light, so auto resolves to light at boot — the
+    // same resolution the <head> boot script performed before first paint.
+    await expect(themeToggle).toHaveText("theme: auto");
+    await expect(root).toHaveAttribute("data-theme", "light");
+    await expect(root).toHaveAttribute("data-density", "comfortable");
+
+    // auto -> light: the resolved attribute is unchanged, the override is stored.
+    await themeToggle.click();
+    await expect(themeToggle).toHaveText("theme: light");
+    await expect(root).toHaveAttribute("data-theme", "light");
+
+    // light -> dark: the page actually repaints dark (body background flips).
+    await themeToggle.click();
+    await expect(themeToggle).toHaveText("theme: dark");
+    await expect(root).toHaveAttribute("data-theme", "dark");
+    await expect
+      .poll(() => page.evaluate(() => getComputedStyle(document.body).backgroundColor))
+      .toBe("rgb(13, 17, 23)"); // --bg dark: #0d1117
+    // color-scheme follows, so native controls match the painted surface.
+    await expect
+      .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme))
+      .toBe("dark");
+    await page.screenshot({ path: screenshotPath("board-theme-dark.png"), fullPage: true });
+
+    // The override survives a reload (persisted under arggon-board-theme-v1).
+    await page.reload();
+    await expect(themeToggle).toHaveText("theme: dark");
+    await expect(root).toHaveAttribute("data-theme", "dark");
+    await expect
+      .poll(() => page.evaluate(() => getComputedStyle(document.body).backgroundColor))
+      .toBe("rgb(13, 17, 23)");
+
+    // dark -> auto: back to the OS preference (light in this context).
+    await themeToggle.click();
+    await expect(themeToggle).toHaveText("theme: auto");
+    await expect(root).toHaveAttribute("data-theme", "light");
+    await expect
+      .poll(() => page.evaluate(() => getComputedStyle(document.body).backgroundColor))
+      .toBe("rgb(244, 245, 247)"); // --bg light: #f4f5f7
+  });
+
+  test("the density toggle flips compact/comfortable, persists, and keeps the board intact (task-board-theme-density)", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    const densityToggle = page.locator("#board-density-toggle");
+    const card = page.locator(".board .card").first();
+    await expect(card).toBeVisible();
+    await expect(densityToggle).toHaveAttribute("aria-pressed", "false");
+    const comfortableSize = await card.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+
+    await densityToggle.click();
+    await expect(densityToggle).toHaveAttribute("aria-pressed", "true");
+    await expect(densityToggle).toHaveText("comfortable density");
+    await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
+    // Compact shrinks the card text, never below 12px: readable by policy.
+    const compactSize = await card.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    expect(compactSize).toBeLessThan(comfortableSize);
+    expect(compactSize).toBeGreaterThanOrEqual(12);
+    // The grid survives compact: the five column sections render and no card
+    // is lost. Earlier tests in this suite move the fixture's cards around,
+    // so a column may legitimately be empty — the card count is the invariant.
+    const cardsBefore = await page.locator(".board .card").count();
+    expect(cardsBefore).toBeGreaterThan(0);
+    for (const status of ["todo", "in_progress", "blocked", "done", "cancelled"]) {
+      await expect(page.locator(`.column[data-status="${status}"]`)).toBeVisible();
+    }
+    await page.screenshot({ path: screenshotPath("board-density-compact.png"), fullPage: true });
+    await expect(page.locator(".board .card")).toHaveCount(cardsBefore);
+
+    // The choice persists across a reload, and toggling back restores comfortable.
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
+    await expect(densityToggle).toHaveAttribute("aria-pressed", "true");
+    await densityToggle.click();
+    await expect(page.locator("html")).toHaveAttribute("data-density", "comfortable");
+    await expect(densityToggle).toHaveAttribute("aria-pressed", "false");
+    await expect(densityToggle).toHaveText("compact density");
+  });
+
+  test("the dark theme carries no axe violation on the ready page (task-board-theme-density)", async ({
+    page,
+  }) => {
+    // Seed the persisted override before any page script runs, so the board
+    // boots dark exactly like a returning dark-mode user — the <head> boot
+    // script resolves it before first paint — and the axe scan judges the
+    // dark palette itself, not a light page switched afterwards.
+    await page.addInitScript(() => {
+      try {
+        localStorage.setItem("arggon-board-theme-v1", JSON.stringify({ theme: "dark" }));
+      } catch {
+        /* storage unavailable: the scan below would fail on data-theme */
+      }
+    });
+    await page.goto(server?.url ?? "");
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await axeScan(page);
   });
 });

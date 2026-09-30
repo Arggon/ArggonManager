@@ -39,8 +39,21 @@ The board hardcodes `color-scheme: light` with fixed density; dark is table stak
 
 ## Acceptance
 
-- [ ] Light/dark follows `prefers-color-scheme` and can be overridden by a toggle persisted in localStorage; `color-scheme` is set correctly on the root so native controls match
-- [ ] Contrast meets WCAG AA for text, badges and columns in both themes (evidence in the review verdict)
-- [ ] No theme flash on load (theme applied before first paint)
-- [ ] Compact/comfortable density toggle keeps card content readable and the grid intact
-- [ ] Static + serve parity; tests for the state plumbing + screenshot evidence; README updated
+- [x] Light/dark follows `prefers-color-scheme` and can be overridden by a toggle persisted in localStorage; `color-scheme` is set correctly on the root so native controls match
+- [x] Contrast meets WCAG AA for text, badges and columns in both themes (evidence in the review verdict)
+- [x] No theme flash on load (theme applied before first paint)
+- [x] Compact/comfortable density toggle keeps card content readable and the grid intact
+- [x] Static + serve parity; tests for the state plumbing + screenshot evidence; README updated
+
+
+### 2026-10-01 @Arggon (coordinator salvage)
+
+The original worker went silent mid-implementation (quota). This coordinator
+completed and verified the uncommitted WIP it left in the worktree: theme
+(auto via prefers-color-scheme + persisted toggle) and density (compact /
+comfortable) with contrast assertions extended to the dark palette and 29-step
+@smoke coverage. Landed via PR after #501 (which merged empty — claim-only —
+before the WIP existed; coordinator error, noted for the record). Gates:
+prettier clean, e2e tsc clean, board tests 96/96, full suite via CI, lint ok,
+@smoke 28-29/29 (the known sticky-header SSE race flaked once in two full
+runs; passes solo, bounded retry from #497 present), validate ok.
