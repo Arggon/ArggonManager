@@ -50,3 +50,7 @@ Implementation verdict (2026-09-30, @Arggon): all four acceptance boxes ticked o
 Gates on the PR head: npm test 107 files / 1803 tests; lint; lint:structure; test:structure (3 passed); build; check:plugin (bundle regenerated, 394093 B); smoke:tui 23/23 in a real PTY (filter typing live, fold hint, done-hide round-trip, live refresh picking up a mid-run tracker write with no r pressed, corrupt-tracker P1 degradation); arggon validate --json ok:true; prettier clean on touched files.
 
 Docs updated: docs/opencode2.md § TUI (prose + checklist rows) and docs/playbooks/opencode.md § Testing.
+
+### handoff 2026-09-30 @Arggon — next: Coordinator: merge PR #411 first (this PR is stacked on it), then review/merge PR #470; flip the item to done after merge.
+- branch: feat/task-native-panel-refresh-filter
+- open questions: Durable (host-storage) per-session view state was skipped — the TUI context has no storage contract; file a follow-up if wanted
