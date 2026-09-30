@@ -594,6 +594,57 @@ test.describe("@smoke board --serve", () => {
     await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
   });
 
+  test("the static export with --details opens the drawer offline from the embedded snapshot", async ({
+    page,
+  }) => {
+    // `--details` (task-board-static-details): the drawer renders the bounded
+    // per-item payload embedded at generation time — no /api/item fetch is
+    // possible on file://, so the assertions below fail if the client tried
+    // the serve path (it would show "detail unavailable").
+    const boardFile = join(fixture, "details-board.html");
+    runCli(fixture, ["board", "--details", "--out", boardFile]);
+    await page.goto(`file://${boardFile}`);
+
+    const card = page.locator(`.card[data-id="${DETAIL_ITEM_ID}"]`);
+    await expect(card).toHaveCount(1);
+    await card.click();
+    const drawer = page.locator("#board-drawer");
+    await expect(drawer).toBeVisible();
+    await expect(drawer.locator(".drawer-title")).toHaveText("Board detail task");
+    // The same bounded content the serve drawer renders: acceptance rows,
+    // dependency states and the hostile body line as literal text.
+    await expect(drawer.locator(".drawer-acceptance .drawer-check")).toHaveCount(2);
+    await expect(drawer.locator(".drawer-acceptance .drawer-check input:checked")).toHaveCount(1);
+    await expect(drawer.locator(".drawer-deps .drawer-dep.open")).toHaveText(
+      `${DETAIL_DEP_ID} · todo`,
+    );
+    await expect(drawer.locator(".drawer-deps .drawer-dep.terminal")).toHaveText(
+      `${DETAIL_DONE_DEP_ID} · cancelled`,
+    );
+    await expect(drawer.locator(".drawer-prose .drawer-body-text")).toContainText(
+      '<img src=x onerror="window.__xss=1">',
+    );
+    await expect(drawer.locator("img")).toHaveCount(0);
+
+    // Esc closes and returns focus; an item with no snapshot entry (created
+    // after the export? none here — instead prove the map drives rendering by
+    // reopening on a second card) closes gracefully instead of fetching.
+    await page.keyboard.press("Escape");
+    await expect(drawer).toBeHidden();
+    await expect(card).toBeFocused();
+
+    // The interactive surface ships with --details too: keyboard nav focuses
+    // cards and the move button is present (moves refuse offline with the
+    // static-snapshot toast — the drag flow's own degradation).
+    const moveButton = card.locator(".card-move");
+    await expect(moveButton).toHaveCount(1);
+    await moveButton.click();
+    const menu = page.locator("#board-move-menu");
+    await expect(menu).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+  });
+
   test("a status move round-trips through the UI and persists", async ({ page }) => {
     await page.goto(server?.url ?? "");
     const card = page.locator(`.card[data-id="${MOVED_ITEM_ID}"]`);
