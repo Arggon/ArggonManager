@@ -16,6 +16,7 @@ import { runList, toContractWorkItem, type ContractWorkItem as WorkItem } from "
 import { renderBoardHtml } from "./board.js";
 
 import {
+  applyTuiSort,
   buildTuiDetailLines,
   clampTuiDetailScroll,
   clampTuiState,
@@ -26,6 +27,7 @@ import {
   handleKey,
   initialTuiState,
   loadTuiItems,
+  nextTuiSort,
   renderTui,
   renderTuiDetail,
   renderTuiScreen,
@@ -41,6 +43,7 @@ import {
   tuiDependencySummary,
   tuiDetailBodyRows,
   tuiDetailLinesFor,
+  tuiViewItems,
   visibleTuiItems,
   wrapTuiLine,
 } from "./tui.js";
@@ -96,7 +99,7 @@ describe("renderTui golden (80x8, color off)", () => {
     const got = lines(frame);
     expect(frame.startsWith("\x1b[H\x1b[2J")).toBe(true);
     expect(got).toEqual([
-      "arggon board --tui · 3 item(s)" + " ".repeat(50),
+      "arggon board --tui · 3 item(s) · sort: id" + " ".repeat(39),
       "todo (2)        " +
         "in_progress (1) " +
         "blocked (0)     " +
@@ -826,14 +829,17 @@ describe("tui freshness stamp (task-tui-live-refresh)", () => {
 
   it("the footer carries the stamp when the data is stamped, nothing before", () => {
     const items = visibleTuiItems(loadTuiItems(newTree()).items, "");
+    // Wide terminal: the help text now carries the sort/lens keys too
+    // (task-tui-sort-ready-lens), so 120 columns would clip `q quit` before
+    // the assertion can see it.
     const stamped = renderTui(
       items,
-      { ...initialTuiState(120, 10), updatedAt: new Date(2026, 8, 30, 12, 3, 44).getTime() },
+      { ...initialTuiState(200, 10), updatedAt: new Date(2026, 8, 30, 12, 3, 44).getTime() },
       { color: false },
     );
     expect(stamped).toContain("updated 12:03:44");
     expect(stamped).toContain("r refresh");
-    const unstamped = renderTui(items, initialTuiState(120, 10), { color: false });
+    const unstamped = renderTui(items, initialTuiState(200, 10), { color: false });
     expect(unstamped).not.toContain("updated ");
     expect(unstamped).toContain("q quit");
   });
@@ -974,6 +980,179 @@ describe("runTuiBoard live refresh (task-tui-live-refresh)", () => {
     term.input.write("q");
     await done;
     expect(term.outputText().endsWith("\x1b[?25h\x1b[?1049l")).toBe(true);
+  });
+});
+
+// ---------- sort + ready lens (task-tui-sort-ready-lens) ----------
+
+/** alpha(p2, ready) beta(p0, claimed) gamma(p1, blocked by alpha) delta(unset, ready). */
+const SORT_SET: WorkItem[] = [
+  item({ id: "alpha", type: "task", status: "todo", priority: "p2" }),
+  item({ id: "beta", type: "task", status: "todo", priority: "p0", assignee: "mia" }),
+  item({ id: "gamma", type: "bug", status: "todo", priority: "p1", depends_on: ["alpha"] }),
+  item({ id: "delta", type: "task", status: "todo" }),
+];
+
+describe("nextTuiSort (task-tui-sort-ready-lens)", () => {
+  it("cycles id -> priority -> next -> id", () => {
+    expect(nextTuiSort("id")).toBe("priority");
+    expect(nextTuiSort("priority")).toBe("next");
+    expect(nextTuiSort("next")).toBe("id");
+  });
+});
+
+describe("applyTuiSort + tuiViewItems (task-tui-sort-ready-lens)", () => {
+  it("id sort is the canonical lexicographic order", () => {
+    expect(applyTuiSort(SORT_SET, "id").map((i) => i.id)).toEqual([
+      "alpha",
+      "beta",
+      "delta",
+      "gamma",
+    ]);
+  });
+
+  it("priority sort is the ADR 0009 tier order, id on ties", () => {
+    expect(applyTuiSort(SORT_SET, "priority").map((i) => i.id)).toEqual([
+      "beta",
+      "gamma",
+      "alpha",
+      "delta", // unprioritized orders with the p3 tier
+    ]);
+  });
+
+  it("next sort is ready-first, then tier, then downstream weight, id on ties", () => {
+    // Ready: alpha, delta (beta is claimed, gamma blocked by alpha). Tiers:
+    // alpha (p2) before delta (p3 tier). Blocked tail: beta (p0) before
+    // gamma (p1).
+    expect(applyTuiSort(SORT_SET, "next").map((i) => i.id)).toEqual([
+      "alpha",
+      "delta",
+      "beta",
+      "gamma",
+    ]);
+  });
+
+  it("the ready-only lens keeps pullable work only, readiness over the whole tree", () => {
+    const view = tuiViewItems(SORT_SET, { filter: "", sort: "id", readyOnly: true });
+    expect(view.map((i) => i.id)).toEqual(["alpha", "delta"]); // beta claimed, gamma blocked
+    // Readiness is computed over the WHOLE tree: a search filter that hides
+    // alpha must not make gamma's dependency look unknown (it stays blocked,
+    // not ready).
+    const filtered = tuiViewItems(SORT_SET, { filter: "gam", sort: "id", readyOnly: true });
+    expect(filtered).toEqual([]);
+  });
+
+  it("the lens composes with the sort and the filter", () => {
+    const view = tuiViewItems(SORT_SET, { filter: "", sort: "priority", readyOnly: true });
+    expect(view.map((i) => i.id)).toEqual(["alpha", "delta"]);
+    const named = tuiViewItems(SORT_SET, { filter: "del", sort: "next", readyOnly: true });
+    expect(named.map((i) => i.id)).toEqual(["delta"]);
+  });
+});
+
+describe("renderTui sort + lens frame (task-tui-sort-ready-lens)", () => {
+  it("the header shows the active sort and the ready-only lens", () => {
+    const frame = lines(
+      renderTui(SORT_SET, { ...initialTuiState(120, 12), sort: "next" }, { color: false }),
+    );
+    expect(frame[0]).toContain("sort: next");
+    expect(frame[0]).not.toContain("ready-only");
+    const lensed = lines(
+      renderTui(SORT_SET, { ...initialTuiState(120, 12), readyOnly: true }, { color: false }),
+    );
+    expect(lensed[0]).toContain("sort: id · ready-only");
+    expect(lensed[1]).toContain("todo (2)"); // counts narrowed with the lens
+  });
+
+  it("cards surface priority, assignee and the blocked marker", () => {
+    const body = lines(renderTui(SORT_SET, initialTuiState(200, 12), { color: false })).join("\n");
+    expect(body).toContain("beta p0 @mia");
+    expect(body).toContain("gamma ⌫ p1");
+    expect(body).toContain("alpha p2");
+  });
+
+  it("the lens hides claimed and blocked cards from the frame", () => {
+    const body = lines(
+      renderTui(SORT_SET, { ...initialTuiState(200, 12), readyOnly: true }, { color: false }),
+    ).join("\n");
+    expect(body).toContain("alpha p2");
+    expect(body).not.toContain("beta p0");
+    expect(body).not.toContain("gamma");
+  });
+
+  it("a lens toggle re-clamps the selection against the narrowed columns", () => {
+    // card 2 (gamma in id order) under the ready lens: the todo column
+    // shrinks to two cards, so the post-toggle clamp pulls the index back.
+    const state = handleKey({ ...initialTuiState(200, 12), card: 2 }, "l");
+    expect(state.readyOnly).toBe(true);
+    const counts = tuiColumnCounts(SORT_SET, "", state.readyOnly);
+    expect(clampTuiState(state, counts).card).toBe(1);
+  });
+});
+
+describe("handleKey sort + lens keys (task-tui-sort-ready-lens)", () => {
+  it("s cycles the sort, l toggles the lens (board mode)", () => {
+    let state = handleKey(initialTuiState(), "s");
+    expect(state.sort).toBe("priority");
+    state = handleKey(state, "s");
+    expect(state.sort).toBe("next");
+    state = handleKey(state, "s");
+    expect(state.sort).toBe("id");
+    state = handleKey(state, "l");
+    expect(state.readyOnly).toBe(true);
+    state = handleKey(state, "l");
+    expect(state.readyOnly).toBe(false);
+  });
+
+  it("s and l type into the search prompt like any other key", () => {
+    let state = handleKey(initialTuiState(), "/");
+    state = handleKey(state, "s");
+    state = handleKey(state, "l");
+    expect(state.searching).toBe(true);
+    expect(state.filter).toBe("sl");
+    expect(state.sort).toBe("id");
+    expect(state.readyOnly).toBe(false);
+  });
+});
+
+describe("runTuiBoard sort + lens keys (task-tui-sort-ready-lens)", () => {
+  it("s and l repaint the board with the active sort and the ready lens", async () => {
+    const root = newTree();
+    writeItem(root, "tasks/launch/epic-a/story-login/task-p0.md", {
+      type: "task",
+      status: "todo",
+      id: "task-p0",
+      parent: "story-login",
+      title: "Hot fix",
+      priority: "p0",
+    });
+    const term = fakeTerminal();
+    term.output.columns = 200;
+    const done = runTuiBoard({ cwd: root, input: term.input, output: term.output });
+    const wait = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+    await wait(30);
+    term.input.write("s"); // sort: priority
+    await wait(30);
+    term.input.write("s"); // sort: next
+    await wait(30);
+    term.input.write("l"); // ready-only lens
+    await wait(30);
+    term.input.write("q");
+    await done;
+    const text = term.outputText();
+    expect(text).toContain("sort: next");
+    expect(text).toContain("ready-only");
+    // Last frame: the lens keeps only pullable work — task-p0 and
+    // task-rate-limit (todo, unclaimed, no open deps); the blocked bug, the
+    // claimed story and the epic are gone. Under sort: next the p0 card
+    // leads the todo column.
+    const frames = text.split("\x1b[H\x1b[2J");
+    const last = frames[frames.length - 1] ?? "";
+    expect(last).toContain("> T task-p0 p0");
+    expect(last.indexOf("task-p0")).toBeLessThan(last.indexOf("task-rate-limit"));
+    expect(last).not.toContain("bug-login-500");
+    expect(last).not.toContain("epic-a");
+    expect(last).not.toContain("story-login");
   });
 });
 

@@ -2203,9 +2203,9 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
-exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.MAX_MISSING_DEPENDENCIES = exports.unlinkNodeModulesLink = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.inspectDeclaredDependencies = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = void 0;
+exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
+exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.MAX_MISSING_DEPENDENCIES = exports.unlinkNodeModulesLink = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.inspectDeclaredDependencies = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.runShow = exports.runList = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2303,12 +2303,14 @@ Object.defineProperty(exports, "applyViewLens", { enumerable: true, get: functio
 Object.defineProperty(exports, "buildStatusIndex", { enumerable: true, get: function () { return view_model_js_1.buildStatusIndex; } });
 Object.defineProperty(exports, "groupItemsBy", { enumerable: true, get: function () { return view_model_js_1.groupItemsBy; } });
 Object.defineProperty(exports, "hasOpenDependencies", { enumerable: true, get: function () { return view_model_js_1.hasOpenDependencies; } });
+Object.defineProperty(exports, "isReadyTodo", { enumerable: true, get: function () { return view_model_js_1.isReadyTodo; } });
 Object.defineProperty(exports, "itemsForStatus", { enumerable: true, get: function () { return view_model_js_1.itemsForStatus; } });
 Object.defineProperty(exports, "matchesSubstringFilter", { enumerable: true, get: function () { return view_model_js_1.matchesSubstringFilter; } });
 Object.defineProperty(exports, "openDependencyIds", { enumerable: true, get: function () { return view_model_js_1.openDependencyIds; } });
 Object.defineProperty(exports, "priorityTier", { enumerable: true, get: function () { return view_model_js_1.priorityTier; } });
 Object.defineProperty(exports, "readyTodoCount", { enumerable: true, get: function () { return view_model_js_1.readyTodoCount; } });
 Object.defineProperty(exports, "sortById", { enumerable: true, get: function () { return view_model_js_1.sortById; } });
+Object.defineProperty(exports, "sortByNextRank", { enumerable: true, get: function () { return view_model_js_1.sortByNextRank; } });
 Object.defineProperty(exports, "sortByPriority", { enumerable: true, get: function () { return view_model_js_1.sortByPriority; } });
 Object.defineProperty(exports, "statusCounts", { enumerable: true, get: function () { return view_model_js_1.statusCounts; } });
 Object.defineProperty(exports, "treeEntries", { enumerable: true, get: function () { return view_model_js_1.treeEntries; } });
@@ -5710,12 +5712,14 @@ exports.hasOpenDependencies = hasOpenDependencies;
 exports.sortById = sortById;
 exports.priorityTier = priorityTier;
 exports.sortByPriority = sortByPriority;
+exports.sortByNextRank = sortByNextRank;
 exports.matchesSubstringFilter = matchesSubstringFilter;
 exports.visibleItems = visibleItems;
 exports.itemsForStatus = itemsForStatus;
 exports.statusCounts = statusCounts;
 exports.groupItemsBy = groupItemsBy;
 exports.treeEntries = treeEntries;
+exports.isReadyTodo = isReadyTodo;
 exports.readyTodoCount = readyTodoCount;
 exports.applyViewLens = applyViewLens;
 const filter_js_1 = require("./filter.js");
@@ -5742,6 +5746,18 @@ function priorityTier(priority) {
 function sortByPriority(items) {
     return [...items].sort((a, b) => priorityTier(a.priority) - priorityTier(b.priority) ||
         (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+function sortByNextRank(items) {
+    const byId = buildStatusIndex(items);
+    const blockedByIndex = (0, filter_js_1.buildBlockedByIndex)(items.map((item) => ({ id: item.id, dependsOn: viewItemDependencies(item) })));
+    const ready = (item) => isReadyTodo(item, byId);
+    const tier = (item) => priorityTier(item.priority);
+    const weight = (item) => (0, next_js_1.downstreamWeight)(item.id, blockedByIndex);
+    const lexicographic = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+    return [...items].sort((a, b) => Number(ready(b)) - Number(ready(a)) ||
+        tier(a) - tier(b) ||
+        weight(b) - weight(a) ||
+        lexicographic(a, b));
 }
 function matchesSubstringFilter(item, filter) {
     if (filter === "")
@@ -5823,12 +5839,15 @@ function treeEntries(items) {
 function viewItemDependencies(item) {
     return [...(item.dependsOn ?? item.depends_on ?? [])];
 }
-function readyTodoCount(items) {
-    const byId = buildStatusIndex(items);
-    return items.filter((item) => (0, status_js_1.isClaimable)(item.type) &&
+function isReadyTodo(item, byId) {
+    return ((0, status_js_1.isClaimable)(item.type) &&
         item.status === "todo" &&
         (item.assignee ?? null) === null &&
-        (0, next_js_1.isReady)({ ...item, dependsOn: viewItemDependencies(item) }, byId)).length;
+        (0, next_js_1.isReady)({ ...item, dependsOn: viewItemDependencies(item) }, byId));
+}
+function readyTodoCount(items) {
+    const byId = buildStatusIndex(items);
+    return items.filter((item) => isReadyTodo(item, byId)).length;
 }
 function applyViewLens(items, lens = {}) {
     const predicates = lens.filter === undefined || lens.filter.trim() === "" ? [] : (0, filter_js_1.parseFilter)(lens.filter);
@@ -6350,17 +6369,23 @@ function linkedWorkspacePackages(primaryRoot, worktreePath) {
 __arggonModules.set("opencode/plugins/arggon/board.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_TYPE_BADGES = exports.ARGON_BOARD_PANEL = void 0;
+exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_SELECTION_MARK = exports.BOARD_SELECTION_PAGE = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_TYPE_BADGES = exports.ARGON_BOARD_PANEL = void 0;
 exports.boardRoot = boardRoot;
 exports.emptyBoardSnapshot = emptyBoardSnapshot;
 exports.activeBoardId = activeBoardId;
 exports.boardSnapshot = boardSnapshot;
 exports.countBoardStatuses = countBoardStatuses;
 exports.boardTreeEntries = boardTreeEntries;
+exports.emptyBoardSelection = emptyBoardSelection;
+exports.resolveBoardSelection = resolveBoardSelection;
+exports.moveBoardSelection = moveBoardSelection;
+exports.selectBoardItem = selectBoardItem;
 exports.clipBoardLine = clipBoardLine;
 exports.boardHeaderLine = boardHeaderLine;
 exports.boardCountsLine = boardCountsLine;
 exports.boardItemLine = boardItemLine;
+exports.boardItemDetail = boardItemDetail;
+exports.boardDetailLines = boardDetailLines;
 exports.boardTreeLines = boardTreeLines;
 exports.sidebarStatusLine = sidebarStatusLine;
 const lib_1 = require("@arggondev/lib");
@@ -6471,6 +6496,55 @@ function countBoardStatuses(items) {
 function boardTreeEntries(items) {
     return (0, lib_1.treeEntries)(items);
 }
+exports.BOARD_SELECTION_PAGE = 10;
+function emptyBoardSelection() {
+    return { index: -1, id: null };
+}
+function selectionAt(entries, index) {
+    if (entries.length === 0)
+        return emptyBoardSelection();
+    const clamped = Math.min(Math.max(index, 0), entries.length - 1);
+    return { index: clamped, id: entries[clamped].item.id };
+}
+function resolveBoardSelection(snapshot, previous) {
+    const entries = boardTreeEntries(snapshot.items);
+    if (entries.length === 0)
+        return emptyBoardSelection();
+    if (previous.id !== null) {
+        const index = entries.findIndex((entry) => entry.item.id === previous.id);
+        if (index >= 0)
+            return { index, id: previous.id };
+    }
+    return selectionAt(entries, previous.index);
+}
+function moveBoardSelection(snapshot, selection, move) {
+    const entries = boardTreeEntries(snapshot.items);
+    if (entries.length === 0)
+        return emptyBoardSelection();
+    const current = selection.index < 0 ? -1 : Math.min(selection.index, entries.length - 1);
+    switch (move) {
+        case "first":
+            return selectionAt(entries, 0);
+        case "last":
+            return selectionAt(entries, entries.length - 1);
+        case "page-up":
+            return selectionAt(entries, current - exports.BOARD_SELECTION_PAGE);
+        case "page-down":
+            return selectionAt(entries, current + exports.BOARD_SELECTION_PAGE);
+        case "up":
+            return selectionAt(entries, current - 1);
+        case "down":
+            return selectionAt(entries, current + 1);
+    }
+}
+function selectBoardItem(snapshot, id) {
+    const wanted = (id ?? "").trim();
+    if (wanted === "")
+        return null;
+    const entries = boardTreeEntries(snapshot.items);
+    const index = entries.findIndex((entry) => entry.item.id === wanted);
+    return index < 0 ? null : { index, id: wanted };
+}
 function clipBoardLine(text, width) {
     if (width <= 0)
         return "";
@@ -6488,8 +6562,10 @@ function boardHeaderLine(snapshot) {
 function boardCountsLine(snapshot) {
     return exports.BOARD_STATUS_ORDER.map((status) => `${status} ${snapshot.counts[status]}`).join(" · ");
 }
-function boardItemLine(entry) {
+exports.BOARD_SELECTION_MARK = "❯";
+function boardItemLine(entry, options = {}) {
     const { item, depth } = entry;
+    const cursor = options.selected === true ? exports.BOARD_SELECTION_MARK : " ";
     const indent = "  ".repeat(Math.min(depth, 8));
     const active = item.active ? "▶" : " ";
     const mark = exports.BOARD_STATUS_MARKS[item.status];
@@ -6499,8 +6575,96 @@ function boardItemLine(entry) {
     const reason = item.blockedReason !== null && item.blockedReason !== ""
         ? ` · blocked: ${(0, lib_1.sanitizeHumanTextUncapped)(item.blockedReason)}`
         : "";
-    return (`${indent}${active}${mark} ${badge} ${(0, lib_1.sanitizeHumanTextUncapped)(item.id)}${blocked}${assignee}` +
+    return (`${cursor}${indent}${active}${mark} ${badge} ${(0, lib_1.sanitizeHumanTextUncapped)(item.id)}${blocked}${assignee}` +
         ` — ${(0, lib_1.sanitizeHumanTextUncapped)(item.title)}${reason}`);
+}
+exports.BOARD_DETAIL_MAX_ROWS = 16;
+exports.BOARD_DETAIL_MAX_LINE_CHARS = 200;
+const BOARD_ACCEPTANCE_ROW = /^\s*[-*]\s+\[([ xX])\]\s?(.*)$/;
+function splitBoardDetailRows(prose) {
+    const acceptance = [];
+    const body = [];
+    for (const raw of prose.replace(/<!--[\s\S]*?-->/g, "").split(/\r?\n/)) {
+        const row = raw.replace(/\t/g, "  ").trimEnd();
+        const check = BOARD_ACCEPTANCE_ROW.exec(row);
+        if (check) {
+            const mark = (check[1] ?? " ").toLowerCase() === "x" ? "x" : " ";
+            const text = (check[2] ?? "").trimEnd();
+            acceptance.push(text === "" ? `[${mark}]` : `[${mark}] ${text}`);
+            continue;
+        }
+        if (body.length === 0 && acceptance.length === 0 && /^#\s+/.test(row))
+            continue;
+        if (row.trim() === "") {
+            if (body.length === 0 || body[body.length - 1] === "")
+                continue;
+            body.push("");
+            continue;
+        }
+        body.push(row);
+    }
+    while (body.length > 0 && body[body.length - 1] === "")
+        body.pop();
+    return { acceptance, body };
+}
+function boardItemDetail(cwd, id, options = {}) {
+    const requested = id.trim();
+    const failed = (error) => ({
+        id: requested,
+        title: null,
+        path: null,
+        acceptance: [],
+        body: [],
+        acceptanceDone: 0,
+        acceptanceTotal: 0,
+        truncated: false,
+        error: (0, lib_1.sanitizeHumanError)(error),
+    });
+    if (requested === "")
+        return failed("detail unavailable: no selected item");
+    try {
+        const shown = (0, lib_1.runShow)({ cwd, id: requested });
+        const { acceptance, body } = splitBoardDetailRows(shown.prose);
+        const budget = Math.max(options.rows ?? exports.BOARD_DETAIL_MAX_ROWS, 0);
+        const shownAcceptance = acceptance.slice(0, budget);
+        const shownBody = body.slice(0, Math.max(budget - shownAcceptance.length, 0));
+        const row = (value) => clipBoardLine((0, lib_1.sanitizeHumanTextUncapped)(value), exports.BOARD_DETAIL_MAX_LINE_CHARS);
+        return {
+            id: requested,
+            title: (0, lib_1.sanitizeHumanTextUncapped)(shown.item.title ?? requested),
+            path: (0, lib_1.sanitizeHumanTextUncapped)(shown.path),
+            acceptance: shownAcceptance.map(row),
+            body: shownBody.map(row),
+            acceptanceDone: acceptance.filter((entry) => entry.startsWith("[x]")).length,
+            acceptanceTotal: acceptance.length,
+            truncated: acceptance.length + body.length > budget,
+            error: null,
+        };
+    }
+    catch (error) {
+        return failed(`detail unavailable: ${detail(error)}`);
+    }
+}
+function boardDetailLines(detail, options = {}) {
+    const width = options.width ?? 0;
+    const clip = (line) => (width > 0 ? clipBoardLine(line, width) : line);
+    if (detail.error !== null) {
+        return [clip(`  ┌ argon detail · ${detail.id}`), clip(`  └ ${detail.error}`)];
+    }
+    const lines = [clip(`  ┌ argon detail · ${detail.id} — ${detail.title ?? detail.id}`)];
+    const row = (value) => (value === "" ? "  │" : `  │ ${value}`);
+    for (const entry of detail.acceptance)
+        lines.push(clip(row(entry)));
+    for (const entry of detail.body)
+        lines.push(clip(row(entry)));
+    if (detail.truncated)
+        lines.push(clip("  │ … more row(s) omitted"));
+    const acceptance = detail.acceptanceTotal > 0
+        ? `${detail.acceptanceDone}/${detail.acceptanceTotal} acceptance`
+        : "no acceptance rows";
+    const path = detail.path !== null ? ` · ${detail.path}` : "";
+    lines.push(clip(`  └ ${acceptance}${path} · esc returns`));
+    return lines;
 }
 function boardTreeLines(snapshot, options = {}) {
     const width = options.width ?? 0;
@@ -6511,9 +6675,23 @@ function boardTreeLines(snapshot, options = {}) {
         return lines;
     lines.push(clip(boardCountsLine(snapshot)));
     const entries = boardTreeEntries(snapshot.items);
-    for (const entry of entries.slice(0, Math.max(limit, 0)))
-        lines.push(clip(boardItemLine(entry)));
-    const hidden = entries.length - Math.min(entries.length, Math.max(limit, 0));
+    const cap = Math.max(limit, 0);
+    const selected = options.selection?.index ?? -1;
+    const start = cap > 0 && selected >= cap
+        ? Math.min(selected - cap + 1, Math.max(entries.length - cap, 0))
+        : 0;
+    if (start > 0)
+        lines.push(clip(`… ${start} earlier item(s)`));
+    const visible = entries.slice(start, start + cap);
+    visible.forEach((entry, offset) => {
+        const index = start + offset;
+        lines.push(clip(boardItemLine(entry, { selected: index === selected })));
+        if (options.detail != null && options.detail.id === entry.item.id) {
+            for (const row of boardDetailLines(options.detail))
+                lines.push(clip(row));
+        }
+    });
+    const hidden = entries.length - start - visible.length;
     if (hidden > 0)
         lines.push(clip(`… ${hidden} more item(s)`));
     return lines;
@@ -6568,7 +6746,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sidebarStatusLine = exports.emptyBoardSnapshot = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardHeaderLine = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.ARGON_BOARD_PANEL = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
+exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
 exports.isArggonItemId = isArggonItemId;
 exports.parseArggonItemFromCommand = parseArggonItemFromCommand;
 exports.parseArggonItemFromCode = parseArggonItemFromCode;
@@ -9026,12 +9204,18 @@ function dispose(registration) {
 }
 var board_js_1 = require("./board.js");
 Object.defineProperty(exports, "ARGON_BOARD_PANEL", { enumerable: true, get: function () { return board_js_1.ARGON_BOARD_PANEL; } });
+Object.defineProperty(exports, "BOARD_DETAIL_MAX_LINE_CHARS", { enumerable: true, get: function () { return board_js_1.BOARD_DETAIL_MAX_LINE_CHARS; } });
+Object.defineProperty(exports, "BOARD_DETAIL_MAX_ROWS", { enumerable: true, get: function () { return board_js_1.BOARD_DETAIL_MAX_ROWS; } });
+Object.defineProperty(exports, "BOARD_SELECTION_MARK", { enumerable: true, get: function () { return board_js_1.BOARD_SELECTION_MARK; } });
+Object.defineProperty(exports, "BOARD_SELECTION_PAGE", { enumerable: true, get: function () { return board_js_1.BOARD_SELECTION_PAGE; } });
 Object.defineProperty(exports, "BOARD_STATUS_MARKS", { enumerable: true, get: function () { return board_js_1.BOARD_STATUS_MARKS; } });
 Object.defineProperty(exports, "BOARD_STATUS_ORDER", { enumerable: true, get: function () { return board_js_1.BOARD_STATUS_ORDER; } });
 Object.defineProperty(exports, "BOARD_TYPE_BADGES", { enumerable: true, get: function () { return board_js_1.BOARD_TYPE_BADGES; } });
 Object.defineProperty(exports, "activeBoardId", { enumerable: true, get: function () { return board_js_1.activeBoardId; } });
 Object.defineProperty(exports, "boardCountsLine", { enumerable: true, get: function () { return board_js_1.boardCountsLine; } });
+Object.defineProperty(exports, "boardDetailLines", { enumerable: true, get: function () { return board_js_1.boardDetailLines; } });
 Object.defineProperty(exports, "boardHeaderLine", { enumerable: true, get: function () { return board_js_1.boardHeaderLine; } });
+Object.defineProperty(exports, "boardItemDetail", { enumerable: true, get: function () { return board_js_1.boardItemDetail; } });
 Object.defineProperty(exports, "boardItemLine", { enumerable: true, get: function () { return board_js_1.boardItemLine; } });
 Object.defineProperty(exports, "boardRoot", { enumerable: true, get: function () { return board_js_1.boardRoot; } });
 Object.defineProperty(exports, "boardSnapshot", { enumerable: true, get: function () { return board_js_1.boardSnapshot; } });
@@ -9039,7 +9223,11 @@ Object.defineProperty(exports, "boardTreeEntries", { enumerable: true, get: func
 Object.defineProperty(exports, "boardTreeLines", { enumerable: true, get: function () { return board_js_1.boardTreeLines; } });
 Object.defineProperty(exports, "clipBoardLine", { enumerable: true, get: function () { return board_js_1.clipBoardLine; } });
 Object.defineProperty(exports, "countBoardStatuses", { enumerable: true, get: function () { return board_js_1.countBoardStatuses; } });
+Object.defineProperty(exports, "emptyBoardSelection", { enumerable: true, get: function () { return board_js_1.emptyBoardSelection; } });
 Object.defineProperty(exports, "emptyBoardSnapshot", { enumerable: true, get: function () { return board_js_1.emptyBoardSnapshot; } });
+Object.defineProperty(exports, "moveBoardSelection", { enumerable: true, get: function () { return board_js_1.moveBoardSelection; } });
+Object.defineProperty(exports, "resolveBoardSelection", { enumerable: true, get: function () { return board_js_1.resolveBoardSelection; } });
+Object.defineProperty(exports, "selectBoardItem", { enumerable: true, get: function () { return board_js_1.selectBoardItem; } });
 Object.defineProperty(exports, "sidebarStatusLine", { enumerable: true, get: function () { return board_js_1.sidebarStatusLine; } });
 exports.default = definition;
 })
@@ -9047,7 +9235,12 @@ exports.default = definition;
 const __arggonEntry = __arggonRequire("opencode/plugins/arggon/index.ts", undefined)
 export default __arggonEntry.default
 export const ARGON_BOARD_PANEL = __arggonEntry.ARGON_BOARD_PANEL
+export const boardItemDetail = __arggonEntry.boardItemDetail
 export const boardSnapshot = __arggonEntry.boardSnapshot
 export const boardTreeLines = __arggonEntry.boardTreeLines
+export const emptyBoardSelection = __arggonEntry.emptyBoardSelection
 export const emptyBoardSnapshot = __arggonEntry.emptyBoardSnapshot
+export const moveBoardSelection = __arggonEntry.moveBoardSelection
+export const resolveBoardSelection = __arggonEntry.resolveBoardSelection
+export const selectBoardItem = __arggonEntry.selectBoardItem
 export const sidebarStatusLine = __arggonEntry.sidebarStatusLine
