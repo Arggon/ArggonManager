@@ -449,10 +449,24 @@ The V2 prompt surface is measured, not assumed (ADR 0006, W6
   window-follow render and the bounded/sanitized detail block (acceptance rows,
   hostile bytes, error degradation), while `tui.test.ts` drives
   `createBoardController` (navigation, jumps + toasts, detail toggle, esc
-  detail-first) and pins the panel keymap's id→bind table. `npm run smoke:tui`
-  is the PTY end-to-end evidence (init → tree → plugin discovery → session →
-  `/arggon-board` → captured panel → selection/jumps/detail frames →
-  duplicate-id degradation).
+  detail-first) and pins the panel keymap's id→bind table. W6b
+  (`task-native-panel-refresh-filter`) extends both again: `board.test.ts`
+  covers the pure view layer (`filterBoardTree` text/status/fold filtering with
+  nearest-folded-ancestor counts, the fold/hide toggles, view-narrowed
+  selection moves/jumps/resolution and the view line + `(+N folded)` +
+  `… N more item(s) (PgDn pages)` renderers), while `tui.test.ts` covers the
+  mode-aware `key()` dispatch (live filter typing/backspace/accept, `s`/`d`/
+  `z`/`Z`, esc stepping back out editor → detail → view → panel), the
+  per-session view store (`boardSessionView`/`setBoardSessionView`), `refresh`
+  (re-read that keeps the cursor and re-reads an open detail block) and the
+  live timer on the panel and sidebar components (fake timers + cleanup). The
+  keymap table pins both layers: the documented-name layer plus the
+  best-effort extended layer (`backspace`, `/`, digits, `-._`) that a host may
+  reject without losing the panel keys. `npm run smoke:tui` is the PTY
+  end-to-end evidence (init → tree → plugin discovery → session →
+  `/arggon-board` → captured panel → selection/jumps/detail frames → filter
+  typing + fold + done-hide frames → a mid-run tracker write appearing on the
+  1.5 s live timer with no `r` pressed → duplicate-id degradation).
 - Fixture smoke: `arggon init` in a temp tree creates the seam; a second run
   leaves an edited `opencode.jsonc` byte-identical (adopter-owned); a tree with
   its own `opencode.json` reports the config skip and writes no `opencode.jsonc`.

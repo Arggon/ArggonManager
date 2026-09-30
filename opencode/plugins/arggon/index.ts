@@ -3897,12 +3897,17 @@ export {
   boardItemLine,
   boardRoot,
   boardSnapshot,
+  boardToggleFold,
+  boardToggleFoldAll,
+  boardToggleHideDone,
   boardTreeEntries,
   boardTreeLines,
+  boardViewActive,
   clipBoardLine,
   countBoardStatuses,
   emptyBoardSelection,
   emptyBoardSnapshot,
+  emptyBoardView,
   moveBoardSelection,
   resolveBoardSelection,
   selectBoardItem,
@@ -3917,6 +3922,7 @@ export type {
   BoardSnapshot,
   BoardTreeEntry,
   BoardTreeOptions,
+  BoardView,
 } from "./board.js"
 
 // `Plugin.define` from `@opencode/plugin` is deliberately not imported: a

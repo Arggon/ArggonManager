@@ -13,7 +13,8 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { runTuiCleanups } from "../../../test/tui-runtime-stub.js";
 import { boardSnapshot, emptyBoardSnapshot } from "./board.js";
 import {
   ARGON_BOARD_BIND,
@@ -21,14 +22,17 @@ import {
   ARGON_BOARD_SLASH,
   createBoardController,
   registerArgonTui,
+  setBoardSessionView,
   type ArgonTuiContext,
   type ArgonTuiSlot,
   type BoardControllerOptions,
+  type BoardView,
 } from "./tui.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const tmpDirs: string[] = [];
 afterEach(() => {
+  runTuiCleanups();
   for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -430,18 +434,171 @@ describe("board panel controller (selection, jumps, detail)", () => {
     expect(controller.detail()).toBeNull();
   });
 
+  it("filters the tree live: s starts the editor, keys append, esc steps back out", () => {
+    const root = fixture();
+    const closes: number[] = [];
+    const controller = controllerFor(root, { close: () => closes.push(1) });
+    // `s` opens the filter editor; letters append and match live.
+    controller.key("s");
+    expect(controller.filterEditing()).toBe(true);
+    for (const character of "task") controller.key(character);
+    expect(controller.view()).toEqual({ folded: [], hideDone: false, text: "task" });
+    expect(controller.selection()).toEqual({ index: 0, id: "task-one" });
+    let text = controller.lines().join("\n");
+    expect(text).toContain('view · filter "task▏" · 1/5 shown');
+    expect(text).toContain("T task-one — First task");
+    expect(text).not.toContain("I launch");
+    // While editing, letters feed the filter — they are not navigation.
+    controller.key("j");
+    expect(controller.view().text).toBe("taskj");
+    // No matches: the visible tree is empty and the cursor clears (total).
+    expect(controller.selection()).toEqual({ index: -1, id: null });
+    controller.key("backspace");
+    expect(controller.view().text).toBe("task");
+    controller.key("return"); // accept: back to the tree, filter stays applied
+    expect(controller.filterEditing()).toBe(false);
+    text = controller.lines().join("\n");
+    expect(text).toContain('view · filter "task" · 1/5 shown');
+    // First esc resets the view, only the second closes the panel.
+    controller.key("escape");
+    expect(controller.view()).toEqual({ folded: [], hideDone: false, text: "" });
+    expect(controller.lines().join("\n")).toContain("I launch");
+    expect(closes).toHaveLength(0);
+    controller.key("escape");
+    expect(closes).toHaveLength(1);
+  });
+
+  it("folds a subtree with z (and all containers with Z), counting hidden rows", () => {
+    const root = fixture();
+    const controller = controllerFor(root);
+    controller.key("j"); // cursor on `core`
+    controller.key("z"); // fold the core subtree
+    let text = controller.lines().join("\n");
+    expect(text).toContain("E core — Core (+3 folded)");
+    expect(text).not.toContain("S story-a");
+    expect(text).toContain('view · filter "" · 1 folded · 2/5 shown');
+    // A fold is a view change: the cursor re-resolves onto the visible tree.
+    expect(controller.selection()).toEqual({ index: 1, id: "core" });
+
+    controller.key("Z"); // every container folds — only the root stays visible
+    text = controller.lines().join("\n");
+    expect(text).toContain('view · filter "" · 3 folded · 1/5 shown');
+    expect(text).not.toContain("S story-a");
+
+    controller.key("Z"); // all folded → unfold everything
+    text = controller.lines().join("\n");
+    expect(text).toContain("S story-a");
+    expect(text).not.toContain("folded");
+
+    // Leaves cannot fold: z on the last row (`task-one`) leaves the view empty.
+    controller.key("last"); // shift+g routes the same token
+    expect(controller.selection().id).toBe("task-one");
+    controller.key("z");
+    expect(controller.view().folded).toEqual([]);
+  });
+
+  it("d hides done and cancelled rows and reports the change to the session", () => {
+    const root = fixture();
+    write(
+      root,
+      "ArggonManager/arggon-manager/launch/core/story-a/task-done.md",
+      "---\ntype: task\nstatus: done\nid: task-done\ntitle: Shipped task\nparent: story-a\n---\n\n# Shipped task\n",
+    );
+    const seen: BoardView[] = [];
+    const controller = controllerFor(root, { onViewChange: (view) => seen.push(view) });
+    expect(controller.lines().join("\n")).toContain("T task-done — Shipped task");
+    controller.key("d");
+    expect(controller.lines().join("\n")).not.toContain("task-done");
+    expect(controller.lines()[2]).toContain("done hidden");
+    expect(seen).toEqual([{ folded: [], hideDone: true, text: "" }]);
+    controller.key("d");
+    expect(controller.lines().join("\n")).toContain("T task-done — Shipped task");
+    expect(controller.view().hideDone).toBe(false);
+  });
+
+  it("keeps the view per session and restores it when the panel reopens", () => {
+    const root = fixture();
+    const { context, slots } = fakeContext(root);
+    registerArgonTui(context, { cwd: root, envItem: null });
+    const panel = slots.find((entry) => entry.slot.append === "session.panel")!;
+    setBoardSessionView("ses_a", { folded: ["core"], hideDone: false, text: "" });
+    const sessionA = render(panel.render({ name: "arggon.board", sessionID: "ses_a", width: 60 }));
+    expect(sessionA).toContain("(+3 folded)");
+    expect(sessionA).toContain("1 folded");
+    const sessionB = render(panel.render({ name: "arggon.board", sessionID: "ses_b", width: 60 }));
+    expect(sessionB).not.toContain("(+3 folded)");
+    // Reopening the same session restores the fold.
+    expect(render(panel.render({ name: "arggon.board", sessionID: "ses_a", width: 60 }))).toContain(
+      "(+3 folded)",
+    );
+  });
+
+  it("refresh re-reads the tracker, keeps the selection and re-reads an open detail", () => {
+    const root = fixture();
+    const controller = controllerFor(root);
+    controller.jump("bug-two", "test");
+    controller.toggleDetail();
+    expect(controller.detail()?.id).toBe("bug-two");
+    // A new item lands on disk; a live tick (not `r`) keeps cursor and block.
+    write(
+      root,
+      "ArggonManager/arggon-manager/launch/core/story-a/task-nine.md",
+      "---\ntype: task\nstatus: todo\nid: task-nine\ntitle: Nine\nparent: story-a\n---\n\n# Nine\n",
+    );
+    controller.refresh();
+    expect(controller.selection()).toEqual({ index: 3, id: "bug-two" });
+    expect(controller.detail()?.id).toBe("bug-two");
+    expect(controller.lines().join("\n")).toContain("T task-nine — Nine");
+    // The selected item disappears: the detail degrades instead of throwing.
+    rmSync(join(root, "ArggonManager/arggon-manager/launch/core/story-a/bug-two.md"));
+    controller.refresh();
+    expect(controller.detail()?.error).not.toBeNull();
+    expect(controller.selection().id).not.toBe("bug-two");
+  });
+
+  it("refreshes the panel and sidebar on the live timer and stops on cleanup", () => {
+    vi.useFakeTimers();
+    try {
+      const root = fixture();
+      const { context, slots } = fakeContext(root);
+      registerArgonTui(context, { cwd: root, envItem: null });
+      const panelSlot = slots.find((entry) => entry.slot.append === "session.panel")!;
+      const sidebarSlot = slots.find((entry) => entry.slot.append === "sidebar.content")!;
+      const panelElement = panelSlot.render({ name: "arggon.board", width: 60 });
+      const sidebarElement = sidebarSlot.render({});
+      expect(render(panelElement)).not.toContain("task-nine");
+      expect(render(sidebarElement)).toContain("arggon ▶ task-one todo");
+      write(
+        root,
+        "ArggonManager/arggon-manager/launch/core/story-a/task-nine.md",
+        "---\ntype: task\nstatus: todo\nid: task-nine\ntitle: Nine\nparent: story-a\n---\n\n# Nine\n",
+      );
+      write(
+        root,
+        "ArggonManager/arggon-manager/launch/core/story-a/task-one.md",
+        "---\ntype: task\nstatus: done\nid: task-one\ntitle: First task\nparent: story-a\n---\n\n# First task\n",
+      );
+      vi.advanceTimersByTime(10_000);
+      // The next renders show the new tree with no `r` pressed.
+      expect(render(panelElement)).toContain("T task-nine — Nine");
+      expect(render(sidebarElement)).toContain("arggon ▶ task-one done");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("binds the documented panel keys through the panel key layer", () => {
     const root = fixture();
     const { context, slots, layers } = fakeContext(root);
     registerArgonTui(context, { cwd: root, envItem: null });
     const panel = slots.find((entry) => entry.slot.append === "session.panel")!;
     render(panel.render({ name: "arggon.board", width: 60 }));
-    const panelLayer = layers.find((factory) => {
+    const panelLayers = layers.filter((factory) => {
       const definition = factory() as { commands?: CommandShape[] };
       return (definition.commands ?? []).some((command) => command.id.startsWith("arggon.board."));
     });
-    expect(panelLayer, "panel key layer registered").toBeDefined();
-    const commands = (panelLayer!() as { commands: CommandShape[] }).commands;
+    expect(panelLayers.length).toBe(2); // the documented layer + the best-effort filter layer
+    const commands = (panelLayers[0]!() as { commands: CommandShape[] }).commands;
     expect(Object.fromEntries(commands.map((command) => [command.id, command.bind]))).toEqual({
       "arggon.board.down": "j",
       "arggon.board.down.arrow": "down",
@@ -456,11 +613,30 @@ describe("board panel controller (selection, jumps, detail)", () => {
       "arggon.board.detail": "return",
       "arggon.board.next": "n",
       "arggon.board.active": "a",
+      "arggon.board.filter.edit": "s",
+      "arggon.board.hide-done": "d",
+      "arggon.board.fold": "z",
+      "arggon.board.fold.all": "shift+z",
       "arggon.board.fullscreen": "f",
       "arggon.board.reload": "r",
       "arggon.board.close": "escape",
+      // Letters with no action of their own feed only the filter editor.
+      ...Object.fromEntries(
+        [..."bcehilmopqtuvwxy"].map((letter) => [`arggon.board.char.${letter}`, letter]),
+      ),
     });
     // Every action is inert-safe without a host panel (no throws).
     for (const command of commands) expect(() => command.run()).not.toThrow();
+    // The extended layer carries the id-style characters and backspace; a host
+    // that rejects those names only loses them (own try/catch).
+    const extended = (panelLayers[1]!() as { commands: CommandShape[] }).commands;
+    expect(Object.fromEntries(extended.map((command) => [command.id, command.bind]))).toEqual({
+      "arggon.board.filter.backspace": "backspace",
+      "arggon.board.char./": "/",
+      ...Object.fromEntries(
+        [..."0123456789._-"].map((character) => [`arggon.board.char.${character}`, character]),
+      ),
+    });
+    for (const command of extended) expect(() => command.run()).not.toThrow();
   });
 });

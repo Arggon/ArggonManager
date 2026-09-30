@@ -240,6 +240,128 @@ export type BoardSelection = {
 export type BoardSelectionMove = "up" | "down" | "page-up" | "page-down" | "first" | "last";
 
 /**
+ * Panel view state (task-native-panel-refresh-filter): fold, hide and text
+ * filter. Kept per session by the TUI entry; `folded` is a plain array so the
+ * state stays serializable and copyable. Pure data — every mutation goes
+ * through the pure toggles below.
+ */
+export type BoardView = {
+  /** Collapsed container ids: their descendant rows are hidden. */
+  folded: string[];
+  /** Hide `done`/`cancelled` rows. */
+  hideDone: boolean;
+  /** Case-insensitive substring filter on id/title ("" = off). */
+  text: string;
+};
+
+/** The unfiltered view: everything visible, nothing folded. Pure. */
+export function emptyBoardView(): BoardView {
+  return { folded: [], hideDone: false, text: "" };
+}
+
+/** True when the view filters or folds anything (drives the view line). Pure. */
+export function boardViewActive(view: BoardView): boolean {
+  return view.folded.length > 0 || view.hideDone || view.text.trim() !== "";
+}
+
+/**
+ * Toggle the fold of one container id; a leaf (or an unknown/empty id) cannot
+ * fold, so the view comes back unchanged. Pure.
+ */
+export function boardToggleFold(
+  view: BoardView,
+  items: readonly BoardItem[],
+  id: string | null,
+): BoardView {
+  const wanted = (id ?? "").trim();
+  if (wanted === "" || !items.some((item) => item.parent === wanted)) return view;
+  const folded = view.folded.includes(wanted)
+    ? view.folded.filter((entry) => entry !== wanted)
+    : [...view.folded, wanted];
+  return { ...view, folded };
+}
+
+/**
+ * Fold every container at once — or, when every container is already folded,
+ * unfold all. Pure.
+ */
+export function boardToggleFoldAll(view: BoardView, items: readonly BoardItem[]): BoardView {
+  const containers = items
+    .filter((item) => items.some((child) => child.parent === item.id))
+    .map((item) => item.id);
+  const allFolded = containers.length > 0 && containers.every((id) => view.folded.includes(id));
+  return { ...view, folded: allFolded ? [] : containers };
+}
+
+/** Toggle the `done`/`cancelled` hide. Pure. */
+export function boardToggleHideDone(view: BoardView): BoardView {
+  return { ...view, hideDone: !view.hideDone };
+}
+
+/** Case-insensitive substring match on id/title (empty needle matches all). */
+function boardFilterMatches(item: BoardItem, needle: string): boolean {
+  if (needle === "") return true;
+  return (
+    item.id.toLowerCase().includes(needle) || (item.title ?? "").toLowerCase().includes(needle)
+  );
+}
+
+/** The visible tree under a view: filtered entries plus fold-hidden counts. */
+export type BoardFilteredTree = {
+  /** Depth-first entries that survive text, status and fold filtering. */
+  entries: BoardTreeEntry[];
+  /**
+   * Per folded container id: how many surviving rows are hidden beneath it
+   * (each hidden row is attributed to its nearest folded ancestor).
+   */
+  foldedCounts: ReadonlyMap<string, number>;
+};
+
+/**
+ * Apply the view to the flattened tree. A row is hidden when it fails the text
+ * filter or the done/cancelled hide, or when ANY ancestor is folded (checked on
+ * the full parent chain, so a folded parent that is itself filtered out still
+ * hides its subtree). Ancestors hidden by filter do NOT hide their children —
+ * a child that matches the filter stays findable. Pure.
+ */
+export function filterBoardTree(
+  items: readonly BoardItem[],
+  view?: BoardView | null,
+): BoardFilteredTree {
+  const all = boardTreeEntries(items);
+  const active = view !== undefined && view !== null && boardViewActive(view);
+  if (!active) return { entries: all, foldedCounts: new Map() };
+  const activeView = view;
+  const needle = activeView.text.trim().toLowerCase();
+  const folded = new Set(activeView.folded);
+  const byId = new Map(items.map((item) => [item.id, item]));
+  const foldedCounts = new Map<string, number>();
+  const entries: BoardTreeEntry[] = [];
+  for (const entry of all) {
+    if (!boardFilterMatches(entry.item, needle)) continue;
+    if (activeView.hideDone && (entry.item.status === "done" || entry.item.status === "cancelled")) {
+      continue;
+    }
+    // Walk the full parent chain: a row under any folded container is hidden,
+    // attributed to the nearest folded ancestor (cycle-guarded like the walk).
+    let parent = entry.item.parent;
+    const seen = new Set<string>();
+    let foldedUnder: string | null = null;
+    while (parent !== null && !seen.has(parent)) {
+      seen.add(parent);
+      if (foldedUnder === null && folded.has(parent)) foldedUnder = parent;
+      parent = byId.get(parent)?.parent ?? null;
+    }
+    if (foldedUnder !== null) {
+      foldedCounts.set(foldedUnder, (foldedCounts.get(foldedUnder) ?? 0) + 1);
+      continue;
+    }
+    entries.push(entry);
+  }
+  return { entries, foldedCounts };
+}
+
+/**
  * Rows one PgUp/PgDn step moves. The host passes no height with the panel props
  * (`{name, sessionID, width, presentation, focused, …}`), so the page size is
  * this fixed, documented constant instead of a guess at the terminal height.
@@ -262,15 +384,17 @@ function selectionAt(
 }
 
 /**
- * Resolve a selection against a freshly read tree (`r` reload): the same id
- * wins when the item still exists, otherwise the previous index is clamped to
- * the new tree, and an empty tree clears the selection. Pure.
+ * Resolve a selection against a freshly read tree (`r` reload, live refresh):
+ * the same id wins when the item is still visible under the view, otherwise the
+ * previous index is clamped to the visible tree, and an empty tree clears the
+ * selection. Pure.
  */
 export function resolveBoardSelection(
   snapshot: BoardSnapshot,
   previous: BoardSelection,
+  view?: BoardView | null,
 ): BoardSelection {
-  const entries = boardTreeEntries(snapshot.items);
+  const entries = filterBoardTree(snapshot.items, view).entries;
   if (entries.length === 0) return emptyBoardSelection();
   if (previous.id !== null) {
     const index = entries.findIndex((entry) => entry.item.id === previous.id);
@@ -284,8 +408,9 @@ export function moveBoardSelection(
   snapshot: BoardSnapshot,
   selection: BoardSelection,
   move: BoardSelectionMove,
+  view?: BoardView | null,
 ): BoardSelection {
-  const entries = boardTreeEntries(snapshot.items);
+  const entries = filterBoardTree(snapshot.items, view).entries;
   if (entries.length === 0) return emptyBoardSelection();
   // -1 means "before the first line", so a first `j` lands on index 0.
   const current = selection.index < 0 ? -1 : Math.min(selection.index, entries.length - 1);
@@ -306,16 +431,18 @@ export function moveBoardSelection(
 }
 
 /**
- * Select an item id (the `n`/`a` jumps). Returns null when the id is absent
- * from the tree — the caller decides whether that is a no-op or a toast; pure.
+ * Select an item id (the `n`/`a` jumps). Returns null when the id is absent or
+ * hidden under the view — the caller decides whether that is a no-op or a
+ * toast; pure.
  */
 export function selectBoardItem(
   snapshot: BoardSnapshot,
   id: string | null,
+  view?: BoardView | null,
 ): BoardSelection | null {
   const wanted = (id ?? "").trim();
   if (wanted === "") return null;
-  const entries = boardTreeEntries(snapshot.items);
+  const entries = filterBoardTree(snapshot.items, view).entries;
   const index = entries.findIndex((entry) => entry.item.id === wanted);
   return index < 0 ? null : { index, id: wanted };
 }
@@ -347,11 +474,13 @@ export const BOARD_SELECTION_MARK = "❯";
 /**
  * One tree line for an entry: selection cursor, indent, active marker, status
  * mark, badge, id, title. Every line carries the cursor cell (space when
- * unselected) so the tree never shifts when the selection moves.
+ * unselected) so the tree never shifts when the selection moves. A folded
+ * container appends a `(+N folded)` hint so the hidden subtree stays visible
+ * as a count.
  */
 export function boardItemLine(
   entry: BoardTreeEntry,
-  options: { selected?: boolean } = {},
+  options: { selected?: boolean; foldedCount?: number } = {},
 ): string {
   const { item, depth } = entry;
   const cursor = options.selected === true ? BOARD_SELECTION_MARK : " ";
@@ -369,9 +498,13 @@ export function boardItemLine(
     item.blockedReason !== null && item.blockedReason !== ""
       ? ` · blocked: ${sanitizeHumanTextUncapped(item.blockedReason)}`
       : "";
+  const folded =
+    options.foldedCount !== undefined && options.foldedCount > 0
+      ? ` (+${options.foldedCount} folded)`
+      : "";
   return (
     `${cursor}${indent}${active}${mark} ${badge} ${sanitizeHumanTextUncapped(item.id)}${blocked}${assignee}` +
-    ` — ${sanitizeHumanTextUncapped(item.title)}${reason}`
+    ` — ${sanitizeHumanTextUncapped(item.title)}${reason}${folded}`
   );
 }
 
@@ -513,7 +646,7 @@ export function boardDetailLines(
   return lines;
 }
 
-/** Panel render options: width/entry cap plus the live selection and detail. */
+/** Panel render options: width/entry cap plus selection, detail and the view. */
 export type BoardTreeOptions = {
   width?: number;
   limit?: number;
@@ -521,13 +654,35 @@ export type BoardTreeOptions = {
   selection?: BoardSelection | null;
   /** Detail block to embed directly under its item's tree line. */
   detail?: BoardItemDetail | null;
+  /** Fold/hide/text-filter view; null/absent shows everything. */
+  view?: BoardView | null;
+  /** True while the filter editor owns the letter keys (view line caret). */
+  filterEditing?: boolean;
 };
 
 /**
- * Plain-text panel body (no ANSI): header, counters, tree and — under the
- * selected line — the bounded detail block. The tree window follows the
- * selection so a jump never targets an invisible line; the tail cap keeps the
- * `… N more item(s)` behavior (a head marker appears only when the window slid).
+ * One status line for the active view: the text filter, the done/cancelled
+ * hide, the folded-container count and the shown/total ratio. The caret marks
+ * a filter editor that currently owns the letter keys. Pure.
+ */
+export function boardViewLine(
+  view: BoardView,
+  info: { editing?: boolean; shown: number; total: number },
+): string {
+  const parts: string[] = ["view"];
+  parts.push(`filter "${view.text}${info.editing === true ? "▏" : ""}"`);
+  if (view.hideDone) parts.push("done hidden");
+  if (view.folded.length > 0) parts.push(`${view.folded.length} folded`);
+  parts.push(`${info.shown}/${info.total} shown`);
+  return parts.join(" · ");
+}
+
+/**
+ * Plain-text panel body (no ANSI): header, counters, view line (when a filter
+ * is active), tree and — under the selected line — the bounded detail block.
+ * The view (fold/hide/filter) narrows the tree before the window logic, and the
+ * window follows the selection so a jump never targets an invisible line; the
+ * tail cap keeps the `… N more item(s)` behavior with an explicit paging hint.
  * Pure.
  */
 export function boardTreeLines(
@@ -540,7 +695,19 @@ export function boardTreeLines(
   const lines = [clip(boardHeaderLine(snapshot))];
   if (snapshot.error !== null) return lines;
   lines.push(clip(boardCountsLine(snapshot)));
-  const entries = boardTreeEntries(snapshot.items);
+  const { entries, foldedCounts } = filterBoardTree(snapshot.items, options.view);
+  const view = options.view ?? emptyBoardView();
+  if (boardViewActive(view) || options.filterEditing === true) {
+    lines.push(
+      clip(
+        boardViewLine(view, {
+          editing: options.filterEditing === true,
+          shown: entries.length,
+          total: snapshot.items.length,
+        }),
+      ),
+    );
+  }
   const cap = Math.max(limit, 0);
   const selected = options.selection?.index ?? -1;
   // Window follows the selection minimally (the CLI TUI's followScroll rule):
@@ -549,17 +716,24 @@ export function boardTreeLines(
     cap > 0 && selected >= cap
       ? Math.min(selected - cap + 1, Math.max(entries.length - cap, 0))
       : 0;
-  if (start > 0) lines.push(clip(`… ${start} earlier item(s)`));
+  if (start > 0) lines.push(clip(`… ${start} earlier item(s) (PgUp)`));
   const visible = entries.slice(start, start + cap);
   visible.forEach((entry, offset) => {
     const index = start + offset;
-    lines.push(clip(boardItemLine(entry, { selected: index === selected })));
+    lines.push(
+      clip(
+        boardItemLine(entry, {
+          selected: index === selected,
+          foldedCount: foldedCounts.get(entry.item.id),
+        }),
+      ),
+    );
     if (options.detail != null && options.detail.id === entry.item.id) {
       for (const row of boardDetailLines(options.detail)) lines.push(clip(row));
     }
   });
   const hidden = entries.length - start - visible.length;
-  if (hidden > 0) lines.push(clip(`… ${hidden} more item(s)`));
+  if (hidden > 0) lines.push(clip(`… ${hidden} more item(s) (PgDn pages)`));
   return lines;
 }
 

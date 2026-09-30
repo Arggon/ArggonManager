@@ -23,10 +23,15 @@ import {
   boardItemLine,
   boardRoot,
   boardSnapshot,
+  boardToggleFold,
+  boardToggleFoldAll,
+  boardToggleHideDone,
   boardTreeEntries,
   boardTreeLines,
   clipBoardLine,
   emptyBoardSelection,
+  emptyBoardView,
+  filterBoardTree,
   moveBoardSelection,
   resolveBoardSelection,
   selectBoardItem,
@@ -309,7 +314,7 @@ describe("board text renderers", () => {
     for (const line of clipped) expect(line.length).toBeLessThanOrEqual(24);
     const limited = boardTreeLines(snapshot, { limit: 2 });
     expect(limited).toHaveLength(5); // header + counters + 2 entries + remainder
-    expect(limited[4]).toBe("… 4 more item(s)");
+    expect(limited[4]).toBe("… 4 more item(s) (PgDn pages)");
     expect(clipBoardLine("abcdef", 3)).toBe("ab…");
     expect(clipBoardLine("abc", 3)).toBe("abc");
     expect(clipBoardLine("abc", 0)).toBe("");
@@ -583,8 +588,156 @@ describe("board inline detail block (kernel-backed, bounded, sanitized)", () => 
     });
     // header + counts + head marker + 3 entries (the window ends at the last row)
     expect(lines).toHaveLength(6);
-    expect(lines[2]).toBe("… 3 earlier item(s)");
+    expect(lines[2]).toBe("… 3 earlier item(s) (PgUp)");
     expect(lines[5]?.startsWith("❯")).toBe(true);
     expect(lines[5]).toContain("T task-two");
+  });
+});
+
+describe("board view (fold, hide, text filter — task-native-panel-refresh-filter)", () => {
+  it("filters by text on id/title, case-insensitively, live", () => {
+    const snapshot = boardSnapshot(fixture());
+    const text = (needle: string): string[] =>
+      filterBoardTree(snapshot.items, { folded: [], hideDone: false, text: needle }).entries.map(
+        (entry) => entry.item.id,
+      );
+    expect(text("")).toEqual(["launch", "core", "story-a", "bug-three", "task-one", "task-two"]);
+    expect(text("task")).toEqual(["task-one", "task-two"]);
+    expect(text("TASK-ONE")).toEqual(["task-one"]);
+    expect(text("first")).toEqual(["task-one"]); // title match
+    expect(text("ghost")).toEqual([]);
+  });
+
+  it("hides done and cancelled rows on demand", () => {
+    const done: BoardItem = {
+      ...boardItem("task-done"),
+      status: "done",
+      parent: "story-a",
+    };
+    const cancelled: BoardItem = {
+      ...boardItem("bug-dead"),
+      status: "cancelled",
+      parent: "story-a",
+    };
+    const snapshot = boardSnapshot(fixture());
+    const items = [...snapshot.items, done, cancelled];
+    const view = { folded: [], hideDone: true, text: "" };
+    const visible = filterBoardTree(items, view).entries.map((entry) => entry.item.id);
+    expect(visible).not.toContain("task-done");
+    expect(visible).not.toContain("bug-dead");
+    expect(visible).toContain("task-one");
+    // Off: everything shows again.
+    expect(filterBoardTree(items, { ...view, hideDone: false }).entries).toHaveLength(8);
+  });
+
+  it("folds subtrees and counts the hidden rows per nearest folded ancestor", () => {
+    const snapshot = boardSnapshot(fixture());
+    const folded = filterBoardTree(snapshot.items, {
+      folded: ["story-a"],
+      hideDone: false,
+      text: "",
+    });
+    expect(folded.entries.map((entry) => entry.item.id)).toEqual(["launch", "core", "story-a"]);
+    expect(folded.foldedCounts.get("story-a")).toBe(3);
+    // Folding an epic hides its whole chain; each hidden row counts once.
+    const epic = filterBoardTree(snapshot.items, { folded: ["core"], hideDone: false, text: "" });
+    expect(epic.entries.map((entry) => entry.item.id)).toEqual(["launch", "core"]);
+    expect(epic.foldedCounts.get("core")).toBe(4);
+    // A folded container that is also filtered out still hides its subtree,
+    // while an unmatched child of a filtered-out parent stays findable.
+    const both = filterBoardTree(snapshot.items, {
+      folded: ["core"],
+      hideDone: false,
+      text: "task-one",
+    });
+    expect(both.entries.map((entry) => entry.item.id)).toEqual([]);
+    const child = filterBoardTree(snapshot.items, {
+      folded: [],
+      hideDone: false,
+      text: "story",
+    });
+    expect(child.entries.map((entry) => entry.item.id)).toEqual(["story-a"]);
+  });
+
+  it("toggles folds purely: one container, all containers, done hide", () => {
+    const snapshot = boardSnapshot(fixture());
+    const items = snapshot.items;
+    const empty = emptyBoardView();
+    // A leaf or an unknown id cannot fold.
+    expect(boardToggleFold(empty, items, "task-one")).toBe(empty);
+    expect(boardToggleFold(empty, items, null)).toBe(empty);
+    expect(boardToggleFold(empty, items, "ghost")).toBe(empty);
+
+    const folded = boardToggleFold(empty, items, "story-a");
+    expect(folded.folded).toEqual(["story-a"]);
+    expect(boardToggleFold(folded, items, "story-a").folded).toEqual([]);
+
+    const all = boardToggleFoldAll(folded, items);
+    // Containers come back in the snapshot's id-sorted item order.
+    expect(all.folded).toEqual(["core", "launch", "story-a"]);
+    expect(boardToggleFoldAll(all, items).folded).toEqual([]); // all folded → unfold
+    expect(boardToggleFoldAll(empty, items).folded).toEqual(["core", "launch", "story-a"]);
+
+    expect(boardToggleHideDone(empty).hideDone).toBe(true);
+    expect(boardToggleHideDone(boardToggleHideDone(empty)).hideDone).toBe(false);
+    // The input view is never mutated.
+    expect(empty).toEqual({ folded: [], hideDone: false, text: "" });
+  });
+
+  it("moves and resolves the selection within the visible tree only", () => {
+    const snapshot = boardSnapshot(fixture());
+    const view = { folded: ["core"], hideDone: false, text: "" };
+    // The visible tree is [launch, core]; `last` clamps to core, never a
+    // hidden row.
+    expect(moveBoardSelection(snapshot, emptyBoardSelection(), "last", view)).toEqual({
+      index: 1,
+      id: "core",
+    });
+    // A jump to a hidden id misses (the caller toasts); a visible one lands.
+    expect(selectBoardItem(snapshot, "task-one", view)).toBeNull();
+    expect(selectBoardItem(snapshot, "core", view)).toEqual({ index: 1, id: "core" });
+    // Reload resolution prefers the id while it stays visible, then clamps.
+    expect(resolveBoardSelection(snapshot, { index: 3, id: "core" }, view)).toEqual({
+      index: 1,
+      id: "core",
+    });
+    expect(resolveBoardSelection(snapshot, { index: 3, id: "task-one" }, view)).toEqual({
+      index: 1,
+      id: "core",
+    });
+  });
+
+  it("renders the view line, fold hints and the paging affordances", () => {
+    const snapshot = boardSnapshot(fixture());
+    const view = { folded: [], hideDone: true, text: "task" };
+    const editing = boardTreeLines(snapshot, { view, filterEditing: true });
+    // header + counts + view line (caret while editing) + the matching rows
+    expect(editing[2]).toBe('view · filter "task▏" · done hidden · 2/6 shown');
+    expect(editing[3]).toContain("T task-one");
+    expect(editing[3]).not.toContain("(+");
+    expect(editing[4]).toContain("T task-two");
+
+    const applied = boardTreeLines(snapshot, { view });
+    expect(applied[2]).toBe('view · filter "task" · done hidden · 2/6 shown');
+
+    // A filter whose only matches sit under a fold shows zero rows honestly.
+    const foldedText = boardTreeLines(snapshot, {
+      view: { folded: ["story-a"], hideDone: true, text: "task" },
+    });
+    expect(foldedText[2]).toBe('view · filter "task" · done hidden · 1 folded · 0/6 shown');
+    expect(foldedText).toHaveLength(3);
+
+    // A folded container line carries its hidden-row count.
+    const folded = boardTreeLines(snapshot, {
+      view: { folded: ["story-a"], hideDone: false, text: "" },
+    });
+    expect(folded.find((line) => line.includes("story-a"))).toContain("(+3 folded)");
+
+    // No view, no editor: no view line at all (the shape the older tests pin).
+    const plain = boardTreeLines(snapshot);
+    expect(plain[2]).not.toContain("view ·");
+    // An idle editor with an empty filter still shows the line (typing target).
+    const idle = boardTreeLines(snapshot, { view: emptyBoardView(), filterEditing: true });
+    expect(idle[2]).toBe('view · filter "▏" · 6/6 shown');
   });
 });

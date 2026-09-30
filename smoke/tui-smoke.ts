@@ -26,6 +26,12 @@
  *      `ARGON_ITEM=story`) and Enter (inline detail block), and asserts each
  *      frame: the `❯` cursor line, the jump targets and
  *      `┌ argon detail · story — Story`.
+ *   4b. view    — the per-session view (task-native-panel-refresh-filter):
+ *      `s` + typed letters filter the tree live (the accepted filter narrows
+ *      the frame to the matching row), `z` folds the selected subtree with a
+ *      `(+N folded)` hint, `d` hides a done task and brings it back, and a
+ *      mid-run tracker write appears on the live-refresh timer
+ *      (`ARGON_BOARD_REFRESH_MS=1500`) with no `r` pressed.
  *   5. corrupt   — a duplicate-id tracker renders the unreadable header, never
  *      a slot crash (W5 review P1).
  *   6. clean     — the capture carries no plugin load failure for argon.
@@ -73,6 +79,14 @@ function available(bin: string): boolean {
 /** One PTY run: the decoded capture plus the chunk boundaries (frame marks). */
 type TuiCapture = { capture: string; marks: number[] };
 
+/** Optional run tuning: a shorter budget and a mid-run harness action. */
+type TuiRunOptions = {
+  /** Kill the TUI after this long (default `TUI_TIMEOUT_MS`). */
+  timeoutMs?: number;
+  /** Run once mid-run (e.g. write a task the live refresh must pick up). */
+  midRun?: () => void;
+};
+
 /**
  * Run the TUI inside a PTY for `TUI_TIMEOUT_MS`, typing the slash command after
  * the UI has started (the runtime needs a moment to boot the session view).
@@ -87,7 +101,9 @@ function runTui(
   env: NodeJS.ProcessEnv,
   sessionID: string,
   keys: readonly string[] = [],
+  options: TuiRunOptions = {},
 ): Promise<TuiCapture> {
+  const budget = options.timeoutMs ?? TUI_TIMEOUT_MS;
   return new Promise<TuiCapture>((resolve) => {
     const child = spawn(
       "script",
@@ -103,11 +119,16 @@ function runTui(
       // and the trailing newline stays literal.
       setTimeout(() => child.stdin.write(SLASH_COMMAND), 6000),
       setTimeout(() => child.stdin.write("\r"), 8000),
+    ];
+    if (options.midRun !== undefined) {
+      timers.push(setTimeout(() => options.midRun?.(), Math.max(budget - 6000, 9000)));
+    }
+    timers.push(
       setTimeout(() => {
         child.stdin.end();
         child.kill("SIGTERM");
-      }, TUI_TIMEOUT_MS),
-    ];
+      }, budget),
+    );
     const onData = (chunk: Buffer): void => {
       chunks.push(chunk);
       stream += chunk.toString("utf8");
@@ -225,6 +246,23 @@ function screenFrames(
 /** True when any replayed frame drew a row matching `pattern`. */
 function sawFrame(frames: readonly string[][], pattern: RegExp): boolean {
   return frames.some((frame) => frame.some((line) => pattern.test(line)));
+}
+
+/**
+ * True when one replayed frame contains every `present` pattern and none of
+ * the `absent` ones — the per-frame form a filtered/folded tree needs (the
+ * hidden row and the surviving row must be missing/present SIMULTANEOUSLY).
+ */
+function sawFrameMatching(
+  frames: readonly string[][],
+  present: readonly RegExp[],
+  absent: readonly RegExp[] = [],
+): boolean {
+  return frames.some(
+    (frame) =>
+      present.every((pattern) => frame.some((line) => pattern.test(line))) &&
+      absent.every((pattern) => frame.every((line) => !pattern.test(line))),
+  );
 }
 
 /** The last replayed screen, for failure details (no ANSI noise). */
@@ -348,7 +386,7 @@ function main(): void {
     //    active item so the `a` jump is deterministic.
     const activeEnv: NodeJS.ProcessEnv = { ...env, ARGON_ITEM: "story" };
     return runTui(fixture, activeEnv, sessionID, ["j", "n", "a", "\r"]).then(
-      ({ capture, marks }) => {
+      async ({ capture, marks }) => {
         // OpenTUI redraws only changed cells, so assertions run on the replayed
         // screen frames, not on raw capture substrings.
         const frames = screenFrames(capture, marks);
@@ -412,36 +450,116 @@ function main(): void {
           }
         }
 
-        // 5. Corrupt tracker (W5 review P1): a duplicate id used to crash the
-        //    slot with "Plugin arggon.tui crashed in slot session.panel:
-        //    Duplicate id '…'". The board must degrade to the unreadable header.
-        const listed = JSON.parse(run(["list", "--full", "--json"]).stdout ?? "{}") as {
-          items?: Array<{ id?: string; path?: string }>;
-        };
-        const taskPath = listed.items?.find((item) => item.id === "task-board-task")?.path;
-        check(
-          "the created task resolves to a tracker path",
-          typeof taskPath === "string",
-          JSON.stringify(listed).slice(0, 200),
-        );
-        if (typeof taskPath !== "string") {
-          finish(fixture);
-          return;
-        }
-        writeFileSync(
-          join(fixture, ...dirname(taskPath).split("/"), "dupe.md"),
-          "---\ntype: task\nstatus: todo\nid: task-board-task\ntitle: Duplicate\n---\n\n# Duplicate\n",
-          "utf8",
-        );
-        return runTui(fixture, env, sessionID).then(({ capture: dupe, marks: dupeMarks }) => {
-          const dupeFrames = screenFrames(dupe, dupeMarks);
+        // View capture (task-native-panel-refresh-filter): the text filter
+        // types live through the panel key layer (`s` opens the editor, the
+        // letters append, Enter accepts) and narrows the tree to the match.
+        const storyDir = ["ArggonManager", "tui-smoke", "core", "story"];
+        return runTui(fixture, env, sessionID, ["s", "b", "o", "a", "r", "d", "\r"], {
+          timeoutMs: 24_000,
+        }).then(async ({ capture: filtered, marks: filteredMarks }) => {
+          const filteredFrames = screenFrames(filtered, filteredMarks);
           check(
-            "a corrupt tracker degrades the panel to the unreadable header (P1)",
-            sawFrame(dupeFrames, /arggon board · tracker unreadable/) &&
-              !dupe.includes("crashed in slot"),
-            screenText(dupeFrames),
+            "s opens the filter editor and typing matches live",
+            sawFrame(filteredFrames, /view · filter "board▏"/) ||
+              sawFrame(filteredFrames, /view · filter "board"/),
+            screenText(filteredFrames),
           );
-          finish(fixture);
+          check(
+            "the accepted filter narrows the tree to the matching row",
+            sawFrameMatching(
+              filteredFrames,
+              [/view · filter "board" · 1\/4 shown/, /T task-board-task — Board task/],
+              [/I tui-smoke — TUI smoke/],
+            ),
+            screenText(filteredFrames),
+          );
+
+          // Fold capture: the cursor lands on the story row and `z` folds its
+          // subtree — the child row disappears while the fold hint counts it.
+          const folded = await runTui(fixture, env, sessionID, ["j", "j", "z"], {
+            timeoutMs: 24_000,
+          });
+          const foldedFrames = screenFrames(folded.capture, folded.marks);
+          check(
+            "z folds the selected subtree and counts the hidden row",
+            sawFrameMatching(
+              foldedFrames,
+              [/S story — Story \(\+1 folded\)/, /view · filter "" · 1 folded · 3\/4 shown/],
+              [/T task-board-task — Board task/],
+            ),
+            screenText(foldedFrames),
+          );
+
+          // Hide capture: a done task is added to the fixture and `d` toggles
+          // it out of (and back into) the tree.
+          writeFileSync(
+            join(fixture, ...storyDir, "task-finished.md"),
+            "---\ntype: task\nstatus: done\nid: task-finished\ntitle: Finished task\nparent: story\n---\n\n# Finished task\n",
+            "utf8",
+          );
+          const hidden = await runTui(fixture, env, sessionID, ["d", "d"], { timeoutMs: 24_000 });
+          const hiddenFrames = screenFrames(hidden.capture, hidden.marks);
+          check(
+            "d hides the done row and d brings it back",
+            sawFrameMatching(
+              hiddenFrames,
+              [/view · filter "" · done hidden · 4\/5 shown/],
+              [/T task-finished — Finished task/],
+            ) &&
+              sawFrameMatching(hiddenFrames, [/T task-finished — Finished task/], [/done hidden/]),
+            screenText(hiddenFrames),
+          );
+
+          // Live-refresh capture: with a 1.5s refresh interval the harness
+          // writes a new task while the panel is open — no `r` is pressed.
+          const liveEnv: NodeJS.ProcessEnv = { ...env, ARGON_BOARD_REFRESH_MS: "1500" };
+          const live = await runTui(fixture, liveEnv, sessionID, [], {
+            timeoutMs: 20_000,
+            midRun: () =>
+              writeFileSync(
+                join(fixture, ...storyDir, "task-live.md"),
+                "---\ntype: task\nstatus: todo\nid: task-live\ntitle: Live task\nparent: story\n---\n\n# Live task\n",
+                "utf8",
+              ),
+          });
+          const liveFrames = screenFrames(live.capture, live.marks);
+          check(
+            "the panel refreshes live when the tracker changes (no r pressed)",
+            sawFrame(liveFrames, /T task-live — Live task/),
+            screenText(liveFrames),
+          );
+
+          // 5. Corrupt tracker (W5 review P1): a duplicate id used to crash the
+          //    slot with "Plugin arggon.tui crashed in slot session.panel:
+          //    Duplicate id '…'". The board must degrade to the unreadable header.
+          const listed = JSON.parse(run(["list", "--full", "--json"]).stdout ?? "{}") as {
+            items?: Array<{ id?: string; path?: string }>;
+          };
+          const taskPath = listed.items?.find((item) => item.id === "task-board-task")?.path;
+          check(
+            "the created task resolves to a tracker path",
+            typeof taskPath === "string",
+            JSON.stringify(listed).slice(0, 200),
+          );
+          if (typeof taskPath !== "string") {
+            finish(fixture);
+            return;
+          }
+          writeFileSync(
+            join(fixture, ...dirname(taskPath).split("/"), "dupe.md"),
+            "---\ntype: task\nstatus: todo\nid: task-board-task\ntitle: Duplicate\n---\n\n# Duplicate\n",
+            "utf8",
+          );
+          return runTui(fixture, env, sessionID).then(({ capture: dupe, marks: dupeMarks }) => {
+            const dupeFrames = screenFrames(dupe, dupeMarks);
+            check(
+              "a corrupt tracker degrades the panel to the unreadable header (P1)",
+              sawFrame(dupeFrames, /arggon board · tracker unreadable/) &&
+                !dupe.includes("crashed in slot"),
+              screenText(dupeFrames),
+            );
+            finish(fixture);
+          });
         });
       },
     );

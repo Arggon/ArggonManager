@@ -20,6 +20,8 @@ declare namespace JSX {
 
 declare module "solid-js" {
   export function createSignal<T>(value: T): [() => T, (next: T | ((previous: T) => T)) => void];
+  /** Register a disposer for the enclosing component (live-refresh timers). */
+  export function onCleanup(fn: () => void): void;
   export function Show(props: { when?: unknown; children?: unknown }): unknown;
   export function For<T>(props: {
     each?: readonly T[];

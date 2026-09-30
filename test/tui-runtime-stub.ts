@@ -55,3 +55,25 @@ export function For(props: {
 export function usePlugin(): unknown {
   return undefined;
 }
+
+/**
+ * `onCleanup` double: registration is recorded so tests can flush the
+ * disposer timers (`setInterval` in the live-refresh components would
+ * otherwise leak across tests and keep the worker busy).
+ */
+const cleanups: Array<() => void> = [];
+
+export function onCleanup(fn: () => void): void {
+  cleanups.push(fn);
+}
+
+/** Run and drop every recorded disposer (call in `afterEach`). */
+export function runTuiCleanups(): void {
+  for (const dispose of cleanups.splice(0)) {
+    try {
+      dispose();
+    } catch {
+      // Disposers are total by contract; a throw here is a test-only bug.
+    }
+  }
+}
