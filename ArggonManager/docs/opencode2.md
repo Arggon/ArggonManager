@@ -252,13 +252,32 @@ The tree is navigable (W6 `task-native-panel-interaction`): every line carries a
 one-column cursor gutter, `j`/`k` (or `↓`/`↑`) move the `❯` cursor, `PgUp`/`PgDn`
 page, `g`/`Home` and `G`/`End` jump to the first/last line, and `r` re-reads the
 tracker keeping the cursor on the same item when it still exists (the 200-line
-cap is preserved; the window follows the cursor when it passes it). `Enter`
+cap is preserved; the window follows the cursor when it passes it — the tail
+hint `… N more item(s) (PgDn pages)` is the explicit paging affordance). `Enter`
 toggles an inline detail block under the selected line — the item's acceptance
 rows plus its body, read through the kernel's bounded `runShow` path, sanitized
 and capped (16 rows, 200 chars/row) — and `Esc` closes the block before the
 panel. `n` jumps to the kernel `next` suggestion and `a` to the session's active
 item (`ARGON_ITEM` or the `feat/<id>`/`fix/<id>` branch), with a toast when there
-is no target. Nothing in the panel writes to the tracker.
+is no target.
+
+The panel and sidebar also refresh live (`task-native-panel-refresh-filter`): a
+timer re-reads the tracker every 10 s (`ARGON_BOARD_REFRESH_MS` overrides it,
+`0` disables; `r` stays the manual reload), so items another session creates or
+claims appear without a keypress — the cursor, an open detail block and the view
+all survive a tick. On top of the tree sits a per-session view: `s` opens the
+text filter (typed letters match id/title live, case-insensitively;
+`backspace` deletes; `Enter` accepts; `Esc` leaves the editor, and a further
+`Esc` resets the whole view before it closes the panel), `d` hides
+`done`/`cancelled` rows, `z` folds the selected container's subtree (a
+`(+N folded)` hint counts the hidden rows; `Z` folds or unfolds every
+container). Ancestors hidden by the filter do not hide matching children;
+ancestors folded always do. The view line
+(`view · filter "…" · done hidden · N folded · x/y shown`) reports the state,
+and the view is kept per session: closing and reopening the panel restores it,
+and sessions never see each other's view.
+
+Nothing in the panel writes to the tracker.
 
 **Manual checklist** (no interactive driver in CI — the automated evidence is
 `npm run smoke:tui`, which drives exactly this flow in a PTY: init → tree →
@@ -272,6 +291,11 @@ is no target. Nothing in the panel writes to the tracker.
 | `n` / `a`                                                | Cursor jumps to the kernel `next` suggestion / the session's active item (`ARGON_ITEM` or `feat/<id>`/`fix/<id>` branch); a toast when there is no target                                                              |
 | `Enter`                                                  | Inline detail block under the selected line: `┌ argon detail · <id> — <title>`, acceptance rows `[ ]`/`[x]`, bounded sanitized body, `└ x/y acceptance · path`; `Enter` again or moving the cursor returns to the tree |
 | `Esc` (detail block open)                                | Detail block closes; the tree stays with the cursor where it was                                                                                                                                                       |
+| `s` then letters (`backspace`, `Enter`)                  | The view line shows the caret (`filter "task▏"`) and the tree narrows live per keystroke; `Enter` accepts and returns to the tree; matching is case-insensitive on id/title                                            |
+| `Esc` (filter applied, no detail block)                  | The view resets (filter cleared, done rows back, subtrees unfolded); a further `Esc` closes the panel                                                                                                                  |
+| `d`                                                      | `done`/`cancelled` rows disappear (view line gains `done hidden`); `d` again brings them back                                                                                                                          |
+| `z` on a container row / `Z`                             | The subtree folds (`(+N folded)` hint, hidden rows gone) / every container folds, `Z` again unfolds all; the cursor re-resolves onto the visible tree                                                                  |
+| Wait ~10 s with another session working the tracker      | The new/changed items appear without a keypress (live refresh; `ARGON_BOARD_REFRESH_MS=0` disables, `r` always forces)                                                                                                 |
 | `esc` (no detail block)                                  | Panel closes; the session view returns; nothing else changes                                                                                                                                                           |
 | `f`                                                      | Presentation toggles to full-screen and back (host no-op on a narrow terminal — it is already full-screen)                                                                                                             |
 | `r`                                                      | Tree is re-read from disk (edits to items appear); the cursor stays on the same item when it still exists, else clamps                                                                                                 |

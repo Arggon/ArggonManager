@@ -6357,6 +6357,12 @@ exports.activeBoardId = activeBoardId;
 exports.boardSnapshot = boardSnapshot;
 exports.countBoardStatuses = countBoardStatuses;
 exports.boardTreeEntries = boardTreeEntries;
+exports.emptyBoardView = emptyBoardView;
+exports.boardViewActive = boardViewActive;
+exports.boardToggleFold = boardToggleFold;
+exports.boardToggleFoldAll = boardToggleFoldAll;
+exports.boardToggleHideDone = boardToggleHideDone;
+exports.filterBoardTree = filterBoardTree;
 exports.emptyBoardSelection = emptyBoardSelection;
 exports.resolveBoardSelection = resolveBoardSelection;
 exports.moveBoardSelection = moveBoardSelection;
@@ -6367,6 +6373,7 @@ exports.boardCountsLine = boardCountsLine;
 exports.boardItemLine = boardItemLine;
 exports.boardItemDetail = boardItemDetail;
 exports.boardDetailLines = boardDetailLines;
+exports.boardViewLine = boardViewLine;
 exports.boardTreeLines = boardTreeLines;
 exports.sidebarStatusLine = sidebarStatusLine;
 const lib_1 = require("@arggondev/lib");
@@ -6477,6 +6484,70 @@ function countBoardStatuses(items) {
 function boardTreeEntries(items) {
     return (0, lib_1.treeEntries)(items);
 }
+function emptyBoardView() {
+    return { folded: [], hideDone: false, text: "" };
+}
+function boardViewActive(view) {
+    return view.folded.length > 0 || view.hideDone || view.text.trim() !== "";
+}
+function boardToggleFold(view, items, id) {
+    const wanted = (id ?? "").trim();
+    if (wanted === "" || !items.some((item) => item.parent === wanted))
+        return view;
+    const folded = view.folded.includes(wanted)
+        ? view.folded.filter((entry) => entry !== wanted)
+        : [...view.folded, wanted];
+    return { ...view, folded };
+}
+function boardToggleFoldAll(view, items) {
+    const containers = items
+        .filter((item) => items.some((child) => child.parent === item.id))
+        .map((item) => item.id);
+    const allFolded = containers.length > 0 && containers.every((id) => view.folded.includes(id));
+    return { ...view, folded: allFolded ? [] : containers };
+}
+function boardToggleHideDone(view) {
+    return { ...view, hideDone: !view.hideDone };
+}
+function boardFilterMatches(item, needle) {
+    if (needle === "")
+        return true;
+    return (item.id.toLowerCase().includes(needle) || (item.title ?? "").toLowerCase().includes(needle));
+}
+function filterBoardTree(items, view) {
+    const all = boardTreeEntries(items);
+    const active = view !== undefined && view !== null && boardViewActive(view);
+    if (!active)
+        return { entries: all, foldedCounts: new Map() };
+    const activeView = view;
+    const needle = activeView.text.trim().toLowerCase();
+    const folded = new Set(activeView.folded);
+    const byId = new Map(items.map((item) => [item.id, item]));
+    const foldedCounts = new Map();
+    const entries = [];
+    for (const entry of all) {
+        if (!boardFilterMatches(entry.item, needle))
+            continue;
+        if (activeView.hideDone && (entry.item.status === "done" || entry.item.status === "cancelled")) {
+            continue;
+        }
+        let parent = entry.item.parent;
+        const seen = new Set();
+        let foldedUnder = null;
+        while (parent !== null && !seen.has(parent)) {
+            seen.add(parent);
+            if (foldedUnder === null && folded.has(parent))
+                foldedUnder = parent;
+            parent = byId.get(parent)?.parent ?? null;
+        }
+        if (foldedUnder !== null) {
+            foldedCounts.set(foldedUnder, (foldedCounts.get(foldedUnder) ?? 0) + 1);
+            continue;
+        }
+        entries.push(entry);
+    }
+    return { entries, foldedCounts };
+}
 exports.BOARD_SELECTION_PAGE = 10;
 function emptyBoardSelection() {
     return { index: -1, id: null };
@@ -6487,8 +6558,8 @@ function selectionAt(entries, index) {
     const clamped = Math.min(Math.max(index, 0), entries.length - 1);
     return { index: clamped, id: entries[clamped].item.id };
 }
-function resolveBoardSelection(snapshot, previous) {
-    const entries = boardTreeEntries(snapshot.items);
+function resolveBoardSelection(snapshot, previous, view) {
+    const entries = filterBoardTree(snapshot.items, view).entries;
     if (entries.length === 0)
         return emptyBoardSelection();
     if (previous.id !== null) {
@@ -6498,8 +6569,8 @@ function resolveBoardSelection(snapshot, previous) {
     }
     return selectionAt(entries, previous.index);
 }
-function moveBoardSelection(snapshot, selection, move) {
-    const entries = boardTreeEntries(snapshot.items);
+function moveBoardSelection(snapshot, selection, move, view) {
+    const entries = filterBoardTree(snapshot.items, view).entries;
     if (entries.length === 0)
         return emptyBoardSelection();
     const current = selection.index < 0 ? -1 : Math.min(selection.index, entries.length - 1);
@@ -6518,11 +6589,11 @@ function moveBoardSelection(snapshot, selection, move) {
             return selectionAt(entries, current + 1);
     }
 }
-function selectBoardItem(snapshot, id) {
+function selectBoardItem(snapshot, id, view) {
     const wanted = (id ?? "").trim();
     if (wanted === "")
         return null;
-    const entries = boardTreeEntries(snapshot.items);
+    const entries = filterBoardTree(snapshot.items, view).entries;
     const index = entries.findIndex((entry) => entry.item.id === wanted);
     return index < 0 ? null : { index, id: wanted };
 }
@@ -6556,8 +6627,11 @@ function boardItemLine(entry, options = {}) {
     const reason = item.blockedReason !== null && item.blockedReason !== ""
         ? ` · blocked: ${(0, lib_1.sanitizeHumanTextUncapped)(item.blockedReason)}`
         : "";
+    const folded = options.foldedCount !== undefined && options.foldedCount > 0
+        ? ` (+${options.foldedCount} folded)`
+        : "";
     return (`${cursor}${indent}${active}${mark} ${badge} ${(0, lib_1.sanitizeHumanTextUncapped)(item.id)}${blocked}${assignee}` +
-        ` — ${(0, lib_1.sanitizeHumanTextUncapped)(item.title)}${reason}`);
+        ` — ${(0, lib_1.sanitizeHumanTextUncapped)(item.title)}${reason}${folded}`);
 }
 exports.BOARD_DETAIL_MAX_ROWS = 16;
 exports.BOARD_DETAIL_MAX_LINE_CHARS = 200;
@@ -6647,6 +6721,16 @@ function boardDetailLines(detail, options = {}) {
     lines.push(clip(`  └ ${acceptance}${path} · esc returns`));
     return lines;
 }
+function boardViewLine(view, info) {
+    const parts = ["view"];
+    parts.push(`filter "${view.text}${info.editing === true ? "▏" : ""}"`);
+    if (view.hideDone)
+        parts.push("done hidden");
+    if (view.folded.length > 0)
+        parts.push(`${view.folded.length} folded`);
+    parts.push(`${info.shown}/${info.total} shown`);
+    return parts.join(" · ");
+}
 function boardTreeLines(snapshot, options = {}) {
     const width = options.width ?? 0;
     const limit = options.limit ?? 200;
@@ -6655,18 +6739,29 @@ function boardTreeLines(snapshot, options = {}) {
     if (snapshot.error !== null)
         return lines;
     lines.push(clip(boardCountsLine(snapshot)));
-    const entries = boardTreeEntries(snapshot.items);
+    const { entries, foldedCounts } = filterBoardTree(snapshot.items, options.view);
+    const view = options.view ?? emptyBoardView();
+    if (boardViewActive(view) || options.filterEditing === true) {
+        lines.push(clip(boardViewLine(view, {
+            editing: options.filterEditing === true,
+            shown: entries.length,
+            total: snapshot.items.length,
+        })));
+    }
     const cap = Math.max(limit, 0);
     const selected = options.selection?.index ?? -1;
     const start = cap > 0 && selected >= cap
         ? Math.min(selected - cap + 1, Math.max(entries.length - cap, 0))
         : 0;
     if (start > 0)
-        lines.push(clip(`… ${start} earlier item(s)`));
+        lines.push(clip(`… ${start} earlier item(s) (PgUp)`));
     const visible = entries.slice(start, start + cap);
     visible.forEach((entry, offset) => {
         const index = start + offset;
-        lines.push(clip(boardItemLine(entry, { selected: index === selected })));
+        lines.push(clip(boardItemLine(entry, {
+            selected: index === selected,
+            foldedCount: foldedCounts.get(entry.item.id),
+        })));
         if (options.detail != null && options.detail.id === entry.item.id) {
             for (const row of boardDetailLines(options.detail))
                 lines.push(clip(row));
@@ -6674,7 +6769,7 @@ function boardTreeLines(snapshot, options = {}) {
     });
     const hidden = entries.length - start - visible.length;
     if (hidden > 0)
-        lines.push(clip(`… ${hidden} more item(s)`));
+        lines.push(clip(`… ${hidden} more item(s) (PgDn pages)`));
     return lines;
 }
 function sidebarStatusLine(snapshot, width = 0) {
@@ -6727,7 +6822,7 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardTreeLines = exports.boardTreeEntries = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
+exports.sidebarStatusLine = exports.selectBoardItem = exports.resolveBoardSelection = exports.moveBoardSelection = exports.emptyBoardView = exports.emptyBoardSnapshot = exports.emptyBoardSelection = exports.countBoardStatuses = exports.clipBoardLine = exports.boardViewActive = exports.boardTreeLines = exports.boardTreeEntries = exports.boardToggleHideDone = exports.boardToggleFoldAll = exports.boardToggleFold = exports.boardSnapshot = exports.boardRoot = exports.boardItemLine = exports.boardItemDetail = exports.boardHeaderLine = exports.boardDetailLines = exports.boardCountsLine = exports.activeBoardId = exports.BOARD_TYPE_BADGES = exports.BOARD_STATUS_ORDER = exports.BOARD_STATUS_MARKS = exports.BOARD_SELECTION_PAGE = exports.BOARD_SELECTION_MARK = exports.BOARD_DETAIL_MAX_ROWS = exports.BOARD_DETAIL_MAX_LINE_CHARS = exports.ARGON_BOARD_PANEL = exports.SESSION_ROOT_UNRESOLVED = exports.ArgonToolError = exports.PINNED_TOOL_NAMES = exports.ARGON_TOOL_NAMESPACE_DESCRIPTION = exports.ARGON_TOOL_NAMESPACE = exports.MAX_SUBSTITUTION_DEPTH = exports.BRANCH_PREFIXES = exports.CACHE_MAX_ENTRIES = exports.CACHE_TTL_MS = exports.ITEM_BLOCK_MAX_BYTES = exports.ITEM_ENV = void 0;
 exports.isArggonItemId = isArggonItemId;
 exports.parseArggonItemFromCommand = parseArggonItemFromCommand;
 exports.parseArggonItemFromCode = parseArggonItemFromCode;
@@ -9200,12 +9295,17 @@ Object.defineProperty(exports, "boardItemDetail", { enumerable: true, get: funct
 Object.defineProperty(exports, "boardItemLine", { enumerable: true, get: function () { return board_js_1.boardItemLine; } });
 Object.defineProperty(exports, "boardRoot", { enumerable: true, get: function () { return board_js_1.boardRoot; } });
 Object.defineProperty(exports, "boardSnapshot", { enumerable: true, get: function () { return board_js_1.boardSnapshot; } });
+Object.defineProperty(exports, "boardToggleFold", { enumerable: true, get: function () { return board_js_1.boardToggleFold; } });
+Object.defineProperty(exports, "boardToggleFoldAll", { enumerable: true, get: function () { return board_js_1.boardToggleFoldAll; } });
+Object.defineProperty(exports, "boardToggleHideDone", { enumerable: true, get: function () { return board_js_1.boardToggleHideDone; } });
 Object.defineProperty(exports, "boardTreeEntries", { enumerable: true, get: function () { return board_js_1.boardTreeEntries; } });
 Object.defineProperty(exports, "boardTreeLines", { enumerable: true, get: function () { return board_js_1.boardTreeLines; } });
+Object.defineProperty(exports, "boardViewActive", { enumerable: true, get: function () { return board_js_1.boardViewActive; } });
 Object.defineProperty(exports, "clipBoardLine", { enumerable: true, get: function () { return board_js_1.clipBoardLine; } });
 Object.defineProperty(exports, "countBoardStatuses", { enumerable: true, get: function () { return board_js_1.countBoardStatuses; } });
 Object.defineProperty(exports, "emptyBoardSelection", { enumerable: true, get: function () { return board_js_1.emptyBoardSelection; } });
 Object.defineProperty(exports, "emptyBoardSnapshot", { enumerable: true, get: function () { return board_js_1.emptyBoardSnapshot; } });
+Object.defineProperty(exports, "emptyBoardView", { enumerable: true, get: function () { return board_js_1.emptyBoardView; } });
 Object.defineProperty(exports, "moveBoardSelection", { enumerable: true, get: function () { return board_js_1.moveBoardSelection; } });
 Object.defineProperty(exports, "resolveBoardSelection", { enumerable: true, get: function () { return board_js_1.resolveBoardSelection; } });
 Object.defineProperty(exports, "selectBoardItem", { enumerable: true, get: function () { return board_js_1.selectBoardItem; } });
@@ -9218,9 +9318,14 @@ export default __arggonEntry.default
 export const ARGON_BOARD_PANEL = __arggonEntry.ARGON_BOARD_PANEL
 export const boardItemDetail = __arggonEntry.boardItemDetail
 export const boardSnapshot = __arggonEntry.boardSnapshot
+export const boardToggleFold = __arggonEntry.boardToggleFold
+export const boardToggleFoldAll = __arggonEntry.boardToggleFoldAll
+export const boardToggleHideDone = __arggonEntry.boardToggleHideDone
 export const boardTreeLines = __arggonEntry.boardTreeLines
+export const boardViewActive = __arggonEntry.boardViewActive
 export const emptyBoardSelection = __arggonEntry.emptyBoardSelection
 export const emptyBoardSnapshot = __arggonEntry.emptyBoardSnapshot
+export const emptyBoardView = __arggonEntry.emptyBoardView
 export const moveBoardSelection = __arggonEntry.moveBoardSelection
 export const resolveBoardSelection = __arggonEntry.resolveBoardSelection
 export const selectBoardItem = __arggonEntry.selectBoardItem
