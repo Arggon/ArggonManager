@@ -33,6 +33,7 @@
     "smoke:opencode": "tsx smoke/opencode-smoke.ts",
     "smoke:opencode:wave": "tsx smoke/opencode-wave.ts",
     "smoke:native-start-cold": "tsx smoke/native-start-cold-smoke.ts",
+    "smoke:worktree-playwright": "tsx smoke/worktree-playwright-smoke.ts",
     "smoke:tui": "tsx smoke/tui-smoke.ts",
     "smoke:tui-board": "tsx smoke/tui-board-smoke.ts",
     "test": "vitest run",
