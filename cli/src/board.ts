@@ -2,12 +2,16 @@ import { writeFileSync } from "node:fs";
 import { relative, resolve, sep } from "node:path";
 import {
   STATUSES,
+  aggregateReport,
   buildStatusIndex,
+  completedOf,
   findTasksDir,
   ghPrListJson,
   groupItemsBy,
+  isClaimable,
   loadItems,
   openDependencyIds,
+  priorityCounts,
   readConventionConfig,
   repoRootFromTasks,
   resolveCurrentLogin,
@@ -18,6 +22,7 @@ import {
   toContractWorkItem,
   type ContractWorkItem as WorkItem,
   type KernelWorkItem,
+  type PriorityCounts,
   type ShowComment,
 } from "@arggondev/lib";
 
@@ -194,6 +199,9 @@ export function runBoard(opts: BoardOptions): BoardResult {
     groupBy,
     lenses,
     me,
+    // Summary header (task-board-progress-header): the kernel report
+    // aggregation over the already-loaded items — static and serve parity.
+    summary: buildBoardSummary(items),
     details: opts.details === true,
     staticDetails: detailMap,
   });
@@ -1727,6 +1735,69 @@ export function wireBoardMovePrompt(): (
   return ask;
 }
 
+/** One epic row of the board summary: the report's per-epic completion. */
+export type BoardSummaryEpic = {
+  id: string;
+  title: string;
+  /** Completed leaves (kernel `completedOf`: done + cancelled). */
+  done: number;
+  /** All leaves under the epic's stories. */
+  total: number;
+};
+
+/** One blocked leaf of the board summary (kernel report's blocked list). */
+export type BoardSummaryBlocked = { id: string; reason: string };
+
+/**
+ * The summary header's payload (task-board-progress-header). Everything is
+ * computed at render from the already-loaded items through the kernel
+ * aggregation — the report's own `aggregateReport` (per-epic completion,
+ * blocked leaves with reasons), `statusCounts` (WIP) and `priorityCounts`
+ * (priority mix) — so no rule is copied. Bounded by construction: one row per
+ * epic, one entry per blocked leaf (reasons are the same strings the blocked
+ * cards already render), five priority buckets, two scalars. No per-item
+ * payload is embedded.
+ */
+export type BoardSummary = {
+  epics: BoardSummaryEpic[];
+  /** Claimable items (story/task/bug) in `in_progress`. */
+  wip: number;
+  blockedTotal: number;
+  blocked: BoardSummaryBlocked[];
+  /**
+   * Priority mix over OPEN claimable items (not todo/in_progress/blocked
+   * terminals): completed work's priority is not actionable. Buckets are the
+   * exact `p0`–`p3` tokens; unset and invalid tokens land in `none`
+   * (kernel `priorityCounts`).
+   */
+  priorities: PriorityCounts;
+};
+
+/**
+ * Compute the board summary from kernel items in one pass (static export and
+ * `--serve` alike — both callers hold the loaded items). Pure: reads nothing
+ * but the input.
+ */
+export function buildBoardSummary(items: KernelWorkItem[]): BoardSummary {
+  const { groups, blocked } = aggregateReport(items);
+  const claimable = items.filter((item) => isClaimable(item.type));
+  const openClaimable = claimable.filter(
+    (item) => item.status !== "done" && item.status !== "cancelled",
+  );
+  return {
+    epics: groups.map((group) => ({
+      id: group.epic.id,
+      title: group.epic.title,
+      done: completedOf(group.totals),
+      total: group.totals.total,
+    })),
+    wip: statusCounts(claimable).in_progress,
+    blockedTotal: blocked.length,
+    blocked: blocked.map((leaf) => ({ id: leaf.id, reason: leaf.blockedReason })),
+    priorities: priorityCounts(openClaimable),
+  };
+}
+
 /**
  * Pure renderer for the static board. Columns are the v0 statuses in enum
  * order; every card shows its own status (no rollup). All dynamic text is
@@ -1737,7 +1808,10 @@ export function wireBoardMovePrompt(): (
  * also has milestone items, so milestone-less columns render as before.
  * With `groupBy: "story"` (task-board-dependency-visuals) cards group under
  * parent-story headers sorted ascending; parent-less cards render last under
- * a "no story" header only when the column also has parent groups.
+ * a "no story" header only when the column also has parent groups. With
+ * `summary` (task-board-progress-header) each story group head also carries
+ * its completion fraction (done + cancelled over the group's cards, the
+ * kernel report's rule via `completedOf`).
  * With `live: true` (GitHub overlay) cards with a `branch` also render a PR
  * badge: state (open/draft/merged/closed) + checks summary; with
  * `diffLinks: true` (task-board-review-surface, --serve only) a second link
@@ -1755,6 +1829,16 @@ export function wireBoardMovePrompt(): (
  * caller resolves it, like `runList`). Both options are additive: without
  * `lenses` the chips container is absent and the board degrades to the plain
  * export plus the filter box.
+ * With `summary` (task-board-progress-header) the header carries a compact
+ * rollup panel computed at render (kernel report aggregation — single source,
+ * no copied rules): per-epic completion (`done + cancelled`/total leaves),
+ * blocked count with reasons, the WIP count (claimable in `in_progress`) and
+ * the priority mix over open claimable items. Bounded: one row per epic, one
+ * entry per blocked leaf, five priority buckets — no per-item payload. It
+ * rolls up the WHOLE tracker at generation time; the lens filters cards, not
+ * the summary. `static + serve` parity: both callers always pass it. Without
+ * the option (direct renderBoardHtml callers) the panel is absent and the
+ * output is unchanged.
  * With `details` (task-board-item-detail) cards become focusable (`tabindex`)
  * and the page carries the drawer shell + client script that renders the item
  * detail. Serve mode (`--serve`) fetches `/api/item?id=<id>` (kernel bounded
@@ -1806,6 +1890,14 @@ export function renderBoardHtml(
      * export included — renders named column landmarks and labeled cards.
      */
     details?: boolean;
+    /**
+     * Summary header (task-board-progress-header): the compact rollup panel
+     * (per-epic completion, blocked with reasons, WIP, priority mix) computed
+     * at render by `buildBoardSummary` from the kernel report aggregation.
+     * Static and serve pass it alike; without it (direct callers) the panel
+     * is absent and the output is unchanged.
+     */
+    summary?: BoardSummary;
     /**
      * Static-export detail payloads (`arggon board --details`,
      * task-board-static-details): one bounded payload per rendered item from
@@ -1879,6 +1971,27 @@ export function renderBoardHtml(
         typeof item.parent === "string" && item.parent !== "" ? item.parent : NO_GROUP
     : (item: WorkItem): string | null => milestoneOf(item);
   const noGroupLabel = groupByStory ? "no story" : "no milestone";
+
+  // Story completion fractions (--group-by story, task-board-progress-header):
+  // per parent key over the WHOLE board (a story's cards span columns),
+  // through the kernel report's completion rule (completedOf: done +
+  // cancelled) — the same numbers `arggon report` prints, never a restated one.
+  const completionByParent = new Map<string, { done: number; total: number }>();
+  if (groupByStory) {
+    const byParent = new Map<string, WorkItem[]>();
+    for (const item of sorted) {
+      if (!item.parent) continue;
+      const list = byParent.get(item.parent) ?? [];
+      list.push(item);
+      byParent.set(item.parent, list);
+    }
+    for (const [parent, children] of byParent) {
+      completionByParent.set(parent, {
+        done: completedOf(statusCounts(children)),
+        total: children.length,
+      });
+    }
+  }
 
   // Roving tabindex (task-board-keyboard-a11y, serve mode): exactly one card
   // carries tabindex="0" and the rest -1, so Tab reaches the board once and the
@@ -1963,7 +2076,13 @@ export function renderBoardHtml(
         if (key === NO_GROUP && groups.length === 1) return body;
         const label = key === NO_GROUP ? noGroupLabel : `⚑ ${esc(key)}`;
         const cls = key === NO_GROUP ? "mgroup-head none" : "mgroup-head";
-        return `<div class="${cls}">${label}</div>\n${body}`;
+        // Completion fraction on story group heads only (task-board-progress-header):
+        // the report's done+cancelled over every card with that parent.
+        const fraction =
+          groupByStory && key !== NO_GROUP
+            ? ` <span class="completion">${completionByParent.get(key)?.done ?? 0}/${completionByParent.get(key)?.total ?? 0}</span>`
+            : "";
+        return `<div class="${cls}">${label}${fraction}</div>\n${body}`;
       })
       .join("\n");
     // Named landmark per column (task-board-keyboard-a11y): the section's
@@ -1981,6 +2100,20 @@ export function renderBoardHtml(
   const counts = STATUSES.map((status) => `${status}: ${statusTotals[status]}`).join(" · ");
   const repo = opts.repoName ? ` — ${esc(opts.repoName)}` : "";
   const live = showPr ? ` · live GitHub overlay (${prs.size} PR(s))` : "";
+
+  // Summary header (task-board-progress-header): one compact panel, every
+  // value escaped, no interactive elements (it is pure read-only rollup).
+  // Direct callers without `summary` skip the panel entirely — the plain
+  // render stays byte-identical.
+  const summary = opts.summary;
+  const summaryPanel = summary
+    ? `<section class="summary" id="board-summary" aria-label="progress summary">
+  <div class="summary-row"><span class="summary-k">epics</span><span class="summary-v" id="board-summary-epics">${summary.epics.length > 0 ? summary.epics.map((epic) => `<span class="epic" title="${esc(epic.title)}">${esc(epic.id)} ${epic.done}/${epic.total}</span>`).join("") : '<span class="sep">none</span>'}</span></div>
+  <div class="summary-row"><span class="summary-k">wip</span><span class="summary-v" id="board-summary-wip">${summary.wip}</span></div>
+  <div class="summary-row"><span class="summary-k">priority mix</span><span class="summary-v" id="board-summary-priorities">${(["p0", "p1", "p2", "p3", "none"] as const).map((bucket) => `${bucket} ${summary.priorities[bucket]}`).join('<span class="sep"> · </span>')}</span></div>
+  <div class="summary-row"><span class="summary-k">blocked</span><span class="summary-v" id="board-summary-blocked">${summary.blockedTotal}${summary.blocked.length > 0 ? ` — ${summary.blocked.map((entry) => `${esc(entry.id)}: ${esc(entry.reason)}`).join('<span class="sep"> · </span>')}` : ""}</span></div>
+</section>`
+    : "";
 
   return `<!doctype html>
 <html lang="en">
@@ -2081,6 +2214,10 @@ header .meta { color: #59636e; font-size: 13px; }
 .mgroup-head { margin: 10px 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #0550ae; }
 .mgroup-head:first-child { margin-top: 0; }
 .mgroup-head.none { color: #666a6f; }
+/* Story completion fraction on group heads (task-board-progress-header): the
+   head's own #0550ae at normal weight, so the number reads as data, not as a
+   new category. #0550ae on #ebecf0 is the pair the head already renders. */
+.mgroup-head .completion { font-weight: 400; letter-spacing: 0; }
 .card[draggable="true"] { cursor: grab; }
 /* Mid-drag affordance (task-board-non-text-contrast-and-drag-affordance):
    the dragged card lifts instead of fading. The old "opacity: 0.5" composited
@@ -2119,6 +2256,17 @@ header .meta { color: #59636e; font-size: 13px; }
 #board-filter-input:focus { outline: 2px solid #0550ae; outline-offset: -1px; }
 #board-filter-clear { padding: 6px 10px; font-size: 12px; font-family: inherit; border: 1px solid #666a6f; border-radius: 6px; background: #fff; cursor: pointer; }
 .filter-count { font-size: 12px; color: #59636e; }
+/* Summary header (task-board-progress-header): the compact progress panel. It
+   sits on a white card against the body fill; the identifying edge is the
+   #666a6f border (#666a6f on #f4f5f7 is 4.99:1, the documented boundary
+   grey). Labels reuse the header's #59636e on #fff (5.45:1); values render in
+   the body text colour. No opacity, no interactive elements. */
+.summary { display: flex; flex-wrap: wrap; gap: 4px 22px; margin-top: 10px; padding: 8px 12px; background: #fff; border: 1px solid #666a6f; border-radius: 8px; font-size: 12px; }
+.summary-row { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.summary-k { color: #59636e; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; flex: 0 0 auto; }
+.summary-v { color: #1f2328; overflow-wrap: anywhere; }
+.summary-v .epic { margin-right: 10px; }
+.summary-v .sep { color: #59636e; }
 .filter-error { display: none; font-size: 12px; color: #cf222e; }
 .filter-error.show { display: inline; }
 .lenses { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -2132,6 +2280,7 @@ ${details ? DETAIL_CSS : ""}
 <header>
   <h1>arggon board${repo}</h1>
   <div class="meta">generated ${esc(opts.generatedAt)} · ${sorted.length} item(s) · <span id="status-counts">${counts}</span> · tracker files remain the source of truth; drops persist only against a live server (arggon board --serve)${live}</div>
+  ${summaryPanel}
 </header>
 <div class="filterbar" id="board-filterbar" role="search" aria-label="board filters">
   <label for="board-filter-input">filter</label>

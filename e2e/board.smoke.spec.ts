@@ -594,6 +594,33 @@ test.describe("@smoke board --serve", () => {
     await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
   });
 
+  test("the summary header rolls up epics, WIP, priority mix and blocked (task-board-progress-header)", async ({
+    page,
+  }) => {
+    await page.goto(server?.url ?? "");
+    const panel = page.locator("#board-summary");
+    await expect(panel).toBeVisible();
+    // The fixture's one epic (`core`) with its story leaves; fractions move as
+    // tests reorder cards, so match the shape, not frozen numbers.
+    await expect(panel.locator("#board-summary-epics .epic")).toHaveText([/^core \d+\/\d+$/]);
+    await expect(panel.locator("#board-summary-wip")).toHaveText(/^\d+$/);
+    // Priority mix: all five buckets, zero-filled (the fixture sets no priorities).
+    await expect(panel.locator("#board-summary-priorities")).toHaveText(
+      /^p0 \d+ · p1 \d+ · p2 \d+ · p3 \d+ · none \d+$/,
+    );
+    await expect(panel.locator("#board-summary-blocked")).toHaveText(/^\d+$/);
+  });
+
+  test("story group heads show the completion fraction with --group-by story", async ({ page }) => {
+    const boardFile = join(fixture, "grouped-board.html");
+    runCli(fixture, ["board", "--group-by", "story", "--out", boardFile]);
+    await page.goto(`file://${boardFile}`);
+    // The `entries` story head carries the report's done+cancelled/total over
+    // its cards; the "no story" head (if rendered) carries none.
+    const head = page.locator(".mgroup-head", { hasText: "entries" }).first();
+    await expect(head).toContainText(/⚑ entries \d+\/\d+/);
+  });
+
   test("the static export with --details opens the drawer offline from the embedded snapshot", async ({
     page,
   }) => {
