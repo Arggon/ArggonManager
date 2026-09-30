@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-tui-split-escape-sequences
 title: TUI key parser treats a chunk-split CSI sequence as Esc (filter cleared mid-paging)
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [tui, ui]
 priority: p3
 created: "2026-09-23"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T15:06:56.671Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-tui-split-escape-sequences
 ---
 <!--
