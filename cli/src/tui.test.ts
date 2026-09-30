@@ -20,7 +20,9 @@ import {
   clampTuiDetailScroll,
   clampTuiState,
   clipLine,
+  createTuiKeyDecoder,
   followTuiScroll,
+  formatTuiClock,
   handleKey,
   initialTuiState,
   loadTuiItems,
@@ -42,7 +44,7 @@ import {
   visibleTuiItems,
   wrapTuiLine,
 } from "./tui.js";
-import type { TuiDetailInput, TuiDetailSource, TuiState } from "./tui.js";
+import type { TuiDetailInput, TuiDetailSource, TuiState, TuiWatchFactory } from "./tui.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -687,6 +689,294 @@ describe("runTuiBoard scroll window (bug-tui-selection-offscreen)", () => {
   });
 });
 
+// ---------- stateful key decoder (bug-tui-split-escape-sequences) ----------
+
+const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+describe("createTuiKeyDecoder (bug-tui-split-escape-sequences)", () => {
+  it("reassembles a PgDn split across two chunks instead of leaking an Esc", () => {
+    const decoder = createTuiKeyDecoder();
+    expect(decoder.decode("\x1b[6")).toEqual([]); // held, NOT consumed as Esc
+    expect(decoder.pending).toBe("\x1b[6");
+    expect(decoder.decode("~")).toEqual(["\x1b[6~"]); // completed by the next chunk
+    expect(decoder.pending).toBe("");
+  });
+
+  it("reassembles Home split right after the ESC byte", () => {
+    const decoder = createTuiKeyDecoder();
+    expect(decoder.decode("\x1b")).toEqual([]);
+    expect(decoder.decode("[H")).toEqual(["\x1b[H"]);
+    expect(decoder.pending).toBe("");
+  });
+
+  it("emits a held Esc as a real Esc key when an unrelated byte follows", () => {
+    const decoder = createTuiKeyDecoder();
+    expect(decoder.decode("\x1b")).toEqual([]);
+    expect(decoder.decode("5")).toEqual(["\x1b", "5"]); // Esc, then the plain key
+    expect(decoder.pending).toBe("");
+  });
+
+  it("keeps whole sequences and mixed chunks byte-exact with splitKeys", () => {
+    const decoder = createTuiKeyDecoder();
+    expect(decoder.decode("\x1b[6~\x1b[Hq")).toEqual(["\x1b[6~", "\x1b[H", "q"]);
+    expect(decoder.decode("ab\x1b[C\x1b")).toEqual(["a", "b", "\x1b[C"]);
+    expect(decoder.pending).toBe("\x1b"); // only the trailing ESC is held
+  });
+
+  it("flush() drains a lone held ESC as Esc when no continuation follows", () => {
+    const decoder = createTuiKeyDecoder();
+    expect(decoder.decode("\x1b")).toEqual([]);
+    expect(decoder.flush()).toEqual(["\x1b"]);
+    expect(decoder.pending).toBe("");
+  });
+
+  it("flush() drains a half-delivered sequence as plain per-character keys", () => {
+    const decoder = createTuiKeyDecoder();
+    expect(decoder.decode("x\x1b[1")).toEqual(["x"]);
+    expect(decoder.pending).toBe("\x1b[1");
+    expect(decoder.flush()).toEqual(["\x1b", "[", "1"]);
+  });
+});
+
+describe("runTuiBoard split escape sequence (bug-tui-split-escape-sequences)", () => {
+  it("a PgDn split across chunks scrolls instead of clearing the filter", async () => {
+    const root = longTree();
+    const term = fakeTerminal();
+    term.output.columns = 200;
+    const done = runTuiBoard({ cwd: root, input: term.input, output: term.output });
+    term.input.write("/demo"); // filter the board down to the demo-* tasks
+    term.input.write("\r"); // apply the filter
+    term.input.write("\x1b[6"); // PgDn, first half only: must NOT act as Esc
+    await wait(10);
+    term.input.write("~"); // second half — the decoder reassembles one PgDn
+    await wait(150); // past the esc flush window: nothing else may decay
+    term.input.write("q");
+    await done;
+    const text = term.outputText();
+    expect(text).toContain("filter: demo"); // the filter survived the paging
+    expect(text).toContain("row 22/30"); // one full body page scrolled
+    expect(text).toContain("\x1b[7m> T demo-21 Demo item 21");
+  });
+
+  it("a lone ESC is flushed by the esc timeout and keeps its semantics", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    const done = runTuiBoard({ cwd: root, input: term.input, output: term.output });
+    term.input.write("/"); // open the search prompt
+    term.input.write("log"); // partial filter
+    await wait(10);
+    term.input.write("\x1b"); // lone Esc: no continuation will follow
+    await wait(150); // the esc flush releases it as a real Esc keypress
+    term.input.write("q");
+    await done;
+    const frames = term.outputText().split("\x1b[H\x1b[2J");
+    const last = frames[frames.length - 1] ?? "";
+    expect(last).not.toContain("esc to cancel"); // the search prompt closed
+    expect(last).not.toContain("filter:"); // and the filter was cleared
+  });
+
+  it("ESC then an unrelated key in the next chunk quits with both applied", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    const done = runTuiBoard({ cwd: root, input: term.input, output: term.output });
+    term.input.write("\x1b"); // lone Esc (held)
+    term.input.write("q"); // unrelated byte: releases the Esc, then quits
+    await done; // resolves: the loop exited cleanly
+    expect(term.outputText().endsWith("\x1b[?25h\x1b[?1049l")).toBe(true);
+  });
+});
+
+// ---------- live refresh (task-tui-live-refresh) ----------
+
+/** Counts the frames the loop has drawn (every render starts with a clear). */
+const frameCount = (text: string): number => text.split("\x1b[H\x1b[2J").length - 1;
+
+/** Injectable watcher double: records the watched dir and fires on demand. */
+function fakeWatchFactory(): {
+  factory: TuiWatchFactory;
+  watchers: Array<{ dir: string; onEvent: () => void; closed: boolean }>;
+  fire: (index: number) => void;
+} {
+  const watchers: Array<{ dir: string; onEvent: () => void; closed: boolean; close(): void }> = [];
+  const factory: TuiWatchFactory = (dir, onEvent) => {
+    const watcher = {
+      dir,
+      onEvent,
+      closed: false,
+      close(): void {
+        watcher.closed = true;
+      },
+    };
+    watchers.push(watcher);
+    return watcher;
+  };
+  return {
+    factory,
+    watchers,
+    fire: (index) => watchers[index]!.onEvent(),
+  };
+}
+
+describe("tui freshness stamp (task-tui-live-refresh)", () => {
+  it("formatTuiClock renders local HH:MM:SS and degrades a broken clock", () => {
+    expect(formatTuiClock(new Date(2026, 8, 30, 12, 3, 44).getTime())).toBe("12:03:44");
+    expect(formatTuiClock(new Date(2026, 8, 30, 7, 5, 9).getTime())).toBe("07:05:09");
+    expect(formatTuiClock(Number.NaN)).toBe("--:--:--");
+  });
+
+  it("the footer carries the stamp when the data is stamped, nothing before", () => {
+    const items = visibleTuiItems(loadTuiItems(newTree()).items, "");
+    const stamped = renderTui(
+      items,
+      { ...initialTuiState(120, 10), updatedAt: new Date(2026, 8, 30, 12, 3, 44).getTime() },
+      { color: false },
+    );
+    expect(stamped).toContain("updated 12:03:44");
+    expect(stamped).toContain("r refresh");
+    const unstamped = renderTui(items, initialTuiState(120, 10), { color: false });
+    expect(unstamped).not.toContain("updated ");
+    expect(unstamped).toContain("q quit");
+  });
+});
+
+describe("runTuiBoard live refresh (task-tui-live-refresh)", () => {
+  it("repaints a tracker change without a keypress and preserves the selection", async () => {
+    const root = newTree();
+    const inject = fakeWatchFactory();
+    const term = fakeTerminal();
+    term.output.columns = 200;
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      watch: inject.factory,
+      refreshDebounceMs: 20,
+    });
+    term.input.write("\x1b[B"); // select card 2 (task-rate-limit, todo)
+    term.input.write("\x1b[B");
+    await wait(30);
+    const before = term.outputText();
+    expect(before).toContain("\x1b[7m> T task-rate-limit");
+    // Another session writes a new item while the board is idle... (its id
+    // sorts AFTER the selected one, so the index-stable selection must not
+    // move — an item sorted before it would shift the card window instead).
+    writeItem(root, "tasks/launch/epic-a/story-login/task-z-live.md", {
+      type: "task",
+      status: "todo",
+      id: "task-z-live",
+      parent: "story-login",
+      title: "Written behind the board's back",
+    });
+    // ...the watcher fires, the loop re-reads and repaints — no key pressed.
+    inject.fire(0);
+    await wait(120);
+    term.input.write("q");
+    await done;
+    const text = term.outputText();
+    expect(frameCount(text)).toBeGreaterThan(frameCount(before)); // a repaint happened
+    expect(text).toContain("T task-z-live"); // the new card is on the board
+    expect(text).toContain("\x1b[7m> T task-rate-limit"); // selection preserved
+    expect(text.endsWith("\x1b[?25h\x1b[?1049l")).toBe(true);
+    // The watcher watched the tracker dir (not the repo root or cwd) and quit
+    // closed it.
+    expect(inject.watchers[0]?.dir).toBe(loadTuiItems(root).tasksDir);
+    expect(inject.watchers[0]?.closed).toBe(true);
+  });
+
+  it("a watcher burst debounces into exactly one re-read", async () => {
+    const root = newTree();
+    const inject = fakeWatchFactory();
+    const term = fakeTerminal();
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      watch: inject.factory,
+      refreshDebounceMs: 40,
+    });
+    await wait(30);
+    const before = frameCount(term.outputText());
+    inject.fire(0);
+    inject.fire(0);
+    inject.fire(0); // three events inside the debounce window
+    await wait(150);
+    term.input.write("q");
+    await done;
+    expect(frameCount(term.outputText())).toBe(before + 1);
+  });
+
+  it("`r` forces a refresh without any watcher event", async () => {
+    const root = newTree();
+    const inject = fakeWatchFactory();
+    const term = fakeTerminal();
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      watch: inject.factory,
+      refreshDebounceMs: 20,
+    });
+    await wait(30);
+    const before = frameCount(term.outputText());
+    term.input.write("r");
+    await wait(60);
+    term.input.write("q");
+    await done;
+    expect(frameCount(term.outputText())).toBe(before + 1);
+  });
+
+  it("a watcher that cannot open (null or throwing) degrades to keypress reads", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      watch: () => null,
+    });
+    term.input.write("\x1b[C"); // column move proves the loop keeps working
+    await wait(30);
+    term.input.write("q");
+    await done;
+    expect(term.outputText()).toContain("\x1b[1;7min_progress (1)");
+  });
+
+  it("a throwing watcher factory never reaches the loop", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      watch: () => {
+        throw new Error("no inotify for you");
+      },
+    });
+    term.input.write("q");
+    await done; // resolves: the loop booted without a watcher
+    expect(term.outputText()).toContain("arggon board --tui");
+  });
+
+  it("a watcher whose close fails still quits cleanly, and quit closes the watcher", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    const failingClose = (): { close(): void } => ({
+      close(): void {
+        throw new Error("already closed");
+      },
+    });
+    const done = runTuiBoard({
+      cwd: root,
+      input: term.input,
+      output: term.output,
+      watch: failingClose,
+    });
+    term.input.write("q");
+    await done;
+    expect(term.outputText().endsWith("\x1b[?25h\x1b[?1049l")).toBe(true);
+  });
+});
+
 // ---------- CLI wiring (spawned, piped stdout = non-TTY) ----------
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -1259,7 +1549,10 @@ describe("detail pane: runTuiBoard loop", () => {
     term.input.write("\x1b[6~"); // PgDn: one pane page
     await tick();
     term.input.write("\x1b"); // Esc: back to the board
-    await tick();
+    // bug-tui-split-escape-sequences: the lone ESC byte is held for the esc
+    // flush window (in case a CSI continuation follows), then flushed as a
+    // real Esc keypress — wait past the window so the board frame is drawn.
+    await wait(150);
     term.input.write("q");
     await done;
 
