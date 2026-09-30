@@ -1,13 +1,15 @@
 ---
 type: story
-status: todo
+status: in_progress
 id: ui-web-board-v2
 title: "Web board v2: lenses, detail and accessibility"
+assignee: Arggon
 parent: ui
 labels: [viewer, board, ui]
 priority: p2
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T23:13:31.273Z"
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/ui-web-board-v2.md (story index; required).
