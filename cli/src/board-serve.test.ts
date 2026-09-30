@@ -12,11 +12,15 @@ import { mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, writeFileSync } f
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { request } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
+  FAVICON_SVG,
   MAX_DETAIL_COMMENT_BYTES,
   MAX_DETAIL_PROSE_BYTES,
   clipDetailText,
+  isAllowedMutatingOrigin,
+  openInBrowser,
   parseAcceptanceRows,
   startBoardServer,
   type BoardServeHandle,
@@ -102,6 +106,17 @@ describe("board --serve", () => {
     expect(html).not.toContain('EventSource("/events")');
     expect(html).not.toContain("board-conn");
     expect(html).not.toContain("board-live-state");
+    // task-board-serve-hardening: the favicon link is serve-only too.
+    expect(html).not.toContain('rel="icon"');
+  });
+
+  it("serves a favicon and links it from the served page only (task-board-serve-hardening)", async () => {
+    const res = await fetch(`${handle.url}/favicon.ico`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/svg+xml");
+    expect(await res.text()).toBe(FAVICON_SVG);
+    const html = await (await fetch(`${handle.url}/`)).text();
+    expect(html).toContain('<link rel="icon" href="/favicon.ico">');
   });
 
   it("routes drag-and-drop edits through the kernel update path", async () => {
@@ -149,6 +164,82 @@ describe("board --serve", () => {
     expect(withReason.status).toBe(200);
   });
 
+  it("refuses cross-site updates with 403 before the kernel write path (task-board-serve-hardening)", async () => {
+    // http.request (not fetch): fetch may not honour a hand-set Host header,
+    // and these cases are precisely about header control.
+    const post = (
+      headers: Record<string, string>,
+      body: object,
+    ): Promise<{ status: number; message: string }> =>
+      new Promise((resolvePromise, reject) => {
+        const req = request(
+          `${handle.url}/api/update`,
+          { method: "POST", headers: { "Content-Type": "application/json", ...headers } },
+          (res) => {
+            let raw = "";
+            res.on("data", (chunk: Buffer) => (raw += chunk.toString("utf8")));
+            res.on("end", () => {
+              const parsed = JSON.parse(raw) as { ok: boolean; error?: { message: string } };
+              resolvePromise({ status: res.statusCode ?? 0, message: parsed.error?.message ?? "" });
+            });
+          },
+        );
+        req.on("error", reject);
+        req.end(JSON.stringify(body));
+      });
+    const gateBody = { id: "task-a", status: "done" };
+
+    // A foreign Origin (any web page that can reach the loopback port).
+    const foreign = await post(
+      { Origin: "http://evil.example:8080", Host: `127.0.0.1:${handle.port}` },
+      gateBody,
+    );
+    expect(foreign.status).toBe(403);
+    expect(foreign.message).toContain("loopback clients only");
+
+    // The literal `null` origin (sandboxed iframe) is refused too.
+    const nullOrigin = await post({ Origin: "null", Host: `127.0.0.1:${handle.port}` }, gateBody);
+    expect(nullOrigin.status).toBe(403);
+
+    // A browser-marked cross-site request is refused even with a matching Host.
+    const crossSite = await post(
+      { "Sec-Fetch-Site": "cross-site", Host: `127.0.0.1:${handle.port}` },
+      gateBody,
+    );
+    expect(crossSite.status).toBe(403);
+
+    // A foreign Host (DNS rebinding / proxy pass-through) is refused.
+    const foreignHost = await post({ Host: "tracker.example.test:80" }, gateBody);
+    expect(foreignHost.status).toBe(403);
+
+    // Nothing above reached the kernel: the item is untouched on disk.
+    const shown = runShow({ cwd: dir, id: "task-a" });
+    expect(shown.item.status).toBe("blocked");
+  });
+
+  it("accepts same-origin updates and Origin-less local clients (task-board-serve-hardening)", async () => {
+    // What the browser page itself sends: loopback Origin, matching Host.
+    const sameOrigin = await fetch(`${handle.url}/api/update`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Origin: handle.url,
+        Host: `127.0.0.1:${handle.port}`,
+        "Sec-Fetch-Site": "same-origin",
+      },
+      body: JSON.stringify({ id: "task-a", status: "blocked", blocked_reason: "gate" }),
+    });
+    expect(sameOrigin.status).toBe(200);
+
+    // What scripts send: no Origin, no Sec-Fetch-Site, loopback Host.
+    const noOrigin = await fetch(`${handle.url}/api/update`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: "task-a", status: "in_progress", assignee: "alice" }),
+    });
+    expect(noOrigin.status).toBe(200);
+  });
+
   it("pushes a reload event over SSE when any work item file changes", async () => {
     const controller = new AbortController();
     const res = await fetch(`${handle.url}/events`, { signal: controller.signal });
@@ -187,6 +278,86 @@ describe("board --serve", () => {
     expect(res.status).toBe(404);
     const body = (await res.json()) as { ok: boolean; error: { message: string } };
     expect(body.ok).toBe(false);
+  });
+});
+
+describe("isAllowedMutatingOrigin (task-board-serve-hardening)", () => {
+  const port = 4173;
+  const allowed = (headers: Parameters<typeof isAllowedMutatingOrigin>[0]): boolean =>
+    isAllowedMutatingOrigin(headers, port);
+
+  it("accepts the served loopback origin and loopback hosts", () => {
+    // What the served page sends on a drop.
+    expect(allowed({ host: `127.0.0.1:${port}`, origin: `http://127.0.0.1:${port}` })).toBe(true);
+    expect(allowed({ host: `localhost:${port}`, origin: `http://localhost:${port}` })).toBe(true);
+    expect(allowed({ host: `[::1]:${port}`, origin: "http://[::1]:4173" })).toBe(true);
+    // What scripts (curl, CI) send: no Origin at all — Host carries the check.
+    expect(allowed({ host: `127.0.0.1:${port}` })).toBe(true);
+    expect(allowed({ host: `127.0.0.1:${port}`, origin: "" })).toBe(true);
+    // A same-origin Sec-Fetch-Site never overrides the loopback checks.
+    expect(
+      allowed({
+        host: `127.0.0.1:${port}`,
+        origin: `http://127.0.0.1:${port}`,
+        secFetchSite: "same-origin",
+      }),
+    ).toBe(true);
+  });
+
+  it("refuses everything that is not the served loopback origin", () => {
+    // Missing or foreign Host: even a missing Origin cannot pass.
+    expect(allowed({})).toBe(false);
+    expect(allowed({ host: `127.0.0.1:${port + 1}`, origin: `http://127.0.0.1:${port}` })).toBe(
+      false,
+    );
+    expect(allowed({ host: "tracker.example.test:80" })).toBe(false);
+    expect(allowed({ host: "localhost:80" })).toBe(false);
+    // A DNS name that resolves to 127.0.0.1 is still not a loopback origin.
+    expect(allowed({ host: `127.0.0.1:${port}`, origin: "http://local.test:4173" })).toBe(false);
+    // Foreign scheme/host and unparseable (incl. the literal `null`) origins.
+    expect(allowed({ host: `127.0.0.1:${port}`, origin: "https://127.0.0.1:4173" })).toBe(false);
+    expect(allowed({ host: `127.0.0.1:${port}`, origin: "http://evil.example:8080" })).toBe(false);
+    expect(allowed({ host: `127.0.0.1:${port}`, origin: "null" })).toBe(false);
+    expect(allowed({ host: `127.0.0.1:${port}`, origin: "not a url" })).toBe(false);
+    // A browser-marked cross-site request is refused despite a matching Host.
+    expect(allowed({ host: `127.0.0.1:${port}`, secFetchSite: "cross-site" })).toBe(false);
+    expect(allowed({ host: `127.0.0.1:${port}`, secFetchSite: "same-site" })).toBe(true);
+    expect(allowed({ host: `127.0.0.1:${port}`, secFetchSite: "none" })).toBe(true);
+  });
+});
+
+describe("openInBrowser (task-board-serve-hardening)", () => {
+  /** Minimal spawn double capturing the command; never launches anything. */
+  function fakeSpawn() {
+    const calls: Array<{ cmd: string; args: string[] }> = [];
+    const fn = ((cmd: string, args: string[]) => {
+      calls.push({ cmd, args });
+      return { on: () => {}, unref: () => {} };
+    }) as unknown as typeof spawn;
+    return { calls, fn };
+  }
+
+  it("picks the platform opener and detaches", () => {
+    const a = fakeSpawn();
+    expect(openInBrowser("http://127.0.0.1:4173", "linux", a.fn)).toBe(true);
+    expect(a.calls[0]).toEqual({ cmd: "xdg-open", args: ["http://127.0.0.1:4173"] });
+
+    const m = fakeSpawn();
+    expect(openInBrowser("http://127.0.0.1:4173", "darwin", m.fn)).toBe(true);
+    expect(m.calls[0]).toEqual({ cmd: "open", args: ["http://127.0.0.1:4173"] });
+
+    const w = fakeSpawn();
+    expect(openInBrowser("http://127.0.0.1:4173", "win32", w.fn)).toBe(true);
+    expect(w.calls[0]).toEqual({ cmd: "cmd", args: ["/c", "start", "", "http://127.0.0.1:4173"] });
+  });
+
+  it("is best-effort: a throw from the launcher never propagates", () => {
+    const throwing = (() => {
+      throw new Error("spawn ENOENT");
+    }) as unknown as typeof spawn;
+    expect(openInBrowser("http://127.0.0.1:4173", "linux", throwing)).toBe(false);
+    const asyncFail = (() => ({ on: () => {}, unref: () => {} })) as unknown as typeof spawn;
+    expect(openInBrowser("http://127.0.0.1:4173", "linux", asyncFail)).toBe(true);
   });
 });
 
@@ -564,6 +735,10 @@ ${"y".repeat(MAX_DETAIL_COMMENT_BYTES + 512)}`,
     expect(html).toContain('id="board-drawer"');
     expect(html).toContain('data-detail-endpoint="/api/item"');
     expect(html).toContain('tabindex="0"');
-    expect(html).toContain("wireBoardDetail(toast, renderBoardDetail);");
+    // Serve mode embeds no snapshot map (BOARD_DETAILS = null): the drawer
+    // fetches /api/item — the static --details export is the map's consumer
+    // (task-board-static-details).
+    expect(html).toContain("var BOARD_DETAILS = null;");
+    expect(html).toContain("wireBoardDetail(toast, renderBoardDetail, BOARD_DETAILS);");
   });
 });

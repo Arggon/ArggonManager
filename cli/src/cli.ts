@@ -3,7 +3,7 @@ import { Command } from "commander";
 import { relative, sep } from "node:path";
 import { formatAdoptAckReport, formatAdoptReport, runAdopt, runAdoptAck } from "./adopt.js";
 import { displayPath, runBoard } from "./board.js";
-import { startBoardServer } from "./board-serve.js";
+import { openInBrowser, startBoardServer } from "./board-serve.js";
 import { runBranch } from "./branch.js";
 import {
   DEFAULT_TAIL_COMMENTS,
@@ -2467,11 +2467,21 @@ program
     "group cards within each column by milestone (ADR 0003) or parent story (story)",
   )
   .option(
+    "--details",
+    "static export: embed a bounded per-item detail (8 KiB prose, 4 KiB per comment, last 3 comments) so the drawer works offline from file://; the page grows per item accordingly",
+    false,
+  )
+  .option(
     "--serve",
     "serve the board locally (127.0.0.1) with live reload; edits go through the update path",
     false,
   )
   .option("--port <port>", "port for --serve (default: a free ephemeral port)")
+  .option(
+    "--open",
+    "open the served board in the default browser after listen (with --serve; best-effort)",
+    false,
+  )
   .option(
     "--tui",
     "interactive read-only terminal kanban (raw ANSI, q quits; not combinable with --json)",
@@ -2483,8 +2493,10 @@ program
       out?: string;
       github?: boolean;
       groupBy?: string;
+      details?: boolean;
       serve?: boolean;
       port?: string;
+      open?: boolean;
       tui?: boolean;
       json?: boolean;
     }) => {
@@ -2502,6 +2514,10 @@ program
         printHumanError("arggon board", message);
         process.exitCode = 1;
       };
+      if (opts.open && !opts.serve) {
+        jsonFailed("--open requires --serve (the static export has nothing to open)");
+        return;
+      }
       if (opts.tui) {
         if (opts.serve) {
           jsonFailed("cannot combine --tui with --serve (both are interactive modes)");
@@ -2510,6 +2526,12 @@ program
         if (opts.groupBy !== undefined) {
           jsonFailed(
             "cannot combine --tui with --group-by (the TUI groups by status column only; use the HTML board for --group-by)",
+          );
+          return;
+        }
+        if (opts.details) {
+          jsonFailed(
+            "cannot combine --tui with --details (--details embeds item details in the static HTML export; the TUI has no drawer)",
           );
           return;
         }
@@ -2531,6 +2553,12 @@ program
           );
           return;
         }
+        if (opts.details) {
+          jsonFailed(
+            "cannot combine --details with --serve (the served drawer always fetches /api/item; --details is the static export's opt-in)",
+          );
+          return;
+        }
         let port: number | undefined;
         if (opts.port !== undefined) {
           port = Number.parseInt(opts.port, 10);
@@ -2545,14 +2573,27 @@ program
             if (json) {
               successJson(
                 "board",
-                { serving: true, url: handle.url, port: handle.port },
+                {
+                  serving: true,
+                  url: handle.url,
+                  port: handle.port,
+                  ...(opts.open ? { open: true } : {}),
+                },
                 readConventionVersion(handle.root),
               );
-              return;
+            } else {
+              console.log(
+                `arggon board: serving ${sanitizeHumanError(displayPath(handle.root, process.cwd()))} on ${sanitizeHumanError(handle.url)} (binds 127.0.0.1 only, Ctrl-C to stop)`,
+              );
             }
-            console.log(
-              `arggon board: serving ${sanitizeHumanError(displayPath(handle.root, process.cwd()))} on ${sanitizeHumanError(handle.url)} (binds 127.0.0.1 only, Ctrl-C to stop)`,
-            );
+            // --open (task-board-serve-hardening): best-effort launch after
+            // listen; a missing opener never breaks the running server.
+            if (opts.open) {
+              const opened = openInBrowser(handle.url);
+              if (!json && !opened) {
+                console.log("arggon board: could not launch a browser (serving anyway)");
+              }
+            }
           });
         } catch (err) {
           jsonFailed(err instanceof Error ? err.message : String(err));
@@ -2565,6 +2606,7 @@ program
           out: opts.out,
           github: opts.github,
           groupBy: opts.groupBy,
+          details: opts.details,
         });
         if (json) {
           successJson(
@@ -2574,13 +2616,14 @@ program
               itemCount: result.itemCount,
               ...(result.groupBy ? { groupBy: result.groupBy } : {}),
               ...(opts.github ? { github: true, prCount: result.prCount } : {}),
+              ...(opts.details ? { details: true, detailBytes: result.detailBytes } : {}),
             },
             readConventionVersion(result.root),
           );
           return;
         }
         console.log(
-          `arggon board: wrote ${sanitizeHumanError(displayPath(result.outPath, process.cwd()))} (${result.itemCount} item(s)${result.groupBy ? `, grouped by ${result.groupBy}` : ""}${opts.github ? `, ${result.prCount} PR(s) linked` : ""})`,
+          `arggon board: wrote ${sanitizeHumanError(displayPath(result.outPath, process.cwd()))} (${result.itemCount} item(s)${result.groupBy ? `, grouped by ${result.groupBy}` : ""}${opts.github ? `, ${result.prCount} PR(s) linked` : ""}${result.detailBytes !== undefined ? `, details embedded (${result.detailBytes} bytes)` : ""})`,
         );
         console.log(
           "  Open it in a browser. Re-run after tree changes — the tracker remains the source of truth.",
