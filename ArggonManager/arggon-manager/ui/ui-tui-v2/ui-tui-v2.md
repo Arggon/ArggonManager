@@ -22,7 +22,6 @@ updated: "2026-09-22"
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 
@@ -36,7 +35,7 @@ updated: "2026-09-22"
 
 ## Acceptance
 
-- [ ] Child tasks/bugs done with their checklists honest
-- [ ] The TUI stays raw-ANSI and dependency-free (ADR 0001); read-only unless a spec authorizes writes through the kernel update path
-- [ ] Golden-frame tests for every new key/interaction + a pty capture in each review verdict (TUI smoke exception, ADR 0008)
-- [ ] README keybinding table updated in every PR that changes a key
+- [x] Child tasks/bugs done with their checklists honest
+- [x] The TUI stays raw-ANSI and dependency-free (ADR 0001); read-only unless a spec authorizes writes through the kernel update path
+- [x] Golden-frame tests for every new key/interaction + a pty capture in each review verdict (TUI smoke exception, ADR 0008)
+- [x] README keybinding table updated in every PR that changes a key

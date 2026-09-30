@@ -22,7 +22,6 @@ updated: "2026-09-22"
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 
@@ -33,7 +32,7 @@ updated: "2026-09-22"
 
 ## Acceptance
 
-- [ ] Child tasks done with their checklists honest
-- [ ] The panel stays display-only except where a spec authorizes actions; any action goes through the kernel rules (no write path bypass)
-- [ ] `npm run smoke:tui` extended for the new interactions (slot crash isolation preserved)
-- [ ] docs/playbooks/opencode.md § TUI and the manual checklist updated
+- [x] Child tasks done with their checklists honest
+- [x] The panel stays display-only except where a spec authorizes actions; any action goes through the kernel rules (no write path bypass)
+- [x] `npm run smoke:tui` extended for the new interactions (slot crash isolation preserved)
+- [x] docs/playbooks/opencode.md § TUI and the manual checklist updated

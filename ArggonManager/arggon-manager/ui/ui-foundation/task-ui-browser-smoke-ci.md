@@ -27,7 +27,6 @@ depends_on: [bug-ci-version-guard-dev-only]
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 

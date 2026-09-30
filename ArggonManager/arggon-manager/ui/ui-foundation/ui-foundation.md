@@ -22,7 +22,6 @@ updated: "2026-09-22"
 
 ## Acceptance
 
-- [ ] 
 
 ## Notes
 
@@ -35,7 +34,7 @@ Separately, ADR 0008 tier 2 (an optional CI `@smoke` Playwright spec) was decide
 
 ## Acceptance
 
-- [ ] `task-ui-shared-viewmodel` done: one pure view-model consumed by all three surfaces, no behavior change
-- [ ] `task-ui-browser-smoke-ci` done: `@smoke`-tagged browser spec runs in CI (Chromium-only, dev-only dependency)
-- [ ] No new runtime dependency; a cross-cutting lib contract change would need an ADR (none expected here)
-- [ ] `npm run check:plugin` + `npm test` green
+- [x] `task-ui-shared-viewmodel` done: one pure view-model consumed by all three surfaces, no behavior change
+- [x] `task-ui-browser-smoke-ci` done: `@smoke`-tagged browser spec runs in CI (Chromium-only, dev-only dependency)
+- [x] No new runtime dependency; a cross-cutting lib contract change would need an ADR (none expected here)
+- [x] `npm run check:plugin` + `npm test` green
