@@ -13,12 +13,16 @@ import {
   displayPath,
   escapeHtml,
   applyBoardFilter,
+  dropNeedsClaimPrompt,
   evaluateDrop,
   renderBoardDetail,
   renderBoardHtml,
   runBoard,
   summarizeChecks,
+  trapBoardFocus,
   wireBoardDetail,
+  wireBoardKeyboardNav,
+  wireBoardMoveMenu,
   type BoardLensItem,
 } from "./board.js";
 import type { BoardGithub, PrInfo } from "./board.js";
@@ -516,12 +520,46 @@ describe("renderBoardHtml drag-and-drop", () => {
       { generatedAt: GENERATED_AT },
     );
     expect(html).toContain(
-      '<div class="card" draggable="true" data-id="task-a" data-type="task" data-status="in_progress" data-assignee="arggon">',
+      '<div class="card" role="group" aria-label="task task-a: task-a (in_progress, @arggon)" draggable="true" data-id="task-a" data-type="task" data-status="in_progress" data-assignee="arggon">',
     );
     expect(html).toContain(
-      '<div class="card" draggable="true" data-id="task-b" data-type="task" data-status="todo">',
+      '<div class="card" role="group" aria-label="task task-b: task-b (todo)" draggable="true" data-id="task-b" data-type="task" data-status="todo">',
     );
     expect(html).not.toContain('data-status="todo" data-assignee');
+  });
+
+  it("names every card for assistive tech, escaping hostile titles (task-board-keyboard-a11y)", () => {
+    const html = renderBoardHtml(
+      [item({ id: "task-x", type: "bug", status: "blocked", title: '</title>"<script>' })],
+      { generatedAt: GENERATED_AT },
+    );
+    expect(html).toContain(
+      'role="group" aria-label="bug task-x: &lt;/title&gt;&quot;&lt;script&gt; (blocked)"',
+    );
+    // The hostile title never survives unescaped anywhere in the page.
+    expect(html).not.toContain('</title>"<script>');
+  });
+
+  it("renders named column landmarks and a labeled board (task-board-keyboard-a11y)", () => {
+    const html = renderBoardHtml([], { generatedAt: GENERATED_AT });
+    for (const status of ["todo", "in_progress", "blocked", "done", "cancelled"]) {
+      expect(html).toContain(`aria-labelledby="board-column-${status}"`);
+      expect(html).toContain(`<h2 id="board-column-${status}">`);
+    }
+    expect(html).toContain('<main class="board" aria-label="arggon board">');
+  });
+
+  it("renders no duplicate ids anywhere in the export (task-board-keyboard-a11y)", () => {
+    const html = renderBoardHtml(
+      [
+        item({ id: "task-a", type: "task", status: "todo", title: "A" }),
+        item({ id: "task-b", type: "bug", status: "done", title: "B" }),
+      ],
+      { generatedAt: GENERATED_AT, details: true },
+    );
+    const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
+    expect(ids.length).toBeGreaterThan(0);
+    expect(new Set(ids).size).toBe(ids.length);
   });
 
   it("embeds the drop rules and update endpoint in the page script", () => {
@@ -640,6 +678,56 @@ describe("renderBoardHtml item detail drawer (task-board-item-detail, serve-only
     expect(html).toContain("wireBoardDetail(toast, renderBoardDetail);");
   });
 
+  it("seeds the roving tabindex on exactly the first card (task-board-keyboard-a11y)", () => {
+    const html = renderBoardHtml(
+      [
+        item({ id: "task-a", type: "task", status: "todo", title: "A" }),
+        item({ id: "task-b", type: "task", status: "todo", title: "B" }),
+        item({ id: "task-c", type: "task", status: "done", title: "C" }),
+      ],
+      { generatedAt: GENERATED_AT, details: true },
+    );
+    expect(html).toContain('aria-label="task task-a: A (todo)" draggable="true" tabindex="0"');
+    expect(html).toContain('aria-label="task task-b: B (todo)" draggable="true" tabindex="-1"');
+    expect(html).toContain('aria-label="task task-c: C (done)" draggable="true" tabindex="-1"');
+    expect(html).toContain(wireBoardKeyboardNav.toString());
+    expect(html).toContain("var keyboardNav = wireBoardKeyboardNav()");
+    expect(html).toContain("keyboardNav.ensureAnchor()");
+  });
+
+  it("renders the card move menu shell and wiring only with details: true (task-board-keyboard-a11y)", () => {
+    const html = renderBoardHtml(items, { generatedAt: GENERATED_AT, details: true });
+    expect(html).toContain('id="board-move-menu"');
+    expect(html).toContain('aria-label="move card"');
+    expect(html).toContain('class="card-move" aria-label="move task-a"');
+    expect(html).toContain(wireBoardMoveMenu.toString());
+    expect(html).toContain(trapBoardFocus.toString());
+    // The menu classifies targets through the drag flow's own rule and prompt
+    // predicate — never a second legality implementation.
+    expect(wireBoardMoveMenu.toString()).toContain("evaluateDrop(");
+    expect(wireBoardMoveMenu.toString()).toContain("dropNeedsClaimPrompt(");
+    expect(html).toContain("wireBoardMoveMenu(attemptMove);");
+  });
+
+  it("classifies only the missing-assignee refusal as completable by the claim prompt", () => {
+    expect(dropNeedsClaimPrompt({ ok: true, reason: "" })).toBe(false);
+    expect(
+      dropNeedsClaimPrompt({
+        ok: false,
+        reason: "task 'a' with status in_progress requires --assignee (claim first)",
+      }),
+    ).toBe(true);
+    expect(dropNeedsClaimPrompt({ ok: false, reason: "cannot transition todo -> done" })).toBe(
+      false,
+    );
+    expect(
+      dropNeedsClaimPrompt({
+        ok: false,
+        reason: "claim conflict: 'a' is claimed by 'alice' (status in_progress).",
+      }),
+    ).toBe(false);
+  });
+
   it("keeps the static export lean and byte-identical without details", () => {
     const plain = renderBoardHtml(items, { generatedAt: GENERATED_AT });
     const explicit = renderBoardHtml(items, { generatedAt: GENERATED_AT, details: false });
@@ -648,6 +736,11 @@ describe("renderBoardHtml item detail drawer (task-board-item-detail, serve-only
     expect(plain).not.toContain("/api/item");
     expect(plain).not.toContain("tabindex");
     expect(plain).not.toContain("renderBoardDetail");
+    // task-board-keyboard-a11y: the interactive surface stays serve-only.
+    expect(plain).not.toContain("board-move-menu");
+    expect(plain).not.toContain("card-move");
+    expect(plain).not.toContain("wireBoardMoveMenu");
+    expect(plain).not.toContain("wireBoardKeyboardNav");
   });
 
   it("runBoard's static export stays drawer-free (no --details opt-in in this item)", () => {
@@ -899,14 +992,15 @@ describe("renderBoardHtml blocked-card visuals (task-board-dependency-visuals)",
       { generatedAt: GENERATED_AT },
     );
     // Blocked card: dimming class + one count badge (two open deps -> "2").
-    expect(html).toContain('<div class="card dep-blocked" draggable="true" data-id="task-a"');
+    expect(html).toContain('<div class="card dep-blocked" role="group"');
+    expect(/<div class="card dep-blocked"[^>]*data-id="task-a"/.test(html)).toBe(true);
     expect(html).toContain('<span class="blocked-badge">blocked by 2</span>');
     // Deps that are only terminal do not block: no class, no badge.
     expect(html).not.toContain('data-id="task-b" class');
     expect(html.match(/class="card dep-blocked"/g)).toHaveLength(1);
     expect(html.match(/<span class="blocked-badge">/g)).toHaveLength(1);
-    expect(html).toContain('<div class="card" draggable="true" data-id="task-b"');
-    expect(html).toContain('<div class="card" draggable="true" data-id="task-c"');
+    expect(/<div class="card"[^>]*data-id="task-b"/.test(html)).toBe(true);
+    expect(/<div class="card"[^>]*data-id="task-c"/.test(html)).toBe(true);
   });
 });
 
