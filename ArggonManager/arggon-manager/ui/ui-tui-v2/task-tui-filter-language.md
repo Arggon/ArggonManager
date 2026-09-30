@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-tui-filter-language
 title: "TUI filter prompt: kernel filter predicates + saved views"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [tui, ui]
 priority: p2
 created: "2026-09-22"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T17:16:16.221Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-tui-filter-language
 ---
 <!--
