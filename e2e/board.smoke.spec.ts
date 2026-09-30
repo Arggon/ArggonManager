@@ -594,8 +594,9 @@ test.describe("@smoke board --serve", () => {
     // its cards; the "no story" head (if rendered) carries none.
     const head = page.locator(".mgroup-head", { hasText: "entries" }).first();
     await expect(head).toContainText(/⚑ entries \d+\/\d+/);
+  });
 
-    test("the static export with --details opens the drawer offline from the embedded snapshot", async ({
+  test("the static export with --details opens the drawer offline from the embedded snapshot", async ({
     page,
   }) => {
     // `--details` (task-board-static-details): the drawer renders the bounded
