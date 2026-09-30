@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adr-number-collision
 title: adr-number-collision-fix
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p1
 created: "2026-09-30"
 updated: "2026-09-30"
-claimed_at: "2026-09-30T00:32:45.309Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr-number-collision
 ---
 <!--
