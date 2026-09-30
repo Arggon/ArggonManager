@@ -42,3 +42,13 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-board-static-details
 - [x] Without the flag the static export stays byte-identical to today (regression test)
 - [x] Tests: unit (embedding/caps/escaping) + an `@smoke` case for the static-with-details export; payload-size evidence in the verdict
 - [x] README board section + `ArggonManager/docs/json-output.md` board section updated (flag + payload contract); `cli/README.md` note aligned with `task-ui-docs-refresh`
+
+### 2026-09-30 @Arggon
+Evidence (PR #493, branch feat/task-board-static-details):
+
+- Gates: npm test 1846/1846 (2 consecutive full runs), npm run lint, npm run build (lib+cli+e2e typecheck), npm run check:plugin (exit 0 after committing the regenerated bundle — lib/src/show.ts is inlined), arggon validate --json ok:true, npx playwright test --grep @smoke 21/21 (20 pre-existing + 1 new static-with-details case).
+- Byte-identity: renderBoardHtml plain == details:false == staticDetails-without-flag (board.test.ts 'keeps the export byte-identical without the flag'); runBoard no-flag == explicit details:false and drawer-free.
+- Caps/escaping unit tests: prose clipped <= 8 KiB with prose_truncated:true, acceptance rows from the clipped prose, comment tail = last 3 of 5 with hidden_comments:2, hostile </script> prose embedded as \u003c (parse-back of the embedded BOARD_DETAILS line).
+- file:// real-browser evidence: static export of this repo's tracker opened the drawer offline (screenshot /tmp/evidence-static-details-drawer.png); drawer title, deps, acceptance and body render from the embedded snapshot.
+- Measured payload on this repo's tracker (368 items, 2026-09-30): page 383,706 -> 2,256,263 bytes; embedded JSON 1,806,619 bytes (~4.9 KiB/item avg); documented in README + ArggonManager/docs/json-output.md (envelope gains details + detailBytes).
+- Note: one full npm test run mid-work showed a single show/runShow-related assertion failure that never reproduced on the two consecutive clean full runs before push; treating as environment flake, flagging here for the reviewer.
