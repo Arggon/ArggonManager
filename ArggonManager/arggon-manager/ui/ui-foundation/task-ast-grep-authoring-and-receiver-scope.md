@@ -42,3 +42,14 @@ Final review of PR #418 passed the high-confidence ast-grep guard and identified
 ## Notes
 
 Non-blocking findings from the final lead-architect review of PR #418, 2026-09-28. Depends on the guard item so the follow-up starts from the merged rule baseline.
+
+### 2026-09-30 @Arggon
+Follow-up verdict (2026-09-30, @Arggon): all four acceptance boxes ticked on the PR branch (833ca326 + merge adde8fca).
+
+Empirical reproduction on @ast-grep/cli@0.45.3 (pinned binary, scratch sgconfig with the repo's languageGlobs): the old authoring note was over-generalized. Verified semantics: (1) several distinct sibling $$$ patterns in one 'any' all fire — the merged native rule itself is the in-repo proof; (2) a metavariable name repeated across 'any' branches does NOT unify (alpha($VAL)/beta($VAL,$OTHER) both fire); (3) inside one 'all', a name repeated across sibling patterns is an EQUALITY constraint — fires only on identical text (pinned: $RECEIVER.add($$$ARGS)+editor.add($$$ARGS) fires exactly on editor.add calls) and silently produces an empty match set on mismatch (pinned: transform($$$CALL)+editor.add($$$CALL) never fires on the nested call). The note in tools/ast-grep/README.md now states exactly this with both minimal examples.
+
+The repro is permanent: cli/src/ast-grep-authoring.test.ts shells out to the pinned binary (same shape as the plugin type gate) and pins all four facets.
+
+Receiver-name scope: documented as an explicit limitation (README § Documented native limitations + the rule's note field) — generic $X.add shapes would reintroduce the generic-name false positives the guard exists to avoid — and pinned by a toolEditor.add case in the rule suite's valid snippets. No exhaustive-semantic-enforcement claim; schema/parity tests stay authoritative.
+
+Gates: test:structure 3/3, lint:structure clean, npm test 108 files / 1784 tests, lint, build, check:plugin (no drift), validate ok:true, prettier clean. Deviation note: the remote branch received a main-merge (030be998) mid-flight from another session; merged cleanly (adde8fca), no force-push.
