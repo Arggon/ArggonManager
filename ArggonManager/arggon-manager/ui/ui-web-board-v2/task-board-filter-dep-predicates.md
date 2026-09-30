@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-board-filter-dep-predicates
 title: "Web board filter: enable parent:, depends-on:, blocked-by: and readiness"
+assignee: Arggon
+branch: feat/task-board-filter-dep-predicates
 parent: ui-web-board-v2
 labels: [viewer, board, ui]
 priority: p3
 created: "2026-09-23"
-updated: "2026-09-23"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T17:01:14.394Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-board-filter-dep-predicates
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-filter-dep-predicates.md
