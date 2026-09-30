@@ -15,8 +15,10 @@
  * `clampTuiDetailScroll` (the two scroll windows), `wrapTuiLine`,
  * `tuiAcceptanceRows`, `tuiDependencySummary`, `tuiBodyRows` +
  * `tuiDetailBodyRows` (frame geometry), `loadTuiItems` (shared data path,
- * detail bodies included). `runTuiBoard` only wires raw mode, keypress events
- * and resize to the pure pieces; it performs no writes anywhere.
+ * detail bodies included) and `createTuiKeyDecoder` (the stateful stdin
+ * splitter, bug-tui-split-escape-sequences). `runTuiBoard` only wires raw
+ * mode, keypress events and resize to the pure pieces; it performs no writes
+ * anywhere.
  */
 import {
   STATUSES,
@@ -297,6 +299,93 @@ const CTRL_C = "\x03";
 const ESC = "\x1b";
 const ENTER = "\r";
 const BACKSPACE = "\x7f";
+
+/**
+ * How long `runTuiBoard` waits for the rest of a split escape sequence before
+ * flushing the buffered bytes as plain keys (bug-tui-split-escape-sequences).
+ * The classic terminal-emulator esc-timeout tradeoff: long enough that a pty
+ * bridge or a paste delivering `\x1b` and `[6~` in separate chunks still
+ * reassembles, far short of human key spacing so a genuinely lone Esc press
+ * registers immediately.
+ */
+export const TUI_ESCAPE_FLUSH_MS = 50;
+
+/**
+ * Stateful stdin key splitter (bug-tui-split-escape-sequences). The pure
+ * `splitKeys` rule, carried across chunks: a CSI sequence that is incomplete
+ * at the end of a chunk (`\x1b` alone, or `\x1b[6` without its final byte) is
+ * held back instead of being consumed as an Esc keypress, and the next chunk
+ * completes it. Three exits release the held bytes:
+ *
+ * - a continuation completes the sequence (`decode("~")` after `\x1b[6` =>
+ *   one PgDn key),
+ * - any other byte proves the ESC was on its own (the held ESC is emitted as
+ *   a real Esc key first, then the new bytes are split), or
+ * - `flush()` drains the hold as plain per-character keys when no
+ *   continuation arrives (the loop wires this to the
+ *   `TUI_ESCAPE_FLUSH_MS` timeout), so a genuinely lone Esc keeps its
+ *   semantics.
+ */
+export type TuiKeyDecoder = {
+  /** Feed one stdin chunk; returns the complete keystrokes it holds. */
+  decode(chunk: string): string[];
+  /** Drain a held-back incomplete sequence as plain per-character keys. */
+  flush(): string[];
+  /** The incomplete trailing sequence held for the next chunk ("" when none). */
+  readonly pending: string;
+};
+
+export function createTuiKeyDecoder(): TuiKeyDecoder {
+  let held = "";
+  return {
+    decode(chunk: string): string[] {
+      const buffer = held + chunk;
+      held = "";
+      const keys: string[] = [];
+      let i = 0;
+      while (i < buffer.length) {
+        if (buffer[i] === ESC && buffer[i + 1] === "[") {
+          let end = i + 2;
+          while (
+            end < buffer.length &&
+            buffer.charCodeAt(end) >= 0x20 &&
+            buffer.charCodeAt(end) <= 0x3f
+          ) {
+            end += 1;
+          }
+          if (end >= buffer.length) {
+            // Incomplete trailing CSI: hold it for the next chunk instead of
+            // consuming the ESC as an Esc keypress.
+            held = buffer.slice(i);
+            return keys;
+          }
+          if (buffer.charCodeAt(end) >= 0x40 && buffer.charCodeAt(end) <= 0x7e) {
+            keys.push(buffer.slice(i, end + 1));
+            i = end + 1;
+            continue;
+          }
+          // A control byte inside the run: not a CSI after all. Fall through
+          // and emit the lone ESC (splitKeys' exact behavior for this input).
+        } else if (buffer[i] === ESC && i + 1 >= buffer.length) {
+          // Lone trailing ESC: it may grow a CSI sequence next chunk.
+          held = buffer.slice(i);
+          return keys;
+        }
+        keys.push(buffer[i]);
+        i += 1;
+      }
+      return keys;
+    },
+    flush(): string[] {
+      const rest = held;
+      held = "";
+      return splitKeys(rest);
+    },
+    get pending(): string {
+      return held;
+    },
+  };
+}
 
 /**
  * Optional per-keypress context: the loop owns the data, the reducer stays
@@ -897,13 +986,23 @@ export type TuiLoopOptions = {
   /** Geometry overrides (tests); defaults to the real size, then 80x24. */
   width?: number;
   height?: number;
+  /**
+   * Esc-flush override (tests): how long a split escape sequence may wait for
+   * its continuation before the buffered bytes are flushed as plain keys.
+   * Defaults to TUI_ESCAPE_FLUSH_MS.
+   */
+  escapeFlushMs?: number;
 };
 
 /**
  * Interactive loop for `arggon board --tui`. Read-only: it re-reads the tree
  * after every keypress (cheap at v0 scale) and never writes. Enter opens the
- * read-only detail pane; Esc/Enter return to the board. Fails with an
- * actionable error when stdout is not a TTY (piped output cannot render).
+ * read-only detail pane; Esc/Enter return to the board. Key bytes go through
+ * the stateful decoder (bug-tui-split-escape-sequences): a CSI sequence split
+ * across stdin chunks reassembles instead of leaking a phantom Esc, and a
+ * genuinely lone Esc is flushed by the TUI_ESCAPE_FLUSH_MS timeout. Fails
+ * with an actionable error when stdout is not a TTY (piped output cannot
+ * render).
  */
 export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
   const output: TuiOutput = opts.output ?? process.stdout;
@@ -913,6 +1012,7 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
       new Error("board --tui requires an interactive terminal (stdout is not a TTY)"),
     );
   }
+  const escapeFlushMs = Math.max(0, Math.floor(opts.escapeFlushMs ?? TUI_ESCAPE_FLUSH_MS));
   const initial = loadTuiItems(opts.cwd);
   const size = (value: number | undefined, fallback: number): number =>
     typeof value === "number" && value > 0 ? value : fallback;
@@ -926,6 +1026,8 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
     let details = initial.details;
     let current = state;
     let settled = false;
+    const decoder = createTuiKeyDecoder();
+    let escTimer: ReturnType<typeof setTimeout> | null = null;
 
     // Alternate screen + hidden cursor; restored on any exit path.
     output.write("\x1b[?1049h\x1b[?25l");
@@ -953,39 +1055,74 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
       output.write(renderTuiScreen(items, current, details));
     };
 
-    const onData = (chunk: string | Buffer): void => {
-      try {
-        const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
-        for (const key of splitKeys(text)) {
-          // Context is re-derived per key: a chunk may open the pane, scroll
-          // it and close it again, and each key must be reduced against the
-          // state (and the data) the previous one left behind.
-          const counts = tuiColumnCounts(items, current.filter);
-          const selected = selectedTuiItem(items, current);
-          const detailLines =
-            current.detail === null
-              ? 0
-              : tuiDetailLinesFor(items, details, current.detail, current.width).length;
-          current = handleKey(current, key, {
-            counts,
-            selectedId: selected?.id ?? null,
-            detailLines,
-          });
-          if (current.quit) {
+    // Reduce decoded keys against the live state; false once the loop quit.
+    const reduce = (keys: string[]): boolean => {
+      for (const key of keys) {
+        // Context is re-derived per key: a chunk may open the pane, scroll
+        // it and close it again, and each key must be reduced against the
+        // state (and the data) the previous one left behind.
+        const counts = tuiColumnCounts(items, current.filter);
+        const selected = selectedTuiItem(items, current);
+        const detailLines =
+          current.detail === null
+            ? 0
+            : tuiDetailLinesFor(items, details, current.detail, current.width).length;
+        current = handleKey(current, key, {
+          counts,
+          selectedId: selected?.id ?? null,
+          detailLines,
+        });
+        if (current.quit) return false;
+      }
+      return true;
+    };
+
+    // Re-read before clamping: the tree is the source of truth and may have
+    // changed while we were idle (no file watcher in v0); the clamp then uses
+    // the fresh counts, keeping the scroll window valid. The detail pane
+    // re-derives its own window per frame from the fresh bodies, so a body
+    // that shrank while open still renders valid.
+    const sync = (): void => {
+      const fresh = loadTuiItems(opts.cwd);
+      items = fresh.items;
+      details = fresh.details;
+      current = clampTuiState(current, tuiColumnCounts(items, current.filter));
+      render();
+    };
+
+    // A chunk that ends inside an escape sequence holds the tail: if no
+    // continuation arrives, the flush releases it as plain keys so a lone Esc
+    // keeps its semantics (bug-tui-split-escape-sequences).
+    const armEscFlush = (): void => {
+      if (decoder.pending === "" || escTimer !== null) return;
+      escTimer = setTimeout(() => {
+        escTimer = null;
+        try {
+          if (!reduce(decoder.flush())) {
             finish();
             return;
           }
+          sync();
+        } catch (err) {
+          fail(err);
         }
-        // Re-read before clamping: the tree is the source of truth and may
-        // have changed while we were idle (no file watcher in v0); the clamp
-        // then uses the fresh counts, keeping the scroll window valid. The
-        // detail pane re-derives its own window per frame from the fresh
-        // bodies, so a body that shrank while open still renders valid.
-        const fresh = loadTuiItems(opts.cwd);
-        items = fresh.items;
-        details = fresh.details;
-        current = clampTuiState(current, tuiColumnCounts(items, current.filter));
-        render();
+      }, escapeFlushMs);
+    };
+
+    const onData = (chunk: string | Buffer): void => {
+      try {
+        // New bytes are the continuation the flush was waiting for.
+        if (escTimer !== null) {
+          clearTimeout(escTimer);
+          escTimer = null;
+        }
+        const text = typeof chunk === "string" ? chunk : chunk.toString("utf8");
+        if (!reduce(decoder.decode(text))) {
+          finish();
+          return;
+        }
+        sync();
+        armEscFlush();
       } catch (err) {
         fail(err);
       }
@@ -1010,6 +1147,10 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
     const rawCapable = input as { setRawMode?: (mode: boolean) => unknown };
     const cleanup = (): void => {
       input.removeListener("data", onData);
+      if (escTimer !== null) {
+        clearTimeout(escTimer);
+        escTimer = null;
+      }
       if (typeof output.removeListener === "function") output.removeListener("resize", onResize);
       if (typeof rawCapable.setRawMode === "function") {
         try {
@@ -1033,11 +1174,15 @@ export function runTuiBoard(opts: TuiLoopOptions): Promise<void> {
 }
 
 /**
- * Split a stdin chunk into single keystrokes: CSI escape sequences stay
- * together (arrows, PgUp/PgDn, Home/End), everything else is one key per
- * character. A CSI sequence is `ESC [`, parameter bytes (0x30-0x3f),
- * intermediate bytes (0x20-0x2f) and one final byte (0x40-0x7e) — reading the
- * whole run keeps `\x1b[6~` (PgDn) from splitting into `\x1b[6` + `~`.
+ * The stateless per-chunk split rule (bug-tui-split-escape-sequences): CSI
+ * escape sequences stay together (arrows, PgUp/PgDn, Home/End), everything
+ * else is one key per character. A CSI sequence is `ESC [`, parameter bytes
+ * (0x30-0x3f), intermediate bytes (0x20-0x2f) and one final byte (0x40-0x7e)
+ * — reading the whole run keeps `\x1b[6~` (PgDn) from splitting into
+ * `\x1b[6` + `~`. The loop feeds chunks through `createTuiKeyDecoder` so a
+ * sequence split ACROSS chunks reassembles; `splitKeys` itself stays the
+ * fallback that drains a flush (a held sequence no continuation ever
+ * completed), where per-character decay of the orphaned bytes is correct.
  */
 function splitKeys(text: string): string[] {
   const keys: string[] = [];

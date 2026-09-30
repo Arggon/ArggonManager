@@ -20,6 +20,7 @@ import {
   clampTuiDetailScroll,
   clampTuiState,
   clipLine,
+  createTuiKeyDecoder,
   followTuiScroll,
   handleKey,
   initialTuiState,
@@ -687,6 +688,103 @@ describe("runTuiBoard scroll window (bug-tui-selection-offscreen)", () => {
   });
 });
 
+// ---------- stateful key decoder (bug-tui-split-escape-sequences) ----------
+
+const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+describe("createTuiKeyDecoder (bug-tui-split-escape-sequences)", () => {
+  it("reassembles a PgDn split across two chunks instead of leaking an Esc", () => {
+    const decoder = createTuiKeyDecoder();
+    expect(decoder.decode("\x1b[6")).toEqual([]); // held, NOT consumed as Esc
+    expect(decoder.pending).toBe("\x1b[6");
+    expect(decoder.decode("~")).toEqual(["\x1b[6~"]); // completed by the next chunk
+    expect(decoder.pending).toBe("");
+  });
+
+  it("reassembles Home split right after the ESC byte", () => {
+    const decoder = createTuiKeyDecoder();
+    expect(decoder.decode("\x1b")).toEqual([]);
+    expect(decoder.decode("[H")).toEqual(["\x1b[H"]);
+    expect(decoder.pending).toBe("");
+  });
+
+  it("emits a held Esc as a real Esc key when an unrelated byte follows", () => {
+    const decoder = createTuiKeyDecoder();
+    expect(decoder.decode("\x1b")).toEqual([]);
+    expect(decoder.decode("5")).toEqual(["\x1b", "5"]); // Esc, then the plain key
+    expect(decoder.pending).toBe("");
+  });
+
+  it("keeps whole sequences and mixed chunks byte-exact with splitKeys", () => {
+    const decoder = createTuiKeyDecoder();
+    expect(decoder.decode("\x1b[6~\x1b[Hq")).toEqual(["\x1b[6~", "\x1b[H", "q"]);
+    expect(decoder.decode("ab\x1b[C\x1b")).toEqual(["a", "b", "\x1b[C"]);
+    expect(decoder.pending).toBe("\x1b"); // only the trailing ESC is held
+  });
+
+  it("flush() drains a lone held ESC as Esc when no continuation follows", () => {
+    const decoder = createTuiKeyDecoder();
+    expect(decoder.decode("\x1b")).toEqual([]);
+    expect(decoder.flush()).toEqual(["\x1b"]);
+    expect(decoder.pending).toBe("");
+  });
+
+  it("flush() drains a half-delivered sequence as plain per-character keys", () => {
+    const decoder = createTuiKeyDecoder();
+    expect(decoder.decode("x\x1b[1")).toEqual(["x"]);
+    expect(decoder.pending).toBe("\x1b[1");
+    expect(decoder.flush()).toEqual(["\x1b", "[", "1"]);
+  });
+});
+
+describe("runTuiBoard split escape sequence (bug-tui-split-escape-sequences)", () => {
+  it("a PgDn split across chunks scrolls instead of clearing the filter", async () => {
+    const root = longTree();
+    const term = fakeTerminal();
+    term.output.columns = 200;
+    const done = runTuiBoard({ cwd: root, input: term.input, output: term.output });
+    term.input.write("/demo"); // filter the board down to the demo-* tasks
+    term.input.write("\r"); // apply the filter
+    term.input.write("\x1b[6"); // PgDn, first half only: must NOT act as Esc
+    await wait(10);
+    term.input.write("~"); // second half — the decoder reassembles one PgDn
+    await wait(150); // past the esc flush window: nothing else may decay
+    term.input.write("q");
+    await done;
+    const text = term.outputText();
+    expect(text).toContain("filter: demo"); // the filter survived the paging
+    expect(text).toContain("row 22/30"); // one full body page scrolled
+    expect(text).toContain("\x1b[7m> T demo-21 Demo item 21");
+  });
+
+  it("a lone ESC is flushed by the esc timeout and keeps its semantics", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    const done = runTuiBoard({ cwd: root, input: term.input, output: term.output });
+    term.input.write("/"); // open the search prompt
+    term.input.write("log"); // partial filter
+    await wait(10);
+    term.input.write("\x1b"); // lone Esc: no continuation will follow
+    await wait(150); // the esc flush releases it as a real Esc keypress
+    term.input.write("q");
+    await done;
+    const frames = term.outputText().split("\x1b[H\x1b[2J");
+    const last = frames[frames.length - 1] ?? "";
+    expect(last).not.toContain("esc to cancel"); // the search prompt closed
+    expect(last).not.toContain("filter:"); // and the filter was cleared
+  });
+
+  it("ESC then an unrelated key in the next chunk quits with both applied", async () => {
+    const root = newTree();
+    const term = fakeTerminal();
+    const done = runTuiBoard({ cwd: root, input: term.input, output: term.output });
+    term.input.write("\x1b"); // lone Esc (held)
+    term.input.write("q"); // unrelated byte: releases the Esc, then quits
+    await done; // resolves: the loop exited cleanly
+    expect(term.outputText().endsWith("\x1b[?25h\x1b[?1049l")).toBe(true);
+  });
+});
+
 // ---------- CLI wiring (spawned, piped stdout = non-TTY) ----------
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -1259,7 +1357,10 @@ describe("detail pane: runTuiBoard loop", () => {
     term.input.write("\x1b[6~"); // PgDn: one pane page
     await tick();
     term.input.write("\x1b"); // Esc: back to the board
-    await tick();
+    // bug-tui-split-escape-sequences: the lone ESC byte is held for the esc
+    // flush window (in case a CSI continuation follows), then flushed as a
+    // real Esc keypress — wait past the window so the board frame is drawn.
+    await wait(150);
     term.input.write("q");
     await done;
 
