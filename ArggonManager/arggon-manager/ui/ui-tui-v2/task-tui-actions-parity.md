@@ -52,3 +52,7 @@ Evidence, expected vs observed:
 - Loop spy tests: exactly one runUpdate per flow; a throwing kernel call lands in the footer and the loop still quits cleanly (alternate screen restored via the existing finish/fail paths).
 
 Deviations: none functional. Notes: (1) a successful write does not move the board selection to the item's new column (the smoke navigates with ->); follow-the-item is a candidate follow-up if review wants it. (2) TUI writes do not auto-commit the tracker (parity with the served board's drag-and-drop), documented in README and the spec.
+
+### handoff 2026-09-30 @Arggon — next: Coordinator review of PR #489; merge (no squash) then auto-done flips the item.
+- branch: feat/task-tui-actions-parity
+- open questions: None blocking
