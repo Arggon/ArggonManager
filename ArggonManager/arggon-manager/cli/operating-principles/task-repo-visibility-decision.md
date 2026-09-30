@@ -50,3 +50,8 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-repo-visibility-decision
 - [ ] If private: npm metadata (`repository`/`homepage`) + trusted publishing/provenance decided while public (impossible after)
 - [ ] If private: `task-ci-recipe-published-one-liner` and `task-retire-opencode2` landed first
 - [x] If stay public: close with the recorded rationale (no further action)
+
+### 2026-09-30 @Arggon
+verdict: approve
+
+Decision recorded by the coordinator on the exploration's measured recommendation (exploration-repo-visibility-011, 2026-09-22): **stay public**. Rationale: free unlimited Actions at the measured burn (~2,800 wall-min/18d); branch protection + rulesets on main need Pro+ when private; secret scanning/push protection free only while public; npm provenance/attestations impossible from private; MIT tarballs + 19 days of history already distributed. Readiness follow-ups landed first: task-retire-opencode2 (#463) and task-ci-recipe-published-one-liner (#464, generated recipe installs the published npm pin — no clone). Exploration-011 Decision section records the decision (status decided); the decision-gap scanner now flags one fewer pending exploration. Both 'if stay public' acceptance boxes ticked; the 'if private' boxes are N/A by the decision.
