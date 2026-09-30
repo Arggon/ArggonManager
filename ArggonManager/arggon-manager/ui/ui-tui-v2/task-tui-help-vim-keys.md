@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-tui-help-vim-keys
 title: TUI help overlay and vim-style navigation keys
+assignee: Arggon
+branch: feat/task-tui-help-vim-keys
 parent: ui-tui-v2
 labels: [tui, ui]
 priority: p3
 created: "2026-09-22"
-updated: "2026-09-22"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T18:57:28.911Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-tui-help-vim-keys
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-tui-v2/task-tui-help-vim-keys.md
