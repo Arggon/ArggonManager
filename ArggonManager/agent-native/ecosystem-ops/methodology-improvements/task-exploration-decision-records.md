@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-exploration-decision-records
 title: exploration-decision-records-cleanup
+assignee: Arggon
+branch: feat/task-exploration-decision-records
 parent: methodology-improvements
 labels: []
 priority: p2
 created: "2026-09-29"
-updated: "2026-09-29"
+updated: "2026-09-30"
+claimed_at: "2026-09-30T12:11:42.385Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-exploration-decision-records
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-exploration-decision-records.md
