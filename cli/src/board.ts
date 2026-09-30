@@ -671,6 +671,25 @@ const MOVE_MENU_MARKUP = `<div id="board-move-menu" class="move-menu" hidden ari
 </div>`;
 
 /**
+ * Move value dialog shell (task-board-move-dialogs). Rendered on EVERY board —
+ * static export and serve alike: the drop flow that replaces `window.prompt`
+ * runs in both. The title, confirm label, input aria-label and inline error
+ * are filled per invocation by `wireBoardMovePrompt`.
+ */
+const MOVE_PROMPT_MARKUP = `<div id="board-move-prompt" class="move-prompt" hidden aria-hidden="true">
+  <div class="move-prompt-backdrop" id="board-move-prompt-backdrop"></div>
+  <div class="move-prompt-panel" role="dialog" aria-modal="true" aria-labelledby="board-move-prompt-title">
+    <div class="move-prompt-title" id="board-move-prompt-title"></div>
+    <input id="board-move-prompt-input" type="text" autocomplete="off" spellcheck="false">
+    <div class="move-prompt-error" id="board-move-prompt-error" role="alert"></div>
+    <div class="move-prompt-actions">
+      <button type="button" class="move-prompt-cancel" id="board-move-prompt-cancel">cancel</button>
+      <button type="button" class="move-prompt-confirm" id="board-move-prompt-confirm">confirm</button>
+    </div>
+  </div>
+</div>`;
+
+/**
  * Client renderer for the serve-mode detail drawer. Embedded into the page
  * script with `toString()` (like `evaluateDrop`/`applyBoardFilter`), so it
  * must stay self-contained: no module-scope references, no template literals.
@@ -1321,6 +1340,136 @@ export function wireBoardMoveMenu(attemptMove: (card: HTMLElement, to: string) =
 }
 
 /**
+ * The move value dialog (task-board-move-dialogs): the in-page replacement
+ * for the drop flow's two `window.prompt` calls. Embedded with `toString()`
+ * on EVERY board (static export and serve alike — the drop flow is the same
+ * in both), so it must stay self-contained: no module-scope references, no
+ * template literals. `ask(title, confirmLabel, onDone)` shows one modal
+ * panel: Esc, the cancel button and the backdrop resolve `onDone(null)`;
+ * confirming with whitespace-only input shows the inline validation message
+ * and keeps the dialog open (an assignee is required for an `in_progress`
+ * claim, a non-empty reason for `blocked`); confirming with a value resolves
+ * `onDone(value.trim())`. Focus is trapped in the panel (the shared
+ * `trapBoardFocus`), moved to the input on open and restored to the opener
+ * on close; the input is `aria-label`ed per mode and the error `role=alert`.
+ */
+export function wireBoardMovePrompt(): (
+  title: string,
+  confirmLabel: string,
+  inputLabel: string,
+  onDone: (value: string | null) => void,
+) => void {
+  const shell = document.getElementById("board-move-prompt");
+  const titleEl = document.getElementById("board-move-prompt-title");
+  const input = document.getElementById("board-move-prompt-input") as HTMLInputElement | null;
+  const error = document.getElementById("board-move-prompt-error");
+  const confirmBtn = document.getElementById(
+    "board-move-prompt-confirm",
+  ) as HTMLButtonElement | null;
+  const cancelBtn = document.getElementById("board-move-prompt-cancel");
+  const backdrop = document.getElementById("board-move-prompt-backdrop");
+  if (!shell || !titleEl || !input || !error || !confirmBtn || !cancelBtn) {
+    return function (title, confirmLabel, inputLabel, onDone) {
+      // Degraded markup: cancel rather than fall back to a blocking prompt.
+      void title;
+      void confirmLabel;
+      void inputLabel;
+      onDone(null);
+    };
+  }
+  const shellEl: HTMLElement = shell;
+  const titleText: HTMLElement = titleEl;
+  const inputEl: HTMLInputElement = input;
+  const errorEl: HTMLElement = error;
+  const confirmEl: HTMLButtonElement = confirmBtn;
+  const cancelEl: HTMLElement = cancelBtn;
+  let opener: HTMLElement | null = null;
+  let onDone: ((value: string | null) => void) | null = null;
+
+  function close(restoreFocus: boolean): void {
+    if (shellEl.hidden) return;
+    shellEl.hidden = true;
+    shellEl.setAttribute("aria-hidden", "true");
+    errorEl.textContent = "";
+    errorEl.classList.remove("show");
+    inputEl.value = "";
+    if (restoreFocus && opener && opener.isConnected) opener.focus();
+    opener = null;
+    onDone = null;
+  }
+
+  function resolve(value: string | null): void {
+    const done = onDone;
+    close(true);
+    if (done) done(value);
+  }
+
+  function ask(
+    title: string,
+    confirmLabel: string,
+    inputLabel: string,
+    done: (value: string | null) => void,
+  ): void {
+    if (!shellEl.hidden) return; // one dialog at a time; the pending one wins
+    opener = document.activeElement as HTMLElement | null;
+    onDone = done;
+    titleText.textContent = title;
+    confirmEl.textContent = confirmLabel;
+    inputEl.setAttribute("aria-label", inputLabel);
+    shellEl.hidden = false;
+    shellEl.setAttribute("aria-hidden", "false");
+    inputEl.focus();
+  }
+
+  confirmEl.addEventListener("click", function () {
+    if (shellEl.hidden || !onDone) return;
+    const value = inputEl.value.trim();
+    if (!value) {
+      errorEl.textContent = "a value is required (Esc or cancel aborts the move)";
+      errorEl.classList.add("show");
+      inputEl.focus();
+      return;
+    }
+    resolve(value);
+  });
+  inputEl.addEventListener("keydown", function (event) {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      confirmEl.click();
+    }
+  });
+  cancelEl.addEventListener("click", function () {
+    resolve(null);
+  });
+  if (backdrop) {
+    backdrop.addEventListener("click", function () {
+      resolve(null);
+    });
+  }
+  document.addEventListener(
+    "keydown",
+    function (event) {
+      if (shellEl.hidden) return;
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      resolve(null);
+    },
+    true,
+  );
+  document.addEventListener(
+    "keydown",
+    function (event) {
+      if (shellEl.hidden) return;
+      if (event.key !== "Tab") return;
+      trapBoardFocus(shellEl.querySelector(".move-prompt-panel") as HTMLElement, event);
+    },
+    true,
+  );
+  return ask;
+}
+
+/**
  * Pure renderer for the static board. Columns are the v0 statuses in enum
  * order; every card shows its own status (no rollup). All dynamic text is
  * HTML-escaped. Sorted lexicographically by id within each column. With
@@ -1360,6 +1509,11 @@ export function wireBoardMoveMenu(attemptMove: (card: HTMLElement, to: string) =
  * localStorage (`arggon-board-columns-v1`, a per-browser view preference that
  * never touches the tracker) and degrades to the default layout without it.
  * Column headings are sticky while the board scrolls.
+ * The drop flow's value collection is an in-page dialog (task-board-move-dialogs)
+ * on EVERY board — claiming into `in_progress` asks the assignee, moving to
+ * `blocked` asks the reason; Esc/cancel aborts, focus is trapped and restored,
+ * and a successful move offers an Undo toast action when the reverse
+ * transition is legal under the same drop rules. There is no `window.prompt`.
  */
 export function renderBoardHtml(
   items: WorkItem[],
@@ -1648,6 +1802,22 @@ header .meta { color: #59636e; font-size: 13px; }
 #board-toast.show { display: block; }
 #board-toast.refused { background: #cf222e; }
 #board-toast.ok { background: #1a7f37; }
+#board-toast .toast-action { margin-left: 10px; border: 1px solid #fff; background: transparent; color: #fff; border-radius: 4px; padding: 1px 8px; font-size: 12px; font-family: inherit; cursor: pointer; text-decoration: underline; }
+/* Move value dialog (task-board-move-dialogs): the in-page replacement for
+   the drop flow's blocking prompts. Same chrome as the move menu; on every
+   board, because the drop flow is. The input carries the boundary grey. */
+.move-prompt { position: fixed; inset: 0; z-index: 30; }
+.move-prompt[hidden] { display: none; }
+.move-prompt-backdrop { position: absolute; inset: 0; background: rgb(0 0 0 / 0.35); }
+.move-prompt-panel { position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%); background: #fff; border: 1px solid #666a6f; border-radius: 8px; box-shadow: 0 8px 24px rgb(0 0 0 / 0.25); padding: 14px; min-width: 300px; max-width: 92vw; }
+.move-prompt-title { font-weight: 600; font-size: 13px; margin-bottom: 8px; overflow-wrap: anywhere; }
+.move-prompt-panel input { width: 100%; box-sizing: border-box; padding: 6px 10px; font-size: 13px; font-family: inherit; border: 1px solid #666a6f; border-radius: 6px; background: #fff; color: inherit; }
+.move-prompt-error { display: none; margin-top: 6px; font-size: 12px; color: #cf222e; }
+.move-prompt-error.show { display: block; }
+.move-prompt-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 12px; }
+.move-prompt-cancel { padding: 4px 10px; font-size: 12px; font-family: inherit; border: 1px solid #666a6f; background: #fff; color: inherit; border-radius: 6px; cursor: pointer; }
+.move-prompt-confirm { padding: 4px 10px; font-size: 12px; font-family: inherit; border: 1px solid #0550ae; background: #0550ae; color: #fff; border-radius: 6px; cursor: pointer; }
+.move-prompt-cancel:focus-visible, .move-prompt-confirm:focus-visible { outline: 2px solid #0550ae; outline-offset: 2px; }
 .filterbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
 .filterbar label { font-size: 11px; color: #59636e; text-transform: uppercase; letter-spacing: 0.05em; }
 #board-filter-input { flex: 1 1 260px; max-width: 560px; padding: 6px 10px; font-size: 13px; font-family: inherit; border: 1px solid #d0d4da; border-radius: 6px; background: #fff; color: inherit; }
@@ -1684,6 +1854,7 @@ ${columns}
 <div id="board-toast" role="status" aria-live="polite"></div>
 ${details ? DRAWER_MARKUP : ""}
 ${details ? MOVE_MENU_MARKUP : ""}
+${MOVE_PROMPT_MARKUP}
 <script>
 'use strict';
 ${evaluateDrop.toString()}
@@ -1692,7 +1863,8 @@ ${applyBoardFilter.toString()}
 /* board-filter:end */
 ${dropNeedsClaimPrompt.toString()}
 ${wireBoardColumns.toString()}
-${details ? trapBoardFocus.toString() : ""}
+${trapBoardFocus.toString()}
+${wireBoardMovePrompt.toString()}
 ${details ? renderBoardDetail.toString() : ""}
 ${details ? wireBoardDetail.toString() : ""}
 ${details ? wireBoardKeyboardNav.toString() : ""}
@@ -1713,9 +1885,23 @@ ${details ? wireBoardMoveMenu.toString() : ""}
   var filterCount = document.getElementById("board-filter-count");
   var lensChips = document.querySelectorAll("#board-lenses .lens");
   var toastTimer = null;
-  function toast(message, kind) {
+  function toast(message, kind, action) {
     var el = document.getElementById("board-toast");
     el.textContent = message;
+    // Undo affordance (task-board-move-dialogs): when the caller passes an
+    // action, the toast carries an explicit button instead of text only.
+    if (action) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "toast-action";
+      btn.textContent = action.label;
+      btn.addEventListener("click", function () {
+        el.className = "";
+        if (toastTimer) clearTimeout(toastTimer);
+        action.run();
+      });
+      el.appendChild(btn);
+    }
     el.className = "show " + (kind || "");
     if (toastTimer) clearTimeout(toastTimer);
     toastTimer = setTimeout(function () { el.className = ""; }, 6000);
@@ -1900,90 +2086,140 @@ ${details ? wireBoardMoveMenu.toString() : ""}
     };
     var edit = {};
     var verdict = evaluateDrop(cardData, to, edit);
-    if (dropNeedsClaimPrompt(verdict)) {
-      // Claim via board: prompt for the login, then re-run the rule with it.
-      var login = window.prompt("--assignee required to claim " + id + " (GitHub login or agent id):");
-      if (!login || !login.trim()) {
-        toast("✗ " + verdict.reason + " (drop cancelled)", "refused");
+    // The optimistic move + server round-trip, as one closure over the card,
+    // the target and the collected edit (task-board-move-dialogs): the value
+    // dialogs resolve asynchronously, so the flow continues from callbacks.
+    function runMove(reason) {
+      var verdictOk = evaluateDrop(cardData, to, edit);
+      if (!verdictOk.ok) {
+        toast("✗ " + verdictOk.reason, "refused");
         return;
       }
-      edit.assignee = login.trim();
-      verdict = evaluateDrop(cardData, to, edit);
+      var anchor = card.nextSibling;
+      var prevAssignee = card.getAttribute("data-assignee");
+      // Reparenting a focused element drops focus to <body> (Chromium), so the
+      // keyboard/touch move flow keeps it: whatever inside the card held focus
+      // (the card itself, or its move button) is re-focused after the move.
+      var focusHeld = null;
+      if (document.activeElement && (document.activeElement === card || card.contains(document.activeElement))) {
+        focusHeld = document.activeElement;
+      }
+      // Never includes force: the update path must reject claim steals itself.
+      var body = { id: id, status: to };
+      if (reason) body.blocked_reason = reason;
+      if (edit.assignee) body.assignee = edit.assignee;
+      // Optimistic move; the catch below reverts it when the update call fails.
+      // The accessible name moves with the card (task-board-keyboard-a11y):
+      // assistive tech must announce the new status/claim immediately, not after
+      // the next server render.
+      card.setAttribute("data-status", to);
+      if (edit.assignee) card.setAttribute("data-assignee", edit.assignee);
+      card.setAttribute("aria-label", cardAriaLabel(card, to));
+      columnFor(to).appendChild(card);
+      if (focusHeld) focusHeld.focus();
+      setFilterState(currentExpr());
+      toast("… arggon update " + id + " --status " + to, "pending");
+      fetch(ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      })
+        .then(function (res) {
+          return res.json().catch(function () {
+            return { ok: false, error: { message: "HTTP " + res.status } };
+          });
+        })
+        .then(function (data) {
+          if (data && data.ok) {
+            // Undo affordance (task-board-move-dialogs): the toast carries an
+            // explicit Undo button when the REVERSE transition is legal under
+            // the same evaluateDrop parity rules (never force, never steal —
+            // undo runs attemptMove, so it collects a claim/reason through the
+            // same dialogs and reverts through the same server path).
+            var reverse = evaluateDrop(
+              {
+                id: id,
+                type: cardData.type,
+                status: to,
+                assignee: card.getAttribute("data-assignee")
+              },
+              from,
+              {}
+            );
+            if (reverse.ok || dropNeedsClaimPrompt(reverse)) {
+              toast("✓ " + id + " -> " + to, "ok", {
+                label: "Undo",
+                run: function () {
+                  attemptMove(card, from);
+                }
+              });
+            } else {
+              toast("✓ " + id + " -> " + to, "ok");
+            }
+            return;
+          }
+          throw new Error(data && data.error && data.error.message ? data.error.message : "update failed");
+        })
+        .catch(function (err) {
+          card.setAttribute("data-status", from);
+          if (edit.assignee) {
+            if (prevAssignee) card.setAttribute("data-assignee", prevAssignee);
+            else card.removeAttribute("data-assignee");
+          }
+          card.setAttribute("aria-label", cardAriaLabel(card, from));
+          var col = columnFor(from);
+          if (anchor && anchor.parentNode === col) col.insertBefore(card, anchor);
+          else col.appendChild(card);
+          if (focusHeld && focusHeld.isConnected) focusHeld.focus();
+          setFilterState(currentExpr());
+          var message = err && err.message ? err.message : "update failed";
+          if (message === "Failed to fetch") {
+            message = "static snapshot: no update endpoint (serve with arggon board --serve)";
+          }
+          toast("✗ " + id + " not moved — " + message + " (run: arggon update " + id + " --status " + to + ")", "refused");
+        });
+    }
+    if (dropNeedsClaimPrompt(verdict)) {
+      // Claim via board: the in-page dialog asks for the login, then the rule
+      // is re-run with it (task-board-move-dialogs — no blocking prompt).
+      askMoveValue(
+        "--assignee required to claim " + id + " (GitHub login or agent id):",
+        "claim",
+        "assignee",
+        function (login) {
+          if (login === null) {
+            toast("✗ " + verdict.reason + " (drop cancelled)", "refused");
+            return;
+          }
+          edit.assignee = login;
+          runMove(null);
+        },
+      );
+      return;
     }
     if (!verdict.ok) {
       toast("✗ " + verdict.reason, "refused");
       return;
     }
-    var reason = null;
     if (to === "blocked") {
-      reason = window.prompt("--blocked-reason required to block " + id + ":");
-      if (!reason || !reason.trim()) {
-        toast("✗ status blocked requires --blocked-reason (drop cancelled)", "refused");
-        return;
-      }
-      reason = reason.trim();
+      askMoveValue(
+        "--blocked-reason required to block " + id + ":",
+        "block",
+        "blocked reason",
+        function (reason) {
+          if (reason === null) {
+            toast("✗ status blocked requires --blocked-reason (drop cancelled)", "refused");
+            return;
+          }
+          runMove(reason);
+        },
+      );
+      return;
     }
-    var anchor = card.nextSibling;
-    var prevAssignee = card.getAttribute("data-assignee");
-    // Reparenting a focused element drops focus to <body> (Chromium), so the
-    // keyboard/touch move flow keeps it: whatever inside the card held focus
-    // (the card itself, or its move button) is re-focused after the move.
-    var focusHeld = null;
-    if (document.activeElement && (document.activeElement === card || card.contains(document.activeElement))) {
-      focusHeld = document.activeElement;
-    }
-    // Never includes force: the update path must reject claim steals itself.
-    var body = { id: id, status: to };
-    if (reason) body.blocked_reason = reason;
-    if (edit.assignee) body.assignee = edit.assignee;
-    // Optimistic move; the catch below reverts it when the update call fails.
-    // The accessible name moves with the card (task-board-keyboard-a11y):
-    // assistive tech must announce the new status/claim immediately, not after
-    // the next server render.
-    card.setAttribute("data-status", to);
-    if (edit.assignee) card.setAttribute("data-assignee", edit.assignee);
-    card.setAttribute("aria-label", cardAriaLabel(card, to));
-    columnFor(to).appendChild(card);
-    if (focusHeld) focusHeld.focus();
-    setFilterState(currentExpr());
-    toast("… arggon update " + id + " --status " + to, "pending");
-    fetch(ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
-    })
-      .then(function (res) {
-        return res.json().catch(function () {
-          return { ok: false, error: { message: "HTTP " + res.status } };
-        });
-      })
-      .then(function (data) {
-        if (data && data.ok) {
-          toast("✓ " + id + " -> " + to, "ok");
-          return;
-        }
-        throw new Error(data && data.error && data.error.message ? data.error.message : "update failed");
-      })
-      .catch(function (err) {
-        card.setAttribute("data-status", from);
-        if (edit.assignee) {
-          if (prevAssignee) card.setAttribute("data-assignee", prevAssignee);
-          else card.removeAttribute("data-assignee");
-        }
-        card.setAttribute("aria-label", cardAriaLabel(card, from));
-        var col = columnFor(from);
-        if (anchor && anchor.parentNode === col) col.insertBefore(card, anchor);
-        else col.appendChild(card);
-        if (focusHeld && focusHeld.isConnected) focusHeld.focus();
-        setFilterState(currentExpr());
-        var message = err && err.message ? err.message : "update failed";
-        if (message === "Failed to fetch") {
-          message = "static snapshot: no update endpoint (serve with arggon board --serve)";
-        }
-        toast("✗ " + id + " not moved — " + message + " (run: arggon update " + id + " --status " + to + ")", "refused");
-      });
+    runMove(null);
   }
   ${details ? "wireBoardDetail(toast, renderBoardDetail); wireBoardMoveMenu(attemptMove);" : ""}
+  var askMoveValue = wireBoardMovePrompt();
 })();
 </script>
 </body>

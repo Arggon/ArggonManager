@@ -24,6 +24,7 @@ import {
   wireBoardColumns,
   wireBoardKeyboardNav,
   wireBoardMoveMenu,
+  wireBoardMovePrompt,
   type BoardLensItem,
 } from "./board.js";
 import type { BoardGithub, PrInfo } from "./board.js";
@@ -584,6 +585,59 @@ describe("renderBoardHtml drag-and-drop", () => {
     expect(html).toContain("requires --assignee");
   });
 
+  it("replaces both window.prompt calls with the in-page move dialog (task-board-move-dialogs)", () => {
+    for (const details of [false, true]) {
+      const html = renderBoardHtml([item({ id: "task-a", type: "task", status: "todo" })], {
+        generatedAt: GENERATED_AT,
+        details,
+      });
+      // No prompt call survives anywhere in the page, static or serve.
+      expect(html).not.toContain("window.prompt");
+      // The dialog shell, its wiring and the focus trap ride with the drop flow.
+      expect(html).toContain('id="board-move-prompt"');
+      expect(html).toContain(wireBoardMovePrompt.toString());
+      expect(html).toContain(trapBoardFocus.toString());
+      expect(html).toContain("var askMoveValue = wireBoardMovePrompt();");
+      // Claim mode and blocked mode collect through the same dialog.
+      expect(html).toContain('"--assignee required to claim " + id');
+      expect(html).toContain('"--blocked-reason required to block " + id');
+    }
+  });
+
+  it("wires dialog validation and focus handling into the move prompt", () => {
+    const source = wireBoardMovePrompt.toString();
+    // Inline validation: whitespace-only input keeps the dialog open.
+    expect(source).toContain("trim()");
+    expect(source).toContain("a value is required");
+    // Esc cancels, focus is trapped in the panel and restored on close.
+    expect(source).toContain("trapBoardFocus(");
+    expect(source).toContain('"Escape"');
+    expect(source).toContain("opener.focus()");
+    // The embedded copy never falls back to a blocking prompt.
+    expect(source).not.toContain("window.prompt");
+    // The error row announces itself (role=alert) and the input is labeled.
+    const html = renderBoardHtml([item({ id: "task-a", type: "task", status: "todo" })], {
+      generatedAt: GENERATED_AT,
+    });
+    expect(html).toContain('role="alert"');
+    expect(html).toContain('aria-labelledby="board-move-prompt-title"');
+  });
+
+  it("offers undo from the success toast only when the reverse move is legal", () => {
+    const html = renderBoardHtml([item({ id: "task-a", type: "task", status: "todo" })], {
+      generatedAt: GENERATED_AT,
+    });
+    // The toast carries an action button; undo re-enters attemptMove (the same
+    // parity rules, dialogs included) and the legality check runs evaluateDrop.
+    expect(html).toContain('label: "Undo"');
+    expect(html).toContain("attemptMove(card, from)");
+    expect(html).toContain(".toast-action");
+    // The undo offer classifies the reverse transition with the drag flow's
+    // own rule — never a second legality implementation.
+    const page = html.slice(html.indexOf("function evaluateDrop"));
+    expect(page).toContain("var reverse = evaluateDrop(");
+  });
+
   it("keeps counts re-computable by tagging the meta counts span", () => {
     const html = renderBoardHtml([item({ id: "task-a", type: "task", status: "todo" })], {
       generatedAt: GENERATED_AT,
@@ -735,7 +789,10 @@ describe("renderBoardHtml item detail drawer (task-board-item-detail, serve-only
     expect(explicit).toBe(plain);
     expect(plain).not.toContain("board-drawer");
     expect(plain).not.toContain("/api/item");
-    expect(plain).not.toContain("tabindex");
+    // Cards stay unfocusable in the static export (the drawer's tabindex is
+    // serve-only); the focus trap's SELECTOR STRING rides along now that the
+    // move dialog shares it, so the assertion pins the attribute, not the word.
+    expect(plain).not.toContain('tabindex="0"');
     expect(plain).not.toContain("renderBoardDetail");
     // task-board-keyboard-a11y: the interactive surface stays serve-only.
     expect(plain).not.toContain("board-move-menu");
