@@ -3,7 +3,7 @@ type: bug
 status: todo
 id: bug-row-table-flake
 title: row-table-stdout-ci-flake
-parent: ui-foundation
+parent: ci-stability
 labels: []
 priority: p2
 created: "2026-09-30"
