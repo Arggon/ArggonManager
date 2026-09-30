@@ -109,6 +109,17 @@ helper that returns `ctx.tool.transform`) is not tracked. Only the exact
 `const transform = ctx?.tool?.transform` binding is recognised. Plugin
 schema/parity tests remain the authoritative check for these shapes.
 
+The canonical **receiver names** are structural anchors too, with the same
+kind of limitation: `ctx.tool.*`, `transform(...)` and `editor.*` are matched
+literally, so a differently named but type-valid receiver — `toolEditor.add(extraTool)`
+beside a real `ToolEditor` — is not covered. Covering renamed receivers
+structurally would require generic `$X.add(...)`/`$X.namespace(...)` shapes,
+which reintroduce exactly the generic-name false positives the rule exists to
+avoid (`Set.add`, event-emitter `.add`, unrelated `definitions` loops). The
+plugin schema/parity tests remain the authoritative check for renamed
+receivers, as for handle indirection: this guard is high-confidence and
+deliberately not exhaustive semantic enforcement.
+
 ## Scope and local checks
 
 The two tracker rules scan hand-authored production `.ts`/`.tsx` files outside
@@ -134,11 +145,48 @@ reports violations but does not rewrite source.
 
 ## Authoring notes
 
-- Only **one** multi-metavariable (`$$$ARGS`) pattern per rule is reliable in
-  `@ast-grep/cli@0.45.3`: when several `$$$` patterns appear as siblings in one
-  `any`, the effective match set is wrong. The tracker rules therefore unify all
-  writer/remover call shapes into a single `$$$` pattern plus a one-argument
-  sibling, and express the serializer call relationally instead of as a second
-  `$$$` pattern.
+- Sibling patterns under one `any` are independent alternatives: several
+  `$$$`-carrying patterns per rule are fine (the native rule ships a dozen, all
+  firing), every branch fires on its own matches, and a metavariable name
+  repeated across branches does not unify. There is no one-`$$$`-per-rule
+  limit:
+
+  ```yaml
+  rule:
+    any:
+      - pattern: alpha($$$FIRST_ARGS) # fires on alpha(...)
+      - pattern: beta($$$SECOND_ARGS) # fires on beta(...)
+  ```
+
+  The real constraint is inside `all`: sibling patterns there must all match
+  the same node, and a metavariable name repeated across those siblings
+  unifies as an **equality constraint** — the rule only fires when every
+  occurrence binds identical text, and silently matches nothing otherwise:
+
+  ```yaml
+  # Fires exactly on editor.add(...) calls: receiver pinned, args unified.
+  rule:
+    all:
+      - pattern: $RECEIVER.add($$$ARGS)
+      - pattern: editor.add($$$ARGS)
+  ```
+
+  ```yaml
+  # Never fires: $$$CALL would have to bind two different texts
+  # (the transform argument and the editor.add argument).
+  rule:
+    all:
+      - pattern: transform($$$CALL)
+      - pattern: editor.add($$$CALL)
+  ```
+
+  So: give each `all` sibling its own metavariable names unless the equality
+  is intended, and express two unrelated shapes as `any` siblings, never as
+  `all` siblings. These semantics are pinned against `@ast-grep/cli@0.45.3` by
+  `cli/src/ast-grep-authoring.test.ts` (reproduced 2026-09-30, PR #418
+  review follow-up). The tracker rules still unify their writer/remover call
+  shapes into a single `$$$` pattern family — for rule clarity, not because
+  sibling patterns are unreliable.
+
 - `ast-grep test` does not evaluate a rule's `files`/`ignores` globs, so scope is
   verified by the committed fixture scan rather than by `valid:` snippets.

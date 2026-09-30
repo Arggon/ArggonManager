@@ -648,6 +648,90 @@ describe("renderBoardHtml drag-and-drop", () => {
   });
 });
 
+describe("renderBoardHtml non-text contrast (WCAG 1.4.11, task-board-non-text-contrast-and-drag-affordance)", () => {
+  // axe has no automated rule for 1.4.11, so the @smoke lane cannot catch a
+  // non-text regression. These assertions pin the decision on the rendered CSS
+  // instead: every interactive-control boundary clears 3:1 on the surfaces it
+  // touches, and no opacity fade exists anywhere in the stylesheet.
+  const html = renderBoardHtml([item({ id: "task-a", type: "task", status: "todo" })], {
+    generatedAt: GENERATED_AT,
+    details: true,
+  });
+  const css = (html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? "").replace(
+    /\/\*[\s\S]*?\*\//g,
+    "",
+  );
+
+  /** Relative luminance per WCAG 2.x. */
+  function luminance(hex: string): number {
+    const [r, g, b] = [0, 2, 4].map((i) => {
+      const v = parseInt(hex.replace("#", "").slice(i, i + 2), 16) / 255;
+      return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+  /** WCAG contrast ratio between two hex colors. */
+  function ratio(fg: string, bg: string): number {
+    const [l1, l2] = [luminance(fg), luminance(bg)].sort((a, b) => b - a);
+    return (l1 + 0.05) / (l2 + 0.05);
+  }
+  /** The declarations of one rule from the rendered stylesheet. */
+  function rule(selector: string): string {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = css.match(new RegExp(`${escaped} \\{([^}]*)\\}`));
+    expect(match, `rule not found in rendered CSS: ${selector}`).toBeTruthy();
+    return match![1];
+  }
+
+  it("keeps every recorded non-text boundary at or above 3:1", () => {
+    // The pairs recorded in the item body: [what, foreground, background].
+    const boundaries: Array<[string, string, string]> = [
+      ["drop-target outline vs column", "#666a6f", "#ebecf0"], // 4.61
+      ["count pill border vs column", "#666a6f", "#ebecf0"], // 4.61
+      ["lens chip border vs page", "#666a6f", "#f4f5f7"], // 4.99
+      ["lens chip border vs chip fill", "#666a6f", "#ffffff"], // 5.45
+      ["lens.active fill vs page", "#0550ae", "#f4f5f7"], // 6.96
+      ["drawer border vs drawer fill", "#666a6f", "#ffffff"], // 5.45
+      ["move-menu border vs panel fill", "#666a6f", "#ffffff"], // 5.45
+    ];
+    for (const [what, fg, bg] of boundaries) {
+      expect(ratio(fg, bg), what).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("uses the boundary grey on every interactive control (never the 1.3:1 #d0d4da)", () => {
+    for (const selector of [
+      "#board-filter-input",
+      "#board-filter-clear",
+      ".lens",
+      ".col-toggle",
+      ".layout-toggle",
+      ".card-move",
+      ".drawer-close",
+      ".drawer-panel",
+      ".move-menu-panel",
+      ".move-menu-target",
+      ".move-menu-cancel",
+    ]) {
+      expect(rule(selector), selector).toContain("1px solid #666a6f");
+    }
+    // The count pill is a passive indicator: its muted fill stays, the pill
+    // edge is the recorded boundary, and its text pair (axe-enforced) is 6.04:1.
+    expect(rule(".column .count")).toContain("border: 1px solid #666a6f");
+    expect(ratio("#424a53", "#d0d4da")).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("affords the dragged card with a lift, never a fade", () => {
+    const dragging = rule(".card.dragging");
+    expect(dragging).toContain("box-shadow");
+    expect(dragging).toContain("outline: 2px solid #0550ae");
+    // No opacity declaration anywhere in the stylesheet: a fade composites
+    // every descendant against the surface below it (measured 1.5-2.7:1), so
+    // the state cue must come from surface, shadow and outline instead.
+    expect(css).not.toMatch(/\bopacity\s*:/);
+  });
+});
+
 describe("renderBoardHtml filter lens (task-board-filter-lenses)", () => {
   const lensItems = [
     item({ id: "task-a", type: "task", status: "todo", title: "A", labels: ["smoke"] }),

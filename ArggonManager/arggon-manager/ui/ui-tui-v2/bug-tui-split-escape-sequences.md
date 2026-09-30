@@ -10,7 +10,6 @@ labels: [tui, ui]
 priority: p3
 created: "2026-09-23"
 updated: "2026-09-30"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-tui-split-escape-sequences
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-tui-v2/bug-tui-split-escape-sequences.md

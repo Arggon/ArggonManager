@@ -235,6 +235,17 @@ page. In practice:
 4. Never add a `disableRules` entry to make the lane pass: that converts a
    tracked defect into an invisible one.
 
+**What the gate does not cover.** WCAG 1.4.11 (non-text contrast, 3:1) has no
+axe rule, so the gate is silent on it by construction — that silence is not a
+pass. The board's non-text boundaries (control borders, the drop-target
+outline, dialog edges) are pinned instead by unit assertions on the rendered
+CSS in `cli/src/board.test.ts` ("renderBoardHtml non-text contrast"), which
+also forbid opacity fades as a state cue: a fade composites every descendant
+against the surface below it (measured 1.5-2.7:1). If you introduce a new
+control, surface or state indicator, add its boundary pair to that test —
+`npm test` is the 1.4.11 gate
+([task-board-non-text-contrast-and-drag-affordance](ArggonManager/arggon-manager/ui/ui-web-board-v2/task-board-non-text-contrast-and-drag-affordance.md)).
+
 ## Propose schema / convention changes
 
 1. Open an issue describing the change and why (agents + humans must share one rule).
