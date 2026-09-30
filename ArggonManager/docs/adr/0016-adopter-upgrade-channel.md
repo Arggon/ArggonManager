@@ -1,6 +1,7 @@
-# 0014 Adopter upgrade channel
+# 0016 Adopter upgrade channel
 
 - Status: Proposed
+> Numbering note (2026-09-29): originally filed as 0014 in collision with `0014-zcode-native-seam.md` (landed first via #439); renumbered to the next free id. Decision content unchanged.
 - Date: 2026-09-29
 - Deciders: Gonzalo Arganaraz
 

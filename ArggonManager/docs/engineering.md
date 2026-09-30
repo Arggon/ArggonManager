@@ -117,7 +117,7 @@ verdict: request-changes (smoke evidence missing)
 
 - User-facing behavior changes update README and/or convention/engineering as appropriate.
 - ADRs for stack, identity, and cross-cutting schema decisions (see below).
-- PRs touching the methodology carriers state their **methodology impact class** (advisory / behavioral, with an ADR 0014 reference when behavioral) — reviewers check it like any bar above; see `ArggonManager/docs/agents.md` §Changing the methodology itself.
+- PRs touching the methodology carriers state their **methodology impact class** (advisory / behavioral, with an ADR 0016 reference when behavioral) — reviewers check it like any bar above; see `ArggonManager/docs/agents.md` §Changing the methodology itself.
 
 ---
 
