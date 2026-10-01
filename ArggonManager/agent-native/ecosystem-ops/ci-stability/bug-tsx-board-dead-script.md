@@ -13,7 +13,6 @@ updated: "2026-09-30"
 claimed_at: "2026-09-30T23:56:07.824Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-tsx-board-dead-script
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/ci-stability/bug-tsx-board-dead-script.md
   Leaves live only under a story. id is the filename stem: bug-tsx-board-dead-script.
@@ -75,3 +74,15 @@ Reproduced at `d55e0933` — **pre-existing**, not a theme-item regression. Invi
 - [x] Gates: full suite, lint, build, check:plugin, validate; README unaffected (dist path unchanged).
 
 (Note: filed under `ecosystem-ops/ci-stability` because the owning `ui` containers are closed; it is a board render-path defect.)
+
+### 2026-10-01 @Arggon
+Fix on fix/bug-tsx-board-dead-script (dffaa47e): strip-at-render via new cli/src/board-embed.ts (embeddedFunctionSource / stripKeepNamesCalls) wired into all 12 toString() embeds in renderBoardHtml. Fail-loud on unrecognized keepNames shapes; identity under tsc/oxc so board-parity toString assertions and dist output are unchanged. Chosen over dist-output rendering (stale/dist divergence) and a page-side __name shim (output must carry zero __name references). keepNames cannot be disabled: tsx exposes no knob.
+
+Smoke evidence (ADR 0008; Playwright Chromium, fixture via createFixture, npx playwright test):
+- BEFORE (tsx render, pre-fix): /tmp board render had 4 __name( lines, 0 definitions. AFTER: 0 __name( references, controllers present.
+- npx playwright test --grep "tsx path" → 4/4 passed: (1) tsx board --serve: h1 renders, served html has no __name(, zero console/page errors, theme auto→light→dark flips body bg to rgb(13,17,23), density→compact, column collapse + all three persist across reload; (2) filter label:smoke visibly narrows to the one labelled card, count line + URL hash updated; (3) drag todo→cancelled round-trips, ok toast, persists (show --json → cancelled); (4) tsx static export: file clean, filters offline from file://, zero page errors.
+- Full @smoke lane after rebuild: 32 passed + 1 pre-existing failure ("a live reload preserves the filter…" — Execution context was destroyed race); the single test fails identically on the CLEAN tree (verified via stash), machine-timing flake unrelated to this change. Everything else in the dist lane (filter, moves, dialogs, theme/density, axe scans) green.
+
+Gates: board/board-parity/board-embed vitest 120/120 (incl. new tsx spawn gate: node tsx cli/src/cli.ts board output has zero __name(). npm run lint clean; npm run build ok; npm run check:plugin no drift; npm run arggon -- validate ok; test:structure 3/3; lint:structure clean. npm test full suite 1942/1946: failures reproduce on the clean tree in this worktree env (headless-ci packed-bin byte-identical, prose-format prettier code-span; plus load-flaky pack/success-stdout spawn tests) — pre-existing, CI authoritative. README: no statement falsified.
+
+Env notes for the coordinator: (1) start --worktree left no node_modules here (claim commit initially failed its pre-commit gate); fixed by npm install in the worktree + re-attach. (2) A working-tree incident mid-session (stashes + a tool-side reset) briefly lost the uncommitted fix; recovered in full from stash@{0} (74f7e78, left in place). (3) .zcode/config.json carries runtime-only changes from the zcode tooling (plugin registration + reformat) — not mine, deliberately unstaged.
