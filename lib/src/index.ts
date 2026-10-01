@@ -241,6 +241,7 @@ export type { ClassifyCleanupDeps, CleanupEntry, CleanupGit, MergedPr } from "./
 export {
   buildLocalWorkspaces,
   inspectDeclaredDependencies,
+  inspectGateBinResolution,
   linkNodeModules,
   linkedWorkspacePackages,
   localWorkspacePackages,
@@ -251,9 +252,12 @@ export {
   prepareWorktreeDependencies,
   unlinkNodeModulesLink,
   MAX_MISSING_DEPENDENCIES,
+  MAX_GATE_BINS,
 } from "./worktree.js";
 export type {
   DeclaredDependencyReport,
+  GateBinResolution,
+  GateBinSource,
   LocalWorkspacePackage,
   ManifestCoverage,
   WorkspaceBuildRunner,
