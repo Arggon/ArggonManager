@@ -58,8 +58,9 @@ Operational duties accepted:
 - The npm trusted-publisher configuration (one per package) binds to the
   workflow filename; renaming `release.yml` is a breaking ops change and must
   be called out in the PR that does it.
-- The publishing runner needs npm ≥ 11.5.1 (setup-node + `npm install -g
-  npm@11.5.1` pattern). Trusted publishing is configured to allow direct
+- The publishing runner needs npm ≥ 11.5.1 (the `npm install -g npm@11.5.1`
+  runner pattern, as in the cited release-please reference workflows).
+  Trusted publishing is configured to allow direct
   `npm publish` for both packages; staged publishing (`npm stage publish` —
   the default for configurations created after 2026-09-03) is the upgrade
   path if the supply-chain bar rises, not the initial shape.
@@ -82,12 +83,17 @@ interval (default 24 h) a detached, hard-timeout (~2 s) GET reads
 (tmp + rename) in the OS temp dir under a format-version key. Surfacing:
 
 - **Humans (TTY):** a deferred one-line notice after the command's own
-  output, with the exact upgrade command (`npm install -g
-  arggon-manager@<latest>`). Suppressed when `CI` is set or stdout is not a
+  output, with the exact upgrade command (`npm install -g arggon-manager@<latest>`).
+  Suppressed when `CI` is set or stdout is not a
   TTY.
 - **Agents (JSON):** additive `update: { latest, current, cachedAt }` fields
   on `doctor --json` and `--version --json` — no `schemaVersion` bump,
   documented in `ArggonManager/docs/json-output.md` in the same PR.
+
+On CI machines the registry GET never runs at all (shared runners, no human
+to notify, no adopter consent surface): the notice is suppressed and the
+additive JSON fields report the cache state — present when the same machine
+carries a fresh-enough local cache, otherwise an explicit unknown.
 
 Guarantees: honors `ARGGON_NO_UPDATE_CHECK=1`; offline, malformed, or 404
 responses are a silent "no update known" — the check never blocks, retries,
