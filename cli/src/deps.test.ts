@@ -180,6 +180,33 @@ describe("validate dependency rules", () => {
     );
   });
 
+  // bug-dependency-cycle-chain-rotation-duplicates-a-node: task-a -> task-c
+  // bypasses task-b, so the DFS (walk order = creation order) enters the
+  // 3-cycle {task-b, task-c, task-d} at task-c — NOT at its smallest member.
+  // The chain must still print exactly one canonical, closed rotation (entered
+  // at the anchor, every member once); the old rotation split the repeated
+  // entry node and printed e.g. "task-b -> task-c -> task-c -> task-d".
+  it("prints one canonical chain for a cycle entered at a non-min member", () => {
+    const { dir, paths } = primedTree();
+    const d = runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Fourth",
+      parent: "story-login",
+      id: "task-d",
+    });
+    setFrontmatter(paths["task-a"], { depends_on: ["task-c"] });
+    setFrontmatter(paths["task-b"], { depends_on: ["task-c"] });
+    setFrontmatter(paths["task-c"], { depends_on: ["task-d"] });
+    setFrontmatter(d.path, { depends_on: ["task-b"] });
+    const result = runValidate({ cwd: dir });
+    expect(codes(result)).toEqual(["DEPENDENCY_CYCLE"]);
+    expect(result.errors[0]!.message).toBe(
+      "dependency cycle: task-b -> task-c -> task-d -> task-b",
+    );
+    expect(result.errors[0]!.path).toContain("task-b.md");
+  });
+
   it("keeps v0-v2 trees valid when they use depends_on (unconditional parsing)", () => {
     const { dir, paths } = primedTree();
     writeFileSync(join(dir, "ArggonManager/.convention.yml"), "version: 0\n", "utf8");
