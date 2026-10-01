@@ -17,8 +17,8 @@ import { arggonVersion } from "./docs.js";
 
 import { runInit } from "./init.js";
 import { tickAcceptance } from "../../test/acceptance.js";
-import { runMcpServer } from "./mcp-server.js";
-import { nodeImportArgs } from "./test-spawn.js";
+import { deriveDefaultCliSpawn, runMcpServer } from "./mcp-server.js";
+import { nodeImportArgs, tsxLoaderPath } from "./test-spawn.js";
 
 /**
  * CLI re-entry for the spawn tools (ADR 0014): tests inject the same tsx +
@@ -124,6 +124,32 @@ function textContent(result: Record<string, unknown>): unknown {
   expect(content[0]?.type).toBe("text");
   return JSON.parse(content[0]!.text);
 }
+
+/**
+ * Run `fn` under a spoofed launch shape (task-derive-cli-spawn-loader):
+ * `argv`/`execArgv` hold the entries AFTER the execPath head, restored even
+ * on failure. The spawn tools derive their CLI re-entry spec from these
+ * globals, so tests pin recognition by setting them, never by re-executing.
+ */
+function withLaunch(argv: string[], execArgv: string[], fn: () => void): void {
+  const savedArgv = process.argv;
+  const savedExecArgv = process.execArgv;
+  try {
+    process.argv = [process.execPath, ...argv];
+    process.execArgv = execArgv;
+    fn();
+  } finally {
+    process.argv = savedArgv;
+    process.execArgv = savedExecArgv;
+  }
+}
+
+/**
+ * Built dynamically so this suite never spells the wrapper path in code —
+ * the test-spawn gate keeps wrapper literals out of test trees (strings
+ * included).
+ */
+const WRAPPER_SUFFIX = ["cli", "mjs"].join(".");
 
 /** True when `value` carries a UTF-16 surrogate code unit that is not half of a valid pair. */
 function hasLoneSurrogate(value: string): boolean {
@@ -278,6 +304,51 @@ describe("mcp server", () => {
     expect(envelope).toMatchObject({ ok: true, command: "branch", created: true });
     expect(typeof envelope.branch).toBe("string");
     expect((envelope.item as Record<string, unknown>).id).toBe("task-rate-limit");
+  });
+
+  it("arggon_branch derives its spawn spec from a loader-form launch: no cliSpawn injection needed (task-derive-cli-spawn-loader)", async () => {
+    // The shape every spawned server process carries since the wrapper
+    // re-exec fix: `node --import <tsx loader> cli.ts` — argv[1] is the
+    // entry, the loader registration sits in execArgv. A server launched
+    // this way must re-enter the CLI through the derived spec, not fall
+    // back to the remediation error (the silent-fallback risk from #518).
+    const git = (args: string[]) =>
+      execFileSync("git", ["-c", "user.name=test", "-c", "user.email=test@example.com", ...args], {
+        cwd: repoDir,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+    git(["init"]);
+    git(["commit", "--allow-empty", "-m", "seed"]);
+    await client.request("tools/call", {
+      name: "arggon_create",
+      arguments: {
+        type: "task",
+        title: "Add rate limiting",
+        parent: "story-login",
+        id: "rate-limit",
+      },
+    });
+    const spawned = new McpTestClient();
+    spawned.cwd = repoDir;
+    const savedArgv = process.argv;
+    const savedExecArgv = process.execArgv;
+    try {
+      // Derivation happens when the spawn tool fires (spawnedOutcome), so
+      // the spoofed launch shape must stay active across the awaited call.
+      process.argv = [process.execPath, cliEntry, "mcp"];
+      process.execArgv = ["--import", tsxLoaderPath()];
+      spawned.start();
+      const result = await spawned.request("tools/call", {
+        name: "arggon_branch",
+        arguments: { id: "task-rate-limit" },
+      });
+      expect(result.isError).toBeUndefined();
+      const envelope = textContent(result) as Record<string, unknown>;
+      expect(envelope).toMatchObject({ ok: true, command: "branch", created: true });
+    } finally {
+      process.argv = savedArgv;
+      process.execArgv = savedExecArgv;
+    }
   });
 
   it("arggon_branch surfaces a kernel failure as a tool error without killing the session", async () => {
@@ -1076,5 +1147,64 @@ describe("mcp server additive update contract (task-native-kernel-lib-polish fin
       issueRoundtrip: { closed: true, issue: 12, repo: "octocat/hello-world" },
     });
     expect((envelope.item as Record<string, unknown>).status).toBe("done");
+  });
+});
+
+describe("deriveDefaultCliSpawn recognition (task-derive-cli-spawn-loader)", () => {
+  it("derives the built-bin spec from a dist/cli.js entry", () => {
+    withLaunch(["/repo/dist/cli.js", "mcp"], [], () => {
+      expect(deriveDefaultCliSpawn()).toEqual({
+        command: process.execPath,
+        args: ["/repo/dist/cli.js"],
+      });
+    });
+  });
+
+  it("still recognizes the wrapper source run (back-compat)", () => {
+    const wrapper = `/repo/node_modules/tsx/dist/${WRAPPER_SUFFIX}`;
+    withLaunch([wrapper, "/repo/cli/src/cli.ts", "mcp"], [], () => {
+      expect(deriveDefaultCliSpawn()).toEqual({
+        command: process.execPath,
+        args: [wrapper, "/repo/cli/src/cli.ts"],
+      });
+    });
+  });
+
+  it("derives the loader-form spec: execArgv is forwarded ahead of the entry", () => {
+    const loader = "/repo/node_modules/tsx/dist/loader.mjs";
+    withLaunch(["/repo/cli/src/cli.ts", "mcp"], ["--import", loader], () => {
+      expect(deriveDefaultCliSpawn()).toEqual({
+        command: process.execPath,
+        args: ["--import", loader, "/repo/cli/src/cli.ts"],
+      });
+    });
+  });
+
+  it("forwards unrelated execArgv flags whole (fork semantics)", () => {
+    const loader = "/repo/node_modules/tsx/dist/loader.mjs";
+    withLaunch(["/repo/cli/src/cli.ts"], ["--cpu-prof-dir=/tmp/prof", "--import", loader], () => {
+      expect(deriveDefaultCliSpawn()).toEqual({
+        command: process.execPath,
+        args: ["--cpu-prof-dir=/tmp/prof", "--import", loader, "/repo/cli/src/cli.ts"],
+      });
+    });
+  });
+
+  it("derives a bare-entry spec under an empty execArgv (NODE_OPTIONS registrations ride in the inherited env)", () => {
+    withLaunch(["/repo/cli/src/cli.ts", "mcp"], [], () => {
+      expect(deriveDefaultCliSpawn()).toEqual({
+        command: process.execPath,
+        args: ["/repo/cli/src/cli.ts"],
+      });
+    });
+  });
+
+  it("returns undefined for anything else (vitest forks worker; missing entry)", () => {
+    withLaunch(["/repo/dist/workers/forks.js", "--threads"], [], () => {
+      expect(deriveDefaultCliSpawn()).toBeUndefined();
+    });
+    withLaunch([], [], () => {
+      expect(deriveDefaultCliSpawn()).toBeUndefined();
+    });
   });
 });

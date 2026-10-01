@@ -1,6 +1,6 @@
 ---
 type: epic
-status: todo
+status: done
 id: update-channel
 title: Update channel (ADR 0018 §3)
 parent: delivery-rollout

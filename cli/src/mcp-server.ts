@@ -848,21 +848,31 @@ function clipTail(text: string, max = CLI_SPAWN_ERROR_CHARS): string {
 /**
  * Derive the CLI re-entry spec from how this server process was launched.
  * Built bin: `arggon mcp` → `argv = [node, <root>/dist/cli.js, "mcp"]` —
- * re-spawn `[node, <root>/dist/cli.js]`. Source run: `npm run arggon -- mcp`
- * → `argv = [node, <tsx>/cli.mjs, <root>/cli/src/cli.ts, "mcp"]` — re-spawn
- * `[node, <tsx>/cli.mjs, <root>/cli/src/cli.ts]`. Anything else returns
- * undefined and the spawn tools fail with the remediation message instead of
- * re-spawning an unrelated entry — tests inject; under vitest the check
- * rejects the forks worker (`dist/workers/forks.js`, what argv[1] actually is
- * there; the suffix check is deliberately narrow, not a basename claim).
+ * re-spawn `[node, <root>/dist/cli.js]`. Wrapper source run: `npm run arggon
+ * -- mcp` → `argv = [node, <tsx>/cli.mjs, <root>/cli/src/cli.ts, "mcp"]` —
+ * re-spawn `[node, <tsx>/cli.mjs, <root>/cli/src/cli.ts]`. Loader source run
+ * (`node --import <tsx loader> <root>/cli/src/cli.ts`, the spawn shape every
+ * test chain uses since the wrapper re-exec fix): node strips its own options
+ * out of argv — argv[1] is already the entry, the `--import` target lives in
+ * `process.execArgv` — so re-spawn with the runtime flags forwarded ahead of
+ * the entry (the `child_process.fork` default). Forwarding `execArgv` whole
+ * also covers `NODE_OPTIONS`-driven registrations, because the child inherits
+ * the environment. Anything else returns undefined and the spawn tools fail
+ * with the remediation message instead of re-spawning an unrelated entry —
+ * tests inject; under vitest the check rejects the forks worker
+ * (`dist/workers/forks.js`, what argv[1] actually is there; the suffix checks
+ * are deliberately narrow, not basename claims).
  */
-function deriveDefaultCliSpawn(): CliSpawnSpec | undefined {
+export function deriveDefaultCliSpawn(): CliSpawnSpec | undefined {
   const entry = process.argv[1];
   if (!entry) return undefined;
   if (entry.endsWith("cli.js")) return { command: process.execPath, args: [entry] };
   const source = process.argv[2];
   if (entry.endsWith("cli.mjs") && typeof source === "string" && source.endsWith(".ts")) {
     return { command: process.execPath, args: [entry, source] };
+  }
+  if (entry.endsWith("cli.ts")) {
+    return { command: process.execPath, args: [...process.execArgv, entry] };
   }
   return undefined;
 }
