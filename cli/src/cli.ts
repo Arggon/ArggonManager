@@ -2405,9 +2405,13 @@ program
       });
       if (json) {
         // Per-candidate prune failures are reported in the payload (each
-        // pruned entry may carry action "failed" + error/leftoverBranch);
-        // CLEANUP_FAILED is reserved for top-level errors (non-git tree,
-        // undetectable default branch).
+        // pruned entry may carry action "failed" + error/leftoverBranch) and
+        // deliberately keep the exit code at 0 (task-cleanup-json-exit-code,
+        // docs/json-output.md §cleanup): --json consumers gate on the
+        // payload, never on the process exit code — the exitCode=1 rule in
+        // the human path below does not apply here. CLEANUP_FAILED is
+        // reserved for top-level errors (non-git tree, undetectable default
+        // branch).
         successJson(
           "cleanup",
           {
