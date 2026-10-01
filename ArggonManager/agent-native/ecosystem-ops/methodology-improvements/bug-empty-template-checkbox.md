@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-empty-template-checkbox
 title: empty-template-checkbox-blocks-done-gate
 assignee: Arggon
@@ -9,11 +9,9 @@ parent: methodology-improvements
 labels: []
 priority: p2
 created: "2026-09-30"
-updated: "2026-09-30"
-claimed_at: "2026-09-30T23:56:04.514Z"
+updated: "2026-10-01"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-empty-template-checkbox
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-empty-template-checkbox.md
   Leaves live only under a story. id is the filename stem: bug-empty-template-checkbox.
