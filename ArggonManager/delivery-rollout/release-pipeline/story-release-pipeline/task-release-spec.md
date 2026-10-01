@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-release-spec
 title: "Spec + plan: release pipeline (release PR + OIDC publish + exact pin + tarballs)"
+assignee: Arggon
+branch: feat/task-release-spec
 parent: story-release-pipeline
 labels: [delivery, spec]
 priority: p1
 created: "2026-10-01"
 updated: "2026-10-01"
+claimed_at: "2026-10-01T14:37:01.475Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-release-spec
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/task-release-spec.md
