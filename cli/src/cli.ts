@@ -2272,6 +2272,7 @@ program
               manifestCoverage: result.manifestCoverage,
               missingDependencies: result.missingDependencies,
               missingDependenciesTotal: result.missingDependenciesTotal,
+              gateBins: result.gateBins,
               postStart: result.postStart,
             },
             readConventionVersion(result.root),
@@ -2317,6 +2318,26 @@ program
                 `declared in package.json — re-install the primary checkout (\`npm install\` there) ` +
                 `or run \`npm ci\` in the worktree (e.g. \`x-worktree.post-start: npm ci\`) for a worktree-local install`,
             );
+          }
+          {
+            // Which node_modules the gate binaries resolve from
+            // (bug-start-worktree-npm-ci-claim): a foreign resolution (a
+            // sibling checkout's .bin on PATH, a parent install) can run the
+            // gate even though the worktree's own install is broken or absent.
+            const foreign = result.gateBins.filter((bin) => bin.source !== "worktree");
+            if (foreign.length > 0) {
+              const named = foreign
+                .map((bin) =>
+                  bin.source === "missing"
+                    ? `${sanitizeHumanError(bin.name)} (missing)`
+                    : `${sanitizeHumanError(bin.name)} (${bin.source}: ${sanitizeHumanError(bin.path ?? "")})`,
+                )
+                .join(", ");
+              console.log(
+                `  note: the project gate resolves ${named} outside this worktree — ` +
+                  `run \`npm ci\` in the worktree for worktree-local resolution`,
+              );
+            }
           }
         }
         if (result.postStart) {

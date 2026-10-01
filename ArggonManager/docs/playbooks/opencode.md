@@ -329,10 +329,16 @@ focused, close, toggleFullscreen, focus}`. `context.ui.panel.open(name)`
     (`ready`, `install`, `linkedNodeModules`, `builtWorkspaces`,
     `linkedWorkspaces`, plus the dependency coverage the kernel receipt computes —
     `manifestCoverage`, `missingDependencies` (capped at 10) and
-    `missingDependenciesTotal`; `ready` also requires the mirrored install to
-    provide the worktree's declared `dependencies`/`devDependencies`, so a stale
-    primary install is reported as not ready WITH the missing names rather than
-    as usable — `agents.md` §4 carries the remedy). The claim commit is explicit
+    `missingDependenciesTotal` — and `gateBins`, which node_modules each
+    declared gate binary resolves from (`worktree`/`external`/`path`/`missing`,
+    capped at 8); `ready` also requires the mirrored install to
+    provide the worktree's declared `dependencies`/`devDependencies` and every
+    reported gate bin to resolve inside the worktree (the clause is vacuous
+    when nothing declared exposes a bin), so a stale primary install is
+    reported as not ready WITH the missing names, and a gate bin resolving
+    from a sibling checkout's `.bin` on PATH is named instead of silently
+    running the gate on a foreign install — `agents.md` §4 carries the remedy).
+    The claim commit is explicit
     and runs the normal pre-commit hook: a required bootstrap/gate failure is a typed
     `START_FAILED`, keeps the worktree, and reports `claimCommitted: false` plus
     the bounded `claimCommit` skip reason and an attach/retry instruction. A

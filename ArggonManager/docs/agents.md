@@ -189,15 +189,21 @@ claim. It links the primary checkout's existing `node_modules` when the fresh
 worktree has none, builds workspace packages that the worktree owns, and
 re-reads which packages still resolve into the primary. The native result
 carries a bounded `preparation` receipt (`ready`, `install`,
-`linkedNodeModules`, `builtWorkspaces`, `linkedWorkspaces`) and an explicit
-`claimCommitted`/`claimCommit` outcome. `ready` is the conjunction of three
+`linkedNodeModules`, `builtWorkspaces`, `linkedWorkspaces`, `gateBins`) and an
+explicit
+`claimCommitted`/`claimCommit` outcome. `ready` is the conjunction of four
 clauses: an install is present, no worktree-owned workspace package resolves
-into the primary, and the install provides what the worktree's own
-`package.json` declares — a linked install mirrors the primary's, so a
+into the primary, the install provides what the worktree's own
+`package.json` declares, and every reported gate binary resolves inside the
+worktree (`gateBins`; an empty report — nothing declared exposes a bin —
+leaves that clause vacuous) — a linked install mirrors the primary's, so a
 devDependency merged since that install ran is missing from every worktree and
 `ready: false` is reported instead of a readiness the gate cannot use. The
 receipt names the reason on BOTH surfaces: `manifestCoverage`,
-`missingDependencies` (kernel-capped at 10 names) and `missingDependenciesTotal`
+`missingDependencies` (kernel-capped at 10 names), `missingDependenciesTotal`
+and `gateBins` (which node_modules each gate binary resolves from —
+`worktree`/`external`/`path`/`missing`; a `path` source is a sibling
+checkout's bin silently running the gate on a foreign install)
 are part of the native `preparation` payload as well as the CLI `--json`
 envelope, so neither caller has to shell out to the other to learn which
 declared dependency is missing (see §4). The remedy is the same on both
