@@ -25,6 +25,7 @@ import {
   type PriorityCounts,
   type ShowComment,
 } from "@arggondev/lib";
+import { embeddedFunctionSource } from "./board-embed.js";
 
 export const DEFAULT_BOARD_FILE = "board.html";
 
@@ -2541,7 +2542,7 @@ ${details ? DETAIL_CSS : ""}
 /* Theme/density boot (task-board-theme-density): runs in <head>, while the
    document is still empty, so the resolved theme/density attributes are in
    place BEFORE first paint — no light flash for a dark user. */
-${bootBoardTheme.toString()}
+${embeddedFunctionSource(bootBoardTheme)}
 bootBoardTheme();
 </script>
 </head>
@@ -2572,19 +2573,19 @@ ${details ? MOVE_MENU_MARKUP : ""}
 ${MOVE_PROMPT_MARKUP}
 <script>
 'use strict';
-${evaluateDrop.toString()}
+${embeddedFunctionSource(evaluateDrop)}
 /* board-filter:start */
-${applyBoardFilter.toString()}
+${embeddedFunctionSource(applyBoardFilter)}
 /* board-filter:end */
-${dropNeedsClaimPrompt.toString()}
-${wireBoardColumns.toString()}
-${wireBoardTheme.toString()}
-${trapBoardFocus.toString()}
-${wireBoardMovePrompt.toString()}
-${details ? renderBoardDetail.toString() : ""}
-${details ? wireBoardDetail.toString() : ""}
-${details ? wireBoardKeyboardNav.toString() : ""}
-${details ? wireBoardMoveMenu.toString() : ""}
+${embeddedFunctionSource(dropNeedsClaimPrompt)}
+${embeddedFunctionSource(wireBoardColumns)}
+${embeddedFunctionSource(wireBoardTheme)}
+${embeddedFunctionSource(trapBoardFocus)}
+${embeddedFunctionSource(wireBoardMovePrompt)}
+${details ? embeddedFunctionSource(renderBoardDetail) : ""}
+${details ? embeddedFunctionSource(wireBoardDetail) : ""}
+${details ? embeddedFunctionSource(wireBoardKeyboardNav) : ""}
+${details ? embeddedFunctionSource(wireBoardMoveMenu) : ""}
 (function () {
   var ENDPOINT = document.body.getAttribute("data-update-endpoint") || "/api/update";
   var BOARD_ITEMS = ${embedJson(lensItems)};

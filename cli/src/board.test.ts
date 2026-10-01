@@ -7,7 +7,9 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   displayPath,
@@ -1807,5 +1809,64 @@ describe("column controls (task-board-column-controls)", () => {
     // Corrupt or missing storage degrades to the default layout. Whitespace
     // varies between the tsc build and the tsx test transform, so match loose.
     expect(source).toMatch(/collapsed:\s*\[\],\s*terminalHidden:\s*false/);
+  });
+});
+
+describe("transform-neutral page script (bug-tsx-board-dead-script)", () => {
+  /**
+   * The rendered page script is assembled from `Function.toString()` of the
+   * controller functions. Under a keepNames transform (tsx/esbuild) those
+   * sources can carry `__name(...)` helper calls the page cannot resolve —
+   * the whole script block then dies on load (filter, drag, collapse, theme
+   * and density controls included). `embeddedFunctionSource` strips the
+   * artifacts at render time, so no rendered board may ever ship one.
+   */
+  it("renders embedded scripts without __name artifacts in every mode", () => {
+    const htmls = [
+      ["static", renderBoardHtml([], { generatedAt: GENERATED_AT })] as const,
+      [
+        "serve",
+        renderBoardHtml([], { generatedAt: GENERATED_AT, details: true, live: true }),
+      ] as const,
+    ];
+    for (const [mode, html] of htmls) {
+      expect(html, mode).not.toContain("__name(");
+      // The controllers are still there — the render did not degrade.
+      expect(html, mode).toContain("function applyBoardFilter");
+      expect(html, mode).toContain("function evaluateDrop");
+    }
+  });
+
+  /**
+   * The in-process assertions above run under vitest's oxc transform, whose
+   * `toString()` is clean — they pass vacuously against the artifact shape.
+   * This gate spawns the real tsx path (`node tsx cli/src/cli.ts board`,
+   * exactly what `npm run arggon -- board` runs) so the keepNames-transformed
+   * sources flow through `embeddedFunctionSource` and the OUTPUT is asserted.
+   * The e2e `@smoke` spec adds the browser-level proof on the same path.
+   */
+  it("the tsx-rendered CLI output carries no __name artifacts", () => {
+    const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+    const tsx = join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs");
+    const cli = join(repoRoot, "cli", "src", "cli.ts");
+    const dir = mkdtempSync(join(tmpdir(), "arggon-board-embed-tsx-"));
+    mkdirSync(join(dir, "tasks"), { recursive: true });
+    writeFileSync(join(dir, "tasks", ".convention.yml"), "version: 1\n", "utf8");
+    writeFileSync(
+      join(dir, "tasks", "task-a.md"),
+      '---\ntype: task\nid: task-a\ntitle: A\nstatus: todo\ncreated: "2026-09-15"\nupdated: "2026-09-15"\n---\n',
+      "utf8",
+    );
+    const out = join(dir, "board.html");
+    const proc = spawnSync(process.execPath, [tsx, cli, "--json", "board", "--out", out], {
+      cwd: dir,
+      encoding: "utf8",
+      timeout: 60_000,
+    });
+    expect(proc.status, proc.stderr).toBe(0);
+    const html = readFileSync(out, "utf8");
+    expect(html).not.toContain("__name(");
+    expect(html).toContain("function applyBoardFilter");
+    expect(html).toContain("function wireBoardTheme");
   });
 });

@@ -1365,3 +1365,183 @@ test.describe("@smoke board --serve", () => {
     await axeScan(page);
   });
 });
+
+/**
+ * `@smoke` leg for the tsx SOURCE path (bug-tsx-board-dead-script).
+ *
+ * The dist bin (`tsc` output) and the tsx run (`npm run arggon -- board`,
+ * `board --serve` from source) render the SAME page through different
+ * transforms — and esbuild's keepNames transform (tsx) is the one that used
+ * to splice unresolvable `__name(...)` calls into the embedded function
+ * sources, killing the whole page script on load. Every gate above drove
+ * dist, so the defect was invisible to CI. This suite starts the server and
+ * renders the static export from `cli/src/cli.ts` through the repo's tsx and
+ * asserts the page is alive: zero console/page errors, the served script
+ * carries no `__name(` artifact, and filter, status move, theme, density and
+ * column collapse all respond — the same interactivity bar as the dist lane.
+ */
+test.describe("@smoke board from source (tsx path, bug-tsx-board-dead-script)", () => {
+  const tsx = join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs");
+  const cliSource = join(repoRoot, "cli", "src", "cli.ts");
+  let fixture: string;
+  let server: { child: ChildProcess; url: string } | undefined;
+
+  /** Run the CLI FROM SOURCE through tsx inside the fixture. */
+  function runCliTs(args: string[]): string {
+    const result = spawnSync(process.execPath, [tsx, cliSource, ...args], {
+      cwd: fixture,
+      encoding: "utf8",
+      timeout: 120_000,
+    });
+    if (result.status !== 0) {
+      throw new Error(
+        `tsx arggon ${args.join(" ")} failed (${result.status}): ${result.stdout ?? ""}${result.stderr ?? ""}`,
+      );
+    }
+    return result.stdout ?? "";
+  }
+
+  /** Start `board --serve` from the tsx source path on a free port. */
+  function startBoardServerTs(): Promise<{ child: ChildProcess; url: string }> {
+    const child = spawn(process.execPath, [tsx, cliSource, "board", "--serve", "--port", "0"], {
+      cwd: fixture,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    return new Promise((resolvePromise, reject) => {
+      let output = "";
+      const timer = setTimeout(() => {
+        reject(new Error(`tsx board --serve printed no URL within ${TIMEOUT_MS}ms:\n${output}`));
+      }, TIMEOUT_MS);
+      const onData = (chunk: Buffer): void => {
+        output += chunk.toString("utf8");
+        const match = /http:\/\/127\.0\.0\.1:\d+/.exec(output);
+        if (match) {
+          clearTimeout(timer);
+          child.stdout?.off("data", onData);
+          resolvePromise({ child, url: match[0] });
+        }
+      };
+      child.stdout?.on("data", onData);
+      child.stderr?.on("data", (chunk: Buffer) => {
+        output += chunk.toString("utf8");
+      });
+      child.on("error", (err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+  }
+
+  test.beforeAll(async () => {
+    fixture = createFixture();
+    server = await startBoardServerTs();
+    await waitForBoard(server.url);
+  });
+
+  test.afterAll(async () => {
+    if (server) await stopServer(server.child);
+    if (fixture) rmSync(fixture, { recursive: true, force: true });
+  });
+
+  test("the served page boots with zero errors and theme/density/collapse respond", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(String(error)));
+    page.on("console", (message) => {
+      if (message.type() === "error") errors.push(message.text());
+    });
+    await page.goto(server?.url ?? "");
+    await expect(page.locator("h1")).toContainText("arggon board");
+
+    // The served script must be free of keepNames artifacts (the class gate;
+    // the unit-level spawn gate lives in cli/src/board.test.ts).
+    const html = await (await fetch(server?.url ?? "")).text();
+    expect(html).not.toContain("__name(");
+    expect(html).toContain("function applyBoardFilter");
+
+    // Theme: auto -> light -> dark (the painted surface actually flips).
+    const root = page.locator("html");
+    const themeToggle = page.locator("#board-theme-toggle");
+    await expect(themeToggle).toHaveText("theme: auto");
+    await themeToggle.click();
+    await expect(themeToggle).toHaveText("theme: light");
+    await themeToggle.click();
+    await expect(themeToggle).toHaveText("theme: dark");
+    await expect(root).toHaveAttribute("data-theme", "dark");
+    await expect
+      .poll(() => page.evaluate(() => getComputedStyle(document.body).backgroundColor))
+      .toBe("rgb(13, 17, 23)"); // --bg dark: #0d1117
+
+    // Density: comfortable -> compact.
+    await page.locator("#board-density-toggle").click();
+    await expect(root).toHaveAttribute("data-density", "compact");
+
+    // Column collapse (wireBoardColumns) responds and persists with the
+    // theme choice across a reload — proof the wiring, not just the markup,
+    // survived the transform.
+    const todo = page.locator('.column[data-status="todo"]');
+    await todo.locator('.col-toggle[data-status="todo"]').click();
+    await expect(todo).toHaveClass(/collapsed/);
+    await page.reload();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(page.locator('.column[data-status="todo"]')).toHaveClass(/collapsed/);
+    await expect(page.locator("html")).toHaveAttribute("data-density", "compact");
+    expect(errors).toEqual([]);
+  });
+
+  test("a filter expression visibly filters cards", async ({ page }) => {
+    await page.goto(server?.url ?? "");
+    await page.locator("#board-filter-input").fill(`label:smoke`);
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
+    await expect(page.locator(`.card:not(.filtered-out)[data-id="${FILTER_ITEM_ID}"]`)).toHaveCount(
+      1,
+    );
+    await expect(page.locator("#board-filter-count")).toHaveText(
+      `1 of ${cliJson<{ items: unknown[] }>(fixture, ["list"]).items.length} item(s)`,
+    );
+    expect(filterFromUrl(page.url())).toBe("label:smoke");
+    await page.locator("#board-filter-clear").click();
+    await expect(page.locator("#board-filter-input")).toHaveValue("");
+  });
+
+  test("a status move round-trips through the UI and persists", async ({ page }) => {
+    // Mute the SSE stream: the move broadcasts a reload that would navigate
+    // mid-assertion (same discipline as the dist-lane move tests).
+    await page.route("**/events", (route) => route.abort());
+    await page.goto(server?.url ?? "");
+    const card = page.locator(`.card[data-id="${MOVED_ITEM_ID}"]`);
+    await expect(card).toHaveAttribute("data-status", "todo");
+
+    await card.dragTo(page.locator('.column[data-status="cancelled"]'));
+    await expect(
+      page.locator(`.column[data-status="cancelled"] .card[data-id="${MOVED_ITEM_ID}"]`),
+    ).toHaveCount(1);
+    // The ok toast only appears after the update endpoint answered, so the
+    // persistence check below cannot race the POST.
+    await expect(page.locator("#board-toast")).toContainText(`${MOVED_ITEM_ID} -> cancelled`);
+    await expect
+      .poll(
+        () => cliJson<{ item: { status: string } }>(fixture, ["show", MOVED_ITEM_ID]).item.status,
+      )
+      .toBe("cancelled");
+  });
+
+  test("the tsx static export is script-clean and filters offline", async ({ page }) => {
+    const boardFile = join(fixture, "tsx-board.html");
+    runCliTs(["board", "--out", boardFile]);
+    const html = readFileSync(boardFile, "utf8");
+    expect(html).not.toContain("__name(");
+
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(String(error)));
+    await page.goto(`file://${boardFile}`);
+    await expect(page.locator("h1")).toContainText("arggon board");
+    await page.locator("#board-filter-input").fill("Board filter task");
+    await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
+    await expect(page.locator(`.card:not(.filtered-out)[data-id="${FILTER_ITEM_ID}"]`)).toHaveCount(
+      1,
+    );
+    expect(errors).toEqual([]);
+  });
+});
