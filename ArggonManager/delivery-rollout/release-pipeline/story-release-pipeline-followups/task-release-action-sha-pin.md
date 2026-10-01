@@ -33,8 +33,16 @@ publish workflow itself has zero third-party actions and owns OIDC).
 
 ## Acceptance
 
-- [ ] Pin the action by full commit SHA (with a version comment), or replace with the official `release-please-actions` digest reference.
-- [ ] `actionlint` clean; `release-please.yml` still proposes the release PR (verify on the next proposal or via dry evidence).
-- [ ] No other workflow regressions; CI green.
+- [x] Pin the action by full commit SHA (with a version comment), or replace with the official `release-please-actions` digest reference.
+- [x] `actionlint` clean; `release-please.yml` still proposes the release PR (verify on the next proposal or via dry evidence).
+- [x] No other workflow regressions; CI green.
 
 ## Notes
+
+- Pinned `googleapis/release-please-action@v4` → `@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1`
+  (newest v4 tag via `git ls-remote … refs/tags/v4*`; `refs/tags/v4^{}` peels to the
+  same commit, so the SHA equals where the floating tag points today). Diff is
+  exactly one line: same step `id`, same `with` inputs, same trigger
+  (`push: [main]`), same permissions. Dry evidence for "still proposes the
+  release PR": only the action ref changed. `actions/checkout@v4` (step 2) is a
+  different action, explicitly out of scope for this item.
