@@ -152,3 +152,20 @@ machine contract, so it is reported for the coordinator to track if wanted.
 ### handoff 2026-10-01 @ses_f0aa6a0b6ffe8unSBPZxBWEaLS (session: ses_f0aa6a0b6ffe8unSBPZxBWEaLS) — next: Review + merge PR #515 (both catch surfaces fixed, tests pin bounds); coordinate with sibling spawn-helper sweep before touching worktree.test.ts
 - branch: fix/bug-cli-cleanup-branch-delete-missing-failure
 - open questions: JSON cleanup exits 0 even with non-empty failures[] (pre-existing, cli.ts json early-return vs human exitCode=1); track separately if wanted
+
+### 2026-10-01 @Arggon
+CLI side fixed in worktree branch fix/bug-cli-cleanup-branch-delete-missing-failure, PR #515 (open, not merged).
+
+Fix (cli/src/cleanup.ts is the only source file touched; worktree item file carries the full evidence section):
+1. Branch-delete catch now pushes the SAME bounded message to BOTH failures[] (<id>: <error>) and pruned[].error — mirrors the native twin's shape (boundedNativeText catch blocks in opencode/plugins/arggon/index.ts).
+2. Outer per-candidate catch: same 500-char envelope bound (control-char strip + elision mark) on both surfaces, via new exported boundedEnvelopeText + MAX_ENVELOPE_DETAIL_CHARS. sanitize.ts helpers deliberately NOT reused (human channel, 2000 chars + escaping).
+
+Evidence, expected vs observed — fixture probe forcing a REAL git branch -d refusal (branch checked out in a second worktree):
+- BEFORE (detached origin/main checkout): pruned carries action:"failed" + leftoverBranch but "failures":[] — the contract violation reproduced.
+- AFTER (this branch): identical pruned entry AND "failures":["task-alpha: git branch -d feat/task-alpha failed: error: cannot delete branch 'feat/task-alpha' used by worktree at '…/fx-holder'"]; record still cleared, run continued, auto-commit unchanged.
+
+Gates (all in the worktree): npm test 1961 passed (110 files); npm run lint clean; npm run build ok; npm run check:plugin ok — bundle byte-identical, nothing regenerated, so no chore(regen) commit needed; arggon validate ok:true. Commit 5f9c2c0e, 3 files staged explicitly (cleanup.ts, worktree.test.ts, item file).
+
+Notes for the reviewer:
+- The test file's direct spawnSync/tsx calls were left exactly as-is (sibling spawn-helper sweep is a different item — no migration done here).
+- Pre-existing, NOT fixed (out of scope): the --json path of cleanup exits 0 even when failures[] is non-empty (json early-return sits before the human-path process.exitCode = 1 in cli.ts). Identical before/after this fix; recorded in the handoff open questions.
