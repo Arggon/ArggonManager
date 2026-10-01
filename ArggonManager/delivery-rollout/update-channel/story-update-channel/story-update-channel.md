@@ -1,6 +1,6 @@
 ---
 type: story
-status: todo
+status: done
 id: story-update-channel
 title: "Update channel: bounded opt-out check, agent-first JSON"
 parent: update-channel
