@@ -70,3 +70,7 @@ Evidence (expected vs observed):
 - Gates: build ok; npm test 112 files / 1999 tests pass; lint ok; check:plugin ok (bundle rebuild byte-identical); arggon validate ok:true (pre-commit gate ran on the commit).
 
 ⚠️ FINDING for the coordinator (out of my scope, NOT fixed here — adopter-owned file, no drive-bys): this repo's own opencode.jsonc is INVALID JSONC since #531. Its edit added "]," after the third permission rule, orphaning the 4th rule (git push *+*) outside the "permissions" array: strict parse fails ("Unexpected token ']'"), so OpenCode likely drops the whole config — the #531 formatter override AND the W4 deny gates may be inactive in this repo's sessions. Introduced in db321c25 (hunk: "+  ]," before the 4th rule); verified with git log -L + strip-json-comments parse; templates/docs/opencode.jsonc parses fine. Suggest a follow-up task under tooling-and-environment: fix the adopter-owned opencode.jsonc (move the 4th rule inside the array, or re-run init --backup to regenerate + re-apply the override) and consider a doctor/config parse gate that warns on unparseable generated-shape configs.
+
+### handoff 2026-10-01 @Arggon (session: ses_f0821d66effdHqVPG5MfLFYpUk) — next: Review + merge PR #541 (template override + tests + changelog/migration note); then file the follow-up for this repo's malformed opencode.jsonc.
+- branch: feat/task-formatter-override-template
+- open questions: Does OpenCode silently drop the malformed repo opencode.jsonc (override + deny gates inactive)?; should doctor warn on unparseable generated-shape configs?
