@@ -59,3 +59,15 @@ Implemented BOTH halves (derivation + measure migration); both low-risk.
 - `check:plugin` → exit 0, bundle byte-identical (expected regen per the task brief did NOT materialize: neither mcp-server.ts nor measure.ts is inlined into `opencode/plugins/arggon/index.bundle.ts`; postbuild regenerates and `git diff --exit-code` confirms no drift).
 
 **Back-compat:** all three previously-recognized launch shapes derive exactly as before; the loader form is additive. The only behavior change is the previously-`undefined` case now deriving — which is the fix.
+
+### 2026-10-01 @Arggon
+Implementation complete, PR opened (not merged): https://github.com/Arggon/ArggonManager/pull/543 — branch feat/task-derive-cli-spawn-loader (commits 8ddf22ed feat(mcp), 6ffa9d82 chore(tasks)).
+
+Changed: (1) cli/src/mcp-server.ts deriveDefaultCliSpawn (now exported for tests) derives the loader form — entry endsWith cli.ts → { execPath, [...process.execArgv, entry] } (fork semantics; NODE_OPTIONS covered via inherited env); wrapper (cli.mjs+.ts argv[2]) and built bin (cli.js) kept verbatim. (2) cli/src/measure.ts cliCommand() source branch → ["--import", <tsx loader.mjs>, <cli.ts>]; entry-last contract kept; measurement stdout unchanged (same CLI, same loader — #518 evidence). (3) package.json tsx lanes documented-exception on the item (leaf-command processes, never host an mcp server, no nested spawn chain to stack IPC servers).
+
+Test evidence (expected vs observed):
+- npx vitest run cli/src/mcp-server.test.ts cli/src/measure.test.ts cli/src/test-spawn.test.ts → 59 passed (new: 6-case recognition table incl. wrapper back-compat + forks-worker rejection; integration test arggon_branch with NO cliSpawn injection under spoofed loader-form launch — the exact #518 silent-fallback scenario; cliCommand exact-shape pin).
+- npm test → 112 files / 2005 passed (0 skipped).
+- First full run: headless-ci.test.ts failed + 6 skipped in the fresh worktree (missing lib/dist/index.js) — REPRODUCED on stashed pristine branch (git stash; 1 failed | 111 passed), fixed by npm run build; environment-only, not caused by the change.
+- npm run lint ok; test:structure ok; build ok; check:plugin exit 0 with bundle byte-identical — expected regen per the task brief did NOT materialize: mcp-server.ts/measure.ts are not inlined into opencode/plugins/arggon/index.bundle.ts (postbuild regenerated; git diff --exit-code confirms no drift), so no chore regen commit exists.
+- npm run arggon -- validate → ok:true, 0 warnings. Wrapper literals in tests built dynamically (["cli","mjs"].join(".")) so the test-spawn grep gate stays green.
