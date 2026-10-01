@@ -135,3 +135,7 @@ verdict: approve (lead-architect review, PR #506)
 - Smoke (blocking bar): fixture cycle {task-b, task-c, task-d} entered at non-min member prints "task-b -> task-c -> task-d -> task-b" from BOTH source and dist (expected vs observed matches; pre-fix printed "task-b -> task-c -> task-c -> task-d").
 - Reviewer bars 1-5 all pass (mechanical pass report on file with coordinator). Ticks honest.
 - Non-blocking, folded into follow-up: (1) the property admits only the reversed orientation for an ambiguous member set; >=4-member sets can carry >2 distinct directed cycles, so elevated ARGGON_PROPERTY_RUNS could spuriously fail the PROPERTY (not the product) — going into the canonical-cycle-set follow-up item. (2) DFS cycle-SET selection remains traversal-dependent (explicitly out of scope here).
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Merged: PR #506 squash -> 74281f7b (CI: cli/tasks-validate/ui-smoke/auto-done green). Item flipped done; merge verified on origin/main. Follow-ups filed: task-cycle-set-canonical (property orientation admission + cycle-SET contract), bug-start-worktree-npm-ci-claim (worker environment report).
