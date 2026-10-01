@@ -804,7 +804,9 @@ describe("tracker-root resolution from the calling session (bug-native-tools-com
       },
     });
     const output = (
-      await tool(defs, "comment").execute({ id: ID, text: "ambient" })
+      // Explicit author: the call exercises plugin-location resolution, not
+      // host-identity lookup — keep it hermetic (task-spawned-tests-gh-path).
+      await tool(defs, "comment").execute({ id: ID, text: "ambient", author: "ambient-agent" })
     ).output as Record<string, unknown>;
     expect(output.ok).toBe(true);
     expect(itemBytes(primary)).toContain("ambient");

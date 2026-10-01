@@ -24,11 +24,27 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-spawned-tests-gh-path
 
 ## Context
 
-<!-- Why this task exists. -->
+The spawned-CLI failures traced to three sites sharing one root cause: comment-author resolution
+(`resolveCurrentLogin`: GITHUB_USER → GITHUB_ACTOR → `gh api user`) failed with gh off PATH, and the
+generic "could not resolve comment author" error named the wrong missing dependency.
+
+1. `cli/src/measure.ts` `measureBudget` spawned `arggon comment …` as FIXTURE SETUP with no explicit
+   author — 8 measure tests failed on host identity, not on what they assert.
+2. `runComment` resolved the author BEFORE locating the item, so `arggon_comment {id:"nope"}` in the
+   MCP test surfaced the author error instead of the deterministic `id 'nope' not found`.
+3. `opencode/plugins/arggon/tools.test.ts` "keeps the plugin location…" commented without an author.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [x] Comment-author resolution degrades gracefully without gh: documented fallback to the local git
+  identity (`git config user.name`) appended to the chain in `resolveCurrentLoginDetailed`
+  (`lib/src/list.ts`); the affected tests are additionally hermetic (explicit `--author` / author
+  input), so none depends on host gh or git identity.
+- [x] Error message for the missing dependency names 'gh' (not 'comment author'):
+  `could not resolve comment author: 'gh' not found on PATH …` (gap `gh-not-found`) vs
+  `… gh is not authenticated ('gh api user' failed) …` (gap `gh-failed`); item-id errors now precede
+  author errors deterministically.
+- [x] Full suite green in an environment without gh on PATH (recipe in the 2026-10-01 @Arggon note).
 
 ## Notes
 

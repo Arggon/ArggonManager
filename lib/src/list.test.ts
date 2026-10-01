@@ -1,9 +1,9 @@
-import { mkdirSync, mkdtempSync as _mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync as _mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { toContractWorkItem } from "./contract.js";
-import { formatListTable, runList } from "./list.js";
+import { formatListTable, resolveCurrentLoginDetailed, runList } from "./list.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -320,6 +320,55 @@ branch: feat/a
         },
       ),
     ).toThrow(/@me/);
+  });
+
+  // task-spawned-tests-gh-path: the author/login resolution chain must degrade
+  // gracefully without gh and its gaps must be nameable ('gh' not found on
+  // PATH vs unauthenticated). Each layer is exercised hermetically through a
+  // PATH scoped to fake bin scripts — no host gh/git is ever consulted.
+  describe("resolveCurrentLoginDetailed fallback chain (task-spawned-tests-gh-path)", () => {
+    function fakeBin(name: string, script: string): string {
+      const dir = mkdtempSync(join(tmpdir(), "arggon-login-bins-"));
+      const file = join(dir, name);
+      writeFileSync(file, `#!/bin/sh\n${script}\n`, "utf8");
+      chmodSync(file, 0o755);
+      return dir;
+    }
+
+    it("GITHUB_USER wins before anything is spawned", () => {
+      expect(resolveCurrentLoginDetailed({ GITHUB_USER: "me-user", PATH: "/nonexistent" })).toEqual(
+        { login: "me-user", source: "GITHUB_USER" },
+      );
+    });
+
+    it("uses gh when it is on PATH", () => {
+      const bins = fakeBin("gh", "echo octo-gh");
+      expect(resolveCurrentLoginDetailed({ PATH: bins })).toEqual({ login: "octo-gh", source: "gh" });
+    });
+
+    it("degrades gracefully to the local git identity when gh is not on PATH", () => {
+      const bins = fakeBin("git", "echo local-git");
+      expect(resolveCurrentLoginDetailed({ PATH: bins })).toEqual({
+        login: "local-git",
+        source: "git-config",
+      });
+    });
+
+    it("distinguishes an unauthenticated gh from a missing binary", () => {
+      const bins = fakeBin("gh", "exit 1");
+      expect(resolveCurrentLoginDetailed({ PATH: bins })).toEqual({
+        login: undefined,
+        gap: "gh-failed",
+      });
+    });
+
+    it("names the missing dependency when neither gh nor a git identity is available", () => {
+      const empty = mkdtempSync(join(tmpdir(), "arggon-login-empty-"));
+      expect(resolveCurrentLoginDetailed({ PATH: empty })).toEqual({
+        login: undefined,
+        gap: "gh-not-found",
+      });
+    });
   });
 
   it("filters assigned vs unassigned", () => {
