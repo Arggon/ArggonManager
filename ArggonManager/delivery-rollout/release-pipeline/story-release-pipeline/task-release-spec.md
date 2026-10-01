@@ -38,3 +38,7 @@ workflow, the exact kernel pin, and the tarball assets. Inputs: ADR 0018,
 - [ ] Non-goals recorded: auto-publish on push to main; standalone binaries; `whatsnew`; non-npm package managers.
 
 ## Notes
+
+### handoff 2026-10-01 @ses_f081ac611ffemv23pwZefY9f10 (session: ses_f081ac611ffemv23pwZefY9f10) — next: Coordinator review of PR #545 (spec+plan only). On merge, task-release-workflow may claim after task-ci-seam-pin-tracks-release lands plan T0 semantics.
+- branch: feat/task-release-spec
+- open questions: C3 trigger deviation from old checklist wording (push-main guarded vs tag/release events) needs coordinator sign-off; repository field missing in both package.jsons is a one-time prereq in plan T1
