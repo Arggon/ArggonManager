@@ -71,3 +71,7 @@ Final verdict: approve — the convention.md contract sentence reconciled in-PR 
 Merged: PR #551 squash -> main (CI green on the reconciled head; smoke 5/5 sequential cold starts with strict armed re-verified by the coordinator).
 Resolution summary for the eight consolidated incidents: the fresh-worktree install gate (default, both surfaces) refuses any created-worktree start whose gate bins resolve outside it — naming bins, the bounded prep log, and the npm ci remediation — before any claim write; never-silent skips (incident 7's flavor) are named errors; attach keeps the honest-receipt/strict semantics so fix-then-attach survives; all eight signatures mapped to named tests or fixed-by-the-gate; the armed strict-gate-bins flag on this repo now escalates attach runs.
 Item done.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Merged: PR #551 squash -> main (CI green on the reconciled head; smoke 5/5 sequential cold starts with strict armed re-verified by the coordinator; convention.md contract reconciled in-PR — attach-vs-created distinction + the fresh-gate bullet). Item done. Recovery note: a broken union pass truncated this item file during a rebase; content restored in full from main@{2} (72eaa49b) and pushed — self-check: 74 lines, 1 status key, 4/4 ticked boxes, 0 markers.
