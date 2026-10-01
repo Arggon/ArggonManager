@@ -818,6 +818,25 @@ describe("prepareWorktreeEnv (spec worktree-env-contract-016)", () => {
     expect(readFileSync(join(bare.worktree, ".env"), "utf8")).toBe("SECRET=worktree\n");
   });
 
+  it("surfaces seed failures as a receipt warning on every path (review should-fix)", () => {
+    const f = fixture();
+    writeFileSync(join(f.primary, ".env"), "SECRET=1\n", "utf8");
+    // A broken symlink at the seed target: existsSync() is false (so the seed
+    // path runs) while COPYFILE_EXCL fails with EEXIST (the name is taken) —
+    // a deterministic, root-proof seed failure.
+    symlinkSync(join(f.primary, "no-such-file"), join(f.worktree, ".env"));
+    const fresh = runEnv(f);
+    // (a) the fresh write SUCCEEDS and the failure still surfaces.
+    expect(fresh.written).toBe(true);
+    expect(fresh.warning).toContain("could not seed .env");
+    expect(existsSync(join(f.worktree, ".arggon.env"))).toBe(true);
+    // (b) the attach path carries the seed warning AND the keep message.
+    const attach = runEnv(f);
+    expect(attach.written).toBe(false);
+    expect(attach.warning).toContain("could not seed .env");
+    expect(attach.warning).toContain("byte-identical");
+  });
+
   it("reports the read-only gitignore probe against a real git repo", () => {
     const f = fixture();
     const git = (args: string[]) =>

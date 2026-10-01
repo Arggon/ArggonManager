@@ -1171,7 +1171,10 @@ export function prepareWorktreeEnv(
   const ignored = checkIgnore(worktreePath, ".arggon.env");
   const gitignored = ignored === undefined ? undefined : ignored;
   // .env seeding: copy-if-absent, never read for interpretation, never
-  // overwritten (COPYFILE_EXCL makes the guarantee race-safe).
+  // overwritten (COPYFILE_EXCL makes the guarantee race-safe). A failure is
+  // collected as a receipt warning and NEVER dropped — the spec invariant is
+  // "any failure is recorded in the receipt as a warning", on the attach and
+  // success returns just as much as on the write-failure one.
   let seededDotenv: string | undefined;
   const dotenvSource = join(primaryRoot, ".env");
   const dotenvTarget = join(worktreePath, ".env");
@@ -1183,6 +1186,8 @@ export function prepareWorktreeEnv(
       warnings.push(`could not seed .env: ${envErrorMessage(error)}`);
     }
   }
+  const attachWarning = (): string =>
+    [...warnings, "already exists — left byte-identical (never overwritten)"].join("; ");
   const envPath = join(worktreePath, ".arggon.env");
   if (existsSync(envPath)) {
     return {
@@ -1190,7 +1195,7 @@ export function prepareWorktreeEnv(
       path: envPath,
       ...(gitignored !== undefined ? { gitignored } : {}),
       ...(seededDotenv !== undefined ? { seededDotenv } : {}),
-      warning: "already exists — left byte-identical (never overwritten)",
+      warning: attachWarning(),
     };
   }
   // `KEY=value` lines, UTF-8, LF, no quoting; CR/LF is stripped from values so
@@ -1222,7 +1227,7 @@ export function prepareWorktreeEnv(
         path: envPath,
         ...(gitignored !== undefined ? { gitignored } : {}),
         ...(seededDotenv !== undefined ? { seededDotenv } : {}),
-        warning: "already exists — left byte-identical (never overwritten)",
+        warning: attachWarning(),
       };
     }
     warnings.push(`could not write .arggon.env: ${envErrorMessage(error)}`);
@@ -1238,6 +1243,9 @@ export function prepareWorktreeEnv(
     keys: [...WORKTREE_ENV_KEYS],
     ...(seededDotenv !== undefined ? { seededDotenv } : {}),
     ...(gitignored !== undefined ? { gitignored } : {}),
+    // A degraded-but-successful write (a failed .env seed) still names what
+    // failed: the warning channel exists for exactly this, on every path.
+    ...(warnings.length > 0 ? { warning: warnings.join("; ") } : {}),
   };
 }
 

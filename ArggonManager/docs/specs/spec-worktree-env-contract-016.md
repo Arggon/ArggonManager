@@ -16,7 +16,7 @@ new tooling — no Docker, no network, no shell.
 
 ## Purpose
 
-Per-item worktrees isolate *files*, not *runtime state*: fixed ports, shared
+Per-item worktrees isolate _files_, not _runtime state_: fixed ports, shared
 databases and singleton state dirs make parallel runs of the same project
 collide. The kernel already computes a per-worktree identity (item id, repo
 name, branch, path) when preparing a worktree; this spec turns that identity
@@ -44,7 +44,7 @@ surface) dependency-preparation path. Opt-out via the tracker
 
 ```yaml
 x-worktree:
-  env: false   # default: absent ⇒ enabled
+  env: false # default: absent ⇒ enabled
 ```
 
 ### The env file
@@ -53,14 +53,14 @@ Path: `<worktree>/.arggon.env`. Format: `KEY=value` lines, UTF-8, LF, no
 quoting. Written on worktree creation; **on attach, an existing file is left
 byte-identical**.
 
-| Key | Value |
-| --- | --- |
-| `ARGON_ITEM` | the item id — the exact name the OpenCode plugin already correlates sessions with (`opencode/plugins/arggon/index.ts` `ITEM_ENV`); the one deliberate non-`ARGGON_` prefix, kept for contract compatibility |
-| `ARGGON_WORKTREE_ID` | `<repo>-<item-id>` (the worktree directory name) |
-| `ARGGON_WORKTREE_PATH` | absolute worktree path |
-| `ARGGON_WORKTREE_BRANCH` | the recorded working branch |
-| `ARGGON_STATE_DIR` | per-OS state base + `/<repo>-<item-id>` suffix (created `mkdir -p`) |
-| `ARGGON_CACHE_DIR` | per-OS cache base + `/<repo>-<item-id>` suffix (created `mkdir -p`) |
+| Key                      | Value                                                                                                                                                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ARGON_ITEM`             | the item id — the exact name the OpenCode plugin already correlates sessions with (`opencode/plugins/arggon/index.ts` `ITEM_ENV`); the one deliberate non-`ARGGON_` prefix, kept for contract compatibility |
+| `ARGGON_WORKTREE_ID`     | `<repo>-<item-id>` (the worktree directory name)                                                                                                                                                            |
+| `ARGGON_WORKTREE_PATH`   | absolute worktree path                                                                                                                                                                                      |
+| `ARGGON_WORKTREE_BRANCH` | the recorded working branch                                                                                                                                                                                 |
+| `ARGGON_STATE_DIR`       | per-OS state base + `/<repo>-<item-id>` suffix (created `mkdir -p`)                                                                                                                                         |
+| `ARGGON_CACHE_DIR`       | per-OS cache base + `/<repo>-<item-id>` suffix (created `mkdir -p`)                                                                                                                                         |
 
 Per-OS bases follow the established platform conventions (XDG on Linux,
 `~/Library` on macOS, `%LOCALAPPDATA%` on Windows — the
@@ -93,6 +93,18 @@ init` gains `.arggon.env` in its generated `.gitignore` template.
 `written:false` with a `warning` (and no other fields guaranteed) covers:
 opt-out via `x-worktree.env: false`, write failure, unreadable state. The
 claim is never refused for any of these.
+
+> **Errata (2026-10-01, review of the implementation):** the list above is
+> **incomplete, not contradicted** — an attach re-run that finds an existing
+> `.arggon.env` is a fourth `written:false` case (`warning: "already exists —
+left byte-identical (never overwritten)"`, with `path`/`gitignored` when
+> knowable). Coordinator ruling, accepted: `written` means **"this run
+> created the file"**. Seed failures surface as a receipt `warning` on every
+> path, including a successful fresh write. On Windows the spec's own
+> env-paths mapping gives both bases as `%LOCALAPPDATA%`, so
+> `ARGGON_STATE_DIR` and `ARGGON_CACHE_DIR` co-locate at
+> `%LOCALAPPDATA%/<repo>-<item-id>` — accepted as documented: isolation is
+> per-worktree uniqueness, which the shared directory does not affect.
 
 ### Degradation
 
