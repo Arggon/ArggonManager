@@ -152,3 +152,12 @@ Evidence:
 ### handoff 2026-10-01 @Arggon — next: Review PR Arggon/ArggonManager#519 (verdict on this item); on merge flip ADR 0017 Proposed→Accepted and confirm task-greenfield-explore-carriers matches the recorded protocol.
 - branch: main
 - open questions: Gate wording: brief acceptance line says "approved spec" while body/step 4 say "spec exists + spec analyze no NEW findings" — docs use the latter; confirm if "approved" implies an extra review step.
+
+### 2026-10-01 @Arggon
+Change request (prose-format) resolved on feat/task-greenfield-explore-adr, fix commit 0f7ac7c8, pushed; PR #519 checks all green: cli pass 4m44s (run 36860250124/job/110362415117), tasks-validate pass, ui-smoke pass.
+
+Evidence:
+- Root cause per cli/src/prose-format.test.ts rule 2: a code span broken across lines inside a list item loses its continuation indent under prettier, so the span's source text is rewritten. The test reports only the FIRST rewritten span per file, so two more occurrences were masked behind the flagged ones; the prettier diff against the files exposed them.
+- Fixed all six occurrences of the pattern (whitespace/reflow only, token streams byte-identical to the parent commit — verified with whitespace-collapsed diff): ADR 0017 Context (`arggon stack explore`) + phase 5 (`arggon spec analyze`, the coordinator-flagged lines 73–74); exploration-015 F1 (`arggon stack explore`, flagged), F4 (`arggon spec analyze`, masked), protocol phase 5 (`arggon spec analyze`, masked), Decision (`arggon spec analyze`, same defect class, plain-paragraph variant prettier happened to preserve — fixed for consistency).
+- Local verification: npx vitest run cli/src/prose-format.test.ts → 3/3 pass (incl. "prettier never rewrites a code span's source text" corpus-wide); npm run arggon -- validate --json → ok:true, 0 errors/warnings (pre-commit gate re-ran it).
+- Scope confirmation: git diff 9cc23add..HEAD --stat shows exactly the two docs (25/31 lines, rewrap only); no other files touched.
