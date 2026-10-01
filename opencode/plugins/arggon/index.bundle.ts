@@ -2720,10 +2720,10 @@ function itemsById(items) {
     return map;
 }
 function acceptanceComplete(body) {
-    const boxes = [...body.matchAll(/^[ \t]*[-*] \[( |x|X)\]/gm)];
-    if (boxes.length === 0)
+    const criteria = [...body.matchAll(/^[ \t]*[-*] \[( |x|X)\][ \t]*[^\s]/gm)];
+    if (criteria.length === 0)
         return true;
-    return boxes.every((match) => match[1] !== " ");
+    return criteria.every((match) => match[1] !== " ");
 }
 })
 
@@ -5499,13 +5499,13 @@ function checkDependencies(items, byId, errors) {
         for (const dep of graph.get(id) ?? []) {
             const state = color.get(dep);
             if (state === "gray") {
-                const cycle = [...stack.slice(stack.indexOf(dep)), dep];
+                const cycle = stack.slice(stack.indexOf(dep));
                 const key = [...cycle].sort().join("\u0000");
                 if (!reported.has(key)) {
                     reported.add(key);
                     const anchorId = cycle.reduce((a, b) => (a < b ? a : b));
                     const at = cycle.indexOf(anchorId);
-                    const chain = [...cycle.slice(at), ...cycle.slice(0, at)];
+                    const chain = [...cycle.slice(at), ...cycle.slice(0, at), anchorId];
                     const anchor = byId.get(anchorId);
                     if (anchor) {
                         push(errors, anchor.relPath, `dependency cycle: ${chain.join(" -> ")}`, "DEPENDENCY_CYCLE");

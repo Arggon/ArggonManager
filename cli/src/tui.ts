@@ -1499,14 +1499,19 @@ export function wrapTuiLine(text: string, width: number): string[] {
  * task-list rule the container cascade counts (`acceptanceComplete`, kernel
  * task-cascade-acceptance-aware) — `- [ ]` / `- [x]` / `- [X]` with leading
  * whitespace tolerated — so the pane shows the checklist whose completion the
- * cascade checks, never a second interpretation of it.
+ * cascade checks, never a second interpretation of it. A checkbox line with
+ * no text after the box is a scaffold placeholder, not a criterion
+ * (bug-empty-template-checkbox) — skipped, so the `checked/total` count is
+ * the same contract the done gate judges.
  */
 export function tuiAcceptanceRows(body: string): TuiAcceptanceRow[] {
   const rows: TuiAcceptanceRow[] = [];
   for (const line of body.split("\n")) {
     const match = /^[ \t]*[-*] \[( |x|X)\]/.exec(line);
     if (!match) continue;
-    rows.push({ checked: match[1] !== " ", text: line.slice(match[0].length).trim() });
+    const text = line.slice(match[0].length).trim();
+    if (!text) continue;
+    rows.push({ checked: match[1] !== " ", text });
   }
   return rows;
 }
