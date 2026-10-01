@@ -24,11 +24,13 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-remove-diag-listener
 
 ## Context
 
-<!-- Why this task exists. -->
+Leftover debug scaffolding from task-board-move-dialogs: commit 2e5f3501 added a TEMP DIAGNOSTIC branch in `startBoardServer`'s stderr handler (`e2e/board.smoke.spec.ts`) that forwards any stderr chunk containing `[DIAG]` to the report. No committed source emits `[DIAG]` (zero hits in `cli/`, `lib/`, `smoke/` across all history via `git log -S`), so the branch is unreachable — dead code from a debugging session whose server-side log line was never committed. Filed from bug-live-reload-sse-race (PR #521 review).
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [x] The dead `[DIAG]` conditional forward is removed from `startBoardServer`; the pre-existing stderr→`output` accumulation (consumed only by the timeout rejection message) is kept.
+- [x] Independence proven: the removed branch only wrote to `process.stderr` (the runner's report stream), which no assertion reads; `output` — the only data sink in the function — is fed by the kept `output +=` line, and its only consumers are the URL regex match and the timeout error. With zero `[DIAG]` emitters in the repo the branch never fired, so removal cannot change fixture behavior; the green `@smoke` lane confirms it empirically.
+- [x] Gates on the worktree: `npm run build` exit 0 (includes `tsc -p tsconfig.e2e.json` type-check of the spec), `npm test` 1997 passed, `npm run lint` exit 0, `npm run check:plugin` exit 0, `npm run arggon -- validate --json` ok:true, `npx playwright test --grep @smoke` 33 passed (23.7s).
 
 ## Notes
 
