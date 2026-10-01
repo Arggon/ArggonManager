@@ -50,3 +50,19 @@ Mirrors plan-release-pipeline-015 T1–T8 (T0 is the
 - [ ] T8 Evidence: both workflow YAMLs linted (actionlint or equivalent); offline-as-possible smoke (guard paths, pack + inspect, release-please dry-run) with expected-vs-observed in the PR; CI lanes green; spec ACs A1–A17 re-checked and ticked before merge; PR notes publishing stays inert (fails closed) until the human completes the npmjs.com trusted-publisher setup, and that renaming `release.yml` is a breaking ops change (spec AC A16/A17).
 
 ## Notes
+
+### 2026-10-01 @ses_f076f3a7bffeHuhB6MxSetlgSU
+Recovery session: verified the previous agent's implementation commit (7230609f) against the item checklist, plan T1–T8, spec C1–C4/A1–A17, ADR 0018 §1–2/§4; fixed two gaps; opened PR; CI green.
+
+Evidence (expected vs observed):
+- Gates: prose-format 3/3 ✅; cli/release-guard.test.ts + cli/inspect-tarballs.test.ts 13/13 ✅ (guard rules 0–3 in predicate order on real git fixture clones, offline bare-repo ls-remote; inspector pass fixture + one broken fixture per check; GITHUB_OUTPUT contract; fail-closed exit 2); actionlint clean on both workflows ✅; eslint on the 4 new cli files clean ✅; arggon validate ok on every commit (pre-commit) ✅.
+- release-please CLI 17.11.2 dry-run vs this branch (--release-as 0.4.2): both packages listed (.: node, lib: node), both "Setting version ... from release-as configuration" (lockstep), "updating from 0.4.1 to 0.4.2" on root and lib, root package.json = CompositeUpdater (PackageJson + extra-files GenericJson), proposal spans exactly the five spec files.
+- GenericJson exact-pin updater exercised directly: caret state ^0.4.0 -> ^0.4.2 (PREFIX PRESERVED); post-bootstrap exact 0.4.1 -> 0.4.2 exact; rest of file byte-identical (A4).
+- CI on PR #555: cli pass 4m54s, tasks-validate pass, ui-smoke pass 8m12s.
+
+Fix commits on top of the inherited implementation:
+- 8e02c5e1 fix(release): docstrings pointed at cli/src/<t>.test.ts; suites live at cli/<t>.test.ts.
+- 2f28e32f fix(release): FINDING — spec C1's "extra-files updater needs no bootstrap" is false for release-please v17.11.2 AND github main (generic-json.ts replaces VERSION_REGEX in-place, preserving the range prefix). As landed, the first release PR would ship "^0.4.2" and fail AC A3/invariant 4. Resolution = the spec's own named escape hatch: one-time hand-unpin inside the FIRST release PR's review (version guard satisfied there by the legitimate bump); machine-owned exact-to-exact from release 2. release.md documents it. Bootstrapping in this PR is guard-blocked by design (dependencies is publish-relevant, v0.4.1 already tagged; bumping here would false-fire the release predicate and squat v0.4.2).
+- eec3ce7a chore(tasks): ticked T1–T7 (personally verified). T8 left open: coordinator ticks spec ACs A1–A17 in spec-release-pipeline-015.md at merge verification (spec file outside this item's edit scope); A12's end-to-end approval flow and A2's zero-conventional-commit proposal are runtime evidence of the first real release-PR cycle.
+
+PR: https://github.com/Arggon/ArggonManager/pull/555 (title+body carry task-release-workflow; body has per-T status, gate table, dry-run evidence, A17 ops notes: publishing fails closed until the human npmjs.com trusted-publisher setup for BOTH packages bound to release.yml with direct publish allowed; renaming release.yml is a breaking ops change; never a workflow_call child).
