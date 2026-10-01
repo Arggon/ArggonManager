@@ -1,6 +1,6 @@
 # 0017 Greenfield exploration gate
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-01
 - Deciders: product owner (Gonzalo), coordinator/architect (Arggon)
 

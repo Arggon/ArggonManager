@@ -51,9 +51,9 @@ Docs + skill only; no kernel/CLI changes.
 
 ## Acceptance
 
-- [ ] task-greenfield-explore-adr: exploration doc + ADR recorded and merged
-- [ ] task-greenfield-explore-carriers: protocol wired into the methodology carriers (skill references + commands + docs pointer), copies byte-equal, impact class Behavioral stated
-- [ ] Both PRs reviewed (verdict on the item) and merged; `arggon validate` ok on main; `npm test` green
-- [ ] `arggon spec analyze` reports no NEW findings introduced by the new docs
+- [x] task-greenfield-explore-adr: exploration doc + ADR recorded and merged
+- [x] task-greenfield-explore-carriers: protocol wired into the methodology carriers (skill references + commands + docs pointer), copies byte-equal, impact class Behavioral stated
+- [x] Both PRs reviewed (verdict on the item) and merged; `arggon validate` ok on main; `npm test` green
+- [x] `arggon spec analyze` reports no NEW findings introduced by the new docs
 
 ## Notes
