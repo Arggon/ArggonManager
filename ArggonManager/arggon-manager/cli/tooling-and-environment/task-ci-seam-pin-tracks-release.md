@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-ci-seam-pin-tracks-release
 title: "arggon.yml ARGGON_VERSION pin must track the release (derive from package.json, not a literal)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [ci, release]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T14:29:51.698Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-ci-seam-pin-tracks-release
 ---
 <!--
