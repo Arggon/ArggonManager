@@ -32,3 +32,8 @@ updated: "2026-10-01"
 ### 2026-10-01 @Coordinator
 ### 2026-10-01 @Coordinator
 Filed from the task-release-action-sha-pin review (#563): actions/checkout@v4 remains tag-pinned in release-please.yml; sweep ALL .github/workflows for tag-pinned `uses:` and SHA-pin each with a human-readable version comment (the #563 pattern). Acceptance: every `uses:` pinned to a full SHA + version comment; a grep gate preventing new floating tags; workflows functionally unchanged (actionlint/yaml parse).
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+verdict: approve (coordinator-executed inline) — 11 tag-pinned `uses:` SHA-pinned across all 5 shipped workflows (checkout -> 11d5960a = v4.4.0; setup-node -> 49933ea5 = v4; lightweight tags verified via ls-remote, so the tag ref IS the commit); the negative-controlled grep gate (cli/src/action-pins.test.ts) fails naming file:line on any floating ref; actionlint clean; workflows functionally unchanged.
+Merged: PR #567 squash -> main. Item done.
