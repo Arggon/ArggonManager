@@ -805,6 +805,49 @@ export function inspectGateBinResolution(
 }
 
 /**
+ * The gate bins a strict start gate would refuse (task-start-gate-strict-mode):
+ * every reported bin whose resolution sits OUTSIDE the worktree — `external`
+ * (a parent-directory install), `path` (a sibling checkout's or global `.bin`
+ * on the invoking PATH), and `missing` (resolves nowhere: the no-link-farm
+ * flavor, bug-start-worktree-npm-ci-claim incident 4). A `worktree` source and
+ * an empty report (nothing declared exposes a bin) are both passes — strict
+ * mode never invents a violation the report-only probe did not observe.
+ */
+export function strictGateBinViolations(gateBins: GateBinResolution[]): GateBinResolution[] {
+  return gateBins.filter((bin) => bin.source !== "worktree");
+}
+
+/**
+ * The actionable refusal message for `x-tracker.strict-gate-bins: true`
+ * (task-start-gate-strict-mode), or null when the gate passes. Named per bin
+ * with its observed source, and remediated with the exact `npm ci` fix; the
+ * caller (CLI or native start) wraps it with its own flow context and the
+ * attach re-run guidance. The same violations feed the report-only receipt's
+ * `ready` clause — strict mode changes the CONSEQUENCE, never the observation.
+ */
+export function strictGateBinFailure(
+  gateBins: GateBinResolution[],
+  worktreePath: string,
+): string | null {
+  const broken = strictGateBinViolations(gateBins);
+  if (broken.length === 0) return null;
+  const named = broken
+    .map((bin) => {
+      if (bin.source === "missing") return `${bin.name}: not resolvable from the worktree`;
+      if (bin.source === "path") {
+        return `${bin.name}: resolves only via PATH from ${bin.path} (outside the worktree)`;
+      }
+      return `${bin.name}: resolves from ${bin.path}, above the worktree`;
+    })
+    .join("; ");
+  return (
+    `x-tracker.strict-gate-bins is set: refusing the claim commit — gate binaries do not ` +
+    `resolve inside the worktree: ${named}. ` +
+    `Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install.`
+  );
+}
+
+/**
  * Report whether the install a worktree resolves through provides what that
  * worktree's own manifest declares (bug-worktree-readiness-misses-stale-primary-install).
  *

@@ -3275,6 +3275,29 @@ async function nativeStartBody(
     }
   }
 
+  // Opt-in strict gate (task-start-gate-strict-mode): with
+  // `x-tracker.strict-gate-bins: true` the preparation receipt's foreign
+  // gate-bin resolution is no longer report-only — the claim is refused before
+  // any item mutation, naming each offending bin, its observed source and the
+  // `npm ci` fix. Unset (the default) keeps the documented honest-receipt
+  // behavior byte-identical: readiness stays informational and the claim
+  // commit remains authoritative.
+  if (worktreePath !== undefined) {
+    const strictRefusal =
+      kernel.readConventionConfig(root).tracker.strictGateBins === true
+        ? kernel.strictGateBinFailure(progress.preparation?.gateBins ?? [], worktreePath)
+        : null
+    if (strictRefusal !== null) {
+      return failBeforeClaim(
+        `${strictRefusal} The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
+          "Then re-run " +
+          `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
+          "it attaches to the existing worktree and retries the claim commit.",
+        "strict gate-bin gate refused",
+      )
+    }
+  }
+
   progress.stage = "claim update"
   const target = worktreePath ?? options.cwd
   const update = kernel.updateOperation({

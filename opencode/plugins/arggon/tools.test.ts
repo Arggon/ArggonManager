@@ -1764,6 +1764,146 @@ describe("worktree domain tools (W4)", () => {
     ]);
   });
 
+  /**
+   * Arm `x-tracker.strict-gate-bins` (task-start-gate-strict-mode) on the
+   * seeded tree. Committed: a dirty tracker tree would trip start's stale
+   * canonical-claim guard instead of exercising the flag.
+   */
+  function armStrictGateBins(dir: string): void {
+    const config = join(dir, "ArggonManager", ".convention.yml");
+    writeFileSync(
+      config,
+      `${readFileSync(config, "utf8")}x-tracker:\n  strict-gate-bins: true\n`,
+      "utf8",
+    );
+    git(dir, ["add", "ArggonManager/.convention.yml"]);
+    git(dir, ["commit", "-qm", "test: arm the strict gate-bin gate"]);
+  }
+
+  /** Install one bin-bearing package (plus its `.bin` shim) into an install dir. */
+  function installGateDepBin(modulesDir: string): void {
+    const dep = join(modulesDir, "native-gate-dep");
+    mkdirSync(dep, { recursive: true });
+    writeFileSync(
+      join(dep, "package.json"),
+      JSON.stringify({
+        name: "native-gate-dep",
+        version: "1.0.0",
+        bin: { "native-gate-dep": "./index.js" },
+      }),
+    );
+    const binDir = join(modulesDir, ".bin");
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(join(binDir, "native-gate-dep"), "#!/bin/sh\nexit 0\n", "utf8");
+    chmodSync(join(binDir, "native-gate-dep"), 0o755);
+  }
+
+  it("refuses the claim before the claim update when strict-gate-bins is armed and the bin resolves outside the worktree (task-start-gate-strict-mode)", async () => {
+    // The same sibling-PATH masking shape as the report-only test above, but
+    // with the flag armed: the resolution must HARD-FAIL the claim instead of
+    // only withholding readiness — and the item copy must stay untouched.
+    const dir = seedGitTree();
+    addNativeManifest(dir, { name: "fixture", devDependencies: { "native-gate-dep": "1.0.0" } });
+    armStrictGateBins(dir);
+    setNativePreCommitHook(dir, "#!/bin/sh\ncommand -v native-gate-dep >/dev/null 2>&1 || exit 1\n");
+    const siblingModules = join(dirname(dir), "sibling-strict", "node_modules");
+    installGateDepBin(siblingModules);
+    const siblingBinDir = join(siblingModules, ".bin");
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const savedPath = process.env.PATH ?? "";
+    process.env.PATH = `${siblingBinDir}:${savedPath}`;
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    } finally {
+      process.env.PATH = savedPath;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    const payload = typed.envelope;
+    const preparation = payload.preparation as {
+      gateBins?: Array<{ name: string; source: string; path?: string }>;
+    };
+    expect(preparation.gateBins).toEqual([
+      { name: "native-gate-dep", source: "path", path: join(siblingBinDir, "native-gate-dep") },
+    ]);
+    // Refused BEFORE the claim update: not-attempted receipt, item copy todo.
+    expect(payload.claimCommitted).toBe(false);
+    const claimCommit = payload.claimCommit as Record<string, unknown>;
+    expect(claimCommit).toMatchObject({ status: "not-attempted", committed: false });
+    expect(claimCommit.reason).toBe("strict gate-bin gate refused");
+    const error = payload.error as Record<string, unknown>;
+    const message = String(error.message);
+    expect(message).toContain("x-tracker.strict-gate-bins is set");
+    expect(message).toContain("refusing the claim commit");
+    expect(message).toContain(
+      `native-gate-dep: resolves only via PATH from ${join(siblingBinDir, "native-gate-dep")}`,
+    );
+    expect(message).toContain("npm ci");
+    const worktreePath = String(payload.worktreePath);
+    expect(message).toContain(worktreePath);
+    expect(existsSync(worktreePath)).toBe(true);
+    const claimed = itemData(dir, "task-rate-limit", worktreePath);
+    expect(claimed.status).toBe("todo");
+    expect(claimed.assignee).toBeUndefined();
+
+    // The documented remediation loop: a worktree-local install (the `npm ci`
+    // shape) flips the resolution to the worktree — the module walk prefers it
+    // over the sibling still on PATH — and the attach re-run commits the claim.
+    installGateDepBin(join(worktreePath, "node_modules"));
+    process.env.PATH = `${join(worktreePath, "node_modules", ".bin")}:${savedPath}`;
+    let retryOutput: Record<string, unknown>;
+    try {
+      const retry = await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+      retryOutput = retry.output as Record<string, unknown>;
+    } finally {
+      process.env.PATH = savedPath;
+    }
+    const retryPreparation = retryOutput.preparation as {
+      gateBins?: Array<{ name: string; source: string; path?: string }>;
+    };
+    expect(retryOutput.worktreeCreated).toBe(false);
+    expect(retryOutput.claimCommitted).toBe(true);
+    expect(retryPreparation.gateBins).toEqual([
+      {
+        name: "native-gate-dep",
+        source: "worktree",
+        path: join(worktreePath, "node_modules", ".bin", "native-gate-dep"),
+      },
+    ]);
+  });
+
+  it("claims normally when strict-gate-bins is armed and the bin resolves from the worktree (task-start-gate-strict-mode)", async () => {
+    // Strict mode never invents a violation: a worktree-resolved gate bin
+    // commits exactly as it does with the flag unset.
+    const dir = seedGitTree();
+    addNativeGateDependency(dir);
+    installGateDepBin(join(dir, "node_modules"));
+    addNativeManifest(dir, { name: "fixture", devDependencies: { "native-gate-dep": "1.0.0" } });
+    armStrictGateBins(dir);
+    setNativePreCommitHook(dir, "#!/bin/sh\nexit 0\n");
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const started = await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    const output = started.output as Record<string, unknown>;
+    const worktreePath = String(output.worktreePath);
+    const preparation = output.preparation as {
+      gateBins?: Array<{ name: string; source: string; path?: string }>;
+    };
+    expect(preparation.gateBins).toEqual([
+      {
+        name: "native-gate-dep",
+        source: "worktree",
+        path: join(worktreePath, "node_modules", ".bin", "native-gate-dep"),
+      },
+    ]);
+    expect(output.claimCommitted).toBe(true);
+  });
+
   it("start refuses to steal a claim and removes the worktree it just created", async () => {
     const dir = seedGitTree();
     const { domain, calls } = fakeDomain(dir);

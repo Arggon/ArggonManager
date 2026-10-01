@@ -17,6 +17,7 @@ import {
   resolveBranchName,
   resolveCurrentLogin,
   runUpdate,
+  strictGateBinFailure,
   unlinkNodeModulesLink,
   withItemLock,
   type GateBinResolution,
@@ -798,6 +799,20 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     // (bug-start-worktree-npm-ci-claim): the claim-commit gate runs with this
     // resolution, so the receipt names it before the commit is attempted.
     gateBins = prepared.gateBins;
+    // Opt-in strict gate (task-start-gate-strict-mode): with
+    // `x-tracker.strict-gate-bins: true` the receipt's foreign resolution is
+    // no longer report-only — the claim commit is REFUSED before any item
+    // mutation, naming each offending bin, its observed source and the `npm
+    // ci` fix. Unset (the default) keeps the documented honest-receipt
+    // behavior byte-identical: readiness stays informational and the claim
+    // commit remains authoritative.
+    if (config.tracker.strictGateBins === true) {
+      const refusal = strictGateBinFailure(gateBins, worktreePath);
+      if (refusal !== null) {
+        step = "enforcing x-tracker.strict-gate-bins";
+        throw new Error(refusal);
+      }
+    }
     // Resolution report (W6/PR-374 finding 2): recomputed at the end too, so a
     // post-start hook that reifies a local install is reflected in the returned
     // state (PR #384 review F2).

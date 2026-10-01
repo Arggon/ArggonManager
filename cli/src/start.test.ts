@@ -1,4 +1,5 @@
 import {
+  cpSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -10,7 +11,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, relative } from "node:path";
+import { basename, join, relative, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { buildLocalWorkspaces, pointWorkspaceAtLocal, runCreate, runUpdate } from "@arggondev/lib";
 import { runInit } from "./init.js";
@@ -240,6 +241,111 @@ describe("start --open-pr closes the linked GitHub issue (task-closes-issue-link
         "Draft opened by `arggon start`.",
     );
     expect(pr?.body).not.toContain("Closes");
+  });
+});
+
+describe("start --worktree strict gate-bin gate (task-start-gate-strict-mode)", () => {
+  /**
+   * A primed task whose worktree (pre-created, since the git runner is faked)
+   * declares a bin-bearing dependency that resolves NOWHERE — the
+   * no-install-anywhere flavor (bug-start-worktree-npm-ci-claim incident 2):
+   * the readiness receipt reports `{ name, source: "missing" }` and strict
+   * mode must refuse the claim commit on it. `strict` appends the
+   * `x-tracker.strict-gate-bins: true` flag to the tracker config; copying the
+   * tracker into the worktree lets a default-mode run complete its claim.
+   */
+  function primedStrictTask(strict: boolean): {
+    dir: string;
+    id: string;
+    worktreePath: string;
+  } {
+    const { dir, id } = primedTask();
+    const manifest = {
+      name: "fixture",
+      private: true,
+      devDependencies: { "native-gate-dep": "1.0.0" },
+    };
+    writeFileSync(join(dir, "package.json"), JSON.stringify(manifest));
+    const configPath = join(dir, "ArggonManager", ".convention.yml");
+    if (strict) {
+      writeFileSync(
+        configPath,
+        readFileSync(configPath, "utf8") + "x-tracker:\n  strict-gate-bins: true\n",
+      );
+    }
+    const worktreePath = resolve(dir, "..", `${basename(dir)}-${id}`);
+    mkdirSync(worktreePath, { recursive: true });
+    // The worktree's own manifest — what the gate-bin probe reads.
+    writeFileSync(join(worktreePath, "package.json"), JSON.stringify(manifest));
+    // A full tracker mirror, so a default-mode run can complete its claim.
+    cpSync(join(dir, "ArggonManager"), join(worktreePath, "ArggonManager"), { recursive: true });
+    return { dir, id, worktreePath };
+  }
+
+  it("refuses the claim commit when the flag is set and a gate bin resolves outside the worktree", () => {
+    const { dir, id, worktreePath } = primedStrictTask(true);
+    const git = fakeGit({ worktreeList: () => [worktreePath] });
+    let message = "";
+    try {
+      runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW }, { git });
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).toContain("x-tracker.strict-gate-bins is set");
+    expect(message).toContain("refusing the claim commit");
+    expect(message).toContain("native-gate-dep: not resolvable from the worktree");
+    expect(message).toContain("npm ci");
+    expect(message).toContain(worktreePath);
+    // Hard fail BEFORE any item mutation: the worktree was prepared and kept,
+    // but no claim commit was attempted.
+    expect(git.calls.some((c) => c.op === "commit")).toBe(false);
+    expect(message).toContain("the worktree was kept");
+    expect(message).toContain(`arggon start ${id} --worktree`);
+  });
+
+  it("keeps the claim commit authoritative when the flag is unset (default, byte-identical)", () => {
+    const { dir, id, worktreePath } = primedStrictTask(false);
+    const git = fakeGit({ worktreeList: () => [worktreePath] });
+    const result = runStart(
+      { cwd: dir, id, assignee: "arggon", worktree: true, now: NOW },
+      { git },
+    );
+    // The SAME violating resolution is reported — but only reported.
+    expect(result.gateBins).toEqual([{ name: "native-gate-dep", source: "missing" }]);
+    expect(result.committed).toBe(true);
+    expect(git.calls.some((c) => c.op === "commit")).toBe(true);
+  });
+
+  it("starts normally when the flag is set and every gate bin resolves from the worktree", () => {
+    const { dir, id, worktreePath } = primedStrictTask(true);
+    // A primary install providing the gate dep: start links it into the
+    // worktree, so the bin resolves from the worktree and strict mode passes.
+    const dep = join(dir, "node_modules", "native-gate-dep");
+    mkdirSync(join(dep), { recursive: true });
+    writeFileSync(
+      join(dep, "package.json"),
+      JSON.stringify({
+        name: "native-gate-dep",
+        version: "1.0.0",
+        bin: { "native-gate-dep": "./index.js" },
+      }),
+    );
+    const binDir = join(dir, "node_modules", ".bin");
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(join(binDir, "native-gate-dep"), "#!/bin/sh\nexit 0\n");
+    const git = fakeGit({ worktreeList: () => [worktreePath] });
+    const result = runStart(
+      { cwd: dir, id, assignee: "arggon", worktree: true, now: NOW },
+      { git },
+    );
+    expect(result.committed).toBe(true);
+    expect(result.gateBins).toEqual([
+      {
+        name: "native-gate-dep",
+        source: "worktree",
+        path: join(worktreePath, "node_modules", ".bin", "native-gate-dep"),
+      },
+    ]);
   });
 });
 
@@ -596,7 +702,9 @@ describe("worktree link farm (task-start-worktree-lib-resolution)", () => {
     // The farm's entries were unlinked, never followed.
     expect(existsSync(join(primary, "node_modules", "commander", "index.js"))).toBe(true);
     expect(existsSync(join(primary, "lib", "dist", "index.js"))).toBe(true);
-    expect(lstatSync(join(primary, "node_modules", "@arggondev", "lib")).isSymbolicLink()).toBe(true);
+    expect(lstatSync(join(primary, "node_modules", "@arggondev", "lib")).isSymbolicLink()).toBe(
+      true,
+    );
 
     // A foreign directory carrying someone else's marker is never ours.
     const foreign = mkdtempSync(join(tmpdir(), "arggon-farm-foreign-"));

@@ -112,6 +112,40 @@ describe("x-tracker.allow-steal parsing", () => {
   });
 });
 
+describe("x-tracker.strict-gate-bins parsing (task-start-gate-strict-mode)", () => {
+  it("defaults to null (report-only start) when absent or under other options", () => {
+    expect(parseConventionConfig("version: 5\n").tracker.strictGateBins).toBeNull();
+    expect(
+      parseConventionConfig("version: 5\nx-tracker:\n  auto-commit: false\n").tracker
+        .strictGateBins,
+    ).toBeNull();
+  });
+
+  it("parses an explicit true/false without disturbing the sibling options", () => {
+    const armed = parseConventionConfig(
+      "x-tracker:\n  auto-commit: false\n  strict-gate-bins: true\n  allow-steal: true\n",
+    ).tracker;
+    expect(armed.strictGateBins).toBe(true);
+    expect(armed.autoCommit).toBe(false);
+    expect(armed.allowSteal).toBe(true);
+    expect(
+      parseConventionConfig("x-tracker:\n  strict-gate-bins: false\n").tracker.strictGateBins,
+    ).toBe(false);
+  });
+
+  it("throws a parse error on invalid values (like auto-commit)", () => {
+    expect(() => parseConventionConfig("x-tracker:\n  strict-gate-bins: strict\n")).toThrow(
+      /'strict-gate-bins' must be a boolean/,
+    );
+  });
+
+  it("ignores unknown x-tracker keys (forward compat)", () => {
+    expect(
+      parseConventionConfig("x-tracker:\n  strict-gate-bins-typo: true\n").tracker.strictGateBins,
+    ).toBeNull();
+  });
+});
+
 describe("gateSteal (CLI update action, before runUpdate)", () => {
   it("refuses when the repo has not armed steal (default)", async () => {
     const { dir, id } = primedTree();
