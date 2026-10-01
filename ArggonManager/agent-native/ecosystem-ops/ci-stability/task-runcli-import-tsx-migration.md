@@ -83,3 +83,7 @@ cli/src/test-spawn.ts: runCli(args, cwd?, opts) sync utf8 spawnSync; spawnNodeCl
 - Byte preservation: no assertion changes. One test-plumbing exception, disclosed: mcp-smoke's "server process gone" wait now accepts signal termination (exitCode !== null || signalCode !== null — idiom test-tmp/tracker-commit already use) because direct node killed by SIGTERM keeps exitCode null where the old wrapper self-exited with a code. Full suite caught this (1 failure → fixed → green).
 
 Commits: 6e5729ee (helper + gate + pack exclusion), 20e625ef (47-suite migration, net -383 lines).
+
+### handoff 2026-10-01 @Arggon (session: ses_f0aa6a0b4ffd9zUh3OD2bgVLIR) — next: Review PR; merge squashes tracker+code commits. Then file e2e/smoke/measure.ts wrapper follow-ups.
+- branch: feat/task-runcli-import-tsx-migration
+- open questions: mcp-smoke signal-death predicate ok? measure.ts product wrapper spawn follow-up item needed
