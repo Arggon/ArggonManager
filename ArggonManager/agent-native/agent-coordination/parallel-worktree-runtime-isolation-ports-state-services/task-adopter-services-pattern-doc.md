@@ -57,3 +57,7 @@ Delivered — PR #564 (branch feat/task-adopter-services-pattern-doc), doc at Ar
 Final verdict: approve — reviewer MERGE, no blockers, evidence independently reproduced (the reviewer re-ran the Compose example live on Docker 29.7.2: lowercasing semantics, the :? loud-failure variant, the --env-file replaces .env nuance, ephemeral port publishing + tmpfs isolation + zero-residue teardown). Six env keys match spec 016 exactly; shipped-vs-promised-vs-planned table honest against current main.
 Placement: docs/worktree-services.md (not a playbook — correct, it's a pattern doc that would false-trip the 90-day freshness gate); cross-link lives in spec-016 §Degradation; the convention.md link lands with the env-contract implementation PR per spec-016's own acceptance (already required there) — tracked.
 Merging after the item-file reconcile.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Merged: PR #564 squash -> main (CI green; reviewer MERGE with the Compose example independently reproduced live). Item done. Also recovered: the item file was briefly truncated to empty by a coordinator conflict-union script during a rebase (second occurrence of that script bug) — restored in full from git and the script is retired; remaining item-file conflicts get git-native resolution only.
