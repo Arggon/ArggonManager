@@ -50,7 +50,7 @@ The item arrived as an empty template. Scoping it now that 0.4.1 generates the `
 The ZCode plugin seam end-to-end on a live ZCode client: the marketplace packaging loads, the agents/commands surface, the hook gate fires, and tracker mutations from a ZCode session land on the item branch (not the primary) — the ZCode analogue of the #426-class bug fixed for OpenCode.
 
 ## Acceptance checklist
-- [ ] Artifact audit (automatable): `.zcode-marketplace/marketplace.json` + `arggon/.zcode-plugin/plugin.json` parse and reference existing files; `agents/` + `commands/` match the OpenCode seam's agent/command set (name-for-name); `hooks/hooks.json` + `gate.mjs` wire the same pre-commit gate the OpenCode seam uses.
+- [x] Artifact audit (automatable): `.zcode-marketplace/marketplace.json` + `arggon/.zcode-plugin/plugin.json` + `hooks/hooks.json` all parse; `agents/` name-for-name parity with `.opencode/agents` (coordinator/ reviewer/ worker); `commands/` complete (adopt/adr/board/done/explore/handoff/next/playbook/review/spec/start/status); `hooks.json` wires PreToolUse (`Agent|Bash|Write|Edit|mcp__arggon__.*`) -> `node gate.mjs pre` via `${CLAUDE_PLUGIN_ROOT}` — live resolution of that env var stays with the live leg. (2026-10-01, coordinator.)
 - [ ] The `.zcode/config.json` registration on this machine points at the installed/linked arggon (`arggon mcp` stdio) and survives a session restart.
 - [ ] Live: a ZCode session started from this repo can run a committing tracker mutation (comment on an item) and the commit lands on the session's item branch — not the primary's main.
 - [ ] Live: the strict-gate refusal path (x-tracker.strict-gate-bins is armed) surfaces in ZCode as an actionable error, not a silent skip.
