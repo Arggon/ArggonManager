@@ -140,13 +140,7 @@ function normalize(raw: string, dir: string): string {
     .replace(/"hash": ?"[0-9a-f]{7,40}"/g, '"hash":"<hash>"');
 }
 
-// The packed-install describe shares ONE fixture across its tests (bootstrap
-// -> drift gate -> MCP-removal are ORDER-DEPENDENT: each step builds on the
-// previous one's side effects), so it must run sequentially even under
-// `--sequence.shuffle` (bug-spawn-lanes-load-flake: shuffled order produced
-// "nothing to commit" / validate failures that looked like load flakes).
-const describePacked =
-  process.platform === "win32" ? describe.skip : describe.sequential;
+const describePacked = describe.skipIf(process.platform === "win32");
 
 describePacked("headless bootstrap + CI (packed install)", () => {
   /** Empty temp root the install step runs against. */
@@ -321,7 +315,13 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     expect(readFileSync(join(root, "README.md"), "utf8")).toContain("mkdir -p /tmp/arggon-packs");
   });
 
-  it("runs the shipped recipe on the adopter fixture: fresh init -> validate/doctor/list green", () => {
+  // bug-spawn-lanes-load-flake: the three phases below SHARE one fixture and
+  // are strictly order-dependent (bootstrap writes the generated seam; the
+  // drift gate commits it and proves staleness fails; the MCP phase removes
+  // the seam artifacts and asserts validate/doctor hold). Vitest 5.0.0 has
+  // no sequential/ordering API and `--sequence.shuffle` shuffles `it`s, so
+  // the phases are ONE atomic test: shuffling cannot break the lifecycle.
+  it("runs the shipped recipe end-to-end: bootstrap -> drift gate -> seam removal", () => {
     const bootstrap = runStep(BOOTSTRAP_STEP, fixture);
     expect(bootstrap.status, `${bootstrap.stdout}\n${bootstrap.stderr}`).toBe(0);
     // Fresh repo: the drift gate has nothing committed to compare yet and
@@ -355,9 +355,7 @@ describePacked("headless bootstrap + CI (packed install)", () => {
       ["doctor", true],
       ["list", true],
     ]);
-  });
-
-  it("drift gate: committed seam current passes, a stale generated file fails", () => {
+    // --- phase 2: drift gate (commit the seam; stale generated file must fail) ---
     // The fixture is a throwaway adopter repo: `-- .` is the adopter's commit.
     const add = git(["add", "--", "."], fixture);
     expect(add.status, add.stderr).toBe(0);
@@ -367,8 +365,8 @@ describePacked("headless bootstrap + CI (packed install)", () => {
 
     // Committed + current: bootstrap is a no-op and the gate passes (the state
     // file's generatedAt refresh is the one documented exception).
-    const bootstrap = runStep(BOOTSTRAP_STEP, fixture);
-    expect(bootstrap.status, `${bootstrap.stdout}\n${bootstrap.stderr}`).toBe(0);
+    const bootstrapNoop = runStep(BOOTSTRAP_STEP, fixture);
+    expect(bootstrapNoop.status, `${bootstrapNoop.stdout}\n${bootstrapNoop.stderr}`).toBe(0);
     const drift = runStep(DRIFT_STEP, fixture);
     expect(drift.status, `${drift.stdout}\n${drift.stderr}`).toBe(0);
 
@@ -405,17 +403,15 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     expect(restore2.status, restore2.stderr).toBe(0);
     expect(runStep(DRIFT_STEP, fixture).status).toBe(0);
 
-    const validate = runStep(VALIDATE_STEP, fixture);
-    expect(validate.status, validate.stderr).toBe(0);
-  });
-
-  it("needs no MCP and no OpenCode seam", () => {
+    const validateDrift = runStep(VALIDATE_STEP, fixture);
+    expect(validateDrift.status, validateDrift.stderr).toBe(0);
+    // --- phase 3: seam artifacts removed; validate/doctor must still hold ---
     rmSync(join(fixture, ".mcp.json"), { force: true });
     rmSync(join(fixture, "opencode.jsonc"), { force: true });
     rmSync(join(fixture, ".opencode"), { recursive: true, force: true });
     rmSync(join(fixture, ".agents"), { recursive: true, force: true });
-    const validate = runStep(VALIDATE_STEP, fixture);
-    expect(validate.status, validate.stderr).toBe(0);
+    const validateNoSeam = runStep(VALIDATE_STEP, fixture);
+    expect(validateNoSeam.status, validateNoSeam.stderr).toBe(0);
     const doctor = runPacked(["doctor", "--json"], fixture);
     expect(doctor.status, doctor.stderr).toBe(0);
     const envelope = JSON.parse(doctor.stdout) as {
