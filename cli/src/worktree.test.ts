@@ -20,7 +20,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
-import { defaultCleanupGit, runCleanup } from "./cleanup.js";
+import { MAX_ENVELOPE_DETAIL_CHARS, defaultCleanupGit, runCleanup } from "./cleanup.js";
 import { parseFrontmatter, runCreate, runUpdate, runValidate } from "@arggondev/lib";
 
 import { tickAllAcceptance } from "../../test/acceptance.js";
@@ -1143,14 +1143,78 @@ describe("arggon cleanup", () => {
 
     const result = runCleanup({ cwd: dir, prune: true, noGh: true }, { git: fakeGit });
 
-    // Per-candidate failure: the run stays green and continues.
-    expect(result.failures).toEqual([]);
+    // The run stays green and continues, but the failure is visible on BOTH
+    // surfaces with the SAME message: `pruned` (structured) AND `failures`
+    // (bug-cli-cleanup-branch-delete-missing-failure).
+    expect(result.failures).toEqual(["task-alpha: refusing to delete branch"]);
     expect(existsSync(paths["task-alpha"])).toBe(false);
     const raw = readFileSync(join(dir, "ArggonManager/launch/auth/login/task-alpha.md"), "utf8");
     expect(parseFrontmatter(raw).data.worktree_path).toBeUndefined();
     const failed = result.pruned.find((a) => a.action === "failed")!;
     expect(failed).toMatchObject({ id: "task-alpha", leftoverBranch: "feat/task-alpha" });
-    expect(failed.error).toContain("refusing to delete branch");
+    expect(failed.error).toBe("refusing to delete branch");
+  });
+
+  it("bounds a branch-delete failure on BOTH surfaces (over-long stderr, control chars)", () => {
+    const { dir } = initCleanupRepo();
+    const fakeGit = {
+      ...defaultCleanupGit(),
+      deleteBranch: () => {
+        throw new Error(`boom\r${"x".repeat(900)}\ttail`);
+      },
+    };
+
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true }, { git: fakeGit });
+
+    const failed = result.pruned.find((a) => a.action === "failed")!;
+    expect(failed).toMatchObject({ id: "task-alpha", leftoverBranch: "feat/task-alpha" });
+    // Control characters are stripped and the clip is MAX_ENVELOPE_DETAIL_CHARS
+    // characters including the elision mark — the native MAX_NATIVE_DETAIL_CHARS
+    // shape.
+    expect(failed.error).toBeDefined();
+    expect(failed.error).not.toMatch(/[\u0000-\u001f\u007f]/);
+    expect(failed.error).toHaveLength(MAX_ENVELOPE_DETAIL_CHARS);
+    expect(failed.error!.endsWith("…")).toBe(true);
+    // Same bounded message on both surfaces.
+    expect(result.failures).toEqual([`task-alpha: ${failed.error}`]);
+  });
+
+  it("bounds a non-Error branch-delete throw on BOTH surfaces", () => {
+    const { dir } = initCleanupRepo();
+    const fakeGit = {
+      ...defaultCleanupGit(),
+      deleteBranch: () => {
+        throw "raw\r\nthrow"; // deliberate non-Error throw
+      },
+    };
+
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true }, { git: fakeGit });
+
+    // Each control character becomes ONE space (\r\n -> two spaces), exactly
+    // like the native boundedNativeText replacement.
+    expect(result.failures).toEqual(["task-alpha: raw  throw"]);
+    expect(result.pruned.find((a) => a.action === "failed")!.error).toBe("raw  throw");
+  });
+
+  it("bounds an outer per-candidate failure on BOTH surfaces (over-long removal stderr)", () => {
+    const { dir, paths } = initCleanupRepo();
+    const fakeGit = {
+      ...defaultCleanupGit(),
+      removeWorktree: () => {
+        throw new Error(`git worktree remove exploded\r\n${"e".repeat(1200)}`);
+      },
+    };
+
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true }, { git: fakeGit });
+
+    const failed = result.pruned.find((a) => a.action === "failed")!;
+    expect(failed).toMatchObject({ id: "task-alpha", action: "failed" });
+    expect(failed.error).toHaveLength(MAX_ENVELOPE_DETAIL_CHARS);
+    expect(failed.error).not.toMatch(/[\u0000-\u001f\u007f]/);
+    expect(result.failures).toEqual([`task-alpha: ${failed.error}`]);
+    // A failed removal keeps the record (the worktree is still there).
+    const raw = readFileSync(join(dir, "ArggonManager/launch/auth/login/task-alpha.md"), "utf8");
+    expect(parseFrontmatter(raw).data.worktree_path).toBe(paths["task-alpha"]);
   });
 
   it("reports the remote-safety skip in the --json payload", () => {
@@ -1173,6 +1237,41 @@ describe("arggon cleanup", () => {
     expect(alpha.reason).toContain("remote branch divergent or behind (origin/feat/task-alpha)");
     expect(envelope.pruned).toEqual([]);
     expect(envelope.failures).toEqual([]);
+  });
+
+  it("reports a real branch-delete failure in BOTH pruned and failures in the --json payload", () => {
+    const { dir, paths } = initCleanupRepo();
+    // Force a REAL `git branch -d` refusal: detach the candidate worktree from
+    // its branch, then check the branch out in a second worktree — cleanup
+    // removes the candidate fine, but the branch stays checked out elsewhere
+    // and `git branch -d` refuses ("used by worktree").
+    git(["checkout", "--quiet", "--detach", "HEAD"], paths["task-alpha"]);
+    const holder = resolve(dirname(dir), `${basename(dir)}-task-holder`);
+    git(["worktree", "add", "--quiet", holder, "feat/task-alpha"], dir);
+
+    const r = spawnSync(process.execPath, [tsx, cli, "cleanup", "--prune", "--json"], {
+      encoding: "utf8",
+      cwd: dir,
+    });
+    // Per-item prune failures never abort the run and do NOT raise
+    // CLEANUP_FAILED (docs/json-output.md §cleanup): the --json path exits 0
+    // even with failures (the exitCode=1 human-path rule sits behind the
+    // json early-return in cli.ts).
+    expect(r.status).toBe(0);
+    const envelope = JSON.parse(r.stdout) as {
+      ok: boolean;
+      pruned: Array<{ id: string; action: string; error?: string; leftoverBranch?: string }>;
+      failures: string[];
+    };
+    expect(envelope.ok).toBe(true);
+    const failed = envelope.pruned.find((a) => a.action === "failed")!;
+    expect(failed).toMatchObject({ id: "task-alpha", leftoverBranch: "feat/task-alpha" });
+    expect(failed.error).toContain("used by worktree");
+    // Same message on both surfaces (bug-cli-cleanup-branch-delete-missing-failure).
+    expect(envelope.failures).toEqual([`task-alpha: ${failed.error}`]);
+    // The worktree is gone, so the record is still cleared.
+    const raw = readFileSync(join(dir, "ArggonManager/launch/auth/login/task-alpha.md"), "utf8");
+    expect(parseFrontmatter(raw).data.worktree_path).toBeUndefined();
   });
 
   /** Fake gh executor returning a merged PR list (task-cleanup-squash-merge). */
