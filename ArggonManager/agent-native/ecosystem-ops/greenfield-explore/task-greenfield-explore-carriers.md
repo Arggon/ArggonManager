@@ -64,3 +64,12 @@ number.
 
 ### 2026-10-01 @Arggon
 Impact class: Behavioral — agents must re-learn the first phase of greenfield work: a new project, subsystem or interface is now classified through the six-phase Greenfield Exploration Protocol (classify → stance → ground → frontier rounds → edge-case hunt → approaches/artifacts) before any spec or implementation task, with a hard gate — no implementation task may be claimed before a spec exists and `arggon spec analyze` reports no NEW findings (ADR 0017, greenfield exploration gate). Carriers updated in this PR: new skills/arggon-cli/references/exploration.md (+ bundled .agents copy), SKILL.md references table + pipeline sentence, methodology.md greenfield work-classification row, the /arggon-explore command (OpenCode + ZCode sources and the generated .opencode copy) now classifies first, the new templates/exploration-project.md project-exploration variant, and one lean pointer in ArggonManager/docs/agents.md. Adopting repos receive this through the staged upgrade channel (ADR 0016): acked/modified docs are never overwritten — the changes surface as init --propose side files and doctor outdated buckets for adopters to absorb deliberately.
+
+### 2026-10-01 @Arggon
+Review evidence (expected vs observed):
+- npm test: expected green; observed 111 test files / 1965 tests passed, 0 failed (two init.test.ts list assertions needed the new generated file added in ASCII-sorted position; headless-ci needed npm run build in the fresh worktree for dist artifacts — environment, not the change).
+- cli/src/skill-copy.test.ts: passes UNCHANGED (copy parity + bundling of every committed reference; .agents copies are gitignored and regenerate).
+- npm run arggon -- validate --json: ok:true (also run by the pre-commit gate).
+- npm run lint / test:structure / lint:structure: clean.
+- Generated-copy fidelity: .opencode/commands/arggon-explore.md verified byte-equal to templates/docs/opencode/commands/arggon-explore.md minus the frontmatter marker line; no CLI-prose regex violations (init-opencode W5 assertions hold: $ARGUMENTS, tools.arggon.create, no shell blocks).
+- Scope guard: git status shows no changes under ArggonManager/docs/explorations/ or ArggonManager/docs/adr/; ADR 0017 cited by number only (no path links), so the adr task stays free to land any filename.
