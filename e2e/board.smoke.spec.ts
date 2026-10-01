@@ -16,7 +16,13 @@
  * (`dist/cli.js board --serve --port 0`, an ephemeral free port) so the spec
  * exercises the shipped entry, not the TypeScript source.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+// `test` comes from the env-gated flake harness (task-flake-repro-throttle-
+// tool): with E2E_THROTTLE / E2E_SPINNERS set, any run of this spec arms CDP
+// CPU throttling plus host busy-spinners; without the env both fixtures are
+// strict no-ops, so the default @smoke lane is untouched. Usage and the
+// proven #521 recipe live in e2e/helpers/flake-harness.ts.
+import { test } from "./helpers/flake-harness.js";
 // Named import, not default: under `module: NodeNext` the package's `types`
 // condition resolves the CJS-paired index.d.ts, where `AxeBuilder as default`
 // is not honored and esModuleInterop synthesizes the module namespace as the
@@ -1117,21 +1123,37 @@ test.describe("@smoke board --serve", () => {
     const scrollBefore = await page.evaluate(() => window.scrollY);
     expect(scrollBefore).toBeGreaterThan(0);
 
-    // Marker on the CURRENT page: undefined after the reload proves the page
-    // was really replaced, so the preservation assertions cannot pass against
-    // the pre-reload DOM.
+    // Marker on the CURRENT page — on the <html> element, not on `window`:
+    // after the reload proves the page was really replaced (the preservation
+    // assertions cannot pass against the pre-reload DOM), and the check below
+    // can assert its ABSENCE with a locator instead of a `page.evaluate` poll.
     await page.evaluate(() => {
-      (window as unknown as { marker?: number }).marker = 42;
+      document.documentElement.dataset.preserveMarker = "42";
     });
 
     // External tracker write (not through this page) fires the SSE reload.
     runCli(fixture, ["update", preserveId, "--status", "cancelled", "--json"]);
 
-    await expect
-      .poll(() => page.evaluate(() => (window as unknown as { marker?: number }).marker), {
-        timeout: 15_000,
-      })
-      .toBeUndefined();
+    // The reload-landed gate: the probe lives only on the OLD document, so
+    // "an <html> without it" resolves exactly when the reloaded document is
+    // resolved — never on the old page (it carries the marker), never in the
+    // navigation teardown window (no document resolves to zero elements, and
+    // the count stays 0 there). A locator wait retries through the navigation
+    // by design; the page.evaluate poll this replaces burned its whole window
+    // throwing "Execution context was destroyed" while the frame navigated.
+    // The ceiling is generous because a contended machine legitimately needs
+    // tens of seconds to parse+layout the reloaded board — the point is the
+    // readiness signal, not the number.
+    await expect(page.locator("html:not([data-preserve-marker])")).toHaveCount(1, {
+      timeout: 30_000,
+    });
+
+    // The page-functional gate: the SSE stream reconnected, so the reloaded
+    // page parsed its reload client and is live again — the same readiness
+    // signal the connection-banner test pins (and the stale-drop test pins in
+    // reverse). Only after this gate do the preservation assertions read the
+    // page, so no later `page.evaluate` can race a pending navigation.
+    await expect(page.locator("#board-conn.live")).toHaveText("live", { timeout: 15_000 });
 
     await expect(page.locator("#board-filter-input")).toHaveValue("label:detail");
     await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
