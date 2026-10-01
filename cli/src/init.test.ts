@@ -34,6 +34,7 @@ const tsx = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
 const TIER1_DOCS = [
   ".agents/skills/arggon-cli/SKILL.md",
+  ".agents/skills/arggon-cli/references/exploration.md",
   ".agents/skills/arggon-cli/references/json-contract.md",
   ".agents/skills/arggon-cli/references/methodology.md",
   ".agents/skills/arggon-cli/references/orchestration.md",
@@ -241,6 +242,7 @@ describe("init", () => {
     // Exactly the ignored generated bundles are skipped — nothing else.
     expect(result.commit?.ignored).toEqual([
       ".agents/skills/arggon-cli/SKILL.md",
+      ".agents/skills/arggon-cli/references/exploration.md",
       ".agents/skills/arggon-cli/references/json-contract.md",
       ".agents/skills/arggon-cli/references/methodology.md",
       ".agents/skills/arggon-cli/references/orchestration.md",

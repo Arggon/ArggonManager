@@ -624,6 +624,7 @@ describe("opencode seam: methodology commands and skill references (W5)", () => 
   ];
   /** Bundled arggon-cli skill references (progressive disclosure). */
   const SKILL_REFERENCES = [
+    ".agents/skills/arggon-cli/references/exploration.md",
     ".agents/skills/arggon-cli/references/json-contract.md",
     ".agents/skills/arggon-cli/references/methodology.md",
     ".agents/skills/arggon-cli/references/orchestration.md",
