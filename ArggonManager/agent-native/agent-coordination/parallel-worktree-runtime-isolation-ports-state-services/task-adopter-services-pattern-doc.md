@@ -2,7 +2,7 @@
 type: task
 status: todo
 id: task-adopter-services-pattern-doc
-title: adopter-services-pattern-doc
+title: "Adopter pattern doc: per-worktree ephemeral service containers (Compose)"
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [docs, behavioral, worktree]
 created: "2026-10-01"
