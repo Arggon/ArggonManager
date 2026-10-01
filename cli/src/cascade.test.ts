@@ -7,7 +7,6 @@
  * opts out. The result names the affected container TYPES (`cascadeLevels`)
  * so callers can tell when the cascade reached epic level or above.
  */
-import { spawn, spawnSync } from "node:child_process";
 import {
   mkdtempSync as _mkdtempSync,
   closeSync,
@@ -18,14 +17,14 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { loadItems, lockFilePathFor, parseFrontmatter, runCreate, runUpdate } from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 
 import { removeFixtureTree } from "./test-tmp.js";
+import { runCli, spawnNodeCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test
 // through the shared bounded-retry helper (test-tmp.ts) — the real CLI
@@ -43,13 +42,6 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
 }
 
 const NOW = new Date("2026-09-11T12:00:00Z");
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(root, "cli/src/cli.ts");
-const tsx = resolve(root, "node_modules/tsx/dist/cli.mjs");
-
-function runCli(args: string[], cwd: string) {
-  return spawnSync(process.execPath, [tsx, cli, ...args], { encoding: "utf8", cwd });
-}
 
 function chainTree(): { dir: string; tasks: string[]; bug: string } {
   const dir = mkdtempSync(join(tmpdir(), "arggon-cascade-"));
@@ -563,7 +555,7 @@ describe("cascade ancestor-write guard (bug-cascade-lost-update)", () => {
   /** Spawn one `arggon ... --json` process; resolve its parsed last-line JSON + stderr. */
   function spawnJson(args: string[], cwd: string, timeoutMs: number): Promise<Json | null> {
     return new Promise((resolvePromise) => {
-      const child = spawn(process.execPath, [tsx, cli, ...args], {
+      const child = spawnNodeCli(args, {
         cwd,
         stdio: ["ignore", "pipe", "pipe"],
       });

@@ -20,19 +20,15 @@
 import { spawn, spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runCreate } from "@arggondev/lib";
 import { runInit } from "./init.js";
+import { runCli, spawnNodeCli } from "./test-spawn.js";
 import { removeFixtureTree } from "./test-tmp.js";
 
 const NOW = new Date("2026-09-14T12:00:00Z");
 const TIMEOUT_MS = 120_000;
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cliEntry = resolve(repoRoot, "cli/src/cli.ts");
-const tsxLoader = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
 function git(args: string[], cwd: string): string {
   const r = spawnSync("git", args, { encoding: "utf8", cwd });
@@ -77,15 +73,10 @@ type CommentJson =
 /** Spawn N `comment --json` processes at once on the same item and collect their JSON. */
 function commentConcurrently(dir: string, id: string, texts: string[]): Promise<CommentJson[]> {
   const children = texts.map((text) =>
-    spawn(
-      process.execPath,
-      [tsxLoader, cliEntry, "comment", id, text, "--author", "agent", "--json"],
-      {
-        cwd: dir,
-        env: { ...process.env },
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    ),
+    spawnNodeCli(["comment", id, text, "--author", "agent", "--json"], {
+      cwd: dir,
+      stdio: ["ignore", "pipe", "pipe"],
+    }),
   );
   return Promise.all(
     children.map(
@@ -220,11 +211,7 @@ describe("concurrent comments on one item (bug-comment-race-no-lock)", () => {
         // A cleanly reported lock timeout is retried sequentially, like a real
         // caller would: the error is actionable and the comment still lands.
         for (const text of failedTexts) {
-          const retry = spawnSync(
-            process.execPath,
-            [tsxLoader, cliEntry, "comment", "task-race", text, "--author", "agent", "--json"],
-            { encoding: "utf8", cwd: dir },
-          );
+          const retry = runCli(["comment", "task-race", text, "--author", "agent", "--json"], dir);
           expect(retry.status, retry.stderr).toBe(0);
         }
 
@@ -235,10 +222,7 @@ describe("concurrent comments on one item (bug-comment-race-no-lock)", () => {
         }
 
         // Tree still structurally sound after the contention.
-        const validate = spawnSync(process.execPath, [tsxLoader, cliEntry, "validate", "--json"], {
-          encoding: "utf8",
-          cwd: dir,
-        });
+        const validate = runCli(["validate", "--json"], dir);
         expect(JSON.parse(validate.stdout.trim().split("\n").pop() ?? "{}")).toMatchObject({
           ok: true,
         });

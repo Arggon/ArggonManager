@@ -1,15 +1,14 @@
 import { mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join } from "node:path";
 import { PassThrough } from "node:stream";
-import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runComment, runCreate, runUpdate, runValidate } from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 import { tickAcceptance } from "../../test/acceptance.js";
 import { runMcpServer } from "./mcp-server.js";
+import { runCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -21,10 +20,6 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
   tmpDirs.push(dir);
   return dir;
 }
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = join(repoRoot, "cli/src/cli.ts");
-const tsx = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
 const NOW = new Date("2026-09-11T12:00:00Z");
 const LATER = new Date("2026-09-12T12:00:00Z");
@@ -238,10 +233,10 @@ describe("comment --file/stdin (task-comment-stdin-file)", () => {
   it("reads comment text from stdin with --file - (spawn with piped input)", () => {
     const { dir, path } = primedTask();
     const piped = 'run `npm run lint` — output was $?, "exit 1"';
-    const proc = spawnSync(
-      process.execPath,
-      [tsx, cli, "--json", "comment", "task-rate-limit", "--file", "-", "--author", "arggon"],
-      { encoding: "utf8", cwd: dir, input: piped },
+    const proc = runCli(
+      ["--json", "comment", "task-rate-limit", "--file", "-", "--author", "arggon"],
+      dir,
+      { input: piped },
     );
     expect(proc.status, proc.stderr).toBe(0);
     const envelope = JSON.parse(proc.stdout) as {
@@ -290,21 +285,9 @@ describe("comment --file/stdin (task-comment-stdin-file)", () => {
 
   it("surfaces --file errors as COMMENT_FAILED through the CLI envelope", () => {
     const { dir } = primedTask();
-    const both = spawnSync(
-      process.execPath,
-      [
-        tsx,
-        cli,
-        "--json",
-        "comment",
-        "task-rate-limit",
-        "positional",
-        "--file",
-        "-",
-        "--author",
-        "a",
-      ],
-      { encoding: "utf8", cwd: dir },
+    const both = runCli(
+      ["--json", "comment", "task-rate-limit", "positional", "--file", "-", "--author", "a"],
+      dir,
     );
     expect(both.status).not.toBe(0);
     expect(JSON.parse(both.stdout)).toMatchObject({
@@ -316,20 +299,9 @@ describe("comment --file/stdin (task-comment-stdin-file)", () => {
       },
     });
 
-    const missing = spawnSync(
-      process.execPath,
-      [
-        tsx,
-        cli,
-        "--json",
-        "comment",
-        "task-rate-limit",
-        "--file",
-        "no-such-file.md",
-        "--author",
-        "a",
-      ],
-      { encoding: "utf8", cwd: dir },
+    const missing = runCli(
+      ["--json", "comment", "task-rate-limit", "--file", "no-such-file.md", "--author", "a"],
+      dir,
     );
     expect(missing.status).not.toBe(0);
     expect(JSON.parse(missing.stdout)).toMatchObject({

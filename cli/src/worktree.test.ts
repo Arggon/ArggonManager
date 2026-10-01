@@ -18,7 +18,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { MAX_ENVELOPE_DETAIL_CHARS, defaultCleanupGit, runCleanup } from "./cleanup.js";
 import { parseFrontmatter, runCreate, runUpdate, runValidate } from "@arggondev/lib";
@@ -28,6 +27,7 @@ import { tickAllAcceptance } from "../../test/acceptance.js";
 import { runInit } from "./init.js";
 import { defaultStartGit, runStart } from "./start.js";
 import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
+import { runCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak + bug-tracker-commit-enotempty-flake +
 // bug-ci-enotempty-rmretry: track mkdtemp dirs (plus any `arggon start
@@ -53,10 +53,6 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
 }
 
 const NOW = new Date("2026-09-11T12:00:00Z");
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(root, "cli/src/cli.ts");
-const tsx = resolve(root, "node_modules/tsx/dist/cli.mjs");
 
 function git(args: string[], cwd: string): string {
   const r = spawnSync("git", args, { encoding: "utf8", cwd });
@@ -1031,10 +1027,7 @@ describe("arggon cleanup", () => {
 
   it("emits the standard --json envelope via the CLI", () => {
     const { dir } = initCleanupRepo();
-    const r = spawnSync(process.execPath, [tsx, cli, "cleanup", "--json", "--no-gh"], {
-      encoding: "utf8",
-      cwd: dir,
-    });
+    const r = runCli(["cleanup", "--json", "--no-gh"], dir);
     expect(r.status).toBe(0);
     const envelope = JSON.parse(r.stdout) as {
       ok: boolean;
@@ -1220,10 +1213,7 @@ describe("arggon cleanup", () => {
   it("reports the remote-safety skip in the --json payload", () => {
     const { dir } = initRemoteCleanupRepo(true);
 
-    const r = spawnSync(process.execPath, [tsx, cli, "cleanup", "--json", "--prune"], {
-      encoding: "utf8",
-      cwd: dir,
-    });
+    const r = runCli(["cleanup", "--json", "--prune"], dir);
     expect(r.status).toBe(0);
     const envelope = JSON.parse(r.stdout) as {
       ok: boolean;
@@ -1249,10 +1239,7 @@ describe("arggon cleanup", () => {
     const holder = resolve(dirname(dir), `${basename(dir)}-task-holder`);
     git(["worktree", "add", "--quiet", holder, "feat/task-alpha"], dir);
 
-    const r = spawnSync(process.execPath, [tsx, cli, "cleanup", "--prune", "--json"], {
-      encoding: "utf8",
-      cwd: dir,
-    });
+    const r = runCli(["cleanup", "--prune", "--json"], dir);
     // Per-item prune failures never abort the run and do NOT raise
     // CLEANUP_FAILED (docs/json-output.md §cleanup): the --json path exits 0
     // even with failures (the exitCode=1 human-path rule sits behind the
@@ -1409,11 +1396,7 @@ describe("arggon cleanup", () => {
 
     // Default: task-charlie (done + unmerged branch) is proven integrated by
     // the merged-PR fallback, so the shim is invoked exactly once.
-    const fallback = spawnSync(process.execPath, [tsx, cli, "cleanup", "--json"], {
-      encoding: "utf8",
-      cwd: dir,
-      env,
-    });
+    const fallback = runCli(["cleanup", "--json"], dir, { env });
     expect(fallback.status, fallback.stderr).toBe(0);
     const withGh = JSON.parse(fallback.stdout) as {
       candidates: Array<{ id: string; removable: boolean; via?: string }>;
@@ -1427,11 +1410,7 @@ describe("arggon cleanup", () => {
 
     // --no-gh: ancestry-only. The second run must not spawn gh at all, and
     // charlie falls back to the plain ancestry skip.
-    const offline = spawnSync(process.execPath, [tsx, cli, "cleanup", "--json", "--no-gh"], {
-      encoding: "utf8",
-      cwd: dir,
-      env,
-    });
+    const offline = runCli(["cleanup", "--json", "--no-gh"], dir, { env });
     expect(offline.status, offline.stderr).toBe(0);
     const noGh = JSON.parse(offline.stdout) as {
       candidates: Array<{ id: string; removable: boolean; reason: string | null }>;

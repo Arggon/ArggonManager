@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync as _mkdtempSync,
@@ -8,8 +7,7 @@ import {
 } from "node:fs";
 import { PassThrough } from "node:stream";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runList, toContractWorkItem, type ContractWorkItem as WorkItem } from "@arggondev/lib";
 
@@ -59,6 +57,7 @@ import type {
   TuiState,
   TuiWatchFactory,
 } from "./tui.js";
+import { runCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -1185,17 +1184,6 @@ describe("runTuiBoard sort + lens keys (task-tui-sort-ready-lens)", () => {
 });
 
 // ---------- CLI wiring (spawned, piped stdout = non-TTY) ----------
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(repoRoot, "cli/src/cli.ts");
-const tsx = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
-
-function runCli(args: string[], cwd: string) {
-  return spawnSync(process.execPath, [tsx, cli, ...args], {
-    encoding: "utf8",
-    cwd,
-  });
-}
 
 describe("arggon board --tui (CLI)", () => {
   it("fails gracefully on a piped (non-TTY) stdout", () => {

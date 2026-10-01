@@ -1,4 +1,4 @@
-import { spawnSync, execFileSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import {
   cpSync,
   existsSync,
@@ -31,6 +31,7 @@ import {
 import { runAdoptAck } from "./adopt.js";
 
 import { runInit } from "./init.js";
+import { runCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -44,12 +45,6 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
 }
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(repoRoot, "cli/src/cli.ts");
-const tsx = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
-
-function runCli(args: string[], cwd: string) {
-  return spawnSync(process.execPath, [tsx, cli, ...args], { encoding: "utf8", cwd });
-}
 
 function tempDir(): string {
   return mkdtempSync(join(tmpdir(), "arggon-doctor-"));

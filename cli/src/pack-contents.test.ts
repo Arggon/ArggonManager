@@ -118,9 +118,11 @@ describe("npm pack contents", () => {
     ]);
     expect(paths.filter((p) => !allowedTopLevel.has(p.split("/")[0]))).toEqual([]);
     // 2. No test artifact anywhere: neither compiled `*.test.*` sources nor the
-    //    test-only `test-tmp` teardown / `pack-fixtures` helpers (the
+    //    test-only `test-tmp` teardown / `test-spawn` / `pack-fixtures` helpers (the
     //    2026-09-18 bug bundled 225 test artifacts).
-    expect(paths.filter((p) => /\.test\.|(^|\/)(test-tmp|pack-fixtures)\./.test(p))).toEqual([]);
+    expect(
+      paths.filter((p) => /\.test\.|(^|\/)(test-tmp|test-spawn|pack-fixtures)\./.test(p)),
+    ).toEqual([]);
     // 3. Runtime assets `arggon init` reads from the package + the bin.
     for (const required of [
       "dist/cli.js",

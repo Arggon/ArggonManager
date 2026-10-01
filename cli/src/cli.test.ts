@@ -23,6 +23,7 @@ import {
 import { tickAcceptance } from "../../test/acceptance.js";
 
 import { runInit } from "./init.js";
+import { runCli as runCliBase } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -36,15 +37,8 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
 }
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(root, "cli/src/cli.ts");
-const tsx = resolve(root, "node_modules/tsx/dist/cli.mjs");
-
 function runCli(args: string[], cwd = root, env: Record<string, string> = {}) {
-  return spawnSync(process.execPath, [tsx, cli, ...args], {
-    encoding: "utf8",
-    cwd,
-    env: { ...process.env, ...env },
-  });
+  return runCliBase(args, cwd, { env: { ...process.env, ...env } });
 }
 
 function runGit(args: string[], cwd: string) {

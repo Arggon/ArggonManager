@@ -4,7 +4,6 @@
  * working until migrated, and `arggon init` upgrades a legacy tree in place
  * (same root, docs at `<root>/docs/`) instead of silently moving it.
  */
-import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -14,8 +13,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runInit } from "./init.js";
 import { bundledTemplatesDir } from "./package-assets.js";
@@ -28,6 +26,7 @@ import {
   runValidate,
   trackerAt,
 } from "@arggondev/lib";
+import { runCli } from "./test-spawn.js";
 
 const tmpDirs: string[] = [];
 afterEach(() => {
@@ -37,14 +36,6 @@ function mkdtempSync(prefix: string): string {
   const dir = _mkdtempSync(prefix);
   tmpDirs.push(dir);
   return dir;
-}
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(repoRoot, "cli/src/cli.ts");
-const tsx = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
-
-function runCli(args: string[], cwd: string) {
-  return spawnSync(process.execPath, [tsx, cli, ...args], { encoding: "utf8", cwd });
 }
 
 /** Minimal legacy tree: tasks/.convention.yml + one initiative. */

@@ -9,12 +9,10 @@
  * kernel (runUpdate) keeps its own semantics, and the MCP layer stays
  * rules-refused via rules.ts (mcp-server.test.ts).
  */
-import { spawnSync } from "node:child_process";
 import { PassThrough } from "node:stream";
 import { mkdtempSync as _mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCreate, runUpdate } from "@arggondev/lib";
 import { runInit } from "./init.js";
@@ -25,6 +23,7 @@ import {
   REOPEN_DECLINED_MESSAGE,
   REOPEN_NON_TTY_MESSAGE,
 } from "./steal-gate.js";
+import { runCli as runCliBase } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -39,9 +38,6 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
 
 const NOW = new Date("2026-09-13T12:00:00Z");
 const LATER = new Date("2026-09-13T13:00:00Z");
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(root, "cli/src/cli.ts");
-const tsx = resolve(root, "node_modules/tsx/dist/cli.mjs");
 
 function primedTree(): { dir: string; id: string } {
   const dir = mkdtempSync(join(tmpdir(), "arggon-reopen-gate-"));
@@ -140,11 +136,7 @@ describe("findItemStatus", () => {
 
 describe("reopen gate through the CLI subprocess (piped stdin is never interactive)", () => {
   function runCli(args: string[], cwd: string, input?: string) {
-    return spawnSync(process.execPath, [tsx, cli, ...args], {
-      encoding: "utf8",
-      cwd,
-      input: input ?? "",
-    });
+    return runCliBase(args, cwd, { input: input ?? "" });
   }
 
   it("refuses --status todo on a done item with the exact message", () => {

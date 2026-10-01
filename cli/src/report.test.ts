@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync as _mkdtempSync,
@@ -7,8 +6,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   aggregateReport,
@@ -20,6 +18,7 @@ import {
   priorityCounts,
   runReport,
 } from "@arggondev/lib";
+import { runCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -279,14 +278,6 @@ describe("formatReportMarkdown", () => {
 });
 
 describe("arggon report --format (CLI)", () => {
-  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-  const cli = join(repoRoot, "cli/src/cli.ts");
-  const tsx = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
-
-  function runCli(args: string[], cwd: string) {
-    return spawnSync(process.execPath, [tsx, cli, ...args], { encoding: "utf8", cwd });
-  }
-
   it("--format markdown writes the standup markdown to stdout", () => {
     const dir = makeBlockedTree();
     const proc = runCli(["report", "--format", "markdown"], dir);

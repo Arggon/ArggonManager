@@ -6,6 +6,15 @@ All notable changes to ArggonManager are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-10-01
+
+### Changed
+
+- Packed tarball also excludes the compiled `dist/test-spawn.*` test
+  helper, same class as `dist/test-tmp.*` (CI version guard demands the
+  version move when the packaged `files` list changes;
+  task-runcli-import-tsx-migration).
+
 ## [0.4.0] - 2026-09-22
 
 ### Added

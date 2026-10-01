@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -8,10 +7,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runSpecNew, runSpecValidate } from "./spec.js";
+import { runCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -25,14 +24,6 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
 }
 
 const repoRoot = process.cwd();
-
-const cliRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(cliRoot, "cli/src/cli.ts");
-const tsx = resolve(cliRoot, "node_modules/tsx/dist/cli.mjs");
-
-function runCli(args: string[], cwd: string) {
-  return spawnSync(process.execPath, [tsx, cli, ...args], { encoding: "utf8", cwd });
-}
 
 /** Temp repo skeleton: only what findTasksDir needs (tasks/.convention.yml). */
 function makeRepo(): string {
