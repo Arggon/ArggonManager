@@ -881,4 +881,55 @@ describe("CLI --json", () => {
     expect(human.stdout).toContain("@ast-grep/cli");
     expect(human.stdout).toContain("npm ci");
   });
+
+  it("arggon start --worktree names the gate-bin resolution and the npm ci fix when the claim commit fails", () => {
+    // bug-start-worktree-npm-ci-claim (incident 2): a worktree with no install
+    // anywhere used to fail its claim commit with a bare `tsx: command not
+    // found`, leaving the worker to diagnose the install state alone. The
+    // failure must name the observed resolution (missing) and the exact fix.
+    const { dir, env } = initStartTree(true);
+    expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
+    expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
+    expect(runCli(["create", "task", "Prepared", "--parent", "login"], dir).status).toBe(0);
+    // A manifest that declares a gate binary, committed (start refuses a dirty
+    // tree) — and NO node_modules anywhere, in the primary or the worktree.
+    writeFileSync(
+      join(dir, "package.json"),
+      JSON.stringify({ name: "fixture", devDependencies: { "fake-gate-dep": "1.0.0" } }, null, 2),
+    );
+    expect(runGit(["add", "package.json"], dir).status).toBe(0);
+    expect(runGit(["commit", "--quiet", "-m", "declare a gate bin"], dir).status).toBe(0);
+    // A real PATH-lookup gate, like `npm run` resolving tsx: it fails with the
+    // incident's own symptom when the bin resolves nowhere. Installed AFTER the
+    // fixture commit above — the hook must not gate that commit itself.
+    const hook = join(dir, ".git", "hooks", "pre-commit");
+    mkdirSync(dirname(hook), { recursive: true });
+    writeFileSync(
+      hook,
+      "#!/bin/sh\ncommand -v fake-gate-dep >/dev/null 2>&1 || " +
+        '{ echo "sh: fake-gate-dep: command not found" >&2; exit 1; }\n',
+    );
+    chmodSync(hook, 0o755);
+
+    const result = runCli(
+      ["start", "task-prepared", "--worktree", "--assignee", "arggon", "--json"],
+      dir,
+      env,
+    );
+
+    expect(result.status).toBe(1);
+    const body = parseStdout(result.stdout);
+    expect(body.ok).toBe(false);
+    expect(body.error).toMatchObject({ code: "START_FAILED" });
+    const message = String((body.error as { message: string }).message);
+    // The worktree is kept and the attach re-run is named (unchanged contract).
+    expect(message).toContain("the worktree was kept at");
+    expect(message).toContain("arggon start task-prepared --worktree");
+    // NEW: the observed resolution source and the exact remediation.
+    expect(message).toContain("fake-gate-dep: not resolvable from the worktree");
+    expect(message).toContain("npm ci");
+    const wt = join(dirname(dir), "work-task-prepared");
+    expect(message).toContain(wt);
+    expect(existsSync(wt)).toBe(true);
+  });
 });
