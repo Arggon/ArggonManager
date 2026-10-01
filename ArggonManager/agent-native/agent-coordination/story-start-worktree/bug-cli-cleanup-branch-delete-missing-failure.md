@@ -169,3 +169,13 @@ Gates (all in the worktree): npm test 1961 passed (110 files); npm run lint clea
 Notes for the reviewer:
 - The test file's direct spawnSync/tsx calls were left exactly as-is (sibling spawn-helper sweep is a different item — no migration done here).
 - Pre-existing, NOT fixed (out of scope): the --json path of cleanup exits 0 even when failures[] is non-empty (json early-return sits before the human-path process.exitCode = 1 in cli.ts). Identical before/after this fix; recorded in the handoff open questions.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+verdict: approve (lead-architect review, PR #515)
+- Architecture: one bounded envelope helper (boundedEnvelopeText + MAX_ENVELOPE_DETAIL_CHARS = 500, control chars -> space then clip with elision) applied to BOTH catches; branch-delete failures now reach failures[] AND pruned[].error, mirroring the native twin's dual-push shape. Human channel (sanitize.ts, 2000 chars) correctly not leaked into the machine envelope; reviewer verified CLI readers lose nothing (human path re-sanitizes).
+- Scope: exactly 3 files; no bundle drift; spawn-helper fence obeyed (4 pre-existing wrapper spawns untouched — the parallel migration item owns those).
+- Tests travel with behavior: reviewer hand-traced every new assertion to fail on pre-fix code (pinned failures entry, 500-char/control-char bounds, non-Error throws, outer catch, real-git e2e with exit-0 caveat documented); coordinator independent run: worktree.test.ts 50/50.
+- Smoke: worker's real-git refusal fixture probe (expected vs observed: failures [] -> populated, record cleared, run continued) on the item.
+- Pre-existing exit-0-with-failures contract finding documented, not drive-by fixed — filed as task-cleanup-json-exit-code (p3).
+- Reviewer bars 1-5 pass; merge pending CI.
