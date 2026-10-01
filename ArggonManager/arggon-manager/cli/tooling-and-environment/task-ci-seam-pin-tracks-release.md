@@ -2,7 +2,7 @@
 type: task
 status: in_progress
 id: task-ci-seam-pin-tracks-release
-title: "arggon.yml ARGGON_VERSION pin must track the release (derive from package.json, not a literal)"
+title: arggon.yml ARGGON_VERSION pin must track the release — enforced by a lag-guard test (derivation rejected with evidence)
 assignee: Arggon
 branch: feat/task-ci-seam-pin-tracks-release
 parent: tooling-and-environment
