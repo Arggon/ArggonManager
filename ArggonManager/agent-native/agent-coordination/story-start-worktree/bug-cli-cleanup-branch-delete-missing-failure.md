@@ -1,14 +1,19 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-cli-cleanup-branch-delete-missing-failure
 title: "CLI cleanup reports a branch-delete failure in pruned but not in failures[]"
+assignee: Arggon
+branch: fix/bug-cli-cleanup-branch-delete-missing-failure
 parent: story-start-worktree
 labels: [opencode-seam, review-followup]
 priority: p3
 created: "2026-09-28"
-updated: "2026-09-28"
+updated: "2026-10-01"
+claimed_at: "2026-10-01T02:44:37.713Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-cli-cleanup-branch-delete-missing-failure
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-cli-cleanup-branch-delete-missing-failure.md
   Leaves live only under a story. id is the filename stem: bug-cli-cleanup-branch-delete-missing-failure.
@@ -43,11 +48,11 @@ tests) so both surfaces are fixed on their own; the shared contract text in
 
 ## Acceptance
 
-- [ ] Every CLI branch-delete failure appends a bounded `<id>: <error>` entry to `failures[]` as well as the structured `pruned` failure, with the SAME message on both surfaces.
-- [ ] The record is still cleared after a failed branch delete (the worktree is gone) and the run still continues with the next candidate — unchanged.
-- [ ] Replace the `expect(result.failures).toEqual([])` assertion in `cli/src/worktree.test.ts` with one that pins the new entry, and cover the bounded message.
-- [ ] `docs/json-output.md` §`cleanup` stays accurate (no change expected — it already documents both surfaces).
-- [ ] Full test, lint, build and validate remain green.
+- [x] Every CLI branch-delete failure appends a bounded `<id>: <error>` entry to `failures[]` as well as the structured `pruned` failure, with the SAME message on both surfaces.
+- [x] The record is still cleared after a failed branch delete (the worktree is gone) and the run still continues with the next candidate — unchanged.
+- [x] Replace the `expect(result.failures).toEqual([])` assertion in `cli/src/worktree.test.ts` with one that pins the new entry, and cover the bounded message.
+- [x] `docs/json-output.md` §`cleanup` stays accurate (no change expected — it already documents both surfaces).
+- [x] Full test, lint, build and validate remain green.
 
 ## Notes
 
@@ -57,6 +62,7 @@ instructions for the native fix scope were "do not change what the CLI emits;
 file the gap instead".
 
 ### 2026-09-29 @Arggon
+
 Sibling-surface note from the review of `bug-native-cleanup-worktree-failure-unbounded` (native plugin, PR #432). Not fixing the CLI here — this item is `todo` and unclaimed, and the native PR is scoped to the plugin.
 
 ## The CLI `cleanup` outer per-candidate catch is unbounded too
@@ -88,3 +94,58 @@ Two things confirmed while checking, both of which bear on this item's acceptanc
 - Cleanup CLI/native parity is pinned for **list mode only** (`opencode/plugins/arggon/tools.test.ts:2130`), so bounding (or not bounding) the CLI prune messages breaks no parity test.
 
 No action taken on this item; recording the evidence so the next agent does not have to re-derive it.
+
+### 2026-10-01 @Arggon — CLI fix implemented
+
+Both surfaces fixed in `cli/src/cleanup.ts` (the only source file touched):
+
+1. **Headline (branch-delete catch):** now bounds the message with a new
+   envelope-shaped helper and pushes `${entry.id}: ${message}` to `failures[]`
+   as well as the structured `pruned` failure — SAME message on both, matching
+   the native twin's shape in `opencode/plugins/arggon/index.ts` (its
+   `boundedNativeText` + `MAX_NATIVE_DETAIL_CHARS` catch blocks).
+2. **Second surface (outer per-candidate catch):** the same bound applied to
+   both `failures[]` and `pruned[].error`.
+3. **The helper:** `boundedEnvelopeText` + `MAX_ENVELOPE_DETAIL_CHARS = 500`,
+   exported from `cli/src/cleanup.ts`: control characters (`U+0000–U+001F`,
+   `U+007F`) each become ONE space, then clip at 500 chars including the `…`
+   elision mark. Deliberately NOT `sanitizeHumanError`/`clipHumanValue` —
+   those are the human channel (2000 chars + escaping) per the 2026-09-29 note.
+
+Tests (`cli/src/worktree.test.ts` only; the direct `spawnSync`/tsx calls were
+left exactly as-is — no spawn-helper migration):
+
+- The old `expect(result.failures).toEqual([])` in "clears the record and
+  reports leftoverBranch when branch -d fails after removal" now pins
+  `["task-alpha: refusing to delete branch"]` + same message on `pruned[].error`.
+- New: over-long stderr (1000+ chars) + `\r`/`\t` in the branch-delete error →
+  both surfaces bounded at exactly 500 chars, elision mark, no control chars.
+- New: non-Error throw (`throw "raw\r\nthrow"`) → `task-alpha: raw  throw`
+  (per-char replacement, native-consistent).
+- New: outer-catch bounding via a throwing `removeWorktree` fake → both
+  surfaces bounded; record kept (worktree still exists).
+- New: real-git end-to-end envelope test — candidate worktree detached, branch
+  checked out in a second worktree so `git branch -d` refuses ("used by
+  worktree"); asserts `failures == ["task-alpha: <error>"]` mirroring
+  `pruned[].error`, `leftoverBranch` set, record cleared, exit 0.
+
+Fixture probe (`cleanup --prune --json` on a temp repo; before = a detached
+`origin/main` checkout, after = this branch — expected vs observed):
+
+- BEFORE: `pruned` carries `action: "failed"` + `leftoverBranch` but
+  `"failures":[]` — the documented-contract violation, reproduced.
+- AFTER: identical `pruned` entry AND `"failures":["task-alpha: git branch -d
+  feat/task-alpha failed: error: cannot delete branch 'feat/task-alpha' used
+  by worktree at '…/fx-holder'"]`; record still cleared, auto-commit still
+  `chore(tasks): pruned task-alpha`, run continued.
+
+Gates: `npm test` 1961 passed (110 files), `npm run lint` clean,
+`npm run build` ok, `npm run check:plugin` ok (bundle byte-identical — cleanup
+is CLI-side, nothing regenerated), `arggon validate` `ok: true`.
+
+Finding (not fixed here — out of scope, no drive-by): the `--json` path of
+`cleanup` returns before the `process.exitCode = 1` rule that the human output
+path applies to non-empty `failures[]` (`cli/src/cli.ts` ~2401 vs ~2438), so
+`cleanup --prune --json` exits 0 even when `failures[]` is non-empty. Confirmed
+identical BEFORE and AFTER this fix (pre-existing); changing it would alter the
+machine contract, so it is reported for the coordinator to track if wanted.
