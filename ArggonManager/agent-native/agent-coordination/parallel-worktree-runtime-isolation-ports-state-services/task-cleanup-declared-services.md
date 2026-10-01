@@ -2,7 +2,7 @@
 type: task
 status: todo
 id: task-cleanup-declared-services
-title: cleanup-declared-services
+title: cleanup --prune reaps per-worktree Compose projects only when the repo declares them
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [cleanup, worktree]
 created: "2026-10-01"
