@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-ci-seam-pin-tracks-release
 title: "arggon.yml ARGGON_VERSION pin must track the release (derive from package.json, not a literal)"
+assignee: Arggon
+branch: feat/task-ci-seam-pin-tracks-release
 parent: tooling-and-environment
 labels: [ci, release]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
+claimed_at: "2026-10-01T14:29:51.698Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-ci-seam-pin-tracks-release
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-ci-seam-pin-tracks-release.md
