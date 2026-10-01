@@ -9,7 +9,30 @@
   // you want the stdio server for another client.
   // Docs: https://opencode.ai/v2/docs/
   "$schema": "https://opencode.ai/config.json",
-  "formatter": true,
+  // `formatter: true` runs the built-in prettier as `<prettier> --write $FILE`
+  // with the session's project directory as cwd. Prettier resolves
+  // `.prettierignore` from that cwd and matches patterns relative to it, so a
+  // session rooted in one checkout that edits a file in a sibling git worktree
+  // (`../<repo>-<item-id>/...`, the `arggon start` layout) bypasses that
+  // checkout's ignore file: an anchored pattern like `dir/` does not match
+  // `../<repo>-<id>/dir/file.ts`, and ignored files get reformatted into
+  // large style-only churn. This override keeps the same prettier invocation
+  // but anchors it at the edited file's own git root (the worktree root for
+  // worktrees), so the ignore file that actually governs the file applies.
+  // Non-ignored files format exactly as before; when no prettier resolves
+  // (e.g. a cold worktree before `start` links the install), the command
+  // exits 0 and formats nothing — skipping beats wrong-style churn.
+  "formatter": {
+    "prettier": {
+      "command": [
+        "sh",
+        "-c",
+        "f=$1; d=$(CDPATH= cd -- \"$(dirname -- \"$f\")\" && pwd); root=$(git -C \"$d\" rev-parse --show-toplevel 2>/dev/null) || root=$d; p=$root/node_modules/.bin/prettier; [ -x \"$p\" ] || p=$(command -v prettier) || exit 0; cd \"$root\" && exec \"$p\" --write \"$f\"",
+        "prettier-cwd-guard",
+        "$FILE"
+      ]
+    }
+  },
   "compaction": {
     "keep": {
       "tokens": 15000
