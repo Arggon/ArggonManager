@@ -10,7 +10,6 @@ labels: [worktree, review-followup]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-start-worktree-npm-ci-claim
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/story-start-worktree/bug-start-worktree-npm-ci-claim.md
