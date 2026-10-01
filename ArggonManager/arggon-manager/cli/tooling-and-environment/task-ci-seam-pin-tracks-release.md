@@ -127,3 +127,7 @@ VERIFICATION EVIDENCE:
 - Gates: npm run build OK; npm test 113 files / 2003 tests passed; npm run lint exit 0; npm run check:plugin exit 0 (bundle unchanged); npm run arggon -- validate --json ok:true errors:[] warnings:[].
 
 COMMITS on feat/task-ci-seam-pin-tracks-release: 0cf39cdc (claim), a162e280 (ci: enforce the seam pin with a lag guard, keep the literal), + this runbook/item commit before push.
+
+### handoff 2026-10-01 @ses_f0821d67dffeJCEv1KlhMw1eCD (session: ses_f0821d67dffeJCEv1KlhMw1eCD) — next: Coordinator: review + merge PR (do not merge myself); then next release's step-6 re-pin per the updated runbook
+- branch: main
+- open questions: ADR 0018 parenthetical still expects derive from this item - superseded by the recorded decision; template pin is 0.4.0 vs committed 0.4.1 (fresh-adopter drift-gate red on first push) - needs a follo…
