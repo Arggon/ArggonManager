@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-cli-cleanup-branch-delete-missing-failure
 title: "CLI cleanup reports a branch-delete failure in pruned but not in failures[]"
 assignee: Arggon
@@ -10,10 +10,8 @@ labels: [opencode-seam, review-followup]
 priority: p3
 created: "2026-09-28"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T02:44:37.713Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-cli-cleanup-branch-delete-missing-failure
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-cli-cleanup-branch-delete-missing-failure.md
   Leaves live only under a story. id is the filename stem: bug-cli-cleanup-branch-delete-missing-failure.
