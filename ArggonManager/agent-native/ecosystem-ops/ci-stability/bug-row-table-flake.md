@@ -48,7 +48,7 @@ Passes consistently locally and on main. Suspect cross-test interference under C
 
 - [x] Reproduce or instrument: run the full suite 5x locally and 3x in CI (or with --sequence.shuffle) until the failure is caught; identify the interfering writer.
 - [x] Fix the interference (isolate stdout capture, or make the assertion test single-file) — not by deleting the assertion.
-- [ ] Full suite green 3 consecutive CI runs on a branch touching unrelated code.
+- [x] Full suite green 3 consecutive CI runs on a branch touching unrelated code. (Coordinator post-merge verification: main CI runs 36802100787 (the #513 merge), 36802945987 and 36803005739 (both unrelated tracker-only pushes) — three consecutive green full-suite `cli` lanes; the arggon workflow green alongside each.)
 
 ### 2026-09-30 @Arggon
 
@@ -76,20 +76,23 @@ Reproduction attempts (all logged under /tmp/opencode/flake-hunt): 325 sequentia
 
 Gates: npm test 1936/1936 green (+ shuffled runs; 400-spawn sequential hammer on the new chain clean); lint, build, check:plugin (bundle unchanged), arggon validate ok. Full-suite-green-in-CI (3 runs) intentionally left to the coordinator.
 
-
 diff --git a/ArggonManager/agent-native/ecosystem-ops/ci-stability/bug-row-table-flake.md b/ArggonManager/agent-native/ecosystem-ops/ci-stability/bug-row-table-flake.md
 index 3fc2de78..6807f2a6 100644
 --- a/ArggonManager/agent-native/ecosystem-ops/ci-stability/bug-row-table-flake.md
 ++ b/ArggonManager/agent-native/ecosystem-ops/ci-stability/bug-row-table-flake.md
 @@ -48,3 +48,24 @@ Mitigation shipped (coordinator): the escape-gate test keeps its strict assertio
- ### handoff 2026-10-01 @ses_f0b410d33ffexCqDkkRw4DH8bG (session: ses_f0b410d33ffexCqDkkRw4DH8bG) — next: Coordinator: review PR #513 and run 3 consecutive CI runs on the branch to confirm the flake is gone
- - branch: fix/bug-row-table-flake
- - open questions: Migrate other runCli spawn helpers (success-stdout, doctor, validate, headless-ci) to --import tsx too? File separate item for load-sensitive headless-ci/pack flakes seen under overload
+
+### handoff 2026-10-01 @ses_f0b410d33ffexCqDkkRw4DH8bG (session: ses_f0b410d33ffexCqDkkRw4DH8bG) — next: Coordinator: review PR #513 and run 3 consecutive CI runs on the branch to confirm the flake is gone
+
+- branch: fix/bug-row-table-flake
+- open questions: Migrate other runCli spawn helpers (success-stdout, doctor, validate, headless-ci) to --import tsx too? File separate item for load-sensitive headless-ci/pack flakes seen under overload
 
 ### 2026-10-01 @ses_f0b410d33ffexCqDkkRw4DH8bG
+
 ### Evidence (subagent, 2026-09-30)
 
 **Misdiagnosis corrected, from the CI logs themselves:**
+
 - PR #475 run 36740682070 log: `AssertionError: expected 1 to be +0` at row-table-stdout.test.ts:199:25; at head eba19cda that line/col is `expect(proc.status).toBe(0)` — the spawned CLI chain exited 1. stdout assertions never ran; no raw-control-char count ever existed.
 - PR #487 run 36758776399 attempt 1 log: identical 199:25 signature. (36764572794 on the same PR is unrelated — TS1005 in e2e/board.smoke.spec.ts on that push.)
 
@@ -98,6 +101,7 @@ index 3fc2de78..6807f2a6 100644
 **Leading writer:** the tsx wrapper CLI (tsx/dist/cli.mjs) re-executes node as a second child and hosts a per-spawn IPC server at /tmp/tsx-<uid>/<pid>.pipe with NO error handling around mkdir/rm/listen — any transient rejection exits the chain 1, matching the rare/load-dependent/exit-1/invisible-stderr signature.
 
 **Reproduction/instrumentation log:**
+
 - 325 sequential spawns of the exact list command under 12-core CPU saturation (old chain): 0 failures.
 - 480 parallel spawns, 12 workers (old chain): 0 failures.
 - 6 full-suite runs under artificial overload + shuffle: row-table never failed; headless-ci/pack-contents/success-stdout/prose-format showed timeouts and the same transient exit-1 signature under load (evidence the suite's spawn chains are environmentally sensitive; also observed live while a sibling session's suite ran concurrently).
@@ -112,11 +116,13 @@ index 517c5bab..3fc2de78 100644
 --- a/ArggonManager/agent-native/ecosystem-ops/ci-stability/bug-row-table-flake.md
 ++ b/ArggonManager/agent-native/ecosystem-ops/ci-stability/bug-row-table-flake.md
 @@ -44,3 +44,7 @@ Passes consistently locally and on main. Suspect cross-test interference under C
- 
- ### 2026-09-30 @Arggon
- Mitigation shipped (coordinator): the escape-gate test keeps its strict assertion but gets one CI-only retry (options-object retry:1 under CI, none locally) — cli/src/row-table-stdout.test.ts. Rationale: 3 failures across hundreds of runs, all under CI load, exactly one raw control char in the spawned process's stdout, never reproducible locally or on retry — environmental noise, not product behavior. Root cause stays open on this bug: reproduce (CI --sequence.shuffle / 5x loops), find the interfering writer, remove the retry.
+
+### 2026-09-30 @Arggon
+
+Mitigation shipped (coordinator): the escape-gate test keeps its strict assertion but gets one CI-only retry (options-object retry:1 under CI, none locally) — cli/src/row-table-stdout.test.ts. Rationale: 3 failures across hundreds of runs, all under CI load, exactly one raw control char in the spawned process's stdout, never reproducible locally or on retry — environmental noise, not product behavior. Root cause stays open on this bug: reproduce (CI --sequence.shuffle / 5x loops), find the interfering writer, remove the retry.
 
 ### handoff 2026-10-01 @ses_f0b410d33ffexCqDkkRw4DH8bG (session: ses_f0b410d33ffexCqDkkRw4DH8bG) — next: Coordinator: review PR #513 and run 3 consecutive CI runs on the branch to confirm the flake is gone
+
 - branch: fix/bug-row-table-flake
 - open questions: Migrate other runCli spawn helpers (success-stdout, doctor, validate, headless-ci) to --import tsx too? File separate item for load-sensitive headless-ci/pack flakes seen under overload
 
@@ -125,13 +131,16 @@ index 6807f2a6..25019150 100644
 --- a/ArggonManager/agent-native/ecosystem-ops/ci-stability/bug-row-table-flake.md
 ++ b/ArggonManager/agent-native/ecosystem-ops/ci-stability/bug-row-table-flake.md
 @@ -69,3 +69,14 @@ Mitigation shipped (coordinator): the escape-gate test keeps its strict assertio
- **Fix (PR #513, branch fix/bug-row-table-flake):** runCli spawns `node --import <abs tsx loader>` (one process, no wrapper, no IPC socket; stdout bytes unchanged); CI-only retry:1 removed; assertion strictness unchanged (UNSAFE gate + discrimination + empty stderr).
- 
- **Gates:** npm test 1936/1936 green (+shuffled); 400-spawn sequential hammer on the new chain clean; npm run lint ok; npm run build ok; npm run check:plugin ok (bundle unchanged); arggon validate ok:true. Full-suite-green-in-CI (3 runs) left to coordinator per instructions.
+**Fix (PR #513, branch fix/bug-row-table-flake):** runCli spawns `node --import <abs tsx loader>` (one process, no wrapper, no IPC socket; stdout bytes unchanged); CI-only retry:1 removed; assertion strictness unchanged (UNSAFE gate + discrimination + empty stderr).
+
+**Gates:** npm test 1936/1936 green (+shuffled); 400-spawn sequential hammer on the new chain clean; npm run lint ok; npm run build ok; npm run check:plugin ok (bundle unchanged); arggon validate ok:true. Full-suite-green-in-CI (3 runs) left to coordinator per instructions.
 
 ### 2026-10-01 @Coordinator
+
 ### 2026-10-01 @Coordinator
+
 verdict: approve (lead-architect review, PR #513)
+
 - Forensics confirmed by the reviewer from primary sources: both CI failures died at the exit-status assertion (row-table-stdout.test.ts:199:25, expect(status).toBe(0) got 1, pinned SHA eba19cda) — the stdout assertions never ran; the "one raw control char" theory is dead; run 36764572794 was an unrelated e2e syntax error.
 - Architecture of the fix: single-process spawn (node --import <abs tsx loader>) removes the wrapper's re-exec + per-spawn IPC server surface entirely; runCli is file-local so blast radius is exactly this suite; loader path absolute; stdio/capture unchanged.
 - Strictness: retry removed, every assertion preserved verbatim (UNSAFE gate, discrimination checks, empty stderr); the status assertion now self-reports stderr/stdout/signal — any recurrence is diagnosable, not retry-masked. Negative control intact from the diff.
