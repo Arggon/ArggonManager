@@ -65,3 +65,7 @@ DEVIATIONS/NOTES (also in the PR body — none silent):
 - No steps-log entries for env (the env fragment is its own channel); NativePrepStep union unchanged.
 - Values strip CR/LF (hostile id/branch cannot split the format).
 - Spec/plan status fields left "proposed" (flipping is not this task's call).
+
+### handoff 2026-10-01 @ses_f0697a26fffelQHzQVRfDPIlHe (session: ses_f0697a26fffelQHzQVRfDPIlHe) — next: Review PR #566 (draft, do not merge via this task); reconcile the attach written:false shape + the cleanup env-reap addition into the adopter-services pattern doc before it lands.
+- branch: main
+- open questions: Attach receipt: spec lists 3 written:false cases, attach is a 4th (implemented, flagged); Windows state/cache dirs co-locate by the spec's env-paths mapping — intended?
