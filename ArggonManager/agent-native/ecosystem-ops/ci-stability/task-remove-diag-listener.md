@@ -57,3 +57,7 @@ Evidence for the reviewer (all commands run in the item worktree `../ArggonManag
 - `npx playwright test --grep @smoke` — expected 33/33; observed **33 passed (23.7s)**.
 
 **Scope** — commit `9cad1adb` stages exactly 2 files: `e2e/board.smoke.spec.ts` (+0/−3 code) and this item file (Acceptance checklist filled + ticked). No drive-by changes. PR: https://github.com/Arggon/ArggonManager/pull/540 (not merged; item left `in_progress` for the coordinator).
+
+### handoff 2026-10-01 @ses_f0821d66dffeodA8X39ByH4h9T (session: ses_f0821d66dffeodA8X39ByH4h9T) — next: Coordinator: review PR #540 (merge, not squash — PR carries tracker auto-commits); item stays in_progress until merge.
+- branch: feat/task-remove-diag-listener
+- open questions: None; all gates green, @smoke 33/33 in worktree.
