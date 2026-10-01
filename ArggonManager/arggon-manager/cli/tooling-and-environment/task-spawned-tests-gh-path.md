@@ -59,3 +59,20 @@ With the mise gh shim off PATH, 10 spawned-CLI tests fail (measure x8, comment x
 - [ ] Comment-author resolution either degrades gracefully without gh (documented fallback) or the failing tests assert an actionable precondition (skip with reason naming 'gh not found on PATH').
 - [ ] Error message for the missing dependency names 'gh' (not 'comment author').
 - [ ] Full suite green in an environment without gh on PATH (or every affected test skips with the actionable reason).
+
+### 2026-10-01 @Arggon
+Resolution + gates evidence (PR #558).
+
+**Approach: graceful degradation (documented fallback) + gh-naming errors + hermetic affected tests.** No skips.
+
+- `lib/src/list.ts`: `resolveCurrentLoginDetailed` — chain is now GITHUB_USER → GITHUB_ACTOR → gh api user → **git config user.name** (documented last-resort local identity); gh/g probes honor the passed env so tests scope PATH hermetically. `resolveCurrentLogin` signature unchanged; @me consumers (list/board/start/tui) benefit without changes.
+- `lib/src/comment.ts`: item locate now precedes author resolution (bad-id errors are deterministic, no longer masked by the environmental author gap); failure message names the actual dependency — `could not resolve comment author: 'gh' not found on PATH …` vs `… gh is not authenticated ('gh api user' failed) …`.
+- `cli/src/measure.ts`: fixture comment passes `--author fixture` (fixture data must not depend on host identity) — fixes all 8 measure failures at the root.
+- `opencode/plugins/arggon/tools.test.ts`: ambient-location test passes an explicit author.
+- Tests: +5 resolver-chain unit tests (fake-bin PATH scoping: gh-found / gh-missing→git fallback / gh-unauthenticated / nothing-available), +3 comment-level pins (gap message, git fallback end-to-end, id-before-author precedence).
+
+**Reproduction (before):** `env -i PATH="/usr/bin:/bin" HOME=$HOME vitest run cli/src/measure.test.ts cli/src/comment.test.ts opencode/plugins/arggon/tools.test.ts` → measure ×8 + comment ×1 + plugin ×1 failed, exactly the reported inventory.
+
+**Gates:** build ✅ · check:plugin ✅ (bundle rebuilt, 52+/13- lines) · lint ✅ · `arggon validate` ok:true ✅ · full suite 2043/2043 (normal PATH) ✅.
+
+**No-gh recipe:** `env -i PATH="$HOME/.local/share/mise/installs/node/26.7.0/bin:/usr/bin:/bin" HOME=$HOME LANG=C.UTF-8 node_modules/.bin/vitest run` (mise node real bin dir keeps node/npm; gh lives only in mise shims/~/.local/bin — all excluded) → 2043/2043, exit 0, 4 consecutive runs. One earlier no-gh run under a loaded machine (157s vs ~76s) had a single unreproduced failure; runs 2–5 all clean — likely the repo's documented spawn-timeout-under-load flake class, not this diff (all touched files passed repeatedly under no-gh).
