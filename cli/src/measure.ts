@@ -114,8 +114,10 @@ export type BudgetCheck = {
 
 /**
  * CLI invocation resolved from the RUNNING installation (bug-budget-adopter-
- * trees), never from the measured tree's cwd: from source (tsx, the repo
- * charter) when this module is cli/src/measure.ts, or from the installed
+ * trees), never from the measured tree's cwd: from source through tsx's
+ * loader registration (`node --import <tsx loader> <cli.ts>` — one node
+ * process, no wrapper re-exec/IPC server, the same spawn shape the test
+ * helper uses) when this module is cli/src/measure.ts, or from the installed
  * dist/cli.js of the executing arggon otherwise (adopter trees have no
  * cli/src — the measurement must work identically there). The measured tree
  * is only the SUBJECT (cwd of the spawned commands); the CLI binary always
@@ -129,7 +131,8 @@ export function cliCommand(): { file: string; args: string[] } {
     return {
       file: process.execPath,
       args: [
-        join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs"),
+        "--import",
+        join(repoRoot, "node_modules", "tsx", "dist", "loader.mjs"),
         join(repoRoot, "cli", "src", "cli.ts"),
       ],
     };
@@ -279,7 +282,14 @@ export async function measureBudget(options: MeasureBudgetOptions = {}): Promise
       const id = created(out);
       if (!firstTask) firstTask = id;
     }
-    runCli(["comment", firstTask, "fixture comment so show has content", "--json"], dir);
+    // Fixture data, not real attribution: an explicit --author keeps the
+    // measurement hermetic — it must not depend on the host's gh/gh-auth or
+    // git identity (task-spawned-tests-gh-path: without it the fixture comment
+    // failed whenever no author source was available).
+    runCli(
+      ["comment", firstTask, "fixture comment so show has content", "--author", "fixture", "--json"],
+      dir,
+    );
 
     const listCompactBytes = Buffer.byteLength(runCli(["list", "--json"], dir), "utf8");
     const listFullBytes = Buffer.byteLength(runCli(["list", "--json", "--full"], dir), "utf8");

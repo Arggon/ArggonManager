@@ -5,10 +5,11 @@ import {
   LEGACY_TRACKER_DIR_NAME,
   TRACKER_DIR_NAME,
   findTasksDir,
+  freshWorktreeInstallRefusal,
   inspectDeclaredDependencies,
   inspectGateBinResolution,
   itemsById,
-  linkNodeModules,
+  linkNodeModulesDetailed,
   linkedWorkspacePackages,
   loadItems,
   prepareWorktreeDependencies,
@@ -17,11 +18,13 @@ import {
   resolveBranchName,
   resolveCurrentLogin,
   runUpdate,
+  strictGateBinFailure,
   unlinkNodeModulesLink,
   withItemLock,
   type GateBinResolution,
   type ManifestCoverage,
   type WorkItem,
+  type WorktreePrepStep,
 } from "@arggondev/lib";
 
 /**
@@ -153,6 +156,22 @@ export type StartResult = {
    * when the manifest declares no binary-exposing dependency.
    */
   gateBins: GateBinResolution[];
+  /**
+   * The bounded preparation log (bug-start-install-ordering), as reported by
+   * the kernel receipt: which prep path ran (link farm created / reused /
+   * skipped-and-why, per-workspace build decisions, the gate-bin verdict).
+   * Empty without `--worktree`.
+   */
+  prepSteps: WorktreePrepStep[];
+  /**
+   * Outcome of re-linking the start-owned install after a
+   * `x-worktree.post-start` hook that left the worktree without one
+   * (bug-start-install-ordering): `"relinked"` when the install was re-created,
+   * `"failed"` when the re-link could not (the worktree is left without an
+   * install — reported, never silent). Present only when a hook ran, the
+   * start-owned link was removed for it, and the hook left no `node_modules`.
+   */
+  postStartRelink?: "relinked" | "failed";
   /**
    * `x-worktree.post-start` outcome (task-start-post-hook): set only when a
    * new worktree was created, a hook is configured, and `--no-hook` was not
@@ -587,6 +606,8 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
       // No worktree was prepared, so no gate-bin resolution was observed; the
       // field is only meaningful with `--worktree`.
       gateBins: [],
+      // Same: no preparation ran, so the log is empty.
+      prepSteps: [],
       item: branch.item,
     };
   });
@@ -778,6 +799,7 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
   let linkedNodeModules = false;
   let linkedWorkspaces: string[] = [];
   let builtWorkspaces: string[] = [];
+  let prepSteps: WorktreePrepStep[] = [];
   let manifestCoverage: ManifestCoverage = "unknown";
   let missingDependencies: string[] = [];
   let missingDependenciesTotal = 0;
@@ -789,6 +811,11 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     linkedNodeModules = prepared.linkedNodeModules;
     builtWorkspaces = prepared.builtWorkspaces;
     linkedWorkspaces = prepared.linkedWorkspaces;
+    // The bounded preparation log (bug-start-install-ordering): which prep
+    // path ran — link farm created / reused / skipped-and-why, per-workspace
+    // build decisions, the gate-bin verdict — carried on the result so a
+    // broken worktree can be correlated with the decision that produced it.
+    prepSteps = prepared.steps;
     // A mirrored install is only as current as the primary's; the receipt names
     // what the worktree cannot resolve (bug-worktree-readiness-misses-stale-primary-install).
     manifestCoverage = prepared.manifestCoverage;
@@ -798,6 +825,37 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     // (bug-start-worktree-npm-ci-claim): the claim-commit gate runs with this
     // resolution, so the receipt names it before the commit is attempted.
     gateBins = prepared.gateBins;
+    // Opt-in strict gate (task-start-gate-strict-mode): with
+    // `x-tracker.strict-gate-bins: true` the receipt's foreign resolution is
+    // no longer report-only — the claim commit is REFUSED before any item
+    // mutation, naming each offending bin, its observed source and the `npm
+    // ci` fix. Unset (the default) keeps the documented honest-receipt
+    // behavior byte-identical: readiness stays informational and the claim
+    // commit remains authoritative.
+    if (config.tracker.strictGateBins === true) {
+      const refusal = strictGateBinFailure(gateBins, worktreePath);
+      if (refusal !== null) {
+        step = "enforcing x-tracker.strict-gate-bins";
+        throw new Error(refusal);
+      }
+    }
+    // Fresh-worktree install gate (bug-start-install-ordering): a start that
+    // CREATED the worktree must leave a gate-usable install — or fail BEFORE
+    // any claim commit with the named cause (the offending bins, the
+    // preparation log, the `npm ci` fix). This closes the eight-incident
+    // record's root defect: prep used to degrade silently (primary install
+    // missing or mid-install, farm creation failing, a PATH-masked
+    // resolution) and the claim commit then died at the gate with a bare
+    // `tsx: command not found`. Attach re-runs keep the report-only receipt
+    // (or the armed strict gate above), so the `npm ci` then attach remedy
+    // stays possible.
+    if (worktreeCreated) {
+      const refusal = freshWorktreeInstallRefusal(gateBins, worktreePath, prepSteps);
+      if (refusal !== null) {
+        step = "enforcing the fresh-worktree install gate";
+        throw new Error(refusal);
+      }
+    }
     // Resolution report (W6/PR-374 finding 2): recomputed at the end too, so a
     // post-start hook that reifies a local install is reflected in the returned
     // state (PR #384 review F2).
@@ -838,6 +896,17 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     if (gitRunner.fileStatus(worktreePath, itemInWorktree.filePath).trim()) {
       gitRunner.commitFile(worktreePath, itemInWorktree.filePath, `claim: ${id}`);
       committed = true;
+    } else if (worktreeCreated) {
+      // bug-start-install-ordering (incident 7): a FRESH worktree's item copy
+      // is HEAD's — after the claim writes above it MUST be dirty. A clean
+      // file means the mutation was lost (a concurrent writer or a clobbered
+      // copy), and skipping the commit quietly was exactly how a start could
+      // report success with no claim commit on the branch. Report or fail,
+      // never skip silently.
+      throw new Error(
+        `the claim write left no change to ${itemInWorktree.filePath} in the fresh ` +
+          `worktree — the claim commit cannot be skipped silently (lost or concurrent mutation)`,
+      );
     }
 
     step = "pushing the branch";
@@ -866,6 +935,7 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     // worktree exists and the claim stands.
     step = "running the post-start hook";
     let postStart: PostStartResult | undefined;
+    let postStartRelink: "relinked" | "failed" | undefined;
     if (worktreeCreated && !opts.noHook) {
       const hookCommand = config.worktree.postStart;
       if (hookCommand) {
@@ -880,7 +950,11 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
         const shell = opts.postStartShell ?? config.worktree.postStartShell ?? "inherit";
         postStart = runPostStart(hookCommand, worktreePath, shell);
         if (hadLink && !existsSync(join(worktreePath, "node_modules"))) {
-          linkNodeModules(root, worktreePath);
+          // Named outcome (bug-start-install-ordering): a failed re-link used
+          // to be swallowed — the worktree silently left with no install.
+          postStartRelink = linkNodeModulesDetailed(root, worktreePath).linked
+            ? "relinked"
+            : "failed";
         }
       }
     }
@@ -921,6 +995,8 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       missingDependencies,
       missingDependenciesTotal,
       gateBins,
+      prepSteps,
+      ...(postStartRelink !== undefined ? { postStartRelink } : {}),
       postStart,
       item: finalItem,
     };

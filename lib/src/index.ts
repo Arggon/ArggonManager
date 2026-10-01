@@ -240,9 +240,11 @@ export {
 export type { ClassifyCleanupDeps, CleanupEntry, CleanupGit, MergedPr } from "./cleanup.js";
 export {
   buildLocalWorkspaces,
+  freshWorktreeInstallRefusal,
   inspectDeclaredDependencies,
   inspectGateBinResolution,
   linkNodeModules,
+  linkNodeModulesDetailed,
   linkedWorkspacePackages,
   localWorkspacePackages,
   packageBuildScript,
@@ -250,19 +252,25 @@ export {
   packageEntryPaths,
   pointWorkspaceAtLocal,
   prepareWorktreeDependencies,
+  strictGateBinFailure,
+  strictGateBinViolations,
   unlinkNodeModulesLink,
   MAX_MISSING_DEPENDENCIES,
   MAX_GATE_BINS,
+  MAX_PREP_STEPS,
 } from "./worktree.js";
 export type {
   DeclaredDependencyReport,
   GateBinResolution,
   GateBinSource,
+  LinkNodeModulesResult,
+  LinkOutcome,
   LocalWorkspacePackage,
   ManifestCoverage,
   WorkspaceBuildRunner,
   WorktreeDependencyPreparation,
   WorktreeInstallState,
+  WorktreePrepStep,
 } from "./worktree.js";
 export { runImportIssues } from "./import-issues.js";
 export type { GhExecutor, ImportIssuesOptions, ImportIssuesResult } from "./import-issues.js";

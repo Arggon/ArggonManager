@@ -29,18 +29,26 @@
  *   6. CANONICAL CHAIN TEXT: each chain is the SIMPLE cycle (every member
  *      exactly once) rotated to its smallest member and closed on it, so a
  *      given cycle prints the byte-identical message under every traversal
- *      order. The one legitimate cross-order difference is which cycle a DFS
- *      names (below), and a member set admitting two OPPOSITE directed cycles
- *      may print either orientation — both are cycle-SELECTION ambiguity, not
- *      text corruption, and the assertion admits exactly the reversed
- *      orientation and nothing else.
+ *      order. A member set can realize SEVERAL distinct directed cycles — a
+ *      >=4-member set is not limited to two opposite orientations — so the
+ *      assertion admits every orientation the generated edges realize over the
+ *      observed member set (anchored at the set's smallest member, exactly the
+ *      shapes the pass prints) and fails on anything outside that family.
  *
- * MEASURED (not asserted): for a graph with SEVERAL cycles, a DFS reports the
- * back edges its own forest closes, so WHICH subset of the cycles is named can
- * differ per traversal order (counted per run and printed at the end). The
- * verdict stays order independent (invariant 2); making the reported cycle SET
- * itself canonical would be a stronger contract and is deliberately out of
- * scope here.
+ * CONTRACT (task-cycle-set-canonical): for a graph with SEVERAL cycles, the
+ * reported cycle SET is the single DFS's FOREST SELECTION — the back edges its
+ * own forest closes, deduplicated by member set — and that selection is
+ * deliberately traversal-order dependent. Only which cycles are NAMED varies:
+ * the verdict is order independent (invariant 2) and each named cycle renders
+ * byte-identically (invariant 6). Consumers must rely on the verdict and the
+ * per-cycle chains, never on which cycles a report names (documented in
+ * docs/convention.md §Dependencies (v3)). The two ambiguous-set
+ * counterexamples — the run-65 divergence corpus and the 4-member
+ * two-distinct-cycles graph — are pinned as deterministic fixtures below.
+ *
+ * MEASURED (not asserted): how often the generated graphs actually name a
+ * different cycle SET across the traversal orders (counted per run and printed
+ * at the end).
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -60,8 +68,8 @@ afterAll(() => {
     console.log(
       `[property] dependency-cycle divergence across traversal orders: ` +
         `${divergentCycleSets} graph(s) named a different cycle SET — ` +
-        `single-DFS cycle selection, deliberately out of scope for the ` +
-        `chain-text contract (candidate follow-up item)`,
+        `single-DFS forest selection, the documented contract ` +
+        `(task-cycle-set-canonical): verdict and per-cycle chain text stay order independent`,
     );
   }
   for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -180,29 +188,59 @@ function rotateEdges(items: Item[]): Item[] {
   });
 }
 
+/** All orderings of a list (bounded: at most the 7 non-anchor members of a cycle set). */
+function permutations<T>(items: T[]): T[][] {
+  if (items.length <= 1) return [items];
+  const out: T[][] = [];
+  for (let at = 0; at < items.length; at++) {
+    const rest = [...items.slice(0, at), ...items.slice(at + 1)];
+    for (const tail of permutations(rest)) out.push([items[at]!, ...tail]);
+  }
+  return out;
+}
+
+/**
+ * The four traversal orders of the SAME graph: two edge-list orders (reversed,
+ * rotated) and two file-write orders. The DFS start order follows the file
+ * walk, which is filesystem-dependent, so only the data-derived order is
+ * perturbed deliberately — the write order is perturbed as well because it
+ * moves the files in the directory.
+ */
+function fourOrderings(items: Item[]): Array<{ items: Item[]; write: number[] }> {
+  return [
+    { items, write: rotate(MAX_NODES, 0) },
+    {
+      items: items.map((item) => ({
+        ...item,
+        dependsOn: [...(item.dependsOn ?? [])].reverse(),
+      })),
+      write: rotate(MAX_NODES, 0),
+    },
+    { items: rotateEdges(items), write: rotate(MAX_NODES, 1) },
+    { items, write: rotate(MAX_NODES, 1) },
+  ];
+}
+
+/** Every reported chain is a real closed walk over the edges (no phantoms). */
+function expectRealCycles(messages: readonly string[], edgeSet: ReadonlySet<string>): void {
+  for (const chain of cycleChains(messages)) {
+    const members = [...new Set(chain.split(" -> "))];
+    for (let at = 0; at < members.length; at++) {
+      expect(
+        edgeSet.has(`${members[at]}->${members[(at + 1) % members.length]}`),
+        `not a real closed walk over the generated edges: ${chain}`,
+      ).toBe(true);
+    }
+  }
+}
+
 describe("dependency graph (property)", () => {
   it("reports a real, canonically anchored cycle for a cyclic graph in every order", () => {
     checkProperty(
       "dependency cycles",
       fc.property(edgeCorpus, (edges) => {
         const items = leaves(edges, () => true);
-        // Four traversal orders of the SAME graph: two edge-list orders and two
-        // file-write orders. The DFS start order follows the file walk, which is
-        // filesystem-dependent, so only the data-derived order is perturbed
-        // deliberately — the write order is perturbed as well because it moves
-        // the files in the directory.
-        const orderings: Array<{ items: Item[]; write: number[] }> = [
-          { items, write: rotate(MAX_NODES, 0) },
-          {
-            items: items.map((item) => ({
-              ...item,
-              dependsOn: [...(item.dependsOn ?? [])].reverse(),
-            })),
-            write: rotate(MAX_NODES, 0),
-          },
-          { items: rotateEdges(items), write: rotate(MAX_NODES, 1) },
-          { items, write: rotate(MAX_NODES, 1) },
-        ];
+        const orderings = fourOrderings(items);
 
         // (1) Every order completes and yields a message list …
         const reported = orderings.map((ordering) =>
@@ -212,12 +250,22 @@ describe("dependency graph (property)", () => {
         // report at least one — and (2) the verdict is order independent.
         for (const messages of reported) expect(cycleSets(messages).length).toBeGreaterThan(0);
 
+        // The edge set under test: also the realness oracle for (4) below.
+        const edgeSet = new Set<string>();
+        for (const item of items)
+          for (const dep of item.dependsOn ?? []) edgeSet.add(`${item.id}->${dep}`);
+
         // (6) CANONICAL CHAIN TEXT, hard assertion: a given cycle prints the
-        // byte-identical chain under every traversal order. A member set
-        // admitting two OPPOSITE directed cycles may legitimately print either
-        // orientation (which one a DFS closes is the selection ambiguity below),
-        // so exactly the reversed orientation is admitted — any other
-        // difference (the old malformed shapes included) fails.
+        // byte-identical chain under every traversal order, and every chain
+        // named for a member set is one of the SIMPLE directed cycles those
+        // edges realize over exactly that set, anchored at its smallest
+        // member. A member set can carry SEVERAL distinct directed cycles (a
+        // >=4-member set is not limited to two opposite orientations — the
+        // 4-member fixture below names two non-reverse ones), so the
+        // admissible family is every realizable orientation, not just the
+        // reversed one (task-cycle-set-canonical): admitting only the reverse
+        // let elevated-run soaks fail the PROPERTY on graphs whose product
+        // behavior was exactly as specified.
         const textBySet = new Map<string, Set<string>>();
         for (const messages of reported) {
           for (const chain of cycleChains(messages)) {
@@ -227,21 +275,29 @@ describe("dependency graph (property)", () => {
             textBySet.set(setKey, texts);
           }
         }
-        const reversedOrientation = (chain: string): string => {
-          const walk = chain.split(" -> ");
-          return [walk[0]!, ...walk.slice(1, -1).reverse(), walk[0]!].join(" -> ");
-        };
-        for (const texts of textBySet.values()) {
-          if (texts.size === 1) continue;
-          const [first, second] = [...texts];
-          expect(
-            texts.size === 2 && second === reversedOrientation(first!),
-            `chain text for one cycle set diverged across traversal orders: ${[...texts].join(" | ")}`,
-          ).toBe(true);
+        for (const [setKey, texts] of textBySet) {
+          const members = setKey.split(",");
+          const anchor = members[0]!;
+          const admissible = new Set<string>();
+          for (const permutation of permutations(members.slice(1))) {
+            const walk = [anchor, ...permutation];
+            const closed = walk.every((node, at) =>
+              edgeSet.has(`${node}->${walk[(at + 1) % walk.length]}`),
+            );
+            if (closed) admissible.add([...walk, anchor].join(" -> "));
+          }
+          for (const chain of texts) {
+            expect(
+              admissible.has(chain),
+              `chain text is not a real simple cycle over its member set: ${chain} ` +
+                `(admissible: ${[...admissible].join(" | ")})`,
+            ).toBe(true);
+          }
         }
         // The guaranteed ring pins the VERDICT (above), not a named chain:
-        // WHICH cycle a DFS closes is selection (measured below), so no
-        // specific chain is required to appear in every order.
+        // WHICH cycle a DFS closes is its forest selection — the documented
+        // contract (header) — so no specific chain is required to appear in
+        // every order.
 
         // Measured deviation: WHICH cycle is named may differ per traversal
         // order (single-DFS cycle selection; see the file header).
@@ -254,10 +310,6 @@ describe("dependency graph (property)", () => {
           messages.filter((message) => !message.startsWith("DEPENDENCY_CYCLE")),
         );
         for (const messages of others) expect(messages).toEqual(others[0]!);
-
-        const edgeSet = new Set<string>();
-        for (const item of items)
-          for (const dep of item.dependsOn ?? []) edgeSet.add(`${item.id}->${dep}`);
 
         for (const messages of reported) {
           const sets = cycleSets(messages);
@@ -315,5 +367,119 @@ describe("dependency graph (property)", () => {
         );
       }),
     );
+  });
+
+  // task-cycle-set-canonical fixture (the run-65 divergence corpus): a graph
+  // with SEVERAL cycles whose named SET moves with the traversal order.
+  // Brute-forced over every possible file-walk order: only the three real
+  // cycles below can ever be named; the identity edge lists always name the
+  // {0,1,7} triangle, while the reversed edge list always names both 2-cycles
+  // (the rotated list may close the triangle on top) — different orders
+  // provably emphasize different cycles of the same graph.
+  it("pins the run-65 corpus: the named SET moves inside the real-cycle family, spine stays", () => {
+    const edges: ReadonlyArray<readonly [number, number]> = [
+      [0, 7],
+      [7, 1],
+      [3, 2],
+      [3, 2],
+      [5, 7],
+      [5, 1],
+      [1, 1],
+      [7, 0],
+    ];
+    const items = leaves(edges, () => true);
+    const reported = fourOrderings(items).map((ordering) =>
+      validateMessages(tmpDir("arggon-fix-run65-"), ordering.items, ordering.write),
+    );
+
+    // The verdict and the non-cycle findings (the corpus's 1 -> 1 self-loop)
+    // are order independent …
+    for (const messages of reported) {
+      expect(cycleSets(messages).length).toBeGreaterThan(0);
+      expect(messages.some((message) => message.startsWith("SELF_DEPENDENCY"))).toBe(true);
+    }
+    const others = reported.map((messages) =>
+      messages.filter((message) => !message.startsWith("DEPENDENCY_CYCLE")),
+    );
+    for (const messages of others) expect(messages).toEqual(others[0]!);
+
+    // … the triangle {0,1,7} is named by both identity edge lists in every
+    // walk order, and the reversed edge list always names both 2-cycles — so
+    // different orders provably emphasize different cycles …
+    const triangle = "task-gen-0 -> task-gen-7 -> task-gen-1 -> task-gen-0";
+    const twoCycle01 = "task-gen-0 -> task-gen-1 -> task-gen-0";
+    const twoCycle07 = "task-gen-0 -> task-gen-7 -> task-gen-0";
+    for (const [at, messages] of reported.entries()) {
+      if (at === 1 || at === 2) continue; // reversed/rotated edge lists
+      expect(cycleChains(messages), `order ${at} lost the triangle spine`).toContain(triangle);
+    }
+    expect(cycleChains(reported[1]!)).toContain(twoCycle01);
+    expect(cycleChains(reported[1]!)).toContain(twoCycle07);
+
+    // … and whatever each order names stays inside the corpus's real-cycle
+    // family — selection varies, the cycles never stop being real.
+    const family = new Set([triangle, twoCycle01, twoCycle07]);
+    const edgeSet = new Set<string>();
+    for (const item of items)
+      for (const dep of item.dependsOn ?? []) edgeSet.add(`${item.id}->${dep}`);
+    for (const messages of reported) {
+      expectRealCycles(messages, edgeSet);
+      for (const chain of cycleChains(messages)) {
+        expect(family.has(chain), `unexpected selection outside the corpus family: ${chain}`).toBe(
+          true,
+        );
+      }
+    }
+  });
+
+  // task-cycle-set-canonical fixture: a 4-member cycle set carrying TWO
+  // distinct directed cycles that are NOT reverses of each other. Brute-forced
+  // over every possible file-walk order: the identity edge list closes
+  // 0->1->2->3->0 and the rotated edge list closes 0->2->1->3->0 in EVERY walk
+  // order, so one member set legitimately prints two non-reverse orientations —
+  // exactly the shape the previous reversed-only chain-text assertion rejected,
+  // which made elevated property soaks fail on correct product behavior.
+  it("pins the 4-member corpus: one member set admits two non-reverse orientations", () => {
+    const edges: ReadonlyArray<readonly [number, number]> = [
+      [0, 1],
+      [1, 2],
+      [2, 3],
+      [3, 0],
+      [0, 2],
+      [2, 1],
+      [1, 3],
+    ];
+    const items = leaves(edges, () => true);
+    const orderings = fourOrderings(items).map((ordering) =>
+      validateMessages(tmpDir("arggon-fix-four-"), ordering.items, ordering.write),
+    );
+    const [identity, , rotated] = orderings;
+
+    const first = "task-gen-0 -> task-gen-1 -> task-gen-2 -> task-gen-3 -> task-gen-0";
+    const second = "task-gen-0 -> task-gen-2 -> task-gen-1 -> task-gen-3 -> task-gen-0";
+    expect(cycleChains(identity!)).toContain(first);
+    expect(cycleChains(identity!)).not.toContain(second);
+    expect(cycleChains(rotated!)).toContain(second);
+    expect(cycleChains(rotated!)).not.toContain(first);
+
+    // Both chains cover ONE member set and neither is the other's reverse:
+    // the set admits k = 2 distinct orientations (enumerating every simple
+    // cycle over {0,1,2,3} yields exactly these two), so admitting only the
+    // reversed orientation is structurally too narrow.
+    const setOf = (chain: string): string => [...new Set(chain.split(" -> "))].sort().join(",");
+    expect(setOf(first)).toBe(setOf(second));
+    const firstWalk = first.split(" -> ");
+    const reverseOfFirst = [firstWalk[0]!, ...firstWalk.slice(1, -1).reverse(), firstWalk[0]!].join(
+      " -> ",
+    );
+    expect(second).not.toBe(reverseOfFirst);
+
+    const edgeSet = new Set<string>();
+    for (const item of items)
+      for (const dep of item.dependsOn ?? []) edgeSet.add(`${item.id}->${dep}`);
+    for (const messages of [identity, rotated]) {
+      expect(messages).toBeDefined();
+      expectRealCycles(messages!, edgeSet);
+    }
   });
 });

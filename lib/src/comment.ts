@@ -5,7 +5,7 @@ import { formatDate } from "./dates.js";
 import { itemsById, loadItems, type WorkItem } from "./items.js";
 import { withItemLock } from "./lock.js";
 import { findTasksDir, repoRootFromTasks } from "./paths.js";
-import { resolveCurrentLogin } from "./list.js";
+import { resolveCurrentLogin, resolveCurrentLoginDetailed } from "./list.js";
 import {
   commitTrackerMutation,
   readAutoCommitConfig,
@@ -91,19 +91,18 @@ export function runComment(opts: CommentOptions): CommentResult {
     throw new Error("comment text must not be empty");
   }
 
+  const tasksDir = findTasksDir(opts.cwd);
+  // Locate the item BEFORE resolving the author: a bad id is a caller error and
+  // must win over the environmental author gap. Resolving the author first let
+  // a missing `gh` on PATH mask "id 'x' not found" behind "could not resolve
+  // comment author" — the wrong missing dependency (task-spawned-tests-gh-path).
+  // The locate is read-only; the item lock is taken below.
+  const item: WorkItem = locateItem(tasksDir, id);
+
   const author = opts.author?.trim() || resolveAuthor(opts);
   if (!author) {
-    throw new Error(
-      "could not resolve comment author (pass --author <login>, or set GITHUB_USER or GITHUB_ACTOR, or authenticate gh: gh api user)",
-    );
+    throw new Error(authorGapMessage(opts));
   }
-
-  const tasksDir = findTasksDir(opts.cwd);
-  // Peek only to LOCATE the item file so its lock can be taken: the
-  // authoritative read below runs under withItemLock (bug-comment-torn-read).
-  // The peek retries a transient miss a bounded number of times so a live item
-  // can never look absent to a contender (see locateItem).
-  const item: WorkItem = locateItem(tasksDir, id);
 
   const now = opts.now ?? new Date();
   const date = formatDate(now);
@@ -189,6 +188,30 @@ function sleepSync(ms: number): void {
 function resolveAuthor(opts: CommentOptions): string | undefined {
   if (opts.resolveMe) return opts.resolveMe();
   return resolveCurrentLogin(opts.env ?? process.env);
+}
+
+/**
+ * Failure-path message for an unresolvable comment author. It must name the
+ * ACTUAL missing dependency — `gh` — instead of the operation that needed it
+ * (task-spawned-tests-gh-path: workers burned time diagnosing "could not
+ * resolve comment author" that really meant "gh is not installed"). The gap is
+ * re-derived from the same inputs as `resolveAuthor`; this only ever runs when
+ * the author is already missing, so the extra probes stay on the error path. A
+ * `resolveMe` override (tests, embedders) hides the true gap, so its message
+ * stays truthful and generic instead of guessing.
+ */
+function authorGapMessage(opts: CommentOptions): string {
+  const remedies =
+    "pass --author <login>, or set GITHUB_USER or GITHUB_ACTOR, or authenticate gh: gh api user";
+  if (opts.resolveMe) {
+    return `could not resolve comment author: no author source available (GITHUB_USER / GITHUB_ACTOR unset, gh unavailable or unauthenticated, no local git identity) (${remedies})`;
+  }
+  const resolution = resolveCurrentLoginDetailed(opts.env ?? process.env);
+  const cause =
+    "gap" in resolution && resolution.gap === "gh-not-found"
+      ? "'gh' not found on PATH (no GITHUB_USER or GITHUB_ACTOR set, no local git identity)"
+      : "gh is not authenticated ('gh api user' failed; no GITHUB_USER or GITHUB_ACTOR set, no local git identity)";
+  return `could not resolve comment author: ${cause} (${remedies})`;
 }
 
 /**

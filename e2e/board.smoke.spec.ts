@@ -16,7 +16,13 @@
  * (`dist/cli.js board --serve --port 0`, an ephemeral free port) so the spec
  * exercises the shipped entry, not the TypeScript source.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+// `test` comes from the env-gated flake harness (task-flake-repro-throttle-
+// tool): with E2E_THROTTLE / E2E_SPINNERS set, any run of this spec arms CDP
+// CPU throttling plus host busy-spinners; without the env both fixtures are
+// strict no-ops, so the default @smoke lane is untouched. Usage and the
+// proven #521 recipe live in e2e/helpers/flake-harness.ts.
+import { test } from "./helpers/flake-harness.js";
 // Named import, not default: under `module: NodeNext` the package's `types`
 // condition resolves the CJS-paired index.d.ts, where `AxeBuilder as default`
 // is not honored and esModuleInterop synthesizes the module namespace as the
@@ -29,6 +35,11 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+// One source of truth for the source-path spawn argv (task-e2e-board-serve-
+// wrapper): `node --import <tsx loader> cli/src/cli.ts`, per bug-row-table-
+// flake. Playwright's transpiler handles the plain TS import (verified by the
+// @smoke lane); the `.js` extension is what NodeNext type-checking requires.
+import { cliEntryPath, nodeImportArgs } from "../cli/src/test-spawn.js";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cli = join(repoRoot, "dist", "cli.js");
@@ -314,9 +325,6 @@ function startBoardServer(fixture: string): Promise<{ child: ChildProcess; url: 
     child.stdout?.on("data", onData);
     child.stderr?.on("data", (chunk: Buffer) => {
       output += chunk.toString("utf8");
-      // TEMP DIAGNOSTIC: surface the server's stderr (POST log) in the report.
-      if (chunk.toString("utf8").includes("[DIAG]"))
-        process.stderr.write("[SRV] " + chunk.toString("utf8"));
     });
     child.on("error", (err) => {
       clearTimeout(timer);
@@ -1115,21 +1123,37 @@ test.describe("@smoke board --serve", () => {
     const scrollBefore = await page.evaluate(() => window.scrollY);
     expect(scrollBefore).toBeGreaterThan(0);
 
-    // Marker on the CURRENT page: undefined after the reload proves the page
-    // was really replaced, so the preservation assertions cannot pass against
-    // the pre-reload DOM.
+    // Marker on the CURRENT page — on the <html> element, not on `window`:
+    // after the reload proves the page was really replaced (the preservation
+    // assertions cannot pass against the pre-reload DOM), and the check below
+    // can assert its ABSENCE with a locator instead of a `page.evaluate` poll.
     await page.evaluate(() => {
-      (window as unknown as { marker?: number }).marker = 42;
+      document.documentElement.dataset.preserveMarker = "42";
     });
 
     // External tracker write (not through this page) fires the SSE reload.
     runCli(fixture, ["update", preserveId, "--status", "cancelled", "--json"]);
 
-    await expect
-      .poll(() => page.evaluate(() => (window as unknown as { marker?: number }).marker), {
-        timeout: 15_000,
-      })
-      .toBeUndefined();
+    // The reload-landed gate: the probe lives only on the OLD document, so
+    // "an <html> without it" resolves exactly when the reloaded document is
+    // resolved — never on the old page (it carries the marker), never in the
+    // navigation teardown window (no document resolves to zero elements, and
+    // the count stays 0 there). A locator wait retries through the navigation
+    // by design; the page.evaluate poll this replaces burned its whole window
+    // throwing "Execution context was destroyed" while the frame navigated.
+    // The ceiling is generous because a contended machine legitimately needs
+    // tens of seconds to parse+layout the reloaded board — the point is the
+    // readiness signal, not the number.
+    await expect(page.locator("html:not([data-preserve-marker])")).toHaveCount(1, {
+      timeout: 30_000,
+    });
+
+    // The page-functional gate: the SSE stream reconnected, so the reloaded
+    // page parsed its reload client and is live again — the same readiness
+    // signal the connection-banner test pins (and the stale-drop test pins in
+    // reverse). Only after this gate do the preservation assertions read the
+    // page, so no later `page.evaluate` can race a pending navigation.
+    await expect(page.locator("#board-conn.live")).toHaveText("live", { timeout: 15_000 });
 
     await expect(page.locator("#board-filter-input")).toHaveValue("label:detail");
     await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
@@ -1379,16 +1403,22 @@ test.describe("@smoke board --serve", () => {
  * asserts the page is alive: zero console/page errors, the served script
  * carries no `__name(` artifact, and filter, status move, theme, density and
  * column collapse all respond — the same interactivity bar as the dist lane.
+ *
+ * Spawn form (bug-row-table-flake, task-e2e-board-serve-wrapper): the argv
+ * comes from the shared `cli/src/test-spawn.ts` helper —
+ * `node --import <tsx loader> cli/src/cli.ts` — replacing the tsx wrapper CLI
+ * (`tsx/dist/cli.mjs`), which re-executes node and hosts a per-spawn IPC
+ * server whose unhandled failures exit the whole chain 1 under load. The
+ * loader registers the same tsx transform, so this leg still exercises the
+ * keepNames surface it was written for, and the served bytes are unchanged.
  */
 test.describe("@smoke board from source (tsx path, bug-tsx-board-dead-script)", () => {
-  const tsx = join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs");
-  const cliSource = join(repoRoot, "cli", "src", "cli.ts");
   let fixture: string;
   let server: { child: ChildProcess; url: string } | undefined;
 
   /** Run the CLI FROM SOURCE through tsx inside the fixture. */
   function runCliTs(args: string[]): string {
-    const result = spawnSync(process.execPath, [tsx, cliSource, ...args], {
+    const result = spawnSync(process.execPath, [...nodeImportArgs(cliEntryPath()), ...args], {
       cwd: fixture,
       encoding: "utf8",
       timeout: 120_000,
@@ -1403,10 +1433,14 @@ test.describe("@smoke board from source (tsx path, bug-tsx-board-dead-script)", 
 
   /** Start `board --serve` from the tsx source path on a free port. */
   function startBoardServerTs(): Promise<{ child: ChildProcess; url: string }> {
-    const child = spawn(process.execPath, [tsx, cliSource, "board", "--serve", "--port", "0"], {
-      cwd: fixture,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    const child = spawn(
+      process.execPath,
+      [...nodeImportArgs(cliEntryPath()), "board", "--serve", "--port", "0"],
+      {
+        cwd: fixture,
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
     return new Promise((resolvePromise, reject) => {
       let output = "";
       const timer = setTimeout(() => {

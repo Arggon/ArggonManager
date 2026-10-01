@@ -17,7 +17,7 @@ import {
   MCP_TOOLS_BASELINE_BYTES,
 } from "./measure.js";
 import { runDoctor } from "./doctor.js";
-import { runCli } from "./test-spawn.js";
+import { cliEntryPath, runCli, tsxLoaderPath } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -177,6 +177,18 @@ describe("budget measurement (task-adr0006-remeasure, ADR 0006)", () => {
       rmSync(adopter, { recursive: true, force: true });
     }
   }, 60_000);
+
+  it("cliCommand resolves the running installation through the tsx loader registration, entry last (task-derive-cli-spawn-loader)", () => {
+    // Source runs spawn `node --import <tsx loader> <cli.ts>` — one node
+    // process, no wrapper re-exec/IPC server (the bug-row-table-flake class).
+    // The spec must equal the shared test helper's shape exactly.
+    const cmd = cliCommand();
+    expect(cmd.file).toBe(process.execPath);
+    expect(cmd.args).toEqual(["--import", tsxLoaderPath(), cliEntryPath()]);
+    // measureBudget reads the subject entry as the LAST arg: the position
+    // contract is pinned by the exact-shape assertion above.
+    expect(existsSync(cliEntryPath())).toBe(true);
+  });
 
   it("runDoctor itself stays synchronous and budget-free; the CLI action attaches the budget", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-measure-"));

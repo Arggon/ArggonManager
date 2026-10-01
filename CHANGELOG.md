@@ -6,14 +6,66 @@ All notable changes to ArggonManager are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **init**: the generated `opencode.jsonc` no longer emits bare
+  `"formatter": true`. The built-in prettier runs as `<prettier> --write $FILE`
+  with the session's project directory as cwd and resolves `.prettierignore`
+  from that cwd, so a session rooted in the primary checkout that edits a file
+  in a sibling `arggon start --worktree` worktree bypassed the ignore file and
+  reformatted gitignored files into large style-only churn. The template now
+  ships a `formatter.prettier.command` override that anchors the same
+  invocation at the edited file's own git root (the worktree root for
+  worktrees): non-ignored files format exactly as before, and the command
+  exits 0 without formatting when no prettier resolves (e.g. a cold worktree
+  before `start` links the install). Fixed for new adopters by the template
+  (task-formatter-override-template, from the incident fixed in this repo by
+  #531).
+  **Adopter migration:** `init` never rewrites an adopter-modified
+  `opencode.jsonc`, so existing adopters must hand-apply the override — copy
+  the `formatter` block from `templates/docs/opencode.jsonc` (or a fresh
+  `arggon init` on a scratch fixture) into your config.
+
 ## [0.4.1] - 2026-10-01
+
+### Fixed
+
+- **Board**: boards rendered through the tsx path embedded esbuild `keepNames`
+  `__name(...)` calls into the page script, killing filter/drag/collapse/theme
+  controls (`ReferenceError` at load); render now strips them, fails loudly on
+  unknown shapes, and a tsx-path spawn gate + `@smoke` browser legs keep the
+  class out (#510).
+- **Frontmatter**: the writer quotes plain scalars the reader would decode as
+  non-string (`0123`, `007`, `-0`, big ints, `null`, `~`, `true`, `false`) so
+  titles/labels/extras keep their exact text on every rewrite (#509).
+- **Validate**: dependency-cycle messages are canonical closed chains
+  (`a -> b -> … -> a`), byte-identical under any traversal order (#506).
+- **Done gate**: empty `- [ ] ` scaffold placeholders no longer wedge the
+  auto-done flip; `create` scaffolds a comment placeholder instead (#507).
+- **cleanup**: branch-delete failures are reported in `failures[]` (not only
+  `pruned[]`), and both catch surfaces bound error text into the envelope
+  (#515).
+- **start --worktree**: readiness reports `gateBins` — which node_modules each
+  gate binary resolves from (worktree/external/PATH/missing) — and both failure
+  errors name the observed source + the `npm ci` remediation (#517).
 
 ### Changed
 
+- All test spawn chains run `node --import <tsx loader>` directly instead of
+  the tsx wrapper CLI (one process, no per-spawn IPC server — the root cause of
+  the row-table CI flakes); test-only, enforced by a wrapper-reference gate
+  (#513, #518).
 - Packed tarball also excludes the compiled `dist/test-spawn.*` test
   helper, same class as `dist/test-tmp.*` (CI version guard demands the
   version move when the packaged `files` list changes;
   task-runcli-import-tsx-migration).
+- `.zcode/` harness state is untracked and ignored — per-machine session churn
+  no longer blocks `start`'s clean-tree precondition (#514).
+- Kernel (`@arggondev/lib` 0.4.1): new `inspectGateBinResolution` /
+  `GateBinResolution` exports and `gateBins` on the worktree dependency
+  preparation (#517).
 
 ## [0.4.0] - 2026-09-22
 
