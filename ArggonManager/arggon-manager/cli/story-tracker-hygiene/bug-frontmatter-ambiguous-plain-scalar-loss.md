@@ -129,3 +129,7 @@ Branch `fix/bug-frontmatter-ambiguous-plain-scalar-loss` (worktree ../ArggonMana
 **Findings for the coordinator (no drive-by fixes made):**
 1. Worktree env hazard: after server restarts, commands without an explicit cwd defaulted to the PRIMARY checkout — `W=$PWD` then silently ran the primary's old-kernel CLI in smoke probes (cause of the bare-write anomaly mid-session). Anything invoking `$W/node_modules/tsx/dist/cli.mjs` or `$W/dist/cli.js` must pin the absolute worktree path. Product code unaffected.
 2. Comment-author resolution in spawned CLIs needs `gh` on PATH (mise shim); a sanitized PATH makes measure.test.ts (8) + comment.test.ts (1) + one plugin tools.test fail with "could not resolve comment author" — environmental, passes with mise shims on PATH.
+
+### handoff 2026-10-01 @Arggon (session: ses_f0b410d34ffdJ6v9kfPk82HPxp) — next: Review + merge PR #509 (do not squash away the separate 'chore: regen plugin bundle' commit order); then cleanup worktree
+- branch: main
+- open questions: true/false quoting decided YES (see PR body); legacy bare-token files keep baked loss by design
