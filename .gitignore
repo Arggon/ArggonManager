@@ -27,6 +27,16 @@ playwright-report/
 .v2c/
 .video_agent/
 
+# bug-harness-config-churn: `.zcode/` is per-machine ZCode harness state — the
+# harness rewrites `.zcode/config.json` during sessions, and while a copy was
+# TRACKED, `start`'s clean-tree precondition refused every claim until an agent
+# stashed by hand. The only shared content that copy carried (the `arggon mcp`
+# registration) lives verbatim in the tracked `.mcp.json`. The harness also
+# drops a transient `.zcodeignore` at the repo root. Existing checkouts keep
+# their local file after pulling (now ignored); fresh clones never see it.
+.zcode/
+.zcodeignore
+
 # task-side-by-side-docs-polish: machine-local mise overrides stay untracked
 # (docs/opencode2.md recommends them over the tracked mise.toml only for
 # personal overrides; worktrees must keep inheriting the committed PATH).
