@@ -27,3 +27,7 @@ updated: "2026-10-01"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Filed from the task-release-action-sha-pin review (#563): actions/checkout@v4 remains tag-pinned in release-please.yml; sweep ALL .github/workflows for tag-pinned `uses:` and SHA-pin each with a human-readable version comment (the #563 pattern). Acceptance: every `uses:` pinned to a full SHA + version comment; a grep gate preventing new floating tags; workflows functionally unchanged (actionlint/yaml parse).
