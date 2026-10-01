@@ -14,40 +14,59 @@ project multiple times to test different changes simultaneously … Docker might
 be the solution, but let's find the best approach that consumes the fewest
 possible resources."
 
-Every number below was **measured on this machine on 2026-10-01** (12 CPUs,
-31 GiB RAM, ≈16 GiB available, Docker 29.7.2 with the daemon active, Node
-26.7.0, psql client 18.6 with no local server binaries — `initdb`/`pg_ctl`
-absent, so Postgres here already runs only in Docker). The scope is every repo
-that follows the per-item-worktree loop (`start --worktree` →
-`../<repo>-<item-id>`): ArggonManager itself plus the adopter projects that
-share this workflow. The decision lands in an ADR — numbering note:
+**Scope: adopters, not this repo.** The loop being improved is the per-item
+worktree (`start --worktree` → `../<repo>-<item-id>`) wherever ArggonManager is
+installed — via npm (`arggon-manager` + `arggon init`/`adopt`), the OpenCode V2
+seam, the ZCode marketplace plugin, or any other client of the CLI/MCP surface
+— on **any machine**. The bundled skill advertises
+`platforms: [linux, macos, windows]` (source:
+`.agents/skills/arggon-cli/SKILL.md` frontmatter, read 2026-10-01), so a
+recommendation is only valid if it holds when Docker is absent, on macOS and
+Windows, and for every adopter project shape. Machine-specific numbers below
+(measured on the author's Linux workstation, 2026-10-01: 12 CPUs, 31 GiB RAM,
+Docker 29.7.2 active, Node 26.7.0, psql client 18.6 with no local server
+binaries) are **evidence of collision classes**, not an adopter baseline — the
+ArggonManager repo itself is just the first adopter of its own convention.
+
+The decision lands in an ADR — numbering note:
 exploration 015 and ADR 0017 are reserved by the open PR
 [#519](https://github.com/Arggon/ArggonManager/pull/519), so the follow-up ADR
 must take the next free id at merge time.
 
 ## Candidates
 
-1. **C1 — Host-native per-worktree environment contract (no containers).**
+1. **C1 — Host-native per-worktree environment contract (no containers, no
+   new dependencies).**
    `start --worktree` derives the worktree identity it already has (item id,
-   worktree path) into a runtime environment contract: exported/`sourced` env
-   (`ARGGON_WORKTREE_ID`, `ARGGON_WORKTREE_PATH`), a generated **gitignored**
-   `.env` seed (copied from the primary checkout only if absent, never
-   overwritten), suffixed per-worktree state/cache dirs for projects that opt
-   in (`XDG_*` variants), and the documented convention that servers bind an
-   **ephemeral port** (`:0`) or a port derived from the worktree id. Services
-   are isolated by *identifier*, not by machine: database name/schema per
-   worktree against one local server, Redis logical DB or socket path per
-   worktree. Resource cost: kilobytes.
+   worktree path) into a runtime environment contract: a generated
+   **gitignored, dotenv-style env file** in the worktree (the
+   lowest-common-denominator mechanism — every runtime on every platform can
+   load one, whereas shell `export` snippets are shell-specific; the dotenv
+   convention: [github.com/motdotla/dotenv](https://github.com/motdotla/dotenv),
+   accessed 2026-10-01) carrying documented variable names
+   (`ARGGON_WORKTREE_ID`, `ARGGON_WORKTREE_PATH`, …), seeded from the primary
+   checkout's `.env` only if absent, never overwritten; a **per-OS state-dir
+   mapping** for projects that opt in (per-worktree suffixed cache/state
+   dirs — see F11 for the per-platform conventions); and the documented
+   convention that servers bind an **ephemeral port** (`:0`, portable to all
+   three platforms) or a port derived from the worktree id. Services are
+   isolated by *identifier*, not by machine: database name/schema per
+   worktree against one local server, Redis logical DB per worktree. Works
+   with zero tooling installed beyond Node itself.
 2. **C2 — Ephemeral per-worktree service containers (Docker for services
-   only).** The app keeps running on the host; only stateful dependencies get
-   a per-worktree throwaway container: a Compose project named
-   `<repo>-<item-id>` (unique network + volumes per worktree), publishing to a
-   **random host port** (or no published port at all — access through a
-   per-worktree unix socket directory), or `docker run --rm --tmpfs` for
-   stateless test databases. Images are shared across worktrees; a test DB
-   lives only for the run. Resource cost: the container's processes' RAM
-   (tens of MB for an alpine Postgres), zero disk when the image is already
-   pulled, writable layer only.
+   only, opt-in per adopter).** The app keeps running on the host; only
+   stateful dependencies get a per-worktree throwaway container: a Compose
+   project named `<repo>-<item-id>` (unique network + volumes per worktree),
+   publishing to a **random host port** (or no published port at all where
+   sockets are supported), or `docker run --rm --tmpfs` for stateless test
+   databases. Images are shared across worktrees; a test DB lives only for
+   the run. Resource cost: the container's processes' RAM (tens of MB for an
+   alpine Postgres), zero disk when the image is already pulled, writable
+   layer only — **on Linux**; on macOS/Windows Docker Desktop runs containers
+   inside a Linux VM, so adopters there pay the VM's standing footprint
+   (F9). This is a **documented pattern for adopters who already ship
+   Docker**, never an arggon requirement — where Docker is absent the
+   pattern degrades to a docs page, and the loop (C1) still works.
 3. **C3 — Full dev-environment container per worktree** (devcontainer / Compose
    with toolchain + app + services in-container). Image layers shared across
    worktrees of the same project; marginal disk per worktree is the writable
@@ -91,6 +110,11 @@ must take the next free id at merge time.
    new convention the docs must carry.
 6. **Reversibility (low)** — a project can adopt the layers it needs, one at
    a time, without methodology churn.
+7. **Platform portability across adopters (high)** — the contract may not
+   depend on Linux-only primitives (`$HOME` assumptions, unix sockets,
+   systemd) nor on tooling an adopter may not have (Docker): portable pieces
+   are the default, platform/tool-specific pieces are opt-in patterns that
+   degrade to documentation when absent.
 
 ## Findings
 
@@ -188,46 +212,111 @@ convention a methodology carrier (behavioral impact class).
 per worktree → `docker compose -p <repo>-<item-id> down -v --remove-orphans`)
 or it converts a workflow win into a permanent disk leak. This is the same
 lesson as the tracker's own auto-commit hygiene: the lifecycle that creates
-must also delete.
+must also delete. For adopters this must be **opt-in and safe by
+construction**: cleanup may only touch Docker when the project's convention
+declares it (a committed services manifest / Compose file in the repo), and
+it must skip with a report — never probe for a Docker daemon it wasn't told
+about.
+
+### F9 — Adopters run on three platforms, and Docker is a VM there
+
+The product advertises `platforms: [linux, macos, windows]` (source:
+`.agents/skills/arggon-cli/SKILL.md` frontmatter, read 2026-10-01); nothing in
+any adopter contract installs or requires Docker. On Linux the Docker daemon
+runs natively on the shared host kernel (F3); on macOS and Windows **Docker
+Desktop runs containers inside a Linux VM** (WSL2/HyperKit/Virtualization
+framework backends), so adopters there pay the VM's standing RAM/disk on top
+of every container (source:
+[Docker Desktop docs — VM-based architecture / WSL 2 backend](https://docs.docker.com/desktop/),
+accessed 2026-10-01). Consequences: (a) Docker-dependent candidates (C2/C3)
+can only ever be **documented opt-in patterns** for projects that already ship
+Docker — most cheaply for teams whose CI/prod already containerize the same
+services; (b) C1 is the only candidate whose marginal cost is zero on *all
+three* platforms; (c) the contract itself must be built from portable
+primitives — TCP ports (`:0` ephemeral binding is POSIX and Windows alike),
+dotenv files, per-OS directory conventions — with sockets an optimization
+where available, never the mechanism.
+
+### F10 — Adopter project shapes differ, so the contract must degrade to a no-op
+
+ADR 0005 already classifies adopter projects by shape and keys defaults on
+that shape — static/docs, SPA + small API, long-running server/DB, jobs
+(read 2026-10-01). The same spectrum applies here: a static-site adopter has
+no services and no ports (the contract must be invisible to it), a server
+adopter needs the port convention, a DB adopter needs the identifier
+convention and — optionally, if it already uses Docker — the C2 pattern. A
+contract that required any given tool or service would be wrong for most of
+the shapes the methodology itself advertises; **the default path must be
+"adds nothing, changes nothing" and every isolation feature must be pulled
+in by the project's own manifests and config.**
+
+### F11 — Per-OS state-directory mapping is a solved naming problem
+
+The per-platform conventions for cache/data/state/log directories are
+documented and battle-tested — XDG under `~/.config`/`~/.cache` on Linux,
+`~/Library/Application Support` + `~/Library/Caches` on macOS,
+`%LOCALAPPDATA%`/`%TEMP%` on Windows (source:
+[github.com/sindresorhus/env-paths](https://github.com/sindresorhus/env-paths),
+accessed 2026-10-01). A per-worktree suffix rule layered on those conventions
+(each dir suffixed with the worktree id) gives adopters isolated state
+without inventing a new scheme, and Node's `os.tmpdir()` covers scratch
+paths portably. The kernel should name the *variables* and the *suffix rule*
+in the spec; the per-OS paths come from the platform conventions, not from
+arggon.
 
 ## Recommendation
 
-**Adopt a layered policy: C1 always, C2 where a stateful-service collision
-actually exists; reject C3, C4 and C6 as defaults; treat C5 as an optional,
-per-project complement (out of scope for arggon).**
+**Adopt a layered policy for every adopter repo, on every platform: C1
+always; C2 only for adopters who already ship Docker and have a real
+stateful-service collision; reject C3, C4 and C6 as defaults; treat C5 as an
+optional, per-project complement (out of scope for arggon).**
 
-- **C1 wins criterion 1 outright (kilobytes) and kills most of the observed
-  collisions by convention** (F1, F5): ephemeral/derived ports, suffixed
-  state dirs, per-worktree DB *names* against one server, gitignored `.env`
-  seeds — implemented as an extension of the existing `start` seam (F6), so
-  criterion 3 holds. If a project's parallel instances only ever collide on
-  ports and state dirs, C2 never needs to exist for it.
+- **C1 wins criterion 1 outright (kilobytes on every OS) and kills most of
+  the observed collisions by convention** (F1, F5): ephemeral/derived ports,
+  per-OS suffixed state dirs (F11), per-worktree DB *names* against one
+  server, a gitignored dotenv seed — delivered as a file by the existing
+  `start` seam (F6), loaded by whatever runtime the adopter already uses, so
+  criteria 3 and 7 hold. For project shapes with no services at all it
+  degrades to a no-op (F10): the file exists, nothing reads it, nothing
+  changes. If a project's parallel instances only ever collide on ports and
+  state dirs, C2 never needs to exist for it.
 - **C2 is the cheapest unit of *real* isolation when one server cannot be
-  shared** (F3): two worktrees running migration-backed suites against
-  Postgres need separate server instances (or at least separate
-  initdb/roles), and a named Compose project per worktree gives that for the
-  RAM of the service itself — no toolchain in any container, all agent seams
-  untouched, image layers shared across worktrees.
-- **C3 loses on criteria 1 and 3**: it re-pays 182 MB × N of install (or
-  volume machinery), adds per-instance RAM for the toolchain, and forces the
-  pre-commit/Playwright/agent seams into containers — significant new
-  convention to buy isolation C1/C2 already deliver. Keep it as the explicit
-  escape hatch for a project whose toolchain genuinely cannot run on the
-  host.
+  shared** (F3) — and it is a **pattern, not a feature**: documented for
+  adopters whose repos already containerize those services (CI or prod),
+  which is precisely where the images and the muscle memory already exist.
+  On Linux the marginal cost is the service's own RAM; on macOS/Windows the
+  Docker Desktop VM is a standing cost the adopter is already paying for
+  those services (F9) — the per-worktree increment stays small, but it is
+  recorded honestly. arggon's role stays conventional: the project name
+  (`<repo>-<item-id>`), the manifest that declares it, and — only then —
+  `cleanup` reaping it (F8). The kernel never probes for or invokes Docker
+  the convention didn't declare.
+- **C3 loses on criteria 1, 3 and 7**: it re-pays the per-worktree install
+  (182 MB × N for a Node project, unless volume machinery), adds
+  per-instance RAM for the toolchain, forces the pre-commit/Playwright/agent
+  seams into containers, and is *worst* exactly where Docker is VM-backed
+  (F9). Keep it as the explicit escape hatch for a project whose toolchain
+  genuinely cannot run on the host.
 - **C4 loses on criterion 2** (F4): sharing `$HOME` is its purpose, and
   `--home` overrides turn it into a worse C3.
-- **C6 loses on criterion 1 by an order of magnitude** and is not seriously
-  in contention on a shared-kernel Linux host.
+- **C6 loses on criterion 1 by an order of magnitude** on every platform and
+  is not seriously in contention.
 
 If the decision is accepted, the follow-up shape is: ADR (next free 4-digit
 id — 0017 is reserved by open PR #519, so likely 0018) → spec for the
-`start` environment contract (env vars, `.env` seed rules, receipt fields)
-with tasks under the `parallel-worktree-runtime-isolation-ports-state-services`
-story → docs convention section + the per-worktree Compose pattern documented
-for adopters → `cleanup` integration (F8). Explicit YAGNI deferrals: no
+`start` environment contract (documented variable names, dotenv file
+mechanism, seed rules, per-OS state-dir mapping per F11, receipt fields,
+degradation semantics when the adopter reads none of it) with tasks under the
+`parallel-worktree-runtime-isolation-ports-state-services` story → docs
+convention section (ports/state/identifiers) → an adopter-facing pattern doc
+for the per-worktree Compose services (C2) via the playbook pipeline →
+opt-in `cleanup` integration per F8. Carriers touched by the convention are
+methodology carriers under ADR 0011/0016: impact class **Behavioral**, skill
+and copies kept byte-equal in the same PR. Explicit YAGNI deferrals: no
 `arggon compose` wrapper command, no global port-allocation registry, no
-Docker installation assistance — the convention is a file format and a name,
-not a subsystem.
+Docker detection/installation assistance in the kernel, no unix-socket
+requirement (an optimization where available, never the contract) — the
+convention is a file format and a name, not a subsystem.
 
 ## Decision
 
