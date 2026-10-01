@@ -76,3 +76,7 @@ Resolution + gates evidence (PR #558).
 **Gates:** build ✅ · check:plugin ✅ (bundle rebuilt, 52+/13- lines) · lint ✅ · `arggon validate` ok:true ✅ · full suite 2043/2043 (normal PATH) ✅.
 
 **No-gh recipe:** `env -i PATH="$HOME/.local/share/mise/installs/node/26.7.0/bin:/usr/bin:/bin" HOME=$HOME LANG=C.UTF-8 node_modules/.bin/vitest run` (mise node real bin dir keeps node/npm; gh lives only in mise shims/~/.local/bin — all excluded) → 2043/2043, exit 0, 4 consecutive runs. One earlier no-gh run under a loaded machine (157s vs ~76s) had a single unreproduced failure; runs 2–5 all clean — likely the repo's documented spawn-timeout-under-load flake class, not this diff (all touched files passed repeatedly under no-gh).
+
+### handoff 2026-10-01 @Arggon (session: ses_f0735ed79ffemPirGuKKl8PhYs) — next: Review PR #558 (do not merge from this session); squash-merge after approval
+- branch: feat/task-spawned-tests-gh-path
+- open questions: Run-1 no-gh flake unreproduced (runs 2-5 clean); git-config fallback may surprise @me filters only when gh absent AND git identity equals an assignee login
