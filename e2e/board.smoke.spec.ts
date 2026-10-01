@@ -1117,21 +1117,37 @@ test.describe("@smoke board --serve", () => {
     const scrollBefore = await page.evaluate(() => window.scrollY);
     expect(scrollBefore).toBeGreaterThan(0);
 
-    // Marker on the CURRENT page: undefined after the reload proves the page
-    // was really replaced, so the preservation assertions cannot pass against
-    // the pre-reload DOM.
+    // Marker on the CURRENT page — on the <html> element, not on `window`:
+    // after the reload proves the page was really replaced (the preservation
+    // assertions cannot pass against the pre-reload DOM), and the check below
+    // can assert its ABSENCE with a locator instead of a `page.evaluate` poll.
     await page.evaluate(() => {
-      (window as unknown as { marker?: number }).marker = 42;
+      document.documentElement.dataset.preserveMarker = "42";
     });
 
     // External tracker write (not through this page) fires the SSE reload.
     runCli(fixture, ["update", preserveId, "--status", "cancelled", "--json"]);
 
-    await expect
-      .poll(() => page.evaluate(() => (window as unknown as { marker?: number }).marker), {
-        timeout: 15_000,
-      })
-      .toBeUndefined();
+    // The reload-landed gate: the probe lives only on the OLD document, so
+    // "an <html> without it" resolves exactly when the reloaded document is
+    // resolved — never on the old page (it carries the marker), never in the
+    // navigation teardown window (no document resolves to zero elements, and
+    // the count stays 0 there). A locator wait retries through the navigation
+    // by design; the page.evaluate poll this replaces burned its whole window
+    // throwing "Execution context was destroyed" while the frame navigated.
+    // The ceiling is generous because a contended machine legitimately needs
+    // tens of seconds to parse+layout the reloaded board — the point is the
+    // readiness signal, not the number.
+    await expect(page.locator("html:not([data-preserve-marker])")).toHaveCount(1, {
+      timeout: 30_000,
+    });
+
+    // The page-functional gate: the SSE stream reconnected, so the reloaded
+    // page parsed its reload client and is live again — the same readiness
+    // signal the connection-banner test pins (and the stale-drop test pins in
+    // reverse). Only after this gate do the preservation assertions read the
+    // page, so no later `page.evaluate` can race a pending navigation.
+    await expect(page.locator("#board-conn.live")).toHaveText("live", { timeout: 15_000 });
 
     await expect(page.locator("#board-filter-input")).toHaveValue("label:detail");
     await expect(page.locator(".card:not(.filtered-out)")).toHaveCount(1);
