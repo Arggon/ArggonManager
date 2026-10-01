@@ -64,3 +64,6 @@ Changes:
 - Criterion 7 (platform portability) added; YAGNI list extended (no Docker detection/installation in kernel).
 
 `npm run arggon -- validate` ok (0 warnings). Recommendation unchanged in verdict, generalized in scope: C1 always; C2 opt-in for Docker-shipping adopters; C3/C4/C6 rejected; C5 optional. ADR remains open pending product-owner acceptance.
+
+### 2026-10-01 @Arggon
+Product owner ACCEPTED the recommendation (2026-10-01, this session). Decision recorded in this PR: ADR 0018 (status: Proposed, Accepted on merge) + exploration flipped to resolved + spec/plan worktree-env-contract-015 (spec validate ok, 26 docs). Follow-up tasks filed under the story: task-env-contract-start (layer 1 implementation), task-cleanup-declared-services (layer 2 reaping, depends_on env-contract-start), task-adopter-services-pattern-doc (layer 2 docs). PR updated to ready-for-review; scope: exploration + decision paper trail, docs-only.
