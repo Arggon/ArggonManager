@@ -90,3 +90,13 @@ Env notes for the coordinator: (1) start --worktree left no node_modules here (c
 ### handoff 2026-10-01 @Arggon (session: ses_f0b410d36ffe1kgCM7j0P2Cztm) — next: Review PR (fix(board) dffaa47e); merge after verdict; drop stash 74f7e78 post-merge
 - branch: fix/bug-tsx-board-dead-script
 - open questions: Pre-existing env test failures (headless-ci packed-bin, prose-format prettier) need a non-worktree CI run to confirm green; live-reload Playwright race worth a follow-up item
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+verdict: approve (lead-architect review, PR #510)
+- Architecture: render-time strip in a dedicated transform-neutral module (cli/src/board-embed.ts) — the right shape: keeps dist as source of truth for CI, no tsx knob exists, page __name shim rejected (bar is zero references). Strip is identity under tsc/oxc; parity suite untouched and still exact-equality.
+- Fail-loud: syntax-aware scanner (strings/templates/comments/regex), all four unrecognized-shape throw paths unit-tested; all 12 embeds routed (zero raw .toString() embeds remain).
+- Tests travel with behavior: spawn-the-CLI tsx gate + CI-wired @smoke tsx browser legs (filter/drag-persist/theme/density/collapse + static export offline). Reviewer confirmed the in-process render assertion is correctly treated as a general invariant, with the real gate on the tsx path.
+- Coordinator independent verification: board trio 120/120; tsx-rendered board.html = 0 __name( with controllers intact; drove all 4 tsx-path Playwright specs myself — 4/4 pass (boot clean, visible filter, persistent round-trip, script-clean export).
+- Reviewer bars 1-5 pass, no blocking findings; notes (regex-division heuristic adjacency, obj.__name( gate-vs-stripper strictness, item-bullet mangle) recorded as polish, no change request.
+- Merged: squash -> 4c407064; CI cli/tasks-validate/ui-smoke green on the final reconciled head (ui-smoke now runs the new tsx legs authoritatively).
