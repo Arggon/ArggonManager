@@ -52,3 +52,19 @@ Changes:
 - Criterion 7 (platform portability) added; YAGNI list extended (no Docker detection/installation in kernel).
 
 `npm run arggon -- validate` ok (0 warnings). Recommendation unchanged in verdict, generalized in scope: C1 always; C2 opt-in for Docker-shipping adopters; C3/C4/C6 rejected; C5 optional. ADR remains open pending product-owner acceptance.
+
+### 2026-10-01 @ses_f06c45a3fffePcjwiADfQ455Bi
+RECONCILIATION DELIVERED (attach session, commit e3028921 on feat/task-record-exploration-016-worktree-runtime-isolation, PR #523 updated + retitled).
+
+NAMING DISCREPANCY (as briefed): the task title says exploration 016, but `exploration-update-delivery-016.md` + ADR 0018-update-delivery + spec/plan 015 merged on main first (concurrent session, different topic). This branch's draft-era ids collided on BOTH sides. Resolution: numbers assigned by merge order -> renumbered on the branch (git mv + all cross-refs + ADR README row): exploration-worktree-env-isolation-016 -> 017, 0018-worktree-runtime-isolation -> 0019, spec/plan-worktree-env-contract-015 -> 016. Stale in-doc numbering notes rewritten; draft-era ids remain only in dated tracker comments (history). The other exploration was NOT renamed. origin/main merged into the branch first (clean, no conflicts).
+
+ACCEPTANCE (all ticked on the item body):
+- exploration-worktree-env-isolation-017.md: methodology structure (C1-C6 candidates, criteria 1-7, F1-F14 findings with dated sources, recommendation), covering the four required areas - process/worktree isolation model (F12/F14), ports/state/services leaks (F1-F3/F5/F11/F13), observed incidents as findings, options going forward.
+- Incidents recorded: F12 seam-pin concurrent-writer disclosure (PR #544, ses_f0821d67: writes at 10:18, 11:41-44, 12:04-07 in the claimed worktree; no work lost, single-writer ownership unenforced); F13 the eight install-incidents (bug-start-install-ordering) + #517 gateBins receipts / #533 opt-in strict / #551 unconditional fresh-start gate semantics + live post-fix observation; F14 PR #559 session-move smoke leg (per-session/per-call resolution, 42/42 checks x2); incident register table added.
+- Alignment: cites ADR 0019 + spec/plan 016; the collision with main's update-delivery 0018/015 is called out in each renumbered doc's numbering note; no content contradictions (update-delivery ADR is a different topic; its only touchpoint, PR #544's release-pipeline reasoning, is unaffected).
+
+GATES (this worktree): validate ok (0 warnings, convention v5); spec validate ok (30 docs, 0 warnings); npm test 2053/2053 green; lint exit 0; plugin bundle regen byte-identical. First-run failures both fixed in-PR: (1) prose-format gate caught a line-wrapped code span `cleanup --prune` in the ADR (rewrapped single-line); (2) headless-ci.test needed `npm run build` in the worktree (environment gap - dist/ is a build artifact, not installed by start).
+
+strict-gate-bins TRIPWIRE (armed per briefing): did NOT fire. tools.arggon.start attach resolved all eight gate bins from the worktree (source: "worktree" x8, strict armed) - no refusal, no npm ci. Recorded as a post-#551 positive observation in exploration F13.
+
+OPEN (not filed from here, flagged for coordinator): single-writer enforcement for claimed worktrees (F12) - should the kernel/plugin detect and refuse a second live session on a claimed worktree? Also note: if another ADR takes 0019 before this merges, renumber again at merge time (PR body notes this).
