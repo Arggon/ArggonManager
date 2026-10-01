@@ -133,3 +133,13 @@ Branch `fix/bug-frontmatter-ambiguous-plain-scalar-loss` (worktree ../ArggonMana
 ### handoff 2026-10-01 @Arggon (session: ses_f0b410d34ffdJ6v9kfPk82HPxp) — next: Review + merge PR #509 (do not squash away the separate 'chore: regen plugin bundle' commit order); then cleanup worktree
 - branch: main
 - open questions: true/false quoting decided YES (see PR body); legacy bare-token files keep baked loss by design
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+verdict: approve (lead-architect review, PR #509)
+- Architecture: writer-side only — AMBIGUOUS_TOKEN /^(?:~|null|true|false|-?\d+)$/ matches the reader's non-string decode set exactly (reviewer cross-checked parseValue/parseScalar: no other branch decodes non-string); parseFrontmatter untouched, legacy bare-token files still tolerated (fixture test proves stable fixed point).
+- Scope: exactly frontmatter.ts + the two test files + regen'd bundle + item file; canary flipped to verbatim round-trip in the same commit as the fix; 14 per-token example pins.
+- Tests travel with behavior: coordinator independent runs — cli/src/frontmatter.test.ts 14/14; property at fresh seed 20260930 x100 green; worker pinned replay 20260928 x25 green; full suite 1941/1941.
+- Decision recorded: true/false QUOTED (bare booleans silently retype x-* extras) — on the item, commit and PR body.
+- Reviewer bars 1-5 pass (mechanical report on file). Known non-goals, accepted: fix is not retroactive (already-baked titles keep their loss until hand-edited); lazy-continuation-style tokens unaffected.
+- Branch reconciled with post-#506/#507 main; bundle union verified canonical via check:plugin.
