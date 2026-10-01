@@ -46,3 +46,7 @@ Delivered — PR #564 (branch feat/task-adopter-services-pattern-doc), doc at Ar
 **Shipped-vs-planned split documented:** Compose pattern/dir-name wiring/post-start hook/cleanup --prune-for-worktrees = shipped today; .arggon.env six keys + .env seed + preparation.env receipt + x-worktree.env = promised by spec-worktree-env-contract-016 (parallel PR, marked "not in any release yet"); cleanup --prune Compose reaping = Planned (task-cleanup-declared-services).
 
 **Staging:** exactly 3 paths — the doc, the one-line spec cross-link (Degradation), the item file. Prettier's full-file reformat of the merged spec was reverted (drive-by churn; the prose gate does not require prettier-clean docs).
+
+### handoff 2026-10-01 @ses_f0697a26dffeiqSzTphhItmARO (session: ses_f0697a26dffeiqSzTphhItmARO) — next: Coordinator review of PR #564 (do not merge from worker). Optional follow-up: add the convention.md cross-link in the env-contract PR that already touches convention.md.
+- branch: main
+- open questions: Should the item's 'linked from the convention' acceptance wording be satisfied by the spec cross-link (as done here) or require a convention.md line too?
