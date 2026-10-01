@@ -27,3 +27,15 @@ updated: "2026-10-01"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Filed from the bug-frontmatter-ambiguous-plain-scalar-loss worker's environment report (PR #509).
+
+## Context
+With the mise gh shim off PATH, 10 spawned-CLI tests fail (measure x8, comment x1, plugin tools x1) with "could not resolve comment author" — the error names the wrong missing dependency. Environmental (CI has gh; local dev may not), but the diagnosis cost the worker time.
+
+## Acceptance
+- [ ] Comment-author resolution either degrades gracefully without gh (documented fallback) or the failing tests assert an actionable precondition (skip with reason naming 'gh not found on PATH').
+- [ ] Error message for the missing dependency names 'gh' (not 'comment author').
+- [ ] Full suite green in an environment without gh on PATH (or every affected test skips with the actionable reason).
