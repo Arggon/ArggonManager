@@ -35,7 +35,7 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       # release-please does not update lockfiles (googleapis/release-please#1993,
       # open): the release PR bumps both package versions and rewrites the root's
