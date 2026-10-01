@@ -71,3 +71,7 @@ Test evidence (expected vs observed):
 - First full run: headless-ci.test.ts failed + 6 skipped in the fresh worktree (missing lib/dist/index.js) — REPRODUCED on stashed pristine branch (git stash; 1 failed | 111 passed), fixed by npm run build; environment-only, not caused by the change.
 - npm run lint ok; test:structure ok; build ok; check:plugin exit 0 with bundle byte-identical — expected regen per the task brief did NOT materialize: mcp-server.ts/measure.ts are not inlined into opencode/plugins/arggon/index.bundle.ts (postbuild regenerated; git diff --exit-code confirms no drift), so no chore regen commit exists.
 - npm run arggon -- validate → ok:true, 0 warnings. Wrapper literals in tests built dynamically (["cli","mjs"].join(".")) so the test-spawn grep gate stays green.
+
+### handoff 2026-10-01 @Arggon (session: ses_f0821d66effeinPPfJjVWl7SAD) — next: Review + merge PR #543; item is acceptance-complete, gates green on the merged tree.
+- branch: feat/task-derive-cli-spawn-loader
+- open questions: None material; bundle-regen expectation resolved: mcp-server.ts is not inlined into the plugin bundle, so no regen commit exists.
