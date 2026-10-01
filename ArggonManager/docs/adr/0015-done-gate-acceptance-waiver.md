@@ -1,6 +1,8 @@
 # 0015 Done gate: enforce acceptance-checklist completeness on the terminal flip, with an explicit waiver
 
-- Status: Proposed (Accepted on merge)
+- Status: Accepted
+> Status note (2026-10-01): flipped from "Proposed (Accepted on merge)" — landed via PR #442 (commit c801aea6, kernel done gate + `--waive`); shipped and documented in CHANGELOG 0.4.1. The status line had lagged the merge.
+
 - Date: 2026-09-29
 - Deciders: product owner (Gonzalo), coordinator/architect (Arggon)
 - Programme: `task-done-gate-acceptance-waiver` (C1 of `exploration-methodology-improvements-014`)
