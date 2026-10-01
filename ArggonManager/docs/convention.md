@@ -393,6 +393,17 @@ Per [ADR 0004](adr/0004-milestone-deps-v3.md), v3 = v2 + the official `milestone
 | `SELF_DEPENDENCY`    | an item depends on itself                     |
 | `DEPENDENCY_CYCLE`   | the graph has a cycle (it must be a DAG)      |
 
+Each reported cycle prints one canonical chain — the simple cycle rotated to its
+lexicographically smallest member and closed on it — so a given cycle renders
+byte-identically under any traversal order. A graph with **several** cycles is
+checked by a single depth-first pass, which names the back edges its own forest
+closes (deduplicated by member set). That **forest selection** is deliberately
+traversal-order dependent and is part of the contract, not a defect: the
+acyclic/cyclic verdict and every chain's text are order independent, while which
+subset of the graph's cycles a report names is not. Consumers must rely on the
+verdict and the per-cycle chains, never on the presence or absence of a
+particular cycle in a report (ADR 0004; task-cycle-set-canonical).
+
 Semantics are deliberately **advisory-only** (ADR 0004):
 
 - Dependencies **never block an update**: `arggon update <id> --status done` still works with open dependencies (humans may close out of order; the trail is in git).
