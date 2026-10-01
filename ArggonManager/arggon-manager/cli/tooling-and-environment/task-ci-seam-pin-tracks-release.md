@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-ci-seam-pin-tracks-release
 title: arggon.yml ARGGON_VERSION pin must track the release — enforced by a lag-guard test (derivation rejected with evidence)
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [ci, release]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T15:23:25.336Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-ci-seam-pin-tracks-release
 ---
 <!--
@@ -24,11 +23,28 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-ci-seam-pin-tracks-relea
 
 ## Context
 
-<!-- Why this task exists. -->
+Filed from the #527 review: publishing 0.4.1 + regenerating the seam with
+0.4.1 turned `tasks-validate` red on main because
+`.github/workflows/arggon.yml` pinned `ARGGON_VERSION` as a literal 0.4.0
+while the committed seam was 0.4.1-shaped. Goal: publishing and pinning
+cannot diverge silently. Resolution (evidence in Notes): a **lag-guard test**
+enforcing the literal pin — run-time derivation was rejected.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+> Amendment 2026-10-01 (coordinator, PR #544 evidence): criterion 1 of the
+> original filing ("pin derived/automated") is resolved as
+> **guard-enforced literal pin** — derivation rejected with recorded evidence
+> (red window is intrinsic to a registry-pinned install: the derived version
+> does not exist between bump and publish, on main and on the release PR
+> itself). The invariant "publishing and pinning cannot diverge" is unchanged;
+> the mechanism is detection (loud red test) instead of prevention.
+
+- [x] A test fails when the pin lags the shipped version: `cli/src/ci-seam-pin.test.ts` — red exactly on the #527 shape (seam stamps newer than pin), green through the whole documented flow (mid-cycle, release window, template-less patch re-pin); demonstrated RED on the real tree with an actionable message, then restored (6/6 green).
+- [x] Enforcement is automated on every PR and push: the guard runs in CI (`npm test` discovery); the opposite drift (pin moved without seam regen) stays policed by the workflow's drift gate.
+- [x] Runbook updated: `release.md` re-pin step is guard-enforced ("a stale pin is a red test, not a silent outage"); no other runbook content changed.
+- [x] PR #544 merged (0ee659fa) after reviewer `verdict: approve` (red path re-derived independently; diff minimal; smoke evidence in body).
+- [x] Superseded wording corrected at the sources: ADR 0018 dated amendment (d70817c8) + item title updated; adopter template keeps its literal pin by design (asserted in the guard test).
 
 ## Notes
 
