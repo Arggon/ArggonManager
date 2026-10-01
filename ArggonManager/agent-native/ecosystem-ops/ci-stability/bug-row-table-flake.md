@@ -146,3 +146,7 @@ verdict: approve (lead-architect review, PR #513)
 - Scope: exactly 2 files (test + item); no product code, no bundle. Conventions clean.
 - The last acceptance box (3 green CI runs) is coordinator-owned and stays open through post-merge verification on main.
 - Merged: squash (CI cli/tasks-validate/ui-smoke green on the reconciled head).
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Done gate satisfied: 3 consecutive green CI runs on main since the #513 squash (36802100787 merge run; 36802945987 + 36803005739 on unrelated tracker-only pushes), full suite each. Item flipped done. Follow-ups filed: task-runcli-import-tsx-migration (~35 sibling wrapper copies; reviewer inventory appended), bug-spawn-lanes-load-flake (headless-ci/pack/success-stdout transient class under load).
