@@ -60,3 +60,7 @@ Evidence for the reviewer (commands run in the worktree ../ArggonManager-task-ci
 - npx prettier -c (3 touched files) — one auto-format fix on the test file, then clean; npx eslint cli/src/ci-seam-pin.test.ts — clean; npx tsc -p tsconfig.typecheck.json — exit 0; npm run arggon -- validate — ok (0 warning(s), convention v5), also green in the pre-commit hook of commit a162e280.
 - cli/src/headless-ci.test.ts: REVERTED byte-identical to main (inherited additions asserted the rejected derivation approach; template assertions folded into the guard test) — the network-dependent suite was therefore not run, by design.
 - Inherited state disposition: workflow derivation step + release.md "derived, no manual re-pin" — reverted/rewritten; untracked guard test — kept and finished; headless-ci expect-tweaks — reverted with the file (they belonged to the derivation approach, not a standalone debugging story).
+
+### handoff 2026-10-01 @ses_f08092f0bffe681eueaMGezSgZ (session: ses_f08092f0bffe681eueaMGezSgZ) — next: Review PR #544; merge if the guard approach is accepted; then file the ADR 0018 parenthetical amendment.
+- branch: main
+- open questions: ADR 0018 says "derive the pin" — decision supersedes it; needs a one-line ADR amendment PR by the coordinator.
