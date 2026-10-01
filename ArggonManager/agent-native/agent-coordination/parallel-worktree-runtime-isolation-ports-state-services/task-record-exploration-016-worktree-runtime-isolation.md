@@ -68,3 +68,7 @@ GATES (this worktree): validate ok (0 warnings, convention v5); spec validate ok
 strict-gate-bins TRIPWIRE (armed per briefing): did NOT fire. tools.arggon.start attach resolved all eight gate bins from the worktree (source: "worktree" x8, strict armed) - no refusal, no npm ci. Recorded as a post-#551 positive observation in exploration F13.
 
 OPEN (not filed from here, flagged for coordinator): single-writer enforcement for claimed worktrees (F12) - should the kernel/plugin detect and refuse a second live session on a claimed worktree? Also note: if another ADR takes 0019 before this merges, renumber again at merge time (PR body notes this).
+
+### handoff 2026-10-01 @ses_f06c45a3fffePcjwiADfQ455Bi (session: ses_f06c45a3fffePcjwiADfQ455Bi) — next: Coordinator: review PR #523 (exploration 017 + ADR 0019 + spec/plan 016, renumbered after main took 016/0018/015); ADR flips Accepted at merge; renumber again only if 0019/016 get taken meanwhile.
+- branch: main
+- open questions: Single-writer enforcement for claimed worktrees (exploration F12) - kernel/plugin detect+refuse a second live session? Needs an owner decision, no task filed; PR #523 title/body still reference the i…
