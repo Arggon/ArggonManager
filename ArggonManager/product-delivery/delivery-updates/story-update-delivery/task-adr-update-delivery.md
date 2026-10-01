@@ -44,3 +44,16 @@ the manual `ARGGON_VERSION` re-pin the same release flow trips over.
 - [x] Exploration 016's Decision section links the landed ADR and its `status:` flipped `open` → `decided` (merged in the same PR); `spec analyze` reports no findings for exploration-016 after merge.
 
 ## Notes
+
+### 2026-10-01 @ses_f0870e73affeEVvaFZPi9K7NDj
+ADR 0018 landed (PR #537, merge 6caa05ca) and is Accepted (flip 3c2b4568: file + index row in the same commit — no 0016-style lag).
+
+Verdict trail: reviewer verdict request-changes on the first pass — one blocking finding (prettier rewrites multi-line code spans; cli/prose-format gate red) + one CI-semantics ambiguity + one process note (untracked Accepted flip). All three addressed: code spans single-lined (prose-format 3/3 green locally), CI pinned as "GET never runs on CI; JSON fields report cache state", and the Accepted flip executed at merge with the index row together. All lanes green before merge (cli 5m26s, ui-smoke, tasks-validate).
+
+Same PR also corrected ADR 0016 Proposed → Accepted (evidence: exploration-007's Decision records adoption; stages shipped; dated status note added) and flipped exploration-016 to decided with the ADR link; spec analyze reports no findings for exploration-016 post-merge.
+
+Next steps (decompose after this ADR, per its Consequences):
+1. Pipeline story first: release-please manifest + release.yml (OIDC trusted publishing, lib-first with propagation retry, tarball assets) + exact kernel pin + land task-ci-seam-pin-tracks-release with/before it. One-time ops setup on npmjs.com: trusted publishers for arggon-manager and @arggondev bound to .github/workflows/release.yml.
+2. Then the update-channel story: spec first (acceptance criteria lifted from exploration-016's edge-case table), then implementation (~50 lines, no new deps).
+
+Observation for the tracker owner (not filed — out of this item's scope): the ADR index (docs/adr/README.md) is missing rows 0014–0017.
