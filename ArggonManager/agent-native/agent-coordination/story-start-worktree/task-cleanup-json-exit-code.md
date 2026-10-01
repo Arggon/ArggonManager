@@ -56,9 +56,6 @@ Gates (worktree ArggonManager-task-cleanup-json-exit-code): npm test 112 files /
 ### handoff 2026-10-01 @ses_f087fbfebffe3hzxLVHwJLtqKc (session: ses_f087fbfebffe3hzxLVHwJLtqKc) — next: Review + merge PR #527 (draft): contract decision documented (keep exit 0 for --json with failures[]), tests pin both paths; coordinator flips item to done after merge.
 - branch: feat/task-cleanup-json-exit-code
 - open questions: start --worktree skipped the link-farm install in this worktree (commit step died: tsx not found before node_modules existed) — coordinator may want a follow-up on install ordering; my worktree was f…
-- [ ] Decide the machine contract explicitly: does a non-empty failures[] mean non-zero exit for --json consumers? (Contract change -> document in json-output.md in the same PR; keeping 0 is also acceptable if documented.)
-- [ ] Implement + test the chosen behavior; human-path behavior unchanged.
-- [ ] Note for callers: agents/scripts keying on exit status today.
 
 ### 2026-10-01 @Coordinator
 ### 2026-10-01 @Coordinator
