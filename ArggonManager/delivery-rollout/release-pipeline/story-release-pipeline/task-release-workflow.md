@@ -66,3 +66,7 @@ Fix commits on top of the inherited implementation:
 - eec3ce7a chore(tasks): ticked T1–T7 (personally verified). T8 left open: coordinator ticks spec ACs A1–A17 in spec-release-pipeline-015.md at merge verification (spec file outside this item's edit scope); A12's end-to-end approval flow and A2's zero-conventional-commit proposal are runtime evidence of the first real release-PR cycle.
 
 PR: https://github.com/Arggon/ArggonManager/pull/555 (title+body carry task-release-workflow; body has per-T status, gate table, dry-run evidence, A17 ops notes: publishing fails closed until the human npmjs.com trusted-publisher setup for BOTH packages bound to release.yml with direct publish allowed; renaming release.yml is a breaking ops change; never a workflow_call child).
+
+### handoff 2026-10-01 @ses_f076f3a7bffeHuhB6MxSetlgSU (session: ses_f076f3a7bffeHuhB6MxSetlgSU) — next: Review+merge PR #555; tick spec ACs A1–A17 in spec-release-pipeline-015.md at merge verification; flip item done after merge.
+- branch: feat/task-release-workflow
+- open questions: C1 amendment needed: GenericJson preserves range prefixes (v17.11.2 + main) — one-time hand-unpin in first release PR, machine-owned after; amend the spec sentence.
