@@ -88,3 +88,11 @@ verdict: request-changes (docs travel with the contract change — single blocke
 - Everything else PASSES: scope (11 files, bundle regen standalone), security (read-only probe, no writes/subprocess/interpolation), kernel logic (resolution order matches npm-run semantics; empty report = unchanged semantics), tests (8 new kernel tests + CLI failure message + native receipt; smoke 23/23 with both incident flavors — coordinator re-ran worktree/start tests 46/46 and the smoke green), ticks honest.
 - Contract call ENDORSED: report-only readiness with named-source errors is the right reading of the documented design; opt-in strict mode filed as follow-up (p4).
 - Non-blocking notes accepted: kernel conjunction unit gap (env-injected PATH case), CLI path/external wording branches, handoff truncation (tracker field cap — re-record the full strict-mode question as a plain comment in the fix pass), stale "draft" wording, sanitize asymmetry, bounds consistency.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+verdict updated: approve after the B1 doc fix (gateBins now documented in json-output.md, agents.md, opencode2.md, playbooks/opencode.md; skills checked — nothing to sync). Merged: PR #517 squash -> fb3b186e (CI green on the reconciled head). Item flipped done — three incidents of the cold-start class are now covered by named-source readiness reporting + actionable failure errors. Follow-up: task-start-gate-strict-mode (opt-in hard-fail flag).
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+FOURTH incident of the class, from the bug-live-reload-sse-race worker (PR #521): start --worktree created no node_modules link farm at all (manual npm ci + build needed); the in-process tracker tools' first auto-commit failed with `tsx: command not found` before install, later ones succeeded. Now covered by the merged #517 readiness reporting (gateBins names the source); noting here so task-start-gate-strict-mode's strict mode design also sees the no-link-farm flavor.
