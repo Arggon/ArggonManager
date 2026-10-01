@@ -140,7 +140,13 @@ function normalize(raw: string, dir: string): string {
     .replace(/"hash": ?"[0-9a-f]{7,40}"/g, '"hash":"<hash>"');
 }
 
-const describePacked = describe.skipIf(process.platform === "win32");
+// The packed-install describe shares ONE fixture across its tests (bootstrap
+// -> drift gate -> MCP-removal are ORDER-DEPENDENT: each step builds on the
+// previous one's side effects), so it must run sequentially even under
+// `--sequence.shuffle` (bug-spawn-lanes-load-flake: shuffled order produced
+// "nothing to commit" / validate failures that looked like load flakes).
+const describePacked =
+  process.platform === "win32" ? describe.skip : describe.sequential;
 
 describePacked("headless bootstrap + CI (packed install)", () => {
   /** Empty temp root the install step runs against. */
