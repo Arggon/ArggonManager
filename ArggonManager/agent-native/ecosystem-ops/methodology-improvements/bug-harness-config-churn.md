@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-harness-config-churn
 title: harness-config-churn-blocks-start
+assignee: Arggon
+branch: fix/bug-harness-config-churn
 parent: methodology-improvements
 labels: []
 priority: p3
 created: "2026-09-30"
-updated: "2026-09-30"
+updated: "2026-10-01"
+claimed_at: "2026-10-01T02:44:39.138Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-harness-config-churn
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-harness-config-churn.md
