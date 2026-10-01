@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-record-exploration-016-worktree-runtime-isolation
 title: "Record exploration 016: worktree runtime isolation"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [worktree, exploration, devex]
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T11:53:03.213Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-record-exploration-016-worktree-runtime-isolation
 ---
 <!--
