@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-derive-cli-spawn-loader
 title: "deriveDefaultCliSpawn cannot derive a spawn spec under the --import loader form (product limitation surfaced by the #518 sweep)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [testing, mcp]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T14:29:06.712Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-derive-cli-spawn-loader
 ---
 <!--
