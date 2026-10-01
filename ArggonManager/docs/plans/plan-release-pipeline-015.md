@@ -1,0 +1,129 @@
+---
+plan_id: release-pipeline-015
+title: Plan for release pipeline
+spec: ArggonManager/docs/specs/spec-release-pipeline-015.md
+status: proposed
+created: 2026-10-01
+---
+
+# Plan: Release pipeline (release-pipeline-015)
+
+Derived from `ArggonManager/docs/specs/spec-release-pipeline-015.md`
+(ADR 0018 §1–2, §4). Each task carries a verifiable acceptance criterion and
+links back to the spec section it implements. Implemented by
+`task-release-workflow`; T0 is the `task-ci-seam-pin-tracks-release`
+dependency (lands with/before the pipeline, per ADR 0018 §1).
+
+## Tasks
+
+### T0: Land/verify the seam-pin dependency (owner: task-ci-seam-pin-tracks-release)
+
+- Implement (or verify if already landed) the derived `ARGGON_VERSION` pin
+  in `.github/workflows/arggon.yml` with the release-window semantics the
+  spec's Interplay section fixes: derived version unpublished → install the
+  latest published release for `arggon validate` and skip the drift-gate
+  comparison with a printed reason; steady state → strict comparison
+  unchanged.
+- **Acceptance:** on a fixture tree whose derived pin names an unpublished
+  version, `tasks-validate` skips the drift gate with the reason printed and
+  still runs `arggon validate`; in steady state the gate compares strictly.
+  `task-ci-seam-pin-tracks-release` is done before T1 merges.
+  (Spec: Interplay; Edge table last row.)
+
+### T1: Manifest scaffold + repository fields
+
+- Add a `repository` field (URL exactly matching the GitHub repo) to both
+  `package.json` files. Add `release-please-config.json` (packages `.` and
+  `lib`; `release-type: node`; `skip-github-release: true`;
+  `changelog-sections` mapped to the Keep-a-Changelog categories; root
+  `extra-files` JSON updater with the bracket-quoted jsonpath
+  `$.dependencies['@arggondev/lib']`) and `.release-please-manifest.json`
+  (`"."` and `"lib"` at the current `0.4.1`).
+- **Acceptance:** both manifests parse as JSON; a `release-please` CLI
+  dry-run (or the action on a scratch clone) from a `Release-As: 0.4.2`
+  proposal lists both packages and produces the exact-pin rewrite in the
+  root package entry. (Spec: C1, C2, Surfaces; AC A2, A3, A4, A13.)
+
+### T2: release-please.yml + lockfile sync
+
+- `.github/workflows/release-please.yml`: `on: push: branches: [main]`;
+  `googleapis/release-please-action@v4` with `config-file` +
+  `manifest-file`; default `GITHUB_TOKEN`;
+  `permissions: contents: write, pull-requests: write`. After the action
+  step, when a release PR is open, check out the PR branch, run
+  `npm install --package-lock-only`, and commit + push the lockfile to the
+  PR branch (release-please never updates lockfiles — issue #1993).
+- **Acceptance:** the produced release PR touches exactly the five files in
+  AC A1, bumps both packages to the same version (A2), carries a synced
+  `package-lock.json` (`npm ci` green on the PR, A12), and its
+  `package.json` diff is limited to `version` + the kernel dependency
+  (A4). (Spec: Surfaces, Edge table row 1; AC A1, A2, A4, A12.)
+
+### T3: release.yml — guard, tag, GitHub Release
+
+- `.github/workflows/release.yml` (name fixed — trusted-publisher binding):
+  `on: push: branches: [main]`; `permissions: contents: write,
+  id-token: write`; `concurrency` group serializing release runs. Guard step
+  per spec C3 (untagged version → release; tag at HEAD → idempotent
+  complete; tag elsewhere → loud failure; unchanged version → exit 0).
+  Release path: annotated tag `v(V)` at `github.sha`, then GitHub Release
+  `v(V)` whose notes are the merged CHANGELOG section for `V`.
+- **Acceptance:** guard-path evidence for all four cases (A5); tag and
+  release created with notes matching the merged section (A10, first
+  half). (Spec: C3, Flow step 4; AC A5, A10.)
+
+### T4: release.yml — build, pack, inspect (before any publish)
+
+- `npm ci`; `npm run build` (fresh `lib/dist` + `write-build-info` so the
+  artifact self-reports the release commit); create the pack destination
+  directory (`npm pack --pack-destination` does not — ENOENT gotcha); pack
+  both packages; extract-and-inspect both tarballs per runbook §2: kernel
+  export symbols present in `dist/*.js`, root ships
+  `dist/`/`templates/`/`skills/`/`opencode/`, zero test-helper leaks,
+  versions correct. Any failure fails the run before publishing.
+- **Acceptance:** the inspection step fails a deliberately broken tree
+  (fixture or local run) and passes the real one; publish steps provably
+  come after it (A11). (Spec: Flow step 4; AC A11.)
+
+### T5: release.yml — OIDC publish, lib first with propagation retry
+
+- setup-node ≥ 22.14; `npm install -g npm@11.5.1` (runner pattern); publish
+  `--workspace lib`; bounded `npm view @arggondev/lib version` poll until
+  `V` is visible; publish the root. No `NPM_TOKEN` anywhere. Both publish
+  steps treat "version already present at `V`" as success (idempotent
+  re-run); never re-publish. Assertion before this job section: tag `v(V)`
+  matches root version `V` and root version == lib version.
+- **Acceptance:** A7 (OIDC-only, npm ≥ 11.5.1, Node ≥ 22.14, provenance
+  automatic), A8 (order + retry + idempotence), A9 (agreement assertion).
+  Publishing fails closed until the human trusted-publisher setup exists —
+  the PR states this (A17). (Spec: Invariants 1–3, Interplay; AC A7, A8,
+  A9, A17.)
+
+### T6: release.yml — tarball assets
+
+- `gh release upload v(V)` both packed tarballs (release already exists
+  from T3 — same run, no race).
+- **Acceptance:** both tarballs present as release assets of `v(V)` (A10).
+  (Spec: Invariant 5; AC A10.)
+
+### T7: Docs
+
+- `release.md` → operator's exception manual per AC A14 (one-time
+  trusted-publisher setup; misconfig recovery; partial-failure re-run;
+  propagation-lag rationale; rebase-over-release-commit; from-source-install
+  shadow; pack-dir ENOENT; manual bump/pack/publish steps removed — the
+  re-pin step is superseded by T0 and must be called out as removed in
+  coordination with `task-ci-seam-pin-tracks-release`'s own runbook edit).
+  `ArggonManager/docs/ci.md` gains the install-from-release-asset variant
+  (A15).
+- **Acceptance:** A14 and A15 content present; no doc statement made false
+  by the pipeline remains. (Spec: Interplay, Surfaces; AC A14, A15.)
+
+### T8: Evidence + AC sweep
+
+- Lint both workflow YAMLs (actionlint or equivalent); offline-as-possible
+  smoke: guard paths on fixture clones, pack + inspect on the working tree,
+  release-please dry-run; expected-vs-observed table in the PR description;
+  PR notes the inert-until-setup state and the `release.yml` rename duty.
+- **Acceptance:** A16, A17; every AC A1–A17 re-checked and ticked in the
+  spec before merge. (Spec: Acceptance; AC A16, A17.)
