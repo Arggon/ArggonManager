@@ -10,7 +10,6 @@ labels: [opencode-seam, review-followup]
 priority: p3
 created: "2026-09-28"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-cli-cleanup-branch-delete-missing-failure
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/bug-cli-cleanup-branch-delete-missing-failure.md
