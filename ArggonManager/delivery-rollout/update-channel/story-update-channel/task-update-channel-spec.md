@@ -10,7 +10,6 @@ labels: [delivery, spec]
 priority: p1
 created: "2026-10-01"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-task-update-channel-spec
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/update-channel/story-update-channel/task-update-channel-spec.md

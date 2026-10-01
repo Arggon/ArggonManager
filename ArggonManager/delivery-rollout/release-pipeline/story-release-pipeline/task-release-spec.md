@@ -10,7 +10,6 @@ labels: [delivery, spec]
 priority: p1
 created: "2026-10-01"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-task-release-spec
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/task-release-spec.md
