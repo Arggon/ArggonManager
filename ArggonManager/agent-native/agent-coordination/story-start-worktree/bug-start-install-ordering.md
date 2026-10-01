@@ -51,3 +51,7 @@ SIXTH incident, from the task-cycle-set-canonical worker (PR #528): start --work
 ### 2026-10-01 @Coordinator
 ### 2026-10-01 @Coordinator
 SEVENTH incident, from the task-e2e-board-serve-wrapper worker (PR #530): start's claim commit was silently SKIPPED (no error surfaced at claim time) because the worktree had no node_modules; worker hand-built the link farm (primary symlinks, @arggondev/lib repointed, build). New detail vs prior six: the skip was SILENT at claim time — the worker only noticed when the pre-commit failed later. Strengthens the instrumentation acceptance: silent skips must be impossible (report or fail, never skip quietly).
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+EIGHTH incident, from the task-start-gate-strict-mode worker (PR #533, observed pre-merge): own start --worktree claim skipped with 'tsx: command not found'; fresh worktree had NO node_modules despite the primary having a full install — the linkNodeModules step apparently did not fire at all (the #521 flavor recurring post-#517). This is also the flavor strict mode now catches loudly ('missing' source). With the flag armed on this repo as of the strict-mode dogfood commit, any recurrence refuses the claim with the named source instead of silently degrading — treat every such refusal as a live reproduction signal for this item's ordering root-fix.
