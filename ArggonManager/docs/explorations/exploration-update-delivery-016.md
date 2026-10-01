@@ -21,6 +21,14 @@ Scope (settled with the maintainer, 2026-10-01): four bundles —
 Primary adopters: agent-driven repos (CI-pinned installs) and human
 maintainers (global installs), weighted equally.
 
+## Classification
+
+Greenfield — no existing release/update flow to read: the release pipeline is
+a human runbook, not code, and the product has no update channel. Others will
+depend on it (adopters' install/upgrade paths, the CI drift gate, the future
+distribution ADR), so the full protocol applies; complexity discovered
+mid-flight upgrades the classification, nothing downgrades it.
+
 ## Current mechanics (facts, not proposals)
 
 - Two public npm packages since 0.4.0: `arggon-manager` (bin + templates +
@@ -94,7 +102,8 @@ maintainers (global installs), weighted equally.
   Honors `ARGGON_NO_UPDATE_CHECK=1` (and never runs when `CI` is set).
 - **B3. `update-notifier` dependency.** Battle-tested (7.x, ~6k dependents)
   but adds a dependency chain to a deliberately dependency-light CLI
-  (runtime deps today: `commander` only); its behavior (background child
+  (third-party runtime deps today: `commander` only, beside the first-party
+  `@arggondev/lib` workspace package); its behavior (background child
   process, config caching) is more machinery than B2 needs.
 
 ### Bundle C — kernel↔CLI skew hardening
@@ -161,20 +170,23 @@ maintainers (global installs), weighted equally.
 
 ## Edge-case hunt
 
-| Dimension         | Hunted case                               | Resolution                                                                                                      |
-| ----------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| hostile input     | registry returns non-JSON / HTML (proxy)  | parse-guard → treat as "no update known", never an error (spec AC)                                              |
-| error states      | 404 / yanked package                      | same as no-update; notice suppressed (spec AC)                                                                  |
-| concurrency       | many CLI runs writing the cache           | atomic write (tmp + rename); cache is advisory only                                                             |
-| failure/timeout   | offline / air-gapped machine              | hard ~2 s timeout, detached check; command never blocks or fails; `ARGGON_NO_UPDATE_CHECK=1` opt-out documented |
-| perf              | check adds startup latency                | interval-gated (24 h default), cached result, deferred/async; cold runs never wait                              |
-| privacy           | what leaves the machine                   | a plain GET of our own public packument; no identifiers, no telemetry; exact behavior documented in README      |
-| environment       | CI / npm-script contexts                  | notice suppressed when `CI` is set or stdout is not a TTY; `--json` fields always available                     |
-| platform          | from-source installs (sha in `--version`) | non-semver version → "cannot compare": no update notice, no false prompt (release.md gotcha)                    |
-| upgrade/data-loss | lib↔CLI skew on adopter install           | bundle C1 exact pin; release PR bumps both in lockstep                                                          |
-| observability     | agents need the signal                    | additive `update` object on `doctor --json` / `--version --json`; docs table updated same PR                    |
-| security          | publish credential theft                  | A3: OIDC trusted publishing, no stored `NPM_TOKEN`; tags remain the release of record                           |
-| ops               | workflow name drift breaks OIDC binding   | trusted-publisher config pins the workflow filename; renaming the workflow is part of the ADR's consequences    |
+| Dimension             | Hunted case                               | Resolution                                                                                                                                               |
+| --------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| hostile input         | registry returns non-JSON / HTML (proxy)  | parse-guard → treat as "no update known", never an error (spec AC)                                                                                       |
+| error states          | 404 / yanked package                      | same as no-update; notice suppressed (spec AC)                                                                                                           |
+| concurrency           | many CLI runs writing the cache           | atomic write (tmp + rename); cache is advisory only (spec AC)                                                                                            |
+| failure/timeout       | offline / air-gapped machine              | hard ~2 s timeout, detached check; command never blocks or fails; `ARGGON_NO_UPDATE_CHECK=1` opt-out documented (spec AC)                                |
+| perf                  | check adds startup latency                | interval-gated (24 h default), cached result, deferred/async; cold runs never wait (spec AC)                                                             |
+| privacy               | what leaves the machine                   | a plain GET of our own public packument; no identifiers, no telemetry; exact behavior documented in README (spec AC)                                     |
+| environment           | CI / npm-script contexts                  | notice suppressed when `CI` is set or stdout is not a TTY; `--json` fields always available (spec AC)                                                    |
+| authn/authz           | credentials on the check path             | none — plain unauthenticated GET of a public packument; no credentials exist to leak; any authenticated registry path is a non-goal                      |
+| platform              | from-source installs (sha in `--version`) | non-semver version → "cannot compare": no update notice, no false prompt (spec AC; release.md gotcha)                                                    |
+| time/locale           | stale or clock-skewed cache timestamp     | `cachedAt` travels with the cache; unparseable/garbage timestamp counts as expired → re-fetch; no locale-sensitive formatting (spec AC)                  |
+| persistence/migration | cache format changes across CLI versions  | cache file carries a format version key; unparseable or foreign-version cache = miss, re-fetch — never an error (spec AC)                                |
+| upgrade/data-loss     | lib↔CLI skew on adopter install           | bundle C1 exact pin; release PR bumps both in lockstep (spec AC, lifted into the ADR/spec)                                                               |
+| observability         | agents need the signal                    | additive `update` object on `doctor --json` / `--version --json`; docs table updated same PR (spec AC)                                                   |
+| security              | publish credential theft                  | A3: OIDC trusted publishing, no stored `NPM_TOKEN`; tags remain the release of record (spec AC)                                                          |
+| ops                   | workflow name drift breaks OIDC binding   | trusted-publisher config pins the workflow filename; renaming the workflow is part of the ADR's consequences (non-goal: runtime workflow-name detection) |
 
 ## Recommendation
 
