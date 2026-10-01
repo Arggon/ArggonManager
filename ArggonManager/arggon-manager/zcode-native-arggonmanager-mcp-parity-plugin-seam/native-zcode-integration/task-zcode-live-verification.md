@@ -58,3 +58,10 @@ The ZCode plugin seam end-to-end on a live ZCode client: the marketplace packagi
 
 ## Notes for whoever executes
 Legs 3-4 need the ZCode app live on this machine (the harness rewrote `.zcode/config.json` during sessions on 2026-09-28/30 — the client is here). Legs 1-2 are automatable headless. Do the automatable legs first; file anything the artifact audit finds as items.
+
+### 2026-10-01 @Coordinator — headless-feasibility probe (legs 3-4 deferred with findings)
+- The ZCode client is a GUI Electron app (v3.14.4, /opt/ZCode/zcode); every `zcode ...` invocation spawns GUI instances (no headless subcommand found in two probes: `zcode --help`, `zcode cli --help`).
+- A CLI harness component EXISTS at ~/.zcode/cli/ (agents/, artifacts/, db/, exec/, config.json) — a possible headless surface worth investigating from a live ZCode session (ask the harness or check upstream docs).
+- The sanctioned computer-use skill (Orca) is NOT installed on this machine (orca-ide: AppImage not found), and raw X11 automation of a localized Electron GUI is out of scope for this item.
+- Leg 2 premise shifted: the repo's .zcode/config.json is machine-local + untracked since #514 and is currently absent; the registration path for 0.4.1 is the generated .zcode-marketplace/ packaging (leg 1, green) — re-derive leg 2 as "the marketplace plugin registration survives a ZCode restart" when executed live.
+- EXECUTION REQUIREMENT for legs 3-4: the ZCode app open on this repo (user-run), then follow the checklist; or a documented zcode headless mode if one exists upstream.

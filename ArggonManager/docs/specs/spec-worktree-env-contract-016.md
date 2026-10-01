@@ -101,6 +101,9 @@ output changes beyond the additive receipt field, no new files beyond
 `.arggon.env` (+ a seeded `.env` when applicable). Projects pull the
 convention in by reading the keys; nothing is pushed onto them.
 
+Adopter guidance for layer 2 — per-worktree service containers (Compose):
+[docs/worktree-services.md](../worktree-services.md).
+
 ## Acceptance
 
 - [x] Fresh `start --worktree` writes `.arggon.env` with exactly the six documented keys; a unit test asserts content shape (kernel-level, no CLI dependency). — evidence: `lib/src/worktree.test.ts` "writes .arggon.env with exactly the six documented keys on a fresh start" (raw `KEY=value` shape, LF, order); smoke legs "the env contract: .arggon.env written with exactly the six documented keys" + "identity values match the worktree".
