@@ -13,7 +13,6 @@ updated: "2026-10-01"
 claimed_at: "2026-10-01T02:44:39.575Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-start-worktree-npm-ci-claim
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/story-start-worktree/bug-start-worktree-npm-ci-claim.md
   Leaves live only under a story. id is the filename stem: bug-start-worktree-npm-ci-claim.
@@ -62,3 +61,13 @@ Evidence: `npm run smoke:native-start-cold` 23/23 ok (new checks: gate bin resol
 ### 2026-10-01 @Coordinator
 
 Second incident of the same class, from the bug-tsx-board-dead-script worker (PR #510): start --worktree left the worktree with no install, so the claim commit failed its pre-commit gate; worker recovered via worktree-local npm install + attach. Two independent occurrences (cycle-rotation worker: npm ci + sibling tsx resolution; board worker: no install at all) — strengthening this item's reproduce-first acceptance: capture BOTH flavors (missing install; wrong resolution source) in the readiness report.
+
+### 2026-10-01 @ses_f0aa6a0b4ffejwR5KRHGYGhyVR
+Fixed on fix/bug-start-worktree-npm-ci-claim — PR #517 (draft, ready for review).
+
+MECHANISM: the receipt already reported install:"missing"/ready:false, but nothing named WHICH node_modules the gate binary resolved from, and a sibling's .bin on PATH could run the gate with the claim landing invisibly on a broken install. Readiness now probes inspectGateBinResolution (kernel): declared deps exposing a bin (or, uninstalled, their own name — npm's string-bin convention) are resolved in the gate's real lookup order (worktree module walk → parent dirs → PATH) and reported as gateBins [{name, source: worktree|external|path|missing, path?}]; ready additionally requires every reported bin to resolve inside the worktree. CLI envelope carries gateBins; both failure errors (CLI + native) name the observed source + the exact "npm ci in the worktree, then attach" remediation.
+
+EVIDENCE (expected vs observed):
+- Live reproduction during this item's own claim: start --worktree → commit.skipped "git commit failed: sh: line 1: tsx: command not found" (no node_modules in the fresh worktree; which tsx → not found). Remediated per the designed path: worktree-local npm ci + re-run start → attached, claim commit 97268fc0 landed through the green gate. Third occurrence, consistent with both incident comments.
+- npm run smoke:native-start-cold → 23/23 ok, exit 0. New checks: (1) "the readiness receipt names the gate bin as resolving INSIDE the worktree" — observed gateBins [{native-gate-dep, worktree, <worktree>/node_modules/.bin/native-gate-dep}] through the link farm; (2) flavor 1 (wrong source): sibling .bin prepended to PATH → gate PASSED, claim landed, receipt observed [{native-gate-dep, path, <sibling>/node_modules/.bin/native-gate-dep}], ready:false; (3) flavor 2 (missing install): clean PATH → claim commit failed, error observed containing "native-gate-dep: not resolvable from the worktree" and "npm ci", receipt gateBins [{native-gate-dep, missing}].
+- Gates: npm test 110 files / 1968 tests passed (8 new kernel tests, CLI failure-message test, native receipt/failure tests); npm run lint clean; npm run build ok (incl. typecheck configs); npm run check:plugin → bundle regenerated (committed separately as "chore: regen plugin bundle"); npm run arggon -- validate --json → ok:true, 0 warnings.
