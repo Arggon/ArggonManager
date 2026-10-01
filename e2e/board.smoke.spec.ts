@@ -319,9 +319,6 @@ function startBoardServer(fixture: string): Promise<{ child: ChildProcess; url: 
     child.stdout?.on("data", onData);
     child.stderr?.on("data", (chunk: Buffer) => {
       output += chunk.toString("utf8");
-      // TEMP DIAGNOSTIC: surface the server's stderr (POST log) in the report.
-      if (chunk.toString("utf8").includes("[DIAG]"))
-        process.stderr.write("[SRV] " + chunk.toString("utf8"));
     });
     child.on("error", (err) => {
       clearTimeout(timer);

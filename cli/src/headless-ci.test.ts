@@ -222,36 +222,21 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     expect(version.stdout.trim()).toContain(pkg.version);
 
     // 4. Adopter-shaped fixture: a small git repo with no tracker at all.
-    fixture = makeAdopterFixture();
-  }, 900_000);
-
-  /**
-   * A fresh adopter-shaped fixture: a small git repo with no tracker, one
-   * initial commit. A factory (not a single shared tree) because the tests
-   * below make ORDERED assumptions about the fixture's state — the recipe
-   * test needs a repo where `init` has never run, so it always starts from a
-   * pristine one instead of depending on test order
-   * (bug-start-install-ordering loaded-run signal: under
-   * `--sequence.shuffle` the shared tree made `git commit` exit 1 with
-   * "nothing to commit" and the drift gate fail on a seam it did not commit).
-   */
-  function makeAdopterFixture(): string {
-    const dir = mkdtemp("arggon-headless-fixture-");
+    fixture = mkdtemp("arggon-headless-fixture-");
     writeFileSync(
-      join(dir, "package.json"),
+      join(fixture, "package.json"),
       `${JSON.stringify({ name: "adopter-demo", version: "0.1.0", private: true }, null, 2)}\n`,
     );
-    writeFileSync(join(dir, "README.md"), "# Adopter demo\n");
-    writeFileSync(join(dir, ".gitignore"), "node_modules/\n");
-    mkdirSync(join(dir, "src"));
-    writeFileSync(join(dir, "src/index.js"), "export const x = 1;\n");
-    initFixtureRepo(dir);
-    const first = git(["add", "--", "."], dir);
+    writeFileSync(join(fixture, "README.md"), "# Adopter demo\n");
+    writeFileSync(join(fixture, ".gitignore"), "node_modules/\n");
+    mkdirSync(join(fixture, "src"));
+    writeFileSync(join(fixture, "src/index.js"), "export const x = 1;\n");
+    initFixtureRepo(fixture);
+    const first = git(["add", "--", "."], fixture);
     expect(first.status, first.stderr).toBe(0);
-    const commit = git(["commit", "-m", "initial"], dir);
+    const commit = git(["commit", "-m", "initial"], fixture);
     expect(commit.status, commit.stderr).toBe(0);
-    return dir;
-  }
+  }, 900_000);
 
   /** Run one workflow step body the way the runner does (`bash -e`). */
   function runStep(
@@ -330,26 +315,27 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     expect(readFileSync(join(root, "README.md"), "utf8")).toContain("mkdir -p /tmp/arggon-packs");
   });
 
-  it("runs the shipped recipe on the adopter fixture: fresh init -> validate/doctor/list green", () => {
-    // A PRISTINE fixture (never `init`ed — see makeAdopterFixture): the test
-    // proves the first-bootstrap experience and asserts the drift gate's
-    // "no committed arggon seam yet" no-op, which a shared, already-committed
-    // tree could never show regardless of shuffle order.
-    const fresh = makeAdopterFixture();
-    const bootstrap = runStep(BOOTSTRAP_STEP, fresh);
+  // bug-spawn-lanes-load-flake: the three phases below SHARE one fixture and
+  // are strictly order-dependent (bootstrap writes the generated seam; the
+  // drift gate commits it and proves staleness fails; the MCP phase removes
+  // the seam artifacts and asserts validate/doctor hold). Vitest 5.0.0 has
+  // no sequential/ordering API and `--sequence.shuffle` shuffles `it`s, so
+  // the phases are ONE atomic test: shuffling cannot break the lifecycle.
+  it("runs the shipped recipe end-to-end: bootstrap -> drift gate -> seam removal", () => {
+    const bootstrap = runStep(BOOTSTRAP_STEP, fixture);
     expect(bootstrap.status, `${bootstrap.stdout}\n${bootstrap.stderr}`).toBe(0);
     // Fresh repo: the drift gate has nothing committed to compare yet and
     // must no-op (the recipe is green on a first clone).
-    const freshDrift = runStep(DRIFT_STEP, fresh);
+    const freshDrift = runStep(DRIFT_STEP, fixture);
     expect(freshDrift.status, freshDrift.stderr).toBe(0);
     expect(freshDrift.stdout).toContain("no committed arggon seam yet");
     // init created the tracker and vendored the very workflow it came from.
-    expect(existsSync(join(fresh, "ArggonManager/.convention.yml"))).toBe(true);
-    const vendored = readFileSync(join(fresh, WORKFLOW_DEST), "utf8");
+    expect(existsSync(join(fixture, "ArggonManager/.convention.yml"))).toBe(true);
+    const vendored = readFileSync(join(fixture, WORKFLOW_DEST), "utf8");
     expect(vendored.startsWith(`${WORKFLOW_MARKER}\n`)).toBe(true);
     expect(vendored).toBe(`${WORKFLOW_MARKER}\n${readFileSync(WORKFLOW_TEMPLATE, "utf8")}`);
 
-    const validate = runStep(VALIDATE_STEP, fresh);
+    const validate = runStep(VALIDATE_STEP, fixture);
     expect(validate.status, validate.stderr).toBe(0);
     expect(JSON.parse(validate.stdout)).toMatchObject({
       ok: true,
@@ -359,7 +345,7 @@ describePacked("headless bootstrap + CI (packed install)", () => {
       warnings: [],
     });
 
-    const diagnostics = runStep(DIAGNOSTICS_STEP, fresh);
+    const diagnostics = runStep(DIAGNOSTICS_STEP, fixture);
     expect(diagnostics.status, diagnostics.stderr).toBe(0);
     const envelopes = diagnostics.stdout
       .trim()
@@ -369,17 +355,7 @@ describePacked("headless bootstrap + CI (packed install)", () => {
       ["doctor", true],
       ["list", true],
     ]);
-  });
-
-  it("drift gate: committed seam current passes, a stale generated file fails", () => {
-    // Self-sufficient under --sequence.shuffle: this test used to assume the
-    // recipe test had already run `init` on the shared fixture. Whatever the
-    // order, the bootstrap is idempotent — run it HERE so the adopter commit
-    // below always has the seam to commit (a clean tree made `git commit`
-    // exit 1 with "nothing to commit"; a seam regenerated after a later
-    // test's cleanup made the gate fail on untracked files).
-    const bootstrap = runStep(BOOTSTRAP_STEP, fixture);
-    expect(bootstrap.status, `${bootstrap.stdout}\n${bootstrap.stderr}`).toBe(0);
+    // --- phase 2: drift gate (commit the seam; stale generated file must fail) ---
     // The fixture is a throwaway adopter repo: `-- .` is the adopter's commit.
     const add = git(["add", "--", "."], fixture);
     expect(add.status, add.stderr).toBe(0);
@@ -389,8 +365,8 @@ describePacked("headless bootstrap + CI (packed install)", () => {
 
     // Committed + current: bootstrap is a no-op and the gate passes (the state
     // file's generatedAt refresh is the one documented exception).
-    const bootstrapAgain = runStep(BOOTSTRAP_STEP, fixture);
-    expect(bootstrapAgain.status, `${bootstrapAgain.stdout}\n${bootstrapAgain.stderr}`).toBe(0);
+    const bootstrapNoop = runStep(BOOTSTRAP_STEP, fixture);
+    expect(bootstrapNoop.status, `${bootstrapNoop.stdout}\n${bootstrapNoop.stderr}`).toBe(0);
     const drift = runStep(DRIFT_STEP, fixture);
     expect(drift.status, `${drift.stdout}\n${drift.stderr}`).toBe(0);
 
@@ -427,24 +403,15 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     expect(restore2.status, restore2.stderr).toBe(0);
     expect(runStep(DRIFT_STEP, fixture).status).toBe(0);
 
-    const validate = runStep(VALIDATE_STEP, fixture);
-    expect(validate.status, validate.stderr).toBe(0);
-  });
-
-  it("needs no MCP and no OpenCode seam", () => {
-    // Self-sufficient under --sequence.shuffle: the tracker must exist before
-    // validate can pass, whatever ran before. The idempotent bootstrap runs
-    // BEFORE the artifact deletions (init regenerates untouched files
-    // quietly, so deleting first would let the bootstrap re-create exactly
-    // what this test removes — the stale-seam failure under shuffle).
-    const bootstrap = runStep(BOOTSTRAP_STEP, fixture);
-    expect(bootstrap.status, `${bootstrap.stdout}\n${bootstrap.stderr}`).toBe(0);
+    const validateDrift = runStep(VALIDATE_STEP, fixture);
+    expect(validateDrift.status, validateDrift.stderr).toBe(0);
+    // --- phase 3: seam artifacts removed; validate/doctor must still hold ---
     rmSync(join(fixture, ".mcp.json"), { force: true });
     rmSync(join(fixture, "opencode.jsonc"), { force: true });
     rmSync(join(fixture, ".opencode"), { recursive: true, force: true });
     rmSync(join(fixture, ".agents"), { recursive: true, force: true });
-    const validate = runStep(VALIDATE_STEP, fixture);
-    expect(validate.status, validate.stderr).toBe(0);
+    const validateNoSeam = runStep(VALIDATE_STEP, fixture);
+    expect(validateNoSeam.status, validateNoSeam.stderr).toBe(0);
     const doctor = runPacked(["doctor", "--json"], fixture);
     expect(doctor.status, doctor.stderr).toBe(0);
     const envelope = JSON.parse(doctor.stdout) as {
