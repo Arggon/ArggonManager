@@ -27,3 +27,7 @@ updated: "2026-10-01"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Filed from task-runcli-import-tsx-migration (PR #518): the sweep deliberately skipped e2e/ (a parallel worker owned e2e/board.smoke.spec.ts at the time). The helper at e2e/board.smoke.spec.ts:1384 still spawns the tsx wrapper CLI — the exact transient exit-1 surface root-caused in bug-row-table-flake (PR #513). Migrate it to the shared cli/src/test-spawn.ts pattern (node --import <abs loader>) or the e2e-appropriate equivalent, preserving asserted bytes. NOTE: PR #517-era board-serve work touched this file — rebase carefully.
