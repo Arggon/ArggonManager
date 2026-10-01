@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-greenfield-explore-adr
 title: "Record exploration + ADR 0017: greenfield exploration gate"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: greenfield-explore
 labels: []
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T11:21:52.364Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-greenfield-explore-adr
 ---
 <!--
