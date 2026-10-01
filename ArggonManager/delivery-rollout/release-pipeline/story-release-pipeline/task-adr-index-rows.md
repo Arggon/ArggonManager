@@ -20,10 +20,13 @@ updated: "2026-10-01"
 
 ## Context
 
-<!-- Why this task exists. -->
+Housekeeping observed during ADR 0018 (PR #537): `ArggonManager/docs/adr/README.md`
+lists 0001–0013 plus 0018 but is missing rows for ADRs 0014–0017. Statuses in
+the index must mirror the `Status:` line of each ADR file exactly.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] `docs/adr/README.md` gains rows for 0014 (zcode-native-seam), 0015 (done-gate-acceptance-waiver), 0016 (adopter-upgrade-channel — now Accepted), 0017 (greenfield-exploration-gate), each with the title and status taken verbatim from the ADR file's front matter/status line.
+- [ ] No other rows or content change in the file.
 
 ## Notes
