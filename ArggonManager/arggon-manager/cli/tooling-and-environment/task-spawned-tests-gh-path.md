@@ -10,7 +10,6 @@ labels: [tooling, testing]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-task-spawned-tests-gh-path
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-spawned-tests-gh-path.md
