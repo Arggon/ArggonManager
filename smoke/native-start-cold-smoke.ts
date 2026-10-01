@@ -42,7 +42,14 @@
  *    item file;
  * 4. a second `start` attaches deterministically (no second domain create, no
  *    duplicate claim commit) and every install stays untouched;
- * 5. teardown removes the worktree, its git registration and the whole
+ * 5. a second, install-free fixture reproduces BOTH incident flavors of
+ *    bug-start-worktree-npm-ci-claim and asserts the readiness report names
+ *    them: a sibling checkout's `.bin` on PATH runs the gate while the
+ *    worktree resolves nothing (the claim lands, the receipt names the
+ *    foreign `path` source and withholds readiness), and a worktree with no
+ *    install anywhere fails its claim commit with the error naming the
+ *    missing bin and the `npm ci` fix;
+ * 6. teardown removes the worktrees, their git registrations and the whole
  *    disposable root, and the bounded receipts are asserted along the way.
  *
  * Exit codes: 0 passed; 1 a check failed (the fixture is kept for inspection);
@@ -84,6 +91,21 @@ const ITEM_ID = "task-cold-start-smoke";
 const GATE_DEP = "native-gate-dep";
 /** Marker the pre-commit gate appends to, proving it really ran. */
 const GATE_MARKER = ".native-gate-ran";
+/**
+ * The fixture's project manifest: it declares the gate dependency, so the
+ * fixture has the realistic shape where readiness can DISCOVER the gate's
+ * binaries (bug-start-worktree-npm-ci-claim) — a manifest declaring nothing
+ * gives the gate-bin probe nothing to report.
+ */
+const FIXTURE_MANIFEST = `${JSON.stringify(
+  {
+    name: "cold-start-smoke-fixture",
+    private: true,
+    devDependencies: { [GATE_DEP]: "1.0.0" },
+  },
+  null,
+  2,
+)}\n`;
 const KEEP = process.env.ARGON_NATIVE_START_SMOKE_KEEP === "1";
 const PROJECT_ID = "cold-smoke-project";
 
@@ -317,9 +339,19 @@ function writeInstall(repo: string): void {
   mkdirSync(dep, { recursive: true });
   writeFileSync(
     join(dep, "package.json"),
-    `${JSON.stringify({ name: GATE_DEP, version: "1.0.0", main: "index.js" }, null, 2)}\n`,
+    `${JSON.stringify(
+      { name: GATE_DEP, version: "1.0.0", main: "index.js", bin: { [GATE_DEP]: "./index.js" } },
+      null,
+      2,
+    )}\n`,
   );
   writeFileSync(join(dep, "index.js"), "module.exports = 'cold-start gate dependency';\n");
+  // The .bin shim npm leaves behind for a package with a `bin` field: the
+  // readiness probe's resolution target (bug-start-worktree-npm-ci-claim).
+  const binDir = join(repo, "node_modules", ".bin");
+  mkdirSync(binDir, { recursive: true });
+  writeFileSync(join(binDir, GATE_DEP), `#!/bin/sh\nexit 0\n`, "utf8");
+  chmodSync(join(binDir, GATE_DEP), 0o755);
   // The shape npm leaves behind, so the fixture's install is a plausible one.
   writeFileSync(
     join(repo, "node_modules", ".package-lock.json"),
@@ -327,12 +359,47 @@ function writeInstall(repo: string): void {
   );
 }
 
-/** The real, executable, dependency-requiring pre-commit gate (never bypassed). */
-function writePreCommitGate(repo: string): void {
+/** The fixture's project manifest (declares the gate dependency). */
+function writeManifest(repo: string): void {
+  writeFileSync(join(repo, "package.json"), FIXTURE_MANIFEST, "utf8");
+}
+
+/**
+ * The bin-lookup gate: passes ONLY when the `native-gate-dep` binary resolves
+ * through the shell's PATH lookup — the lookup a sibling checkout's
+ * `node_modules/.bin` on PATH can satisfy even though the worktree's own
+ * install resolves nothing (bug-start-worktree-npm-ci-claim, incident 1).
+ */
+const BIN_GATE_SCRIPT = [
+  "#!/bin/sh",
+  `# task-native-start-cold-smoke: a PATH-lookup pre-commit gate.`,
+  `if ! command -v ${GATE_DEP} >/dev/null 2>&1; then`,
+  `  echo "cold-start gate: bin ${GATE_DEP} is not on PATH" >&2`,
+  "  exit 1",
+  "fi",
+  `printf 'bin gate ran in %s\\n' "$PWD" >> ${GATE_MARKER}`,
+  "",
+].join("\n");
+
+function writePreCommitGate(repo: string, script: string = GATE_SCRIPT): void {
   const hook = join(repo, ".git", "hooks", "pre-commit");
   mkdirSync(dirname(hook), { recursive: true });
-  writeFileSync(hook, GATE_SCRIPT, "utf8");
+  writeFileSync(hook, script, "utf8");
   chmodSync(hook, 0o755);
+}
+
+/**
+ * A "sibling worktree": another checkout of the fixture repo with its own
+ * install, whose `.bin` lands on PATH for the masking scenario. The absolute
+ * path is returned so the receipt's named resolution source can be asserted.
+ */
+function writeSiblingInstall(parent: string): string {
+  const sibling = join(parent, "sibling-checkout");
+  const binDir = join(sibling, "node_modules", ".bin");
+  mkdirSync(binDir, { recursive: true });
+  writeFileSync(join(binDir, GATE_DEP), `#!/bin/sh\nexit 0\n`, "utf8");
+  chmodSync(join(binDir, GATE_DEP), 0o755);
+  return join(binDir, GATE_DEP);
 }
 
 /** Recursively find `<itemId>.md` under `root` (bounded: a four-item tree). */
@@ -438,6 +505,10 @@ async function main(): Promise<void> {
   const repo = join(parent, "repo");
   mkdirSync(repo);
   let worktree = join(parent, `repo-${ITEM_ID}`);
+  /** Worktrees of the failure-flavor fixtures (section 4b), for teardown. */
+  const extraWorktrees: string[] = [];
+  /** The no-install fixture repo that owns the section-4b worktrees. */
+  const repoNoInstall = join(parent, "repo-no-install");
   console.log(`fixture: ${parent}`);
   try {
     // --- 1. the fixture: tracker, primary install, real pre-commit gate ----
@@ -458,6 +529,7 @@ async function main(): Promise<void> {
       });
     }
     writeFileSync(join(repo, ".gitignore"), "node_modules/\n", "utf8");
+    writeManifest(repo);
     gitOrThrow(repo, ["init", "-q"]);
     gitOrThrow(repo, ["config", "user.email", "cold-smoke@example.test"]);
     gitOrThrow(repo, ["config", "user.name", "Cold Start Smoke"]);
@@ -560,6 +632,17 @@ async function main(): Promise<void> {
         preparation.linkedWorkspaces.length === 0,
       `preparation: ${JSON.stringify(preparation)}`,
     );
+    const gateBins = (preparation.gateBins ?? []) as Array<Record<string, unknown>>;
+    check(
+      report,
+      "the readiness receipt names the gate bin as resolving INSIDE the worktree (bug-start-worktree-npm-ci-claim)",
+      gateBins.length === 1 &&
+        gateBins[0].name === GATE_DEP &&
+        gateBins[0].source === "worktree" &&
+        typeof gateBins[0].path === "string" &&
+        String(gateBins[0].path).startsWith(worktree),
+      `gateBins: ${JSON.stringify(gateBins)}\nworktree: ${worktree}`,
+    );
     check(
       report,
       "the readiness/claim-commit receipt stays bounded",
@@ -650,26 +733,165 @@ async function main(): Promise<void> {
       installDrift(canonicalBefore, installFingerprint(canonical)).length === 0,
       installDrift(canonicalBefore, installFingerprint(canonical)).join("; "),
     );
+
+    // --- 4b. BOTH failure flavors are named by the readiness report --------
+    // bug-start-worktree-npm-ci-claim: two independent incidents. Flavor 1
+    // (wrong resolution source): a sibling checkout's `.bin` on PATH ran the
+    // gate while the worktree resolved nothing — the claim landed and the
+    // broken install stayed invisible. Flavor 2 (missing install): no
+    // install anywhere, and the claim commit died with a bare
+    // `tsx: command not found`. Both fixtures below have NO install at all;
+    // only PATH differs.
+    const pathItemId = "task-cold-bin-path";
+    const missingItemId = "task-cold-bin-missing";
+    const pathWorktree = join(parent, `repo-no-install-${pathItemId}`);
+    const missingWorktree = join(parent, `repo-no-install-${missingItemId}`);
+    extraWorktrees.push(pathWorktree, missingWorktree);
+    {
+      runInit({ dir: repoNoInstall, force: false });
+      const chain2: Array<[string, string, string | undefined, string]> = [
+        ["initiative", "Bin resolution", undefined, "bin-resolution"],
+        ["epic", "Cold flavors", "bin-resolution", "cold-flavors"],
+        ["story", "Named failures", "cold-flavors", "named-failures"],
+        ["task", "Sibling path masking", "named-failures", "cold-bin-path"],
+        ["task", "Missing install", "named-failures", "cold-bin-missing"],
+      ];
+      for (const [type, title, parentId, id] of chain2) {
+        runCreate({
+          cwd: repoNoInstall,
+          type: type as "initiative" | "epic" | "story" | "task",
+          title,
+          ...(parentId !== undefined ? { parent: parentId } : {}),
+          ...(id !== "" ? { id } : {}),
+        });
+      }
+      writeManifest(repoNoInstall);
+      gitOrThrow(repoNoInstall, ["init", "-q"]);
+      gitOrThrow(repoNoInstall, ["config", "user.email", "cold-smoke@example.test"]);
+      gitOrThrow(repoNoInstall, ["config", "user.name", "Cold Start Smoke"]);
+      gitOrThrow(repoNoInstall, ["config", "maintenance.auto", "false"]);
+      gitOrThrow(repoNoInstall, ["add", "-A"]);
+      gitOrThrow(repoNoInstall, ["commit", "-qm", "chore: fixture (no install)"]);
+      // The gate looks the binary up through the shell (PATH), like `npm run`
+      // resolves `tsx` — never bypassed, no --no-verify anywhere.
+      writePreCommitGate(repoNoInstall, BIN_GATE_SCRIPT);
+
+      const { domain: domain2 } = worktreeDomain(repoNoInstall);
+      const defs2: ArgonToolDefinition[] = argonToolDefinitions(kernel, {
+        cwd: repoNoInstall,
+        templatesDir: pluginTemplatesDir(),
+        worktree: { projectID: PROJECT_ID, canonical: repoNoInstall, domain: domain2 },
+      });
+      const start2 = (id: string): Promise<{ output: Record<string, unknown> }> => {
+        const definition = defs2.find((candidate) => candidate.name === "start");
+        if (definition === undefined) throw new Error("the native namespace has no start tool");
+        return definition.execute(
+          { id, assignee: "cold-smoke" },
+          { sessionID: "cold-smoke" },
+        ) as Promise<{ output: Record<string, unknown> }>;
+      };
+      const preparationOf = (envelope: Record<string, unknown>): Record<string, unknown> =>
+        (envelope.preparation ?? {}) as Record<string, unknown>;
+      const gateBinsOf = (envelope: Record<string, unknown>): Array<Record<string, unknown>> =>
+        (preparationOf(envelope).gateBins ?? []) as Array<Record<string, unknown>>;
+
+      // Flavor 1: the sibling's bin masks the absent worktree install — the
+      // gate PASSES and the claim lands, but the receipt must name the
+      // foreign resolution and withhold readiness.
+      const savedPath = process.env.PATH ?? "";
+      const siblingBin = writeSiblingInstall(parent);
+      process.env.PATH = `${dirname(siblingBin)}:${savedPath}`;
+      let masked: Record<string, unknown>;
+      try {
+        masked = (await start2(pathItemId)).output;
+      } finally {
+        process.env.PATH = savedPath;
+      }
+      const maskedBins = gateBinsOf(masked);
+      check(
+        report,
+        "flavor 1 (wrong resolution source): a sibling .bin on PATH runs the gate, and the receipt names it",
+        masked.ok === true &&
+          masked.claimCommitted === true &&
+          masked.worktreePath === pathWorktree &&
+          preparationOf(masked).ready === false &&
+          preparationOf(masked).install === "missing" &&
+          maskedBins.length === 1 &&
+          maskedBins[0].name === GATE_DEP &&
+          maskedBins[0].source === "path" &&
+          maskedBins[0].path === siblingBin,
+        `gateBins: ${JSON.stringify(maskedBins)}\nsibling bin: ${siblingBin}\nmarker: ${existsSync(join(pathWorktree, GATE_MARKER))}`,
+      );
+
+      // Flavor 2: no install anywhere, nothing on PATH — the claim commit
+      // fails, and the typed failure names the missing bin and the exact fix.
+      let missingEnvelope: Record<string, unknown> = {};
+      let missingError = "";
+      try {
+        await start2(missingItemId);
+        missingError = "start unexpectedly succeeded";
+      } catch (error) {
+        missingEnvelope = ((error as { envelope?: unknown }).envelope ?? {}) as Record<
+          string,
+          unknown
+        >;
+        const failure = (missingEnvelope.error ?? {}) as Record<string, unknown>;
+        missingError = String(failure.message ?? error);
+      }
+      const missingBins = gateBinsOf(missingEnvelope);
+      check(
+        report,
+        "flavor 2 (missing install): the claim commit fails, and the failure names the missing bin + the npm ci fix",
+        missingEnvelope.ok === false &&
+          missingEnvelope.claimCommitted === false &&
+          missingWorktree !== undefined &&
+          existsSync(missingWorktree) &&
+          preparationOf(missingEnvelope).install === "missing" &&
+          missingBins.length === 1 &&
+          missingBins[0].name === GATE_DEP &&
+          missingBins[0].source === "missing" &&
+          missingBins[0].path === undefined &&
+          missingError.includes("not resolvable from the worktree") &&
+          missingError.includes("npm ci"),
+        `gateBins: ${JSON.stringify(missingBins)}\nerror: ${missingError.split("\n").slice(0, 6).join("\n")}`,
+      );
+    }
   } catch (error) {
     report.passed = false;
     console.error(`      harness error: ${error instanceof Error ? error.message : String(error)}`);
   } finally {
-    // --- 5. teardown: no worktree, no registration, no leftover process ---
+    // --- 7. teardown: no worktree, no registration, no leftover process ---
     // Every spawn above is synchronous or awaited by the plugin, so nothing of
     // this run is still running here; what teardown owns is the filesystem and
     // git state. Best-effort by design: a harness error must not mask the
     // checks that already failed.
     const teardownErrors: string[] = [];
     const isRepo = existsSync(join(repo, ".git"));
-    for (const dir of [worktree, join(parent, "cold-probe")]) {
-      if (!isRepo || !existsSync(dir)) continue;
-      const removed = git(repo, ["worktree", "remove", "--force", dir]);
+    const isRepoNoInstall = existsSync(join(repoNoInstall, ".git"));
+    for (const dir of [worktree, join(parent, "cold-probe"), ...extraWorktrees]) {
+      if (!existsSync(dir)) continue;
+      // git worktree remove needs the repo the worktree belongs to; a
+      // failure-flavor worktree belongs to its own fixture repo.
+      const fromRepoNoInstall = extraWorktrees.includes(dir);
+      const owner = fromRepoNoInstall ? repoNoInstall : repo;
+      if (fromRepoNoInstall && !isRepoNoInstall) {
+        // The harness died before the fixture repo existed: fall back to a
+        // plain recursive remove so teardown still leaves nothing behind.
+        rmSync(dir, { recursive: true, force: true });
+        continue;
+      }
+      const removed = git(owner, ["worktree", "remove", "--force", dir]);
       if (removed.code !== 0)
         teardownErrors.push(`worktree remove ${dir}: ${removed.stderr.trim()}`);
     }
     if (isRepo) {
       const pruned = git(repo, ["worktree", "prune"]);
       if (pruned.code !== 0) teardownErrors.push(`worktree prune: ${pruned.stderr.trim()}`);
+    }
+    if (isRepoNoInstall) {
+      const pruned = git(repoNoInstall, ["worktree", "prune"]);
+      if (pruned.code !== 0)
+        teardownErrors.push(`worktree prune (no-install): ${pruned.stderr.trim()}`);
     }
     const registered = isRepo
       ? git(repo, ["worktree", "list", "--porcelain"])
@@ -678,7 +900,16 @@ async function main(): Promise<void> {
           .map((line) => line.slice("worktree ".length).trim())
           .filter((dir) => resolve(dir) !== resolve(repo))
       : [];
-    const leftover = [worktree, join(parent, "cold-probe")].filter((dir) => existsSync(dir));
+    const registeredNoInstall = isRepoNoInstall
+      ? git(repoNoInstall, ["worktree", "list", "--porcelain"])
+          .stdout.split("\n")
+          .filter((line) => line.startsWith("worktree "))
+          .map((line) => line.slice("worktree ".length).trim())
+          .filter((dir) => resolve(dir) !== resolve(repoNoInstall))
+      : [];
+    const leftover = [worktree, join(parent, "cold-probe"), ...extraWorktrees].filter((dir) =>
+      existsSync(dir),
+    );
     // A failed run keeps its fixture for inspection (the age-gated `arggon-*`
     // tmpdir purge in test/teardown-tmp.ts reclaims it later); a passing run
     // leaves nothing behind at all.
@@ -687,11 +918,15 @@ async function main(): Promise<void> {
     check(
       report,
       "the worktree and its git registration are gone",
-      registered.length === 0 && leftover.length === 0 && teardownErrors.length === 0,
+      registered.length === 0 &&
+        registeredNoInstall.length === 0 &&
+        leftover.length === 0 &&
+        teardownErrors.length === 0,
       [
         ...teardownErrors,
         ...leftover.map((dir) => `left behind: ${dir}`),
         ...registered.map((dir) => `still registered: ${dir}`),
+        ...registeredNoInstall.map((dir) => `still registered (no-install fixture): ${dir}`),
       ].join("; "),
     );
     if (keep) {
@@ -701,7 +936,7 @@ async function main(): Promise<void> {
     }
   }
 
-  // --- 6. the harness wrote nothing outside its disposable root ----------
+  // --- 8. the harness wrote nothing outside its disposable root ----------
   const checkoutAfter = gitOrThrow(repoRoot, ["status", "--porcelain", "--untracked-files=all"]);
   check(
     report,

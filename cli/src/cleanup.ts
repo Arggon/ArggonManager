@@ -36,6 +36,25 @@ export {
   type MergedPr,
 } from "@arggondev/lib";
 
+/**
+ * Envelope text bound (bug-cli-cleanup-branch-delete-missing-failure):
+ * untrusted git text enters the `--json` envelope bounded and single-line —
+ * control characters become spaces, then the value clips at `max` characters
+ * with an elision mark. Same shape as the native plugin's `boundedNativeText`
+ * + `MAX_NATIVE_DETAIL_CHARS`. The `sanitizeHumanError`/`clipHumanValue`
+ * helpers in `lib/src/sanitize.ts` are the HUMAN channel (2000 chars plus
+ * escaping) and must never be reused here: the envelope is a machine surface.
+ */
+export const MAX_ENVELOPE_DETAIL_CHARS = 500;
+
+export function boundedEnvelopeText(value: unknown, max: number): string {
+  const text = (typeof value === "string" ? value : String(value)).replace(
+    /[\u0000-\u001f\u007f]/g,
+    " ",
+  );
+  return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
 export type CleanupOptions = {
   cwd: string;
   /**
@@ -172,8 +191,15 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
           } catch (err) {
             // Race: pre-flight passed but the delete failed. The worktree is
             // already gone, so its record is obsolete either way; report the
-            // leftover branch explicitly and keep the run going.
-            const message = err instanceof Error ? err.message : String(err);
+            // leftover branch explicitly and keep the run going. The failure
+            // is reported on BOTH surfaces — the structured `pruned` action
+            // AND the flat `failures` list, which would otherwise read as a
+            // clean run (bug-cli-cleanup-branch-delete-missing-failure).
+            const message = boundedEnvelopeText(
+              err instanceof Error ? err.message : String(err),
+              MAX_ENVELOPE_DETAIL_CHARS,
+            );
+            failures.push(`${entry.id}: ${message}`);
             pruned.push({
               id: entry.id,
               action: "failed",
@@ -193,8 +219,13 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
       } catch (err) {
         // Per-candidate failure: nothing is orphaned (the worktree_path
         // record stays only while the worktree still exists); the run
-        // continues and CLEANUP_FAILED is not raised.
-        const message = err instanceof Error ? err.message : String(err);
+        // continues and CLEANUP_FAILED is not raised. Same envelope bound
+        // as the branch-delete catch above, on BOTH surfaces
+        // (bug-cli-cleanup-branch-delete-missing-failure, acceptance box 1).
+        const message = boundedEnvelopeText(
+          err instanceof Error ? err.message : String(err),
+          MAX_ENVELOPE_DETAIL_CHARS,
+        );
         failures.push(`${entry.id}: ${message}`);
         pruned.push({ id: entry.id, action: "failed", error: message });
       }
