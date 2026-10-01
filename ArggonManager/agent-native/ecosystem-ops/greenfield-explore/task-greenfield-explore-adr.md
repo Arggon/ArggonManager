@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-greenfield-explore-adr
 title: "Record exploration + ADR 0017: greenfield exploration gate"
+assignee: Arggon
+branch: feat/task-greenfield-explore-adr
 parent: greenfield-explore
 labels: []
 created: "2026-10-01"
 updated: "2026-10-01"
+claimed_at: "2026-10-01T11:21:52.364Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-greenfield-explore-adr
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/greenfield-explore/task-greenfield-explore-adr.md
@@ -118,16 +122,22 @@ too large for a paragraph and too load-bearing to bury in an existing file).
 
 ## Acceptance
 
-- [ ] `ArggonManager/docs/explorations/exploration-greenfield-exploration-015.md` (use the next free number; `exploration_id: greenfield-exploration-015`) records C1/C2/C3, the criteria, F1–F5 with dated sources (the three GitHub skill paths + the repo files, accessed 2026-10-01), the recommendation (C1), and the six-phase protocol as the proposed methodology.
-- [ ] The exploration doc follows the existing exploration doc structure (frontmatter `exploration_id`/`title`/`status: open`, Candidates/Criteria/Findings/Recommendation/Decision sections — see `exploration-methodology-improvements-014.md` as the quality bar).
-- [ ] `ArggonManager/docs/adr/0017-greenfield-exploration-gate.md` (verify the next free 4-digit id under `docs/adr/` first): Context / Decision / Consequences / Alternatives considered, per `docs/engineering.md` §ADR process; Decision states the protocol is the **default first phase for greenfield work** and the hard gate (no implementation task claimed before an approved spec with a clean `spec analyze`).
-- [ ] The exploration's Decision section links the ADR (placeholder while Proposed is fine; link format as in other explorations).
-- [ ] `npm run arggon -- validate` ok; no files touched outside `docs/explorations/` and `docs/adr/`.
+- [x] `ArggonManager/docs/explorations/exploration-greenfield-exploration-015.md` (use the next free number; `exploration_id: greenfield-exploration-015`) records C1/C2/C3, the criteria, F1–F5 with dated sources (the three GitHub skill paths + the repo files, accessed 2026-10-01), the recommendation (C1), and the six-phase protocol as the proposed methodology.
+- [x] The exploration doc follows the existing exploration doc structure (frontmatter `exploration_id`/`title`/`status: open`, Candidates/Criteria/Findings/Recommendation/Decision sections — see `exploration-methodology-improvements-014.md` as the quality bar).
+- [x] `ArggonManager/docs/adr/0017-greenfield-exploration-gate.md` (verify the next free 4-digit id under `docs/adr/` first): Context / Decision / Consequences / Alternatives considered, per `docs/engineering.md` §ADR process; Decision states the protocol is the **default first phase for greenfield work** and the hard gate (no implementation task claimed before an approved spec with a clean `spec analyze`).
+- [x] The exploration's Decision section links the ADR (placeholder while Proposed is fine; link format as in other explorations).
+- [x] `npm run arggon -- validate` ok; no files touched outside `docs/explorations/` and `docs/adr/`.
 
 ## Notes
 
 PR references this item id. Never flip this item done yourself — the
 coordinator flips after merge verification.
+
+Change set (2026-10-01): only the two docs above were created; the only other
+edit is this item file's checkboxes/notes (tracker artifact). `arggon validate`
+ok:true with zero errors/warnings. ADR left at Status: Proposed per the design
+brief; the hard-gate wording follows the item body / step-4 phrasing ("a spec
+exists and `arggon spec analyze` reports no NEW findings").
 
 ### 2026-10-01 @Arggon
 Change recorded on branch feat/task-greenfield-explore-adr (commit 8e59da92), PR Arggon/ArggonManager#519 (draft).
