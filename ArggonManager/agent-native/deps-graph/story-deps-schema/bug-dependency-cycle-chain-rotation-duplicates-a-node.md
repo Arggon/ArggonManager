@@ -3,11 +3,12 @@ type: bug
 status: todo
 id: bug-dependency-cycle-chain-rotation-duplicates-a-node
 title: Cycle chain rotation duplicates a node
+branch: fix/bug-dependency-cycle-chain-rotation-duplicates-a-node
 parent: story-deps-schema
 labels: [testing, kernel, property-based]
 priority: p2
 created: "2026-09-29"
-updated: "2026-09-29"
+updated: "2026-10-01"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/deps-graph/story-deps-schema/bug-dependency-cycle-chain-rotation-duplicates-a-node.md
