@@ -79,3 +79,7 @@ Resolution + gates evidence (PR #558).
 ### handoff 2026-10-01 @Arggon (session: ses_f0735ed79ffemPirGuKKl8PhYs) — next: Review PR #558 (do not merge from this session); squash-merge after approval
 - branch: feat/task-spawned-tests-gh-path
 - open questions: Run-1 no-gh flake unreproduced (runs 2-5 clean); git-config fallback may surprise @me filters only when gh absent AND git identity equals an assignee login
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Merged: PR #558 squash -> main (worker gates green; no-gh simulation 4x clean; both checklist copies — worker's and my filed-comment duplicate — now ticked consistently). Item done.
