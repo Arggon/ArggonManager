@@ -27,3 +27,12 @@ updated: "2026-10-01"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Filed from the bug-row-table-flake investigation evidence (PR #513): during 6 full-suite runs under deliberate 12-core saturation + shuffle, the row-table suite never failed, but OTHER spawn-heavy files showed the same transient class (exit-1/timeout under load; headless-ci packed-bin and pack named by the worker; one failure observed live while a sibling session's suite ran concurrently). The row-table instance was root-caused to the tsx wrapper's IPC server (fixed by #513); these siblings share the spawn-under-load pattern.
+
+## Acceptance
+- [ ] Reproduce under controlled load (saturation + shuffle loops) and identify which lanes flake; capture stderr via diagnosable assertion messages (PR #513 pattern) where missing.
+- [ ] For each confirmed lane: either remove the spawn-chain nondeterminism (see task-runcli-import-tsx-migration) or make the wait deterministic (readiness signal, not sleep).
+- [ ] Lane-specific retries removed once root-caused; any remaining retry documents its rationale in the test.
