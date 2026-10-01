@@ -2,7 +2,7 @@
 type: task
 status: todo
 id: task-env-contract-start
-title: env-contract-start
+title: Implement the worktree env contract in start (spec worktree-env-contract-015)
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [kernel, cli, worktree]
 created: "2026-10-01"
