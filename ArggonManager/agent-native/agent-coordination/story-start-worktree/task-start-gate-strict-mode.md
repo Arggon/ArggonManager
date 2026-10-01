@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-start-gate-strict-mode
 title: "Opt-in strict start gate: fail the claim commit when a reported gate bin resolves outside the worktree (x-tracker flag)"
 assignee: Arggon
