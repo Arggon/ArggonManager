@@ -25,8 +25,9 @@ Implements [ADR 0018](../../../../docs/adr/0018-update-delivery-and-distribution
 + [plan-release-pipeline-015](../../../../docs/plans/plan-release-pipeline-015.md)
 (hard gate: `spec analyze --baseline` reports no NEW findings before this item
 is claimed). Gated on `task-ci-seam-pin-tracks-release` (plan T0: the seam pin
-must be derived — with the spec's release-window skip semantics — before this
-lands). The publish workflow file MUST be named `release.yml` — the npmjs.com
+stays **literal** with the lag-guard test — enforced non-divergence, run-time
+derivation rejected per the recorded decision on that item, 2026-10-01 —
+before this lands). The publish workflow file MUST be named `release.yml` — the npmjs.com
 trusted-publisher configuration (human, one-time) binds to that filename.
 Ownership per spec C3: `release-please.yml` maintains the release PR only
 (default `GITHUB_TOKEN`, `skip-github-release: true`); `release.yml` owns
@@ -45,7 +46,7 @@ Mirrors plan-release-pipeline-015 T1–T8 (T0 is the
 - [ ] T4 release.yml build → pack → inspect BEFORE any publish: fresh `lib/dist` + build info, pack dir created first (ENOENT gotcha), extract-and-inspect both tarballs (kernel exports, root artifacts, zero test-helper leaks, versions) per old runbook §2 (spec AC A11).
 - [ ] T5 release.yml OIDC publish: no `NPM_TOKEN`, npm ≥ 11.5.1 installed on the runner, Node ≥ 22.14; lib first with bounded `npm view` propagation poll; both publishes idempotent ("already at `V`" = success, never re-publish); tag↔version + root==lib assertion before publishing; provenance automatic (spec AC A7/A8/A9).
 - [ ] T6 both packed tarballs attached to the GitHub Release (spec AC A10).
-- [ ] T7 `release.md` shrunk to the operator's exception manual (one-time npmjs.com trusted-publisher setup for both packages bound to `release.yml` with direct publish allowed; publish-time misconfig recovery; partial-failure re-run; propagation-lag rationale; rebase-over-release-commit; from-source-install shadow; pack-dir ENOENT; manual bump/pack/publish removed — the re-pin step superseded by `task-ci-seam-pin-tracks-release`); `ArggonManager/docs/ci.md` gains the install-from-release-asset variant (spec AC A14/A15).
+- [ ] T7 `release.md` shrunk to the operator's exception manual (one-time npmjs.com trusted-publisher setup for both packages bound to `release.yml` with direct publish allowed; publish-time misconfig recovery; partial-failure re-run; propagation-lag rationale; rebase-over-release-commit; from-source-install shadow; pack-dir ENOENT; manual bump/pack/publish removed — the re-pin step stays, made guard-enforced by `task-ci-seam-pin-tracks-release` ("a stale pin is a red test, not a silent outage")); `ArggonManager/docs/ci.md` gains the install-from-release-asset variant (spec AC A14/A15).
 - [ ] T8 Evidence: both workflow YAMLs linted (actionlint or equivalent); offline-as-possible smoke (guard paths, pack + inspect, release-please dry-run) with expected-vs-observed in the PR; CI lanes green; spec ACs A1–A17 re-checked and ticked before merge; PR notes publishing stays inert (fails closed) until the human completes the npmjs.com trusted-publisher setup, and that renaming `release.yml` is a breaking ops change (spec AC A16/A17).
 
 ## Notes
