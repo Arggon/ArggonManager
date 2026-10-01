@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-start-worktree-npm-ci-claim
 title: start --worktree claim commit failed in a fresh worktree until a manual npm ci (tsx resolved from a sibling worktree)
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [worktree, review-followup]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T02:44:39.575Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-start-worktree-npm-ci-claim
 ---
 <!--
