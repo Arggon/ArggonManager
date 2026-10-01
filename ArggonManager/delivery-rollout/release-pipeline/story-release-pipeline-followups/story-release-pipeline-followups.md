@@ -1,6 +1,6 @@
 ---
 type: story
-status: todo
+status: done
 id: story-release-pipeline-followups
 title: Release pipeline follow-ups
 parent: release-pipeline

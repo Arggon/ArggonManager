@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-release-action-sha-pin
 title: SHA-pin googleapis/release-please-action@v4 in release-please.yml
 assignee: Arggon
@@ -10,9 +10,7 @@ labels: [ci, release, supply-chain]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T21:39:41.253Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-release-action-sha-pin
-claimed_at: "2026-10-01T21:55:34.972Z"
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/task-release-action-sha-pin.md
