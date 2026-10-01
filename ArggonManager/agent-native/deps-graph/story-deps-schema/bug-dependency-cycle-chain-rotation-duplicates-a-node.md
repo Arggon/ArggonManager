@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-dependency-cycle-chain-rotation-duplicates-a-node
 title: Cycle chain rotation duplicates a node
 assignee: Arggon
@@ -10,10 +10,8 @@ labels: [testing, kernel, property-based]
 priority: p2
 created: "2026-09-29"
 updated: "2026-10-01"
-claimed_at: "2026-09-30T23:56:05.641Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-dependency-cycle-chain-rotation-duplicates-a-node
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/deps-graph/story-deps-schema/bug-dependency-cycle-chain-rotation-duplicates-a-node.md
   Leaves live only under a story. id is the filename stem: bug-dependency-cycle-chain-rotation-duplicates-a-node.
