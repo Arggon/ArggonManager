@@ -73,3 +73,7 @@ verdict: approve (lead-architect review, PR #514; mechanical pass completed by c
 - Smoke: real-seam A/B on disposable clones — pre-fix start refuses the dirty tracked file (bug reproduced), post-fix start --worktree succeeds with the same dirty file ignored and the claim commit carrying only the item file; fresh clone carries no tracked .zcode content. Migration note for existing checkouts in the PR.
 - Ticks honest (decision + rationale + verification recorded on the item); cosmetic leading-dot-trim finding documented, not drive-by fixed.
 - Worker finding 1 (cold-start claim-commit failure needing manual npm ci) matches the two incidents already tracked on bug-start-worktree-npm-ci-claim — in flight this wave.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Merged: PR #514 squash -> main (CI green). Item flipped done. NOTE for all sessions: after pulling main, .zcode/ churn no longer blocks start — the stash dance is dead.
