@@ -43,3 +43,11 @@ PR #517 (merged) added named-source readiness reporting (gateBins) and task-star
 - [ ] Identify the race/ordering defect (prep skipped when node_modules partially exists? post-start hook timing? workspace pre-build gated on a stale readiness check?) and fix it so a fresh start --worktree ALWAYS leaves a gate-usable install (or fails start itself with the named cause).
 - [ ] smoke:native-start-cold extended: N sequential cold starts on fresh fixtures, ALL with gateBins resolving inside the worktree and claim commits passing first try.
 - [ ] Five incident signatures each covered by a test or documented as fixed-by-the-same-fix.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+SIXTH incident, from the task-cycle-set-canonical worker (PR #528): start --worktree laid no link farm; claim commit skipped with 'tsx: command not found'; worker recovered with a worktree-local npm ci (tracker mutations after that point committed normally). Pattern unchanged across all six: prep intermittently absent exactly when the claim commit first needs the gate.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+SEVENTH incident, from the task-e2e-board-serve-wrapper worker (PR #530): start's claim commit was silently SKIPPED (no error surfaced at claim time) because the worktree had no node_modules; worker hand-built the link farm (primary symlinks, @arggondev/lib repointed, build). New detail vs prior six: the skip was SILENT at claim time — the worker only noticed when the pre-commit failed later. Strengthens the instrumentation acceptance: silent skips must be impossible (report or fail, never skip quietly).
