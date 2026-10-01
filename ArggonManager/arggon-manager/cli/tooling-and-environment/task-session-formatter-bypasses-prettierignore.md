@@ -101,3 +101,7 @@ npm test → 112 files / 1980 passed / 0 failed (headless-ci needed npm run buil
 ### handoff 2026-10-01 @Arggon (session: ses_f087fbfe8ffeB7CicWxFX7KC1U) — next: Coordinator review of PR #531 (config+doc only); merge flips the item — checklist already ticked, evidence comment recorded.
 - branch: feat/task-session-formatter-bypasses-prettierignore
 - open questions: Apply the same cwd-anchoring override to the GENERATED opencode.jsonc template for adopters? Also: native start left the worktree without node_modules (gate failed once) — expected?
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Merged: PR #531 squash -> main (reviewer: merge, no blockers; override script verified safe + behavior-preserving; playbook bullet documents the non-simplification constraint). Item done. Follow-up filed: task-formatter-override-template (ship the anchor override in the generated template).
