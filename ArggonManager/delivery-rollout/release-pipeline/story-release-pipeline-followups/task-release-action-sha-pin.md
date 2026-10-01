@@ -10,7 +10,6 @@ labels: [ci, release, supply-chain]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-task-release-action-sha-pin
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/task-release-action-sha-pin.md
