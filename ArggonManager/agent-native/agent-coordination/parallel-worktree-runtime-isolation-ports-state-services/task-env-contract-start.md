@@ -40,3 +40,28 @@ it never blocks the claim. The reviewable contract is
 - [ ] Coordinator review verdict recorded on this item before merge.
 
 ## Notes
+
+### 2026-10-01 @ses_f0697a26fffelQHzQVRfDPIlHe
+Implemented spec-worktree-env-contract-016 in start. PR: https://github.com/Arggon/ArggonManager/pull/566 (draft, NOT merged). Branch: feat/task-env-contract-start.
+
+PER-BOX EVIDENCE (all ten ticked in the spec file):
+1. Fresh six-key write — lib/src/worktree.test.ts "writes .arggon.env with exactly the six documented keys" (raw KEY=value, LF, order) + smoke leg.
+2. Attach byte-identical — FS-level guarantee (wx open, COPYFILE_EXCL seed); kernel + CLI tests + smoke "the attach re-run leaves .arggon.env byte-identical".
+3. .env seed only-if-absent — kernel test (seed / adopter-modified kept / no-primary), receipt seededDotenv.
+4. Per-OS dirs exist — kernel test via exported env-paths mapping (env/home injectable); smoke asserts existence + <repo>-<item-id> suffix.
+5. preparation.env on both surfaces — CLI envelope additive env (parity test green unchanged, mcp-server spawns CLI); native receipt forwarded bounded (tools.test.ts assertion); json-output.md env row.
+6. Never staged/committed — smoke "claim commit stays env-free" on top of the only-the-item-file leg; CLI status check.
+7. x-worktree.env: false — parse tests (explicit false only), kernel disabled test, CLI test (claim still lands).
+8. init .gitignore — new generated destination templates/docs/gitignore (provenance-managed, created only when missing; adopter .gitignore kept); init test added.
+9. Docs — README subsection + cleanup sentence; json-output row+prose (prettier-stable); agents.md §4 subsection; convention.md env bullet; adopter template row.
+10. Gates — see below.
+
+GATES: npm test 2067/2067 (one transient fixture-race failure in one run; two subsequent full runs green); lint clean; build green; check:plugin green after the separate "chore: regen plugin bundle" commit (dd9b595e); smoke:native-start-cold 47/47 incl. 5 new env checks; npm run arggon -- validate ok:true (pre-commit gate ran on every commit).
+
+DEVIATIONS/NOTES (also in the PR body — none silent):
+- Attach is a fourth written:false case the spec left implicit; receipt reports written:false + warning "already exists — left byte-identical" (+path/gitignored when knowable). Spec bug or intent? Coordinator call; the adopter-services doc should state it.
+- Windows: by the spec's env-paths mapping both state and cache bases are %LOCALAPPDATA%, so the two dirs co-locate at %LOCALAPPDATA%/<repo>-<item-id> there. Implemented as spec'd; documented.
+- ADDITION beyond the spec: cleanup --prune now reaps a start-created .arggon.env (strict ownership: all lines must be the six KEY=value pairs; adopter-customized files/symlinks left) before git worktree remove — found as a REAL failure (cleanup refused pruning otherwise). The adopter-services pattern doc must mention this.
+- No steps-log entries for env (the env fragment is its own channel); NativePrepStep union unchanged.
+- Values strip CR/LF (hostile id/branch cannot split the format).
+- Spec/plan status fields left "proposed" (flipping is not this task's call).
