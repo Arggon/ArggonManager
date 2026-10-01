@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-release-action-sha-pin
 title: SHA-pin googleapis/release-please-action@v4 in release-please.yml
+assignee: Arggon
+branch: feat/task-release-action-sha-pin
 parent: story-release-pipeline-followups
 labels: [ci, release, supply-chain]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
+claimed_at: "2026-10-01T21:39:41.253Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-release-action-sha-pin
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/task-release-action-sha-pin.md
