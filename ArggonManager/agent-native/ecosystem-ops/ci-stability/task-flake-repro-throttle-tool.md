@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-flake-repro-throttle-tool
 title: Commit a reusable CPU-throttle + load repro harness for flaky e2e specs (CDP setCPUThrottlingRate + busy-spinners)
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [testing, flaky, board]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T18:46:47.598Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-flake-repro-throttle-tool
 ---
 <!--
