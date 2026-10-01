@@ -5,6 +5,7 @@
  * missing installs, link farms, or a failed local workspace build.
  */
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -18,10 +19,12 @@ import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  freshWorktreeInstallRefusal,
   inspectDeclaredDependencies,
   inspectGateBinResolution,
   MAX_MISSING_DEPENDENCIES,
   MAX_GATE_BINS,
+  MAX_PREP_STEPS,
   prepareWorktreeDependencies,
   strictGateBinFailure,
   strictGateBinViolations,
@@ -102,6 +105,13 @@ describe("prepareWorktreeDependencies", () => {
       missingDependenciesTotal: 0,
       // Nothing is declared, so the gate-bin probe has nothing to report.
       gateBins: [],
+      // The preparation log names the skip (bug-start-install-ordering): the
+      // primary had no install to link, which is the eight-incident record's
+      // "no install at all" flavor — never silent again.
+      steps: [
+        { step: "link", outcome: "primary-install-missing" },
+        { step: "gate-bins", outcome: "all-worktree" },
+      ],
     });
   });
 
@@ -125,6 +135,12 @@ describe("prepareWorktreeDependencies", () => {
       missingDependenciesTotal: 0,
       // Nothing declared, so no gate bin is probed and ready is unaffected.
       gateBins: [],
+      // The log names the path that ran: bare symlink (no workspace packages
+      // to shadow), probe verdict all-worktree (empty report is vacuous).
+      steps: [
+        { step: "link", outcome: "symlink-created" },
+        { step: "gate-bins", outcome: "all-worktree" },
+      ],
     });
     expect(lstatSync(join(worktree, "node_modules")).isSymbolicLink()).toBe(true);
     expect(readFileSync(join(worktree, "node_modules", "gate-dep.js"), "utf8")).toContain("true");
@@ -142,6 +158,10 @@ describe("prepareWorktreeDependencies", () => {
       ready: true,
       install: "existing",
       linkedNodeModules: false,
+      // The skip is named (bug-start-install-ordering): the worktree already
+      // had an install — an attach re-run, or a PARTIAL install left by an
+      // interrupted npm ci, reused as-is.
+      steps: expect.arrayContaining([{ step: "link", outcome: "worktree-install-present" }]),
     });
     expect(readFileSync(join(worktree, "node_modules", "local-marker"), "utf8")).toBe("keep\n");
   });
@@ -171,6 +191,13 @@ describe("prepareWorktreeDependencies", () => {
       missingDependencies: [],
       missingDependenciesTotal: 0,
       gateBins: [],
+      // The incident-relevant ordering, visible (bug-start-install-ordering):
+      // the farm was laid, then the workspace build ran and flipped.
+      steps: [
+        { step: "link", outcome: "farm-created" },
+        { step: "build", outcome: "built", pkg: "@arggondev/lib" },
+        { step: "gate-bins", outcome: "all-worktree" },
+      ],
     });
     expect(existsSync(join(worktree, "lib", "dist", "index.js"))).toBe(true);
     expect(lstatSync(join(worktree, "node_modules")).isSymbolicLink()).toBe(false);
@@ -190,8 +217,114 @@ describe("prepareWorktreeDependencies", () => {
       linkedNodeModules: true,
       builtWorkspaces: [],
       linkedWorkspaces: ["@arggondev/lib"],
+      // A failed build is a named decision, not a silent fallback
+      // (bug-start-install-ordering).
+      steps: expect.arrayContaining([
+        { step: "build", outcome: "build-failed", pkg: "@arggondev/lib" },
+      ]),
     });
     expect(existsSync(join(worktree, "lib", "dist", "index.js"))).toBe(false);
+  });
+
+  it("records a failed link when neither farm nor symlink can be created", () => {
+    const { primary, worktree } = fixture();
+    addWorkspacePackage(primary, worktree);
+    // A read-only worktree directory refuses mkdir and symlink: the whole
+    // best-effort chain degrades to `false` — and the outcome must say so
+    // instead of leaving an absent install unexplained.
+    chmodSync(worktree, 0o500);
+
+    try {
+      const receipt = prepareWorktreeDependencies(primary, worktree);
+      expect(receipt.linkedNodeModules).toBe(false);
+      // The primary HAS an install this run could not link: `unavailable`,
+      // never a ready state (bug-start-worktree-node-modules).
+      expect(receipt.install).toBe("unavailable");
+      expect(receipt.ready).toBe(false);
+      expect(receipt.steps).toContainEqual({ step: "link", outcome: "failed" });
+    } finally {
+      chmodSync(worktree, 0o755);
+    }
+  });
+
+  it("caps the preparation log and flags the truncation", () => {
+    const { primary, worktree } = fixture();
+    mkdirSync(join(primary, "node_modules"), { recursive: true });
+    // MAX_PREP_STEPS + 1 workspace packages: every build decision is recorded
+    // until the cap, then `stepsTruncated` is set — the log stays bounded
+    // without pretending it saw everything.
+    for (let index = 0; index < MAX_PREP_STEPS; index++) {
+      const name = `@scope/pkg-${index}`;
+      for (const root of [primary, worktree]) {
+        const pkg = join(root, `pkg-${index}`);
+        mkdirSync(pkg, { recursive: true });
+        writeFileSync(
+          join(pkg, "package.json"),
+          JSON.stringify({ name, version: "1.0.0", main: "dist/index.js" }),
+        );
+      }
+      const scope = join(primary, "node_modules", "@scope");
+      mkdirSync(scope, { recursive: true });
+      symlinkSync(join(primary, `pkg-${index}`), join(scope, `pkg-${index}`), "dir");
+    }
+
+    const receipt = prepareWorktreeDependencies(primary, worktree, {
+      runBuild: (pkgDir) => {
+        mkdirSync(join(pkgDir, "dist"), { recursive: true });
+        writeFileSync(join(pkgDir, "dist", "index.js"), "module.exports = 1;\n");
+        return true;
+      },
+    });
+
+    expect(receipt.steps.length).toBe(MAX_PREP_STEPS);
+    expect(receipt.stepsTruncated).toBe(true);
+  });
+});
+
+describe("freshWorktreeInstallRefusal (bug-start-install-ordering)", () => {
+  it("names the offending bin, the preparation log, and the npm ci fix", () => {
+    const refusal = freshWorktreeInstallRefusal(
+      [{ name: "tsx", source: "missing" }],
+      "/repo-worktree",
+      [
+        { step: "link", outcome: "primary-install-missing" },
+        { step: "gate-bins", outcome: "foreign-resolution" },
+      ],
+    );
+    expect(refusal).toContain("refusing the claim commit");
+    expect(refusal).toContain("fresh worktree must leave a gate-usable install");
+    expect(refusal).toContain("tsx: not resolvable from the worktree");
+    expect(refusal).toContain(
+      "Preparation ran: link:primary-install-missing, gate-bins:foreign-resolution",
+    );
+    expect(refusal).toContain("npm ci");
+    expect(refusal).toContain("/repo-worktree");
+    expect(refusal).toContain("re-run start --worktree to attach");
+  });
+
+  it("names a PATH-masked bin with its sibling source", () => {
+    const refusal = freshWorktreeInstallRefusal(
+      [{ name: "tsx", source: "path", path: "/sibling/node_modules/.bin/tsx" }],
+      "/repo-worktree",
+    );
+    expect(refusal).toContain(
+      "tsx: resolves only via PATH from /sibling/node_modules/.bin/tsx (outside the worktree)",
+    );
+  });
+
+  it("is null when every reported bin resolves from the worktree", () => {
+    expect(
+      freshWorktreeInstallRefusal(
+        [{ name: "tsx", source: "worktree", path: "/wt/node_modules/.bin/tsx" }],
+        "/wt",
+      ),
+    ).toBeNull();
+  });
+
+  it("is null for an empty report (nothing declared exposes a bin)", () => {
+    // The documented carve-out: a project with no dependency-needing gate may
+    // still have no install and commit the claim.
+    expect(freshWorktreeInstallRefusal([], "/wt")).toBeNull();
   });
 });
 
@@ -231,6 +364,10 @@ describe("prepareWorktreeDependencies reports a stale mirrored install", () => {
       // @ast-grep/cli is probed under its own name (npm's string-bin
       // convention) and reports missing.
       gateBins: [{ name: "@ast-grep/cli", source: "missing" }],
+      steps: [
+        { step: "link", outcome: "symlink-created" },
+        { step: "gate-bins", outcome: "foreign-resolution" },
+      ],
     });
   });
 

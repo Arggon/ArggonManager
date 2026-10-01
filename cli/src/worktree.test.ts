@@ -422,13 +422,15 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     expect(relinked.linkedWorkspaces).toEqual(["@arggondev/lib"]);
   });
 
-  it("names a declared dependency the mirrored primary install does not provide (bug-worktree-readiness-misses-stale-primary-install)", () => {
+  it("refuses a fresh worktree whose stale mirrored install cannot provide a declared bin (bug-worktree-readiness-misses-stale-primary-install + bug-start-install-ordering)", () => {
     const dir = initRepo();
     addFakeDependency(dir, "fake-gate-dep");
     // The measured machine state, reproduced deterministically: a declared
     // devDependency the primary's install (and therefore every link farm
-    // mirroring it) cannot resolve. Reported before this fix as `ready: true`,
-    // which is what cost two workers their structure gates.
+    // mirroring it) cannot resolve. Reported by name before this fix as
+    // `ready: true` with the claim landing anyway (incident 3's "readiness
+    // passed while the environment needed hand-install"); a start that
+    // CREATED the worktree now refuses before any claim, naming it.
     setManifest(dir, {
       name: "fixture-repo",
       dependencies: { "fake-gate-dep": "^1.0.0" },
@@ -436,42 +438,76 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     });
     const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
 
-    const result = runStart(
-      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
-      { git: localGit() },
-    );
+    const message = startError(dir, "task-alpha", "arggon");
 
-    // Non-fatal, and still a usable worktree: the install is linked, the claim
-    // landed, nothing was rolled back.
-    expect(result.linkedNodeModules).toBe(true);
-    expect(result.committed).toBe(true);
+    // The named dependency (#517's observation) inside the refusal
+    // (bug-start-install-ordering's consequence), with both remedies.
+    expect(message).toContain("fresh worktree must leave a gate-usable install");
+    expect(message).toContain("@ast-grep/cli: not resolvable from the worktree");
+    expect(message).toContain("Preparation ran: link:symlink-created");
+    expect(message).toContain("npm ci");
+    expect(message).toContain("npm install");
+    expect(message).toContain(expectedPath);
+    expect(message).toMatch(/kept/);
+    // The worktree was kept, prepared (the linked install is there) — and the
+    // claim never happened: the item copy is untouched.
     expect(existsSync(join(expectedPath, "ArggonManager"))).toBe(true);
-    // The receipt distinguishes "a linked install is present" (unchanged, still
-    // true above) from "it satisfies what the manifest declares".
-    expect(result.manifestCoverage).toBe("stale");
-    expect(result.missingDependencies).toEqual(["@ast-grep/cli"]);
-    expect(result.missingDependenciesTotal).toBe(1);
+    expect(
+      existsSync(join(expectedPath, "node_modules", "fake-gate-dep")),
+    ).toBe(true);
+    const itemCopy = join(
+      expectedPath,
+      "ArggonManager",
+      "launch",
+      "auth",
+      "login",
+      "task-alpha.md",
+    );
+    expect(readFileSync(itemCopy, "utf8")).toContain("status: todo");
+    expect(
+      git(["status", "--porcelain", "--", "ArggonManager/launch/auth/login/task-alpha.md"], expectedPath),
+    ).toBe("");
   });
 
-  it("reports a satisfied install again once a post-start hook installs locally", () => {
+  it("refuses a cold fixture whose only remedy would be the post-claim hook, and reports satisfied once the remedy installs locally", () => {
     const dir = initRepo();
     setManifest(dir, { name: "fixture-repo", devDependencies: { "hook-dep": "1.0.0" } });
-    // The documented remedy (an `npm ci` stand-in): the hook owns the
-    // worktree's install, and the report describes the state it is left in.
+    // The hook runs AFTER the claim commit, so it cannot be the PRE-claim
+    // remedy: with the declared dependency resolving nowhere at preparation
+    // time, the fresh-worktree install gate refuses (bug-start-install-ordering).
     setPostStart(
       dir,
       "mkdir -p node_modules/hook-dep && echo '{}' > node_modules/hook-dep/package.json",
     );
+    const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
 
-    const result = runStart(
+    const message = startError(dir, "task-alpha", "arggon");
+
+    expect(message).toContain("fresh worktree must leave a gate-usable install");
+    expect(message).toContain("hook-dep: not resolvable from the worktree");
+    expect(message).toContain("npm ci");
+    expect(existsSync(expectedPath)).toBe(true);
+
+    // The documented remedy — a worktree-local install (the `npm ci`
+    // stand-in) — then the attach lands the claim, and the receipt describes
+    // the state the worktree is LEFT in.
+    mkdirSync(join(expectedPath, "node_modules", "hook-dep"), { recursive: true });
+    writeFileSync(
+      join(expectedPath, "node_modules", "hook-dep", "package.json"),
+      JSON.stringify({ name: "hook-dep", version: "1.0.0" }),
+    );
+    const retry = runStart(
       { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
       { git: localGit() },
     );
-
-    expect(result.postStart?.ok).toBe(true);
-    expect(result.manifestCoverage).toBe("satisfied");
-    expect(result.missingDependencies).toEqual([]);
-    expect(result.missingDependenciesTotal).toBe(0);
+    expect(retry.worktreeCreated).toBe(false);
+    expect(retry.committed).toBe(true);
+    expect(retry.manifestCoverage).toBe("satisfied");
+    expect(retry.missingDependencies).toEqual([]);
+    expect(retry.missingDependenciesTotal).toBe(0);
+    // Attach runs no hook (creation-only), so nothing re-linked either.
+    expect(retry.postStart).toBeUndefined();
+    expect(retry.postStartRelink).toBeUndefined();
   });
 
   it("keeps the worktree, reports the failing step + remediation, and a re-run attaches", () => {

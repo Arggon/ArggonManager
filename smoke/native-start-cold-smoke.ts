@@ -47,19 +47,23 @@
  *    a second item must not change a healthy worktree — the claim lands with
  *    the same worktree-owned `gateBins` receipt (the flag changes the
  *    consequence of a foreign resolution, never the observation);
+ * 4a-2. N sequential cold starts (bug-start-install-ordering): five fresh
+ *    worktrees in a row on the strict-armed fixture, each with a link farm
+ *    laid, the workspace package built and flipped, `gateBins` resolving
+ *    inside the worktree, the gate running there, and the claim commit landing
+ *    FIRST TRY with the instrumented preparation log naming the path that ran;
  * 5. a second, install-free fixture reproduces BOTH incident flavors of
- *    bug-start-worktree-npm-ci-claim in DEFAULT mode (flag unset) and asserts
- *    the readiness report names them: a sibling checkout's `.bin` on PATH runs
- *    the gate while the worktree resolves nothing (the claim lands, the
- *    receipt names the foreign `path` source and withholds readiness), and a
- *    worktree with no install anywhere fails its claim commit with the error
- *    naming the missing bin and the `npm ci` fix;
+ *    bug-start-worktree-npm-ci-claim in DEFAULT mode (flag unset): a sibling
+ *    checkout's `.bin` on PATH (the masking flavor) and a worktree with no
+ *    install anywhere both now REFUSE the claim BEFORE the claim update
+ *    (bug-start-install-ordering — a start that created the worktree must
+ *    leave a gate-usable install or fail with the named cause); the receipt
+ *    still names the foreign `path`/`missing` source and the `npm ci` fix;
  * 5a. strict mode REFUSING (task-start-gate-strict-mode): a third fixture with
- *    the same no-install shape but `x-tracker.strict-gate-bins: true` turns
- *    both flavors into a refusal BEFORE the claim update — the not-attempted
- *    receipt names the offending bin, its observed source and the `npm ci`
- *    fix, the worktree is kept for the remediation, and the item copy stays
- *    unclaimed;
+ *    the same no-install shape but `x-tracker.strict-gate-bins: true` refuses
+ *    with the shipped strict reason — the not-attempted receipt names the
+ *    offending bin, its observed source and the `npm ci` fix, the worktree is
+ *    kept for the remediation, and the item copy stays unclaimed;
  * 6. teardown removes the worktrees, their git registrations and the whole
  *    disposable root, and the bounded receipts are asserted along the way.
  *
@@ -78,6 +82,7 @@ import { createHash } from "node:crypto";
 import {
   chmodSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -85,6 +90,7 @@ import {
   realpathSync,
   rmSync,
   statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -103,20 +109,19 @@ const GATE_DEP = "native-gate-dep";
 /** Marker the pre-commit gate appends to, proving it really ran. */
 const GATE_MARKER = ".native-gate-ran";
 /**
- * The fixture's project manifest: it declares the gate dependency, so the
- * fixture has the realistic shape where readiness can DISCOVER the gate's
- * binaries (bug-start-worktree-npm-ci-claim) — a manifest declaring nothing
- * gives the gate-bin probe nothing to report.
+ * The workspace package the fixture carries (bug-start-install-ordering): the
+ * worktree owns a copy with NO build output (gitignored), so every cold start
+ * must lay the link farm, run the package's own build in the worktree copy and
+ * flip the farm entry — the exact ordering the eight-incident record flagged —
+ * before the gate can load the package.
  */
-const FIXTURE_MANIFEST = `${JSON.stringify(
-  {
-    name: "cold-start-smoke-fixture",
-    private: true,
-    devDependencies: { [GATE_DEP]: "1.0.0" },
-  },
-  null,
-  2,
-)}\n`;
+const WORKSPACE_PKG = "@cold/libx";
+const WORKSPACE_DIR = "libx";
+/**
+ * How many sequential cold starts the smoke drives (bug-start-install-ordering
+ * acceptance: N >= 5, all first-try claims on fresh fixtures, strict armed).
+ */
+const SEQUENTIAL_COLD_STARTS = 5;
 const KEEP = process.env.ARGON_NATIVE_START_SMOKE_KEEP === "1";
 const PROJECT_ID = "cold-smoke-project";
 
@@ -131,6 +136,13 @@ const GATE_SCRIPT = [
   `# task-native-start-cold-smoke: a real, dependency-requiring pre-commit gate.`,
   `if ! node -e "require('${GATE_DEP}')" >/dev/null 2>&1; then`,
   `  echo "cold-start gate: dependency ${GATE_DEP} is not installed" >&2`,
+  "  exit 1",
+  "fi",
+  `# The workspace package must resolve to the WORKTREE's own build (the link`,
+  `# farm was flipped after the pre-build) — the primary's copy reports a`,
+  `# different build directory and fails here (bug-start-install-ordering).`,
+  `if ! node -e "const v = require('${WORKSPACE_PKG}'); process.exit(v === 'built in ' + process.cwd() ? 0 : 1)" >/dev/null 2>&1; then`,
+  `  echo "cold-start gate: ${WORKSPACE_PKG} is not the worktree's own build" >&2`,
   "  exit 1",
   "fi",
   `printf 'gate ran in %s\\n' "$PWD" >> ${GATE_MARKER}`,
@@ -368,11 +380,64 @@ function writeInstall(repo: string): void {
     join(repo, "node_modules", ".package-lock.json"),
     `${JSON.stringify({ name: GATE_DEP, lockfileVersion: 3, packages: {} }, null, 2)}\n`,
   );
+  // The workspace link npm leaves for a workspace package (the shape
+  // `primaryWorkspaceLinks` detects, bug-start-install-ordering): the primary
+  // install carries `@cold/libx -> ../../libx`.
+  const scope = join(repo, "node_modules", "@cold");
+  mkdirSync(scope, { recursive: true });
+  symlinkSync(`../../${WORKSPACE_DIR}`, join(scope, "libx"), "dir");
+  // The primary's own workspace build (the `npm ci` + `prepare` shape): the
+  // entry names the build directory, so the gate can tell which copy loaded.
+  // Gitignored — a fresh worktree never inherits it, which is what forces the
+  // per-worktree pre-build.
+  writeFileSync(
+    join(repo, WORKSPACE_DIR, "index.js"),
+    `module.exports = 'built in ' + ${JSON.stringify(repo)};\n`,
+    "utf8",
+  );
+}
+
+/**
+ * The fixture's workspace package source: a build script that emits the
+ * package entry naming ITS build directory, so the gate can tell the
+ * worktree's own build from the primary's (bug-start-install-ordering). The
+ * entry itself is gitignored — a fresh worktree never has it, which is what
+ * forces the pre-build ordering.
+ */
+function writeWorkspacePackage(repo: string): void {
+  const pkg = join(repo, WORKSPACE_DIR);
+  mkdirSync(pkg, { recursive: true });
+  writeFileSync(
+    join(pkg, "package.json"),
+    `${JSON.stringify(
+      {
+        name: WORKSPACE_PKG,
+        version: "1.0.0",
+        main: "index.js",
+        scripts: { build: "node build.js" },
+      },
+      null,
+      2,
+    )}\n`,
+  );
+  writeFileSync(
+    join(pkg, "build.js"),
+    `require("fs").writeFileSync(__dirname + "/index.js", "module.exports = 'built in ' + process.cwd();\\n");\n`,
+    "utf8",
+  );
 }
 
 /** The fixture's project manifest (declares the gate dependency). */
-function writeManifest(repo: string): void {
-  writeFileSync(join(repo, "package.json"), FIXTURE_MANIFEST, "utf8");
+function writeManifest(
+  repo: string,
+  manifest: Record<string, unknown> = {
+    name: "cold-start-smoke-fixture",
+    private: true,
+    dependencies: { [WORKSPACE_PKG]: "1.0.0" },
+    devDependencies: { [GATE_DEP]: "1.0.0" },
+  },
+): void {
+  writeFileSync(join(repo, "package.json"), `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 }
 
 /**
@@ -538,6 +603,18 @@ async function main(): Promise<void> {
       // Claimed only in section 4a, after the strict flag is armed: strict
       // mode must not change a healthy worktree (task-start-gate-strict-mode).
       ["task", "Strict mode satisfied", "cold-start", "cold-strict-happy"],
+      // Claimed by the N-sequential-cold-start loop (4a-2,
+      // bug-start-install-ordering): every one first-try, strict armed.
+      ...Array.from(
+        { length: SEQUENTIAL_COLD_STARTS },
+        (_, index) =>
+          ["task", `Sequential cold start ${index + 1}`, "cold-start", `cold-seq-${index + 1}`] as [
+            string,
+            string,
+            string | undefined,
+            string,
+          ],
+      ),
     ];
     for (const [type, title, parentId, id] of chain) {
       runCreate({
@@ -548,8 +625,9 @@ async function main(): Promise<void> {
         ...(id !== "" ? { id } : {}),
       });
     }
-    writeFileSync(join(repo, ".gitignore"), "node_modules/\n", "utf8");
+    writeFileSync(join(repo, ".gitignore"), `node_modules/\n${WORKSPACE_DIR}/index.js\n`, "utf8");
     writeManifest(repo);
+    writeWorkspacePackage(repo);
     gitOrThrow(repo, ["init", "-q"]);
     gitOrThrow(repo, ["config", "user.email", "cold-smoke@example.test"]);
     gitOrThrow(repo, ["config", "user.name", "Cold Start Smoke"]);
@@ -663,6 +741,29 @@ async function main(): Promise<void> {
         String(gateBins[0].path).startsWith(worktree),
       `gateBins: ${JSON.stringify(gateBins)}\nworktree: ${worktree}`,
     );
+    const builtWorkspaces = (preparation.builtWorkspaces ?? []) as string[];
+    const prepSteps = (preparation.steps ?? []) as Array<Record<string, unknown>>;
+    check(
+      report,
+      "the preparation log names the path that ran: farm laid, workspace built and flipped, probe verdict (bug-start-install-ordering)",
+      Array.isArray(prepSteps) &&
+        prepSteps.some((entry) => entry.step === "link" && entry.outcome === "farm-created") &&
+        prepSteps.some(
+          (entry) =>
+            entry.step === "build" && entry.outcome === "built" && entry.pkg === WORKSPACE_PKG,
+        ) &&
+        prepSteps.some((entry) => entry.step === "gate-bins" && entry.outcome === "all-worktree"),
+      `steps: ${JSON.stringify(prepSteps)}\nbuilt: ${JSON.stringify(builtWorkspaces)}`,
+    );
+    check(
+      report,
+      "the workspace package was built in the worktree and the farm entry flipped to it (the incident ordering, end to end)",
+      builtWorkspaces.includes(WORKSPACE_PKG) &&
+        existsSync(join(worktree, WORKSPACE_DIR, "index.js")) &&
+        lstatSync(join(worktree, "node_modules", "@cold", "libx")).isSymbolicLink() === true &&
+        realpathSync(join(worktree, "node_modules", "@cold", "libx")).startsWith(worktree),
+      `built: ${JSON.stringify(builtWorkspaces)}\nfarm entry: ${realpathSync(join(worktree, "node_modules", "@cold", "libx"))}`,
+    );
     check(
       report,
       "the readiness/claim-commit receipt stays bounded",
@@ -736,6 +837,27 @@ async function main(): Promise<void> {
         claimCommits === 1,
       `HEAD ${headAfterFirst.slice(0, 8)} -> ${headAfterSecond.slice(0, 8)}\nclaim commits on branch: ${claimCommits}\nclaimCommitted: ${String(second.claimCommitted)}\ngate marker lines: ${markerAfterFirst.length} -> ${markerLines} (git runs the pre-commit hook on the empty attempt too, so a second line proves the gate was never bypassed, not a second commit)\nreceipt: ${JSON.stringify(second.claimCommit)}`,
     );
+    {
+      // The attach's preparation log names the reuse decisions
+      // (bug-start-install-ordering): the install already exists (never
+      // re-laid), the workspace entry is already importable (never rebuilt).
+      const secondSteps = (((second.preparation ?? {}) as Record<string, unknown>).steps ??
+        []) as Array<Record<string, unknown>>;
+      check(
+        report,
+        "the attach re-run's preparation log names the reuse (install present, workspace entry exists)",
+        secondSteps.some(
+          (entry) => entry.step === "link" && entry.outcome === "worktree-install-present",
+        ) &&
+          secondSteps.some(
+            (entry) =>
+              entry.step === "build" &&
+              entry.outcome === "entry-exists" &&
+              entry.pkg === WORKSPACE_PKG,
+          ),
+        `steps: ${JSON.stringify(secondSteps)}`,
+      );
+    }
     const claimed = readItemData(parseFrontmatter, findItemFile(worktree, ITEM_ID) ?? "");
     check(
       report,
@@ -798,6 +920,63 @@ async function main(): Promise<void> {
       gitOrThrow(strictHappyWorktree, ["log", "--format=%s", `refs/heads/feat/${strictHappyId}`]),
     );
 
+    // --- 4a-2. N sequential cold starts, all first-try (bug-start-install-ordering)
+    // The acceptance this item adds: five fresh worktrees IN A ROW on the
+    // strict-armed fixture, each one leaving a gate-usable install (farm laid,
+    // workspace pre-built and flipped), gateBins resolving inside the
+    // worktree, and the claim commit landing FIRST TRY — with the
+    // instrumented preparation log naming the path that ran every time.
+    for (let index = 1; index <= SEQUENTIAL_COLD_STARTS; index++) {
+      const seqId = `task-cold-seq-${index}`;
+      const seq = (await start(seqId)).output;
+      const seqWorktree = String(seq.worktreePath);
+      repoOwnedWorktrees.push(seqWorktree);
+      const seqPreparation = (seq.preparation ?? {}) as Record<string, unknown>;
+      const seqBins = (seqPreparation.gateBins ?? []) as Array<Record<string, unknown>>;
+      const seqSteps = (seqPreparation.steps ?? []) as Array<Record<string, unknown>>;
+      const seqClaim = (seq.claimCommit ?? {}) as Record<string, unknown>;
+      const seqCommitted = gitOrThrow(seqWorktree, [
+        "show",
+        "--name-only",
+        "--pretty=format:",
+        "HEAD",
+      ])
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line !== "");
+      const seqItemFile = findItemFile(repo, seqId);
+      if (seqItemFile === null) throw new Error(`seeded item ${seqId}.md not found in the fixture`);
+      check(
+        report,
+        `sequential cold start ${index}/${SEQUENTIAL_COLD_STARTS}: fresh worktree, farm laid, workspace built, gate ran, claim first try (strict armed)`,
+        seq.ok === true &&
+          seq.worktreeCreated === true &&
+          seqPreparation.ready === true &&
+          seqPreparation.install === "linked" &&
+          (seqPreparation.builtWorkspaces as string[]).includes(WORKSPACE_PKG) &&
+          seqSteps.some((entry) => entry.step === "link" && entry.outcome === "farm-created") &&
+          seqSteps.some(
+            (entry) =>
+              entry.step === "build" && entry.outcome === "built" && entry.pkg === WORKSPACE_PKG,
+          ) &&
+          seqSteps.some(
+            (entry) => entry.step === "gate-bins" && entry.outcome === "all-worktree",
+          ) &&
+          seqBins.length === 1 &&
+          seqBins[0].name === GATE_DEP &&
+          seqBins[0].source === "worktree" &&
+          String(seqBins[0].path).startsWith(seqWorktree) &&
+          seq.claimCommitted === true &&
+          seqClaim.status === "committed" &&
+          readFileSync(join(seqWorktree, GATE_MARKER), "utf8").trim() ===
+            `gate ran in ${seqWorktree}` &&
+          claimCommitFaults(seqCommitted, relative(repo, seqItemFile).split(sep).join("/"))
+            .length === 0 &&
+          receiptOverBudget(seqPreparation).length === 0,
+        `gateBins: ${JSON.stringify(seqBins)}\nsteps: ${JSON.stringify(seqSteps)}\nclaim: ${JSON.stringify(seqClaim)}\ncommit paths: ${seqCommitted.join(", ")}`,
+      );
+    }
+
     // --- 4b. BOTH failure flavors are named by the readiness report --------
     // bug-start-worktree-npm-ci-claim: two independent incidents. Flavor 1
     // (wrong resolution source): a sibling checkout's `.bin` on PATH ran the
@@ -829,7 +1008,12 @@ async function main(): Promise<void> {
           ...(id !== "" ? { id } : {}),
         });
       }
-      writeManifest(repoNoInstall);
+      // No workspace package here: the manifest declares only the gate dep.
+      writeManifest(repoNoInstall, {
+        name: "cold-start-smoke-fixture-no-install",
+        private: true,
+        devDependencies: { [GATE_DEP]: "1.0.0" },
+      });
       gitOrThrow(repoNoInstall, ["init", "-q"]);
       gitOrThrow(repoNoInstall, ["config", "user.email", "cold-smoke@example.test"]);
       gitOrThrow(repoNoInstall, ["config", "user.name", "Cold Start Smoke"]);
@@ -860,35 +1044,56 @@ async function main(): Promise<void> {
         (preparationOf(envelope).gateBins ?? []) as Array<Record<string, unknown>>;
 
       // Flavor 1: the sibling's bin masks the absent worktree install — the
-      // gate PASSES and the claim lands, but the receipt must name the
-      // foreign resolution and withhold readiness.
+      // gate USED to pass through the PATH lookup and the claim landed on the
+      // broken environment (incident 1). A start that created the worktree now
+      // REFUSES the claim before the claim update, naming the sibling
+      // (bug-start-install-ordering).
       const savedPath = process.env.PATH ?? "";
       const siblingBin = writeSiblingInstall(parent);
       process.env.PATH = `${dirname(siblingBin)}:${savedPath}`;
-      let masked: Record<string, unknown>;
+      let maskedEnvelope: Record<string, unknown> = {};
+      let maskedError = "";
       try {
-        masked = (await start2(pathItemId)).output;
+        await start2(pathItemId);
+        maskedError = "start unexpectedly succeeded";
+      } catch (error) {
+        maskedEnvelope = ((error as { envelope?: unknown }).envelope ?? {}) as Record<
+          string,
+          unknown
+        >;
+        const failure = (maskedEnvelope.error ?? {}) as Record<string, unknown>;
+        maskedError = String(failure.message ?? error);
       } finally {
         process.env.PATH = savedPath;
       }
-      const maskedBins = gateBinsOf(masked);
+      const maskedBins = gateBinsOf(maskedEnvelope);
+      const maskedClaim = (maskedEnvelope.claimCommit ?? {}) as Record<string, unknown>;
       check(
         report,
-        "flavor 1 (wrong resolution source): a sibling .bin on PATH runs the gate, and the receipt names it",
-        masked.ok === true &&
-          masked.claimCommitted === true &&
-          masked.worktreePath === pathWorktree &&
-          preparationOf(masked).ready === false &&
-          preparationOf(masked).install === "missing" &&
+        "flavor 1 (wrong resolution source): the sibling .bin on PATH no longer ships a broken worktree — the fresh start refuses, naming the source",
+        maskedEnvelope.ok === false &&
+          maskedEnvelope.claimCommitted === false &&
+          maskedClaim.status === "not-attempted" &&
+          maskedClaim.reason === "fresh-worktree install gate refused" &&
+          preparationOf(maskedEnvelope).ready === false &&
+          preparationOf(maskedEnvelope).install === "missing" &&
           maskedBins.length === 1 &&
           maskedBins[0].name === GATE_DEP &&
           maskedBins[0].source === "path" &&
-          maskedBins[0].path === siblingBin,
-        `gateBins: ${JSON.stringify(maskedBins)}\nsibling bin: ${siblingBin}\nmarker: ${existsSync(join(pathWorktree, GATE_MARKER))}`,
+          maskedBins[0].path === siblingBin &&
+          maskedError.includes(`resolves only via PATH from ${siblingBin}`) &&
+          maskedError.includes("fresh worktree must leave a gate-usable install") &&
+          maskedError.includes("npm ci") &&
+          existsSync(pathWorktree) &&
+          readItemData(parseFrontmatter, findItemFile(repoNoInstall, pathItemId) ?? "").status ===
+            "todo",
+        `gateBins: ${JSON.stringify(maskedBins)}\nclaim: ${JSON.stringify(maskedClaim)}\nerror: ${maskedError.split("\n").slice(0, 6).join("\n")}`,
       );
 
-      // Flavor 2: no install anywhere, nothing on PATH — the claim commit
-      // fails, and the typed failure names the missing bin and the exact fix.
+      // Flavor 2: no install anywhere, nothing on PATH — the claim commit used
+      // to die with a bare `tsx: command not found` AFTER the claim write; the
+      // fresh-worktree install gate now refuses BEFORE any claim, with the
+      // named bin and the exact fix.
       let missingEnvelope: Record<string, unknown> = {};
       let missingError = "";
       try {
@@ -903,21 +1108,36 @@ async function main(): Promise<void> {
         missingError = String(failure.message ?? error);
       }
       const missingBins = gateBinsOf(missingEnvelope);
+      const missingClaim = (missingEnvelope.claimCommit ?? {}) as Record<string, unknown>;
+      const missingSteps = (preparationOf(missingEnvelope).steps ?? []) as Array<
+        Record<string, unknown>
+      >;
       check(
         report,
-        "flavor 2 (missing install): the claim commit fails, and the failure names the missing bin + the npm ci fix",
+        "flavor 2 (missing install): the fresh start refuses BEFORE the claim, naming the missing bin + the npm ci fix + the preparation log",
         missingEnvelope.ok === false &&
           missingEnvelope.claimCommitted === false &&
+          missingClaim.status === "not-attempted" &&
+          missingClaim.reason === "fresh-worktree install gate refused" &&
           missingWorktree !== undefined &&
           existsSync(missingWorktree) &&
           preparationOf(missingEnvelope).install === "missing" &&
+          missingSteps.some(
+            (entry) => entry.step === "link" && entry.outcome === "primary-install-missing",
+          ) &&
+          missingSteps.some(
+            (entry) => entry.step === "gate-bins" && entry.outcome === "foreign-resolution",
+          ) &&
           missingBins.length === 1 &&
           missingBins[0].name === GATE_DEP &&
           missingBins[0].source === "missing" &&
           missingBins[0].path === undefined &&
           missingError.includes("not resolvable from the worktree") &&
-          missingError.includes("npm ci"),
-        `gateBins: ${JSON.stringify(missingBins)}\nerror: ${missingError.split("\n").slice(0, 6).join("\n")}`,
+          missingError.includes("Preparation ran: link:primary-install-missing") &&
+          missingError.includes("npm ci") &&
+          readItemData(parseFrontmatter, findItemFile(repoNoInstall, missingItemId) ?? "")
+            .status === "todo",
+        `gateBins: ${JSON.stringify(missingBins)}\nsteps: ${JSON.stringify(missingSteps)}\nerror: ${missingError.split("\n").slice(0, 6).join("\n")}`,
       );
     }
 
@@ -945,7 +1165,12 @@ async function main(): Promise<void> {
           ...(id !== "" ? { id } : {}),
         });
       }
-      writeManifest(repoStrict);
+      // No workspace package here either: only the gate dep is declared.
+      writeManifest(repoStrict, {
+        name: "cold-start-smoke-fixture-strict",
+        private: true,
+        devDependencies: { [GATE_DEP]: "1.0.0" },
+      });
       const strictConfig = join(repoStrict, "ArggonManager", ".convention.yml");
       writeFileSync(
         strictConfig,
