@@ -1,6 +1,6 @@
 ---
 type: story
-status: todo
+status: done
 id: greenfield-explore
 title: "Greenfield exploration methodology: think first by default"
 parent: ecosystem-ops
