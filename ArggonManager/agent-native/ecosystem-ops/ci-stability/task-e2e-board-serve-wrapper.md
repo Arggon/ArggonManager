@@ -56,3 +56,7 @@ Migration executed on feat/task-e2e-board-serve-wrapper (worktree ../ArggonManag
 - npm run arggon -- validate → ok:true
 
 **Environment note:** start's claim commit was skipped (pre-commit needs tsx; worktree had no node_modules). Fixed by building the per-worktree link farm manually (node_modules/* → primary's install as symlinks; node_modules/@arggondev/lib → ../../lib real-dir relative link so the worktree's own lib is used), then npm run build. Nothing of this is committed (node_modules gitignored).
+
+### handoff 2026-10-01 @ses_f087fbfe9ffedOKNVd73vMVZ10 (session: ses_f087fbfe9ffedOKNVd73vMVZ10) — next: PR #530 open, do not merge (coordinator merges). Reviewer: confirm ui-smoke CI lane green at merge; re-soak the spec if the batch-1 run-3 anomaly needs explaining (see comment).
+- branch: feat/task-e2e-board-serve-wrapper
+- open questions: Batch-1 run 3 (unlogged) printed 32/33 passed — classified UI expect-timeout under load, not spawn exit-1; 20 captured consecutive runs clean
