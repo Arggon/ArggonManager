@@ -27,3 +27,15 @@ updated: "2026-10-01"
 - [ ] 
 
 ## Notes
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Filed from the bug-dependency-cycle-chain-rotation-duplicates-a-node worker's environment report (PR #506).
+
+## Context
+tools.arggon.start --worktree on a fresh worktree hit a claim-commit failure: the worktree had no npm ci install and tsx resolved from a SIBLING worktree's node_modules. The worker followed the reported remediation (worktree-local npm ci, then re-run start to attach) and the claim commit landed — so the failure/recover path worked as designed, but the readiness prep (link farm + workspace pre-build, see bug-native-start-worktree-no-install) did not cover this tsx/bin resolution case, and a sibling-worktree resolution can silently mask a broken worktree install.
+
+## Acceptance
+- [ ] Reproduce the cold-worktree claim-commit failure mode, or instrument start readiness to report WHICH node_modules tsx/bin resolve from (worktree vs primary vs sibling).
+- [ ] Either fix readiness to verify bin/tsx resolution inside the worktree, or extend the failure error to name the observed resolution source + the exact remediation (expected vs observed in the smoke).
+- [ ] npm run smoke:native-start-cold stays green; linkedNodeModules/linkedWorkspaces reporting unchanged or improved.
