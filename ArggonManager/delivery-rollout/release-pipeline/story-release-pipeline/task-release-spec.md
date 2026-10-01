@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-release-spec
 title: "Spec + plan: release pipeline (release PR + OIDC publish + exact pin + tarballs)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [delivery, spec]
 priority: p1
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T15:21:49.979Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-release-spec
 ---
 <!--
@@ -44,10 +43,10 @@ task-ci-seam-pin-tracks-release and the ADR 0018 amendment of 2026-10-01).
 - [x] Non-goals recorded: no auto-publish on push to main (enforceable form: no publish without a human-pushed version-bump commit), no standalone binaries, no `whatsnew`, no non-npm package managers.
 
 ## Noteswhat triggers `release.yml` (tag push vs release published); the CHANGELOG section format (must match the existing Keep-a-Changelog style; hand-editable in the release PR).
-- [ ] Documents the interplay: CI version guard (tags), drift gate + `ARGGON_VERSION` pin, `task-ci-seam-pin-tracks-release`, and the one-time human step (npmjs.com trusted publishers for `arggon-manager` + `@arggondev/lib`, workflow file `release.yml`, direct publish allowed).
-- [ ] Plan at `ArggonManager/docs/plans/plan-release-pipeline-NNN.md` linked to the spec; ordered tasks each with verifiable acceptance criteria; the implementation task `task-release-workflow` updated to mirror them.
-- [ ] `arggon spec validate` ok; `spec analyze --baseline <file>` reports no NEW findings (baseline committed beside the spec work); `arggon validate` ok.
-- [ ] Non-goals recorded: auto-publish on push to main; standalone binaries; `whatsnew`; non-npm package managers.
+- [x] Documents the interplay: CI version guard (tags), drift gate + `ARGGON_VERSION` pin, `task-ci-seam-pin-tracks-release`, and the one-time human step (npmjs.com trusted publishers for `arggon-manager` + `@arggondev/lib`, workflow file `release.yml`, direct publish allowed).
+- [x] Plan at `ArggonManager/docs/plans/plan-release-pipeline-015.md` linked to the spec; ordered tasks each with verifiable acceptance criteria; the implementation task `task-release-workflow` updated to mirror them.
+- [x] `arggon spec validate` ok; `spec analyze --baseline <file>` reports no NEW findings (baseline committed beside the spec work); `arggon validate` ok.
+- [x] Non-goals recorded: auto-publish on push to main; standalone binaries; `whatsnew`; non-npm package managers.
 
 ## Notes
 
