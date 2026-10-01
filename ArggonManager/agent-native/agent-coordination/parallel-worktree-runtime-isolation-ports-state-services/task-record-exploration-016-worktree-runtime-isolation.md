@@ -4,6 +4,7 @@ status: in_progress
 id: task-record-exploration-016-worktree-runtime-isolation
 title: "Record exploration 016: worktree runtime isolation"
 assignee: Arggon
+branch: feat/task-record-exploration-016-worktree-runtime-isolation
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [worktree, exploration, devex]
 created: "2026-10-01"
