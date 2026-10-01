@@ -13,7 +13,6 @@ updated: "2026-10-01"
 claimed_at: "2026-10-01T12:46:49.702Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-start-gate-strict-mode
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/story-start-worktree/task-start-gate-strict-mode.md
   Leaves live only under a story. id is the filename stem: task-start-gate-strict-mode.
@@ -44,3 +43,18 @@ This item adds the OPT-IN strict mode: `x-tracker.strict-gate-bins: true` in the
 ### 2026-10-01 @Coordinator
 
 Filed from the bug-start-worktree-npm-ci-claim review (PR #517): readiness reporting is deliberately report-only (claim commit authoritative; honest-receipt design). This item: an opt-in x-tracker flag that HARD-FAILS the claim commit when inspectGateBinResolution reports any gate bin resolving outside the worktree. Acceptance: flag documented (convention.md + json-output.md), default behavior unchanged, smoke:native-start-cold covers both modes, tests pin the failure path. Context: the full strict-mode question was truncated by the handoff field cap — recorded here in full instead.
+
+### 2026-10-01 @Arggon
+Implemented on feat/task-start-gate-strict-mode — PR #533 (ready for review; NOT merged, coordinator's call).
+
+FLAG + SEMANTICS: `x-tracker.strict-gate-bins: true` in the tracker .convention.yml (kernel TrackerConfig.strictGateBins; boolean-validated, ignore-unknown preserved). When armed, start --worktree (CLI + native) refuses the claim commit when the preparation receipt (gateBins) reports any declared gate bin resolving OUTSIDE the worktree: external (parent install), path (sibling .bin on PATH), or missing (resolves nowhere — the no-link-farm flavor). Refusal happens BEFORE the claim update (item file untouched), the worktree is kept, and the failure names each offending bin + observed source + the npm ci fix + the attach re-run. Unset = byte-identical report-only behavior; an empty gateBins report never violates the gate.
+
+DEFAULT-MODE PROOF: existing kernel/CLI/native tests + smoke sections 1-4 and 4b unchanged and green (flavor 1 still lands with a report-only receipt; flavor 2 still fails at the real gate); new CLI test runs the SAME violating fixture with the flag unset and asserts committed=true with the same gateBins receipt.
+
+FAILURE PATH PINNED AT ALL THREE LEVELS (#517 layout): lib/src/worktree.test.ts (strictGateBinViolations/strictGateBinFailure: null for worktree-sourced + empty; message pins bin+source+npm ci+worktree path for path/missing/external), cli/src/start.test.ts (refused before any commit call; default commits; strict+satisfied commits), opencode/plugins/arggon/tools.test.ts (START_FAILED, claimCommit {status: "not-attempted", reason: "strict gate-bin gate refused"}, item copy stays todo, full remediation loop — worktree-local install flips the resolution and the attach re-run commits; strict+satisfied lands).
+
+SMOKE (both modes): npm run smoke:native-start-cold 27/27 ok, exit 0 — 4a strict satisfied (flag armed, worktree-owned bin, claim lands, single claim commit on the branch); 5a strict refused BOTH flavors (path + missing: not-attempted receipt, actionable message, worktree kept, item copy todo). Default sections untouched.
+
+GATES (expected vs observed): npm test 112 files / 1994 tests passed (was 1968 at #517; +26 since incl. my 14: 5 kernel + 3 CLI + 2 native + 4 config-parse); npm run lint clean; npm run build ok; check:plugin green AFTER the separate final "chore: regen plugin bundle" commit cec576de (bundle diff is exactly the strict-gate addition — do not squash it away); npm run arggon -- validate ok:true 0 warnings. Claim commit 98e6eb72 landed through the green pre-commit gate (after a worktree-local npm ci — see the incident note below). Docs: convention.md §Tracker hygiene (config key + semantics) + json-output.md §start prose (not-attempted receipt + flag effect); §cleanup untouched (parallel PR owns it).
+
+FINDING FOR THE COORDINATOR (suspected FIFTH incident of the class, no item filed per scope rules): this item's own tools.arggon.start --worktree claim (2026-10-01T12:46Z) was skipped with "git commit failed: sh: line 1: tsx: command not found" AND the fresh worktree had NO node_modules at all — although the primary checkout HAS a full install, so linkNodeModules should have created a farm/bare symlink (the #521 no-link-farm flavor, now post-#517). Remediated per the documented path (worktree npm ci + re-run start to attach). Root cause of the missing farm not diagnosed here (out of scope) — worth a look before the class is declared closed.
