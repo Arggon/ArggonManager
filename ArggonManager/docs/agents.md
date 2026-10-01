@@ -386,13 +386,21 @@ Work items live under the tracker root (ArggonManager/) — see ArggonManager/do
 
 ### OpenCode V2
 
-`arggon init` generates the OpenCode **V2** seam (tier-1; never overwrites an existing file): a root `opencode.jsonc` — **only when the repo has no OpenCode config of its own** (`opencode.json(c)` or `.opencode/opencode.json(c)`) — carrying formatter + compaction retention and **no MCP stanza** (ADR 0011 §5/§6: MCP left the default path in W3), plus `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` and the eleven native `.opencode/commands/arggon-{next,start,done,handoff,review,status,spec,adr,explore,playbook,adopt}.md` (prompt templates that drive the native tools and write the methodology artifacts directly — no CLI-driving prose, no shell blocks). The generated `.mcp.json` still serves other clients (e.g. Claude Code), and the skills bundled under `.agents/skills/` are auto-discovered (no config needed):
+`arggon init` generates the OpenCode **V2** seam (tier-1; never overwrites an existing file): a root `opencode.jsonc` — **only when the repo has no OpenCode config of its own** (`opencode.json(c)` or `.opencode/opencode.json(c)`) — carrying a git-root-anchored prettier formatter override + compaction retention and **no MCP stanza** (ADR 0011 §5/§6: MCP left the default path in W3), plus `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` and the eleven native `.opencode/commands/arggon-{next,start,done,handoff,review,status,spec,adr,explore,playbook,adopt}.md` (prompt templates that drive the native tools and write the methodology artifacts directly — no CLI-driving prose, no shell blocks). The generated `.mcp.json` still serves other clients (e.g. Claude Code), and the skills bundled under `.agents/skills/` are auto-discovered (no config needed):
 
 ```jsonc
 {
-  // formatter + compaction retention; the native `arggon` tools come from the
-  // vendored plugin, so no MCP stanza is needed.
-  "formatter": true,
+  // formatter override + compaction retention; the native `arggon` tools come
+  // from the vendored plugin, so no MCP stanza is needed. The prettier
+  // override anchors the session formatter at the edited file's own git root,
+  // so sibling-worktree files (the `start` layout) keep their own
+  // .prettierignore — the full command is in the generated opencode.jsonc.
+  "$schema": "https://opencode.ai/config.json",
+  "formatter": {
+    "prettier": {
+      "command": ["sh", "-c", "<git-root-anchored prettier --write>", "prettier-cwd-guard", "$FILE"],
+    },
+  },
   "compaction": { "keep": { "tokens": 15000 } },
 }
 ```

@@ -64,12 +64,18 @@ is the first wave that publishes the packages.
 5. **Publish the two packages, in dependency order** (owner-run; see
    § Publishing to npm).
 6. Post-release, in a follow-up PR: pin the generated CI recipe to the released
-   seam — set `ARGGON_VERSION: "X.Y.Z"` in
-   `templates/docs/github/workflows/arggon.yml` and regenerate the committed
-   `.github/workflows/arggon.yml` (`arggon init`) so adopters' drift gates
-   compare against the released package instead of a moving pin
-   (task-ci-recipe-published-one-liner: the recipe installs from the registry,
-   no GitHub clone).
+   seam — set `ARGGON_VERSION: "X.Y.Z"` in BOTH
+   `templates/docs/github/workflows/arggon.yml` (what adopters vendor) and the
+   committed `.github/workflows/arggon.yml` (this repo's own CI; the pin is a
+   literal on purpose, `task-ci-seam-pin-tracks-release` — deriving it from
+   `package.json` would install the bumped version between the step-1 bump and
+   the step-5 publish, before the registry has it), and regenerate the seam
+   (`arggon init`) so adopters' drift gates compare against the released
+   package instead of a moving pin (task-ci-recipe-published-one-liner: the
+   recipe installs from the registry, no GitHub clone). The lag guard
+   `cli/src/ci-seam-pin.test.ts` (runs in `npm test`) fails until the pin
+   matches the regenerated seam — move both pins in the same PR as the
+   regeneration.
 
 ## Publishing to npm
 

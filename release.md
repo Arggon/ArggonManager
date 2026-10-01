@@ -78,6 +78,10 @@ self-reports the exact release commit.
   `.github/workflows/arggon.yml` to the released version — CI validates the
   committed seam against what that version generates, and a stale pin turns
   `tasks-validate` red on main and every open PR (hit at 0.4.1: the init
-  regeneration was 0.4.1-shaped while the pin said 0.4.0).
-  `task-ci-seam-pin-tracks-release` tracks deriving the pin from
-  `package.json` so this cannot diverge again.
+  regeneration was 0.4.1-shaped while the pin said 0.4.0). The pin is a
+  literal on purpose (`task-ci-seam-pin-tracks-release`): deriving it from
+  `package.json` would install the bumped version between the step-1 bump
+  and the step-3 publish, before the registry has it — guaranteed red on
+  main and on every PR. The re-pin is enforced by
+  `cli/src/ci-seam-pin.test.ts` — a stale pin is a red test naming this
+  step, not a silent outage.
