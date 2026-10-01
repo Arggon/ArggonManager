@@ -50,3 +50,13 @@ Chosen invariant (now enforced by cli/src/ci-seam-pin.test.ts): the literal pin 
 Diff shape: .github/workflows/arggon.yml reverted to the literal pin (comment now records why derivation was rejected); release.md re-pin step = "a stale pin is a red test, not a silent outage" (guard-enforced re-pin); the untracked guard test finished (pure lag predicate + red-case table + template-still-pins-literally assertions); cli/src/headless-ci.test.ts REVERTED to main (its inherited additions asserted derivation — wrong under this decision; the template assertions moved into the guard test, so the slow network suite is untouched).
 
 Follow-ups for the coordinator (not filed): (a) ADR 0018 §Decision 1 parenthetical says "derive the seam's ARGGON_VERSION pin" — it contradicts this decision and needs a one-line amendment PR (outside this item's file scope); (b) primary checkout still shows cli/src/headless-ci.test.ts dirty despite stash@{0} "seam-pin worker diagnostics...".
+
+### 2026-10-01 @ses_f08092f0bffe681eueaMGezSgZ
+PR: https://github.com/Arggon/ArggonManager/pull/544 (branch feat/task-ci-seam-pin-tracks-release, commit a162e280 on top of the claim commit).
+
+Evidence for the reviewer (commands run in the worktree ../ArggonManager-task-ci-seam-pin-tracks-release):
+- npx vitest run cli/src/ci-seam-pin.test.ts — expected pass, observed 6/6 passed (617ms): verdict-table greens (whole release flow), red cases (#527 shape, newest-stamp-wins), file-based guard, repo-workflow-never-derives, template-still-pins-literally.
+- RED demonstration (smoke gate): sed the workflow pin 0.4.1 -> 0.4.0, run the file-based test — observed FAIL with "ARGGON_VERSION 0.4.0 lags the committed seam ... Bump ARGGON_VERSION ... (release runbook Gotchas: \"Re-pin the seam check\"). A stale pin is a red test, not a silent outage."; restored the file, re-run — 6/6 green. Restored bytes verified by the green run + git diff cleanliness before commit.
+- npx prettier -c (3 touched files) — one auto-format fix on the test file, then clean; npx eslint cli/src/ci-seam-pin.test.ts — clean; npx tsc -p tsconfig.typecheck.json — exit 0; npm run arggon -- validate — ok (0 warning(s), convention v5), also green in the pre-commit hook of commit a162e280.
+- cli/src/headless-ci.test.ts: REVERTED byte-identical to main (inherited additions asserted the rejected derivation approach; template assertions folded into the guard test) — the network-dependent suite was therefore not run, by design.
+- Inherited state disposition: workflow derivation step + release.md "derived, no manual re-pin" — reverted/rewritten; untracked guard test — kept and finished; headless-ci expect-tweaks — reverted with the file (they belonged to the derivation approach, not a standalone debugging story).
