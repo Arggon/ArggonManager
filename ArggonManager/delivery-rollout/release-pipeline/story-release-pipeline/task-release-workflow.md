@@ -73,3 +73,14 @@ PR: https://github.com/Arggon/ArggonManager/pull/555 (title+body carry task-rele
 ### handoff 2026-10-01 @ses_f076f3a7bffeHuhB6MxSetlgSU (session: ses_f076f3a7bffeHuhB6MxSetlgSU) — next: Review+merge PR #555; tick spec ACs A1–A17 in spec-release-pipeline-015.md at merge verification; flip item done after merge.
 - branch: feat/task-release-workflow
 - open questions: C1 amendment needed: GenericJson preserves range prefixes (v17.11.2 + main) — one-time hand-unpin in first release PR, machine-owned after; amend the spec sentence.
+
+### 2026-10-01 @ses_f0870e73affeEVvaFZPi9K7NDj
+Completed via PR #555 (merged 9abfca91; main's own CI on the merge commit green).
+
+Verdict trail: reviewer verdict request-changes with the C3 ordered predicate verified adversarially (real-history + real-remote probes — the repo's own historical 0.4.1 release pattern fails loudly under rule 3, exactly as designed; supply chain clean; publish order/safety present). Coordinator-applied fixes from the reviewer's findings: F1 canonical runbook retired to a pointer + binding invariants (it instructed the now-forbidden manual path; README repointed), F2 guard fails closed on ls-remote failure, F3 "merge the release PR by itself" in release.md. F4 (SHA-pin release-please-action@v4) filed as task-release-action-sha-pin.
+
+Library-level finding recorded as the spec C1 amendment (PR #555 evidence): GenericJson.updateContent preserves the range prefix — first automated release PR carries a one-time hand-unpin inside its review (the spec's own escape hatch), machine-owned exact→exact from release 2; documented in release.md + spec.
+
+T8 closure: spec A1–A17 ticked with a dated Verification subsection (runtime-pending named: A2 end-to-end, A12 approve-click, live publish); spec + plan statuses → implemented; prose-format gate green. One transient cli flake on the final PR head (row-table stdout, 18/18 locally on identical bytes; main's own run green).
+
+Live behavior: release.yml already ran on main — the ordered guard held (rule 0, exit 0; first live exercise). Publishing stays inert (fails closed) until the human completes the npmjs.com trusted-publisher setup for both packages (workflow release.yml, direct publish allowed).
