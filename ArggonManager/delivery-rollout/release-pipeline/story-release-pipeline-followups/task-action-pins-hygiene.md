@@ -1,13 +1,15 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-action-pins-hygiene
 title: "Pin-hygiene sweep: SHA-pin remaining tag-pinned actions across .github/workflows"
+assignee: Arggon
 parent: story-release-pipeline-followups
 labels: [ci, supply-chain]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
+claimed_at: "2026-10-01T23:59:51.427Z"
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline-followups/task-action-pins-hygiene.md
