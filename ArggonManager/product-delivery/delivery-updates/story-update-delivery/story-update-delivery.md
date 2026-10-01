@@ -1,6 +1,6 @@
 ---
 type: story
-status: todo
+status: done
 id: story-update-delivery
 title: Update delivery and adopter install ergonomics
 parent: delivery-updates

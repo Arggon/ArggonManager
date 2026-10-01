@@ -1,6 +1,6 @@
 ---
 type: epic
-status: todo
+status: done
 id: delivery-updates
 title: Delivery and update channel
 parent: product-delivery

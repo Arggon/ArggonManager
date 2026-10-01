@@ -1,6 +1,6 @@
 ---
 type: initiative
-status: todo
+status: done
 id: product-delivery
 title: "Product delivery: release pipeline and update channels"
 labels: [growth, delivery]

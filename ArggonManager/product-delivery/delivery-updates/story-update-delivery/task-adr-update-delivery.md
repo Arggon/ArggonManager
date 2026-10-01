@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adr-update-delivery
 title: "ADR: update delivery and distribution channel (release pipeline + update channel + skew + tarballs)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [delivery, install, adr]
 priority: p1
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T14:02:34.916Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr-update-delivery
 ---
 <!--
