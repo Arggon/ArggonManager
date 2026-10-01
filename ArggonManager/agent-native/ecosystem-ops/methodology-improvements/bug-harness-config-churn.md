@@ -65,3 +65,12 @@ DIRTY-.zcode START VERIFICATION (real seam, two disposable clones of this repo, 
 ### handoff 2026-10-01 @ses_f0aa6a0b5ffeZK4Oie0nnXQU7V (session: ses_f0aa6a0b5ffeZK4Oie0nnXQU7V) — next: Review + merge PR (MERGE-merge, not squash — branch carries tracker auto-commits); coordinator flips done after merge
 - branch: fix/bug-harness-config-churn
 - open questions: None; note for reviewers: untracking means existing checkouts keep a now-ignored local .zcode/config.json
+
+### 2026-10-01 @Coordinator
+verdict: approve (lead-architect review, PR #514; mechanical pass completed by coordinator after the reviewer session hit the usage limit)
+- Architecture: untrack+gitignore is the right minimal fix — the file's sole content (arggon mcp stdio registration) verified SEMANTICALLY IDENTICAL to the tracked .mcp.json stanza ({command: arggon, args: [mcp]}); allowlist machinery and docs-only rejected with recorded rationale; no ADR needed (no contract change, ADR 0014 §2).
+- Scope: exactly 4 files (.gitignore, index removal of .zcode/config.json, new cli/src/harness-state.test.ts, item file) — zero product-code change; no bundle drift.
+- Tests travel with behavior: 3 invariants pin the untracking (CI fails on re-tracking; full-list gitignore check catches partial regressions); start.test.ts keeps the precondition strict for real edits. Coordinator independent run: harness-state.test.ts 3/3.
+- Smoke: real-seam A/B on disposable clones — pre-fix start refuses the dirty tracked file (bug reproduced), post-fix start --worktree succeeds with the same dirty file ignored and the claim commit carrying only the item file; fresh clone carries no tracked .zcode content. Migration note for existing checkouts in the PR.
+- Ticks honest (decision + rationale + verification recorded on the item); cosmetic leading-dot-trim finding documented, not drive-by fixed.
+- Worker finding 1 (cold-start claim-commit failure needing manual npm ci) matches the two incidents already tracked on bug-start-worktree-npm-ci-claim — in flight this wave.
