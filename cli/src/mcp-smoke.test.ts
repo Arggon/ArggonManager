@@ -7,14 +7,13 @@
  * with a second client, tools/list advertises the kernel tools, and a
  * tools/call round trip returns the documented `--json` envelope.
  */
-import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync as _mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { runInit } from "./init.js";
 import { removeFixtureTree } from "./test-tmp.js";
+import { spawnNodeCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test
 // through the shared bounded-retry helper (test-tmp.ts) — the MCP server
@@ -30,14 +29,10 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
   return dir;
 }
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = join(root, "cli/src/cli.ts");
-const tsx = join(root, "node_modules/tsx/dist/cli.mjs");
-
 type Message = Record<string, unknown>;
 
 function startServer(cwd: string) {
-  const child = spawn(process.execPath, [tsx, cli, "mcp"], {
+  const child = spawnNodeCli(["mcp"], {
     cwd,
     stdio: ["pipe", "pipe", "pipe"],
   });
@@ -141,8 +136,13 @@ describe("arggon mcp smoke (child process client)", () => {
       expect(envelope.items.map((item) => item.id)).toContain("smoke-initiative");
     } finally {
       server.child.kill("SIGTERM");
+      // Signal death leaves exitCode null (signalCode set instead) — same
+      // "process gone" idiom test-tmp.ts/tracker-commit.ts use. Under the old
+      // tsx wrapper the top process exited with a code; direct node
+      // (bug-row-table-flake loader form) dies by signal.
       await waitFor(
-        () => (server.child.exitCode !== null ? true : undefined),
+        () =>
+          server.child.exitCode !== null || server.child.signalCode !== null ? true : undefined,
         "server process exit",
       );
     }

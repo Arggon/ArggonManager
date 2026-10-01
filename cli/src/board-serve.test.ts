@@ -7,11 +7,10 @@
  * the SSE live-reload stream firing when a work item file changes, and the
  * 127.0.0.1-only binding.
  */
-import { spawn, spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { request } from "node:http";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -29,6 +28,7 @@ import type { BoardDetailPayload, BoardGithub, PrInfo } from "./board.js";
 import { renderBoardHtml } from "./board.js";
 import { runInit } from "./init.js";
 import { runCreate, runShow, runUpdate } from "@arggondev/lib";
+import { runCli, spawnNodeCli } from "./test-spawn.js";
 import { removeFixtureTree } from "./test-tmp.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test
@@ -455,12 +455,8 @@ describe("board --serve review surface (task-board-review-surface)", () => {
 });
 
 describe("arggon board --serve (CLI)", () => {
-  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-  const cli = join(repoRoot, "cli/src/cli.ts");
-  const tsx = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
-
   function spawnCli(args: string[], cwd: string) {
-    return spawn(process.execPath, [tsx, cli, ...args], {
+    return spawnNodeCli(args, {
       cwd,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -494,10 +490,7 @@ describe("arggon board --serve (CLI)", () => {
   }, 20_000);
 
   it("refuses --serve combined with --github", () => {
-    const proc = spawnSync(process.execPath, [tsx, cli, "--json", "board", "--serve", "--github"], {
-      encoding: "utf8",
-      cwd: dir,
-    });
+    const proc = runCli(["--json", "board", "--serve", "--github"], dir);
     expect(proc.status).not.toBe(0);
     const envelope = JSON.parse(proc.stdout) as { ok: boolean; error: { message: string } };
     expect(envelope.ok).toBe(false);
@@ -505,14 +498,7 @@ describe("arggon board --serve (CLI)", () => {
   });
 
   it("rejects invalid --port values", () => {
-    const proc = spawnSync(
-      process.execPath,
-      [tsx, cli, "--json", "board", "--serve", "--port", "99999"],
-      {
-        encoding: "utf8",
-        cwd: dir,
-      },
-    );
+    const proc = runCli(["--json", "board", "--serve", "--port", "99999"], dir);
     expect(proc.status).not.toBe(0);
     const envelope = JSON.parse(proc.stdout) as { ok: boolean; error: { message: string } };
     expect(envelope.error.message).toMatch(/invalid --port '99999'/);

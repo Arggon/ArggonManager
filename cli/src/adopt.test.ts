@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -8,8 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   ADOPT_STORY_ID,
@@ -36,6 +34,7 @@ import { runDoctor } from "./doctor.js";
 
 import { runInit } from "./init.js";
 import { tickAcceptance } from "../../test/acceptance.js";
+import { runCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -46,14 +45,6 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
   const dir = _mkdtempSync(prefix, options);
   tmpDirs.push(dir);
   return dir;
-}
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(repoRoot, "cli/src/cli.ts");
-const tsx = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
-
-function runCli(args: string[], cwd: string) {
-  return spawnSync(process.execPath, [tsx, cli, ...args], { encoding: "utf8", cwd });
 }
 
 function tempDir(prefix: string): string {

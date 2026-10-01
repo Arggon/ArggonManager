@@ -1,8 +1,9 @@
 ---
 type: bug
-status: todo
+status: done
 id: bug-live-reload-sse-race
 title: Board live-reload Playwright spec races the SSE reconnect on slow machines (timing flake)
+assignee: Arggon
 parent: ci-stability
 labels: [board, flaky]
 priority: p3
@@ -47,3 +48,7 @@ verdict: approve (lead-architect review, PR #521)
 - Evidence: A/B under identical throttle+load (old 3/5 fail, fixed 12/12), formal 10/10 at 20x throttle, @smoke 33/33; coordinator confirmations: CI cli/tasks-validate/ui-smoke all green on the final reconciled head (the tick-3 CI conjunct now evidenced).
 - Scope: exactly e2e/board.smoke.spec.ts + item file; reviewer bars 1-5 pass; procedural note (CI conjunct ticked ahead of CI) resolved by this confirmation.
 - Findings filed: task-flake-repro-throttle-tool (committed flake harness), task-remove-diag-listener (dead [DIAG] listener); fourth cold-start incident appended to bug-start-worktree-npm-ci-claim (now merged/covered).
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Merged: PR #521 squash -> main (CI cli/tasks-validate/ui-smoke green on the final reconciled head). Item flipped done (todo->in_progress->done to satisfy the transition gate after the auto-done workflow had reset the local copy).

@@ -1,9 +1,7 @@
 import { mkdtempSync as _mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { join } from "node:path";
 import { PassThrough } from "node:stream";
-import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   HANDOFF_FIELD_CAP,
@@ -15,6 +13,7 @@ import {
 
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
+import { runCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -26,10 +25,6 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
   tmpDirs.push(dir);
   return dir;
 }
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = join(repoRoot, "cli/src/cli.ts");
-const tsx = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
 const NOW = new Date("2026-09-15T12:00:00Z");
 
@@ -471,11 +466,8 @@ describe("handoff", () => {
 describe("handoff CLI", () => {
   it("emits the v1 envelope with handoff fields and commits via --json", () => {
     const { dir } = primedTask();
-    const proc = spawnSync(
-      process.execPath,
+    const proc = runCli(
       [
-        tsx,
-        cli,
         "--json",
         "handoff",
         "task-rate-limit",
@@ -489,7 +481,7 @@ describe("handoff CLI", () => {
         "arggon",
         "--no-commit",
       ],
-      { encoding: "utf8", cwd: dir },
+      dir,
     );
     expect(proc.status, proc.stderr).toBe(0);
     const envelope = JSON.parse(proc.stdout) as {
@@ -516,11 +508,8 @@ describe("handoff CLI", () => {
 
   it("passes --session through the CLI flag into the heading (provenance)", () => {
     const { dir } = primedTask();
-    const proc = spawnSync(
-      process.execPath,
+    const proc = runCli(
       [
-        tsx,
-        cli,
         "--json",
         "handoff",
         "task-rate-limit",
@@ -534,7 +523,7 @@ describe("handoff CLI", () => {
         "arggon",
         "--no-commit",
       ],
-      { encoding: "utf8", cwd: dir },
+      dir,
     );
     expect(proc.status, proc.stderr).toBe(0);
     const envelope = JSON.parse(proc.stdout) as {
@@ -545,11 +534,7 @@ describe("handoff CLI", () => {
 
   it("surfaces a missing --next as ok:false with COMMENT_FAILED (reused comment code, by design)", () => {
     const { dir } = primedTask();
-    const proc = spawnSync(
-      process.execPath,
-      [tsx, cli, "--json", "handoff", "task-rate-limit", "--author", "a"],
-      { encoding: "utf8", cwd: dir },
-    );
+    const proc = runCli(["--json", "handoff", "task-rate-limit", "--author", "a"], dir);
     expect(proc.status).not.toBe(0);
     expect(JSON.parse(proc.stdout)).toMatchObject({
       ok: false,

@@ -8,7 +8,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,6 +16,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { runInit, dryRunInit, type ProposalEntry } from "./init.js";
 import { arggonVersion, renderGeneratedDoc } from "./docs.js";
 import { readGeneratedState, updateGeneratedSection } from "@arggondev/lib";
+import { runCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -29,11 +30,10 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
 }
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(repoRoot, "cli/src/cli.ts");
-const tsx = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
 const TIER1_DOCS = [
   ".agents/skills/arggon-cli/SKILL.md",
+  ".agents/skills/arggon-cli/references/exploration.md",
   ".agents/skills/arggon-cli/references/json-contract.md",
   ".agents/skills/arggon-cli/references/methodology.md",
   ".agents/skills/arggon-cli/references/orchestration.md",
@@ -241,6 +241,7 @@ describe("init", () => {
     // Exactly the ignored generated bundles are skipped — nothing else.
     expect(result.commit?.ignored).toEqual([
       ".agents/skills/arggon-cli/SKILL.md",
+      ".agents/skills/arggon-cli/references/exploration.md",
       ".agents/skills/arggon-cli/references/json-contract.md",
       ".agents/skills/arggon-cli/references/methodology.md",
       ".agents/skills/arggon-cli/references/orchestration.md",
@@ -302,10 +303,7 @@ describe("init", () => {
 
   it("carries the warning in the --json envelope and on stderr (human output only there)", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-"));
-    const proc = spawnSync(process.execPath, [tsx, cli, "init", "--json", dir], {
-      encoding: "utf8",
-      cwd: dir,
-    });
+    const proc = runCli(["init", "--json", dir], dir);
     expect(proc.status).toBe(0);
     // Human-facing warning rides stderr even in --json mode? No: the JSON
     // envelope carries the additive `warning` field; stderr stays quiet there.
@@ -449,14 +447,7 @@ describe("init --dry-run", () => {
   it("e2e: init --dry-run --json is additive to the envelope and writes nothing; human output carries the plan + footer", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-init-dry-"));
     gitInit(dir);
-    const proc = spawnSync(
-      process.execPath,
-      [tsx, cli, "init", "--dry-run", "--full", "--json", dir],
-      {
-        encoding: "utf8",
-        cwd: dir,
-      },
-    );
+    const proc = runCli(["init", "--dry-run", "--full", "--json", dir], dir);
     expect(proc.status).toBe(0);
     const body = JSON.parse(proc.stdout) as {
       ok: boolean;
@@ -473,10 +464,7 @@ describe("init --dry-run", () => {
     expect(existsSync(join(dir, "ArggonManager"))).toBe(false);
     expect(git(dir, ["status", "--porcelain"])).toBe("");
 
-    const human = spawnSync(process.execPath, [tsx, cli, "init", "--dry-run", dir], {
-      encoding: "utf8",
-      cwd: dir,
-    });
+    const human = runCli(["init", "--dry-run", dir], dir);
     expect(human.status).toBe(0);
     expect(human.stdout).toContain("nothing was written (dry run)");
     expect(human.stdout).toContain("created");
@@ -837,10 +825,7 @@ describe("init --propose", () => {
     const { gainedLines } = setupSectionFixture(dir); // git-inited + template gain simulated
     const version = arggonVersion();
 
-    const json = spawnSync(process.execPath, [tsx, cli, "init", "--propose", "--json", dir], {
-      encoding: "utf8",
-      cwd: dir,
-    });
+    const json = runCli(["init", "--propose", "--json", dir], dir);
     expect(json.status).toBe(0);
     const body = JSON.parse(json.stdout) as {
       ok: boolean;
@@ -866,22 +851,12 @@ describe("init --propose", () => {
     expect(body.commit).toBeUndefined();
     expect(existsSync(join(dir, `AGENTS.md.proposed-${version}`))).toBe(true);
 
-    const human = spawnSync(process.execPath, [tsx, cli, "init", "--propose", dir], {
-      encoding: "utf8",
-      cwd: dir,
-    });
+    const human = runCli(["init", "--propose", dir], dir);
     expect(human.status).toBe(0);
     expect(human.stdout).toMatch(/proposed/);
     expect(human.stdout).toMatch(/adopt --ack/);
 
-    const combo = spawnSync(
-      process.execPath,
-      [tsx, cli, "init", "--propose", "--backup", "--json", dir],
-      {
-        encoding: "utf8",
-        cwd: dir,
-      },
-    );
+    const combo = runCli(["init", "--propose", "--backup", "--json", dir], dir);
     expect(combo.status).not.toBe(0);
     const comboBody = JSON.parse(combo.stdout) as { ok: boolean; error?: { message?: string } };
     expect(comboBody.ok).toBe(false);

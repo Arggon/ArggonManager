@@ -12,13 +12,13 @@
 import { spawnSync } from "node:child_process";
 import { cpSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 import { PassThrough } from "node:stream";
 import { afterEach, describe, expect, it } from "vitest";
 import { runCreate } from "@arggondev/lib";
 import { runInit } from "./init.js";
 import { runMcpServer } from "./mcp-server.js";
+import { cliEntryPath, nodeImportArgs, runCli as runCliBase } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -30,17 +30,12 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
   tmpDirs.push(dir);
   return dir;
 }
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = join(root, "cli/src/cli.ts");
-const tsx = join(root, "node_modules/tsx/dist/cli.mjs");
+const cli = cliEntryPath();
 
 type Envelope = Record<string, unknown>;
 
 function runCli(args: string[], cwd: string) {
-  return spawnSync(process.execPath, [tsx, cli, "--json", ...args], {
-    encoding: "utf8",
-    cwd,
-  });
+  return runCliBase(["--json", ...args], cwd);
 }
 
 function cliJson(args: string[], cwd: string): Envelope {
@@ -126,7 +121,7 @@ function gitInit(dir: string): void {
  * spec the CLI side of these tests uses — inside vitest, the default argv
  * derivation deliberately refuses to guess, so the spec is injected.
  */
-const CLI_SPAWN = { cliSpawn: { command: process.execPath, args: [tsx, cli] } };
+const CLI_SPAWN = { cliSpawn: { command: process.execPath, args: nodeImportArgs(cliEntryPath()) } };
 
 describe("CLI <-> MCP parity", () => {
   it("create produces the same envelope through both entry points", async () => {

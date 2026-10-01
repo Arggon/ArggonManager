@@ -1,8 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync as _mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import {
   formatListTable,
@@ -15,6 +14,7 @@ import {
 import { arggonVersion, checksumOf } from "./docs.js";
 
 import { removeFixtureTree } from "./test-tmp.js";
+import { runCli } from "./test-spawn.js";
 import { initialTuiState, renderTui } from "./tui.js";
 
 /**
@@ -34,8 +34,6 @@ import { initialTuiState, renderTui } from "./tui.js";
  * forbids raw unsafe code points, so an unsanitized formatter fails too.
  */
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(root, "cli/src/cli.ts");
 // bug-row-table-flake: drive node's module-loader registration directly
 // (`--import <tsx loader>`) instead of the tsx wrapper CLI. The wrapper
 // (tsx/dist/cli.mjs) re-executes node as a second child process and hosts a
@@ -45,15 +43,9 @@ const cli = resolve(root, "cli/src/cli.ts");
 // 36740682070, PR #487 attempt 1 of run 36758776399: `expect(proc.status)
 // .toBe(0)` failed with status 1 and passed on the identical retry). One node
 // process, no wrapper, no IPC socket: the transient class is gone. The stdout
-// bytes asserted below are unchanged (same CLI, same loader).
-const tsxLoader = resolve(root, "node_modules/tsx/dist/loader.mjs");
-
-function runCli(args: string[], cwd: string) {
-  return spawnSync(process.execPath, ["--import", tsxLoader, cli, ...args], {
-    encoding: "utf8",
-    cwd,
-  });
-}
+// bytes asserted below are unchanged (same CLI, same loader). This file's
+// local helper became the shared `runCli` in ./test-spawn.js
+// (task-runcli-import-tsx-migration).
 
 function runGit(args: string[], cwd: string) {
   return spawnSync("git", args, { encoding: "utf8", cwd });

@@ -1,8 +1,10 @@
 ---
 type: task
-status: todo
+status: done
 id: task-greenfield-explore-carriers
 title: Wire greenfield exploration protocol into the methodology carriers
+assignee: Arggon
+branch: feat/task-greenfield-explore-carriers
 parent: greenfield-explore
 labels: []
 created: "2026-10-01"
@@ -41,15 +43,15 @@ the agents.md pointer.
 
 ## Acceptance
 
-- [ ] New `skills/arggon-cli/references/exploration.md`: the six-phase protocol — classification gate table (spike / bounded / greenfield + one-way ratchet), stance (thinking-not-building, permitted writes = methodology artifacts), ground (verify before asking), frontier rounds (whole-frontier semantics + the domain ordering bank: outcome/users → scope → constraints → data → interfaces → failure/edge → ops/security → rollout, plus "I don't know → spike" and "ballooning → decompose"), edge-case hunt (the 12-dimension checklist and the three-way resolution rule: spec acceptance criterion | explicit non-goal | spike item — nothing stays unknown), approaches (2–3 with trade-offs, YAGNI, decompose-first), artifacts + hard gate (greenfield exploration doc → ADRs → spec with hunted cases as acceptance criteria → `arggon spec analyze` no NEW findings → plan/tasks with depends_on; no implementation task claimed before that), self-review (placeholder scan, consistency, scope, ambiguity).
-- [ ] `skills/arggon-cli/SKILL.md`: the references table gains the `references/exploration.md` row (read-it-for column in the same style), and the §4 pipeline sentence mentions exploration-first for greenfield. No version bump, no other edits.
-- [ ] `skills/arggon-cli/references/methodology.md`: the work-classification table gains the greenfield/new-project row (exploration-first default + hard gate before implementation tasks).
-- [ ] Byte-equal copies under `.agents/skills/arggon-cli/` — `cli/src/skill-copy.test.ts` must pass unchanged.
-- [ ] `/arggon-explore` command updated everywhere it lives — find every copy (`grep -rl "arggon-explore" templates/ opencode/ .opencode/ templates/docs/`): the OpenCode source template, the generated `.opencode/commands/arggon-explore.md` (regenerate or byte-mirror the source including the generated marker), the ZCode command template, and any other generated copy. Step 1 becomes "classify: spike / bounded / greenfield"; greenfield routes through the protocol (pointing at `references/exploration.md`); the existing stack-spike flow stays for stack decisions.
-- [ ] `templates/exploration.md` gains the project-exploration variant — either a new `templates/exploration-project.md` (sections: classification, frontier-rounds log, edge-case table with columns dimension / hunted case / resolution, approaches considered, decision/ADR links) or a clearly separated second mode; check `cli/src` for template-copy/fixture tests first and keep them green.
-- [ ] `ArggonManager/docs/agents.md`: ONE lean pointer (≤3 lines, §Specs and plans or §Technology playbooks — pick one place) noting the greenfield exploration gate and pointing at the reference + ADR 0017. Do not restate the protocol there.
-- [ ] PR body states `Impact class: Behavioral`, references ADR 0017 and ADR 0016; post the same statement as an `arggon comment` on this item.
-- [ ] `npm test` and `npm run arggon -- validate` green; no changes under `ArggonManager/docs/explorations/` or `ArggonManager/docs/adr/` (task-greenfield-explore-adr owns those).
+- [x] New `skills/arggon-cli/references/exploration.md`: the six-phase protocol — classification gate table (spike / bounded / greenfield + one-way ratchet), stance (thinking-not-building, permitted writes = methodology artifacts), ground (verify before asking), frontier rounds (whole-frontier semantics + the domain ordering bank: outcome/users → scope → constraints → data → interfaces → failure/edge → ops/security → rollout, plus "I don't know → spike" and "ballooning → decompose"), edge-case hunt (the 12-dimension checklist and the three-way resolution rule: spec acceptance criterion | explicit non-goal | spike item — nothing stays unknown), approaches (2–3 with trade-offs, YAGNI, decompose-first), artifacts + hard gate (greenfield exploration doc → ADRs → spec with hunted cases as acceptance criteria → `arggon spec analyze` no NEW findings → plan/tasks with depends_on; no implementation task claimed before that), self-review (placeholder scan, consistency, scope, ambiguity).
+- [x] `skills/arggon-cli/SKILL.md`: the references table gains the `references/exploration.md` row (read-it-for column in the same style), and the §4 pipeline sentence mentions exploration-first for greenfield. No version bump, no other edits.
+- [x] `skills/arggon-cli/references/methodology.md`: the work-classification table gains the greenfield/new-project row (exploration-first default + hard gate before implementation tasks).
+- [x] Byte-equal copies under `.agents/skills/arggon-cli/` — `cli/src/skill-copy.test.ts` must pass unchanged.
+- [x] `/arggon-explore` command updated everywhere it lives — find every copy (`grep -rl "arggon-explore" templates/ opencode/ .opencode/ templates/docs/`): the OpenCode source template, the generated `.opencode/commands/arggon-explore.md` (regenerate or byte-mirror the source including the generated marker), the ZCode command template, and any other generated copy. Step 1 becomes "classify: spike / bounded / greenfield"; greenfield routes through the protocol (pointing at `references/exploration.md`); the existing stack-spike flow stays for stack decisions.
+- [x] `templates/exploration.md` gains the project-exploration variant — either a new `templates/exploration-project.md` (sections: classification, frontier-rounds log, edge-case table with columns dimension / hunted case / resolution, approaches considered, decision/ADR links) or a clearly separated second mode; check `cli/src` for template-copy/fixture tests first and keep them green.
+- [x] `ArggonManager/docs/agents.md`: ONE lean pointer (≤3 lines, §Specs and plans or §Technology playbooks — pick one place) noting the greenfield exploration gate and pointing at the reference + ADR 0017. Do not restate the protocol there.
+- [x] PR body states `Impact class: Behavioral`, references ADR 0017 and ADR 0016; post the same statement as an `arggon comment` on this item.
+- [x] `npm test` and `npm run arggon -- validate` green; no changes under `ArggonManager/docs/explorations/` or `ArggonManager/docs/adr/` (task-greenfield-explore-adr owns those).
 
 ## Notes
 
@@ -57,3 +59,22 @@ PR references this item id. Never flip this item done yourself — the
 coordinator flips after merge verification. The ADR number in this task assumes
 0017 is free; if the adr task landed a different number, follow the actual
 number.
+
+### 2026-10-01 @Arggon
+Impact class: Behavioral — agents must re-learn the first phase of greenfield work: a new project, subsystem or interface is now classified through the six-phase Greenfield Exploration Protocol (classify → stance → ground → frontier rounds → edge-case hunt → approaches/artifacts) before any spec or implementation task, with a hard gate — no implementation task may be claimed before a spec exists and `arggon spec analyze` reports no NEW findings (ADR 0017, greenfield exploration gate). Carriers updated in this PR: new skills/arggon-cli/references/exploration.md (+ bundled .agents copy), SKILL.md references table + pipeline sentence, methodology.md greenfield work-classification row, the /arggon-explore command (OpenCode + ZCode sources and the generated .opencode copy) now classifies first, the new templates/exploration-project.md project-exploration variant, and one lean pointer in ArggonManager/docs/agents.md. Adopting repos receive this through the staged upgrade channel (ADR 0016): acked/modified docs are never overwritten — the changes surface as init --propose side files and doctor outdated buckets for adopters to absorb deliberately.
+
+### 2026-10-01 @Arggon
+Review evidence (expected vs observed):
+- npm test: expected green; observed 111 test files / 1965 tests passed, 0 failed (two init.test.ts list assertions needed the new generated file added in ASCII-sorted position; headless-ci needed npm run build in the fresh worktree for dist artifacts — environment, not the change).
+- cli/src/skill-copy.test.ts: passes UNCHANGED (copy parity + bundling of every committed reference; .agents copies are gitignored and regenerate).
+- npm run arggon -- validate --json: ok:true (also run by the pre-commit gate).
+- npm run lint / test:structure / lint:structure: clean.
+- Generated-copy fidelity: .opencode/commands/arggon-explore.md verified byte-equal to templates/docs/opencode/commands/arggon-explore.md minus the frontmatter marker line; no CLI-prose regex violations (init-opencode W5 assertions hold: $ARGUMENTS, tools.arggon.create, no shell blocks).
+- Scope guard: git status shows no changes under ArggonManager/docs/explorations/ or ArggonManager/docs/adr/; ADR 0017 cited by number only (no path links), so the adr task stays free to land any filename.
+
+### handoff 2026-10-01 @Arggon — next: Coordinator: review + merge PR #520 after task-greenfield-explore-adr lands ADR 0017 (docs/adr/0017-greenfield-exploration-gate.md assumed); then flip done
+- branch: feat/task-greenfield-explore-carriers
+- open questions: ADR 0017 wording should mirror references/exploration.md phase numbering 0-5; smoke:opencode transcript gate still to be driven by the reviewer (docs-only-ish carrier change, CLI behavior untouched)
+
+### 2026-10-01 @Arggon
+verdict: approve — reviewed PR #520 as lead architect. Evidence: references/exploration.md implements all six phases of the contract (classify gate + one-way ratchet, stance, ground, frontier rounds with domain bank and I-don't-know→spike, 12-dimension edge-case hunt with the three-way resolution rule, approaches, artifacts + hard gate, self-review) in 74 lean lines mirroring methodology.md's voice; SKILL.md/methodology.md edits are minimal rows/sentences as required, no version bump; all three /arggon-explore command surfaces classify-first with the stack-spike flow preserved (generated .opencode copy consistent with source, marker intact); templates/exploration-project.md has the required sections incl. the none—<why> escape hatch and preserves the ## Decision heading for spec analyze; agents.md pointer is one 2-line bullet + the two justified false-statement enumeration fixes (agents.md §Reference integrations, README tier-1 list); cli/src/docs.ts BUNDLED_SKILLS entry and the two fixture extensions are additive one-liners; skill-copy + init-opencode tests re-run by the coordinator (47/47) and full suite green per worker (1965); impact-class Behavioral comment present on this item referencing ADR 0017 + ADR 0016; no explorations/adr edits (scope respected); validate ok. Advisory: BUNDLED_SKILLS insertion order is not ASCII-sorted (placed after methodology.md to mirror the SKILL.md table) — fixtures are sorted, tests green, no action.

@@ -18,10 +18,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseFrontmatter } from "@arggondev/lib";
+import { runCli as runCliBase } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -33,10 +33,6 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
   tmpDirs.push(dir);
   return dir;
 }
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(root, "cli/src/cli.ts");
-const tsx = resolve(root, "node_modules/tsx/dist/cli.mjs");
 
 type Pr = { number: number; title: string; headRefName: string; url: string };
 
@@ -50,11 +46,7 @@ function pr(number: number, headRefName: string): Pr {
 }
 
 function runCli(args: string[], cwd: string, env: Record<string, string>) {
-  return spawnSync(process.execPath, [tsx, cli, ...args], {
-    encoding: "utf8",
-    cwd,
-    env: { ...process.env, ...env },
-  });
+  return runCliBase(args, cwd, { env: { ...process.env, ...env } });
 }
 
 /**

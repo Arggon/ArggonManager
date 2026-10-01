@@ -32,10 +32,9 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { disableAutoMaintenance, initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
+import { nodeImportArgs } from "./test-spawn.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const root = resolve(here, "../..");
-const tsx = resolve(root, "node_modules/tsx/dist/cli.mjs");
 const testTmpModule = resolve(here, "./test-tmp.js");
 
 // bug-tmp-fixture-leak: every temp dir this file creates goes through the
@@ -251,7 +250,7 @@ console.log(JSON.stringify({ pid: process.pid, loops: iterations }));
     try {
       const runs = await Promise.all(
         Array.from({ length: workers }, () =>
-          runChild(process.execPath, [tsx, runner, work, String(iterations)]),
+          runChild(process.execPath, [...nodeImportArgs(runner), work, String(iterations)]),
         ),
       );
       for (const out of runs) {
