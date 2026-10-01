@@ -10,7 +10,6 @@ labels: []
 priority: p2
 created: "2026-09-30"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-empty-template-checkbox
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-empty-template-checkbox.md

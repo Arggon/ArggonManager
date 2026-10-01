@@ -10,7 +10,6 @@ labels: [testing, kernel, property-based]
 priority: p2
 created: "2026-09-29"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-frontmatter-ambiguous-plain-scalar-loss
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/bug-frontmatter-ambiguous-plain-scalar-loss.md

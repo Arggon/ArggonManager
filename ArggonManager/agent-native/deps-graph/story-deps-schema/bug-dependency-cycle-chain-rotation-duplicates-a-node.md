@@ -10,7 +10,6 @@ labels: [testing, kernel, property-based]
 priority: p2
 created: "2026-09-29"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-dependency-cycle-chain-rotation-duplicates-a-node
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/deps-graph/story-deps-schema/bug-dependency-cycle-chain-rotation-duplicates-a-node.md
