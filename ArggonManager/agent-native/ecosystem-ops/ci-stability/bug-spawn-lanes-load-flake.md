@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-spawn-lanes-load-flake
 title: "Spawn-heavy CI tests show transient exit-1/timeout flakes under runner load (headless-ci packed-bin, pack, success-stdout)"
 assignee: Arggon
@@ -9,7 +9,6 @@ labels: [testing, flaky, ci]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T17:11:41.789Z"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/ci-stability/bug-spawn-lanes-load-flake.md
