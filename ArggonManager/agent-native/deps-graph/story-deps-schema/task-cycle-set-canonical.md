@@ -76,3 +76,7 @@ For a graph with SEVERAL cycles, a DFS reports the back edges its own forest clo
 ### 2026-10-01 @Coordinator
 ### 2026-10-01 @Coordinator
 Final verdict: approve — reviewer pass complete with independent verification: the reviewer modeled checkDependencies and ran ALL 40320 walk orders, confirming the 4-member fixture deterministically fails the old reversed-only rule (real regression pin), no phantom admission in the widened family (bounded <=7!, anchored at the same reduce-based anchor the product computes), run-65 claims permutation-universal-true, convention.md paragraph clause-by-clause accurate vs the #506 code. Contract decision ENDORSED (DFS-forest selection documented; no product change). Merging after the stale-branch reconcile.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Merged: PR #528 squash -> main (reviewer independently verified all 40320 walk orders; property widened to k orientations, 2000-run soak green; convention.md carries the normative DFS-forest-selection paragraph). Item done.
