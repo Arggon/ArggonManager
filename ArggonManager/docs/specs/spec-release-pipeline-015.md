@@ -48,11 +48,19 @@ Invariants (any implementation must hold all of them):
 6. **The publish workflow file is named `release.yml`** — the npmjs.com
    trusted-publisher configuration binds to that filename; renaming it is a
    breaking ops change called out in the renaming PR (ADR 0018 §1 duty).
-7. **A release exists only as a human-merged release proposal** — no
-   workflow bumps versions, tags, or publishes except on the merge of a
-   release PR maintained by the manifest flow (ADR 0018: "merging it is the
-   release"; maintainer constraint: "a human-merged release proposal, not
-   auto-publish on push to main").
+7. **No publish without a human-pushed version-bump commit to main** — no
+   workflow bumps versions, tags, or publishes on its own; every publication
+   is downstream of a version-bumping commit on main that a human pushed
+   (normally the squash merge of the release PR — "merging it is the
+   release", ADR 0018; maintainer constraint preserved in this enforceable
+   form). Stated boundary: the release guard reads the pushed commit, not
+   its provenance — it cannot distinguish a squash-merged release PR from a
+   maintainer pushing the same bump by hand, so a hand-pushed version bump
+   IS treated as the release act (named, accepted trust boundary — Edge
+   table). What this invariant rules out is the other reading of
+   "auto-publish on push to main": versioned artifacts shipping without any
+   human-pushed bump — no timers, no automatic version bumps, no release
+   proposals generated from ordinary commits.
 
 ## Synopsis
 
@@ -151,18 +159,36 @@ transcription-error class the runbook suffers).
 ### C3. `release.yml` trigger: `push` to `main`, self-guarded to release commits — not tag push, not release published
 
 `release.yml` runs `on: push: branches: [main]`. Its first step decides
-release vs no-op: let `V` be the root `package.json` version at the pushed
-commit (`github.sha`).
+release vs no-op as an **ordered predicate — classify the commit first, then
+consult the tag** — with `V` the root `package.json` version at the pushed
+commit (`github.sha`):
 
-- tag `v(V)` does **not** exist → this push is a release: proceed;
-- tag `v(V)` exists and points at `github.sha` → idempotent re-run
-  (complete remaining steps; safe under the `concurrency` group — also the
-  recovery path for "Re-run failed jobs" and for a publish that failed
-  before the trusted-publisher config existed);
-- tag `v(V)` exists pointing elsewhere → **fail loudly** (a shipped version
-  is being re-shipped; agreement gate);
-- any other push to main (tracker flips, docs, fixes) → exit 0 without
-  publishing.
+0. **Version unchanged from the parent → not a release commit → exit 0
+   without publishing.** If the root version at `github.sha` equals the
+   version at the pushed commit's parent, the push did not change the
+   version: a tracker flip, docs or fix push, or the pipeline's own
+   post-merge push — no tag consultation, no publication. This rule runs
+   FIRST, so steady state after any release is permanently green: an
+   ordinary post-release push carries the already-tagged version with the
+   tag pointing at the release commit, and must not read as "re-shipping"
+   (the flaw of consulting the tag before classifying the commit).
+1. **Version-changing push, tag `v(V)` absent → this is the release:
+   proceed** (tag → GitHub Release → build → pack → inspect → publish).
+2. **Version-changing push, tag `v(V)` exists and points at `github.sha` →
+   idempotent re-run** (complete remaining steps; safe under the
+   `concurrency` group — also the recovery path for "Re-run failed jobs"
+   and for a publish that failed before the trusted-publisher config
+   existed).
+3. **Tag `v(V)` exists pointing elsewhere → fail loudly** (a shipped
+   version is being re-shipped; agreement gate).
+
+The parent-comparison in rule 0 is safe for squash-merged release PRs: the
+squash merge lands the whole PR as exactly one commit whose parent is
+pre-bump main, so the version differs exactly once — at the merge commit —
+and every later push compares equal to its parent and exits at rule 0.
+Corollary: the bump must be the pushed commit's HEAD to fire the release —
+true for the squash-merged release PR by construction; a hand-pushed bump
+must land alone (the direct-push trust boundary, Edge table).
 
 **Rationale.** Both "obvious" triggers are structurally unavailable, verified
 2026-10-01: (a) release-please creates the tag and GitHub Release using the
@@ -183,11 +209,11 @@ only event is the human's merge of the release PR (real push, no recursion
 involved), tag creation and asset upload share one run (no release-object
 race), and the tag↔version agreement is enforced at the only gate that could
 violate it. This preserves the ADR's decided semantics — nothing publishes
-without a human-merged release proposal; the invariant-7 non-goal
-("auto-publish on push to main") means versioned artifacts shipping without
-a merged proposal, which the guard makes impossible (only a version bump
-beyond the latest `v*` tag — i.e. a release PR's merge — fires the release
-path).
+without a human-pushed version-bump commit to main (invariant 7, enforceable
+form); the "auto-publish on push to main" non-goal means versioned artifacts
+shipping without such a commit, which the ordered guard makes impossible
+(only a version-changing push whose bump is HEAD — a squash-merged release
+PR, or the accepted direct-push trust boundary — fires the release path).
 
 **Ownership consequence** (deviation from the task-release-workflow
 checklist's original wording, reconciled in the mirrored checklist):
@@ -249,7 +275,14 @@ Workflow inputs: none. The released version is read from the tree at
    (see Edge: lockfile) onto the PR branch.
 3. **Human review** — verify the PR touches exactly those five files; hand-
    edit the CHANGELOG section to house style; merge. The existing CI version
-   guard passes naturally (bumped version is not yet a tag).
+   guard passes naturally (bumped version is not yet a tag). One gate is
+   named because release-please.yml creates the PR with the default
+   `GITHUB_TOKEN`: pull_request events from `GITHUB_TOKEN`-created PRs start
+   in an **approval-required** state — a write-access user clicks
+   **"Approve workflows"** once and the runs start (docs.github.com,
+   *security hardening for GITHUB_TOKEN / "When GITHUB_TOKEN triggers
+   workflow runs"*, accessed 2026-10-01); the T2 lockfile-sync push
+   afterwards only updates the PR — it starts no new runs.
 4. **release.yml** (the merge push): guard passes → annotated tag `vX.Y.Z`
    at HEAD → GitHub Release `vX.Y.Z` with the merged CHANGELOG section as
    notes → `npm ci` → `npm run build` (fresh `lib/dist`; `write-build-info`
@@ -274,7 +307,8 @@ Workflow inputs: none. The released version is read from the tree at
 | Trusted-publisher misconfiguration (filename/repo mismatch) surfaces only at publish time — npm does not validate on save | publish fails closed with an authentication error AFTER tag+release exist; recovery documented in `release.md`: fix the npmjs.com config, re-run the workflow (idempotent guard path completes the publish) (A14, A17) |
 | Partial failure: lib published, CLI publish failed | both publish steps are individually idempotent — a publish that fails because the version already exists at `X.Y.Z` on the registry is treated as success, so a re-run completes without unpublishing anything (A8) |
 | Propagation lag exceeds the bounded poll | the run fails after the bound; operator re-runs (guard path); the retry exists to prevent re-publish, not to wait forever (A8) |
-| Tag/race: two pushes to main in quick succession (release merge + tracker flip) | `concurrency` group serializes; the second run sees `v(V)` at HEAD and completes idempotently (A5) |
+| Tag/race: two pushes to main in quick succession (release merge + tracker flip) | `concurrency` group serializes; the second run is a tracker flip — version unchanged from parent → exits 0 at guard rule 0, no publication at all (A5) |
+| Direct hand-pushed version bump to an untagged number (no release PR) | accepted trust boundary, named: the guard reads the pushed commit, not its provenance — a maintainer pushing a version bump by hand IS treated as the release act and the pipeline publishes (invariant 7, enforceable form); the release-PR flow stays the only blessed way to produce that commit, and the guard's agreement + version-gate checks still apply to it (A5, A9) |
 | Direct push bumps the version onto an already-tagged number | `release.yml` guard fails loudly (tag exists elsewhere); the PR-only CI version guard may have been bypassed, so this is the backstop (A5) |
 | Both packages proposed independently (only one side has changes) | out of scope by design: proposals are Release-As whole-lockstep proposals; the AC verifies both packages land at the same version in the PR (A2); per-package independent releases are a non-goal |
 | Runner npm too old for trusted publishing | the workflow installs npm ≥ 11.5.1 explicitly before publishing (the runner pattern from the cited release-please reference workflows); Node on the runner must be ≥ 22.14.0 per npm docs (A7) |
@@ -358,9 +392,12 @@ Workflow inputs: none. The released version is read from the tree at
       `dependencies["@arggondev/lib"]` (no re-serialization churn), and the
       bracket-quoted jsonpath resolves the `@`-containing key
 - [ ] A5 `release.yml` is named exactly `release.yml`; fixture-or-dry-run
-      evidence for the guard's four paths: untagged version → release path;
-      tag at HEAD → idempotent complete; tag elsewhere → loud failure;
-      unchanged version → exit 0 without publishing (C3 verified)
+      evidence for the guard's paths in predicate order (C3): version
+      unchanged from parent → exit 0 without publishing (first rule — and
+      every post-release push stays green with the tag pointing elsewhere:
+      no permanent-red steady state); version-changing push, tag absent →
+      release path; tag at HEAD → idempotent complete; tag elsewhere → loud
+      failure (C3 verified)
 - [ ] A6 the merged CHANGELOG section matches the house format
       (`## [X.Y.Z] - YYYY-MM-DD`, Keep-a-Changelog `### Added`/`### Changed`/
       `### Fixed`), is hand-edited in the release PR, and a subsequent
@@ -384,9 +421,14 @@ Workflow inputs: none. The released version is read from the tree at
       (`dist/`/`templates/`/`skills/`/`opencode/`), test-helper leak
       (`test-spawn`/`test-tmp`/`pack-fixtures`), version mismatch — the
       runbook §2 checks, scripted
-- [ ] A12 the release PR carries a synced `package-lock.json` (`npm ci`
-      green on the PR) and the sync is automated in `release-please.yml`
-      (issue #1993 workaround per the Edge table)
+- [ ] A12 the release PR carries a synced `package-lock.json` and the sync
+      is automated in `release-please.yml` (issue #1993 workaround per the
+      Edge table). Evidence path executable end to end: the workflow-created
+      PR appears in the approval-required state → a write-access user clicks
+      **"Approve workflows"** once (docs.github.com, *security hardening for
+      GITHUB_TOKEN*, accessed 2026-10-01) → CI starts and runs green on the
+      PR head **including the lockfile-sync push** (`npm ci` green) — the
+      sync push itself updates the PR without starting new runs
 - [ ] A13 both `package.json` files carry a `repository` field whose URL
       exactly matches the GitHub repository before the first automated
       publish
@@ -409,9 +451,9 @@ Workflow inputs: none. The released version is read from the tree at
 
 ## Non-goals
 
-- Auto-publish without a human-merged release proposal — no timer, no
-  automatic version bump, no release PR from ordinary commits (invariant 7;
-  ADR 0018 constraint).
+- Auto-publish without a human-pushed version-bump commit to main — no
+  timer, no automatic version bump, no release proposal from ordinary
+  commits (invariant 7, enforceable form; ADR 0018 constraint).
 - Conventional-commit adoption as a flow requirement (C2 exists precisely so
   it is not).
 - Standalone binaries (node SEA / bun compile) — ADR 0018 non-goal.

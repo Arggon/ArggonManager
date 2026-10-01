@@ -66,13 +66,19 @@ dependency (lands with/before the pipeline, per ADR 0018 §1).
 - `.github/workflows/release.yml` (name fixed — trusted-publisher binding):
   `on: push: branches: [main]`; `permissions: contents: write,
   id-token: write`; `concurrency` group serializing release runs. Guard step
-  per spec C3 (untagged version → release; tag at HEAD → idempotent
-  complete; tag elsewhere → loud failure; unchanged version → exit 0).
+  per spec C3's **ordered predicate**: (0) version at `github.sha` unchanged
+  from the parent → exit 0 without publishing, FIRST (post-release pushes
+  stay green; the tag is consulted only for version-changing pushes);
+  (1) version-changing push, tag `v(V)` absent → release; (2) tag at HEAD →
+  idempotent complete; (3) tag elsewhere → loud failure. Parent-comparison
+  is safe for squash-merged release PRs (one commit, parent is pre-bump
+  main, version differs exactly once).
   Release path: annotated tag `v(V)` at `github.sha`, then GitHub Release
   `v(V)` whose notes are the merged CHANGELOG section for `V`.
-- **Acceptance:** guard-path evidence for all four cases (A5); tag and
-  release created with notes matching the merged section (A10, first
-  half). (Spec: C3, Flow step 4; AC A5, A10.)
+- **Acceptance:** guard-path evidence for the predicate's cases in order
+  (A5) — including a post-release ordinary push staying green (rule 0, no
+  false loud failure); tag and release created with notes matching the
+  merged section (A10, first half). (Spec: C3, Flow step 4; AC A5, A10.)
 
 ### T4: release.yml — build, pack, inspect (before any publish)
 
