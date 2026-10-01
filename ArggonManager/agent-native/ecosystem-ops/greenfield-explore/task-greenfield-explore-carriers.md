@@ -9,7 +9,6 @@ parent: greenfield-explore
 labels: []
 created: "2026-10-01"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-task-greenfield-explore-carriers
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/greenfield-explore/task-greenfield-explore-carriers.md
