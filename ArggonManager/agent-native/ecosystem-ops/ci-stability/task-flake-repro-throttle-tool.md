@@ -54,3 +54,7 @@ Landed as PR #557 (branch feat/task-flake-repro-throttle-tool, commit c04b9fa9).
 **Gates (final tree)**: npm test 2035/2035 · lint clean · build clean · check:plugin no drift · arggon validate ok:true · npx playwright test --grep @smoke 33/33 unthrottled. Spinner backstops verified (stop() and parent-SIGKILL paths → 0 leaks).
 
 **Findings for the coordinator**: (1) Playwright rejects fixture callbacks whose first arg is not a destructuring pattern (`async (_, use)` errors at load: "First argument must use the object destructuring pattern") — `({ }, use)` required. (2) PR #521 remains open and unmerged; the proof used its patch throwaway, so #521 and #557 are independent. (3) pgrep -f self-matches its own wrapper shell — count spinners with a bracket pattern (Math[.]sin) to avoid phantom "orphans".
+
+### handoff 2026-10-01 @ses_f0735ed78ffeLByLc6ASP7JHkU (session: ses_f0735ed78ffeLByLc6ASP7JHkU) — next: Review PR #557; merge after #521 or independently — harness is spec-agnostic; verify CI ui-smoke lane stays green
+- branch: feat/task-flake-repro-throttle-tool
+- open questions: Should #521's preserve-spec fix rebase onto main once either PR merges (patch applies clean today)?
