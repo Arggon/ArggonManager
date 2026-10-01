@@ -5495,13 +5495,13 @@ function checkDependencies(items, byId, errors) {
         for (const dep of graph.get(id) ?? []) {
             const state = color.get(dep);
             if (state === "gray") {
-                const cycle = [...stack.slice(stack.indexOf(dep)), dep];
+                const cycle = stack.slice(stack.indexOf(dep));
                 const key = [...cycle].sort().join("\u0000");
                 if (!reported.has(key)) {
                     reported.add(key);
                     const anchorId = cycle.reduce((a, b) => (a < b ? a : b));
                     const at = cycle.indexOf(anchorId);
-                    const chain = [...cycle.slice(at), ...cycle.slice(0, at)];
+                    const chain = [...cycle.slice(at), ...cycle.slice(0, at), anchorId];
                     const anchor = byId.get(anchorId);
                     if (anchor) {
                         push(errors, anchor.relPath, `dependency cycle: ${chain.join(" -> ")}`, "DEPENDENCY_CYCLE");
