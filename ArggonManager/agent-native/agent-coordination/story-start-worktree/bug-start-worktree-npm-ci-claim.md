@@ -43,3 +43,11 @@ tools.arggon.start --worktree on a fresh worktree hit a claim-commit failure: th
 ### 2026-10-01 @Coordinator
 ### 2026-10-01 @Coordinator
 Second incident of the same class, from the bug-tsx-board-dead-script worker (PR #510): start --worktree left the worktree with no install, so the claim commit failed its pre-commit gate; worker recovered via worktree-local npm install + attach. Two independent occurrences (cycle-rotation worker: npm ci + sibling tsx resolution; board worker: no install at all) — strengthening this item's reproduce-first acceptance: capture BOTH flavors (missing install; wrong resolution source) in the readiness report.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+verdict: request-changes (docs travel with the contract change — single blocker)
+- BLOCKING (B1, reviewer-verified): gateBins is now part of TWO documented contracts but no normative doc moved: ArggonManager/docs/json-output.md start --worktree envelope table lacks the gateBins row (cli.ts:2275 emits it); ArggonManager/docs/agents.md:193 "ready is the conjunction of three clauses" is now four (lib/src/worktree.ts:924-929) + receipt field list omits gateBins; ArggonManager/docs/opencode2.md:111 native preparation enumeration same staleness (index.ts:2214 forwards gateBins); skills/arggon-cli/ sync line. Precedent: 9c21e293 updated all four docs in-PR for the comparable receipt extension. Fix is mechanical — land it on this PR.
+- Everything else PASSES: scope (11 files, bundle regen standalone), security (read-only probe, no writes/subprocess/interpolation), kernel logic (resolution order matches npm-run semantics; empty report = unchanged semantics), tests (8 new kernel tests + CLI failure message + native receipt; smoke 23/23 with both incident flavors — coordinator re-ran worktree/start tests 46/46 and the smoke green), ticks honest.
+- Contract call ENDORSED: report-only readiness with named-source errors is the right reading of the documented design; opt-in strict mode filed as follow-up (p4).
+- Non-blocking notes accepted: kernel conjunction unit gap (env-injected PATH case), CLI path/external wording branches, handoff truncation (tracker field cap — re-record the full strict-mode question as a plain comment in the fix pass), stale "draft" wording, sanitize asymmetry, bounds consistency.
