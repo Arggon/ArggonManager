@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-start-install-ordering
 title: start --worktree intermittently ships no usable install (link farm skipped) — five incidents across five sessions
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [worktree, install, dogfood]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T14:29:29.361Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-start-install-ordering
 ---
 <!--
