@@ -107,3 +107,25 @@ reader would decode as a different type.
   scalar" pins today's exact mapping token by token, and the run log reports
   `frontmatter ambiguous scalar: 25 runs, seed 20260928`.
 - Replay: `ARGGON_PROPERTY_SEED=20260928 ARGGON_PROPERTY_RUNS=25 npm run test:property`.
+
+### 2026-10-01 @Arggon
+## Fix implemented — PR #509 (not merged, coordinator's call)
+
+Branch `fix/bug-frontmatter-ambiguous-plain-scalar-loss` (worktree ../ArggonManager-bug-frontmatter-ambiguous-plain-scalar-loss), commits: claim e154d3ad, fix 2bf22276, bundle 1c9d20d6.
+
+**Fix:** writer-side only — `formatScalar` force-quotes `AMBIGUOUS_TOKEN = /^(?:~|null|true|false|-?\d+)$/`; reader untouched (bare-token files still parse). `formatValue` keeps genuine numbers bare in arrays; non-number list elements go through formatScalar (reader decodes array booleans/nulls as strings either way — quoting = same read, first-write fixed point).
+
+**DECISION (true/false): quoted too.** Bare `true`/`false` keep text but retype x-* extras string->boolean; quoting keeps text AND decoded type stable. Recorded in the item body and the PR body.
+
+**Gates (all green, worktree):**
+- npm test: 1941/1941 passed (109 files), incl. property suite
+- Property replay: ARGGON_PROPERTY_SEED=20260928 ARGGON_PROPERTY_RUNS=25 npm run test:property -> 12/12 (canary flipped to verbatim round trip, 14 tokens x title/parent/x-note)
+- npm run lint, npm run build, npm run check:plugin (bundle = separate final commit, deterministic), npm run arggon -- validate: ok:true
+
+**Smoke (fixture tracker, real product path via built bin dist/cli.js):**
+- create task "0123" -> file has `title: "0123"` (quoted); show --json -> "0123"; update --labels probe -> file STILL `title: "0123"`
+- same spot-checks: 007 -> "007", -0 (via `create task -- ... -0`) -> "-0", null -> "null" (field present), all surviving update rewrites
+
+**Findings for the coordinator (no drive-by fixes made):**
+1. Worktree env hazard: after server restarts, commands without an explicit cwd defaulted to the PRIMARY checkout — `W=$PWD` then silently ran the primary's old-kernel CLI in smoke probes (cause of the bare-write anomaly mid-session). Anything invoking `$W/node_modules/tsx/dist/cli.mjs` or `$W/dist/cli.js` must pin the absolute worktree path. Product code unaffected.
+2. Comment-author resolution in spawned CLIs needs `gh` on PATH (mise shim); a sanitized PATH makes measure.test.ts (8) + comment.test.ts (1) + one plugin tools.test fail with "could not resolve comment author" — environmental, passes with mise shims on PATH.
