@@ -9,11 +9,35 @@
   // you want the stdio server for another client.
   // Docs: https://opencode.ai/v2/docs/
   "$schema": "https://opencode.ai/config.json",
-  "formatter": true,
+  // `formatter: true` runs the built-in prettier as `<prettier> --write $FILE`
+  // with the session's project directory as cwd. Prettier resolves
+  // `.prettierignore` from that cwd and matches patterns relative to it, so a
+  // session rooted in the primary checkout editing a file in a sibling git
+  // worktree (`../<repo>-<item-id>/...`, the arggon `start` layout) bypasses
+  // the ignore file: the anchored pattern `opencode/plugins/arggon/` does not
+  // match `../<repo>-<id>/opencode/plugins/arggon/index.ts`, and a ~4k-line
+  // semicolon-free file gets reformatted (observed 2026-09-28, reverted by the
+  // worker; probe evidence on the item). This override keeps the same prettier
+  // invocation but anchors it at the edited file's own git root (the worktree
+  // root for worktrees), so the ignore file that actually governs the file
+  // applies. Non-ignored files format exactly as before; when no prettier
+  // resolves (e.g. a cold worktree before `start` links the install), the
+  // command exits 0 and formats nothing — skipping beats wrong-style churn.
+  "formatter": {
+    "prettier": {
+      "command": [
+        "sh",
+        "-c",
+        "f=$1; d=$(CDPATH= cd -- \"$(dirname -- \"$f\")\" && pwd); root=$(git -C \"$d\" rev-parse --show-toplevel 2>/dev/null) || root=$d; p=$root/node_modules/.bin/prettier; [ -x \"$p\" ] || p=$(command -v prettier) || exit 0; cd \"$root\" && exec \"$p\" --write \"$f\"",
+        "prettier-cwd-guard",
+        "$FILE",
+      ],
+    },
+  },
   "compaction": {
     "keep": {
-      "tokens": 15000
-    }
+      "tokens": 15000,
+    },
   },
   // Minimal workflow gates (W4, task-native-permissions-worktrees). They
   // complement — never replace — the kernel invariants (never steal a claim,
@@ -26,6 +50,7 @@
     { "action": "shell", "resource": "git commit --no-verify*", "effect": "deny" },
     { "action": "shell", "resource": "git push --force*", "effect": "deny" },
     { "action": "shell", "resource": "git push -f*", "effect": "deny" },
+  ],
     { "action": "shell", "resource": "git push *+*", "effect": "deny" }
   ]
 }
