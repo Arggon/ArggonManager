@@ -250,6 +250,8 @@ export {
   packageEntryPaths,
   pointWorkspaceAtLocal,
   prepareWorktreeDependencies,
+  strictGateBinFailure,
+  strictGateBinViolations,
   unlinkNodeModulesLink,
   MAX_MISSING_DEPENDENCIES,
   MAX_GATE_BINS,

@@ -466,18 +466,20 @@ x-playbooks:
 
 ### Tracker hygiene (`x-tracker`)
 
-`x-tracker` is the official namespaced extension for tracker-hygiene options (story-tracker-hygiene). It is a mapping of option names to values; the only official option today is `auto-commit`:
+`x-tracker` is the official namespaced extension for tracker-hygiene options (story-tracker-hygiene). It is a mapping of option names to values; the official options today are `auto-commit`, `allow-steal` (claim-steal arming, see Stealing), and `strict-gate-bins` (strict start gate):
 
 ```yaml
 version: 3
 x-tracker:
   auto-commit: false
+  strict-gate-bins: true
 ```
 
 - Tracker mutations — `create`, `comment`, `adopt` (task + story files), `cleanup --prune` (cleared `worktree_path` records) — commit their own mutated files by default as `chore(tasks): <verb> <id>` (verbs: `created`/`commented`/`adopted`/`pruned`). Staging is surgical (`git add -- <path>` only): the user's pre-existing dirty files are never swept into the tool's commit. Mutated paths matched by `.gitignore` are skipped and reported in the additive `commit.ignored` array — never force-added; one ignored path would otherwise abort `git add` after staging the rest, leaving a dirty index (bug-init-ignored-artifacts-dirty-commit).
 - `x-tracker.auto-commit: false` opts out tree-wide. Precedence: the per-invocation `--no-commit` flag wins over `x-tracker.auto-commit`, which wins over the built-in default of **true**.
 - Skipping is never a failure: non-git trees, a missing `git` binary, or a no-op commit (nothing staged) are reported (`--json` additive `commit: { skipped: <reason> }`) and the command succeeds — the CLI works without git.
-- Unknown nested keys inside `x-tracker` are ignored (ignore-unknown, forward compat); a scalar `x-tracker` value or an `auto-commit` that is not `true`/`false` is a parse error.
+- `x-tracker.strict-gate-bins: true` arms the strict start gate (task-start-gate-strict-mode): `start --worktree` then HARD-FAILS the claim commit when the dependency-preparation receipt (`gateBins`, bug-start-worktree-npm-ci-claim) reports any declared gate binary resolving from OUTSIDE the worktree — `external` (an install above the worktree), `path` (a sibling checkout's or global `.bin` on the invoking PATH, the silent-masking flavor), or `missing` (resolves nowhere; the no-link-farm flavor). The refusal happens before the claim update (the item file is not mutated), the worktree is kept, and the failure names each offending bin with its observed source plus the exact remediation (`npm ci` in the worktree, then re-run `start --worktree` to attach). Unset or `false` keeps the documented honest-receipt default byte-identical: the resolution stays report-only (readiness withholds `ready`; the claim commit remains authoritative). An empty `gateBins` report (nothing declared exposes a bin) never violates the gate — strict mode never invents a violation the report-only probe did not observe.
+- Unknown nested keys inside `x-tracker` are ignored (ignore-unknown, forward compat); a scalar `x-tracker` value or an `auto-commit`/`allow-steal`/`strict-gate-bins` value that is not `true`/`false` is a parse error.
 - The key is namespaced (`x-*`), so older tools ignore it per the extension policy above.
 
 ### Import type mapping (`x-import`)

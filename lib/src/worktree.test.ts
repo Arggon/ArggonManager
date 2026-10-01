@@ -23,6 +23,8 @@ import {
   MAX_MISSING_DEPENDENCIES,
   MAX_GATE_BINS,
   prepareWorktreeDependencies,
+  strictGateBinFailure,
+  strictGateBinViolations,
 } from "./worktree.js";
 
 const roots: string[] = [];
@@ -498,5 +500,85 @@ describe("inspectGateBinResolution", () => {
   it("reports nothing when the manifest declares nothing", () => {
     const { primary, worktree } = fixture();
     expect(inspectGateBinResolution(worktree, primary, noPath)).toEqual([]);
+  });
+});
+
+describe("strictGateBinFailure (task-start-gate-strict-mode)", () => {
+  /** An empty env: no PATH, so a `path` source is only ever an injected one. */
+  const noPath: NodeJS.ProcessEnv = {};
+
+  function addInstalledPackageWithBins(
+    primary: string,
+    name: string,
+    bins: Record<string, string> | string,
+  ): void {
+    addInstalledPackage(primary, name);
+    const dir = join(primary, "node_modules", ...name.split("/"));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name, version: "1.0.0", bin: bins }));
+  }
+
+  it("is null when every reported bin resolves from the worktree", () => {
+    const { primary, worktree } = fixture();
+    setManifest(worktree, { devDependencies: { tsx: "^1.0.0" } });
+    addInstalledPackageWithBins(primary, "tsx", { tsx: "./cli.mjs" });
+    const worktreeBin = join(worktree, "node_modules", ".bin");
+    mkdirSync(worktreeBin, { recursive: true });
+    writeFileSync(join(worktreeBin, "tsx"), "#!/bin/sh\n");
+    const bins = inspectGateBinResolution(worktree, primary, noPath);
+    expect(strictGateBinViolations(bins)).toEqual([]);
+    expect(strictGateBinFailure(bins, worktree)).toBeNull();
+  });
+
+  it("is null for an empty report (nothing declared exposes a bin)", () => {
+    expect(strictGateBinFailure([], join("sep", "worktree"))).toBeNull();
+  });
+
+  it("names a PATH-resolved bin, its observed source, and the npm ci remediation", () => {
+    const { primary, worktree, parent } = siblingFixture();
+    setManifest(worktree, { devDependencies: { tsx: "^1.0.0" } });
+    addInstalledPackageWithBins(primary, "tsx", { tsx: "./cli.mjs" });
+    const siblingBin = join(parent, "sibling", "node_modules", ".bin", "tsx");
+    mkdirSync(dirname(siblingBin), { recursive: true });
+    writeFileSync(siblingBin, "#!/bin/sh\n");
+    const bins = inspectGateBinResolution(worktree, primary, { PATH: dirname(siblingBin) });
+    const message = strictGateBinFailure(bins, worktree);
+    expect(strictGateBinViolations(bins)).toEqual([
+      { name: "tsx", source: "path", path: siblingBin },
+    ]);
+    expect(message).toContain("x-tracker.strict-gate-bins");
+    expect(message).toContain("refusing the claim commit");
+    expect(message).toContain("tsx: resolves only via PATH from");
+    expect(message).toContain(siblingBin);
+    expect(message).toContain("npm ci");
+    expect(message).toContain(worktree);
+  });
+
+  it("covers the bin-missing-everywhere flavor with the same actionable shape", () => {
+    const { primary, worktree } = fixture();
+    setManifest(worktree, { devDependencies: { nativegate: "^1.0.0" } });
+    addInstalledPackage(primary, "unrelated");
+    const bins = inspectGateBinResolution(worktree, primary, noPath);
+    expect(bins).toEqual([{ name: "nativegate", source: "missing" }]);
+    const message = strictGateBinFailure(bins, worktree);
+    expect(message).toContain("nativegate: not resolvable from the worktree");
+    expect(message).toContain("npm ci");
+  });
+
+  it("names an external (parent-directory) resolution as outside the worktree", () => {
+    const { primary, worktree, parent } = siblingFixture();
+    setManifest(worktree, { devDependencies: { tsx: "^1.0.0" } });
+    addInstalledPackageWithBins(primary, "tsx", { tsx: "./cli.mjs" });
+    // An install in a directory ABOVE the worktree: the module walk finds it
+    // before PATH would matter, and the source is outside the worktree.
+    const externalBin = join(parent, "node_modules", ".bin", "tsx");
+    mkdirSync(dirname(externalBin), { recursive: true });
+    writeFileSync(externalBin, "#!/bin/sh\n");
+    const bins = inspectGateBinResolution(worktree, primary, noPath);
+    expect(strictGateBinViolations(bins)).toEqual([
+      { name: "tsx", source: "external", path: externalBin },
+    ]);
+    const message = strictGateBinFailure(bins, worktree);
+    expect(message).toContain("tsx: resolves from");
+    expect(message).toContain(externalBin);
   });
 });

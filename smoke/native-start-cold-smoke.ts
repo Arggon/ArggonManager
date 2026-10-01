@@ -42,13 +42,24 @@
  *    item file;
  * 4. a second `start` attaches deterministically (no second domain create, no
  *    duplicate claim commit) and every install stays untouched;
+ * 4a. strict mode SATISFIED (task-start-gate-strict-mode): arming
+ *    `x-tracker.strict-gate-bins` in the fixture's tracker config and claiming
+ *    a second item must not change a healthy worktree — the claim lands with
+ *    the same worktree-owned `gateBins` receipt (the flag changes the
+ *    consequence of a foreign resolution, never the observation);
  * 5. a second, install-free fixture reproduces BOTH incident flavors of
- *    bug-start-worktree-npm-ci-claim and asserts the readiness report names
- *    them: a sibling checkout's `.bin` on PATH runs the gate while the
- *    worktree resolves nothing (the claim lands, the receipt names the
- *    foreign `path` source and withholds readiness), and a worktree with no
- *    install anywhere fails its claim commit with the error naming the
- *    missing bin and the `npm ci` fix;
+ *    bug-start-worktree-npm-ci-claim in DEFAULT mode (flag unset) and asserts
+ *    the readiness report names them: a sibling checkout's `.bin` on PATH runs
+ *    the gate while the worktree resolves nothing (the claim lands, the
+ *    receipt names the foreign `path` source and withholds readiness), and a
+ *    worktree with no install anywhere fails its claim commit with the error
+ *    naming the missing bin and the `npm ci` fix;
+ * 5a. strict mode REFUSING (task-start-gate-strict-mode): a third fixture with
+ *    the same no-install shape but `x-tracker.strict-gate-bins: true` turns
+ *    both flavors into a refusal BEFORE the claim update — the not-attempted
+ *    receipt names the offending bin, its observed source and the `npm ci`
+ *    fix, the worktree is kept for the remediation, and the item copy stays
+ *    unclaimed;
  * 6. teardown removes the worktrees, their git registrations and the whole
  *    disposable root, and the bounded receipts are asserted along the way.
  *
@@ -507,8 +518,14 @@ async function main(): Promise<void> {
   let worktree = join(parent, `repo-${ITEM_ID}`);
   /** Worktrees of the failure-flavor fixtures (section 4b), for teardown. */
   const extraWorktrees: string[] = [];
+  /** Additional worktrees of the MAIN fixture (section 4a), for teardown. */
+  const repoOwnedWorktrees: string[] = [];
+  /** Worktrees of the strict fixture (section 5a), for teardown. */
+  const strictWorktrees: string[] = [];
   /** The no-install fixture repo that owns the section-4b worktrees. */
   const repoNoInstall = join(parent, "repo-no-install");
+  /** The strict fixture repo that owns the section-5a worktrees. */
+  const repoStrict = join(parent, "repo-strict");
   console.log(`fixture: ${parent}`);
   try {
     // --- 1. the fixture: tracker, primary install, real pre-commit gate ----
@@ -518,6 +535,9 @@ async function main(): Promise<void> {
       ["epic", "Worktree", "native-start", "worktree"],
       ["story", "Cold start", "worktree", "cold-start"],
       ["task", "Native start cold smoke", "cold-start", "cold-start-smoke"],
+      // Claimed only in section 4a, after the strict flag is armed: strict
+      // mode must not change a healthy worktree (task-start-gate-strict-mode).
+      ["task", "Strict mode satisfied", "cold-start", "cold-strict-happy"],
     ];
     for (const [type, title, parentId, id] of chain) {
       runCreate({
@@ -577,11 +597,11 @@ async function main(): Promise<void> {
       templatesDir: pluginTemplatesDir(),
       worktree: { projectID: PROJECT_ID, canonical: repo, domain },
     });
-    const start = (): Promise<{ output: Record<string, unknown> }> => {
+    const start = (id: string = ITEM_ID): Promise<{ output: Record<string, unknown> }> => {
       const definition = defs.find((candidate) => candidate.name === "start");
       if (definition === undefined) throw new Error("the native namespace has no start tool");
       return definition.execute(
-        { id: ITEM_ID, assignee: "cold-smoke" },
+        { id, assignee: "cold-smoke" },
         {
           sessionID: "cold-smoke",
         },
@@ -734,6 +754,50 @@ async function main(): Promise<void> {
       installDrift(canonicalBefore, installFingerprint(canonical)).join("; "),
     );
 
+    // --- 4a. strict mode SATISFIED (task-start-gate-strict-mode) ----------
+    // Arm `x-tracker.strict-gate-bins` in the fixture's tracker config and
+    // claim a second item: a healthy worktree (the farm resolves the gate bin
+    // worktree-locally) must start exactly as before — same receipt, same
+    // claim commit. The flag changes the CONSEQUENCE of a foreign resolution,
+    // never the observation, and never a satisfied worktree.
+    const strictHappyId = "task-cold-strict-happy";
+    const strictHappyConfig = join(repo, "ArggonManager", ".convention.yml");
+    writeFileSync(
+      strictHappyConfig,
+      `${readFileSync(strictHappyConfig, "utf8")}x-tracker:\n  strict-gate-bins: true\n`,
+      "utf8",
+    );
+    gitOrThrow(repo, ["add", "ArggonManager/.convention.yml"]);
+    gitOrThrow(repo, ["commit", "-qm", "chore: arm the strict gate-bin gate"]);
+    const strictHappy = (await start(strictHappyId)).output;
+    const strictHappyWorktree = String(strictHappy.worktreePath);
+    repoOwnedWorktrees.push(strictHappyWorktree);
+    const strictHappyPreparation = (strictHappy.preparation ?? {}) as Record<string, unknown>;
+    const strictHappyBins = (strictHappyPreparation.gateBins ?? []) as Array<
+      Record<string, unknown>
+    >;
+    check(
+      report,
+      "strict mode satisfied: with the flag armed a worktree-owned gate bin still commits the claim",
+      strictHappy.ok === true &&
+        strictHappy.claimCommitted === true &&
+        strictHappy.worktreeCreated === true &&
+        strictHappyPreparation.ready === true &&
+        strictHappyBins.length === 1 &&
+        strictHappyBins[0].name === GATE_DEP &&
+        strictHappyBins[0].source === "worktree" &&
+        String(strictHappyBins[0].path).startsWith(strictHappyWorktree),
+      `gateBins: ${JSON.stringify(strictHappyBins)}\nworktree: ${strictHappyWorktree}`,
+    );
+    check(
+      report,
+      "strict mode satisfied: the claim commit is the only one on the strict-happy branch",
+      gitOrThrow(strictHappyWorktree, ["log", "--format=%s", `refs/heads/feat/${strictHappyId}`])
+        .split("\n")
+        .filter((subject) => subject === `chore(tasks): claimed ${strictHappyId}`).length === 1,
+      gitOrThrow(strictHappyWorktree, ["log", "--format=%s", `refs/heads/feat/${strictHappyId}`]),
+    );
+
     // --- 4b. BOTH failure flavors are named by the readiness report --------
     // bug-start-worktree-npm-ci-claim: two independent incidents. Flavor 1
     // (wrong resolution source): a sibling checkout's `.bin` on PATH ran the
@@ -856,6 +920,146 @@ async function main(): Promise<void> {
         `gateBins: ${JSON.stringify(missingBins)}\nerror: ${missingError.split("\n").slice(0, 6).join("\n")}`,
       );
     }
+
+    // --- 5a. strict mode REFUSING (task-start-gate-strict-mode) -----------
+    // The same no-install shape as 4b, but with `x-tracker.strict-gate-bins:
+    // true` in the tracker config: BOTH flavors must now refuse the claim
+    // BEFORE the claim update — the not-attempted receipt names the offending
+    // bin, its observed source and the `npm ci` fix, the worktree is kept for
+    // the remediation, and the item copy stays unclaimed.
+    {
+      runInit({ dir: repoStrict, force: false });
+      const chain3: Array<[string, string, string | undefined, string]> = [
+        ["initiative", "Strict gate", undefined, "strict-gate"],
+        ["epic", "Refusals", "strict-gate", "refusals"],
+        ["story", "Armed flavors", "refusals", "armed-flavors"],
+        ["task", "Strict sibling path", "armed-flavors", "cold-strict-path"],
+        ["task", "Strict missing install", "armed-flavors", "cold-strict-missing"],
+      ];
+      for (const [type, title, parentId, id] of chain3) {
+        runCreate({
+          cwd: repoStrict,
+          type: type as "initiative" | "epic" | "story" | "task",
+          title,
+          ...(parentId !== undefined ? { parent: parentId } : {}),
+          ...(id !== "" ? { id } : {}),
+        });
+      }
+      writeManifest(repoStrict);
+      const strictConfig = join(repoStrict, "ArggonManager", ".convention.yml");
+      writeFileSync(
+        strictConfig,
+        `${readFileSync(strictConfig, "utf8")}x-tracker:\n  strict-gate-bins: true\n`,
+        "utf8",
+      );
+      gitOrThrow(repoStrict, ["init", "-q"]);
+      gitOrThrow(repoStrict, ["config", "user.email", "cold-smoke@example.test"]);
+      gitOrThrow(repoStrict, ["config", "user.name", "Cold Start Smoke"]);
+      gitOrThrow(repoStrict, ["config", "maintenance.auto", "false"]);
+      gitOrThrow(repoStrict, ["add", "-A"]);
+      gitOrThrow(repoStrict, ["commit", "-qm", "chore: fixture (strict gate armed)"]);
+      // The same PATH-lookup gate as 4b: with the flag armed it never even
+      // runs — the refusal happens before the claim update.
+      writePreCommitGate(repoStrict, BIN_GATE_SCRIPT);
+
+      const { domain: domain3 } = worktreeDomain(repoStrict);
+      const defs3: ArgonToolDefinition[] = argonToolDefinitions(kernel, {
+        cwd: repoStrict,
+        templatesDir: pluginTemplatesDir(),
+        worktree: { projectID: PROJECT_ID, canonical: repoStrict, domain: domain3 },
+      });
+      const start3 = (id: string): Promise<{ output: Record<string, unknown> }> => {
+        const definition = defs3.find((candidate) => candidate.name === "start");
+        if (definition === undefined) throw new Error("the native namespace has no start tool");
+        return definition.execute(
+          { id, assignee: "cold-smoke" },
+          { sessionID: "cold-smoke" },
+        ) as Promise<{ output: Record<string, unknown> }>;
+      };
+      const refusalOf = (error: unknown): Record<string, unknown> =>
+        ((error as { envelope?: unknown }).envelope ?? {}) as Record<string, unknown>;
+
+      const strictPathId = "task-cold-strict-path";
+      const strictPathWorktree = join(parent, `repo-strict-${strictPathId}`);
+      strictWorktrees.push(strictPathWorktree);
+      const savedPath3 = process.env.PATH ?? "";
+      const siblingBin3 = join(parent, "sibling-checkout", "node_modules", ".bin", GATE_DEP);
+      let strictPathEnvelope: Record<string, unknown> = {};
+      let strictPathError = "";
+      try {
+        process.env.PATH = `${dirname(siblingBin3)}:${savedPath3}`;
+        await start3(strictPathId);
+        strictPathError = "start unexpectedly succeeded";
+      } catch (error) {
+        strictPathEnvelope = refusalOf(error);
+        const failure = (strictPathEnvelope.error ?? {}) as Record<string, unknown>;
+        strictPathError = String(failure.message ?? error);
+      } finally {
+        process.env.PATH = savedPath3;
+      }
+      const strictPathBins = (((strictPathEnvelope.preparation ?? {}) as Record<string, unknown>)
+        .gateBins ?? []) as Array<Record<string, unknown>>;
+      const strictPathClaim = (strictPathEnvelope.claimCommit ?? {}) as Record<string, unknown>;
+      check(
+        report,
+        "strict refused (path flavor): the claim is not attempted and the failure names the bin, the sibling source, and the npm ci fix",
+        strictPathEnvelope.ok === false &&
+          strictPathEnvelope.claimCommitted === false &&
+          strictPathClaim.status === "not-attempted" &&
+          strictPathClaim.reason === "strict gate-bin gate refused" &&
+          existsSync(strictPathWorktree) &&
+          strictPathBins.length === 1 &&
+          strictPathBins[0].name === GATE_DEP &&
+          strictPathBins[0].source === "path" &&
+          strictPathBins[0].path === siblingBin3 &&
+          strictPathError.includes("x-tracker.strict-gate-bins is set") &&
+          strictPathError.includes("refusing the claim commit") &&
+          strictPathError.includes(`resolves only via PATH from ${siblingBin3}`) &&
+          strictPathError.includes("npm ci") &&
+          strictPathError.includes(strictPathWorktree) &&
+          readItemData(parseFrontmatter, findItemFile(strictPathWorktree, strictPathId) ?? "")
+            .status === "todo",
+        `gateBins: ${JSON.stringify(strictPathBins)}\nclaim: ${JSON.stringify(strictPathClaim)}\nerror: ${strictPathError.split("\n").slice(0, 6).join("\n")}`,
+      );
+
+      const strictMissingId = "task-cold-strict-missing";
+      const strictMissingWorktree = join(parent, `repo-strict-${strictMissingId}`);
+      strictWorktrees.push(strictMissingWorktree);
+      let strictMissingEnvelope: Record<string, unknown> = {};
+      let strictMissingError = "";
+      try {
+        await start3(strictMissingId);
+        strictMissingError = "start unexpectedly succeeded";
+      } catch (error) {
+        strictMissingEnvelope = refusalOf(error);
+        const failure = (strictMissingEnvelope.error ?? {}) as Record<string, unknown>;
+        strictMissingError = String(failure.message ?? error);
+      }
+      const strictMissingBins = ((
+        (strictMissingEnvelope.preparation ?? {}) as Record<string, unknown>
+      ).gateBins ?? []) as Array<Record<string, unknown>>;
+      const strictMissingClaim = (strictMissingEnvelope.claimCommit ?? {}) as Record<
+        string,
+        unknown
+      >;
+      check(
+        report,
+        "strict refused (missing flavor): the bin-resolves-nowhere case refuses with the same receipt",
+        strictMissingEnvelope.ok === false &&
+          strictMissingEnvelope.claimCommitted === false &&
+          strictMissingClaim.status === "not-attempted" &&
+          strictMissingClaim.reason === "strict gate-bin gate refused" &&
+          existsSync(strictMissingWorktree) &&
+          strictMissingBins.length === 1 &&
+          strictMissingBins[0].name === GATE_DEP &&
+          strictMissingBins[0].source === "missing" &&
+          strictMissingError.includes("native-gate-dep: not resolvable from the worktree") &&
+          strictMissingError.includes("npm ci") &&
+          readItemData(parseFrontmatter, findItemFile(strictMissingWorktree, strictMissingId) ?? "")
+            .status === "todo",
+        `gateBins: ${JSON.stringify(strictMissingBins)}\nclaim: ${JSON.stringify(strictMissingClaim)}\nerror: ${strictMissingError.split("\n").slice(0, 6).join("\n")}`,
+      );
+    }
   } catch (error) {
     report.passed = false;
     console.error(`      harness error: ${error instanceof Error ? error.message : String(error)}`);
@@ -868,15 +1072,26 @@ async function main(): Promise<void> {
     const teardownErrors: string[] = [];
     const isRepo = existsSync(join(repo, ".git"));
     const isRepoNoInstall = existsSync(join(repoNoInstall, ".git"));
-    for (const dir of [worktree, join(parent, "cold-probe"), ...extraWorktrees]) {
+    const isRepoStrict = existsSync(join(repoStrict, ".git"));
+    /** Owning fixture repo of each tracked worktree (`worktree remove` needs it). */
+    const ownerOf = (dir: string): string => {
+      if (extraWorktrees.includes(dir)) return repoNoInstall;
+      if (strictWorktrees.includes(dir)) return repoStrict;
+      return repo;
+    };
+    const allWorktrees = [
+      worktree,
+      join(parent, "cold-probe"),
+      ...repoOwnedWorktrees,
+      ...extraWorktrees,
+      ...strictWorktrees,
+    ];
+    for (const dir of allWorktrees) {
       if (!existsSync(dir)) continue;
-      // git worktree remove needs the repo the worktree belongs to; a
-      // failure-flavor worktree belongs to its own fixture repo.
-      const fromRepoNoInstall = extraWorktrees.includes(dir);
-      const owner = fromRepoNoInstall ? repoNoInstall : repo;
-      if (fromRepoNoInstall && !isRepoNoInstall) {
-        // The harness died before the fixture repo existed: fall back to a
-        // plain recursive remove so teardown still leaves nothing behind.
+      const owner = ownerOf(dir);
+      // The harness may have died before a fixture repo existed: fall back to
+      // a plain recursive remove so teardown still leaves nothing behind.
+      if (!existsSync(join(owner, ".git"))) {
         rmSync(dir, { recursive: true, force: true });
         continue;
       }
@@ -893,6 +1108,11 @@ async function main(): Promise<void> {
       if (pruned.code !== 0)
         teardownErrors.push(`worktree prune (no-install): ${pruned.stderr.trim()}`);
     }
+    if (isRepoStrict) {
+      const pruned = git(repoStrict, ["worktree", "prune"]);
+      if (pruned.code !== 0)
+        teardownErrors.push(`worktree prune (strict): ${pruned.stderr.trim()}`);
+    }
     const registered = isRepo
       ? git(repo, ["worktree", "list", "--porcelain"])
           .stdout.split("\n")
@@ -907,9 +1127,20 @@ async function main(): Promise<void> {
           .map((line) => line.slice("worktree ".length).trim())
           .filter((dir) => resolve(dir) !== resolve(repoNoInstall))
       : [];
-    const leftover = [worktree, join(parent, "cold-probe"), ...extraWorktrees].filter((dir) =>
-      existsSync(dir),
-    );
+    const registeredStrict = isRepoStrict
+      ? git(repoStrict, ["worktree", "list", "--porcelain"])
+          .stdout.split("\n")
+          .filter((line) => line.startsWith("worktree "))
+          .map((line) => line.slice("worktree ".length).trim())
+          .filter((dir) => resolve(dir) !== resolve(repoStrict))
+      : [];
+    const leftover = [
+      worktree,
+      join(parent, "cold-probe"),
+      ...repoOwnedWorktrees,
+      ...extraWorktrees,
+      ...strictWorktrees,
+    ].filter((dir) => existsSync(dir));
     // A failed run keeps its fixture for inspection (the age-gated `arggon-*`
     // tmpdir purge in test/teardown-tmp.ts reclaims it later); a passing run
     // leaves nothing behind at all.
@@ -920,6 +1151,7 @@ async function main(): Promise<void> {
       "the worktree and its git registration are gone",
       registered.length === 0 &&
         registeredNoInstall.length === 0 &&
+        registeredStrict.length === 0 &&
         leftover.length === 0 &&
         teardownErrors.length === 0,
       [
@@ -927,6 +1159,7 @@ async function main(): Promise<void> {
         ...leftover.map((dir) => `left behind: ${dir}`),
         ...registered.map((dir) => `still registered: ${dir}`),
         ...registeredNoInstall.map((dir) => `still registered (no-install fixture): ${dir}`),
+        ...registeredStrict.map((dir) => `still registered (strict fixture): ${dir}`),
       ].join("; "),
     );
     if (keep) {

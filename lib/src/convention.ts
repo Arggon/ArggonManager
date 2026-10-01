@@ -69,6 +69,17 @@ export type TrackerConfig = {
    * human-only steal flow.
    */
   allowSteal: boolean | null;
+  /**
+   * Strict start gate from `x-tracker.strict-gate-bins`
+   * (task-start-gate-strict-mode). `null` (unset) and `false` both keep start
+   * report-only (the documented honest-receipt design: the claim commit stays
+   * authoritative and a foreign gate-bin resolution only withholds `ready`);
+   * an explicit `true` additionally HARD-FAILS the claim commit when the
+   * readiness receipt reports any gate binary resolving from OUTSIDE the
+   * worktree (`external`, `path`, or `missing` — the bin-resolves-nowhere
+   * flavor included).
+   */
+  strictGateBins: boolean | null;
 };
 
 /** `x-import` namespaced extension options (task-import-type-mapping). */
@@ -277,7 +288,7 @@ export function parseConventionConfig(
   const branchPatterns: Record<ItemType, string> = { ...DEFAULT_BRANCH_PATTERNS };
   const views: Record<string, string> = {};
   const playbooks: PlaybooksConfig = { maxAgeDays: null };
-  const tracker: TrackerConfig = { autoCommit: null, allowSteal: null };
+  const tracker: TrackerConfig = { autoCommit: null, allowSteal: null, strictGateBins: null };
   const generated: Record<string, GeneratedEntry> = {};
   let generatedProjectName: string | null = null;
   const importLabelTypes: Record<string, ItemType> = {};
@@ -401,8 +412,9 @@ export function parseConventionConfig(
     }
     if (section === "x-tracker") {
       // Namespaced extension: unknown nested keys are ignored (ignore-unknown),
-      // the official options are `auto-commit` (tracker hygiene) and
-      // `allow-steal` (claim-steal arming, bug-cli-steal-not-gated).
+      // the official options are `auto-commit` (tracker hygiene), `allow-steal`
+      // (claim-steal arming, bug-cli-steal-not-gated), and `strict-gate-bins`
+      // (strict start gate, task-start-gate-strict-mode).
       if (key === "allow-steal") {
         if (value !== "true" && value !== "false") {
           throw new Error(
@@ -410,6 +422,15 @@ export function parseConventionConfig(
           );
         }
         tracker.allowSteal = value === "true";
+        continue;
+      }
+      if (key === "strict-gate-bins") {
+        if (value !== "true" && value !== "false") {
+          throw new Error(
+            `${sourcePath}: 'strict-gate-bins' must be a boolean (got ${JSON.stringify(value)})`,
+          );
+        }
+        tracker.strictGateBins = value === "true";
         continue;
       }
       if (key !== "auto-commit") continue;
@@ -551,7 +572,7 @@ export function readConventionConfig(dir: string): ConventionConfig {
       branchPatterns: { ...DEFAULT_BRANCH_PATTERNS },
       views: {},
       playbooks: { maxAgeDays: null },
-      tracker: { autoCommit: null, allowSteal: null },
+      tracker: { autoCommit: null, allowSteal: null, strictGateBins: null },
       import: { labelTypes: null },
       worktree: { postStart: null, postStartShell: null },
       github: { issueRoundtrip: false },
