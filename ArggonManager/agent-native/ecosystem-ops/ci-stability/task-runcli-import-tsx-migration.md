@@ -87,3 +87,12 @@ Commits: 6e5729ee (helper + gate + pack exclusion), 20e625ef (47-suite migration
 ### handoff 2026-10-01 @Arggon (session: ses_f0aa6a0b4ffd9zUh3OD2bgVLIR) — next: Review PR; merge squashes tracker+code commits. Then file e2e/smoke/measure.ts wrapper follow-ups.
 - branch: feat/task-runcli-import-tsx-migration
 - open questions: mcp-smoke signal-death predicate ok? measure.ts product wrapper spawn follow-up item needed
+
+### 2026-10-01 @Arggon
+Merge-resolution update (review blocker B1 on PR #518): the branch forked before #515 merged; #515 added a new wrapper spawn in cli/src/worktree.test.ts (~1252 on main: cleanup --prune --json with local tsx/cli consts). The textual merge dropped my deleted declarations under it → TS2304 at worktree.test.ts:1242 on the merge commit (CI run 36853491884).
+
+Resolution: merged origin/main; migrated the #515-added site to the shared runCli helper (const r = runCli(["cleanup", "--prune", "--json"], dir)) instead of resurrecting local declarations. #515's assertions, comments, and diagnostic message kept byte-identical to main. Verified cli/src/harness-state.test.ts (new on main) and cli/src/cleanup.ts carry no wrapper spawns — the site was the only new one.
+
+Inventory correction: 47 test files (file count unchanged), now 48 spawn SITES. Notable: the grep gate could not have caught this — gate scans *.test.* for the cli.mjs literal, and the #515 site's wrapper reference lived in the (merge-deleted) const declarations, not in the spawn line itself; tsc (TS2304) was the backstop that caught it. Both backstops now green.
+
+Post-merge gates: npm test 1968/1968 (112 files — main's additions incl. harness-state.test.ts), lint 0, build ok, check:plugin ok, arggon validate ok:true; trio doctor/success-stdout/measure one clean pass each. Note: main already tracks the product-side follow-ups I flagged (task-derive-cli-spawn-loader, task-e2e-board-serve-wrapper).
