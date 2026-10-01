@@ -41,6 +41,7 @@ import {
 
 import { runInit } from "./init.js";
 import { runStart, defaultStartGit } from "./start.js";
+import { nodeImportArgs } from "./test-spawn.js";
 
 import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
 
@@ -1227,17 +1228,18 @@ console.log(JSON.stringify(r));
 `,
       "utf8",
     );
-    const tsxCli = resolve(
-      new URL("../../node_modules/tsx/dist/cli.mjs", import.meta.url).pathname,
-    );
     const results = await Promise.all(
       paths.map(
         (p, i) =>
           new Promise<string>((done, fail) => {
-            const child = spawn(process.execPath, [tsxCli, runner, dir, p, `item-${i}`], {
-              cwd: dir,
-              stdio: ["ignore", "pipe", "pipe"],
-            });
+            const child = spawn(
+              process.execPath,
+              [...nodeImportArgs(runner), dir, p, `item-${i}`],
+              {
+                cwd: dir,
+                stdio: ["ignore", "pipe", "pipe"],
+              },
+            );
             let out = "";
             child.stdout.on("data", (d: Buffer) => (out += d));
             child.stderr.on("data", (d: Buffer) => (out += d));

@@ -23,6 +23,7 @@ import {
 import { tickAcceptance } from "../../test/acceptance.js";
 
 import { runInit } from "./init.js";
+import { runCli as runCliBase } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -36,15 +37,8 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
 }
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(root, "cli/src/cli.ts");
-const tsx = resolve(root, "node_modules/tsx/dist/cli.mjs");
-
 function runCli(args: string[], cwd = root, env: Record<string, string> = {}) {
-  return spawnSync(process.execPath, [tsx, cli, ...args], {
-    encoding: "utf8",
-    cwd,
-    env: { ...process.env, ...env },
-  });
+  return runCliBase(args, cwd, { env: { ...process.env, ...env } });
 }
 
 function runGit(args: string[], cwd: string) {
@@ -833,11 +827,12 @@ describe("CLI --json", () => {
     expect(runGit(["log", "--format=%s"], wt).stdout).toContain("claim: task-prepared");
   });
 
-  it("arggon start --worktree names the declared dependency a stale install does not provide", () => {
-    // bug-worktree-readiness-misses-stale-primary-install: the linked install
-    // mirrors the PRIMARY's entries, so a devDependency declared after that
-    // install ran is resolvable nowhere from the worktree. Reported by name
-    // (not silently as ready) and non-fatal — the claim still lands.
+  it("arggon start --worktree refuses a fresh worktree whose stale install cannot provide the declared bin", () => {
+    // bug-worktree-readiness-misses-stale-primary-install + bug-start-install-ordering:
+    // the linked install mirrors the PRIMARY's entries, so a devDependency
+    // declared after that install ran is resolvable nowhere from the worktree.
+    // It used to be reported by name with the claim landing anyway; a start
+    // that CREATED the worktree now refuses BEFORE the claim, naming it.
     const { dir, env } = initStartTree(true);
     expect(runCli(["create", "epic", "Auth", "--parent", "launch-mvp"], dir).status).toBe(0);
     expect(runCli(["create", "story", "Login", "--parent", "auth"], dir).status).toBe(0);
@@ -857,29 +852,41 @@ describe("CLI --json", () => {
       env,
     );
 
-    expect(result.status).toBe(0);
-    const body = parseStdout(result.stdout);
-    expect(body.ok).toBe(true);
-    // The linked install is still there and still reported as linked...
-    expect(body.linkedNodeModules).toBe(true);
-    // ...but it does not satisfy the manifest, and the receipt says which part.
-    expect(body.manifestCoverage).toBe("stale");
-    expect(body.missingDependencies).toEqual(["@ast-grep/cli"]);
-    expect(body.missingDependenciesTotal).toBe(1);
-    // Non-fatal: the worktree exists and the claim commit landed in it.
+    expect(result.status).not.toBe(0);
+    const body = parseStdout(result.stdout) as {
+      ok: boolean;
+      error: { code: string; message: string };
+    };
+    expect(body.ok).toBe(false);
+    expect(body.error.code).toBe("START_FAILED");
+    const message = body.error.message;
+    expect(message).toContain("fresh worktree must leave a gate-usable install");
+    expect(message).toContain("@ast-grep/cli: not resolvable from the worktree");
+    expect(message).toContain("npm ci");
+    expect(message).toContain("npm install");
+    // The worktree was kept and prepared, and no claim landed in it.
     const wt = join(dirname(dir), "work-task-prepared");
     expect(existsSync(join(wt, "package.json"))).toBe(true);
-    expect(runGit(["log", "--format=%s"], wt).stdout).toContain("claim: task-prepared");
+    expect(runGit(["log", "--format=%s"], wt).stdout).not.toContain("claim: task-prepared");
 
-    // The human output names the remedy, not just the symptom.
-    const human = runCli(
-      ["start", "task-prepared", "--worktree", "--assignee", "arggon"],
+    // The documented remedy — a worktree-local install — lets the attach land
+    // the claim that the first run refused (attach runs are report-only
+    // without the flag, so the fix-then-attach loop is what completes it).
+    mkdirSync(join(wt, "node_modules", "@ast-grep", "cli"), { recursive: true });
+    writeFileSync(
+      join(wt, "node_modules", "@ast-grep", "cli", "package.json"),
+      JSON.stringify({ name: "@ast-grep/cli", version: "0.45.3" }),
+    );
+    const retry = runCli(
+      ["start", "task-prepared", "--worktree", "--assignee", "arggon", "--json"],
       dir,
       env,
     );
-    expect(human.status).toBe(0);
-    expect(human.stdout).toContain("@ast-grep/cli");
-    expect(human.stdout).toContain("npm ci");
+    expect(retry.status).toBe(0);
+    const retryBody = parseStdout(retry.stdout);
+    expect(retryBody.ok).toBe(true);
+    expect(retryBody.manifestCoverage).toBe("satisfied");
+    expect(runGit(["log", "--format=%s"], wt).stdout).toContain("claim: task-prepared");
   });
 
   it("arggon start --worktree names the gate-bin resolution and the npm ci fix when the claim commit fails", () => {

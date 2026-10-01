@@ -7,9 +7,8 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { execFileSync, spawnSync } from "node:child_process";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
+import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   conventionPathForRoot,
@@ -21,6 +20,7 @@ import {
 
 import { runInit } from "./init.js";
 import { tickAcceptance } from "../../test/acceptance.js";
+import { runCli as runCliBase } from "./test-spawn.js";
 
 // task-issue-roundtrip: done flips close the linked GitHub issue — opt-in via
 // tasks/.convention.yml `x-github.issue-roundtrip: true`, best effort (gh
@@ -40,17 +40,9 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
 const NOW = new Date("2026-09-03T12:00:00Z");
 const LATER = new Date("2026-09-04T12:00:00Z");
 
-const cliRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(cliRoot, "cli/src/cli.ts");
-const tsx = resolve(cliRoot, "node_modules/tsx/dist/cli.mjs");
-
 /** Spawn the real CLI (used for the human stdout/stderr channels). */
 function runCli(args: string[], cwd: string, env?: NodeJS.ProcessEnv) {
-  return spawnSync(process.execPath, [tsx, cli, ...args], {
-    encoding: "utf8",
-    cwd,
-    env: env ? { ...process.env, ...env } : process.env,
-  });
+  return runCliBase(args, cwd, env ? { env: { ...process.env, ...env } } : {});
 }
 
 /** A task claimed in_progress, carrying `issue: 12` (as import-issues writes it). */

@@ -10,7 +10,6 @@ labels: []
 priority: p1
 created: "2026-09-30"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-tsx-board-dead-script
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/ci-stability/bug-tsx-board-dead-script.md

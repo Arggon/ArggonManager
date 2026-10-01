@@ -93,8 +93,24 @@ Before the claim commit it prepares the worktree for the project gate:
 #### Install hygiene
 
 - Start never commits the install (the claim commit stages only the item file) — but stage explicit paths, never `git add -A`.
-- The install is removed before a configured `x-worktree.post-start` hook runs (so the canonical `npm ci` bootstraps a real install instead of reifying through it and emptying the primary checkout) and re-created only when the hook leaves no `node_modules`.
+- The install is removed before a configured `x-worktree.post-start` hook runs (so the canonical `npm ci` bootstraps a real install instead of reifying through it and emptying the primary checkout) and re-created only when the hook leaves no `node_modules` (the re-link outcome is reported: `postStartRelink: "relinked" | "failed"` — never swallowed).
 - Hooks are never bypassed (`--no-verify` is never passed).
+
+#### Fresh-worktree install gate (bug-start-install-ordering)
+
+A start that **created** the worktree must leave a gate-usable install — or
+fail itself, before any claim commit, with the named cause. Whenever the
+preparation leaves a gate binary resolving outside the worktree (`external`,
+`path`, or `missing`), the claim is refused before the claim update with the
+offending bins, the bounded `prepSteps` log (which prep path ran: link farm
+created / reused / skipped-and-why, per-workspace build decisions), and the
+`npm ci` fix — no flag required. Attach re-runs keep the report-only receipt
+(or the `x-tracker.strict-gate-bins` refusal when armed), so the fix-then-
+attach remedy stays possible, and an empty `gateBins` report (nothing declared
+exposes a bin) never violates the gate. The preparation log rides the CLI
+`--json` envelope (`prepSteps`) and the native `preparation` payload (`steps`);
+a fresh worktree whose item file is unexpectedly clean at claim-commit time is
+a named error, never a silently skipped commit.
 
 #### Failure semantics
 
@@ -210,9 +226,40 @@ declared dependency is missing (see §4). The remedy is the same on both
 surfaces: re-install the primary checkout, or give the worktree its own install. A required dependency or
 pre-commit failure is a typed `START_FAILED`, never an unqualified `ok:true`: the native
 worktree and branch are kept, the skip reason is bounded, and the message gives
-the `tools.arggon.start` attach/retry command. `preparation.ready: false` is an
-honest receipt, not by itself a failure: a project with no dependency-needing
-gate may still have no install and commit the claim. The commit outcome is the
+the `tools.arggon.start` attach/retry command. The preparation receipt also
+carries the bounded `steps` log (bug-start-install-ordering): which prep path
+ran — link farm created / reused / skipped-and-why, per-workspace build
+decisions, the gate-bin verdict — so a broken worktree can always be
+correlated with the exact decision that produced it; the CLI envelope carries
+the same log as `prepSteps`.
+
+**Fresh-worktree install gate (bug-start-install-ordering).** A start that
+CREATED the worktree must leave a gate-usable install — or fail itself, before
+any claim commit, with the named cause. The eight-incident record behind
+`bug-start-install-ordering` was exactly this ordering: the preparation steps
+degraded silently (the primary install missing or mid-install at prep time, a
+farm that could not be created, a sibling checkout's `.bin` on PATH masking
+the absent install) and the claim commit then died at the gate with a bare
+`tsx: command not found`. Both surfaces therefore refuse the claim BEFORE the
+claim update whenever the worktree was created this run and the receipt
+reports any gate bin resolving outside the worktree — no flag required
+(`claimCommit.reason: "fresh-worktree install gate refused"` on the native
+surface; the CLI wraps the same refusal with its step/keep/attach report).
+The refusal names the offending bins, the `steps` log, and the fix (`npm ci`
+in the worktree, or `npm install` in a stale/missing primary), and the
+worktree is kept: fix the install, re-run start, and the attach retries the
+claim. Attach re-runs keep the historical semantics — report-only without the
+flag, refused by `x-tracker.strict-gate-bins` when armed — so the documented
+`npm ci` then attach remedy stays possible. The carve-out is unchanged: a
+project with no dependency-needing gate may still have no install and commit
+the claim (an empty `gateBins` report violates neither gate). Related
+never-silent rules from the same fix: a fresh worktree whose item file is
+unexpectedly clean at claim-commit time is a named error, not a skipped
+commit (a lost mutation must not look like success), and a post-start hook
+that leaves the worktree without an install has its re-link outcome
+(`relinked`/`failed`) reported instead of swallowed.
+
+The commit outcome is the
 authority; `claimCommit.status: "not-needed"` means no second commit was needed,
 not that a commit was silently skipped. Re-running after fixing the gate
 retries a dirty claim instead of treating the no-op update as success.
@@ -274,6 +321,7 @@ Agents and humans keep the docs alive **in the same PR as the change** — never
 
 ### Specs and plans (for non-trivial features)
 
+- **Greenfield/new project?** Exploration comes first (arggon-cli skill, `references/exploration.md`; ADR 0017): the six-phase protocol hunts edge cases into spec acceptance criteria, explicit non-goals or spike items, and no implementation task is claimed before a spec with clean `spec analyze`.
 - **Spec** (`ArggonManager/docs/specs/spec-<slug>-NNN.md`): the reviewable contract — purpose, synopsis, flags, JSON shapes, invariants ("never overwrites", "pure read"), and acceptance criteria. Write it **before** implementing; frontmatter carries `spec_id`, `title`, `status` (`proposed` → `implemented`), `created`.
 - **Plan** (`ArggonManager/docs/plans/plan-<slug>-NNN.md`): the implementation breakdown derived from the spec — ordered tasks, each with verifiable acceptance criteria and a link back to the spec. Frontmatter: `plan_id`, `spec`, `status`.
 - When the feature lands, flip both statuses in the same PR as the implementation (never leave a shipped feature `proposed`).
@@ -331,7 +379,7 @@ Copy-paste wiring so agents follow ArggonManager rules **by default** — same C
 
 Or print it on demand: `arggon instructions` extracts these snippets from this file at runtime (`--json` emits them as structured fields), so doc and command cannot drift.
 
-The generated AGENTS.md also mandates the bundled **arggon-cli skill** (`.agents/skills/arggon-cli/SKILL.md`, copied by `arggon init` from this repo's `skills/arggon-cli/SKILL.md` — single source, no duplicate): agents load it before any arggon invocation for the JSON contract, claim rules and pitfalls. It is an umbrella — `SKILL.md` plus `references/{json-contract,methodology,orchestration,pitfalls}.md`, bundled beside it; V2 advertises the supporting paths and the model reads the relevant reference on demand instead of carrying all detail per step. A parity test (`cli/src/skill-copy.test.ts`) keeps every bundled file byte-equal to its source, modulo the generated marker.
+The generated AGENTS.md also mandates the bundled **arggon-cli skill** (`.agents/skills/arggon-cli/SKILL.md`, copied by `arggon init` from this repo's `skills/arggon-cli/SKILL.md` — single source, no duplicate): agents load it before any arggon invocation for the JSON contract, claim rules and pitfalls. It is an umbrella — `SKILL.md` plus `references/{json-contract,methodology,exploration,orchestration,pitfalls}.md`, bundled beside it; V2 advertises the supporting paths and the model reads the relevant reference on demand instead of carrying all detail per step. A parity test (`cli/src/skill-copy.test.ts`) keeps every bundled file byte-equal to its source, modulo the generated marker.
 
 ### Pre-commit gate
 
@@ -385,13 +433,21 @@ Work items live under the tracker root (ArggonManager/) — see ArggonManager/do
 
 ### OpenCode V2
 
-`arggon init` generates the OpenCode **V2** seam (tier-1; never overwrites an existing file): a root `opencode.jsonc` — **only when the repo has no OpenCode config of its own** (`opencode.json(c)` or `.opencode/opencode.json(c)`) — carrying formatter + compaction retention and **no MCP stanza** (ADR 0011 §5/§6: MCP left the default path in W3), plus `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` and the eleven native `.opencode/commands/arggon-{next,start,done,handoff,review,status,spec,adr,explore,playbook,adopt}.md` (prompt templates that drive the native tools and write the methodology artifacts directly — no CLI-driving prose, no shell blocks). The generated `.mcp.json` still serves other clients (e.g. Claude Code), and the skills bundled under `.agents/skills/` are auto-discovered (no config needed):
+`arggon init` generates the OpenCode **V2** seam (tier-1; never overwrites an existing file): a root `opencode.jsonc` — **only when the repo has no OpenCode config of its own** (`opencode.json(c)` or `.opencode/opencode.json(c)`) — carrying a git-root-anchored prettier formatter override + compaction retention and **no MCP stanza** (ADR 0011 §5/§6: MCP left the default path in W3), plus `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` and the eleven native `.opencode/commands/arggon-{next,start,done,handoff,review,status,spec,adr,explore,playbook,adopt}.md` (prompt templates that drive the native tools and write the methodology artifacts directly — no CLI-driving prose, no shell blocks). The generated `.mcp.json` still serves other clients (e.g. Claude Code), and the skills bundled under `.agents/skills/` are auto-discovered (no config needed):
 
 ```jsonc
 {
-  // formatter + compaction retention; the native `arggon` tools come from the
-  // vendored plugin, so no MCP stanza is needed.
-  "formatter": true,
+  // formatter override + compaction retention; the native `arggon` tools come
+  // from the vendored plugin, so no MCP stanza is needed. The prettier
+  // override anchors the session formatter at the edited file's own git root,
+  // so sibling-worktree files (the `start` layout) keep their own
+  // .prettierignore — the full command is in the generated opencode.jsonc.
+  "$schema": "https://opencode.ai/config.json",
+  "formatter": {
+    "prettier": {
+      "command": ["sh", "-c", "<git-root-anchored prettier --write>", "prettier-cwd-guard", "$FILE"],
+    },
+  },
   "compaction": { "keep": { "tokens": 15000 } },
 }
 ```

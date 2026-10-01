@@ -26,6 +26,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { CONVENTION_VERSION, readConventionConfig } from "@arggondev/lib";
 import { runInit } from "./init.js";
+import { nodeImportArgs } from "./test-spawn.js";
 import { removeFixtureTree } from "./test-tmp.js";
 
 const TIMEOUT_MS = 120_000;
@@ -36,7 +37,6 @@ const ITERATIONS = 8;
 const PAD_LINES = 20_000;
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const tsxLoader = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
 type ReaderStats = { reads: number; torn: number; samples: string[] };
 type ChildResult = { code: number | null; stderr: string };
@@ -150,7 +150,9 @@ async function probe(dir: string, driver: string, label: string, keepPad: boolea
   const stopFile = join(dir, `STOP-${label}`);
   const readers = startReaders(yml, stopFile, READERS);
   const results = await Promise.all(
-    Array.from({ length: WRITERS }, () => runChild([tsxLoader, driver, dir, String(ITERATIONS)])),
+    Array.from({ length: WRITERS }, () =>
+      runChild([...nodeImportArgs(driver), dir, String(ITERATIONS)]),
+    ),
   );
   writeFileSync(stopFile, "");
   const stats = await Promise.all(readers);

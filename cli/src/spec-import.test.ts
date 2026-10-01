@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -9,8 +8,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   normalizeForZeroLoss,
@@ -19,6 +17,7 @@ import {
   SpecImportError,
 } from "./spec-import.js";
 import { runSpecValidate } from "./spec.js";
+import { runCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -280,12 +279,6 @@ describe("spec import openspec — CLI wiring (e2e)", () => {
   // Regression: `.command("import openspec")` bound the literal "openspec" to
   // the handler's first positional and silently ignored the real <path>. These
   // tests exercise the commander wiring end-to-end, not just runSpecImport.
-  const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-  const cli = resolve(root, "cli/src/cli.ts");
-  const tsx = resolve(root, "node_modules/tsx/dist/cli.mjs");
-  function runCli(args: string[], cwd: string) {
-    return spawnSync(process.execPath, [tsx, cli, ...args], { encoding: "utf8", cwd });
-  }
   function makeCorpus(): string {
     const corpus = mkdtempSync(join(tmpdir(), "arggon-corpus-"));
     writeCapability(corpus, "auth-core", GOLDEN_SPEC_MD);

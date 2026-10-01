@@ -5,7 +5,6 @@
  * doc edit that breaks the expected sections fails these tests instead of
  * silently drifting from the command output.
  */
-import { spawnSync } from "node:child_process";
 import { mkdirSync, mkdtempSync as _mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -13,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { runInit } from "./init.js";
 import { runInstructions } from "./instructions.js";
+import { runCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -26,8 +26,6 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
 }
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = join(repoRoot, "cli/src/cli.ts");
-const tsx = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
 function primedTree(): string {
   const dir = mkdtempSync(join(tmpdir(), "arggon-instructions-"));
@@ -127,10 +125,7 @@ describe("runInstructions", () => {
 
 describe("arggon instructions CLI", () => {
   it("--json emits the snippets as structured fields", () => {
-    const proc = spawnSync(process.execPath, [tsx, cli, "--json", "instructions"], {
-      encoding: "utf8",
-      cwd: repoRoot,
-    });
+    const proc = runCli(["--json", "instructions"], repoRoot);
     expect(proc.status, proc.stderr).toBe(0);
     const envelope = JSON.parse(proc.stdout) as {
       ok: boolean;
@@ -146,10 +141,7 @@ describe("arggon instructions CLI", () => {
   });
 
   it("human output prints every section and fails cleanly without a playbook", () => {
-    const human = spawnSync(process.execPath, [tsx, cli, "instructions"], {
-      encoding: "utf8",
-      cwd: repoRoot,
-    });
+    const human = runCli(["instructions"], repoRoot);
     expect(human.status).toBe(0);
     for (const marker of [
       "## install",
@@ -162,10 +154,7 @@ describe("arggon instructions CLI", () => {
     expect(human.stdout).toContain("```sh");
 
     const dir = primedTree();
-    const missing = spawnSync(process.execPath, [tsx, cli, "--json", "instructions"], {
-      encoding: "utf8",
-      cwd: dir,
-    });
+    const missing = runCli(["--json", "instructions"], dir);
     expect(missing.status).not.toBe(0);
     const envelope = JSON.parse(missing.stdout) as { ok: boolean; error: { message: string } };
     expect(envelope.ok).toBe(false);

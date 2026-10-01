@@ -1,8 +1,10 @@
 ---
 type: task
-status: todo
+status: done
 id: task-greenfield-explore-adr
 title: "Record exploration + ADR 0017: greenfield exploration gate"
+assignee: Arggon
+branch: feat/task-greenfield-explore-adr
 parent: greenfield-explore
 labels: []
 created: "2026-10-01"
@@ -118,16 +120,22 @@ too large for a paragraph and too load-bearing to bury in an existing file).
 
 ## Acceptance
 
-- [ ] `ArggonManager/docs/explorations/exploration-greenfield-exploration-015.md` (use the next free number; `exploration_id: greenfield-exploration-015`) records C1/C2/C3, the criteria, F1–F5 with dated sources (the three GitHub skill paths + the repo files, accessed 2026-10-01), the recommendation (C1), and the six-phase protocol as the proposed methodology.
-- [ ] The exploration doc follows the existing exploration doc structure (frontmatter `exploration_id`/`title`/`status: open`, Candidates/Criteria/Findings/Recommendation/Decision sections — see `exploration-methodology-improvements-014.md` as the quality bar).
-- [ ] `ArggonManager/docs/adr/0017-greenfield-exploration-gate.md` (verify the next free 4-digit id under `docs/adr/` first): Context / Decision / Consequences / Alternatives considered, per `docs/engineering.md` §ADR process; Decision states the protocol is the **default first phase for greenfield work** and the hard gate (no implementation task claimed before an approved spec with a clean `spec analyze`).
-- [ ] The exploration's Decision section links the ADR (placeholder while Proposed is fine; link format as in other explorations).
-- [ ] `npm run arggon -- validate` ok; no files touched outside `docs/explorations/` and `docs/adr/`.
+- [x] `ArggonManager/docs/explorations/exploration-greenfield-exploration-015.md` (use the next free number; `exploration_id: greenfield-exploration-015`) records C1/C2/C3, the criteria, F1–F5 with dated sources (the three GitHub skill paths + the repo files, accessed 2026-10-01), the recommendation (C1), and the six-phase protocol as the proposed methodology.
+- [x] The exploration doc follows the existing exploration doc structure (frontmatter `exploration_id`/`title`/`status: open`, Candidates/Criteria/Findings/Recommendation/Decision sections — see `exploration-methodology-improvements-014.md` as the quality bar).
+- [x] `ArggonManager/docs/adr/0017-greenfield-exploration-gate.md` (verify the next free 4-digit id under `docs/adr/` first): Context / Decision / Consequences / Alternatives considered, per `docs/engineering.md` §ADR process; Decision states the protocol is the **default first phase for greenfield work** and the hard gate (no implementation task claimed before an approved spec with a clean `spec analyze`).
+- [x] The exploration's Decision section links the ADR (placeholder while Proposed is fine; link format as in other explorations).
+- [x] `npm run arggon -- validate` ok; no files touched outside `docs/explorations/` and `docs/adr/`.
 
 ## Notes
 
 PR references this item id. Never flip this item done yourself — the
 coordinator flips after merge verification.
+
+Change set (2026-10-01): only the two docs above were created; the only other
+edit is this item file's checkboxes/notes (tracker artifact). `arggon validate`
+ok:true with zero errors/warnings. ADR left at Status: Proposed per the design
+brief; the hard-gate wording follows the item body / step-4 phrasing ("a spec
+exists and `arggon spec analyze` reports no NEW findings").
 
 ### 2026-10-01 @Arggon
 Change recorded on branch feat/task-greenfield-explore-adr (commit 8e59da92), PR Arggon/ArggonManager#519 (draft).
@@ -142,3 +150,15 @@ Evidence:
 ### handoff 2026-10-01 @Arggon — next: Review PR Arggon/ArggonManager#519 (verdict on this item); on merge flip ADR 0017 Proposed→Accepted and confirm task-greenfield-explore-carriers matches the recorded protocol.
 - branch: main
 - open questions: Gate wording: brief acceptance line says "approved spec" while body/step 4 say "spec exists + spec analyze no NEW findings" — docs use the latter; confirm if "approved" implies an extra review step.
+
+### 2026-10-01 @Arggon
+Change request (prose-format) resolved on feat/task-greenfield-explore-adr, fix commit 0f7ac7c8, pushed; PR #519 checks all green: cli pass 4m44s (run 36860250124/job/110362415117), tasks-validate pass, ui-smoke pass.
+
+Evidence:
+- Root cause per cli/src/prose-format.test.ts rule 2: a code span broken across lines inside a list item loses its continuation indent under prettier, so the span's source text is rewritten. The test reports only the FIRST rewritten span per file, so two more occurrences were masked behind the flagged ones; the prettier diff against the files exposed them.
+- Fixed all six occurrences of the pattern (whitespace/reflow only, token streams byte-identical to the parent commit — verified with whitespace-collapsed diff): ADR 0017 Context (`arggon stack explore`) + phase 5 (`arggon spec analyze`, the coordinator-flagged lines 73–74); exploration-015 F1 (`arggon stack explore`, flagged), F4 (`arggon spec analyze`, masked), protocol phase 5 (`arggon spec analyze`, masked), Decision (`arggon spec analyze`, same defect class, plain-paragraph variant prettier happened to preserve — fixed for consistency).
+- Local verification: npx vitest run cli/src/prose-format.test.ts → 3/3 pass (incl. "prettier never rewrites a code span's source text" corpus-wide); npm run arggon -- validate --json → ok:true, 0 errors/warnings (pre-commit gate re-ran it).
+- Scope confirmation: git diff 9cc23add..HEAD --stat shows exactly the two docs (25/31 lines, rewrap only); no other files touched.
+
+### 2026-10-01 @Arggon
+verdict: approve — reviewed PR #519 as lead architect. Evidence: scope is exactly the three expected files; exploration-greenfield-exploration-015 follows the established exploration structure with F1–F5 matching the design brief and dated sources (2026-10-01); ADR 0017 follows the engineering.md ADR process (Proposed/Date/Deciders/Context/Decision/Consequences/Alternatives); the Decision states the default-first-phase rule and the hard gate with the precise phrasing (spec exists + spec analyze no NEW findings — the intended design, 'approved' would imply a review step the autonomous loop does not have); phase numbering 0–5 is consistent with the carriers PR's reference; the three-way edge-case resolution rule and the social-gate-with-kernel-fallback posture are recorded in Consequences; validate ok. History: initial review returned request-changes for two multi-line code spans breaking cli/src/prose-format.test.ts; the worker fixed six such spans in 0f7ac7c8 (whitespace-only reflow, verified by whitespace-collapsed token comparison; the test masks later spans per file, so the larger fix was correct) and CI went green (run 36860250124). Advisory: the ADR is silent on the 'none — <why>' dimension escape hatch the project template added — acceptable, the template comment self-documents it; two prettier normalization desires remain in exploration-015 (F3 '+' bullets, a joinable line at the C2 bullet) — outside the gate, fold into any future format pass.

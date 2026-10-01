@@ -52,6 +52,20 @@ installing it needs no scripts. npm may warn that the tarball's blocked
 npm install -g arggon-manager      # both packages from the registry
 ```
 
+**From a GitHub Release asset (no registry access)** — every release attaches
+both packed tarballs to its GitHub Release (ADR 0018 §4's non-npm fallback):
+
+```bash
+mkdir -p /tmp/arggon-release
+gh release download vX.Y.Z --repo Arggon/ArggonManager --dir /tmp/arggon-release \
+  --pattern 'arggon-manager-*.tgz' --pattern 'arggondev-lib-*.tgz'
+npm install -g /tmp/arggon-release/arggon-manager-*.tgz /tmp/arggon-release/arggondev-lib-*.tgz
+arggon --version
+```
+
+Install **both** tarballs together so the kernel resolves at the released
+lockstep version, exactly like the pinned-checkout flow below.
+
 **Repo-local, no global install** (Node projects; keeps `PATH` untouched) —
 reuses the tarballs packed above, or pack them into any directory you created
 first:

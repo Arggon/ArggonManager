@@ -193,6 +193,10 @@ export const BUNDLED_SKILLS = [
     dest: ".agents/skills/arggon-cli/references/methodology.md",
   },
   {
+    source: "skills/arggon-cli/references/exploration.md",
+    dest: ".agents/skills/arggon-cli/references/exploration.md",
+  },
+  {
     source: "skills/arggon-cli/references/orchestration.md",
     dest: ".agents/skills/arggon-cli/references/orchestration.md",
   },

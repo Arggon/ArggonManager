@@ -5,7 +5,7 @@
  * and every failure path degrades to the bare version instead of failing the
  * command.
  */
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync as _mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -19,10 +19,9 @@ import {
   readBakedBuildInfo,
 } from "./build-info.js";
 import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
+import { runCli } from "./test-spawn.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const tsx = resolve(root, "node_modules/tsx/dist/cli.mjs");
-const cliEntry = resolve(root, "cli/src/cli.ts");
 
 const tmpDirs: string[] = [];
 afterEach(() => {
@@ -129,10 +128,7 @@ describe("buildVersion", () => {
 
 describe("arggon --version", () => {
   it("prints the semver prefix plus the checkout identity", () => {
-    const proc = spawnSync(process.execPath, [tsx, cliEntry, "--version"], {
-      cwd: root,
-      encoding: "utf8",
-    });
+    const proc = runCli(["--version"], root);
     expect(proc.status, proc.stderr).toBe(0);
     const printed = proc.stdout.trim();
     expect(printed.startsWith(arggonVersion())).toBe(true);

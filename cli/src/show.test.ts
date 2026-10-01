@@ -1,18 +1,13 @@
 import { mkdtempSync as _mkdtempSync, readFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { DEFAULT_TAIL_COMMENTS, runComment, runCreate, runShow } from "@arggondev/lib";
 
 import { runInit } from "./init.js";
 
 import { removeFixtureTree } from "./test-tmp.js";
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = join(repoRoot, "cli/src/cli.ts");
-const tsx = join(repoRoot, "node_modules/tsx/dist/cli.mjs");
+import { runCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test
 // through the shared bounded-retry helper (test-tmp.ts) — the CLI children are
@@ -62,10 +57,6 @@ function primedTask(commentCount = 5): { dir: string; id: string; path: string }
     });
   }
   return { dir, id: task.id, path: task.path };
-}
-
-function runCli(args: string[], cwd: string) {
-  return spawnSync(process.execPath, [tsx, cli, ...args], { encoding: "utf8", cwd });
 }
 
 describe("show (ADR 0006 progressive disclosure)", () => {

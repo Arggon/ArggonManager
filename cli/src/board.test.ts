@@ -7,9 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   displayPath,
@@ -41,6 +39,7 @@ import {
   type ContractWorkItem as WorkItem,
   type KernelWorkItem,
 } from "@arggondev/lib";
+import { runCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -1846,9 +1845,6 @@ describe("transform-neutral page script (bug-tsx-board-dead-script)", () => {
    * The e2e `@smoke` spec adds the browser-level proof on the same path.
    */
   it("the tsx-rendered CLI output carries no __name artifacts", () => {
-    const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-    const tsx = join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs");
-    const cli = join(repoRoot, "cli", "src", "cli.ts");
     const dir = mkdtempSync(join(tmpdir(), "arggon-board-embed-tsx-"));
     mkdirSync(join(dir, "tasks"), { recursive: true });
     writeFileSync(join(dir, "tasks", ".convention.yml"), "version: 1\n", "utf8");
@@ -1858,11 +1854,7 @@ describe("transform-neutral page script (bug-tsx-board-dead-script)", () => {
       "utf8",
     );
     const out = join(dir, "board.html");
-    const proc = spawnSync(process.execPath, [tsx, cli, "--json", "board", "--out", out], {
-      cwd: dir,
-      encoding: "utf8",
-      timeout: 60_000,
-    });
+    const proc = runCli(["--json", "board", "--out", out], dir, { timeout: 60_000 });
     expect(proc.status, proc.stderr).toBe(0);
     const html = readFileSync(out, "utf8");
     expect(html).not.toContain("__name(");

@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -15,6 +14,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { findOpenCodeConfig, generatedYamlMarker, stampGeneratedContent } from "./docs.js";
 import { runInit } from "./init.js";
 import { readConventionConfig } from "@arggondev/lib";
+import { runCli as runCliBase } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -28,11 +28,9 @@ function mkdtempSync(prefix: string): string {
 }
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(repoRoot, "cli/src/cli.ts");
-const tsx = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
 function runCli(args: string[], cwd: string = repoRoot) {
-  return spawnSync(process.execPath, [tsx, cli, ...args], { encoding: "utf8", cwd });
+  return runCliBase(args, cwd);
 }
 
 function tempDir(): string {
@@ -89,8 +87,58 @@ describe("opencode seam: fresh init", () => {
     // optional stdio server can be registered by the adopter.
     expect(parsed.mcp).toBeUndefined();
     expect(raw).not.toContain('"arggon", "mcp"');
-    expect(parsed.formatter).toBe(true);
+    // task-formatter-override-template: the template no longer emits bare
+    // `formatter: true` — the command override pinned below is the default.
+    expect(parsed.formatter).toBeTypeOf("object");
     expect(parsed.compaction?.keep?.tokens).toBe(15000);
+  });
+
+  it("ships the git-root-anchored prettier formatter override (task-formatter-override-template)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const raw = readFileSync(join(dir, "opencode.jsonc"), "utf8");
+    const parsed = JSON.parse(raw.replace(/^\s*\/\/.*$/gm, "")) as {
+      formatter?: { prettier?: { command?: string[] } };
+    };
+    const command = parsed.formatter?.prettier?.command;
+    expect(command, "formatter.prettier.command must be an array").toBeInstanceOf(Array);
+    // Same invocation shape as the built-in (`sh -c <script> <name> $FILE`),
+    // so OpenCode still passes the edited file as $1/$FILE.
+    expect(command![0]).toBe("sh");
+    expect(command![1]).toBe("-c");
+    expect(command![3]).toBe("prettier-cwd-guard");
+    expect(command![4]).toBe("$FILE");
+    // The anchor semantics must survive any template edit: resolve the edited
+    // file's own git root (the worktree root for worktrees), prefer that
+    // root's prettier, and skip (exit 0) when none resolves — never format
+    // from the session cwd, where .prettierignore does not govern the file.
+    const script = command![2];
+    expect(script).toContain("rev-parse --show-toplevel");
+    expect(script).toContain("node_modules/.bin/prettier");
+    expect(script).toContain("exit 0");
+    expect(script).toContain('--write "$f"');
+  });
+
+  it("generated opencode.jsonc stays byte-equal to its template and the override survives regeneration", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    // JSON destination: no provenance marker, no placeholders — init writes
+    // the template bytes verbatim, so the shipped override IS what adopters
+    // get.
+    const template = readFileSync(join(repoRoot, "templates", "docs", "opencode.jsonc"), "utf8");
+    expect(readFileSync(join(dir, "opencode.jsonc"), "utf8")).toBe(template);
+    // Regeneration over the untouched file keeps the override byte-identical.
+    const second = runCli(["init", dir, "--json"]);
+    expect(second.status).toBe(0);
+    const body = JSON.parse(second.stdout) as {
+      updated: string[];
+      modified: string[];
+      skipped: string[];
+    };
+    expect(body.updated).toContain("opencode.jsonc");
+    expect(body.modified).not.toContain("opencode.jsonc");
+    expect(body.skipped).not.toContain("opencode.jsonc");
+    expect(readFileSync(join(dir, "opencode.jsonc"), "utf8")).toBe(template);
   });
 
   it("agents and commands are frontmatter-first with the YAML provenance marker", () => {
@@ -624,6 +672,7 @@ describe("opencode seam: methodology commands and skill references (W5)", () => 
   ];
   /** Bundled arggon-cli skill references (progressive disclosure). */
   const SKILL_REFERENCES = [
+    ".agents/skills/arggon-cli/references/exploration.md",
     ".agents/skills/arggon-cli/references/json-contract.md",
     ".agents/skills/arggon-cli/references/methodology.md",
     ".agents/skills/arggon-cli/references/orchestration.md",

@@ -62,10 +62,10 @@ import {
   type ArgonKernel,
   type ArgonToolDefinition,
 } from "./index.js";
+import { runCli as runCliBase } from "../../../cli/src/test-spawn.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const tsx = join(root, "node_modules/tsx/dist/cli.mjs");
-const cli = join(root, "cli/src/cli.ts");
+
 
 /**
  * The twelve spec tools (spec-native-first-011 §Tools) plus the three W4
@@ -157,9 +157,7 @@ function legacyPriorityLabel(dir: string): void {
 }
 
 function runCli(args: string[], cwd: string, env?: NodeJS.ProcessEnv) {
-  const proc = spawnSync(process.execPath, [tsx, cli, "--json", ...args], {
-    encoding: "utf8",
-    cwd,
+  const proc = runCliBase(["--json", ...args], cwd, {
     timeout: 60_000,
     ...(env === undefined ? {} : { env }),
   });
@@ -1166,6 +1164,13 @@ describe("worktree domain tools (W4)", () => {
       ready: false,
       install: "missing",
       linkedNodeModules: false,
+      // The preparation log names what ran (bug-start-install-ordering): the
+      // primary had no install to link, and with nothing declared the probe
+      // verdict is vacuous.
+      steps: [
+        { step: "link", outcome: "primary-install-missing" },
+        { step: "gate-bins", outcome: "all-worktree" },
+      ],
     });
     expect(output.claimCommitted).toBe(true);
     expect(output.claimCommit).toMatchObject({ status: "committed", committed: true });
@@ -1560,10 +1565,13 @@ describe("worktree domain tools (W4)", () => {
     expect(startSchema).not.toContain("missingDependencies");
   });
 
-  it("names the declared dependencies a stale mirrored install cannot provide (bug-worktree-readiness-misses-stale-primary-install)", async () => {
+  it("refuses a fresh worktree whose stale mirrored install cannot provide a declared gate bin (bug-worktree-readiness-misses-stale-primary-install + bug-start-install-ordering)", async () => {
     // The measured machine state, reproduced deterministically: the primary's
-    // install predates a merged devDependency, so the link farm (which mirrors
-    // it) cannot resolve that name. The receipt used to say `ready: true`.
+    // install predates a merged devDependency, so the linked install (which
+    // mirrors it) cannot resolve that name. The receipt used to say
+    // `ready: true` and the claim landed anyway (incident 3's "readiness
+    // passed while the environment needed hand-install"); a start that
+    // created the worktree now refuses, naming the dependency.
     const dir = seedGitTree();
     addNativeGateDependency(dir);
     addNativeManifest(dir, {
@@ -1575,26 +1583,44 @@ describe("worktree domain tools (W4)", () => {
     const { domain } = fakeDomain(dir);
     const defs = worktreeDefinitions(dir, domain);
 
-    const started = await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
-    const output = started.output as Record<string, unknown>;
-    const preparation = output.preparation as Record<string, unknown>;
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    const payload = typed.envelope;
+    const preparation = payload.preparation as Record<string, unknown>;
 
     // The linked install is still there and still reported as linked...
     expect(preparation).toMatchObject({ install: "linked", linkedNodeModules: true });
-    // ...but readiness is not silently claimed, and the reason is IN the
-    // payload: a native caller does not shell out to the CLI to learn which
-    // declared dependency the mirrored install is missing.
+    // ...but readiness is not silently claimed, the reason is IN the payload
+    // (a native caller does not shell out to the CLI to learn which declared
+    // dependency the mirrored install is missing), and a start that created
+    // the worktree refuses the claim instead of landing it on a broken env.
     expect(preparation.ready).toBe(false);
     expect(preparation.manifestCoverage).toBe("stale");
     expect(preparation.missingDependencies).toEqual(["@ast-grep/cli"]);
     expect(preparation.missingDependenciesTotal).toBe(1);
-    // Non-fatal here too: the gate ran and the claim commit landed.
-    expect(output.ok).toBe(true);
-    expect(output.claimCommitted).toBe(true);
-    expect(output.claimCommit).toMatchObject({ status: "committed", committed: true });
+    expect(payload.ok).toBe(false);
+    expect(typed.code).toBe("START_FAILED");
+    const claimCommit = payload.claimCommit as Record<string, unknown>;
+    expect(claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+      reason: "fresh-worktree install gate refused",
+    });
+    const message = String((payload.error as Record<string, unknown>).message);
+    expect(message).toContain("@ast-grep/cli: not resolvable from the worktree");
+    expect(message).toContain("npm install");
+    const worktreePath = String(payload.worktreePath);
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(itemData(dir, "task-rate-limit", worktreePath)).toMatchObject({ status: "todo" });
   });
 
-  it("caps the native missing-dependency list and reports the total behind the cap", async () => {
+  it("refuses the claim with the capped missing-dependency receipt intact (cap travels through the refusal)", async () => {
     const dir = seedGitTree();
     addNativeGateDependency(dir);
     const declared: Record<string, string> = {};
@@ -1605,8 +1631,14 @@ describe("worktree domain tools (W4)", () => {
     const { domain } = fakeDomain(dir);
     const defs = worktreeDefinitions(dir, domain);
 
-    const started = await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
-    const preparation = (started.output as Record<string, unknown>).preparation as Record<
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const preparation = ((caught as ArgonToolError).envelope.preparation ?? {}) as Record<
       string,
       unknown
     >;
@@ -1618,7 +1650,6 @@ describe("worktree domain tools (W4)", () => {
     expect(preparation.missingDependencies).toHaveLength(MAX_MISSING_DEPENDENCIES);
     expect(preparation.missingDependenciesTotal).toBe(MAX_MISSING_DEPENDENCIES + 3);
     expect(preparation.truncated).toBe(true);
-    expect(preparation.claimCommitted).toBeUndefined();
   });
 
   it("keeps the worktree and reports a skipped claim commit when the gate fails, then retries on attach", async () => {
@@ -1680,13 +1711,14 @@ describe("worktree domain tools (W4)", () => {
     );
   });
 
-  it("forwards the gate-bin resolution and names it when the claim commit fails (bug-start-worktree-npm-ci-claim)", async () => {
+  it("refuses a fresh worktree whose gate bin resolves nowhere, BEFORE the claim, by default (bug-start-install-ordering)", async () => {
     // The measured machine state, reproduced deterministically: no install
     // anywhere (the worktree has no node_modules and the primary has none), a
     // manifest declaring the gate binary, and a PATH-lookup gate like `npm run`
-    // resolving tsx. The claim commit dies with the incident's own symptom —
-    // and the failure must name the observed resolution and the exact fix
-    // instead of a bare `command not found`.
+    // resolving tsx. This is the eight-incident record's "no install at all"
+    // flavor: the preparation used to degrade silently and the claim commit
+    // died at the gate with a bare `command not found`. The fresh-worktree
+    // install gate now refuses BEFORE any claim, with the named cause.
     const dir = seedGitTree();
     addNativeManifest(dir, { name: "fixture", devDependencies: { "native-gate-dep": "1.0.0" } });
     setNativePreCommitHook(
@@ -1711,25 +1743,41 @@ describe("worktree domain tools (W4)", () => {
     // reports missing, with no path.
     const preparation = payload.preparation as {
       gateBins?: Array<{ name: string; source: string; path?: string }>;
+      steps?: Array<{ step: string; outcome: string; pkg?: string }>;
     };
-    expect(preparation.gateBins).toEqual([
-      { name: "native-gate-dep", source: "missing" },
-    ]);
+    expect(preparation.gateBins).toEqual([{ name: "native-gate-dep", source: "missing" }]);
     expect(preparation.ready).toBe(false);
+    // The preparation log names the decision that produced the state
+    // (bug-start-install-ordering instrumentation).
+    expect(preparation.steps).toEqual([
+      { step: "link", outcome: "primary-install-missing" },
+      { step: "gate-bins", outcome: "foreign-resolution" },
+    ]);
 
-    // The failure message names the flavor and the fix.
+    // The refusal names the flavor, the preparation log, and the fix — and it
+    // happened BEFORE the claim update: not-attempted receipt, item copy todo.
     const error = payload.error as Record<string, unknown>;
     const message = String(error.message);
+    expect(message).toContain("fresh worktree must leave a gate-usable install");
     expect(message).toContain("native-gate-dep: not resolvable from the worktree");
+    expect(message).toContain("Preparation ran: link:primary-install-missing");
     expect(message).toContain("npm ci");
-    const claimCommit = payload.claimCommit as { skipped?: string };
-    expect(String(claimCommit.skipped)).toContain("command not found");
+    const claimCommit = payload.claimCommit as Record<string, unknown>;
+    expect(claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+      reason: "fresh-worktree install gate refused",
+    });
+    const worktreePath = String(payload.worktreePath);
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(itemData(dir, "task-rate-limit", worktreePath)).toMatchObject({ status: "todo" });
   });
 
-  it("names a sibling .bin on PATH as the gate-bin resolution source (bug-start-worktree-npm-ci-claim)", async () => {
-    // Incident 1: the sibling's bin masks the absent worktree install — the
-    // gate PASSES through the PATH lookup and the claim lands. The receipt
-    // must still name the foreign source and withhold readiness.
+  it("refuses a fresh worktree whose gate bin resolves only via PATH, by default (bug-start-install-ordering masking flavor)", async () => {
+    // Incident 1's flavor: the sibling's bin masks the absent worktree install
+    // — the gate USED to pass through the PATH lookup and the claim landed on
+    // a broken environment. A start that created the worktree now refuses the
+    // claim instead of handing the worker that state, naming the sibling.
     const dir = seedGitTree();
     addNativeManifest(dir, { name: "fixture", devDependencies: { "native-gate-dep": "1.0.0" } });
     setNativePreCommitHook(dir, "#!/bin/sh\ncommand -v native-gate-dep >/dev/null 2>&1 || exit 1\n");
@@ -1740,30 +1788,181 @@ describe("worktree domain tools (W4)", () => {
     const { domain } = fakeDomain(dir);
     const defs = worktreeDefinitions(dir, domain);
     const savedPath = process.env.PATH ?? "";
+    let caught: unknown;
     process.env.PATH = `${siblingBinDir}:${savedPath}`;
-    let output: Record<string, unknown>;
     try {
-      const started = await tool(defs, "start").execute({
-        id: "task-rate-limit",
-        assignee: "smoke",
-      });
-      output = started.output as Record<string, unknown>;
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
     } finally {
       process.env.PATH = savedPath;
     }
-
-    const preparation = output.preparation as {
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    const payload = typed.envelope;
+    const preparation = payload.preparation as {
       ready?: unknown;
       gateBins?: Array<{ name: string; source: string; path?: string }>;
     };
-    expect(output.ok).toBe(true);
-    expect(output.claimCommitted).toBe(true);
-    // The gate ran on the sibling's binary — the exact silent masking — so
-    // readiness is withheld and the receipt names the sibling's path.
+    // The same observation strict mode uses — the receipt names the foreign
+    // source and withholds readiness; the fresh gate changes the consequence.
     expect(preparation.ready).toBe(false);
     expect(preparation.gateBins).toEqual([
       { name: "native-gate-dep", source: "path", path: join(siblingBinDir, "native-gate-dep") },
     ]);
+    const claimCommit = payload.claimCommit as Record<string, unknown>;
+    expect(claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+      reason: "fresh-worktree install gate refused",
+    });
+    const message = String((payload.error as Record<string, unknown>).message);
+    expect(message).toContain(
+      `native-gate-dep: resolves only via PATH from ${join(siblingBinDir, "native-gate-dep")}`,
+    );
+    expect(itemData(dir, "task-rate-limit", String(payload.worktreePath))).toMatchObject({
+      status: "todo",
+    });
+  });
+
+  /**
+   * Arm `x-tracker.strict-gate-bins` (task-start-gate-strict-mode) on the
+   * seeded tree. Committed: a dirty tracker tree would trip start's stale
+   * canonical-claim guard instead of exercising the flag.
+   */
+  function armStrictGateBins(dir: string): void {
+    const config = join(dir, "ArggonManager", ".convention.yml");
+    writeFileSync(
+      config,
+      `${readFileSync(config, "utf8")}x-tracker:\n  strict-gate-bins: true\n`,
+      "utf8",
+    );
+    git(dir, ["add", "ArggonManager/.convention.yml"]);
+    git(dir, ["commit", "-qm", "test: arm the strict gate-bin gate"]);
+  }
+
+  /** Install one bin-bearing package (plus its `.bin` shim) into an install dir. */
+  function installGateDepBin(modulesDir: string): void {
+    const dep = join(modulesDir, "native-gate-dep");
+    mkdirSync(dep, { recursive: true });
+    writeFileSync(
+      join(dep, "package.json"),
+      JSON.stringify({
+        name: "native-gate-dep",
+        version: "1.0.0",
+        bin: { "native-gate-dep": "./index.js" },
+      }),
+    );
+    const binDir = join(modulesDir, ".bin");
+    mkdirSync(binDir, { recursive: true });
+    writeFileSync(join(binDir, "native-gate-dep"), "#!/bin/sh\nexit 0\n", "utf8");
+    chmodSync(join(binDir, "native-gate-dep"), 0o755);
+  }
+
+  it("refuses the claim before the claim update when strict-gate-bins is armed and the bin resolves outside the worktree (task-start-gate-strict-mode)", async () => {
+    // The same sibling-PATH masking shape as the report-only test above, but
+    // with the flag armed: the resolution must HARD-FAIL the claim instead of
+    // only withholding readiness — and the item copy must stay untouched.
+    const dir = seedGitTree();
+    addNativeManifest(dir, { name: "fixture", devDependencies: { "native-gate-dep": "1.0.0" } });
+    armStrictGateBins(dir);
+    setNativePreCommitHook(dir, "#!/bin/sh\ncommand -v native-gate-dep >/dev/null 2>&1 || exit 1\n");
+    const siblingModules = join(dirname(dir), "sibling-strict", "node_modules");
+    installGateDepBin(siblingModules);
+    const siblingBinDir = join(siblingModules, ".bin");
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const savedPath = process.env.PATH ?? "";
+    process.env.PATH = `${siblingBinDir}:${savedPath}`;
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    } finally {
+      process.env.PATH = savedPath;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    expect(typed.code).toBe("START_FAILED");
+    const payload = typed.envelope;
+    const preparation = payload.preparation as {
+      gateBins?: Array<{ name: string; source: string; path?: string }>;
+    };
+    expect(preparation.gateBins).toEqual([
+      { name: "native-gate-dep", source: "path", path: join(siblingBinDir, "native-gate-dep") },
+    ]);
+    // Refused BEFORE the claim update: not-attempted receipt, item copy todo.
+    expect(payload.claimCommitted).toBe(false);
+    const claimCommit = payload.claimCommit as Record<string, unknown>;
+    expect(claimCommit).toMatchObject({ status: "not-attempted", committed: false });
+    expect(claimCommit.reason).toBe("strict gate-bin gate refused");
+    const error = payload.error as Record<string, unknown>;
+    const message = String(error.message);
+    expect(message).toContain("x-tracker.strict-gate-bins is set");
+    expect(message).toContain("refusing the claim commit");
+    expect(message).toContain(
+      `native-gate-dep: resolves only via PATH from ${join(siblingBinDir, "native-gate-dep")}`,
+    );
+    expect(message).toContain("npm ci");
+    const worktreePath = String(payload.worktreePath);
+    expect(message).toContain(worktreePath);
+    expect(existsSync(worktreePath)).toBe(true);
+    const claimed = itemData(dir, "task-rate-limit", worktreePath);
+    expect(claimed.status).toBe("todo");
+    expect(claimed.assignee).toBeUndefined();
+
+    // The documented remediation loop: a worktree-local install (the `npm ci`
+    // shape) flips the resolution to the worktree — the module walk prefers it
+    // over the sibling still on PATH — and the attach re-run commits the claim.
+    installGateDepBin(join(worktreePath, "node_modules"));
+    process.env.PATH = `${join(worktreePath, "node_modules", ".bin")}:${savedPath}`;
+    let retryOutput: Record<string, unknown>;
+    try {
+      const retry = await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+      retryOutput = retry.output as Record<string, unknown>;
+    } finally {
+      process.env.PATH = savedPath;
+    }
+    const retryPreparation = retryOutput.preparation as {
+      gateBins?: Array<{ name: string; source: string; path?: string }>;
+    };
+    expect(retryOutput.worktreeCreated).toBe(false);
+    expect(retryOutput.claimCommitted).toBe(true);
+    expect(retryPreparation.gateBins).toEqual([
+      {
+        name: "native-gate-dep",
+        source: "worktree",
+        path: join(worktreePath, "node_modules", ".bin", "native-gate-dep"),
+      },
+    ]);
+  });
+
+  it("claims normally when strict-gate-bins is armed and the bin resolves from the worktree (task-start-gate-strict-mode)", async () => {
+    // Strict mode never invents a violation: a worktree-resolved gate bin
+    // commits exactly as it does with the flag unset.
+    const dir = seedGitTree();
+    addNativeGateDependency(dir);
+    installGateDepBin(join(dir, "node_modules"));
+    addNativeManifest(dir, { name: "fixture", devDependencies: { "native-gate-dep": "1.0.0" } });
+    armStrictGateBins(dir);
+    setNativePreCommitHook(dir, "#!/bin/sh\nexit 0\n");
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const started = await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    const output = started.output as Record<string, unknown>;
+    const worktreePath = String(output.worktreePath);
+    const preparation = output.preparation as {
+      gateBins?: Array<{ name: string; source: string; path?: string }>;
+    };
+    expect(preparation.gateBins).toEqual([
+      {
+        name: "native-gate-dep",
+        source: "worktree",
+        path: join(worktreePath, "node_modules", ".bin", "native-gate-dep"),
+      },
+    ]);
+    expect(output.claimCommitted).toBe(true);
   });
 
   it("start refuses to steal a claim and removes the worktree it just created", async () => {

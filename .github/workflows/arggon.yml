@@ -23,10 +23,15 @@ on:
 env:
   # The bin installs from the registry, pinned to a release
   # (task-ci-recipe-published-one-liner): no GitHub clone, works from private
-  # or forked remotes alike. The pin moves only in the release runbook's
-  # post-release follow-up (step 6), so the drift gate compares against a
-  # fixed seam instead of a moving one.
-  ARGGON_VERSION: "0.4.0"
+  # or forked remotes alike. The pin is a literal on purpose
+  # (task-ci-seam-pin-tracks-release): deriving it from package.json would
+  # install the bumped version between the release runbook's step-1 bump and
+  # its step-3 publish — before the registry has it — turning tasks-validate
+  # red on main and on the release PR on every release. A stale literal is a
+  # red test, not a silent outage: cli/src/ci-seam-pin.test.ts fails until
+  # the runbook's post-release re-pin lands. The adopter TEMPLATE keeps its
+  # literal pin by design — adopters pin deliberately.
+  ARGGON_VERSION: "0.4.1"
 
 jobs:
   tasks-validate:

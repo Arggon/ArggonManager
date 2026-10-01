@@ -33,13 +33,13 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { runCreate, runUpdate } from "@arggondev/lib";
 import { runInit } from "./init.js";
 import { removeFixtureTree } from "./test-tmp.js";
+import { nodeImportArgs } from "./test-spawn.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 /** Fresh-clone stand-in, created in beforeAll (see {@link freshCloneCopy}). */
 let copy = "";
-/** The copy's CLI entry + tsx, so every parity run uses the copy's artifact. */
+/** The copy's CLI entry, so every parity run uses the copy's artifact. */
 let cli = "";
-let tsx = "";
 
 /** Kernel entrypoints the built artifact must expose (subset of lib.test.ts). */
 const REQUIRED_BUILT_EXPORTS = [
@@ -201,7 +201,7 @@ function npm(args: string[], cwd: string) {
 }
 
 function runCli(args: string[], cwd: string) {
-  return spawnSync(process.execPath, [tsx, cli, "--json", ...args], {
+  return spawnSync(process.execPath, [...nodeImportArgs(cli, copy), "--json", ...args], {
     encoding: "utf8",
     cwd,
     timeout: 60_000,
@@ -360,7 +360,6 @@ beforeAll(() => {
   // while sibling test files run).
   copy = freshCloneCopy();
   cli = join(copy, "cli/src/cli.ts");
-  tsx = join(copy, "node_modules/tsx/dist/cli.mjs");
   expect(existsSync(join(copy, "dist"))).toBe(false);
   expect(existsSync(join(copy, "lib/dist"))).toBe(false);
   const build = npm(["run", "build"], copy);

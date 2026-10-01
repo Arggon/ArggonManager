@@ -25,6 +25,7 @@ file — read the one that matches the task **before** acting:
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------ |
 | `references/json-contract.md` | **JSON contract**: `--json` envelopes, error codes, filters, output surfaces, native tools, MCP              |
 | `references/methodology.md`   | **Methodology**: what the work needs — spec, plan, ADR, exploration, playbook, runbook — and the quality bar |
+| `references/exploration.md`   | **Greenfield exploration**: the six-phase protocol — classify, stance, ground, frontier rounds, edge-case hunt, artifacts + hard gate (ADR 0017) |
 | `references/orchestration.md` | **Orchestration**: coordinator/subagent waves, review bar, smoke gate, worktrees                             |
 | `references/pitfalls.md`      | **Pitfalls**: claim, cascade, tracker-merge and commit-staging traps                                         |
 
@@ -189,8 +190,11 @@ arggon playbook refresh <tech>  # After re-research: set version + researched: t
 ```
 
 Pipeline: **explore → ADR → playbook → status/refresh**, with a spec (and plan)
-before non-trivial implementation. What the work needs — and when a playbook must
-be re-researched — is in `references/methodology.md`; the generated AGENTS.md
+before non-trivial implementation. Greenfield work is exploration-first
+(`references/exploration.md`): the six-phase protocol runs before any spec, and
+no implementation task is claimed before a spec with clean `spec analyze`
+(ADR 0017). What the work needs — and when a playbook must be re-researched —
+is in `references/methodology.md`; the generated AGENTS.md
 points agents at `ArggonManager/docs/playbooks/`.
 
 OpenCode V2 sessions get the same pipeline as commands: `/arggon-spec`,
