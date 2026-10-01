@@ -2179,7 +2179,17 @@ type NativePreparationReceipt = {
    * absent, and without this report the resolution stays invisible.
    */
   gateBins: NativeGateBinResolution[]
+  /** Bounded preparation log (bug-start-install-ordering), as reported by the kernel. */
+  steps?: NativePrepStep[]
   truncated?: boolean
+}
+
+/** One bounded entry of the native preparation log (bug-start-install-ordering). */
+type NativePrepStep = {
+  /** Same bounded phases the kernel log uses (structurally a `WorktreePrepStep`). */
+  step: "link" | "build" | "gate-bins"
+  outcome: string
+  pkg?: string
 }
 
 type NativeClaimCommitReceipt = {
@@ -2221,6 +2231,7 @@ function boundedPreparation(input: {
   missingDependencies: string[]
   missingDependenciesTotal: number
   gateBins?: NativeGateBinResolution[]
+  steps?: NativePrepStep[]
 }): NativePreparationReceipt {
   const built = input.builtWorkspaces
     .slice(0, MAX_NATIVE_PREPARATION_NAMES)
@@ -2244,9 +2255,25 @@ function boundedPreparation(input: {
     }
     return bounded
   })
+  // The kernel owns discovery and its own cap (MAX_PREP_STEPS = 16, below this
+  // function's MAX_NATIVE_PREPARATION_NAMES); only the per-string bound is
+  // re-applied, and an over-cap kernel log folds into the shared truncation.
+  const steps = (input.steps ?? []).slice(0, MAX_NATIVE_PREPARATION_NAMES).map((entry) => {
+    const bounded: NativePrepStep = {
+      // A kernel-produced phase token from a fixed three-value set: passed
+      // through, not re-bounded as free text.
+      step: entry.step,
+      outcome: boundedNativeText(entry.outcome, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+    }
+    if (entry.pkg !== undefined) {
+      bounded.pkg = boundedNativeText(entry.pkg, MAX_NATIVE_PREPARATION_VALUE_CHARS)
+    }
+    return bounded
+  })
   const truncated =
     input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
     input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
+    (input.steps?.length ?? 0) > steps.length ||
     input.missingDependenciesTotal > input.missingDependencies.length ||
     (input.gateBins?.length ?? 0) > gateBins.length ||
     built.some((name, index) => name !== input.builtWorkspaces[index]) ||
@@ -2268,6 +2295,7 @@ function boundedPreparation(input: {
     missingDependencies: missing,
     missingDependenciesTotal: input.missingDependenciesTotal,
     gateBins,
+    ...(steps.length > 0 ? { steps } : {}),
     ...(truncated ? { truncated: true } : {}),
   }
 }
@@ -3294,6 +3322,32 @@ async function nativeStartBody(
           `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
           "it attaches to the existing worktree and retries the claim commit.",
         "strict gate-bin gate refused",
+      )
+    }
+  }
+
+  // Fresh-worktree install gate (bug-start-install-ordering): a start that
+  // CREATED the worktree must leave a gate-usable install — or fail BEFORE any
+  // claim commit with the named cause (the offending bins, the preparation
+  // log, the `npm ci` fix). This closes the eight-incident record's root
+  // defect: the preparation steps used to degrade silently (a primary install
+  // missing or mid-install, a failed farm, a PATH-masked resolution) and the
+  // claim commit then died at the gate with a bare `tsx: command not found`.
+  // Attach re-runs keep the report-only receipt (or the armed strict gate
+  // above), so the documented `npm ci` then attach remedy stays possible.
+  if (worktreePath !== undefined && progress.worktreeCreated) {
+    const refusal = kernel.freshWorktreeInstallRefusal(
+      progress.preparation?.gateBins ?? [],
+      worktreePath,
+      progress.preparation?.steps ?? [],
+    )
+    if (refusal !== null) {
+      return failBeforeClaim(
+        `${refusal} The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
+          "Then re-run " +
+          `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
+          "it attaches to the existing worktree and retries the claim commit.",
+        "fresh-worktree install gate refused",
       )
     }
   }

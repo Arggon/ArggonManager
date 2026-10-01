@@ -307,6 +307,42 @@ function createLinkFarm(
 }
 
 /**
+ * Why `linkNodeModules` did (or did not) lay an install
+ * (bug-start-install-ordering): every incident flavor of the eight-count
+ * record was a silent `false` here — a skipped farm whose reason was never
+ * surfaced. The detailed outcome makes the skip reason nameable, so the
+ * preparation receipt can correlate a refusal (or a broken worktree) with the
+ * exact decision that produced it.
+ *
+ * - `farm-created`: the per-worktree link farm was laid (workspace copies shadowed).
+ * - `symlink-created`: a bare symlink to the primary install (no workspace
+ *   packages to shadow).
+ * - `farm-failed-symlink-fallback`: the farm could not be created and the bare
+ *   symlink stood in — the worktree now resolves the PRIMARY's workspace
+ *   copies (the W6 staleness), so `linkedWorkspaces` will report them.
+ * - `worktree-install-present`: skipped — the worktree already had a
+ *   `node_modules` (an attach re-run, or a PARTIAL install left by an
+ *   interrupted `npm ci`; reused as-is, never repaired — the gate-bin probe
+ *   names what the reused install cannot provide).
+ * - `primary-install-missing`: skipped — the primary checkout had no
+ *   `node_modules` at preparation time. Either the repo has no install (fresh
+ *   clone) or one was in flight (`npm ci`/`npm install` deletes the tree
+ *   first) — the intermittent flavor behind the "no install at all" incidents.
+ * - `failed`: neither the farm nor the bare symlink could be created
+ *   (permissions, platform without symlinks).
+ */
+export type LinkOutcome =
+  | "farm-created"
+  | "symlink-created"
+  | "farm-failed-symlink-fallback"
+  | "worktree-install-present"
+  | "primary-install-missing"
+  | "failed";
+
+/** Result of `linkNodeModulesDetailed`: the boolean plus WHY. */
+export type LinkNodeModulesResult = { linked: boolean; outcome: LinkOutcome };
+
+/**
  * Link the primary checkout's install into a worktree that lacks one
  * (bug-start-worktree-node-modules), as a link farm when the worktree carries
  * its own workspace package copy (task-start-worktree-lib-resolution). A fresh
@@ -323,19 +359,36 @@ function createLinkFarm(
  * created.
  */
 export function linkNodeModules(primaryRoot: string, worktreePath: string): boolean {
+  return linkNodeModulesDetailed(primaryRoot, worktreePath).linked;
+}
+
+/** `linkNodeModules` plus the named outcome (bug-start-install-ordering). */
+export function linkNodeModulesDetailed(
+  primaryRoot: string,
+  worktreePath: string,
+): LinkNodeModulesResult {
   const target = join(primaryRoot, "node_modules");
   const link = join(worktreePath, "node_modules");
-  if (!existsSync(target) || existsSync(link)) return false;
+  if (!existsSync(target)) return { linked: false, outcome: "primary-install-missing" };
+  if (existsSync(link)) return { linked: false, outcome: "worktree-install-present" };
   const workspaceLinks = primaryWorkspaceLinks(primaryRoot);
   const locals = localPackagesFromLinks(workspaceLinks, worktreePath);
-  if (locals.length > 0 && createLinkFarm(target, link, workspaceLinks, locals)) return true;
+  if (locals.length > 0 && createLinkFarm(target, link, workspaceLinks, locals)) {
+    return { linked: true, outcome: "farm-created" };
+  }
   try {
     // "junction" is the no-privilege directory link on Windows; POSIX ignores
     // the type argument.
     symlinkSync(target, link, process.platform === "win32" ? "junction" : "dir");
-    return true;
+    return {
+      linked: true,
+      // A farm that could not be created falls back to the whole-install
+      // symlink: usable for the gate, but the worktree now resolves the
+      // PRIMARY's workspace copies — named so the fallback is never silent.
+      outcome: locals.length > 0 ? "farm-failed-symlink-fallback" : "symlink-created",
+    };
   } catch {
-    return false;
+    return { linked: false, outcome: "failed" };
   }
 }
 
@@ -522,29 +575,54 @@ function installConsumesLocalBuild(
 export function buildLocalWorkspaces(
   primaryRoot: string,
   worktreePath: string,
-  deps: { runBuild?: WorkspaceBuildRunner } = {},
+  deps: {
+    runBuild?: WorkspaceBuildRunner;
+    /** Per-package outcome collector (bug-start-install-ordering instrumentation). */
+    onStep?: (outcome: string, pkg: string) => void;
+  } = {},
 ): string[] {
   const runBuild = deps.runBuild ?? defaultWorkspaceBuildRunner;
   const built: string[] = [];
   for (const pkg of localWorkspacePackages(primaryRoot, worktreePath)) {
     try {
-      if (packageEntryExists(pkg.path)) continue; // already importable
-      if (packageBuildScript(pkg.path) === undefined) continue; // nothing to run
+      if (packageEntryExists(pkg.path)) {
+        deps.onStep?.("entry-exists", pkg.name); // already importable
+        continue;
+      }
+      if (packageBuildScript(pkg.path) === undefined) {
+        deps.onStep?.("no-build-script", pkg.name); // nothing to run
+        continue;
+      }
       // Never pay for a build the install cannot use: with a bare symlink to
       // the primary install there is no farm to flip, so an attach re-run would
       // rebuild for ~2s and still resolve the primary's copy (PR #388 finding 3).
-      if (!installConsumesLocalBuild(primaryRoot, worktreePath, pkg)) continue;
+      if (!installConsumesLocalBuild(primaryRoot, worktreePath, pkg)) {
+        deps.onStep?.("install-cannot-consume", pkg.name);
+        continue;
+      }
       // The exit is honored: a failed build falls back visibly even when it
       // emitted the declared entry (`tsc` without `noEmitOnError`), so the gate
       // never runs a kernel the package itself reported as failed.
-      if (!runBuild(pkg.path)) continue;
+      if (!runBuild(pkg.path)) {
+        deps.onStep?.("build-failed", pkg.name);
+        continue;
+      }
       // A build that did not produce the declared entry leaves the primary's
       // copy in place: the gate keeps a loadable package and the report names
       // the shadowed one.
-      if (!packageEntryExists(pkg.path)) continue;
-      if (pointWorkspaceAtLocal(primaryRoot, worktreePath, pkg.name)) built.push(pkg.name);
+      if (!packageEntryExists(pkg.path)) {
+        deps.onStep?.("build-no-entry", pkg.name);
+        continue;
+      }
+      if (pointWorkspaceAtLocal(primaryRoot, worktreePath, pkg.name)) {
+        deps.onStep?.("built", pkg.name);
+        built.push(pkg.name);
+      } else {
+        deps.onStep?.("flip-failed", pkg.name);
+      }
     } catch {
       // Best-effort: one broken package never fails the start (or the others).
+      deps.onStep?.("errored", pkg.name);
     }
   }
   return built;
@@ -848,6 +926,56 @@ export function strictGateBinFailure(
 }
 
 /**
+ * The refusal for a worktree this start CREATED (bug-start-install-ordering):
+ * a fresh `start --worktree` must ALWAYS leave a gate-usable install — or fail
+ * before any claim commit with the named cause. This is the root fix for the
+ * eight-incident record: the preparation steps used to degrade silently (a
+ * skipped farm, a mid-install primary, a PATH-masked resolution) and the claim
+ * commit then died at the gate with a bare `tsx: command not found`, stranding
+ * the worker. The refusal names the offending bins (same observation strict
+ * mode uses — the flag changes the consequence, never the observation), the
+ * preparation log that produced the state, and the exact fix.
+ *
+ * Default-on for fresh worktrees — no flag required: a start that created the
+ * worktree vouches for its install, and must not hand the worker a broken one.
+ * Attach re-runs are NOT covered here (their report-only receipt — or the
+ * armed strict gate — governs them), so the documented `npm ci` then attach
+ * remedy stays possible. Null when nothing declared exposes a bin (the
+ * documented carve-out: a project with no dependency-needing gate may still
+ * have no install and commit the claim).
+ */
+export function freshWorktreeInstallRefusal(
+  gateBins: GateBinResolution[],
+  worktreePath: string,
+  steps: WorktreePrepStep[] = [],
+): string | null {
+  const broken = strictGateBinViolations(gateBins);
+  if (broken.length === 0) return null;
+  const named = broken
+    .map((bin) => {
+      if (bin.source === "missing") return `${bin.name}: not resolvable from the worktree`;
+      if (bin.source === "path") {
+        return `${bin.name}: resolves only via PATH from ${bin.path} (outside the worktree)`;
+      }
+      return `${bin.name}: resolves from ${bin.path}, above the worktree`;
+    })
+    .join("; ");
+  const prep =
+    steps.length > 0
+      ? ` Preparation ran: ${steps
+          .map((entry) => `${entry.step}:${entry.outcome}${entry.pkg ? ` (${entry.pkg})` : ""}`)
+          .join(", ")}.`
+      : "";
+  return (
+    `refusing the claim commit — a fresh worktree must leave a gate-usable install, and ` +
+    `these gate binaries do not resolve inside it: ${named}.${prep} ` +
+    `Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install ` +
+    `(or \`npm install\` in the primary checkout if its install is stale or missing), ` +
+    `then re-run start --worktree to attach.`
+  );
+}
+
+/**
  * Report whether the install a worktree resolves through provides what that
  * worktree's own manifest declares (bug-worktree-readiness-misses-stale-primary-install).
  *
@@ -878,6 +1006,29 @@ export function inspectDeclaredDependencies(worktreePath: string): DeclaredDepen
 
 /** What dependency preparation found (or created) in a worktree. */
 export type WorktreeInstallState = "linked" | "existing" | "missing" | "unavailable";
+
+/**
+ * One bounded entry of the preparation log (bug-start-install-ordering): WHICH
+ * prep path ran, so an incident's worktree state can be correlated with the
+ * exact decision that produced it — a created/reused/failed link farm, a
+ * skipped-and-named build, and the final gate-bin verdict. Eight consolidated
+ * incidents were all silent decisions here; the log makes every skip nameable.
+ */
+export type WorktreePrepStep = {
+  /** Preparation phase that produced the entry: the link, a build, the probe. */
+  step: "link" | "build" | "gate-bins";
+  /** Bounded outcome token (e.g. `farm-created`, `primary-install-missing`). */
+  outcome: string;
+  /** Workspace package the outcome is about (build entries only). */
+  pkg?: string;
+};
+
+/**
+ * Cap on the preparation-log entries a bounded receipt carries: enough for the
+ * link decision, every workspace build decision of a normal repo, and the
+ * probe verdict, without letting a hundred-workspace monorepo inflate it.
+ */
+export const MAX_PREP_STEPS = 16;
 
 /**
  * Bounded-shape receipt for the shared pre-claim dependency preparation.
@@ -919,6 +1070,17 @@ export type WorktreeDependencyPreparation = {
    * `ready` unchanged.
    */
   gateBins: GateBinResolution[];
+  /**
+   * The bounded preparation log (bug-start-install-ordering): which prep path
+   * ran — link farm created / reused / skipped-and-why, per-workspace build
+   * decisions, and the gate-bin probe verdict — capped at `MAX_PREP_STEPS`.
+   * This is the instrumentation the eight-incident record asked for: a
+   * refusal, a failed gate, or a broken worktree can now be correlated with
+   * the exact silent decision that used to produce it.
+   */
+  steps: WorktreePrepStep[];
+  /** Present only when the log hit `MAX_PREP_STEPS` and entries were dropped. */
+  stepsTruncated?: true;
 };
 
 /**
@@ -939,9 +1101,23 @@ export function prepareWorktreeDependencies(
   deps: { runBuild?: WorkspaceBuildRunner } = {},
 ): WorktreeDependencyPreparation {
   const worktreeModules = join(worktreePath, "node_modules");
-  const linkedNodeModules = linkNodeModules(primaryRoot, worktreePath);
+  // Bounded preparation log (bug-start-install-ordering): every decision is
+  // recorded, never silent — the link outcome, each workspace build decision
+  // and the probe verdict. A skip states WHY in its outcome token.
+  const steps: WorktreePrepStep[] = [];
+  let stepsTruncated = false;
+  const record = (step: WorktreePrepStep["step"], outcome: string, pkg?: string): void => {
+    if (steps.length >= MAX_PREP_STEPS) {
+      stepsTruncated = true;
+      return;
+    }
+    steps.push(pkg === undefined ? { step, outcome } : { step, outcome, pkg });
+  };
+  const link = linkNodeModulesDetailed(primaryRoot, worktreePath);
+  record("link", link.outcome);
   const builtWorkspaces = buildLocalWorkspaces(primaryRoot, worktreePath, {
     runBuild: deps.runBuild,
+    onStep: (outcome, pkg) => record("build", outcome, pkg),
   });
   const linkedWorkspaces = linkedWorkspacePackages(primaryRoot, worktreePath);
   const hasInstall = existsSync(worktreeModules);
@@ -950,7 +1126,7 @@ export function prepareWorktreeDependencies(
   // gone (or becomes unreadable during the handoff). Do not call that a ready
   // linked install: the receipt must distinguish a usable link from a link
   // whose dependency tree cannot actually be resolved.
-  const install: WorktreeInstallState = linkedNodeModules
+  const install: WorktreeInstallState = link.linked
     ? hasInstall
       ? "linked"
       : "unavailable"
@@ -970,6 +1146,8 @@ export function prepareWorktreeDependencies(
   // while the worktree itself resolves nothing — readiness names it and
   // withholds `ready` instead of letting the resolution stay invisible.
   const gateBins = inspectGateBinResolution(worktreePath, primaryRoot);
+  const foreignBins = gateBins.filter((bin) => bin.source !== "worktree");
+  record("gate-bins", foreignBins.length === 0 ? "all-worktree" : "foreign-resolution");
   return {
     ready:
       hasInstall &&
@@ -977,13 +1155,15 @@ export function prepareWorktreeDependencies(
       declared.coverage === "satisfied" &&
       gateBins.every((bin) => bin.source === "worktree"),
     install,
-    linkedNodeModules,
+    linkedNodeModules: link.linked,
     builtWorkspaces,
     linkedWorkspaces,
     manifestCoverage: declared.coverage,
     missingDependencies: declared.missing,
     missingDependenciesTotal: declared.missingTotal,
     gateBins,
+    steps,
+    ...(stepsTruncated ? { stepsTruncated: true as const } : {}),
   };
 }
 

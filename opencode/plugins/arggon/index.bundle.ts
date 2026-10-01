@@ -2218,8 +2218,9 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
 exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.unlinkNodeModulesLink = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = void 0;
+exports.runImportIssues = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.unlinkNodeModulesLink = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = void 0;
+exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = void 0;
+exports.successJson = exports.jsonEnabled = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2383,9 +2384,11 @@ Object.defineProperty(exports, "defaultCleanupGit", { enumerable: true, get: fun
 Object.defineProperty(exports, "findMergedPr", { enumerable: true, get: function () { return cleanup_js_1.findMergedPr; } });
 var worktree_js_1 = require("./worktree.js");
 Object.defineProperty(exports, "buildLocalWorkspaces", { enumerable: true, get: function () { return worktree_js_1.buildLocalWorkspaces; } });
+Object.defineProperty(exports, "freshWorktreeInstallRefusal", { enumerable: true, get: function () { return worktree_js_1.freshWorktreeInstallRefusal; } });
 Object.defineProperty(exports, "inspectDeclaredDependencies", { enumerable: true, get: function () { return worktree_js_1.inspectDeclaredDependencies; } });
 Object.defineProperty(exports, "inspectGateBinResolution", { enumerable: true, get: function () { return worktree_js_1.inspectGateBinResolution; } });
 Object.defineProperty(exports, "linkNodeModules", { enumerable: true, get: function () { return worktree_js_1.linkNodeModules; } });
+Object.defineProperty(exports, "linkNodeModulesDetailed", { enumerable: true, get: function () { return worktree_js_1.linkNodeModulesDetailed; } });
 Object.defineProperty(exports, "linkedWorkspacePackages", { enumerable: true, get: function () { return worktree_js_1.linkedWorkspacePackages; } });
 Object.defineProperty(exports, "localWorkspacePackages", { enumerable: true, get: function () { return worktree_js_1.localWorkspacePackages; } });
 Object.defineProperty(exports, "packageBuildScript", { enumerable: true, get: function () { return worktree_js_1.packageBuildScript; } });
@@ -2398,6 +2401,7 @@ Object.defineProperty(exports, "strictGateBinViolations", { enumerable: true, ge
 Object.defineProperty(exports, "unlinkNodeModulesLink", { enumerable: true, get: function () { return worktree_js_1.unlinkNodeModulesLink; } });
 Object.defineProperty(exports, "MAX_MISSING_DEPENDENCIES", { enumerable: true, get: function () { return worktree_js_1.MAX_MISSING_DEPENDENCIES; } });
 Object.defineProperty(exports, "MAX_GATE_BINS", { enumerable: true, get: function () { return worktree_js_1.MAX_GATE_BINS; } });
+Object.defineProperty(exports, "MAX_PREP_STEPS", { enumerable: true, get: function () { return worktree_js_1.MAX_PREP_STEPS; } });
 var import_issues_js_1 = require("./import-issues.js");
 Object.defineProperty(exports, "runImportIssues", { enumerable: true, get: function () { return import_issues_js_1.runImportIssues; } });
 var import_issues_js_2 = require("./import-issues.js");
@@ -6015,18 +6019,20 @@ function applyViewFilter(items, expr, opts = {}) {
 __arggonModules.set("lib/src/worktree.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = void 0;
+exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = void 0;
 exports.packageEntryPaths = packageEntryPaths;
 exports.packageEntryExists = packageEntryExists;
 exports.packageBuildScript = packageBuildScript;
 exports.localWorkspacePackages = localWorkspacePackages;
 exports.linkNodeModules = linkNodeModules;
+exports.linkNodeModulesDetailed = linkNodeModulesDetailed;
 exports.unlinkNodeModulesLink = unlinkNodeModulesLink;
 exports.pointWorkspaceAtLocal = pointWorkspaceAtLocal;
 exports.buildLocalWorkspaces = buildLocalWorkspaces;
 exports.inspectGateBinResolution = inspectGateBinResolution;
 exports.strictGateBinViolations = strictGateBinViolations;
 exports.strictGateBinFailure = strictGateBinFailure;
+exports.freshWorktreeInstallRefusal = freshWorktreeInstallRefusal;
 exports.inspectDeclaredDependencies = inspectDeclaredDependencies;
 exports.prepareWorktreeDependencies = prepareWorktreeDependencies;
 exports.linkedWorkspacePackages = linkedWorkspacePackages;
@@ -6216,20 +6222,29 @@ function createLinkFarm(target, link, workspaceLinks, locals) {
     }
 }
 function linkNodeModules(primaryRoot, worktreePath) {
+    return linkNodeModulesDetailed(primaryRoot, worktreePath).linked;
+}
+function linkNodeModulesDetailed(primaryRoot, worktreePath) {
     const target = (0, node_path_1.join)(primaryRoot, "node_modules");
     const link = (0, node_path_1.join)(worktreePath, "node_modules");
-    if (!(0, node_fs_1.existsSync)(target) || (0, node_fs_1.existsSync)(link))
-        return false;
+    if (!(0, node_fs_1.existsSync)(target))
+        return { linked: false, outcome: "primary-install-missing" };
+    if ((0, node_fs_1.existsSync)(link))
+        return { linked: false, outcome: "worktree-install-present" };
     const workspaceLinks = primaryWorkspaceLinks(primaryRoot);
     const locals = localPackagesFromLinks(workspaceLinks, worktreePath);
-    if (locals.length > 0 && createLinkFarm(target, link, workspaceLinks, locals))
-        return true;
+    if (locals.length > 0 && createLinkFarm(target, link, workspaceLinks, locals)) {
+        return { linked: true, outcome: "farm-created" };
+    }
     try {
         (0, node_fs_1.symlinkSync)(target, link, process.platform === "win32" ? "junction" : "dir");
-        return true;
+        return {
+            linked: true,
+            outcome: locals.length > 0 ? "farm-failed-symlink-fallback" : "symlink-created",
+        };
     }
     catch {
-        return false;
+        return { linked: false, outcome: "failed" };
     }
 }
 function ownedLinkFarm(primaryRoot, worktreePath) {
@@ -6349,20 +6364,36 @@ function buildLocalWorkspaces(primaryRoot, worktreePath, deps = {}) {
     const built = [];
     for (const pkg of localWorkspacePackages(primaryRoot, worktreePath)) {
         try {
-            if (packageEntryExists(pkg.path))
+            if (packageEntryExists(pkg.path)) {
+                deps.onStep?.("entry-exists", pkg.name);
                 continue;
-            if (packageBuildScript(pkg.path) === undefined)
+            }
+            if (packageBuildScript(pkg.path) === undefined) {
+                deps.onStep?.("no-build-script", pkg.name);
                 continue;
-            if (!installConsumesLocalBuild(primaryRoot, worktreePath, pkg))
+            }
+            if (!installConsumesLocalBuild(primaryRoot, worktreePath, pkg)) {
+                deps.onStep?.("install-cannot-consume", pkg.name);
                 continue;
-            if (!runBuild(pkg.path))
+            }
+            if (!runBuild(pkg.path)) {
+                deps.onStep?.("build-failed", pkg.name);
                 continue;
-            if (!packageEntryExists(pkg.path))
+            }
+            if (!packageEntryExists(pkg.path)) {
+                deps.onStep?.("build-no-entry", pkg.name);
                 continue;
-            if (pointWorkspaceAtLocal(primaryRoot, worktreePath, pkg.name))
+            }
+            if (pointWorkspaceAtLocal(primaryRoot, worktreePath, pkg.name)) {
+                deps.onStep?.("built", pkg.name);
                 built.push(pkg.name);
+            }
+            else {
+                deps.onStep?.("flip-failed", pkg.name);
+            }
         }
         catch {
+            deps.onStep?.("errored", pkg.name);
         }
     }
     return built;
@@ -6517,6 +6548,31 @@ function strictGateBinFailure(gateBins, worktreePath) {
         `resolve inside the worktree: ${named}. ` +
         `Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install.`);
 }
+function freshWorktreeInstallRefusal(gateBins, worktreePath, steps = []) {
+    const broken = strictGateBinViolations(gateBins);
+    if (broken.length === 0)
+        return null;
+    const named = broken
+        .map((bin) => {
+        if (bin.source === "missing")
+            return `${bin.name}: not resolvable from the worktree`;
+        if (bin.source === "path") {
+            return `${bin.name}: resolves only via PATH from ${bin.path} (outside the worktree)`;
+        }
+        return `${bin.name}: resolves from ${bin.path}, above the worktree`;
+    })
+        .join("; ");
+    const prep = steps.length > 0
+        ? ` Preparation ran: ${steps
+            .map((entry) => `${entry.step}:${entry.outcome}${entry.pkg ? ` (${entry.pkg})` : ""}`)
+            .join(", ")}.`
+        : "";
+    return (`refusing the claim commit — a fresh worktree must leave a gate-usable install, and ` +
+        `these gate binaries do not resolve inside it: ${named}.${prep} ` +
+        `Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install ` +
+        `(or \`npm install\` in the primary checkout if its install is stale or missing), ` +
+        `then re-run start --worktree to attach.`);
+}
 function inspectDeclaredDependencies(worktreePath) {
     const declared = declaredDependencyNames(worktreePath);
     if (declared === null)
@@ -6536,16 +6592,28 @@ function inspectDeclaredDependencies(worktreePath) {
         missingTotal: missing.length,
     };
 }
+exports.MAX_PREP_STEPS = 16;
 function prepareWorktreeDependencies(primaryRoot, worktreePath, deps = {}) {
     const worktreeModules = (0, node_path_1.join)(worktreePath, "node_modules");
-    const linkedNodeModules = linkNodeModules(primaryRoot, worktreePath);
+    const steps = [];
+    let stepsTruncated = false;
+    const record = (step, outcome, pkg) => {
+        if (steps.length >= exports.MAX_PREP_STEPS) {
+            stepsTruncated = true;
+            return;
+        }
+        steps.push(pkg === undefined ? { step, outcome } : { step, outcome, pkg });
+    };
+    const link = linkNodeModulesDetailed(primaryRoot, worktreePath);
+    record("link", link.outcome);
     const builtWorkspaces = buildLocalWorkspaces(primaryRoot, worktreePath, {
         runBuild: deps.runBuild,
+        onStep: (outcome, pkg) => record("build", outcome, pkg),
     });
     const linkedWorkspaces = linkedWorkspacePackages(primaryRoot, worktreePath);
     const hasInstall = (0, node_fs_1.existsSync)(worktreeModules);
     const primaryHasInstall = (0, node_fs_1.existsSync)((0, node_path_1.join)(primaryRoot, "node_modules"));
-    const install = linkedNodeModules
+    const install = link.linked
         ? hasInstall
             ? "linked"
             : "unavailable"
@@ -6556,19 +6624,23 @@ function prepareWorktreeDependencies(primaryRoot, worktreePath, deps = {}) {
                 : "missing";
     const declared = inspectDeclaredDependencies(worktreePath);
     const gateBins = inspectGateBinResolution(worktreePath, primaryRoot);
+    const foreignBins = gateBins.filter((bin) => bin.source !== "worktree");
+    record("gate-bins", foreignBins.length === 0 ? "all-worktree" : "foreign-resolution");
     return {
         ready: hasInstall &&
             linkedWorkspaces.length === 0 &&
             declared.coverage === "satisfied" &&
             gateBins.every((bin) => bin.source === "worktree"),
         install,
-        linkedNodeModules,
+        linkedNodeModules: link.linked,
         builtWorkspaces,
         linkedWorkspaces,
         manifestCoverage: declared.coverage,
         missingDependencies: declared.missing,
         missingDependenciesTotal: declared.missingTotal,
         gateBins,
+        steps,
+        ...(stepsTruncated ? { stepsTruncated: true } : {}),
     };
 }
 function linkedWorkspacePackages(primaryRoot, worktreePath) {
@@ -8444,8 +8516,19 @@ function boundedPreparation(input) {
         }
         return bounded;
     });
+    const steps = (input.steps ?? []).slice(0, MAX_NATIVE_PREPARATION_NAMES).map((entry) => {
+        const bounded = {
+            step: entry.step,
+            outcome: boundedNativeText(entry.outcome, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+        };
+        if (entry.pkg !== undefined) {
+            bounded.pkg = boundedNativeText(entry.pkg, MAX_NATIVE_PREPARATION_VALUE_CHARS);
+        }
+        return bounded;
+    });
     const truncated = input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
         input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
+        (input.steps?.length ?? 0) > steps.length ||
         input.missingDependenciesTotal > input.missingDependencies.length ||
         (input.gateBins?.length ?? 0) > gateBins.length ||
         built.some((name, index) => name !== input.builtWorkspaces[index]) ||
@@ -8464,6 +8547,7 @@ function boundedPreparation(input) {
         missingDependencies: missing,
         missingDependenciesTotal: input.missingDependenciesTotal,
         gateBins,
+        ...(steps.length > 0 ? { steps } : {}),
         ...(truncated ? { truncated: true } : {}),
     };
 }
@@ -9040,6 +9124,15 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
                 "Then re-run " +
                 `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
                 "it attaches to the existing worktree and retries the claim commit.", "strict gate-bin gate refused");
+        }
+    }
+    if (worktreePath !== undefined && progress.worktreeCreated) {
+        const refusal = kernel.freshWorktreeInstallRefusal(progress.preparation?.gateBins ?? [], worktreePath, progress.preparation?.steps ?? []);
+        if (refusal !== null) {
+            return failBeforeClaim(`${refusal} The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
+                "Then re-run " +
+                `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
+                "it attaches to the existing worktree and retries the claim commit.", "fresh-worktree install gate refused");
         }
     }
     progress.stage = "claim update";
