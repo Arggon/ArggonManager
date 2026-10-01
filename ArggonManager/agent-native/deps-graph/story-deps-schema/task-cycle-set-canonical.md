@@ -69,3 +69,11 @@ For a graph with SEVERAL cycles, a DFS reports the back edges its own forest clo
 ### handoff 2026-10-01 @ses_f087fbfecffetE1W3D2QkOLuJX (session: ses_f087fbfecffetE1W3D2QkOLuJX) — next: Review PR (DFS-forest contract + property admission + 2 fixtures); merge is the coordinator's call.
 - branch: feat/task-cycle-set-canonical
 - open questions: None blocking; canonical cycle-basis contract was rejected as out of proportion (see evidence comment).
+- [ ] Decide the contract explicitly: report every cycle, canonicalize a cycle basis, or document DFS-forest selection as the contract (convention/engineering note in the same PR).
+- [ ] The property admits ANY consistent selection over the same member set (k orientations, not just reversed) so soaks at 2000+ runs cannot spuriously fail; the per-cycle chain text stays byte-identical across traversal orders.
+- [ ] Ambiguous-set counterexamples pinned as fixtures: edge corpus [[0,7],[7,1],[3,2],[3,2],[5,7],[5,1],[1,1],[7,0]] (run 65 divergence) and the 4-member two-distinct-cycles graph above.
+- [ ] If validate output changes: fixtures + docs updated in the same PR; deps cycle tests stay green.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Final verdict: approve — reviewer pass complete with independent verification: the reviewer modeled checkDependencies and ran ALL 40320 walk orders, confirming the 4-member fixture deterministically fails the old reversed-only rule (real regression pin), no phantom admission in the widened family (bounded <=7!, anchored at the same reduce-based anchor the product computes), run-65 claims permutation-universal-true, convention.md paragraph clause-by-clause accurate vs the #506 code. Contract decision ENDORSED (DFS-forest selection documented; no product change). Merging after the stale-branch reconcile.
