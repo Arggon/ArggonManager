@@ -127,3 +127,13 @@ Finding for the coordinator: the remaining measured divergence (different traver
 
 - branch: main
 - open questions: File a follow-up item for canonical cycle-SET reporting across traversal orders?
+
+### 2026-10-01 @Coordinator
+### 2026-09-30 @Coordinator
+verdict: approve (lead-architect review, PR #506)
+- Architecture: fix at the true source (checkDependencies): simple-cycle slice, dedup key now the simple member set, canonical rotation + anchor re-append — 3-line behavioral change, bounded, comments cite the bug id. No contract/doc change needed.
+- Scope: exactly lib/src/validate.ts, lib/src/validate.property.test.ts, cli/src/deps.test.ts, regen'd bundle (separate commit), item file. No drive-bys.
+- Tests travel with behavior: example test pins the old malformed shape (hand-traced by reviewer to discriminate pre/post); canary deleted, chain text now a hard property invariant; reviewer + coordinator independent runs: deps.test.ts 22/22; property at fresh seed 20260930 x100 green; worker pinned replay 20260928 x25 + 500/2000-run soaks green.
+- Smoke (blocking bar): fixture cycle {task-b, task-c, task-d} entered at non-min member prints "task-b -> task-c -> task-d -> task-b" from BOTH source and dist (expected vs observed matches; pre-fix printed "task-b -> task-c -> task-c -> task-d").
+- Reviewer bars 1-5 all pass (mechanical pass report on file with coordinator). Ticks honest.
+- Non-blocking, folded into follow-up: (1) the property admits only the reversed orientation for an ambiguous member set; >=4-member sets can carry >2 distinct directed cycles, so elevated ARGGON_PROPERTY_RUNS could spuriously fail the PROPERTY (not the product) — going into the canonical-cycle-set follow-up item. (2) DFS cycle-SET selection remains traversal-dependent (explicitly out of scope here).
