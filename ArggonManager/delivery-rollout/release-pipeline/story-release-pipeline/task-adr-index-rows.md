@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adr-index-rows
 title: "ADR index: add missing rows 0014-0017"
+assignee: Arggon
+branch: feat/task-adr-index-rows
 parent: story-release-pipeline
 labels: [docs, housekeeping]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
+claimed_at: "2026-10-01T14:38:14.574Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-adr-index-rows
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/task-adr-index-rows.md
