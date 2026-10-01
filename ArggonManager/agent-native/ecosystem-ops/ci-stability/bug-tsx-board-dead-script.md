@@ -13,6 +13,7 @@ updated: "2026-09-30"
 claimed_at: "2026-09-30T23:56:07.824Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-tsx-board-dead-script
 ---
+
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/ci-stability/bug-tsx-board-dead-script.md
   Leaves live only under a story. id is the filename stem: bug-tsx-board-dead-script.
@@ -26,13 +27,32 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-tsx-board-dead-script
 
 <!-- What went wrong / how to reproduce. -->
 
+`npm run arggon -- board` (tsx path) embeds controller functions with `Function.toString()`; under tsx those sources carry esbuild keepNames `__name(...)` calls the page never defines, so the body script throws `ReferenceError: __name is not defined` on load and every control is dead. See the coordinator's verified context below.
+
 ## Acceptance
 
-- [ ] 
+- [x] Root cause confirmed (which transform injects `__name` and why toString carries it) and the chosen fix recorded.
+- [x] `npm run arggon -- board` output contains zero `__name(` references and every control works in a real browser (Playwright drive, expected vs observed).
+- [x] `npm run arggon -- board --serve` interactivity verified the same way.
+- [x] Regression gate added (rendered-script assertion + a tsx-path smoke leg) so it cannot return.
+- [x] Gates: full suite, lint, build, check:plugin, validate; README unaffected (dist path unchanged).
 
 ## Notes
 
 ### 2026-09-30 @Arggon
+
+### Root cause + chosen fix (worker, 2026-09-30)
+
+**Root cause (confirmed).** `tsx` compiles the CLI with esbuild, which enables `keepNames`. Lowering nested function declarations/closures renames symbols, and keepNames preserves `.name` by splicing `__name(target, "name")` calls INTO the enclosing function body — three shapes: statement (`__name(inner,"inner");`), comma-list (`__name(a,"a"),__name(b,"b");`) and expression wrapper (`const cb=__name(fn,"cb");`). `Function.toString()` of the transformed function returns that body, and `renderBoardHtml` embeds exactly those sources, so the page script references a `__name` that is nowhere defined and the whole block dies at load. `tsc` (dist bin) and vitest's oxc transform never inject it — which is why CI, `npm test` and the dist-driven smoke lane were all blind.
+
+**Chosen fix: strip at render time (option 2, strip variant), fail loud on unknown shapes.** `__name` returns its first argument, so replacing the call with that argument restores the exact tsc shape for all three forms. New `cli/src/board-embed.ts`: `embeddedFunctionSource(fn)` = `stripKeepNamesCalls(fn.toString())` — a syntax-aware scanner (strings, templates, comments, regex literals) so literals containing `__name(` are never touched; any code-context `__name` it cannot classify as a known shape **throws at render time** (a future esbuild emission change must fail the render loudly, never ship a dead page). Identity under tsc/oxc, so `board-parity.test.ts`'s `toString()` parity assertions hold unchanged and dist output is byte-identical. Rejected: dist-output rendering (stale/absent dist, divergent sources) and a page-side `__name` shim (output would still carry the artifacts; the item bar is zero references). Not feasible: disabling keepNames (tsx exposes no knob).
+
+**Gates added.** `cli/src/board-embed.test.ts` (shape + literal-safety + fail-loud units); `cli/src/board.test.ts` (no-`__name(` rendered-script assertion, static + serve, plus a spawn gate running `node tsx cli/src/cli.ts board` — the real keepNames path — asserting clean output); `e2e/board.smoke.spec.ts` new `@smoke` describe driving the tsx path in Chromium (serve: zero console/page errors, no `__name(` in served script, filter visibly filters, status move round-trips and persists via `show --json`, theme/density/collapse respond and persist; static export: script-clean, filters offline).
+
+**Gates run.** vitest board/board-embed/board-parity: 120/120. `npm run lint`, `npm run build`, `npm run check:plugin` (no drift), `npm run arggon -- validate` (ok), `test:structure` (3/3), `lint:structure`: green. `npm test` full suite: 1942/1946 — the 2-4 failures (headless-ci packed-bin byte-identical, prose-format prettier code-span, flaky pack/success-stdout spawn tests under load) reproduce on the **clean tree** in this worktree environment (blocked esbuild postinstall) and are pre-existing; CI is authoritative. Full `@smoke` Playwright lane: 32 passed + 1 pre-existing timing failure ("a live reload preserves…", `Execution context was destroyed` race — also fails on the clean tree, machine-timing). README: no statement becomes false.
+
+### 2026-09-30 @Arggon
+
 ### Context (found by the task-board-theme-density worker; verified by the coordinator 2026-10-01)
 
 Boards rendered through the **tsx path** (`npm run arggon -- board`, or `--serve` from source) embed a body script that dies on load: esbuild's `keepNames` transform (tsx) rewrites embedded function sources so `Function.toString()` carries `__name(...)` helper calls, but the helper is never defined in the page. Verified on this checkout: `npm run arggon -- board` → `board.html` contains **4 `__name(` calls, 0 definitions** (`applyBoardFilter`, `wireBoardColumns`, `wireBoardTheme`, …). The script throws `__name is not defined`, so **filter, drag, collapse, theme and density controls are dead** on that path (the `<head>` theme boot survives — separate script block).
@@ -40,16 +60,18 @@ Boards rendered through the **tsx path** (`npm run arggon -- board`, or `--serve
 Reproduced at `d55e0933` — **pre-existing**, not a theme-item regression. Invisible to every gate: vitest transforms via oxc (no `__name` in `Function.toString()`), and the smoke lane + CI drive `dist/cli.js` (tsc output, no `__name`). A reviewer driving the Playwright bar from source (`npm run arggon -- board --serve`) hits a dead page; from dist it passes.
 
 ### Fix shape (decide among)
+
 - Render embedded board scripts from the **tsc-built dist output** rather than tsx-transformed sources;
 - or **strip `__name(...)` calls / inject the helper** for toString-embedded sources at render time;
 - or disable keepNames for the tsx run of the board path (esbuild/tsconfig knob) — verify the page script then round-trips.
-Plus a **gate**: an e2e/unit assertion that the rendered page script contains no unresolved `__name` references (and a smoke leg driving the tsx path), so the class cannot return silently.
+  Plus a **gate**: an e2e/unit assertion that the rendered page script contains no unresolved `__name` references (and a smoke leg driving the tsx path), so the class cannot return silently.
 
 ### Acceptance checklist
-- [ ] Root cause confirmed (which transform injects `__name` and why toString carries it) and the chosen fix recorded.
-- [ ] `npm run arggon -- board` output contains zero `__name(` references and every control works in a real browser (Playwright drive, expected vs observed).
-- [ ] `npm run arggon -- board --serve` interactivity verified the same way.
-- [ ] Regression gate added (rendered-script assertion + a tsx-path smoke leg) so it cannot return.
-- [ ] Gates: full suite, lint, build, check:plugin, validate; README unaffected (dist path unchanged).
+
+- [x] Root cause confirmed (which transform injects `__name` and why toString carries it) and the chosen fix recorded.
+- [x] `npm run arggon -- board` output contains zero `__name(` references and every control works in a real browser (Playwright drive, expected vs observed).
+- [x] `npm run arggon -- board --serve` interactivity verified the same way.
+- [x] Regression gate added (rendered-script assertion + a tsx-path smoke leg) so it cannot return.
+- [x] Gates: full suite, lint, build, check:plugin, validate; README unaffected (dist path unchanged).
 
 (Note: filed under `ecosystem-ops/ci-stability` because the owning `ui` containers are closed; it is a board render-path defect.)
