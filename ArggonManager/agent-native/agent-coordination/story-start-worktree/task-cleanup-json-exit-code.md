@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-cleanup-json-exit-code
 title: "cleanup --prune --json exits 0 even with non-empty failures[] (exit-code contract decision)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [opencode-seam, cli]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T12:46:44.289Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-cleanup-json-exit-code
 ---
 <!--
