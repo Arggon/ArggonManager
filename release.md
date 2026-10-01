@@ -14,8 +14,9 @@ procedure to execute by hand — the manual bump/pack/publish runbook is gone.
    Decide the number first: bug fixes → patch, new surface → minor.
 2. **`release-please.yml`** opens/updates the release PR: bumps both
    `package.json` versions in lockstep, rewrites the root's kernel dependency
-   to the exact released version (no caret — the exact pin is machine-owned),
-   drafts the `CHANGELOG.md` section, and syncs `package-lock.json` onto the
+   to the exact released version (no caret — exact-to-exact once the first
+   release PR has un-pinned the caret, see the exception below), drafts the
+   `CHANGELOG.md` section, and syncs `package-lock.json` onto the
    PR branch. The PR touches exactly five files: both `package.json` files,
    `package-lock.json`, `CHANGELOG.md`, `.release-please-manifest.json`.
 3. **Review + merge** — hand-edit the drafted `## [X.Y.Z] - YYYY-MM-DD`
@@ -103,6 +104,19 @@ replaces it.
 `npm pack --pack-destination` does not create the destination directory
 (npm 10 and 12 exit 254 with `ENOENT`) — create it first (`release.yml` and
 `ArggonManager/docs/ci.md` both script the `mkdir`).
+
+## Exception: the first release PR un-pins the kernel (one-time)
+
+release-please's extra-files JSON updater rewrites the version inside the
+existing dependency string (`generic-json.ts` does a version-regex substring
+replace), so the range prefix is preserved: today's `^0.4.0` becomes
+`^0.4.2` in the first release PR, not `0.4.2`. The exact pin needs a one-time
+bootstrap performed in that PR's review: edit the root dependency to the
+exact `X.Y.Z` being released (the version guard is satisfied there — the
+release PR bumps the version to an untagged number). From the second release
+on the rewrite is exact-to-exact and fully machine-owned. A dependency-only
+un-pin outside a release PR is blocked by design: the CI version guard treats
+`dependencies` as publish-relevant and demands a version bump.
 
 ## The re-pin (guard-enforced)
 
