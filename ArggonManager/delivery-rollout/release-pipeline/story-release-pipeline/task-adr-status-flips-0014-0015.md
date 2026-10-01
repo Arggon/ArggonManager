@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adr-status-flips-0014-0015
 title: "ADR status flips: 0014 and 0015 carry \"Accepted on merge\" but were never flipped"
 assignee: Arggon
@@ -10,8 +10,6 @@ labels: [docs, housekeeping]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T17:44:45.119Z"
-worktree_path: /home/arggon/Projects/ArggonManager-task-adr-status-flips-0014-0015
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/task-adr-status-flips-0014-0015.md
@@ -32,9 +30,16 @@ verbatim, so the index is honest; the files themselves lag the merge.
 
 ## Acceptance
 
-- [ ] Per-ADR merge evidence gathered (which PR/merge landed each ADR; both shipped — the ZCode seam per docs/agents.md §ZCode, the done gate per CHANGELOG 0.4.1 "Done gate" entry).
-- [ ] Both ADR files' status lines flipped to `Accepted`, each with a dated status note recording the evidence and the flip commit (pattern: 0016's status note from PR #537).
-- [ ] ADR index rows updated to `Accepted` in the same change.
-- [ ] `arggon validate` ok; no other ADR content changes.
+- [x] Per-ADR merge evidence gathered: 0014 added in 0a340798 (`task-mcp-full-surface`), merged via PR #436 (`514f9efa`, verified with `--ancestry-path` first-merge); 0015 added in c801aea6 (kernel done gate + `--waive`), merged via PR #442 (`f1195d67`); both shipped (0014: docs/agents.md §ZCode; 0015: CHANGELOG 0.4.1).
+- [x] Both ADR files' status lines flipped to `Accepted`, each with a dated status note recording the evidence (PR #553).
+- [x] ADR index rows updated to `Accepted` in the same change.
+- [x] `arggon validate` ok; no other ADR content changes (diff: two status lines + two notes + two index rows).
 
 ## Notes
+
+### 2026-10-01 @ses_f0870e73affeEVvaFZPi9K7NDj
+Done via PR #553 (merged 0d1f2263, all lanes green; coordinator-inline mechanical docs change with self-review).
+
+Evidence recorded in the dated status notes: 0014 — PR #436 (commit 0a340798, task-mcp-full-surface; ZCode seam live); 0015 — PR #442 (commit c801aea6, kernel done gate + --waive; shipped per CHANGELOG 0.4.1). Index rows updated to mirror the files (task-adr-index-rows rule preserved).
+
+ADR status ledger is now fully consistent: 0014, 0015, 0016, 0017, 0018 all Accepted; the only remaining Proposed rows (0002, 0003, 0004 per the index) are recorded as prototype/folded states — the tracker owner can adjudicate those separately if wanted.
