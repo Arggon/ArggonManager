@@ -6728,6 +6728,7 @@ function prepareWorktreeEnv(primaryRoot, worktreePath, request) {
             warnings.push(`could not seed .env: ${envErrorMessage(error)}`);
         }
     }
+    const attachWarning = () => [...warnings, "already exists — left byte-identical (never overwritten)"].join("; ");
     const envPath = (0, node_path_1.join)(worktreePath, ".arggon.env");
     if ((0, node_fs_1.existsSync)(envPath)) {
         return {
@@ -6735,7 +6736,7 @@ function prepareWorktreeEnv(primaryRoot, worktreePath, request) {
             path: envPath,
             ...(gitignored !== undefined ? { gitignored } : {}),
             ...(seededDotenv !== undefined ? { seededDotenv } : {}),
-            warning: "already exists — left byte-identical (never overwritten)",
+            warning: attachWarning(),
         };
     }
     const value = (raw) => raw.replace(/[\r\n]+/g, " ");
@@ -6763,7 +6764,7 @@ function prepareWorktreeEnv(primaryRoot, worktreePath, request) {
                 path: envPath,
                 ...(gitignored !== undefined ? { gitignored } : {}),
                 ...(seededDotenv !== undefined ? { seededDotenv } : {}),
-                warning: "already exists — left byte-identical (never overwritten)",
+                warning: attachWarning(),
             };
         }
         warnings.push(`could not write .arggon.env: ${envErrorMessage(error)}`);
@@ -6779,6 +6780,7 @@ function prepareWorktreeEnv(primaryRoot, worktreePath, request) {
         keys: [...exports.WORKTREE_ENV_KEYS],
         ...(seededDotenv !== undefined ? { seededDotenv } : {}),
         ...(gitignored !== undefined ? { gitignored } : {}),
+        ...(warnings.length > 0 ? { warning: warnings.join("; ") } : {}),
     };
 }
 exports.MAX_PREP_STEPS = 16;
