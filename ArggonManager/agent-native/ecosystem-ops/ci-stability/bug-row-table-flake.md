@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-row-table-flake
 title: row-table-stdout-ci-flake
 assignee: Arggon
@@ -9,11 +9,9 @@ parent: ci-stability
 labels: []
 priority: p2
 created: "2026-09-30"
-updated: "2026-09-30"
-claimed_at: "2026-09-30T23:56:00.472Z"
+updated: "2026-10-01"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-row-table-flake
 ---
-
 <!--
   Placement (v0): ArggonManager/arggon-manager/ui/ui-foundation/bug-row-table-flake.md
   Leaves live only under a story. id is the filename stem: bug-row-table-flake.
