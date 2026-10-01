@@ -93,3 +93,7 @@ npm test → 112 files / 1980 passed / 0 failed (headless-ci needed npm run buil
 - The generated template (cli/src/docs.ts OPENCODE_CONFIG) still emits formatter: true — adopters get the built-in unchanged; this repo's config is now adopter-owned. If the cwd-anchoring bypass is wanted for adopters too, that is a separate product decision (not filed per subagent rules — coordinator's call).
 - Cold-worktree edge: before start links node_modules the override finds no prettier and skips formatting (previous built-in resolved opencode's cached prettier regardless). By the time agents edit in an arggon worktree the install is linked; degradation is safe (no formatting, never wrong formatting).
 - Incidental observation, no action taken: the start-created worktree initially had no node_modules, so the claim commit's pre-commit gate (tsx) failed once; I linked the primary install per the playbook remedy and re-ran start (attach) — the claim commit then needed a manual git commit. Worth a look if native start's link step was expected to fire here.
+
+### handoff 2026-10-01 @Arggon (session: ses_f087fbfe8ffeB7CicWxFX7KC1U) — next: Coordinator review of PR #531 (config+doc only); merge flips the item — checklist already ticked, evidence comment recorded.
+- branch: feat/task-session-formatter-bypasses-prettierignore
+- open questions: Apply the same cwd-anchoring override to the GENERATED opencode.jsonc template for adopters? Also: native start left the worktree without node_modules (gate failed once) — expected?
