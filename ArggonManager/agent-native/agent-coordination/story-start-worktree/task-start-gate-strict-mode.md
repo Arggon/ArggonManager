@@ -27,3 +27,7 @@ updated: "2026-10-01"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Filed from the bug-start-worktree-npm-ci-claim review (PR #517): readiness reporting is deliberately report-only (claim commit authoritative; honest-receipt design). This item: an opt-in x-tracker flag that HARD-FAILS the claim commit when inspectGateBinResolution reports any gate bin resolving outside the worktree. Acceptance: flag documented (convention.md + json-output.md), default behavior unchanged, smoke:native-start-cold covers both modes, tests pin the failure path. Context: the full strict-mode question was truncated by the handoff field cap — recorded here in full instead.
