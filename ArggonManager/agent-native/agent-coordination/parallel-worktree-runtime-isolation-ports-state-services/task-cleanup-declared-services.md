@@ -20,7 +20,7 @@ depends_on: [task-env-contract-start]
 
 ## Context
 
-The reaping side of [ADR 0018](../../../../docs/adr/0018-worktree-runtime-isolation.md)
+The reaping side of [ADR 0019](../../../../docs/adr/0019-worktree-runtime-isolation.md)
 layer 2: an adopter following the per-worktree services pattern creates a
 Compose project named `<repo>-<item-id>` per worktree; when the worktree is
 reaped (`cleanup --prune`), the project must go with it — or it becomes

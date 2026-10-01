@@ -1,9 +1,12 @@
-# 0018 Worktree runtime isolation: environment contract by default, ephemeral service containers as an opt-in pattern
+# 0019 Worktree runtime isolation: environment contract by default, ephemeral service containers as an opt-in pattern
 
 - Status: Proposed
 - Date: 2026-10-01
 - Deciders: Product owner (accepted the recommendation, 2026-10-01); coordinator recorded
-- Evidence: [exploration-worktree-env-isolation-016](../explorations/exploration-worktree-env-isolation-016.md)
+- Evidence: [exploration-worktree-env-isolation-017](../explorations/exploration-worktree-env-isolation-017.md)
+- Numbering note: drafted as 0018; a concurrent update-delivery ADR merged
+  first on `main` and took 0018, so this record renumbers to the next free id
+  (2026-10-01).
 
 ## Context
 
@@ -13,7 +16,7 @@ OpenCode V2 seam, ZCode plugin) and for every adopter project shape. Worktrees
 isolate *files* but not *runtime state*: parallel runs of the same project
 collide on fixed ports, shared local services and singleton state dirs. The
 product owner asked for the best approach "that consumes the fewest possible
-resources" and accepted the layered recommendation from exploration 016
+resources" and accepted the layered recommendation from exploration 017
 (measured evidence: 2026-10-01).
 
 Constraints from prior decisions: ADR 0001 keeps the product dependency-light
@@ -36,13 +39,13 @@ be a default assumption of the loop.
    documented conventions: servers bind ephemeral ports (`:0`) or a port
    derived from the worktree id; services are isolated by identifier
    (per-worktree database name/schema) against one local server. Spec:
-   [spec-worktree-env-contract-015](../specs/spec-worktree-env-contract-015.md).
+   [spec-worktree-env-contract-016](../specs/spec-worktree-env-contract-016.md).
 2. **Ephemeral per-worktree service containers as a documented opt-in pattern
    (layer 2), never a kernel feature.** For adopters who already ship Docker
    (CI or prod), stateful dependencies run as a Compose project named
    `<repo>-<item-id>` with random host ports or supported sockets, living only
-   for the run. arggon's role stays conventional (naming, docs); `cleanup
-   --prune` may reap such projects **only when the repo's convention declares
+   for the run. arggon's role stays conventional (naming, docs);
+   `cleanup --prune` may reap such projects **only when the repo's convention declares
    them** and otherwise skips with a report — the kernel never probes for or
    invokes Docker the convention didn't declare.
 3. **Rejected as defaults:** full dev-environment containers per worktree
@@ -69,7 +72,7 @@ requirement (an optimization where available, never the contract).
 - Layer 2 is documentation, not enforcement: adopters without Docker lose
   nothing; adopters with it keep their own lifecycle, now reaped by cleanup
   when declared. Unreaped per-worktree infrastructure is a known residue
-  class (exploration 016, F2/F8) — the declaration gate is what keeps cleanup
+  class (exploration 017, F2/F8) — the declaration gate is what keeps cleanup
   safe by construction.
 - Follow-up implementation is filed as tasks under
   `parallel-worktree-runtime-isolation-ports-state-services` and follows the

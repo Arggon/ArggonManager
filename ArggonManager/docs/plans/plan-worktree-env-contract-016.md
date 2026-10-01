@@ -1,14 +1,14 @@
 ---
-plan_id: worktree-env-contract-015
+plan_id: worktree-env-contract-016
 title: Plan for Worktree environment contract
-spec: ArggonManager/docs/specs/spec-worktree-env-contract-015.md
+spec: ArggonManager/docs/specs/spec-worktree-env-contract-016.md
 status: proposed
 created: 2026-10-01
 ---
 
-# Plan: Worktree environment contract (worktree-env-contract-015)
+# Plan: Worktree environment contract (worktree-env-contract-016)
 
-Derived from `ArggonManager/docs/specs/spec-worktree-env-contract-015.md`. Each task carries a
+Derived from `ArggonManager/docs/specs/spec-worktree-env-contract-016.md`. Each task carries a
 verifiable acceptance criterion and links back to the spec.
 
 ## Tasks

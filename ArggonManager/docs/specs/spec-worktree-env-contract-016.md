@@ -1,14 +1,14 @@
 ---
-spec_id: worktree-env-contract-015
+spec_id: worktree-env-contract-016
 title: Worktree environment contract
 status: proposed
 created: 2026-10-01
 ---
 
-# Spec: Worktree environment contract (worktree-env-contract-015)
+# Spec: Worktree environment contract (worktree-env-contract-016)
 
-Implements layer 1 of [ADR 0018](../adr/0018-worktree-runtime-isolation.md)
-(decision recorded in [exploration-worktree-env-isolation-016](../explorations/exploration-worktree-env-isolation-016.md)):
+Implements layer 1 of [ADR 0019](../adr/0019-worktree-runtime-isolation.md)
+(decision recorded in [exploration-worktree-env-isolation-017](../explorations/exploration-worktree-env-isolation-017.md)):
 give every `start --worktree` checkout a runtime environment that lets N
 worktrees of the same project run concurrently without colliding, at zero
 marginal cost, on all supported platforms (linux/macos/windows), requiring no

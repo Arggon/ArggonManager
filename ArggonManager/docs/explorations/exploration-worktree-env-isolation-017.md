@@ -1,11 +1,11 @@
 ---
-exploration_id: worktree-env-isolation-016
+exploration_id: worktree-env-isolation-017
 title: "Parallel worktree runtime isolation: run N instances of a project with minimal resources"
 status: resolved
 created: 2026-10-01
 ---
 
-# Exploration: Parallel worktree runtime isolation: run N instances of a project with minimal resources (worktree-env-isolation-016)
+# Exploration: Parallel worktree runtime isolation: run N instances of a project with minimal resources (worktree-env-isolation-017)
 
 Trigger: coordinator directive (2026-10-01) — "we create a new worktree for each
 task so we can work without altering other files … however, this sometimes
@@ -28,10 +28,15 @@ Docker 29.7.2 active, Node 26.7.0, psql client 18.6 with no local server
 binaries) are **evidence of collision classes**, not an adopter baseline — the
 ArggonManager repo itself is just the first adopter of its own convention.
 
-The decision lands in an ADR — numbering note:
-exploration 015 and ADR 0017 are reserved by the open PR
-[#519](https://github.com/Arggon/ArggonManager/pull/519), so the follow-up ADR
-must take the next free id at merge time.
+The decision lands in an ADR — numbering note (revised 2026-10-01 after a
+merge race): this record was drafted as exploration 016 when exploration 015
+and ADR 0017 were still reserved by the open PR
+[#519](https://github.com/Arggon/ArggonManager/pull/519). A **concurrent
+record for a different topic — update delivery — merged first** and took
+exploration 016, ADR 0018 and spec/plan 015 on `main`. Numbers are assigned by
+merge order, so this record renumbers to **exploration 017, ADR 0019 and
+spec/plan worktree-env-contract-016**; the draft-era ids (016/0018/015) appear
+only in historical tracker comments, never in linked documents.
 
 ## Candidates
 
@@ -264,6 +269,68 @@ paths portably. The kernel should name the *variables* and the *suffix rule*
 in the spec; the per-OS paths come from the platform conventions, not from
 arggon.
 
+### F12 — Worktrees isolate files per item; nothing enforces one *writer* per claimed worktree
+
+The process model of the loop is: one claimed item → one worktree
+(`../<repo>-<item-id>`) → one session that owns it. Ownership is convention,
+not enforcement. Observed 2026-10-01: the seam-pin worker session
+(`ses_f0821d67`, disclosed on PR
+[#544](https://github.com/Arggon/ArggonManager/pull/544)) found a concurrent
+writer session active **in its claimed worktree** (writes at 10:18,
+11:41–44, 12:04–07 local); the worker waited for it to finish, re-assessed and
+adopted the writer's converged state — no work was lost, but only the two
+sessions' discipline and disclosure kept it that way. This is a *process*
+collision class the runtime options above deliberately do not address: two
+sessions in one worktree share one identity (same branch, same `.arggon.env`,
+same ports), so C1 cannot separate them. The mitigation layer is session
+ownership (F14), and the residual open question — should the kernel or plugin
+*detect and refuse* a second live session on a claimed worktree — is recorded
+as an open question for the coordinator, not resolved here.
+
+### F13 — The gate environment is the most-repaired runtime leak: eight install-incidents, one root cause
+
+Across 2026-10-01 sessions, eight consolidated incidents
+(bug-start-install-ordering) hit one shape: a fresh worktree whose pre-commit
+gate bins resolved **outside** it — a sibling worktree, the primary checkout,
+or nowhere (`tsx: command not found`), once silently (the claim commit skipped
+without surfacing an error). The leaked runtime resource is the install itself
+(`node_modules`/link farm) — the "writable singleton dirs" collision class of
+criterion 2, applied to tooling. The fix arc also fixed the *semantics*:
+[#517](https://github.com/Arggon/ArggonManager/pull/517) added named-source
+`gateBins` receipts, [#533](https://github.com/Arggon/ArggonManager/pull/533)
+added the opt-in strict gate for attach runs, and
+[#551](https://github.com/Arggon/ArggonManager/pull/551) made a created
+worktree's start **refuse before the claim write** unless the gate bins
+resolve inside it (naming bins, prep log, `npm ci` remediation) — i.e.
+**report honestly where the run is a guest (attach), hard-fail where the tool
+vouches for what it just built (create)**. Live confirmation on this very item
+(2026-10-01): an attach start resolved all eight gate bins from the worktree
+(`source: "worktree"` ×8, strict armed, no refusal, no hand-`npm ci`) — the
+fixed ordering holds on a real attach.
+
+### F14 — Per-session resolution is proven end-to-end, which is what makes single-writer worktrees implementable
+
+PR [#559](https://github.com/Arggon/ArggonManager/pull/559)'s smoke leg drives
+the real OpenCode host: a session created at a fixture primary, moved with
+`POST /api/session/{id}/move` to the item worktree, then a model-free agent
+loop calls `tools.arggon.comment` through the real plugin — and
+`resolveToolCwd` resolves **per call**: the commit lands on the item branch in
+the worktree; primary HEAD and porcelain stay untouched (42/42 checks, two
+consecutive green runs). Together with F13's gate semantics, the process side
+of the isolation model now has the property the env contract gives files:
+*identity resolves per session, per call, per worktree*. What the smoke leg
+pins is resolution, not exclusion — F12's two-writers incident is compatible
+with every mechanism here and remains the open process gap.
+
+### Incident register (all observed 2026-10-01 on this repo's own loop)
+
+| Incident | Collision class | Finding | Status |
+| --- | --- | --- | --- |
+| Claimed worktree written into by a concurrent session (PR #544 disclosure) | process — single-writer ownership | F12 | open — coordination-layer convention; enforcement question filed for the coordinator |
+| Eight install-incidents: gate bins resolving outside the fresh worktree (bug-start-install-ordering) | runtime — install/gate environment leaks across worktrees | F13 | resolved — #517/#533/#551; all eight signatures mapped to tests or fixed-by-the-gate |
+| Session↔worktree resolution assumed, not proven, on the real host (from the PR #426 review) | process — per-session resolution | F14 | resolved — PR #559 smoke leg green |
+| Attach-vs-created gate semantics (#517/#533/#551) | runtime — enforcement semantics | F13 | resolved — documented contract (convention.md, attach-vs-created) |
+
 ## Recommendation
 
 **Adopt a layered policy for every adopter repo, on every platform: C1
@@ -303,7 +370,8 @@ optional, per-project complement (out of scope for arggon).**
   is not seriously in contention.
 
 If the decision is accepted, the follow-up shape is: ADR (next free 4-digit
-id — 0017 is reserved by open PR #519, so likely 0018) → spec for the
+id at merge time — the numbering race above is why this record now cites 0019)
+→ spec for the
 `start` environment contract (documented variable names, dotenv file
 mechanism, seed rules, per-OS state-dir mapping per F11, receipt fields,
 degradation semantics when the adopter reads none of it) with tasks under the
@@ -320,10 +388,10 @@ convention is a file format and a name, not a subsystem.
 
 ## Decision
 
-[ADR 0018 — Worktree runtime isolation: environment contract by default, ephemeral service containers as an opt-in pattern](../adr/0018-worktree-runtime-isolation.md)
+[ADR 0019 — Worktree runtime isolation: environment contract by default, ephemeral service containers as an opt-in pattern](../adr/0019-worktree-runtime-isolation.md)
 records the decision (status: Proposed; **accepted by the product owner on
 2026-10-01**, ADR flips to Accepted at merge). Implementation follows
-[spec-worktree-env-contract-015](../specs/spec-worktree-env-contract-015.md)
-with [plan](../plans/plan-worktree-env-contract-015.md); follow-up tasks are
+[spec-worktree-env-contract-016](../specs/spec-worktree-env-contract-016.md)
+with [plan](../plans/plan-worktree-env-contract-016.md); follow-up tasks are
 filed under the
 `parallel-worktree-runtime-isolation-ports-state-services` story.
