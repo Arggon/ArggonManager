@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-harness-config-churn
 title: harness-config-churn-blocks-start
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: []
 priority: p3
 created: "2026-09-30"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T02:44:39.138Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-harness-config-churn
 ---
 <!--
