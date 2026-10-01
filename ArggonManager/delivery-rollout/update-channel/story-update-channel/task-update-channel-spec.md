@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-update-channel-spec
 title: "Spec + plan: bounded opt-out update channel"
+assignee: Arggon
+branch: feat/task-update-channel-spec
 parent: story-update-channel
 labels: [delivery, spec]
 priority: p1
 created: "2026-10-01"
 updated: "2026-10-01"
+claimed_at: "2026-10-01T14:37:34.769Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-update-channel-spec
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/update-channel/story-update-channel/task-update-channel-spec.md
