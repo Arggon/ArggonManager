@@ -38,3 +38,17 @@ Evidence:
 - `npm run arggon -- validate` ok (0 warnings, convention v5) before staging; pre-commit gate re-ran it on commit.
 - Measured inputs (2026-10-01): board --serve binds port 0 (cli/src/board-serve.ts:473); docker ps shows fixed-port shared services (evajoyas-db 5433, mssql 1433); node_modules 182 MB; docker system df 3.3 GB reclaimable volumes; distrobox shares $HOME (docs); containers share host kernel (Red Hat/CMU sources).
 - Recommendation recorded: layered — C1 host-native env contract always (via the existing start --worktree seam), C2 ephemeral per-worktree service containers only for real service collisions; C3 devcontainer/C4 distrobox/C6 VM rejected as defaults; C5 Nix optional complement. ADR left open pending product-owner acceptance (next free ADR id likely 0018 at merge time).
+
+### 2026-10-01 @Arggon
+Adopter-generality revision pushed to PR #523 (commit 727df50a) after product-owner correction: the methodology ships to adopters (npm / OpenCode seam / ZCode plugin) on linux/macos/windows — the exploration must not assume this repo or this machine.
+
+Changes:
+- Scope restated: ArggonManager is the first adopter of its own convention; measured numbers are collision-class evidence, not an adopter baseline.
+- New F9: Docker is not part of any adopter contract, and Docker Desktop runs a Linux VM on macOS/Windows (docs.docker.com, 2026-10-01) — Docker-dependent options are documented opt-in patterns only; C1 is the only zero-marginal-cost option on all three platforms.
+- New F10: ADR 0005 adopter shapes — contract must degrade to a no-op (static-site adopter changes nothing).
+- New F11: per-OS state-dir mapping follows env-paths conventions, not a new scheme.
+- C1 mechanism corrected to file-first (gitignored dotenv-style file) instead of shell export — portable across runtimes and shells; unix sockets demoted to an optimization, never the contract.
+- Cleanup integration made opt-in and safe by construction: kernel never probes/invokes Docker the convention didn't declare (F8).
+- Criterion 7 (platform portability) added; YAGNI list extended (no Docker detection/installation in kernel).
+
+`npm run arggon -- validate` ok (0 warnings). Recommendation unchanged in verdict, generalized in scope: C1 always; C2 opt-in for Docker-shipping adopters; C3/C4/C6 rejected; C5 optional. ADR remains open pending product-owner acceptance.
