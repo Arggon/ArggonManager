@@ -1,120 +1,34 @@
-# Release runbook
+# Release runbook — publishing `arggon-manager` + `@arggondev/lib`
 
-Cutting a release of ArggonManager — the version bump, the changelog entry, the
-`vX.Y.Z` tag, and the npm publication of the two packages (`@arggondev/lib` and
-`arggon-manager`, ADR 0013).
+> **Superseded by automation (ADR 0018, `task-release-workflow`).** The manual
+> bump/tag/publish procedure this page used to carry is gone: releases are now
+> proposed by release-please and published by
+> [`.github/workflows/release.yml`](../../.github/workflows/release.yml).
+> **The operator procedure lives at the repo root
+> [`release.md`](../../release.md)** — read it there. This page keeps only the
+> invariants that outlive the automation.
 
-## When to run it
+## Invariants (still binding)
 
-When a wave of merged work on `main` should become a numbered release so
-adopters' `arggonVersion` stamps (in every generated doc's x-generated state)
-mean something. The native-first program (`plan-native-first-011`, waves W0–W7)
-is the first wave that publishes the packages.
+- **`CHANGELOG.md` is append-only** — a release adds its section at the top and
+  never rewrites older sections (the release flow asserts it; older sections
+  must stay byte-identical).
+- **Never move or delete a release tag** — `vX.Y.Z` is the release of record;
+  the CI guard fails loudly if a shipped version is re-shipped from a different
+  commit, and re-tagging would break every pinned adopter install.
+- **Never unpublish** — npm unpublish is off the table for released versions;
+  a bad release is fixed by a new release.
+- **Owner-only irreversible decisions** — npm publishes and GitHub Releases are
+  owner-run or owner-configured (npmjs.com trusted publishers); everything else
+  in the flow is automation.
+- **Merge the release PR by itself** — the guard classifies the pushed HEAD
+  commit; a version bump buried under later commits in the same push silently
+  strands the release (the bump never lands at HEAD).
 
-## Who decides what
-
-- **Product owner only, never an agent:** publishing to npm, removing
-  `private: true`, bumping `"version"`, and creating or pushing tags. Agents
-  prepare the changelog, the docs and this checklist, run every verification
-  that needs no publication, and stop before the first irreversible step.
-- **Irreversible by policy:** a published version number can never be reused and
-  tags on `main` are never moved or deleted. If a release is wrong, cut the next
-  patch — the changelog is append-only and `npm unpublish` is not part of this
-  process.
-
-## Version bump rules
+## Version bump rules (for the release PR's changelog)
 
 - **major** — convention/schema break: existing legacy `tasks/` trees need the
   `arggon migrate --layout` move to keep working.
 - **minor** — new commands, new templates or template changes, methodology
-  changes, or any new adopter-facing feature. (The native-first rebuild is a
-  **minor** bump: new tools, commands, plugin/TUI surfaces and the layout.)
+  changes, or any new adopter-facing feature.
 - **patch** — bug fixes with no adopter-facing surface change.
-
-## Prerequisites
-
-- Work on `main` (or a release PR merged to `main`).
-- `CHANGELOG.md` updated (see step 2) — the adopter-facing notes, including any
-  **default-path change** (e.g. the W3 removal of MCP auto-registration).
-- The release PR is green: `npm test`, `npm run lint`, `npm run build`,
-  `npm run check:plugin`, `arggon validate`, `arggon spec validate`,
-  `npm run context:report -- --strict`.
-- npm account with publish rights to both packages and a 2FA/token accepted by
-  `npm publish`.
-
-## Steps
-
-1. Bump `"version"` in `package.json` (0.Y.Z). `@arggondev/lib` versions in
-   lockstep with the root; the root declares it as `^0.Y.Z`.
-2. Turn the `## [Unreleased]` section of `CHANGELOG.md` into
-   `## <version> (YYYY-MM-DD)` and list **adopter-facing** changes: templates,
-   methodology, commands, plugin surfaces, fixes. Adopters and their agents read
-   the changelog to decide whether to upgrade — keep it about what changed for
-   them, not internal refactors.
-3. Verify (from repo root):
-   - `npm run arggon -- --version` prints the new version.
-   - `npm test` / `npm run lint` / `npm run build` / `npm run check:plugin` all
-     clean.
-   - `arggon validate --json` and `arggon spec validate` ok.
-   - `npm run context:report -- --strict` → all ADR 0006 bounds pass.
-   - `arggon doctor --json` reports 0 modified / 0 drifted generated docs
-     (acknowledged and adopter-owned docs are expected, not drift).
-4. Merge the release PR to `main` and tag the release commit on `main`:
-   `git tag vX.Y.Z && git push origin vX.Y.Z`.
-5. **Publish the two packages, in dependency order** (owner-run; see
-   § Publishing to npm).
-6. Post-release, in a follow-up PR: pin the generated CI recipe to the released
-   seam — set `ARGGON_VERSION: "X.Y.Z"` in BOTH
-   `templates/docs/github/workflows/arggon.yml` (what adopters vendor) and the
-   committed `.github/workflows/arggon.yml` (this repo's own CI; the pin is a
-   literal on purpose, `task-ci-seam-pin-tracks-release` — deriving it from
-   `package.json` would install the bumped version between the step-1 bump and
-   the step-5 publish, before the registry has it), and regenerate the seam
-   (`arggon init`) so adopters' drift gates compare against the released
-   package instead of a moving pin (task-ci-recipe-published-one-liner: the
-   recipe installs from the registry, no GitHub clone). The lag guard
-   `cli/src/ci-seam-pin.test.ts` (runs in `npm test`) fails until the pin
-   matches the regenerated seam — move both pins in the same PR as the
-   regeneration.
-
-## Publishing to npm
-
-Both packages stay `private: true` until the release wave. The release PR
-removes the flag from `package.json` (root) and `lib/package.json`
-(`@arggondev/lib`); then, from the tagged commit:
-
-```bash
-npm ci                                   # prepare builds lib/dist + dist/ + the plugin bundle
-npm publish --workspace @arggondev/lib      # kernel first
-npm publish                              # arggon-manager (bin + templates + plugin)
-```
-
-Notes:
-
-- The root package cannot resolve `@arggondev/lib` from the registry before the
-  kernel is published: publish `@arggondev/lib` first (same version), and never
-  publish the root alone.
-- `npm pack` is the pre-release rehearsal and stays the documented install path
-  until the registry has both packages (`ArggonManager/docs/ci.md`).
-- Verify after publishing: `npm view @arggondev/lib version`,
-  `npm view arggon-manager version`, then in a scratch directory
-  `npm install -g arggon-manager && arggon --version` — the one-liner replaces
-  the two-tarball block in the docs (`README.md` § Install,
-  `ArggonManager/docs/ci.md`) in the same follow-up PR as step 6.
-
-## Verification
-
-- `git tag` contains `vX.Y.Z`; `git rev-parse vX.Y.Z^{commit}` is a commit on
-  `main`.
-- Generated-doc stamps (`arggonVersion` in x-generated state) reflect the new
-  version after regeneration.
-- The registry serves both packages at the released version and a clean global
-  install prints it.
-
-## Rollback
-
-There is no undo for a published tag or a published npm version — do not delete
-or move tags on `main`, and do not `npm unpublish`. If the version is wrong, cut
-the next patch release with a corrected number; the changelog is append-only.
-A bad tarball that never worked can be deprecated (`npm deprecate`) while the
-patch is prepared.

@@ -2,7 +2,7 @@
 plan_id: release-pipeline-015
 title: Plan for release pipeline
 spec: ArggonManager/docs/specs/spec-release-pipeline-015.md
-status: proposed
+status: implemented
 created: 2026-10-01
 ---
 

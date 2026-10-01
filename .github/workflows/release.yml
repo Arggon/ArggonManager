@@ -1,0 +1,264 @@
+# The release workflow — owns tag + GitHub Release + build + pack + inspect +
+# OIDC publish + tarball assets (ADR 0018 §1–2, §4; spec-release-pipeline-015).
+#
+# FILENAME IS FIXED (`release.yml`): the npmjs.com trusted-publisher
+# configuration for BOTH packages binds to the workflow filename — renaming
+# this file is a breaking ops change and MUST be called out in the renaming PR
+# (ADR 0018 §1 operational duty; npm validates the calling workflow's name, so
+# this file also must never become a `workflow_call` child of another workflow:
+# trusted publishing would then bind to the caller's name, spec C3).
+#
+# Trigger is `push` to main, self-guarded by the C3 ordered predicate
+# (cli/release-guard.mjs — classify the commit first, consult the tag only for
+# version-changing pushes):
+#   0. version unchanged from the parent commit -> not a release commit:
+#      exit 0, nothing below runs (steady state after any release is
+#      permanently green — tracker flips, docs pushes and this pipeline's own
+#      pushes never publish);
+#   1. version-changing push, tag v(V) absent -> this is the release: proceed;
+#   2. tag v(V) already at HEAD -> idempotent re-run: complete the remaining
+#      steps ("Re-run failed jobs", or a publish that failed before the
+#      npmjs.com trusted-publisher setup existed);
+#   3. tag v(V) elsewhere -> the guard fails the run loudly.
+#
+# The release act is a human-pushed version-bump commit to main (normally the
+# squash merge of the release PR maintained by release-please.yml — "merging it
+# is the release", ADR 0018). No workflow bumps versions, tags or publishes on
+# its own (invariant 7): the tag/release/publish below are downstream of that
+# one commit, read from the tree at `github.sha` — no dispatch inputs, nothing
+# to mistype.
+#
+# Publishing authenticates via npm OIDC trusted publishing ONLY: no NPM_TOKEN
+# secret exists anywhere, `id-token: write` is the only extra permission,
+# provenance is automatic (no --provenance flag). It fails closed until the
+# one-time npmjs.com setup exists (release.md): repo Arggon/ArggonManager,
+# workflow filename release.yml, no environment, direct publish allowed — for
+# both `arggon-manager` and `@arggondev/lib`.
+name: release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  # Serialize release runs; never cancel a publishing run mid-flight — a
+  # cancelled publish is indistinguishable from a failed one, and the queued
+  # run's guard decides what (if anything) it still owns.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The guard compares the pushed commit against its parent (rule 0);
+          # two commits are enough for a squash-merged history. Tags are NOT
+          # fetched here: the tag lookup goes through `git ls-remote origin`
+          # (exact, ancestry-free, works on a shallow clone).
+          fetch-depth: 2
+      - uses: actions/setup-node@v4
+        with:
+          # npm trusted publishing needs Node >= 22.14.0 (docs.npmjs.com,
+          # trusted-publishers); the 22 line's latest satisfies it and keeps
+          # the engines field (>=22.12) honest.
+          node-version: ">=22.14.0"
+          cache: npm
+
+      - id: guard
+        name: "Ordered predicate: classify the commit, then consult the tag (C3)"
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+        run: node cli/release-guard.mjs --sha "$RELEASE_SHA"
+
+      - name: Create the annotated tag v(V) at the pushed commit
+        if: steps.guard.outputs.release == 'true' && steps.guard.outputs.tag_exists == 'false'
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          VERSION: ${{ steps.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${VERSION}" -m "arggon-manager v${VERSION} (+ @arggondev/lib in lockstep)" "$RELEASE_SHA"
+          git push origin "refs/tags/v${VERSION}"
+
+      - name: Assert tag-version agreement and root-lib lockstep before anything ships
+        # Invariant 1: the tag names the exact commit being published and the
+        # kernel version equals the CLI version. Mismatch fails without
+        # publishing (AC A9). After the tag step, `git ls-remote` is the truth.
+        if: steps.guard.outputs.release == 'true'
+        env:
+          RELEASE_SHA: ${{ github.sha }}
+          VERSION: ${{ steps.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          tag_sha="$(git ls-remote origin "refs/tags/v${VERSION}^{}" | awk 'NR==1{print $1}')"
+          if [ "$tag_sha" != "$RELEASE_SHA" ]; then
+            echo "tag v${VERSION} does not name the published commit (tag: ${tag_sha:-absent}, pushed: $RELEASE_SHA)" >&2
+            exit 1
+          fi
+          root_v="$(node -p "require('./package.json').version")"
+          lib_v="$(node -p "require('./lib/package.json').version")"
+          if [ "$root_v" != "$lib_v" ]; then
+            echo "lockstep broken: root $root_v != lib $lib_v — refusing to publish" >&2
+            exit 1
+          fi
+          echo "agreement ok: tag v${VERSION} -> $RELEASE_SHA, root == lib == $root_v"
+
+      - name: GitHub Release v(V) with the merged CHANGELOG section as notes
+        # release-please.yml is PR-only (skip-github-release), so this run owns
+        # the release object — created in the same run that tags, publishes and
+        # uploads (no release-object race). Notes are the merged CHANGELOG
+        # section for V (the hand-edited, house-style section from the release
+        # PR — C4); a missing section fails loudly instead of shipping empty
+        # notes. Idempotent: an existing release (rule-2 re-run) is kept and
+        # only the remaining steps complete.
+        if: steps.guard.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          notes="$RUNNER_TEMP/release-notes.md"
+          pattern="^## \\[${VERSION//./\\.}\\]"
+          awk -v pat="$pattern" '
+            $0 ~ pat { insec = 1; next }
+            insec && /^## / { exit }
+            insec && !started && /^$/ { next }
+            insec { started = 1; print }
+          ' CHANGELOG.md > "$notes"
+          if ! grep -q . "$notes"; then
+            echo "CHANGELOG.md has no '## [$VERSION]' section - the merged release section is the notes source; refusing to create an empty release" >&2
+            exit 1
+          fi
+          if gh release view "v${VERSION}" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "release v${VERSION} already exists (idempotent re-run) - keeping it"
+          else
+            gh release create "v${VERSION}" --repo "$GITHUB_REPOSITORY" --title "v${VERSION}" --notes-file "$notes"
+          fi
+
+      - name: Build (fresh lib/dist; build-info stamps the release commit)
+        # `write-build-info` runs in postbuild, so the packed artifact
+        # self-reports the exact release commit (`arggon --version`), per
+        # runbook §4. Building is not optional before packing: a stale lib/dist
+        # ships stale kernel exports.
+        if: steps.guard.outputs.release == 'true'
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+
+      - name: Pack both packages (pack dir created first — npm pack does not mkdir)
+        # `npm pack --pack-destination` exits 254 with ENOENT when the
+        # destination does not exist (npm 10 and 12) — the runbook/ci.md
+        # gotcha, scripted here as mkdir-before-pack.
+        if: steps.guard.outputs.release == 'true'
+        id: pack
+        env:
+          VERSION: ${{ steps.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          pack_dir="$RUNNER_TEMP/arggon-packs"
+          mkdir -p "$pack_dir"
+          lib_name="$(npm pack --workspace lib --pack-destination "$pack_dir" | grep -o '[^ /]\+\.tgz$' | tail -n1)"
+          root_name="$(npm pack --pack-destination "$pack_dir" | grep -o '[^ /]\+\.tgz$' | tail -n1)"
+          echo "lib_tgz=$pack_dir/$lib_name" >> "$GITHUB_OUTPUT"
+          echo "root_tgz=$pack_dir/$root_name" >> "$GITHUB_OUTPUT"
+
+      - name: Extract-and-inspect both tarballs BEFORE any publish (runbook §2, scripted)
+        # Fails the run on: missing kernel export symbols, missing root
+        # artifacts (dist/templates/skills/opencode), test-helper leaks
+        # (test-spawn/test-tmp/pack-fixtures/*.test.*), version mismatch.
+        # Everything after this step depends on it having passed.
+        if: steps.guard.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.guard.outputs.version }}
+        run: node cli/inspect-tarballs.mjs "$RUNNER_TEMP/arggon-packs" --version "$VERSION"
+
+      - name: Upgrade npm on the runner (trusted publishing needs npm >= 11.5.1)
+        # The runner pattern from the cited release-please reference workflows
+        # (ADR 0018 §1): the preinstalled npm can lag the OIDC requirement.
+        if: steps.guard.outputs.release == 'true'
+        run: |
+          set -euo pipefail
+          npm install -g npm@11.5.1
+          node --version
+          npm --version
+
+      - name: Publish the kernel first (@arggondev/lib via OIDC)
+        # lib before CLI: the root resolves @arggondev/lib from the registry at
+        # install time, so the dependency must exist first (invariant 3).
+        # Idempotent (partial-failure recovery): a version already on the
+        # registry at V is SUCCESS — never re-publish, never unpublish. No
+        # NPM_TOKEN anywhere: authentication is the OIDC trusted publisher,
+        # provenance is automatic.
+        if: steps.guard.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          if npm view "@arggondev/lib@${VERSION}" version > /dev/null 2>&1; then
+            echo "@arggondev/lib@${VERSION} already on the registry - already-published = success, never re-publish"
+            exit 0
+          fi
+          npm publish --workspace lib
+
+      - name: Poll the registry until the kernel is visible (propagation lag; bounded)
+        # The runbook gotcha, scripted: registry propagation lags minutes, so
+        # `npm view` may still show the old version right after publish. Retry
+        # (bounded poll) — never re-publish. Poll exhaustion fails the run; the
+        # operator re-runs it and the guard's idempotent path completes the
+        # release once the registry has caught up.
+        if: steps.guard.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 300))
+          while :; do
+            visible="$(npm view "@arggondev/lib" version 2>/dev/null || true)"
+            if [ "$visible" = "$VERSION" ]; then
+              echo "registry serves @arggondev/lib@${VERSION}"
+              exit 0
+            fi
+            if [ "$SECONDS" -ge "$deadline" ]; then
+              echo "propagation poll exceeded 300s (last seen: ${visible:-nothing}); failing closed" >&2
+              echo "re-run this workflow once the registry has caught up - the guard's idempotent path completes the release" >&2
+              exit 1
+            fi
+            echo "registry still at '${visible:-nothing}' - waiting 10s for @arggondev/lib@${VERSION} to propagate"
+            sleep 10
+          done
+
+      - name: Publish the CLI (arggon-manager via OIDC)
+        if: steps.guard.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          if npm view "arggon-manager@${VERSION}" version > /dev/null 2>&1; then
+            echo "arggon-manager@${VERSION} already on the registry - already-published = success, never re-publish"
+            exit 0
+          fi
+          npm publish
+
+      - name: Attach both packed tarballs to the release
+        # ADR 0018 §4: the non-npm fallback. Both tarballs from the inspect-
+        # passed pack dir go onto the release created earlier in this run
+        # (--clobber makes re-runs idempotent).
+        if: steps.guard.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          gh release upload "v${VERSION}" --repo "$GITHUB_REPOSITORY" --clobber \
+            "${{ steps.pack.outputs.lib_tgz }}" \
+            "${{ steps.pack.outputs.root_tgz }}"
+          gh release view "v${VERSION}" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'

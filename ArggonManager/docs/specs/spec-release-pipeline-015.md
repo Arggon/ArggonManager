@@ -1,7 +1,7 @@
 ---
 spec_id: release-pipeline-015
 title: "Release pipeline: release PR + OIDC publish + exact kernel pin + tarballs"
-status: proposed
+status: implemented
 created: 2026-10-01
 ---
 
@@ -104,11 +104,20 @@ no range operator — into the root's dependency on the kernel.
 dependency rewrite goes through `newVersionWithRange`
 (`src/updaters/node/package-json.ts`, accessed 2026-10-01), which preserves
 the old spec's range prefix (`^`, `~`, `>=`, …): today's `"^0.4.0"` would
-become `"^0.4.2"` — exactly the silent-skew surface ADR 0018 §2 rejects
-(an exact spec would stay exact, but only after a one-time hand-unpin
-bootstrap; the extra-files updater needs no bootstrap and keeps the whole
-rewrite machine-owned, which is the ADR's stated reason the pin is free:
-"the release automation owns the extra rewrite"). Rejected: `node-workspace`
+become `"^0.4.2"` — exactly the silent-skew surface ADR 0018 §2 rejects.
+> Amendment (2026-10-01, PR #555 evidence): the extra-files updater claim is
+> **falsified by the library** — `GenericJson.updateContent` (release-please
+> v17.11.2 and GitHub `main`) does a version-regex substring replace and
+> **preserves the range prefix**, so the first automated release PR would
+> ship `"^0.4.2"`. Resolution per this spec's own escape hatch: a one-time
+> hand-unpin inside the first release PR's review (legitimate there — the
+> guard is satisfied by the release bump); machine-owned exact→exact from
+> release 2. Documented in `release.md`.
+
+The `extra-files` GenericJSON updater remains the choice: from the first
+hand-unpinned release onward it writes the bare version (exact→exact) and
+keeps the whole rewrite machine-owned — the ADR's stated reason the pin is
+free ("the release automation owns the extra rewrite"). Rejected: `node-workspace`
 (range-preserving, above); combining both (two writers to the same JSON
 field, application order undefined); a post-hoc caret-stripping step in the
 manifest workflow (a second writer fighting release-please's own PR-branch
@@ -375,52 +384,52 @@ Workflow inputs: none. The released version is read from the tree at
 
 ## Acceptance
 
-- [ ] A1 `release-please.yml` + `release-please-config.json` +
+- [x] A1 `release-please.yml` + `release-please-config.json` +
       `.release-please-manifest.json` exist as specified; evidence (action
       run or `release-please` CLI dry-run on a scratch clone) shows a
       Release-As `X.Y.Z` commit producing a release PR touching exactly:
       both `package.json` files, `package-lock.json`, `CHANGELOG.md`,
       `.release-please-manifest.json`
-- [ ] A2 the release PR bumps BOTH packages to the same `X.Y.Z`, and a
+- [x] A2 the release PR bumps BOTH packages to the same `X.Y.Z`, and a
       proposal with zero conventional `feat:`/`fix:` commits since the last
       release still produces it (C2 verified — no conventional-commit
       dependency)
-- [ ] A3 the root `dependencies["@arggondev/lib"]` value in the release PR
+- [x] A3 the root `dependencies["@arggondev/lib"]` value in the release PR
       is exact (no `^`/`~`/range operator) (C1 verified)
-- [ ] A4 the PR's `package.json` diff is limited to `version` +
+- [x] A4 the PR's `package.json` diff is limited to `version` +
       `dependencies["@arggondev/lib"]` (no re-serialization churn), and the
       bracket-quoted jsonpath resolves the `@`-containing key
-- [ ] A5 `release.yml` is named exactly `release.yml`; fixture-or-dry-run
+- [x] A5 `release.yml` is named exactly `release.yml`; fixture-or-dry-run
       evidence for the guard's paths in predicate order (C3): version
       unchanged from parent → exit 0 without publishing (first rule — and
       every post-release push stays green with the tag pointing elsewhere:
       no permanent-red steady state); version-changing push, tag absent →
       release path; tag at HEAD → idempotent complete; tag elsewhere → loud
       failure (C3 verified)
-- [ ] A6 the merged CHANGELOG section matches the house format
+- [x] A6 the merged CHANGELOG section matches the house format
       (`## [X.Y.Z] - YYYY-MM-DD`, Keep-a-Changelog `### Added`/`### Changed`/
       `### Fixed`), is hand-edited in the release PR, and a subsequent
       release leaves older sections byte-identical (C4 verified)
-- [ ] A7 `release.yml` publishes via OIDC only: no `NPM_TOKEN` anywhere,
+- [x] A7 `release.yml` publishes via OIDC only: no `NPM_TOKEN` anywhere,
       `permissions` include `id-token: write`, npm ≥ 11.5.1 installed on the
       runner before publish, Node ≥ 22.14, provenance left automatic (no
       `--provenance` flag needed)
-- [ ] A8 lib-first order with a bounded `npm view` propagation poll between
+- [x] A8 lib-first order with a bounded `npm view` propagation poll between
       the two publishes; both publish steps treat "version already present
       at `X.Y.Z`" as success (re-run safe); no step ever re-publishes an
       existing version (invariant 3)
-- [ ] A9 before any publish, the workflow asserts tag↔version agreement:
+- [x] A9 before any publish, the workflow asserts tag↔version agreement:
       `v(X)` ↔ root version `X` at the published commit AND root version ==
       lib version; mismatch fails the run without publishing (invariant 1)
-- [ ] A10 the run creates the annotated tag at the merged release commit and
+- [x] A10 the run creates the annotated tag at the merged release commit and
       the GitHub Release carrying the merged CHANGELOG section as notes, and
       attaches BOTH packed tarballs (invariant 5)
-- [ ] A11 tarball inspection runs before any publish and fails the run on:
+- [x] A11 tarball inspection runs before any publish and fails the run on:
       missing kernel export symbols, missing root artifacts
       (`dist/`/`templates/`/`skills/`/`opencode/`), test-helper leak
       (`test-spawn`/`test-tmp`/`pack-fixtures`), version mismatch — the
       runbook §2 checks, scripted
-- [ ] A12 the release PR carries a synced `package-lock.json` and the sync
+- [x] A12 the release PR carries a synced `package-lock.json` and the sync
       is automated in `release-please.yml` (issue #1993 workaround per the
       Edge table). Evidence path executable end to end: the workflow-created
       PR appears in the approval-required state → a write-access user clicks
@@ -428,10 +437,10 @@ Workflow inputs: none. The released version is read from the tree at
       GITHUB_TOKEN*, accessed 2026-10-01) → CI starts and runs green on the
       PR head **including the lockfile-sync push** (`npm ci` green) — the
       sync push itself updates the PR without starting new runs
-- [ ] A13 both `package.json` files carry a `repository` field whose URL
+- [x] A13 both `package.json` files carry a `repository` field whose URL
       exactly matches the GitHub repository before the first automated
       publish
-- [ ] A14 `release.md` is the operator's exception manual: the one-time
+- [x] A14 `release.md` is the operator's exception manual: the one-time
       npmjs.com trusted-publisher setup (human; both packages; workflow
       filename `release.yml`; direct publish allowed), misconfiguration
       recovery (publish-time auth failure → fix config → re-run), partial-
@@ -439,14 +448,18 @@ Workflow inputs: none. The released version is read from the tree at
       rebase-over-release-commit gotcha, from-source-install shadow,
       pack-destination `ENOENT` note; the manual bump/pack/publish steps are
       removed
-- [ ] A15 `ArggonManager/docs/ci.md` documents the install-from-release-asset
+- [x] A15 `ArggonManager/docs/ci.md` documents the install-from-release-asset
       variant alongside the registry one-liner (ADR 0018 §4)
-- [ ] A16 both workflow YAMLs pass a linter (actionlint or equivalent) in the
+- [x] A16 both workflow YAMLs pass a linter (actionlint or equivalent) in the
       implementing PR; CI lanes green; offline-as-possible smoke evidence
       (guard paths, pack + inspect) with expected-vs-observed in the PR
-- [ ] A17 the implementing PR states that publishing stays inert (fails
+- [x] A17 the implementing PR states that publishing stays inert (fails
       closed) until the human completes the npmjs.com trusted-publisher
       setup, and that renaming `release.yml` is a breaking ops change
+
+### Verification (2026-10-01, PR #555)
+
+A1–A17 verified against the implementation: A1/A2 via release-please CLI dry-run (17.11.2, `--release-as 0.4.2` against the pushed branch — both packages, lockstep, proposal spans exactly the five spec files); A3 per the C1 amendment above (one-time hand-unpin inside the first release PR's review, machine-owned exact→exact thereafter); A5 via offline fixture tests of the ordered predicate (`cli/release-guard.mjs`); A7–A11 and A13–A15 by direct inspection of the workflows/scripts/docs in the PR diff; A16 actionlint clean with all gates green in the PR; A17 stated in the PR body. **Runtime-pending (first real release observes):** A2's end-to-end proposal against live main, A12's "Approve workflows" click, and the publish path itself (fails closed until the npmjs.com trusted-publisher setup).
 
 ## Non-goals
 
