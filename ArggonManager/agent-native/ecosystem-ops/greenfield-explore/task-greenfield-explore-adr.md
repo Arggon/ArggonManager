@@ -138,3 +138,17 @@ edit is this item file's checkboxes/notes (tracker artifact). `arggon validate`
 ok:true with zero errors/warnings. ADR left at Status: Proposed per the design
 brief; the hard-gate wording follows the item body / step-4 phrasing ("a spec
 exists and `arggon spec analyze` reports no NEW findings").
+
+### 2026-10-01 @Arggon
+Change recorded on branch feat/task-greenfield-explore-adr (commit 8e59da92), PR Arggon/ArggonManager#519 (draft).
+
+Evidence:
+- Files created: ArggonManager/docs/explorations/exploration-greenfield-exploration-015.md (exploration_id: greenfield-exploration-015, status: open, created 2026-10-01) and ArggonManager/docs/adr/0017-greenfield-exploration-gate.md (Status: Proposed, Date: 2026-10-01). Only other edit: this item's acceptance checkboxes + notes.
+- Numbering verified before writing: docs/adr/ max was 0016 (0017 free); docs/explorations/ max was 014 (015 free).
+- `npm run arggon -- validate --json` → ok:true, 0 errors, 0 warnings (ran before staging and again via the pre-commit gate).
+- Content check vs design brief: C1/C2/C3, five criteria, F1–F5 with dated sources (three GitHub skill paths — Fission-AI/OpenSpec skills/openspec-explore/SKILL.md, obra/superpowers skills/brainstorming/, mattpocock/skills skills/productivity/grill-me/ — plus templates/exploration.md, .opencode/commands/arggon-explore.md, skills/arggon-cli/references/methodology.md, docs/agents.md §Specs and plans, accessed 2026-10-01), recommendation C1, six-phase protocol (0–5) all transcribed; ADR Decision states default-first-phase for greenfield (new project / subsystem / interface others depend on), one-way ratchet, and the hard gate verbatim from the brief (spec exists + `arggon spec analyze` reports no NEW findings).
+- Wording nuance for the reviewer: the acceptance checklist paraphrases the gate as "an approved spec"; the item body protocol and the coordinator's step 4 say "a spec exists and `arggon spec analyze` reports no NEW findings" — the docs use the latter (more precise) phrasing.
+
+### handoff 2026-10-01 @Arggon — next: Review PR Arggon/ArggonManager#519 (verdict on this item); on merge flip ADR 0017 Proposed→Accepted and confirm task-greenfield-explore-carriers matches the recorded protocol.
+- branch: main
+- open questions: Gate wording: brief acceptance line says "approved spec" while body/step 4 say "spec exists + spec analyze no NEW findings" — docs use the latter; confirm if "approved" implies an extra review step.

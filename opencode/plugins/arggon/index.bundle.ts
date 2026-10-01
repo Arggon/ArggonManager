@@ -2211,8 +2211,8 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
 exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.MAX_MISSING_DEPENDENCIES = exports.unlinkNodeModulesLink = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.inspectDeclaredDependencies = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = void 0;
+exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.unlinkNodeModulesLink = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2377,6 +2377,7 @@ Object.defineProperty(exports, "findMergedPr", { enumerable: true, get: function
 var worktree_js_1 = require("./worktree.js");
 Object.defineProperty(exports, "buildLocalWorkspaces", { enumerable: true, get: function () { return worktree_js_1.buildLocalWorkspaces; } });
 Object.defineProperty(exports, "inspectDeclaredDependencies", { enumerable: true, get: function () { return worktree_js_1.inspectDeclaredDependencies; } });
+Object.defineProperty(exports, "inspectGateBinResolution", { enumerable: true, get: function () { return worktree_js_1.inspectGateBinResolution; } });
 Object.defineProperty(exports, "linkNodeModules", { enumerable: true, get: function () { return worktree_js_1.linkNodeModules; } });
 Object.defineProperty(exports, "linkedWorkspacePackages", { enumerable: true, get: function () { return worktree_js_1.linkedWorkspacePackages; } });
 Object.defineProperty(exports, "localWorkspacePackages", { enumerable: true, get: function () { return worktree_js_1.localWorkspacePackages; } });
@@ -2387,6 +2388,7 @@ Object.defineProperty(exports, "pointWorkspaceAtLocal", { enumerable: true, get:
 Object.defineProperty(exports, "prepareWorktreeDependencies", { enumerable: true, get: function () { return worktree_js_1.prepareWorktreeDependencies; } });
 Object.defineProperty(exports, "unlinkNodeModulesLink", { enumerable: true, get: function () { return worktree_js_1.unlinkNodeModulesLink; } });
 Object.defineProperty(exports, "MAX_MISSING_DEPENDENCIES", { enumerable: true, get: function () { return worktree_js_1.MAX_MISSING_DEPENDENCIES; } });
+Object.defineProperty(exports, "MAX_GATE_BINS", { enumerable: true, get: function () { return worktree_js_1.MAX_GATE_BINS; } });
 var import_issues_js_1 = require("./import-issues.js");
 Object.defineProperty(exports, "runImportIssues", { enumerable: true, get: function () { return import_issues_js_1.runImportIssues; } });
 var import_issues_js_2 = require("./import-issues.js");
@@ -6004,7 +6006,7 @@ function applyViewFilter(items, expr, opts = {}) {
 __arggonModules.set("lib/src/worktree.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MAX_MISSING_DEPENDENCIES = void 0;
+exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = void 0;
 exports.packageEntryPaths = packageEntryPaths;
 exports.packageEntryExists = packageEntryExists;
 exports.packageBuildScript = packageBuildScript;
@@ -6013,6 +6015,7 @@ exports.linkNodeModules = linkNodeModules;
 exports.unlinkNodeModulesLink = unlinkNodeModulesLink;
 exports.pointWorkspaceAtLocal = pointWorkspaceAtLocal;
 exports.buildLocalWorkspaces = buildLocalWorkspaces;
+exports.inspectGateBinResolution = inspectGateBinResolution;
 exports.inspectDeclaredDependencies = inspectDeclaredDependencies;
 exports.prepareWorktreeDependencies = prepareWorktreeDependencies;
 exports.linkedWorkspacePackages = linkedWorkspacePackages;
@@ -6393,6 +6396,95 @@ function installResolutionPath(fromDir) {
         dir = parent;
     }
 }
+exports.MAX_GATE_BINS = 8;
+function packageBinNames(pkgDir, packageName) {
+    const manifest = packageManifest(pkgDir);
+    if (manifest === null)
+        return [];
+    const bin = manifest.bin;
+    if (typeof bin === "string" && bin.length > 0) {
+        const own = packageName.split("/").pop() ?? packageName;
+        return own.length > 0 ? [own] : [];
+    }
+    if (bin !== null && typeof bin === "object" && !Array.isArray(bin)) {
+        return Object.keys(bin).filter((name) => name.length > 0);
+    }
+    return [];
+}
+function installedPackageDir(modules, name) {
+    const segments = name.split("/");
+    for (const root of modules) {
+        const dir = (0, node_path_1.join)(root, ...segments);
+        if ((0, node_fs_1.existsSync)((0, node_path_1.join)(dir, "package.json")))
+            return dir;
+    }
+    return null;
+}
+function binOnResolutionPath(fromDir, worktreePath, bin) {
+    let dir = (0, node_path_1.resolve)(fromDir);
+    for (;;) {
+        const candidate = (0, node_path_1.join)(dir, "node_modules", ".bin", bin);
+        if ((0, node_fs_1.existsSync)(candidate)) {
+            return {
+                path: candidate,
+                source: isInside((0, node_path_1.resolve)(worktreePath), dir) ? "worktree" : "external",
+            };
+        }
+        const parent = (0, node_path_1.dirname)(dir);
+        if (parent === dir)
+            return null;
+        dir = parent;
+    }
+}
+function binOnPath(bin, env) {
+    const search = env.PATH ?? env.Path;
+    if (typeof search !== "string" || search.length === 0)
+        return null;
+    for (const dir of search.split(node_path_1.delimiter)) {
+        if (dir.length === 0)
+            continue;
+        const candidate = (0, node_path_1.join)(dir, bin);
+        if ((0, node_fs_1.existsSync)(candidate))
+            return candidate;
+    }
+    return null;
+}
+function inspectGateBinResolution(worktreePath, primaryRoot, env = process.env) {
+    const declared = declaredDependencyNames(worktreePath);
+    if (declared === null || declared.length === 0)
+        return [];
+    const discovery = installResolutionPath(worktreePath);
+    if (primaryRoot !== undefined)
+        discovery.push(...installResolutionPath(primaryRoot));
+    const names = new Set();
+    for (const dep of declared) {
+        if (names.size >= exports.MAX_GATE_BINS)
+            break;
+        const dir = installedPackageDir(discovery, dep);
+        if (dir !== null) {
+            const bins = packageBinNames(dir, dep);
+            if (bins.length === 0)
+                continue;
+            for (const bin of bins) {
+                names.add(bin);
+                if (names.size >= exports.MAX_GATE_BINS)
+                    break;
+            }
+            continue;
+        }
+        names.add(dep);
+    }
+    const resolveBin = (bin) => {
+        const onModules = binOnResolutionPath(worktreePath, worktreePath, bin);
+        if (onModules !== null)
+            return { name: bin, source: onModules.source, path: onModules.path };
+        const onPath = binOnPath(bin, env);
+        if (onPath !== null)
+            return { name: bin, source: "path", path: onPath };
+        return { name: bin, source: "missing" };
+    };
+    return [...names].sort().slice(0, exports.MAX_GATE_BINS).map(resolveBin);
+}
 function inspectDeclaredDependencies(worktreePath) {
     const declared = declaredDependencyNames(worktreePath);
     if (declared === null)
@@ -6431,8 +6523,12 @@ function prepareWorktreeDependencies(primaryRoot, worktreePath, deps = {}) {
                 ? "unavailable"
                 : "missing";
     const declared = inspectDeclaredDependencies(worktreePath);
+    const gateBins = inspectGateBinResolution(worktreePath, primaryRoot);
     return {
-        ready: hasInstall && linkedWorkspaces.length === 0 && declared.coverage === "satisfied",
+        ready: hasInstall &&
+            linkedWorkspaces.length === 0 &&
+            declared.coverage === "satisfied" &&
+            gateBins.every((bin) => bin.source === "worktree"),
         install,
         linkedNodeModules,
         builtWorkspaces,
@@ -6440,6 +6536,7 @@ function prepareWorktreeDependencies(primaryRoot, worktreePath, deps = {}) {
         manifestCoverage: declared.coverage,
         missingDependencies: declared.missing,
         missingDependenciesTotal: declared.missingTotal,
+        gateBins,
     };
 }
 function linkedWorkspacePackages(primaryRoot, worktreePath) {
@@ -8305,12 +8402,26 @@ function boundedPreparation(input) {
         .slice(0, MAX_NATIVE_PREPARATION_NAMES)
         .map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS));
     const missing = input.missingDependencies.map((name) => boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS));
+    const gateBins = (input.gateBins ?? []).map((bin) => {
+        const bounded = {
+            name: boundedNativeText(bin.name, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+            source: bin.source,
+        };
+        if (bin.path !== undefined) {
+            bounded.path = boundedNativeText(bin.path, MAX_NATIVE_PREPARATION_VALUE_CHARS);
+        }
+        return bounded;
+    });
     const truncated = input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
         input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
         input.missingDependenciesTotal > input.missingDependencies.length ||
+        (input.gateBins?.length ?? 0) > gateBins.length ||
         built.some((name, index) => name !== input.builtWorkspaces[index]) ||
         linked.some((name, index) => name !== input.linkedWorkspaces[index]) ||
-        missing.some((name, index) => name !== input.missingDependencies[index]);
+        missing.some((name, index) => name !== input.missingDependencies[index]) ||
+        gateBins.some((bin, index) => input.gateBins?.[index] === undefined ||
+            bin.name !== input.gateBins[index].name ||
+            bin.path !== input.gateBins[index].path);
     return {
         ready: input.ready,
         install: input.install,
@@ -8320,6 +8431,7 @@ function boundedPreparation(input) {
         manifestCoverage: input.manifestCoverage,
         missingDependencies: missing,
         missingDependenciesTotal: input.missingDependenciesTotal,
+        gateBins,
         ...(truncated ? { truncated: true } : {}),
     };
 }
@@ -8878,6 +8990,7 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
                 manifestCoverage: "unknown",
                 missingDependencies: [],
                 missingDependenciesTotal: 0,
+                gateBins: [],
             });
             const preparationRemoved = kernel.unlinkNodeModulesLink(primaryRoot, worktreePath);
             return failBeforeClaim(`dependency preparation failed in ${worktreePath}: ${boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)}; ` +
@@ -8933,8 +9046,25 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
         const kept = worktreePath !== undefined
             ? `the worktree was kept at ${worktreePath} (nothing was rolled back)`
             : "the claim file was left in place for inspection";
+        const foreignBins = (progress.preparation?.gateBins ?? []).filter((bin) => bin.source !== "worktree");
+        const resolution = foreignBins.length > 0
+            ? ` Gate binaries do not resolve inside the worktree — ${foreignBins
+                .map((bin) => bin.source === "missing"
+                ? `${bin.name}: not resolvable from the worktree`
+                : bin.source === "path"
+                    ? `${bin.name}: resolves only via PATH from ${bin.path} (outside the worktree)`
+                    : `${bin.name}: resolves from ${bin.path}, above the worktree`)
+                .join("; ")}.`
+            : "";
+        const install = progress.preparation?.install ?? "unknown";
+        const installNote = install === "missing" || install === "unavailable"
+            ? ` The worktree has no usable install of its own (${install}).`
+            : "";
+        const fix = resolution !== "" || installNote !== ""
+            ? " Run `npm ci` in the worktree for a worktree-local install, then re-run."
+            : "";
         return startFailure(kernel, `start failed while committing the claim; ${kept}. ` +
-            `${reason}. Fix the project gate/dependency cause, then re-run ` +
+            `${reason}.${resolution}${installNote}${fix} Otherwise re-run ` +
             `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
             "it attaches to the existing worktree and retries the claim commit.", version, claimPayload);
     }

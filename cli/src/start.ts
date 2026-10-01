@@ -6,6 +6,7 @@ import {
   TRACKER_DIR_NAME,
   findTasksDir,
   inspectDeclaredDependencies,
+  inspectGateBinResolution,
   itemsById,
   linkNodeModules,
   linkedWorkspacePackages,
@@ -18,6 +19,7 @@ import {
   runUpdate,
   unlinkNodeModulesLink,
   withItemLock,
+  type GateBinResolution,
   type ManifestCoverage,
   type WorkItem,
 } from "@arggondev/lib";
@@ -141,6 +143,16 @@ export type StartResult = {
   missingDependencies: string[];
   /** Full count behind `missingDependencies`; they differ only when the list is capped. */
   missingDependenciesTotal: number;
+  /**
+   * Which node_modules the project gate's binaries resolve from, relative to
+   * the worktree (bug-start-worktree-npm-ci-claim): `"worktree"`, `"external"`
+   * (a parent-directory install), `"path"` (a sibling checkout or global bin
+   * on the invoking PATH — the silent-masking flavor), or `"missing"`. A gate
+   * that passes via a foreign resolution used to leave the broken worktree
+   * install invisible; this names the source. Empty without `--worktree` or
+   * when the manifest declares no binary-exposing dependency.
+   */
+  gateBins: GateBinResolution[];
   /**
    * `x-worktree.post-start` outcome (task-start-post-hook): set only when a
    * new worktree was created, a hook is configured, and `--no-hook` was not
@@ -572,9 +584,44 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
       manifestCoverage: "unknown",
       missingDependencies: [],
       missingDependenciesTotal: 0,
+      // No worktree was prepared, so no gate-bin resolution was observed; the
+      // field is only meaningful with `--worktree`.
+      gateBins: [],
       item: branch.item,
     };
   });
+}
+
+/**
+ * Human sentence for a failure report, naming which node_modules the gate
+ * binaries actually resolve from (bug-start-worktree-npm-ci-claim). The two
+ * observed flavors of a cold-worktree claim-commit failure: no worktree
+ * install at all (nothing resolves), and a resolution from OUTSIDE the
+ * worktree — a parent-directory install, or a sibling checkout's `.bin` on
+ * the invoking PATH — silently masking the broken worktree install. Null when
+ * the observed resolution is unremarkable (every reported bin resolves from
+ * the worktree, or nothing was probed and an install exists).
+ */
+function gateBinFailureReport(input: {
+  hasInstall: boolean;
+  gateBins: GateBinResolution[];
+}): string | null {
+  const broken = input.gateBins.filter((bin) => bin.source !== "worktree");
+  if (broken.length === 0) {
+    return input.hasInstall
+      ? null
+      : "Readiness: the worktree has no node_modules of its own (nothing resolved, so no gate binary could be probed).";
+  }
+  const named = broken
+    .map((bin) => {
+      if (bin.source === "missing") return `${bin.name}: not resolvable from the worktree`;
+      if (bin.source === "path") {
+        return `${bin.name}: resolves only via PATH from ${bin.path} (outside the worktree)`;
+      }
+      return `${bin.name}: resolves from ${bin.path}, above the worktree`;
+    })
+    .join("; ");
+  return `Readiness: the gate binaries do not resolve inside the worktree — ${named}.`;
 }
 
 /**
@@ -584,14 +631,26 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
  * (attach only lands a pending claim commit — review F3), so the branch must be
  * pushed manually there.
  */
-function worktreeRemediation(input: { step: string; id: string; branch: string }): string {
+function worktreeRemediation(input: {
+  step: string;
+  id: string;
+  branch: string;
+  worktreePath?: string;
+  readiness?: { hasInstall: boolean; gateBins: GateBinResolution[] };
+}): string {
   const attach = `re-run \`arggon start ${input.id} --worktree\` — it attaches to the existing worktree`;
   if (input.step.startsWith("committing the claim")) {
+    const observed =
+      input.readiness === undefined ? "" : (gateBinFailureReport(input.readiness) ?? "");
+    const installFix =
+      input.readiness !== undefined && observed !== ""
+        ? ` Exact fix for the observed resolution: run \`npm ci\` in ${input.worktreePath ?? "the worktree"}, then ${attach}.`
+        : "";
     return (
       "The pre-commit gate (or the git commit itself) failed inside the worktree — fix the " +
       "reported cause there (install dependencies, or link the primary checkout's node_modules: " +
       "`ln -s <primary>/node_modules <worktree>/node_modules`; start does this itself when the " +
-      `primary has one), then ${attach}.`
+      `primary has one), then ${attach}.${observed === "" ? "" : ` ${observed}`}${installFix}`
     );
   }
   if (input.step.startsWith("pushing")) {
@@ -626,6 +685,7 @@ function worktreeFailureMessage(input: {
   createBranch: boolean;
   step: string;
   err: unknown;
+  readiness?: { hasInstall: boolean; gateBins: GateBinResolution[] };
 }): string {
   const detail = input.err instanceof Error ? input.err.message : String(input.err);
   const discard = input.createBranch
@@ -635,7 +695,13 @@ function worktreeFailureMessage(input: {
     `start failed while ${input.step}; the worktree was kept at ${input.worktreePath} ` +
     `(nothing was rolled back).\n` +
     `${detail}\n` +
-    `${worktreeRemediation({ step: input.step, id: input.id, branch: input.branch })} ` +
+    `${worktreeRemediation({
+      step: input.step,
+      id: input.id,
+      branch: input.branch,
+      worktreePath: input.worktreePath,
+      readiness: input.readiness,
+    })} ` +
     `To discard it instead: \`${discard}\`.`
   );
 }
@@ -715,6 +781,7 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
   let manifestCoverage: ManifestCoverage = "unknown";
   let missingDependencies: string[] = [];
   let missingDependenciesTotal = 0;
+  let gateBins: GateBinResolution[] = [];
   try {
     // The kernel owns the dependency-preparation orchestration shared with the
     // native start surface. Git/domain lifecycle stays here in the CLI.
@@ -727,6 +794,10 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     manifestCoverage = prepared.manifestCoverage;
     missingDependencies = prepared.missingDependencies;
     missingDependenciesTotal = prepared.missingDependenciesTotal;
+    // Which node_modules the gate binaries resolve from
+    // (bug-start-worktree-npm-ci-claim): the claim-commit gate runs with this
+    // resolution, so the receipt names it before the commit is attempted.
+    gateBins = prepared.gateBins;
     // Resolution report (W6/PR-374 finding 2): recomputed at the end too, so a
     // post-start hook that reifies a local install is reflected in the returned
     // state (PR #384 review F2).
@@ -821,6 +892,10 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     // in — the pre-hook value only ever described the claim-commit gate window
     // (PR #384 review F2).
     linkedWorkspaces = linkedWorkspacePackages(root, worktreePath);
+    // Same rule for the gate binaries: a hook that reifies a local install
+    // flips their resolution to the worktree, so the returned field describes
+    // the state the worktree is LEFT in.
+    gateBins = inspectGateBinResolution(worktreePath, root);
     // Same rule for the install's currency: a hook that reifies a local install
     // also stops it being stale, and one that did not leaves the names visible.
     const declared = inspectDeclaredDependencies(worktreePath);
@@ -845,6 +920,7 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       manifestCoverage,
       missingDependencies,
       missingDependenciesTotal,
+      gateBins,
       postStart,
       item: finalItem,
     };
@@ -853,8 +929,22 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     // worktree destroys the diagnostic context (hook output, partial claim) and
     // forces the manual pre-create + symlink dance. The worktree and branch are
     // kept; the error names the failing step, the path and the attach re-run.
+    // The readiness snapshot is a FRESH read of the failed state, so the
+    // report names the resolution the gate actually saw
+    // (bug-start-worktree-npm-ci-claim).
     throw new Error(
-      worktreeFailureMessage({ id, branch: name, worktreePath, createBranch, step, err }),
+      worktreeFailureMessage({
+        id,
+        branch: name,
+        worktreePath,
+        createBranch,
+        step,
+        err,
+        readiness: {
+          hasInstall: existsSync(join(worktreePath, "node_modules")),
+          gateBins: inspectGateBinResolution(worktreePath, root),
+        },
+      }),
     );
   }
 }

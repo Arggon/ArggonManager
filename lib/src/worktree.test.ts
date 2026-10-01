@@ -19,7 +19,9 @@ import { join, dirname } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   inspectDeclaredDependencies,
+  inspectGateBinResolution,
   MAX_MISSING_DEPENDENCIES,
+  MAX_GATE_BINS,
   prepareWorktreeDependencies,
 } from "./worktree.js";
 
@@ -37,6 +39,17 @@ function fixture(): { primary: string; worktree: string } {
   mkdirSync(primary, { recursive: true });
   mkdirSync(worktree, { recursive: true });
   return { primary, worktree };
+}
+
+/** Like `fixture`, but the returned `parent` carries no install of its own. */
+function siblingFixture(): { primary: string; worktree: string; parent: string } {
+  const parent = mkdtempSync(join(tmpdir(), "arggon-worktree-kernel-"));
+  roots.push(parent);
+  const primary = join(parent, "primary");
+  const worktree = join(parent, "worktree");
+  mkdirSync(primary, { recursive: true });
+  mkdirSync(worktree, { recursive: true });
+  return { primary, worktree, parent };
 }
 
 function addWorkspacePackage(primary: string, worktree: string): void {
@@ -85,6 +98,8 @@ describe("prepareWorktreeDependencies", () => {
       manifestCoverage: "satisfied",
       missingDependencies: [],
       missingDependenciesTotal: 0,
+      // Nothing is declared, so the gate-bin probe has nothing to report.
+      gateBins: [],
     });
   });
 
@@ -106,6 +121,8 @@ describe("prepareWorktreeDependencies", () => {
       manifestCoverage: "satisfied",
       missingDependencies: [],
       missingDependenciesTotal: 0,
+      // Nothing declared, so no gate bin is probed and ready is unaffected.
+      gateBins: [],
     });
     expect(lstatSync(join(worktree, "node_modules")).isSymbolicLink()).toBe(true);
     expect(readFileSync(join(worktree, "node_modules", "gate-dep.js"), "utf8")).toContain("true");
@@ -151,6 +168,7 @@ describe("prepareWorktreeDependencies", () => {
       manifestCoverage: "satisfied",
       missingDependencies: [],
       missingDependenciesTotal: 0,
+      gateBins: [],
     });
     expect(existsSync(join(worktree, "lib", "dist", "index.js"))).toBe(true);
     expect(lstatSync(join(worktree, "node_modules")).isSymbolicLink()).toBe(false);
@@ -206,6 +224,11 @@ describe("prepareWorktreeDependencies reports a stale mirrored install", () => {
       manifestCoverage: "stale",
       missingDependencies: ["@ast-grep/cli"],
       missingDependenciesTotal: 1,
+      // The gate-bin probe (bug-start-worktree-npm-ci-claim): gate-dep is
+      // installed but exposes no bin, so it is not probed; the uninstalled
+      // @ast-grep/cli is probed under its own name (npm's string-bin
+      // convention) and reports missing.
+      gateBins: [{ name: "@ast-grep/cli", source: "missing" }],
     });
   });
 
@@ -341,5 +364,139 @@ describe("inspectDeclaredDependencies", () => {
       missing: [],
       missingTotal: 0,
     });
+  });
+});
+
+/**
+ * Which node_modules the project gate's binaries resolve from
+ * (bug-start-worktree-npm-ci-claim). A fresh worktree with no install used to
+ * fail its claim commit with a bare `tsx: command not found`, and a sibling
+ * checkout's `.bin` on the invoking PATH could run the gate against a foreign
+ * install while the worktree resolved nothing. The probe reports the source of
+ * each gate bin so readiness can name both flavors. Every test passes an
+ * explicit env: the runner's own PATH must never decide an assertion.
+ */
+describe("inspectGateBinResolution", () => {
+  /** An empty env: no PATH, so a `path` source is only ever an injected one. */
+  const noPath: NodeJS.ProcessEnv = {};
+
+  function addInstalledPackageWithBins(
+    primary: string,
+    name: string,
+    bins: Record<string, string> | string,
+  ): void {
+    addInstalledPackage(primary, name);
+    const dir = join(primary, "node_modules", ...name.split("/"));
+    writeFileSync(join(dir, "package.json"), JSON.stringify({ name, version: "1.0.0", bin: bins }));
+  }
+
+  it("reports a bin present in the worktree's own install as worktree", () => {
+    const { primary, worktree } = fixture();
+    setManifest(worktree, { devDependencies: { tsx: "^1.0.0" } });
+    addInstalledPackageWithBins(primary, "tsx", { tsx: "./cli.mjs" });
+    const worktreeBin = join(worktree, "node_modules", ".bin");
+    mkdirSync(worktreeBin, { recursive: true });
+    writeFileSync(join(worktreeBin, "tsx"), "#!/bin/sh\n");
+
+    expect(inspectGateBinResolution(worktree, primary, noPath)).toEqual([
+      { name: "tsx", source: "worktree", path: join(worktreeBin, "tsx") },
+    ]);
+  });
+
+  it("reports a bin found on an injected PATH as the masking flavor, with its source", () => {
+    const { primary, worktree, parent } = siblingFixture();
+    setManifest(worktree, { devDependencies: { "gate-dep": "^1.0.0" } });
+    // The dep is installed in the primary WITH a bin field (so the gate can
+    // legitimately invoke it), but the worktree resolves nothing itself.
+    addInstalledPackageWithBins(primary, "gate-dep", { "gate-dep": "./cli.js" });
+    const siblingBinDir = join(parent, "sibling", "node_modules", ".bin");
+    mkdirSync(siblingBinDir, { recursive: true });
+    writeFileSync(join(siblingBinDir, "gate-dep"), "#!/bin/sh\n");
+
+    const env: NodeJS.ProcessEnv = { PATH: siblingBinDir };
+    expect(inspectGateBinResolution(worktree, primary, env)).toEqual([
+      { name: "gate-dep", source: "path", path: join(siblingBinDir, "gate-dep") },
+    ]);
+  });
+
+  it("reports missing when nothing resolves anywhere", () => {
+    const { primary, worktree } = fixture();
+    setManifest(worktree, { devDependencies: { "gate-dep": "^1.0.0" } });
+
+    // gate-dep is not installed anywhere, so its own name is probed (npm's
+    // string-bin convention) and nothing resolves: source "missing", no path.
+    expect(inspectGateBinResolution(worktree, primary, noPath)).toEqual([
+      { name: "gate-dep", source: "missing" },
+    ]);
+  });
+
+  it("reports a bin from an install above the worktree as external", () => {
+    const { primary, worktree, parent } = siblingFixture();
+    setManifest(worktree, { devDependencies: { "gate-dep": "^1.0.0" } });
+    // No worktree or primary install; the parent carries the bin.
+    const parentBinDir = join(parent, "node_modules", ".bin");
+    mkdirSync(parentBinDir, { recursive: true });
+    writeFileSync(join(parentBinDir, "gate-dep"), "#!/bin/sh\n");
+
+    expect(inspectGateBinResolution(worktree, primary, noPath)).toEqual([
+      { name: "gate-dep", source: "external", path: join(parentBinDir, "gate-dep") },
+    ]);
+  });
+
+  it("prefers the worktree's own resolution over PATH and parent installs", () => {
+    const { primary, worktree, parent } = siblingFixture();
+    setManifest(worktree, { devDependencies: { "gate-dep": "^1.0.0" } });
+    addInstalledPackageWithBins(primary, "gate-dep", { "gate-dep": "./cli.js" });
+    const worktreeBin = join(worktree, "node_modules", ".bin");
+    mkdirSync(worktreeBin, { recursive: true });
+    writeFileSync(join(worktreeBin, "gate-dep"), "#!/bin/sh\n");
+    const siblingBinDir = join(parent, "sibling", "node_modules", ".bin");
+    mkdirSync(siblingBinDir, { recursive: true });
+    writeFileSync(join(siblingBinDir, "gate-dep"), "#!/bin/sh\n");
+
+    const env: NodeJS.ProcessEnv = { PATH: siblingBinDir };
+    const bins = inspectGateBinResolution(worktree, primary, env);
+    expect(bins).toHaveLength(1);
+    expect(bins[0].source).toBe("worktree");
+  });
+
+  it("uses the real bin names of an installed package, not a guessed one", () => {
+    const { primary, worktree } = fixture();
+    setManifest(worktree, { devDependencies: { typescript: "^5.0.0" } });
+    // typescript's bins are tsc/tsserver — the package name itself is no bin.
+    addInstalledPackageWithBins(primary, "typescript", { tsc: "./bin/tsc" });
+    const worktreeBin = join(worktree, "node_modules", ".bin");
+    mkdirSync(worktreeBin, { recursive: true });
+    writeFileSync(join(worktreeBin, "tsc"), "#!/bin/sh\n");
+
+    expect(inspectGateBinResolution(worktree, primary, noPath)).toEqual([
+      { name: "tsc", source: "worktree", path: join(worktreeBin, "tsc") },
+    ]);
+  });
+
+  it("skips installed packages that expose no bin and caps the report", () => {
+    const { primary, worktree } = fixture();
+    const devDependencies: Record<string, string> = {};
+    for (let index = 0; index < MAX_GATE_BINS + 2; index += 1) {
+      const name = `binned-dep-${index}`;
+      devDependencies[name] = "1.0.0";
+      addInstalledPackageWithBins(primary, name, { [name]: "./cli.js" });
+    }
+    // An installed, bin-less dependency must not be probed under a guess.
+    devDependencies["plain-dep"] = "1.0.0";
+    addInstalledPackage(primary, "plain-dep");
+    setManifest(worktree, { devDependencies });
+
+    const bins = inspectGateBinResolution(worktree, primary, noPath);
+    expect(bins).toHaveLength(MAX_GATE_BINS);
+    expect(bins.map((bin) => bin.name)).toEqual(
+      Array.from({ length: MAX_GATE_BINS }, (_, index) => `binned-dep-${index}`),
+    );
+    expect(bins.every((bin) => bin.source === "missing")).toBe(true);
+  });
+
+  it("reports nothing when the manifest declares nothing", () => {
+    const { primary, worktree } = fixture();
+    expect(inspectGateBinResolution(worktree, primary, noPath)).toEqual([]);
   });
 });

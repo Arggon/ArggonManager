@@ -2143,6 +2143,16 @@ function startNotAttempted(
 /** The kernel's coverage union (`ManifestCoverage` in `lib/src/worktree.ts`). */
 type NativeManifestCoverage = "satisfied" | "stale" | "unknown"
 
+/** The kernel's gate-bin source union (`GateBinSource` in `lib/src/worktree.ts`). */
+type NativeGateBinSource = "worktree" | "external" | "path" | "missing"
+
+/** One gate binary's observed resolution, as the kernel reports it. */
+type NativeGateBinResolution = {
+  name: string
+  source: NativeGateBinSource
+  path?: string
+}
+
 type NativePreparationReceipt = {
   ready: boolean
   install: string
@@ -2160,6 +2170,15 @@ type NativePreparationReceipt = {
   manifestCoverage: NativeManifestCoverage
   missingDependencies: string[]
   missingDependenciesTotal: number
+  /**
+   * Which node_modules the project gate's binaries resolve from, relative to
+   * the worktree (bug-start-worktree-npm-ci-claim). Forwarded from the kernel
+   * receipt, which owns discovery and the `MAX_GATE_BINS` cap: a `path`
+   * source here is the silent-masking flavor — the claim commit can pass on a
+   * sibling checkout's binary while the worktree's own install is broken or
+   * absent, and without this report the resolution stays invisible.
+   */
+  gateBins: NativeGateBinResolution[]
   truncated?: boolean
 }
 
@@ -2201,6 +2220,7 @@ function boundedPreparation(input: {
   manifestCoverage: NativeManifestCoverage
   missingDependencies: string[]
   missingDependenciesTotal: number
+  gateBins?: NativeGateBinResolution[]
 }): NativePreparationReceipt {
   const built = input.builtWorkspaces
     .slice(0, MAX_NATIVE_PREPARATION_NAMES)
@@ -2211,13 +2231,33 @@ function boundedPreparation(input: {
   const missing = input.missingDependencies.map((name) =>
     boundedNativeText(name, MAX_NATIVE_PREPARATION_VALUE_CHARS),
   )
+  // The kernel receipt owns discovery and the MAX_GATE_BINS cap (8, below this
+  // function's own list cap), so there is nothing to re-slice — only the
+  // per-name/per-path character bound is re-applied.
+  const gateBins = (input.gateBins ?? []).map((bin) => {
+    const bounded: NativeGateBinResolution = {
+      name: boundedNativeText(bin.name, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+      source: bin.source,
+    }
+    if (bin.path !== undefined) {
+      bounded.path = boundedNativeText(bin.path, MAX_NATIVE_PREPARATION_VALUE_CHARS)
+    }
+    return bounded
+  })
   const truncated =
     input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
     input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
     input.missingDependenciesTotal > input.missingDependencies.length ||
+    (input.gateBins?.length ?? 0) > gateBins.length ||
     built.some((name, index) => name !== input.builtWorkspaces[index]) ||
     linked.some((name, index) => name !== input.linkedWorkspaces[index]) ||
-    missing.some((name, index) => name !== input.missingDependencies[index])
+    missing.some((name, index) => name !== input.missingDependencies[index]) ||
+    gateBins.some(
+      (bin, index) =>
+        input.gateBins?.[index] === undefined ||
+        bin.name !== input.gateBins[index].name ||
+        bin.path !== input.gateBins[index].path,
+    )
   return {
     ready: input.ready,
     install: input.install,
@@ -2227,6 +2267,7 @@ function boundedPreparation(input: {
     manifestCoverage: input.manifestCoverage,
     missingDependencies: missing,
     missingDependenciesTotal: input.missingDependenciesTotal,
+    gateBins,
     ...(truncated ? { truncated: true } : {}),
   }
 }
@@ -3215,10 +3256,12 @@ async function nativeStartBody(
         builtWorkspaces: [],
         linkedWorkspaces: [],
         // A preparation that threw was never compared against the manifest:
-        // `unknown`, never a `satisfied` claim (same rule as the kernel).
+        // `unknown`, never a `satisfied` claim (same rule as the kernel), and
+        // no gate-bin resolution was observed either.
         manifestCoverage: "unknown",
         missingDependencies: [],
         missingDependenciesTotal: 0,
+        gateBins: [],
       })
       const preparationRemoved = kernel.unlinkNodeModulesLink(primaryRoot, worktreePath)
       return failBeforeClaim(
@@ -3307,10 +3350,38 @@ async function nativeStartBody(
     const kept = worktreePath !== undefined
       ? `the worktree was kept at ${worktreePath} (nothing was rolled back)`
       : "the claim file was left in place for inspection"
+    // Name the observed gate-binary resolution and the exact remediation
+    // (bug-start-worktree-npm-ci-claim): a bare `tsx: command not found` used
+    // to leave the worker to diagnose the install state alone, and a foreign
+    // resolution (a sibling checkout's .bin on PATH) used to stay invisible.
+    const foreignBins = (progress.preparation?.gateBins ?? []).filter(
+      (bin) => bin.source !== "worktree",
+    )
+    const resolution =
+      foreignBins.length > 0
+        ? ` Gate binaries do not resolve inside the worktree — ${foreignBins
+            .map((bin) =>
+              bin.source === "missing"
+                ? `${bin.name}: not resolvable from the worktree`
+                : bin.source === "path"
+                  ? `${bin.name}: resolves only via PATH from ${bin.path} (outside the worktree)`
+                  : `${bin.name}: resolves from ${bin.path}, above the worktree`,
+            )
+            .join("; ")}.`
+        : ""
+    const install = progress.preparation?.install ?? "unknown"
+    const installNote =
+      install === "missing" || install === "unavailable"
+        ? ` The worktree has no usable install of its own (${install}).`
+        : ""
+    const fix =
+      resolution !== "" || installNote !== ""
+        ? " Run `npm ci` in the worktree for a worktree-local install, then re-run."
+        : ""
     return startFailure(
       kernel,
       `start failed while committing the claim; ${kept}. ` +
-        `${reason}. Fix the project gate/dependency cause, then re-run ` +
+        `${reason}.${resolution}${installNote}${fix} Otherwise re-run ` +
         `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
         "it attaches to the existing worktree and retries the claim commit.",
       version,
