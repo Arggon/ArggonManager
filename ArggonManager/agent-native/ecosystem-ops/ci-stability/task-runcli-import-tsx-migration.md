@@ -41,3 +41,7 @@ Filed from the bug-row-table-flake root cause (PR #513): the tsx wrapper CLI (ts
 ### 2026-10-01 @Coordinator
 ### 2026-10-01 @Coordinator
 Inventory precision from the PR #513 mechanical review: runCli copies spawning the tsx wrapper CLI exist in doctor.test.ts:48, success-stdout.test.ts:30, and ~33 further files (~35 total) — the acceptance inventory should confirm that count and sweep all of them; consider extracting ONE shared spawn helper instead of 35 per-file copies.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Inventory precision from the PR #513 mechanical review: runCli copies spawning the tsx wrapper CLI exist in doctor.test.ts:48, success-stdout.test.ts:30, and ~33 further files (~35 total) — the acceptance inventory should confirm that count and sweep all of them; consider extracting ONE shared spawn helper instead of 35 per-file copies.
