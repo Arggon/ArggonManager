@@ -33,9 +33,14 @@ population of ADR 0005 (low-staffing, agent-operated) and all three platforms
 
 ## Acceptance
 
-- [ ] Pattern doc exists and is reachable: docker playbook via `arggon playbook new docker --version <v>` (research with dated sources) or a page under `ArggonManager/docs/` linked from the convention — the choice is stated in the PR.
-- [ ] Covers: Compose project naming `<repo>-<item-id>`; random host-port publishing (or sockets where supported); ephemeral (`--tmpfs`/`--rm`) vs persistent volumes; reading the `.arggon.env` keys; the cleanup declaration manifest; the macOS/Windows Desktop VM cost note.
-- [ ] Docker claims carry dated sources; cross-links ADR 0019, exploration 017 and spec 016.
-- [ ] `arggon validate` ok; `arggon spec analyze` reports no NEW findings introduced by the doc.
+- [x] Pattern doc exists and is reachable: docker playbook via `arggon playbook new docker --version <v>` (research with dated sources) or a page under `ArggonManager/docs/` linked from the convention — the choice is stated in the PR. *(Choice: docs page `ArggonManager/docs/worktree-services.md` — a pattern doc, not a version-pinned stack decision, so the playbook template + 90-day freshness gate would misfit. Reachability: cross-linked from spec-worktree-env-contract-016 §Degradation; a `convention.md` cross-link is left to the env-contract implementation PR, which already touches convention.md for `x-worktree.env`.)*
+- [x] Covers: Compose project naming `<repo>-<item-id>`; random host-port publishing (or sockets where supported); ephemeral (`--tmpfs`/`--rm`) vs persistent volumes; reading the `.arggon.env` keys; the cleanup declaration manifest; the macOS/Windows Desktop VM cost note.
+- [x] Docker claims carry dated sources; cross-links ADR 0019, exploration 017 and spec 016.
+- [x] `arggon validate` ok; `arggon spec analyze` reports no NEW findings introduced by the doc. *(6 findings before = 6 after, byte-identical output; baseline captured pre-edit.)*
+- [x] Copy-paste example validated live (Docker 29.7.2, 2026-10-01): `docker compose config` parses with/without `WORKTREE_SUFFIX`; two per-worktree projects concurrently on distinct random host ports; data isolation proven cross-project; `down -v --remove-orphans` leaves zero containers/networks/volumes (tmpfs pattern).
+- [x] Cross-linked from the spec (one line: "adopter guidance: docs/worktree-services.md" in spec-worktree-env-contract-016 §Degradation).
+- [x] Gates: `npm test` untouched-green; prose-format gate (`cli/src/prose-format.test.ts`) green. *(One environmental failure — `headless-ci.test.ts` expecting `lib/dist/index.js` in the fresh worktree — resolved by `npm run build`; doc-only change, zero test files touched.)*
 
 ## Notes
+
+- Honesty constraint honored: the env contract is implemented in a parallel PR — the doc is written against spec-worktree-env-contract-016 and carries a "Shipped vs promised vs planned" table (spec-promised pieces marked "not in any release yet"; cleanup reaping marked Planned, pointing at `task-cleanup-declared-services`).
