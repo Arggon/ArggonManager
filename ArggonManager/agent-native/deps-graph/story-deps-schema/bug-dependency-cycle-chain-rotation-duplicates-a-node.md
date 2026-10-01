@@ -81,18 +81,18 @@ the two halves and the result neither closes nor stays simple.
 
 ## Acceptance
 
-- [ ] Rotate the SIMPLE cycle (drop the repeated closing node) and re-append the
+- [x] Rotate the SIMPLE cycle (drop the repeated closing node) and re-append the
       anchor, so the chain is `a -> b -> … -> a` with every member exactly once.
-- [ ] Re-check the dedup key: it is built from the repeated-node multiset
+- [x] Re-check the dedup key: it is built from the repeated-node multiset
       (`[...cycle].sort().join("\0")`); keep deduping on the simple member set so
       the "report each distinct cycle once" contract still holds.
-- [ ] The message for a given cycle is byte-identical under every traversal order
+- [x] The message for a given cycle is byte-identical under every traversal order
       of the same graph (the property asserts this; today it is pinned as a known
       deviation).
-- [ ] Example-based test: a 3-item cycle entered at a non-min member prints one
+- [x] Example-based test: a 3-item cycle entered at a non-min member prints one
       canonical chain, and the existing `cli/src/deps.test.ts` cycle tests stay
       green.
-- [ ] Delete the `isRotationWithOneDuplicate` canary in
+- [x] Delete the `isRotationWithOneDuplicate` canary in
       `lib/src/validate.property.test.ts` with the fix — it exists only to pin
       today's malformed shape.
 
