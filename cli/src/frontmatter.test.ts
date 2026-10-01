@@ -203,6 +203,127 @@ title: "nits: \\\\\\\\( here"
   });
 });
 
+describe("frontmatter ambiguous plain scalars (bug-frontmatter-ambiguous-plain-scalar-loss)", () => {
+  /** Tokens `parseValue`/`parseScalar` would decode as a NON-string when bare. */
+  const TOKENS = [
+    "null",
+    "~",
+    "true",
+    "false",
+    "0",
+    "42",
+    "-7",
+    "00",
+    "-0",
+    "007",
+    "0123",
+    "-007",
+    "9007199254740993",
+    "12345678901234567890",
+  ];
+
+  it("quotes every token the reader would decode as a non-string, byte-stable", () => {
+    for (const token of TOKENS) {
+      const once = stringifyFrontmatter(
+        { type: "task", status: "todo", id: "task-x", title: token },
+        "# x\n",
+      );
+      expect(rawTitleLineFrom(once), `write "${token}"`).toBe(`title: "${token}"`);
+      const reread = parseFrontmatter(once);
+      expect(reread.data.title, `read "${token}"`).toBe(token);
+      expect(stringifyFrontmatter(reread.data, reread.body), `rewrite "${token}"`).toBe(once);
+    }
+  });
+
+  it("keeps an ambiguous token in labels and depends_on elements verbatim", () => {
+    const data = {
+      type: "task",
+      status: "todo",
+      id: "task-x",
+      labels: ["06"],
+      depends_on: ["007"],
+    };
+    const once = stringifyFrontmatter(data, "# x\n");
+    expect(once).toContain('labels: ["06"]');
+    expect(once).toContain('depends_on: ["007"]');
+    const reread = parseFrontmatter(once);
+    expect(reread.data.labels).toEqual(["06"]);
+    expect(reread.data.depends_on).toEqual(["007"]);
+    expect(stringifyFrontmatter(reread.data, reread.body)).toBe(once);
+  });
+
+  it("keeps REAL numbers bare in scalars and list elements", () => {
+    // A genuine number keeps its bare token so the reader decodes the SAME
+    // type back — the fix only quotes strings (and non-number list elements,
+    // which the reader decodes as strings either way).
+    const data = { type: "task", status: "todo", id: "task-x", "x-n": 6 };
+    const once = stringifyFrontmatter(data, "# x\n");
+    expect(once).toContain("x-n: 6");
+    const reread = parseFrontmatter(once);
+    expect(reread.data["x-n"]).toBe(6);
+    expect(stringifyFrontmatter(reread.data, reread.body)).toBe(once);
+
+    const listed = stringifyFrontmatter(
+      { type: "task", status: "todo", id: "task-x", "x-list": [1, true, null] },
+      "# x\n",
+    );
+    expect(listed).toContain('x-list: [1, "true", "null"]');
+    const rereadList = parseFrontmatter(listed);
+    expect(rereadList.data["x-list"]).toEqual([1, "true", "null"]);
+    expect(stringifyFrontmatter(rereadList.data, rereadList.body)).toBe(listed);
+  });
+
+  it("still tolerates a file already written with a bare token (reader unchanged)", () => {
+    // Old tree: `title: 0123` bare. It parses (as the number 123 — the loss is
+    // already baked in), validate stays green, and the rewrite is a stable
+    // fixed point: no throw, no new corruption.
+    const legacy = `---
+type: task
+status: todo
+id: task-legacy
+title: 0123
+labels: []
+created: "2026-09-11"
+---
+
+# legacy
+`;
+    const first = parseFrontmatter(legacy);
+    expect(first.data.title).toBe(123); // reader-side, unchanged
+    const once = stringifyFrontmatter(first.data, first.body);
+    expect(rawTitleLineFrom(once)).toBe("title: 123"); // bare number stays bare
+    const twice = stringifyFrontmatter(parseFrontmatter(once).data, parseFrontmatter(once).body);
+    expect(twice).toBe(once);
+  });
+
+  it("survives create/show/update through the kernel with a numeric title", () => {
+    const { dir } = primedTask();
+    const created = runCreate({
+      cwd: dir,
+      type: "task",
+      title: "0123",
+      parent: "story-login",
+      id: "ambiguous-nits",
+      now: NOW,
+      commit: false,
+    });
+    const path = created.path;
+
+    // create: the file already carries the lossless quoted form.
+    expect(rawTitleLine(path)).toBe('title: "0123"');
+    expect(parseFrontmatter(readFileSync(path, "utf8")).data.title).toBe("0123");
+
+    // update: the rewrite cannot change bytes (no loss to bake in).
+    runUpdate({ cwd: dir, id: created.id, labels: "probe", now: LATER });
+    expect(rawTitleLine(path)).toBe('title: "0123"');
+    expect(parseFrontmatter(readFileSync(path, "utf8")).data.title).toBe("0123");
+    expect(parseFrontmatter(readFileSync(path, "utf8")).data.labels).toEqual(["probe"]);
+
+    // The tree stays valid throughout (validate reads the same parse path).
+    expect(runValidate({ cwd: dir }).errors).toEqual([]);
+  });
+});
+
 /** `title:` line extracted from already-serialized frontmatter text. */
 function rawTitleLineFrom(frontmatter: string): string {
   const line = frontmatter.match(/^title:.*$/m)?.[0];

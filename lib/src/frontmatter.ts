@@ -169,7 +169,14 @@ export function stringifyFrontmatter(data: Frontmatter, body: string): string {
 function formatValue(key: string, value: unknown): string {
   if (Array.isArray(value)) {
     if (value.length === 0) return "[]";
-    return `[${value.map((v) => formatScalar(String(v), false)).join(", ")}]`;
+    // A genuine NUMBER element keeps its bare token (`parseScalar` decodes
+    // bare digits back to a number). Every other element goes through
+    // `formatScalar`: the reader decodes array booleans/nulls as STRINGS
+    // anyway (`parseScalar` has no true/false/null branch), so quoting them
+    // is the same read with a first-write fixed point.
+    return `[${value
+      .map((v) => (typeof v === "number" ? String(v) : formatScalar(String(v), false)))
+      .join(", ")}]`;
   }
   if (value === null) return "null";
   if (typeof value === "boolean") return value ? "true" : "false";
@@ -179,14 +186,30 @@ function formatValue(key: string, value: unknown): string {
   return formatScalar(text, forceQuote);
 }
 
+/**
+ * Plain tokens the reader (`parseValue` / `parseScalar`) resolves to a
+ * NON-string: `null` / `~` -> null, `true` / `false` -> boolean,
+ * `/^-?\d+$/` -> Number. The writer has to quote every string that matches,
+ * or a title like `0123` loses its text on the first read and the next write
+ * bakes the loss into the file
+ * (bug-frontmatter-ambiguous-plain-scalar-loss; same class as
+ * bug-tracker-title-rescape: the writer must quote anything the reader would
+ * decode as a different type).
+ */
+const AMBIGUOUS_TOKEN = /^(?:~|null|true|false|-?\d+)$/;
+
 function formatScalar(value: string, forceQuote: boolean): string {
   // Backslashes force the quoted (JSON-escaped) form too
   // (bug-tracker-title-rescape): that keeps an input double-quoted scalar
   // byte-identical instead of silently down-converting it to a plain scalar.
   // Control characters force it as well (PR #360 review F1): a decoded `\n`
   // used to be written raw, splitting the frontmatter and corrupting the tree.
+  // YAML-ambiguous tokens force it too (see AMBIGUOUS_TOKEN) so a string that
+  // looks like null/~/a boolean/an integer survives as that exact string —
+  // this also covers list elements (`depends_on`), which skip `formatValue`.
   if (
     forceQuote ||
+    AMBIGUOUS_TOKEN.test(value) ||
     /[\u0000-\u001f\u007f\u2028\u2029]|[:#{}[\],&*?!'"\\]|^\s|\s$|^$/.test(value)
   ) {
     // JSON.stringify escapes \u0000-\u001f, but leaves DEL and the YAML/JS

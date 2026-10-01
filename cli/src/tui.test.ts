@@ -1431,6 +1431,11 @@ describe("detail pane: acceptance rows", () => {
       { checked: true, text: "also done" },
     ]);
   });
+
+  it("skips empty-box placeholder lines (bug-empty-template-checkbox)", () => {
+    const rows = tuiAcceptanceRows(["- [ ] ", "- [x] real", "- [ ]", "  * [ ] "].join("\n"));
+    expect(rows).toEqual([{ checked: true, text: "real" }]);
+  });
 });
 
 describe("detail pane: dependency summary", () => {
@@ -1811,7 +1816,6 @@ describe("detail pane: runTuiBoard loop", () => {
     expect(term.outputText()).toContain("item task-rate-limit is not in the tree anymore");
   });
 });
-
 
 // ---------- help overlay + vim keys (task-tui-help-vim-keys) ----------
 

@@ -1,13 +1,16 @@
 ---
 type: bug
-status: todo
+status: done
 id: bug-empty-template-checkbox
 title: empty-template-checkbox-blocks-done-gate
+assignee: Arggon
+branch: fix/bug-empty-template-checkbox
 parent: methodology-improvements
 labels: []
 priority: p2
 created: "2026-09-30"
-updated: "2026-09-30"
+updated: "2026-10-01"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-empty-template-checkbox
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-empty-template-checkbox.md
@@ -24,21 +27,63 @@ updated: "2026-09-30"
 
 ## Acceptance
 
-- [ ] 
+<!-- Real criteria: the checklist under Notes, below. -->
 
 ## Notes
 
 ### 2026-09-30 @Arggon
+
 ### Repro (2026-09-30, done gate live since #442)
 
 'arggon create' scaffolds '## Acceptance' with a bare '- [ ] ' placeholder line. When the real acceptance checklist is filed via a comment (create has no --body flag), the placeholder stays unchecked. With ADR 0015's done gate, the auto-done flip is then REFUSED (warning annotation, item stays in_progress) even though every real criterion is ticked — hit on task-exploration-decision-records and bug-stale-vendored-plugin-copy today; coordinator had to delete the line and flip manually.
 
 ### Candidate fixes
+
 - Kernel: 'acceptanceComplete' ignores checkbox lines with no text (an empty box is not an acceptance criterion) — smallest fix, keeps the gate strict for real criteria.
 - Or: 'arggon create' scaffolds '## Acceptance' with no checkbox until one exists.
 - Or: both.
 
 ### Acceptance checklist
-- [ ] Empty checkbox lines (no text after the box) never count as unticked criteria in acceptanceComplete — unit test.
-- [ ] Items whose acceptance lives in a comment flip via auto-done without manual surgery (regression: create item, comment checklist, tick, flip).
-- [ ] If create scaffolding changes: fixtures + template updated in the same PR.
+
+- [x] Empty checkbox lines (no text after the box) never count as unticked criteria in acceptanceComplete — unit test.
+- [x] Items whose acceptance lives in a comment flip via auto-done without manual surgery (regression: create item, comment checklist, tick, flip).
+- [x] If create scaffolding changes: fixtures + template updated in the same PR.
+
+### 2026-10-01 @Arggon
+
+Fixed — PR #507 (fix/bug-empty-template-checkbox), not merged; completion is the coordinator's call.
+
+CHOSEN FIX: both candidates.
+
+- Kernel: acceptanceComplete (lib/src/items.ts) now ignores checkbox lines with no text after the box — an empty box is not a criterion. Rationale: matches the acceptance checklist ("never count as unticked criteria") and the documented no-checklist semantic; the gate stays strict for real (text-bearing) criteria, and the acceptance-aware cascade uses the same predicate so containers are judged identically.
+- create scaffolding: templates/{task,bug,story,epic,initiative}.md scaffold ## Acceptance with a placeholder comment and NO checkbox — new items never carry the trap.
+- Consistency scanners: cli/src/tui.ts tuiAcceptanceRows skips empty-box rows so the pane's checked/total count equals the gate's contract (test/acceptance.ts tickAcceptance left unchanged — it over-ticks, harmless under both semantics); smoke/opencode-wave.ts rewrites both scaffold shapes; opencode/plugins/arggon/index.bundle.ts regenerated (separate commit "chore: regen plugin bundle").
+
+GATES: npm test 109 files / 1941 tests PASS; npm run lint PASS; npm run build PASS; npm run check:plugin PASS (after the regen commit); arggon validate ok:true on every commit (pre-commit gate).
+
+SMOKE (fixture tracker /tmp/opencode/smoke-betc/repo, built CLI from this branch — expected vs observed):
+
+1. arggon create task ... → scaffolded ## Acceptance shows the placeholder comment, NO checkbox (observed).
+2. Comment a checklist (- [ ] schema documented / - [ ] round-trip tested), flip done unticked → UPDATE_FAILED "cannot mark ... unchecked boxes" (observed, expected).
+3. Tick every real criterion, flip done → {"ok":true,...,"status":"done"}, cascade auto-completed the chain, NO gate error/warning, no Waiver section (observed, expected — the bug is fixed).
+4. Placeholder + a REAL unticked criterion → UPDATE_FAILED, item stays in_progress (observed, expected — gate stays strict).
+5. Coordinator's exact legacy hit: bare "- [ ] " placeholder + fully-ticked comment checklist → ok:true, done (observed; refused before the fix).
+
+NOTE on the task's "placeholder-only case still correctly REFUSES the flip": under the acceptance checklist's own item 1 ("empty checkbox lines never count as unticked criteria"), a placeholder-ONLY body is equivalent to the documented no-checklist semantic and flips — demonstrated in the legacy-hit case above. The strictness proof requested is case 4 (real criterion refuses). Flagging the wording conflict explicitly rather than silently picking one.
+
+FINDINGS (not filed, coordinator's call): templates/spec.md + templates/plan.md still carry a bare "- [ ]" under ## Acceptance (doc scaffolds for spec new, never gate-relevant — left untouched); convention.md:113's "containers generated by arggon init carry placeholder acceptance checkboxes" was stale (init scaffolds no item tree) — reworded in this PR to the real rule. Methodology impact class: behavioral (ADR 0016) — stated in the PR description; skill statements checked, still accurate, no skill edit needed.
+
+### handoff 2026-10-01 @Arggon (session: ses_f0b410d34ffeYOuLd9GG9z2KpL) — next: Review + merge PR #507 (fix/bug-empty-template-checkbox); verify smoke in the verdict, then flip the item.
+
+- branch: main
+- open questions: Task said placeholder-only should still refuse; implemented per checklist item 1 (empty box = not a criterion, so it flips) — strictness proven with real criteria; confirm the reading.
+
+### 2026-10-01 @Arggon
+
+Branch correction: the handoff above auto-detected the primary checkout's main; the work branch is fix/bug-empty-template-checkbox (PR #507).
+
+> > > > > > > origin/main
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Adjudication: the item checklist wins — an empty box is not a criterion, so a placeholder-only body flips (no-checklist semantic); strictness is proven against real unticked criteria (worker smoke case 4). Merged: PR #507 squash -> 6d23a815 (CI green). Item flipped done; the gate then accepted bug-...-rotation's stale placeholder flip with no surgery — the bug is dead. Format-churn nit (opencode-wave.ts/tui.test.ts rewraps) noted; non-blocking. Lazy-continuation criterion semantic (text not on the box line = empty) is documented, no item filed.

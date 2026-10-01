@@ -319,10 +319,15 @@ export function itemsById(items: WorkItem[]): Map<string, WorkItem> {
  * Markdown task-list items only (`- [ ]` / `- [x]` / `- [X]`, leading
  * whitespace tolerated). A body with NO task-list items has no acceptance
  * checklist — treated as complete so the cascade may finish it as before.
- * A body WITH any checklist item is complete only when every one is checked.
+ * A body WITH checklist items is complete only when every CRITERION is
+ * checked, and a checkbox line with no text after the box is not a criterion
+ * (bug-empty-template-checkbox): it is a scaffold placeholder — `create`
+ * used to leave one under `## Acceptance`, and since the real checklist is
+ * filed in a comment, that stale empty box must never wedge the done gate
+ * or the cascade. Real (text-bearing) unchecked boxes still gate strictly.
  */
 export function acceptanceComplete(body: string): boolean {
-  const boxes = [...body.matchAll(/^[ \t]*[-*] \[( |x|X)\]/gm)];
-  if (boxes.length === 0) return true;
-  return boxes.every((match) => match[1] !== " ");
+  const criteria = [...body.matchAll(/^[ \t]*[-*] \[( |x|X)\][ \t]*[^\s]/gm)];
+  if (criteria.length === 0) return true;
+  return criteria.every((match) => match[1] !== " ");
 }
