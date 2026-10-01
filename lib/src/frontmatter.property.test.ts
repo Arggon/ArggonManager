@@ -35,8 +35,10 @@
  *
  * The class the letter rule excludes — plain scalars the parser resolves to a
  * non-string — is NOT hidden: it is covered exhaustively by the second property
- * in this file, which pins today's behaviour token by token and carries the
- * filed bug. Nothing in this file weakens an invariant to make a run pass.
+ * in this file, which pins the round trip token by token
+ * (bug-frontmatter-ambiguous-plain-scalar-loss, fixed writer-side: the writer
+ * quotes every such token). Nothing in this file weakens an invariant to make
+ * a run pass.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -151,10 +153,11 @@ const kebabWordWithLetter = fc
 /**
  * Kebab-case id/label token whose FIRST segment carries an ASCII letter. Both
  * shapes are inside the convention (`ID_PATTERN` / `LABEL_PATTERN` accept a
- * purely numeric token such as `06`), but a token with no letter can be a bare
- * YAML integer — the ambiguous class the canary property below covers
- * exhaustively and the filed bug tracks. Keeping the letter here is a DOCUMENTED
- * domain restriction, not a special case for a failing input.
+ * purely numeric token such as `06`); a token with no letter would be a bare
+ * YAML integer, the ambiguous class the canary property below covers
+ * exhaustively (and which the writer now quotes — see
+ * bug-frontmatter-ambiguous-plain-scalar-loss). Keeping the letter here is a
+ * DOCUMENTED domain restriction, not a special case for a failing input.
  */
 const kebab = fc
   .tuple(kebabWordWithLetter, fc.array(kebabWord, { maxLength: 2 }))
@@ -429,79 +432,65 @@ describe("frontmatter round-trip (property)", () => {
   });
 
   /**
-   * Plain scalars the kernel's reader resolves to a NON-string: `null` / `~` ->
-   * null, `true` / `false` -> boolean, `/^-?\d+$/` -> number (`parseValue`).
+   * Plain scalars the kernel's reader would resolve to a NON-string when
+   * written bare: `null` / `~` -> null, `true` / `false` -> boolean,
+   * `/^-?\d+$/` -> number (`parseValue`).
    *
-   * THIS PROPERTY IS A BUG CANARY, and the `verdict` column says which row is
-   * which, so the distinction survives a skim:
-   *
-   * - `preserved` — a CORRECT invariant. The token's text comes back unchanged,
-   *   so the property asserts real contract here.
-   * - `lost` — CURRENT BUGGY BEHAVIOUR, pinned on purpose
-   *   (`bug-frontmatter-ambiguous-plain-scalar-loss`). A leading-zero, `-0` or
-   *   > 2^53 integer loses its text and `null` / `~` lose the field entirely:
-   *   `arggon create task "0123"` then shows `123`, and the next write bakes
-   *   `title: 123` into the file. The row asserts that wrong output so the
-   *   corruption cannot silently change shape or grow; when the bug is fixed
-   *   this property goes RED on purpose and the row is flipped to `preserved`
-   *   in the same change.
-   *
-   * `expectedText` is what the item model (`stringField`) reports on the FIRST
-   * read. Every row also asserts the correct part of the contract
-   * unconditionally: the writer and reader never throw, the loss is bounded to a
-   * single normalization (the third write is byte-identical to the second), and
-   * the body is never touched.
+   * bug-frontmatter-ambiguous-plain-scalar-loss, FIXED writer-side: the
+   * writer used to emit these tokens bare, so a string that happened to look
+   * like a null/boolean/integer lost its text on the very first read (`0123`
+   * read back as `123`, `null` lost the field entirely) and the next write
+   * baked the loss into the file. `formatScalar` now force-quotes every
+   * `AMBIGUOUS_TOKEN`, so each token below round-trips VERBATIM as a string
+   * and the FIRST write is already a fixed point. The reader is untouched:
+   * a file that already carries a bare token still parses (decoding the old
+   * way) instead of breaking existing trees.
    */
-  const AMBIGUOUS_SCALARS: ReadonlyArray<
-    readonly [token: string, expectedText: string | undefined, verdict: "preserved" | "lost"]
-  > = [
-    // --- lost: the field itself disappears (bug canary) ---
-    ["null", undefined, "lost"],
-    ["~", undefined, "lost"],
-    // --- preserved: the text survives, so this is the real contract ---
-    ["true", "true", "preserved"],
-    ["false", "false", "preserved"],
-    ["0", "0", "preserved"],
-    ["42", "42", "preserved"],
-    ["-7", "-7", "preserved"],
-    // --- lost: the integer does not survive Number() (bug canary) ---
-    ["00", "0", "lost"],
-    ["-0", "0", "lost"],
-    ["007", "7", "lost"],
-    ["0123", "123", "lost"],
-    ["-007", "-7", "lost"],
-    ["9007199254740993", "9007199254740992", "lost"],
-    ["12345678901234567890", "12345678901234567000", "lost"],
+  const AMBIGUOUS_SCALARS: readonly string[] = [
+    // null-ish (used to lose the FIELD on the first read)
+    "null",
+    "~",
+    // boolean (used to change decoded type; text survived)
+    "true",
+    "false",
+    // plain integers (used to change decoded type; text survived)
+    "0",
+    "42",
+    "-7",
+    // the measured losses: leading zeros, -0, > 2^53 integers
+    "00",
+    "-0",
+    "007",
+    "0123",
+    "-007",
+    "9007199254740993",
+    "12345678901234567890",
   ];
 
-  it("normalizes an ambiguous plain scalar exactly once, never throwing", () => {
+  it("round-trips an ambiguous plain scalar verbatim as a quoted string", () => {
     checkProperty(
       "frontmatter ambiguous scalar",
       fc.property(
         fc.constantFrom(...AMBIGUOUS_SCALARS),
         // Every field a bare token can legally land in, all read through the
         // same accessor. (The list form coerces through `String()` inside
-        // `stringArrayField` and has its own table; deps.test.ts pins that
-        // form example-based.)
+        // `stringArrayField` and is pinned example-based in
+        // cli/src/frontmatter.test.ts.)
         fc.constantFrom("title", "parent", "x-note"),
-        ([token, expectedText, verdict], carrier) => {
-          // The table is self-consistent: a `preserved` row really does read
-          // back as the token, a `lost` row really does not.
-          if (verdict === "preserved") expect(expectedText).toBe(token);
-          else expect(expectedText).not.toBe(token);
+        (token, carrier) => {
           const data: Frontmatter = { type: "task", status: "todo", id: "task-ambiguous" };
           data[carrier] = token;
           const raw1 = stringifyFrontmatter(data, "\nbody\n");
           const first = parseFrontmatter(raw1);
           const raw2 = stringifyFrontmatter(first.data, first.body);
           const second = parseFrontmatter(raw2);
-          const raw3 = stringifyFrontmatter(second.data, second.body);
 
-          // Pinned behaviour: the token's text after the first read.
-          expect(stringField(first.data, carrier)).toBe(expectedText);
-          expect(stringField(second.data, carrier)).toBe(expectedText);
-          // Bounded corruption: one write normalizes, then the bytes are stable.
-          expect(raw3).toBe(raw2);
+          // The token's text survives every read, exactly as generated.
+          expect(stringField(first.data, carrier)).toBe(token);
+          expect(stringField(second.data, carrier)).toBe(token);
+          // The first write is already the fixed point: a later mutation
+          // cannot change bytes, so no loss can ever be baked in.
+          expect(raw2).toBe(raw1);
           // The body is never touched by the ambiguity.
           expect(second.body).toBe(first.body);
         },

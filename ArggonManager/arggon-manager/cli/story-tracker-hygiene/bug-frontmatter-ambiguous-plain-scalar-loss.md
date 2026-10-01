@@ -13,6 +13,7 @@ updated: "2026-09-30"
 claimed_at: "2026-09-30T23:56:00.008Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-frontmatter-ambiguous-plain-scalar-loss
 ---
+
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/story-tracker-hygiene/bug-frontmatter-ambiguous-plain-scalar-loss.md
   Leaves live only under a story. id is the filename stem: bug-frontmatter-ambiguous-plain-scalar-loss.
@@ -28,11 +29,12 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-frontmatter-ambiguous-pla
 
 ## Acceptance
 
-- [ ] 
+- [ ]
 
 ## Notes
 
 ### 2026-09-29 @Arggon
+
 Found by the kernel property suite added in `task-fast-check-invariant-properties`
 (`lib/src/frontmatter.property.test.ts`), not by an example: a plain YAML scalar
 that resolves to a NON-STRING is written verbatim and read back as that type, so
@@ -78,21 +80,23 @@ reader would decode as a different type.
 
 ## Acceptance
 
-- [ ] `stringifyFrontmatter` quotes every plain scalar that `parseValue` would
+- [x] `stringifyFrontmatter` quotes every plain scalar that `parseValue` would
       decode to a non-string, so `parse(stringify(v))` returns the identical
       string. Minimal fix: extend the `formatScalar` force-quote predicate with
       `/^(?:~|null|true|false|-?\d+)$/`.
-- [ ] Leading-zero, `-0` and > 2^53 integer strings, plus `null` and `~`, survive
+- [x] Leading-zero, `-0` and > 2^53 integer strings, plus `null` and `~`, survive
       parse -> serialize -> parse byte-identically (an example-based test per
       concrete token, or the property canary below updated in the same change).
-- [ ] `parseFrontmatter` keeps tolerating files already written with a bare token
+- [x] `parseFrontmatter` keeps tolerating files already written with a bare token
       (no hard break for existing trees); the fix is writer-side only.
-- [ ] The `isRotationWithOneDuplicate`-style canary in
+- [x] The `isRotationWithOneDuplicate`-style canary in
       `lib/src/frontmatter.property.test.ts` ("frontmatter ambiguous scalar") is
       updated together with the fix — its pinned expectations encode today's loss.
-- [ ] Decide explicitly whether `true` / `false` are quoted too: their text is
+- [x] Decide explicitly whether `true` / `false` are quoted too: their text is
       preserved today, but the parsed value changes type, which matters for
-      `x-*` pass-through extras.
+      `x-*` pass-through extras. DECISION: quoted too (in `AMBIGUOUS_TOKEN`) —
+      a bare `true` reads back as boolean, silently retyping `x-*` extras;
+      quoting keeps text AND decoded type stable across read/write.
 
 ## Property evidence
 
