@@ -4,11 +4,20 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   claimCommitFaults,
+  codemodeCommentScript,
+  executeCallFaults,
   installDrift,
   installFingerprint,
   isInside,
+  moveLegFaults,
+  type MoveLegObservation,
   NATIVE_RECEIPT_LIMITS,
   receiptOverBudget,
+  servePassword,
+  servePort,
+  serveRegisteredTools,
+  startScriptedProvider,
+  type ScriptedRound,
 } from "./native-start-cold-smoke.js";
 
 // Unit tests for the harness's pure predicates — the same split as
@@ -190,5 +199,184 @@ describe("native-start-cold-smoke: receiptOverBudget", () => {
     const over = receiptOverBudget(receipt);
     expect(over).toHaveLength(1);
     expect(over[0]).toContain(`bytes (max ${NATIVE_RECEIPT_LIMITS.maxBytes})`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Move leg helpers (task-native-session-move-smoke-leg)
+// ---------------------------------------------------------------------------
+
+describe("native-start-cold-smoke: codemodeCommentScript", () => {
+  it("inlines the arguments as JSON, so quoting survives any content", () => {
+    const script = codemodeCommentScript("task-x", `quote " backslash \\ newline-free`);
+    expect(script).toBe(
+      `return await tools.arggon.comment({"id":"task-x","text":"quote \\" backslash \\\\ newline-free"});`,
+    );
+    expect(script).not.toContain("\n");
+  });
+});
+
+describe("native-start-cold-smoke: serve log parsers", () => {
+  it("extracts the password and the printed port from the serve stdout", () => {
+    const log = [
+      "server listening on http://127.0.0.1:41234",
+      "server password in2rsXd9g-TZgNSGfQwWUdh8TEksUbVHdncz3XW3oQY",
+    ].join("\n");
+    expect(servePassword(log)).toBe("in2rsXd9g-TZgNSGfQwWUdh8TEksUbVHdncz3XW3oQY");
+    expect(servePort(log)).toBe(41234);
+  });
+
+  it("returns undefined for a log that never became ready", () => {
+    expect(servePassword("starting up\n")).toBeUndefined();
+    expect(servePort("starting up\n")).toBeUndefined();
+    expect(servePort("server listening on http://127.0.0.1:notaport\n")).toBeUndefined();
+  });
+
+  it("reads the plugin registration count from the log", () => {
+    expect(serveRegisteredTools("[arggon] tools: registered 15 native arggon tools (namespace)")).toBe(15);
+    expect(serveRegisteredTools("no registration yet")).toBeUndefined();
+  });
+});
+
+describe("native-start-cold-smoke: executeCallFaults", () => {
+  const code = codemodeCommentScript("task-x", "evidence");
+
+  it("accepts exactly one execute round carrying the script, closed by a text round", () => {
+    const rounds: ScriptedRound[] = [
+      { call: 1, offers: [], action: { kind: "text" } },
+      { call: 2, offers: ["execute"], action: { kind: "tool", name: "execute", arguments: { code } } },
+      { call: 3, offers: ["execute"], action: { kind: "text" } },
+    ];
+    expect(executeCallFaults(rounds, code)).toEqual([]);
+  });
+
+  it("reports a missing script, a wrong tool name and a loop that never closed", () => {
+    const wrongCode: ScriptedRound[] = [
+      { call: 1, offers: ["execute"], action: { kind: "tool", name: "execute", arguments: { code: "other" } } },
+      { call: 2, offers: ["execute"], action: { kind: "text" } },
+    ];
+    expect(executeCallFaults(wrongCode, code)).toEqual([
+      "the execute round did not carry the expected Code Mode script",
+    ]);
+    const wrongName: ScriptedRound[] = [
+      { call: 1, offers: ["shell"], action: { kind: "tool", name: "shell", arguments: {} } },
+      { call: 2, offers: ["shell"], action: { kind: "text" } },
+    ];
+    expect(executeCallFaults(wrongName, code)).toContain("tool round called shell, expected execute");
+    // A tool round with no closing text round: the agent loop never closed.
+    expect(executeCallFaults([
+      { call: 1, offers: ["execute"], action: { kind: "tool", name: "execute", arguments: { code } } },
+    ], code)).toContain("no final text round: the agent loop never closed");
+    expect(executeCallFaults([{ call: 1, offers: ["execute"], action: { kind: "text" } }], code)).toContain(
+      "expected exactly 1 tool round, observed 0",
+    );
+  });
+});
+
+describe("native-start-cold-smoke: moveLegFaults", () => {
+  const good: MoveLegObservation = {
+    branch: "feat/task-x",
+    worktreeSubjects: ["chore(tasks): commented task-x", "chore: fixture"],
+    commitPaths: ["ArggonManager/a/b/task-x.md"],
+    commitText: "## Notes\n\nmove-leg scripted evidence\n",
+    gateMarker: "move gate ran in /tmp/wt",
+    primaryHeadBefore: "aaa",
+    primaryHeadAfter: "aaa",
+    primaryPorcelainBefore: "",
+    primaryPorcelainAfter: "",
+    primarySubjects: ["chore: fixture"],
+    worktreePath: "/tmp/wt",
+    expectedBranch: "feat/task-x",
+    expectedSubject: "chore(tasks): commented task-x",
+    expectedItemPath: "ArggonManager/a/b/task-x.md",
+    expectedText: "move-leg scripted evidence",
+  };
+
+  it("accepts the invariant holding: worktree commit, gate in the worktree, primary untouched", () => {
+    expect(moveLegFaults(good)).toEqual([]);
+  });
+
+  it("reports the P1 signature: the comment commit landing on the primary's branch", () => {
+    expect(
+      moveLegFaults({ ...good, primarySubjects: ["chore(tasks): commented task-x", "chore: fixture"] }),
+    ).toEqual(["the P1 signature: the comment commit landed on the primary's branch"]);
+  });
+
+  it("reports a moved primary, a dirty primary and a wrong branch/paths/missing gate", () => {
+    expect(moveLegFaults({ ...good, primaryHeadAfter: "bbb" })).toEqual([
+      "primary HEAD moved: aaa -> bbb",
+    ]);
+    expect(moveLegFaults({ ...good, primaryPorcelainAfter: "?? x\n" })).toHaveLength(1);
+    expect(moveLegFaults({ ...good, branch: "main" })[0]).toContain("worktree is on main");
+    expect(moveLegFaults({ ...good, commitPaths: ["a.txt", "b.txt"] })[0]).toContain(
+      "expected only ArggonManager/a/b/task-x.md",
+    );
+    expect(moveLegFaults({ ...good, gateMarker: "move gate ran in /tmp/other" })[0]).toContain(
+      "expected the hook to run in the worktree",
+    );
+    expect(moveLegFaults({ ...good, commitText: "unrelated" })[0]).toContain(
+      "does not carry the scripted comment",
+    );
+    expect(moveLegFaults({ ...good, worktreeSubjects: ["chore: fixture"] })[0]).toContain(
+      'no "chore(tasks): commented task-x" commit',
+    );
+  });
+});
+
+describe("native-start-cold-smoke: startScriptedProvider", () => {
+  it("answers a tools-offered round with one execute tool call and closes on the tool result", async () => {
+    const provider = await startScriptedProvider({ id: "task-x", text: "evidence" });
+    try {
+      const post = (body: unknown): Promise<string> =>
+        fetch(`http://127.0.0.1:${provider.port}/v1/chat/completions`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        }).then((response) => response.text());
+
+      const toolRound = await post({
+        model: "cold-move-model",
+        stream: true,
+        tools: [{ type: "function", function: { name: "execute" } }],
+        messages: [{ role: "user", content: "go" }],
+      });
+      expect(toolRound).toContain("chat.completion.chunk");
+      expect(toolRound).toContain('"finish_reason":"tool_calls"');
+      expect(toolRound).toContain("data: [DONE]");
+      // Parse the SSE stream and assert on the actual tool call the host would
+      // execute — the script rides double-JSON-encoded in the raw bytes.
+      const toolCalls = toolRound
+        .split("\n")
+        .filter((line) => line.startsWith("data: ") && !line.includes("[DONE]"))
+        .map((line) => JSON.parse(line.slice("data: ".length)) as {
+          choices?: Array<{ delta?: { tool_calls?: Array<{ function?: { name?: string; arguments?: string } }> } }>;
+        })
+        .flatMap((chunk) => chunk.choices?.[0]?.delta?.tool_calls ?? []);
+      expect(toolCalls).toHaveLength(1);
+      expect(toolCalls[0]?.function?.name).toBe("execute");
+      expect(JSON.parse(toolCalls[0]?.function?.arguments ?? "{}")).toEqual({
+        code: codemodeCommentScript("task-x", "evidence"),
+      });
+
+      const finalRound = await post({
+        model: "cold-move-model",
+        stream: true,
+        tools: [{ type: "function", function: { name: "execute" } }],
+        messages: [
+          { role: "user", content: "go" },
+          { role: "tool", content: "ok" },
+        ],
+      });
+      expect(finalRound).toContain('"finish_reason":"stop"');
+      expect(finalRound).toContain("scripted done");
+
+      const rounds = provider.rounds();
+      expect(rounds).toHaveLength(2);
+      expect(rounds[0]?.action.kind).toBe("tool");
+      expect(rounds[1]?.action.kind).toBe("text");
+      expect(executeCallFaults(rounds, codemodeCommentScript("task-x", "evidence"))).toEqual([]);
+    } finally {
+      await provider.close();
+    }
   });
 });

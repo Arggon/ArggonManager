@@ -64,7 +64,27 @@
  *    with the shipped strict reason — the not-attempted receipt names the
  *    offending bin, its observed source and the `npm ci` fix, the worktree is
  *    kept for the remediation, and the item copy stays unclaimed;
- * 6. teardown removes the worktrees, their git registrations and the whole
+ * 6. the MOVE leg (task-native-session-move-smoke-leg): a REAL OpenCode server
+ *    (`opencode serve`, skipped when the binary is absent — CI) hosts a session
+ *    on a fourth fixture, `POST /api/session/{id}/move` moves it into an item
+ *    worktree, and a SCRIPTED provider (an in-process OpenAI-compatible SSE
+ *    server returning canned responses — deterministic, model-free) drives the
+ *    session's agent loop through one Code Mode `execute` call running the
+ *    native `tools.arggon.comment`. The assertions are behavioral: the host's
+ *    own session record answers `location.directory` with the worktree, the
+ *    comment commit lands on the item branch IN THE WORKTREE (gate marker
+ *    proving the pre-commit hook ran there), and the primary checkout is
+ *    untouched — the exact failure the pre-fix code shipped (commits on the
+ *    primary's `main`: d24215b9, b65ef7c6, adacc20a). The negative direction
+ *    drives the REAL plugin resolver (`sessionDirectoryResolver` +
+ *    `resolveToolCwd`) with the host's observed no-record shape for an unknown
+ *    session: a typed `SESSION_ROOT_UNRESOLVED` refusal and nothing written.
+ *    What stays simulated is documented on the item: the host cannot carry a
+ *    tool call for a session it has no record of, so the refusal is driven at
+ *    the plugin seam with the host's observed absence, not through a live tool
+ *    call; the scripted provider stands in for the model's DECISION, while the
+ *    session, the move, the tool execution and the commit are all real.
+ * 7. teardown removes the worktrees, their git registrations and the whole
  *    disposable root, and the bounded receipts are asserted along the way.
  *
  * Exit codes: 0 passed; 1 a check failed (the fixture is kept for inspection);
@@ -73,14 +93,15 @@
  * fixture on success too.
  *
  * Pure helpers (`isInside`, `installFingerprint`, `installDrift`,
- * `claimCommitFaults`, `receiptOverBudget`) are exported for
- * `smoke/native-start-cold-smoke.test.ts`; the scenario only runs when this
+ * `claimCommitFaults`, `receiptOverBudget`, the move-leg helpers) are exported
+ * for `smoke/native-start-cold-smoke.test.ts`; the scenario only runs when this
  * file is the process entrypoint.
  */
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   chmodSync,
+  copyFileSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -93,6 +114,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+import { createServer as createHttpServer, type Server } from "node:http";
 import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -124,6 +146,298 @@ const WORKSPACE_DIR = "libx";
 const SEQUENTIAL_COLD_STARTS = 5;
 const KEEP = process.env.ARGON_NATIVE_START_SMOKE_KEEP === "1";
 const PROJECT_ID = "cold-smoke-project";
+
+// ---------------------------------------------------------------------------
+// Move leg (section 6, task-native-session-move-smoke-leg)
+// ---------------------------------------------------------------------------
+
+/** The item the move leg claims a worktree branch for. */
+const MOVE_ITEM_ID = "task-cold-move-leg";
+/** Branch the convention generates for it. */
+const MOVE_BRANCH = `feat/${MOVE_ITEM_ID}`;
+/** The scripted provider's model id, declared in the fixture's opencode.json. */
+const MOVE_MODEL_ID = "cold-move-model";
+/** Provider id the fixture config declares for the scripted provider. */
+const MOVE_PROVIDER_ID = "scripted";
+/** Marker the move fixture's trivial gate appends to, proving it ran. */
+const MOVE_GATE_MARKER = ".move-gate-ran";
+/** Commit subject the kernel writes for a native comment. */
+const MOVE_COMMENT_SUBJECT = `chore(tasks): commented ${MOVE_ITEM_ID}`;
+/** Bounded waits: the host answers in seconds when healthy. */
+const MOVE_SERVE_TIMEOUT_MS = 30_000;
+const MOVE_PROMPT_TIMEOUT_MS = 90_000;
+const MOVE_POLL_INTERVAL_MS = 250;
+/** A session id the host has no record of (the negative leg's probe). */
+const MOVE_UNKNOWN_SESSION = "ses-cold-smoke-unknown";
+
+/**
+ * The move fixture's pre-commit gate: trivially passing, but it records the
+ * directory it ran in — so the comment commit proves the hook executed inside
+ * the worktree, not in the primary.
+ */
+const MOVE_GATE_SCRIPT = [
+  "#!/bin/sh",
+  `# task-native-start-cold-smoke move leg: a real, marker-writing gate.`,
+  `printf 'move gate ran in %s\\n' "$PWD" >> ${MOVE_GATE_MARKER}`,
+  "exit 0",
+  "",
+].join("\n");
+
+/**
+ * The Code Mode script the scripted provider submits through the host's
+ * `execute` tool: one native committing call, `tools.arggon.comment`, with the
+ * arguments inlined as JSON (so quoting survives any content).
+ */
+export function codemodeCommentScript(id: string, text: string): string {
+  return `return await tools.arggon.comment(${JSON.stringify({ id, text })});`;
+}
+
+/** `server password …` line from `opencode serve` stdout. */
+export function servePassword(log: string): string | undefined {
+  return /server password (\S+)/.exec(log)?.[1];
+}
+
+/** `server listening on http://127.0.0.1:PORT` line from the serve stdout. */
+export function servePort(log: string): number | undefined {
+  const raw = /server listening on http:\/\/127\.0\.0\.1:(\d+)/.exec(log)?.[1];
+  const port = raw === undefined ? undefined : Number(raw);
+  return port !== undefined && Number.isInteger(port) && port > 0 ? port : undefined;
+}
+
+/** `[arggon] tools: registered N native arggon tools` — the real plugin ran. */
+export function serveRegisteredTools(log: string): number | undefined {
+  const raw = /registered (\d+) native arggon tools/.exec(log)?.[1];
+  const count = raw === undefined ? undefined : Number(raw);
+  return count !== undefined && Number.isInteger(count) && count >= 0 ? count : undefined;
+}
+
+/** One scripted-provider round: what the host offered and what it answered. */
+export type ScriptedRound = {
+  call: number;
+  offers: string[];
+  action:
+    | { kind: "tool"; name: string; arguments: { code?: string } }
+    | { kind: "text" };
+};
+
+/**
+ * Faults in the recorded provider rounds (empty = the scripted drive was
+ * exactly one `execute` round carrying the native comment script, then a final
+ * text round that closed the agent loop).
+ */
+export function executeCallFaults(rounds: ScriptedRound[], expectedCode: string): string[] {
+  const faults: string[] = [];
+  const tool = rounds.filter(
+    (round): round is ScriptedRound & { action: { kind: "tool"; name: string; arguments: { code?: string } } } =>
+      round.action.kind === "tool",
+  );
+  if (tool.length !== 1) {
+    faults.push(`expected exactly 1 tool round, observed ${tool.length}`);
+  }
+  const execute = tool[0];
+  if (execute !== undefined) {
+    if (execute.action.name !== "execute") {
+      faults.push(`tool round called ${execute.action.name}, expected execute`);
+    }
+    if (execute.action.arguments.code !== expectedCode) {
+      faults.push("the execute round did not carry the expected Code Mode script");
+    }
+  }
+  const lastText = [...rounds].reverse().find((round) => round.action.kind === "text");
+  if (lastText === undefined) {
+    faults.push("no final text round: the agent loop never closed");
+  } else if (execute !== undefined && lastText.call < execute.call) {
+    faults.push("the final text round preceded the tool round");
+  }
+  return faults;
+}
+
+/** Everything the move-leg assertions read out of git and the host. */
+export type MoveLegObservation = {
+  /** Branch checked out in the worktree. */
+  branch: string;
+  /** The commit subjects on that branch. */
+  worktreeSubjects: string[];
+  /** Paths of the comment commit. */
+  commitPaths: string[];
+  /** The item file's content as the commit left it. */
+  commitText: string;
+  /** The gate marker's content inside the worktree. */
+  gateMarker: string | undefined;
+  /** The primary's branch head before/after the leg. */
+  primaryHeadBefore: string;
+  primaryHeadAfter: string;
+  /** The primary's porcelain status before/after the leg. */
+  primaryPorcelainBefore: string;
+  primaryPorcelainAfter: string;
+  /** Subjects on the primary's branch (the P1 signature lands here). */
+  primarySubjects: string[];
+  /** Where the gate was expected to have run. */
+  worktreePath: string;
+  /** Expected values. */
+  expectedBranch: string;
+  expectedSubject: string;
+  expectedItemPath: string;
+  expectedText: string;
+};
+
+/** Faults in a move-leg observation (empty = the invariant held). */
+export function moveLegFaults(o: MoveLegObservation): string[] {
+  const faults: string[] = [];
+  if (o.branch !== o.expectedBranch) {
+    faults.push(`worktree is on ${o.branch}, expected ${o.expectedBranch}`);
+  }
+  if (!o.worktreeSubjects.includes(o.expectedSubject)) {
+    faults.push(`no "${o.expectedSubject}" commit on the worktree branch`);
+  }
+  const paths = o.commitPaths.filter((path) => path !== "");
+  if (paths.length !== 1 || paths[0] !== o.expectedItemPath) {
+    faults.push(`commit touches [${paths.join(", ")}], expected only ${o.expectedItemPath}`);
+  }
+  if (!o.commitText.includes(o.expectedText)) {
+    faults.push("the committed item file does not carry the scripted comment");
+  }
+  if (o.gateMarker !== `move gate ran in ${o.worktreePath}`) {
+    faults.push(`gate marker is ${JSON.stringify(o.gateMarker)}, expected the hook to run in the worktree`);
+  }
+  if (o.primaryHeadBefore !== o.primaryHeadAfter) {
+    faults.push(`primary HEAD moved: ${o.primaryHeadBefore} -> ${o.primaryHeadAfter}`);
+  }
+  if (o.primaryPorcelainBefore !== o.primaryPorcelainAfter) {
+    faults.push(
+      `primary porcelain changed:\nbefore: ${JSON.stringify(o.primaryPorcelainBefore)}\nafter: ${JSON.stringify(o.primaryPorcelainAfter)}`,
+    );
+  }
+  if (o.primarySubjects.includes(o.expectedSubject)) {
+    faults.push("the P1 signature: the comment commit landed on the primary's branch");
+  }
+  return faults;
+}
+
+/**
+ * The scripted provider: an in-process OpenAI-compatible STREAMING chat
+ * completions server with a two-round state machine — the first round that is
+ * offered tools gets one `execute` tool call carrying the Code Mode script
+ * (the native committing comment); any round that already carries a tool
+ * result gets the closing text; requests without tools (session title
+ * generation) get plain text. No model, no outbound network: the host
+ * connects to 127.0.0.1.
+ */
+export type ScriptedProvider = {
+  port: number;
+  target: { id: string; text: string };
+  /** The rounds the host drove, in order. */
+  rounds(): ScriptedRound[];
+  close(): Promise<void>;
+};
+
+export function startScriptedProvider(target: { id: string; text: string }): Promise<ScriptedProvider> {
+  const rounds: ScriptedRound[] = [];
+  let call = 0;
+  const server: Server = createHttpServer((req, res) => {
+    let body = "";
+    req.on("data", (chunk: string) => (body += chunk));
+    req.on("end", () => {
+      call += 1;
+      const parsed = body === "" ? {} : (JSON.parse(body) as Record<string, unknown>);
+      const stream = parsed.stream === true;
+      const messages = (parsed.messages ?? []) as Array<{ role?: string }>;
+      const offers = ((parsed.tools ?? []) as Array<{ function?: { name?: string }; name?: string }>)
+        .map((tool) => tool?.function?.name ?? tool?.name)
+        .filter((name): name is string => typeof name === "string");
+      const hasToolResult = messages.some((message) => message.role === "tool");
+      const action: ScriptedRound["action"] =
+        offers.length > 0 && !hasToolResult
+          ? {
+              kind: "tool",
+              name: "execute",
+              arguments: { code: codemodeCommentScript(target.id, target.text) },
+            }
+          : { kind: "text" };
+      rounds.push({ call, offers, action });
+
+      const id = `chatcmpl-scripted-${call}`;
+      const created = Math.floor(Date.now() / 1000);
+      const model = typeof parsed.model === "string" ? parsed.model : MOVE_MODEL_ID;
+      res.writeHead(200, {
+        "content-type": stream ? "text/event-stream" : "application/json",
+        "cache-control": "no-cache",
+        connection: "keep-alive",
+      });
+      const chunk = (delta: Record<string, unknown>, finish: string | null): void => {
+        res.write(
+          `data: ${JSON.stringify({
+            id,
+            object: "chat.completion.chunk",
+            created,
+            model,
+            choices: [{ index: 0, delta, finish_reason: finish }],
+          })}\n\n`,
+        );
+      };
+      if (!stream) {
+        res.end(
+          JSON.stringify({
+            id,
+            object: "chat.completion",
+            created,
+            model,
+            choices: [
+              {
+                index: 0,
+                message: { role: "assistant", content: "scripted" },
+                finish_reason: "stop",
+              },
+            ],
+            usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+          }),
+        );
+        return;
+      }
+      if (action.kind === "tool") {
+        chunk({ role: "assistant", content: null }, null);
+        chunk(
+          {
+            role: "assistant",
+            tool_calls: [
+              {
+                index: 0,
+                id: `call_scripted_${call}`,
+                type: "function",
+                function: { name: action.name, arguments: JSON.stringify(action.arguments) },
+              },
+            ],
+          },
+          null,
+        );
+        chunk({}, "tool_calls");
+      } else {
+        chunk({ role: "assistant", content: "scripted done" }, null);
+        chunk({}, "stop");
+      }
+      res.write("data: [DONE]\n\n");
+      res.end();
+    });
+  });
+  return new Promise((resolvePromise, rejectPromise) => {
+    server.once("error", rejectPromise);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      const port =
+        address !== null && typeof address === "object" ? address.port : undefined;
+      if (port === undefined) {
+        rejectPromise(new Error("the scripted provider could not bind a port"));
+        return;
+      }
+      resolvePromise({
+        port,
+        target,
+        rounds: () => rounds.map((round) => structuredClone(round)),
+        close: () => new Promise((done) => server.close(() => done())),
+      });
+    });
+  });
+}
 
 /**
  * The gate installed in the fixture's primary checkout. It resolves a package
@@ -509,6 +823,501 @@ function check(report: Report, name: string, ok: boolean, detail?: string): void
     ok || detail === undefined ? "" : `\n      ${detail.split("\n").slice(0, 8).join("\n      ")}`;
   console.log(`${ok ? "  ok  " : "  FAIL"} ${name}${suffix}`);
   if (!ok) report.passed = false;
+}
+
+// ---------------------------------------------------------------------------
+// The move leg (section 6): a real OpenCode server hosts a session, moves it
+// into an item worktree, and a scripted (model-free) provider drives one
+// committing native tool call through the host's agent loop.
+// ---------------------------------------------------------------------------
+
+type PluginModule = typeof import("../opencode/plugins/arggon/index.js");
+type RunInit = (input: { dir: string; force: boolean }) => unknown;
+
+/** `opencode --version` succeeds → the binary is usable. */
+function opencodeBinary(): string | undefined {
+  const probe = spawnSync("opencode", ["--version"], { encoding: "utf8", timeout: 30_000 });
+  return probe.error === undefined && probe.status === 0 ? "opencode" : undefined;
+}
+
+/** A free localhost port (bound and released; the serve spawn re-binds it). */
+function freePort(): Promise<number> {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const server = createHttpServer();
+    server.once("error", rejectPromise);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      const port = address !== null && typeof address === "object" ? address.port : undefined;
+      server.close(() => {
+        if (port === undefined) rejectPromise(new Error("no free port"));
+        else resolvePromise(port);
+      });
+    });
+  });
+}
+
+type ApiResponse = { status: number; json: unknown };
+
+/** One authenticated call against the fixture's OpenCode server. */
+async function opencodeApi(
+  base: string,
+  password: string,
+  method: "GET" | "POST" | "DELETE",
+  path: string,
+  body?: unknown,
+): Promise<ApiResponse> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const response = await fetch(`${base}${path}`, {
+      method,
+      headers: {
+        authorization: `Basic ${Buffer.from(`opencode:${password}`).toString("base64")}`,
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
+      },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      signal: controller.signal,
+    });
+    const text = await response.text();
+    let json: unknown = undefined;
+    if (text !== "") {
+      try {
+        json = JSON.parse(text) as unknown;
+      } catch {
+        json = text;
+      }
+    }
+    return { status: response.status, json };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Bounded polling for an eventually-consistent observation. */
+async function pollUntil(
+  predicate: () => boolean | Promise<boolean>,
+  timeoutMs: number,
+  intervalMs: number,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (await predicate()) return true;
+    if (Date.now() + intervalMs > deadline) return predicate() instanceof Promise ? await predicate() : predicate();
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, intervalMs));
+  }
+}
+
+type ServingOpenCode = {
+  child: ReturnType<typeof spawn>;
+  base: string;
+  password: string;
+  /** The accumulated stdout+stderr, updated as the child prints. */
+  logText(): string;
+};
+
+/** Spawn `opencode serve` in the fixture and wait for the auth + URL lines. */
+async function serveOpenCode(
+  bin: string,
+  cwd: string,
+  port: number,
+  env: NodeJS.ProcessEnv,
+): Promise<ServingOpenCode> {
+  const child = spawn(bin, ["serve", "--hostname", "127.0.0.1", "--port", String(port)], {
+    cwd,
+    env,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  // The holder is mutated by the data handlers, so readers via logText() see
+  // the live output instead of the snapshot from spawn time.
+  const acc = { text: "" };
+  const append = (chunk: Buffer): void => {
+    acc.text += chunk.toString();
+    if (acc.text.length > 256 * 1024) acc.text = acc.text.slice(-128 * 1024);
+  };
+  child.stdout.on("data", append);
+  child.stderr.on("data", append);
+  const ready = await pollUntil(
+    () => servePassword(acc.text) !== undefined && servePort(acc.text) !== undefined,
+    MOVE_SERVE_TIMEOUT_MS,
+    100,
+  );
+  if (!ready) {
+    child.kill("SIGTERM");
+    throw new Error(`opencode serve did not become ready within ${MOVE_SERVE_TIMEOUT_MS}ms\nlog: ${acc.text.slice(-2_000)}`);
+  }
+  const printedPort = servePort(acc.text);
+  if (printedPort !== port) {
+    child.kill("SIGTERM");
+    throw new Error(`opencode serve printed port ${printedPort}, expected ${port}\nlog: ${acc.text.slice(-2_000)}`);
+  }
+  return { child, base: `http://127.0.0.1:${port}`, password: servePassword(acc.text) ?? "", logText: () => acc.text };
+}
+
+/** Bounded, readable transcript tail for a failed prompt wait. */
+async function transcriptDetail(
+  base: string,
+  password: string,
+  sessionID: string,
+): Promise<string> {
+  try {
+    const { json } = await opencodeApi(base, password, "GET", `/api/session/${sessionID}/message`);
+    const data = (json as { data?: Array<Record<string, unknown>> } | undefined)?.data ?? [];
+    const lines: string[] = [];
+    for (const message of data.slice(-6)) {
+      for (const part of (message.parts ?? []) as Array<Record<string, unknown>>) {
+        if (part.type === "tool") {
+          const state = (part.state ?? {}) as Record<string, unknown>;
+          lines.push(
+            `tool ${String(part.tool)}: ${String(state.status)} ${JSON.stringify(state.error ?? "")}`.slice(0, 300),
+          );
+        } else if (part.type === "text") {
+          lines.push(`text: ${String(part.text).slice(0, 120)}`);
+        }
+      }
+      const error = message.error as Record<string, unknown> | undefined;
+      if (error !== undefined && error !== null) {
+        lines.push(`message error: ${JSON.stringify(error).slice(0, 300)}`);
+      }
+    }
+    return lines.join("\n");
+  } catch (error) {
+    return `transcript unavailable: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+/** The whole move leg; every check lands on `report`. */
+async function runMoveLeg(
+  report: Report,
+  deps: {
+    bin: string;
+    parent: string;
+    kernel: ArgonKernel;
+    plugin: PluginModule;
+    runInit: RunInit;
+  },
+): Promise<void> {
+  const { bin, parent, kernel, plugin, runInit } = deps;
+  const { runCreate } = kernel;
+  const { sessionDirectoryResolver, resolveToolCwd, SESSION_ROOT_UNRESOLVED } = plugin;
+  const repoMove = join(parent, "repo-move");
+  const worktree = join(parent, `repo-move-${MOVE_ITEM_ID}`);
+  const moveText = `move-leg scripted evidence ${Date.now()}`;
+  const expectedCode = codemodeCommentScript(MOVE_ITEM_ID, moveText);
+  const itemRelPath = (() => {
+    runInit({ dir: repoMove, force: false });
+    const chain: Array<[string, string, string | undefined, string]> = [
+      ["initiative", "Move leg", undefined, "move-leg-initiative"],
+      ["epic", "Real host", "move-leg-initiative", "real-host"],
+      ["story", "Moved sessions", "real-host", "moved-sessions"],
+      ["task", "Session move smoke leg", "moved-sessions", MOVE_ITEM_ID],
+    ];
+    for (const [type, title, parentId, id] of chain) {
+      runCreate({
+        cwd: repoMove,
+        type: type as "initiative" | "epic" | "story" | "task",
+        title,
+        ...(parentId !== undefined ? { parent: parentId } : {}),
+        ...(id !== "" ? { id } : {}),
+      });
+    }
+    const found = findItemFile(repoMove, MOVE_ITEM_ID);
+    if (found === null) throw new Error(`seeded item ${MOVE_ITEM_ID}.md not found in the move fixture`);
+    return relative(repoMove, found).split(sep).join("/");
+  })();
+
+  const provider = await startScriptedProvider({ id: MOVE_ITEM_ID, text: moveText });
+  let serve: ServingOpenCode | undefined;
+  let sessionID: string | undefined;
+  try {
+    // The fixture: tracker + trivial marker gate + the vendored plugin bundle
+    // (check:plugin keeps it derived from this checkout's source) + the
+    // scripted provider config + the item worktree on its branch.
+    gitOrThrow(repoMove, ["init", "-q", "-b", "main"]);
+    gitOrThrow(repoMove, ["config", "user.email", "cold-smoke@example.test"]);
+    gitOrThrow(repoMove, ["config", "user.name", "Cold Start Smoke"]);
+    gitOrThrow(repoMove, ["config", "maintenance.auto", "false"]);
+    writePreCommitGate(repoMove, MOVE_GATE_SCRIPT);
+    const pluginDir = join(repoMove, ".opencode", "plugins", "arggon");
+    mkdirSync(pluginDir, { recursive: true });
+    copyFileSync(
+      fileURLToPath(new URL("../opencode/plugins/arggon/index.bundle.ts", import.meta.url)),
+      join(pluginDir, "index.ts"),
+    );
+    writeFileSync(
+      join(repoMove, "opencode.json"),
+      `${JSON.stringify(
+        {
+          $schema: "https://opencode.ai/config.json",
+          provider: {
+            [MOVE_PROVIDER_ID]: {
+              npm: "@ai-sdk/openai-compatible",
+              name: "Scripted",
+              options: { baseURL: `http://127.0.0.1:${provider.port}/v1`, apiKey: "sk-scripted" },
+              models: { [MOVE_MODEL_ID]: { name: "Scripted Model" } },
+            },
+          },
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
+    gitOrThrow(repoMove, ["add", "-A"]);
+    gitOrThrow(repoMove, ["commit", "-qm", "chore: move-leg fixture (plugin + scripted provider)"]);
+    gitOrThrow(repoMove, ["worktree", "add", "-b", MOVE_BRANCH, worktree]);
+    check(
+      report,
+      "the move fixture carries the vendored plugin and its worktree is on the item branch",
+      existsSync(join(worktree, ".opencode", "plugins", "arggon", "index.ts")) &&
+        gitOrThrow(worktree, ["rev-parse", "--abbrev-ref", "HEAD"]).trim() === MOVE_BRANCH,
+      `worktree: ${worktree}`,
+    );
+
+    // The primary's invariant baseline, taken before the host does anything.
+    const primaryHeadBefore = gitOrThrow(repoMove, ["rev-parse", "HEAD"]).trim();
+    const primaryPorcelainBefore = gitOrThrow(repoMove, [
+      "status",
+      "--porcelain",
+      "--untracked-files=all",
+    ]);
+    const primarySubjectsBefore = gitOrThrow(repoMove, ["log", "--format=%s", "refs/heads/main"])
+      .split("\n")
+      .map((line) => line.trim());
+
+    // The bin shim: the plugin's CLI fallbacks (item views) resolve THIS
+    // checkout's CLI, like smoke:opencode's fixtures do.
+    const binDir = join(parent, "move-bin");
+    mkdirSync(binDir, { recursive: true });
+    const shim = join(binDir, "arggon");
+    writeFileSync(
+      shim,
+      `#!/bin/sh\nexec "${process.execPath}" "${join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs")}" "${join(repoRoot, "cli", "src", "cli.ts")}" "$@"\n`,
+      "utf8",
+    );
+    chmodSync(shim, 0o755);
+
+    const port = await freePort();
+    serve = await serveOpenCode(bin, repoMove, port, {
+      ...process.env,
+      ARGON_ITEM: undefined,
+      PWD: repoMove,
+      PATH: `${binDir}:${process.env.PATH ?? ""}`,
+    });
+    const { base, password } = serve;
+
+    // 1. a real session on the primary checkout.
+    const created = await opencodeApi(base, password, "POST", "/api/session", {
+      model: { providerID: MOVE_PROVIDER_ID, id: MOVE_MODEL_ID },
+      location: { directory: repoMove },
+    });
+    sessionID = (created.json as { data?: { id?: string } } | undefined)?.data?.id;
+    if (sessionID === undefined) {
+      check(report, "the real OpenCode server hosts a session rooted at the fixture primary", false, `status ${created.status}`);
+      return;
+    }
+    const readLocation = async (): Promise<string | undefined> => {
+      const view = await opencodeApi(base, password, "GET", `/api/session/${sessionID}`);
+      return (view.json as { data?: { location?: { directory?: string } } })?.data?.location
+        ?.directory;
+    };
+    const locationBefore = await readLocation();
+    check(
+      report,
+      "the real OpenCode server hosts a session rooted at the fixture primary",
+      created.status === 200 && locationBefore === repoMove,
+      `status ${created.status}\nsession ${sessionID}\nlocation: ${String(locationBefore)}`,
+    );
+
+    // 2. the real move: the host re-roots the session into the worktree. The
+    // re-rooting is also what loads the moved project's plugin (the
+    // registration line follows the move, not the create — observed on
+    // 2.0.21), so its check comes after this.
+    const moved = await opencodeApi(base, password, "POST", `/api/session/${sessionID}/move`, {
+      directory: worktree,
+    });
+    // The move is eventually consistent server-side: poll the record briefly
+    // instead of racing the first read.
+    await pollUntil(async () => (await readLocation()) === worktree, 10_000, 200);
+    const locationAfter = await readLocation();
+    check(
+      report,
+      "the host moved the session and its record answers location.directory with the worktree (the link resolveToolCwd reads per call)",
+      moved.status === 204 && locationAfter === worktree,
+      `move status ${moved.status}\nlocation: ${String(locationAfter)}\nexpected: ${worktree}`,
+    );
+    const registered = await pollUntil(
+      () => serveRegisteredTools(serve.logText()) !== undefined,
+      15_000,
+      200,
+    );
+    check(
+      report,
+      "the real host loaded the vendored plugin and registered the native tools",
+      registered && serveRegisteredTools(serve.logText()) !== undefined,
+      `registered: ${String(serveRegisteredTools(serve.logText()))}`,
+    );
+
+    // 3. the scripted drive: one Code Mode execute round calling the native
+    // comment tool, then the closing text round.
+    const primaryHeadAtPrompt = gitOrThrow(repoMove, ["rev-parse", "HEAD"]).trim();
+    await opencodeApi(base, password, "POST", `/api/session/${sessionID}/prompt`, {
+      text: "append the scripted comment to the item",
+    });
+    const itemFile = join(worktree, ...itemRelPath.split("/"));
+    const landed = await pollUntil(
+      () =>
+        provider.rounds().some((round) => round.action.kind === "tool") &&
+        existsSync(itemFile) &&
+        gitOrThrow(worktree, ["log", "--format=%s", MOVE_BRANCH])
+          .split("\n")
+          .map((line) => line.trim())
+          .includes(MOVE_COMMENT_SUBJECT),
+      MOVE_PROMPT_TIMEOUT_MS,
+      MOVE_POLL_INTERVAL_MS,
+    );
+    if (!landed) {
+      check(
+        report,
+        "the scripted drive produced the comment commit in the worktree",
+        false,
+        `rounds: ${JSON.stringify(provider.rounds()).slice(0, 600)}\n${await transcriptDetail(base, password, sessionID)}`,
+      );
+      return;
+    }
+
+    // 4. the behavioral assertions: the commit is on the item branch in the
+    // worktree, the gate ran there, and the primary is untouched.
+    const commentHash = gitOrThrow(worktree, ["log", "--format=%H %s", MOVE_BRANCH])
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => line.endsWith(MOVE_COMMENT_SUBJECT))
+      ?.split(" ")[0];
+    const commitPaths =
+      commentHash === undefined
+        ? []
+        : gitOrThrow(worktree, ["show", "--name-only", "--pretty=format:", commentHash])
+            .split("\n")
+            .map((line) => line.trim());
+    const commitText =
+      commentHash === undefined ? "" : gitOrThrow(worktree, ["show", `${commentHash}:${itemRelPath}`]);
+    const observation: MoveLegObservation = {
+      branch: gitOrThrow(worktree, ["rev-parse", "--abbrev-ref", "HEAD"]).trim(),
+      worktreeSubjects: gitOrThrow(worktree, ["log", "--format=%s", MOVE_BRANCH])
+        .split("\n")
+        .map((line) => line.trim()),
+      commitPaths,
+      commitText,
+      gateMarker: existsSync(join(worktree, MOVE_GATE_MARKER))
+        ? readFileSync(join(worktree, MOVE_GATE_MARKER), "utf8").trim()
+        : undefined,
+      primaryHeadBefore: primaryHeadAtPrompt,
+      primaryHeadAfter: gitOrThrow(repoMove, ["rev-parse", "HEAD"]).trim(),
+      primaryPorcelainBefore,
+      primaryPorcelainAfter: gitOrThrow(repoMove, ["status", "--porcelain", "--untracked-files=all"]),
+      primarySubjects: gitOrThrow(repoMove, ["log", "--format=%s", "refs/heads/main"])
+        .split("\n")
+        .map((line) => line.trim()),
+      worktreePath: worktree,
+      expectedBranch: MOVE_BRANCH,
+      expectedSubject: MOVE_COMMENT_SUBJECT,
+      expectedItemPath: itemRelPath,
+      expectedText: moveText,
+    };
+    const faults = moveLegFaults(observation);
+    check(
+      report,
+      "the commit leg: the scripted native call committed to the item branch IN the worktree; the primary is untouched",
+      faults.length === 0 &&
+        primaryHeadBefore === primaryHeadAtPrompt &&
+        !primarySubjectsBefore.includes(MOVE_COMMENT_SUBJECT),
+      faults.join("; ") || `commit ${commentHash} on ${observation.branch}`,
+    );
+    check(
+      report,
+      "the scripted drive was exactly one execute round with the native comment script, then a closing text round",
+      executeCallFaults(provider.rounds(), expectedCode).length === 0,
+      executeCallFaults(provider.rounds(), expectedCode).join("; ") ||
+        JSON.stringify(provider.rounds()).slice(0, 400),
+    );
+
+    // 5. the negative direction: the host has no record of an unknown session
+    // (observed over the same server API), and the REAL plugin resolver +
+    // per-call root resolution refuse it with the typed code — writing
+    // nothing, anywhere.
+    const unknown = await opencodeApi(base, password, "GET", `/api/session/${MOVE_UNKNOWN_SESSION}`);
+    const worktreeHeadBeforeNegative = gitOrThrow(worktree, ["rev-parse", "HEAD"]).trim();
+    const resolver = sessionDirectoryResolver({
+      session: { get: async () => undefined },
+    });
+    const throwingResolver = sessionDirectoryResolver({
+      session: {
+        get: async () => {
+          throw new Error("host storage unavailable");
+        },
+      },
+    });
+    const refusal = await resolveToolCwd(kernel, "comment", { cwd: repoMove, sessionDirectory: resolver }, {
+      sessionID: MOVE_UNKNOWN_SESSION,
+    });
+    const refusalThrowing = await resolveToolCwd(
+      kernel,
+      "comment",
+      { cwd: repoMove, sessionDirectory: throwingResolver },
+      { sessionID: MOVE_UNKNOWN_SESSION },
+    );
+    const refusalCode =
+      "error" in refusal ? refusal.error.code : "(resolved unexpectedly)";
+    const refusalMessage = "error" in refusal ? refusal.error.message : "";
+    const throwingCode =
+      "error" in refusalThrowing ? refusalThrowing.error.code : "(resolved unexpectedly)";
+    const negativeFaults: string[] = [];
+    if (unknown.status !== 404) negativeFaults.push(`unknown session returned ${unknown.status}, expected 404`);
+    if (refusalCode !== SESSION_ROOT_UNRESOLVED) {
+      negativeFaults.push(`resolver refusal code ${refusalCode}, expected ${SESSION_ROOT_UNRESOLVED}`);
+    }
+    if (throwingCode !== SESSION_ROOT_UNRESOLVED) {
+      negativeFaults.push(`throwing-resolver refusal code ${throwingCode}, expected ${SESSION_ROOT_UNRESOLVED}`);
+    }
+    if (!refusalMessage.includes(MOVE_UNKNOWN_SESSION) || !refusalMessage.includes(repoMove)) {
+      negativeFaults.push("the refusal does not name the session and the refused fallback location");
+    }
+    if (gitOrThrow(worktree, ["rev-parse", "HEAD"]).trim() !== worktreeHeadBeforeNegative) {
+      negativeFaults.push("the negative round moved the worktree HEAD");
+    }
+    if (gitOrThrow(repoMove, ["rev-parse", "HEAD"]).trim() !== primaryHeadBefore) {
+      negativeFaults.push("the negative round moved the primary HEAD");
+    }
+    if (gitOrThrow(repoMove, ["status", "--porcelain", "--untracked-files=all"]) !== primaryPorcelainBefore) {
+      negativeFaults.push("the negative round dirtied the primary");
+    }
+    check(
+      report,
+      "the negative leg: an unresolvable session root is refused with SESSION_ROOT_UNRESOLVED and nothing is written anywhere",
+      negativeFaults.length === 0,
+      negativeFaults.join("; ") || `unknown session: HTTP ${unknown.status}; refusal code ${refusalCode}`,
+    );
+  } finally {
+    // Local teardown: the session record, the server process, the provider
+    // socket, the worktree + its registration. Best-effort — a failure here
+    // must not mask the checks.
+    try {
+      if (sessionID !== undefined && serve !== undefined) {
+        await opencodeApi(serve.base, serve.password, "DELETE", `/api/session/${sessionID}`);
+      }
+    } catch {
+      // Best-effort: the disposable parent is removed regardless.
+    }
+    if (serve !== undefined) {
+      serve.child.kill("SIGTERM");
+      const force = setTimeout(() => serve?.child.kill("SIGKILL"), 5_000);
+      force.unref?.();
+    }
+    await provider.close();
+    if (existsSync(join(repoMove, ".git"))) {
+      git(repoMove, ["worktree", "remove", "--force", worktree]);
+      git(repoMove, ["worktree", "prune"]);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1284,6 +2093,26 @@ async function main(): Promise<void> {
             .status === "todo",
         `gateBins: ${JSON.stringify(strictMissingBins)}\nclaim: ${JSON.stringify(strictMissingClaim)}\nerror: ${strictMissingError.split("\n").slice(0, 6).join("\n")}`,
       );
+    }
+
+    // --- 6. the move leg: a real session, really moved, really committing --
+    // task-native-session-move-smoke-leg. Deterministic and model-free: the
+    // scripted provider (in-process, localhost-only) drives the host's agent
+    // loop through one Code Mode `execute` round; the session, the move, the
+    // tool execution and the commit are the real host's. Skipped when the
+    // `opencode` binary is absent (CI), like smoke:opencode.
+    {
+      const bin = opencodeBinary();
+      if (bin === undefined) {
+        check(
+          report,
+          "move leg skipped: the opencode binary is not installed (CI) — run where OpenCode V2 is available",
+          true,
+          "the leg is part of npm run smoke:native-start-cold and guards bug-native-tools-commit-to-primary-checkout",
+        );
+      } else {
+        await runMoveLeg(report, { bin, parent, kernel, plugin, runInit });
+      }
     }
   } catch (error) {
     report.passed = false;
