@@ -32,7 +32,6 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-formatter-override-templ
 ## Notes
 
 ### 2026-10-01 @Coordinator
-### 2026-10-01 @Coordinator
 Filed from task-session-formatter-bypasses-prettierignore (PR #531): the bypass (session formatter runs prettier with the session cwd; sibling-worktree files bypass .prettierignore) is generic to the arggon start layout, but the fix — the formatter.prettier.command override anchoring at the edited file's git root — lives only in THIS repo's hand-edited opencode.jsonc (now adopter-owned; init skips it). The GENERATED template (templates/opencode.jsonc source in the product) still emits formatter: true, so every adopter using start --worktree hits the same ~900-line reformat churn.
 
 ## Acceptance
@@ -73,3 +72,9 @@ Evidence (expected vs observed):
 ### handoff 2026-10-01 @Arggon (session: ses_f0821d66effdHqVPG5MfLFYpUk) — next: Review + merge PR #541 (template override + tests + changelog/migration note); then file the follow-up for this repo's malformed opencode.jsonc.
 - branch: feat/task-formatter-override-template
 - open questions: Does OpenCode silently drop the malformed repo opencode.jsonc (override + deny gates inactive)?; should doctor warn on unparseable generated-shape configs?
+- [ ] Product decision recorded: ship the override in the template (recommended — same layout guarantees the same bug) or document the bypass + manual fix in the init output/docs instead.
+- [ ] If shipping: templates updated + a template-vs-fixture test that the override survives regeneration; adopter-modified opencode.jsonc files are skipped by init (documented migration note).
+- [ ] changelog entry in the next release.
+
+### 2026-10-01 @Coordinator
+verdict: approve (reviewer MERGE, no blockers — override script byte-verified vs #531, strict-parse verified by execution, parity test meaningful via stampGeneratedContent verbatim-JSON behavior). Merged: PR #541 squash -> main. Item done. The malformed own-config side-finding: coordinator hand-fixed on main separately; a doctor/config-parse gate follow-up is filed.
