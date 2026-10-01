@@ -59,8 +59,7 @@ acceptance proof is an empty dependency diff in the implementation PR.
 
 - `runDoctor`'s result gains the always-present `update: { latest, current, cachedAt }` (spec § Surfaces table; `current` from the package version —
   never `null`). The root `--version` handling learns `--json`: the standard
-  success envelope `{ ok, schemaVersion: 1, conventionVersion, command:
-  "version", version, update }` (human `--version` output byte-unchanged).
+  success envelope `{ ok, schemaVersion: 1, conventionVersion, command: "version", version, update }` (human `--version` output byte-unchanged).
   Doctor human output unchanged (golden test). The check's read happens before
   the command's work; the fetch trigger honors the spec's gates (not `mcp`).
 - **Acceptance:** envelope probes on initialized + non-initialized fixtures
@@ -98,8 +97,7 @@ acceptance proof is an empty dependency diff in the implementation PR.
 ## T6: Gates, smoke, status flip (closes the spec)
 
 - Run: `npm test`, `npm run lint`, `npm run build`, `arggon validate --json`,
-  `arggon spec validate`, and `arggon spec analyze --baseline
-  ArggonManager/spec-analyze-baseline.json` (exit 0 — no NEW findings; the
+  `arggon spec validate`, and `arggon spec analyze --baseline ArggonManager/spec-analyze-baseline.json` (exit 0 — no NEW findings; the
   committed baseline is the gate reference).
 - Smoke evidence for the review verdict (blocking bar): against a local
   registry stub on a fixture tree — cold run (no cache): command unchanged,

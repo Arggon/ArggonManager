@@ -143,8 +143,7 @@ are never omitted (absent-vs-unknown is decided by shape, not by `in` checks):
   exit-0 charter, and `DOCTOR_FAILED` semantics are unchanged.
 - `--version --json`: today the root `--version` flag prints plain text and
   `--json` is ignored. This spec defines the JSON surface: the standard success
-  envelope — `{ ok: true, schemaVersion: 1, conventionVersion, command:
-  "version", version, update }` where `version` is the same string the human
+  envelope — `{ ok: true, schemaVersion: 1, conventionVersion, command: "version", version, update }` where `version` is the same string the human
   flag prints (build version incl. git identity) and `conventionVersion` is
   read from the tracker `.convention.yml` walk-up from cwd (`0` when absent,
   like `hello`). `arggon --version` without `--json` prints exactly what it
