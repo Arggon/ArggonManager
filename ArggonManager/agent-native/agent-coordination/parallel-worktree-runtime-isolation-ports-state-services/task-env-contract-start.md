@@ -73,3 +73,20 @@ DEVIATIONS/NOTES (also in the PR body — none silent):
 ### handoff 2026-10-01 @ses_f0697a26fffelQHzQVRfDPIlHe (session: ses_f0697a26fffelQHzQVRfDPIlHe) — next: Review PR #566 (draft, do not merge via this task); reconcile the attach written:false shape + the cleanup env-reap addition into the adopter-services pattern doc before it lands.
 - branch: feat/task-env-contract-start
 - open questions: Attach receipt: spec lists 3 written:false cases, attach is a 4th (implemented, flagged); Windows state/cache dirs co-locate by the spec's env-paths mapping — intended?
+
+### 2026-10-01 @ses_f0697a26fffelQHzQVRfDPIlHe
+Change requests landed on PR #566 (pushed to the same branch, dd9b595e..58bfce5c; item stays in_progress — not done).
+
+FIX 1 — seed-warning drop (lib/src/worktree.ts):
+(a) fresh-write success return now carries ...(warnings.length > 0 ? { warning: warnings.join("; ") } : {}) — a failed .env seed after a successful .arggon.env write surfaces as written:true + warning "could not seed .env: …".
+(b) attach (and the EEXIST race) returns build the warning as [...warnings, "already exists — left byte-identical (never overwritten)"].join("; ") — seed failures no longer discarded.
+Test: "surfaces seed failures as a receipt warning on every path" — deterministic root-proof repro via a broken symlink at <worktree>/.env (existsSync false, COPYFILE_EXCL fails EEXIST); asserts fresh written:true + warning, attach written:false + warning containing BOTH "could not seed .env" and "byte-identical".
+
+FIX 2 — reconciled with main (merged origin/main cleanly, c71f842e; #564 pattern doc):
+- docs/worktree-services.md table: .arggon.env six keys / .env seed+dirs / preparation.env+opt-out rows Promised -> Shipped ("**this PR**", PR #566); NEW row "cleanup --prune reaping of a start-created .arggon.env (contract-shape ownership) — Shipped (this PR)"; "Promised means…" paragraph replaced with the Shipped-this-PR/release-caution wording; stale "after the env contract ships" snippets updated.
+- NEW "Env contract receipt and lifecycle notes" section in the pattern doc: attach written:false semantics per ruling (a); Windows %LOCALAPPDATA% co-location per ruling (b) (isolation = per-worktree uniqueness, unaffected); seed-failures-never-vanish; cleanup reap with STRICT ownership (every line a six-set KEY=value; comments/extra keys/symlinks left) and the reviewer caveat stated plainly: value-only edits of a contract-shaped file ARE reaped — do not park data in .arggon.env.
+- Spec 016 errata blockquote: the three-case written:false list is incomplete, not contradicted — attach is the fourth case; rulings (a) and (b) encoded.
+
+FIX 3 — rulings encoded as docs text: (a) in the spec errata + pattern-doc receipt note ("written means this run created the file" — matches the kernel doc comment verbatim); (b) in the spec errata + pattern-doc note line.
+
+GATES (post-fix, on the pushed head): npm test 2068/2068 green; lint clean; build green; check:plugin green (regen committed separately 58bfce5c); smoke:native-start-cold 47/47 with all 5 env legs; npm run arggon -- validate ok:true (pre-commit gate on both commits).
