@@ -38,10 +38,10 @@ the manual `ARGGON_VERSION` re-pin the same release flow trips over.
 
 ## Acceptance
 
-- [ ] ADR under `ArggonManager/docs/adr/` (next free id — check the directory; exploration placeholder says 0018) with status Proposed, dated sources, alternatives considered (incl. rejected C2 startup guard, D3 standalone binaries, B3 update-notifier dep).
-- [ ] Decision covers all four bundles or explicitly defers each with rationale (pipeline automation / update channel / exact-pin skew hardening / GitHub Release tarballs).
-- [ ] Non-goals stated: automatic self-update, standalone binaries, `whatsnew` command (stays deferred per ADR 0016), non-npm package managers.
-- [ ] Consequences name the operational duties: trusted-publisher config pins the release workflow filename (renaming breaks OIDC binding), lib-first publish order preserved, CHANGELOG per release.
-- [ ] Exploration 016's Decision section links the landed ADR and its `status:` flips `open` → `decided`.
+- [x] ADR under `ArggonManager/docs/adr/` as **0018-update-delivery-and-distribution-channel.md** — `Proposed` in PR #537, flipped to **Accepted** on merge per the ADR lifecycle (flip commit 3c2b4568, file + index row together, so no 0016-style drift).
+- [x] Decision covers all four bundles: pipeline automation (release-please-style release PR + OIDC trusted publishing, lib-then-cli, tarball assets), update channel (bounded opt-out check, agent-first JSON), exact-pin skew hardening, GitHub Release tarballs — with rejected alternatives recorded (C2 startup guard, D3 binaries, B3 update-notifier, release-it/changesets, A1/A2).
+- [x] Non-goals stated: automatic self-update, standalone binaries, `whatsnew` (stays deferred per ADR 0016), non-npm package managers.
+- [x] Consequences name the operational duties: trusted-publisher config binds the workflow filename, npm ≥ 11.5.1 on the runner, lib-first order preserved, additive JSON documented same PR, `task-ci-seam-pin-tracks-release` lands with/before the pipeline. Review finding 3 resolved: on CI the GET never runs; JSON fields report cache state (explicit unknown otherwise).
+- [x] Exploration 016's Decision section links the landed ADR and its `status:` flipped `open` → `decided` (merged in the same PR); `spec analyze` reports no findings for exploration-016 after merge.
 
 ## Notes
