@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-release-workflow
 title: release.yml + release-please manifest + exact pin + runbook shrink
+assignee: Arggon
+branch: feat/task-release-workflow
 parent: story-release-pipeline
 labels: [delivery, ci]
 priority: p1
 created: "2026-10-01"
 updated: "2026-10-01"
+claimed_at: "2026-10-01T15:46:40.895Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-release-workflow
 ---
 <!--
   Placement (v0): ArggonManager/delivery-rollout/release-pipeline/story-release-pipeline/task-release-workflow.md
