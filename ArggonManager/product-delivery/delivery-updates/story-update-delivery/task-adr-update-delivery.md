@@ -1,15 +1,18 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adr-update-delivery
 title: "ADR: update delivery and distribution channel (release pipeline + update channel + skew + tarballs)"
+assignee: Arggon
+branch: feat/task-adr-update-delivery
 parent: story-update-delivery
 labels: [delivery, install, adr]
 priority: p1
 created: "2026-10-01"
 updated: "2026-10-01"
+claimed_at: "2026-10-01T14:02:34.916Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-adr-update-delivery
 ---
-
 <!--
   Placement (v0): ArggonManager/product-delivery/delivery-updates/story-update-delivery/task-adr-update-delivery.md
   Leaves live only under a story. id is the filename stem: task-adr-update-delivery.

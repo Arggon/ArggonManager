@@ -1,7 +1,7 @@
 ---
 exploration_id: update-delivery-016
 title: Update delivery and adopter install ergonomics
-status: open
+status: decided
 created: 2026-10-01
 ---
 
@@ -209,4 +209,11 @@ future ADR by ADR 0016 — this exploration is the input to it).
 
 ## Decision
 
-<!-- ADR reference placeholder: ArggonManager/docs/adr/0018-<slug>.md once the ADR lands. -->
+Adopted as [ADR 0018 — update delivery and distribution channel](../adr/0018-update-delivery-and-distribution-channel.md)
+(all four bundles: release PR + CI publish via OIDC trusted publishing with
+release-please-style manifest; exact kernel pin in lockstep; bounded opt-out
+update channel with agent-first JSON surface; GitHub Release tarballs).
+Non-goals held: automatic self-update, standalone binaries, `whatsnew` (still
+deferred per ADR 0016), non-npm package managers. Implementation decomposes
+after the ADR: pipeline story first, then the update-channel story (spec
+first, acceptance criteria lifted from the edge-case table above).
