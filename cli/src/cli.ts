@@ -2274,6 +2274,7 @@ program
               missingDependenciesTotal: result.missingDependenciesTotal,
               gateBins: result.gateBins,
               prepSteps: result.prepSteps,
+              env: result.env,
               ...(result.postStartRelink !== undefined
                 ? { postStartRelink: result.postStartRelink }
                 : {}),
@@ -2290,6 +2291,22 @@ program
           console.log(
             `  worktree: ${sanitizeHumanError(result.worktreePath)} (${result.worktreeCreated ? "created" : "attached"})`,
           );
+          {
+            // Worktree env contract (spec worktree-env-contract-016): one
+            // line for what the contract did — written / kept / skipped.
+            const env = result.env;
+            if (env.written) {
+              console.log(
+                `  env: ${sanitizeHumanError(env.path ?? ".arggon.env")} written (${env.keys?.length ?? 0} keys)`,
+              );
+            } else if (env.path !== undefined) {
+              console.log(`  env: kept — ${sanitizeHumanError(env.warning ?? "already exists")}`);
+            } else {
+              console.log(
+                `  env: skipped — ${sanitizeHumanError(env.warning ?? "not prepared")}`,
+              );
+            }
+          }
           if (result.linkedNodeModules) {
             console.log(
               `  node_modules: linked from the primary checkout (the project gate can run in the worktree)`,

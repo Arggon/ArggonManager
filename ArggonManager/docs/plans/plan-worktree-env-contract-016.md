@@ -25,6 +25,13 @@ verifiable acceptance criterion and links back to the spec.
 - **Acceptance:** unit tests cover: keys+shape on fresh start, attach
   byte-identical, `.env` seed only-if-absent, dirs exist, disabled flag,
   warning-on-failure; the kernel keeps no CLI imports.
+  - [x] keys+shape fresh (lib/src/worktree.test.ts, hermetic env/home)
+  - [x] attach byte-identical (FS-level `wx`/`COPYFILE_EXCL` guarantee)
+  - [x] `.env` seed only-if-absent (three cases)
+  - [x] dirs exist (existence, not location)
+  - [x] disabled flag (`x-worktree.env: false` → `written:false` + reason)
+  - [x] warning-on-failure (uncreatable state base → warning, no throw)
+  - [x] kernel keeps no CLI imports (probe is an injected/read-only `git check-ignore`)
 
 ### T2: Surfaces — CLI and native receipt parity
 
@@ -35,6 +42,10 @@ verifiable acceptance criterion and links back to the spec.
 - **Acceptance:** `cli/src/mcp-parity.test.ts` and `skill-copy.test.ts`
   green unchanged; `--json` envelope shows `preparation.env` on a fixture
   run (probe evidence in the PR).
+  - [x] CLI envelope gains additive `env` (flat, like `gateBins`); parity test green unchanged
+  - [x] native receipt forwards bounded `preparation.env` (tools.test.ts assertion)
+  - [x] bundle regenerated; `check:plugin` green after the regen commit
+  - [x] CLI worktree-suite fixture run asserts the envelope `env` receipt
 
 ### T3: Docs and init template (same PR as T1/T2 per the docs-maintenance rule)
 
@@ -48,6 +59,10 @@ verifiable acceptance criterion and links back to the spec.
   a new receipt field and a new convention key; skill copies byte-equal.
 - **Acceptance:** doc grep — every statement about the new field/key matches
   the implemented behavior; init test green; `arggon validate` ok.
+  - [x] README env-contract subsection (+ cleanup reap sentence)
+  - [x] json-output `env` row + prose (prettier-stable)
+  - [x] agents.md §4 subsection; convention.md `env` bullet; template row
+  - [x] init `.gitignore` destination + tests (created-when-missing, adopter-owned kept)
 
 ### T4: Smoke — `smoke:native-start-cold` env leg
 
@@ -55,3 +70,6 @@ verifiable acceptance criterion and links back to the spec.
   the six keys, absent from the claim commit, and byte-identical on attach.
 - **Acceptance:** the smoke passes beside anything (offline, no provider),
   and fails if a future change starts committing or overwriting env files.
+  - [x] four env legs green (written+keys, identity values, dirs+suffix, probe+env-free commit)
+  - [x] attach leg byte-identical (receipt `written:false` + warning)
+  - [x] smoke green end-to-end (47 checks)

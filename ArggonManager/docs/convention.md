@@ -505,14 +505,17 @@ x-import:
 
 ### Worktree bootstrap (`x-worktree`)
 
-`x-worktree` is the official namespaced extension for worktree-bootstrap options (`arggon start --worktree`, task-start-post-hook). It is a mapping of option names to values; the official options are `post-start`, a shell command run after a new worktree is created, and `post-start-shell`, the shell that command runs through:
+`x-worktree` is the official namespaced extension for worktree-bootstrap options (`arggon start --worktree`, task-start-post-hook). It is a mapping of option names to values; the official options are `post-start`, a shell command run after a new worktree is created, `post-start-shell`, the shell that command runs through, and `env`, the worktree env-contract opt-out:
 
 ```yaml
 version: 3
 x-worktree:
   post-start: "npm ci"
   post-start-shell: "login"
+  env: false
 ```
+
+- **`env` (spec worktree-env-contract-016):** absent or `true` (the default) keeps the per-worktree env contract enabled; only an explicit `false` disables it. Enabled, `start --worktree` writes a gitignored, dotenv-style `.arggon.env` at the worktree root carrying the worktree identity (`ARGON_ITEM`, `ARGGON_WORKTREE_ID` = `<repo>-<item-id>`, `ARGGON_WORKTREE_PATH`, `ARGGON_WORKTREE_BRANCH`) and per-OS suffixed state/cache dirs (`ARGGON_STATE_DIR`/`ARGGON_CACHE_DIR` — XDG on Linux, `~/Library` on macOS, `%LOCALAPPDATA%` on Windows, each + `/<repo>-<item-id>`, created `mkdir -p`), seeds a primary `.env` into the worktree copy-if-absent (never overwritten, never interpreted), and reports the read-only `git check-ignore .arggon.env` probe in the additive `env` receipt field. Nothing is ever overwritten (an existing `.arggon.env` or `.env` is left byte-identical), env files are never staged or committed, and the preparation is best-effort: `written: false` with a `warning` never blocks the claim. `arggon init` generates a `.gitignore` that ignores `.arggon.env` on fresh scaffolds; `cleanup --prune` reaps a start-created env file before removing the worktree.
 
 - The hook runs **only when `arggon start --worktree` creates a new worktree** — the sanctioned spot for per-checkout bootstrap like `npm ci` (linked worktrees do not share `node_modules`). Attach re-runs (idempotent re-starts of the same item) never re-run it.
 - Execution: `sh -c <command>` with cwd = the worktree root, after the claim commit / push / PR steps have succeeded.

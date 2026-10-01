@@ -229,10 +229,15 @@ describe("x-import (issue-import options, task-import-type-mapping)", () => {
 describe("x-worktree (worktree bootstrap, task-start-post-hook)", () => {
   it("defaults to postStart null when the file or the key is missing", () => {
     const dir = mkdtempSync(join(tmpdir(), "arggon-xwt-missing-"));
-    expect(readConventionConfig(dir).worktree).toEqual({ postStart: null, postStartShell: null });
+    expect(readConventionConfig(dir).worktree).toEqual({
+      postStart: null,
+      postStartShell: null,
+      env: null,
+    });
     expect(parseConventionConfig("version: 3\n").worktree).toEqual({
       postStart: null,
       postStartShell: null,
+      env: null,
     });
   });
 
@@ -240,16 +245,21 @@ describe("x-worktree (worktree bootstrap, task-start-post-hook)", () => {
     const config = parseConventionConfig(
       ["version: 3", "x-worktree:", '  post-start: "npm ci"', "  future-option: 7", ""].join("\n"),
     );
-    expect(config.worktree).toEqual({ postStart: "npm ci", postStartShell: null });
+    expect(config.worktree).toEqual({ postStart: "npm ci", postStartShell: null, env: null });
     expect(parseConventionConfig("x-worktree:\n  post-start: npm ci\n").worktree).toEqual({
       postStart: "npm ci",
       postStartShell: null,
+      env: null,
     });
   });
 
   it("parses x-worktree regardless of the declared tree version (v0 too)", () => {
     const config = parseConventionConfig('version: 0\nx-worktree:\n  post-start: "make setup"\n');
-    expect(config.worktree).toEqual({ postStart: "make setup", postStartShell: null });
+    expect(config.worktree).toEqual({
+      postStart: "make setup",
+      postStartShell: null,
+      env: null,
+    });
   });
 
   it("rejects scalar x-worktree and empty / mapping post-start values", () => {
@@ -276,6 +286,19 @@ describe("x-worktree (worktree bootstrap, task-start-post-hook)", () => {
     expect(() => parseConventionConfig("x-worktree:\n  post-start-shell: ''\n")).toThrow(
       /'post-start-shell' must be "inherit" or "login"/,
     );
+  });
+
+  it("parses the env opt-out: only an explicit false disables (spec worktree-env-contract-016)", () => {
+    // Unset = enabled (null); explicit true keeps the default.
+    expect(parseConventionConfig("version: 5\n").worktree.env).toBeNull();
+    expect(parseConventionConfig("x-worktree:\n  env: false\n").worktree.env).toBe(false);
+    expect(parseConventionConfig("x-worktree:\n  env: true\n").worktree.env).toBe(true);
+    expect(() => parseConventionConfig("x-worktree:\n  env: off\n")).toThrow(
+      /'env' must be a boolean/,
+    );
+    // Unknown sibling keys stay ignored (ignore-unknown).
+    expect(() => parseConventionConfig("x-worktree:\n  env-typo: false\n")).not.toThrow();
+    expect(parseConventionConfig("x-worktree:\n  env-typo: false\n").worktree.env).toBeNull();
   });
 });
 

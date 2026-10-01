@@ -112,6 +112,14 @@ export type WorktreeConfig = {
    * The `--post-start-shell` start flag overrides per invocation.
    */
   postStartShell: "inherit" | "login" | null;
+  /**
+   * Env-contract opt-out from `x-worktree.env` (spec
+   * worktree-env-contract-016): only an explicit `false` disables the
+   * per-worktree `.arggon.env` preparation (and the receipt reports
+   * `env: { written: false, warning }` for it); `null` (unset) and `true`
+   * both keep the documented default of enabled.
+   */
+  env: boolean | null;
 };
 
 /** `x-github` namespaced extension options (task-issue-roundtrip). */
@@ -293,7 +301,7 @@ export function parseConventionConfig(
   let generatedProjectName: string | null = null;
   const importLabelTypes: Record<string, ItemType> = {};
   let importHasLabelTypes = false;
-  const worktree: WorktreeConfig = { postStart: null, postStartShell: null };
+  const worktree: WorktreeConfig = { postStart: null, postStartShell: null, env: null };
   const github: GitHubConfig = { issueRoundtrip: false };
   let version = CONVENTION_VERSION_DEFAULT;
   let section: string | null = null;
@@ -480,7 +488,9 @@ export function parseConventionConfig(
     if (section === "x-worktree") {
       // Namespaced extension (task-start-post-hook): unknown nested keys are
       // ignored (ignore-unknown); the official `post-start` option is a shell
-      // command run inside a freshly created worktree.
+      // command run inside a freshly created worktree, `post-start-shell`
+      // selects the shell variant, and `env` (spec
+      // worktree-env-contract-016) opts out of the per-worktree env file.
       if (key === "post-start-shell") {
         // Shell variant (task-post-start-env): "inherit" (default) or "login"
         // ($SHELL -lc, sources profile files so rustup/mise/asdf toolchains
@@ -492,6 +502,15 @@ export function parseConventionConfig(
           );
         }
         worktree.postStartShell = shell;
+        continue;
+      }
+      if (key === "env") {
+        if (value !== "true" && value !== "false") {
+          throw new Error(
+            `${sourcePath}: 'env' must be a boolean (got ${JSON.stringify(value)})`,
+          );
+        }
+        worktree.env = value === "true";
         continue;
       }
       if (key !== "post-start") continue;
@@ -574,7 +593,7 @@ export function readConventionConfig(dir: string): ConventionConfig {
       playbooks: { maxAgeDays: null },
       tracker: { autoCommit: null, allowSteal: null, strictGateBins: null },
       import: { labelTypes: null },
-      worktree: { postStart: null, postStartShell: null },
+      worktree: { postStart: null, postStartShell: null, env: null },
       github: { issueRoundtrip: false },
       generated: {},
       generatedProjectName: null,

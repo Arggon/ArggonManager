@@ -24,6 +24,7 @@ import {
   type GateBinResolution,
   type ManifestCoverage,
   type WorkItem,
+  type WorktreeEnvReceipt,
   type WorktreePrepStep,
 } from "@arggondev/lib";
 
@@ -39,6 +40,7 @@ export {
   linkNodeModules,
   linkedWorkspacePackages,
   unlinkNodeModulesLink,
+  unlinkWorktreeEnv,
 } from "@arggondev/lib";
 import { runBranch, type GitRunner } from "./branch.js";
 
@@ -163,6 +165,17 @@ export type StartResult = {
    * Empty without `--worktree`.
    */
   prepSteps: WorktreePrepStep[];
+  /**
+   * The worktree env contract receipt (spec worktree-env-contract-016):
+   * `.arggon.env` written with the six identity keys, the `.env` seeded
+   * copy-if-absent, the per-OS state/cache dirs created, and the read-only
+   * gitignore probe. `written: false` with a `warning` covers the
+   * `x-worktree.env: false` opt-out, a write failure, and the attach path
+   * (an existing file left byte-identical) — the claim is never refused for
+   * any of them. Without `--worktree` no env contract applies; the field
+   * reports that.
+   */
+  env: WorktreeEnvReceipt;
   /**
    * Outcome of re-linking the start-owned install after a
    * `x-worktree.post-start` hook that left the worktree without one
@@ -608,6 +621,11 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
       gateBins: [],
       // Same: no preparation ran, so the log is empty.
       prepSteps: [],
+      // The env contract is worktree-only: no `--worktree`, nothing applies.
+      env: {
+        written: false,
+        warning: "no --worktree: the env contract is written only inside worktree checkouts",
+      },
       item: branch.item,
     };
   });
@@ -804,10 +822,24 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
   let missingDependencies: string[] = [];
   let missingDependenciesTotal = 0;
   let gateBins: GateBinResolution[] = [];
+  // Env contract (spec worktree-env-contract-016): best-effort, so the
+  // defensive default below is only observable if preparation itself throws.
+  let env: WorktreeEnvReceipt = {
+    written: false,
+    warning: "env preparation did not run",
+  };
   try {
     // The kernel owns the dependency-preparation orchestration shared with the
     // native start surface. Git/domain lifecycle stays here in the CLI.
-    const prepared = prepareWorktreeDependencies(root, worktreePath);
+    // `x-worktree.env` opts out (spec worktree-env-contract-016): only an
+    // explicit `false` disables, unset/true keep the documented default.
+    const prepared = prepareWorktreeDependencies(root, worktreePath, {
+      env: {
+        identity: { itemId: id, branch: name },
+        enabled: config.worktree.env !== false,
+      },
+    });
+    env = prepared.env ?? env;
     linkedNodeModules = prepared.linkedNodeModules;
     builtWorkspaces = prepared.builtWorkspaces;
     linkedWorkspaces = prepared.linkedWorkspaces;
@@ -996,6 +1028,7 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       missingDependenciesTotal,
       gateBins,
       prepSteps,
+      env,
       ...(postStartRelink !== undefined ? { postStartRelink } : {}),
       postStart,
       item: finalItem,

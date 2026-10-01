@@ -1552,6 +1552,23 @@ describe("worktree domain tools (W4)", () => {
       linkedNodeModules: true,
       linkedWorkspaces: [],
     });
+    // Worktree env contract (spec worktree-env-contract-016): the native
+    // receipt forwards the kernel's bounded env fragment.
+    expect(preparation.env).toMatchObject({
+      written: true,
+      keys: [
+        "ARGON_ITEM",
+        "ARGGON_WORKTREE_ID",
+        "ARGGON_WORKTREE_PATH",
+        "ARGGON_WORKTREE_BRANCH",
+        "ARGGON_STATE_DIR",
+        "ARGGON_CACHE_DIR",
+      ],
+    });
+    expect(existsSync(join(worktreePath, ".arggon.env"))).toBe(true);
+    expect(readFileSync(join(worktreePath, ".arggon.env"), "utf8")).toContain(
+      `ARGON_ITEM=task-rate-limit\n`,
+    );
     expect(output.claimCommitted).toBe(true);
     expect(claimCommit).toMatchObject({ status: "committed", committed: true });
     expect(output.commit).toMatchObject({ message: "chore(tasks): claimed task-rate-limit" });

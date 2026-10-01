@@ -1,8 +1,12 @@
 import { spawnSync } from "node:child_process";
 import {
+  closeSync,
+  constants as fsConstants,
+  copyFileSync,
   existsSync,
   lstatSync,
   mkdirSync,
+  openSync,
   readdirSync,
   readFileSync,
   readlinkSync,
@@ -14,9 +18,11 @@ import {
   symlinkSync,
   unlinkSync,
   writeFileSync,
+  writeSync,
   type Dirent,
 } from "node:fs";
-import { delimiter, dirname, join, relative, resolve, sep } from "node:path";
+import { homedir as osHomedir } from "node:os";
+import { basename, delimiter, dirname, join, relative, resolve, sep } from "node:path";
 
 /**
  * Worktree dependency-link helpers, shared by every surface (W4,
@@ -1004,6 +1010,237 @@ export function inspectDeclaredDependencies(worktreePath: string): DeclaredDepen
   };
 }
 
+// ---------------------------------------------------------------------------
+// Worktree env contract (spec worktree-env-contract-016)
+// ---------------------------------------------------------------------------
+
+/**
+ * The six documented env keys (`docs/specs/spec-worktree-env-contract-016.md`),
+ * in file and receipt order. `ARGON_ITEM` is the one deliberate non-`ARGGON_`
+ * prefix: it is the exact name the OpenCode plugin already correlates sessions
+ * with, kept for contract compatibility.
+ */
+export const WORKTREE_ENV_KEYS = [
+  "ARGON_ITEM",
+  "ARGGON_WORKTREE_ID",
+  "ARGGON_WORKTREE_PATH",
+  "ARGGON_WORKTREE_BRANCH",
+  "ARGGON_STATE_DIR",
+  "ARGGON_CACHE_DIR",
+] as const;
+
+/**
+ * The additive `preparation.env` receipt fragment. `written: true` carries the
+ * full shape; `written: false` guarantees only `warning` (the failure /
+ * skipped reason — opt-out, write failure, unreadable state, or an existing
+ * file left byte-identical), with `path`/`gitignored`/`seededDotenv` present
+ * when they are knowable. The claim is never refused for any of these.
+ */
+export type WorktreeEnvReceipt = {
+  /** True only when this run created `.arggon.env`; attach runs report false. */
+  written: boolean;
+  /** Absolute path of the env file, when known. */
+  path?: string;
+  /** The keys a fresh write contains, in order (only on a fresh write). */
+  keys?: string[];
+  /** Absolute path of the seeded worktree `.env`, when one was copied. */
+  seededDotenv?: string;
+  /** `git check-ignore .arggon.env` probe result, when the probe answered. */
+  gitignored?: boolean;
+  /** Why nothing was (re)written or what degraded — never blocks the claim. */
+  warning?: string;
+};
+
+/** Item identity the env contract needs beyond the two roots. */
+export type WorktreeEnvIdentity = {
+  /** The claimed item id (`ARGON_ITEM`). */
+  itemId: string;
+  /** The recorded working branch (`ARGGON_WORKTREE_BRANCH`). */
+  branch: string;
+};
+
+/**
+ * Read-only `git check-ignore` probe (injectable for tests): true = ignored,
+ * false = not ignored, undefined = the probe did not answer (no git, error).
+ */
+export type CheckIgnoreRunner = (cwd: string, relPath: string) => boolean | undefined;
+
+/** Env-contract request passed to `prepareWorktreeDependencies`. */
+export type WorktreeEnvRequest = {
+  identity: WorktreeEnvIdentity;
+  /** `false` = the `x-worktree.env: false` opt-out; absent/true = enabled. */
+  enabled?: boolean;
+  /** Environment for the per-OS base resolution (defaults to `process.env`). */
+  env?: NodeJS.ProcessEnv;
+  /** Home override for the per-OS base resolution (defaults to `os.homedir()`). */
+  home?: string;
+  /** Gitignore-probe override (tests); defaults to a real `git check-ignore`. */
+  checkIgnore?: CheckIgnoreRunner;
+};
+
+/**
+ * Per-OS state base (env-paths mapping, spec worktree-env-contract-016): XDG
+ * `XDG_STATE_HOME` (else `~/.local/state`) on Linux, `~/Library/Application
+ * Support` on macOS, `%LOCALAPPDATA%` on Windows. The kernel invents no new
+ * scheme; `env`/`home` are injectable so tests stay hermetic.
+ */
+export function worktreeStateBase(env: NodeJS.ProcessEnv, home: string): string {
+  switch (process.platform) {
+    case "darwin":
+      return join(home, "Library", "Application Support");
+    case "win32":
+      return env.LOCALAPPDATA ?? join(home, "AppData", "Local");
+    default:
+      return env.XDG_STATE_HOME ?? join(home, ".local", "state");
+  }
+}
+
+/**
+ * Per-OS cache base (env-paths mapping): `XDG_CACHE_HOME` (else `~/.cache`)
+ * on Linux, `~/Library/Caches` on macOS, `%LOCALAPPDATA%` on Windows. On
+ * Windows the two bases coincide by the spec's own mapping, so the state and
+ * cache dirs share the `%LOCALAPPDATA%/<repo>-<item-id>` directory there.
+ */
+export function worktreeCacheBase(env: NodeJS.ProcessEnv, home: string): string {
+  switch (process.platform) {
+    case "darwin":
+      return join(home, "Library", "Caches");
+    case "win32":
+      return env.LOCALAPPDATA ?? join(home, "AppData", "Local");
+    default:
+      return env.XDG_CACHE_HOME ?? join(home, ".cache");
+  }
+}
+
+/** First line of an error, for bounded best-effort warnings. */
+function envErrorMessage(error: unknown): string {
+  return (error instanceof Error ? error.message : String(error)).split("\n")[0] ?? "unknown error";
+}
+
+/** The default read-only gitignore probe: `git check-ignore --quiet`. */
+function defaultCheckIgnore(cwd: string, relPath: string): boolean | undefined {
+  const result = spawnSync("git", ["check-ignore", "--quiet", relPath], {
+    cwd,
+    encoding: "utf8",
+    timeout: 10_000,
+  });
+  if (result.error !== undefined) return undefined;
+  if (result.status === 0) return true;
+  if (result.status === 1) return false;
+  return undefined; // not a repo, git missing, or another probe error: no answer
+}
+
+/**
+ * Write the per-worktree env contract (spec worktree-env-contract-016): a
+ * dotenv-style `.arggon.env` at the worktree root carrying the worktree
+ * identity (the six `WORKTREE_ENV_KEYS`), a `.env` seeded copy-if-absent from
+ * the primary checkout, and the two per-OS suffixed state/cache directories
+ * (`mkdir -p`). Filesystem-only — no Docker, no network, no shell beyond the
+ * read-only `git check-ignore` probe — and best-effort by invariant: any
+ * failure is a receipt warning while the claim proceeds.
+ *
+ * Never-overwrite is enforced at the filesystem level: the env file is opened
+ * `wx` (the write fails if the file raced into existence) and the `.env` seed
+ * copies with `COPYFILE_EXCL`, so an existing file is always left
+ * byte-identical — the attach path never rewrites an adopter's copy.
+ */
+export function prepareWorktreeEnv(
+  primaryRoot: string,
+  worktreePath: string,
+  request: WorktreeEnvRequest,
+): WorktreeEnvReceipt {
+  if (request.enabled === false) {
+    return { written: false, warning: "disabled via x-worktree.env: false" };
+  }
+  const env = request.env ?? process.env;
+  const home = request.home ?? osHomedir();
+  const worktreeId = basename(worktreePath);
+  const stateDir = join(worktreeStateBase(env, home), worktreeId);
+  const cacheDir = join(worktreeCacheBase(env, home), worktreeId);
+  const warnings: string[] = [];
+  try {
+    mkdirSync(stateDir, { recursive: true });
+    mkdirSync(cacheDir, { recursive: true });
+  } catch (error) {
+    return {
+      written: false,
+      warning: `could not create the per-worktree state/cache dirs: ${envErrorMessage(error)}`,
+    };
+  }
+  const checkIgnore = request.checkIgnore ?? defaultCheckIgnore;
+  const ignored = checkIgnore(worktreePath, ".arggon.env");
+  const gitignored = ignored === undefined ? undefined : ignored;
+  // .env seeding: copy-if-absent, never read for interpretation, never
+  // overwritten (COPYFILE_EXCL makes the guarantee race-safe).
+  let seededDotenv: string | undefined;
+  const dotenvSource = join(primaryRoot, ".env");
+  const dotenvTarget = join(worktreePath, ".env");
+  if (!existsSync(dotenvTarget) && existsSync(dotenvSource)) {
+    try {
+      copyFileSync(dotenvSource, dotenvTarget, fsConstants.COPYFILE_EXCL);
+      seededDotenv = dotenvTarget;
+    } catch (error) {
+      warnings.push(`could not seed .env: ${envErrorMessage(error)}`);
+    }
+  }
+  const envPath = join(worktreePath, ".arggon.env");
+  if (existsSync(envPath)) {
+    return {
+      written: false,
+      path: envPath,
+      ...(gitignored !== undefined ? { gitignored } : {}),
+      ...(seededDotenv !== undefined ? { seededDotenv } : {}),
+      warning: "already exists — left byte-identical (never overwritten)",
+    };
+  }
+  // `KEY=value` lines, UTF-8, LF, no quoting; CR/LF is stripped from values so
+  // a hostile id/branch cannot split the line-oriented format.
+  const value = (raw: string): string => raw.replace(/[\r\n]+/g, " ");
+  const body =
+    [
+      `ARGON_ITEM=${value(request.identity.itemId)}`,
+      `ARGGON_WORKTREE_ID=${value(worktreeId)}`,
+      `ARGGON_WORKTREE_PATH=${value(resolve(worktreePath))}`,
+      `ARGGON_WORKTREE_BRANCH=${value(request.identity.branch)}`,
+      `ARGGON_STATE_DIR=${value(stateDir)}`,
+      `ARGGON_CACHE_DIR=${value(cacheDir)}`,
+    ].join("\n") + "\n";
+  try {
+    // `wx` fails when the file exists: the never-overwrite invariant holds
+    // even against a creator racing this write.
+    const fd = openSync(envPath, "wx");
+    try {
+      writeSync(fd, body, 0, "utf8");
+    } finally {
+      closeSync(fd);
+    }
+  } catch (error) {
+    if (existsSync(envPath)) {
+      // Lost a creation race: the file is there, leave it byte-identical.
+      return {
+        written: false,
+        path: envPath,
+        ...(gitignored !== undefined ? { gitignored } : {}),
+        ...(seededDotenv !== undefined ? { seededDotenv } : {}),
+        warning: "already exists — left byte-identical (never overwritten)",
+      };
+    }
+    warnings.push(`could not write .arggon.env: ${envErrorMessage(error)}`);
+    return {
+      written: false,
+      ...(gitignored !== undefined ? { gitignored } : {}),
+      warning: warnings.join("; "),
+    };
+  }
+  return {
+    written: true,
+    path: envPath,
+    keys: [...WORKTREE_ENV_KEYS],
+    ...(seededDotenv !== undefined ? { seededDotenv } : {}),
+    ...(gitignored !== undefined ? { gitignored } : {}),
+  };
+}
+
 /** What dependency preparation found (or created) in a worktree. */
 export type WorktreeInstallState = "linked" | "existing" | "missing" | "unavailable";
 
@@ -1081,7 +1318,51 @@ export type WorktreeDependencyPreparation = {
   steps: WorktreePrepStep[];
   /** Present only when the log hit `MAX_PREP_STEPS` and entries were dropped. */
   stepsTruncated?: true;
+  /**
+   * The worktree env contract receipt (spec worktree-env-contract-016), when
+   * the caller requested it (`deps.env`) — present on every `start --worktree`
+   * run of both surfaces, absent from direct kernel callers that pass no
+   * `deps.env` (legacy shape unchanged). Best-effort: a `written: false` here
+   * never blocks the claim.
+   */
+  env?: WorktreeEnvReceipt;
 };
+
+/**
+ * Remove the start-created env contract file from a worktree, if present
+ * (spec worktree-env-contract-016): an untracked `.arggon.env` blocks
+ * `git worktree remove` exactly like the start-created install link did
+ * (review F2), and the lifecycle that creates must also delete (exploration
+ * 017 F8). Ownership mirrors `unlinkNodeModulesLink`: only a file whose every
+ * line is one of the six documented `KEY=value` pairs counts as start-created
+ * shape — an adopter-customized env file (comments, extra keys, a symlink) is
+ * adopter-owned and left for git to report. Returns true only when a matching
+ * file was removed. Best-effort: never throws.
+ */
+export function unlinkWorktreeEnv(worktreePath: string): boolean {
+  const envPath = join(worktreePath, ".arggon.env");
+  let raw: string;
+  try {
+    if (lstatSync(envPath).isSymbolicLink()) return false; // never remove a link
+    raw = readFileSync(envPath, "utf8");
+  } catch {
+    return false;
+  }
+  const lines = raw.split("\n");
+  if (lines.pop() !== "") return false; // the contract file ends with a newline
+  if (lines.length === 0) return false;
+  const keys = new Set<string>(WORKTREE_ENV_KEYS);
+  for (const line of lines) {
+    const eq = line.indexOf("=");
+    if (eq <= 0 || !keys.has(line.slice(0, eq))) return false;
+  }
+  try {
+    rmSync(envPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Prepare a worktree's project dependencies before its claim commit.
@@ -1098,8 +1379,14 @@ export type WorktreeDependencyPreparation = {
 export function prepareWorktreeDependencies(
   primaryRoot: string,
   worktreePath: string,
-  deps: { runBuild?: WorkspaceBuildRunner } = {},
+  deps: { runBuild?: WorkspaceBuildRunner; env?: WorktreeEnvRequest } = {},
 ): WorktreeDependencyPreparation {
+  // Worktree env contract (spec worktree-env-contract-016): runs first and
+  // best-effort, so even a later install-gate refusal leaves the kept
+  // worktree with its env contract in place. Absent `deps.env` = the caller
+  // did not request env preparation: the receipt keeps its legacy shape.
+  const envReceipt =
+    deps.env === undefined ? undefined : prepareWorktreeEnv(primaryRoot, worktreePath, deps.env);
   const worktreeModules = join(worktreePath, "node_modules");
   // Bounded preparation log (bug-start-install-ordering): every decision is
   // recorded, never silent — the link outcome, each workspace build decision
@@ -1164,6 +1451,7 @@ export function prepareWorktreeDependencies(
     gateBins,
     steps,
     ...(stepsTruncated ? { stepsTruncated: true as const } : {}),
+    ...(envReceipt !== undefined ? { env: envReceipt } : {}),
   };
 }
 

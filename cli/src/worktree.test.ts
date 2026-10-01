@@ -647,6 +647,76 @@ describe("start --worktree prepares the worktree and keeps it on failure (bug-st
     expect(readlinkSync(join(expectedPath, "node_modules"))).toBe(join(dir, "node_modules"));
   });
 
+  it("writes the worktree env contract and never overwrites it on attach (spec worktree-env-contract-016)", () => {
+    const dir = initRepo();
+    writeFileSync(join(dir, ".env"), "SECRET=primary\n", "utf8");
+    const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
+
+    const created = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    // Fresh start: the six documented keys, the seeded .env, and the probe.
+    expect(created.env.written).toBe(true);
+    expect(created.env.keys).toEqual([
+      "ARGON_ITEM",
+      "ARGGON_WORKTREE_ID",
+      "ARGGON_WORKTREE_PATH",
+      "ARGGON_WORKTREE_BRANCH",
+      "ARGGON_STATE_DIR",
+      "ARGGON_CACHE_DIR",
+    ]);
+    expect(created.env.seededDotenv).toBe(join(expectedPath, ".env"));
+    expect(created.env.gitignored).toBe(true); // init's generated .gitignore carries .arggon.env
+    const envFile = join(expectedPath, ".arggon.env");
+    const raw = readFileSync(envFile, "utf8");
+    expect(raw).toContain(`ARGON_ITEM=task-alpha\n`);
+    expect(raw).toContain(`ARGGON_WORKTREE_ID=${basename(dir)}-task-alpha\n`);
+    expect(raw).toContain(`ARGGON_WORKTREE_BRANCH=feat/task-alpha\n`);
+    // The claim commit staged only the item file: the env file is never
+    // committed (the smoke's "contains only the item file" leg proves it
+    // end-to-end; here the worktree status names the env file untracked).
+    const status = spawnSync("git", ["status", "--porcelain"], {
+      cwd: expectedPath,
+      encoding: "utf8",
+    });
+    expect(status.stdout).not.toMatch(/^A\s+\.arggon\.env$/m);
+
+    // Attach: byte-identical, seeded .env untouched, written:false + reason.
+    writeFileSync(envFile, "ARGON_ITEM=adopter-owned\n", "utf8");
+    writeFileSync(join(expectedPath, ".env"), "SECRET=adopter\n", "utf8");
+    const attached = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+    expect(readFileSync(envFile, "utf8")).toBe("ARGON_ITEM=adopter-owned\n");
+    expect(readFileSync(join(expectedPath, ".env"), "utf8")).toBe("SECRET=adopter\n");
+    expect(attached.env.written).toBe(false);
+    expect(attached.env.path).toBe(envFile);
+    expect(attached.env.warning).toContain("byte-identical");
+  });
+
+  it("honors x-worktree.env: false — no env file, written:false + reason", () => {
+    const dir = initRepo();
+    appendFileSync(join(dir, "ArggonManager/.convention.yml"), "x-worktree:\n  env: false\n");
+    commitAllIfDirty(dir, "disable the env contract");
+    const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);
+
+    const result = runStart(
+      { cwd: dir, id: "task-alpha", assignee: "arggon", worktree: true, now: NOW },
+      { git: localGit() },
+    );
+
+    expect(result.env).toEqual({
+      written: false,
+      warning: "disabled via x-worktree.env: false",
+    });
+    expect(existsSync(join(expectedPath, ".arggon.env"))).toBe(false);
+    // The claim still landed: the opt-out never blocks the claim path.
+    expect(result.committed).toBe(true);
+  });
+
   it("tells the user to push manually when the push step fails, and attach does not retry it", () => {
     const dir = initRepo();
     const expectedPath = resolve(dirname(dir), `${basename(dir)}-task-alpha`);

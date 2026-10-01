@@ -1434,7 +1434,11 @@ async function main(): Promise<void> {
         ...(id !== "" ? { id } : {}),
       });
     }
-    writeFileSync(join(repo, ".gitignore"), `node_modules/\n${WORKSPACE_DIR}/index.js\n`, "utf8");
+    writeFileSync(
+      join(repo, ".gitignore"),
+      `node_modules/\n${WORKSPACE_DIR}/index.js\n.arggon.env\n`,
+      "utf8",
+    );
     writeManifest(repo);
     writeWorkspacePackage(repo);
     gitOrThrow(repo, ["init", "-q"]);
@@ -1619,9 +1623,66 @@ async function main(): Promise<void> {
       `${canonicalBefore.path}: ${canonicalBefore.entries} entries before\ndrift: ${installDrift(canonicalBefore, installFingerprint(canonical)).join("; ") || "none"}`,
     );
 
+    // --- 3b. the worktree env contract (spec worktree-env-contract-016) ---
+    const envReceipt = (preparation.env ?? {}) as Record<string, unknown>;
+    const envPath = join(worktree, ".arggon.env");
+    const envRaw = existsSync(envPath) ? readFileSync(envPath, "utf8") : "";
+    const envLines = envRaw.split("\n");
+    const envKeys = envLines
+      .filter((line) => line.includes("="))
+      .map((line) => line.slice(0, line.indexOf("=")));
+    const envValue = (key: string): string =>
+      envLines.find((line) => line.startsWith(`${key}=`))?.slice(key.length + 1) ?? "";
+    const stateDir = envValue("ARGGON_STATE_DIR");
+    const cacheDir = envValue("ARGGON_CACHE_DIR");
+    check(
+      report,
+      "the env contract: .arggon.env written with exactly the six documented keys",
+      envReceipt.written === true &&
+        JSON.stringify(envReceipt.keys) ===
+          JSON.stringify([
+            "ARGON_ITEM",
+            "ARGGON_WORKTREE_ID",
+            "ARGGON_WORKTREE_PATH",
+            "ARGGON_WORKTREE_BRANCH",
+            "ARGGON_STATE_DIR",
+            "ARGGON_CACHE_DIR",
+          ]) &&
+        envLines[envLines.length - 1] === "" &&
+        envKeys.join(",") === envReceipt.keys?.join(","),
+      `receipt: ${JSON.stringify(envReceipt)}\nfile: ${JSON.stringify(envRaw)}`,
+    );
+    check(
+      report,
+      "the env contract: identity values match the worktree (id, dir, path, branch)",
+      envValue("ARGON_ITEM") === ITEM_ID &&
+        envValue("ARGGON_WORKTREE_ID") === `repo-${ITEM_ID}` &&
+        envValue("ARGGON_WORKTREE_PATH") === worktree &&
+        envValue("ARGGON_WORKTREE_BRANCH") === `feat/${ITEM_ID}`,
+      `ARGON_ITEM=${envValue("ARGON_ITEM")}\nARGGON_WORKTREE_ID=${envValue("ARGGON_WORKTREE_ID")}\nARGGON_WORKTREE_BRANCH=${envValue("ARGGON_WORKTREE_BRANCH")}`,
+    );
+    check(
+      report,
+      "the env contract: per-OS state/cache dirs exist and carry the worktree suffix",
+      stateDir.endsWith(`repo-${ITEM_ID}`) &&
+        cacheDir.endsWith(`repo-${ITEM_ID}`) &&
+        stateDir !== "" &&
+        cacheDir !== "" &&
+        existsSync(stateDir) &&
+        existsSync(cacheDir),
+      `ARGGON_STATE_DIR=${stateDir} (exists: ${existsSync(stateDir)})\nARGGON_CACHE_DIR=${cacheDir} (exists: ${existsSync(cacheDir)})`,
+    );
+    check(
+      report,
+      "the env contract: the gitignore probe reports the fixture rule, and the claim commit stays env-free",
+      envReceipt.gitignored === true && !committed.some((path) => path === ".arggon.env"),
+      `gitignored: ${String(envReceipt.gitignored)}\ncommit paths: ${committed.join(", ")}`,
+    );
+
     // --- 4. re-running start attaches, without a duplicate claim commit ----
     const headAfterFirst = gitOrThrow(worktree, ["rev-parse", "HEAD"]).trim();
     const markerAfterFirst = readFileSync(join(worktree, GATE_MARKER), "utf8").trim().split("\n");
+    const envBeforeAttach = readFileSync(envPath, "utf8");
     const second = (await start()).output;
     const headAfterSecond = gitOrThrow(worktree, ["rev-parse", "HEAD"]).trim();
     const claimCommits = gitOrThrow(worktree, ["log", "--format=%s", `refs/heads/feat/${ITEM_ID}`])
@@ -1665,6 +1726,21 @@ async function main(): Promise<void> {
               entry.pkg === WORKSPACE_PKG,
           ),
         `steps: ${JSON.stringify(secondSteps)}`,
+      );
+    }
+    {
+      // Attach env contract (spec worktree-env-contract-016): the existing
+      // .arggon.env is left byte-identical and the receipt says so.
+      const secondEnv = (((second.preparation ?? {}) as Record<string, unknown>).env ??
+        {}) as Record<string, unknown>;
+      check(
+        report,
+        "the attach re-run leaves .arggon.env byte-identical (never overwritten) and reports it",
+        secondEnv.written === false &&
+          typeof secondEnv.warning === "string" &&
+          secondEnv.warning.includes("byte-identical") &&
+          readFileSync(envPath, "utf8") === envBeforeAttach,
+        `receipt: ${JSON.stringify(secondEnv)}\nfile unchanged: ${readFileSync(envPath, "utf8") === envBeforeAttach}`,
       );
     }
     const claimed = readItemData(parseFrontmatter, findItemFile(worktree, ITEM_ID) ?? "");
