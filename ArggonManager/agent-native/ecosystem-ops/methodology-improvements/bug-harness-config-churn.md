@@ -61,3 +61,7 @@ DIRTY-.zcode START VERIFICATION (real seam, two disposable clones of this repo, 
 - Expected pre-fix (@ ff8ce2e5, file tracked) with harness-style rewrite: start refuses. Observed: "arggon start: working tree has changes that block start (commit or stash first): ... modified/staged tracked files ... .zcode/config.json" — bug reproduced.
 - Expected post-fix (@ 26884b3b, same rewrite present, now ignored): start --worktree succeeds, claim commit carries only the item file. Observed: "worktree: /tmp/opencode/sv-postfix-task-start-verify-post-fix-scratch (created) / node_modules: linked from the primary checkout (the project gate can run in the worktree) / pushed" — EXIT=0; claim commit 9e369630 staged exactly the item file through the gate.
 - Fresh clone: `git ls-files .zcode` is empty — no harness state resurrects. Migration for existing checkouts: the local .zcode/config.json stays on disk after pulling, now ignored; no action needed (recorded for the PR body).
+
+### handoff 2026-10-01 @ses_f0aa6a0b5ffeZK4Oie0nnXQU7V (session: ses_f0aa6a0b5ffeZK4Oie0nnXQU7V) — next: Review + merge PR (MERGE-merge, not squash — branch carries tracker auto-commits); coordinator flips done after merge
+- branch: fix/bug-harness-config-churn
+- open questions: None; note for reviewers: untracking means existing checkouts keep a now-ignored local .zcode/config.json
