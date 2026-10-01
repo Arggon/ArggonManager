@@ -33,7 +33,7 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-native-session-move-smok
 - [x] The leg also covers the negative direction: with the session root unresolvable, the call refuses with `SESSION_ROOT_UNRESOLVED` and nothing is written anywhere.
 - [x] Reuse the existing fixtures and helpers; do not build a second harness.
 - [x] `npm test`, `npm run lint`, `npm run build`, `npm run check:plugin`, `npm run lint:structure`, `npm run test:structure`, the smoke command and `arggon validate` are green.
-- [x] Record expected-vs-observed evidence on this item, including what the leg would have caught on the pre-fix code.
+- [x] Record expected-vs-observed evidence on this item, including a source-reasoned pre-fix comparison: the leg pins current per-call resolution end-to-end, but does NOT discriminate pre-#426 on the pinned host (2.0.21 builds the post-move plugin instance from the destination location, so a frozen cwd converges to the correct commit in this ordering) — the P1-signature fault is likely unreachable here.
 
 ## Notes
 
@@ -63,7 +63,7 @@ existed because that single link was assumed.
 - [x] The leg also covers the negative direction: with the session root unresolvable, the call refuses with `SESSION_ROOT_UNRESOLVED` and nothing is written anywhere.
 - [x] Reuse the existing fixtures and helpers; do not build a second harness.
 - [x] `npm test`, `npm run lint`, `npm run build`, `npm run check:plugin`, `npm run lint:structure`, `npm run test:structure`, the smoke command and `arggon validate` are green.
-- [x] Record expected-vs-observed evidence on this item, including what the leg would have caught on the pre-fix code.
+- [x] Record expected-vs-observed evidence on this item, including a source-reasoned pre-fix comparison: the leg pins current per-call resolution end-to-end, but does NOT discriminate pre-#426 on the pinned host (2.0.21 builds the post-move plugin instance from the destination location, so a frozen cwd converges to the correct commit in this ordering) — the P1-signature fault is likely unreachable here.
 
 ## Notes
 
@@ -83,7 +83,7 @@ live defect.
 
 **Expected vs observed** — expected: commit `chore(tasks): commented task-cold-move-leg` on `feat/task-cold-move-leg` in the worktree, gate marker reading `move gate ran in <worktree>`, primary HEAD and porcelain identical before/after, one execute round + one closing text round. Observed: all of it, twice (two consecutive smoke runs, 42/42 checks each; the second run's log: /tmp/opencode/move-smoke-run2.log). Negative direction: `GET /api/session/<unknown>` on the real server returns 404 (the observed no-record shape); the REAL plugin exports (`sessionDirectoryResolver` + `resolveToolCwd`) driven with that absence refuse with `error.code: SESSION_ROOT_UNRESOLVED` naming the session and the refused fallback, for both the undefined-record and the throwing-lookup flavors, and git state is asserted unchanged afterward.
 
-**What the leg would have caught on the pre-fix code**: `resolveToolCwd` falling back to `options.cwd` (the plugin instance location = the primary) would land the comment commit on the PRIMARY's current branch — the exact d24215b9/b65ef7c6/adacc20a signature. `moveLegFaults` asserts both directions: "no `chore(tasks): commented …` commit on the worktree branch" AND "the P1 signature: the comment commit landed on the primary's branch", so the pre-fix behavior fails the leg twice.
+**What the leg proves about the pre-fix code — reasoned from source, not executed (corrected 2026-10-01 after reviewer verification)**: the leg pins CURRENT per-call resolution end-to-end (real server, real session.move, real plugin instance, real gate): the commit lands on the item branch in the worktree only, with the primary untouched. The pre-fix comparison is an argument from source, not an executed regression: on opencode 2.0.21 the plugin instance that answers the tool call is built AT MOVE TIME from the DESTINATION location (`packages/core/src/session/move.ts` — `resolveDestination` runs `locations.contextEffect(destination.location)`; consistent with this leg's own observation that the registration line appears only after the move), so on pre-#426 code the frozen `options.cwd` would resolve to the WORKTREE in this ordering too and the comment would still commit correctly — the P1-signature fault (`moveLegFaults`: "the comment commit landed on the primary's branch") is therefore likely UNREACHABLE on the pinned host, and this leg's positive assertions do not discriminate pre-#426 vs post-#426 there (reviewer's analysis, cited). What the fault still guards is the invariant on hosts whose plugin instance is NOT destination-loaded, and the negative direction's `SESSION_ROOT_UNRESOLVED` refusal is independent of this ordering.
 
 **What remains simulated (coordinator-adjudicated)**: only the model's DECISION (a canned tool call instead of an LLM) and, for the negative direction, the resolver's INPUT — the host cannot carry a live tool call for a session it has no record of, so the refusal is driven at the plugin seam with the host's observed absence, not through a live call. The session, the move, the plugin registration, the tool execution, the gate and the commit are all the real host's.
 
