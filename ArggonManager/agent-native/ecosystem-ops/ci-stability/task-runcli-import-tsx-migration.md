@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-runcli-import-tsx-migration
 title: "Migrate the remaining spawn-chain helpers (success-stdout, doctor, validate, headless-ci) from the tsx wrapper CLI to node --import tsx"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [testing, flaky]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T02:44:38.110Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-runcli-import-tsx-migration
 ---
 <!--
