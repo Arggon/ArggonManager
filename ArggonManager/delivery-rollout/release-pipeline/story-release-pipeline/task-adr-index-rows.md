@@ -1,8 +1,10 @@
 ---
 type: task
-status: todo
+status: done
 id: task-adr-index-rows
 title: "ADR index: add missing rows 0014-0017"
+assignee: Arggon
+branch: feat/task-adr-index-rows
 parent: story-release-pipeline
 labels: [docs, housekeeping]
 priority: p3
@@ -26,7 +28,12 @@ the index must mirror the `Status:` line of each ADR file exactly.
 
 ## Acceptance
 
-- [ ] `docs/adr/README.md` gains rows for 0014 (zcode-native-seam), 0015 (done-gate-acceptance-waiver), 0016 (adopter-upgrade-channel — now Accepted), 0017 (greenfield-exploration-gate), each with the title and status taken verbatim from the ADR file's front matter/status line.
-- [ ] No other rows or content change in the file.
+- [x] `docs/adr/README.md` gains rows for 0014 (zcode-native-seam), 0015 (done-gate-acceptance-waiver), 0016 (adopter-upgrade-channel — now Accepted), 0017 (greenfield-exploration-gate), each with the title and status taken verbatim from the ADR file's status line.
+- [x] No other rows or content change in the file (diff: 4 added rows only; PR #539, merged 327cd31d, all lanes green).
 
 ## Notes
+
+### 2026-10-01 @ses_f0870e73affeEVvaFZPi9K7NDj
+Done via PR #539 (merged 327cd31d, all lanes green; coordinator-inline, mechanical docs change with self-review: the four added rows' statuses diffed verbatim against each ADR file's status line — 0014/0015 "Proposed (Accepted on merge)", 0016/0017 Accepted).
+
+Observation kept out of scope (tracker owner's call): ADRs 0014/0015 still carry the "Accepted on merge" annotation without the flip — same lag class 0016 had. A tiny follow-up with per-ADR merge evidence can flip both if wanted.

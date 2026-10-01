@@ -67,6 +67,15 @@ Operational duties accepted:
 - `task-ci-seam-pin-tracks-release` (derive the seam's `ARGGON_VERSION` pin
   from the root version) lands with or before the pipeline, so publishing
   and pinning cannot diverge.
+  > Amendment (2026-10-01, PR #544): the mechanism resolved to a
+  > **guard-enforced literal pin** — run-time derivation was rejected with
+  > evidence: between the release version bump and the npm publish the
+  > derived version does not exist on the registry, so a derived pin turns
+  > `tasks-validate` red on main and on the very release PR whose green CI
+  > gates the merge (the #527 outage class, made routine). Non-divergence is
+  > instead enforced by `cli/src/ci-seam-pin.test.ts`, which fails when the
+  > pin lags the root `package.json` version or the newest `arggonVersion`
+  > stamp. See task-ci-seam-pin-tracks-release for the full decision record.
 
 ### 2. Skew hardening: exact kernel pin, bumped in lockstep
 
