@@ -89,3 +89,7 @@ FIX 2 — reconciled with main (merged origin/main cleanly, c71f842e; #564 patte
 FIX 3 — rulings encoded as docs text: (a) in the spec errata + pattern-doc receipt note ("written means this run created the file" — matches the kernel doc comment verbatim); (b) in the spec errata + pattern-doc note line.
 
 GATES (post-fix, on the pushed head): npm test 2068/2068 green; lint clean; build green; check:plugin green (regen committed separately 58bfce5c); smoke:native-start-cold 47/47 with all 5 env legs; npm run arggon -- validate ok:true (pre-commit gate on both commits).
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Final verdict: approve — reviewer PASS 10/10 spec boxes with per-box trace-to-test; rulings encoded in docs: attach `written:false` ACCEPTED (written = this run created the file; spec errata marks the 3-case list incomplete + adds the attach case); Windows state/cache co-location ACCEPTED as documented (isolation = per-worktree uniqueness); cleanup env-reap shipped with the reviewer's caveat stated plainly in the pattern doc (value-only edits of a contract-shaped file ARE reaped); the seed-warning drop fixed + tested (never-silent invariant restored). Merged: PR #566 squash -> main (f2117c06; CI green on the reconciled head; smoke 47/47 incl. the 5 env legs + the env-free claim-commit leg). Item done. Follow-ups: task-cleanup-declared-services unblocked; pattern-doc table reconciled in-PR.
