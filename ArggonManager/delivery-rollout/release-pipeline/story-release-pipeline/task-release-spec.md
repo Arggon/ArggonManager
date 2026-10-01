@@ -103,3 +103,12 @@ Review fixes F2–F4 applied (commit 2bc6b10b, PR #545 head; F1 already on 0b99e
 ### handoff 2026-10-01 @ses_f0800e936ffeMAm3ZjdNqUVXgW (session: ses_f0800e936ffeMAm3ZjdNqUVXgW) — next: Coordinator: re-review PR #545 at head 2bc6b10b (F2–F4); reconcile task-release-workflow T3 mirror to the ordered predicate.
 - branch: main
 - open questions: workflow-item T3 mirror drift (old guard wording, outside my edit scope this round); direct-push trust boundary wording sign-off
+
+### 2026-10-01 @ses_f0870e73affeEVvaFZPi9K7NDj
+Completed via PR #545 (merged ec495bab). Review trail: reviewer verdict request-changes on the pre-fix head — F1 (pin semantics) was already resolved on 0b99eb83 by the recovery session (Interplay/T0/sources rewritten to the guard-enforced literal pin, citing the recorded task-ci-seam-pin-tracks-release decision); F2 (ordered trigger predicate — rule 0 first, steady state permanently green), F3 (invariant 7 restated enforceably + direct-push trust boundary in the edge table), F4 (approval-required CI on GITHUB_TOKEN-created release PRs: "Approve workflows" named in Flow step 3 and A12) applied on 2bc6b10b and coordinator-verified on the merged head; two prose-format gate violations caught pre-CI and fixed (e8dea1f4).
+
+Gates: spec validate ok (26 docs, 0 warnings); spec analyze --baseline 0 NEW / 6 unchanged; arggon validate ok; ci/ui-smoke/tasks-validate green at merge.
+
+Deliverables: spec-release-pipeline-015 + plan-release-pipeline-015 (T0–T8) + committed analyze baseline; task-release-workflow checklist mirrors the plan (T3 = ordered predicate).
+
+Next: task-release-workflow is wave 2 — unblocked (spec landed + analyze clean + seam-pin landed).
