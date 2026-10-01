@@ -16,14 +16,27 @@ depends_on: [task-env-contract-start]
   parent MUST be the story id. Omit assignee when unassigned. Omit blocked_reason unless status is blocked.
 -->
 
-# cleanup-declared-services
+# cleanup --prune reaps per-worktree Compose projects only when the repo declares them
 
 ## Context
 
-<!-- Why this task exists. -->
+The reaping side of [ADR 0018](../../../../docs/adr/0018-worktree-runtime-isolation.md)
+layer 2: an adopter following the per-worktree services pattern creates a
+Compose project named `<repo>-<item-id>` per worktree; when the worktree is
+reaped (`cleanup --prune`), the project must go with it — or it becomes
+permanent docker residue (exploration 016 F2/F8: 3.3 GB reclaimable observed
+on one machine). Safety by construction: the kernel may invoke Docker **only**
+for projects the repo's committed convention declares (a Compose/services
+manifest naming the project); with no declaration — or no Docker — cleanup
+stays report-only. Sequencing only: `depends_on: task-env-contract-start`
+settles the convention shapes this task consumes.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] `cleanup` lists (and with `--prune` removes) Compose projects whose name matches the declared convention, only for worktrees that otherwise qualify (done/cancelled + merged branch).
+- [ ] No Docker invocation when the repo declares nothing or Docker is absent — the report-only path is covered by tests that need no daemon (CI-safe).
+- [ ] Removal uses `docker compose -p <repo>-<item-id> down -v --remove-orphans`; failures land in the existing `failures[]` surface (see task-cleanup-json-exit-code for the exit-code contract) and never abort the run.
+- [ ] Docs updated in the same PR (README cleanup section; `json-output.md` if the payload changes); impact class stated; skill copies byte-equal.
+- [ ] `npm test` green; `arggon validate` ok.
 
 ## Notes

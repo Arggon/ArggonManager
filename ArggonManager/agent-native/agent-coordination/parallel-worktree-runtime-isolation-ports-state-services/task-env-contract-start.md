@@ -15,14 +15,24 @@ updated: "2026-10-01"
   parent MUST be the story id. Omit assignee when unassigned. Omit blocked_reason unless status is blocked.
 -->
 
-# env-contract-start
+# Implement the worktree env contract in start (spec worktree-env-contract-015)
 
 ## Context
 
-<!-- Why this task exists. -->
+Implements layer 1 of [ADR 0018](../../../../docs/adr/0018-worktree-runtime-isolation.md):
+`start --worktree` (CLI + native `tools.arggon.start`) writes the gitignored
+`.arggon.env` (six documented keys incl. `ARGON_ITEM` for plugin correlation),
+seeds `.env` copy-if-absent, creates the per-OS suffixed state/cache dirs, and
+reports the additive `preparation.env` receipt field. The contract is
+filesystem-only and portable (linux/macos/windows), best-effort by design —
+it never blocks the claim. The reviewable contract is
+`ArggonManager/docs/specs/spec-worktree-env-contract-015.md`; the breakdown is
+`ArggonManager/docs/plans/plan-worktree-env-contract-015.md` (T1–T4).
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] Every acceptance box in `spec-worktree-env-contract-015` is ticked — those ten verifiable boxes are the contract for this task (kernel unit tests, never-overwrite, seed-only-if-absent, per-OS dirs, additive receipt on both surfaces, env files never committed, `x-worktree.env: false` opt-out, init gitignore, docs same PR, tests/smoke green).
+- [ ] PR references this item id and the spec id; impact class **Behavioral** stated in the PR (ADR 0016) — new receipt field + convention key.
+- [ ] Coordinator review verdict recorded on this item before merge.
 
 ## Notes

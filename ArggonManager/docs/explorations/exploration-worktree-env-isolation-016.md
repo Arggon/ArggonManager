@@ -1,7 +1,7 @@
 ---
 exploration_id: worktree-env-isolation-016
 title: "Parallel worktree runtime isolation: run N instances of a project with minimal resources"
-status: open
+status: resolved
 created: 2026-10-01
 ---
 
@@ -320,4 +320,10 @@ convention is a file format and a name, not a subsystem.
 
 ## Decision
 
-<!-- ADR reference placeholder: ArggonManager/docs/adr/0000-<slug>.md once the ADR lands. -->
+[ADR 0018 — Worktree runtime isolation: environment contract by default, ephemeral service containers as an opt-in pattern](../adr/0018-worktree-runtime-isolation.md)
+records the decision (status: Proposed; **accepted by the product owner on
+2026-10-01**, ADR flips to Accepted at merge). Implementation follows
+[spec-worktree-env-contract-015](../specs/spec-worktree-env-contract-015.md)
+with [plan](../plans/plan-worktree-env-contract-015.md); follow-up tasks are
+filed under the
+`parallel-worktree-runtime-isolation-ports-state-services` story.
