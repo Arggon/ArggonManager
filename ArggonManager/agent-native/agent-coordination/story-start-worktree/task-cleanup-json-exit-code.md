@@ -66,3 +66,7 @@ verdict: approve (lead-architect review; merge blocked ONLY by the red tasks-val
 ### 2026-10-01 @Coordinator
 ### 2026-10-01 @Coordinator
 Final verdict: approve — reviewer pass complete (scope exact, contract documented accurately incl. the human-path divergence, discriminating human-path test with #515's proven refusal mechanics, flip-matrix verified); the red tasks-validate was my 0.4.1-seam drift, fixed by the 6ff1d99d pin. Merging.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Merged: PR #527 squash -> main (all lanes green on the reconciled head; the interim tasks-validate red was my 0.4.1 seam drift, fixed via the 6ff1d99d pin + the release.md re-pin step). Also dropped an unticked duplicate checklist set (rebase union artifact) — criteria were met once. Item done. Follow-ups: task-ci-seam-pin-tracks-release, bug-start-install-ordering (its handoff recorded the install incident).
