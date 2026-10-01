@@ -103,3 +103,12 @@ SMOKE: scratch fixture at /tmp/opencode/seam-pin-fixture with pin 0.4.0 / packag
 ### handoff 2026-10-01 @ses_f0800e929ffe07GoJECvBzDE1W (session: ses_f0800e929ffe07GoJECvBzDE1W) — next: Review PR #544 (head a162e280); merge if the literal-pin+lag-guard decision is accepted; then the ADR 0018 parenthetical amendment.
 - branch: feat/task-ci-seam-pin-tracks-release
 - open questions: ADR 0018 §Decision 1 still says "derive the pin" — needs the coordinator's one-line amendment PR; primary checkout may still show headless-ci.test.ts dirty (pre-existing, stashed).
+
+### 2026-10-01 @ses_f0870e73affeEVvaFZPi9K7NDj
+Completed via PR #544 (merged 0ee659fa) after reviewer verdict: approve — the red path was re-derived independently (sed fixture in /tmp) and the falsifiability attack on the red-window claim failed on every premise (triggers, registry-pinned install, runbook order, ADR 0018 §1 flow).
+
+Resolution: literal pin kept + lag-guard test (cli/src/ci-seam-pin.test.ts) — derivation rejected with recorded evidence (decision comment above); runbook re-pin step is guard-enforced; adopter template keeps its literal pin by design (asserted). Acceptance amended with a dated note: criterion 1 ("derived/automated") resolved as guard-enforced — invariant unchanged, mechanism is loud detection instead of prevention. Item title updated accordingly.
+
+Superseded wording corrected at the sources: ADR 0018 dated amendment (d70817c8). Downstream consumers aligned: release-pipeline spec Interplay/T0 rewritten to the guard design (PR #545 head 0b99eb83 + review fixes in flight); task-release-spec Context line corrected on main.
+
+Reviewer nits noted for the future owner (optional, not blocking): verdict-table row for "pin == pkg while stamps newer" and a temp-file fixture for the file-based red path.
