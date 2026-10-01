@@ -74,3 +74,10 @@ self-reports the exact release commit.
   is already in the tarball).
 - Parallel branches that touch publish-relevant fields must rebase over the
   release commit (the guard compares against tags, not branches).
+- **Re-pin the seam check**: after publishing, bump `ARGGON_VERSION` in
+  `.github/workflows/arggon.yml` to the released version — CI validates the
+  committed seam against what that version generates, and a stale pin turns
+  `tasks-validate` red on main and every open PR (hit at 0.4.1: the init
+  regeneration was 0.4.1-shaped while the pin said 0.4.0).
+  `task-ci-seam-pin-tracks-release` tracks deriving the pin from
+  `package.json` so this cannot diverge again.
