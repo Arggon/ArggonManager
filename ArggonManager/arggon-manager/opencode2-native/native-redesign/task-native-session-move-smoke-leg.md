@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-native-session-move-smoke-leg
 title: Add a real-runtime smoke leg proving a session that moved into a worktree commits to the worktree branch
+assignee: Arggon
+branch: feat/task-native-session-move-smoke-leg
 parent: native-redesign
 labels: [opencode-seam, worktree, smoke]
 priority: p3
 created: "2026-09-28"
-updated: "2026-09-28"
+updated: "2026-10-01"
+claimed_at: "2026-10-01T18:46:38.916Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-native-session-move-smoke-leg
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-native-session-move-smoke-leg.md
