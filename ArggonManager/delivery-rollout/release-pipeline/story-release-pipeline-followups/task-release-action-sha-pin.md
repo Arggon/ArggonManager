@@ -57,3 +57,7 @@ Evidence for review (worktree /home/arggon/Projects/ArggonManager-task-release-a
 - npm run arggon -- validate: ok (0 warnings, convention v5).
 - npm test: 115/115 files, 2053/2053 passed. Note: first run had 1 file failing on the dist/cli.js build-artifact assertion — fresh worktree lacked the gitignored build; npm run build fixed it, second run fully green. Unrelated to this YAML-only diff.
 - Commit 22cadcc8 "ci(release): SHA-pin release-please-action to v4.4.1 (task-release-action-sha-pin)"; PR https://github.com/Arggon/ArggonManager/pull/563 (NOT merged; coordinator decides completion).
+
+### handoff 2026-10-01 @ses_f0697a26fffdSSbEC0G9eu6TPK (session: ses_f0697a26fffdSSbEC0G9eu6TPK) — next: Review+merge PR #563; afterwards bump the pin when a newer v4.x ships (re-run git ls-remote, update SHA+comment).
+- branch: feat/task-release-action-sha-pin
+- open questions: actions/checkout@v4 SHA-pinning is a separate follow-up if the story wants repo-wide pin hygiene.
