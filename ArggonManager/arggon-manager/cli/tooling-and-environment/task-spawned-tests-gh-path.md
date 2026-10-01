@@ -56,8 +56,8 @@ Filed from the bug-frontmatter-ambiguous-plain-scalar-loss worker's environment 
 With the mise gh shim off PATH, 10 spawned-CLI tests fail (measure x8, comment x1, plugin tools x1) with "could not resolve comment author" — the error names the wrong missing dependency. Environmental (CI has gh; local dev may not), but the diagnosis cost the worker time.
 
 ## Acceptance
-- [ ] Comment-author resolution either degrades gracefully without gh (documented fallback) or the failing tests assert an actionable precondition (skip with reason naming 'gh not found on PATH').
-- [ ] Error message for the missing dependency names 'gh' (not 'comment author').
+- [x] Comment-author resolution either degrades gracefully without gh (documented fallback) or the failing tests assert an actionable precondition (skip with reason naming 'gh not found on PATH'). (2026-10-01, PR #558: documented fallback chain GITHUB_USER -> GITHUB_ACTOR -> gh -> git config user.name, in lib/src/list.ts resolveCurrentLoginDetailed.)
+- [x] Error message for the missing dependency names 'gh' (not 'comment author'). (PR #558: lib/src/comment.ts distinguishes absent vs unauthenticated gh; item lookup now precedes author resolution so caller errors are never masked.)
 - [ ] Full suite green in an environment without gh on PATH (or every affected test skips with the actionable reason).
 
 ### 2026-10-01 @Arggon
