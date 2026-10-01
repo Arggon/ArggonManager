@@ -24,10 +24,12 @@ const TEST_FILE = /\.test\.[cm]?[jt]sx?$/;
 
 /**
  * Only `*.test.*` files are scanned: this gate owns the TEST spawn chains.
- * The two remaining product-side mentions (cli/src/measure.ts `cliCommand()`
- * and cli/src/mcp-server.ts `deriveDefaultCliSpawn()`) are deliberate,
- * tracked follow-ups on task-runcli-import-tsx-migration — product code is
- * out of scope there.
+ * Product code is not scanned, and since task-derive-cli-spawn-loader it no
+ * longer carries wrapper surface either: cli/src/measure.ts `cliCommand()`
+ * spawns through the same loader registration, and cli/src/mcp-server.ts
+ * `deriveDefaultCliSpawn()` keeps the wrapper shape only as a recognized
+ * back-compat form. The package.json `tsx`-bin script lanes (arggon/dev/
+ * smoke:*) are documented exceptions on that item.
  */
 
 /**

@@ -114,8 +114,10 @@ export type BudgetCheck = {
 
 /**
  * CLI invocation resolved from the RUNNING installation (bug-budget-adopter-
- * trees), never from the measured tree's cwd: from source (tsx, the repo
- * charter) when this module is cli/src/measure.ts, or from the installed
+ * trees), never from the measured tree's cwd: from source through tsx's
+ * loader registration (`node --import <tsx loader> <cli.ts>` — one node
+ * process, no wrapper re-exec/IPC server, the same spawn shape the test
+ * helper uses) when this module is cli/src/measure.ts, or from the installed
  * dist/cli.js of the executing arggon otherwise (adopter trees have no
  * cli/src — the measurement must work identically there). The measured tree
  * is only the SUBJECT (cwd of the spawned commands); the CLI binary always
@@ -129,7 +131,8 @@ export function cliCommand(): { file: string; args: string[] } {
     return {
       file: process.execPath,
       args: [
-        join(repoRoot, "node_modules", "tsx", "dist", "cli.mjs"),
+        "--import",
+        join(repoRoot, "node_modules", "tsx", "dist", "loader.mjs"),
         join(repoRoot, "cli", "src", "cli.ts"),
       ],
     };
