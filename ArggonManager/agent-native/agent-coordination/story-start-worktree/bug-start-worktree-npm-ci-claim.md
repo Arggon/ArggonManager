@@ -39,3 +39,7 @@ tools.arggon.start --worktree on a fresh worktree hit a claim-commit failure: th
 - [ ] Reproduce the cold-worktree claim-commit failure mode, or instrument start readiness to report WHICH node_modules tsx/bin resolve from (worktree vs primary vs sibling).
 - [ ] Either fix readiness to verify bin/tsx resolution inside the worktree, or extend the failure error to name the observed resolution source + the exact remediation (expected vs observed in the smoke).
 - [ ] npm run smoke:native-start-cold stays green; linkedNodeModules/linkedWorkspaces reporting unchanged or improved.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Second incident of the same class, from the bug-tsx-board-dead-script worker (PR #510): start --worktree left the worktree with no install, so the claim commit failed its pre-commit gate; worker recovered via worktree-local npm install + attach. Two independent occurrences (cycle-rotation worker: npm ci + sibling tsx resolution; board worker: no install at all) — strengthening this item's reproduce-first acceptance: capture BOTH flavors (missing install; wrong resolution source) in the readiness report.
