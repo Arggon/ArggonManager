@@ -66,3 +66,7 @@ No assertion weakened: the marker still proves document replacement; ceilings ar
 - A/B under identical throttle+load: OLD body 3/5 failed (same signature: marker poll, context destroyed); FIXED body 12/12 passed (load avg 11→23).
 - Acceptance loop: 10/10 passed with THROTTLE_CPU=20; plus full @smoke lane 33/33 unthrottled.
 - Gates: vitest 1957/1957, eslint clean, build clean, check:plugin no drift, arggon validate ok.
+
+### handoff 2026-10-01 @ses_f0aa6a0b5ffdBhJTdljdX8f59T (session: ses_f0aa6a0b5ffdBhJTdljdX8f59T) — next: Review PR (spec-only flake fix); merge closes the item — CI ui-smoke lane confirms.
+- branch: fix/bug-live-reload-sse-race
+- open questions: Whether repo-wide evaluate-based waits should be swept; found none other in this spec that can race a navigation.
