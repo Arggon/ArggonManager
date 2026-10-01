@@ -16,7 +16,13 @@
  * (`dist/cli.js board --serve --port 0`, an ephemeral free port) so the spec
  * exercises the shipped entry, not the TypeScript source.
  */
-import { expect, test, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+// `test` comes from the env-gated flake harness (task-flake-repro-throttle-
+// tool): with E2E_THROTTLE / E2E_SPINNERS set, any run of this spec arms CDP
+// CPU throttling plus host busy-spinners; without the env both fixtures are
+// strict no-ops, so the default @smoke lane is untouched. Usage and the
+// proven #521 recipe live in e2e/helpers/flake-harness.ts.
+import { test } from "./helpers/flake-harness.js";
 // Named import, not default: under `module: NodeNext` the package's `types`
 // condition resolves the CJS-paired index.d.ts, where `AxeBuilder as default`
 // is not honored and esModuleInterop synthesizes the module namespace as the
