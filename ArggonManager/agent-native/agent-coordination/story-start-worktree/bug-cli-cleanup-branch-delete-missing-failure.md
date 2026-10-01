@@ -177,3 +177,7 @@ verdict: approve (lead-architect review, PR #515)
 - Smoke: worker's real-git refusal fixture probe (expected vs observed: failures [] -> populated, record cleared, run continued) on the item.
 - Pre-existing exit-0-with-failures contract finding documented, not drive-by fixed — filed as task-cleanup-json-exit-code (p3).
 - Reviewer bars 1-5 pass; merge pending CI.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Merged: PR #515 squash -> main (CI cli/tasks-validate/ui-smoke green). Item flipped done. Follow-up filed: task-cleanup-json-exit-code (exit-0-with-failures contract decision).
