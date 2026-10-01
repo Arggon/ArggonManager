@@ -103,8 +103,7 @@ Environment gates (all exact, testable values):
 
 - **Location:** a single file, `arggon-update-check.json`, directly in
   `os.tmpdir()`. Nothing else is ever written; the repo tree is never touched.
-- **Format (version 1):** `{ "formatVersion": 1, "latest": "0.5.0",
-  "fetchedAt": "2026-10-01T09:30:00.000Z" }` — `latest` strict semver,
+- **Format (version 1):** `{ "formatVersion": 1, "latest": "0.5.0", "fetchedAt": "2026-10-01T09:30:00.000Z" }` — `latest` strict semver,
   `fetchedAt` ISO-8601 UTC. The `formatVersion` key is the migration contract:
   a cache file whose `formatVersion` differs from the running CLI's expected
   value (`1`) is a **miss** — overwritten by the next successful fetch, never

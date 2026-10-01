@@ -57,8 +57,7 @@ acceptance proof is an empty dependency diff in the implementation PR.
 
 ## T3: JSON surfaces (`doctor --json`, `--version --json`)
 
-- `runDoctor`'s result gains the always-present `update: { latest, current,
-  cachedAt }` (spec § Surfaces table; `current` from the package version —
+- `runDoctor`'s result gains the always-present `update: { latest, current, cachedAt }` (spec § Surfaces table; `current` from the package version —
   never `null`). The root `--version` handling learns `--json`: the standard
   success envelope `{ ok, schemaVersion: 1, conventionVersion, command:
   "version", version, update }` (human `--version` output byte-unchanged).
