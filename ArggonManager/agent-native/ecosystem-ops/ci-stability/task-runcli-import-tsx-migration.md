@@ -37,3 +37,7 @@ Filed from the bug-row-table-flake root cause (PR #513): the tsx wrapper CLI (ts
 - [ ] Migrate each to `node --import <abs>/tsx/dist/loader.mjs` (or the packed dist bin where the lane already uses one), preserving asserted stdout/stderr bytes.
 - [ ] Full suite green; each migrated suite run 10x locally without transient exit-1.
 - [ ] Confirm no remaining reference to tsx/dist/cli.mjs in test spawn chains (grep gate or follow-up note).
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Inventory precision from the PR #513 mechanical review: runCli copies spawning the tsx wrapper CLI exist in doctor.test.ts:48, success-stdout.test.ts:30, and ~33 further files (~35 total) — the acceptance inventory should confirm that count and sweep all of them; consider extracting ONE shared spawn helper instead of 35 per-file copies.
