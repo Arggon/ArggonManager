@@ -72,3 +72,6 @@ OPEN (not filed from here, flagged for coordinator): single-writer enforcement f
 ### handoff 2026-10-01 @ses_f06c45a3fffePcjwiADfQ455Bi (session: ses_f06c45a3fffePcjwiADfQ455Bi) — next: Coordinator: review PR #523 (exploration 017 + ADR 0019 + spec/plan 016, renumbered after main took 016/0018/015); ADR flips Accepted at merge; renumber again only if 0019/016 get taken meanwhile.
 - branch: main
 - open questions: Single-writer enforcement for claimed worktrees (exploration F12) - kernel/plugin detect+refuse a second live session? Needs an owner decision, no task filed; PR #523 title/body still reference the i…
+
+### 2026-10-01 @ses_f06c45a3fffePcjwiADfQ455Bi
+Correction to the handoff above: 'branch: main' is a wrong auto-detection (the tool ran from the primary checkout — same trap ses_f0821d67 hit on task-ci-seam-pin-tracks-release). The item branch is feat/task-record-exploration-016-worktree-runtime-isolation, head e3028921 (renumber + incident findings), PR #523. Tracker note: the comment/handoff sections were auto-committed on main (4000d1b3, e728abb9) while the claim commit (1ae3f286) lives on the branch — merging origin/main into the branch next so the item file reconciles on both sides before PR merge.
