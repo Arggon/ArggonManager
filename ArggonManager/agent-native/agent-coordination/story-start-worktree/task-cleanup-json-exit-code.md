@@ -27,3 +27,12 @@ updated: "2026-10-01"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Filed from the bug-cli-cleanup-branch-delete-missing-failure review (PR #515). Pre-existing, confirmed identical before/after: the --json path of cleanup --prune returns before the human path sets process.exitCode = 1 (cli.ts ~2401 vs ~2438), so a prune run with failures[] exits 0.
+
+## Acceptance
+- [ ] Decide the machine contract explicitly: does a non-empty failures[] mean non-zero exit for --json consumers? (Contract change -> document in json-output.md in the same PR; keeping 0 is also acceptable if documented.)
+- [ ] Implement + test the chosen behavior; human-path behavior unchanged.
+- [ ] Note for callers: agents/scripts keying on exit status today.
