@@ -20,6 +20,6 @@ updated: "YYYY-MM-DD"
 
 ## Acceptance
 
-- [ ] 
+<!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes

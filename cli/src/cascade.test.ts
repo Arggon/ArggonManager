@@ -518,6 +518,24 @@ describe("acceptance-aware cascade", () => {
     expect(acceptanceComplete("  - [ ] indented pending")).toBe(false);
     expect(acceptanceComplete("- [x] done\n- [ ] pending")).toBe(false);
   });
+
+  it("acceptanceComplete: an empty checkbox line is a placeholder, not a criterion (bug-empty-template-checkbox)", async () => {
+    const { acceptanceComplete } = await import("@arggondev/lib");
+    // Bare scaffold placeholders (with or without the trailing space, `*`
+    // bullet, or indentation) never count as unticked criteria.
+    expect(acceptanceComplete("## Acceptance\n\n- [ ] \n")).toBe(true);
+    expect(acceptanceComplete("- [ ]\n")).toBe(true);
+    expect(acceptanceComplete("  * [ ] \n")).toBe(true);
+    expect(acceptanceComplete("- [x] \n")).toBe(true);
+    // ...but a real criterion on the same body gates exactly as before.
+    expect(acceptanceComplete("- [ ] \n- [ ] real criterion")).toBe(false);
+    expect(acceptanceComplete("- [x] \n- [ ] real criterion")).toBe(false);
+    // The bug's shape: stale placeholder + fully-ticked real checklist
+    // (filed as a comment) is complete — no manual surgery needed.
+    expect(
+      acceptanceComplete("## Acceptance\n\n- [ ] \n\n### 2026-09-30 @worker\n\n- [x] filed late\n"),
+    ).toBe(true);
+  });
 });
 
 /**

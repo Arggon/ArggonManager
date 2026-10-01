@@ -174,15 +174,21 @@ function checkDependencies(items: SoftItem[], byId: Map<string, SoftItem>, error
     for (const dep of graph.get(id) ?? []) {
       const state = color.get(dep);
       if (state === "gray") {
-        const cycle = [...stack.slice(stack.indexOf(dep)), dep];
+        // The stack slice already closes on `dep`; keep the SIMPLE cycle (the
+        // slice itself — every member exactly once) so the rotation below can
+        // re-append the anchor and close the chain cleanly. (Rotating the
+        // closed walk split the repeated entry node across the halves:
+        // bug-dependency-cycle-chain-rotation-duplicates-a-node.)
+        const cycle = stack.slice(stack.indexOf(dep));
         const key = [...cycle].sort().join("\u0000");
         if (!reported.has(key)) {
           reported.add(key);
-          // Rotate the chain so it starts at the smallest id: the message and
-          // anchor path stay deterministic regardless of traversal order.
+          // Rotate the simple cycle so it starts at the smallest id, then
+          // close it on that anchor: the message and anchor path stay
+          // deterministic (byte-identical) regardless of traversal order.
           const anchorId = cycle.reduce((a, b) => (a < b ? a : b));
           const at = cycle.indexOf(anchorId);
-          const chain = [...cycle.slice(at), ...cycle.slice(0, at)];
+          const chain = [...cycle.slice(at), ...cycle.slice(0, at), anchorId];
           const anchor = byId.get(anchorId);
           if (anchor) {
             push(

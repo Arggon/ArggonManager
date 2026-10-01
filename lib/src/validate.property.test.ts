@@ -26,19 +26,21 @@
  *   5. CANONICAL ANCHORING: each chain starts at the lexicographically smallest
  *      member of its own cycle and the issue is anchored on that item's file —
  *      what makes the reported path deterministic.
+ *   6. CANONICAL CHAIN TEXT: each chain is the SIMPLE cycle (every member
+ *      exactly once) rotated to its smallest member and closed on it, so a
+ *      given cycle prints the byte-identical message under every traversal
+ *      order. The one legitimate cross-order difference is which cycle a DFS
+ *      names (below), and a member set admitting two OPPOSITE directed cycles
+ *      may print either orientation — both are cycle-SELECTION ambiguity, not
+ *      text corruption, and the assertion admits exactly the reversed
+ *      orientation and nothing else.
  *
- * DOCUMENTED DEVIATION (measured, not hidden): the chain ROTATION runs on the
- * stack slice that already contains the closing node, so a cycle entered at a
- * non-min member is printed with a member duplicated and a different traversal
- * of the same graph prints a different string — and, for a graph with several
- * cycles, a different traversal may close a different back edge and name a
- * different subset of them. Both are a BUG CANARY for
- * bug-dependency-cycle-chain-rotation-duplicates-a-node: the malformed chain
- * shape is recognised and pinned (see `isRotationWithOneDuplicate`) and the
- * divergence is counted per run, while every load-bearing part is asserted
- * unconditionally — the cyclic/acyclic verdict, and that every cycle named is
- * real, canonically anchored and deduped. The pinned shape is NOT the expected
- * output; the `else` branch of that `if` is.
+ * MEASURED (not asserted): for a graph with SEVERAL cycles, a DFS reports the
+ * back edges its own forest closes, so WHICH subset of the cycles is named can
+ * differ per traversal order (counted per run and printed at the end). The
+ * verdict stays order independent (invariant 2); making the reported cycle SET
+ * itself canonical would be a stronger contract and is deliberately out of
+ * scope here.
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -50,17 +52,16 @@ import { fc, checkProperty } from "../../test/property-runner.js";
 
 const tmpDirs: string[] = [];
 
-/** Generated graphs whose reported cycle set or chain text differed per order. */
+/** Generated graphs whose reported cycle set differed per traversal order. */
 let divergentCycleSets = 0;
-let divergentChainTexts = 0;
 
 afterAll(() => {
-  if (divergentCycleSets > 0 || divergentChainTexts > 0) {
+  if (divergentCycleSets > 0) {
     console.log(
       `[property] dependency-cycle divergence across traversal orders: ` +
-        `${divergentCycleSets} graph(s) named a different cycle SET, ` +
-        `${divergentChainTexts} printed a different chain TEXT ` +
-        `— see bug-dependency-cycle-chain-rotation-duplicates-a-node`,
+        `${divergentCycleSets} graph(s) named a different cycle SET — ` +
+        `single-DFS cycle selection, deliberately out of scope for the ` +
+        `chain-text contract (candidate follow-up item)`,
     );
   }
   for (const dir of tmpDirs.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -139,32 +140,6 @@ function cycleSets(messages: readonly string[]): string[] {
     .sort();
 }
 
-/**
- * True when `nodes` is a rotation of `members` with ONE member repeated right
- * after itself.
- *
- * THIS IS THE BUG CANARY, and the shape it recognises is CURRENT BUGGY BEHAVIOUR,
- * not the contract: the rotation in `checkDependencies` is applied to the stack
- * slice that already contains the closing node, so a cycle entered at a
- * non-min member is printed with a member duplicated and a chain that does not
- * close (bug-dependency-cycle-chain-rotation-duplicates-a-node). Recognising it
- * is what keeps the property green while the bug is open, and it makes any
- * THIRD shape fail. Fixing the bug removes this helper and the branch that uses
- * it in the same change; until then, a reader must not read the pinned shape as
- * the expected output.
- */
-function isRotationWithOneDuplicate(nodes: readonly string[], members: readonly string[]): boolean {
-  if (nodes.length !== members.length + 1) return false;
-  for (let start = 0; start < members.length; start++) {
-    const rotation = [...members.slice(start), ...members.slice(0, start)];
-    for (let at = 0; at < rotation.length; at++) {
-      const candidate = [...rotation.slice(0, at + 1), rotation[at]!, ...rotation.slice(at + 1)];
-      if (candidate.join(" -> ") === nodes.join(" -> ")) return true;
-    }
-  }
-  return false;
-}
-
 const MAX_NODES = 8;
 /** Leaf ids carry the `task-` prefix `checkItemShape` enforces. */
 const taskId = (index: number): string => `task-gen-${index}`;
@@ -237,13 +212,41 @@ describe("dependency graph (property)", () => {
         // report at least one — and (2) the verdict is order independent.
         for (const messages of reported) expect(cycleSets(messages).length).toBeGreaterThan(0);
 
-        // Documented deviation: WHICH cycle is named, and how it is printed,
-        // may differ per traversal order (see the file header + the bug).
+        // (6) CANONICAL CHAIN TEXT, hard assertion: a given cycle prints the
+        // byte-identical chain under every traversal order. A member set
+        // admitting two OPPOSITE directed cycles may legitimately print either
+        // orientation (which one a DFS closes is the selection ambiguity below),
+        // so exactly the reversed orientation is admitted — any other
+        // difference (the old malformed shapes included) fails.
+        const textBySet = new Map<string, Set<string>>();
+        for (const messages of reported) {
+          for (const chain of cycleChains(messages)) {
+            const setKey = [...new Set(chain.split(" -> "))].sort().join(",");
+            const texts = textBySet.get(setKey) ?? new Set<string>();
+            texts.add(chain);
+            textBySet.set(setKey, texts);
+          }
+        }
+        const reversedOrientation = (chain: string): string => {
+          const walk = chain.split(" -> ");
+          return [walk[0]!, ...walk.slice(1, -1).reverse(), walk[0]!].join(" -> ");
+        };
+        for (const texts of textBySet.values()) {
+          if (texts.size === 1) continue;
+          const [first, second] = [...texts];
+          expect(
+            texts.size === 2 && second === reversedOrientation(first!),
+            `chain text for one cycle set diverged across traversal orders: ${[...texts].join(" | ")}`,
+          ).toBe(true);
+        }
+        // The guaranteed ring pins the VERDICT (above), not a named chain:
+        // WHICH cycle a DFS closes is selection (measured below), so no
+        // specific chain is required to appear in every order.
+
+        // Measured deviation: WHICH cycle is named may differ per traversal
+        // order (single-DFS cycle selection; see the file header).
         if (new Set(reported.map((messages) => cycleSets(messages).join("|"))).size > 1) {
           divergentCycleSets++;
-        }
-        if (new Set(reported.map((messages) => cycleChains(messages).join("|"))).size > 1) {
-          divergentChainTexts++;
         }
         // Everything else is order independent: the non-cycle findings (unknown
         // ids, self-dependencies) are per item.
@@ -282,18 +285,10 @@ describe("dependency graph (property)", () => {
                   message.includes(`${CYCLE_PREFIX}${chain}`),
               ),
             ).toBe(true);
-            // The chain SHAPE. The CORRECT invariant is the `else`: a simple
-            // closed cycle, every member once, closing on the anchor. The `if`
-            // is the BUG CANARY — today's malformed rotation, pinned only so
-            // the gate stays green while
-            // bug-dependency-cycle-chain-rotation-duplicates-a-node is open;
-            // it asserts the duplicate's position, so the corruption cannot
-            // change shape silently. Any third shape fails both branches.
-            if (isRotationWithOneDuplicate(nodes, members)) {
-              expect(nodes.length).toBe(members.length + 1);
-            } else {
-              expect(nodes).toEqual([...members, members[0]!]);
-            }
+            // The chain SHAPE (hard, the canary for the old malformed rotation
+            // is gone with the fix): a simple closed cycle — every member
+            // exactly once, closing back on the anchor.
+            expect(nodes).toEqual([...members, members[0]!]);
           }
           // (4) A self-loop is reported once as SELF_DEPENDENCY, never as a cycle.
           for (const message of messages) {
