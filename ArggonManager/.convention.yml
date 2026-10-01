@@ -8,6 +8,7 @@ branch_patterns:
 
 x-tracker:
   auto-commit: true
+  strict-gate-bins: true
 
 x-generated:
   projectName: "ArggonManager"
