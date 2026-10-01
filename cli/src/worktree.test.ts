@@ -1239,10 +1239,7 @@ describe("arggon cleanup", () => {
     const holder = resolve(dirname(dir), `${basename(dir)}-task-holder`);
     git(["worktree", "add", "--quiet", holder, "feat/task-alpha"], dir);
 
-    const r = spawnSync(process.execPath, [tsx, cli, "cleanup", "--prune", "--json"], {
-      encoding: "utf8",
-      cwd: dir,
-    });
+    const r = runCli(["cleanup", "--prune", "--json"], dir);
     // Per-item prune failures never abort the run and do NOT raise
     // CLEANUP_FAILED (docs/json-output.md §cleanup): the --json path exits 0
     // even with failures (the exitCode=1 human-path rule sits behind the
