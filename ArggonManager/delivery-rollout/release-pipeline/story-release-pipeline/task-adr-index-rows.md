@@ -33,3 +33,8 @@ the index must mirror the `Status:` line of each ADR file exactly.
 - [x] No other rows or content change in the file (diff: 4 added rows only; PR #539, merged 327cd31d, all lanes green).
 
 ## Notes
+
+### 2026-10-01 @ses_f0870e73affeEVvaFZPi9K7NDj
+Done via PR #539 (merged 327cd31d, all lanes green; coordinator-inline, mechanical docs change with self-review: the four added rows' statuses diffed verbatim against each ADR file's status line — 0014/0015 "Proposed (Accepted on merge)", 0016/0017 Accepted).
+
+Observation kept out of scope (tracker owner's call): ADRs 0014/0015 still carry the "Accepted on merge" annotation without the flip — same lag class 0016 had. A tiny follow-up with per-ADR merge evidence can flip both if wanted.
