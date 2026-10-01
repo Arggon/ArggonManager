@@ -2716,10 +2716,10 @@ function itemsById(items) {
     return map;
 }
 function acceptanceComplete(body) {
-    const boxes = [...body.matchAll(/^[ \t]*[-*] \[( |x|X)\]/gm)];
-    if (boxes.length === 0)
+    const criteria = [...body.matchAll(/^[ \t]*[-*] \[( |x|X)\][ \t]*[^\s]/gm)];
+    if (criteria.length === 0)
         return true;
-    return boxes.every((match) => match[1] !== " ");
+    return criteria.every((match) => match[1] !== " ");
 }
 })
 
