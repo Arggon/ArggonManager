@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-cycle-set-canonical
 title: Canonicalize the reported dependency-cycle SET across traversal orders (or explicitly admit DFS-forest selection)
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [kernel, property-based]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T12:46:41.606Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-cycle-set-canonical
 ---
 <!--
