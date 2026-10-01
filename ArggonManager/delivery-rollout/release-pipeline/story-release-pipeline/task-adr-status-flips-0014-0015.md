@@ -20,10 +20,17 @@ updated: "2026-10-01"
 
 ## Context
 
-<!-- Why this task exists. -->
+Same drift class ADR 0016 had before its correction (PR #537): ADRs 0014
+(zcode-native-seam) and 0015 (done-gate-acceptance-waiver) still read
+`Status: Proposed (Accepted on merge)` — the lifecycle annotation without the
+flip. The ADR index rows added by task-adr-index-rows mirror the files
+verbatim, so the index is honest; the files themselves lag the merge.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] Per-ADR merge evidence gathered (which PR/merge landed each ADR; both shipped — the ZCode seam per docs/agents.md §ZCode, the done gate per CHANGELOG 0.4.1 "Done gate" entry).
+- [ ] Both ADR files' status lines flipped to `Accepted`, each with a dated status note recording the evidence and the flip commit (pattern: 0016's status note from PR #537).
+- [ ] ADR index rows updated to `Accepted` in the same change.
+- [ ] `arggon validate` ok; no other ADR content changes.
 
 ## Notes
