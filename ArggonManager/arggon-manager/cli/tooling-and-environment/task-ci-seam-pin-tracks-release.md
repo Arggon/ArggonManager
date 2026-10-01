@@ -27,3 +27,7 @@ updated: "2026-10-01"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Filed from the #527 review: publishing 0.4.1 + regenerating the seam with 0.4.1 turned tasks-validate red on main because .github/workflows/arggon.yml pins ARGGON_VERSION as a literal 0.4.0. The manual re-pin is release-runbook step now documented in release.md; this item removes the foot-gun: derive the pin from the root package.json version (or a workflow-level env referenced from package.json), so publishing and pinning cannot diverge. Acceptance: pin derived/automated, a test or CI check that fails when the pin lags the shipped version, runbook updated.
