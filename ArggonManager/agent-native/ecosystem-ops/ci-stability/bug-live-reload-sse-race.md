@@ -1,13 +1,15 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-live-reload-sse-race
 title: Board live-reload Playwright spec races the SSE reconnect on slow machines (timing flake)
+assignee: Arggon
 parent: ci-stability
 labels: [board, flaky]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
+claimed_at: "2026-10-01T12:10:19.890Z"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/ci-stability/bug-live-reload-sse-race.md
