@@ -58,7 +58,7 @@ With the mise gh shim off PATH, 10 spawned-CLI tests fail (measure x8, comment x
 ## Acceptance
 - [x] Comment-author resolution either degrades gracefully without gh (documented fallback) or the failing tests assert an actionable precondition (skip with reason naming 'gh not found on PATH'). (2026-10-01, PR #558: documented fallback chain GITHUB_USER -> GITHUB_ACTOR -> gh -> git config user.name, in lib/src/list.ts resolveCurrentLoginDetailed.)
 - [x] Error message for the missing dependency names 'gh' (not 'comment author'). (PR #558: lib/src/comment.ts distinguishes absent vs unauthenticated gh; item lookup now precedes author resolution so caller errors are never masked.)
-- [ ] Full suite green in an environment without gh on PATH (or every affected test skips with the actionable reason).
+- [x] Full suite green in an environment without gh on PATH (or every affected test skips with the actionable reason). (2026-10-01, PR #558: no-gh simulation 2043/2043 exit 0, 4 consecutive runs; recipe documented in the worker note.)
 
 ### 2026-10-01 @Arggon
 Resolution + gates evidence (PR #558).
