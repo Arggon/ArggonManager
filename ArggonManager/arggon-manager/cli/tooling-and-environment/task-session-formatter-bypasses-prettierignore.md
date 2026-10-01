@@ -10,7 +10,6 @@ labels: [tooling, dogfood]
 priority: p3
 created: "2026-09-28"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-task-session-formatter-bypasses-prettierignore
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-session-formatter-bypasses-prettierignore.md

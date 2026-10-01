@@ -10,7 +10,6 @@ labels: [opencode-seam, cli]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-task-cleanup-json-exit-code
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/story-start-worktree/task-cleanup-json-exit-code.md

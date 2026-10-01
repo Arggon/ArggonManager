@@ -10,8 +10,7 @@ labels: [worktree, opencode-seam]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-task-start-gate-strict-mode
-claimed_at: "2026-10-01T14:14:18.973Z"
+status: done
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/story-start-worktree/task-start-gate-strict-mode.md

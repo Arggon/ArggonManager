@@ -10,7 +10,6 @@ labels: [testing, flaky]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-task-e2e-board-serve-wrapper
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/ci-stability/task-e2e-board-serve-wrapper.md

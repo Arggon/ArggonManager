@@ -10,7 +10,6 @@ labels: [kernel, property-based]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-task-cycle-set-canonical
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/deps-graph/story-deps-schema/task-cycle-set-canonical.md
