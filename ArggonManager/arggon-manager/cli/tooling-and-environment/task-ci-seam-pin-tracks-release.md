@@ -10,7 +10,7 @@ labels: [ci, release]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T14:29:51.698Z"
+claimed_at: "2026-10-01T15:23:25.336Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-ci-seam-pin-tracks-release
 ---
 <!--
