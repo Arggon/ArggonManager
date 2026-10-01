@@ -16,7 +16,7 @@ import {
   writeFileSync,
   type Dirent,
 } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { delimiter, dirname, join, relative, resolve, sep } from "node:path";
 
 /**
  * Worktree dependency-link helpers, shared by every surface (W4,
@@ -654,6 +654,156 @@ function installResolutionPath(fromDir: string): string[] {
   }
 }
 
+/** Where a gate binary was observed resolving from, relative to the worktree. */
+export type GateBinSource =
+  /** `<worktree>/node_modules/.bin/<name>` exists (any install state — the worktree's own path provides it). */
+  | "worktree"
+  /** Found on the parent-directory walk, above the worktree root. */
+  | "external"
+  /** Found on the invoking process's PATH (a sibling checkout, a global install). */
+  | "path"
+  /** Found nowhere: the gate cannot run unless a worktree-local install appears. */
+  | "missing";
+
+/** One gate binary's observed resolution. */
+export type GateBinResolution = {
+  /** Bin name as the gate invokes it (e.g. `tsx`). */
+  name: string;
+  /** Where the first resolution hit came from. */
+  source: GateBinSource;
+  /** Absolute path of the hit; absent when `source: "missing"`. */
+  path?: string;
+};
+
+/**
+ * Cap on the gate bins a bounded receipt carries: enough for a repo's usual
+ * one or two runner binaries without letting a manifest with hundreds of
+ * binned dependencies inflate the report.
+ */
+export const MAX_GATE_BINS = 8;
+
+/**
+ * Bin names a package exposes (`bin` as a string uses the package's own name;
+ * a record maps bin name → entry path), or [] when it exposes none.
+ */
+function packageBinNames(pkgDir: string, packageName: string): string[] {
+  const manifest = packageManifest(pkgDir);
+  if (manifest === null) return [];
+  const bin = manifest.bin;
+  if (typeof bin === "string" && bin.length > 0) {
+    const own = packageName.split("/").pop() ?? packageName;
+    return own.length > 0 ? [own] : [];
+  }
+  if (bin !== null && typeof bin === "object" && !Array.isArray(bin)) {
+    return Object.keys(bin).filter((name) => name.length > 0);
+  }
+  return [];
+}
+
+/** First install on `modules` that provides `name`, or null. */
+function installedPackageDir(modules: string[], name: string): string | null {
+  const segments = name.split("/");
+  for (const root of modules) {
+    const dir = join(root, ...segments);
+    if (existsSync(join(dir, "package.json"))) return dir;
+  }
+  return null;
+}
+
+/**
+ * First `.bin/<bin>` hit on the worktree's module resolution walk, classified
+ * by where the hit sits relative to the worktree root: the walk continues
+ * past the worktree (parent directories can carry an install too), and only
+ * hits at or below `worktreePath` count as the worktree's own.
+ */
+function binOnResolutionPath(
+  fromDir: string,
+  worktreePath: string,
+  bin: string,
+): { path: string; source: "worktree" | "external" } | null {
+  let dir = resolve(fromDir);
+  for (;;) {
+    const candidate = join(dir, "node_modules", ".bin", bin);
+    if (existsSync(candidate)) {
+      return {
+        path: candidate,
+        source: isInside(resolve(worktreePath), dir) ? "worktree" : "external",
+      };
+    }
+    const parent = dirname(dir);
+    if (parent === dir) return null;
+    dir = parent;
+  }
+}
+
+/** First PATH directory providing the bin file, or null. Deterministic given the env. */
+function binOnPath(bin: string, env: NodeJS.ProcessEnv): string | null {
+  const search = env.PATH ?? env.Path;
+  if (typeof search !== "string" || search.length === 0) return null;
+  for (const dir of search.split(delimiter)) {
+    if (dir.length === 0) continue;
+    const candidate = join(dir, bin);
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
+/**
+ * Report which node_modules the gate binaries a worktree's project gate needs
+ * actually resolve from (bug-start-worktree-npm-ci-claim): a fresh worktree
+ * with no install used to fail its claim commit with a bare
+ * `tsx: command not found`, and a sibling worktree's `.bin` on the invoking
+ * PATH could silently run the gate against a foreign install. Readiness names
+ * the source instead of letting the resolution stay invisible.
+ *
+ * The probed bins are the ones the worktree's own manifest declares that
+ * expose a `bin` field, discovered from the worktree's resolution path first
+ * and the primary's install second (a cold worktree discovers from the primary
+ * exactly because it cannot resolve anything itself). Resolution order is the
+ * gate's real lookup order: the worktree's module walk (own install before
+ * parent directories), then PATH. Read-only and best-effort: an undeclared or
+ * undiscoverable bin is simply not reported, and nothing here throws.
+ */
+export function inspectGateBinResolution(
+  worktreePath: string,
+  primaryRoot?: string,
+  env: NodeJS.ProcessEnv = process.env,
+): GateBinResolution[] {
+  const declared = declaredDependencyNames(worktreePath);
+  if (declared === null || declared.length === 0) return [];
+  const discovery = installResolutionPath(worktreePath);
+  if (primaryRoot !== undefined) discovery.push(...installResolutionPath(primaryRoot));
+  const names = new Set<string>();
+  for (const dep of declared) {
+    if (names.size >= MAX_GATE_BINS) break;
+    const dir = installedPackageDir(discovery, dep);
+    if (dir !== null) {
+      // Installed somewhere: probe the bins it really exposes.
+      const bins = packageBinNames(dir, dep);
+      if (bins.length === 0) continue; // installed, exposes no bin
+      for (const bin of bins) {
+        names.add(bin);
+        if (names.size >= MAX_GATE_BINS) break;
+      }
+      continue;
+    }
+    // Not installed anywhere — the missing-install flavor itself: fall back to
+    // the package's own name, npm's convention for a string `bin` (tsx, eslint,
+    // vitest). Reporting `<dep>: not resolvable` is true then — neither the
+    // module nor any bin of it resolves on this worktree — and a dep that is
+    // present but exposes no bin is never probed under a guessed name.
+    names.add(dep);
+  }
+  const resolveBin = (bin: string): GateBinResolution => {
+    const onModules = binOnResolutionPath(worktreePath, worktreePath, bin);
+    if (onModules !== null) return { name: bin, source: onModules.source, path: onModules.path };
+    const onPath = binOnPath(bin, env);
+    if (onPath !== null) return { name: bin, source: "path", path: onPath };
+    return { name: bin, source: "missing" };
+  };
+  return [...names].sort().slice(0, MAX_GATE_BINS).map(resolveBin);
+}
+
 /**
  * Report whether the install a worktree resolves through provides what that
  * worktree's own manifest declares (bug-worktree-readiness-misses-stale-primary-install).
@@ -689,14 +839,16 @@ export type WorktreeInstallState = "linked" | "existing" | "missing" | "unavaila
 /**
  * Bounded-shape receipt for the shared pre-claim dependency preparation.
  *
- * `ready` means all three of: an install is present, no worktree-owned
- * workspace package still resolves into the primary checkout, AND the install
+ * `ready` means all four of: an install is present, no worktree-owned
+ * workspace package still resolves into the primary checkout, the install
  * provides what the worktree's own manifest declares (`manifestCoverage:
- * "satisfied"`). It grew the third clause deliberately
+ * "satisfied"`), AND every reported gate binary resolves from the worktree
+ * itself (`gateBins`, bug-start-worktree-npm-ci-claim). It grew the third clause deliberately
  * (bug-worktree-readiness-misses-stale-primary-install): a link farm mirrors the
  * primary's entries, so a devDependency merged since that install ran was
  * invisible here and the receipt claimed readiness a gate could not use. The
- * verdict is the conjunction; `manifestCoverage` + `missingDependencies` say
+ * verdict is the conjunction; `manifestCoverage` + `missingDependencies` +
+ * `gateBins` say
  * WHICH clause failed, so `ready: false` is always actionable without a diffing
  * script. A false receipt is informative, not a blanket start failure: the CLI
  * keeps its historical best-effort fallback, while native start surfaces it and
@@ -714,6 +866,16 @@ export type WorktreeDependencyPreparation = {
   missingDependencies: string[];
   /** Full count behind `missingDependencies`; the two differ only when capped. */
   missingDependenciesTotal: number;
+  /**
+   * Which node_modules the project gate's binaries resolve from, relative to
+   * the worktree (bug-start-worktree-npm-ci-claim), sorted by name and capped
+   * at `MAX_GATE_BINS`. A `path` source is the silent-masking flavor: the gate
+   * can pass on a sibling checkout's binary while the worktree's own install
+   * is broken or absent. `ready` requires every reported bin to resolve from
+   * the worktree; an empty report (nothing declared exposes a bin) leaves
+   * `ready` unchanged.
+   */
+  gateBins: GateBinResolution[];
 };
 
 /**
@@ -759,8 +921,18 @@ export function prepareWorktreeDependencies(
   // mirror what the primary has, so a declared-but-uninstalled dependency is
   // reported by name instead of being read as a ready worktree.
   const declared = inspectDeclaredDependencies(worktreePath);
+  // Which node_modules the gate binaries resolve from
+  // (bug-start-worktree-npm-ci-claim): a sibling checkout's `.bin` on the
+  // invoking PATH can run the claim commit's gate against a foreign install
+  // while the worktree itself resolves nothing — readiness names it and
+  // withholds `ready` instead of letting the resolution stay invisible.
+  const gateBins = inspectGateBinResolution(worktreePath, primaryRoot);
   return {
-    ready: hasInstall && linkedWorkspaces.length === 0 && declared.coverage === "satisfied",
+    ready:
+      hasInstall &&
+      linkedWorkspaces.length === 0 &&
+      declared.coverage === "satisfied" &&
+      gateBins.every((bin) => bin.source === "worktree"),
     install,
     linkedNodeModules,
     builtWorkspaces,
@@ -768,6 +940,7 @@ export function prepareWorktreeDependencies(
     manifestCoverage: declared.coverage,
     missingDependencies: declared.missing,
     missingDependenciesTotal: declared.missingTotal,
+    gateBins,
   };
 }
 

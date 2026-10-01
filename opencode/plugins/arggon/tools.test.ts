@@ -1678,6 +1678,92 @@ describe("worktree domain tools (W4)", () => {
     );
   });
 
+  it("forwards the gate-bin resolution and names it when the claim commit fails (bug-start-worktree-npm-ci-claim)", async () => {
+    // The measured machine state, reproduced deterministically: no install
+    // anywhere (the worktree has no node_modules and the primary has none), a
+    // manifest declaring the gate binary, and a PATH-lookup gate like `npm run`
+    // resolving tsx. The claim commit dies with the incident's own symptom —
+    // and the failure must name the observed resolution and the exact fix
+    // instead of a bare `command not found`.
+    const dir = seedGitTree();
+    addNativeManifest(dir, { name: "fixture", devDependencies: { "native-gate-dep": "1.0.0" } });
+    setNativePreCommitHook(
+      dir,
+      '#!/bin/sh\ncommand -v native-gate-dep >/dev/null 2>&1 || { echo "sh: native-gate-dep: command not found" >&2; exit 1; }\n',
+    );
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    const payload = typed.envelope;
+
+    // The receipt carries the resolution: the declared dep is installed
+    // nowhere, so its own name is probed (npm's string-bin convention) and it
+    // reports missing, with no path.
+    const preparation = payload.preparation as {
+      gateBins?: Array<{ name: string; source: string; path?: string }>;
+    };
+    expect(preparation.gateBins).toEqual([
+      { name: "native-gate-dep", source: "missing" },
+    ]);
+    expect(preparation.ready).toBe(false);
+
+    // The failure message names the flavor and the fix.
+    const error = payload.error as Record<string, unknown>;
+    const message = String(error.message);
+    expect(message).toContain("native-gate-dep: not resolvable from the worktree");
+    expect(message).toContain("npm ci");
+    const claimCommit = payload.claimCommit as { skipped?: string };
+    expect(String(claimCommit.skipped)).toContain("command not found");
+  });
+
+  it("names a sibling .bin on PATH as the gate-bin resolution source (bug-start-worktree-npm-ci-claim)", async () => {
+    // Incident 1: the sibling's bin masks the absent worktree install — the
+    // gate PASSES through the PATH lookup and the claim lands. The receipt
+    // must still name the foreign source and withhold readiness.
+    const dir = seedGitTree();
+    addNativeManifest(dir, { name: "fixture", devDependencies: { "native-gate-dep": "1.0.0" } });
+    setNativePreCommitHook(dir, "#!/bin/sh\ncommand -v native-gate-dep >/dev/null 2>&1 || exit 1\n");
+    const siblingBinDir = join(dirname(dir), "sibling", "node_modules", ".bin");
+    mkdirSync(siblingBinDir, { recursive: true });
+    writeFileSync(join(siblingBinDir, "native-gate-dep"), "#!/bin/sh\nexit 0\n", "utf8");
+    chmodSync(join(siblingBinDir, "native-gate-dep"), 0o755);
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const savedPath = process.env.PATH ?? "";
+    process.env.PATH = `${siblingBinDir}:${savedPath}`;
+    let output: Record<string, unknown>;
+    try {
+      const started = await tool(defs, "start").execute({
+        id: "task-rate-limit",
+        assignee: "smoke",
+      });
+      output = started.output as Record<string, unknown>;
+    } finally {
+      process.env.PATH = savedPath;
+    }
+
+    const preparation = output.preparation as {
+      ready?: unknown;
+      gateBins?: Array<{ name: string; source: string; path?: string }>;
+    };
+    expect(output.ok).toBe(true);
+    expect(output.claimCommitted).toBe(true);
+    // The gate ran on the sibling's binary — the exact silent masking — so
+    // readiness is withheld and the receipt names the sibling's path.
+    expect(preparation.ready).toBe(false);
+    expect(preparation.gateBins).toEqual([
+      { name: "native-gate-dep", source: "path", path: join(siblingBinDir, "native-gate-dep") },
+    ]);
+  });
+
   it("start refuses to steal a claim and removes the worktree it just created", async () => {
     const dir = seedGitTree();
     const { domain, calls } = fakeDomain(dir);
