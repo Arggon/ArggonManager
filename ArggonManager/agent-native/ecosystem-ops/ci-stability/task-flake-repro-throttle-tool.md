@@ -10,7 +10,6 @@ labels: [testing, flaky, board]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-task-flake-repro-throttle-tool
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/ci-stability/task-flake-repro-throttle-tool.md

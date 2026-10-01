@@ -10,8 +10,6 @@ labels: [opencode-seam, worktree, smoke]
 priority: p3
 created: "2026-09-28"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T18:46:38.916Z"
-worktree_path: /home/arggon/Projects/ArggonManager-task-native-session-move-smoke-leg
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/opencode2-native/native-redesign/task-native-session-move-smoke-leg.md
