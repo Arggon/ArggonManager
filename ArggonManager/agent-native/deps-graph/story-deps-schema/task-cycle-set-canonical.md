@@ -65,3 +65,7 @@ For a graph with SEVERAL cycles, a DFS reports the back edges its own forest clo
 - `npm test` → 112 files / 1982 tests passed. `npm run lint` → 0. `npm run build` → ok. `npm run check:plugin` → ok (bundle byte-identical). `npm run arggon -- validate` → ok (0 warnings, v5).
 
 **Analysis artifacts:** /tmp/opencode/cycle-analysis2.mjs (faithful model of leaves()/checkDependencies incl. dedup + self-loop drop; permuted walk orders).
+
+### handoff 2026-10-01 @ses_f087fbfecffetE1W3D2QkOLuJX (session: ses_f087fbfecffetE1W3D2QkOLuJX) — next: Review PR (DFS-forest contract + property admission + 2 fixtures); merge is the coordinator's call.
+- branch: feat/task-cycle-set-canonical
+- open questions: None blocking; canonical cycle-basis contract was rejected as out of proportion (see evidence comment).
