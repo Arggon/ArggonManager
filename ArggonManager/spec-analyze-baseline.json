@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "conventionVersion": 5,
+  "count": 6,
+  "findings": [
+    {
+      "file": "ArggonManager/docs/explorations/exploration-ui-improvements-012.md",
+      "kind": "DECISION-PENDING-EXPLORATION",
+      "line": 165,
+      "severity": "warn",
+      "message": "Decision section records no decision after 9 day(s) (threshold 7) — link docs/adr/<NNNN>-<slug>.md, record \"No ADR required — <reason>\", or supersede the exploration"
+    },
+    {
+      "file": "ArggonManager/docs/specs/spec-deps-001.md",
+      "kind": "no-error-path",
+      "severity": "warn",
+      "message": "no error/failure path mentioned anywhere in the spec"
+    },
+    {
+      "file": "ArggonManager/docs/specs/spec-opencode-seam-010.md",
+      "kind": "no-error-path",
+      "severity": "warn",
+      "message": "no error/failure path mentioned anywhere in the spec"
+    },
+    {
+      "file": "ArggonManager/docs/specs/spec-opencode2-009.md",
+      "kind": "vague-quantifier",
+      "line": 14,
+      "severity": "warn",
+      "message": "vague term 'efficient' — quantify or replace with a measurable term"
+    },
+    {
+      "file": "ArggonManager/docs/specs/spec-spec-import-openspec-005.md",
+      "kind": "vague-quantifier",
+      "line": 117,
+      "severity": "warn",
+      "message": "vague term 'several' — quantify or replace with a measurable term"
+    },
+    {
+      "file": "ArggonManager/docs/specs/spec-spec-import-openspec-005.md",
+      "kind": "vague-quantifier",
+      "line": 131,
+      "severity": "warn",
+      "message": "vague term 'several' — quantify or replace with a measurable term"
+    }
+  ]
+}
