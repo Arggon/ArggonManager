@@ -1,6 +1,8 @@
 # 0014 ZCode native seam: MCP as the full tool surface + declarative plugin
 
-- Status: Proposed (Accepted on merge)
+- Status: Accepted
+> Status note (2026-10-01): flipped from "Proposed (Accepted on merge)" — landed via PR #436 (commit 0a340798, `task-mcp-full-surface`); the seam is live per `docs/agents.md` §ZCode. The status line had lagged the merge.
+
 - Date: 2026-09-29
 - Deciders: product owner (Gonzalo), coordinator/architect (Arggon)
 - Amends: [ADR 0011](0011-native-first-architecture.md) §5/§6 (MCP scope), extends [ADR 0010](0010-opencode2-native-architecture.md) to a second client
