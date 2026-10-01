@@ -60,3 +60,7 @@ The three order-dependent phases are ONE atomic test (bootstrap -> drift gate ->
 - Fix: DONE (#513/#518 spawn chains + #546 shuffle-safe lifecycle).
 - Retries removed once root-caused: DONE (#513 removed the row-table retry; none remain).
 Item done.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Status reconciliation: the item had been flipped back to in_progress by tracker churn during the multi-session merge window; the work itself landed (PR #546 merged, saturated shuffle verification green — see the 2026-10-01 verdict + ticked checklist). Done re-confirmed.
