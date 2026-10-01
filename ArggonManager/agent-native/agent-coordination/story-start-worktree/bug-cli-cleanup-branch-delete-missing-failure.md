@@ -149,3 +149,6 @@ path applies to non-empty `failures[]` (`cli/src/cli.ts` ~2401 vs ~2438), so
 `cleanup --prune --json` exits 0 even when `failures[]` is non-empty. Confirmed
 identical BEFORE and AFTER this fix (pre-existing); changing it would alter the
 machine contract, so it is reported for the coordinator to track if wanted.
+### handoff 2026-10-01 @ses_f0aa6a0b6ffe8unSBPZxBWEaLS (session: ses_f0aa6a0b6ffe8unSBPZxBWEaLS) — next: Review + merge PR #515 (both catch surfaces fixed, tests pin bounds); coordinate with sibling spawn-helper sweep before touching worktree.test.ts
+- branch: fix/bug-cli-cleanup-branch-delete-missing-failure
+- open questions: JSON cleanup exits 0 even with non-empty failures[] (pre-existing, cli.ts json early-return vs human exitCode=1); track separately if wanted
