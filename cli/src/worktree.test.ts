@@ -1241,9 +1241,10 @@ describe("arggon cleanup", () => {
 
     const r = runCli(["cleanup", "--prune", "--json"], dir);
     // Per-item prune failures never abort the run and do NOT raise
-    // CLEANUP_FAILED (docs/json-output.md §cleanup): the --json path exits 0
-    // even with failures (the exitCode=1 human-path rule sits behind the
-    // json early-return in cli.ts).
+    // CLEANUP_FAILED, and the exit code stays 0 even with non-empty
+    // failures (task-cleanup-json-exit-code, docs/json-output.md §cleanup):
+    // --json consumers gate on the payload; the exitCode=1 human-path rule
+    // sits behind the json early-return in cli.ts.
     expect(r.status).toBe(0);
     const envelope = JSON.parse(r.stdout) as {
       ok: boolean;
@@ -1259,6 +1260,27 @@ describe("arggon cleanup", () => {
     // The worktree is gone, so the record is still cleared.
     const raw = readFileSync(join(dir, "ArggonManager/launch/auth/login/task-alpha.md"), "utf8");
     expect(parseFrontmatter(raw).data.worktree_path).toBeUndefined();
+  });
+
+  it("exits 1 on the human path when a prune failure occurred (unchanged human contract)", () => {
+    const { dir, paths } = initCleanupRepo();
+    // Same forced refusal as the --json test above: detach the candidate
+    // worktree from its branch, then check the branch out in a second
+    // worktree — cleanup removes the candidate fine, but `git branch -d`
+    // refuses ("used by worktree").
+    git(["checkout", "--quiet", "--detach", "HEAD"], paths["task-alpha"]);
+    const holder = resolve(dirname(dir), `${basename(dir)}-task-holder`);
+    git(["worktree", "add", "--quiet", holder, "feat/task-alpha"], dir);
+
+    const r = runCli(["cleanup", "--prune"], dir);
+    // Deliberate divergence from the --json path (exit 0 with failures[] in
+    // the payload — task-cleanup-json-exit-code): text output has no
+    // structured failure channel, so the human path sets exit 1.
+    expect(r.status).toBe(1);
+    expect(r.stderr).toContain("failed:    task-alpha");
+    expect(r.stderr).toContain("used by worktree");
+    expect(r.stderr).toContain("(leftover branch: feat/task-alpha)");
+    expect(r.stdout).toContain("arggon cleanup:");
   });
 
   /** Fake gh executor returning a merged PR list (task-cleanup-squash-merge). */
