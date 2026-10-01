@@ -64,8 +64,7 @@ dependency (lands with/before the pipeline, per ADR 0018 §1).
 ### T3: release.yml — guard, tag, GitHub Release
 
 - `.github/workflows/release.yml` (name fixed — trusted-publisher binding):
-  `on: push: branches: [main]`; `permissions: contents: write,
-  id-token: write`; `concurrency` group serializing release runs. Guard step
+  `on: push: branches: [main]`; `permissions: contents: write, id-token: write`; `concurrency` group serializing release runs. Guard step
   per spec C3's **ordered predicate**: (0) version at `github.sha` unchanged
   from the parent → exit 0 without publishing, FIRST (post-release pushes
   stay green; the tag is consulted only for version-changing pushes);

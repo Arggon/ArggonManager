@@ -287,8 +287,7 @@ Workflow inputs: none. The released version is read from the tree at
    at HEAD → GitHub Release `vX.Y.Z` with the merged CHANGELOG section as
    notes → `npm ci` → `npm run build` (fresh `lib/dist`; `write-build-info`
    stamps the release commit so the artifact self-reports it, per runbook
-   §4) → create the pack destination directory first (`npm pack
-   --pack-destination` does not create it — runbook/ci.md gotcha) → pack
+   §4) → create the pack destination directory first (`npm pack --pack-destination` does not create it — runbook/ci.md gotcha) → pack
    both packages → extract-and-inspect both tarballs (kernel exports present
    in `dist/*.js`; root ships `dist/`, `templates/`, `skills/`, `opencode/`;
    zero test-helper leaks; versions correct) → **before any publish** →
