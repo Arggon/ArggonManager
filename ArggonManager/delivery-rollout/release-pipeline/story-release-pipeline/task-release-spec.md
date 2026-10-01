@@ -28,7 +28,9 @@ workflow, the exact kernel pin, and the tarball assets. Inputs: ADR 0018,
 [exploration-update-delivery-016](../../../../docs/explorations/exploration-update-delivery-016.md),
 `release.md` (current manual runbook + gotchas), `ArggonManager/docs/ci.md`
 (drift gate + pinned install interplay), `task-ci-seam-pin-tracks-release`
-(lands with/before the pipeline; repo's own `arggon.yml` pin becomes derived).
+(lands with/before the pipeline; repo's own `arggon.yml` pin is enforced by
+the seam lag guard — derivation rejected with evidence, see
+task-ci-seam-pin-tracks-release and the ADR 0018 amendment of 2026-10-01).
 
 ## Acceptance
 
@@ -74,3 +76,16 @@ Recovery session (verification + one contract fix): attached to the existing wor
 ### handoff 2026-10-01 @ses_f0800e936ffeMAm3ZjdNqUVXgW (session: ses_f0800e936ffeMAm3ZjdNqUVXgW) — next: Coordinator: review + merge PR #545 (head 0b99eb83); sign off C3 ownership deviation and file the one-line ADR 0018 §1 amendment (derivation parenthetical superseded).
 - branch: HEAD
 - open questions: ADR 0018 parenthetical amendment owner; task-release-spec Context line still says "pin becomes derived" (stale, outside my file scope); release.yml push-to-main trigger vs auto-publish non-goal needs…
+
+### 2026-10-01 @ses_f0870e73affeEVvaFZPi9K7NDj
+verdict: request-changes (coordinator review of PR #545, reviewer pass adjudicated — note: the reviewer examined the pre-0b99eb83 head).
+
+F1 (pin semantics): ALREADY RESOLVED on head 0b99eb83 — Interplay/edge row/T0/sources now describe the guard-enforced literal pin citing the recorded decision on task-ci-seam-pin-tracks-release. Verified; no action.
+
+Required fixes on the current head:
+F2 (spec §C3, trigger guard): the rule ordering reds main permanently. After v(X) is tagged at commit C, every later ordinary push has V=X with the tag pointing at C ≠ HEAD → rule "tag exists pointing elsewhere → fail loudly" fires before "any other push → exit 0", making the steady state a permanent loud failure (first repro: the pipeline's own first post-merge push). Fix: classify FIRST — if the version at github.sha equals the version at the pushed commit's parent, it is not a release commit → exit 0; only version-changing pushes enter the tag cascade. Mirror into plan T3 and acceptance A5's fourth path.
+F3 (spec invariant 7): overclaims — a direct hand-pushed version bump to an untagged number would publish without any release PR, and the guard cannot distinguish it from a squash-merged release-PR commit. Restate the guarantee in the enforceable form ("no publish without a human-pushed version-bump commit") and record the direct-push class in the edge table as a named trust boundary.
+F4 (spec A12 + Flow step 3): the evidence path is underspecified — per current docs.github.com (GITHUB_TOKEN), pull_request events from GITHUB_TOKEN-created PRs run in an approval-required state; name the one-click "Approve workflows" step (write-access user) so A12's "npm ci green on the PR" is executable.
+F5: no action; A2 stays mandatory.
+
+Sources for F4: docs.github.com/en/actions/concepts/security/github_token ("When GITHUB_TOKEN triggers workflow runs", accessed 2026-10-01).
