@@ -95,20 +95,15 @@ import { tickAcceptance } from "../test/acceptance.js";
 import { removeFixtureTree } from "../cli/src/test-tmp.js";
 
 import { GENERATED_DOC_COUNT } from "../cli/src/docs.js";
+import { runCli as runCliBase, spawnNodeCli } from "../cli/src/test-spawn.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const cli = join(root, "cli/src/cli.ts");
-const tsx = join(root, "node_modules/tsx/dist/cli.mjs");
 
 type Json = Record<string, unknown>;
 
 /** Spawn one `arggon ... --json` process and return its parsed last-line JSON + raw stderr. */
 function runCli(args: string[], cwd: string): { body: Json | null; stderr: string } {
-  const proc = spawnSync(process.execPath, [tsx, cli, ...args], {
-    encoding: "utf8",
-    cwd,
-    env: { ...process.env },
-  });
+  const proc = runCliBase(args, cwd);
   const out = proc.stdout.trim();
   const body = out ? (JSON.parse(out.split("\n").pop() ?? out) as Json) : null;
   return { body, stderr: proc.stderr };
@@ -161,9 +156,8 @@ type SpawnResult = { body: Json | null; stderr: string };
 /** Spawn N CLI processes at once (real concurrency) and collect their JSON envelopes. */
 function spawnAll(cwd: string, commands: Array<{ args: string[] }>): Promise<SpawnResult[]> {
   const children = commands.map(({ args }) =>
-    spawn(process.execPath, [tsx, cli, ...args], {
+    spawnNodeCli(args, {
       cwd,
-      env: { ...process.env },
       stdio: ["ignore", "pipe", "pipe"],
     }),
   );
@@ -573,7 +567,7 @@ type McpServer = {
 };
 
 function startServer(cwd: string): McpServer {
-  const child = spawn(process.execPath, [tsx, cli, "mcp"], {
+  const child = spawnNodeCli(["mcp"], {
     cwd,
     stdio: ["pipe", "pipe", "pipe"],
   });

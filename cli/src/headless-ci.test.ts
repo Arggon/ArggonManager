@@ -46,10 +46,9 @@ import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { CONVENTION_VERSION } from "@arggondev/lib";
 import { initFixtureRepo, removeFixtureTree } from "./test-tmp.js";
+import { runCli } from "./test-spawn.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = join(root, "cli/src/cli.ts");
-const tsx = join(root, "node_modules/tsx/dist/cli.mjs");
 const WORKFLOW_TEMPLATE = join(root, "templates/docs/github/workflows/arggon.yml");
 const WORKFLOW_DEST = ".github/workflows/arggon.yml";
 const WORKFLOW_MARKER = `# arggon:generated template="github/workflows/arggon.yml"`;
@@ -256,13 +255,9 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     });
   }
 
-  /** Run the checkout CLI (`tsx cli/src/cli.ts`) with the same argv. */
+  /** Run the checkout CLI (tsx loader, see bug-row-table-flake) with the same argv. */
   function runCheckoutCli(args: string[], cwd: string): SpawnSyncReturns<string> {
-    return spawnSync(process.execPath, [tsx, cli, ...args], {
-      cwd,
-      encoding: "utf8",
-      timeout: 120_000,
-    });
+    return runCli(args, cwd, { timeout: 120_000 });
   }
 
   /** Run the packed bin with the same argv. */

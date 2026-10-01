@@ -62,10 +62,10 @@ import {
   type ArgonKernel,
   type ArgonToolDefinition,
 } from "./index.js";
+import { runCli as runCliBase } from "../../../cli/src/test-spawn.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const tsx = join(root, "node_modules/tsx/dist/cli.mjs");
-const cli = join(root, "cli/src/cli.ts");
+
 
 /**
  * The twelve spec tools (spec-native-first-011 §Tools) plus the three W4
@@ -157,9 +157,7 @@ function legacyPriorityLabel(dir: string): void {
 }
 
 function runCli(args: string[], cwd: string, env?: NodeJS.ProcessEnv) {
-  const proc = spawnSync(process.execPath, [tsx, cli, "--json", ...args], {
-    encoding: "utf8",
-    cwd,
+  const proc = runCliBase(["--json", ...args], cwd, {
     timeout: 60_000,
     ...(env === undefined ? {} : { env }),
   });

@@ -1,8 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync as _mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { basename, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   createMeasurementTree,
@@ -18,6 +17,7 @@ import {
   MCP_TOOLS_BASELINE_BYTES,
 } from "./measure.js";
 import { runDoctor } from "./doctor.js";
+import { runCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -28,14 +28,6 @@ function mkdtempSync(prefix: string): string {
   const dir = _mkdtempSync(prefix);
   tmpDirs.push(dir);
   return dir;
-}
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(repoRoot, "cli/src/cli.ts");
-const tsx = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
-
-function runCli(args: string[], cwd: string) {
-  return spawnSync(process.execPath, [tsx, cli, ...args], { encoding: "utf8", cwd });
 }
 
 describe("budget measurement (task-adr0006-remeasure, ADR 0006)", () => {

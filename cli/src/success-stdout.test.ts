@@ -8,10 +8,10 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { removeFixtureTree } from "./test-tmp.js";
+import { runCli } from "./test-spawn.js";
 
 /**
  * task-success-stdout-sanitize: the success-path human channel is the last
@@ -24,14 +24,6 @@ import { removeFixtureTree } from "./test-tmp.js";
  * These tests drive the real CLI (spawn + tsx) so they assert the actual
  * stdout bytes, not a formatter in isolation.
  */
-
-const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(root, "cli/src/cli.ts");
-const tsx = resolve(root, "node_modules/tsx/dist/cli.mjs");
-
-function runCli(args: string[], cwd: string) {
-  return spawnSync(process.execPath, [tsx, cli, ...args], { encoding: "utf8", cwd });
-}
 
 function runGit(args: string[], cwd: string) {
   return spawnSync("git", args, { encoding: "utf8", cwd });

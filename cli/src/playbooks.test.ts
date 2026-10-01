@@ -1,4 +1,3 @@
-import { spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdirSync,
@@ -8,8 +7,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { itemsById, loadItems, runCreate } from "@arggondev/lib";
 import { bundledTemplatesDir } from "./package-assets.js";
@@ -22,6 +20,7 @@ import {
   runPlaybookStatus,
   runStackExplore,
 } from "./playbooks.js";
+import { runCli } from "./test-spawn.js";
 
 // bug-tmp-fixture-leak: track mkdtemp dirs and remove them after each test.
 const tmpDirs: string[] = [];
@@ -33,10 +32,6 @@ function mkdtempSync(prefix: string, options?: { encoding?: "utf8" }): string {
   tmpDirs.push(dir);
   return dir;
 }
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cli = resolve(repoRoot, "cli/src/cli.ts");
-const tsx = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
 /** Fixed clock for staleness math: 2026-09-12 UTC. */
 const NOW = new Date("2026-09-12T12:00:00Z");
@@ -84,10 +79,6 @@ function makeStory(dir: string): string {
     templatesDir,
   });
   return "demo-s";
-}
-
-function runCli(args: string[], cwd: string) {
-  return spawnSync(process.execPath, [tsx, cli, ...args], { encoding: "utf8", cwd });
 }
 
 describe("stack explore", () => {

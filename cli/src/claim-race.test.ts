@@ -9,23 +9,19 @@
  * Temp repos get a bare remote so the real push step succeeds (no gh, no
  * --open-pr). The CLI runs from source via tsx, like cli.test.ts.
  */
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 import { parseFrontmatter, runCreate } from "@arggondev/lib";
 
 import { runInit } from "./init.js";
+import { spawnNodeCli } from "./test-spawn.js";
 import { removeFixtureTree } from "./test-tmp.js";
 
 const NOW = new Date("2026-09-13T12:00:00Z");
 const TIMEOUT_MS = 120_000;
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
-const cliEntry = resolve(repoRoot, "cli/src/cli.ts");
-const tsxLoader = resolve(repoRoot, "node_modules/tsx/dist/cli.mjs");
 
 // bug-tmp-fixture-leak: track mkdtemp dirs (plus `arggon start --worktree`
 // sibling worktrees named `<basename>-task-*`) and remove them once the
@@ -96,15 +92,11 @@ type StartJson =
 /** Spawn N `start --worktree --json` processes at once and collect their JSON. */
 function startConcurrently(dir: string, id: string, assignees: string[]): Promise<StartJson[]> {
   const children = assignees.map((assignee) =>
-    spawn(
-      process.execPath,
-      [tsxLoader, cliEntry, "start", id, "--assignee", assignee, "--worktree", "--json"],
-      {
-        cwd: dir,
-        env: { ...process.env, GITHUB_USER: assignee },
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    ),
+    spawnNodeCli(["start", id, "--assignee", assignee, "--worktree", "--json"], {
+      cwd: dir,
+      env: { ...process.env, GITHUB_USER: assignee },
+      stdio: ["ignore", "pipe", "pipe"],
+    }),
   );
   return Promise.all(
     children.map(
