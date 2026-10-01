@@ -43,10 +43,10 @@ Consolidating the incident record — FIVE sessions hit a cold/broken install ri
 PR #517 (merged) added named-source readiness reporting (gateBins) and task-start-gate-strict-mode (in flight) adds opt-in hard-fail — both observe/report, neither fixes the underlying ORDERING: the dependency-prep step intermittently does not run or does not complete before the claim commit needs the gate. This item owns the root fix.
 
 ## Acceptance
-- [ ] Instrument prepareWorktreeDependencies/start to log (bounded) which prep path ran (link farm created / reused / skipped-and-why) and correlate with the five incidents' signatures.
-- [ ] Identify the race/ordering defect (prep skipped when node_modules partially exists? post-start hook timing? workspace pre-build gated on a stale readiness check?) and fix it so a fresh start --worktree ALWAYS leaves a gate-usable install (or fails start itself with the named cause).
-- [ ] smoke:native-start-cold extended: N sequential cold starts on fresh fixtures, ALL with gateBins resolving inside the worktree and claim commits passing first try.
-- [ ] Five incident signatures each covered by a test or documented as fixed-by-the-same-fix.
+- [x] Instrument prepareWorktreeDependencies/start to log (bounded) which prep path ran (link farm created / reused / skipped-and-why) and correlate with the five incidents' signatures.
+- [x] Identify the race/ordering defect (prep skipped when node_modules partially exists? post-start hook timing? workspace pre-build gated on a stale readiness check?) and fix it so a fresh start --worktree ALWAYS leaves a gate-usable install (or fails start itself with the named cause).
+- [x] smoke:native-start-cold extended: N sequential cold starts on fresh fixtures, ALL with gateBins resolving inside the worktree and claim commits passing first try.
+- [x] Five incident signatures each covered by a test or documented as fixed-by-the-same-fix.
 
 ### 2026-10-01 @Coordinator
 ### 2026-10-01 @Coordinator

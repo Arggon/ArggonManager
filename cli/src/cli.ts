@@ -2273,6 +2273,10 @@ program
               missingDependencies: result.missingDependencies,
               missingDependenciesTotal: result.missingDependenciesTotal,
               gateBins: result.gateBins,
+              prepSteps: result.prepSteps,
+              ...(result.postStartRelink !== undefined
+                ? { postStartRelink: result.postStartRelink }
+                : {}),
               postStart: result.postStart,
             },
             readConventionVersion(result.root),
@@ -2303,6 +2307,35 @@ program
                 `resolve(s) into the primary checkout through the linked install — build the worktree copy ` +
                 `or run \`npm ci\` in the worktree (e.g. \`x-worktree.post-start: npm ci\`) for worktree-local resolution`,
             );
+          }
+          {
+            // Bounded preparation log (bug-start-install-ordering): a skip or
+            // a failure in the prep path is never silent — name the decisions
+            // that left the worktree in its state.
+            const noteworthy = result.prepSteps.filter((entry) =>
+              [
+                "primary-install-missing",
+                "worktree-install-present",
+                "farm-failed-symlink-fallback",
+                "failed",
+                "install-cannot-consume",
+                "build-failed",
+                "build-no-entry",
+                "flip-failed",
+                "errored",
+                "foreign-resolution",
+              ].includes(entry.outcome),
+            );
+            if (noteworthy.length > 0) {
+              const named = noteworthy
+                .map((entry) =>
+                  entry.pkg === undefined
+                    ? `${entry.step}: ${entry.outcome}`
+                    : `${entry.step}: ${entry.outcome} (${sanitizeHumanError(entry.pkg)})`,
+                )
+                .join("; ");
+              console.log(`  note: dependency prep — ${sanitizeHumanError(named)}`);
+            }
           }
           if (result.manifestCoverage === "stale") {
             // A mirrored install is only as current as the primary's: name what
@@ -2346,6 +2379,16 @@ program
           } else {
             console.log(`  ${sanitizeHumanError(result.postStart.error ?? "")}`);
           }
+        }
+        if (result.postStartRelink !== undefined) {
+          // bug-start-install-ordering: a failed re-link after the hook used
+          // to be silent — the worktree left with no install at all.
+          console.log(
+            result.postStartRelink === "relinked"
+              ? `  post-start: the start-owned install was re-created (the hook left no node_modules)`
+              : `  note: the start-owned install could NOT be re-created after the post-start hook — ` +
+                  `the worktree has no node_modules; run \`npm ci\` in the worktree`,
+          );
         }
         if (result.prUrl) {
           console.log(`  draft PR: ${sanitizeHumanError(result.prUrl)}`);
