@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-e2e-board-serve-wrapper
 title: "Migrate the last tsx-wrapper spawn: e2e/board.smoke.spec.ts helper (left out of the #518 sweep)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [testing, flaky]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T12:46:47.733Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-e2e-board-serve-wrapper
 ---
 <!--
