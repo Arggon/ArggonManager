@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-env-contract-start
 title: Implement the worktree env contract in start (spec worktree-env-contract-016)
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [kernel, cli, worktree]
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T21:39:37.961Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-env-contract-start
 ---
 <!--
