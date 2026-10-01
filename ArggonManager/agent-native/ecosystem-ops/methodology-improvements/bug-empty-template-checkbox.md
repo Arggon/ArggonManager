@@ -83,3 +83,7 @@ FINDINGS (not filed, coordinator's call): templates/spec.md + templates/plan.md 
 Branch correction: the handoff above auto-detected the primary checkout's main; the work branch is fix/bug-empty-template-checkbox (PR #507).
 
 > > > > > > > origin/main
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Adjudication: the item checklist wins — an empty box is not a criterion, so a placeholder-only body flips (no-checklist semantic); strictness is proven against real unticked criteria (worker smoke case 4). Merged: PR #507 squash -> 6d23a815 (CI green). Item flipped done; the gate then accepted bug-...-rotation's stale placeholder flip with no surgery — the bug is dead. Format-churn nit (opencode-wave.ts/tui.test.ts rewraps) noted; non-blocking. Lazy-continuation criterion semantic (text not on the box line = empty) is documented, no item filed.
