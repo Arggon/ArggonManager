@@ -702,7 +702,7 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
     const branchPatterns = { ...exports.DEFAULT_BRANCH_PATTERNS };
     const views = {};
     const playbooks = { maxAgeDays: null };
-    const tracker = { autoCommit: null, allowSteal: null };
+    const tracker = { autoCommit: null, allowSteal: null, strictGateBins: null };
     const generated = {};
     let generatedProjectName = null;
     const importLabelTypes = {};
@@ -832,6 +832,13 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
                 tracker.allowSteal = value === "true";
                 continue;
             }
+            if (key === "strict-gate-bins") {
+                if (value !== "true" && value !== "false") {
+                    throw new Error(`${sourcePath}: 'strict-gate-bins' must be a boolean (got ${JSON.stringify(value)})`);
+                }
+                tracker.strictGateBins = value === "true";
+                continue;
+            }
             if (key !== "auto-commit")
                 continue;
             if (value !== "true" && value !== "false") {
@@ -945,7 +952,7 @@ function readConventionConfig(dir) {
             branchPatterns: { ...exports.DEFAULT_BRANCH_PATTERNS },
             views: {},
             playbooks: { maxAgeDays: null },
-            tracker: { autoCommit: null, allowSteal: null },
+            tracker: { autoCommit: null, allowSteal: null, strictGateBins: null },
             import: { labelTypes: null },
             worktree: { postStart: null, postStartShell: null },
             github: { issueRoundtrip: false },
@@ -2211,8 +2218,8 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
 exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.unlinkNodeModulesLink = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = void 0;
+exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.unlinkNodeModulesLink = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2386,6 +2393,8 @@ Object.defineProperty(exports, "packageEntryExists", { enumerable: true, get: fu
 Object.defineProperty(exports, "packageEntryPaths", { enumerable: true, get: function () { return worktree_js_1.packageEntryPaths; } });
 Object.defineProperty(exports, "pointWorkspaceAtLocal", { enumerable: true, get: function () { return worktree_js_1.pointWorkspaceAtLocal; } });
 Object.defineProperty(exports, "prepareWorktreeDependencies", { enumerable: true, get: function () { return worktree_js_1.prepareWorktreeDependencies; } });
+Object.defineProperty(exports, "strictGateBinFailure", { enumerable: true, get: function () { return worktree_js_1.strictGateBinFailure; } });
+Object.defineProperty(exports, "strictGateBinViolations", { enumerable: true, get: function () { return worktree_js_1.strictGateBinViolations; } });
 Object.defineProperty(exports, "unlinkNodeModulesLink", { enumerable: true, get: function () { return worktree_js_1.unlinkNodeModulesLink; } });
 Object.defineProperty(exports, "MAX_MISSING_DEPENDENCIES", { enumerable: true, get: function () { return worktree_js_1.MAX_MISSING_DEPENDENCIES; } });
 Object.defineProperty(exports, "MAX_GATE_BINS", { enumerable: true, get: function () { return worktree_js_1.MAX_GATE_BINS; } });
@@ -6016,6 +6025,8 @@ exports.unlinkNodeModulesLink = unlinkNodeModulesLink;
 exports.pointWorkspaceAtLocal = pointWorkspaceAtLocal;
 exports.buildLocalWorkspaces = buildLocalWorkspaces;
 exports.inspectGateBinResolution = inspectGateBinResolution;
+exports.strictGateBinViolations = strictGateBinViolations;
+exports.strictGateBinFailure = strictGateBinFailure;
 exports.inspectDeclaredDependencies = inspectDeclaredDependencies;
 exports.prepareWorktreeDependencies = prepareWorktreeDependencies;
 exports.linkedWorkspacePackages = linkedWorkspacePackages;
@@ -6484,6 +6495,27 @@ function inspectGateBinResolution(worktreePath, primaryRoot, env = process.env) 
         return { name: bin, source: "missing" };
     };
     return [...names].sort().slice(0, exports.MAX_GATE_BINS).map(resolveBin);
+}
+function strictGateBinViolations(gateBins) {
+    return gateBins.filter((bin) => bin.source !== "worktree");
+}
+function strictGateBinFailure(gateBins, worktreePath) {
+    const broken = strictGateBinViolations(gateBins);
+    if (broken.length === 0)
+        return null;
+    const named = broken
+        .map((bin) => {
+        if (bin.source === "missing")
+            return `${bin.name}: not resolvable from the worktree`;
+        if (bin.source === "path") {
+            return `${bin.name}: resolves only via PATH from ${bin.path} (outside the worktree)`;
+        }
+        return `${bin.name}: resolves from ${bin.path}, above the worktree`;
+    })
+        .join("; ");
+    return (`x-tracker.strict-gate-bins is set: refusing the claim commit — gate binaries do not ` +
+        `resolve inside the worktree: ${named}. ` +
+        `Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install.`);
 }
 function inspectDeclaredDependencies(worktreePath) {
     const declared = declaredDependencyNames(worktreePath);
@@ -8997,6 +9029,17 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
                 (preparationRemoved
                     ? "the start-owned dependency link was removed and the worktree was kept"
                     : "the worktree and any start-owned dependency link were kept"), "dependency preparation failed", { preparation: preparationError, rollback: { preparationRemoved } });
+        }
+    }
+    if (worktreePath !== undefined) {
+        const strictRefusal = kernel.readConventionConfig(root).tracker.strictGateBins === true
+            ? kernel.strictGateBinFailure(progress.preparation?.gateBins ?? [], worktreePath)
+            : null;
+        if (strictRefusal !== null) {
+            return failBeforeClaim(`${strictRefusal} The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
+                "Then re-run " +
+                `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
+                "it attaches to the existing worktree and retries the claim commit.", "strict gate-bin gate refused");
         }
     }
     progress.stage = "claim update";
