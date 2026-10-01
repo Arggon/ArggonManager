@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-tsx-board-dead-script
 title: tsx-rendered-board-dead-script
 assignee: Arggon
@@ -9,11 +9,9 @@ parent: ci-stability
 labels: []
 priority: p1
 created: "2026-09-30"
-updated: "2026-09-30"
-claimed_at: "2026-09-30T23:56:07.824Z"
+updated: "2026-10-01"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-tsx-board-dead-script
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/ci-stability/bug-tsx-board-dead-script.md
   Leaves live only under a story. id is the filename stem: bug-tsx-board-dead-script.
