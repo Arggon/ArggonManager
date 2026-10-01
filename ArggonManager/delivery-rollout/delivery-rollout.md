@@ -1,6 +1,6 @@
 ---
 type: initiative
-status: todo
+status: done
 id: delivery-rollout
 title: "Roll out ADR 0018: release pipeline and update channel"
 labels: [delivery]

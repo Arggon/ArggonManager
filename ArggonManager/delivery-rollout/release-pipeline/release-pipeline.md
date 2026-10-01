@@ -1,6 +1,6 @@
 ---
 type: epic
-status: todo
+status: done
 id: release-pipeline
 title: "Release pipeline (ADR 0018 §1–2, §4)"
 parent: delivery-rollout

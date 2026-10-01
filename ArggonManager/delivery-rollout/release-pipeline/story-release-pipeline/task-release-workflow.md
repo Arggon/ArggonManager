@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-release-workflow
 title: release.yml + release-please manifest + exact pin + runbook shrink
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [delivery, ci]
 priority: p1
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T15:46:40.895Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-release-workflow
 ---
 <!--

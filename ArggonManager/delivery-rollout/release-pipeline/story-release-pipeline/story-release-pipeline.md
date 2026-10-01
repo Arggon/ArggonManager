@@ -1,6 +1,6 @@
 ---
 type: story
-status: todo
+status: done
 id: story-release-pipeline
 title: "Release pipeline: release PR + OIDC publish + exact pin + tarballs"
 parent: release-pipeline
