@@ -19,3 +19,4 @@ Files: `NNNN-short-title.md` (four-digit number, kebab title).
 | [0016](./0016-adopter-upgrade-channel.md)       | Adopter upgrade channel                                                         | Accepted                        |
 | [0017](./0017-greenfield-exploration-gate.md)   | Greenfield exploration gate                                                     | Accepted                        |
 | [0018](./0018-update-delivery-and-distribution-channel.md) | Update delivery and distribution channel (release pipeline, update channel, skew, tarballs) | Accepted |
+| [0019](./0019-worktree-runtime-isolation.md) | Worktree runtime isolation: environment contract by default, ephemeral service containers as an opt-in pattern | Proposed |
