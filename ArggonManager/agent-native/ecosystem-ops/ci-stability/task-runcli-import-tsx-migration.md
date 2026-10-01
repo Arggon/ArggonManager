@@ -96,3 +96,12 @@ Resolution: merged origin/main; migrated the #515-added site to the shared runCl
 Inventory correction: 47 test files (file count unchanged), now 48 spawn SITES. Notable: the grep gate could not have caught this — gate scans *.test.* for the cli.mjs literal, and the #515 site's wrapper reference lived in the (merge-deleted) const declarations, not in the spawn line itself; tsc (TS2304) was the backstop that caught it. Both backstops now green.
 
 Post-merge gates: npm test 1968/1968 (112 files — main's additions incl. harness-state.test.ts), lint 0, build ok, check:plugin ok, arggon validate ok:true; trio doctor/success-stdout/measure one clean pass each. Note: main already tracks the product-side follow-ups I flagged (task-derive-cli-spawn-loader, task-e2e-board-serve-wrapper).
+
+### 2026-10-01 @Arggon
+B1 resolved, CI green (run 36856706281: cli pass 4m18s, ui-smoke pass, tasks-validate pass).
+
+Merge: origin/main merged into feat/task-runcli-import-tsx-migration; the #515-added worktree.test.ts cleanup --prune --json spawn migrated to the shared runCli helper (assertions + diagnostic messages byte-identical to main). harness-state.test.ts / cleanup.ts verified wrapper-free — it was the only new site. Inventory: 47 test files / 48 spawn sites.
+
+One additional CI gate surfaced on the push: the version guard classifies the package.json `files` exclusion as publish-relevant while v0.4.0 is already tagged ("release forgotten"). Resolved per the guard's design: version bumped 0.4.0 -> 0.4.1 (patch) + minimal CHANGELOG entry; guard now passes ("version 0.4.1 is not yet tagged - ok"). Flagging for the release runbook: the next publish is 0.4.1, and any parallel branch touching shipping fields should rebase over a359a3a1.
+
+Post-merge + post-bump gates: npm test 1968/1968 (112 files), lint 0, build ok, check:plugin ok, arggon validate ok:true; trio (doctor/success-stdout/measure) clean pass post-merge. PR body updated with the corrected counts and both resolutions. Item stays in_progress — review/merge is the coordinator's call.
