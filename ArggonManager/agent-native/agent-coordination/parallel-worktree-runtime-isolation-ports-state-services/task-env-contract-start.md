@@ -35,9 +35,9 @@ it never blocks the claim. The reviewable contract is
 
 ## Acceptance
 
-- [ ] Every acceptance box in `spec-worktree-env-contract-016` is ticked — those ten verifiable boxes are the contract for this task (kernel unit tests, never-overwrite, seed-only-if-absent, per-OS dirs, additive receipt on both surfaces, env files never committed, `x-worktree.env: false` opt-out, init gitignore, docs same PR, tests/smoke green).
-- [ ] PR references this item id and the spec id; impact class **Behavioral** stated in the PR (ADR 0016) — new receipt field + convention key.
-- [ ] Coordinator review verdict recorded on this item before merge.
+- [x] Every acceptance box in `spec-worktree-env-contract-016` is ticked — those ten verifiable boxes are the contract for this task (kernel unit tests, never-overwrite, seed-only-if-absent, per-OS dirs, additive receipt on both surfaces, env files never committed, `x-worktree.env: false` opt-out, init gitignore, docs same PR, tests/smoke green).
+- [x] PR references this item id and the spec id; impact class **Behavioral** stated in the PR (ADR 0016) — new receipt field + convention key.
+- [x] Coordinator review verdict recorded on this item before merge. (2026-10-01: approve — reviewer traced all ten boxes to named tests/smoke legs; rulings recorded: attach written:false accepted, Windows co-location accepted, cleanup env-reap caveat documented.)
 
 ## Notes
 
