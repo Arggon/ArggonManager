@@ -18,6 +18,7 @@
     "LICENSE",
     "!**/*.test.*",
     "!dist/test-tmp.*",
+    "!dist/test-spawn.*",
     "!dist/pack-fixtures.*"
   ],
   "scripts": {
