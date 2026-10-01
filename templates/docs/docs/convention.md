@@ -77,7 +77,7 @@ priority: p1
 | `x-tracker`   | Tracker hygiene options: `auto-commit`, `allow-steal`                                                                                               | ArggonManager repo § Tracker hygiene          |
 | `x-import`    | `arggon import-issues` options, e.g. `label-types` (GitHub label → work-item type mapping)                                                          | ArggonManager repo § Import type mapping      |
 | `x-github`    | GitHub issue round-trip: with `issue-roundtrip: true` (default OFF), flipping an item with an `issue:` field to done closes the linked GitHub issue | ArggonManager repo § Issue round-trip         |
-| `x-worktree`  | Worktree bootstrap for `arggon start --worktree`: `post-start` / `post-start-shell` commands                                                        | ArggonManager repo § Worktree bootstrap       |
+| `x-worktree`  | Worktree bootstrap for `arggon start --worktree`: `post-start` / `post-start-shell` commands, and `env: false` to opt out of the per-worktree `.arggon.env` identity/state contract (gitignored; never committed) | ArggonManager repo § Worktree bootstrap       |
 | `x-generated` | Checksum/provenance state for arggon-generated docs (drives `arggon doctor` modified/stale reporting)                                               | ArggonManager repo § Generated-doc provenance |
 
 ## Validation

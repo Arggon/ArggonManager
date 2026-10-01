@@ -45,6 +45,9 @@ const TIER1_DOCS = [
   ".github/copilot-instructions.md",
   // W6 task-native-headless-ci: the headless CI recipe ships with init.
   ".github/workflows/arggon.yml",
+  // spec worktree-env-contract-016: the generated .gitignore ignores
+  // .arggon.env so a fresh scaffold never tracks the per-worktree env file.
+  ".gitignore",
   ".mcp.json",
   ".opencode/agents/arggon-coordinator.md",
   ".opencode/agents/arggon-reviewer.md",
@@ -135,6 +138,27 @@ describe("init", () => {
       expect(result.created).not.toContain(doc);
     }
     expect(result.skipped).toEqual([]);
+  });
+
+  it("generates a .gitignore that ignores .arggon.env, and never touches an existing one (spec worktree-env-contract-016)", () => {
+    // Fresh scaffold: the generated .gitignore ignores the per-worktree env
+    // file from day one.
+    const fresh = mkdtempSync(join(tmpdir(), "arggon-init-gitignore-"));
+    const created = runInit({ dir: fresh, force: false });
+    expect(created.created).toContain(".gitignore");
+    const generated = readFileSync(join(fresh, ".gitignore"), "utf8");
+    expect(generated).toContain(".arggon.env");
+    expect(generated.startsWith("# arggon:generated template=")).toBe(true);
+    // Re-run: untouched regeneration (provenance state, not overwrite).
+    const second = runInit({ dir: fresh, force: false });
+    expect(second.updated).toContain(".gitignore");
+    // An adopter's existing .gitignore is adopter-owned: reported, kept.
+    const adopter = mkdtempSync(join(tmpdir(), "arggon-init-gitignore-"));
+    writeFileSync(join(adopter, ".gitignore"), "node_modules/\n", "utf8");
+    const result = runInit({ dir: adopter, force: false });
+    expect(result.modified).toContain(".gitignore");
+    expect(result.created).not.toContain(".gitignore");
+    expect(readFileSync(join(adopter, ".gitignore"), "utf8")).toBe("node_modules/\n");
   });
 
   it("generates the tier-2 doc set only with full", () => {

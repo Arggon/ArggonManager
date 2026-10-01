@@ -17,7 +17,7 @@ import {
   type TrackerCommitResult,
 } from "@arggondev/lib";
 
-import { unlinkNodeModulesLink } from "./start.js";
+import { unlinkNodeModulesLink, unlinkWorktreeEnv } from "./start.js";
 
 /**
  * Cleanup classification and git plumbing are shared kernel rules since W4
@@ -173,6 +173,11 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
           const mainRoot = resolve(gitRunner.worktreeList(root)[0] ?? root);
           unlinkNodeModulesLink(mainRoot, entry.path);
           if (mainRoot !== resolve(root)) unlinkNodeModulesLink(root, entry.path);
+          // The env contract file (spec worktree-env-contract-016) is
+          // untracked the same way and blocks `git worktree remove` the same
+          // way; only start-created shape (the six documented KEY=value lines)
+          // is ever removed here, never an adopter-customized one.
+          unlinkWorktreeEnv(entry.path);
           gitRunner.removeWorktree(root, entry.path);
           pruned.push({
             id: entry.id,

@@ -718,7 +718,7 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
     let generatedProjectName = null;
     const importLabelTypes = {};
     let importHasLabelTypes = false;
-    const worktree = { postStart: null, postStartShell: null };
+    const worktree = { postStart: null, postStartShell: null, env: null };
     const github = { issueRoundtrip: false };
     let version = exports.CONVENTION_VERSION_DEFAULT;
     let section = null;
@@ -896,6 +896,13 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
                 worktree.postStartShell = shell;
                 continue;
             }
+            if (key === "env") {
+                if (value !== "true" && value !== "false") {
+                    throw new Error(`${sourcePath}: 'env' must be a boolean (got ${JSON.stringify(value)})`);
+                }
+                worktree.env = value === "true";
+                continue;
+            }
             if (key !== "post-start")
                 continue;
             const command = stripQuotes(value);
@@ -965,7 +972,7 @@ function readConventionConfig(dir) {
             playbooks: { maxAgeDays: null },
             tracker: { autoCommit: null, allowSteal: null, strictGateBins: null },
             import: { labelTypes: null },
-            worktree: { postStart: null, postStartShell: null },
+            worktree: { postStart: null, postStartShell: null, env: null },
             github: { issueRoundtrip: false },
             generated: {},
             generatedProjectName: null,
@@ -2229,9 +2236,9 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
 exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.runImportIssues = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.unlinkNodeModulesLink = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = void 0;
-exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = void 0;
-exports.successJson = exports.jsonEnabled = void 0;
+exports.worktreeStateBase = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkNodeModulesLink = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = void 0;
+exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2407,12 +2414,17 @@ Object.defineProperty(exports, "packageEntryExists", { enumerable: true, get: fu
 Object.defineProperty(exports, "packageEntryPaths", { enumerable: true, get: function () { return worktree_js_1.packageEntryPaths; } });
 Object.defineProperty(exports, "pointWorkspaceAtLocal", { enumerable: true, get: function () { return worktree_js_1.pointWorkspaceAtLocal; } });
 Object.defineProperty(exports, "prepareWorktreeDependencies", { enumerable: true, get: function () { return worktree_js_1.prepareWorktreeDependencies; } });
+Object.defineProperty(exports, "prepareWorktreeEnv", { enumerable: true, get: function () { return worktree_js_1.prepareWorktreeEnv; } });
 Object.defineProperty(exports, "strictGateBinFailure", { enumerable: true, get: function () { return worktree_js_1.strictGateBinFailure; } });
 Object.defineProperty(exports, "strictGateBinViolations", { enumerable: true, get: function () { return worktree_js_1.strictGateBinViolations; } });
 Object.defineProperty(exports, "unlinkNodeModulesLink", { enumerable: true, get: function () { return worktree_js_1.unlinkNodeModulesLink; } });
+Object.defineProperty(exports, "unlinkWorktreeEnv", { enumerable: true, get: function () { return worktree_js_1.unlinkWorktreeEnv; } });
+Object.defineProperty(exports, "worktreeCacheBase", { enumerable: true, get: function () { return worktree_js_1.worktreeCacheBase; } });
+Object.defineProperty(exports, "worktreeStateBase", { enumerable: true, get: function () { return worktree_js_1.worktreeStateBase; } });
 Object.defineProperty(exports, "MAX_MISSING_DEPENDENCIES", { enumerable: true, get: function () { return worktree_js_1.MAX_MISSING_DEPENDENCIES; } });
 Object.defineProperty(exports, "MAX_GATE_BINS", { enumerable: true, get: function () { return worktree_js_1.MAX_GATE_BINS; } });
 Object.defineProperty(exports, "MAX_PREP_STEPS", { enumerable: true, get: function () { return worktree_js_1.MAX_PREP_STEPS; } });
+Object.defineProperty(exports, "WORKTREE_ENV_KEYS", { enumerable: true, get: function () { return worktree_js_1.WORKTREE_ENV_KEYS; } });
 var import_issues_js_1 = require("./import-issues.js");
 Object.defineProperty(exports, "runImportIssues", { enumerable: true, get: function () { return import_issues_js_1.runImportIssues; } });
 var import_issues_js_2 = require("./import-issues.js");
@@ -6058,7 +6070,7 @@ function applyViewFilter(items, expr, opts = {}) {
 __arggonModules.set("lib/src/worktree.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = void 0;
+exports.MAX_PREP_STEPS = exports.WORKTREE_ENV_KEYS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = void 0;
 exports.packageEntryPaths = packageEntryPaths;
 exports.packageEntryExists = packageEntryExists;
 exports.packageBuildScript = packageBuildScript;
@@ -6073,10 +6085,15 @@ exports.strictGateBinViolations = strictGateBinViolations;
 exports.strictGateBinFailure = strictGateBinFailure;
 exports.freshWorktreeInstallRefusal = freshWorktreeInstallRefusal;
 exports.inspectDeclaredDependencies = inspectDeclaredDependencies;
+exports.worktreeStateBase = worktreeStateBase;
+exports.worktreeCacheBase = worktreeCacheBase;
+exports.prepareWorktreeEnv = prepareWorktreeEnv;
+exports.unlinkWorktreeEnv = unlinkWorktreeEnv;
 exports.prepareWorktreeDependencies = prepareWorktreeDependencies;
 exports.linkedWorkspacePackages = linkedWorkspacePackages;
 const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
+const node_os_1 = require("node:os");
 const node_path_1 = require("node:path");
 const LINK_FARM_MARKER = ".arggon-link-farm";
 function isInside(parent, child) {
@@ -6631,8 +6648,174 @@ function inspectDeclaredDependencies(worktreePath) {
         missingTotal: missing.length,
     };
 }
+exports.WORKTREE_ENV_KEYS = [
+    "ARGON_ITEM",
+    "ARGGON_WORKTREE_ID",
+    "ARGGON_WORKTREE_PATH",
+    "ARGGON_WORKTREE_BRANCH",
+    "ARGGON_STATE_DIR",
+    "ARGGON_CACHE_DIR",
+];
+function worktreeStateBase(env, home) {
+    switch (process.platform) {
+        case "darwin":
+            return (0, node_path_1.join)(home, "Library", "Application Support");
+        case "win32":
+            return env.LOCALAPPDATA ?? (0, node_path_1.join)(home, "AppData", "Local");
+        default:
+            return env.XDG_STATE_HOME ?? (0, node_path_1.join)(home, ".local", "state");
+    }
+}
+function worktreeCacheBase(env, home) {
+    switch (process.platform) {
+        case "darwin":
+            return (0, node_path_1.join)(home, "Library", "Caches");
+        case "win32":
+            return env.LOCALAPPDATA ?? (0, node_path_1.join)(home, "AppData", "Local");
+        default:
+            return env.XDG_CACHE_HOME ?? (0, node_path_1.join)(home, ".cache");
+    }
+}
+function envErrorMessage(error) {
+    return (error instanceof Error ? error.message : String(error)).split("\n")[0] ?? "unknown error";
+}
+function defaultCheckIgnore(cwd, relPath) {
+    const result = (0, node_child_process_1.spawnSync)("git", ["check-ignore", "--quiet", relPath], {
+        cwd,
+        encoding: "utf8",
+        timeout: 10_000,
+    });
+    if (result.error !== undefined)
+        return undefined;
+    if (result.status === 0)
+        return true;
+    if (result.status === 1)
+        return false;
+    return undefined;
+}
+function prepareWorktreeEnv(primaryRoot, worktreePath, request) {
+    if (request.enabled === false) {
+        return { written: false, warning: "disabled via x-worktree.env: false" };
+    }
+    const env = request.env ?? process.env;
+    const home = request.home ?? (0, node_os_1.homedir)();
+    const worktreeId = (0, node_path_1.basename)(worktreePath);
+    const stateDir = (0, node_path_1.join)(worktreeStateBase(env, home), worktreeId);
+    const cacheDir = (0, node_path_1.join)(worktreeCacheBase(env, home), worktreeId);
+    const warnings = [];
+    try {
+        (0, node_fs_1.mkdirSync)(stateDir, { recursive: true });
+        (0, node_fs_1.mkdirSync)(cacheDir, { recursive: true });
+    }
+    catch (error) {
+        return {
+            written: false,
+            warning: `could not create the per-worktree state/cache dirs: ${envErrorMessage(error)}`,
+        };
+    }
+    const checkIgnore = request.checkIgnore ?? defaultCheckIgnore;
+    const ignored = checkIgnore(worktreePath, ".arggon.env");
+    const gitignored = ignored === undefined ? undefined : ignored;
+    let seededDotenv;
+    const dotenvSource = (0, node_path_1.join)(primaryRoot, ".env");
+    const dotenvTarget = (0, node_path_1.join)(worktreePath, ".env");
+    if (!(0, node_fs_1.existsSync)(dotenvTarget) && (0, node_fs_1.existsSync)(dotenvSource)) {
+        try {
+            (0, node_fs_1.copyFileSync)(dotenvSource, dotenvTarget, node_fs_1.constants.COPYFILE_EXCL);
+            seededDotenv = dotenvTarget;
+        }
+        catch (error) {
+            warnings.push(`could not seed .env: ${envErrorMessage(error)}`);
+        }
+    }
+    const attachWarning = () => [...warnings, "already exists — left byte-identical (never overwritten)"].join("; ");
+    const envPath = (0, node_path_1.join)(worktreePath, ".arggon.env");
+    if ((0, node_fs_1.existsSync)(envPath)) {
+        return {
+            written: false,
+            path: envPath,
+            ...(gitignored !== undefined ? { gitignored } : {}),
+            ...(seededDotenv !== undefined ? { seededDotenv } : {}),
+            warning: attachWarning(),
+        };
+    }
+    const value = (raw) => raw.replace(/[\r\n]+/g, " ");
+    const body = [
+        `ARGON_ITEM=${value(request.identity.itemId)}`,
+        `ARGGON_WORKTREE_ID=${value(worktreeId)}`,
+        `ARGGON_WORKTREE_PATH=${value((0, node_path_1.resolve)(worktreePath))}`,
+        `ARGGON_WORKTREE_BRANCH=${value(request.identity.branch)}`,
+        `ARGGON_STATE_DIR=${value(stateDir)}`,
+        `ARGGON_CACHE_DIR=${value(cacheDir)}`,
+    ].join("\n") + "\n";
+    try {
+        const fd = (0, node_fs_1.openSync)(envPath, "wx");
+        try {
+            (0, node_fs_1.writeSync)(fd, body, 0, "utf8");
+        }
+        finally {
+            (0, node_fs_1.closeSync)(fd);
+        }
+    }
+    catch (error) {
+        if ((0, node_fs_1.existsSync)(envPath)) {
+            return {
+                written: false,
+                path: envPath,
+                ...(gitignored !== undefined ? { gitignored } : {}),
+                ...(seededDotenv !== undefined ? { seededDotenv } : {}),
+                warning: attachWarning(),
+            };
+        }
+        warnings.push(`could not write .arggon.env: ${envErrorMessage(error)}`);
+        return {
+            written: false,
+            ...(gitignored !== undefined ? { gitignored } : {}),
+            warning: warnings.join("; "),
+        };
+    }
+    return {
+        written: true,
+        path: envPath,
+        keys: [...exports.WORKTREE_ENV_KEYS],
+        ...(seededDotenv !== undefined ? { seededDotenv } : {}),
+        ...(gitignored !== undefined ? { gitignored } : {}),
+        ...(warnings.length > 0 ? { warning: warnings.join("; ") } : {}),
+    };
+}
 exports.MAX_PREP_STEPS = 16;
+function unlinkWorktreeEnv(worktreePath) {
+    const envPath = (0, node_path_1.join)(worktreePath, ".arggon.env");
+    let raw;
+    try {
+        if ((0, node_fs_1.lstatSync)(envPath).isSymbolicLink())
+            return false;
+        raw = (0, node_fs_1.readFileSync)(envPath, "utf8");
+    }
+    catch {
+        return false;
+    }
+    const lines = raw.split("\n");
+    if (lines.pop() !== "")
+        return false;
+    if (lines.length === 0)
+        return false;
+    const keys = new Set(exports.WORKTREE_ENV_KEYS);
+    for (const line of lines) {
+        const eq = line.indexOf("=");
+        if (eq <= 0 || !keys.has(line.slice(0, eq)))
+            return false;
+    }
+    try {
+        (0, node_fs_1.rmSync)(envPath);
+        return true;
+    }
+    catch {
+        return false;
+    }
+}
 function prepareWorktreeDependencies(primaryRoot, worktreePath, deps = {}) {
+    const envReceipt = deps.env === undefined ? undefined : prepareWorktreeEnv(primaryRoot, worktreePath, deps.env);
     const worktreeModules = (0, node_path_1.join)(worktreePath, "node_modules");
     const steps = [];
     let stepsTruncated = false;
@@ -6680,6 +6863,7 @@ function prepareWorktreeDependencies(primaryRoot, worktreePath, deps = {}) {
         gateBins,
         steps,
         ...(stepsTruncated ? { stepsTruncated: true } : {}),
+        ...(envReceipt !== undefined ? { env: envReceipt } : {}),
     };
 }
 function linkedWorkspacePackages(primaryRoot, worktreePath) {
@@ -8565,6 +8749,7 @@ function boundedPreparation(input) {
         }
         return bounded;
     });
+    const env = input.env === undefined ? undefined : boundedEnvReceipt(input.env);
     const truncated = input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
         input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
         (input.steps?.length ?? 0) > steps.length ||
@@ -8575,7 +8760,8 @@ function boundedPreparation(input) {
         missing.some((name, index) => name !== input.missingDependencies[index]) ||
         gateBins.some((bin, index) => input.gateBins?.[index] === undefined ||
             bin.name !== input.gateBins[index].name ||
-            bin.path !== input.gateBins[index].path);
+            bin.path !== input.gateBins[index].path) ||
+        (env !== undefined && envTruncated(env, input.env));
     return {
         ready: input.ready,
         install: input.install,
@@ -8587,8 +8773,39 @@ function boundedPreparation(input) {
         missingDependenciesTotal: input.missingDependenciesTotal,
         gateBins,
         ...(steps.length > 0 ? { steps } : {}),
+        ...(env !== undefined ? { env } : {}),
         ...(truncated ? { truncated: true } : {}),
     };
+}
+function boundedEnvReceipt(input) {
+    const bounded = { written: input.written };
+    if (input.path !== undefined) {
+        bounded.path = boundedNativeText(input.path, MAX_NATIVE_PREPARATION_VALUE_CHARS);
+    }
+    if (input.keys !== undefined) {
+        bounded.keys = input.keys
+            .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+            .map((key) => boundedNativeText(key, MAX_NATIVE_PREPARATION_VALUE_CHARS));
+    }
+    if (input.seededDotenv !== undefined) {
+        bounded.seededDotenv = boundedNativeText(input.seededDotenv, MAX_NATIVE_PREPARATION_VALUE_CHARS);
+    }
+    if (input.gitignored !== undefined) {
+        bounded.gitignored = input.gitignored;
+    }
+    if (input.warning !== undefined) {
+        bounded.warning = boundedNativeText(input.warning, MAX_NATIVE_PREPARATION_VALUE_CHARS);
+    }
+    return bounded;
+}
+function envTruncated(bounded, input) {
+    if (input === undefined)
+        return true;
+    return (bounded.path !== input.path ||
+        bounded.seededDotenv !== input.seededDotenv ||
+        bounded.warning !== input.warning ||
+        (input.keys?.length ?? 0) > (bounded.keys?.length ?? 0) ||
+        (bounded.keys ?? []).some((key, index) => key !== input.keys?.[index]));
 }
 function boundedNames(names) {
     if (names === undefined)
@@ -9133,7 +9350,12 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
     if (worktreePath !== undefined) {
         progress.stage = "dependency preparation";
         try {
-            progress.preparation = boundedPreparation(kernel.prepareWorktreeDependencies(primaryRoot, worktreePath));
+            progress.preparation = boundedPreparation(kernel.prepareWorktreeDependencies(primaryRoot, worktreePath, {
+                env: {
+                    identity: { itemId: id, branch },
+                    enabled: kernel.readConventionConfig(root).worktree.env !== false,
+                },
+            }));
         }
         catch (error) {
             const preparationError = boundedPreparation({
@@ -9354,6 +9576,7 @@ async function nativeCleanup(kernel, input, options) {
                     if ((0, node_path_1.resolve)(canonical) !== (0, node_path_1.resolve)(root)) {
                         kernel.unlinkNodeModulesLink(root, entry.path);
                     }
+                    kernel.unlinkWorktreeEnv(entry.path);
                     const removal = await removeWorktreeObserved(options, entry.path, root, {
                         force: false,
                     });

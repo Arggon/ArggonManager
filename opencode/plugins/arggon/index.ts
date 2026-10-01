@@ -2181,6 +2181,12 @@ type NativePreparationReceipt = {
   gateBins: NativeGateBinResolution[]
   /** Bounded preparation log (bug-start-install-ordering), as reported by the kernel. */
   steps?: NativePrepStep[]
+  /**
+   * Worktree env contract receipt (spec worktree-env-contract-016), forwarded
+   * from the kernel when the caller requested env preparation (every
+   * `start --worktree` run does).
+   */
+  env?: NativeEnvReceipt
   truncated?: boolean
 }
 
@@ -2190,6 +2196,21 @@ type NativePrepStep = {
   step: "link" | "build" | "gate-bins"
   outcome: string
   pkg?: string
+}
+
+/**
+ * The worktree env contract receipt (spec worktree-env-contract-016),
+ * structurally the kernel's `WorktreeEnvReceipt`: `written: false` guarantees
+ * only `warning` (opt-out, write failure, or an existing file left
+ * byte-identical on attach) — it never blocks the claim.
+ */
+type NativeEnvReceipt = {
+  written: boolean
+  path?: string
+  keys?: string[]
+  seededDotenv?: string
+  gitignored?: boolean
+  warning?: string
 }
 
 type NativeClaimCommitReceipt = {
@@ -2232,6 +2253,7 @@ function boundedPreparation(input: {
   missingDependenciesTotal: number
   gateBins?: NativeGateBinResolution[]
   steps?: NativePrepStep[]
+  env?: NativeEnvReceipt
 }): NativePreparationReceipt {
   const built = input.builtWorkspaces
     .slice(0, MAX_NATIVE_PREPARATION_NAMES)
@@ -2270,6 +2292,9 @@ function boundedPreparation(input: {
     }
     return bounded
   })
+  // Env contract fragment (spec worktree-env-contract-016): projected, not
+  // re-derived — the kernel owns the check and the six-key shape.
+  const env = input.env === undefined ? undefined : boundedEnvReceipt(input.env)
   const truncated =
     input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
     input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
@@ -2284,7 +2309,8 @@ function boundedPreparation(input: {
         input.gateBins?.[index] === undefined ||
         bin.name !== input.gateBins[index].name ||
         bin.path !== input.gateBins[index].path,
-    )
+    ) ||
+    (env !== undefined && envTruncated(env, input.env))
   return {
     ready: input.ready,
     install: input.install,
@@ -2296,8 +2322,49 @@ function boundedPreparation(input: {
     missingDependenciesTotal: input.missingDependenciesTotal,
     gateBins,
     ...(steps.length > 0 ? { steps } : {}),
+    ...(env !== undefined ? { env } : {}),
     ...(truncated ? { truncated: true } : {}),
   }
+}
+
+/**
+ * Bound one env receipt fragment: only the free-text fields (`path`,
+ * `seededDotenv`, `warning`, each `keys` entry) are re-bounded; `written` and
+ * `gitignored` are booleans. The kernel owns the six-key set (`keys` is never
+ * longer than that), so the list cap is a formality here.
+ */
+function boundedEnvReceipt(input: NativeEnvReceipt): NativeEnvReceipt {
+  const bounded: NativeEnvReceipt = { written: input.written }
+  if (input.path !== undefined) {
+    bounded.path = boundedNativeText(input.path, MAX_NATIVE_PREPARATION_VALUE_CHARS)
+  }
+  if (input.keys !== undefined) {
+    bounded.keys = input.keys
+      .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+      .map((key) => boundedNativeText(key, MAX_NATIVE_PREPARATION_VALUE_CHARS))
+  }
+  if (input.seededDotenv !== undefined) {
+    bounded.seededDotenv = boundedNativeText(input.seededDotenv, MAX_NATIVE_PREPARATION_VALUE_CHARS)
+  }
+  if (input.gitignored !== undefined) {
+    bounded.gitignored = input.gitignored
+  }
+  if (input.warning !== undefined) {
+    bounded.warning = boundedNativeText(input.warning, MAX_NATIVE_PREPARATION_VALUE_CHARS)
+  }
+  return bounded
+}
+
+/** True when bounding changed (or dropped) anything in the env fragment. */
+function envTruncated(bounded: NativeEnvReceipt, input: NativeEnvReceipt | undefined): boolean {
+  if (input === undefined) return true
+  return (
+    bounded.path !== input.path ||
+    bounded.seededDotenv !== input.seededDotenv ||
+    bounded.warning !== input.warning ||
+    (input.keys?.length ?? 0) > (bounded.keys?.length ?? 0) ||
+    (bounded.keys ?? []).some((key, index) => key !== input.keys?.[index])
+  )
 }
 
 function boundedNames(names: string[] | undefined): string[] | undefined {
@@ -3272,9 +3339,16 @@ async function nativeStartBody(
     try {
       // The shared kernel receipt runs before the claim write/commit. A false
       // `ready` value remains explicit; the claim commit below is the final
-      // authority for whether a project gate actually required it.
+      // authority for whether a project gate actually required it. The env
+      // contract (spec worktree-env-contract-016) rides the same receipt:
+      // `x-worktree.env: false` opts out; unset/true keep the default.
       progress.preparation = boundedPreparation(
-        kernel.prepareWorktreeDependencies(primaryRoot, worktreePath),
+        kernel.prepareWorktreeDependencies(primaryRoot, worktreePath, {
+          env: {
+            identity: { itemId: id, branch },
+            enabled: kernel.readConventionConfig(root).worktree.env !== false,
+          },
+        }),
       )
     } catch (error) {
       const preparationError = boundedPreparation({
@@ -3615,6 +3689,10 @@ async function nativeCleanup(
           if (resolve(canonical) !== resolve(root)) {
             kernel.unlinkNodeModulesLink(root, entry.path)
           }
+          // Same parity for the env contract file (spec
+          // worktree-env-contract-016): untracked, blocks the removal, and
+          // only start-created shape (the six KEY=value lines) is removed.
+          kernel.unlinkWorktreeEnv(entry.path)
           // The SAME observed removal the start rollback uses, without its force
           // policy: a dirty worktree must still be refused by git (bug-native-
           // cleanup-unverified-worktree-removal).

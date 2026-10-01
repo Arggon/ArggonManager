@@ -4,6 +4,7 @@
  * tests pin the filesystem receipt itself so both callers cannot drift on
  * missing installs, link farms, or a failed local workspace build.
  */
+import { spawnSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
@@ -26,8 +27,13 @@ import {
   MAX_GATE_BINS,
   MAX_PREP_STEPS,
   prepareWorktreeDependencies,
+  prepareWorktreeEnv,
   strictGateBinFailure,
   strictGateBinViolations,
+  unlinkWorktreeEnv,
+  worktreeCacheBase,
+  worktreeStateBase,
+  WORKTREE_ENV_KEYS,
 } from "./worktree.js";
 
 const roots: string[] = [];
@@ -717,5 +723,208 @@ describe("strictGateBinFailure (task-start-gate-strict-mode)", () => {
     const message = strictGateBinFailure(bins, worktree);
     expect(message).toContain("tsx: resolves from");
     expect(message).toContain(externalBin);
+  });
+});
+
+describe("prepareWorktreeEnv (spec worktree-env-contract-016)", () => {
+  const identity = { itemId: "task-env", branch: "feat/task-env" };
+
+  /**
+   * Hermetic per-OS bases: XDG overrides (honored on Linux) plus a fake home
+   * (the macOS/Windows bases derive from it). The tests assert EXISTENCE at
+   * the location the exported platform mapping resolves — never a hardcoded
+   * path, so the suite stays portable across the three supported platforms.
+   */
+  function hermetic(parent: string): { env: NodeJS.ProcessEnv; home: string } {
+    return {
+      env: {
+        XDG_STATE_HOME: join(parent, "xdg-state"),
+        XDG_CACHE_HOME: join(parent, "xdg-cache"),
+      },
+      home: join(parent, "home"),
+    };
+  }
+
+  /** The env receipt for a fixture worktree, with hermetic dir bases. */
+  function runEnv(f: { primary: string; worktree: string }) {
+    return prepareWorktreeEnv(f.primary, f.worktree, {
+      identity,
+      ...hermetic(dirname(f.worktree)),
+    });
+  }
+
+  it("writes .arggon.env with exactly the six documented keys on a fresh start", () => {
+    const f = siblingFixture();
+    const hermeticEnv = hermetic(f.parent);
+    const receipt = prepareWorktreeEnv(f.primary, f.worktree, { identity, ...hermeticEnv });
+    expect(receipt.written).toBe(true);
+    expect(receipt.keys).toEqual([...WORKTREE_ENV_KEYS]);
+    const raw = readFileSync(receipt.path ?? "", "utf8");
+    // UTF-8, LF, no quoting: `KEY=value` lines, trailing newline, six lines.
+    const lines = raw.split("\n");
+    expect(lines[lines.length - 1]).toBe("");
+    expect(lines.slice(0, -1)).toEqual([
+      `ARGON_ITEM=${identity.itemId}`,
+      `ARGGON_WORKTREE_ID=worktree`,
+      `ARGGON_WORKTREE_PATH=${f.worktree}`,
+      `ARGGON_WORKTREE_BRANCH=${identity.branch}`,
+      `ARGGON_STATE_DIR=${join(worktreeStateBase(hermeticEnv.env, hermeticEnv.home), "worktree")}`,
+      `ARGGON_CACHE_DIR=${join(worktreeCacheBase(hermeticEnv.env, hermeticEnv.home), "worktree")}`,
+    ]);
+  });
+
+  it("creates the per-OS state and cache dirs (existence, not location)", () => {
+    const f = fixture();
+    runEnv(f);
+    const { env, home } = hermetic(dirname(f.worktree));
+    const worktreeId = "worktree";
+    for (const dir of [
+      join(worktreeStateBase(env, home), worktreeId),
+      join(worktreeCacheBase(env, home), worktreeId),
+    ]) {
+      expect(existsSync(dir)).toBe(true);
+      expect(lstatSync(dir).isDirectory()).toBe(true);
+    }
+  });
+
+  it("leaves an existing .arggon.env byte-identical on attach (never-overwrite)", () => {
+    const f = fixture();
+    const custom = "ARGON_ITEM=adopter-owned\nCUSTOM=yes\n";
+    writeFileSync(join(f.worktree, ".arggon.env"), custom, "utf8");
+    const receipt = runEnv(f);
+    expect(readFileSync(join(f.worktree, ".arggon.env"), "utf8")).toBe(custom);
+    expect(receipt.written).toBe(false);
+    expect(receipt.path).toBe(join(f.worktree, ".arggon.env"));
+    expect(receipt.warning).toContain("byte-identical");
+    expect(receipt.keys).toBeUndefined();
+  });
+
+  it("seeds .env from the primary only when the worktree has none", () => {
+    const f = fixture();
+    writeFileSync(join(f.primary, ".env"), "SECRET=primary-only\n", "utf8");
+    const receipt = runEnv(f);
+    expect(receipt.seededDotenv).toBe(join(f.worktree, ".env"));
+    expect(readFileSync(join(f.worktree, ".env"), "utf8")).toBe("SECRET=primary-only\n");
+    // Attach with an adopter-modified .env: never overwritten.
+    writeFileSync(join(f.worktree, ".env"), "SECRET=adopter\n", "utf8");
+    const attach = runEnv(f);
+    expect(attach.seededDotenv).toBeUndefined();
+    expect(readFileSync(join(f.worktree, ".env"), "utf8")).toBe("SECRET=adopter\n");
+    // A worktree .env without a primary counterpart is left alone, too.
+    const bare = fixture();
+    writeFileSync(join(bare.worktree, ".env"), "SECRET=worktree\n", "utf8");
+    const bareReceipt = runEnv(bare);
+    expect(bareReceipt.seededDotenv).toBeUndefined();
+    expect(readFileSync(join(bare.worktree, ".env"), "utf8")).toBe("SECRET=worktree\n");
+  });
+
+  it("surfaces seed failures as a receipt warning on every path (review should-fix)", () => {
+    const f = fixture();
+    writeFileSync(join(f.primary, ".env"), "SECRET=1\n", "utf8");
+    // A broken symlink at the seed target: existsSync() is false (so the seed
+    // path runs) while COPYFILE_EXCL fails with EEXIST (the name is taken) —
+    // a deterministic, root-proof seed failure.
+    symlinkSync(join(f.primary, "no-such-file"), join(f.worktree, ".env"));
+    const fresh = runEnv(f);
+    // (a) the fresh write SUCCEEDS and the failure still surfaces.
+    expect(fresh.written).toBe(true);
+    expect(fresh.warning).toContain("could not seed .env");
+    expect(existsSync(join(f.worktree, ".arggon.env"))).toBe(true);
+    // (b) the attach path carries the seed warning AND the keep message.
+    const attach = runEnv(f);
+    expect(attach.written).toBe(false);
+    expect(attach.warning).toContain("could not seed .env");
+    expect(attach.warning).toContain("byte-identical");
+  });
+
+  it("reports the read-only gitignore probe against a real git repo", () => {
+    const f = fixture();
+    const git = (args: string[]) =>
+      spawnSync("git", ["-c", "user.name=t", "-c", "user.email=t@example.test", ...args], {
+        cwd: f.worktree,
+        encoding: "utf8",
+      });
+    expect(git(["init"]).status).toBe(0);
+    // No ignore rule: the probe answers false.
+    const unignored = runEnv(f);
+    expect(unignored.gitignored).toBe(false);
+    // `.arggon.env` in .gitignore: the probe answers true.
+    writeFileSync(join(f.worktree, ".gitignore"), ".arggon.env\n", "utf8");
+    const ignored = runEnv(f);
+    expect(ignored.gitignored).toBe(true);
+  });
+
+  it("skips the whole path with written:false + reason when disabled", () => {
+    const f = fixture();
+    const receipt = prepareWorktreeEnv(f.primary, f.worktree, {
+      identity,
+      enabled: false,
+      ...(hermetic(dirname(f.worktree)) as { env: NodeJS.ProcessEnv; home: string }),
+    });
+    expect(receipt).toEqual({
+      written: false,
+      warning: "disabled via x-worktree.env: false",
+    });
+    expect(existsSync(join(f.worktree, ".arggon.env"))).toBe(false);
+  });
+
+  it("degrades to written:false + warning when the state dirs cannot be created", () => {
+    const f = fixture();
+    // The fake home is a FILE: every base derived from it fails mkdir (ENOTDIR).
+    const blockedHome = join(dirname(f.worktree), "blocked-home");
+    writeFileSync(blockedHome, "not a directory\n", "utf8");
+    const receipt = prepareWorktreeEnv(f.primary, f.worktree, {
+      identity,
+      env: {},
+      home: blockedHome,
+    });
+    expect(receipt.written).toBe(false);
+    expect(receipt.warning).toContain("could not create the per-worktree state/cache dirs");
+    expect(existsSync(join(f.worktree, ".arggon.env"))).toBe(false);
+  });
+
+  it("rides prepareWorktreeDependencies additively and never blocks the claim path", () => {
+    const f = fixture();
+    writeFileSync(join(f.primary, ".env"), "SECRET=1\n", "utf8");
+    const prepared = prepareWorktreeDependencies(f.primary, f.worktree, {
+      env: { identity, ...(hermetic(dirname(f.worktree)) as { env: NodeJS.ProcessEnv; home: string }) },
+    });
+    expect(prepared.env?.written).toBe(true);
+    expect(prepared.env?.keys).toEqual([...WORKTREE_ENV_KEYS]);
+    // Legacy callers pass no env request: the receipt keeps its shape.
+    const legacy = prepareWorktreeDependencies(f.primary, f.worktree);
+    expect(legacy.env).toBeUndefined();
+  });
+
+  describe("unlinkWorktreeEnv (cleanup ownership, exploration 017 F8)", () => {
+    it("removes the start-created contract file and nothing else", () => {
+      const f = fixture();
+      expect(unlinkWorktreeEnv(f.worktree)).toBe(false); // nothing there
+      const receipt = runEnv(f);
+      expect(receipt.written).toBe(true);
+      writeFileSync(join(f.worktree, ".env"), "SECRET=work\n", "utf8");
+      expect(unlinkWorktreeEnv(f.worktree)).toBe(true);
+      expect(existsSync(join(f.worktree, ".arggon.env"))).toBe(false);
+      // The seeded .env is adopter data: never touched by the reap.
+      expect(readFileSync(join(f.worktree, ".env"), "utf8")).toBe("SECRET=work\n");
+    });
+
+    it("leaves adopter-customized files (comments, unknown keys, symlinks)", () => {
+      const f = fixture();
+      writeFileSync(
+        join(f.worktree, ".arggon.env"),
+        "# my overrides\nARGON_ITEM=task-env\n",
+        "utf8",
+      );
+      expect(unlinkWorktreeEnv(f.worktree)).toBe(false);
+      expect(existsSync(join(f.worktree, ".arggon.env"))).toBe(true);
+      writeFileSync(join(f.worktree, ".arggon.env"), "MY_KEY=1\n", "utf8");
+      expect(unlinkWorktreeEnv(f.worktree)).toBe(false);
+      expect(existsSync(join(f.worktree, ".arggon.env"))).toBe(true);
+      rmSync(join(f.worktree, ".arggon.env"));
+      symlinkSync("/etc/hostname", join(f.worktree, ".arggon.env"));
+      expect(unlinkWorktreeEnv(f.worktree)).toBe(false);
+      expect(lstatSync(join(f.worktree, ".arggon.env")).isSymbolicLink()).toBe(true);
+    });
   });
 });

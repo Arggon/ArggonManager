@@ -16,7 +16,7 @@ new tooling — no Docker, no network, no shell.
 
 ## Purpose
 
-Per-item worktrees isolate *files*, not *runtime state*: fixed ports, shared
+Per-item worktrees isolate _files_, not _runtime state_: fixed ports, shared
 databases and singleton state dirs make parallel runs of the same project
 collide. The kernel already computes a per-worktree identity (item id, repo
 name, branch, path) when preparing a worktree; this spec turns that identity
@@ -44,7 +44,7 @@ surface) dependency-preparation path. Opt-out via the tracker
 
 ```yaml
 x-worktree:
-  env: false   # default: absent ⇒ enabled
+  env: false # default: absent ⇒ enabled
 ```
 
 ### The env file
@@ -53,14 +53,14 @@ Path: `<worktree>/.arggon.env`. Format: `KEY=value` lines, UTF-8, LF, no
 quoting. Written on worktree creation; **on attach, an existing file is left
 byte-identical**.
 
-| Key | Value |
-| --- | --- |
-| `ARGON_ITEM` | the item id — the exact name the OpenCode plugin already correlates sessions with (`opencode/plugins/arggon/index.ts` `ITEM_ENV`); the one deliberate non-`ARGGON_` prefix, kept for contract compatibility |
-| `ARGGON_WORKTREE_ID` | `<repo>-<item-id>` (the worktree directory name) |
-| `ARGGON_WORKTREE_PATH` | absolute worktree path |
-| `ARGGON_WORKTREE_BRANCH` | the recorded working branch |
-| `ARGGON_STATE_DIR` | per-OS state base + `/<repo>-<item-id>` suffix (created `mkdir -p`) |
-| `ARGGON_CACHE_DIR` | per-OS cache base + `/<repo>-<item-id>` suffix (created `mkdir -p`) |
+| Key                      | Value                                                                                                                                                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ARGON_ITEM`             | the item id — the exact name the OpenCode plugin already correlates sessions with (`opencode/plugins/arggon/index.ts` `ITEM_ENV`); the one deliberate non-`ARGGON_` prefix, kept for contract compatibility |
+| `ARGGON_WORKTREE_ID`     | `<repo>-<item-id>` (the worktree directory name)                                                                                                                                                            |
+| `ARGGON_WORKTREE_PATH`   | absolute worktree path                                                                                                                                                                                      |
+| `ARGGON_WORKTREE_BRANCH` | the recorded working branch                                                                                                                                                                                 |
+| `ARGGON_STATE_DIR`       | per-OS state base + `/<repo>-<item-id>` suffix (created `mkdir -p`)                                                                                                                                         |
+| `ARGGON_CACHE_DIR`       | per-OS cache base + `/<repo>-<item-id>` suffix (created `mkdir -p`)                                                                                                                                         |
 
 Per-OS bases follow the established platform conventions (XDG on Linux,
 `~/Library` on macOS, `%LOCALAPPDATA%` on Windows — the
@@ -94,6 +94,18 @@ init` gains `.arggon.env` in its generated `.gitignore` template.
 opt-out via `x-worktree.env: false`, write failure, unreadable state. The
 claim is never refused for any of these.
 
+> **Errata (2026-10-01, review of the implementation):** the list above is
+> **incomplete, not contradicted** — an attach re-run that finds an existing
+> `.arggon.env` is a fourth `written:false` case (`warning: "already exists —
+left byte-identical (never overwritten)"`, with `path`/`gitignored` when
+> knowable). Coordinator ruling, accepted: `written` means **"this run
+> created the file"**. Seed failures surface as a receipt `warning` on every
+> path, including a successful fresh write. On Windows the spec's own
+> env-paths mapping gives both bases as `%LOCALAPPDATA%`, so
+> `ARGGON_STATE_DIR` and `ARGGON_CACHE_DIR` co-locate at
+> `%LOCALAPPDATA%/<repo>-<item-id>` — accepted as documented: isolation is
+> per-worktree uniqueness, which the shared directory does not affect.
+
 ### Degradation
 
 Adopters who read none of the keys are unaffected: no flag changes, no
@@ -106,13 +118,13 @@ Adopter guidance for layer 2 — per-worktree service containers (Compose):
 
 ## Acceptance
 
-- [ ] Fresh `start --worktree` writes `.arggon.env` with exactly the six documented keys; a unit test asserts content shape (kernel-level, no CLI dependency).
-- [ ] Attach re-run leaves an existing `.arggon.env` byte-identical (never-overwrite test).
-- [ ] `.env` is copied from the primary checkout only when the worktree has none; an existing `.env` is never modified (test).
-- [ ] `ARGGON_STATE_DIR`/`ARGGON_CACHE_DIR` resolve per-OS and the directories exist after start (test asserts existence, not location — location is platform-conventional).
-- [ ] `preparation.env` appears in both surfaces (CLI `--json`, native `tools.arggon.start` receipt); `mcp-parity` and skill-copy tests stay green; `docs/json-output.md` documents the field.
-- [ ] Env files are never staged or committed: the claim commit contains only the item file (`smoke:native-start-cold` leg).
-- [ ] `x-worktree.env: false` skips the whole path and reports `written:false` + reason (test).
-- [ ] `arggon init` generated `.gitignore` includes `.arggon.env` (init test updated).
-- [ ] Docs updated in the same PR: `README.md` (worktree section), `ArggonManager/docs/json-output.md`, `ArggonManager/docs/agents.md` §4, `ArggonManager/docs/convention.md` (`x-worktree.env` key).
-- [ ] `npm test` green; `npm run build` + `check:plugin` green; `npm run smoke:native-start-cold` green.
+- [x] Fresh `start --worktree` writes `.arggon.env` with exactly the six documented keys; a unit test asserts content shape (kernel-level, no CLI dependency). — evidence: `lib/src/worktree.test.ts` "writes .arggon.env with exactly the six documented keys on a fresh start" (raw `KEY=value` shape, LF, order); smoke legs "the env contract: .arggon.env written with exactly the six documented keys" + "identity values match the worktree".
+- [x] Attach re-run leaves an existing `.arggon.env` byte-identical (never-overwrite test). — evidence: kernel test (custom file untouched, receipt `written:false` + warning), CLI test (attach leg), smoke "the attach re-run leaves .arggon.env byte-identical (never overwritten) and reports it"; enforced at the FS level (`wx` open + `COPYFILE_EXCL` seed).
+- [x] `.env` is copied from the primary checkout only when the worktree has none; an existing `.env` is never modified (test). — evidence: kernel test "seeds .env from the primary only when the worktree has none" (seed / adopter-modified kept / no-primary cases) + `seededDotenv` receipt.
+- [x] `ARGGON_STATE_DIR`/`ARGGON_CACHE_DIR` resolve per-OS and the directories exist after start (test asserts existence, not location — location is platform-conventional). — evidence: kernel test "creates the per-OS state and cache dirs (existence, not location)" via the exported env-paths mapping (`worktreeStateBase`/`worktreeCacheBase`, env/home injectable); smoke leg asserts existence + `<repo>-<item-id>` suffix.
+- [x] `preparation.env` appears in both surfaces (CLI `--json`, native `tools.arggon.start` receipt); `mcp-parity` and skill-copy tests stay green; `docs/json-output.md` documents the field. — evidence: CLI envelope carries additive `env` (mcp-server spawns the CLI, so parity holds — `cli/src/mcp-parity.test.ts` green); native receipt forwards the bounded fragment (`opencode/plugins/arggon/tools.test.ts` happy-path assertion); `docs/json-output.md` `env` row; skill sources untouched (copies byte-equal).
+- [x] Env files are never staged or committed: the claim commit contains only the item file (`smoke:native-start-cold` leg). — evidence: smoke "the env contract: the gitignore probe reports the fixture rule, and the claim commit stays env-free" on top of the standing "claim commit contains only the item file" leg; CLI test asserts the env file never appears as staged.
+- [x] `x-worktree.env: false` skips the whole path and reports `written:false` + reason (test). — evidence: parse tests (`cli/src/convention.test.ts`, only an explicit `false` disables), kernel disabled-path test, CLI test "honors x-worktree.env: false — no env file, written:false + reason" (claim still lands).
+- [x] `arggon init` generated `.gitignore` includes `.arggon.env` (init test updated). — evidence: new generated destination `templates/docs/gitignore` → `.gitignore` (`#` provenance marker), init test "generates a .gitignore that ignores .arggon.env, and never touches an existing one"; adopter `.gitignore` stays adopter-owned (modified-skip, kept).
+- [x] Docs updated in the same PR: `README.md` (worktree section), `ArggonManager/docs/json-output.md`, `ArggonManager/docs/agents.md` §4, `ArggonManager/docs/convention.md` (`x-worktree.env` key). — evidence: README env-contract subsection + cleanup sentence; json-output `env` row + prose; agents.md §4 "Worktree env contract" subsection; convention.md `x-worktree` `env` bullet; adopter template summary row updated.
+- [x] `npm test` green; `npm run build` + `check:plugin` green; `npm run smoke:native-start-cold` green. — evidence: full suite green after the init-list updates (see PR); bundle regenerated (`chore: regen plugin bundle` commit); smoke 47/47 checks with the four env legs.

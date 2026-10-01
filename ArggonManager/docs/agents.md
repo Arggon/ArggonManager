@@ -112,6 +112,31 @@ exposes a bin) never violates the gate. The preparation log rides the CLI
 a fresh worktree whose item file is unexpectedly clean at claim-commit time is
 a named error, never a silently skipped commit.
 
+#### Worktree env contract (`.arggon.env`)
+
+Every `--worktree` checkout carries a portable runtime environment (spec
+[worktree-env-contract-016](specs/spec-worktree-env-contract-016.md)): start
+writes a gitignored, dotenv-style `.arggon.env` at the worktree root with the
+per-worktree identity — `ARGON_ITEM` (the name the OpenCode plugin already
+correlates sessions with, deliberately un-prefixed), `ARGGON_WORKTREE_ID`
+(`<repo>-<item-id>`), `ARGGON_WORKTREE_PATH`, `ARGGON_WORKTREE_BRANCH`, and
+`ARGGON_STATE_DIR`/`ARGGON_CACHE_DIR` (per-OS state/cache bases — XDG on
+Linux, `~/Library` on macOS, `%LOCALAPPDATA%` on Windows — suffixed with the
+worktree id, created `mkdir -p`). A primary `.env` is seeded copy-if-absent
+(never overwritten, never interpreted); an existing `.arggon.env` (attach
+re-run) is left byte-identical; the read-only `git check-ignore` probe is
+reported as `env.gitignored`. The whole path is best-effort: `written: false`
+with a `warning` (the `x-worktree.env: false` opt-out, a write failure, the
+attach keep) never blocks the claim, and the env file is never staged — the
+claim commit still contains only the item file. Projects pull the convention
+in by reading the keys: servers bind an ephemeral port (`:0`) or one derived
+from the worktree id, and services are isolated by identifier (per-worktree
+database name/schema) against one local server — adopters who read none of it
+are unaffected. `cleanup --prune` reaps a start-created env file (contract
+shape only) before `git worktree remove`, so an unignored one never wedges
+pruning. The receipt rides both surfaces: the CLI envelope's additive `env`
+field and the native `preparation.env`.
+
 #### Failure semantics
 
 A failure after the worktree exists **never** rolls it back: the worktree and branch are kept for inspection, and the error names the failing step, the worktree path, the remediation, and the fact that re-running `arggon start <id> --worktree` attaches to it. A failed push is the exception — attach does not retry it, and the error instructs `git push -u origin <branch>` manually.
@@ -445,7 +470,13 @@ Work items live under the tracker root (ArggonManager/) — see ArggonManager/do
   "$schema": "https://opencode.ai/config.json",
   "formatter": {
     "prettier": {
-      "command": ["sh", "-c", "<git-root-anchored prettier --write>", "prettier-cwd-guard", "$FILE"],
+      "command": [
+        "sh",
+        "-c",
+        "<git-root-anchored prettier --write>",
+        "prettier-cwd-guard",
+        "$FILE",
+      ],
     },
   },
   "compaction": { "keep": { "tokens": 15000 } },

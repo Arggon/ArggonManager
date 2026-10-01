@@ -264,6 +264,11 @@ function bundledSourcePath(templatesDir: string, source: string): string {
  */
 const DOC_PATH_MAP: Record<string, string> = {
   editorconfig: ".editorconfig",
+  // Worktree env contract (spec worktree-env-contract-016): init ships a
+  // generated `.gitignore` so a fresh scaffold ignores `.arggon.env` from day
+  // one; an adopter's existing `.gitignore` is never touched (the provenance
+  // decision reports it adopter-modified and keeps it).
+  gitignore: ".gitignore",
   "github/copilot-instructions.md": ".github/copilot-instructions.md",
   "github/CODEOWNERS": ".github/CODEOWNERS",
   "github/PULL_REQUEST_TEMPLATE.md": ".github/PULL_REQUEST_TEMPLATE.md",
@@ -341,6 +346,15 @@ function isYamlDestination(dest: string): boolean {
 }
 
 /**
+ * Gitignore destinations (the generated `.gitignore`) take the same `#`
+ * comment: a gitignore line starting with `#` is a comment, while an HTML
+ * comment would be a literal (nonsensical) ignore pattern.
+ */
+function isGitignoreDestination(dest: string): boolean {
+  return dest === ".gitignore" || dest.endsWith("/.gitignore");
+}
+
+/**
  * Markdown artifacts whose syntax requires YAML frontmatter on the first line
  * (OpenCode and ZCode agents/commands): their visible marker is a `#` comment
  * INSIDE the frontmatter instead of a leading HTML comment.
@@ -368,7 +382,7 @@ export function stampGeneratedContent(
   if (isTypeScriptDestination(dest)) {
     return `// arggon:generated template="${markerTemplate}"\n${content}`;
   }
-  if (isYamlDestination(dest)) {
+  if (isYamlDestination(dest) || isGitignoreDestination(dest)) {
     return `${generatedYamlMarker(markerTemplate)}\n${content}`;
   }
   // NIT-9 (PR #322 review): tolerate a CRLF frontmatter opener so a CRLF
