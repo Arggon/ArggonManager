@@ -131,3 +131,6 @@ COMMITS on feat/task-ci-seam-pin-tracks-release: 0cf39cdc (claim), a162e280 (ci:
 ### handoff 2026-10-01 @ses_f0821d67dffeJCEv1KlhMw1eCD (session: ses_f0821d67dffeJCEv1KlhMw1eCD) — next: Coordinator: review + merge PR (do not merge myself); then next release's step-6 re-pin per the updated runbook
 - branch: main
 - open questions: ADR 0018 parenthetical still expects derive from this item - superseded by the recorded decision; template pin is 0.4.0 vs committed 0.4.1 (fresh-adopter drift-gate red on first push) - needs a follo…
+
+### 2026-10-01 @ses_f0821d67dffeJCEv1KlhMw1eCD
+Correction to the handoff above: 'branch: main' is a wrong auto-detection (the tool ran from the primary checkout). The item branch is feat/task-ci-seam-pin-tracks-release (see frontmatter); head is 3fb2e280 after the handoff append.
