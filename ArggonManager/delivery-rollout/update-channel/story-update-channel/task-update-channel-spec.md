@@ -37,11 +37,11 @@ otherwise).
 
 ## Acceptance
 
-- [ ] Spec at `ArggonManager/docs/specs/spec-update-channel-NNN.md` (next free number via `arggon spec new update-channel --plan`) + linked plan. Surfaces: additive `update: { latest, current, cachedAt }` on `doctor --json` and `--version --json` (documented in `ArggonManager/docs/json-output.md` — additive only, no `schemaVersion` bump); TTY-only deferred one-line notice with the exact upgrade command.
-- [ ] Every edge-case row from the exploration table appears as an acceptance criterion (hostile/garbage → no-update never-error; 404 → same; concurrency → atomic cache; offline/timeout → silent no-op ≤ ~2 s; perf → interval + cached, cold runs never wait; privacy → own-packument GET only, documented in README same-PR; environment → `CI` set = no GET, notice suppressed, JSON fields always present; platform → non-semver installed version = "cannot compare", no notice; time → `cachedAt`, unparseable timestamp = expired; persistence → cache format-version key, foreign cache = miss).
-- [ ] Invariants: the check never blocks, retries, or fails a command; no new runtime dependencies; `ARGGON_NO_UPDATE_CHECK=1` honored (documented in README in the same PR as the implementation — note it in the plan's task list).
-- [ ] Non-goals: automatic self-update; `whatsnew`; authenticated registry paths; check-on-CI.
-- [ ] `arggon spec validate` ok; `spec analyze --baseline <file>` no NEW findings (baseline committed); `arggon validate` ok.
-- [ ] Scope stays design-only: implementation tasks are filed later under `story-update-channel` (this item does not touch `cli/src`).
+- [x] Spec at `ArggonManager/docs/specs/spec-update-channel-NNN.md` (next free number via `arggon spec new update-channel --plan`) + linked plan. Surfaces: additive `update: { latest, current, cachedAt }` on `doctor --json` and `--version --json` (documented in `ArggonManager/docs/json-output.md` — additive only, no `schemaVersion` bump); TTY-only deferred one-line notice with the exact upgrade command.
+- [x] Every edge-case row from the exploration table appears as an acceptance criterion (hostile/garbage → no-update never-error; 404 → same; concurrency → atomic cache; offline/timeout → silent no-op ≤ ~2 s; perf → interval + cached, cold runs never wait; privacy → own-packument GET only, documented in README same-PR; environment → `CI` set = no GET, notice suppressed, JSON fields always present; platform → non-semver installed version = "cannot compare", no notice; time → `cachedAt`, unparseable timestamp = expired; persistence → cache format-version key, foreign cache = miss).
+- [x] Invariants: the check never blocks, retries, or fails a command; no new runtime dependencies; `ARGGON_NO_UPDATE_CHECK=1` honored (documented in README in the same PR as the implementation — note it in the plan's task list).
+- [x] Non-goals: automatic self-update; `whatsnew`; authenticated registry paths; check-on-CI.
+- [x] `arggon spec validate` ok; `spec analyze --baseline <file>` no NEW findings (baseline committed); `arggon validate` ok.
+- [x] Scope stays design-only: implementation tasks are filed later under `story-update-channel` (this item does not touch `cli/src`).
 
 ## Notes
