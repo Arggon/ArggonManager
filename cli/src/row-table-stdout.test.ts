@@ -25,7 +25,8 @@ import { initialTuiState, renderTui } from "./tui.js";
  * render inert on the human path while `--json` keeps the raw bytes and
  * ordinary values stay byte-identical.
  *
- * These tests drive the real CLI (spawn + tsx) for the line-oriented channels
+ * These tests drive the real CLI (spawned via `node --import <tsx loader>`, see
+ * bug-row-table-flake below) for the line-oriented channels
  * so they assert actual stdout bytes, and call the pure TUI renderer directly
  * (the interactive loop needs a TTY). Each hostile assertion is a
  * discrimination check: it requires the escaped text to be PRESENT, so a
@@ -35,10 +36,23 @@ import { initialTuiState, renderTui } from "./tui.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const cli = resolve(root, "cli/src/cli.ts");
-const tsx = resolve(root, "node_modules/tsx/dist/cli.mjs");
+// bug-row-table-flake: drive node's module-loader registration directly
+// (`--import <tsx loader>`) instead of the tsx wrapper CLI. The wrapper
+// (tsx/dist/cli.mjs) re-executes node as a second child process and hosts a
+// per-spawn IPC server (`/tmp/tsx-<uid>/<pid>.pipe`); its listen/rm/reject
+// path has no error handling, so any transient failure there exits the whole
+// chain 1 — which is exactly the two CI failures this file saw (PR #475 run
+// 36740682070, PR #487 attempt 1 of run 36758776399: `expect(proc.status)
+// .toBe(0)` failed with status 1 and passed on the identical retry). One node
+// process, no wrapper, no IPC socket: the transient class is gone. The stdout
+// bytes asserted below are unchanged (same CLI, same loader).
+const tsxLoader = resolve(root, "node_modules/tsx/dist/loader.mjs");
 
 function runCli(args: string[], cwd: string) {
-  return spawnSync(process.execPath, [tsx, cli, ...args], { encoding: "utf8", cwd });
+  return spawnSync(process.execPath, ["--import", tsxLoader, cli, ...args], {
+    encoding: "utf8",
+    cwd,
+  });
 }
 
 function runGit(args: string[], cwd: string) {
@@ -194,32 +208,43 @@ function hostileTree(): string {
 }
 
 describe("row/table stdout: list", () => {
-  // bug-row-table-flake: under CI load this test has failed 3x across
-  // unrelated PRs with exactly one raw control char in the spawned process's
-  // stdout (never locally, never on retry). The assertion stays strict; one
-  // CI-only retry keeps the gate from blocking merges on environmental noise
-  // while the root cause stays open on the bug.
-  it(
-    "escapes the id/title/assignee/branch cells (no raw control, one inert row)",
-    { retry: process.env.CI ? 1 : 0 },
-    () => {
-      const proc = runCli(["list"], hostileTree());
-      expect(proc.status).toBe(0);
-      expect(proc.stdout).not.toMatch(UNSAFE);
-      expect(proc.stdout).not.toContain("\nspoof");
+  // bug-row-table-flake root cause (recorded 2026-09-30, supersedes the
+  // CI-only retry mitigation): the two CI failures (PR #475 run 36740682070,
+  // PR #487 attempt 1 of run 36758776399) were NOT a sanitize leak — both died
+  // at `expect(proc.status).toBe(0)` (then line 199, col 25) because the
+  // spawned `node tsx/dist/cli.mjs cli.ts list` chain exited 1 transiently
+  // under CI load; the stdout assertions never ran. The spawn chain is the
+  // only nondeterminism here (the list path itself is pure fs read + format +
+  // one stdout write), and the tsx wrapper's per-spawn IPC server
+  // (/tmp/tsx-<uid>/<pid>.pipe) plus its second re-exec'd node process were
+  // the only unhandled-rejection surface in that chain — so runCli now spawns
+  // `node --import <tsx loader>` directly (one process, no wrapper). The
+  // status assertion below carries stderr/stdout in its message so any
+  // recurrence is immediately diagnosable instead of retry-masked.
+  it("escapes the id/title/assignee/branch cells (no raw control, one inert row)", () => {
+    const proc = runCli(["list"], hostileTree());
+    // bug-row-table-flake: two CI runs failed here with status 1 and no
+    // visibility into why (the retry passed, so the child's stderr was never
+    // captured). Surface stderr/stdout in the assertion message so the next
+    // occurrence is diagnosable; the assertion itself is unchanged.
+    expect(
+      proc.status,
+      `arggon list exited ${proc.status} (signal: ${proc.signal}, spawn error: ${proc.error});\n--- stderr ---\n${proc.stderr}\n--- stdout ---\n${proc.stdout}`,
+    ).toBe(0);
+    expect(proc.stdout).not.toMatch(UNSAFE);
+    expect(proc.stdout).not.toContain("\nspoof");
 
-      // Discrimination: the hostile bytes must have reached the formatter and
-      // been escaped; one physical line carries the evil row.
-      const evilLines = proc.stdout.split("\n").filter((line) => line.includes("Fake title"));
-      expect(evilLines).toHaveLength(1);
-      const row = evilLines[0]!;
-      expect(row).toContain(`task-evil`);
-      expect(row).toContain(`alice${HOSTILE_ESCAPED}`);
-      expect(row).toContain(`feat/${HOSTILE_ESCAPED}`);
-      expect(row).toContain(`Fake title ${HOSTILE_ESCAPED}`);
-      expect(proc.stderr).toBe("");
-    },
-  );
+    // Discrimination: the hostile bytes must have reached the formatter and
+    // been escaped; one physical line carries the evil row.
+    const evilLines = proc.stdout.split("\n").filter((line) => line.includes("Fake title"));
+    expect(evilLines).toHaveLength(1);
+    const row = evilLines[0]!;
+    expect(row).toContain(`task-evil`);
+    expect(row).toContain(`alice${HOSTILE_ESCAPED}`);
+    expect(row).toContain(`feat/${HOSTILE_ESCAPED}`);
+    expect(row).toContain(`Fake title ${HOSTILE_ESCAPED}`);
+    expect(proc.stderr).toBe("");
+  });
 
   it("keeps the raw values in the --json envelope", () => {
     const proc = runCli(["list", "--json"], hostileTree());
