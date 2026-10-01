@@ -47,3 +47,7 @@ PR #517 (merged) added named-source readiness reporting (gateBins) and task-star
 ### 2026-10-01 @Coordinator
 ### 2026-10-01 @Coordinator
 SIXTH incident, from the task-cycle-set-canonical worker (PR #528): start --worktree laid no link farm; claim commit skipped with 'tsx: command not found'; worker recovered with a worktree-local npm ci (tracker mutations after that point committed normally). Pattern unchanged across all six: prep intermittently absent exactly when the claim commit first needs the gate.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+SEVENTH incident, from the task-e2e-board-serve-wrapper worker (PR #530): start's claim commit was silently SKIPPED (no error surfaced at claim time) because the worktree had no node_modules; worker hand-built the link farm (primary symlinks, @arggondev/lib repointed, build). New detail vs prior six: the skip was SILENT at claim time — the worker only noticed when the pre-commit failed later. Strengthens the instrumentation acceptance: silent skips must be impossible (report or fail, never skip quietly).
