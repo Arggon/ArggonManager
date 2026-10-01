@@ -60,3 +60,7 @@ Evidence for review (worktree /home/arggon/Projects/ArggonManager-task-release-a
 ### handoff 2026-10-01 @ses_f0697a26fffdSSbEC0G9eu6TPK (session: ses_f0697a26fffdSSbEC0G9eu6TPK) — next: Review+merge PR #563; afterwards bump the pin when a newer v4.x ships (re-run git ls-remote, update SHA+comment).
 - branch: feat/task-release-action-sha-pin
 - open questions: actions/checkout@v4 SHA-pinning is a separate follow-up if the story wants repo-wide pin hygiene.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+verdict: approve (coordinator-reviewed — one-line diff; SHA independently verified: refs/tags/v4^{} peels to exactly 5c625bfb = v4.4.1 = the pinned SHA, so the pin freezes today's floating target; same step id/inputs/triggers; actionlint clean; full suite green; reconciled onto latest main). Merged: PR #563 squash -> main. Item done. Follow-up filed: task-action-pins-hygiene (actions/checkout@v4 + repo-wide pin sweep).
