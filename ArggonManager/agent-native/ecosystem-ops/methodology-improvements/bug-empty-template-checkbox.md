@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-empty-template-checkbox
 title: empty-template-checkbox-blocks-done-gate
+assignee: Arggon
+branch: fix/bug-empty-template-checkbox
 parent: methodology-improvements
 labels: []
 priority: p2
 created: "2026-09-30"
 updated: "2026-09-30"
+claimed_at: "2026-09-30T23:56:04.514Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-empty-template-checkbox
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/bug-empty-template-checkbox.md
