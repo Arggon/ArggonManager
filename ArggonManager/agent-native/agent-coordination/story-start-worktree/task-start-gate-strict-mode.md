@@ -62,3 +62,12 @@ FINDING FOR THE COORDINATOR (suspected FIFTH incident of the class, no item file
 ### handoff 2026-10-01 @Arggon (session: ses_f087fbfeaffeG1DPJSt3EYuOpU) — next: Review PR #533 (https://github.com/Arggon/ArggonManager/pull/533); merge after the review bar — do not squash away cec576de (chore: regen plugin bundle, the check:plugin receipt). Item stays in_progr…
 - branch: feat/task-start-gate-strict-mode
 - open questions: 1) Root-cause the suspected fifth incident: start --worktree left this worktree with NO node_modules although the primary has a full install (comment on this item has the observed facts); 2) should t…
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+verdict: approve (lead-architect review; reviewer PASS on all seven bars)
+- Default byte-identity proven in code (flag-unset path adds only the === true comparison; the same violating fixture with flag unset commits with the identical receipt; zero existing assertions deleted).
+- Strict correctness: refusal before claim update on both surfaces (native claimCommit not-attempted + item stays todo, pinned end-to-end incl. the remediation attach loop); all three non-worktree sources covered; empty report vacuous; re-enforcement on attach is real (pinned in smoke 4a + native test).
+- Security/bounds: config parsing mirrors allow-steal discipline; no new subprocess/shell surface; native envelope bounded (2048/500 + kernel MAX_GATE_BINS=8); CLI passes full actionable text per pre-existing convention.
+- Docs normative in convention.md + json-output.md; bundle regen separate; smoke 27/27.
+- Coordinator rulings: (a) dedicated no-link-farm check NOT in this gate — 'missing' is its gate-observable symptom; farm-layer coverage belongs to bug-start-install-ordering. (b) This repo arms the flag post-merge (done next), treating any refusal as signal per the reviewer. (c) Worker nit (CLI item-todo assert) noted, non-blocking.
+- CI: green on the final reconciled head (cli rerun after the known ENOTEMPTY teardown flake — environmental, passes locally; flake class already tracked).
