@@ -6,14 +6,15 @@
 
 ## Context
 
-The repo's exploration methodology is a stack-spike record (`arggon stack
-explore` → candidates/criteria/findings/recommendation; `/arggon-explore`
-per-topic) — built for comparing library/framework candidates, not for
-planning a whole new project or subsystem. The methodology work table routes a
-"non-trivial feature" straight to spec/plan; a NEW project has no existing
-flow to read, so there is nothing to ground the spec in, and edge cases
-surface during implementation as bugs instead of before it. Nothing makes
-think-first the **default** for greenfield work. Full analysis:
+The repo's exploration methodology is a stack-spike record
+(`arggon stack explore` → candidates/criteria/findings/recommendation;
+`/arggon-explore` per-topic) — built for comparing library/framework
+candidates, not for planning a whole new project or subsystem. The
+methodology work table routes a "non-trivial feature" straight to spec/plan;
+a NEW project has no existing flow to read, so there is nothing to ground
+the spec in, and edge cases surface during implementation as bugs instead of
+before it. Nothing makes think-first the **default** for greenfield work.
+Full analysis:
 [exploration-greenfield-exploration-015](../explorations/exploration-greenfield-exploration-015.md).
 
 Three external skills model the missing pieces and are complementary, not
@@ -70,10 +71,10 @@ downgrades.
    exploration doc (project-exploration variant of the exploration template),
    ADRs for cross-cutting decisions, spec with the hunted edge cases as
    acceptance criteria, plan + tasks with `depends_on`. **Hard gate: no
-   implementation task may be claimed before a spec exists and `arggon spec
-   analyze` reports no NEW findings** — the scanner is the automated grill.
-   Self-review before handoff: placeholder scan, internal consistency, scope
-   check, ambiguity check.
+   implementation task may be claimed before a spec exists and
+   `arggon spec analyze` reports no NEW findings** — the scanner is the
+   automated grill. Self-review before handoff: placeholder scan, internal
+   consistency, scope check, ambiguity check.
 
 The protocol's operational detail is carried by the `arggon-cli` skill
 (`references/exploration.md`, wired by `task-greenfield-explore-carriers`);

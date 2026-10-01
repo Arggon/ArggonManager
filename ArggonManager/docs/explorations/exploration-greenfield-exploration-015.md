@@ -65,12 +65,13 @@ Weighted; highest first (mirroring exploration-014):
 
 ## Findings
 
-- **F1 — The exploration methodology is a stack-spike record only.** `arggon
-  stack explore` scaffolds candidates → criteria → findings → recommendation
-  (`templates/exploration.md`), and `/arggon-explore` is per-topic — built for
-  comparing library/framework candidates, not for planning a whole new project
-  or subsystem (source: `templates/exploration.md`,
-  `.opencode/commands/arggon-explore.md`, 2026-10-01).
+- **F1 — The exploration methodology is a stack-spike record only.**
+  `arggon stack explore` scaffolds candidates → criteria → findings →
+  recommendation (`templates/exploration.md`), and `/arggon-explore` is
+  per-topic — built for comparing library/framework candidates, not for
+  planning a whole new project or subsystem (source:
+  `templates/exploration.md`, `.opencode/commands/arggon-explore.md`,
+  2026-10-01).
 - **F2 — No greenfield kickoff phase exists.** The methodology work table
   routes a "non-trivial feature" straight to spec/plan. A NEW project has no
   existing flow to read, so there is nothing to ground the spec in — and edge
@@ -84,9 +85,9 @@ Weighted; highest first (mirroring exploration-014):
   `skills/productivity/grill-me/`). A synthesis covers what none covers alone:
   a default think-first phase that ends with edge cases already solved on
   paper (sources: the three skill files, accessed 2026-10-01).
-- **F4 — The repo already automates the mechanical part of the grill.** `arggon
-  spec analyze` scans for vague quantifiers, TODO/TBD markers, missing error
-  paths and untestable acceptance criteria (source:
+- **F4 — The repo already automates the mechanical part of the grill.**
+  `arggon spec analyze` scans for vague quantifiers, TODO/TBD markers, missing
+  error paths and untestable acceptance criteria (source:
   `ArggonManager/docs/agents.md` §Specs and plans, 2026-10-01) — so the
   protocol can stay docs-only (C3's kernel gate is not needed to be
   enforceable-in-practice today).
@@ -152,10 +153,10 @@ the gate that makes it binding.
    exploration doc (project-exploration variant of the exploration template),
    ADRs for cross-cutting decisions, spec with the hunted edge cases as
    acceptance criteria, plan + tasks with `depends_on`. **Hard gate**: no
-   implementation task may be claimed before the spec exists and `arggon spec
-   analyze` reports no NEW findings — the scanner is the automated grill.
-   Self-review before handoff: placeholder scan, internal consistency, scope
-   check, ambiguity check.
+   implementation task may be claimed before the spec exists and
+   `arggon spec analyze` reports no NEW findings — the scanner is the
+   automated grill. Self-review before handoff: placeholder scan, internal
+   consistency, scope check, ambiguity check.
 
 ## Decision
 
@@ -163,8 +164,8 @@ Adopted — **C1**, recorded as [ADR 0017 — Greenfield exploration gate](../ad
 (Proposed; becomes Accepted at PR merge). The Greenfield Exploration Protocol
 (phases 0–5 above) becomes the **default first phase for greenfield work** — a
 new project, subsystem, or interface others will depend on — with the hard
-gate: no implementation task may be claimed before a spec exists and `arggon
-spec analyze` reports no NEW findings. Carrier wiring (skill reference
+gate: no implementation task may be claimed before a spec exists and
+`arggon spec analyze` reports no NEW findings. Carrier wiring (skill reference
 `references/exploration.md`, command/template updates, docs pointer) lands via
 `task-greenfield-explore-carriers` under the ADR 0011 behavioral impact class
 and the ADR 0016 adopter-upgrade channel.
