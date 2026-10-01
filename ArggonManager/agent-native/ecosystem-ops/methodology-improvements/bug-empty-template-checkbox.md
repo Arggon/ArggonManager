@@ -67,3 +67,6 @@ FINDINGS (not filed, coordinator's call): templates/spec.md + templates/plan.md 
 ### handoff 2026-10-01 @Arggon (session: ses_f0b410d34ffeYOuLd9GG9z2KpL) — next: Review + merge PR #507 (fix/bug-empty-template-checkbox); verify smoke in the verdict, then flip the item.
 - branch: main
 - open questions: Task said placeholder-only should still refuse; implemented per checklist item 1 (empty box = not a criterion, so it flips) — strictness proven with real criteria; confirm the reading.
+
+### 2026-10-01 @Arggon
+Branch correction: the handoff above auto-detected the primary checkout's main; the work branch is fix/bug-empty-template-checkbox (PR #507).
