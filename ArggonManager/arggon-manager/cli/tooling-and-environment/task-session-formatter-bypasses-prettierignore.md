@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-session-formatter-bypasses-prettierignore
 title: "Session file formatter rewrites plugin source that .prettierignore excludes, so agent edits inject a ~900-line reformat"
+assignee: Arggon
+branch: feat/task-session-formatter-bypasses-prettierignore
 parent: tooling-and-environment
 labels: [tooling, dogfood]
 priority: p3
 created: "2026-09-28"
-updated: "2026-09-28"
+updated: "2026-10-01"
+claimed_at: "2026-10-01T12:46:53.743Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-session-formatter-bypasses-prettierignore
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-session-formatter-bypasses-prettierignore.md
