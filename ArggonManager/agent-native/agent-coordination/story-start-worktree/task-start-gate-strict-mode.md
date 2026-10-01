@@ -72,3 +72,7 @@ verdict: approve (lead-architect review; reviewer PASS on all seven bars)
 - Docs normative in convention.md + json-output.md; bundle regen separate; smoke 27/27.
 - Coordinator rulings: (a) dedicated no-link-farm check NOT in this gate — 'missing' is its gate-observable symptom; farm-layer coverage belongs to bug-start-install-ordering. (b) This repo arms the flag post-merge (done next), treating any refusal as signal per the reviewer. (c) Worker nit (CLI item-todo assert) noted, non-blocking.
 - CI: green on the final reconciled head (cli rerun after the known ENOTEMPTY teardown flake — environmental, passes locally; flake class already tracked).
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Merged: PR #533 squash -> main (CI green on the reconciled head). Item done. Next: arm x-tracker.strict-gate-bins in this repo's .convention.yml (dogfood) and append the worker's own no-node_modules incident to bug-start-install-ordering.
