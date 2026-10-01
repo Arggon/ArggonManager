@@ -39,6 +39,21 @@ docs or the V1 schema for V2 work.
   [spec-opencode-seam-010](../specs/spec-opencode-seam-010.md)). The commands are
   prompt templates that drive the native tools and write the methodology
   artifacts directly; they carry no CLI-driving prose and no shell blocks.
+- **This repo's `opencode.jsonc` deliberately overrides the prettier formatter's
+  `command`** (do not simplify it back to `"formatter": true`). The built-in
+  runs `<prettier> --write $FILE` with the **session's project directory** as
+  cwd, and prettier resolves `.prettierignore` from that cwd — so a session
+  rooted in the primary checkout editing a file in a sibling arggon worktree
+  (`../<repo>-<item-id>/…`, the normal `start` layout) escapes the anchored
+  ignore entry for `opencode/plugins/arggon/` and reformats the ~4k-line
+  semicolon-free plugin source (~900 changed lines, observed and reverted
+  2026-09-28; `task-session-formatter-bypasses-prettierignore`). The override
+  re-anchors the same invocation at the edited file's own git root (the
+  worktree root for worktrees), so the ignore file that governs the file
+  applies; non-ignored files format exactly as before. Probed on 2026-10-01:
+  cwd=primary + worktree file → prettier 3.9.6 rewrote the file without the
+  override and skips it with the override; a live headless `edit` against the
+  override produced a content-only diff.
 - `arggon init` vendors the plugin at `.opencode/plugins/arggon/index.ts`
   (auto-discovered, zero config). Since W3 it is the **single-file,
   dependency-free bundle** built from `opencode/plugins/arggon/index.ts` with
