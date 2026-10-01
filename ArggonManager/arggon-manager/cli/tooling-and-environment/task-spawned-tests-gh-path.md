@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-spawned-tests-gh-path
 title: "Spawned-CLI tests fail with a misleading 'could not resolve comment author' when gh is off PATH"
+assignee: Arggon
+branch: feat/task-spawned-tests-gh-path
 parent: tooling-and-environment
 labels: [tooling, testing]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
+claimed_at: "2026-10-01T18:46:42.543Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-spawned-tests-gh-path
 ---
 <!--
   Placement (v0): ArggonManager/arggon-manager/cli/tooling-and-environment/task-spawned-tests-gh-path.md
