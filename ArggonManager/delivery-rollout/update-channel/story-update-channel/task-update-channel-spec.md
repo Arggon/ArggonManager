@@ -59,3 +59,7 @@ Gates (worktree, branch feat/task-update-channel-spec):
 - Scope check: git diff vs main touches only spec-update-channel-015.md, plan-update-channel-015.md, spec-analyze-baseline.json, task-update-channel-spec.md (checklist ticks)
 
 PR: https://github.com/Arggon/ArggonManager/pull/542 (item id in title)
+
+### handoff 2026-10-01 @ses_f081ac601ffeuHKWvORtLujr9F (session: ses_f081ac601ffeuHKWvORtLujr9F) — next: After PR #542 merges: file the implementation task(s) under story-update-channel per plan-update-channel-015.md T1-T6; spec-update-channel-015.md is the contract; flip spec+plan to implemented in the…
+- branch: feat/task-update-channel-spec
+- open questions: 1) Detached-fetch mechanism (child process vs in-process unref) is bound by the observable contract (cache populated after triggering command exits) - implementer picks; 2) ARGGON_NO_UPDATE_CHECK hon…
