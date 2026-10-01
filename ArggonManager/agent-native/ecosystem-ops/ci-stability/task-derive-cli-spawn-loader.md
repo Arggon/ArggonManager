@@ -27,3 +27,7 @@ updated: "2026-10-01"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Filed from task-runcli-import-tsx-migration (PR #518): with tests now spawning the CLI via `node --import <loader>`, the product-side deriveDefaultCliSpawn cannot derive a spawn spec in that form. Safe today (no test exercises spawn tools through child-spawned mcp servers), but any future test doing so will silently fall back. Acceptance: either teach deriveDefaultCliSpawn the loader form (argv triple) or assert loudly + document the limitation where the derivation is attempted; add a test pinning whichever behavior is chosen.
