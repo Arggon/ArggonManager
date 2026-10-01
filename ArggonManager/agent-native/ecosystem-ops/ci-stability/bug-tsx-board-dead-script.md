@@ -86,3 +86,7 @@ Smoke evidence (ADR 0008; Playwright Chromium, fixture via createFixture, npx pl
 Gates: board/board-parity/board-embed vitest 120/120 (incl. new tsx spawn gate: node tsx cli/src/cli.ts board output has zero __name(). npm run lint clean; npm run build ok; npm run check:plugin no drift; npm run arggon -- validate ok; test:structure 3/3; lint:structure clean. npm test full suite 1942/1946: failures reproduce on the clean tree in this worktree env (headless-ci packed-bin byte-identical, prose-format prettier code-span; plus load-flaky pack/success-stdout spawn tests) — pre-existing, CI authoritative. README: no statement falsified.
 
 Env notes for the coordinator: (1) start --worktree left no node_modules here (claim commit initially failed its pre-commit gate); fixed by npm install in the worktree + re-attach. (2) A working-tree incident mid-session (stashes + a tool-side reset) briefly lost the uncommitted fix; recovered in full from stash@{0} (74f7e78, left in place). (3) .zcode/config.json carries runtime-only changes from the zcode tooling (plugin registration + reformat) — not mine, deliberately unstaged.
+
+### handoff 2026-10-01 @Arggon (session: ses_f0b410d36ffe1kgCM7j0P2Cztm) — next: Review PR (fix(board) dffaa47e); merge after verdict; drop stash 74f7e78 post-merge
+- branch: fix/bug-tsx-board-dead-script
+- open questions: Pre-existing env test failures (headless-ci packed-bin, prose-format prettier) need a non-worktree CI run to confirm green; live-reload Playwright race worth a follow-up item
