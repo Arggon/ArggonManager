@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adopter-services-pattern-doc
 title: "Adopter pattern doc: per-worktree ephemeral service containers (Compose)"
+assignee: Arggon
+branch: feat/task-adopter-services-pattern-doc
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [docs, behavioral, worktree]
 created: "2026-10-01"
 updated: "2026-10-01"
+claimed_at: "2026-10-01T21:39:33.019Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-adopter-services-pattern-doc
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-adopter-services-pattern-doc.md
