@@ -65,8 +65,10 @@ function tagPointsAt(cwd, remote, version) {
       `refs/tags/v${version}`,
       `refs/tags/v${version}^{}`,
     ]);
-  } catch {
-    return { exists: false, sha: "" };
+  } catch (err) {
+    // Fail closed: a guard that cannot classify never starts a release.
+    console.error(`release-guard: ls-remote failed for v${version} — cannot classify the push (${err.message}). Not a release; re-run when the network is healthy.`);
+    process.exit(2);
   }
   const shas = new Map();
   for (const line of out.split("\n")) {

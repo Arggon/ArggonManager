@@ -22,7 +22,9 @@ procedure to execute by hand — the manual bump/pack/publish runbook is gone.
 3. **Review + merge** — hand-edit the drafted `## [X.Y.Z] - YYYY-MM-DD`
    section to house style (`### Added` / `### Changed` / `### Fixed`, kernel-
    facing changes called out), verify the five-file diff, merge. Merging is
-   the release.
+   the release. Merge the release PR **by itself**: the guard classifies the
+   pushed HEAD commit, so a bump buried under later commits in the same push
+   silently strands the release.
 4. **`release.yml`** (the merge push) runs the ordered guard, then: annotated
    tag `vX.Y.Z` → GitHub Release (notes = the merged CHANGELOG section) →
    build → pack → extract-and-inspect → publish `@arggondev/lib` first, then
