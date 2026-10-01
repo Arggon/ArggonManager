@@ -1,7 +1,8 @@
 # 0016 Adopter upgrade channel
 
-- Status: Proposed
+- Status: Accepted
 > Numbering note (2026-09-29): originally filed as 0014 in collision with `0014-zcode-native-seam.md` (landed first via #439); renumbered to the next free id. Decision content unchanged.
+> Status note (2026-10-01): flipped from Proposed to Accepted — [exploration-adopter-upgrade-experience-007](../explorations/exploration-adopter-upgrade-experience-007.md)'s Decision records this ADR as adopted (stages A–C + D shipped); the status line had lagged the merge. Distribution of the tool itself lands separately as [ADR 0018](./0018-update-delivery-and-distribution-channel.md).
 - Date: 2026-09-29
 - Deciders: Gonzalo Arganaraz
 
