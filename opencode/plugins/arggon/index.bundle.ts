@@ -1627,7 +1627,9 @@ function formatValue(key, value) {
     if (Array.isArray(value)) {
         if (value.length === 0)
             return "[]";
-        return `[${value.map((v) => formatScalar(String(v), false)).join(", ")}]`;
+        return `[${value
+            .map((v) => (typeof v === "number" ? String(v) : formatScalar(String(v), false)))
+            .join(", ")}]`;
     }
     if (value === null)
         return "null";
@@ -1639,8 +1641,10 @@ function formatValue(key, value) {
     const forceQuote = key === "created" || key === "updated" || /^\d{4}-\d{2}-\d{2}$/.test(text);
     return formatScalar(text, forceQuote);
 }
+const AMBIGUOUS_TOKEN = /^(?:~|null|true|false|-?\d+)$/;
 function formatScalar(value, forceQuote) {
     if (forceQuote ||
+        AMBIGUOUS_TOKEN.test(value) ||
         /[\u0000-\u001f\u007f\u2028\u2029]|[:#{}[\],&*?!'"\\]|^\s|\s$|^$/.test(value)) {
         return JSON.stringify(value)
             .replaceAll("\u007f", "\\x7F")
