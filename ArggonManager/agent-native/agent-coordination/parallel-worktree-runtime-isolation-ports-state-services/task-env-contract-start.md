@@ -69,3 +69,7 @@ DEVIATIONS/NOTES (also in the PR body — none silent):
 ### handoff 2026-10-01 @ses_f0697a26fffelQHzQVRfDPIlHe (session: ses_f0697a26fffelQHzQVRfDPIlHe) — next: Review PR #566 (draft, do not merge via this task); reconcile the attach written:false shape + the cleanup env-reap addition into the adopter-services pattern doc before it lands.
 - branch: main
 - open questions: Attach receipt: spec lists 3 written:false cases, attach is a 4th (implemented, flagged); Windows state/cache dirs co-locate by the spec's env-paths mapping — intended?
+
+### handoff 2026-10-01 @ses_f0697a26fffelQHzQVRfDPIlHe (session: ses_f0697a26fffelQHzQVRfDPIlHe) — next: Review PR #566 (draft, do not merge via this task); reconcile the attach written:false shape + the cleanup env-reap addition into the adopter-services pattern doc before it lands.
+- branch: feat/task-env-contract-start
+- open questions: Attach receipt: spec lists 3 written:false cases, attach is a 4th (implemented, flagged); Windows state/cache dirs co-locate by the spec's env-paths mapping — intended?
