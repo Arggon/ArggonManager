@@ -35,9 +35,9 @@ claimed_at: "2026-10-01T17:11:41.789Z"
 Filed from the bug-row-table-flake investigation evidence (PR #513): during 6 full-suite runs under deliberate 12-core saturation + shuffle, the row-table suite never failed, but OTHER spawn-heavy files showed the same transient class (exit-1/timeout under load; headless-ci packed-bin and pack named by the worker; one failure observed live while a sibling session's suite ran concurrently). The row-table instance was root-caused to the tsx wrapper's IPC server (fixed by #513); these siblings share the spawn-under-load pattern.
 
 ## Acceptance
-- [ ] Reproduce under controlled load (saturation + shuffle loops) and identify which lanes flake; capture stderr via diagnosable assertion messages (PR #513 pattern) where missing.
-- [ ] For each confirmed lane: either remove the spawn-chain nondeterminism (see task-runcli-import-tsx-migration) or make the wait deterministic (readiness signal, not sleep).
-- [ ] Lane-specific retries removed once root-caused; any remaining retry documents its rationale in the test.
+- [x] Reproduce under controlled load (saturation + shuffle loops) and identify which lanes flake; capture stderr via diagnosable assertion messages (PR #513 pattern) where missing. (2026-10-01: saturated shuffle loops reproduce 1-2 failures/round in headless-ci; final root cause — ORDER-DEPENDENCE under shuffle, not spawn/IO — see the 2026-10-01 verdict comment.)
+- [x] For each confirmed lane: either remove the spawn-chain nondeterminism (see task-runcli-import-tsx-migration) or make the wait deterministic (readiness signal, not sleep). (Spawn chains: #518 migration; the remaining headless-ci phase ordering made deterministic via the atomic combined test, PR #546.)
+- [x] Lane-specific retries removed once root-caused; any remaining retry documents its rationale in the test. (#513 removed the row-table CI-only retry; no other retries existed in these lanes.)
 
 ### 2026-10-01 @Coordinator
 ### 2026-10-01 @Coordinator
