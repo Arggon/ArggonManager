@@ -141,3 +141,7 @@ verdict: approve (lead-architect review, PR #509)
 - Decision recorded: true/false QUOTED (bare booleans silently retype x-* extras) — on the item, commit and PR body.
 - Reviewer bars 1-5 pass (mechanical report on file). Known non-goals, accepted: fix is not retroactive (already-baked titles keep their loss until hand-edited); lazy-continuation-style tokens unaffected.
 - Branch reconciled with post-#506/#507 main; bundle union verified canonical via check:plugin.
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Merged: PR #509 squash -> main (CI: cli/tasks-validate/ui-smoke green). Item flipped done; merge verified on origin/main. Follow-up filed: task-spawned-tests-gh-path (misleading failure without gh on PATH).
