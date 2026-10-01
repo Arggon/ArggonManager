@@ -88,3 +88,7 @@ live defect.
 **What remains simulated (coordinator-adjudicated)**: only the model's DECISION (a canned tool call instead of an LLM) and, for the negative direction, the resolver's INPUT — the host cannot carry a live tool call for a session it has no record of, so the refusal is driven at the plugin seam with the host's observed absence, not through a live call. The session, the move, the plugin registration, the tool execution, the gate and the commit are all the real host's.
 
 **Gates**: npm test 115 files / 2045 tests green; lint, build, check:plugin, lint:structure, test:structure exit 0; `arggon validate` ok:true. Unit coverage for the leg's pure helpers in smoke/native-start-cold-smoke.test.ts (25 tests incl. a real HTTP round against the scripted provider). The leg SKIPS (passing, documented) when the `opencode` binary is absent (CI) — same tradeoff as `smoke:opencode`.
+
+### handoff 2026-10-01 @ses_f0735ed77ffewWZr4DUpwOUc58 (session: ses_f0735ed77ffewWZr4DUpwOUc58) — next: Coordinator review of PR #559; merge squashes the smoke leg + unit tests + item ticks. Acceptance checklist complete; awaiting adjudication note on the simulated-decision scope.
+- branch: feat/task-native-session-move-smoke-leg
+- open questions: CI runs without the opencode binary, so the move leg reports a documented skip there (same tradeoff as smoke:opencode) — acceptable?; scripted-provider leg is pinned to observed v2.0.21 server API sh…
