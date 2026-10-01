@@ -30,7 +30,7 @@ the index must mirror the `Status:` line of each ADR file exactly.
 
 ## Acceptance
 
-- [ ] `docs/adr/README.md` gains rows for 0014 (zcode-native-seam), 0015 (done-gate-acceptance-waiver), 0016 (adopter-upgrade-channel — now Accepted), 0017 (greenfield-exploration-gate), each with the title and status taken verbatim from the ADR file's front matter/status line.
-- [ ] No other rows or content change in the file.
+- [x] `docs/adr/README.md` gains rows for 0014 (zcode-native-seam), 0015 (done-gate-acceptance-waiver), 0016 (adopter-upgrade-channel — now Accepted), 0017 (greenfield-exploration-gate), each with the title and status taken verbatim from the ADR file's status line.
+- [x] No other rows or content change in the file (diff: 4 added rows only; PR #539, merged 327cd31d, all lanes green).
 
 ## Notes
