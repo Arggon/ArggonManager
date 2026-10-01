@@ -114,3 +114,7 @@ Evidence:
 - Lesson recorded: a first-draft hard assertion "the guaranteed ring chain appears in every order" was DISPROVEN by soak counterexample [[0,7],[7,1],[3,2],[3,2],[5,7],[5,1],[1,1],[7,0]] (seed 20260928, run 65/500) — which cycle a DFS names is selection, not text canonicalization; that assertion was dropped, textBySet kept.
 
 Finding for the coordinator: the remaining measured divergence (different traversal orders name a different SUBSET of cycles for multi-cycle graphs; the soak counter fires regularly) is real and now only counted/logged. Recommend filing it as its own item under story-deps-schema if canonical cycle reporting is wanted — deliberately not attempted here per scope.
+
+### handoff 2026-10-01 @ses_f0b410d35ffe26SgXzzzBBraX4 (session: ses_f0b410d35ffe26SgXzzzBBraX4) — next: Review + merge PR #506 (fix + property hardening + example test + regen bundle); item goes done on merge.
+- branch: main
+- open questions: File a follow-up item for canonical cycle-SET reporting across traversal orders?
