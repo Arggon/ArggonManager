@@ -1,0 +1,79 @@
+# Release-proposal maintenance (ADR 0018 §1; spec-release-pipeline-015 C3
+# "Ownership consequence"): this workflow opens and updates the release PR —
+# it never tags, never creates a GitHub Release and never publishes
+# (`skip-github-release: true` in release-please-config.json). Tag + GitHub
+# Release + publish + tarball assets are owned by `release.yml`.
+#
+# Default GITHUB_TOKEN on purpose (checklist mandate): release-please uses it
+# for the PR, and GitHub's recursion rule ("events triggered by the
+# GITHUB_TOKEN will not create a new workflow run") is exactly what keeps this
+# workflow from looping on its own PR pushes. Consequence, documented in
+# release.md: pull_request runs on a GITHUB_TOKEN-created PR start in an
+# approval-required state — a write-access user clicks "Approve workflows"
+# once and the runs start.
+#
+# The release itself is proposed by a human: push a `Release-As: X.Y.Z`
+# trailer commit to main (empty commit allowed — no conventional-commit
+# dependency, spec C2). Merging the release PR is the release.
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      - uses: actions/checkout@v4
+
+      # release-please does not update lockfiles (googleapis/release-please#1993,
+      # open): the release PR bumps both package versions and rewrites the root's
+      # kernel dependency to the exact released version, so an unsynced
+      # package-lock.json would desync the PR and `npm ci` on it would be red.
+      # This step is the issue-#1993 workaround: whenever a release PR is open,
+      # check out its branch, recompute the lockfile (no install — workspace
+      # links resolve the not-yet-published version locally) and push it onto
+      # the PR branch. release-please's own later branch updates are re-synced
+      # by the next run of this step; the push starts no new workflow runs
+      # (GITHUB_TOKEN recursion rule) and only updates the PR.
+      #
+      # PR discovery keys off the manifest-mode branch name default
+      # (`release-please--branches--main`, manifest-releaser.md) rather than the
+      # action's created-only outputs, so updates and re-syncs take the same
+      # path as creation. Changing `branch-name` in the config breaks this
+      # lookup — keep them in sync.
+      - name: Sync package-lock.json onto the release PR branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch="$(gh pr list --repo "$GITHUB_REPOSITORY" --state open \
+            --head 'release-please--branches--main' \
+            --json headRefName --jq '.[].headRefName' | head -n1)"
+          if [ -z "$branch" ]; then
+            echo "no open release PR - nothing to sync"
+            exit 0
+          fi
+          echo "release PR branch: $branch"
+          git fetch --force origin "refs/heads/$branch:refs/remotes/origin/$branch"
+          git checkout -B "$branch" "origin/$branch"
+          npm install --package-lock-only
+          if git diff --quiet -- package-lock.json; then
+            echo "package-lock.json already in sync"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: sync package-lock.json with the release PR versions"
+          git push origin "HEAD:refs/heads/$branch"
