@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adr-index-rows
 title: "ADR index: add missing rows 0014-0017"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [docs, housekeeping]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-01"
-claimed_at: "2026-10-01T14:38:14.574Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr-index-rows
 ---
 <!--
