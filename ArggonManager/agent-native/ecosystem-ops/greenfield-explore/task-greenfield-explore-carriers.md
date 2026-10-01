@@ -73,3 +73,7 @@ Review evidence (expected vs observed):
 - npm run lint / test:structure / lint:structure: clean.
 - Generated-copy fidelity: .opencode/commands/arggon-explore.md verified byte-equal to templates/docs/opencode/commands/arggon-explore.md minus the frontmatter marker line; no CLI-prose regex violations (init-opencode W5 assertions hold: $ARGUMENTS, tools.arggon.create, no shell blocks).
 - Scope guard: git status shows no changes under ArggonManager/docs/explorations/ or ArggonManager/docs/adr/; ADR 0017 cited by number only (no path links), so the adr task stays free to land any filename.
+
+### handoff 2026-10-01 @Arggon — next: Coordinator: review + merge PR #520 after task-greenfield-explore-adr lands ADR 0017 (docs/adr/0017-greenfield-exploration-gate.md assumed); then flip done
+- branch: feat/task-greenfield-explore-carriers
+- open questions: ADR 0017 wording should mirror references/exploration.md phase numbering 0-5; smoke:opencode transcript gate still to be driven by the reviewer (docs-only-ish carrier change, CLI behavior untouched)
