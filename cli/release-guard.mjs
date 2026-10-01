@@ -35,7 +35,7 @@
  *
  * Offline-testable by design: everything it needs is the local clone plus
  * `git ls-remote <remote>`, so the fixture tests point `--remote` at a local
- * bare repo (cli/src/release-guard.test.ts) and exercise all four rules.
+ * bare repo (cli/release-guard.test.ts) and exercise all four rules.
  */
 import { execFileSync } from "node:child_process";
 import { appendFileSync, realpathSync } from "node:fs";

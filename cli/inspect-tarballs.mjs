@@ -22,7 +22,7 @@
  * more checks failed (every failure is printed); exit 2 — usage/IO error.
  *
  * Offline-testable by design: the fixture tests synthesize tarballs with
- * `tar` (cli/src/inspect-tarballs.test.ts) — a pass fixture mirroring the
+ * `tar` (cli/inspect-tarballs.test.ts) — a pass fixture mirroring the
  * real layout plus deliberately broken ones per check.
  */
 import { execFileSync } from "node:child_process";
