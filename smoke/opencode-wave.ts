@@ -323,8 +323,10 @@ class Fixture {
     if (typeof item?.id !== "string" || typeof item.path !== "string") return undefined;
     const raw = this.read(item.path);
     const acceptance = `- [ ] Create the file ${file} at the repository root containing exactly: ${content}`;
+    // The scaffold's `## Acceptance` body: a placeholder comment (current
+    // templates, bug-empty-template-checkbox) or the legacy bare `- [ ]` box.
     const rewritten = raw.replace(
-      /## Acceptance\n\n- \[ \] ?\n/,
+      /## Acceptance\n\n(?:- \[ \] ?\n|<!--[\s\S]*?-->\n)?/,
       `## Acceptance\n\n${acceptance}\n`,
     );
     if (rewritten === raw) return undefined;
@@ -488,8 +490,7 @@ function exportedTokenTotals(f: Fixture, sessionID: string | undefined): Tokens 
   const totals: Tokens = { calls: 0, input: 0, output: 0, cacheRead: 0, cacheWrite: 0 };
   for (const message of messages as Array<Record<string, unknown>>) {
     const tokens = message.tokens as
-      | { input?: number; output?: number; cache?: { read?: number; write?: number } }
-      | undefined;
+      { input?: number; output?: number; cache?: { read?: number; write?: number } } | undefined;
     if (tokens === undefined) continue;
     totals.calls += 1;
     totals.input += tokens.input ?? 0;
@@ -671,7 +672,8 @@ function scenarioCoordinatorLaunch(
       expected === "completed"
         ? forAgent.some((call) => call.status === "completed" && /PROBE_OK/.test(call.output ?? ""))
         : forAgent.some(
-            (call) => call.status === "error" && /Permission denied: subagent/i.test(call.error ?? ""),
+            (call) =>
+              call.status === "error" && /Permission denied: subagent/i.test(call.error ?? ""),
           );
   }
   check(`coordinator session ran (${agent})`, last?.status === 0, last ? runTail(last) : "no run");
@@ -966,7 +968,11 @@ function scenarioWorkerSessionStats(f: Fixture, result: RunResult): void {
   for (const call of workers) {
     const sessionID = subagentSessionId(call);
     if (sessionID === undefined) {
-      check("worker subagent output carries a child session id", false, JSON.stringify(call.output));
+      check(
+        "worker subagent output carries a child session id",
+        false,
+        JSON.stringify(call.output),
+      );
       continue;
     }
     const totals = exportedTokenTotals(f, sessionID);

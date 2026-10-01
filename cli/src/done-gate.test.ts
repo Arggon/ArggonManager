@@ -8,6 +8,7 @@ import {
   itemsById,
   loadItems,
   parseFrontmatter,
+  runComment,
   runCreate,
   runUpdate,
   updateOperation,
@@ -40,9 +41,14 @@ function seedChain(dir: string, storyId: string): string {
 
 /**
  * Seeded tree for the done gate (task-done-gate-acceptance-waiver, ADR 0015).
- * `arggon create` fills the template body, which carries ONE unchecked
- * acceptance checkbox — exactly the gated shape.
+ * Since bug-empty-template-checkbox the create template scaffolds NO checkbox
+ * under `## Acceptance` (an empty box is not a criterion), so the tests that
+ * exercise the gate seed ONE REAL unchecked criterion explicitly — the gated
+ * shape.
  */
+const PRIMED_BODY =
+  "## Context\n\nKeep the gate honest.\n\n## Acceptance\n\n- [ ] p95 under 100ms\n";
+
 function primedTask(): { dir: string; id: string } {
   const dir = mkdtempSync(join(tmpdir(), "arggon-done-gate-"));
   runInit({ dir, force: false });
@@ -53,6 +59,7 @@ function primedTask(): { dir: string; id: string } {
     title: "Add rate limiting",
     parent: story,
     id: "rate-limit",
+    body: PRIMED_BODY,
     now: NOW,
   });
   return { dir, id: task.id };
@@ -69,6 +76,15 @@ function itemOf(dir: string, id: string): WorkItem {
 function tickFirstBox(dir: string, id: string): void {
   const filePath = itemOf(dir, id).filePath;
   writeFileSync(filePath, readFileSync(filePath, "utf8").replace("- [ ]", "- [x]"), "utf8");
+}
+
+/** Replace an item's body wholesale (the frontmatter is kept). */
+function setBody(dir: string, id: string, body: string): void {
+  const filePath = itemOf(dir, id).filePath;
+  const raw = readFileSync(filePath, "utf8");
+  const end = raw.indexOf("\n---\n");
+  if (end < 0) throw new Error(`setBody: no frontmatter terminator in ${filePath}`);
+  writeFileSync(filePath, raw.slice(0, end + 5) + body, "utf8");
 }
 
 describe("done gate: refusal (task-done-gate-acceptance-waiver)", () => {
@@ -214,9 +230,9 @@ describe("done gate: paths that stay open (task-done-gate-acceptance-waiver)", (
     );
   });
 
-  it("does not gate containers (story/epic/initiative keep the cascade contract)", () => {
+  it("does not gate containers (their contract is the acceptance-aware cascade)", () => {
     const { dir } = primedTask();
-    // story-login carries the template's unchecked box; containers are not gated.
+    // Containers are exempt from the done gate whatever their body carries.
     runUpdate({ cwd: dir, id: "story-login", status: "in_progress", assignee: "worker", now: NOW });
     expect(() =>
       runUpdate({ cwd: dir, id: "story-login", status: "done", now: NOW }),
@@ -232,12 +248,15 @@ describe("done gate: paths that stay open (task-done-gate-acceptance-waiver)", (
 
   it("a waived flip still cascades through the unchanged acceptance-aware rule", () => {
     const { dir, id } = primedTask();
-    // Ticking the STORY's box lets the cascade complete it; the task waives.
+    // Real acceptance contracts on the containers: ticking the STORY's
+    // criterion lets the cascade complete it; the epic's stays unticked.
+    setBody(dir, "story-login", "## Acceptance\n\n- [ ] login shipped\n");
+    setBody(dir, "auth", "## Acceptance\n\n- [ ] auth epic rolled up\n");
     tickFirstBox(dir, "story-login");
     claim(dir, id);
     runUpdate({ cwd: dir, id, status: "done", waive: WAIVE_REASON, now: NOW });
     expect(itemOf(dir, "story-login").status).toBe("done");
-    // The epic/initiative keep their own template boxes: the cascade must skip.
+    // The epic keeps an unticked REAL criterion: the cascade must skip it.
     expect(itemOf(dir, "auth").status).not.toBe("done");
   });
 });
@@ -253,3 +272,107 @@ describe("done gate: envelope (task-done-gate-acceptance-waiver)", () => {
     expect(envelope.error?.message).toMatch(/--waive "<reason>"/);
   });
 });
+
+describe("done gate: placeholders are not criteria (bug-empty-template-checkbox)", () => {
+  it("scaffolds `## Acceptance` with no checkbox, and a fresh scaffold flips", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-done-gate-scaffold-"));
+    runInit({ dir, force: false });
+    const story = seedChain(dir, "story-s");
+    const task = runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Scaffolded",
+      parent: story,
+      id: "scaffolded",
+      now: NOW,
+    });
+    // No checkbox is scaffolded at all: the acceptance contract starts empty.
+    expect(itemOf(dir, task.id).body).toMatch(/## Acceptance/);
+    expect(itemOf(dir, task.id).body).not.toMatch(/^- \[.\]/m);
+    expect(acceptanceComplete(itemOf(dir, task.id).body)).toBe(true);
+    claim(dir, task.id);
+    expect(() => runUpdate({ cwd: dir, id: task.id, status: "done", now: NOW })).not.toThrow();
+    expect(itemOf(dir, task.id).status).toBe("done");
+  });
+
+  it("a legacy placeholder-only body no longer wedges the gate; a real criterion still does", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-done-gate-placeholder-"));
+    runInit({ dir, force: false });
+    const story = seedChain(dir, "story-s");
+    // The pre-fix scaffold shape: a bare empty box under ## Acceptance.
+    const stale = runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Stale placeholder",
+      parent: story,
+      id: "stale-placeholder",
+      body: "## Acceptance\n\n- [ ] \n",
+      now: NOW,
+    });
+    expect(acceptanceComplete(itemOf(dir, stale.id).body)).toBe(true);
+    claim(dir, stale.id);
+    expect(() => runUpdate({ cwd: dir, id: stale.id, status: "done", now: NOW })).not.toThrow();
+    expect(itemOf(dir, stale.id).status).toBe("done");
+    // The gate stays strict for REAL criteria: box + text still refuses.
+    const real = runCreate({
+      cwd: dir,
+      type: "bug",
+      title: "Real criterion",
+      parent: story,
+      id: "real-criterion",
+      body: "## Acceptance\n\n- [ ] \n- [ ] repro fixed\n",
+      now: NOW,
+    });
+    expect(acceptanceComplete(itemOf(dir, real.id).body)).toBe(false);
+    claim(dir, real.id);
+    expect(() => runUpdate({ cwd: dir, id: real.id, status: "done", now: NOW })).toThrow(
+      /unchecked boxes[\s\S]*--waive "<reason>"/,
+    );
+    expect(itemOf(dir, real.id).status).toBe("in_progress");
+  });
+
+  it("a checklist filed as a comment flips once its real criteria are ticked — no waiver, no surgery", () => {
+    const dir = mkdtempSync(join(tmpdir(), "arggon-done-gate-comment-"));
+    runInit({ dir, force: false });
+    const story = seedChain(dir, "story-s");
+    const task = runCreate({
+      cwd: dir,
+      type: "task",
+      title: "Commented contract",
+      parent: story,
+      id: "commented-contract",
+      now: NOW,
+    });
+    runComment({
+      cwd: dir,
+      id: task.id,
+      text: "Acceptance:\n\n- [ ] schema documented\n- [ ] round-trip tested\n",
+      author: "coordinator",
+      commit: false,
+      now: NOW,
+    });
+    // The commented criteria are REAL: the flip is refused until they tick.
+    expect(acceptanceComplete(itemOf(dir, task.id).body)).toBe(false);
+    claim(dir, task.id);
+    expect(() => runUpdate({ cwd: dir, id: task.id, status: "done", now: NOW })).toThrow(
+      /unchecked boxes/,
+    );
+    // Tick every real criterion (the honest path) — the flip then succeeds.
+    tickAcceptanceBody(dir, task.id);
+    expect(acceptanceComplete(itemOf(dir, task.id).body)).toBe(true);
+    runUpdate({ cwd: dir, id: task.id, status: "done", now: NOW });
+    const item = itemOf(dir, task.id);
+    expect(item.status).toBe("done");
+    expect(item.body).not.toContain("### Waiver");
+  });
+});
+
+/** Tick every unchecked checkbox in ONE item's body (test-local, like test/acceptance.ts). */
+function tickAcceptanceBody(dir: string, id: string): void {
+  const filePath = itemOf(dir, id).filePath;
+  writeFileSync(
+    filePath,
+    readFileSync(filePath, "utf8").replace(/^([ \t]*[-*] \[) (\])/gm, "$1x]"),
+    "utf8",
+  );
+}
