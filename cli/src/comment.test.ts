@@ -1,4 +1,4 @@
-import { mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync as _mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { PassThrough } from "node:stream";
@@ -170,6 +170,44 @@ describe("comment", () => {
         now: NOW,
       }),
     ).toThrow(/could not resolve comment author/);
+  });
+
+  // task-spawned-tests-gh-path: the error must name the ACTUAL missing
+  // dependency ('gh'), and a missing author source must never mask an
+  // item-id error. Each layer is exercised hermetically through a PATH
+  // scoped to fake bin scripts — no host gh/git is ever consulted.
+  describe("author resolution without gh (task-spawned-tests-gh-path)", () => {
+    function fakeBin(name: string, script: string): string {
+      const dir = mkdtempSync(join(tmpdir(), "arggon-comment-bins-"));
+      const file = join(dir, name);
+      writeFileSync(file, `#!/bin/sh\n${script}\n`, "utf8");
+      chmodSync(file, 0o755);
+      return dir;
+    }
+
+    it("names 'gh' as the missing dependency when it is not on PATH", () => {
+      const { dir, id } = primedTask();
+      const empty = mkdtempSync(join(tmpdir(), "arggon-comment-empty-path-"));
+      expect(() => runComment({ cwd: dir, id, text: "x", env: { PATH: empty }, now: NOW })).toThrow(
+        /could not resolve comment author: 'gh' not found on PATH/,
+      );
+    });
+
+    it("degrades gracefully to the local git identity (documented fallback)", () => {
+      const { dir, id, path } = primedTask();
+      const bins = fakeBin("git", "echo local-git");
+      const result = runComment({ cwd: dir, id, text: "x", env: { PATH: bins }, now: NOW });
+      expect(result.comment.author).toBe("local-git");
+      expect(readFileSync(path, "utf8")).toContain("### 2026-09-11 @local-git\nx\n");
+    });
+
+    it("reports the item-id error before author resolution (deterministic precedence)", () => {
+      const { dir } = primedTask();
+      const empty = mkdtempSync(join(tmpdir(), "arggon-comment-empty-path-"));
+      expect(() =>
+        runComment({ cwd: dir, id: "ghost", text: "x", env: { PATH: empty }, now: NOW }),
+      ).toThrow(/id 'ghost' not found under the tracker/);
+    });
   });
 
   it("prefers the explicit --author over env resolution", () => {

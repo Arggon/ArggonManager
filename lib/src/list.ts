@@ -46,22 +46,85 @@ export type ListResult = {
   items: WorkItem[];
 };
 
-export function resolveCurrentLogin(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  const user = env.GITHUB_USER?.trim();
-  if (user) return user;
-  const actor = env.GITHUB_ACTOR?.trim();
-  if (actor) return actor;
+/**
+ * How the current login was resolved, or why it could not be. `source` names
+ * the winning layer of the documented fallback chain; `gap` names the missing
+ * dependency so callers can surface an error that names `gh` itself instead of
+ * the operation that needed it (task-spawned-tests-gh-path: a missing gh used
+ * to surface as the misleading "could not resolve comment author").
+ */
+export type CurrentLoginResolution =
+  | { login: string; source: "GITHUB_USER" | "GITHUB_ACTOR" | "gh" | "git-config" }
+  | { login: undefined; gap: "gh-not-found" | "gh-failed" };
+
+/**
+ * `gh api user -q .login` with a verdict: a login, or WHY the lookup yielded
+ * nothing — binary absent from PATH (`gh-not-found`, the local-DX case) vs
+ * present but failing/unauthenticated (`gh-failed`).
+ */
+function ghLogin(env: NodeJS.ProcessEnv): { login: string } | { gap: "gh-not-found" | "gh-failed" } {
   try {
     const out = execFileSync("gh", ["api", "user", "-q", ".login"], {
       encoding: "utf8",
       timeout: 15_000,
       stdio: ["ignore", "pipe", "ignore"],
-      env: process.env,
+      env,
     }).trim();
-    return out || undefined;
+    return out ? { login: out } : { gap: "gh-failed" };
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException | null)?.code;
+    return code === "ENOENT" ? { gap: "gh-not-found" } : { gap: "gh-failed" };
+  }
+}
+
+/** Last-resort local attribution: the configured git identity, if any. */
+function gitIdentity(env: NodeJS.ProcessEnv): string | undefined {
+  try {
+    return (
+      execFileSync("git", ["config", "user.name"], {
+        encoding: "utf8",
+        timeout: 5_000,
+        stdio: ["ignore", "pipe", "ignore"],
+        env,
+      }).trim() || undefined
+    );
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Resolve the current login through a DOCUMENTED fallback chain:
+ *
+ *   1. `GITHUB_USER`            (explicit env override)
+ *   2. `GITHUB_ACTOR`           (CI-provided)
+ *   3. `gh api user -q .login`  (authenticated GitHub CLI)
+ *   4. `git config user.name`   (local identity; degrades gracefully when gh
+ *      is not installed — the tracker is git-based, so the git identity is a
+ *      sensible local attribution)
+ *
+ * The `env` parameter seeds the lookup environment for the spawned `gh`/`git`
+ * processes (PATH overrides let tests exercise each layer hermetically);
+ * unspecified variables still come from `process.env`.
+ */
+export function resolveCurrentLoginDetailed(
+  env: NodeJS.ProcessEnv = process.env,
+): CurrentLoginResolution {
+  const user = env.GITHUB_USER?.trim();
+  if (user) return { login: user, source: "GITHUB_USER" };
+  const actor = env.GITHUB_ACTOR?.trim();
+  if (actor) return { login: actor, source: "GITHUB_ACTOR" };
+  const childEnv = { ...process.env, ...env };
+  const gh = ghLogin(childEnv);
+  if ("login" in gh) return { login: gh.login, source: "gh" };
+  const local = gitIdentity(childEnv);
+  if (local) return { login: local, source: "git-config" };
+  return { login: undefined, gap: gh.gap };
+}
+
+/** Simple boolean-shaped wrapper over `resolveCurrentLoginDetailed`. */
+export function resolveCurrentLogin(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  return resolveCurrentLoginDetailed(env).login;
 }
 
 /** Stale-threshold durations: number + unit (d/h/m), e.g. 7d, 12h, 30m. */

@@ -476,12 +476,12 @@ function runComment(opts) {
     if (!text.trim()) {
         throw new Error("comment text must not be empty");
     }
-    const author = opts.author?.trim() || resolveAuthor(opts);
-    if (!author) {
-        throw new Error("could not resolve comment author (pass --author <login>, or set GITHUB_USER or GITHUB_ACTOR, or authenticate gh: gh api user)");
-    }
     const tasksDir = (0, paths_js_1.findTasksDir)(opts.cwd);
     const item = locateItem(tasksDir, id);
+    const author = opts.author?.trim() || resolveAuthor(opts);
+    if (!author) {
+        throw new Error(authorGapMessage(opts));
+    }
     const now = opts.now ?? new Date();
     const date = (0, dates_js_1.formatDate)(now);
     const lines = text.split("\n");
@@ -530,6 +530,17 @@ function resolveAuthor(opts) {
     if (opts.resolveMe)
         return opts.resolveMe();
     return (0, list_js_1.resolveCurrentLogin)(opts.env ?? process.env);
+}
+function authorGapMessage(opts) {
+    const remedies = "pass --author <login>, or set GITHUB_USER or GITHUB_ACTOR, or authenticate gh: gh api user";
+    if (opts.resolveMe) {
+        return `could not resolve comment author: no author source available (GITHUB_USER / GITHUB_ACTOR unset, gh unavailable or unauthenticated, no local git identity) (${remedies})`;
+    }
+    const resolution = (0, list_js_1.resolveCurrentLoginDetailed)(opts.env ?? process.env);
+    const cause = "gap" in resolution && resolution.gap === "gh-not-found"
+        ? "'gh' not found on PATH (no GITHUB_USER or GITHUB_ACTOR set, no local git identity)"
+        : "gh is not authenticated ('gh api user' failed; no GITHUB_USER or GITHUB_ACTOR set, no local git identity)";
+    return `could not resolve comment author: ${cause} (${remedies})`;
 }
 function readCommentSource(file) {
     if (file === "-") {
@@ -2822,6 +2833,7 @@ function successJson(command, payload = {}, conventionVersion = convention_js_1.
 __arggonModules.set("lib/src/list.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.resolveCurrentLoginDetailed = resolveCurrentLoginDetailed;
 exports.resolveCurrentLogin = resolveCurrentLogin;
 exports.parseOlderThan = parseOlderThan;
 exports.runList = runList;
@@ -2835,25 +2847,52 @@ const priority_js_1 = require("./priority.js");
 const paths_js_1 = require("./paths.js");
 const sanitize_js_1 = require("./sanitize.js");
 const status_js_1 = require("./status.js");
-function resolveCurrentLogin(env = process.env) {
-    const user = env.GITHUB_USER?.trim();
-    if (user)
-        return user;
-    const actor = env.GITHUB_ACTOR?.trim();
-    if (actor)
-        return actor;
+function ghLogin(env) {
     try {
         const out = (0, node_child_process_1.execFileSync)("gh", ["api", "user", "-q", ".login"], {
             encoding: "utf8",
             timeout: 15_000,
             stdio: ["ignore", "pipe", "ignore"],
-            env: process.env,
+            env,
         }).trim();
-        return out || undefined;
+        return out ? { login: out } : { gap: "gh-failed" };
+    }
+    catch (err) {
+        const code = err?.code;
+        return code === "ENOENT" ? { gap: "gh-not-found" } : { gap: "gh-failed" };
+    }
+}
+function gitIdentity(env) {
+    try {
+        return ((0, node_child_process_1.execFileSync)("git", ["config", "user.name"], {
+            encoding: "utf8",
+            timeout: 5_000,
+            stdio: ["ignore", "pipe", "ignore"],
+            env,
+        }).trim() || undefined);
     }
     catch {
         return undefined;
     }
+}
+function resolveCurrentLoginDetailed(env = process.env) {
+    const user = env.GITHUB_USER?.trim();
+    if (user)
+        return { login: user, source: "GITHUB_USER" };
+    const actor = env.GITHUB_ACTOR?.trim();
+    if (actor)
+        return { login: actor, source: "GITHUB_ACTOR" };
+    const childEnv = { ...process.env, ...env };
+    const gh = ghLogin(childEnv);
+    if ("login" in gh)
+        return { login: gh.login, source: "gh" };
+    const local = gitIdentity(childEnv);
+    if (local)
+        return { login: local, source: "git-config" };
+    return { login: undefined, gap: gh.gap };
+}
+function resolveCurrentLogin(env = process.env) {
+    return resolveCurrentLoginDetailed(env).login;
 }
 const OLDER_THAN_PATTERN = /^(\d+)([dhm])$/;
 const UNIT_MS = { d: 86_400_000, h: 3_600_000, m: 60_000 };

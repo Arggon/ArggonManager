@@ -282,7 +282,14 @@ export async function measureBudget(options: MeasureBudgetOptions = {}): Promise
       const id = created(out);
       if (!firstTask) firstTask = id;
     }
-    runCli(["comment", firstTask, "fixture comment so show has content", "--json"], dir);
+    // Fixture data, not real attribution: an explicit --author keeps the
+    // measurement hermetic — it must not depend on the host's gh/gh-auth or
+    // git identity (task-spawned-tests-gh-path: without it the fixture comment
+    // failed whenever no author source was available).
+    runCli(
+      ["comment", firstTask, "fixture comment so show has content", "--author", "fixture", "--json"],
+      dir,
+    );
 
     const listCompactBytes = Buffer.byteLength(runCli(["list", "--json"], dir), "utf8");
     const listFullBytes = Buffer.byteLength(runCli(["list", "--json", "--full"], dir), "utf8");
