@@ -27,3 +27,12 @@ updated: "2026-10-01"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-01 @Coordinator
+### 2026-10-01 @Coordinator
+Filed from task-session-formatter-bypasses-prettierignore (PR #531): the bypass (session formatter runs prettier with the session cwd; sibling-worktree files bypass .prettierignore) is generic to the arggon start layout, but the fix — the formatter.prettier.command override anchoring at the edited file's git root — lives only in THIS repo's hand-edited opencode.jsonc (now adopter-owned; init skips it). The GENERATED template (templates/opencode.jsonc source in the product) still emits formatter: true, so every adopter using start --worktree hits the same ~900-line reformat churn.
+
+## Acceptance
+- [ ] Product decision recorded: ship the override in the template (recommended — same layout guarantees the same bug) or document the bypass + manual fix in the init output/docs instead.
+- [ ] If shipping: templates updated + a template-vs-fixture test that the override survives regeneration; adopter-modified opencode.jsonc files are skipped by init (documented migration note).
+- [ ] changelog entry in the next release.
