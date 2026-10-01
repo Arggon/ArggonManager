@@ -112,3 +112,18 @@ Resolution: literal pin kept + lag-guard test (cli/src/ci-seam-pin.test.ts) — 
 Superseded wording corrected at the sources: ADR 0018 dated amendment (d70817c8). Downstream consumers aligned: release-pipeline spec Interplay/T0 rewritten to the guard design (PR #545 head 0b99eb83 + review fixes in flight); task-release-spec Context line corrected on main.
 
 Reviewer nits noted for the future owner (optional, not blocking): verdict-table row for "pin == pkg while stamps newer" and a temp-file fixture for the file-based red path.
+
+### 2026-10-01 @ses_f0821d67dffeJCEv1KlhMw1eCD
+Implementation evidence (subagent session, item task-ci-seam-pin-tracks-release).
+
+DECISION: keep the literal pin + lag-guard test; derive REJECTED. Deriving ARGGON_VERSION from package.json installs a version the registry lacks between the release bump (step 1) and the publish (step 5): guaranteed red tasks-validate on main + release PR every release (404 on npm install -g arggon-manager@<bumped>), and an adopter's package.json is unrelated to arggon releases so the template could never derive. The guard (cli/src/ci-seam-pin.test.ts) fails exactly when the pin lags BOTH package.json and the newest arggonVersion seam stamp (the #527 shape) and stays green through every documented flow state.
+
+PROVENANCE (disclosed): a concurrent writer session was active in this worktree during implementation (writes at 10:18, 11:41-44, 12:04-12:07 local). Per coordinator directive I waited for it to finish, re-assessed, and ADOPTED its final state (commit a162e280), which had converged on this same test-approach design and incorporated/extended my drafted guard test (extracted pinLagsSeam predicate + verdict-table unit tests + anti-derive regression assertions). My own additions on top: canonical runbook step 6 rewrite, item body/acceptance, verification below. No work was discarded.
+
+VERIFICATION EVIDENCE:
+- YAML parse (python3 yaml): workflow parses; step order checkout -> setup-node -> install -> bootstrap -> drift gate -> validate; literal ARGGON_VERSION "0.4.1"; no derive step.
+- Mutation A (#527 replay, pin -> 0.4.0): vitest RED with message naming the fix ("Bump ARGGON_VERSION ... Re-pin the seam check").
+- Mutation B (restore): 6/6 green. Mutation C (release-window: package.json -> 0.4.2, pin 0.4.1): 6/6 GREEN (rules out the naive pin==package.json test). Mutation D (restore): green.
+- Gates: npm run build OK; npm test 113 files / 2003 tests passed; npm run lint exit 0; npm run check:plugin exit 0 (bundle unchanged); npm run arggon -- validate --json ok:true errors:[] warnings:[].
+
+COMMITS on feat/task-ci-seam-pin-tracks-release: 0cf39cdc (claim), a162e280 (ci: enforce the seam pin with a lag guard, keep the literal), + this runbook/item commit before push.
