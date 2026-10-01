@@ -31,7 +31,8 @@ docs or the V1 schema for V2 work.
   project's.
 - `arggon init` generates the tier-1 seam: `opencode.jsonc` **only when the repo
   has no OpenCode config of its own** (`opencode.json(c)` at the root or
-  `.opencode/opencode.json(c)`) — formatter + compaction retention and **no MCP
+  `.opencode/opencode.json(c)`) — a git-root-anchored prettier formatter
+  override + compaction retention and **no MCP
   stanza** (W3, `task-native-commands-seam`; ADR 0011 §5/§6) — plus
   `.opencode/agents/arggon-{coordinator,worker,reviewer}.md` and the eleven
   native `.opencode/commands/arggon-{next,start,done,handoff,review,status,spec,adr,explore,playbook,adopt}.md`
@@ -39,8 +40,10 @@ docs or the V1 schema for V2 work.
   [spec-opencode-seam-010](../specs/spec-opencode-seam-010.md)). The commands are
   prompt templates that drive the native tools and write the methodology
   artifacts directly; they carry no CLI-driving prose and no shell blocks.
-- **This repo's `opencode.jsonc` deliberately overrides the prettier formatter's
-  `command`** (do not simplify it back to `"formatter": true`). The built-in
+- **The generated `opencode.jsonc` deliberately overrides the prettier
+  formatter's `command`** (do not simplify it back to `"formatter": true`;
+  the template ships it by default since task-formatter-override-template, and
+  this repo's own adopter-owned copy carries the same override). The built-in
   runs `<prettier> --write $FILE` with the **session's project directory** as
   cwd, and prettier resolves `.prettierignore` from that cwd — so a session
   rooted in the primary checkout editing a file in a sibling arggon worktree

@@ -6,6 +6,28 @@ All notable changes to ArggonManager are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **init**: the generated `opencode.jsonc` no longer emits bare
+  `"formatter": true`. The built-in prettier runs as `<prettier> --write $FILE`
+  with the session's project directory as cwd and resolves `.prettierignore`
+  from that cwd, so a session rooted in the primary checkout that edits a file
+  in a sibling `arggon start --worktree` worktree bypassed the ignore file and
+  reformatted gitignored files into large style-only churn. The template now
+  ships a `formatter.prettier.command` override that anchors the same
+  invocation at the edited file's own git root (the worktree root for
+  worktrees): non-ignored files format exactly as before, and the command
+  exits 0 without formatting when no prettier resolves (e.g. a cold worktree
+  before `start` links the install). Fixed for new adopters by the template
+  (task-formatter-override-template, from the incident fixed in this repo by
+  #531).
+  **Adopter migration:** `init` never rewrites an adopter-modified
+  `opencode.jsonc`, so existing adopters must hand-apply the override — copy
+  the `formatter` block from `templates/docs/opencode.jsonc` (or a fresh
+  `arggon init` on a scratch fixture) into your config.
+
 ## [0.4.1] - 2026-10-01
 
 ### Fixed
