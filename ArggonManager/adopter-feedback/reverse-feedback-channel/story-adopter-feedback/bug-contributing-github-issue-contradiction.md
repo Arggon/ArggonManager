@@ -13,7 +13,6 @@ updated: "2026-10-02"
 claimed_at: "2026-10-02T18:59:22.820Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-contributing-github-issue-contradiction
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/bug-contributing-github-issue-contradiction.md
   Leaves live only under a story. id is the filename stem: bug-contributing-github-issue-contradiction.
@@ -47,3 +46,5 @@ Evidence (read from branch fix/bug-contributing-github-issue-contradiction @ 5b5
 - Item frontmatter still in_progress on the branch — expected; coordinator flips to done on merge.
 
 No blocking findings. OK to merge PR #594 and mark the item done.
+### 2026-10-02 @Arggon
+Fixed: CONTRIBUTING.md line 269 and README.md Contributing section no longer tell contributors to open an issue; both now route to in-tree work items (arggon create task). Policy stated exactly once in CONTRIBUTING.md (line 13). Grep sweep of README/SUPPORT/templates/docs found no other stale 'open an issue' instruction. Gates: arggon validate ok, npm run lint + lint:structure clean. PR #594.
