@@ -803,10 +803,15 @@ registration to record. Outcome per recommendation, verified 2026-10-02:
    plus `sgconfig.yml` and `tools/ast-grep/rules/*.yml`; items
    `task-ast-grep-structural-rules`, `task-fast-check-invariant-properties` and
    `task-ui-browser-smoke-ci` are all done.
-3. **§C `codebase-memory-mcp` as the default discovery aid — not adopted in this
-   repository.** No ADR, playbook, item or repo doc names it (`AGENTS.md`
-   included), so it stayed a developer-local tool and there is no repository
-   decision to record.
+3. **§C `codebase-memory-mcp` as the default discovery aid — undecided, and
+   deliberately left that way.** §C's verdict ("Adopt as an already-compatible
+   developer standard") and the matrix's "Adopt as dev standard" row are this
+   document's dated research position; the repository has recorded **no
+   decision** either way — no ADR, no playbook, and no repo doc names it
+   (`AGENTS.md` included), so it remains a developer-local tool. The open
+   question is tracked as `task-decide-codebase-memory-default-discovery`
+   (`todo`, filed 2026-10-02 while this PR was under review); read that item
+   for the disposition. This bullet deliberately does not close it.
 4. **§A `opencode2-shell-tasks@0.1.1` — not adopted**, measured FAIL: items
    `task-pilot-opencode2-shell-tasks-server-only` and
    `task-record-shell-tasks-pilot-negative-result` (both done) and
@@ -823,15 +828,26 @@ registration to record. Outcome per recommendation, verified 2026-10-02:
    honored.** Root `dependencies` are unchanged (`@arggondev/lib`,
    `commander`) and `lib` declares none.
 
-Two cross-cutting questions this exploration raised were decided later, in their
+Two cross-cutting questions this exploration raised were taken up later, in their
 own records, so neither needs a new ADR here:
 
 - §0's "optional providers after parity" (`mise`, Devbox, Nix, Dev Container as
-  adapters over a committed project contract) was taken up in
+  adapters over a committed project contract) was taken up — partially — in
   [ADR 0019 — Worktree runtime isolation](../adr/0019-worktree-runtime-isolation.md)
-  from [exploration-worktree-env-isolation-017](exploration-worktree-env-isolation-017.md):
-  the env contract is the default and a per-worktree dev container stays the
-  escape hatch. Recommendation 1 itself closed a gap **inside** the existing
+  from [exploration-worktree-env-isolation-017](exploration-worktree-env-isolation-017.md),
+  which is still `- Status: Proposed` (the product owner's acceptance is recorded
+  in its `Deciders` line, not yet merged as `Accepted`). What it decides is the
+  runtime-isolation half of that thread, not a toolchain: **layer 1** makes the
+  env contract (`.arggon.env` plus the per-OS state/cache dirs, spec
+  `spec-worktree-env-contract-016`) the default; **layer 2** makes ephemeral
+  per-worktree **service** containers (Compose) a documented opt-in pattern,
+  never a kernel feature; and its point 3 **rejects as defaults** per-worktree
+  **dev-environment** containers, distrobox/toolbox and per-worktree VMs — the
+  dev-container option survives only as a last-resort escape hatch for
+  toolchains that cannot run on the host. Nix/devbox stays "optional, per-project
+  complement outside arggon's scope" (out of scope, never an arggon
+  requirement), and ADR 0019 does not mention `mise` at all. Recommendation 1
+  itself closed a gap **inside** the existing
   native-surface contract
   ([ADR 0010](../adr/0010-opencode2-native-architecture.md) /
   [ADR 0011](../adr/0011-native-first-architecture.md)) rather than choosing

@@ -166,7 +166,7 @@ SaaS/hosted board (viewer spike + cheap-infra), do-nothing (measured defects).
 
 No ADR required — the recommendation was an **execution plan inside the packages
 that already exist**, so nothing cross-cutting was decided and no ADR was owed.
-The plan has now shipped exactly that way (verified 2026-10-02): all **21** items
+The plan has now shipped exactly that way (verified 2026-10-02): all **20** items
 in the filed-work table below are `done` (epic `ui`: 39 done, 0 todo, 0
 in_progress) and the lane added **no runtime dependency** — the root
 `dependencies` are `@arggondev/lib` and `commander`, `lib` declares none, and
