@@ -61,3 +61,7 @@ Work landed on `fix/bug-native-refusal-advice-clipped-by-head-clip` → PR https
 
 ## Flake note (not a regression)
 `smoke:native-start-cold` failed its 'scripted drive' check twice and passed twice on the IDENTICAL fixed tree, and passed once on a stashed clean tree: baseline(stash)=PASS, fix run1=FAIL, fix run2=FAIL, fix run3=PASS, fix run4=PASS, post-rebase=PASS. That check reads the live OpenCode host transcript ordering (`smoke/native-start-cold-smoke.ts:228-250`), unreachable from this diff. Separately, one full `npm test` run had a transient failure in `cli/src/prose-format.test.ts` (its `git ls-files` prose sweep) right after the rebase; the suite passed in isolation 3/3 and in two other full runs (2168/2168).
+
+### handoff 2026-10-02 @ses_f01cebaa9ffeuQRcpbUpyt0LNy (session: ses_f01cebaa9ffeuQRcpbUpyt0LNy) — next: Review PR #595; merge, then flip the item to done. Decide the strictGateBinFailure residual (remedy-first there too) or file it.
+- branch: fix/bug-native-refusal-advice-clipped-by-head-clip
+- open questions: Acceptance says 10 named paths but MAX_GATE_BINS caps bins at 8 — OK as ticked?; strictGateBinFailure's own npm ci clause is still the clipped tail — in scope here or a follow-up?
