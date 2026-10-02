@@ -3,7 +3,7 @@ type: bug
 status: todo
 id: bug-mcp-parity-branch-test-json-parse-of-human-stdout
 title: "mcp-parity \"branch checks out identically\" test JSON.parses a CLI line that can be the human \"arggon branch …\" success message, not the --json envelope"
-parent: story-spec-pipeline
+parent: methodology-improvements
 labels: [tests, mcp]
 created: "2026-10-02"
 updated: "2026-10-02"
