@@ -2228,14 +2228,64 @@ type NativeClaimWriteReport = {
 }
 
 /**
+ * One persisted take-over chain entry (`WorktreeClaimTakeoverRecord`): who took
+ * a worktree over, when, and which stamp it replaced. Deliberately narrow (four
+ * fields) so the chain in the stamp file cannot grow with a chatty history.
+ */
+type NativeClaimTakeoverRecord = {
+  at: string
+  by: string
+  replacedIdentity: string
+  replacedClaimedAt: string
+}
+
+/**
+ * The replaced ownership stamp (`WorktreeClaimStamp`), reported in full on a
+ * take-over so the audit trail names the presumed-dead owner, their item and
+ * branch — not just an opaque id.
+ */
+type NativeClaimStamp = {
+  identity: string
+  item: string
+  branch: string
+  claimedAt: string
+  assignee?: string
+  surface?: string
+  takeovers?: NativeClaimTakeoverRecord[]
+}
+
+/**
+ * A deliberate take-over of a presumed-dead stamped owner
+ * (task-strict-attach-dead-owner-hatch), structurally the kernel's
+ * `WorktreeClaimTakeover`. The kernel moves the fired evidence OUT of
+ * `foreignWrites` into this field, so exactly one of the two is ever present
+ * and an authorized take-over resolves the armed strict gate unchanged. The
+ * evidence is MOVED, never dropped — this mapping is a whitelist, so a field
+ * missing here would make the take-over resolve the gate AND vanish from the
+ * tool result.
+ */
+type NativeClaimTakeover = {
+  at: string
+  by: string
+  replacedIdentity: string
+  replacedClaimedAt: string
+  replaced: NativeClaimStamp
+  files: string[]
+  total: number
+}
+
+/**
  * The claim-stamp receipt (task-single-writer-worktree-enforcement),
  * structurally the kernel's `WorktreeClaimReceipt`: `stamped` reports the
  * rolling ownership stamp; a fired `foreignWrites` report is a WARNING by
- * default and an attach refusal under `x-tracker.strict-worktree-writes`.
+ * default and an attach refusal under `x-tracker.strict-worktree-writes`;
+ * `takeOver` is the authorized replacement of a presumed-dead stamp
+ * (task-strict-attach-dead-owner-hatch), reported instead of `foreignWrites`.
  */
 type NativeClaimReceipt = {
   stamped: boolean
   foreignWrites?: NativeClaimWriteReport
+  takeOver?: NativeClaimTakeover
   warning?: string
 }
 
@@ -2336,6 +2386,7 @@ function boundedPreparation(input: {
     (input.gateBins?.length ?? 0) > gateBins.length ||
     (claim?.foreignWrites !== undefined &&
       claim.foreignWrites.total > claim.foreignWrites.files.length) ||
+    (claim !== undefined && claimTakeoverTruncated(claim, input.claim)) ||
     built.some((name, index) => name !== input.builtWorkspaces[index]) ||
     linked.some((name, index) => name !== input.linkedWorkspaces[index]) ||
     missing.some((name, index) => name !== input.missingDependencies[index]) ||
@@ -2367,6 +2418,16 @@ function boundedPreparation(input: {
  * Bound one claim-stamp receipt fragment: only the free-text fields (`owner`,
  * `claimedAt`, each `files` entry, `warning`) are re-bounded; `stamped` and
  * `total` are honest counts the kernel owns.
+ *
+ * `takeOver` (task-strict-attach-dead-owner-hatch) is PROJECTED with the same
+ * bounds, never dropped: it carries the fired evidence the kernel moved out of
+ * `foreignWrites`, so dropping it here would resolve the armed strict gate AND
+ * lose the audit record of who replaced whose dead claim. `replaced` is a stamp
+ * read out of the worktree's git dir, so it is attacker-shaped like every other
+ * free-text surface here — each of its strings is re-bounded and its nested
+ * `takeovers` chain is capped, with the kernel's own `MAX_CLAIM_TAKEOVERS` cap
+ * (5) below this function's list cap as the reason nothing is left to re-slice
+ * beyond the fold below.
  */
 function boundedClaimReceipt(input: NativeClaimReceipt): NativeClaimReceipt {
   const bounded: NativeClaimReceipt = { stamped: input.stamped }
@@ -2383,10 +2444,111 @@ function boundedClaimReceipt(input: NativeClaimReceipt): NativeClaimReceipt {
       total: input.foreignWrites.total,
     }
   }
+  if (input.takeOver !== undefined) {
+    bounded.takeOver = boundedClaimTakeover(input.takeOver)
+  }
   if (input.warning !== undefined) {
     bounded.warning = boundedNativeText(input.warning, MAX_NATIVE_PREPARATION_VALUE_CHARS)
   }
   return bounded
+}
+
+/** Bound one take-over receipt: free text and the replaced stamp's strings. */
+function boundedClaimTakeover(input: NativeClaimTakeover): NativeClaimTakeover {
+  return {
+    at: boundedNativeText(input.at, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+    by: boundedNativeText(input.by, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+    replacedIdentity: boundedNativeText(input.replacedIdentity, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+    replacedClaimedAt: boundedNativeText(
+      input.replacedClaimedAt,
+      MAX_NATIVE_PREPARATION_VALUE_CHARS,
+    ),
+    replaced: boundedClaimStamp(input.replaced),
+    files: input.files
+      .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+      .map((file) => boundedNativeText(file, MAX_NATIVE_PREPARATION_VALUE_CHARS)),
+    total: input.total,
+  }
+}
+
+/** Bound one replaced ownership stamp: every string re-bounded, chain capped. */
+function boundedClaimStamp(input: NativeClaimStamp): NativeClaimStamp {
+  const bounded: NativeClaimStamp = {
+    identity: boundedNativeText(input.identity, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+    item: boundedNativeText(input.item, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+    branch: boundedNativeText(input.branch, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+    claimedAt: boundedNativeText(input.claimedAt, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+  }
+  if (input.assignee !== undefined) {
+    bounded.assignee = boundedNativeText(input.assignee, MAX_NATIVE_PREPARATION_VALUE_CHARS)
+  }
+  if (input.surface !== undefined) {
+    bounded.surface = boundedNativeText(input.surface, MAX_NATIVE_PREPARATION_VALUE_CHARS)
+  }
+  if (input.takeovers !== undefined) {
+    bounded.takeovers = input.takeovers
+      .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+      .map((entry) => ({
+        at: boundedNativeText(entry.at, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+        by: boundedNativeText(entry.by, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+        replacedIdentity: boundedNativeText(
+          entry.replacedIdentity,
+          MAX_NATIVE_PREPARATION_VALUE_CHARS,
+        ),
+        replacedClaimedAt: boundedNativeText(
+          entry.replacedClaimedAt,
+          MAX_NATIVE_PREPARATION_VALUE_CHARS,
+        ),
+      }))
+  }
+  return bounded
+}
+
+/**
+ * True when bounding shortened the take-over's evidence: an over-cap named-file
+ * list, a string clipped at `MAX_NATIVE_PREPARATION_VALUE_CHARS`, or an over-cap
+ * chain inside the replaced stamp.
+ *
+ * The length fold is the honest "you are not seeing all of it" signal (the
+ * kernel owns both counts, so this never re-derives the evidence). The string
+ * fold is the same discipline the `built`/`linked`/`missingDependencies`
+ * projections already apply: a path or identity silently shortened to 200 chars
+ * and then reported as if it were the whole value is exactly the failure this
+ * flag exists to name — and a dirty tracked path over 200 chars is ordinary in
+ * any deep repo.
+ *
+ * The chain-cap term below is defense in depth: the kernel's stamp reader
+ * already caps `takeovers` at `MAX_CLAIM_TAKEOVERS` (5) before this mapper
+ * ever sees it, so through the kernel it cannot fire. It stays because the
+ * input is a file in the worktree's git dir, and an unreachable-but-harmless
+ * branch is cheaper than a silent assumption.
+ */
+function claimTakeoverTruncated(
+  bounded: NativeClaimReceipt,
+  input: NativeClaimReceipt | undefined,
+): boolean {
+  if (input === undefined) return true
+  const takeOver = bounded.takeOver
+  const source = input.takeOver
+  if (takeOver === undefined || source === undefined) return false
+  const replaced = source.replaced
+  const clipped =
+    takeOver.at !== source.at ||
+    takeOver.by !== source.by ||
+    takeOver.replacedIdentity !== source.replacedIdentity ||
+    takeOver.replacedClaimedAt !== source.replacedClaimedAt ||
+    takeOver.replaced.identity !== replaced.identity ||
+    takeOver.replaced.item !== replaced.item ||
+    takeOver.replaced.branch !== replaced.branch ||
+    takeOver.replaced.claimedAt !== replaced.claimedAt ||
+    takeOver.replaced.assignee !== replaced.assignee ||
+    takeOver.replaced.surface !== replaced.surface ||
+    takeOver.files.some((file, index) => file !== source.files[index])
+  return (
+    clipped ||
+    takeOver.total > takeOver.files.length ||
+    (replaced.takeovers?.length ?? 0) > (takeOver.replaced.takeovers?.length ?? 0)
+  )
 }
 
 /**
@@ -3242,6 +3404,13 @@ async function nativeStartBody(
   const claimIdentity = sessionToken(tool?.sessionID) ?? assignee
 
   const wantWorktree = input.worktree !== false
+  // Deliberate take-over of a presumed-dead stamped owner
+  // (task-strict-attach-dead-owner-hatch), the CLI's `--take-over-worktree`:
+  // forwarded to the kernel claim request so an attach whose single-writer
+  // detection fired re-stamps the worktree and records a dated take-over.
+  // Default OFF, and then nothing changes; the kernel only records a take-over
+  // when a detection FIRES, so a clean attach is a no-op, not a re-stamp.
+  const takeOverWorktree = input.takeOverWorktree === true
   // `worktree: false` is an explicit branch-only mode. Do not attach to (or
   // prepare) a stale `worktree_path` left by an earlier run; the canonical
   // checkout is the target and the result must report no worktree for this
@@ -3263,6 +3432,18 @@ async function nativeStartBody(
     extra: Record<string, unknown> = {},
   ): { ok: false; envelope: Record<string, unknown> } =>
     startNotAttempted(kernel, message, version, context(extra), reason)
+
+  // The take-over is worktree-scoped (same rule and same reason as the CLI):
+  // without a worktree there is no claim stamp to take over, and a silently
+  // ignored input is exactly how a recovery step gets believed to have
+  // happened. Refused before any branch or claim mutation.
+  if (takeOverWorktree && !wantWorktree) {
+    return failBeforeClaim(
+      "takeOverWorktree requires worktree (it takes over a claimed worktree's ownership " +
+        "stamp; a plain start writes no stamp)",
+      "invalid input",
+    )
+  }
 
   if (wantWorktree) {
     const canonical = primaryRoot
@@ -3423,6 +3604,13 @@ async function nativeStartBody(
             itemId: id,
             branch,
             surface: "native",
+            // Deliberate take-over (task-strict-attach-dead-owner-hatch): only
+            // recorded when a detection FIRES, so passing the flag on a clean
+            // attach is a no-op rather than a re-stamp. The kernel moves the
+            // fired evidence out of `foreignWrites` into `claim.takeOver`, so
+            // the strict gate below — unchanged — treats the authorized
+            // replacement as resolved and no surface change is needed here.
+            ...(takeOverWorktree ? { takeOver: true } : {}),
           },
         }),
       )
@@ -3484,6 +3672,11 @@ async function nativeStartBody(
   // documented report-only behavior byte-identical: the detection rides the
   // preparation receipt (`claim.foreignWrites`) and the claim commit remains
   // authoritative.
+  //
+  // A `takeOverWorktree` run (task-strict-attach-dead-owner-hatch) is NOT here:
+  // the kernel reports the fired evidence as `claim.takeOver` instead of
+  // `claim.foreignWrites`, so this gate — unchanged — treats the authorized
+  // replacement of a presumed-dead stamp as resolved.
   if (worktreePath !== undefined) {
     const foreignWrites = progress.preparation?.claim?.foreignWrites
     const strictWriteRefusal =
@@ -3492,11 +3685,36 @@ async function nativeStartBody(
         ? kernel.strictWorktreeWriteFailure(foreignWrites)
         : null
     if (strictWriteRefusal !== null) {
+      // A plain re-run CANNOT succeed here: the anti-unlock rule keeps the
+      // previous stamp, so every retry re-detects against the SAME evidence
+      // (task-single-writer-worktree-enforcement). Advertising one would be a
+      // retry that cannot succeed. Name the designed hatch instead, plus the
+      // manual recovery the CLI's refusal also names — the caller must confirm
+      // the stamped session is dead first.
+      //
+      // ORDER IS LOAD-BEARING, not style. `startFailure` clips the composed
+      // message at MAX_NATIVE_ERROR_CHARS (2048) HEAD-first, and the kernel
+      // refusal ENDS with its own tail — up to 10 named dirty paths, ~57
+      // chars each in this very repo. Advice APPENDED after it is the first
+      // thing the clip eats, so the remedies used to vanish exactly when the
+      // evidence was long enough to matter. Every remedy therefore goes FIRST
+      // and the kernel refusal — its lead sentence naming the stamped owner,
+      // the claim time and the file count — closes the message, exactly the
+      // ordering #573's round 2 applied on the CLI for this same reason. The
+      // path list is evidence to scroll back for, never the instruction to act
+      // on.
+      const recovery =
+        "A plain re-run cannot clear this: the fired detection is unchanged while the previous " +
+        "stamp stands. The worktree was kept at " +
+        `${worktreePath} (nothing was rolled back). If the stamped session is really dead, take ` +
+        "the worktree over explicitly with " +
+        `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)}, takeOverWorktree: true }) — ` +
+        "it records a dated take-over naming the replaced owner (the same hatch as " +
+        "`arggon start --worktree --take-over-worktree`). Otherwise, with a live writer, do NOT " +
+        "take over; remove the stamp by hand after confirming no live writer: " +
+        `rm "$(git -C ${worktreePath} rev-parse --absolute-git-dir)/arggon-claim.json". `
       return failBeforeClaim(
-        `${strictWriteRefusal} The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
-          "Then re-run " +
-          `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
-          "it attaches to the existing worktree and retries the claim commit.",
+        `${recovery}${strictWriteRefusal}`,
         "strict worktree-write gate refused",
       )
     }
@@ -4035,6 +4253,11 @@ const WORKTREE_TOOL_SPECS: ArgonToolSpec[] = [
         branch: { type: "string" },
         worktree: BOOLEAN,
         push: BOOLEAN,
+        takeOverWorktree: {
+          type: "boolean",
+          description:
+            "Take over a presumed-dead stamped owner (CLI --take-over-worktree). Default OFF; requires worktree; acts only when the single-writer detection fired.",
+        },
       },
       required: ["id"],
       additionalProperties: false,
