@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-prover-agent-reviewer-split
 title: "Split execution evidence out of the reviewer: a shell-capable arggon-prover agent + a read-only reviewer contract"
+assignee: Arggon
+branch: feat/task-prover-agent-reviewer-split
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [opencode-seam, methodology]
 priority: p2
 created: "2026-10-02"
 updated: "2026-10-02"
+claimed_at: "2026-10-02T12:49:16.705Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-prover-agent-reviewer-split
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-prover-agent-reviewer-split.md
