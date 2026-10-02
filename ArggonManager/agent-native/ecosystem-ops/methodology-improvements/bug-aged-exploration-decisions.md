@@ -97,3 +97,7 @@ Scanner untouched: `git diff` on the branch touches only the two exploration doc
 ### Tracker-write hazard check
 
 Every write was made from this worktree (`/home/arggon/Projects/ArggonManager-bug-aged-exploration-decisions`). The native `tools.arggon.*` surface resolves the tracker root from the session cwd, which is the **primary** checkout here, so it was used read-only; all mutations (this comment, the handoff) go through `npm run arggon -- …` executed with the worktree as cwd. The primary checkout is still at `17091702` with a clean `git status` — no commit landed there.
+
+### handoff 2026-10-02 @Arggon — next: Coordinator: review + merge the PR for fix/bug-aged-exploration-decisions (merge, do not squash — it carries tracker auto-commits), then flip this bug to done.
+- branch: fix/bug-aged-exploration-decisions
+- open questions: Is exploration-013 rec 3 (codebase-memory-mcp) meant to be a repo standard? Recorded as not adopted in-repo; filing is your call. Confirm baseline stays unrefreshed.
