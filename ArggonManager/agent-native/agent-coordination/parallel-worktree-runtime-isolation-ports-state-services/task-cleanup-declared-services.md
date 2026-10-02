@@ -13,7 +13,6 @@ claimed_at: "2026-10-01T23:52:12.615Z"
 depends_on: [task-env-contract-start]
 worktree_path: /home/arggon/Projects/ArggonManager-task-cleanup-declared-services
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-cleanup-declared-services.md
   Leaves live only under a story. id is the filename stem: task-cleanup-declared-services.
@@ -48,3 +47,14 @@ settles the convention shapes this task consumes.
 
 - Manifest shape (ADR 0019 left it open — decided minimally per its "the pattern is a name and a manifest" guidance): a single scalar declaration `x-worktree.services` in `.convention.yml` — the reaper needs only the project NAME (`down` resolves the project through container labels, no Compose file and no YAML parsing), so the declaration is exactly that name: `true` (canonical worktree id) or the adopter's base name. Recorded in convention.md; the parse-time validation enforces Compose's project alphabet.
 - Scope note for review: the OpenCode plugin's `nativeCleanup` keeps its own prune loop and does NOT reap Compose (safe by construction — report-only); the MCP surface (`arggon_cleanup`) spawns the CLI and reaps. Native parity is a follow-up for the coordinator.
+
+### 2026-10-02 @ses_f061e465effeTJZ6pCepJBk192
+Implemented; PR #569 (feat/task-cleanup-declared-services, not merged — coordinator review). Impact class: **Behavioral (ADR 0016)** — new x-worktree.services convention key + additive cleanup --json compose field; skill copies byte-equal (sources untouched).
+
+**Manifest shape (ADR 0019 left it open; decided minimally per its "a name and a manifest" guidance):** scalar `x-worktree.services` in .convention.yml — `true` = canonical worktree-id naming (<repo>-<item-id>), a base name = pattern-doc naming (<base>-<repo>-<item-id>, lowercased), absent/false = no Docker ever. Rationale: `down` resolves projects by container label, so the reaper needs only the NAME; parse-time validation enforces Compose's alphabet ([A-Za-z0-9][A-Za-z0-9_-]*).
+
+**Reap semantics:** docker compose -p <project> down -v --remove-orphans per removable entry (done/cancelled + merged, unchanged), BEFORE git worktree remove; already-gone project = exit-0 no-op (live-verified Docker 29.7.2/Compose 5.5.1 2026-10-01); absent docker = report-only (compose.dockerUnavailable, never a failure); reap failures on BOTH pruned[].error and failures[] (#515 discipline, boundedEnvelopeText), never wedging the removal, exit code 0 (task-cleanup-json-exit-code unchanged). Preservation pinned by test: only derived names reach the executor; undeclared adopter projects (incl. the primary's own) are never touched.
+
+**Commands run / expected vs observed:** npm test → 2081 passed (9 new compose tests + convention/lib units; daemon-free, CI-safe); npm run lint → 0; npm run build → green; npm run check:plugin → green AFTER the prescribed separate "chore: regen plugin bundle" commit (kernel modules are inlined into the vendored bundle, so lib changes drifted it — expected, recorded as its own commit 00df6ad1); npm run smoke:native-start-cold → passed (all legs incl. "checkout unchanged"); npm run arggon -- validate → ok:true. One initial red herring: headless-ci failed until the worktree's root `npm run build` produced dist artifacts (the suite asserts them) — environment, not code.
+
+**Finding (follow-up for coordinator):** the OpenCode plugin's nativeCleanup keeps its own prune loop and does NOT reap Compose (safe by construction — report-only). MCP arggon_cleanup spawns the CLI and reaps. Native parity is unfiled per the no-self-filing rule; worktreeComposeProject is kernel-exported so the plugin can adopt it trivially.
