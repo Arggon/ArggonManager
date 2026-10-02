@@ -10,7 +10,6 @@ labels: [release, seam]
 priority: p1
 created: "2026-10-02"
 updated: "2026-10-02"
-worktree_path: /home/arggon/Projects/ArggonManager-task-adopt-050-seam-repin
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-adopt-050-seam-repin.md

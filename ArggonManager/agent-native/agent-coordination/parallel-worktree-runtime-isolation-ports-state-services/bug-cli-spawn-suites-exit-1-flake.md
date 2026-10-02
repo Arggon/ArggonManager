@@ -10,7 +10,6 @@ labels: [ci, flaky]
 priority: p2
 created: "2026-10-02"
 updated: "2026-10-02"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-cli-spawn-suites-exit-1-flake
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-cli-spawn-suites-exit-1-flake.md

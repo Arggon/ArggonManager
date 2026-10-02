@@ -1,6 +1,6 @@
 # 0020 Methodology-first productization with per-agent native adapters
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-10-02
 - Deciders: Gonzalo Arganaraz
 - Input: [exploration-methodology-productization-018](../explorations/exploration-methodology-productization-018.md) (2026-10-02)

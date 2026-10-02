@@ -10,7 +10,6 @@ labels: [docs, spec]
 priority: p1
 created: "2026-10-02"
 updated: "2026-10-02"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-spec-017-missing-synopsis-blocks-all-prs
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-spec-017-missing-synopsis-blocks-all-prs.md
