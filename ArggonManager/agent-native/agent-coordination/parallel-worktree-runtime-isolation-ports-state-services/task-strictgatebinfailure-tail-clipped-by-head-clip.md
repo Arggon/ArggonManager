@@ -27,9 +27,9 @@ Found while reviewing PR #595 (bug-native-refusal-advice-clipped-by-head-clip): 
 
 ## Acceptance
 
-- [ ] `strictGateBinFailure` composes its "Fix:" remedy before the kernel refusal text (same shape #579/#595 landed), keeping every existing clause verbatim
-- [ ] A test with the full `MAX_GATE_BINS` worst-case list asserts the `npm ci` remedy survives the clip, with ordering pinned
-- [ ] Negative control: message at the cap and the last named bin absent
+- [x] `strictGateBinFailure` composes its "Fix:" remedy before the kernel refusal text (same shape #579/#595 landed), keeping every existing clause verbatim
+- [x] A test with the full `MAX_GATE_BINS` worst-case list asserts the `npm ci` remedy survives the clip, with ordering pinned
+- [x] Negative control: message at the cap and the last named bin absent
 
 ## Notes
 
