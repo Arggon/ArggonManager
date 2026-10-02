@@ -1751,6 +1751,27 @@ function prepareWorktreeClaim(
 }
 
 /**
+ * The Compose project `cleanup --prune` reaps for a worktree, derived from the
+ * `x-worktree.services` declaration (ADR 0019 layer 2,
+ * task-cleanup-declared-services) and the worktree id — the worktree
+ * directory's basename, `<repo>-<item-id>`. Compose lowercases project names
+ * and restricts them to `[a-z0-9_-]` (verified live, Docker 29.7.2,
+ * 2026-10-01), so the derivation lowercases the whole result:
+ * `services: "true"` names the project exactly the worktree id (compose
+ * `name: "${ARGGON_WORKTREE_ID:-}"`); any other declared value is the
+ * adopter's base project name and follows the adopter pattern doc's
+ * `name: "<base>${WORKTREE_SUFFIX:-}"` with
+ * `WORKTREE_SUFFIX="-<repo>-<item-id>"`, reaped as
+ * `<base>-<repo>-<item-id>`. The declared base itself is validated at
+ * convention-parse time; the worktree id needs no validation (it is whatever
+ * directory the adopter's `compose up` already named a project after).
+ */
+export function worktreeComposeProject(services: string, worktreeId: string): string {
+  const base = services === "true" ? "" : `${services}-`;
+  return `${base}${worktreeId}`.toLowerCase();
+}
+
+/**
  * Prepare a worktree's project dependencies before its claim commit.
  *
  * This is the one kernel-level orchestration point shared by CLI and native

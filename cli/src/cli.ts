@@ -2489,6 +2489,7 @@ program
             candidates: result.entries,
             pruned: result.pruned,
             failures: result.failures,
+            ...(result.compose ? { compose: result.compose } : {}),
             ...(result.commit ? { commit: commitPayload(result.commit) } : {}),
           },
           readConventionVersion(result.root),
@@ -2526,6 +2527,11 @@ program
       if (commitLine) console.log(`  ${commitLine}`);
       for (const failure of result.failures) {
         console.error(sanitizeHumanError(`  failed:    ${failure}`));
+      }
+      if (result.compose?.dockerUnavailable) {
+        console.log(
+          `  note:      compose reaping declared (x-worktree.services: ${sanitizeHumanError(result.compose.declared)}) but docker not found — nothing reaped`,
+        );
       }
       if (!opts.prune && removable.length > 0) {
         console.log(`next: arggon cleanup --prune removes ${removable.length} worktree(s)`);

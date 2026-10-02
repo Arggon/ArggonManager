@@ -37,6 +37,7 @@ import {
   unlinkWorktreeEnv,
   worktreeCacheBase,
   worktreeForeignWriteWarning,
+  worktreeComposeProject,
   worktreeStateBase,
   WORKTREE_ENV_KEYS,
   detectWorktreeForeignWrites,
@@ -894,7 +895,10 @@ describe("prepareWorktreeEnv (spec worktree-env-contract-016)", () => {
     const f = fixture();
     writeFileSync(join(f.primary, ".env"), "SECRET=1\n", "utf8");
     const prepared = prepareWorktreeDependencies(f.primary, f.worktree, {
-      env: { identity, ...(hermetic(dirname(f.worktree)) as { env: NodeJS.ProcessEnv; home: string }) },
+      env: {
+        identity,
+        ...(hermetic(dirname(f.worktree)) as { env: NodeJS.ProcessEnv; home: string }),
+      },
     });
     expect(prepared.env?.written).toBe(true);
     expect(prepared.env?.keys).toEqual([...WORKTREE_ENV_KEYS]);
@@ -1206,5 +1210,28 @@ describe("claim stamp: single-writer detection (task-single-writer-worktree-enfo
     expect(refusal).toContain("refusing the claim");
     expect(refusal).toContain("a.ts, b.ts");
     expect(strictWorktreeWriteFailure({ ...report, files: [], total: 0 })).toBeNull();
+  });
+});
+
+describe("worktreeComposeProject (ADR 0019 layer 2, task-cleanup-declared-services)", () => {
+  it("services: true names the project exactly the worktree id, lowercased", () => {
+    expect(worktreeComposeProject("true", "MyRepo-task-123")).toBe("myrepo-task-123");
+    expect(worktreeComposeProject("true", "arggonmanager-task-cleanup-declared-services")).toBe(
+      "arggonmanager-task-cleanup-declared-services",
+    );
+  });
+
+  it("a declared base follows the pattern doc naming: <base>-<repo>-<item-id>, lowercased", () => {
+    expect(worktreeComposeProject("myapp", "MyRepo-task-123")).toBe("myapp-myrepo-task-123");
+    expect(worktreeComposeProject("MyApp", "repo-task-9")).toBe("myapp-repo-task-9");
+  });
+
+  it("mixed case in the worktree id is lowercased with the base", () => {
+    // Compose lowercases the whole project name ([a-z0-9_-], verified live on
+    // Docker 29.7.2, 2026-10-01); the derivation pre-applies that so `down`
+    // targets the same label `up` recorded.
+    expect(worktreeComposeProject("Shop", "ArggonManager-task-7")).toBe(
+      "shop-arggonmanager-task-7",
+    );
   });
 });

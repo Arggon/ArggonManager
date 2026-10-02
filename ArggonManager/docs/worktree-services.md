@@ -163,15 +163,17 @@ docker compose -p "$COMPOSE_PROJECT" down -v --remove-orphans
 Compose no longer tracks (command verified live: networks and containers removed,
 zero residue, Docker 29.7.2, 2026-10-01).
 
-**Planned, not shipped:** `arggon cleanup --prune` will eventually do this reaping
-for you — running `docker compose -p <repo>-<item-id> down -v --remove-orphans` for
-merged worktrees, but **only when the repo's convention declares its services
-manifest**, and skipping with a report otherwise; the kernel never probes for or
-invokes a Docker daemon the convention did not declare. That behavior is tracked as
-`task-cleanup-declared-services` under the
-`parallel-worktree-runtime-isolation-ports-state-services` story and does not exist
-in any build today. Until it ships, the reaping step is yours (a script, a Make
-target, or your session's end-of-run checklist).
+**Shipped (task-cleanup-declared-services):** `arggon cleanup --prune` now does this
+reaping for you — running `docker compose -p <repo>-<item-id> down -v --remove-orphans`
+(or, when your declaration carries a base name, `-p <base>-<repo>-<item-id>`) for
+merged worktrees, **but only when the repo's convention declares its services
+manifest** (`x-worktree.services` in `ArggonManager/.convention.yml`), and staying
+report-only otherwise; the kernel never probes for or invokes a Docker daemon the
+convention did not declare, and an adopter-run project the convention does not
+declare is never touched. See [convention.md](./convention.md) §Worktree bootstrap
+for the declaration grammar. Until your checkout carries it (next release), the
+reaping step remains yours (a script, a Make target, or your session's end-of-run
+checklist).
 
 ### Optional today: wire `up` into worktree creation
 
@@ -285,18 +287,18 @@ can be shared, and reach for this pattern when it cannot.
 
 ## Shipped vs promised vs planned
 
-| Piece                                                                                       | Status  | Where                                                                                                           |
-| ------------------------------------------------------------------------------------------- | ------- | --------------------------------------------------------------------------------------------------------------- |
-| Per-item worktrees, identity dir name `<repo>-<item-id>`                                    | Shipped | today's build                                                                                                   |
-| Unique Compose project via directory-derived default                                        | Shipped | Compose default (no arggon code involved)                                                                       |
-| `${WORKTREE_SUFFIX:-}` interpolation pattern, random ports, tmpfs volumes, manual `down -v` | Shipped | this page — pure Compose, no arggon changes needed                                                              |
-| `x-worktree.post-start` hook (auto-`up` on creation)                                        | Shipped | [convention.md](./convention.md) §Worktree bootstrap                                                            |
-| `cleanup --prune` for merged worktrees (no Docker involvement)                              | Shipped | today's build                                                                                                   |
-| `.arggon.env` with the six keys (`ARGGON_WORKTREE_ID`, `ARGGON_STATE_DIR`, …)               | Shipped | **this PR** ([spec-worktree-env-contract-016](./specs/spec-worktree-env-contract-016.md) implemented, PR #566)  |
-| `.env` seed (copy-if-absent) + `ARGGON_STATE_DIR`/`ARGGON_CACHE_DIR`                        | Shipped | **this PR** (same spec — per-OS bases, `mkdir -p`'d)                                                            |
-| `preparation.env` receipt field, `x-worktree.env` opt-out                                   | Shipped | **this PR** (same spec — CLI `env`, native `preparation.env`; `written:false` + warning never blocks the claim) |
-| `cleanup --prune` reaping of a start-created `.arggon.env` (contract-shape ownership)       | Shipped | **this PR** — see the lifecycle notes above                                                                     |
-| `cleanup --prune` reaping of **declared** Compose projects                                  | Planned | `task-cleanup-declared-services` (declaration manifest shape decided there)                                     |
+| Piece                                                                                       | Status  | Where                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Per-item worktrees, identity dir name `<repo>-<item-id>`                                    | Shipped | today's build                                                                                                                                                          |
+| Unique Compose project via directory-derived default                                        | Shipped | Compose default (no arggon code involved)                                                                                                                              |
+| `${WORKTREE_SUFFIX:-}` interpolation pattern, random ports, tmpfs volumes, manual `down -v` | Shipped | this page — pure Compose, no arggon changes needed                                                                                                                     |
+| `x-worktree.post-start` hook (auto-`up` on creation)                                        | Shipped | [convention.md](./convention.md) §Worktree bootstrap                                                                                                                   |
+| `cleanup --prune` for merged worktrees (no Docker involvement)                              | Shipped | today's build                                                                                                                                                          |
+| `.arggon.env` with the six keys (`ARGGON_WORKTREE_ID`, `ARGGON_STATE_DIR`, …)               | Shipped | **this PR** ([spec-worktree-env-contract-016](./specs/spec-worktree-env-contract-016.md) implemented, PR #566)                                                         |
+| `.env` seed (copy-if-absent) + `ARGGON_STATE_DIR`/`ARGGON_CACHE_DIR`                        | Shipped | **this PR** (same spec — per-OS bases, `mkdir -p`'d)                                                                                                                   |
+| `preparation.env` receipt field, `x-worktree.env` opt-out                                   | Shipped | **this PR** (same spec — CLI `env`, native `preparation.env`; `written:false` + warning never blocks the claim)                                                        |
+| `cleanup --prune` reaping of a start-created `.arggon.env` (contract-shape ownership)       | Shipped | **this PR** — see the lifecycle notes above                                                                                                                            |
+| `cleanup --prune` reaping of **declared** Compose projects                                  | Shipped | **PR #569** (`task-cleanup-declared-services` — `x-worktree.services` declaration, `down -v --remove-orphans` before the worktree removal, report-only without Docker) |
 
 "Shipped (this PR)" means: merged with the env-contract implementation PR — script
 against `.arggon.env` freely in worktrees, but a **released** build carries it only

@@ -508,7 +508,7 @@ x-import:
 
 ### Worktree bootstrap (`x-worktree`)
 
-`x-worktree` is the official namespaced extension for worktree-bootstrap options (`arggon start --worktree`, task-start-post-hook). It is a mapping of option names to values; the official options are `post-start`, a shell command run after a new worktree is created, `post-start-shell`, the shell that command runs through, and `env`, the worktree env-contract opt-out:
+`x-worktree` is the official namespaced extension for worktree-bootstrap options (`arggon start --worktree`, task-start-post-hook). It is a mapping of option names to values; the official options are `post-start`, a shell command run after a new worktree is created, `post-start-shell`, the shell that command runs through, `env`, the worktree env-contract opt-out, and `services`, the Compose reaping declaration:
 
 ```yaml
 version: 3
@@ -516,9 +516,15 @@ x-worktree:
   post-start: "npm ci"
   post-start-shell: "login"
   env: false
+  services: myapp
 ```
 
 - **`env` (spec worktree-env-contract-016):** absent or `true` (the default) keeps the per-worktree env contract enabled; only an explicit `false` disables it. Enabled, `start --worktree` writes a gitignored, dotenv-style `.arggon.env` at the worktree root carrying the worktree identity (`ARGON_ITEM`, `ARGGON_WORKTREE_ID` = `<repo>-<item-id>`, `ARGGON_WORKTREE_PATH`, `ARGGON_WORKTREE_BRANCH`) and per-OS suffixed state/cache dirs (`ARGGON_STATE_DIR`/`ARGGON_CACHE_DIR` — XDG on Linux, `~/Library` on macOS, `%LOCALAPPDATA%` on Windows, each + `/<repo>-<item-id>`, created `mkdir -p`), seeds a primary `.env` into the worktree copy-if-absent (never overwritten, never interpreted), and reports the read-only `git check-ignore .arggon.env` probe in the additive `env` receipt field. Nothing is ever overwritten (an existing `.arggon.env` or `.env` is left byte-identical), env files are never staged or committed, and the preparation is best-effort: `written: false` with a `warning` never blocks the claim. `arggon init` generates a `.gitignore` that ignores `.arggon.env` on fresh scaffolds; `cleanup --prune` reaps a start-created env file before removing the worktree.
+
+- **`services` (ADR 0019 layer 2, task-cleanup-declared-services):** the declaration that arms `cleanup --prune` to tear down a worktree's per-worktree Compose project (pattern: [worktree-services.md](./worktree-services.md)). Safety by construction: **the kernel never invokes Docker unless this key declares services** — absent, `false`, or an unparseable convention file keep cleanup entirely report-only. The value names the project:
+  - `services: true` — the per-worktree Compose project is named exactly the worktree id `<repo>-<item-id>` (compose `name: "${ARGGON_WORKTREE_ID:-}"`); cleanup reaps `<repo>-<item-id>` (lowercased).
+  - `services: <base>` — the declared base project name of the adopter pattern (`name: "<base>${WORKTREE_SUFFIX:-}"` with `WORKTREE_SUFFIX="-<repo>-<item-id>"`); cleanup reaps `<base>-<repo>-<item-id>` (lowercased). Validated at parse time against Compose's documented project alphabet (`[A-Za-z0-9][A-Za-z0-9_-]*` — anything else is a convention parse error).
+  - Reaping runs `docker compose -p <project> down -v --remove-orphans` (volumes included, orphans swept) **before** `git worktree remove`, only for worktrees that otherwise qualify (done/cancelled + merged branch), with the project derived from the worktree directory's basename — never from a scan. A project that is already gone is a graceful no-op (the command exits 0 with a "No resource found to remove" warning); an absent `docker` CLI degrades the whole run to report-only (`compose.dockerUnavailable` in `--json`, a `note:` line in human output); a failed teardown is a per-item failure on both the `pruned[]` (`action: "failed"`) and `failures[]` surfaces and never blocks the worktree removal or aborts the run. An adopter-run project that the convention does not declare is never touched.
 
 - The hook runs **only when `arggon start --worktree` creates a new worktree** — the sanctioned spot for per-checkout bootstrap like `npm ci` (linked worktrees do not share `node_modules`). Attach re-runs (idempotent re-starts of the same item) never re-run it.
 - Execution: `sh -c <command>` with cwd = the worktree root, after the claim commit / push / PR steps have succeeded.
