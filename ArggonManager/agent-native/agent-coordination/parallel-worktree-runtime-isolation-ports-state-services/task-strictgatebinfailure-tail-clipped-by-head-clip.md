@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-strictgatebinfailure-tail-clipped-by-head-clip
 title: "`strictGateBinFailure` still appends its own \"Fix:\" line at the message tail, so worst-case head-clip eats the remedy"
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [opencode-seam]
 created: "2026-10-02"
 updated: "2026-10-02"
-claimed_at: "2026-10-02T22:27:43.772Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-strictgatebinfailure-tail-clipped-by-head-clip
 ---
 <!--
