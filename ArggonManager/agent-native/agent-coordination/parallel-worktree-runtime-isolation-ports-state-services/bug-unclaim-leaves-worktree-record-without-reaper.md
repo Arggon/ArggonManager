@@ -80,3 +80,7 @@ Both halves, split by what each surface owns: `update` REPORTS the dropped claim
 ### Not done here (for the coordinator)
 
 The item stays `in_progress` — merge, acceptance verification and the `done` flip are yours.
+
+### handoff 2026-10-02 @ses_f01cee59fffeSatwHpianDIykt (session: ses_f01cee59fffeSatwHpianDIykt) — next: Coordinator: review + merge PR #596 (claim-release contract), then flip the item done
+- branch: main
+- open questions: Release refuses a dirty worktree unless --take-over-worktree is armed — intended? MCP schema props kept bare to stay under the 16 KiB budget
