@@ -28,3 +28,8 @@ Found while reviewing PR #598: `ArggonManager/docs/adr/README.md` has no row for
 - [ ] A test asserts index/directory parity so a new ADR cannot ship unindexed
 
 ## Notes
+
+### 2026-10-02 @ses_f02ab5836ffeOAxmisboIwWE4x
+Scope corrected by the reviewer of PR #598 (2026-10-02): the index is not missing only ADR 0020. Verified against the directory — `ArggonManager/docs/adr/` holds 0001–0020 plus README.md, and README.md indexes 0001–0004 and 0010–0019 only.
+
+Missing rows: **0005, 0006, 0007, 0008, 0009, 0020** (six). The acceptance already says "sweep the whole dir, not just 0020" and requires an index/directory parity test, so this is a widening of scope, not a new problem — filing it as ADR-0020-only would have left five ADRs unindexed and the parity test would have failed anyway.
