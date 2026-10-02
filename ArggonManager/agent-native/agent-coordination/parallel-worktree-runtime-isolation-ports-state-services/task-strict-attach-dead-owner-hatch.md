@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-strict-attach-dead-owner-hatch
 title: "Strict worktree-write gate: recovery hatch when the stamped owner session is dead"
+assignee: Arggon
+branch: feat/task-strict-attach-dead-owner-hatch
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [worktree, opencode-seam]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-02"
+claimed_at: "2026-10-02T03:24:55.350Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-strict-attach-dead-owner-hatch
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-strict-attach-dead-owner-hatch.md
