@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-generated-seam-bytes-predate-050
 title: "The generated OpenCode seam bytes are one release behind: the vendored plugin copy predates 0.5.0, so the live native surface has none of the worktree-isolation features"
+assignee: Arggon
+branch: fix/bug-generated-seam-bytes-predate-050
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [opencode-seam, release]
 priority: p1
 created: "2026-10-02"
 updated: "2026-10-02"
+claimed_at: "2026-10-02T14:41:09.185Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-generated-seam-bytes-predate-050
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-generated-seam-bytes-predate-050.md
