@@ -144,10 +144,11 @@ Weighted, highest first.
 
 ## Decision
 
-Pending — this exploration feeds ADR 0020 (to be created): adopt **C1**
-(methodology-as-product inside this monorepo), with **C2 recorded as a future
-option** and **C3 rejected**.
-
-The decision decomposes into: formalizing the carriers (advisory methodology
-edit), the per-agent adapter spec (`spec-methodology-adapters-017`), and the
-plan that files adapter tasks per agent.
+Adopted as [ADR 0020 — Methodology-first productization with per-agent
+native adapters](../adr/0020-methodology-first-productization.md) (Status:
+Proposed 2026-10-02): C1 inside this monorepo, C2 recorded as a future
+option, C3 rejected. Decomposition: methodology carriers + README (T1),
+adapter selection flags (T2), capability matrix (T3), OpenCode adapter
+expansion (T4), ZCode adapter expansion (T5), Claude Code follow-on
+(T6) — tracked under `native-agent-adapters` via
+`plan-methodology-adapters-017`.
