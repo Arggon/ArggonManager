@@ -59,6 +59,23 @@ Each item is a Markdown file with **YAML frontmatter** (status and other fields)
 3. **Same rules for humans and agents**
 4. **Simple & self-hostable** — open, lightweight, no lock-in
 
+## The methodology
+
+ArggonManager's process — find → claim → work → review → merge → done, carried by the docs below, with specs, plans, ADRs, explorations and playbooks — is the product.
+
+- **Scope:** any project — not only software.
+- **Invariants:** humans and agents follow the same rules; state lives in git; discipline is enforceable; docs travel with code; never-steal / never-reopen.
+- **Version:** tracks the ArggonManager package version; changes reach adopters through the [adopter upgrade channel](ArggonManager/docs/adr/0016-adopter-upgrade-channel.md) ([ADR 0020](ArggonManager/docs/adr/0020-methodology-first-productization.md)).
+
+The carriers, one hop from here:
+
+- [Agent playbook](ArggonManager/docs/agents.md)
+- [Engineering conventions](ArggonManager/docs/engineering.md)
+- [Task convention](ArggonManager/docs/convention.md)
+- [arggon-cli skill](skills/arggon-cli/SKILL.md)
+
+Per-agent enforcement (OpenCode V2, ZCode, Claude Code) builds on the same kernel — one rules path, no forks — see the [native agent adapters epic](ArggonManager/methodology-productization/native-agent-adapters/native-agent-adapters.md) and [spec methodology-adapters-017](ArggonManager/docs/specs/spec-methodology-adapters-017.md).
+
 ## Why ArggonManager
 
 Upgrades are safe by construction. Every doc the tool generates is adopter-owned the moment it exists and is never overwritten: re-running `arggon init` silently refreshes the docs you haven't touched, skips the ones you've modified and reports them, and `--backup` archives a modified doc before regenerating it. Your customization survives every tool upgrade.
