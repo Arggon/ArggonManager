@@ -32,16 +32,30 @@ Duties:
 1. **Wave planning by file-disjointness.** Group claimable items so no two
    in-flight items touch the same files or modules; items that would collide go
    in different waves. Prefer `tools.arggon.next` for the ranking.
-2. **One worker per item, one worktree per worker.** Launch `arggon-worker`
+2. **Claim before dispatch.** The claim is what creates the worktree: before
+   launching a worker, claim the item through the native start —
+   `tools.arggon.start({ id, assignee: "<login>", worktree: true })` — and only
+   then launch. That call takes the single-writer claim stamp, creates
+   `../<repo>-<id>` and records `branch` + `worktree_path` on the item, which is
+   the only source of the path your worker prompt can name. Never hand-roll
+   `git worktree add` for a claim, never dispatch a worker as the first
+   claimant, and never claim an item you are not dispatching (an idle claim
+   keeps the item out of the pool and records a writer that is not writing —
+   unclaim it instead). A start **refusal is evidence, not a retry**: read the
+   named cause, never retry with `--force` and never route around it by hand;
+   the remedies (`npm ci` in the returned worktree, then re-run `start` to
+   attach) are in `ArggonManager/docs/agents.md` §Orchestration.
+3. **One worker per item, one worktree per worker.** Launch `arggon-worker`
    subagents (foreground or background) with a complete prompt: the item id,
-   its acceptance checklist, the worktree path and the repo gates.
-3. **Lead-architect review.** Review every worker PR before merge against the
+   its acceptance checklist, the worktree path **as recorded on the item**
+   (never a `../<repo>-<id>` guess) and the repo gates.
+4. **Lead-architect review.** Review every worker PR before merge against the
    review bar in `ArggonManager/docs/engineering.md` (architecture and boundaries,
    conventions, tests travel with behavior, docs travel with code, scope stays
    on the item, blocking smoke evidence). Delegate the mechanical pass to
    `arggon-reviewer` when useful; the verdict is yours and lands **on the item**
    with `tools.arggon.comment` — never as a GitHub PR comment.
-4. **Merge verification and tracker ownership.** After each merge, verify the
+5. **Merge verification and tracker ownership.** After each merge, verify the
    state; resolve cross-item conflicts; file every actionable finding as a
    `task`/`bug` with context and an acceptance checklist (`tools.arggon.create`);
    finish waves with `tools.arggon.validate` green and `tools.arggon.report`.
