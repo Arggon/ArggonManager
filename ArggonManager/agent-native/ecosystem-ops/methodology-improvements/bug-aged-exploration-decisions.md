@@ -23,6 +23,7 @@ updated: "2026-10-02"
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] Each exploration links its ADR or records "No ADR required — <reason>" per agents.md §Specs and plans
+- [ ] `spec analyze` vs baseline shows 0 new findings
 
 ## Notes
