@@ -27,3 +27,12 @@ updated: "2026-10-02"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-02 @Coordinator
+### 2026-10-01 @Coordinator
+Filed from the #568 review: under `x-tracker.strict-worktree-writes`, a crashed stamped session makes every new session 'foreign' by session id, and the refusal's own remedy ('have it re-attach') is impossible — the documented manual recovery is removing `<git-dir>/arggon-claim.json` by hand.
+
+## Acceptance
+- [ ] Document the manual recovery step in convention.md + agents.md (in the #568 docs touch or this item's PR).
+- [ ] Decide + implement a designed hatch: e.g. `start --take-over-worktree` (records a dated takeover receipt naming the replaced stamp), or a stale-stamp window (claimedAt older than N days auto-expires with a warning).
+- [ ] Tests: dead-owner scenario pins the hatch; live-owner refusals unchanged.
