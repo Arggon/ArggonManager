@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adr-0019-amendment-claim-stamp
 title: "Amend ADR 0019 with the claim-stamp/detection layer (claim concurrency decision, per engineering.md's ADR list)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [worktree, docs]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-02"
-claimed_at: "2026-10-02T03:24:49.901Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0019-amendment-claim-stamp
 ---
 <!--
