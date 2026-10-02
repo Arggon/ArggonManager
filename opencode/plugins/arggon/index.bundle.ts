@@ -9153,12 +9153,24 @@ function claimTakeoverTruncated(bounded, input) {
     if (input === undefined)
         return true;
     const takeOver = bounded.takeOver;
-    if (takeOver === undefined)
+    const source = input.takeOver;
+    if (takeOver === undefined || source === undefined)
         return false;
-    const replaced = input.takeOver?.replaced;
-    return (takeOver.total > takeOver.files.length ||
-        (replaced !== undefined &&
-            (replaced.takeovers?.length ?? 0) > (takeOver.replaced.takeovers?.length ?? 0)));
+    const replaced = source.replaced;
+    const clipped = takeOver.at !== source.at ||
+        takeOver.by !== source.by ||
+        takeOver.replacedIdentity !== source.replacedIdentity ||
+        takeOver.replacedClaimedAt !== source.replacedClaimedAt ||
+        takeOver.replaced.identity !== replaced.identity ||
+        takeOver.replaced.item !== replaced.item ||
+        takeOver.replaced.branch !== replaced.branch ||
+        takeOver.replaced.claimedAt !== replaced.claimedAt ||
+        takeOver.replaced.assignee !== replaced.assignee ||
+        takeOver.replaced.surface !== replaced.surface ||
+        takeOver.files.some((file, index) => file !== source.files[index]);
+    return (clipped ||
+        takeOver.total > takeOver.files.length ||
+        (replaced.takeovers?.length ?? 0) > (takeOver.replaced.takeovers?.length ?? 0));
 }
 function boundedEnvReceipt(input) {
     const bounded = { written: input.written };
@@ -9791,15 +9803,16 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
             ? kernel.strictWorktreeWriteFailure(foreignWrites)
             : null;
         if (strictWriteRefusal !== null) {
-            return failBeforeClaim(`${strictWriteRefusal} The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
-                "A plain re-run cannot clear this: the fired detection is unchanged while the previous " +
-                "stamp stands. If the stamped session is really dead, take the worktree over explicitly " +
-                "with " +
+            const recovery = "A plain re-run cannot clear this: the fired detection is unchanged while the previous " +
+                "stamp stands. The worktree was kept at " +
+                `${worktreePath} (nothing was rolled back). If the stamped session is really dead, take ` +
+                "the worktree over explicitly with " +
                 `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)}, takeOverWorktree: true }) — ` +
                 "it records a dated take-over naming the replaced owner (the same hatch as " +
                 "`arggon start --worktree --take-over-worktree`). Otherwise, with a live writer, do NOT " +
                 "take over; remove the stamp by hand after confirming no live writer: " +
-                `rm "$(git -C ${worktreePath} rev-parse --absolute-git-dir)/arggon-claim.json".`, "strict worktree-write gate refused");
+                `rm "$(git -C ${worktreePath} rev-parse --absolute-git-dir)/arggon-claim.json". `;
+            return failBeforeClaim(`${recovery}${strictWriteRefusal}`, "strict worktree-write gate refused");
         }
     }
     if (worktreePath !== undefined && progress.worktreeCreated) {
