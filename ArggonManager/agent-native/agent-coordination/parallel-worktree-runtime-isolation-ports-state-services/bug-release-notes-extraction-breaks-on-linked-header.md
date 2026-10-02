@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-release-notes-extraction-breaks-on-linked-header
 title: "release.yml's CHANGELOG notes extraction cannot match release-please's linked header, stranding the release after the tag"
+assignee: Arggon
+branch: fix/bug-release-notes-extraction-breaks-on-linked-header
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [release, ci]
 priority: p1
 created: "2026-10-02"
 updated: "2026-10-02"
+claimed_at: "2026-10-02T13:45:30.907Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-release-notes-extraction-breaks-on-linked-header
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-release-notes-extraction-breaks-on-linked-header.md
