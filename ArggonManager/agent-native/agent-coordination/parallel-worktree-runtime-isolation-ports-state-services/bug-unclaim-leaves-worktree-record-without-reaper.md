@@ -89,3 +89,50 @@ The item stays `in_progress` — merge, acceptance verification and the `done` f
 ### handoff 2026-10-02 @ses_f01cee59fffeSatwHpianDIykt (session: ses_f01cee59fffeSatwHpianDIykt) — next: Coordinator: review + merge PR #596 (claim-release contract), then flip the item done
 - branch: fix/bug-unclaim-leaves-worktree-record-without-reaper
 - open questions: Release refuses a dirty worktree unless --take-over-worktree is armed — intended? MCP schema props kept bare to stay under the 16 KiB budget
+
+## Review round 2 addressed — PR #596
+
+Branch `fix/bug-unclaim-leaves-worktree-record-without-reaper` pushed to `cee40628` (item left `in_progress`).
+
+### Blocking
+
+**M1 — `claimFootprint` over-triggered past `done`.** The receipt gate is now unclaim-only (`lib/src/update.ts`: `wasClaimed && !willBeClaimed && newStatus === "todo" && worktreePath != null`), and its JSDoc + `json-output.md` say why: a terminal flip leaves the same footprint but `cleanup --prune` is the merge-gated remedy there, and a blocked item keeps its assignee (context, not a lease) so it is not an abandoned claim. Test `M1: only the unclaim names the release — → done and → blocked report no receipt` (`cli/src/worktree.test.ts`) asserts: no receipt on `→ done`, no `claim dropped` line for `→ blocked`, the assignee riding along on blocked, the worktree untouched, and — the sharp edge the finding described — an UNMERGED branch still protected (prune reports `removable: false`, `refs/heads/feat/task-alpha` intact).
+
+**M2 — a failed removal stripped the single-writer evidence.** Two changes, both surfaces:
+- `classifyReleaseEntry` now refuses **removal-blocking content during classification** (`worktreeDirtyRefusal`, new `parseRemovalBlockingPaths`, entry fields `blockingPaths`/`blockingTotal`), before anything is reaped. One `git status --porcelain` is shared by the F12 detection and the new gate (no second probe).
+- The claim stamp is reaped only **after an observed removal**; the pre-removal read records whether a stamp existed, so the action reports which of the two ways it died: `reaped arggon-claim.json stamp` (a domain removal that leaves `.git/worktrees/<name>`) or `arggon-claim.json stamp gone with the worktree` (a real `git worktree remove` takes the git dir with it).
+- Test `M2: a dirty worktree is refused with its stamp + env intact, and only the hatch forces it` (CLI) and its native twin: expected `releasable: false`, `reason` naming the uncommitted content, `blockingTotal > 0`, `blockingPaths` naming the item file, the stamp present, `.arggon.env` present, the record intact, `calls.remove === []` — observed exactly that; then with the hatch: forced removal, `action` containing `forced past its uncommitted content`, nothing left.
+
+**M3 — the native release committed twice.** `nativeRelease` now RETURNS its `commit` and no longer pushes to `clearedPaths`; the run-level commit is prune-only (`commit = release?.commit ?? runCommit`), so both surfaces own exactly one `chore(tasks): released <id>`. Tests: `M3: the native release reports its own commit` asserts `commit.message`, a string `hash`, `skipped` undefined, the commit really landed (`git log -1`) and the tree clean; plus a **cross-surface parity test** (`M3: the release envelope is identical to cleanup --release <id> --json`) that builds twin fixtures, runs the native tool on one and the spawned CLI on the other, and compares the whole envelopes with only the commit hash normalized.
+
+### Non-blocking (coordinator ruling)
+
+- **m4 — docs in full.** `README.md`: the cleanup flags list `--release <id>`/`--take-over-worktree`, the envelope names `release`/`released`, plus a full release-arm paragraph. `claim.md` §Unclaim recovery rewritten (what survives an unclaim, the receipt, its unclaim-only scope) + the playbook bullet. The coordinator prompts say "unclaim **and release**" in BOTH template sources (`templates/docs/opencode/agents/`, `templates/docs/zcode/arggon/agents/`) AND their generated copies (`.opencode/agents/`, `.zcode-marketplace/arggon/agents/` — verified byte-identical to the templates modulo the generated header, because `arggon init` classifies them adopter-modified and would not rewrite them), plus the skill's `references/orchestration.md` (same remedy, same drift).
+- **m5 —** `--take-over-worktree`/`take_over_worktree` without a release is a typed refusal on both surfaces (`--take-over-worktree requires --release <id>` / `take_over_worktree requires release`), mirroring `start`; tests both, CLI exit code included.
+- **m6 —** the still-claimed refusal is **unconditional** (`classifyReleaseEntry` no longer consults the hatch for it) and its reason says so ("This refusal is not overridable: --take-over-worktree is for a presumed-dead stamped owner on an UNCLAIMED item"). Tests on both surfaces, plus the owner-unclaims-then-releases path. Docs (agents.md, convention.md, json-output.md, opencode2.md, README, claim.md) updated to match.
+- **m7 —** `claimFootprint.branch` dropped (type, gate, docs); the release still probes the real branch via `worktreeBranch`.
+- **m8 —** the human warning now reads "only the release reaps it with its claim stamp and .arggon.env".
+- **m9 —** release refusal reasons clamped through `boundedEnvelopeText(..., MAX_ENVELOPE_DETAIL_CHARS)` (CLI) / `boundedNativeText(..., MAX_NATIVE_DETAIL_CHARS)` (native), on both the `failures` entry and the action `error`.
+
+### Gates (cwd = the item worktree, on the final pushed tree)
+
+| Gate | Command | Observed |
+| --- | --- | --- |
+| build | `npm run build` | ok — `build:plugin — 41 modules inlined, 457609 bytes` |
+| test | `npm test` | `Test Files 118 passed (118) / Tests 2187 passed (2187)` |
+| lint | `npm run lint` | clean |
+| validate | `npm run arggon -- validate` | `ok (0 warning(s), convention v5)` |
+| plugin drift | `npm run check:plugin` | exit 0 (bundle byte-identical to index.ts) |
+
+Targeted: `cli/src/worktree.test.ts -t "claim release"` → 11 passed; `opencode/plugins/arggon/tools.test.ts -t "native release"` → 8 passed; `cli/src/mcp-parity.test.ts` → 17 passed (both new flags keep live MCP counterparts).
+
+### Two things the coordinator should know
+
+1. **History, not content.** `origin/main` advanced under this branch, so I rebased; the remote head was the pre-rebase tip and a fast-forward push is refused (**force-push is denied by policy** and I did not route around it), so the branch carries one `Merge the pre-rebase PR tip` commit whose conflicted paths all take this branch's copy — no content change. GitHub pins PR #596's base at `51d1472a`, so its file list also shows files that landed on main after the PR was opened (e.g. `bug-context-report-baseline-date-mismatch.md`, byte-identical to main). Squash-merging collapses this.
+2. **The rebase surfaced a second acceptance block.** The coordinator had committed my round-1 comment from the primary checkout, so `main` carried the comment history while my branch carried the ticked boxes. I merged both — history intact, ONE `## Acceptance` block, no duplicated evidence — and re-ticked it honestly for round 2: the boxes describe exactly what this round delivers, including the M1/M2/M3 regression tests and m4's full doc set.
+
+Open for the coordinator: merge after re-review; the `done` flip is yours.
+
+### handoff 2026-10-02 @ses_f01cee59fffeSatwHpianDIykt (session: ses_f01cee59fffeSatwHpianDIykt) — next: Coordinator: re-review PR #596 (M1-M3 + m4-m9 addressed), squash-merge, then flip done
+- branch: fix/bug-unclaim-leaves-worktree-record-without-reaper
+- open questions: PR base pinned at 51d1472a + one merge commit (force-push denied); squash-merge collapses both. Blocked items are not claims, so their worktrees are not still-claimed-refused — confirm that reading.
