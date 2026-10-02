@@ -3,7 +3,7 @@ type: task
 status: todo
 id: task-strictgatebinfailure-tail-clipped-by-head-clip
 title: "`strictGateBinFailure` still appends its own \"Fix:\" line at the message tail, so worst-case head-clip eats the remedy"
-parent: story-methodology-carriers
+parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [opencode-seam]
 created: "2026-10-02"
 updated: "2026-10-02"
