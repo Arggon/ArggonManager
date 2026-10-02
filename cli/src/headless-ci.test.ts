@@ -190,10 +190,30 @@ describePacked("headless bootstrap + CI (packed install)", () => {
     const packsDir = join(runnerTemp, "packs");
     mkdirSync(packsDir, { recursive: true });
     for (const cwd of [join(root, "lib"), root]) {
-      const packed = spawnSync("npm", ["pack", "--pack-destination", packsDir], {
-        cwd,
-        encoding: "utf8",
-      });
+      // bug-cli-spawn-suites-exit-1-flake: `--ignore-scripts` is load-bearing,
+      // not a speed-up. `npm pack` in the repo ROOT runs the `prepare`
+      // lifecycle (`npm run build`), and this loop runs with vitest's other
+      // forks live: four `tsc` passes then rewrite every file of `lib/dist` and
+      // `dist` IN PLACE (tsc does not skip byte-identical output, so each file
+      // is `open(O_TRUNC)` + write), for ~1s of wall clock. Every other lane's
+      // spawned child ESM-loads those exact files — the CLI's own sources are
+      // transpiled in memory, but `@arggondev/lib` resolves to `lib/dist` — so
+      // a child linking the graph inside that window reads a half-written
+      // module and dies in Node's loader before the CLI ever runs. That was
+      // three CI flakes that all printed a bare `expected 1 to be +0` (PR #571
+      // run 36960202458 `handoff --session`, PR #576 `adopt --ack`, PR #573 run
+      // 36966932103 `arggon init`); a measured full-suite run rewrites 141
+      // artifact files across two such windows. The bytes under test must be
+      // the ones `npm run build` already produced (the assertions above are
+      // the build-before-test precondition), so skipping the rebuild is exactly
+      // what this gate means: pack the built tree, never rebuild it under the
+      // suite. `pack-contents.test.ts` does build on purpose — but in a fresh
+      // clone copy that owns its own `lib/`: same repo, opposite discipline.
+      const packed = spawnSync(
+        "npm",
+        ["pack", "--ignore-scripts", "--pack-destination", packsDir],
+        { cwd, encoding: "utf8" },
+      );
       expect(packed.status, `${packed.stdout}\n${packed.stderr}`).toBe(0);
     }
     const rootTarball = join(packsDir, `arggon-manager-${pkg.version}.tgz`);
