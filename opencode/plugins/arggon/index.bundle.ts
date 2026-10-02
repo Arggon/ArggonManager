@@ -7037,16 +7037,15 @@ function strictWorktreeWriteFailure(report) {
     const named = report.files.join(", ");
     return (`x-tracker.strict-worktree-writes is set: refusing the claim — the worktree is stamped by ` +
         `session ${report.owner} (claimed ${report.claimedAt}) and ${report.total} tracked ` +
-        `file${report.total === 1 ? " was" : "s were"} modified after that claim: ` +
-        `${named}${extra > 0 ? ` (and ${extra} more)` : ""}. ` +
+        `file${report.total === 1 ? " was" : "s were"} modified after that claim. ` +
         "Another session may be writing here; coordinate with the stamped session (or have it " +
         "re-attach to refresh the stamp), then re-run start --worktree to attach. This refusal " +
         "never re-stamps the worktree, so a retry re-detects the same evidence. If the stamped " +
-        "session is gone (crashed), two recovery paths exist, both requiring that confirmation " +
-        "first: re-run with the take-over flag (start --worktree --take-over-worktree), which " +
-        "re-stamps the worktree and records a dated take-over naming the replaced stamp, or remove " +
-        "the stamp by hand " +
-        '(rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json").');
+        "session is gone (crashed): confirm no live writer, then re-run with the take-over flag " +
+        "(start --worktree --take-over-worktree) — it re-stamps the worktree and records a dated " +
+        "take-over naming the replaced stamp — or remove the stamp by hand " +
+        '(rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json"). ' +
+        `Files modified after that claim: ${named}${extra > 0 ? ` (and ${extra} more)` : ""}.`);
 }
 function worktreeTakeoverWarning(takeover) {
     const extra = takeover.total - takeover.files.length;
