@@ -210,3 +210,10 @@ My round-1 sentence — "refreshing it would delete the evidence that these two 
 ### Tracker-write hazard re-check
 
 Every write went through `npm run arggon -- …` with this worktree as cwd; the native `tools.arggon.*` surface stays read-only because it resolves the tracker root from the session cwd (the primary checkout). Branch commits: `6d231f50` (merge main), `d3640d5d` (the three corrections) — plus round 1's `fc9a14e9`/`21b52684`/`e1f883da`. `git status` in this worktree is clean. The primary checkout has been advancing throughout from other sessions (e.g. `ee0789cfe`-era tracker commits); none of them are mine, and none of my commits are reachable from `main`.
+
+### 2026-10-02 @Arggon
+Three corrections to my previous comment — the substance of all four findings is unchanged; these are the checkable values, and a PR about truthful records does not get to ship a mistyped hash.
+
+1. I wrote "ee0789cfe" for the main tip. The commit I actually merged is **`e0789cfe`** (now further advanced; the tip at the time of this note is `09bee07b`). Neither is mine.
+2. `findingKey` is at **`cli/src/spec.ts:977-979`** (the key is the `return` on line 978, which includes `f.message` where the age lives) — my "976-979" was off by one at the start, carried over from the reviewer's citation instead of re-read. The conclusion it supports is unaffected: the age is inside the key, so the 012 baseline entry rotates with day drift.
+3. "byte-identical signature" overstates what I checked: I grepped the rerun log for `SpawnHarnessError`, `child-boot-failed` and `kernel artifact drift`, and all three appear with the same wording as in attempt 1. Same three-line signature, not a byte comparison of the whole log.
