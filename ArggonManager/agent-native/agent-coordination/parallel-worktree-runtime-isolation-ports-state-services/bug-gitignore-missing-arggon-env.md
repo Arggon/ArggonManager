@@ -77,3 +77,7 @@ $ git check-ignore -v .arggon.env
 ```
 
 Decision (acceptance #3): `init`/`adopt` must never silently rewrite an adopter's `.gitignore`; a documented hand-step alone already proved insufficient for this repo, so the new item task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters files a report-only `init`/`adopt`/`doctor` hint (stdout + --json note) when `.arggon.env` is missing from the tracked `.gitignore`, never a write.
+
+### handoff 2026-10-02 @ses_f01ff0880ffeUkY0YiMsq3V3QC (session: ses_f01ff0880ffeUkY0YiMsq3V3QC) — next: Coordinator review: merge PR #593 after verifying the env.gitignored receipt evidence on the item; follow-up task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters tracks the init/adopt rep…
+- branch: fix/bug-gitignore-missing-arggon-env
+- open questions: Native start claim commit did not land the in_progress stamp on origin/main (bug-native-tools-commit-to-primary-checkout related); scratch verification item was cancelled and its worktree/branch remo…
