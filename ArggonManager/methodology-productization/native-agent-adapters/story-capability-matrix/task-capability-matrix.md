@@ -7,6 +7,7 @@ parent: story-capability-matrix
 labels: []
 created: "2026-10-02"
 updated: "2026-10-02"
+depends_on: [task-methodology-carriers]
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-capability-matrix/task-capability-matrix.md
