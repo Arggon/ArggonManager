@@ -31,7 +31,7 @@ env:
   # red test, not a silent outage: cli/src/ci-seam-pin.test.ts fails until
   # the runbook's post-release re-pin lands. The adopter TEMPLATE keeps its
   # literal pin by design — adopters pin deliberately.
-  ARGGON_VERSION: "0.4.1"
+  ARGGON_VERSION: "0.5.0"
 
 jobs:
   tasks-validate:
