@@ -713,7 +713,12 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
     const branchPatterns = { ...exports.DEFAULT_BRANCH_PATTERNS };
     const views = {};
     const playbooks = { maxAgeDays: null };
-    const tracker = { autoCommit: null, allowSteal: null, strictGateBins: null };
+    const tracker = {
+        autoCommit: null,
+        allowSteal: null,
+        strictGateBins: null,
+        strictWorktreeWrites: null,
+    };
     const generated = {};
     let generatedProjectName = null;
     const importLabelTypes = {};
@@ -850,6 +855,13 @@ function parseConventionConfig(raw, sourcePath = `${paths_js_1.TRACKER_DIR_NAME}
                 tracker.strictGateBins = value === "true";
                 continue;
             }
+            if (key === "strict-worktree-writes") {
+                if (value !== "true" && value !== "false") {
+                    throw new Error(`${sourcePath}: 'strict-worktree-writes' must be a boolean (got ${JSON.stringify(value)})`);
+                }
+                tracker.strictWorktreeWrites = value === "true";
+                continue;
+            }
             if (key !== "auto-commit")
                 continue;
             if (value !== "true" && value !== "false") {
@@ -970,7 +982,12 @@ function readConventionConfig(dir) {
             branchPatterns: { ...exports.DEFAULT_BRANCH_PATTERNS },
             views: {},
             playbooks: { maxAgeDays: null },
-            tracker: { autoCommit: null, allowSteal: null, strictGateBins: null },
+            tracker: {
+                autoCommit: null,
+                allowSteal: null,
+                strictGateBins: null,
+                strictWorktreeWrites: null,
+            },
             import: { labelTypes: null },
             worktree: { postStart: null, postStartShell: null, env: null },
             github: { issueRoundtrip: false },
@@ -2236,9 +2253,9 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
 exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.worktreeStateBase = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkNodeModulesLink = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = void 0;
-exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = void 0;
+exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = void 0;
+exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.worktreeStateBase = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkNodeModulesLink = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2402,6 +2419,7 @@ Object.defineProperty(exports, "defaultCleanupGit", { enumerable: true, get: fun
 Object.defineProperty(exports, "findMergedPr", { enumerable: true, get: function () { return cleanup_js_1.findMergedPr; } });
 var worktree_js_1 = require("./worktree.js");
 Object.defineProperty(exports, "buildLocalWorkspaces", { enumerable: true, get: function () { return worktree_js_1.buildLocalWorkspaces; } });
+Object.defineProperty(exports, "detectWorktreeForeignWrites", { enumerable: true, get: function () { return worktree_js_1.detectWorktreeForeignWrites; } });
 Object.defineProperty(exports, "freshWorktreeInstallRefusal", { enumerable: true, get: function () { return worktree_js_1.freshWorktreeInstallRefusal; } });
 Object.defineProperty(exports, "inspectDeclaredDependencies", { enumerable: true, get: function () { return worktree_js_1.inspectDeclaredDependencies; } });
 Object.defineProperty(exports, "inspectGateBinResolution", { enumerable: true, get: function () { return worktree_js_1.inspectGateBinResolution; } });
@@ -2412,14 +2430,18 @@ Object.defineProperty(exports, "localWorkspacePackages", { enumerable: true, get
 Object.defineProperty(exports, "packageBuildScript", { enumerable: true, get: function () { return worktree_js_1.packageBuildScript; } });
 Object.defineProperty(exports, "packageEntryExists", { enumerable: true, get: function () { return worktree_js_1.packageEntryExists; } });
 Object.defineProperty(exports, "packageEntryPaths", { enumerable: true, get: function () { return worktree_js_1.packageEntryPaths; } });
+Object.defineProperty(exports, "parseTrackedModifications", { enumerable: true, get: function () { return worktree_js_1.parseTrackedModifications; } });
 Object.defineProperty(exports, "pointWorkspaceAtLocal", { enumerable: true, get: function () { return worktree_js_1.pointWorkspaceAtLocal; } });
 Object.defineProperty(exports, "prepareWorktreeDependencies", { enumerable: true, get: function () { return worktree_js_1.prepareWorktreeDependencies; } });
 Object.defineProperty(exports, "prepareWorktreeEnv", { enumerable: true, get: function () { return worktree_js_1.prepareWorktreeEnv; } });
+Object.defineProperty(exports, "readWorktreeClaimStamp", { enumerable: true, get: function () { return worktree_js_1.readWorktreeClaimStamp; } });
 Object.defineProperty(exports, "strictGateBinFailure", { enumerable: true, get: function () { return worktree_js_1.strictGateBinFailure; } });
 Object.defineProperty(exports, "strictGateBinViolations", { enumerable: true, get: function () { return worktree_js_1.strictGateBinViolations; } });
+Object.defineProperty(exports, "strictWorktreeWriteFailure", { enumerable: true, get: function () { return worktree_js_1.strictWorktreeWriteFailure; } });
 Object.defineProperty(exports, "unlinkNodeModulesLink", { enumerable: true, get: function () { return worktree_js_1.unlinkNodeModulesLink; } });
 Object.defineProperty(exports, "unlinkWorktreeEnv", { enumerable: true, get: function () { return worktree_js_1.unlinkWorktreeEnv; } });
 Object.defineProperty(exports, "worktreeCacheBase", { enumerable: true, get: function () { return worktree_js_1.worktreeCacheBase; } });
+Object.defineProperty(exports, "worktreeForeignWriteWarning", { enumerable: true, get: function () { return worktree_js_1.worktreeForeignWriteWarning; } });
 Object.defineProperty(exports, "worktreeStateBase", { enumerable: true, get: function () { return worktree_js_1.worktreeStateBase; } });
 Object.defineProperty(exports, "MAX_MISSING_DEPENDENCIES", { enumerable: true, get: function () { return worktree_js_1.MAX_MISSING_DEPENDENCIES; } });
 Object.defineProperty(exports, "MAX_GATE_BINS", { enumerable: true, get: function () { return worktree_js_1.MAX_GATE_BINS; } });
@@ -6070,7 +6092,7 @@ function applyViewFilter(items, expr, opts = {}) {
 __arggonModules.set("lib/src/worktree.ts", (exports, require, module) => {
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MAX_PREP_STEPS = exports.WORKTREE_ENV_KEYS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = void 0;
+exports.MAX_CLAIM_WRITE_NAMES = exports.MAX_PREP_STEPS = exports.WORKTREE_ENV_KEYS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = void 0;
 exports.packageEntryPaths = packageEntryPaths;
 exports.packageEntryExists = packageEntryExists;
 exports.packageBuildScript = packageBuildScript;
@@ -6089,6 +6111,11 @@ exports.worktreeStateBase = worktreeStateBase;
 exports.worktreeCacheBase = worktreeCacheBase;
 exports.prepareWorktreeEnv = prepareWorktreeEnv;
 exports.unlinkWorktreeEnv = unlinkWorktreeEnv;
+exports.readWorktreeClaimStamp = readWorktreeClaimStamp;
+exports.parseTrackedModifications = parseTrackedModifications;
+exports.detectWorktreeForeignWrites = detectWorktreeForeignWrites;
+exports.worktreeForeignWriteWarning = worktreeForeignWriteWarning;
+exports.strictWorktreeWriteFailure = strictWorktreeWriteFailure;
 exports.prepareWorktreeDependencies = prepareWorktreeDependencies;
 exports.linkedWorkspacePackages = linkedWorkspacePackages;
 const node_child_process_1 = require("node:child_process");
@@ -6814,7 +6841,185 @@ function unlinkWorktreeEnv(worktreePath) {
         return false;
     }
 }
+const CLAIM_STAMP_FILE = "arggon-claim.json";
+exports.MAX_CLAIM_WRITE_NAMES = 10;
+function defaultAbsoluteGitDir(cwd) {
+    const result = (0, node_child_process_1.spawnSync)("git", ["rev-parse", "--absolute-git-dir"], {
+        cwd,
+        encoding: "utf8",
+        timeout: 10_000,
+    });
+    const out = String(result.stdout ?? "").trim();
+    if (result.error !== undefined || result.status !== 0 || out.length === 0)
+        return undefined;
+    return out;
+}
+function defaultWorktreeStatus(cwd) {
+    const result = (0, node_child_process_1.spawnSync)("git", ["status", "--porcelain"], {
+        cwd,
+        encoding: "utf8",
+        timeout: 10_000,
+    });
+    if (result.error !== undefined || result.status !== 0)
+        return undefined;
+    return String(result.stdout ?? "");
+}
+function claimStampPath(worktreePath, deps) {
+    const gitDir = (deps.gitDir ?? defaultAbsoluteGitDir)(worktreePath);
+    if (gitDir === undefined || gitDir.length === 0)
+        return undefined;
+    return (0, node_path_1.join)(gitDir, CLAIM_STAMP_FILE);
+}
+function readWorktreeClaimStamp(worktreePath, deps = {}) {
+    const path = claimStampPath(worktreePath, deps);
+    if (path === undefined)
+        return null;
+    try {
+        const parsed = JSON.parse((0, node_fs_1.readFileSync)(path, "utf8"));
+        if (parsed === null || typeof parsed !== "object")
+            return null;
+        const record = parsed;
+        const identity = typeof record.identity === "string" ? record.identity : undefined;
+        const item = typeof record.item === "string" ? record.item : undefined;
+        const branch = typeof record.branch === "string" ? record.branch : undefined;
+        const claimedAt = typeof record.claimedAt === "string" ? record.claimedAt : undefined;
+        if (identity === undefined ||
+            item === undefined ||
+            branch === undefined ||
+            claimedAt === undefined) {
+            return null;
+        }
+        return {
+            identity,
+            item,
+            branch,
+            claimedAt,
+            ...(typeof record.assignee === "string" && record.assignee.length > 0
+                ? { assignee: record.assignee }
+                : {}),
+            ...(typeof record.surface === "string" && record.surface.length > 0
+                ? { surface: record.surface }
+                : {}),
+        };
+    }
+    catch {
+        return null;
+    }
+}
+function writeWorktreeClaimStamp(worktreePath, stamp, deps) {
+    const path = claimStampPath(worktreePath, deps);
+    if (path === undefined)
+        return false;
+    const tmp = `${path}.tmp-${process.pid}-${Date.now()}`;
+    try {
+        (0, node_fs_1.writeFileSync)(tmp, `${JSON.stringify(stamp, null, 2)}\n`, "utf8");
+        (0, node_fs_1.renameSync)(tmp, path);
+        return true;
+    }
+    catch {
+        try {
+            (0, node_fs_1.rmSync)(tmp, { force: true });
+        }
+        catch {
+        }
+        return false;
+    }
+}
+function parseTrackedModifications(porcelain) {
+    const paths = [];
+    for (const line of porcelain.split("\n")) {
+        if (line.trim().length === 0)
+            continue;
+        const code = line.slice(0, 2);
+        if (code === "??" || code === "!!")
+            continue;
+        let path = line.slice(3).trim();
+        const arrow = path.indexOf(" -> ");
+        if (arrow !== -1)
+            path = path.slice(arrow + 4);
+        path = path.replace(/^"|"$/g, "");
+        if (path.length > 0)
+            paths.push(path);
+    }
+    return paths;
+}
+function detectWorktreeForeignWrites(worktreePath, stamp, deps = {}) {
+    const claimedMs = Date.parse(stamp.claimedAt);
+    if (!Number.isFinite(claimedMs))
+        return null;
+    const porcelain = (deps.status ?? defaultWorktreeStatus)(worktreePath);
+    if (porcelain === undefined)
+        return null;
+    const files = [];
+    let total = 0;
+    for (const rel of parseTrackedModifications(porcelain)) {
+        let mtimeMs;
+        try {
+            mtimeMs = (0, node_fs_1.statSync)((0, node_path_1.resolve)(worktreePath, rel)).mtimeMs;
+        }
+        catch {
+            continue;
+        }
+        if (mtimeMs > claimedMs) {
+            total++;
+            if (files.length < exports.MAX_CLAIM_WRITE_NAMES)
+                files.push(rel);
+        }
+    }
+    if (total === 0)
+        return null;
+    return { owner: stamp.identity, claimedAt: stamp.claimedAt, files, total };
+}
+function worktreeForeignWriteWarning(report) {
+    const extra = report.total - report.files.length;
+    const named = report.files.join(", ");
+    return (`the worktree is stamped by session ${report.owner} (claimed ${report.claimedAt}) and ` +
+        `${report.total} tracked file${report.total === 1 ? " was" : "s were"} modified after that ` +
+        `claim: ${named}${extra > 0 ? ` (and ${extra} more)` : ""} — that session's uncommitted ` +
+        "work or a concurrent writer; check before writing here");
+}
+function strictWorktreeWriteFailure(report) {
+    if (report.total === 0)
+        return null;
+    const extra = report.total - report.files.length;
+    const named = report.files.join(", ");
+    return (`x-tracker.strict-worktree-writes is set: refusing the claim — the worktree is stamped by ` +
+        `session ${report.owner} (claimed ${report.claimedAt}) and ${report.total} tracked ` +
+        `file${report.total === 1 ? " was" : "s were"} modified after that claim: ` +
+        `${named}${extra > 0 ? ` (and ${extra} more)` : ""}. ` +
+        "Another session may be writing here; coordinate with the stamped session (or have it " +
+        "re-attach to refresh the stamp), then re-run start --worktree to attach.");
+}
+function prepareWorktreeClaim(worktreePath, request) {
+    const previous = readWorktreeClaimStamp(worktreePath, request);
+    let foreignWrites;
+    if (previous !== null && previous.identity !== request.identity) {
+        foreignWrites = detectWorktreeForeignWrites(worktreePath, previous, request) ?? undefined;
+    }
+    const claimedDate = request.now === undefined
+        ? new Date()
+        : request.now instanceof Date
+            ? request.now
+            : new Date(request.now);
+    const claimedAt = (Number.isNaN(claimedDate.getTime()) ? new Date() : claimedDate).toISOString();
+    const stamped = writeWorktreeClaimStamp(worktreePath, {
+        identity: request.identity,
+        item: request.itemId,
+        branch: request.branch,
+        claimedAt,
+        ...(request.assignee !== undefined && request.assignee.length > 0
+            ? { assignee: request.assignee }
+            : {}),
+        ...(request.surface !== undefined ? { surface: request.surface } : {}),
+    }, request);
+    return {
+        stamped,
+        ...(foreignWrites !== undefined ? { foreignWrites } : {}),
+        ...(stamped ? {} : { warning: "could not write the claim stamp" }),
+    };
+}
 function prepareWorktreeDependencies(primaryRoot, worktreePath, deps = {}) {
+    const claimReceipt = deps.claim === undefined ? undefined : prepareWorktreeClaim(worktreePath, deps.claim);
     const envReceipt = deps.env === undefined ? undefined : prepareWorktreeEnv(primaryRoot, worktreePath, deps.env);
     const worktreeModules = (0, node_path_1.join)(worktreePath, "node_modules");
     const steps = [];
@@ -6864,6 +7069,7 @@ function prepareWorktreeDependencies(primaryRoot, worktreePath, deps = {}) {
         steps,
         ...(stepsTruncated ? { stepsTruncated: true } : {}),
         ...(envReceipt !== undefined ? { env: envReceipt } : {}),
+        ...(claimReceipt !== undefined ? { claim: claimReceipt } : {}),
     };
 }
 function linkedWorkspacePackages(primaryRoot, worktreePath) {
@@ -8750,11 +8956,14 @@ function boundedPreparation(input) {
         return bounded;
     });
     const env = input.env === undefined ? undefined : boundedEnvReceipt(input.env);
+    const claim = input.claim === undefined ? undefined : boundedClaimReceipt(input.claim);
     const truncated = input.builtWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
         input.linkedWorkspaces.length > MAX_NATIVE_PREPARATION_NAMES ||
         (input.steps?.length ?? 0) > steps.length ||
         input.missingDependenciesTotal > input.missingDependencies.length ||
         (input.gateBins?.length ?? 0) > gateBins.length ||
+        (claim?.foreignWrites !== undefined &&
+            claim.foreignWrites.total > claim.foreignWrites.files.length) ||
         built.some((name, index) => name !== input.builtWorkspaces[index]) ||
         linked.some((name, index) => name !== input.linkedWorkspaces[index]) ||
         missing.some((name, index) => name !== input.missingDependencies[index]) ||
@@ -8774,8 +8983,26 @@ function boundedPreparation(input) {
         gateBins,
         ...(steps.length > 0 ? { steps } : {}),
         ...(env !== undefined ? { env } : {}),
+        ...(claim !== undefined ? { claim } : {}),
         ...(truncated ? { truncated: true } : {}),
     };
+}
+function boundedClaimReceipt(input) {
+    const bounded = { stamped: input.stamped };
+    if (input.foreignWrites !== undefined) {
+        bounded.foreignWrites = {
+            owner: boundedNativeText(input.foreignWrites.owner, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+            claimedAt: boundedNativeText(input.foreignWrites.claimedAt, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+            files: input.foreignWrites.files
+                .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+                .map((file) => boundedNativeText(file, MAX_NATIVE_PREPARATION_VALUE_CHARS)),
+            total: input.foreignWrites.total,
+        };
+    }
+    if (input.warning !== undefined) {
+        bounded.warning = boundedNativeText(input.warning, MAX_NATIVE_PREPARATION_VALUE_CHARS);
+    }
+    return bounded;
 }
 function boundedEnvReceipt(input) {
     const bounded = { written: input.written };
@@ -9226,7 +9453,7 @@ function plainRollbackDescription(rollback, branch) {
     }
     return `rollback incomplete: ${rollback.error ?? `the branch remains: ${branch}`}`;
 }
-async function nativeStart(kernel, input, options) {
+async function nativeStart(kernel, input, options, tool) {
     const id = asString(input.id);
     if (id === undefined) {
         return startNotAttempted(kernel, "id is required", undefined, {}, "invalid id");
@@ -9258,15 +9485,16 @@ async function nativeStart(kernel, input, options) {
             worktreeCreated: false,
             branchCreated: false,
         };
-        return await nativeStartBody(kernel, input, options, progress, item, root, assignee);
+        return await nativeStartBody(kernel, input, options, progress, item, root, assignee, tool);
     }
     catch (error) {
         return safeUnexpectedStartFailure(kernel, error, progress, { id, version });
     }
 }
-async function nativeStartBody(kernel, input, options, progress, item, root, assignee) {
+async function nativeStartBody(kernel, input, options, progress, item, root, assignee, tool) {
     const { id, branch, version } = progress;
     const primaryRoot = canonicalRoot(options, root);
+    const claimIdentity = sessionToken(tool?.sessionID) ?? assignee;
     const wantWorktree = input.worktree !== false;
     let worktreePath = wantWorktree ? asString(item.worktree_path) : undefined;
     if (worktreePath !== undefined && !(0, node_fs_1.existsSync)(worktreePath))
@@ -9355,6 +9583,13 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
                     identity: { itemId: id, branch },
                     enabled: kernel.readConventionConfig(root).worktree.env !== false,
                 },
+                claim: {
+                    identity: claimIdentity,
+                    assignee,
+                    itemId: id,
+                    branch,
+                    surface: "native",
+                },
             }));
         }
         catch (error) {
@@ -9385,6 +9620,19 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
                 "Then re-run " +
                 `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
                 "it attaches to the existing worktree and retries the claim commit.", "strict gate-bin gate refused");
+        }
+    }
+    if (worktreePath !== undefined) {
+        const foreignWrites = progress.preparation?.claim?.foreignWrites;
+        const strictWriteRefusal = kernel.readConventionConfig(root).tracker.strictWorktreeWrites === true &&
+            foreignWrites !== undefined
+            ? kernel.strictWorktreeWriteFailure(foreignWrites)
+            : null;
+        if (strictWriteRefusal !== null) {
+            return failBeforeClaim(`${strictWriteRefusal} The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
+                "Then re-run " +
+                `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
+                "it attaches to the existing worktree and retries the claim commit.", "strict worktree-write gate refused");
         }
     }
     if (worktreePath !== undefined && progress.worktreeCreated) {
@@ -9683,7 +9931,7 @@ const WORKTREE_TOOL_SPECS = [
             additionalProperties: false,
         },
         output: OBJECT,
-        run: (kernel, input, options) => guarded(kernel, "start", "START_FAILED", () => nativeStart(kernel, input, options)),
+        run: (kernel, input, options, tool) => guarded(kernel, "start", "START_FAILED", () => nativeStart(kernel, input, options, tool)),
     },
     {
         name: "branch",
