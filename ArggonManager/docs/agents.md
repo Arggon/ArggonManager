@@ -180,7 +180,7 @@ no detection, never to a false accusation. A fired detection never re-stamps the
    (an older CLI or plugin build without the flag). It discards the ownership
    record, so prefer (1).
 
-A strict worktree-write refusal therefore never advises a plain re-run: while the fired detection stands, every retry re-detects against the same evidence, so the refusal names the take-over input instead.
+The **native** refusal therefore no longer advertises a plain re-run: while the fired detection stands, every retry re-detects against the same evidence, so it names the take-over input instead (the shared kernel refusal still carries the coordinate-first advice — "coordinate with the stamped session, then re-run start --worktree" — which is correct when the owner can still re-attach and refresh the stamp; a crashed owner has no such session, which is what the take-over and the manual `rm` are for).
 
 #### Failure semantics
 
