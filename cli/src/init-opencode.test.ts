@@ -360,12 +360,24 @@ describe("opencode seam: fresh init", () => {
     expect(zcode).toContain("**Claim before dispatch.**");
     expect(zcode).toContain("worktree: true");
     expect(zcode).not.toContain("Claim **your** item");
+    // 3b. the ZCode worker contract (the fifth carrier the review's list missed)
+    const zcodeWorker = flat("templates/docs/zcode/arggon/agents/arggon-worker.md");
+    expect(zcodeWorker).toContain("Your item is **already claimed**");
+    expect(zcodeWorker).toContain("never re-claim");
+    expect(zcodeWorker).not.toContain("Claim your item (`arggon_update`");
+    // The agent DESCRIPTION is a carrier too — "claims exactly one item" is what
+    // told a reader the worker is the claimant.
+    expect(worker).not.toContain("claims exactly one item");
+    expect(zcodeWorker).not.toContain("claims exactly one item");
     // 4. this repo's own AGENTS.md — the bare-update claim bullet and the
     // hand-rolled `git worktree add` bullet are what every session here loads.
     const agents = flat("AGENTS.md");
     expect(agents).toMatch(nativeClaim);
     expect(agents).toContain("worktree_path");
-    expect(agents).not.toContain("git worktree add");
+    // The INSTRUCTION is gone, not the string: the replacement still names
+    // `git worktree add` in order to forbid it.
+    expect(agents).not.toContain("git worktree add ../<repo>-<item-id>");
+    expect(agents).not.toContain("create one per item with");
     expect(agents).not.toContain("--status in_progress --assignee");
   });
 
