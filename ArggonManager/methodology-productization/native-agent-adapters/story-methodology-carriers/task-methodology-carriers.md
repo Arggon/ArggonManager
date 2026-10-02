@@ -40,3 +40,16 @@ Gates in worktree /home/arggon/Projects/ArggonManager-task-methodology-carriers 
 ### handoff 2026-10-02 @ses_f02038341ffeqxEIdpXnpaLcf9 (session: ses_f02038341ffeqxEIdpXnpaLcf9) — next: Coordinator reviews PR #592 and merges; item stays in_progress until merge.
 - branch: feat/task-methodology-carriers
 - open questions: None — T1 complete; T2/T3 remain for other tasks.
+
+### 2026-10-02 @ses_f01ef6a8dffefttjZZwGqQtWss
+verdict: approve
+
+Evidence checked by reading (branch feat/task-methodology-carriers, PR #592, 5 files / +43 -1):
+- Identical methodology block: extracted lines 3-9 of ArggonManager/docs/{agents,engineering,convention}.md at the PR head — byte-identical (diff exit 0 across all three), covering scope ("any project — not only software"), the same verbatim invariant list, version tracking the package, and the ADR 0016 upgrade-channel pointer.
+- README §The methodology: one-hop relative links to ArggonManager/docs/agents.md, ArggonManager/docs/engineering.md, ArggonManager/docs/convention.md, skills/arggon-cli/SKILL.md, the native-agent-adapters epic and docs/specs/spec-methodology-adapters-017.md — all target paths confirmed present on disk.
+- Impact class: PR body states "## Impact class: Behavioral" and cites agents.md §Changing the methodology itself.
+- No unrelated reformatting: diff is purely additive (+7 per carrier doc, +17 README, +5/-1 item frontmatter for the claim metadata); no other lines touched.
+- No cross-item files: the only tracker file touched is task-methodology-carriers.md itself.
+
+## Probes needed
+- `npm run arggon -- validate` (cwd /home/arggon/Projects/ArggonManager-task-methodology-carriers) — confirm 0 warnings / convention v5, since validate-green is an acceptance item and I did not execute it. Green CI otherwise claimed in PR/item notes.
