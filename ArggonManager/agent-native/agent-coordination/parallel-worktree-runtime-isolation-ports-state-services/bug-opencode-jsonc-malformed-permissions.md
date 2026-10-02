@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-opencode-jsonc-malformed-permissions
 title: opencode.jsonc permissions block is malformed JSONC (stray rule outside the array) — breaks permission parsing for agent sessions
+assignee: Arggon
+branch: fix/bug-opencode-jsonc-malformed-permissions
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [seam, config]
 priority: p1
 created: "2026-10-02"
 updated: "2026-10-02"
+claimed_at: "2026-10-02T04:24:55.811Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-opencode-jsonc-malformed-permissions
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-opencode-jsonc-malformed-permissions.md
