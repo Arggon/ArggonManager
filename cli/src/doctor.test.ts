@@ -645,7 +645,14 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     writeFileSync(join(dir, "opencode.jsonc"), SEAM_CONFIG, "utf8");
     mkdirSync(join(dir, ".opencode", "agents"), { recursive: true });
     mkdirSync(join(dir, ".opencode", "commands"), { recursive: true });
-    for (const name of ["arggon-coordinator", "arggon-worker", "arggon-reviewer"]) {
+    // The planted seam mirrors a fresh `init`, prover included
+    // (task-prover-agent-reviewer-split).
+    for (const name of [
+      "arggon-coordinator",
+      "arggon-worker",
+      "arggon-reviewer",
+      "arggon-prover",
+    ]) {
       writeFileSync(join(dir, ".opencode", "agents", `${name}.md`), "---\n---\n", "utf8");
     }
     for (const name of ["arggon-next", "arggon-start", "arggon-done", "arggon-handoff"]) {
@@ -682,7 +689,8 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     expect(result.opencode.v1).toEqual({ findings: [], truncated: false });
     expect(result.opencode.artifacts).toEqual({
       config: true,
-      agents: ["arggon-coordinator", "arggon-reviewer", "arggon-worker"],
+      // task-prover-agent-reviewer-split: the prover is part of the seam now.
+      agents: ["arggon-coordinator", "arggon-prover", "arggon-reviewer", "arggon-worker"],
       commands: [
         "arggon-adopt",
         "arggon-adr",
@@ -703,7 +711,8 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     expect(result.opencode.mcp).toEqual({ native: false, mcpJson: true, hint: null });
     const report = formatDoctorReport(result);
     expect(report).toContain("opencode: config opencode.jsonc");
-    expect(report).toContain("seam 15 artifact(s)"); // 1 config + 3 agents + 11 commands
+    // 1 config + 4 agents (task-prover-agent-reviewer-split added the prover) + 11 commands
+    expect(report).toContain("seam 16 artifact(s)");
     expect(report).toContain("2 bundled skill(s)");
     expect(report).toContain("MCP only in .mcp.json (other clients)");
     // Genuinely clean: every generated doc is untouched, so no hint line at all
@@ -723,7 +732,8 @@ describe("doctor: OpenCode integration (task-opencode-v2-doctor)", () => {
     expect(result.opencode.v1).toEqual({ findings: [], truncated: false });
     expect(result.opencode.artifacts).toEqual({
       config: true,
-      agents: ["arggon-coordinator", "arggon-reviewer", "arggon-worker"],
+      // task-prover-agent-reviewer-split: the prover is part of the seam now.
+      agents: ["arggon-coordinator", "arggon-prover", "arggon-reviewer", "arggon-worker"],
       commands: ["arggon-done", "arggon-handoff", "arggon-next", "arggon-start"],
       skills: [],
       truncated: false,
