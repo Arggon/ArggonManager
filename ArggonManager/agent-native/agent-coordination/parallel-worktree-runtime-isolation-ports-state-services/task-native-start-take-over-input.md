@@ -58,3 +58,7 @@ Fix: every actionable clause now LEADS (recovery block → kept-worktree note �
 Gates on the pushed head: `npm test` 117 files / **2154 green** (6 plugin files / 189), `npm run lint`, `npm run build`, `npm run check:plugin`, `npm run arggon -- validate` `ok:true`, CI all three jobs green. PR left ready (not draft), NOT merged; item left `todo` — completion is the coordinator's call.
 
 Residual for the record, not fixed here (out of lane): the same character-clipping gap exists for `claim.foreignWrites` (pre-existing, untouched — fixing it would flip `truncated` on default receipts this PR's default-identity invariant pins), and a hostile long string inside a chain entry would still clip silently. The other two native refusals (gate-bin, fresh-worktree install) still append their advice after the kernel refusal and carry the same clip risk — pre-existing, untouched.
+
+### handoff 2026-10-02 @Arggon — next: Review + merge PR #579 (ready, not draft); item left todo for the coordinator
+- branch: feat/task-native-start-take-over-input
+- open questions: foreignWrites char-clip fold + the other two refusals' clip risk left as residual findings
