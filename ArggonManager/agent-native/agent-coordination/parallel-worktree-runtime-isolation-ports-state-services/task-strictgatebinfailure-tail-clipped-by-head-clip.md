@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-strictgatebinfailure-tail-clipped-by-head-clip
 title: "`strictGateBinFailure` still appends its own \"Fix:\" line at the message tail, so worst-case head-clip eats the remedy"
+assignee: Arggon
+branch: feat/task-strictgatebinfailure-tail-clipped-by-head-clip
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [opencode-seam]
 created: "2026-10-02"
 updated: "2026-10-02"
+claimed_at: "2026-10-02T22:27:43.772Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-strictgatebinfailure-tail-clipped-by-head-clip
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-methodology-carriers/task-strictgatebinfailure-tail-clipped-by-head-clip.md
@@ -23,9 +27,9 @@ Found while reviewing PR #595 (bug-native-refusal-advice-clipped-by-head-clip): 
 
 ## Acceptance
 
-- [ ] `strictGateBinFailure` composes its "Fix:" remedy before the kernel refusal text (same shape #579/#595 landed), keeping every existing clause verbatim
-- [ ] A test with the full `MAX_GATE_BINS` worst-case list asserts the `npm ci` remedy survives the clip, with ordering pinned
-- [ ] Negative control: message at the cap and the last named bin absent
+- [x] `strictGateBinFailure` composes its "Fix:" remedy before the kernel refusal text (same shape #579/#595 landed), keeping every existing clause verbatim
+- [x] A test with the full `MAX_GATE_BINS` worst-case list asserts the `npm ci` remedy survives the clip, with ordering pinned
+- [x] Negative control: message at the cap and the last named bin absent
 
 ## Notes
 

@@ -6804,9 +6804,9 @@ function strictGateBinFailure(gateBins, worktreePath) {
         return `${bin.name}: resolves from ${bin.path}, above the worktree`;
     })
         .join("; ");
-    return (`x-tracker.strict-gate-bins is set: refusing the claim commit — gate binaries do not ` +
-        `resolve inside the worktree: ${named}. ` +
-        `Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install.`);
+    return (`Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install. ` +
+        `x-tracker.strict-gate-bins is set: refusing the claim commit — gate binaries do not ` +
+        `resolve inside the worktree: ${named}.`);
 }
 function freshWorktreeInstallRefusal(gateBins, worktreePath, steps = []) {
     const broken = strictGateBinViolations(gateBins);

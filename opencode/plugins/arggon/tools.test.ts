@@ -2109,6 +2109,12 @@ describe("worktree domain tools (W4)", () => {
     expect(message.indexOf("it attaches to the existing worktree and retries the claim commit")).toBeLessThan(
       firstNamedIndex,
     );
+    // The kernel refusal's OWN remedy must survive too
+    // (task-strictgatebinfailure-tail-clipped-by-head-clip): it used to trail
+    // the named list, so at this worst case the head-clip ate the only fix and
+    // left the diagnosis alone. It now leads, inside the kept head window.
+    expect(message).toContain("npm ci");
+    expect(message.indexOf("npm ci")).toBeLessThan(firstNamedIndex);
     // Negative control: pinned at the cap, last named entry gone.
     expect(message.length).toBe(2048);
     expect(message).not.toContain(sorted[sorted.length - 1]);
