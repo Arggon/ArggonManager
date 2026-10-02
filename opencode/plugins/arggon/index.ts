@@ -3722,10 +3722,73 @@ async function domainWorktrees(options: ArgonToolOptions): Promise<string[]> {
   }
 }
 
+/** `docker compose down` timeout (the CLI's bound, so both surfaces wait alike). */
+const COMPOSE_DOWN_TIMEOUT_MS = 120_000
+
+/**
+ * One Compose teardown for the native cleanup prune — the twin of the CLI's
+ * `ComposeDown` seam (`cli/src/cleanup.ts`), same command shape (ADR 0019
+ * layer 2): `docker compose -p <project> down -v --remove-orphans` as an argv
+ * array, cwd = the repo root (no Compose file is needed — `down` resolves the
+ * project through the containers' `com.docker.compose.project` labels, so an
+ * already-gone project exits 0 with only a "No resource found to remove"
+ * warning: the no-op needs no probing).
+ *
+ * Contract, deliberately identical to the CLI's: a rejection whose `code` is
+ * `"ENOENT"` means the docker CLI is absent and degrades the WHOLE run to
+ * report-only; every other rejection is a per-item reap failure that never
+ * blocks the worktree removal. The message text matches the CLI's byte for
+ * byte (same prefix, same `stderr`-then-`(message)` fallback) so both prune
+ * envelopes stay comparable.
+ */
+function nativeComposeDown(project: string, cwd: string): Promise<void> {
+  return new Promise((resolvePromise, rejectPromise) => {
+    const child = execFile(
+      "docker",
+      ["compose", "-p", project, "down", "-v", "--remove-orphans"],
+      {
+        cwd,
+        encoding: "utf8",
+        timeout: COMPOSE_DOWN_TIMEOUT_MS,
+        // execFileSync's 1 MiB default, stated explicitly: an oversized stderr
+        // must truncate the same way on both surfaces.
+        maxBuffer: 1024 * 1024,
+        windowsHide: true,
+      },
+      (error, _stdout, stderr) => {
+        if (error === null) {
+          resolvePromise()
+          return
+        }
+        // Absent docker CLI: reject untouched — the ENOENT `code` IS the
+        // report-only signal the prune loop keys on.
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+          rejectPromise(error)
+          return
+        }
+        const detailText = String(stderr ?? "").trim()
+        const message = error instanceof Error ? error.message : String(error)
+        rejectPromise(
+          new Error(
+            `docker compose -p ${project} down -v --remove-orphans failed` +
+              (detailText ? `: ${detailText}` : ` (${message})`),
+          ),
+        )
+      },
+    )
+    // `down` never reads stdin; ending the pipe right away keeps a stray read
+    // from parking the teardown until the timeout (what the CLI's
+    // `stdio: ["ignore", …]` buys there).
+    child.stdin?.end()
+  })
+}
+
 /**
  * `cleanup` (native): classify every item with a `worktree_path` record with
  * the shared kernel rule (`classifyCleanupEntry`, the same one the CLI uses)
- * and, with `prune: true`, remove removable worktrees through the domain
+ * and, with `prune: true`, reap each removable entry's declared per-worktree
+ * Compose project (ADR 0019 layer 2 — only when the repo's convention declares
+ * `x-worktree.services`), remove removable worktrees through the domain
  * (observed, with a git fallback — the same primitive the start rollback uses),
  * then delete their merged branches and clear the records in ONE tracker commit.
  * A removal that is not observably complete reports a per-candidate failure
@@ -3778,8 +3841,50 @@ async function nativeCleanup(
   const failures: string[] = []
   const clearedPaths: string[] = []
   const clearedIds: string[] = []
+  // Compose reaping declaration (ADR 0019 layer 2), read once with the CLI's
+  // discipline: a malformed convention file degrades to the report-only path
+  // (no declaration), because never reaping is always safe and validate/start
+  // already report the tree's convention error loudly.
+  let services: string | null = null
+  try {
+    services = kernel.readConventionConfig(root).worktree.services
+  } catch {
+    services = null
+  }
+  const compose: { declared: string; dockerUnavailable?: boolean } | undefined = services
+    ? { declared: services }
+    : undefined
+  let composeUnavailable = false
   if (input.prune === true) {
     for (const entry of entries.filter((candidate) => candidate.removable)) {
+      // Reap BEFORE the worktree removal — the stack that lives only for the
+      // run dies with the worktree (exploration 017 F8). Only a repo whose
+      // convention declares services ever reaches Docker; the kernel never
+      // probes for or invokes Docker the convention did not declare.
+      if (compose !== undefined && entry.path !== "" && !composeUnavailable) {
+        // The worktree id is the worktree directory's basename
+        // (`<repo>-<item-id>` — the value `ARGGON_WORKTREE_ID` carries), so the
+        // derivation needs no repo-name resolution of its own.
+        const project = kernel.worktreeComposeProject(compose.declared, basename(entry.path))
+        try {
+          await nativeComposeDown(project, root)
+          pruned.push({ id: entry.id, action: `reaped compose project ${project}` })
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException | null)?.code === "ENOENT") {
+            // Absent docker CLI: report once, degrade the whole run to the
+            // report-only path. Not a failure — the ADR's graceful no-op.
+            composeUnavailable = true
+            compose.dockerUnavailable = true
+          } else {
+            // Non-fatal, and reported on BOTH surfaces (the structured `pruned`
+            // action AND the flat `failures` list, which would otherwise read
+            // as a clean run): a failed reap never wedges the removal below.
+            const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS)
+            failures.push(`${entry.id}: ${message}`)
+            pruned.push({ id: entry.id, action: "failed", error: message })
+          }
+        }
+      }
       try {
         if (entry.action?.startsWith("remove worktree")) {
           // CLI parity: a start-created `node_modules` link is untracked and
@@ -3893,6 +3998,7 @@ async function nativeCleanup(
         candidates: entries,
         pruned,
         failures,
+        ...(compose !== undefined ? { compose } : {}),
         ...(commit !== undefined ? { commit: kernel.commitPayload(commit as never) } : {}),
       },
       version,
