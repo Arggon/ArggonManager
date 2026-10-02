@@ -298,7 +298,7 @@ can be shared, and reach for this pattern when it cannot.
 | `.env` seed (copy-if-absent) + `ARGGON_STATE_DIR`/`ARGGON_CACHE_DIR`                        | Shipped | **this PR** (same spec — per-OS bases, `mkdir -p`'d)                                                                                                                   |
 | `preparation.env` receipt field, `x-worktree.env` opt-out                                   | Shipped | **this PR** (same spec — CLI `env`, native `preparation.env`; `written:false` + warning never blocks the claim)                                                        |
 | `cleanup --prune` reaping of a start-created `.arggon.env` (contract-shape ownership)       | Shipped | **this PR** — see the lifecycle notes above                                                                                                                            |
-| `cleanup --prune` reaping of **declared** Compose projects                                  | Shipped | **this PR** (`task-cleanup-declared-services` — `x-worktree.services` declaration, `down -v --remove-orphans` before the worktree removal, report-only without Docker) |
+| `cleanup --prune` reaping of **declared** Compose projects                                  | Shipped | **PR #569** (`task-cleanup-declared-services` — `x-worktree.services` declaration, `down -v --remove-orphans` before the worktree removal, report-only without Docker) |
 
 "Shipped (this PR)" means: merged with the env-contract implementation PR — script
 against `.arggon.env` freely in worktrees, but a **released** build carries it only
