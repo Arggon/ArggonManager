@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adr-0019-hatch-shipped-wording
 title: "ADR 0019 decision point 4: record the shipped dead-owner take-over (and the native surface's take-over input)"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [docs, adr]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-02"
-claimed_at: "2026-10-02T22:27:47.227Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0019-hatch-shipped-wording
 ---
 <!--
