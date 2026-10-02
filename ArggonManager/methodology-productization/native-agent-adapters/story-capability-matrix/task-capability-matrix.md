@@ -74,3 +74,14 @@ Fix (either way, then re-read the other three claude rows): either (a) keep `gap
 ## What I could not verify by reading
 
 Whether `arggon doctor` renders acceptably end-to-end on a fixture (human + `--json`, initialized and not) — the blocking smoke bar in `engineering.md` §Smoke test requires a probe with expected-vs-observed, and that is the prover's to run. Same for the three budget numbers and for the 200-char note clip as rendered. Probes below.
+
+### 2026-10-02 @ses_f02ab5836ffeOAxmisboIwWE4x
+Coordinator note on the prover's round-1 evidence (2026-10-02) — one worker claim corrected, and the budget attribution fixed.
+
+**P3 was satisfied by nothing.** The worker's evidence line — "arggon validate --json still exit 0 with gaps present (test-enforced)" — is misleading on its face: `validate --json` never reports gaps (125-byte envelope, zero matrix/gap keys; `validate` has no knowledge of the matrix). The prover observed the envelope and confirmed the exit-0 half only. The substantive report-only claim IS still true — a tree carrying gap rows validates clean with empty errors[]/warnings[] — but it is demonstrated by the tree, not by reading that payload. Rewrite the evidence line to say exactly that, or it re-asserts a check that does not exist.
+
+**P4's attribution was wrong, not the numbers.** Both figures are confirmed at the claimed values (native catalog 12,162 ≤ 12,288; MCP tools/list 16,253 ≤ 16,384), but NOT by the cited command: `arggon doctor --budget` prints no native-catalog line at all. `nativeToolsCatalogBytes` lives in the plugin (opencode/plugins/arggon/index.ts:10524) and its cap in smoke/context-report.ts:84; the correct command is `npm run context:report`. This is the same misattribution class as bug-context-report-baseline-date-mismatch (one figure, two surfaces, wrong label on one) — cite the surface that actually owns the number.
+
+**Also relevant to F2:** the prover independently found the same doc/code contradiction the reviewer flagged, in the PR's own json-output.md table (`present`/`source` cells still say "tree copy or installed package" as fallback) — confirming that half of F2 is real and specifically located.
+
+Nothing here blocks: the substantive properties (report-only, budgets in cap, absent-matrix honest and legible on both shapes) are proven. Correct the two evidence lines and re-run the two gates after the F1/F2 edits land.
