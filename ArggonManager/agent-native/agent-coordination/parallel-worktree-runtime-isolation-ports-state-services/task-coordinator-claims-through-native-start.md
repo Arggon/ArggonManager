@@ -225,3 +225,24 @@ The existing coordinator pin also now covers the foreground rule, the `arggon-pr
 
 - Item box 2 (reconciling `bug-release-notes-extraction-breaks-on-linked-header` and `task-native-start-take-over-input`) — left to the coordinator lane, unticked.
 - Not filed by me: whether the reverted stamps deserve a follow-up item (a release regenerates them), and the round-1 finding 2 (stale checksums at HEAD) is now moot for the plugin/SKILL entries but will resurface at the next regen.
+
+### 2026-10-02 @ses_f02bcc476ffes6LrJvCQylx0li
+### Round-2 gates, exact (worktree `/home/arggon/Projects/ArggonManager-task-coordinator-claims-through-native-start`, head `c0fcfa0b` + tracker commits)
+
+```
+npm test          → Test Files 118 passed (118) | Tests 2166 passed (2166)   (77.59s)
+npm run lint      → clean (no output)
+npm run build     → clean (tsc x3 + postbuild; bundle 443240 bytes)
+npm run check:plugin → exit 0, no `git diff` on opencode/plugins/arggon/index.bundle.ts
+npm run arggon -- validate → {"ok":true,"errors":[],"warnings":[]}
+prettier --check  → clean on all 11 touched files (templates x4, skills ref, AGENTS.md,
+                     ArggonManager/docs/agents.md, cli/src/init-opencode.test.ts,
+                     .opencode/agents/arggon-{coordinator,worker}.md,
+                     .zcode-marketplace/arggon/agents/arggon-coordinator.md)
+B1 probe          → `npx --yes arggon-manager@0.5.0 init --no-commit` then
+                     `git status --porcelain -- . ':(exclude)ArggonManager/.convention.yml'` = EMPTY
+```
+
+Suite went 2165 → 2166 (one new pin). The only failures I hit en route were my own two bad pins, both fixed: an `AGENTS.md` `not.toContain("git worktree add")` that can never pass (the replacement forbids the command by name — now pins the instruction instead) and a `.not.includes` typo on a string.
+
+Item boxes ticked in this round: **1** (contract states claim step, ordering, prohibitions — now in all five carriers) and **3** (seam test pins the claim duty's presence, and the pins now cover every carrier). Box **2** left unticked for the coordinator lane; box **4** left unticked (its seam-test half is delivered, its reconciled-frontmatter half is box 2). Item stays `in_progress`, PR stays a draft.
