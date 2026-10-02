@@ -19,10 +19,12 @@ updated: "2026-10-02"
 
 ## Context
 
-<!-- Why this task exists. -->
+Found while reviewing PR #595 (bug-native-refusal-advice-clipped-by-head-clip): that PR reordered the two native refusals so the actionable advice leads and the kernel refusal trails, but `strictGateBinFailure` composes its own trailing "Fix: run npm ci ..." line AFTER the kernel text — so at worst case (8 named bins, MAX_GATE_BINS) the head-clip at MAX_NATIVE_ERROR_CHARS still eats that line, leaving the agent without the remedy. The item acceptance for #595 did not cover it (it only required named bins + attach re-run for the gate-bin gate), so the worker correctly left it out rather than widening the PR.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] `strictGateBinFailure` composes its "Fix:" remedy before the kernel refusal text (same shape #579/#595 landed), keeping every existing clause verbatim
+- [ ] A test with the full `MAX_GATE_BINS` worst-case list asserts the `npm ci` remedy survives the clip, with ordering pinned
+- [ ] Negative control: message at the cap and the last named bin absent
 
 ## Notes
