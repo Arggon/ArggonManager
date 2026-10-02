@@ -2169,6 +2169,69 @@ describe("worktree domain tools (W4)", () => {
     expect(message).not.toContain("assignee: \"smoke\" }) —");
   });
 
+  it("keeps both remedies inside the clipped refusal message when the dirty-path list is at its worst case (task-native-start-take-over-input review finding: the clip ate the advice)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    armStrictWorktreeWrites(dir);
+    // The kernel names up to 10 dirty paths, and `startFailure` clips the
+    // composed message HEAD-first at 2048 chars. Ten ~60-char paths are the
+    // case where advice APPENDED after the refusal disappears: one short file
+    // (every other test here) can never see the clip, which is exactly how the
+    // ordering defect survived review.
+    const paths: string[] = [];
+    for (let index = 0; index < 10; index += 1) {
+      const name = `deeply/nested/module/path/number-${index}/with-a-long-file-name-here.md`;
+      const file = join(worktreePath, name);
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, `dirty ${index}\n`, "utf8");
+      git(worktreePath, ["add", name]);
+      paths.push(name);
+    }
+    for (const name of paths) {
+      const file = join(worktreePath, name);
+      const when = new Date(Date.now() + 60_000);
+      utimesSync(file, when, when);
+    }
+
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute(
+        { id: "task-rate-limit", assignee: "smoke" },
+        { sessionID: "ses_b" },
+      );
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const message = String(((caught as ArgonToolError).envelope.error as { message?: unknown }).message);
+    // Both remedies survive the clip.
+    expect(message).toContain("takeOverWorktree: true");
+    expect(message).toContain("arggon-claim.json");
+    expect(message).toContain("confirming no live writer");
+    // The kernel's own diagnosis survives too: it leads the message now, so the
+    // stamped owner and the file count are never what gets clipped.
+    expect(message).toContain("x-tracker.strict-worktree-writes is set");
+    expect(message).toContain("ses_a");
+    expect(message).toContain("10 tracked files were modified after that claim");
+    // ORDER is the pinned contract, not the prose: every actionable clause
+    // precedes the named-file list, which is the only thing allowed to clip.
+    const firstFile = message.indexOf(paths[0]);
+    expect(firstFile).toBeGreaterThan(-1);
+    for (const clause of [
+      "takeOverWorktree: true",
+      "arggon-claim.json",
+      "A plain re-run cannot clear this",
+    ]) {
+      expect(message.indexOf(clause)).toBeLessThan(firstFile);
+    }
+    // The clip really did bite (otherwise this test would pass vacuously on a
+    // message that simply got longer).
+    expect(message.length).toBeLessThanOrEqual(2048);
+    expect(message).not.toContain(paths[paths.length - 1]);
+  });
+
   it("takes over a presumed-dead stamped owner on the native seam: the claim lands and the stamp carries the chain (task-strict-attach-dead-owner-hatch)", async () => {
     const dir = seedGitTree();
     const { domain } = fakeDomain(dir);
@@ -2365,6 +2428,62 @@ describe("worktree domain tools (W4)", () => {
     expect(String(takeOver?.replaced.identity).length).toBeLessThanOrEqual(200);
     expect(takeOver?.replaced.takeovers?.length).toBeLessThanOrEqual(32);
     // A capped list is never passed off as the whole set.
+    expect(preparation.truncated).toBe(true);
+  });
+
+  it("folds CHARACTER clipping of the take-over's free text into `truncated`, not just the list caps (task-native-start-take-over-input review finding)", async () => {
+    const dir = seedGitTree();
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const worktreePath = await startAndStamp(defs, "ses_a");
+    // Exactly ONE dirty path, and it is over `MAX_NATIVE_PREPARATION_VALUE_CHARS`
+    // (200): the list cap and `total > files.length` cannot fire here, so the
+    // only honest signal that the value was shortened is `truncated` itself.
+    const longPath = `deep/${"segment-".repeat(28)}end.md`;
+    expect(longPath.length).toBeGreaterThan(200);
+    const longFile = join(worktreePath, longPath);
+    mkdirSync(dirname(longFile), { recursive: true });
+    writeFileSync(longFile, "dirty\n", "utf8");
+    git(worktreePath, ["add", longPath]);
+    const when = new Date(Date.now() + 60_000);
+    utimesSync(longFile, when, when);
+    // A replaced identity over the same per-value cap, and a chain the kernel's
+    // own reader accepts (5 entries) so the length-cap branch stays out of it.
+    const stampPath = join(worktreeGitDir(dir, worktreePath), "arggon-claim.json");
+    const hostile = JSON.parse(readFileSync(stampPath, "utf8")) as Record<string, unknown>;
+    hostile.identity = "y".repeat(600);
+    hostile.branch = "z".repeat(600);
+    hostile.takeovers = Array.from({ length: 5 }, (_unused, index) => ({
+      at: `2020-01-0${index + 1}T00:00:00.000Z`,
+      by: `taker-${index}`,
+      replacedIdentity: `owner-${index}`,
+      replacedClaimedAt: "2019-01-01T00:00:00.000Z",
+    }));
+    writeFileSync(stampPath, `${JSON.stringify(hostile)}\n`, "utf8");
+
+    const taken = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke", takeOverWorktree: true },
+      { sessionID: "ses_b" },
+    );
+    const preparation = (taken.output as Record<string, unknown>).preparation as {
+      claim?: {
+        takeOver?: {
+          replaced: { identity: string; branch: string };
+          files: string[];
+          total: number;
+        };
+      };
+      truncated?: boolean;
+    };
+    const takeOver = preparation.claim?.takeOver;
+    // Nothing was DROPPED here: one path named, the count honest. Only the
+    // characters were clipped.
+    expect(takeOver?.total).toBe(1);
+    expect(takeOver?.files).toHaveLength(1);
+    expect(String(takeOver?.files[0]).length).toBeLessThanOrEqual(200);
+    expect(String(takeOver?.replaced.identity).length).toBeLessThanOrEqual(200);
+    expect(String(takeOver?.replaced.branch).length).toBeLessThanOrEqual(200);
+    // …and that is exactly why the receipt must SAY so.
     expect(preparation.truncated).toBe(true);
   });
 
