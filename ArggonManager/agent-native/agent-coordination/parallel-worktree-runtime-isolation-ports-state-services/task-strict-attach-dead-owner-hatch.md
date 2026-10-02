@@ -129,3 +129,7 @@ Implemented on `feat/task-strict-attach-dead-owner-hatch` (worktree `/home/arggo
 **Gates (all green in the worktree):** `npm test` 2122 passed / 116 files, `npm run lint`, `npm run build`, `npm run check:plugin`, `npm run smoke:native-start-cold` (passed), `npm run arggon -- validate` → `ok (0 warnings, convention v5)`, prose-format clean.
 
 **Open question for the coordinator:** the native `start` tool has no input field for the take-over; wiring is a one-argument pass-through in `opencode/plugins/arggon/index.ts` (owned by the sibling worker on task-nativeCleanup Compose parity) plus the `preparation.claim` bounded mapping forwarding `takeOver`. Until then the native surface keeps the manual `rm` recovery, which is documented in agents.md as path (2).
+
+### handoff 2026-10-02 @ses_f055b7ab0ffeYscgHIY6455maW (session: ses_f055b7ab0ffeYscgHIY6455maW) — next: Review + merge PR #573 (draft): explicit --take-over-worktree hatch, kernel-first; then file/wire the native start takeOver input (index.ts, sibling-owned lane)
+- branch: feat/task-strict-attach-dead-owner-hatch
+- open questions: native start has no takeOver input field — one-arg pass-through in index.ts + preparation.claim mapping; should the coordinator file that task or fold it into the sibling's PR?
