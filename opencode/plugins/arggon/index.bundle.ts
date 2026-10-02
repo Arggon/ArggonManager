@@ -9067,6 +9067,7 @@ function boundedPreparation(input) {
         (input.gateBins?.length ?? 0) > gateBins.length ||
         (claim?.foreignWrites !== undefined &&
             claim.foreignWrites.total > claim.foreignWrites.files.length) ||
+        (claim !== undefined && claimTakeoverTruncated(claim, input.claim)) ||
         built.some((name, index) => name !== input.builtWorkspaces[index]) ||
         linked.some((name, index) => name !== input.linkedWorkspaces[index]) ||
         missing.some((name, index) => name !== input.missingDependencies[index]) ||
@@ -9102,10 +9103,62 @@ function boundedClaimReceipt(input) {
             total: input.foreignWrites.total,
         };
     }
+    if (input.takeOver !== undefined) {
+        bounded.takeOver = boundedClaimTakeover(input.takeOver);
+    }
     if (input.warning !== undefined) {
         bounded.warning = boundedNativeText(input.warning, MAX_NATIVE_PREPARATION_VALUE_CHARS);
     }
     return bounded;
+}
+function boundedClaimTakeover(input) {
+    return {
+        at: boundedNativeText(input.at, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+        by: boundedNativeText(input.by, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+        replacedIdentity: boundedNativeText(input.replacedIdentity, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+        replacedClaimedAt: boundedNativeText(input.replacedClaimedAt, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+        replaced: boundedClaimStamp(input.replaced),
+        files: input.files
+            .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+            .map((file) => boundedNativeText(file, MAX_NATIVE_PREPARATION_VALUE_CHARS)),
+        total: input.total,
+    };
+}
+function boundedClaimStamp(input) {
+    const bounded = {
+        identity: boundedNativeText(input.identity, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+        item: boundedNativeText(input.item, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+        branch: boundedNativeText(input.branch, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+        claimedAt: boundedNativeText(input.claimedAt, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+    };
+    if (input.assignee !== undefined) {
+        bounded.assignee = boundedNativeText(input.assignee, MAX_NATIVE_PREPARATION_VALUE_CHARS);
+    }
+    if (input.surface !== undefined) {
+        bounded.surface = boundedNativeText(input.surface, MAX_NATIVE_PREPARATION_VALUE_CHARS);
+    }
+    if (input.takeovers !== undefined) {
+        bounded.takeovers = input.takeovers
+            .slice(0, MAX_NATIVE_PREPARATION_NAMES)
+            .map((entry) => ({
+            at: boundedNativeText(entry.at, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+            by: boundedNativeText(entry.by, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+            replacedIdentity: boundedNativeText(entry.replacedIdentity, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+            replacedClaimedAt: boundedNativeText(entry.replacedClaimedAt, MAX_NATIVE_PREPARATION_VALUE_CHARS),
+        }));
+    }
+    return bounded;
+}
+function claimTakeoverTruncated(bounded, input) {
+    if (input === undefined)
+        return true;
+    const takeOver = bounded.takeOver;
+    if (takeOver === undefined)
+        return false;
+    const replaced = input.takeOver?.replaced;
+    return (takeOver.total > takeOver.files.length ||
+        (replaced !== undefined &&
+            (replaced.takeovers?.length ?? 0) > (takeOver.replaced.takeovers?.length ?? 0)));
 }
 function boundedEnvReceipt(input) {
     const bounded = { written: input.written };
@@ -9599,6 +9652,7 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
     const primaryRoot = canonicalRoot(options, root);
     const claimIdentity = sessionToken(tool?.sessionID) ?? assignee;
     const wantWorktree = input.worktree !== false;
+    const takeOverWorktree = input.takeOverWorktree === true;
     let worktreePath = wantWorktree ? asString(item.worktree_path) : undefined;
     if (worktreePath !== undefined && !(0, node_fs_1.existsSync)(worktreePath))
         worktreePath = undefined;
@@ -9609,6 +9663,10 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
         ...extra,
     });
     const failBeforeClaim = (message, reason, extra = {}) => startNotAttempted(kernel, message, version, context(extra), reason);
+    if (takeOverWorktree && !wantWorktree) {
+        return failBeforeClaim("takeOverWorktree requires worktree (it takes over a claimed worktree's ownership " +
+            "stamp; a plain start writes no stamp)", "invalid input");
+    }
     if (wantWorktree) {
         const canonical = primaryRoot;
         if (worktreePath === undefined) {
@@ -9692,6 +9750,7 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
                     itemId: id,
                     branch,
                     surface: "native",
+                    ...(takeOverWorktree ? { takeOver: true } : {}),
                 },
             }));
         }
@@ -9733,9 +9792,14 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
             : null;
         if (strictWriteRefusal !== null) {
             return failBeforeClaim(`${strictWriteRefusal} The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
-                "Then re-run " +
-                `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
-                "it attaches to the existing worktree and retries the claim commit.", "strict worktree-write gate refused");
+                "A plain re-run cannot clear this: the fired detection is unchanged while the previous " +
+                "stamp stands. If the stamped session is really dead, take the worktree over explicitly " +
+                "with " +
+                `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)}, takeOverWorktree: true }) — ` +
+                "it records a dated take-over naming the replaced owner (the same hatch as " +
+                "`arggon start --worktree --take-over-worktree`). Otherwise, with a live writer, do NOT " +
+                "take over; remove the stamp by hand after confirming no live writer: " +
+                `rm "$(git -C ${worktreePath} rev-parse --absolute-git-dir)/arggon-claim.json".`, "strict worktree-write gate refused");
         }
     }
     if (worktreePath !== undefined && progress.worktreeCreated) {
@@ -10085,6 +10149,10 @@ const WORKTREE_TOOL_SPECS = [
                 branch: { type: "string" },
                 worktree: BOOLEAN,
                 push: BOOLEAN,
+                takeOverWorktree: {
+                    type: "boolean",
+                    description: "Take over a presumed-dead stamped owner (CLI --take-over-worktree). Default OFF; requires worktree; acts only when the single-writer detection fired.",
+                },
             },
             required: ["id"],
             additionalProperties: false,
