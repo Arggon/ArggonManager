@@ -1,7 +1,7 @@
 ---
 name: arggon-cli
 description: Work in an ArggonManager repo — run the find → claim → work → PR loop and follow the engineering methodology (specs, ADRs, explorations, playbooks) with the native arggon tools (OpenCode V2) or the arggon CLI.
-version: 0.4.0
+version: 0.5.0
 author: Arggon (Arggon), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
