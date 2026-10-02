@@ -1464,10 +1464,7 @@ function defaultWorktreeStatus(cwd: string): string | undefined {
 }
 
 /** Absolute path of a worktree's claim stamp, or undefined without a git dir. */
-function claimStampPath(
-  worktreePath: string,
-  deps: { gitDir?: GitDirRunner },
-): string | undefined {
+function claimStampPath(worktreePath: string, deps: { gitDir?: GitDirRunner }): string | undefined {
   const gitDir = (deps.gitDir ?? defaultAbsoluteGitDir)(worktreePath);
   if (gitDir === undefined || gitDir.length === 0) return undefined;
   return join(gitDir, CLAIM_STAMP_FILE);
@@ -1648,7 +1645,10 @@ export function strictWorktreeWriteFailure(report: WorktreeForeignWriteReport): 
     `file${report.total === 1 ? " was" : "s were"} modified after that claim: ` +
     `${named}${extra > 0 ? ` (and ${extra} more)` : ""}. ` +
     "Another session may be writing here; coordinate with the stamped session (or have it " +
-    "re-attach to refresh the stamp), then re-run start --worktree to attach."
+    "re-attach to refresh the stamp), then re-run start --worktree to attach. This refusal " +
+    "never re-stamps the worktree, so a retry re-detects the same evidence; if the stamped " +
+    "session is gone, confirm no live writer and remove the stamp by hand " +
+    '(rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json").'
   );
 }
 
@@ -1674,7 +1674,11 @@ export type WorktreeClaimRequest = {
 
 /** The additive claim-stamp receipt fragment (`preparation.claim`). */
 export type WorktreeClaimReceipt = {
-  /** True when the worktree carries this run's stamp after the run. */
+  /**
+   * True when the worktree carries a claim stamp after the run — this run's
+   * stamp, or the PREVIOUS owner's when a fired detection suppressed the
+   * replacement (a refusal must never refresh the stamp it refused against).
+   */
   stamped: boolean;
   /**
    * A fired attach-time detection (present only when the previous stamp named
@@ -1690,8 +1694,18 @@ export type WorktreeClaimReceipt = {
 /**
  * Stamp-or-detect one worktree for a start run: read the previous stamp, fire
  * the detection when a DIFFERENT identity owned the window, then write this
- * run's stamp (the rolling ownership record). Best-effort by invariant — every
- * degradation lands in the receipt as a warning, never as a throw.
+ * run's stamp (the rolling ownership record). One deliberate exception — the
+ * anti-unlock rule (review on task-single-writer-worktree-enforcement): when
+ * the detection FIRES, the replacement is suppressed and the previous stamp
+ * stands. Writing the new stamp anyway would let a STRICT-refused attach
+ * re-stamp the worktree with the refused caller's identity, so the retry
+ * would see a matching stamp, skip detection, and claim silently over the
+ * foreign window — the gate would unlock itself. With the previous stamp
+ * kept, every retry re-detects against the SAME evidence until the stamped
+ * owner re-attaches (refreshing it legitimately) or the documented manual
+ * recovery (`rm <git-dir>/arggon-claim.json`) is used. Best-effort by
+ * invariant — every degradation lands in the receipt as a warning, never as a
+ * throw.
  */
 function prepareWorktreeClaim(
   worktreePath: string,
@@ -1701,6 +1715,13 @@ function prepareWorktreeClaim(
   let foreignWrites: WorktreeForeignWriteReport | undefined;
   if (previous !== null && previous.identity !== request.identity) {
     foreignWrites = detectWorktreeForeignWrites(worktreePath, previous, request) ?? undefined;
+    if (foreignWrites !== undefined) {
+      // Anti-unlock: keep the previous stamp (see above); nothing is written.
+      return {
+        stamped: true,
+        foreignWrites,
+      };
+    }
   }
   const claimedDate =
     request.now === undefined
@@ -1708,9 +1729,7 @@ function prepareWorktreeClaim(
       : request.now instanceof Date
         ? request.now
         : new Date(request.now);
-  const claimedAt = (
-    Number.isNaN(claimedDate.getTime()) ? new Date() : claimedDate
-  ).toISOString();
+  const claimedAt = (Number.isNaN(claimedDate.getTime()) ? new Date() : claimedDate).toISOString();
   const stamped = writeWorktreeClaimStamp(
     worktreePath,
     {
@@ -1727,7 +1746,6 @@ function prepareWorktreeClaim(
   );
   return {
     stamped,
-    ...(foreignWrites !== undefined ? { foreignWrites } : {}),
     ...(stamped ? {} : { warning: "could not write the claim stamp" }),
   };
 }

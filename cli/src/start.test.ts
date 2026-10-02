@@ -1110,6 +1110,35 @@ describe("start --worktree claim stamp: single-writer detection (task-single-wri
     expect(readFileSync(itemFile, "utf8")).toContain(`assignee: arggon`);
   });
 
+  it("keeps the stamped owner when a strict refusal fires, so a retry re-detects instead of silently claiming (no self-unlocking gate)", () => {
+    const { dir, id, worktreePath, stampPath, createGit } = primedWriterTask(true);
+    runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW }, { git: createGit });
+    stampAsForeignSession(stampPath, id, "feat/task-rate-limit", NOW);
+    foreignWrite(worktreePath, "src/foreign.ts", NOW);
+    const git = writerGit(worktreePath, ["src/foreign.ts"]);
+    const attempt = (): string => {
+      try {
+        runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: LATER }, { git });
+        return "";
+      } catch (err) {
+        return err instanceof Error ? err.message : String(err);
+      }
+    };
+    // (1) A refused attach must NOT hand ownership to the refused caller...
+    expect(attempt()).toContain("refusing the claim");
+    expect(JSON.parse(readFileSync(stampPath, "utf8"))).toMatchObject({
+      identity: FOREIGN_SESSION,
+      claimedAt: NOW.toISOString(),
+    });
+    // (2) ...otherwise the retry would match its own stamp, skip detection and
+    // claim silently over the stamped owner's uncommitted work.
+    const retry = attempt();
+    expect(retry).toContain("refusing the claim");
+    expect(retry).toContain(FOREIGN_SESSION);
+    expect(retry).toContain("src/foreign.ts");
+    expect(git.calls.some((c) => c.op === "commit")).toBe(false);
+  });
+
   it("commits normally under strict-worktree-writes when the stamp is the caller's own", () => {
     const { dir, id, worktreePath, createGit } = primedWriterTask(true);
     runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW }, { git: createGit });

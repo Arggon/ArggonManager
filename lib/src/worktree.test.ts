@@ -991,7 +991,7 @@ describe("claim stamp: single-writer detection (task-single-writer-worktree-enfo
     });
   });
 
-  it("fires on a foreign attach whose tracked files are newer than the claim, then re-stamps", () => {
+  it("fires on a foreign attach whose tracked files are newer than the claim, and keeps the stamped owner (anti-unlock)", () => {
     const { primary, worktree, gitDir } = stampedFixture();
     const probes = { gitDir: () => gitDir };
     prepareWorktreeDependencies(primary, worktree, {
@@ -1021,9 +1021,10 @@ describe("claim stamp: single-writer detection (task-single-writer-worktree-enfo
       files: ["src/foreign.ts"],
       total: 1,
     });
-    // The rolling record: the attach re-stamps with the new identity, so the
-    // NEXT attach detects that window.
-    expect(readWorktreeClaimStamp(worktree, probes)?.identity).toBe("ses_b");
+    // The rolling record STOPS at a fired detection: the previous owner stays
+    // stamped, so the refused attacher cannot make the next attach match its
+    // own identity and claim silently over that window.
+    expect(readWorktreeClaimStamp(worktree, probes)?.identity).toBe("ses_a");
   });
 
   it("stays silent when the attaching identity matches the stamp (the owner's own re-attach)", () => {
