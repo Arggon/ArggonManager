@@ -50,6 +50,9 @@ const TIER1_DOCS = [
   ".gitignore",
   ".mcp.json",
   ".opencode/agents/arggon-coordinator.md",
+  // task-prover-agent-reviewer-split: execution evidence is its own agent, and
+  // init emits the agents alphabetically (coordinator, prover, reviewer, worker).
+  ".opencode/agents/arggon-prover.md",
   ".opencode/agents/arggon-reviewer.md",
   ".opencode/agents/arggon-worker.md",
   ".opencode/commands/arggon-adopt.md",
