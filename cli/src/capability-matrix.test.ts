@@ -208,7 +208,10 @@ describe("capability matrix: reader posture (report-only, bounded, never throws)
     expect(matrix.present).toBe(true);
     expect(matrix.source).toBe(MATRIX_PATH);
     expect(matrix.rows).toBe(1);
-    // No tree copy: the shipped matrix from the package answers instead.
+    // No tree copy: the reader falls back to the installed package's copy (in
+    // this repo that is the same committed file; in an adopter tree it is the
+    // one a release ships - `adapters/` joins the pack allowlist with the
+    // release, since `files` is a shipping field, ADR 0018).
     expect(readCapabilityMatrix({ root: tempDir() }).present).toBe(true);
   });
 
