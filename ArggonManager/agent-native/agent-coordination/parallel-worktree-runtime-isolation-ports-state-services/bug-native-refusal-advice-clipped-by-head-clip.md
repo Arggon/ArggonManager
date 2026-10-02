@@ -65,3 +65,10 @@ Work landed on `fix/bug-native-refusal-advice-clipped-by-head-clip` → PR https
 ### handoff 2026-10-02 @ses_f01cebaa9ffeuQRcpbUpyt0LNy (session: ses_f01cebaa9ffeuQRcpbUpyt0LNy) — next: Review PR #595; merge, then flip the item to done. Decide the strictGateBinFailure residual (remedy-first there too) or file it.
 - branch: fix/bug-native-refusal-advice-clipped-by-head-clip
 - open questions: Acceptance says 10 named paths but MAX_GATE_BINS caps bins at 8 — OK as ticked?; strictGateBinFailure's own npm ci clause is still the clipped tail — in scope here or a follow-up?
+
+### 2026-10-02 @ses_f02ab5836ffeOAxmisboIwWE4x
+Coordinator note on acceptance wording (2026-10-02, merged-PR verification).
+
+The acceptance box said "worst-case named list (10 long paths)". That count came from the write-gate precedent (MAX_CLAIM_WRITE_NAMES = 10, lib/src/worktree.ts:1484), but these two refusals report `resolveGateBins`, hard-capped at MAX_GATE_BINS = 8 (lib/src/worktree.ts:767). The worker tested the real cap (8 entries, ~270 chars each) and the negative control proves the clip bites — the substantive bar (worst-case list, advice survives the 2048-char head-clip, ordering pinned, negative control) is met; only the literal count in the criterion was unreachable for this surface. Verified independently, not taken on the worker's word. Noted here rather than rewriting the criterion post-hoc.
+
+Residual deliberately not fixed (worker's own call-out, verified as real): at worst case the tail of `strictGateBinFailure` (its own "Fix: run npm ci …" line) is still what the head-clip eats. The acceptance for that refusal only covered the named bins + attach re-run, so this is out of the item's scope — filed separately as task-strictgatebinfailure-tail-clipped-by-head-clip rather than silently widening this PR.
