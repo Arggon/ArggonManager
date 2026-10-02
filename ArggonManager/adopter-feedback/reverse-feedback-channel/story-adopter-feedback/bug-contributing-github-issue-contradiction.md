@@ -9,6 +9,7 @@ priority: p2
 created: "2026-10-02"
 updated: "2026-10-02"
 ---
+
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/bug-contributing-github-issue-contradiction.md
   Leaves live only under a story. id is the filename stem: bug-contributing-github-issue-contradiction.
