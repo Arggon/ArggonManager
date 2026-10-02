@@ -7,6 +7,7 @@ labels: []
 created: "2026-10-02"
 updated: "2026-10-02"
 ---
+
 <!--
   Placement (v0): ArggonManager/adopter-feedback/adopter-feedback.md (initiative index; required).
   No parent. Omit assignee when unassigned.
