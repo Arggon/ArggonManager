@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-single-writer-worktree-enforcement
 title: "Single-writer worktree enforcement: detect + refuse concurrent writes into a claimed worktree"
 assignee: Arggon
@@ -9,11 +9,9 @@ parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [worktree, devex]
 priority: p3
 created: "2026-10-01"
-updated: "2026-10-01"
-claimed_at: "2026-10-01T23:52:28.218Z"
+updated: "2026-10-02"
 worktree_path: /home/arggon/Projects/ArggonManager-task-single-writer-worktree-enforcement
 ---
-
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-single-writer-worktree-enforcement.md
   Leaves live only under a story. id is the filename stem: task-single-writer-worktree-enforcement.
