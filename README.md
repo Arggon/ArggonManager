@@ -590,7 +590,7 @@ The package version in `package.json` is bumped manually, once per release wave 
 
 ## Contributing
 
-Ideas on folder layout, frontmatter schema, and CLI UX are especially useful right now. Open an issue. Please follow the [`task convention`](ArggonManager/docs/convention.md) when proposing sample trees or templates.
+Ideas on folder layout, frontmatter schema, and CLI UX are especially useful right now. Create a work item in the tracker (`arggon create task`) describing the idea. Please follow the [`task convention`](ArggonManager/docs/convention.md) when proposing sample trees or templates.
 
 ## License
 

@@ -13,6 +13,7 @@ updated: "2026-10-02"
 claimed_at: "2026-10-02T18:59:22.820Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-contributing-github-issue-contradiction
 ---
+
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/bug-contributing-github-issue-contradiction.md
   Leaves live only under a story. id is the filename stem: bug-contributing-github-issue-contradiction.
@@ -24,11 +25,13 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-contributing-github-issue
 
 ## Context
 
-<!-- What went wrong / how to reproduce. -->
+`CONTRIBUTING.md` line 13 stated "GitHub issues are not used" while line 269 told contributors to "Open an issue describing the change". `README.md`'s Contributing section had the same stale instruction.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [x] `CONTRIBUTING.md` states the tracker-not-GitHub-issues policy (AGENTS.md / `ArggonManager/docs/agents.md` §0) exactly once and contains no "open an issue" instruction
+- [x] No stale "open an issue" instruction remains in `README.md`, `SUPPORT.md`, or `templates/`
+- [x] `arggon validate` passes
 
 ## Notes
 
