@@ -9816,6 +9816,32 @@ async function domainWorktrees(options) {
         return [];
     }
 }
+const COMPOSE_DOWN_TIMEOUT_MS = 120_000;
+function nativeComposeDown(project, cwd) {
+    return new Promise((resolvePromise, rejectPromise) => {
+        const child = (0, node_child_process_1.execFile)("docker", ["compose", "-p", project, "down", "-v", "--remove-orphans"], {
+            cwd,
+            encoding: "utf8",
+            timeout: COMPOSE_DOWN_TIMEOUT_MS,
+            maxBuffer: 1024 * 1024,
+            windowsHide: true,
+        }, (error, _stdout, stderr) => {
+            if (error === null) {
+                resolvePromise();
+                return;
+            }
+            if (error.code === "ENOENT") {
+                rejectPromise(error);
+                return;
+            }
+            const detailText = String(stderr ?? "").trim();
+            const message = error instanceof Error ? error.message : String(error);
+            rejectPromise(new Error(`docker compose -p ${project} down -v --remove-orphans failed` +
+                (detailText ? `: ${detailText}` : ` (${message})`)));
+        });
+        child.stdin?.end();
+    });
+}
 async function nativeCleanup(kernel, input, options) {
     let root;
     try {
@@ -9851,8 +9877,37 @@ async function nativeCleanup(kernel, input, options) {
     const failures = [];
     const clearedPaths = [];
     const clearedIds = [];
+    let services = null;
+    try {
+        services = kernel.readConventionConfig(root).worktree.services;
+    }
+    catch {
+        services = null;
+    }
+    const compose = services
+        ? { declared: services }
+        : undefined;
+    let composeUnavailable = false;
     if (input.prune === true) {
         for (const entry of entries.filter((candidate) => candidate.removable)) {
+            if (compose !== undefined && entry.path !== "" && !composeUnavailable) {
+                const project = kernel.worktreeComposeProject(compose.declared, (0, node_path_1.basename)(entry.path));
+                try {
+                    await nativeComposeDown(project, root);
+                    pruned.push({ id: entry.id, action: `reaped compose project ${project}` });
+                }
+                catch (error) {
+                    if (error?.code === "ENOENT") {
+                        composeUnavailable = true;
+                        compose.dockerUnavailable = true;
+                    }
+                    else {
+                        const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS);
+                        failures.push(`${entry.id}: ${message}`);
+                        pruned.push({ id: entry.id, action: "failed", error: message });
+                    }
+                }
+            }
             try {
                 if (entry.action?.startsWith("remove worktree")) {
                     const canonical = canonicalRoot(options, root);
@@ -9940,6 +9995,7 @@ async function nativeCleanup(kernel, input, options) {
             candidates: entries,
             pruned,
             failures,
+            ...(compose !== undefined ? { compose } : {}),
             ...(commit !== undefined ? { commit: kernel.commitPayload(commit) } : {}),
         }, version),
     };
