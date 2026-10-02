@@ -42,6 +42,12 @@ const SEAM_AGENTS = [
   ".opencode/agents/arggon-coordinator.md",
   ".opencode/agents/arggon-worker.md",
   ".opencode/agents/arggon-reviewer.md",
+  // task-prover-agent-reviewer-split: execution evidence has its own role.
+  // The prover RUNS gates (shell allowed) and never touches the tree or history
+  // (edit/subagent/tracker writes/git history writes denied in its frontmatter);
+  // the reviewer's contract stops instructing itself to run suites and hands
+  // probes back under `## Probes needed` instead.
+  ".opencode/agents/arggon-prover.md",
 ];
 const SEAM_COMMANDS = [
   ".opencode/commands/arggon-next.md",
@@ -167,6 +173,38 @@ describe("opencode seam: fresh init", () => {
     expect(worker).toMatch(/action: subagent\s+resource: "\*"\s+effect: deny/);
     expect(reviewer).toMatch(/action: subagent\s+resource: "\*"\s+effect: deny/);
     expect(reviewer).toMatch(/action: edit\s+resource: "\*"\s+effect: deny/);
+  });
+
+  it("the prover runs gates; the reviewer only reads and hands probes back (task-prover-agent-reviewer-split)", () => {
+    const dir = tempDir();
+    runInit({ dir, force: false });
+    const reviewer = readFileSync(join(dir, ".opencode/agents/arggon-reviewer.md"), "utf8");
+    const prover = readFileSync(join(dir, ".opencode/agents/arggon-prover.md"), "utf8");
+
+    // The reviewer's contract stops sending it to the terminal for evidence.
+    expect(reviewer).not.toContain("read, run tests and inspect freely");
+    expect(reviewer).toContain("Do not execute gates");
+    expect(reviewer).toContain("Probes needed");
+
+    // The prover is shell-capable — that is the role — but never a writer of
+    // the tree, the history, the tracker or other agents.
+    expect(prover).not.toMatch(/action: shell\s+resource: "\*"/);
+    for (const command of ["git commit\\*", "git push\\*", "git merge\\*", "git rebase\\*"]) {
+      expect(prover, command).toMatch(new RegExp(`resource: "${command}"\\s+effect: deny`));
+    }
+    expect(prover).toMatch(/action: edit\s+resource: "\*"\s+effect: deny/);
+    expect(prover).toMatch(/action: subagent\s+resource: "\*"\s+effect: deny/);
+    for (const action of ["arggon_update", "arggon_start", "arggon_cleanup"]) {
+      expect(prover, action).toMatch(
+        new RegExp(`action: ${action}\\s+resource: "\\*"\\s+effect: deny`),
+      );
+    }
+    // The evidence contract a verdict depends on: expected vs observed, and the
+    // boundary of what a green gate does not prove.
+    expect(prover).toContain("expected:");
+    expect(prover).toContain("observed:");
+    expect(prover).toContain("does NOT prove");
+    expect(prover).toContain("Never post to the tracker");
   });
 
   it("agents deny tracker mutations at the tool level, native and MCP spellings (W4 probe)", () => {
