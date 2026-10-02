@@ -34,7 +34,7 @@ Found while reviewing PR #589 (task-coordinator-claims-through-native-start): th
 
 ## Acceptance
 - [x] Decide + implement the contract: **both halves, split by what each surface owns.** `update` is frontmatter-only (it is the very call that CLEARS a `worktree_path` record), so it never reaps a worktree; it REPORTS the dropped claim's footprint on the unclaim as the additive `claimFootprint` receipt, naming the release path per surface. The release is an explicit, distinct `cleanup` action — `arggon cleanup --release <id>` / native `cleanup({ release })` — classified by the shared kernel rule `classifyReleaseEntry`: remove worktree + branch, reap `.arggon.env` + `arggon-claim.json` stamp, clear `worktree_path`, reported as its own `release`/`released` family (never mixed into `pruned`; `--release` and `--prune` mutually exclusive). **Review round 2:** the receipt is unclaim-only (`→ done` keeps `cleanup --prune` as the merge-gated remedy; a blocked item keeps its assignee), the claim stamp is reaped only AFTER an observed removal, uncommitted/untracked content is refused during classification (`blockingPaths`/`blockingTotal`) so a failed release keeps the stamp + env, the still-claimed refusal is unconditional (no hatch bypass), `--take-over-worktree` without `--release` is refused, and both surfaces' release owns and reports its own tracker commit.
-- [x] Kernel-owned and CLI+native parity: the release path lives in `lib/src/cleanup.ts` — the kernel entry re-exports `classifyReleaseEntry` (the rule both surfaces call) and `worktreeReleaseRefusal`; the refusal sentences and the porcelain parser (`worktreeDirtyRefusal`, `parseRemovalBlockingPaths`) are module-internal helpers of that rule, and the native surface reaches the whole rule through `kernel.classifyReleaseEntry`, so parity is structural, not prose; both surfaces call it and execute the same ordered steps, and the release arm now has a **cross-surface envelope test** (`tools.test.ts`, release vs `cleanup --release <id> --json` on twin fixtures, commit hash normalized) plus MCP parity for both flags.
+- [x] Kernel-owned and CLI+native parity: the release path lives in `lib/src/cleanup.ts` — the kernel entry re-exports `classifyReleaseEntry` (the rule both surfaces call) and `worktreeReleaseRefusal`; the refusal sentences and the porcelain parser (`worktreeDirtyRefusal`, `parseRemovalBlockingPaths`) are module-internal helpers of that rule, and the native surface reaches the whole rule through `kernel.classifyReleaseEntry`, so parity is structural, not prose — both surfaces execute the same ordered steps, and the release arm has a **cross-surface envelope test** (`tools.test.ts`, release vs `cleanup --release <id> --json` on twin fixtures, commit hash normalized) plus MCP parity for both flags.
 - [x] Tests: `cli/src/worktree.test.ts` "claim release — unclaim leaves nothing" (11 cases) and `opencode/plugins/arggon/tools.test.ts` "native release of a dropped claim" (8 cases), including one regression test per blocking finding — M1 (`→ done` / `→ blocked` report no receipt; the unmerged branch stays protected), M2 (a dirty worktree is refused with stamp + env intact; only the hatch forces it), M3 (the native release reports its own commit, never a skipped nothing-to-commit, plus the CLI-parity comparison) — and the original three: claim → unclaim → release leaves nothing; a plain unclaim of a never-worktree item is byte-identical; a release while another session holds the worktree is refused (no stealing a live writer's worktree).
 - [x] Docs: agents.md's claim duty (PR #589) states the consequence and names the release path ("unclaim **and release**"), §Unclaim + §Cleanup document the contract (unclaim-only receipt, the three refusals, the hatch's scope), `claim.md` §Unclaim recovery + playbook, `json-output.md` §cleanup/§update, `opencode2.md`, `convention.md` (stamp lifecycle), and **m4 in full**: README's cleanup flags/envelope + release arm, and the coordinator prompts — the two template sources (`templates/docs/opencode/agents/`, `templates/docs/zcode/arggon/agents/`) plus their generated copies (`.opencode/agents/`, `.zcode-marketplace/arggon/agents/`, verified byte-identical to the templates modulo the generated header) and the skill's `references/orchestration.md`. **Round 3 (record/doc only, no behavior change):** this item file carries the whole review record again (round-1 `verdict: request-changes`, the coordinator's ruling, both evidence rounds and the round-2 verdict) — an earlier reconciliation commit had replaced it with a pre-review copy, which would have deleted the durable record `engineering.md` §Review verdicts and `arggon sync --json` depend on — and `convention.md` now documents the shipped `claimFootprint` shape `{ worktreePath, release: { cli, native } }` (m7 had dropped `branch` there last).
 ### 2026-10-02 @ses_f01cee59fffeSatwHpianDIykt
@@ -215,3 +215,41 @@ All four ticked boxes are backed by content in this diff: box 1 by the `newStatu
 
 ## Probes needed
 None. O1/O2 are record/doc edits I can confirm by reading the resulting diff — they need no execution evidence, and every gate is already covered by the prover's run.
+
+## Round 3 addressed (O1 + O2) — record/doc only, no behavior change
+
+PR #596 branch pushed to `fe8c37b1` (fast-forward push, no force; item left `in_progress`).
+
+**O1 — the item file on this branch had lost the review record; restored.** The file is rebuilt from the full record and now carries, in order: the scaffold, the coordinator's original finding, my round-1 evidence, the round-1 `verdict: request-changes`, the coordinator's ruling, my round-2 evidence + handoff, and the round-2 `verdict: request-changes` — with exactly ONE ticked `## Acceptance` block (the scaffold placeholder above it is untouched, as in `main`). Verified in the PUSHED tree (`origin/fix/…`):
+
+| Check | Occurrences |
+| --- | --- |
+| `Reviewer` | 5 |
+| `Coordinator ruling` | 3 |
+| `verdict: request-changes` | 5 |
+| round-2 re-review header (`independent re-review`) | 1 |
+| `verdict:` header lines | `none` (self-report) + round-1 `request-changes` + round-2 `request-changes` |
+| ticked / unticked acceptance boxes | 4 / 0 |
+| `## Acceptance` headings | 2 (scaffold placeholder + the ticked one) |
+
+On the sequencing caveat: I restored from the reviewer's own tree (this session's tracker root is the primary checkout, which is 3 commits ahead of `origin/main` and carries both round-2 comments), NOT from an older `origin/main` snapshot — that is why the round-2 verdict is present. This confirmation comment will land on `main` afterwards, as the reviewer predicted; nothing on this branch will overwrite it, because the branch now starts from the full record rather than a pre-review copy.
+
+**O2 — `convention.md` aligned with the shipped envelope.** `ArggonManager/docs/convention.md:491` now documents `{ worktreePath, release: { cli, native } }` (m7 dropped `branch`) and states why there is no branch — the unclaim already cleared the item's field, and the release probes the branch from the worktree itself. Grepped the whole tree for the stale 3-field shape (`worktreePath, branch, release`): **0 hits outside this item's history** (the only remaining occurrence is the reviewer's own O2 quote, which is the record, not a doc).
+
+**Also folded in (the re-review's nit, no action required).** The parity acceptance box named four kernel symbols but only two are on the kernel entry (`classifyReleaseEntry`, `worktreeReleaseRefusal`); `worktreeDirtyRefusal` / `parseRemovalBlockingPaths` are module-internal helpers of that rule and the native surface reaches the whole rule through `kernel.classifyReleaseEntry`. I reworded the box to name the surface it actually claims rather than re-exporting symbols nothing needs — doc-only, consistent with "no behavior change".
+
+**Gates** (cwd = the item worktree, on the pushed tree; doc-only delta, so the full suite was not re-run):
+
+| Gate | Command | Observed |
+| --- | --- | --- |
+| build | `npm run build` | ok — `build:plugin — 41 modules inlined, 457609 bytes` |
+| lint | `npm run lint` | clean |
+| validate | `npm run arggon -- validate` | `ok (0 warning(s), convention v5)` |
+
+Files touched this round: exactly two — the item file and `ArggonManager/docs/convention.md` (no TS).
+
+Open for the coordinator: re-review, squash-merge (the branch still carries the inert pre-rebase merge commit; squashing collapses it), then the `done` flip.
+
+### handoff 2026-10-02 @ses_f01cee59fffeSatwHpianDIykt (session: ses_f01cee59fffeSatwHpianDIykt) — next: Coordinator: re-review PR #596 (O1 record restored, O2 convention.md aligned), squash-merge, flip done
+- branch: fix/bug-unclaim-leaves-worktree-record-without-reaper
+- open questions: Branch still carries the inert pre-rebase merge commit (force-push denied) — squash-merge collapses it
