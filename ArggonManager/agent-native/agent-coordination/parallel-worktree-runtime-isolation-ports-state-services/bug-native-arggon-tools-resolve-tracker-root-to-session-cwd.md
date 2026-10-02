@@ -23,6 +23,10 @@ updated: "2026-10-02"
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] A tracker write issued from a session working in a worktree lands in that worktree's branch, or is refused with the resolved-vs-expected mismatch named — never silently commits to the primary checkout
+- [ ] The resolved tracker root is visible in a read receipt (`show --json` and/or the native equivalent), so an agent can detect the mismatch without guessing
+- [ ] `.arggon.env` per-worktree identity (`ARGGON_WORKTREE_PATH` / `ARGGON_STATE_DIR`) is consulted when resolving, so a worktree session cannot bind to the primary
+- [ ] A regression test drives the native surface from a worktree cwd and asserts the write lands in the worktree's branch (and one that asserts the refusal/visibility path)
+- [ ] `docs/agents.md` §Orchestration (and the worker's operating rules) no longer rely on `session_move` as the mitigation, since it demonstrably does not rebind the tracker root
 
 ## Notes
