@@ -123,3 +123,7 @@ Same poller, same full suite, post-fix: `TOTAL MUTATIONS: 0` (was 141-143). Suit
 
 ### Gates (worktree, branch fix/bug-cli-spawn-suites-exit-1-flake)
 npm test 117 files / 2147 tests pass | npm run lint rc=0 | npm run build rc=0 | npm run check:plugin rc=0 | npm run arggon -- validate: ok (0 warning(s), convention v5). Plugin bundle NOT in the diff.
+
+### handoff 2026-10-02 @Arggon (session: ses_f04e06d6effesjYkcieGbj4zMn) — next: Review PR #580; merge after CI is green, then flip the item done and archive the worktree (tools.arggon.cleanup {prune:true}).
+- branch: fix/bug-cli-spawn-suites-exit-1-flake
+- open questions: End-to-end race did not reproduce locally (~120 rewrite windows, 0 hits) - accept CI as the oracle? spawnNodeCli (claim-race/cascade/board-serve) gets the root-cause fix but NOT the typed error; asyn…
