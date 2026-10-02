@@ -23,6 +23,7 @@ updated: "2026-10-02"
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] Both surfaces print the same baseline date for the same baseline figure, sourced from one constant/file
+- [ ] A test asserts the two surfaces agree (date + figure), so the labels cannot drift apart again
 
 ## Notes
