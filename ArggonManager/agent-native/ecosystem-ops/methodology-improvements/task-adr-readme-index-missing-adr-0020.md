@@ -1,12 +1,16 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-adr-readme-index-missing-adr-0020
 title: "`docs/adr/README.md` index is missing ADRs 0005–0009 and 0020 (six rows), not just 0020"
+assignee: Arggon
+branch: feat/task-adr-readme-index-missing-adr-0020
 parent: methodology-improvements
 labels: [docs, adr]
 created: "2026-10-02"
 updated: "2026-10-02"
+claimed_at: "2026-10-02T23:58:14.217Z"
+worktree_path: /home/arggon/Projects/ArggonManager-task-adr-readme-index-missing-adr-0020
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/ecosystem-ops/methodology-improvements/task-adr-readme-index-missing-adr-0020.md
