@@ -46,4 +46,4 @@ The split, as implemented on `feat/task-prover-agent-reviewer-split` (worktree `
 - [x] `arggon-reviewer` no longer instructs itself to run tests, and defines the `## Probes needed` hand-off instead; its permission posture is unchanged (still read-only tree).
 - [x] This repo's `.opencode/agents/` regenerated from the templates (reviewer updated, prover created) — `arggon init` produces them from a clean scratch dir too (init test pinned: 42/42 green including the new contract test).
 - [x] `ArggonManager/docs/agents.md` documents the split (who proves, who reviews) with the methodology impact class stated (Behavioral per ADR 0016).
-- [ ] Gates: npm test, lint, build, check:plugin, validate ok; CI green on the PR.
+- [x] Gates: npm test, lint, build, check:plugin, validate ok; CI green on the PR. Evidence: 2143 green / 117 files (incl. 42 init-opencode, 49 doctor, 38 init), lint clean, build clean, check:plugin exit 0, validate ok (0 warnings, convention v5), CI green on the reconciled head; merged as PR #583 squash.
