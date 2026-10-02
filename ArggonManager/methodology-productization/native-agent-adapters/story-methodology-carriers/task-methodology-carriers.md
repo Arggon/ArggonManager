@@ -19,10 +19,13 @@ updated: "2026-10-02"
 
 ## Context
 
-<!-- Why this task exists. -->
+Declare scope/invariants/version/upgrade-channel of the methodology in agents.md, engineering.md, convention.md headers; README §The methodology with links to carriers and the adapter matrix
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] `README.md` links every carrier in one hop
+- [ ] carriers carry the same invariant list verbatim
+- [ ] PR states impact class (Behavioral) per agents.md §Changing the methodology itself
+- [ ] `arggon validate` green
 
 ## Notes

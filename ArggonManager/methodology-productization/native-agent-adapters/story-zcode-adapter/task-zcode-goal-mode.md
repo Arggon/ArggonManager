@@ -20,10 +20,12 @@ depends_on: [task-adapter-selection-flags, task-capability-matrix]
 
 ## Context
 
-<!-- Why this task exists. -->
+Generated goal-mode template: objective + verification contract derived from the claimed item's acceptance checklist; never spans worktrees
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] template generation test
+- [ ] goal contract parses the checklist
+- [ ] documented: one goal per claimed item
 
 ## Notes

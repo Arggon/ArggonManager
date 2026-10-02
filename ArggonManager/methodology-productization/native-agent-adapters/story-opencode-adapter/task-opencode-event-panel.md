@@ -20,10 +20,12 @@ depends_on: [task-adapter-selection-flags, task-capability-matrix]
 
 ## Context
 
-<!-- Why this task exists. -->
+Board panel refreshes from the OpenCode event stream instead of polling
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] unit test for event→refresh path
+- [ ] headless smoke evidence
+- [ ] no polling fallback regression
 
 ## Notes

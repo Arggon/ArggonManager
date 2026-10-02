@@ -20,10 +20,12 @@ depends_on: [task-adapter-selection-flags, task-capability-matrix]
 
 ## Context
 
-<!-- Why this task exists. -->
+OpenCode session `prompt` hook stamps branch/item metadata on admission; `compaction` hook retains the item block
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] unit tests for the hook rewrite contract
+- [ ] headless smoke evidence (expected vs observed in verdict)
+- [ ] permission rules unchanged
 
 ## Notes

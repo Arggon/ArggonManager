@@ -20,10 +20,13 @@ depends_on: [task-methodology-carriers]
 
 ## Context
 
-<!-- Why this task exists. -->
+Add `arggon init --agents <list>` / `--no-agents` (default: detected agents) and `arggon doctor --agents` (per-agent files present/stale/adopter-edited + gap rows)
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] fixture matrix test over init flag combinations
+- [ ] `--json` reports written/skipped per artifact; adopter edits never overwritten
+- [ ] doctor output snapshot test
+- [ ] README + agents.md §init updated in same PR
 
 ## Notes

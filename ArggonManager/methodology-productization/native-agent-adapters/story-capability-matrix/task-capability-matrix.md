@@ -20,10 +20,12 @@ depends_on: [task-methodology-carriers]
 
 ## Context
 
-<!-- Why this task exists. -->
+Commit `adapters/capability-matrix.json`: methodology invariant × agent → mechanism/package/gap note; `arggon doctor` prints gap rows report-only
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] JSON validates in CI (schema test)
+- [ ] every gap row carries a note
+- [ ] doctor output bounded and report-only
 
 ## Notes

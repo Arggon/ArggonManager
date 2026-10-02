@@ -20,10 +20,11 @@ depends_on: [task-opencode-prompt-stamp, task-opencode-event-panel, task-zcode-g
 
 ## Context
 
-<!-- Why this task exists. -->
+File the Claude Code adapter story with acceptance: plugin bundle (skills/agents/hooks/commands/MCP), marketplace manifest, headless smoke bar; no code in this wave
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] story filed with checklist linked from spec S6
+- [ ] no implementation in this wave
 
 ## Notes

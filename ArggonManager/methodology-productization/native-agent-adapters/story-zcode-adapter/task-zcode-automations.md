@@ -20,10 +20,12 @@ depends_on: [task-adapter-selection-flags, task-capability-matrix]
 
 ## Context
 
-<!-- Why this task exists. -->
+Opt-in automation templates: daily spec-drift scan, weekly stale-claim sweep — read-only or item-filing only
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] templates carry claim/branch preconditions
+- [ ] scans run read-only; findings filed via arggon create
+- [ ] documented as opt-in
 
 ## Notes
