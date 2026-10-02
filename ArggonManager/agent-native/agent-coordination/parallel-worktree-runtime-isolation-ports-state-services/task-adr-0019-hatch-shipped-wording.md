@@ -37,9 +37,9 @@ worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0019-hatch-shipped-w
 Owed by the task-adr-0019-amendment-claim-stamp verdict and confirmed by the PR #579 review: ADR 0019's decision point 4(b) still says the recovery hatch "is tracked in `task-strict-attach-dead-owner-hatch`". It has since shipped in two parts — `arggon start <id> --worktree --take-over-worktree` (#573, kernel-owned `WorktreeClaimRequest.takeOver`, default OFF, bounded `takeovers` chain, the fired evidence moved out of `claim.foreignWrites` so both strict gates needed no change) and the native seam's `takeOverWorktree` input (#579). The stale-stamp window stays a recorded **rejected** alternative, and the raw-porcelain detection fix (#573) is worth a clause in the same place since it is a decision-relevant implementation fact, not trivia.
 
 ## Acceptance
-- [ ] ADR 0019 decision point 4 names the shipped hatch (flag + native input), the anti-unlock invariant, and the dead-owner recovery order (flag, then the manual `rm`, then the modelled hatch in task-strict-attach-dead-owner-hatch).
-- [ ] The rejected stale-window row and the accepted explicit-hatch row stay consistent with what shipped.
-- [ ] No ADR status change (0019 is still Proposed); wording-only, and `validate` + prettier green.
+- [x] ADR 0019 decision point 4 names the shipped hatch (flag + native input), the anti-unlock invariant, and the dead-owner recovery order (flag, then the manual `rm`, then the modelled hatch in task-strict-attach-dead-owner-hatch).
+- [x] The rejected stale-window row and the accepted explicit-hatch row stay consistent with what shipped.
+- [x] No ADR status change (0019 is still Proposed); wording-only, and `validate` + prettier green.
 
 ### 2026-10-02 @Reviewer
 verdict: approve (docs-only ADR amendment; two non-blocking nits, one scope observation)
