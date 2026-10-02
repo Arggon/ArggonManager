@@ -7,6 +7,7 @@ parent: story-opencode-adapter
 labels: []
 created: "2026-10-02"
 updated: "2026-10-02"
+depends_on: [task-adapter-selection-flags, task-capability-matrix]
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-opencode-adapter/task-opencode-event-panel.md
