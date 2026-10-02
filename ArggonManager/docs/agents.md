@@ -160,7 +160,7 @@ owner's own re-attach never fires — the stamp is refreshed with its identity).
 Detection is bounded and best-effort: one porcelain read plus one `stat` per
 dirty path, covering the UNCOMMITTED collision window; committed work is
 history, and a missing or unreadable stamp (pre-feature worktrees) degrades to
-no detection, never to a false accusation.
+no detection, never to a false accusation. A fired detection never re-stamps the worktree, so the previous owner stays stamped and every retry re-detects — a strict refusal cannot be unlocked by retrying. If the stamped session is gone, confirm no live writer and remove the stamp by hand: `rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json"`.
 
 #### Failure semantics
 
