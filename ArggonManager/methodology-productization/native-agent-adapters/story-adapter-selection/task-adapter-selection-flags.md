@@ -7,6 +7,7 @@ parent: story-adapter-selection
 labels: []
 created: "2026-10-02"
 updated: "2026-10-02"
+depends_on: [task-methodology-carriers]
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-adapter-selection/task-adapter-selection-flags.md
