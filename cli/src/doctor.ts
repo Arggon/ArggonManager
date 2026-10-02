@@ -31,6 +31,11 @@ import {
 } from "./docs.js";
 
 import { measureBudget, formatBudgetLines, type BudgetResult } from "./measure.js";
+import {
+  formatMatrixLines,
+  readCapabilityMatrix,
+  type CapabilityMatrix,
+} from "./capability-matrix.js";
 
 // The sanitizer implementation moved to sanitize.ts (bug-cli-error-output-injection
 // F1) so the CLI error channel shares it; re-exported for existing consumers.
@@ -517,6 +522,16 @@ export type DoctorResult = {
    */
   opencode: DoctorOpenCode;
   /**
+   * Capability-matrix state (additive, task-capability-matrix; spec S3,
+   * ADR 0020): the committed `adapters/capability-matrix.json` — declared
+   * invariants, agents, row/gap counts and the bounded gap detail. DATA only:
+   * the matrix carries no rule logic and nothing here gates anything (report-
+   * only, never blocking; the kernel stays the enforcement of record). Present
+   * on initialized and non-initialized reports alike — it is a product asset,
+   * not a signal about the examined tree.
+   */
+  matrix: CapabilityMatrix;
+  /**
    * Context-budget measurement (additive, task-adr0006-remeasure): present
    * only when `doctor --budget` is passed. Measures the ADR 0006 agent-facing
    * surfaces with the 2026-09-14 baseline method (fresh `init --full` in a
@@ -622,6 +637,9 @@ export function runDoctor(opts: {
       // No tasks/ tree, so cwd is the best root for the OpenCode probe — the
       // same directory gitState probes (task-opencode-v2-doctor).
       opencode: detectOpenCode(opts.cwd),
+      // Same reasoning for the matrix probe: the tree copy wins, the installed
+      // package's shipped matrix is the fallback.
+      matrix: readCapabilityMatrix({ root: opts.cwd }),
     };
   }
 
@@ -738,6 +756,9 @@ export function runDoctor(opts: {
     },
     git: gitState(root),
     opencode: detectOpenCode(root),
+    // The tree's own committed matrix when it has one (this repo does), the
+    // installed package's shipped matrix otherwise.
+    matrix: readCapabilityMatrix({ root }),
   };
 }
 
@@ -815,6 +836,9 @@ export function formatDoctorReport(result: DoctorResult): string {
       "arggon doctor: not initialized (no tracker .convention.yml found — ArggonManager/ or legacy tasks/) — run `arggon init`",
     ];
     if (hasOpenCodeSignal(result.opencode)) lines.push(...formatOpenCodeLines(result.opencode));
+    // The matrix is a product asset, not a tree signal: print it whenever it is
+    // readable (or say why it is not), on both report shapes.
+    lines.push(...formatMatrixLines(result.matrix));
     if (result.budget) lines.push(...formatBudgetLines(result.budget));
     return `${lines.join("\n")}\n`;
   }
@@ -833,6 +857,8 @@ export function formatDoctorReport(result: DoctorResult): string {
       : []),
     `  git: ${formatGitLine(result.git)}`,
     ...formatOpenCodeLines(result.opencode),
+    // Gap rows are advisory (spec S3, ADR 0020): printed, never blocking.
+    ...formatMatrixLines(result.matrix),
   ];
   if (result.budget) {
     lines.push(...formatBudgetLines(result.budget));

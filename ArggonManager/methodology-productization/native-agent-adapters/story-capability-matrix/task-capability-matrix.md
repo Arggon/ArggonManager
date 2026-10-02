@@ -13,6 +13,7 @@ claimed_at: "2026-10-02T22:27:40.179Z"
 depends_on: [task-methodology-carriers]
 worktree_path: /home/arggon/Projects/ArggonManager-task-capability-matrix
 ---
+
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-capability-matrix/task-capability-matrix.md
   Leaves live only under a story. id is the filename stem: task-capability-matrix.
@@ -28,12 +29,13 @@ Commit `adapters/capability-matrix.json`: methodology invariant × agent → mec
 
 ## Acceptance
 
-- [ ] JSON validates in CI (schema test)
-- [ ] every gap row carries a note
-- [ ] doctor output bounded and report-only
+- [x] JSON validates in CI (schema test)
+- [x] every gap row carries a note
+- [x] doctor output bounded and report-only
 
 ## Notes
 
+<<<<<<< HEAD
 ### 2026-10-02 @arggon-reviewer
 verdict: request-changes (two bounded corrections: two claude rows assert absences the shipped seam contradicts; the JSON contract doc + 3 code comments still describe the removed package fallback)
 
@@ -141,3 +143,19 @@ The gap set changed 5 → 2, so the human `doctor` line the smoke bar covers is 
 ## Recommendation: MERGE
 
 F1 and F2 are fixed in substance, not cosmetically; the gates that lock the fixes in discriminate against the round-1 data; the item's acceptance checklist is complete and its body no longer asserts anything false. Nothing above blocks.
+=======
+- `adapters/capability-matrix.json` (committed, shipped in the pack): 5 methodology
+  invariants (the carriers' `**Invariants:**` header block, mirrored by test) x 3
+  agents (opencode, zcode, claude) = 15 rows, each with `mechanism`, `package`,
+  `gap` and `note`. DATA only, no rule logic; the kernel stays the enforcement of
+  record on every row.
+- Current gaps: all 5 claude rows (ADR 0020, "today it remains docs + CLAUDE.md";
+  each note names the missing native mechanism and what enforces it meanwhile).
+  opencode and zcode have zero gap rows (shipped seams).
+- `arggon doctor` prints one `matrix:` line plus one `gap:` line per gap row
+  (cap `MAX_MATRIX_GAP_ROWS` = 10, notes display-sanitized), additive `matrix`
+  block in `--json`. Report-only: exit code and every gate unchanged.
+- Budgets after: native tools catalog 12,162 B (cap 12,288), live MCP `tools/list`
+  16,253 B (cap 16,384), generated AGENTS.md 2,022 B (cap 2,048) — identical to
+  the pre-change numbers (nothing on the tool-schema surfaces moved).
+>>>>>>> f4d28aa4 (feat(matrix): committed capability matrix + report-only doctor gap rows)

@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "matrixId": "methodology-capability-matrix",
+  "title": "Methodology invariant x agent capability matrix",
+  "decision": "ArggonManager/docs/adr/0020-methodology-first-productization.md",
+  "spec": "ArggonManager/docs/specs/spec-methodology-adapters-017.md",
+  "planTask": "T3 (task-capability-matrix)",
+  "mode": "report-only",
+  "modeNote": "Data consumed by `arggon doctor`. No rule logic lives here: the rows DECLARE which native mechanism each agent uses for each methodology invariant, and `gap: true` means the agent's adapter surface delivers that invariant natively or not at all. The kernel (@arggondev/lib) behind the arggon CLI stays the enforcement of record on every row, and a gap row is advisory in every surface - never blocking in CI or in a transition.",
+  "fieldNotes": {
+    "invariants[].statement": "Verbatim clause from the carriers' `- **Invariants:**` header block (agents.md / engineering.md / convention.md).",
+    "rows[].mechanism": "The native client feature used, agent-namespaced (`opencode:` / `zcode:` / `claude:`), or `docs + CLI floor:` where the shipped docs plus the arggon CLI/kernel are the whole mechanism.",
+    "rows[].package": "The client package whose native surface carries the mechanism (`opencode`, `zcode`); `none` where no client mechanism exists and the docs + CLI floor carries the invariant.",
+    "rows[].gap": "true when the agent has no shipped adapter surface delivering the invariant - the note says what is missing and what enforces it meanwhile.",
+    "rows[].note": "Required non-empty for every gap row (schema-gated); null otherwise."
+  },
+  "invariants": [
+    { "id": "same-rules", "statement": "humans and agents follow the same rules" },
+    { "id": "state-in-git", "statement": "state lives in git" },
+    { "id": "discipline-enforceable", "statement": "discipline is enforceable" },
+    { "id": "docs-travel-with-code", "statement": "docs travel with code" },
+    { "id": "claim-integrity", "statement": "never-steal / never-reopen." }
+  ],
+  "agents": [
+    {
+      "id": "opencode",
+      "package": "opencode",
+      "adapter": "vendored plugin bundle `.opencode/plugins/arggon/index.ts` + generated `.opencode/agents`, `.opencode/commands`, `opencode.jsonc`"
+    },
+    {
+      "id": "zcode",
+      "package": "zcode",
+      "adapter": "generated plugin bundle `templates/docs/zcode/arggon/` (`arggon mcp`, commands, agents, hooks) installed through the local marketplace"
+    },
+    {
+      "id": "claude",
+      "package": "none",
+      "adapter": "docs pointer only: `CLAUDE.md` -> `@AGENTS.md` (no plugin bundle yet; spec S6 follow-on story)"
+    }
+  ],
+  "rows": [
+    {
+      "invariant": "same-rules",
+      "agent": "opencode",
+      "mechanism": "opencode:tool.transform registers the native `arggon` tools (Code Mode `tools.arggon.*`), each calling the same kernel operation the CLI's --json path runs and returning the documented envelope",
+      "package": "opencode",
+      "gap": false,
+      "note": null
+    },
+    {
+      "invariant": "state-in-git",
+      "agent": "opencode",
+      "mechanism": "opencode:worktree domain (`ctx.worktree.create/list/refresh/remove`) through tools.arggon.start/branch/cleanup; every tracker mutation auto-commits only the files it wrote, and the generated pre-commit gate runs `arggon validate`",
+      "package": "opencode",
+      "gap": false,
+      "note": null
+    },
+    {
+      "invariant": "discipline-enforceable",
+      "agent": "opencode",
+      "mechanism": "opencode:permissions - generated deny rules in opencode.jsonc (force-push, `commit --no-verify`) plus the per-agent tool allow-lists in .opencode/agents/*.md (reviewer cannot edit, worker cannot nest); kernel refusals arrive as typed tool errors",
+      "package": "opencode",
+      "gap": false,
+      "note": null
+    },
+    {
+      "invariant": "docs-travel-with-code",
+      "agent": "opencode",
+      "mechanism": "opencode:session.hook(\"context\") re-injects the bounded (1 KiB) active work-item block built from `arggon show --meta --json`, and the generated .opencode/commands/arggon-* carry the same playbook as the docs",
+      "package": "opencode",
+      "gap": false,
+      "note": null
+    },
+    {
+      "invariant": "claim-integrity",
+      "agent": "opencode",
+      "mechanism": "opencode:tool.transform — the kernel operation refuses a stolen claim and every reopen on all paths (native tools, CLI, MCP); the generated worker/reviewer agent contracts state the rule and tools.arggon.cleanup releases a dropped claim",
+      "package": "opencode",
+      "gap": false,
+      "note": null
+    },
+    {
+      "invariant": "same-rules",
+      "agent": "zcode",
+      "mechanism": "zcode:mcp - the plugin bundle registers `arggon mcp`, whose tools return the identical envelopes from the same kernel operations as the CLI (schema parity test-gated)",
+      "package": "zcode",
+      "gap": false,
+      "note": null
+    },
+    {
+      "invariant": "state-in-git",
+      "agent": "zcode",
+      "mechanism": "zcode:mcp - arggon_start (claim + worktree), arggon_branch and arggon_cleanup drive the same kernel commit/worktree path; the plugin never writes a tracker file itself",
+      "package": "zcode",
+      "gap": false,
+      "note": null
+    },
+    {
+      "invariant": "discipline-enforceable",
+      "agent": "zcode",
+      "mechanism": "zcode:plugin.hooks.PreToolUse (hooks/gate.mjs) denies force-push and `commit --no-verify` for every session and holds the reviewer backstop window; fail-open by design, so the kernel stays the enforcement of record",
+      "package": "zcode",
+      "gap": false,
+      "note": null
+    },
+    {
+      "invariant": "docs-travel-with-code",
+      "agent": "zcode",
+      "mechanism": "zcode:plugin bundle — the generated commands/, agents/ (coordinator, worker, reviewer) and the `arggon-cli` skill, refreshed by `arggon init` with provenance and never overwriting adopter edits",
+      "package": "zcode",
+      "gap": false,
+      "note": null
+    },
+    {
+      "invariant": "claim-integrity",
+      "agent": "zcode",
+      "mechanism": "zcode:mcp - the kernel refuses a stolen claim and every reopen, and the reviewer backstop denies the mutating mcp__arggon__* tools (arggon_comment stays open as the verdict channel)",
+      "package": "zcode",
+      "gap": false,
+      "note": null
+    },
+    {
+      "invariant": "same-rules",
+      "agent": "claude",
+      "mechanism": "docs + CLI floor: CLAUDE.md points at @AGENTS.md, and the agent runs the arggon CLI, whose kernel holds the rules; there is no plugin and no native tool surface",
+      "package": "none",
+      "gap": true,
+      "note": "no adapters/claude/ plugin bundle (skills, agents, hooks, commands, `arggon mcp` wiring): the parity bar is filed as the spec S6 follow-on story, so on this client the methodology is docs plus the CLI."
+    },
+    {
+      "invariant": "state-in-git",
+      "agent": "claude",
+      "mechanism": "docs + CLI floor: git runs on the Claude Code shell and tracker mutations go through the arggon CLI, which commits exactly the files it wrote",
+      "package": "none",
+      "gap": true,
+      "note": "no client-side seam: a plugin bundle would register the arggon tools so item mutations never depend on the agent hand-writing shell commands correctly."
+    },
+    {
+      "invariant": "discipline-enforceable",
+      "agent": "claude",
+      "mechanism": "docs + CLI floor: the generated pre-commit hook and CI run `arggon validate`; nothing is enforced inside the client",
+      "package": "none",
+      "gap": true,
+      "note": "no claude:plugin.hooks.PreToolUse gate and no permission wiring - the OpenCode deny rules and the ZCode PreToolUse gate have no Claude Code equivalent today, so the kernel, pre-commit and CI carry it alone."
+    },
+    {
+      "invariant": "docs-travel-with-code",
+      "agent": "claude",
+      "mechanism": "docs + CLI floor: the agent reads CLAUDE.md/AGENTS.md and pulls item context itself with `arggon show`",
+      "package": "none",
+      "gap": true,
+      "note": "no session hook injects the active work item (the OpenCode `session.hook('context')` block), so the agent has to ask for the context instead of receiving it."
+    },
+    {
+      "invariant": "claim-integrity",
+      "agent": "claude",
+      "mechanism": "docs + CLI floor: the kernel refuses a stolen claim and every reopen on the CLI path, and the playbook the agent reads states the rule",
+      "package": "none",
+      "gap": true,
+      "note": "no client-side backstop (no ZCode reviewer window, no OpenCode per-agent permissions): enforcement rests on the kernel alone on this client."
+    }
+  ]
+}

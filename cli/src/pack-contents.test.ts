@@ -112,6 +112,9 @@ describe("npm pack contents", () => {
       "templates",
       "skills",
       "opencode",
+      // task-capability-matrix: the committed capability matrix ships so an
+      // adopter tree's `arggon doctor` can report the gap rows (spec S3).
+      "adapters",
       "package.json",
       "README.md",
       "LICENSE",
@@ -133,6 +136,8 @@ describe("npm pack contents", () => {
       "skills/arggon-cli/SKILL.md",
       "opencode/plugins/arggon/index.ts",
       "opencode/plugins/arggon/index.bundle.ts",
+      // W3 task-capability-matrix: doctor reads the shipped matrix.
+      "adapters/capability-matrix.json",
       // W5 task-native-tui: the TUI entry vendored beside the server bundle.
       "opencode/plugins/arggon/tui.tsx",
       "README.md",

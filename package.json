@@ -14,6 +14,7 @@
     "templates/",
     "skills/",
     "opencode/",
+    "adapters/",
     "README.md",
     "LICENSE",
     "!**/*.test.*",
