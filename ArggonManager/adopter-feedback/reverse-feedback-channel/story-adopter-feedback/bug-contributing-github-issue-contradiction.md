@@ -48,3 +48,7 @@ Evidence (read from branch fix/bug-contributing-github-issue-contradiction @ 5b5
 No blocking findings. OK to merge PR #594 and mark the item done.
 ### 2026-10-02 @Arggon
 Fixed: CONTRIBUTING.md line 269 and README.md Contributing section no longer tell contributors to open an issue; both now route to in-tree work items (arggon create task). Policy stated exactly once in CONTRIBUTING.md (line 13). Grep sweep of README/SUPPORT/templates/docs found no other stale 'open an issue' instruction. Gates: arggon validate ok, npm run lint + lint:structure clean. PR #594.
+
+### handoff 2026-10-02 @Arggon — next: Review PR #594; coordinator merges and flips the item to done. No further worker action needed.
+- branch: fix/bug-contributing-github-issue-contradiction
+- open questions: None.
