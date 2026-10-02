@@ -254,3 +254,7 @@ Every tracker mutation ran from inside the worktree (`/home/arggon/Projects/Argg
 ## Collateral finding, reported not fixed
 
 Item bodies in this story linked docs with a four-level `..` prefix that resolves one directory **above** the tracker root (correct depth: three). Fixed in this item and in all nine items filed here, so the exploration chain's links resolve. Still broken and deliberately untouched (other items' bodies): `bug-contributing-github-issue-contradiction.md`, `bug-prettier-glues-split-inline-code-span.md`.
+
+### handoff 2026-10-02 @ses_f01435336ffeYS4KAJmBnNqG2k (session: ses_f01435336ffeYS4KAJmBnNqG2k) — next: Coordinator: review ADR 0020 + spec-friction-capture-017, then merge PR (open). On acceptance, release task-friction-capture-command (T1) as the first claimable implementation task.
+- branch: feat/task-explore-adopter-feedback-channel
+- open questions: Is doctor.friction scope creep (cuttable, channel loses its visibility)? Issues vs Discussions for tier B (spike)? Broken 4-level doc links in the two sibling bug-* bodies: fix here or leave to their…
