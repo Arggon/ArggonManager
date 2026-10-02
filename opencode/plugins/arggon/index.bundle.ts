@@ -6988,13 +6988,22 @@ function strictWorktreeWriteFailure(report) {
         `file${report.total === 1 ? " was" : "s were"} modified after that claim: ` +
         `${named}${extra > 0 ? ` (and ${extra} more)` : ""}. ` +
         "Another session may be writing here; coordinate with the stamped session (or have it " +
-        "re-attach to refresh the stamp), then re-run start --worktree to attach.");
+        "re-attach to refresh the stamp), then re-run start --worktree to attach. This refusal " +
+        "never re-stamps the worktree, so a retry re-detects the same evidence; if the stamped " +
+        "session is gone, confirm no live writer and remove the stamp by hand " +
+        '(rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json").');
 }
 function prepareWorktreeClaim(worktreePath, request) {
     const previous = readWorktreeClaimStamp(worktreePath, request);
     let foreignWrites;
     if (previous !== null && previous.identity !== request.identity) {
         foreignWrites = detectWorktreeForeignWrites(worktreePath, previous, request) ?? undefined;
+        if (foreignWrites !== undefined) {
+            return {
+                stamped: true,
+                foreignWrites,
+            };
+        }
     }
     const claimedDate = request.now === undefined
         ? new Date()
@@ -7014,7 +7023,6 @@ function prepareWorktreeClaim(worktreePath, request) {
     }, request);
     return {
         stamped,
-        ...(foreignWrites !== undefined ? { foreignWrites } : {}),
         ...(stamped ? {} : { warning: "could not write the claim stamp" }),
     };
 }
