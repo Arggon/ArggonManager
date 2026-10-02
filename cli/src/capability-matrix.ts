@@ -11,12 +11,19 @@
  *
  * Posture mirrors the rest of `doctor`: pure reads, never throws, every list
  * explicitly capped, and a missing or malformed matrix is a normal report
- * (`present: false` + `error`) that still exits 0. The file is resolved from
- * the TREE first (`<root>/adapters/capability-matrix.json` — this repo's own
- * committed copy) and from the INSTALLED PACKAGE second, so an adopter tree
- * with no `adapters/` dir still reports the shipped matrix. A tree copy that
- * exists but does not parse is reported as an error instead of silently
- * falling back to the package copy: a corrupt tree file must stay visible.
+ * (`present: false` + `error`) that still exits 0.
+ *
+ * Resolution is the EXAMINED TREE only — `<root>/adapters/capability-matrix.json`,
+ * the copy the tree commits — deliberately with no fallback to the installed
+ * package. Two reasons, both learned the hard way:
+ *   - the matrix is a repo asset (it declares THIS product's adapters), not an
+ *     installation asset, so the tree that owns it is the only authority;
+ *   - a package fallback made `doctor --json` differ between the packed bin and
+ *     the checkout CLI on the very same tree (the checkout resolves
+ *     `packageRoot()` to the repo, the packed bin to an install dir), which
+ *     broke the headless pack↔checkout byte-parity gate. An additive field
+ *     that depends on something outside the examined tree is not parity-safe;
+ *     this one reads only what the tree carries.
  *
  * Schema conformance of the COMMITTED file is gated by test
  * (`cli/src/capability-matrix.test.ts`), not by this reader: doctor reports
@@ -26,7 +33,6 @@
 import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { sanitizeHumanText } from "@arggondev/lib";
-import { packageRoot } from "./package-assets.js";
 
 /** Matrix file location, relative to the tree root or the installed package root. */
 export const MATRIX_PATH = "adapters/capability-matrix.json";
@@ -63,8 +69,8 @@ export type CapabilityMatrix = {
   /** A readable matrix file was found. */
   present: boolean;
   /**
-   * Posix path of the file that was read: tree-relative when the tree carries
-   * its own copy, else the installed package's `adapters/capability-matrix.json`.
+   * Posix path of the file that was read, relative to the examined tree
+   * (`adapters/capability-matrix.json`); null when none was read.
    */
   source: string | null;
   /** `schemaVersion` of the file, or null when absent/unreadable. */
@@ -83,7 +89,7 @@ export type CapabilityMatrix = {
   truncated: boolean;
   /** Rows dropped for not matching the shape — a hand-edited file, reported not repaired. */
   invalid: number;
-  /** Why no matrix was read (absent, unreadable, oversized, malformed). */
+  /** Why no matrix was read (absent from this tree, unreadable, oversized, malformed). */
   error: string | null;
 };
 
@@ -213,37 +219,32 @@ export function parseCapabilityMatrix(text: string, source: string | null): Capa
   };
 }
 
-/** Options for {@link readCapabilityMatrix} (test seam; not part of the JSON payload). */
+/** Options for {@link readCapabilityMatrix} (not part of the JSON payload). */
 export type ReadCapabilityMatrixOptions = {
   /**
-   * Tree root to probe for `<root>/adapters/capability-matrix.json`. Defaults
-   * to the installed package root (the shipped matrix); doctor passes the tree
-   * root (or the cwd on a non-initialized tree).
+   * Root of the tree to read. Doctor passes the repo root, or the cwd on a
+   * non-initialized tree — the same roots it probes `git` and the OpenCode seam
+   * with.
    */
-  root?: string | null;
+  root: string;
 };
 
 /**
- * Read the capability matrix: the tree's own committed copy first, then the
- * installed package's. Pure read, never throws, size-capped before the content
- * is loaded.
+ * Read the capability matrix from the examined tree. Pure read, never throws,
+ * size-capped before the content is loaded.
  */
-export function readCapabilityMatrix(opts: ReadCapabilityMatrixOptions = {}): CapabilityMatrix {
-  const treeRoot = opts.root ?? null;
-  if (treeRoot !== null) {
-    const abs = join(treeRoot, ...MATRIX_PATH.split("/"));
-    const state = readMatrixFile(abs, MATRIX_PATH);
-    if (state !== null) return state;
-  }
-  // Tree copy absent (or not a tree): the shipped matrix from the package.
+export function readCapabilityMatrix(opts: ReadCapabilityMatrixOptions): CapabilityMatrix {
+  const abs = join(opts.root, ...MATRIX_PATH.split("/"));
   return (
-    readMatrixFile(join(packageRoot(), ...MATRIX_PATH.split("/")), MATRIX_PATH) ??
-    emptyMatrix(`not found (expected ${MATRIX_PATH} in the tree or the installed package)`, null)
+    readMatrixFile(abs) ?? emptyMatrix(`not found (expected ${MATRIX_PATH} in this tree)`, null)
   );
 }
 
-/** Read + parse one candidate path; null when absent/unreadable/oversized. */
-function readMatrixFile(absPath: string, source: string): CapabilityMatrix | null {
+/**
+ * Read + parse `<root>/adapters/capability-matrix.json`; null when the tree
+ * carries no readable file at that path. `source` is the tree-relative path.
+ */
+function readMatrixFile(absPath: string): CapabilityMatrix | null {
   let size: number;
   try {
     const stat = statSync(absPath);
@@ -253,15 +254,21 @@ function readMatrixFile(absPath: string, source: string): CapabilityMatrix | nul
     return null;
   }
   if (size > MAX_MATRIX_BYTES) {
-    return emptyMatrix(`matrix file is ${size} B, over the ${MAX_MATRIX_BYTES} B ceiling`, source);
+    return emptyMatrix(
+      `matrix file is ${size} B, over the ${MAX_MATRIX_BYTES} B ceiling`,
+      MATRIX_PATH,
+    );
   }
   let text: string;
   try {
     text = readFileSync(absPath, "utf8");
   } catch (err) {
-    return emptyMatrix(`unreadable: ${err instanceof Error ? err.message : String(err)}`, source);
+    return emptyMatrix(
+      `unreadable: ${err instanceof Error ? err.message : String(err)}`,
+      MATRIX_PATH,
+    );
   }
-  return parseCapabilityMatrix(text, source);
+  return parseCapabilityMatrix(text, MATRIX_PATH);
 }
 
 /**
@@ -272,7 +279,7 @@ function readMatrixFile(absPath: string, source: string): CapabilityMatrix | nul
  */
 export function formatMatrixLines(matrix: CapabilityMatrix): string[] {
   if (!matrix.present) {
-    const why = matrix.error === null ? `not found (expected ${MATRIX_PATH})` : matrix.error;
+    const why = matrix.error ?? `not found (expected ${MATRIX_PATH} in this tree)`;
     return [`  matrix: ${sanitizeHumanText(why)} — report-only, never blocking`];
   }
   const source = sanitizeHumanText(matrix.source ?? MATRIX_PATH);

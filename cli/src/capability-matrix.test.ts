@@ -187,7 +187,7 @@ describe("capability matrix: committed file matches its schema", () => {
 });
 
 describe("capability matrix: reader posture (report-only, bounded, never throws)", () => {
-  it("reads the tree copy ahead of the installed package copy", () => {
+  it("reads the matrix the examined tree commits", () => {
     const dir = tempDir();
     mkdirSync(join(dir, "adapters"), { recursive: true });
     writeFileSync(
@@ -208,14 +208,19 @@ describe("capability matrix: reader posture (report-only, bounded, never throws)
     expect(matrix.present).toBe(true);
     expect(matrix.source).toBe(MATRIX_PATH);
     expect(matrix.rows).toBe(1);
-    // No tree copy: the reader falls back to the installed package's copy (in
-    // this repo that is the same committed file; in an adopter tree it is the
-    // one a release ships - `adapters/` joins the pack allowlist with the
-    // release, since `files` is a shipping field, ADR 0018).
-    expect(readCapabilityMatrix({ root: tempDir() }).present).toBe(true);
+    // A tree with no matrix is a normal report, NOT a package fallback: the
+    // block must depend only on the examined tree, or `doctor --json` would
+    // differ between the packed bin and the checkout CLI on the same tree
+    // (headless-ci.test.ts pins those envelopes byte-identical).
+    const absent = readCapabilityMatrix({ root: tempDir() });
+    expect(absent.present).toBe(false);
+    expect(absent.source).toBeNull();
+    expect(absent.error).toMatch(
+      /not found \(expected adapters\/capability-matrix.json in this tree\)/,
+    );
   });
 
-  it("reports a corrupt tree copy instead of silently falling back", () => {
+  it("reports a corrupt tree copy instead of hiding it", () => {
     const dir = tempDir();
     mkdirSync(join(dir, "adapters"), { recursive: true });
     writeFileSync(join(dir, MATRIX_PATH), "{not json", "utf8");
@@ -320,11 +325,27 @@ describe("doctor: matrix block is bounded and report-only", () => {
     expect(runCli(["validate", "--json"], repoRoot).status).toBe(0);
   });
 
-  it("reports the shipped matrix on a non-initialized tree too", () => {
+  it("reports the matrix block on a non-initialized tree, absent there", () => {
     const result = runDoctor({ cwd: tempDir() });
     expect(result.initialized).toBe(false);
-    expect(result.matrix.present).toBe(true);
-    expect(formatDoctorReport(result)).toContain("matrix:");
+    expect(result.matrix.present).toBe(false);
+    // Still a report line, still exit 0: a tree without a matrix is a normal
+    // state, not a doctor failure.
+    const report = formatDoctorReport(result);
+    expect(report).toContain("matrix: ");
+    expect(report).toContain("report-only, never blocking");
+  });
+
+  it("keeps the block byte-identical between a packed bin and the checkout CLI", () => {
+    // The regression this pins: with a package-root fallback the block reported
+    // the repo's own matrix to the checkout CLI and nothing to the packed bin on
+    // the SAME adopter tree, which broke the headless pack-parity gate. Reading
+    // the tree only makes the two agree by construction (headless-ci.test.ts is
+    // the end-to-end proof; this is the unit-level pin).
+    const dir = tempDir();
+    const fromThisTree = runDoctor({ cwd: dir }).matrix;
+    expect(fromThisTree.present).toBe(false);
+    expect(readCapabilityMatrix({ root: dir })).toEqual(fromThisTree);
   });
 
   it("renders a hostile matrix note inert on the human line; JSON keeps it raw (F3)", () => {
