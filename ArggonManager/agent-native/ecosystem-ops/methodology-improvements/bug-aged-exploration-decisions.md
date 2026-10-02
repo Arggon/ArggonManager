@@ -217,3 +217,7 @@ Three corrections to my previous comment — the substance of all four findings 
 1. I wrote "ee0789cfe" for the main tip. The commit I actually merged is **`e0789cfe`** (now further advanced; the tip at the time of this note is `09bee07b`). Neither is mine.
 2. `findingKey` is at **`cli/src/spec.ts:977-979`** (the key is the `return` on line 978, which includes `f.message` where the age lives) — my "976-979" was off by one at the start, carried over from the reviewer's citation instead of re-read. The conclusion it supports is unaffected: the age is inside the key, so the 012 baseline entry rotates with day drift.
 3. "byte-identical signature" overstates what I checked: I grepped the rerun log for `SpawnHarnessError`, `child-boot-failed` and `kernel artifact drift`, and all three appear with the same wording as in attempt 1. Same three-line signature, not a byte comparison of the whole log.
+
+### handoff 2026-10-02 @Arggon — next: Coordinator: merge PR #599 (merge, do not squash - branch carries tracker auto-commits), then flip this bug to done. All three doc findings fixed; CI green at head d3640d5d.
+- branch: fix/bug-aged-exploration-decisions
+- open questions: Rec 3 (codebase-memory-mcp) stays open in task-decide-codebase-memory-default-discovery - its placement comment is wrong; fix on claim. Rerun of the pre-merge head stayed red (spawn flake).
