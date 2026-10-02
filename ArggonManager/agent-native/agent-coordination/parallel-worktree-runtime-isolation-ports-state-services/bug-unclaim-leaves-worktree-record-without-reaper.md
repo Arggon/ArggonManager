@@ -122,3 +122,15 @@ Unverified by execution: all gates (mine to route, not run), M1/M2/M3 observed b
 5. M2 probe (CLI): same fixture, make the worktree dirty, `arggon cleanup --release <id>` (no flag) — expected a failure AND the stamp + `.arggon.env` GONE while the worktree survives; then repeat with `--take-over-worktree` — expected `releasable: true` with no `foreignWrites` evidence (gate disarmed).
 6. M3 probe (native): `tools.arggon.cleanup({ release })` on the merged-record shape — expected `commit: { skipped: "nothing to merge" /* "nothing to commit" */ }` where `arggon cleanup --release <id> --json` reports `{ hash, message: "chore(tasks): released <id>" }`.
 7. `npx arggon doctor --budget` — expected `nativeToolsCatalogBytes` ≤ 12288 and the live MCP `tools/list` ≤ 16384.
+
+### 2026-10-02 @ses_f02ab5836ffeOAxmisboIwWE4x
+Coordinator ruling on the review's non-blocking findings (2026-10-02) — M1, M2, M3 blocking; the rest resolved as follows so the worker has one list.
+
+**Must land in this PR (docs-travel-with-code / contract truth):**
+- m4 — in full. `README.md:322` flags+envelope must list `--release`/`--take-over-worktree` and the `release`/`released` family; the three coordinator prompts (repo `.opencode/agents/`, `.zcode-marketplace/`, and the `templates/docs/zcode/` source the others generate from) must say "unclaim **and release**" so the generated seam cannot drift back; `claim.md` §Unclaim recovery updated. The prompt edits go in the template source; generated copies stay in sync.
+- m5 — align with `start`: `--take-over-worktree` without `--release` must fail loudly (typed refusal), never silently no-op.
+- m6 — coordinator decision: **the "still claimed" refusal stays unconditional; `--take-over-worktree` does not bypass it.** A re-claimed item is by definition a live owner, and the cheap remedy is the claimant's own unclaim. The hatch exists only for a *presumed-dead stamped owner on an unclaimed item*. Update the code and the docs that currently say otherwise, and test it.
+- m7 — drop `claimFootprint.branch` (always `null` on the documented path) rather than document a field that lies; the release already probes the real branch via `worktreeBranch`.
+- m8, m9 — cheap, fold in: reword the human warning so the stamp/env die with the release, and clamp the release refusal reasons like its sibling paths.
+
+**Probes:** 1-3 and 7 go to `arggon-prover` (read-only gates + budget). Probes 4-6 are the M1-M3 defect demonstrations — the durable proof is the regression tests, so add one per blocking finding (→ done over-trigger, dirty-failure keeps stamp+env, native release commit parity incl. `commit` assertion), each failing without the fix. Report the probe evidence back here when green, and address the change requests before this merges.
