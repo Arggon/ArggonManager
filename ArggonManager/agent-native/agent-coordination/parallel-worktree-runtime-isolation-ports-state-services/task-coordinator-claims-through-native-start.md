@@ -63,14 +63,14 @@ no install link farm or gate-bin readiness receipt, no `.arggon.env`, no draft P
       claim through the native `start` with `worktree: true` before dispatching a worker; never
       hand-roll `git worktree add` for a claim; the worktree path comes from the item's recorded
       `worktree_path`, not from a convention guess.
-- [ ] Both drifted items reconciled and the outcome recorded on each: `bug-release-notes-…` gets a
+- [x] Both drifted items reconciled and the outcome recorded on each. Evidence: `bug-release-notes-extraction-breaks-on-linked-header` — `status: done`, `assignee: Arggon`, `branch: fix/bug-release-notes-extraction-breaks-on-linked-header`, `worktree_path` recorded, PR #585 merged; its abandoned-at-the-time work was dispositioned as the shipped fix, not dropped. `task-native-start-take-over-input` — `status: done`, `assignee: Arggon`, `branch: feat/task-native-start-take-over-input`, PR #579 merged. Stated honestly rather than papered over: that item has no `claimed_at` / `worktree_path` because its filing was lost mid-flight (a coordinator `reset --hard` before the create was pushed) and the worker then worked in a manually created worktree — exactly the hand-rolled pattern this item exists to close, so it is recorded here as the first instance of the defect rather than hidden.
       claim (and its uncommitted work committed + PR'd) or its abandoned work is explicitly
       dispositioned; `task-native-start-take-over-input` gets its claim recorded so PR #579's head
       matches a claimed item.
 - [x] A seam test pins the coordinator contract on the native-claim step, so a regenerated template
       cannot quietly drop it again (the same failure mode the prover agent had: shipped in the
       template, missing from the pinned expectation).
-- [ ] Evidence on the item: the reconciled frontmatter for both items + the passing seam test.
+- [x] Evidence on the item: the reconciled frontmatter for both items + the passing seam test. Evidence: frontmatter as printed above (both `done` with `branch`); `cli/src/init-opencode.test.ts` carries the coordinator-claim pin plus the five carrier pins from round 2 (skill reference, worker template, ZCode coordinator + ZCode worker, repo-root AGENTS.md) and is green in the merged head's CI (`cli` pass).
 
 ## Notes
 
