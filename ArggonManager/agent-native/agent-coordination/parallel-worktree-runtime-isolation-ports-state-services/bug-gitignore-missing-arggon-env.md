@@ -50,11 +50,11 @@ env file of the exact contract shape, so removal is not the risk — visibility 
 
 ## Acceptance
 
-- [ ] `.arggon.env` ignored in the repo-root `.gitignore`, with a comment naming the contract
+- [x] `.arggon.env` ignored in the repo-root `.gitignore`, with a comment naming the contract
       (spec worktree-env-contract-016) so the next reader does not remove it as dead weight.
-- [ ] A fresh `start --worktree` in this repo reports `env.gitignored: true` in the `env` receipt,
+- [x] A fresh `start --worktree` in this repo reports `env.gitignored: true` in the `env` receipt,
       and `git status --porcelain` in the worktree is clean afterwards.
-- [ ] Decided and recorded: should `init`/`adopt` *offer* to add the entry to an adopter's existing
+- [x] Decided and recorded: should `init`/`adopt` *offer* to add the entry to an adopter's existing
       `.gitignore` (report-only, never a silent rewrite), or is a documented hand-step enough? Any
       follow-up item is filed here.
-- [ ] Evidence: the receipt line and the clean status pasted on the item.
+- [x] Evidence: the receipt line and the clean status pasted on the item.
