@@ -908,6 +908,18 @@ export function strictGateBinViolations(gateBins: GateBinResolution[]): GateBinR
  * caller (CLI or native start) wraps it with its own flow context and the
  * attach re-run guidance. The same violations feed the report-only receipt's
  * `ready` clause — strict mode changes the CONSEQUENCE, never the observation.
+ *
+ * ORDERING is load-bearing (task-strictgatebinfailure-tail-clipped-by-head-clip):
+ * the `npm ci` remedy LEADS and the named-bin list trails, because both the
+ * human and the native channel compose this text with more and clip a
+ * composite error head-kept (`startFailure` at MAX_NATIVE_ERROR_CHARS = 2048,
+ * which keeps the HEAD), and the reachable worst case is the named list at its
+ * MAX_GATE_BINS cap with long sibling paths (~270 chars an entry). With the
+ * remedy last it was exactly what the clip ate — the agent got the diagnosis
+ * and no way forward. Same ordering #573's round 2 landed for
+ * strictWorktreeWriteFailure and #579/#595 applied on the native seam; the
+ * named list is evidence to scroll back for, never the instruction. Only the
+ * clause order moved: every clause is verbatim, none added or dropped.
  */
 export function strictGateBinFailure(
   gateBins: GateBinResolution[],
@@ -925,9 +937,9 @@ export function strictGateBinFailure(
     })
     .join("; ");
   return (
+    `Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install. ` +
     `x-tracker.strict-gate-bins is set: refusing the claim commit — gate binaries do not ` +
-    `resolve inside the worktree: ${named}. ` +
-    `Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install.`
+    `resolve inside the worktree: ${named}.`
   );
 }
 
