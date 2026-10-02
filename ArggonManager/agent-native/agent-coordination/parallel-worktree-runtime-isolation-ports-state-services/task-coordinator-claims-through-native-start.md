@@ -165,3 +165,63 @@ Two tests in `cli/src/init-opencode.test.ts` (both whitespace-flattened so prose
 ### handoff 2026-10-02 @ses_f02bcc476ffes6LrJvCQylx0li (session: ses_f02bcc476ffes6LrJvCQylx0li) — next: Review PR #589 (coordinator) and merge; then reconcile the two drifted items and tick the remaining boxes
 - branch: feat/task-coordinator-claims-through-native-start
 - open questions: Should the skill reference + worker template + root AGENTS.md get the same claim-before-dispatch wording (file a follow-up); who owns reconciling the two drifted items
+
+### 2026-10-02 @ses_f02bcc476ffes6LrJvCQylx0li
+## Review round 2 addressed (same branch, still a draft, not merged, item not flipped)
+
+### B1 — `.convention.yml` stamps dropped (decision recorded, not a silent pass)
+
+`ArggonManager/.convention.yml` is byte-identical to `origin/main` again (`git diff --quiet origin/main -- ArggonManager/.convention.yml` → clean). The vendored agent copies stay regenerated from source.
+
+Reviewer's probe, run verbatim on the committed tree in this worktree:
+
+```
+$ npx --yes arggon-manager@0.5.0 init --no-commit
+arggon init: kept adopter-modified docs: 21 file(s) (--backup archives and regenerates)
+$ git status --porcelain -- . ':(exclude)ArggonManager/.convention.yml'
+<EMPTY>
+```
+
+Expected: empty — released 0.5.0 finds the regenerated copies' checksums (recorded from origin/main) mismatched, classifies them **adopter-modified** and skips them, so no tracked file is rewritten. Observed: empty. **B1 fixed.**
+
+**Recorded decision + trade-off:** the provenance state file no longer describes the committed bytes of the regenerated generated artifacts until a release regenerates them. Same posture as #583. Consequences accepted knowingly:
+- `arggon doctor` now reports those copies as adopter-modified rather than `untouched`, and `vendored plugin current` is no longer the reported state for the plugin copy (the stamps were stale at HEAD anyway — see round-1 finding 2).
+- The round-1 acceptance line "doctor must report `vendored plugin current`" is **superseded** by this review decision. The vendor-copy requirement itself is still met: every `.opencode/` and `.zcode-marketplace/` copy is a byte-for-byte `arggon init` render of its committed template (verified by `npm test` parity tests + the round-1 pin).
+
+### B2 — all four carriers fixed (plus a fifth the list missed)
+
+| carrier | before → after |
+|---|---|
+| `skills/arggon-cli/references/orchestration.md` (loaded before the first tool call by BOTH agent templates) | "Per-item worktrees … each in its own worktree (`../<repo>-<item-id>`)" + "Claim **your** item (`in_progress` + assignee)" → **Claim before dispatch** coordinator duty (native `start` with `worktree: true`, recorded path, three prohibitions, refusal-is-evidence) + subagent rule is now verify-an-already-claimed-item |
+| `templates/docs/opencode/agents/arggon-worker.md` | "Claim your item (`tools.arggon.update` with status `in_progress` + assignee) only if it is unclaimed" + description "claims exactly one item" → "Your item is **already claimed** … never re-claim, never take over the stamp, never hand-roll a worktree" + §Orchestration cross-link + description "owns exactly one already-claimed item" |
+| `templates/docs/zcode/arggon/agents/arggon-coordinator.md` | no claim step → duty 2 "Claim before dispatch" in MCP spelling (`arggon_start({ id, assignee, worktree: true })`), duties renumbered |
+| `AGENTS.md` (repo root, loaded at the top of every session here) | "Claim before starting: `npm run arggon -- update <id> --status in_progress --assignee <login>`" + "create one per item with `git worktree add ../<repo>-<item-id> -b <branch>`" → native `tools.arggon.start({ id, assignee, worktree: true })` (`/arggon-start`, or `arggon start <id> --worktree`) + "work in the worktree your claim recorded on the item's `worktree_path`" |
+
+**Fifth carrier (not in the review's list, found by grepping the drift phrase repo-wide):** `templates/docs/zcode/arggon/agents/arggon-worker.md` — identical stale claim bullet ("Claim your item (`arggon_update` with status `in_progress` + assignee) only if it is unclaimed") and the same "claims exactly one item" description. Fixed the same way; vendored copy regenerated.
+
+Vendored copies regenerated with `npm run arggon -- init`; `.agents/skills/**` refreshed with `npm run skills:sync`; `.convention.yml` reverted after every regen.
+
+### In-lane review notes, folded in (prose)
+
+- `agents.md`: "convention guess that drifts silently" + a repeated guess in the next bullet → **Per-item worktrees** now names the item's **recorded `worktree_path`** (`../<repo>-<id>` is the naming convention `start` follows, not a path to re-derive).
+- Subagent-rule tail: "only when you are the one who works it" → "only when **you picked the item up yourself and no claim exists**" (a dispatched worker *does* work it).
+- Spelling consistency: the native duties no longer mix CLI syntax — `start` has no `--force` (the `--force` on `update` is human-only and never the remedy), and the unclaim step is `tools.arggon.update({ id, status: "todo" })`.
+- Refusal taxonomy: the `npm ci` remedy is attributed to **both** arms — the **unconditional** fresh-worktree install gate (`bug-start-install-ordering`) and `x-tracker.strict-gate-bins` on an attach; a single-writer refusal is the same shape (coordinate first; `--take-over-worktree` only for a dead owner).
+- Coordinator template duty-3 drift: "foreground or background" → **foreground** (a background child outlives a headless `opencode run`), and duty 4 now routes the reviewer's `## Probes needed` blocks to `arggon-prover` (#583).
+- **One consequence I had to make for coherence:** duty 4 telling the coordinator to use `arggon-prover` is incoherent while the template's own allow-list denies it. `ArggonManager/docs/agents.md` §Orchestration already documents the allow-list as `arggon-worker` / `arggon-reviewer` / `arggon-prover` / `explore`, so the template was behind its own carrier — added `- action: subagent / resource: arggon-prover / effect: allow`. The wave smoke's permission probe denies `general`, which is unaffected.
+
+### Pins (`cli/src/init-opencode.test.ts`, 45 tests green in that file)
+
+New test **"no other carrier tells an agent to claim without a worktree, or to hand-roll one"** walks all five carriers (skill reference, OpenCode worker, ZCode coordinator, ZCode worker, repo-root `AGENTS.md`): each must carry the claim/verify rule and none may carry "Claim your item …", "Claim **your** item (`in_progress` + assignee)", "claims exactly one item", `git worktree add ../<repo>-<item-id>`, "create one per item with" or `--status in_progress --assignee`.
+
+The existing coordinator pin also now covers the foreground rule, the `arggon-prover` mention, and the prover allow-list entry. Note the two pins that had to be assertion-shaped rather than string-shaped: a "not.toContain('git worktree add')" pin can never pass, because the replacement forbids that command by name (my first attempt failed exactly this way — fixed to pin the instruction, not the string).
+
+### Gates (worktree, head `c0fcfa0b`)
+
+- `npm test` → see the run recorded below · `npm run lint` · `npm run build` · `npm run check:plugin` (bundle byte-identical, no `opencode/plugins/arggon/**` change) · `npm run arggon -- validate` → `ok:true`, 0 errors, 0 warnings · prettier clean on every touched file
+- B1 probe: empty (above)
+
+### Still open (not mine)
+
+- Item box 2 (reconciling `bug-release-notes-extraction-breaks-on-linked-header` and `task-native-start-take-over-input`) — left to the coordinator lane, unticked.
+- Not filed by me: whether the reverted stamps deserve a follow-up item (a release regenerates them), and the round-1 finding 2 (stale checksums at HEAD) is now moot for the plugin/SKILL entries but will resurface at the next regen.
