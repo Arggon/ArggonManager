@@ -13,7 +13,6 @@ updated: "2026-10-02"
 claimed_at: "2026-10-02T14:18:08.885Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-explore-adopter-feedback-channel
 ---
-
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/task-explore-adopter-feedback-channel.md
   Leaves live only under a story. id is the filename stem: task-explore-adopter-feedback-channel.
@@ -211,3 +210,47 @@ Phase 0–5 complete. Summary of the verdict on the original proposal:
 Gates green: `validate` ok (0 warnings, v5); `spec validate` ok (30 docs); `spec analyze` no new finding; prettier clean; placeholder scan clean.
 
 Next per the ADR 0017 gate: an ADR (settling the carrier change's behavioral impact class, opt-out semantics, and the explicit non-goal of automatic publication), then the spec carrying the 13 hunted edge-case dimensions as acceptance criteria. No implementation task claimed before `spec analyze` reports no NEW findings.
+
+### 2026-10-02 @ses_f01435336ffeYS4KAJmBnNqG2k
+**Recommendation: needs a spec — ADR 0020 + spec-friction-capture-017 + plan written. Nothing implemented. Coordinator decides.**
+
+The exploration's Phases 0–5 were already on this item (`exploration-adopter-feedback-channel-018`), so this session closed the **artifact gate** it was waiting on: the ADR, the spec, the plan, and the implementation chain.
+
+## What landed
+
+| Artifact | What it settles |
+| --- | --- |
+| [ADR 0020](../../../docs/adr/0020-adopter-friction-channel.md) | carrier change is **behavioral**; opt-out gates capture but never discoverability; automatic publication is a **hard non-goal**; the evals harness is ruled out as the capture vehicle |
+| [spec-friction-capture-017](../../../docs/specs/spec-friction-capture-017.md) | all 13 hunted edge-case dimensions → 13 mapped acceptance criteria + non-goals |
+| [plan-friction-capture-017](../../../docs/plans/plan-friction-capture-017.md) | T1–T6 with ordering and the spike list |
+| 6 tasks + 3 spikes | filed under `story-adopter-feedback`, chained |
+
+## Two things the prior research had not settled
+
+**1. `doctor` gains a `friction` staleness block (ADR 0020 §2).** This is the finding I would most want a second opinion on. An adopter that has acked its generated docs receives the trigger only as an ADR 0016 `init --propose` side file — so without a doctor signal, "the channel is not live here" is **invisible**. That is precisely the failure ADR 0016 already had to fix for docs via the `outdated` bucket, and it is the `deftai` maxim (*"a disabled capability nobody can see is absent"*) applied to a mechanism this repo already owns. Cheap (compare a stamped marker), and it is what separates "the trigger was never seen" from "the trigger was seen and ignored" in the compliance spike. If the coordinator thinks this is scope creep, it is the piece to cut — everything else stands without it, but the channel then inherits the exact blind spot that sank the original proposal.
+
+**2. The evals harness is the wrong vehicle, but the right producer (ADR 0020 §5).** `skills/arggon-cli/evals/` answers "can an agent reading only `SKILL.md` derive and run the right command" — it runs against `dist/cli.js` in a **synthetic temp fixture it creates itself**, scores pass/fail into stdout for a maintainer to read, and **never touches an adopter repo**. Reusing it as the channel would put capture back inside one machine's local test loop: the exact blind spot `telemetry-mining.md` already documents, and its FAIL line is not a record. What it *is* good for: an eval FAIL is machine-derived, so its fingerprint fields (eval id, predicate, expected, observed, command shape) are stable structured values rather than LLM-authored prose — which is the Sentry hazard the whole dedupe design turns on. Kept as a stage-2 producer that appends one record per failed case; it must never auto-file.
+
+## Filed (none claimable until the ADR/spec decision lands — ADR 0017 gate)
+
+`task-friction-capture-command` (p1) → `task-friction-redaction-at-write` (p1) + `task-friction-dedupe-and-report` (p1) → `task-friction-tier-b-url-and-optout` (p2) → `task-friction-surface-parity-and-docs` (p2) → `task-friction-trigger-carrier` (p1, the behavioral carrier change).
+
+Spikes: `task-spike-friction-trigger-compliance` (does an embedded trigger fire more reliably than a skill reference? **gates stage 2 and tier C**), `task-spike-friction-tier-b-surface` (Issues vs Discussions), `task-spike-friction-volume-threshold` (depends on the compliance spike; a null result — "no automation, revisit only with data" — is the expected answer).
+
+Ordering note carried into the plan: **the trigger carrier task lands last.** An agent file naming a command that does not exist yet is worse than no trigger at all.
+
+## Scope note (stage 1 vs the story title)
+
+The story is titled "capture, dedupe, human-gated publish", and stage 1 deliberately stops before tier C. Tier C is `gh`-mediated upstream dedupe and comment-on-existing; it is the part that most resembles "automatic", so it is gated behind a measured-volume spike rather than shipped with the local half. Stage 1 still ships the human gate (tier A copy, tier B prefilled URL a human clicks) — that is the part that keeps `docs/agents.md` §0 intact, and it is what makes the channel exist at all.
+
+## Gates
+
+`arggon validate` ok (0 warnings, convention v5) · `arggon spec validate` ok (32 docs) · `arggon spec analyze` **7 findings, the same 7 pre-existing ones — zero NEW** across 19 specs · `npm run lint` clean · prettier clean.
+
+## Tracker-write hazard check
+
+Every tracker mutation ran from inside the worktree (`/home/arggon/Projects/ArggonManager-task-explore-adopter-feedback-channel`), and all 9 creates used `--no-commit` with a single explicit-path commit. `git log --oneline origin/feat/task-explore-adopter-feedback-channel -3` shows both commits on the branch; **the primary checkout is clean on `main` with no commits from this session.**
+
+## Collateral finding, reported not fixed
+
+Item bodies in this story linked docs with a four-level `..` prefix that resolves one directory **above** the tracker root (correct depth: three). Fixed in this item and in all nine items filed here, so the exploration chain's links resolve. Still broken and deliberately untouched (other items' bodies): `bug-contributing-github-issue-contradiction.md`, `bug-prettier-glues-split-inline-code-span.md`.
