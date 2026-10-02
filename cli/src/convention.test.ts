@@ -233,11 +233,13 @@ describe("x-worktree (worktree bootstrap, task-start-post-hook)", () => {
       postStart: null,
       postStartShell: null,
       env: null,
+      services: null,
     });
     expect(parseConventionConfig("version: 3\n").worktree).toEqual({
       postStart: null,
       postStartShell: null,
       env: null,
+      services: null,
     });
   });
 
@@ -245,11 +247,17 @@ describe("x-worktree (worktree bootstrap, task-start-post-hook)", () => {
     const config = parseConventionConfig(
       ["version: 3", "x-worktree:", '  post-start: "npm ci"', "  future-option: 7", ""].join("\n"),
     );
-    expect(config.worktree).toEqual({ postStart: "npm ci", postStartShell: null, env: null });
+    expect(config.worktree).toEqual({
+      postStart: "npm ci",
+      postStartShell: null,
+      env: null,
+      services: null,
+    });
     expect(parseConventionConfig("x-worktree:\n  post-start: npm ci\n").worktree).toEqual({
       postStart: "npm ci",
       postStartShell: null,
       env: null,
+      services: null,
     });
   });
 
@@ -259,6 +267,7 @@ describe("x-worktree (worktree bootstrap, task-start-post-hook)", () => {
       postStart: "make setup",
       postStartShell: null,
       env: null,
+      services: null,
     });
   });
 
@@ -299,6 +308,35 @@ describe("x-worktree (worktree bootstrap, task-start-post-hook)", () => {
     // Unknown sibling keys stay ignored (ignore-unknown).
     expect(() => parseConventionConfig("x-worktree:\n  env-typo: false\n")).not.toThrow();
     expect(parseConventionConfig("x-worktree:\n  env-typo: false\n").worktree.env).toBeNull();
+  });
+
+  it("parses the services declaration: true, false, or a Compose project base (ADR 0019 layer 2)", () => {
+    // Unset or explicit false = nothing declared (cleanup never invokes Docker).
+    expect(parseConventionConfig("version: 5\n").worktree.services).toBeNull();
+    expect(parseConventionConfig("x-worktree:\n  services: false\n").worktree.services).toBeNull();
+    // Canonical worktree naming (the project IS `<repo>-<item-id>`).
+    expect(parseConventionConfig("x-worktree:\n  services: true\n").worktree.services).toBe("true");
+    // A declared base project name (the pattern doc's `name: "<base>${WORKTREE_SUFFIX:-}"`).
+    expect(parseConventionConfig("x-worktree:\n  services: myapp\n").worktree.services).toBe("myapp");
+    expect(parseConventionConfig("x-worktree:\n  services: my_app-2\n").worktree.services).toBe(
+      "my_app-2",
+    );
+    // Anything else is a parse error: empty, dotted, dashed-leading, special chars.
+    expect(() => parseConventionConfig("x-worktree:\n  services: ''\n")).toThrow(
+      /'services' must be true, false, or a Compose project base name/,
+    );
+    expect(() => parseConventionConfig("x-worktree:\n  services: my.app\n")).toThrow(
+      /'services' must be true, false, or a Compose project base name/,
+    );
+    expect(() => parseConventionConfig("x-worktree:\n  services: -lead\n")).toThrow(
+      /'services' must be true, false, or a Compose project base name/,
+    );
+    expect(() => parseConventionConfig("x-worktree:\n  services: my app\n")).toThrow(
+      /'services' must be true, false, or a Compose project base name/,
+    );
+    // Unknown sibling keys stay ignored (ignore-unknown).
+    expect(() => parseConventionConfig("x-worktree:\n  services-typo: myapp\n")).not.toThrow();
+    expect(parseConventionConfig("x-worktree:\n  services-typo: myapp\n").worktree.services).toBeNull();
   });
 });
 

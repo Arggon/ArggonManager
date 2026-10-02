@@ -507,7 +507,7 @@ const TOOLS: ToolDefinition[] = [
   {
     name: "arggon_cleanup",
     description:
-      "List worktrees of done/cancelled items whose branches are merged (`prune: true` removes them, deletes their merged branches, and clears the worktree_path records). Spawns the arggon CLI. Returns the arggon `cleanup --json` envelope: {ok, schemaVersion, conventionVersion, command, base, candidates, pruned, failures[, commit]}.",
+      "List worktrees of done/cancelled items whose branches are merged (`prune: true` removes them, deletes their merged branches, and clears the worktree_path records; when the repo declares `x-worktree.services`, each removable worktree's Compose project is torn down first). Spawns the arggon CLI. Returns the arggon `cleanup --json` envelope: {ok, schemaVersion, conventionVersion, command, base, candidates, pruned, failures[, compose][, commit]}.",
     inputSchema: {
       type: "object",
       properties: {

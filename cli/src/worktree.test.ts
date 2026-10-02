@@ -124,6 +124,35 @@ function setPostStart(dir: string, command: string | null): void {
 }
 
 /**
+ * Configure `x-worktree.services` (ADR 0019 layer 2,
+ * task-cleanup-declared-services) and commit it.
+ */
+function setServices(dir: string, value: string): void {
+  appendFileSync(join(dir, "ArggonManager/.convention.yml"), `x-worktree:\n  services: ${value}\n`);
+  git(["add", "ArggonManager/.convention.yml"], dir);
+  git(["commit", "--quiet", "-m", "config: x-worktree.services"], dir);
+}
+
+/**
+ * Recording ComposeDown stand-in (no daemon in CI). `fail` makes every call
+ * throw: `"enoent"` like an absent docker CLI (the report-only signal), any
+ * other message like a real `docker compose down` failure.
+ */
+function fakeCompose(fail?: "enoent" | string) {
+  const calls: Array<{ project: string; cwd: string }> = [];
+  const down = (project: string, cwd: string): void => {
+    calls.push({ project, cwd });
+    if (fail === "enoent") {
+      const err = new Error("spawn docker ENOENT") as NodeJS.ErrnoException;
+      err.code = "ENOENT";
+      throw err;
+    }
+    if (fail !== undefined) throw new Error(fail);
+  };
+  return { calls, down };
+}
+
+/**
  * Create a minimal package under `<dir>/node_modules/<name>` so a project gate
  * can `require("<name>")` — the dependency stand-in for a real install
  * (bug-start-worktree-node-modules).
@@ -977,9 +1006,11 @@ describe("post-start shell variant (task-post-start-env)", () => {
   });
 });
 
-describe("arggon cleanup", () => {
-  /** alpha: done + merged worktree; bravo: todo worktree; charlie: done + unmerged worktree. */
-  function initCleanupRepo(): { dir: string; paths: Record<string, string> } {
+/**
+ * alpha: done + merged worktree; bravo: todo worktree; charlie: done + unmerged worktree.
+ * (Module scope: shared by the cleanup describes, incl. the Compose-reap one.)
+ */
+function initCleanupRepo(): { dir: string; paths: Record<string, string> } {
     const dir = initRepo();
     const paths: Record<string, string> = {};
 
@@ -1021,8 +1052,9 @@ describe("arggon cleanup", () => {
     git(["add", "ArggonManager"], dir);
     git(["commit", "--quiet", "-m", "records"], dir);
     return { dir, paths };
-  }
+}
 
+describe("arggon cleanup", () => {
   it("lists only terminal items with merged branches (default mode removes nothing)", () => {
     const { dir, paths } = initCleanupRepo();
 
@@ -1764,5 +1796,168 @@ describe("start --worktree flips workspace packages to the worktree copy (task-s
     // Removing the farm never followed its entries into the primary install.
     expect(existsSync(join(dir, "node_modules", "fake-gate-dep", "index.js"))).toBe(true);
     expect(existsSync(join(dir, "lib", "package.json"))).toBe(true);
+  });
+});
+
+describe("arggon cleanup reaps declared Compose projects (ADR 0019 layer 2, task-cleanup-declared-services)", () => {
+  /** The cleanup fixture plus a committed `x-worktree.services` declaration. */
+  function initComposeRepo(services: string): { dir: string; paths: Record<string, string> } {
+    const { dir, paths } = initCleanupRepo();
+    setServices(dir, services);
+    return { dir, paths };
+  }
+
+  it("never invokes Docker when the repo declares nothing (report-only path)", () => {
+    const { dir } = initCleanupRepo();
+    const compose = fakeCompose();
+
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true }, { compose: compose.down });
+
+    // Not a single docker invocation, and no compose report at all.
+    expect(compose.calls).toEqual([]);
+    expect(result.compose).toBeUndefined();
+    expect(result.failures).toEqual([]);
+    expect(result.pruned.length).toBeGreaterThan(0);
+  });
+
+  it("reaps `<repo>-<item-id>` for services: true, before removing the worktree", () => {
+    const { dir, paths } = initComposeRepo("true");
+    const compose = fakeCompose();
+    let worktreeExistedAtReap: boolean | null = null;
+    const down = (project: string, cwd: string): void => {
+      compose.down(project, cwd);
+      worktreeExistedAtReap = existsSync(paths["task-alpha"]);
+    };
+
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true }, { compose: down });
+
+    const project = basename(paths["task-alpha"]).toLowerCase();
+    expect(compose.calls).toEqual([{ project, cwd: dir }]);
+    // The stack dies with the worktree: reap FIRST, removal after.
+    expect(worktreeExistedAtReap).toBe(true);
+    expect(result.compose).toEqual({ declared: "true" });
+    expect(result.failures).toEqual([]);
+    expect(result.pruned.map((a) => a.action)).toEqual([
+      `reaped compose project ${project}`,
+      `removed worktree ${paths["task-alpha"]}`,
+      "deleted branch feat/task-alpha",
+      "cleared worktree_path",
+    ]);
+  });
+
+  it("derives `<base>-<repo>-<item-id>` from a declared base name, lowercased", () => {
+    const { dir, paths } = initComposeRepo("MyApp");
+    const compose = fakeCompose();
+
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true }, { compose: compose.down });
+
+    // The adopter pattern's `name: "MyApp${WORKTREE_SUFFIX:-}"` with
+    // WORKTREE_SUFFIX="-<repo>-<item-id>"; Compose lowercases project names,
+    // so the whole derivation is lowercased (the fixture id has uppercase hex).
+    const project = `myapp-${basename(paths["task-alpha"])}`.toLowerCase();
+    expect(compose.calls).toEqual([{ project, cwd: dir }]);
+    expect(result.compose).toEqual({ declared: "MyApp" });
+    expect(result.failures).toEqual([]);
+  });
+
+  it("never reaps an adopter-run project the convention does not declare", () => {
+    const { dir, paths } = initComposeRepo("myapp");
+    const compose = fakeCompose();
+
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true }, { compose: compose.down });
+
+    // Exactly one call, exactly the declared derivation: the primary
+    // checkout's own `myapp` project (no worktree suffix), any other base's
+    // per-worktree project, and the skipped worktrees (bravo/charlie) are
+    // never passed to Docker.
+    expect(compose.calls).toEqual([
+      { project: `myapp-${basename(paths["task-alpha"])}`.toLowerCase(), cwd: dir },
+    ]);
+    expect(result.failures).toEqual([]);
+  });
+
+  it("absent docker CLI (ENOENT) degrades to report-only and still prunes", () => {
+    const { dir, paths } = initComposeRepo("true");
+    const compose = fakeCompose("enoent");
+
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true }, { compose: compose.down });
+
+    // The absence is reported once, never as a failure, and the prune
+    // completes (the worktree removal does not wait for Docker).
+    expect(compose.calls).toEqual([{ project: basename(paths["task-alpha"]).toLowerCase(), cwd: dir }]);
+    expect(result.compose).toEqual({ declared: "true", dockerUnavailable: true });
+    expect(result.failures).toEqual([]);
+    expect(result.pruned.map((a) => a.action)).toEqual([
+      `removed worktree ${paths["task-alpha"]}`,
+      "deleted branch feat/task-alpha",
+      "cleared worktree_path",
+    ]);
+    expect(existsSync(paths["task-alpha"])).toBe(false);
+  });
+
+  it("reports a reap failure on BOTH surfaces and never wedges the removal", () => {
+    const { dir, paths } = initComposeRepo("true");
+    const compose = fakeCompose("Cannot connect to the Docker daemon");
+
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true }, { compose: compose.down });
+
+    expect(result.failures).toEqual([
+      "task-alpha: Cannot connect to the Docker daemon",
+    ]);
+    const failed = result.pruned.find((a) => a.action === "failed");
+    expect(failed).toMatchObject({
+      id: "task-alpha",
+      error: "Cannot connect to the Docker daemon",
+    });
+    // Non-fatal: the worktree, its branch and its record are still reaped.
+    expect(result.pruned.map((a) => a.action)).toContain(`removed worktree ${paths["task-alpha"]}`);
+    expect(result.pruned.map((a) => a.action)).toContain("deleted branch feat/task-alpha");
+    expect(existsSync(paths["task-alpha"])).toBe(false);
+  });
+
+  it("reaps the residue of an already-removed worktree; an already-gone project is a no-op", () => {
+    const { dir, paths } = initComposeRepo("true");
+    // The worktree directory is gone but the record (and possibly the Compose
+    // project) remain — exactly the F8 residue class. The teardown command on
+    // an already-gone project exits 0 with only a "No resource found to
+    // remove" warning (verified live: Docker 29.7.2 / Compose 5.5.1,
+    // 2026-10-01), so the executor succeeding here IS that no-op.
+    git(["worktree", "remove", "--force", paths["task-alpha"]], dir);
+    const compose = fakeCompose();
+
+    const result = runCleanup({ cwd: dir, prune: true, noGh: true }, { compose: compose.down });
+
+    expect(compose.calls).toEqual([{ project: basename(paths["task-alpha"]).toLowerCase(), cwd: dir }]);
+    expect(result.failures).toEqual([]);
+    expect(result.pruned.map((a) => a.action)).toEqual([
+      `reaped compose project ${basename(paths["task-alpha"]).toLowerCase()}`,
+      "deleted branch feat/task-alpha",
+      "cleared worktree_path",
+    ]);
+  });
+
+  it("emits the additive compose report through the CLI --json envelope", () => {
+    const { dir } = initCleanupRepo();
+    const r = runCli(["cleanup", "--json", "--no-gh"], dir);
+    expect(r.status).toBe(0);
+    const envelope = JSON.parse(r.stdout) as { compose?: unknown };
+    // No declaration: the field is absent entirely (additive within schemaVersion: 1).
+    expect("compose" in envelope).toBe(false);
+  });
+
+  it("the human run reports the docker-absent degradation and still prunes (no daemon needed)", () => {
+    const { dir, paths } = initComposeRepo("true");
+    // A PATH with git but no docker: the spawned CLI hits the real ENOENT.
+    const bin = mkdtempSync(join(tmpdir(), "arggon-nodocker-bin-"));
+    const gitReal = spawnSync("sh", ["-c", "command -v git"], { encoding: "utf8" }).stdout.trim();
+    symlinkSync(gitReal, join(bin, "git"));
+
+    const r = runCli(["cleanup", "--prune", "--no-gh"], dir, {
+      env: { ...process.env, PATH: bin },
+    });
+
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("docker not found — nothing reaped");
+    expect(r.stdout).toContain(`removed worktree ${paths["task-alpha"]}`);
   });
 });
