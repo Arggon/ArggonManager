@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-methodology-carriers
 title: Declare the methodology in carriers + README (plan T1)
 assignee: Arggon
@@ -9,7 +9,6 @@ parent: story-methodology-carriers
 labels: []
 created: "2026-10-02"
 updated: "2026-10-02"
-claimed_at: "2026-10-02T18:59:09.458Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-methodology-carriers
 ---
 <!--

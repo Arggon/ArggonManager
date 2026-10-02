@@ -1,6 +1,6 @@
 ---
 type: story
-status: todo
+status: done
 id: story-methodology-carriers
 title: Methodology carriers + README declaration (spec S1)
 parent: native-agent-adapters
