@@ -1,5 +1,12 @@
 # Engineering conventions (Phase 1)
 
+> **Methodology carrier (per [ADR 0020](./adr/0020-methodology-first-productization.md)).** This document is a carrier of the ArggonManager methodology — declared together with `ArggonManager/docs/agents.md`, `ArggonManager/docs/engineering.md`, `ArggonManager/docs/convention.md`, and the bundled `arggon-cli` skill.
+>
+> - **Scope:** any project — not only software.
+> - **Invariants:** humans and agents follow the same rules; state lives in git; discipline is enforceable; docs travel with code; never-steal / never-reopen.
+> - **Version:** tracks the ArggonManager package version.
+> - **Upgrade channel:** methodology changes reach adopters through the adopter upgrade channel ([ADR 0016](./adr/0016-adopter-upgrade-channel.md)).
+
 Technical direction for ArggonManager: how we structure the repo, what “done” means for eng, and the bars that block merge.
 
 This document is owned by **Software Architect**. It complements [`ArggonManager/docs/convention.md`](./convention.md) (task tree / frontmatter schema). Product/feature acceptance stays with **Project Manager**. Implementation stays with **Software Developer**. UI QA (Phase 2+) stays with **UI Tester**.

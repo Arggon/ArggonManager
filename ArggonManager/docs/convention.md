@@ -1,5 +1,12 @@
 # Task convention (v0)
 
+> **Methodology carrier (per [ADR 0020](./adr/0020-methodology-first-productization.md)).** This document is a carrier of the ArggonManager methodology — declared together with `ArggonManager/docs/agents.md`, `ArggonManager/docs/engineering.md`, `ArggonManager/docs/convention.md`, and the bundled `arggon-cli` skill.
+>
+> - **Scope:** any project — not only software.
+> - **Invariants:** humans and agents follow the same rules; state lives in git; discipline is enforceable; docs travel with code; never-steal / never-reopen.
+> - **Version:** tracks the ArggonManager package version.
+> - **Upgrade channel:** methodology changes reach adopters through the adopter upgrade channel ([ADR 0016](./adr/0016-adopter-upgrade-channel.md)).
+
 ArggonManager stores work as Markdown files under the tracker root — `ArggonManager/`
 (legacy `tasks/` trees are auto-detected and keep working; see [Tracker layout
 (v5)](#tracker-layout-v5)). Humans and agents create, claim, and update items the same way: edit the file and commit.
