@@ -2059,9 +2059,11 @@ describe("claim release — unclaim leaves nothing (bug-unclaim-leaves-worktree-
       // The branch comes from the WORKTREE: the unclaim cleared the item field.
       branch: "feat/task-alpha",
     });
+    // The stamp is reaped AFTER the observed removal (review M2): a failed
+    // removal must leave the single-writer evidence standing.
     expect(released.release?.actions.map((action) => action.action)).toEqual([
-      "reaped arggon-claim.json stamp",
       `removed worktree ${wt}`,
+      "arggon-claim.json stamp gone with the worktree",
       "deleted branch feat/task-alpha",
       "cleared worktree_path",
     ]);
@@ -2104,8 +2106,8 @@ describe("claim release — unclaim leaves nothing (bug-unclaim-leaves-worktree-
     expect(released.failures).toEqual([]);
     expect(released.release?.entry.branch).toBe("feat/task-alpha");
     expect(released.release?.actions.map((action) => action.action)).toEqual([
-      "reaped arggon-claim.json stamp",
       `removed worktree ${wt}`,
+      "arggon-claim.json stamp gone with the worktree",
       "deleted branch feat/task-alpha",
       "disposed worktree_path record with the worktree",
     ]);
@@ -2238,5 +2240,148 @@ describe("claim release — unclaim leaves nothing (bug-unclaim-leaves-worktree-
 
     expect(unclaimed.stdout).toContain("claim dropped");
     expect(unclaimed.stdout).toContain("arggon cleanup --release task-alpha");
+  });
+
+  // --- review round 2 ---------------------------------------------------
+  // M1: the receipt must name the release ONLY on the unclaim. `→ done` leaves
+  // the same footprint, but there `cleanup --prune` is the merge-gated remedy —
+  // and a receipt there would invite an agent to force-delete a branch that
+  // still carries unmerged work.
+  it("M1: only the unclaim names the release — → done and → blocked report no receipt", () => {
+    const dir = initRepo();
+    const wt = claimedAndMerged(dir, "task-alpha");
+    // A commit on the feature branch, unmerged: exactly what a release would
+    // force-delete with `git branch -D`.
+    writeFileSync(join(wt, "unmerged.txt"), "work\n", "utf8");
+    git(["add", "unmerged.txt"], wt);
+    git(["commit", "--quiet", "-m", "unmerged work"], wt);
+
+    const done = runUpdate({ cwd: dir, id: "task-alpha", status: "done", now: NOW });
+
+    expect(done.claimFootprint).toBeUndefined();
+    // The receipt is absent, not degraded: the release is never named on stdout
+    // either (the human path is where an agent would read the remedy).
+    const human = runCli(["update", "task-bravo", "--status", "blocked", "--blocked-reason", "x"], dir);
+    expect(human.stdout).not.toContain("claim dropped");
+    expect(existsSync(wt)).toBe(true);
+    // `--prune` is the merge-gated remedy the docs point a done item at: the
+    // unmerged branch is still protected.
+    expect(runCleanup({ cwd: dir, prune: true, noGh: true }).entries[0]?.removable).toBe(false);
+    expect(refExists(dir, "refs/heads/feat/task-alpha")).toBe(true);
+
+    // → blocked keeps the assignee: a blocked item is not an abandoned claim, so
+    // no receipt either (and its worktree is still that owner's).
+    const blocked = runUpdate({
+      cwd: dir,
+      id: "task-bravo",
+      status: "in_progress",
+      assignee: "arggon",
+      now: NOW,
+    });
+    const wt2 = join(dirname(dir), `${basename(dir)}-task-bravo`);
+    git(["worktree", "add", "--quiet", "-b", "feat/task-bravo", wt2], dir);
+    runUpdate({ cwd: dir, id: "task-bravo", worktreePath: wt2, now: NOW });
+    const toBlocked = runUpdate({
+      cwd: dir,
+      id: "task-bravo",
+      status: "blocked",
+      blockedReason: "waiting",
+      now: NOW,
+    });
+    expect(blocked.claimFootprint).toBeUndefined();
+    expect(toBlocked.claimFootprint).toBeUndefined();
+    // The assignee rides along on `→ blocked` (it is context, not a lease), but
+    // the item is not a CLAIM, so no release is named. The still-claimed
+    // refusal (m6) is the in_progress case, covered by its own test.
+    expect(itemData(dir, "task-bravo")).toMatchObject({ status: "blocked", assignee: "arggon" });
+    expect(existsSync(wt2)).toBe(true);
+  });
+
+  // M2: a refused/failed release must leave the worktree's single-writer stamp
+  // and env file standing. Reaping them before the removal is what stripped a
+  // surviving worktree of its evidence and disarmed every later attempt.
+  it("M2: a dirty worktree is refused with its stamp + env intact, and only the hatch forces it", () => {
+    const dir = initRepo();
+    const wt = claimedAndMerged(dir);
+    runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+    const stamp = stampPath(wt);
+    // A tracked, uncommitted edit — the shape that makes git refuse the removal.
+    foreignWrite(wt);
+
+    // Refused during classification: nothing was reaped, nothing removed.
+    const refused = runCleanup({ cwd: dir, release: "task-alpha", releaseIdentity: "arggon" });
+    expect(refused.release?.entry.releasable).toBe(false);
+    expect(refused.release?.entry.reason).toContain("uncommitted or untracked file");
+    expect(refused.release?.entry.blockingTotal).toBeGreaterThan(0);
+    expect(refused.release?.entry.blockingPaths).toContain("ArggonManager/launch/auth/login/task-alpha.md");
+    expect(refused.failures).toHaveLength(1);
+    expect(existsSync(wt)).toBe(true);
+    expect(existsSync(stamp)).toBe(true); // the evidence survives a refused release
+    expect(existsSync(join(wt, ".arggon.env"))).toBe(true);
+    expect(itemData(dir, "task-alpha").worktree_path).toBe(wt);
+
+    // The audited hatch for a presumed-dead owner: the removal is forced, and
+    // the stamp dies WITH the worktree (nothing survives).
+    const forced = runCleanup({
+      cwd: dir,
+      release: "task-alpha",
+      releaseIdentity: "arggon",
+      releaseTakeOverWorktree: true,
+    });
+    expect(forced.failures).toEqual([]);
+    expect(forced.release?.entry.action).toContain("forced past its uncommitted content");
+    expect(forced.release?.actions.map((action) => action.action)).toContain(
+      `removed worktree ${wt}`,
+    );
+    expect(existsSync(wt)).toBe(false);
+    expect(existsSync(stamp)).toBe(false);
+    expect(existsSync(join(wt, ".arggon.env"))).toBe(false);
+  });
+
+  // m5: the hatch is meaningless without the release it authorizes, and a flag
+  // that is read once and never used must fail loudly (`start` refuses its twin).
+  it("m5: --take-over-worktree without --release fails loudly", () => {
+    const dir = initRepo();
+    const wt = claimedAndMerged(dir);
+
+    expect(() =>
+      runCleanup({ cwd: dir, releaseTakeOverWorktree: true, noGh: true }),
+    ).toThrow(/--take-over-worktree requires --release/);
+
+    const human = runCli(["cleanup", "--take-over-worktree"], dir);
+    expect(human.status).not.toBe(0);
+    expect(human.stdout + human.stderr).toContain("--take-over-worktree requires --release");
+    expect(existsSync(wt)).toBe(true);
+  });
+
+  // m6: the still-claimed refusal is unconditional — the hatch must not buy a
+  // live owner's worktree, and nothing durable would record the override.
+  it("m6: the hatch does not bypass the still-claimed refusal", () => {
+    const dir = initRepo();
+    const wt = claimedAndMerged(dir);
+
+    const refused = runCleanup({
+      cwd: dir,
+      release: "task-alpha",
+      releaseIdentity: "arggon",
+      releaseTakeOverWorktree: true,
+    });
+
+    expect(refused.release?.entry.releasable).toBe(false);
+    expect(refused.release?.entry.reason).toContain("still claimed by arggon");
+    expect(refused.release?.entry.reason).toContain("not overridable");
+    expect(existsSync(wt)).toBe(true);
+    expect(itemData(dir, "task-alpha").worktree_path).toBe(wt);
+
+    // The cheap remedy still works: the owner unclaims, then releases.
+    runUpdate({ cwd: dir, id: "task-alpha", status: "todo", now: NOW });
+    const released = runCleanup({
+      cwd: dir,
+      release: "task-alpha",
+      releaseIdentity: "arggon",
+      releaseTakeOverWorktree: true,
+    });
+    expect(released.failures).toEqual([]);
+    expect(existsSync(wt)).toBe(false);
   });
 });

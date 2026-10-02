@@ -5,7 +5,9 @@ import type { GhExecutor } from "./import-issues.js";
 import type { WorkItem } from "./items.js";
 import { isClaimed } from "./status.js";
 import {
+  defaultWorktreeStatus,
   detectWorktreeForeignWrites,
+  MAX_CLAIM_WRITE_NAMES,
   readWorktreeClaimStamp,
   type GitDirRunner,
   type WorktreeClaimStamp,
@@ -379,7 +381,8 @@ export function classifyCleanupEntry(
  * work whose branch is integrated into the base (terminal status + merge), while
  * a release reaps an ABANDONED claim (any status, branch merged or not). The
  * two never compete for one item in one run — the CLI refuses `--release`
- * together with `--prune`.
+ * together with `--prune`. A terminal item is therefore NOT this path: its
+ * remedy is `--prune`, whose merge gate protects unmerged work.
  */
 export type ReleaseRequest = {
   /**
@@ -391,13 +394,21 @@ export type ReleaseRequest = {
    * Deliberate take-over of a presumed-dead stamped owner
    * (task-strict-attach-dead-owner-hatch; CLI `--take-over-worktree`). Default
    * OFF, and then the flag changes NOTHING about a clean release: a fired
-   * single-writer detection keeps its refusal, because that is the evidence of
-   * a live second writer. Armed, it releases anyway and records the replaced
-   * stamp on the entry — the caller owns the judgement, the kernel only
-   * reports it.
+   * single-writer detection and removal-blocking content each keep their
+   * refusal, because those are the evidence of a live writer and of work a
+   * release would discard without removing anything. Armed, it releases anyway
+   * and records the replaced stamp on the entry — the caller owns the judgement,
+   * the kernel only reports it.
+   *
+   * It does NOT bypass the still-claimed refusal (m6): a re-claimed item has a
+   * live owner by definition, and nothing durable here records an override.
    */
   takeOver?: boolean;
-  /** Porcelain-probe override (tests); defaults to a real `git status`. */
+  /**
+   * Porcelain-probe override (tests); defaults to a real `git status`. Shared
+   * by the live-writer detection and the removal-blocking check, so a run
+   * probes the worktree at most once.
+   */
   status?: WorktreeStatusRunner;
   /** Git-dir-probe override (tests); defaults to a real `git rev-parse`. */
   gitDir?: GitDirRunner;
@@ -425,6 +436,16 @@ export type ReleaseEntry = {
   foreignWrites?: WorktreeForeignWriteReport;
   /** The stamp an armed take-over replaced (task-strict-attach-dead-owner-hatch). */
   takeOver?: { replacedIdentity: string; replacedClaimedAt: string };
+  /**
+   * Additive (review M2): the paths that block `git worktree remove`
+   * (uncommitted or untracked content), capped at `MAX_CLAIM_WRITE_NAMES`, with
+   * the exact `blockingTotal`. Present only on the refusal that names them —
+   * whose reason explains that a release would otherwise strip the worktree's
+   * env file and claim stamp without removing anything.
+   */
+  blockingPaths?: string[];
+  /** Exact count of `blockingPaths` before the cap. */
+  blockingTotal?: number;
 };
 
 /**
@@ -458,19 +479,76 @@ export function worktreeReleaseRefusal(
 }
 
 /**
- * Classify ONE item for release. The order is the contract: recorded path →
- * still claimed (an abandoned claim is the premise; a live one must be dropped
- * or taken over first) → filesystem state → branch → single-writer gate. Every
- * refusal carries a `reason`; every releasable entry carries the `action` the
- * surface performs.
+ * The porcelain lines that BLOCK `git worktree remove`: git refuses a worktree
+ * with modified, staged, renamed, conflicted or untracked content — only
+ * IGNORED (`!!`) files go away with it. Raw output (never trimmed: the leading
+ * status columns are positional), rename lines (`R  old -> new`) contribute the
+ * post-rename path.
+ */
+export function parseRemovalBlockingPaths(porcelain: string): string[] {
+  const paths: string[] = [];
+  for (const line of porcelain.split("\n")) {
+    if (line.trim().length === 0) continue;
+    if (line.slice(0, 2) === "!!") continue; // ignored files die with the worktree
+    let path = line.slice(3).trim();
+    const arrow = path.indexOf(" -> ");
+    if (arrow !== -1) path = path.slice(arrow + 4);
+    path = path.replace(/^"|"$/g, "");
+    if (path.length > 0) paths.push(path);
+  }
+  return paths;
+}
+
+/**
+ * The refusal for a worktree that cannot be removed as it stands (review M2).
  *
- * The single-writer gate reuses the attach-time detection verbatim: the stamp
- * must name a DIFFERENT identity than the requester, and tracked files must
- * have moved after that stamp. Its bound is the documented one (one porcelain
- * read plus one `stat` per dirty path, no full-tree walk) and its degradation
- * is the same — a missing or corrupt stamp, or a probe that does not answer,
- * yields no detection and never a false accusation. An armed `takeOver` is the
- * only sanctioned way past a fired detection, exactly like `start`'s.
+ * git refuses a dirty worktree, so releasing one without the take-over hatch
+ * would reaped nothing while DESTROYING the evidence: the env file goes (it is
+ * untracked, so it has to go before the removal) and — before this gate existed
+ * — so did the claim stamp, which disarmed the single-writer gate for every
+ * later attempt and lost the F12 evidence. Refusing during classification, with
+ * the offending paths named, keeps the whole footprint intact and the retry
+ * honest. Same bounded shape as the F12 refusal (a cap on the names, the exact
+ * total).
+ */
+export function worktreeDirtyRefusal(item: WorkItem, paths: string[]): string {
+  const named = paths.slice(0, MAX_CLAIM_WRITE_NAMES);
+  const extra = paths.length - named.length;
+  return (
+    `refusing to release the worktree of '${item.id}': it has ${paths.length} uncommitted or ` +
+    `untracked file${paths.length === 1 ? "" : "s"}, so 'git worktree remove' would refuse it and a ` +
+    "release would discard the work without removing the worktree. Commit or discard that work " +
+    "first, or — if the stamped owner is dead and the work is disposable — confirm no live writer " +
+    "and re-run with the take-over flag (cleanup --release <id> --take-over-worktree; native " +
+    `cleanup({ release, take_over_worktree })). Blocking paths: ${named.join(", ")}` +
+    `${extra > 0 ? ` (and ${extra} more)` : ""}.`
+  );
+}
+
+/**
+ * Classify ONE item for release. The order is the contract: recorded path →
+ * still claimed → filesystem state → branch → ONE porcelain probe feeding the
+ * live-writer gate and the removal-blocking gate. Every refusal carries a
+ * `reason`; every releasable entry carries the `action` the surface performs.
+ *
+ * Two refusals are UNCONDITIONAL, by decision (m6, coordinator ruling):
+ *
+ * - **still claimed** — a re-claimed item has a live owner by definition, and
+ *   the cheap remedy is that owner's own unclaim. `--take-over-worktree` does
+ *   NOT bypass it; the hatch is for a *presumed-dead stamped owner on an
+ *   unclaimed item*, where nothing durable would record the override either.
+ * - **removal-blocking content** — refused unless the take-over hatch is armed,
+ *   because reaping the env file (untracked, so it must go before the removal)
+ *   and then failing to remove anything is how a failed release used to strip
+ *   the claim stamp off a surviving worktree.
+ *
+ * The live-writer gate reuses the attach-time detection verbatim: the stamp must
+ * name a DIFFERENT identity than the requester, and tracked files must have moved
+ * after that stamp. Its bound is the documented one (one porcelain read plus one
+ * `stat` per dirty path, no full-tree walk) and its degradation is the same — a
+ * missing or corrupt stamp, or a probe that does not answer, yields no detection
+ * and never a false accusation. An armed `takeOver` is the only sanctioned way
+ * past a fired detection or a dirty worktree, exactly like `start`'s.
  */
 export function classifyReleaseEntry(
   item: WorkItem,
@@ -492,15 +570,16 @@ export function classifyReleaseEntry(
     entry.reason = "no worktree recorded on the item (nothing to release)";
     return entry;
   }
-  if (isClaimed(item.type, item.status, item.assignee) && request.takeOver !== true) {
-    // The release exists for an ABANDONED claim. Releasing a worktree under a
-    // live claim would hand a live writer a destroyed tree — so the premise is
-    // checked, and the audited take-over flag is the way past a presumed-dead
-    // owner (the same hatch `start` has).
+  if (isClaimed(item.type, item.status, item.assignee)) {
+    // The release exists for an ABANDONED claim, and this refusal is
+    // unconditional (m6): a re-claimed item has a live owner, the cheap remedy
+    // is that owner's own unclaim, and unlike `start`'s take-over nothing here
+    // durably records an override.
     entry.reason =
       `item is still claimed by ${item.assignee} — drop the claim first ` +
-      `(arggon update ${item.id} --status todo), then release the worktree ` +
-      "(or pass --take-over-worktree for a presumed-dead owner)";
+      `(arggon update ${item.id} --status todo), then release the worktree. ` +
+      "This refusal is not overridable: --take-over-worktree is for a " +
+      "presumed-dead stamped owner on an UNCLAIMED item.";
     return entry;
   }
   if (!existsSync(path)) {
@@ -528,29 +607,54 @@ export function classifyReleaseEntry(
       ? (item.branch ?? null)
       : (gitRunner.worktreeBranch(root, path) ?? null);
 
+  // ONE porcelain probe, shared by both gates below: the F12 detection needs the
+  // raw lines (status columns are positional) and the removal-blocking check
+  // needs the same read. A probe that does not answer degrades to "no evidence"
+  // for both — never to a refusal, and never to a false accusation.
+  const porcelain = (request.status ?? defaultWorktreeStatus)(path);
+
   const stamp: WorktreeClaimStamp | null = readWorktreeClaimStamp(path, {
     ...(request.gitDir !== undefined ? { gitDir: request.gitDir } : {}),
   });
-  if (stamp !== null && stamp.identity !== request.identity) {
+  if (stamp !== null && stamp.identity !== request.identity && porcelain !== undefined) {
     const foreignWrites = detectWorktreeForeignWrites(path, stamp, {
-      ...(request.status !== undefined ? { status: request.status } : {}),
+      status: () => porcelain,
     });
-    if (foreignWrites !== null && request.takeOver !== true) {
-      entry.reason = worktreeReleaseRefusal(item, path, foreignWrites);
-      entry.foreignWrites = foreignWrites;
-      return entry;
-    }
     if (foreignWrites !== null) {
+      if (request.takeOver !== true) {
+        entry.reason = worktreeReleaseRefusal(item, path, foreignWrites);
+        entry.foreignWrites = foreignWrites;
+        return entry;
+      }
       entry.takeOver = {
         replacedIdentity: stamp.identity,
         replacedClaimedAt: stamp.claimedAt,
       };
     }
   }
-  entry.action =
+  let forced = false;
+  if (porcelain !== undefined) {
+    const blocking = parseRemovalBlockingPaths(porcelain);
+    if (blocking.length > 0) {
+      if (request.takeOver !== true) {
+        entry.reason = worktreeDirtyRefusal(item, blocking);
+        entry.blockingPaths = blocking.slice(0, MAX_CLAIM_WRITE_NAMES);
+        entry.blockingTotal = blocking.length;
+        return entry;
+      }
+      // The hatch disarms the refusal AND forces the removal; the action says
+      // so, so the envelope never reports a bare forced discard (and this is
+      // the ONLY case in which a removal is forced).
+      forced = true;
+    }
+  }
+  const disposal =
     entry.branch === null
-      ? "remove the worktree and clear the worktree_path record"
-      : "remove the worktree, delete its branch and clear the worktree_path record";
+      ? "clear the worktree_path record"
+      : "delete its branch and clear the worktree_path record";
+  entry.action = forced
+    ? `remove the worktree (forced past its uncommitted content), ${disposal}`
+    : `remove the worktree, ${disposal}`;
   entry.releasable = true;
   return entry;
 }

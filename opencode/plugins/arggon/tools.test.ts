@@ -3779,9 +3779,15 @@ describe("native release of a dropped claim (bug-unclaim-leaves-worktree-record-
       releasable: true,
       branch: "feat/task-rate-limit",
     });
+    // The stamp step comes AFTER the observed removal (M2 parity): a failed
+    // removal must leave the single-writer evidence standing. This fixture's
+    // domain removal is a real `git worktree remove`, which takes the worktree's
+    // git dir with it, so the stamp is reported as gone WITH the worktree; the
+    // explicit reap (`reaped arggon-claim.json stamp`) is the domain path that
+    // leaves the admin dir behind.
     expect(envelope.released).toEqual([
-      { id: "task-rate-limit", action: "reaped arggon-claim.json stamp" },
       { id: "task-rate-limit", action: `removed worktree ${worktreePath}` },
+      { id: "task-rate-limit", action: "arggon-claim.json stamp gone with the worktree" },
       { id: "task-rate-limit", action: "deleted branch feat/task-rate-limit" },
       { id: "task-rate-limit", action: "cleared worktree_path" },
     ]);
@@ -3864,6 +3870,162 @@ describe("native release of a dropped claim (bug-unclaim-leaves-worktree-record-
     expect((caught as ArgonToolError).code).toBe("CLEANUP_FAILED");
     expect(String((caught as ArgonToolError).envelope.error.message)).toContain(
       "either release or prune",
+    );
+  });
+
+  // --- review round 2 ---------------------------------------------------
+  // m6: the still-claimed refusal is unconditional on both surfaces — a
+  // re-claimed item has a live owner and nothing durable records an override.
+  it("m6: take_over_worktree does not bypass the still-claimed refusal", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await claimedAndMerged(dir);
+
+    const refused = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit", take_over_worktree: true },
+      { sessionID: "ses_a" },
+    );
+    expect((refused.output.release as Record<string, unknown>).releasable).toBe(false);
+    expect(String((refused.output.release as Record<string, unknown>).reason)).toContain(
+      "not overridable",
+    );
+    expect(calls.remove).toEqual([]);
+    expect(existsSync(worktreePath)).toBe(true);
+  });
+
+  // m5: the hatch authorizes a release; without one it is a typed refusal, never
+  // a silent no-op (`start` already refuses takeOverWorktree without worktree).
+  it("m5: take_over_worktree without release fails typed", async () => {
+    const dir = seedGitTree();
+    const { defs } = await completedWorktree(dir);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "cleanup").execute({ take_over_worktree: true });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    expect((caught as ArgonToolError).code).toBe("CLEANUP_FAILED");
+    expect(String((caught as ArgonToolError).envelope.error.message)).toContain(
+      "take_over_worktree requires release",
+    );
+  });
+
+  // M2: a dirty worktree is refused during classification, so nothing is
+  // reaped — the claim stamp (the single-writer evidence) and the env file
+  // survive the refused release. Reaping them before the removal is what
+  // disarmed every later attempt.
+  it("M2: a dirty worktree is refused with its stamp + env intact; only the hatch forces it", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await claimedAndMerged(dir);
+    await tool(defs, "update").execute(
+      { id: "task-rate-limit", status: "todo" },
+      { sessionID: "ses_a" },
+    );
+    const stamp = join(
+      gitOut(worktreePath, ["rev-parse", "--absolute-git-dir"]).trim(),
+      "arggon-claim.json",
+    );
+    foreignWriteIn(worktreePath);
+
+    const refused = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_a" },
+    );
+    const release = refused.output.release as Record<string, unknown>;
+    expect(release.releasable).toBe(false);
+    expect(String(release.reason)).toContain("uncommitted or untracked file");
+    expect(release.blockingTotal).toBeGreaterThan(0);
+    expect(calls.remove).toEqual([]);
+    // The evidence and the env contract both survive: nothing was reaped.
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(existsSync(stamp)).toBe(true);
+    expect(existsSync(join(worktreePath, ".arggon.env"))).toBe(true);
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBe(worktreePath);
+
+    const forced = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit", take_over_worktree: true },
+      { sessionID: "ses_a" },
+    );
+    expect((forced.output as Record<string, unknown>).failures).toEqual([]);
+    expect(String((forced.output.release as Record<string, unknown>).action)).toContain(
+      "forced past its uncommitted content",
+    );
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: true },
+    ]);
+    expect(existsSync(worktreePath)).toBe(false);
+    expect(existsSync(stamp)).toBe(false);
+  });
+
+  // M3: the release owns its tracker commit and reports it. Committing inside
+  // the release and then letting the run-level commit stage the same path
+  // reported `skipped: "nothing to commit"` for a commit it had just made.
+  it("M3: the native release reports its own commit (never a skipped nothing-to-commit)", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs } = await claimedAndMerged(dir);
+    await tool(defs, "update").execute(
+      { id: "task-rate-limit", status: "todo" },
+      { sessionID: "ses_a" },
+    );
+
+    const output = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_a" },
+    );
+    const envelope = output.output as Record<string, unknown>;
+    expect(envelope.commit).toMatchObject({ message: "chore(tasks): released task-rate-limit" });
+    expect((envelope.commit as Record<string, unknown>).hash).toEqual(expect.any(String));
+    expect((envelope.commit as Record<string, unknown>).skipped).toBeUndefined();
+    // The commit really happened: the cleared record is committed on main.
+    expect(gitOut(dir, ["log", "-1", "--format=%s"])).toContain("chore(tasks): released");
+    expect(gitOut(dir, ["status", "--porcelain", "ArggonManager"])).toBe("");
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+    expect(existsSync(worktreePath)).toBe(false);
+  });
+
+  // M3 parity: the release envelope must match `cleanup --release --json` on the
+  // same fixture shape (the prune arm's twin at the list-mode parity test).
+  // Only the commit hash differs — two trees, two commits — so it is normalized.
+  it("M3: the release envelope is identical to `cleanup --release <id> --json` (CLI parity)", async () => {
+    const nativeDir = seedGitTree("arggon-relparity-a-");
+    const cliDir = seedGitTree("arggon-relparity-b-");
+    const build = async (dir: string) => {
+      const { domain } = fakeDomain(dir);
+      const defs = worktreeDefinitions(dir, domain);
+      await tool(defs, "start").execute(
+        { id: "task-rate-limit", assignee: "smoke" },
+        { sessionID: "ses_a" },
+      );
+      git(dir, ["merge", "--no-ff", "feat/task-rate-limit", "-m", "Merge claim (stubbed)"]);
+      await tool(defs, "update").execute(
+        { id: "task-rate-limit", status: "todo" },
+        { sessionID: "ses_a" },
+      );
+      return defs;
+    };
+    const nativeDefs = await build(nativeDir);
+    await build(cliDir); // the CLI twin: driven through the spawned CLI below
+    // The CLI resolves its own identity (the fixture's git user.name); both
+    // surfaces run unclaimed with a clean worktree, so the single-writer gate is
+    // not involved on either side.
+    const cliProc = runCli(["cleanup", "--release", "task-rate-limit", "--json", "--no-gh"], cliDir);
+    expect(cliProc.status, cliProc.stderr).toBe(0);
+
+    const native = await tool(nativeDefs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_a" },
+    );
+    const normalize = (envelope: Record<string, unknown>, dir: string): unknown => {
+      const copy = JSON.parse(
+        JSON.stringify(envelope).split(dir).join("<ROOT>"),
+      ) as Record<string, unknown>;
+      const commit = copy.commit as Record<string, unknown> | undefined;
+      if (commit !== undefined) delete commit.hash; // two trees, two hashes
+      return copy;
+    };
+    expect(normalize(native.output as Record<string, unknown>, nativeDir)).toEqual(
+      normalize(JSON.parse(cliProc.stdout) as Record<string, unknown>, cliDir),
     );
   });
 });

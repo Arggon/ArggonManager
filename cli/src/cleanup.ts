@@ -10,6 +10,7 @@ import {
   loadItems,
   readAutoCommitConfig,
   readConventionConfig,
+  readWorktreeClaimStamp,
   readConventionVersion,
   repoRootFromTasks,
   resolveAutoCommit,
@@ -269,6 +270,14 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
     // finished work. Refusing the combination keeps each run's item set
     // single-purpose instead of letting both mutate one worktree.
     throw new Error("pass either --release <id> or --prune, not both");
+  }
+  if (opts.release === undefined && opts.releaseTakeOverWorktree === true) {
+    // The hatch is meaningless without the release it authorizes (m5), and
+    // `start` already refuses its twin without `--worktree` (START_FAILED) —
+    // so this fails loudly instead of reading the flag once and never using it.
+    throw new Error(
+      "--take-over-worktree requires --release <id> (it authorizes a release of a worktree whose stamped owner is presumed dead)",
+    );
   }
   const base = gitRunner.defaultBranch(root);
   // Captured before any release can remove this run's own working directory.
@@ -535,10 +544,12 @@ function releaseClaimedWorktree(run: ReleaseRun): CleanupRelease {
     // A refusal is never a silent no-op: it lands in the action list AND in the
     // flat `failures` (the both-surfaces discipline prune uses for a failed
     // step), so the human path exits non-zero and a `--json` consumer reads it
-    // in the payload.
-    failures.push(`${id}: ${reason}`);
-    actions.push({ id, action: "failed", error: reason });
-    return { entry, actions };
+    // in the payload. Clamped like every sibling failure path (review m9) — the
+    // refusals embed paths, and the envelope is a machine surface.
+    const message = boundedEnvelopeText(reason, MAX_ENVELOPE_DETAIL_CHARS);
+    failures.push(`${id}: ${message}`);
+    actions.push({ id, action: "failed", error: message });
+    return { entry: { ...entry, reason: message }, actions };
   };
   const item = byId.get(id);
   if (item === undefined) {
@@ -573,11 +584,11 @@ function releaseClaimedWorktree(run: ReleaseRun): CleanupRelease {
   // recorded IN that worktree copy, so releasing it disposes the record with the
   // directory — nothing to write, nothing a commit could outlive).
   const recordHome = resolve(root) !== resolve(entry.path);
-  // Uncommitted work is never discarded silently: the removal stays unforced
-  // unless the caller armed the take-over hatch — their explicit "that owner is
-  // dead and that work is disposable" call, the same one that lets a release
-  // past a fired single-writer detection. Otherwise git refuses the dirty
-  // worktree and git's own message (which names --force) is reported verbatim.
+  // Uncommitted work is never discarded silently. The classification already
+  // refused removal-blocking content unless the take-over hatch was armed (the
+  // dirty gate, review M2), so reaching here with the hatch armed is exactly
+  // the caller's "that owner is dead and that work is disposable" — and it is
+  // the only case in which the removal is forced.
   const forceArmed = opts.releaseTakeOverWorktree === true;
 
   try {
@@ -607,15 +618,29 @@ function releaseClaimedWorktree(run: ReleaseRun): CleanupRelease {
       // happens from a LINKED worktree, the link points at the MAIN checkout.
       unlinkNodeModulesLink(gitRoot, entry.path);
       if (gitRoot !== resolve(root)) unlinkNodeModulesLink(root, entry.path);
+      // The env contract is untracked, so it has to go BEFORE the removal or git
+      // refuses the worktree — same ownership rule as prune (start-created shape
+      // only, never an adopter's own file).
       unlinkWorktreeEnv(entry.path);
-      // The claim stamp is reaped explicitly rather than left to `git worktree
-      // remove`'s bookkeeping: it is the single-writer evidence, and its removal
-      // is an OBSERVABLE step, not an accident of git's internals.
-      if (unlinkWorktreeClaimStamp(entry.path)) {
-        actions.push({ id, action: "reaped arggon-claim.json stamp" });
-      }
+      // Did this worktree carry a claim stamp? Read BEFORE the removal, because
+      // `git worktree remove` takes the worktree's git dir (and the stamp in it)
+      // with it — which is why the post-removal reap below is the one that
+      // matters for a DOMAIN removal (it never touches `.git/worktrees/<name>`).
+      const hadStamp = readWorktreeClaimStamp(entry.path) !== null;
       gitRunner.removeWorktree(gitRoot, entry.path, { force: forceArmed });
       actions.push({ id, action: `removed worktree ${entry.path}` });
+      // AFTER the observed removal, never before (review M2): the claim stamp is
+      // the single-writer evidence, and a failed removal must leave it standing
+      // — reaping it first stripped a surviving worktree of its ownership
+      // record, disarming the gate for every later attempt and losing the F12
+      // evidence. Both outcomes are reported, because both are the invariant
+      // "no stamp survives a release": either this run removed the file, or the
+      // removal took it with the worktree.
+      if (unlinkWorktreeClaimStamp(entry.path)) {
+        actions.push({ id, action: "reaped arggon-claim.json stamp" });
+      } else if (hadStamp) {
+        actions.push({ id, action: "arggon-claim.json stamp gone with the worktree" });
+      }
       if (entry.branch !== null && gitRunner.branchExists(gitRoot, entry.branch)) {
         // Force, never the safe delete: an abandoned claim's branch is by
         // definition NOT provably merged into the base (that is what prune's

@@ -1111,10 +1111,12 @@ program
           // The unclaim contract, surfaced on the call that drops the claim
           // (bug-unclaim-leaves-worktree-record-without-reaper): `update` clears
           // the assignee, never the worktree. Loud, because the unclaimed
-          // worktree is what accumulates as unowned clutter.
+          // worktree is what accumulates as unowned clutter. The stamp and env
+          // file die with the RELEASE, not with the worktree (review m8: the
+          // old wording read as "they go when the worktree goes").
           if (result.claimFootprint) {
             console.log(
-              `⚠ claim dropped: the worktree ${sanitizeHumanError(result.claimFootprint.worktreePath)} still stands (its claim stamp and .arggon.env die with it) — release it with: ${sanitizeHumanError(result.claimFootprint.release.cli)}`,
+              `⚠ claim dropped: the worktree ${sanitizeHumanError(result.claimFootprint.worktreePath)} still stands, and only the release reaps it with its claim stamp and .arggon.env — release it with: ${sanitizeHumanError(result.claimFootprint.release.cli)}`,
             );
           }
         } catch (err) {

@@ -127,9 +127,15 @@ namespace:
 
   `cleanup({ release: "<id>" })` is the other arm of the same domain — the
   inverse of `start` for a claim that was dropped
-  (bug-unclaim-leaves-worktree-record-without-reaper), refusing while another
-  session's live writer holds the worktree (`take_over_worktree` is the audited
-  hatch for a presumed-dead owner, and the only thing that forces the removal).
+  (bug-unclaim-leaves-worktree-record-without-reaper). Three refusals, in the
+  shared kernel rule `classifyReleaseEntry`: the item is still claimed
+  (**unconditional**), another identity's stamp shows a live writer, or the
+  worktree has uncommitted/untracked content (refused before anything is
+  reaped, so a failed release keeps the stamp and env file; the stamp is reaped
+  only after an observed removal). `take_over_worktree` is the audited hatch for
+  a presumed-dead stamped owner on an unclaimed item, the only thing that forces
+  the removal, and is refused without a `release`. The release owns its tracker
+  commit and reports it, exactly like the CLI.
   `update` cannot release — it is frontmatter-only, and it is the same call that
   CLEARS a `worktree_path` record — so the native `update` payload carries the
   additive `claimFootprint` receipt naming this call instead. See

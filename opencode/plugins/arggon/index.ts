@@ -4043,11 +4043,14 @@ function nativeComposeDown(project: string, cwd: string): Promise<void> {
  * through the domain, deletes its branch, reaps the start-created env file and
  * the claim stamp, and clears the record — reported as its own `release` /
  * `released` action family, never mixed into `pruned`. Refused with the same
- * evidence and remedy order the CLI reports when the item is still claimed or
- * the worktree's stamp names another identity whose window shows a live writer;
- * `take_over_worktree` is the audited hatch for a presumed-dead owner (the
- * mirror of `start`'s). The identity is the calling session — exactly what
- * `start` stamped — so the ordinary path is never refused.
+ * evidence and remedy order the CLI reports: unconditionally while the item is
+ * still claimed (a re-claimed item has a live owner; the hatch does not bypass
+ * it), and for a stamp held by another identity whose window shows a live writer
+ * or for removal-blocking content. `take_over_worktree` is the audited hatch for
+ * a presumed-dead stamped owner — the mirror of `start`'s, and the only thing
+ * that forces the removal; without a `release` it is refused (m5). The identity
+ * is the calling session — exactly what `start` stamped — so the ordinary path
+ * is never refused.
  */
 async function nativeCleanup(
   kernel: ArgonKernel,
@@ -4088,6 +4091,17 @@ async function nativeCleanup(
       "cleanup",
       "CLEANUP_FAILED",
       "pass either release or prune, not both",
+      version,
+    )
+  }
+  if (releaseId === undefined && input.take_over_worktree === true) {
+    // The hatch authorizes a release; without one it is a silent no-op (m5).
+    // `start` already refuses its twin without `worktree`, and so does this.
+    return worktreeFail(
+      kernel,
+      "cleanup",
+      "CLEANUP_FAILED",
+      "take_over_worktree requires release (it authorizes a release of a worktree whose stamped owner is presumed dead)",
       version,
     )
   }
@@ -4267,16 +4281,17 @@ async function nativeCleanup(
           compose,
           isComposeUnavailable: () => composeUnavailable,
           failures,
-          clearedPaths,
-          clearedIds,
         })
 
   // One tracker commit for every cleared record (surgical staging; the kernel
-  // resolves `x-tracker.auto-commit`), exactly like `cleanup --prune`.
-  let commit: unknown
-  if (clearedPaths.length > 0) {
+  // resolves `x-tracker.auto-commit`), exactly like `cleanup --prune` — and the
+  // release's OWN commit wins when it has one (review M3: letting the run-level
+  // commit re-stage the path the release already committed reported
+  // `skipped: "nothing to commit"` for a commit it had just made). CLI parity.
+  let commit: unknown = release?.commit
+  if (commit === undefined && clearedPaths.length > 0) {
     commit = kernel.commitTrackerMutation(root, clearedPaths, {
-      message: kernel.trackerCommitMessage(releaseId === undefined ? "pruned" : "released", clearedIds),
+      message: kernel.trackerCommitMessage("pruned", clearedIds),
       commit: kernel.resolveAutoCommit(
         input.no_commit === true ? false : undefined,
         kernel.readAutoCommitConfig(root),
@@ -4316,8 +4331,6 @@ type NativeReleaseRun = {
   compose: { declared: string; dockerUnavailable?: boolean } | undefined
   isComposeUnavailable: () => boolean
   failures: string[]
-  clearedPaths: string[]
-  clearedIds: string[]
 }
 
 /** The `CleanupGit` shape the native runner supplies (git plus the domain list). */
@@ -4337,13 +4350,21 @@ type CleanupGitShape = ReturnType<ArgonKernel["defaultCleanupGit"]>
 async function nativeRelease(
   kernel: ArgonKernel,
   run: NativeReleaseRun,
-): Promise<{ entry: Record<string, unknown>; actions: Array<Record<string, unknown>> }> {
+): Promise<{
+  entry: Record<string, unknown>
+  actions: Array<Record<string, unknown>>
+  /** The cleared-record commit this run owns (review M3) — never re-committed by the caller. */
+  commit?: unknown
+}> {
   const { id, root, byId, git, runner, input, options, failures } = run
   const actions: Array<Record<string, unknown>> = []
   const refuse = (reason: string, entry: Record<string, unknown>) => {
-    failures.push(`${id}: ${reason}`)
-    actions.push({ id, action: "failed", error: reason })
-    return { entry, actions }
+    // Clamped like every sibling failure path (m9): the refusals embed paths and
+    // the envelope is a machine surface.
+    const message = boundedNativeText(reason, MAX_NATIVE_DETAIL_CHARS)
+    failures.push(`${id}: ${message}`)
+    actions.push({ id, action: "failed", error: message })
+    return { entry: { ...entry, reason: message }, actions }
   }
   const item = byId.get(id)
   if (item === undefined) {
@@ -4394,21 +4415,25 @@ async function nativeRelease(
       }
       // CLI parity: the start-created install link and the start-shaped env
       // file are untracked and block the removal; ownership-scoped removal only
-      // (never a real directory, never an adopter's own file).
+      // (never a real directory, never an adopter's own file). The env contract
+      // has to go BEFORE the removal or git refuses the worktree.
       kernel.unlinkNodeModulesLink(gitRoot, path)
       if (gitRoot !== resolve(root)) kernel.unlinkNodeModulesLink(root, path)
       kernel.unlinkWorktreeEnv(path)
-      // The claim stamp is reaped as an OBSERVABLE step, never left to the
-      // removal's internals: a domain removal never touches the git dir.
-      if (kernel.unlinkWorktreeClaimStamp(path)) {
-        actions.push({ id, action: "reaped arggon-claim.json stamp" })
-      }
-      // Uncommitted work is never discarded silently: unforced unless the caller
-  // armed the take-over hatch — their explicit "that owner is dead and that work
-  // is disposable" call, the same one that lets a release past a fired
-  // single-writer detection. Otherwise git refuses the dirty worktree and the
-  // refusal is reported, git's own message (which names --force) included.
-  const removal = await removeWorktreeObserved(options, path, gitRoot, {
+      // Did this worktree carry a claim stamp? Read BEFORE the removal:
+      // `git worktree remove` takes the worktree's git dir (and the stamp in it)
+      // with it, so only the post-removal reap below matters for a DOMAIN
+      // removal (it never touches `.git/worktrees/<name>`). CLI parity.
+      const hadStamp = kernel.readWorktreeClaimStamp(path) !== null
+      // Uncommitted work is never discarded silently. The classification already
+      // refused removal-blocking content unless the take-over hatch was armed
+      // (the dirty gate, CLI parity), so forcing here is exactly the caller's
+      // "that owner is dead and that work is disposable" — the only case.
+      // Uncommitted work is never discarded silently. The classification already
+      // refused removal-blocking content unless the take-over hatch was armed
+      // (the dirty gate, CLI parity), so forcing here is exactly the caller's
+      // "that owner is dead and that work is disposable" — the only case.
+      const removal = await removeWorktreeObserved(options, path, gitRoot, {
         force: input.take_over_worktree === true,
       })
       if (!removal.removed) {
@@ -4418,6 +4443,19 @@ async function nativeRelease(
         return { entry, actions }
       }
       actions.push({ id, action: `removed worktree ${path}` })
+      // AFTER the observed removal, never before (CLI parity): the claim stamp is
+      // the single-writer evidence, and a failed removal must leave it standing.
+      // A domain removal never touches the git dir, so the stamp is reaped
+      // explicitly here — an OBSERVABLE step, not an accident of git's
+      // bookkeeping.
+      // Both outcomes are reported, because both are the invariant "no stamp
+      // survives a release": either this run removed the file, or the removal
+      // took it with the worktree.
+      if (kernel.unlinkWorktreeClaimStamp(path)) {
+        actions.push({ id, action: "reaped arggon-claim.json stamp" })
+      } else if (hadStamp) {
+        actions.push({ id, action: "arggon-claim.json stamp gone with the worktree" })
+      }
       if (classified.branch !== null && git.branchExists(gitRoot, classified.branch)) {
         try {
           // Force, never the safe delete: an abandoned claim's branch is by
@@ -4439,7 +4477,10 @@ async function nativeRelease(
     }
     if (recordHome) {
       // The record outlives the removal here: cleared AFTER the worktree is
-      // observably gone (prune's invariant), in ONE tracker commit.
+      // observably gone (prune's invariant), in ONE tracker commit — which this
+      // run OWNS and RETURNS (review M3: committing here and then letting the
+      // run-level commit stage the same path reported `skipped: "nothing to
+      // commit"` for a commit it had just made).
       const cleared = kernel.updateOperation({
         cwd: root,
         id,
@@ -4449,16 +4490,14 @@ async function nativeRelease(
       })
       if (!cleared.ok) throw new Error(kernelError(cleared.envelope))
       actions.push({ id, action: "cleared worktree_path" })
-      kernel.commitTrackerMutation(root, [item.filePath], {
+      const commit = kernel.commitTrackerMutation(root, [item.filePath], {
         message: kernel.trackerCommitMessage("released", [id]),
         commit: kernel.resolveAutoCommit(
           input.no_commit === true ? false : undefined,
           kernel.readAutoCommitConfig(root),
         ),
       })
-      run.clearedPaths.push(item.filePath)
-      run.clearedIds.push(id)
-      return { entry, actions }
+      return { entry, actions, commit }
     }
     // The record lived inside the removed copy: disposed with it, nothing to
     // write (a commit here could not outlive the removal).

@@ -1512,7 +1512,16 @@ function defaultAbsoluteGitDir(cwd: string): string | undefined {
   return out;
 }
 
-function defaultWorktreeStatus(cwd: string): string | undefined {
+/**
+ * Read-only `git status --porcelain` probe (injectable for tests).
+ *
+ * Exported (not just a `WorktreeStatusRunner` default) so the release rule can
+ * ask a second question of the SAME read — does this worktree block its own
+ * removal? (bug-unclaim-leaves-worktree-record-without-reaper review M2) —
+ * instead of probing the worktree twice per classification. Raw output, never
+ * trimmed: the leading status columns are positional.
+ */
+export function defaultWorktreeStatus(cwd: string): string | undefined {
   const result = spawnSync("git", ["status", "--porcelain"], {
     cwd,
     encoding: "utf8",

@@ -241,6 +241,8 @@ exports.defaultCleanupGit = defaultCleanupGit;
 exports.findMergedPr = findMergedPr;
 exports.classifyCleanupEntry = classifyCleanupEntry;
 exports.worktreeReleaseRefusal = worktreeReleaseRefusal;
+exports.parseRemovalBlockingPaths = parseRemovalBlockingPaths;
+exports.worktreeDirtyRefusal = worktreeDirtyRefusal;
 exports.classifyReleaseEntry = classifyReleaseEntry;
 const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
@@ -472,6 +474,34 @@ function worktreeReleaseRefusal(item, path, report) {
         `(rm "$(git -C ${path} rev-parse --absolute-git-dir)/arggon-claim.json"). ` +
         `Files modified after that claim: ${named}${extra > 0 ? ` (and ${extra} more)` : ""}.`);
 }
+function parseRemovalBlockingPaths(porcelain) {
+    const paths = [];
+    for (const line of porcelain.split("\n")) {
+        if (line.trim().length === 0)
+            continue;
+        if (line.slice(0, 2) === "!!")
+            continue;
+        let path = line.slice(3).trim();
+        const arrow = path.indexOf(" -> ");
+        if (arrow !== -1)
+            path = path.slice(arrow + 4);
+        path = path.replace(/^"|"$/g, "");
+        if (path.length > 0)
+            paths.push(path);
+    }
+    return paths;
+}
+function worktreeDirtyRefusal(item, paths) {
+    const named = paths.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
+    const extra = paths.length - named.length;
+    return (`refusing to release the worktree of '${item.id}': it has ${paths.length} uncommitted or ` +
+        `untracked file${paths.length === 1 ? "" : "s"}, so 'git worktree remove' would refuse it and a ` +
+        "release would discard the work without removing the worktree. Commit or discard that work " +
+        "first, or — if the stamped owner is dead and the work is disposable — confirm no live writer " +
+        "and re-run with the take-over flag (cleanup --release <id> --take-over-worktree; native " +
+        `cleanup({ release, take_over_worktree })). Blocking paths: ${named.join(", ")}` +
+        `${extra > 0 ? ` (and ${extra} more)` : ""}.`);
+}
 function classifyReleaseEntry(item, root, gitRunner, request) {
     const path = item.worktreePath ? (0, node_path_1.resolve)(item.worktreePath) : "";
     const entry = {
@@ -487,11 +517,12 @@ function classifyReleaseEntry(item, root, gitRunner, request) {
         entry.reason = "no worktree recorded on the item (nothing to release)";
         return entry;
     }
-    if ((0, status_js_1.isClaimed)(item.type, item.status, item.assignee) && request.takeOver !== true) {
+    if ((0, status_js_1.isClaimed)(item.type, item.status, item.assignee)) {
         entry.reason =
             `item is still claimed by ${item.assignee} — drop the claim first ` +
-                `(arggon update ${item.id} --status todo), then release the worktree ` +
-                "(or pass --take-over-worktree for a presumed-dead owner)";
+                `(arggon update ${item.id} --status todo), then release the worktree. ` +
+                "This refusal is not overridable: --take-over-worktree is for a " +
+                "presumed-dead stamped owner on an UNCLAIMED item.";
         return entry;
     }
     if (!(0, node_fs_1.existsSync)(path)) {
@@ -510,29 +541,45 @@ function classifyReleaseEntry(item, root, gitRunner, request) {
         gitRunner.worktreeBranch === undefined
             ? (item.branch ?? null)
             : (gitRunner.worktreeBranch(root, path) ?? null);
+    const porcelain = (request.status ?? worktree_js_1.defaultWorktreeStatus)(path);
     const stamp = (0, worktree_js_1.readWorktreeClaimStamp)(path, {
         ...(request.gitDir !== undefined ? { gitDir: request.gitDir } : {}),
     });
-    if (stamp !== null && stamp.identity !== request.identity) {
+    if (stamp !== null && stamp.identity !== request.identity && porcelain !== undefined) {
         const foreignWrites = (0, worktree_js_1.detectWorktreeForeignWrites)(path, stamp, {
-            ...(request.status !== undefined ? { status: request.status } : {}),
+            status: () => porcelain,
         });
-        if (foreignWrites !== null && request.takeOver !== true) {
-            entry.reason = worktreeReleaseRefusal(item, path, foreignWrites);
-            entry.foreignWrites = foreignWrites;
-            return entry;
-        }
         if (foreignWrites !== null) {
+            if (request.takeOver !== true) {
+                entry.reason = worktreeReleaseRefusal(item, path, foreignWrites);
+                entry.foreignWrites = foreignWrites;
+                return entry;
+            }
             entry.takeOver = {
                 replacedIdentity: stamp.identity,
                 replacedClaimedAt: stamp.claimedAt,
             };
         }
     }
-    entry.action =
-        entry.branch === null
-            ? "remove the worktree and clear the worktree_path record"
-            : "remove the worktree, delete its branch and clear the worktree_path record";
+    let forced = false;
+    if (porcelain !== undefined) {
+        const blocking = parseRemovalBlockingPaths(porcelain);
+        if (blocking.length > 0) {
+            if (request.takeOver !== true) {
+                entry.reason = worktreeDirtyRefusal(item, blocking);
+                entry.blockingPaths = blocking.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
+                entry.blockingTotal = blocking.length;
+                return entry;
+            }
+            forced = true;
+        }
+    }
+    const disposal = entry.branch === null
+        ? "clear the worktree_path record"
+        : "delete its branch and clear the worktree_path record";
+    entry.action = forced
+        ? `remove the worktree (forced past its uncommitted content), ${disposal}`
+        : `remove the worktree, ${disposal}`;
     entry.releasable = true;
     return entry;
 }
@@ -5457,10 +5504,9 @@ function runUpdate(opts) {
                 process.stderr.write(`arggon: warning: issue round-trip skipped: ${(0, sanitize_js_1.sanitizeHumanError)(issueRoundtrip.skipped)}\n`);
             }
         }
-        const claimFootprint = wasClaimed && !willBeClaimed && (updated.worktreePath ?? null) !== null
+        const claimFootprint = wasClaimed && !willBeClaimed && newStatus === "todo" && updated.worktreePath != null
             ? {
                 worktreePath: (0, node_path_1.resolve)(updated.worktreePath),
-                branch: updated.branch ?? null,
                 release: {
                     cli: `arggon cleanup --release ${updated.id}`,
                     native: `tools.arggon.cleanup({ release: ${JSON.stringify(updated.id)} })`,
@@ -6238,6 +6284,7 @@ exports.worktreeStateBase = worktreeStateBase;
 exports.worktreeCacheBase = worktreeCacheBase;
 exports.prepareWorktreeEnv = prepareWorktreeEnv;
 exports.unlinkWorktreeEnv = unlinkWorktreeEnv;
+exports.defaultWorktreeStatus = defaultWorktreeStatus;
 exports.readWorktreeClaimStamp = readWorktreeClaimStamp;
 exports.unlinkWorktreeClaimStamp = unlinkWorktreeClaimStamp;
 exports.parseTrackedModifications = parseTrackedModifications;
@@ -10134,6 +10181,9 @@ async function nativeCleanup(kernel, input, options, tool) {
     if (releaseId !== undefined && input.prune === true) {
         return worktreeFail(kernel, "cleanup", "CLEANUP_FAILED", "pass either release or prune, not both", version);
     }
+    if (releaseId === undefined && input.take_over_worktree === true) {
+        return worktreeFail(kernel, "cleanup", "CLEANUP_FAILED", "take_over_worktree requires release (it authorizes a release of a worktree whose stamped owner is presumed dead)", version);
+    }
     const inventory = await domainWorktrees(options);
     const runner = {
         ...git,
@@ -10264,13 +10314,11 @@ async function nativeCleanup(kernel, input, options, tool) {
             compose,
             isComposeUnavailable: () => composeUnavailable,
             failures,
-            clearedPaths,
-            clearedIds,
         });
-    let commit;
-    if (clearedPaths.length > 0) {
+    let commit = release?.commit;
+    if (commit === undefined && clearedPaths.length > 0) {
         commit = kernel.commitTrackerMutation(root, clearedPaths, {
-            message: kernel.trackerCommitMessage(releaseId === undefined ? "pruned" : "released", clearedIds),
+            message: kernel.trackerCommitMessage("pruned", clearedIds),
             commit: kernel.resolveAutoCommit(input.no_commit === true ? false : undefined, kernel.readAutoCommitConfig(root)),
         });
     }
@@ -10291,9 +10339,10 @@ async function nativeRelease(kernel, run) {
     const { id, root, byId, git, runner, input, options, failures } = run;
     const actions = [];
     const refuse = (reason, entry) => {
-        failures.push(`${id}: ${reason}`);
-        actions.push({ id, action: "failed", error: reason });
-        return { entry, actions };
+        const message = boundedNativeText(reason, MAX_NATIVE_DETAIL_CHARS);
+        failures.push(`${id}: ${message}`);
+        actions.push({ id, action: "failed", error: message });
+        return { entry: { ...entry, reason: message }, actions };
     };
     const item = byId.get(id);
     if (item === undefined) {
@@ -10338,9 +10387,7 @@ async function nativeRelease(kernel, run) {
             if (gitRoot !== (0, node_path_1.resolve)(root))
                 kernel.unlinkNodeModulesLink(root, path);
             kernel.unlinkWorktreeEnv(path);
-            if (kernel.unlinkWorktreeClaimStamp(path)) {
-                actions.push({ id, action: "reaped arggon-claim.json stamp" });
-            }
+            const hadStamp = kernel.readWorktreeClaimStamp(path) !== null;
             const removal = await removeWorktreeObserved(options, path, gitRoot, {
                 force: input.take_over_worktree === true,
             });
@@ -10351,6 +10398,12 @@ async function nativeRelease(kernel, run) {
                 return { entry, actions };
             }
             actions.push({ id, action: `removed worktree ${path}` });
+            if (kernel.unlinkWorktreeClaimStamp(path)) {
+                actions.push({ id, action: "reaped arggon-claim.json stamp" });
+            }
+            else if (hadStamp) {
+                actions.push({ id, action: "arggon-claim.json stamp gone with the worktree" });
+            }
             if (classified.branch !== null && git.branchExists(gitRoot, classified.branch)) {
                 try {
                     git.deleteBranchForce(gitRoot, classified.branch);
@@ -10379,13 +10432,11 @@ async function nativeRelease(kernel, run) {
             if (!cleared.ok)
                 throw new Error(kernelError(cleared.envelope));
             actions.push({ id, action: "cleared worktree_path" });
-            kernel.commitTrackerMutation(root, [item.filePath], {
+            const commit = kernel.commitTrackerMutation(root, [item.filePath], {
                 message: kernel.trackerCommitMessage("released", [id]),
                 commit: kernel.resolveAutoCommit(input.no_commit === true ? false : undefined, kernel.readAutoCommitConfig(root)),
             });
-            run.clearedPaths.push(item.filePath);
-            run.clearedIds.push(id);
-            return { entry, actions };
+            return { entry, actions, commit };
         }
         actions.push({ id, action: "disposed worktree_path record with the worktree" });
         return { entry, actions };

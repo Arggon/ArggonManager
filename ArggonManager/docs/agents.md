@@ -200,7 +200,10 @@ When the work is done and merged, `arggon cleanup` lists (and with `--prune` rem
 `--prune` only reaps **finished** work (terminal item + merged branch), so it cannot reap an **abandoned claim**: an item back in `todo` is invisible to it. That is what `--release <id>` is for (bug-unclaim-leaves-worktree-record-without-reaper) — the inverse of `start --worktree`, the other arm of the same worktree domain:
 
 - `arggon cleanup --release <id>` (native: `tools.arggon.cleanup({ release: "<id>" })`) removes that item's worktree, deletes its branch, reaps the start-created `.arggon.env` and the `arggon-claim.json` stamp, and clears the `worktree_path` record — reported as its own `release`/`released` action family, never mixed into `pruned`. Run it from the checkout whose tracker copy carries the record: the claim commit rides the feature branch, so before it merges that copy is the **worktree itself** (release from the claiming session's worktree).
-- It is **refused**, never forced, while the item is still claimed, or when the stamp names another identity whose window shows a live writer (`arggon cleanup --release <id> --take-over-worktree` / `tools.arggon.cleanup({ release, take_over_worktree: true })` is the audited hatch for a presumed-dead owner, exactly like `start --take-over-worktree`; the worktree removal is forced only under that flag, so uncommitted work is never discarded silently).
+- It is **refused**, never forced, while the item is still `in_progress` with an assignee: a re-claimed item has a live owner, and the cheap remedy is that owner's own unclaim. `--take-over-worktree` does **not** bypass this (the hatch is for a _presumed-dead stamped owner on an unclaimed item_, where nothing durable would record the override).
+- Two more refusals, same shape and same both-surfaces reporting: a stamp held by another identity whose window shows a live writer (the F12 evidence rides `release.foreignWrites`), and a worktree with uncommitted or untracked content (`release.blockingPaths`/`blockingTotal`) — refused during classification, before anything is reaped, so a failed release leaves the worktree's claim stamp and `.arggon.env` standing and the next attempt still has its evidence. The claim stamp is reaped only AFTER an observed removal.
+- `arggon cleanup --release <id> --take-over-worktree` / `tools.arggon.cleanup({ release, take_over_worktree: true })` is the audited hatch for a presumed-dead stamped owner, exactly like `start --take-over-worktree`: it passes those two refusals, records the replaced stamp in `release.takeOver`, and is the only thing that forces the removal — so uncommitted work is never discarded silently. Without a release it is refused (`--take-over-worktree requires --release <id>`).
+- A `blocked` item is not a claim (it keeps its assignee as context, not as a lease), so it is not refused here — the single-writer and content gates still protect a live writer.
 - `--release` and `--prune` are mutually exclusive — two reapers, one run.
 
 Native `tools.arggon.start` uses that same kernel dependency-preparation path before its explicit claim commit. Its bounded `preparation` and `claimCommit` receipts make a required install, pre-commit gate, or claim-commit failure a typed failure (with the worktree kept and an attach/retry instruction), never an unqualified success; see §Orchestration → Native `start` dependency contract.
@@ -258,7 +261,11 @@ in the `--json` envelope, `⚠ claim dropped: … release it with: arggon cleanu
 --release <id>` on stdout, and the native `update` tool's `claimFootprint`
 carrying `tools.arggon.cleanup({ release: "<id>" })`. If you drop a claim that
 created a worktree, release it with `arggon cleanup --release <id>` (§Cleanup);
-nothing else will, because `--prune` only reaps terminal, merged work.
+nothing else will, because `--prune` only reaps terminal, merged work. The
+receipt is **unclaim-only**: a `→ done` flip leaves the same footprint, but there
+`cleanup --prune` is the merge-gated remedy (a release force-deletes the branch
+and never checks merge state), and a blocked item keeps its assignee, so neither
+names a release.
 
 ### Reopen
 
