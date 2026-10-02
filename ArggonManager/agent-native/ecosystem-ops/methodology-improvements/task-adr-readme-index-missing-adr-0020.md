@@ -2,7 +2,7 @@
 type: task
 status: todo
 id: task-adr-readme-index-missing-adr-0020
-title: "`docs/adr/README.md` has no row for ADR 0020 (methodology-first productization), which is Accepted on main"
+title: "`docs/adr/README.md` index is missing ADRs 0005–0009 and 0020 (six rows), not just 0020"
 parent: methodology-improvements
 labels: [docs, adr]
 created: "2026-10-02"
