@@ -3185,3 +3185,463 @@ describe("worktree domain tools (W4)", () => {
     expect((caught as ArgonToolError).code).toBe("CLEANUP_FAILED");
   });
 });
+
+/**
+ * Native `cleanup` reaps declared per-worktree Compose projects (ADR 0019 layer
+ * 2, task-native-cleanup-compose-parity) exactly like `arggon cleanup --prune`
+ * (task-cleanup-declared-services, PR #569): one `docker compose -p <project>
+ * down -v --remove-orphans` per removable entry, BEFORE the worktree removal,
+ * with the same no-op, degradation and bounded-failure semantics.
+ *
+ * The executor seam is the real one on purpose — the plugin has no injectable
+ * dep — so a recording `docker` shim on PATH drives BOTH surfaces (the native
+ * tool in-process, the CLI in a spawned child), which is what makes the
+ * same-fixture parity assertions below possible without a fake.
+ */
+describe("native cleanup reaps declared Compose projects (ADR 0019 layer 2, task-native-cleanup-compose-parity)", () => {
+  /** Commit an `x-worktree.services` declaration onto the fixture. */
+  function declareServices(dir: string, services: string): void {
+    const config = join(dir, "ArggonManager", ".convention.yml");
+    writeFileSync(
+      config,
+      `${readFileSync(config, "utf8")}x-worktree:\n  services: ${services}\n`,
+      "utf8",
+    );
+    git(dir, ["add", "ArggonManager/.convention.yml"]);
+    git(dir, ["commit", "-qm", "config: x-worktree.services"]);
+  }
+
+  /** One `docker` invocation as the shim recorded it. */
+  type DockerCall = { cwd: string; argv: string[]; worktree: "present" | "absent" };
+
+  /**
+   * A recording `docker` shim on a fresh PATH dir (no daemon in CI). The record
+   * target and the observed worktree come from the caller's environment, so one
+   * shim can serve both surfaces; `selfDelete` makes it remove itself on the
+   * first call, so the NEXT spawn hits the real ENOENT — the absent-docker
+   * signal a report-only run degrades on. `fail` makes it exit non-zero with
+   * that stderr, like a real `docker compose down` failure.
+   */
+  function fakeDocker(options: { fail?: string; selfDelete?: boolean } = {}): string {
+    const bin = hermeticBin("arggon-fake-docker-");
+    const shim = join(bin, "docker");
+    writeFileSync(
+      shim,
+      [
+        "#!/bin/sh",
+        'log="$ARGGON_FAKE_DOCKER_LOG"',
+        'if [ -d "$ARGGON_FAKE_DOCKER_WT" ]; then state=present; else state=absent; fi',
+        'printf \'cwd %s\\nworktree %s\\n\' "$PWD" "$state" >> "$log"',
+        'for arg in "$@"; do printf \'arg %s\\n\' "$arg" >> "$log"; done',
+        'printf -- "---\\n" >> "$log"',
+        // The absolute path, not `$0`: a PATH-resolved exec does not guarantee
+        // the script path in `$0`, and a silent no-op delete would leave the
+        // shim answering every later spawn.
+        ...(options.selfDelete === true ? ['rm -f "$ARGGON_FAKE_DOCKER_SHIM"'] : []),
+        ...(options.fail === undefined
+          ? []
+          : [`printf '%s\\n' ${JSON.stringify(options.fail)} >&2`, "exit 1"]),
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    chmodSync(shim, 0o755);
+    return bin;
+  }
+
+  /** A fresh empty log file for the shim to append to. */
+  function dockerLog(): string {
+    return join(mkdtemp("arggon-docker-log-"), "docker.log");
+  }
+
+  /**
+   * The environment a surface's Compose teardown sees: the shim's hermetic PATH
+   * plus the keys the shim reads — where it records (`log`), which worktree it
+   * must still find (`wt`, the proof the reap precedes the removal) and its own
+   * path (the self-delete).
+   */
+  function dockerEnv(bin: string, log: string, wt: string): Record<string, string> {
+    return {
+      PATH: bin,
+      ARGGON_FAKE_DOCKER_LOG: log,
+      ARGGON_FAKE_DOCKER_WT: wt,
+      ARGGON_FAKE_DOCKER_SHIM: join(bin, "docker"),
+    };
+  }
+
+  /** A spawned CLI's env: the patch on top of this process's own environment. */
+  function spawnEnv(patch: Record<string, string>): NodeJS.ProcessEnv {
+    return { ...process.env, ...patch };
+  }
+
+  /** A PATH with git but no docker: the spawn hits the real ENOENT. */
+  function gitOnlyBin(): string {
+    return hermeticBin("arggon-fake-nodocker-");
+  }
+
+  /**
+   * A PATH holding ONLY git (and `rm`, which the self-deleting shim needs), so
+   * the Compose teardown resolves `docker` in that directory and nowhere else:
+   * a shim there is the whole story, its absence is the real ENOENT, and the
+   * host's own `/usr/bin/docker` can never answer (which would make a "no
+   * docker" test pass for the wrong reason — a real `compose down` on an unknown
+   * project exits 0 with a "No resource found" warning).
+   */
+  function hermeticBin(prefix: string): string {
+    const bin = mkdtemp(prefix);
+    for (const tool of ["git", "rm"]) {
+      const real = spawnSync("sh", ["-c", `command -v ${tool}`], { encoding: "utf8" }).stdout.trim();
+      symlinkSync(real, join(bin, tool));
+    }
+    return bin;
+  }
+
+  /** Parse the shim's log into per-invocation records (one block, `---` ended). */
+  function dockerCalls(log: string): DockerCall[] {
+    if (!existsSync(log)) return [];
+    const calls: DockerCall[] = [];
+    let current: { cwd: string; argv: string[]; worktree: "present" | "absent" } | null = null;
+    for (const line of readFileSync(log, "utf8").split("\n")) {
+      if (line === "---") {
+        if (current !== null) calls.push(current);
+        current = null;
+        continue;
+      }
+      if (line.startsWith("cwd ")) {
+        current = { cwd: line.slice("cwd ".length), argv: [], worktree: "absent" };
+      } else if (current === null) {
+        continue;
+      } else if (line.startsWith("worktree ")) {
+        current.worktree = line.slice("worktree ".length) as "present" | "absent";
+      } else if (line.startsWith("arg ")) {
+        current.argv.push(line.slice("arg ".length));
+      }
+    }
+    return calls;
+  }
+
+  /**
+   * Run `body` with `env` patched onto THIS process (the native tool spawns in
+   * process, so PATH is the only seam), restoring every key afterwards.
+   */
+  async function withEnv<T>(env: Record<string, string>, body: () => Promise<T>): Promise<T> {
+    const saved = new Map<string, string | undefined>();
+    for (const [key, value] of Object.entries(env)) {
+      saved.set(key, process.env[key]);
+      process.env[key] = value;
+    }
+    try {
+      return await body();
+    } finally {
+      for (const [key, value] of saved) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    }
+  }
+
+  /** Add the extra terminal items the reap-per-candidate cases need. */
+  function addItems(dir: string, ids: string[]): void {
+    for (const id of ids) {
+      runCreate({ cwd: dir, type: "task", title: `Task ${id}`, parent: "story-login", id });
+      tickAcceptance(dir, `task-${id}`);
+    }
+  }
+
+  /**
+   * N removable entries on one shared domain: claim → worktree → commit →
+   * merge (stub PR) → done, per id. The reap loop must run once per entry.
+   */
+  async function completedWorktrees(
+    dir: string,
+    ids: string[],
+  ): Promise<{ defs: ArgonToolDefinition[]; paths: string[] }> {
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const paths: string[] = [];
+    for (const id of ids) {
+      const started = await tool(defs, "start").execute({ id, assignee: "smoke" });
+      const worktreePath = String((started.output as { worktreePath?: unknown }).worktreePath);
+      // Content unique per item: a later worktree branches off a main that
+      // already carries the previous item's file, so a shared body would make
+      // its commit empty.
+      writeFileSync(join(worktreePath, "work.txt"), `work ${id}\n`, "utf8");
+      git(worktreePath, ["add", "work.txt"]);
+      git(worktreePath, ["commit", "-qm", "feat: work"]);
+      git(dir, ["merge", "--no-ff", `feat/${id}`, "-m", "Merge PR (stubbed)"]);
+      await tool(defs, "update").execute({ id, status: "done" });
+      paths.push(worktreePath);
+    }
+    return { defs, paths };
+  }
+
+  it("reaps `<repo>-<item-id>` for services: true, before the worktree removal", async () => {
+    const dir = seedGitTree();
+    declareServices(dir, "true");
+    const { defs, paths } = await completedWorktrees(dir, ["task-rate-limit"]);
+    const log = dockerLog();
+    const bin = fakeDocker();
+
+    const output = await withEnv(dockerEnv(bin, log, paths[0]), () =>
+      tool(defs, "cleanup").execute({ prune: true, no_gh: true }),
+    );
+    const envelope = output.output as Record<string, unknown>;
+
+    // The ADR 0019 command shape, as an argv array, with the repo root as cwd.
+    const project = basename(paths[0]).toLowerCase();
+    expect(dockerCalls(log)).toEqual([
+      {
+        cwd: dir,
+        argv: ["compose", "-p", project, "down", "-v", "--remove-orphans"],
+        worktree: "present",
+      },
+    ]);
+    // The stack dies with the worktree: reap FIRST, removal after.
+    expect(envelope.pruned).toEqual([
+      { id: "task-rate-limit", action: `reaped compose project ${project}` },
+      { id: "task-rate-limit", action: `removed worktree ${paths[0]}` },
+      { id: "task-rate-limit", action: "deleted branch feat/task-rate-limit" },
+      { id: "task-rate-limit", action: "cleared worktree_path" },
+    ]);
+    expect(envelope.compose).toEqual({ declared: "true" });
+    expect(envelope.failures).toEqual([]);
+    expect(existsSync(paths[0])).toBe(false);
+  });
+
+  it("derives `<base>-<repo>-<item-id>` from a declared base name, lowercased", async () => {
+    const dir = seedGitTree();
+    declareServices(dir, "MyApp");
+    const { defs, paths } = await completedWorktrees(dir, ["task-rate-limit"]);
+    const log = dockerLog();
+    const bin = fakeDocker();
+
+    const output = await withEnv(dockerEnv(bin, log, paths[0]), () =>
+      tool(defs, "cleanup").execute({ prune: true, no_gh: true }),
+    );
+    const envelope = output.output as Record<string, unknown>;
+
+    // The adopter pattern's `name: "MyApp${WORKTREE_SUFFIX:-}"`; Compose
+    // lowercases project names, so the whole derivation is lowercased.
+    const project = `myapp-${basename(paths[0])}`.toLowerCase();
+    expect(dockerCalls(log).map((call) => call.argv[2])).toEqual([project]);
+    expect(envelope.compose).toEqual({ declared: "MyApp" });
+    expect(envelope.failures).toEqual([]);
+  });
+
+  it("never invokes Docker when the repo declares nothing (report-only path)", async () => {
+    const dir = seedGitTree();
+    addItems(dir, ["second"]);
+    const { defs, paths } = await completedWorktrees(dir, ["task-rate-limit", "task-second"]);
+    const log = dockerLog();
+    const bin = fakeDocker();
+
+    const output = await withEnv(dockerEnv(bin, log, paths[0]), () =>
+      tool(defs, "cleanup").execute({ prune: true, no_gh: true }),
+    );
+    const envelope = output.output as Record<string, unknown>;
+
+    // Not a single docker invocation, and no compose report at all.
+    expect(dockerCalls(log)).toEqual([]);
+    expect("compose" in envelope).toBe(false);
+    expect(envelope.failures).toEqual([]);
+    const actions = (envelope.pruned as Array<Record<string, unknown>>).map((a) => String(a.action));
+    expect(actions.filter((action) => action.includes("compose"))).toEqual([]);
+    for (const path of paths) expect(existsSync(path)).toBe(false);
+  });
+
+  it("reaps every removable entry, one project each, before that entry's removal", async () => {
+    const dir = seedGitTree();
+    declareServices(dir, "true");
+    addItems(dir, ["second"]);
+    const { defs, paths } = await completedWorktrees(dir, ["task-rate-limit", "task-second"]);
+    const log = dockerLog();
+    const bin = fakeDocker();
+
+    const output = await withEnv(dockerEnv(bin, log, paths[0]), () =>
+      tool(defs, "cleanup").execute({ prune: true, no_gh: true }),
+    );
+    const envelope = output.output as Record<string, unknown>;
+
+    // Ids sort task-rate-limit before task-second, so the reap order is that.
+    const projects = [basename(paths[0]).toLowerCase(), basename(paths[1]).toLowerCase()];
+    expect(dockerCalls(log).map((call) => call.argv[2])).toEqual(projects);
+    const actions = (envelope.pruned as Array<Record<string, unknown>>).map((a) => String(a.action));
+    expect(actions).toEqual([
+      `reaped compose project ${projects[0]}`,
+      `removed worktree ${paths[0]}`,
+      "deleted branch feat/task-rate-limit",
+      "cleared worktree_path",
+      `reaped compose project ${projects[1]}`,
+      `removed worktree ${paths[1]}`,
+      "deleted branch feat/task-second",
+      "cleared worktree_path",
+    ]);
+    expect(envelope.failures).toEqual([]);
+  });
+
+  it("reports a reap failure on BOTH surfaces and never wedges the removal", async () => {
+    const dir = seedGitTree();
+    declareServices(dir, "true");
+    addItems(dir, ["second"]);
+    const { defs, paths } = await completedWorktrees(dir, ["task-rate-limit", "task-second"]);
+    const log = dockerLog();
+    const bin = fakeDocker({ fail: "Cannot connect to the Docker daemon" });
+
+    const output = await withEnv(dockerEnv(bin, log, paths[0]), () =>
+      tool(defs, "cleanup").execute({ prune: true, no_gh: true }),
+    );
+    const envelope = output.output as Record<string, unknown>;
+
+    // The CLI's message shape verbatim (same prefix, same stderr fallback), so
+    // both prune envelopes stay comparable.
+    const errors = [basename(paths[0]), basename(paths[1])].map(
+      (id) =>
+        `docker compose -p ${id.toLowerCase()} down -v --remove-orphans failed: Cannot connect to the Docker daemon`,
+    );
+    expect(envelope.failures).toEqual([
+      `task-rate-limit: ${errors[0]}`,
+      `task-second: ${errors[1]}`,
+    ]);
+    const actions = envelope.pruned as Array<Record<string, unknown>>;
+    expect(actions.filter((action) => action.action === "failed")).toEqual([
+      { id: "task-rate-limit", action: "failed", error: errors[0] },
+      { id: "task-second", action: "failed", error: errors[1] },
+    ]);
+    // Non-fatal: every worktree, branch and record is still reaped.
+    for (const path of paths) expect(existsSync(path)).toBe(false);
+    for (const branch of ["feat/task-rate-limit", "feat/task-second"]) {
+      expect(gitOut(dir, ["branch", "--list", branch])).toBe("");
+    }
+    expect(itemData(dir, "task-second").worktree_path).toBeUndefined();
+  });
+
+  it("an absent docker CLI degrades the whole run to report-only and still prunes", async () => {
+    const dir = seedGitTree();
+    declareServices(dir, "true");
+    addItems(dir, ["second"]);
+    const { defs, paths } = await completedWorktrees(dir, ["task-rate-limit", "task-second"]);
+    const bin = gitOnlyBin();
+
+    const output = await withEnv({ PATH: bin }, () =>
+      tool(defs, "cleanup").execute({ prune: true, no_gh: true }),
+    );
+    const envelope = output.output as Record<string, unknown>;
+
+    // The absence is reported once, never as a failure, and the prune completes
+    // (the worktree removal does not wait for Docker).
+    expect(envelope.compose).toEqual({ declared: "true", dockerUnavailable: true });
+    expect(envelope.failures).toEqual([]);
+    expect((envelope.pruned as Array<Record<string, unknown>>).map((a) => String(a.action))).toEqual([
+      `removed worktree ${paths[0]}`,
+      "deleted branch feat/task-rate-limit",
+      "cleared worktree_path",
+      `removed worktree ${paths[1]}`,
+      "deleted branch feat/task-second",
+      "cleared worktree_path",
+    ]);
+    for (const path of paths) expect(existsSync(path)).toBe(false);
+  });
+
+  it("one ENOENT degrades the REST of the run: no later entry ever reaches Docker", async () => {
+    const dir = seedGitTree();
+    declareServices(dir, "true");
+    addItems(dir, ["second", "third"]);
+    const { defs, paths } = await completedWorktrees(dir, [
+      "task-rate-limit",
+      "task-second",
+      "task-third",
+    ]);
+    const log = dockerLog();
+    // The shim fails its first call and then deletes itself: entry two hits the
+    // real ENOENT (the report-only signal), entry three must never spawn.
+    const bin = fakeDocker({ fail: "Cannot connect to the Docker daemon", selfDelete: true });
+
+    const output = await withEnv(dockerEnv(bin, log, paths[0]), () =>
+      tool(defs, "cleanup").execute({ prune: true, no_gh: true }),
+    );
+    const envelope = output.output as Record<string, unknown>;
+
+    // Exactly one spawn: the ENOENT that followed it is the run-wide switch.
+    expect(dockerCalls(log)).toHaveLength(1);
+    expect(envelope.compose).toEqual({ declared: "true", dockerUnavailable: true });
+    // Only the real (non-ENOENT) failure is a failure; the rest is silent.
+    expect(envelope.failures).toEqual([
+      `task-rate-limit: docker compose -p ${basename(paths[0]).toLowerCase()} down -v --remove-orphans failed: Cannot connect to the Docker daemon`,
+    ]);
+    // Every entry is still removed, cleared and branch-deleted.
+    for (const path of paths) expect(existsSync(path)).toBe(false);
+    expect(itemData(dir, "task-third").worktree_path).toBeUndefined();
+  });
+
+  it("native prune is byte-identical to `cleanup --prune --json` on the same fixture (declared, reaped)", async () => {
+    // The parity harness: two twin fixtures (same repo basename, same layout,
+    // completed the same way), then the SAME recording docker shim on both
+    // surfaces — the native tool in-process and the CLI in a spawned child, so
+    // "the same fixture" means the same bytes of scenario, not one shared
+    // directory (a prune mutates). `--no-commit` keeps the tracker-commit
+    // payload the same deterministic skip on both sides.
+    const cliDir = seedGitTree("arggon-w4-parity-");
+    const nativeDir = seedGitTree("arggon-w4-parity-");
+    for (const dir of [cliDir, nativeDir]) {
+      declareServices(dir, "true");
+      addItems(dir, ["second"]);
+    }
+    const cli = await completedWorktrees(cliDir, ["task-rate-limit", "task-second"]);
+    const native = await completedWorktrees(nativeDir, ["task-rate-limit", "task-second"]);
+    const bin = fakeDocker();
+    const cliLog = dockerLog();
+    const nativeLog = dockerLog();
+
+    // The local runCli takes the env MAP (not an options object).
+    const expected = runCli(
+      ["cleanup", "--prune", "--no-gh", "--no-commit"],
+      cliDir,
+      spawnEnv(dockerEnv(bin, cliLog, cli.paths[0])),
+    );
+    expect(expected.status, expected.stderr).toBe(0);
+    const output = await withEnv(dockerEnv(bin, nativeLog, native.paths[0]), () =>
+      tool(native.defs, "cleanup").execute({ prune: true, no_gh: true, no_commit: true }),
+    );
+
+    // Both surfaces reaped the same projects, in the same order, from the repo
+    // root, while their own worktree was still on disk.
+    const projects = native.paths.map((path) => basename(path).toLowerCase());
+    expect(dockerCalls(cliLog).map((call) => call.argv[2])).toEqual(projects);
+    expect(dockerCalls(nativeLog).map((call) => call.argv[2])).toEqual(projects);
+    expect(dockerCalls(nativeLog).every((call) => call.cwd === nativeDir)).toBe(true);
+    // Each entry's own reap ran while THAT entry's worktree was still on disk.
+    expect(dockerCalls(nativeLog).map((call) => call.worktree)).toEqual(["present", "absent"]);
+    // The envelopes are the same bytes (fixture root normalized).
+    expect(normalize(expected.stdout, cliDir)).toBe(normalize(`${JSON.stringify(output.output)}\n`, nativeDir));
+  });
+
+  it("native prune matches `cleanup --prune --json` on the absent-docker degradation", async () => {
+    // The report-only shape (ADR 0019 layer 2): both surfaces report
+    // `compose.dockerUnavailable` once, fail nothing, and prune everything.
+    const cliDir = seedGitTree("arggon-w4-parity-");
+    const nativeDir = seedGitTree("arggon-w4-parity-");
+    for (const dir of [cliDir, nativeDir]) {
+      declareServices(dir, "true");
+      addItems(dir, ["second"]);
+    }
+    // The CLI fixture must reach the same state, so it runs the same lifecycle.
+    await completedWorktrees(cliDir, ["task-rate-limit", "task-second"]);
+    const native = await completedWorktrees(nativeDir, ["task-rate-limit", "task-second"]);
+    const bin = gitOnlyBin();
+
+    const expected = runCli(
+      ["cleanup", "--prune", "--no-gh", "--no-commit"],
+      cliDir,
+      spawnEnv({ PATH: bin }),
+    );
+    expect(expected.status, expected.stderr).toBe(0);
+    const output = await withEnv({ PATH: bin }, () =>
+      tool(native.defs, "cleanup").execute({ prune: true, no_gh: true, no_commit: true }),
+    );
+    const envelope = output.output as Record<string, unknown>;
+    expect(envelope.compose).toEqual({ declared: "true", dockerUnavailable: true });
+    expect(envelope.failures).toEqual([]);
+    expect(normalize(expected.stdout, cliDir)).toBe(normalize(`${JSON.stringify(output.output)}\n`, nativeDir));
+    for (const path of native.paths) expect(existsSync(path)).toBe(false);
+  });
+});
