@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-adopt-050-seam-repin
 title: "Adopt 0.5.0 on this machine: re-pin the seam checks and regenerate the vendored seam with the released version"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [release, seam]
 priority: p1
 created: "2026-10-02"
 updated: "2026-10-02"
-claimed_at: "2026-10-02T12:31:30.743Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-adopt-050-seam-repin
 ---
 <!--
