@@ -3,6 +3,7 @@ type: task
 status: todo
 id: task-native-start-take-over-input
 title: "Native tools.arggon.start: accept a take-over input so the dead-owner hatch is reachable from the OpenCode seam"
+branch: feat/task-native-start-take-over-input
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [worktree, opencode-seam, parity]
 priority: p3
