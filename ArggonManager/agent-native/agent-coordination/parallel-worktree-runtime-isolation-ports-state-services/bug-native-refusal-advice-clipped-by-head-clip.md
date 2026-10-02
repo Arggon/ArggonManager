@@ -37,9 +37,9 @@ worktree_path: /home/arggon/Projects/ArggonManager-bug-native-refusal-advice-cli
 Found while reviewing PR #579: the native seam's other two refusals have the composition defect that #579 just fixed for the worktree-write refusal. Both build `failBeforeClaim(\`\${<kernel refusal>}\${advice}\`, …)` — kernel text first, advice last — while `startFailure` clips the composed message at `MAX_NATIVE_ERROR_CHARS = 2048` and `clip()` keeps the HEAD. The advice is therefore the first thing lost when the named file list is long. The CLI equivalents were already reordered in #573's round 2 for exactly this reason, and the project record treats it as a defect.
 
 ## Acceptance
-- [ ] Both native refusals compose the actionable advice FIRST (kernel refusal last), keeping every existing clause verbatim — same shape #579 landed for `strict worktree-write gate refused`.
-- [ ] A test per refusal with the worst-case named-list (10 long paths) asserting the advice (the `npm ci` remedy + the prep log for the fresh-worktree gate; the named bins + attach re-run for the gate-bin gate) survives the clip, with the ordering pinned (advice index precedes the first named path).
-- [ ] Negative control: assert the message length is at the cap and the last named path is absent, so the test cannot pass on a merely longer message.
+- [x] Both native refusals compose the actionable advice FIRST (kernel refusal last), keeping every existing clause verbatim — same shape #579 landed for `strict worktree-write gate refused`.
+- [x] A test per refusal with the worst-case named-list (10 long paths) asserting the advice (the `npm ci` remedy + the prep log for the fresh-worktree gate; the named bins + attach re-run for the gate-bin gate) survives the clip, with the ordering pinned (advice index precedes the first named path).
+- [x] Negative control: assert the message length is at the cap and the last named path is absent, so the test cannot pass on a merely longer message.
 
 ### 2026-10-02 @ses_f01cebaa9ffeuQRcpbUpyt0LNy
 Work landed on `fix/bug-native-refusal-advice-clipped-by-head-clip` → PR https://github.com/Arggon/ArggonManager/pull/595 (rebased onto origin/main, clean). Acceptance ticked in the item file. NOT flipped to done.

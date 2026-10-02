@@ -42,7 +42,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
-import { MAX_MISSING_DEPENDENCIES, parseFrontmatter, runCreate, runUpdate } from "@arggondev/lib";
+import { MAX_GATE_BINS, MAX_MISSING_DEPENDENCIES, parseFrontmatter, runCreate, runUpdate } from "@arggondev/lib";
 import { runInit } from "../../../cli/src/init.js";
 import { tickAcceptance, tickAllAcceptance } from "../../../test/acceptance.js";
 import {
@@ -1845,6 +1845,88 @@ describe("worktree domain tools (W4)", () => {
     });
   });
 
+  it("keeps the npm ci remedy and the preparation log inside the clipped fresh-worktree refusal when the named-bin list is at its worst case (bug-native-refusal-advice-clipped-by-head-clip)", async () => {
+    const dir = seedGitTree();
+    const devDependencies: Record<string, string> = {};
+    const names: string[] = [];
+    for (let index = 0; index < MAX_GATE_BINS; index += 1) {
+      const name = `worktree-gate-binary-number-${index}-with-a-very-long-name-for-the-clip`;
+      devDependencies[name] = "1.0.0";
+      names.push(name);
+    }
+    addNativeManifest(dir, { name: "fixture", devDependencies });
+    // The FULL MAX_GATE_BINS list (every gate-bin name the kernel can report;
+    // every other test here names one bin, which can never trip the 2048-char
+    // head clip) of PATH-masked shims under a deep sibling. Each entry costs
+    // ~270 chars (long name + the deep sibling path), so this is the reachable
+    // worst case — the acceptance's 10 long paths is the write gate's
+    // `MAX_CLAIM_WRITE_NAMES` cap, not a bin cap — and it overruns the cap by
+    // several entries. `startFailure` clips the composed message at
+    // MAX_NATIVE_ERROR_CHARS = 2048 and keeps the HEAD, so advice APPENDED
+    // after the kernel refusal — or the remedy the refusal itself tails — is
+    // exactly what the clip eats. The remedies must therefore lead.
+    const siblingBinDir = join(
+      dirname(dir),
+      "deeply",
+      "nested",
+      "module",
+      "path",
+      "number",
+      "with",
+      "a",
+      "long",
+      "sibling",
+      "checkout",
+      "node_modules",
+      ".bin",
+    );
+    mkdirSync(siblingBinDir, { recursive: true });
+    for (const name of names) {
+      writeFileSync(join(siblingBinDir, name), "#!/bin/sh\nexit 0\n", "utf8");
+      chmodSync(join(siblingBinDir, name), 0o755);
+    }
+    setNativePreCommitHook(dir, "#!/bin/sh\nexit 1\n");
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const savedPath = process.env.PATH ?? "";
+    process.env.PATH = `${siblingBinDir}:${savedPath}`;
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    } finally {
+      process.env.PATH = savedPath;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    const payload = typed.envelope;
+    const claimCommit = payload.claimCommit as Record<string, unknown>;
+    expect(claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+      reason: "fresh-worktree install gate refused",
+    });
+    const message = String((payload.error as { message?: unknown }).message);
+    const sorted = [...names].sort();
+    const firstEntry = `${sorted[0]}: resolves only via PATH from ${join(siblingBinDir, sorted[0])}`;
+    // The actionable advice survives the clip: the prep log and the `npm ci`
+    // remedy come FIRST (with the native worktree-kept/attach re-run ahead of
+    // the kernel refusal entirely), so the head-clip keeps them.
+    expect(message).toContain("The worktree was kept at");
+    expect(message).toContain("npm ci");
+    expect(message).toContain("Preparation ran:");
+    const firstNamedIndex = message.indexOf(firstEntry);
+    expect(firstNamedIndex).toBeGreaterThan(-1);
+    expect(message.indexOf("The worktree was kept at")).toBeLessThan(firstNamedIndex);
+    expect(message.indexOf("npm ci")).toBeLessThan(firstNamedIndex);
+    expect(message.indexOf("Preparation ran:")).toBeLessThan(firstNamedIndex);
+    // Negative control: the message is pinned at the cap and the LAST named
+    // entry is gone — the test cannot pass on a merely longer message.
+    expect(message.length).toBe(2048);
+    expect(message).not.toContain(sorted[sorted.length - 1]);
+  });
+
   /**
    * Arm `x-tracker.strict-gate-bins` (task-start-gate-strict-mode) on the
    * seeded tree. Committed: a dirty tracker tree would trip start's stale
@@ -1956,6 +2038,80 @@ describe("worktree domain tools (W4)", () => {
         path: join(worktreePath, "node_modules", ".bin", "native-gate-dep"),
       },
     ]);
+  });
+
+  it("keeps the named bins and the attach re-run inside the clipped strict gate-bin refusal when the named-bin list is at its worst case (bug-native-refusal-advice-clipped-by-head-clip)", async () => {
+    const dir = seedGitTree();
+    const devDependencies: Record<string, string> = {};
+    const names: string[] = [];
+    for (let index = 0; index < MAX_GATE_BINS; index += 1) {
+      const name = `worktree-gate-binary-number-${index}-with-a-very-long-name-for-the-clip`;
+      devDependencies[name] = "1.0.0";
+      names.push(name);
+    }
+    addNativeManifest(dir, { name: "fixture", devDependencies });
+    armStrictGateBins(dir);
+    setNativePreCommitHook(dir, "#!/bin/sh\nexit 1\n");
+    // Same worst-case shape as the fresh-worktree refusal's test: the full
+    // MAX_GATE_BINS list of PATH-masked shims under a deep sibling, so
+    // `MAX_NATIVE_ERROR_CHARS` (2048) clips the composed message HEAD-first and
+    // only the leading advice and the first named bins survive.
+    const siblingBinDir = join(
+      dirname(dir),
+      "deeply",
+      "nested",
+      "module",
+      "path",
+      "number",
+      "with",
+      "a",
+      "long",
+      "sibling",
+      "checkout",
+      "node_modules",
+      ".bin",
+    );
+    mkdirSync(siblingBinDir, { recursive: true });
+    for (const name of names) {
+      writeFileSync(join(siblingBinDir, name), "#!/bin/sh\nexit 0\n", "utf8");
+      chmodSync(join(siblingBinDir, name), 0o755);
+    }
+    const { domain } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const savedPath = process.env.PATH ?? "";
+    process.env.PATH = `${siblingBinDir}:${savedPath}`;
+    let caught: unknown;
+    try {
+      await tool(defs, "start").execute({ id: "task-rate-limit", assignee: "smoke" });
+    } catch (error) {
+      caught = error;
+    } finally {
+      process.env.PATH = savedPath;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    const typed = caught as ArgonToolError;
+    const payload = typed.envelope;
+    const claimCommit = payload.claimCommit as Record<string, unknown>;
+    expect(claimCommit).toMatchObject({
+      status: "not-attempted",
+      committed: false,
+      reason: "strict gate-bin gate refused",
+    });
+    const message = String((payload.error as { message?: unknown }).message);
+    const sorted = [...names].sort();
+    const firstEntry = `${sorted[0]}: resolves only via PATH from ${join(siblingBinDir, sorted[0])}`;
+    // The actionable advice survives the clip: the attach re-run FIRST, then
+    // the named bins (the evidence the clip starts eating last).
+    expect(message).toContain("The worktree was kept at");
+    expect(message).toContain("it attaches to the existing worktree and retries the claim commit");
+    const firstNamedIndex = message.indexOf(firstEntry);
+    expect(firstNamedIndex).toBeGreaterThan(-1);
+    expect(message.indexOf("it attaches to the existing worktree and retries the claim commit")).toBeLessThan(
+      firstNamedIndex,
+    );
+    // Negative control: pinned at the cap, last named entry gone.
+    expect(message.length).toBe(2048);
+    expect(message).not.toContain(sorted[sorted.length - 1]);
   });
 
   it("claims normally when strict-gate-bins is armed and the bin resolves from the worktree (task-start-gate-strict-mode)", async () => {
