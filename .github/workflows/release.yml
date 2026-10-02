@@ -76,6 +76,19 @@ jobs:
           RELEASE_SHA: ${{ github.sha }}
         run: node cli/release-guard.mjs --sha "$RELEASE_SHA"
 
+      - name: Validate the CHANGELOG section for V BEFORE tagging
+        # bug-release-notes-extraction-breaks-on-linked-header: the notes used
+        # to be extracted AFTER the tag was pushed, so the first automated
+        # release (v0.5.0) died with a published tag, no release object and
+        # nothing on npm. The extraction is a tested module now
+        # (cli/src/release-notes.ts, prefix-matched so release-please's LINKED
+        # header works), and the gate runs HERE — a notes problem can no
+        # longer strand a tag. Idempotent: re-reads, writes nothing.
+        if: steps.guard.outputs.release == 'true'
+        env:
+          VERSION: ${{ steps.guard.outputs.version }}
+        run: npx tsx cli/src/release-notes.ts --check --version "$VERSION"
+
       - name: Create the annotated tag v(V) at the pushed commit
         if: steps.guard.outputs.release == 'true' && steps.guard.outputs.tag_exists == 'false'
         env:
@@ -126,17 +139,14 @@ jobs:
         run: |
           set -euo pipefail
           notes="$RUNNER_TEMP/release-notes.md"
-          pattern="^## \\[${VERSION//./\\.}\\]"
-          awk -v pat="$pattern" '
-            $0 ~ pat { insec = 1; next }
-            insec && /^## / { exit }
-            insec && !started && /^$/ { next }
-            insec { started = 1; print }
-          ' CHANGELOG.md > "$notes"
-          if ! grep -q . "$notes"; then
-            echo "CHANGELOG.md has no '## [$VERSION]' section - the merged release section is the notes source; refusing to create an empty release" >&2
-            exit 1
-          fi
+          # cli/src/release-notes.ts: the section is matched by its `## [V]`
+          # PREFIX, so release-please's linked header
+          # (`## [0.5.0](…compare/…) (date)`) and the plain
+          # `## [0.4.1] - 2026-10-01` form both work — the awk this replaced
+          # anchored to the closing bracket and matched only the plain form,
+          # which stranded v0.5.0 after its tag. Fails closed, listing the
+          # headers it did find.
+          npx tsx cli/src/release-notes.ts --write "$notes" --version "$VERSION"
           if gh release view "v${VERSION}" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
             echo "release v${VERSION} already exists (idempotent re-run) - keeping it"
           else

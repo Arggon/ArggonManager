@@ -63,6 +63,55 @@ state: a write-access user clicks **"Approve workflows"** on the PR once and
 CI runs. The lockfile-sync push afterwards only updates the PR — it starts no
 new runs.
 
+## Exception: the release run dies after the tag (worked example: 0.5.0)
+
+A failing step that runs **after** the tag leaves a published tag with no
+GitHub Release and nothing on npm. The guard cannot re-enter for that commit
+(rule 0: version unchanged; rule 2: the tag already names this sha — which
+needs a re-run of the _same_ push, i.e. the same workflow file), and a re-run
+replays the file the run started with. So the remaining steps are the operator's,
+in the order the workflow would have used:
+
+```bash
+# 1. the release notes for V (the merged CHANGELOG section) — same extractor
+#    the workflow now calls, so the shape is identical
+node cli/release-notes.mjs --write /tmp/release-notes.md --version <V>
+gh release create "v<V>" --title "v<V>" --notes-file /tmp/release-notes.md
+
+# 2. build at the RELEASE COMMIT (build-info must name it, not main's head),
+#    from a detached worktree so the tree matches the tag exactly
+git worktree add ../rel-<V> --detach v<V>
+(cd ../rel-<V> && npm run build && node -p "require('./dist/build-info.json').sha")
+
+# 3. pack BOTH packages (mkdir first — see the npm pack ENOENT gotcha), then
+#    the same extract-and-inspect gate CI runs; nothing ships without it
+mkdir -p /tmp/arggon-packs
+(cd ../rel-<V> && npm pack --workspace lib --pack-destination /tmp/arggon-packs)
+(cd ../rel-<V> && npm pack --pack-destination /tmp/arggon-packs)
+(cd ../rel-<V> && node cli/inspect-tarballs.mjs /tmp/arggon-packs --version <V>)
+
+# 4. kernel first, then CLI (invariant 3), each idempotent
+(cd ../rel-<V> && npm publish --workspace lib)
+npm view "@arggondev/lib" version          # poll until it shows <V>, never re-publish
+(cd ../rel-<V> && npm publish)
+
+# 5. attach both tarballs, then clean up
+gh release upload "v<V>" --clobber /tmp/arggon-packs/*.tgz
+git worktree remove ../rel-<V>
+```
+
+**0.5.0 (2026-10-02), exactly this path.** The run died at the notes step —
+the extractor was inline awk anchored to the closing bracket of `## [V]`, and
+release-please writes the LINKED form `## [0.5.0](…compare/…) (2026-10-02)`,
+which that pattern cannot match. The tag `v0.5.0` → `13d72f5f` was already
+pushed, so the operator completed the release by hand (release object with the
+hand-curated notes, build at the tag, `inspect-tarballs` green, kernel then CLI
+published, both tarballs attached). Fixed in the same PR as this entry: the
+extraction is a tested module (`cli/release-notes.mjs`) that matches the header
+by prefix, and it now runs as a `--check` gate **before** the tag step, so this
+class cannot strand a tag again. Local publishing needs registry credentials in
+`~/.npmrc`; the workflow's own path is OIDC trusted publishing.
+
 ## Exception: publish fails with an authentication error
 
 Trusted-publisher misconfiguration (wrong filename, wrong repo, stage-only
