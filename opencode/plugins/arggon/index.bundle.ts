@@ -6677,11 +6677,11 @@ function freshWorktreeInstallRefusal(gateBins, worktreePath, steps = []) {
             .map((entry) => `${entry.step}:${entry.outcome}${entry.pkg ? ` (${entry.pkg})` : ""}`)
             .join(", ")}.`
         : "";
-    return (`refusing the claim commit — a fresh worktree must leave a gate-usable install, and ` +
-        `these gate binaries do not resolve inside it: ${named}.${prep} ` +
+    return (`refusing the claim commit — a fresh worktree must leave a gate-usable install.${prep} ` +
         `Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install ` +
         `(or \`npm install\` in the primary checkout if its install is stale or missing), ` +
-        `then re-run start --worktree to attach.`);
+        `then re-run start --worktree to attach. ` +
+        `These gate binaries do not resolve inside it: ${named}.`);
 }
 function inspectDeclaredDependencies(worktreePath) {
     const declared = declaredDependencyNames(worktreePath);
@@ -9790,10 +9790,11 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
             ? kernel.strictGateBinFailure(progress.preparation?.gateBins ?? [], worktreePath)
             : null;
         if (strictRefusal !== null) {
-            return failBeforeClaim(`${strictRefusal} The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
+            return failBeforeClaim(`The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
                 "Then re-run " +
                 `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
-                "it attaches to the existing worktree and retries the claim commit.", "strict gate-bin gate refused");
+                "it attaches to the existing worktree and retries the claim commit. " +
+                strictRefusal, "strict gate-bin gate refused");
         }
     }
     if (worktreePath !== undefined) {
@@ -9818,10 +9819,11 @@ async function nativeStartBody(kernel, input, options, progress, item, root, ass
     if (worktreePath !== undefined && progress.worktreeCreated) {
         const refusal = kernel.freshWorktreeInstallRefusal(progress.preparation?.gateBins ?? [], worktreePath, progress.preparation?.steps ?? []);
         if (refusal !== null) {
-            return failBeforeClaim(`${refusal} The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
+            return failBeforeClaim(`The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
                 "Then re-run " +
                 `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
-                "it attaches to the existing worktree and retries the claim commit.", "fresh-worktree install gate refused");
+                "it attaches to the existing worktree and retries the claim commit. " +
+                refusal, "fresh-worktree install gate refused");
         }
     }
     progress.stage = "claim update";

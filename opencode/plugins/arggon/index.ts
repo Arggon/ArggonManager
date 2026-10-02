@@ -3654,11 +3654,22 @@ async function nativeStartBody(
         ? kernel.strictGateBinFailure(progress.preparation?.gateBins ?? [], worktreePath)
         : null
     if (strictRefusal !== null) {
+      // ORDER IS LOAD-BEARING, same contract the strict worktree-write gate
+      // below documents: `startFailure` clips the composed message HEAD-first
+      // at MAX_NATIVE_ERROR_CHARS (2048), and the worst case is the named-bin
+      // list at its MAX_GATE_BINS cap (~270 chars an entry). Advice APPENDED
+      // after the kernel refusal is then the first thing the clip eats — and it
+      // used to vanish whole, leaving only bin names with no way forward. So
+      // every remedy goes FIRST (the worktree-kept note + the attach re-run)
+      // and the kernel refusal closes the message: its lead sentence and the
+      // first named bins survive the clip, exactly the ordering #579 landed
+      // for strict worktree-write gate.
       return failBeforeClaim(
-        `${strictRefusal} The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
+        `The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
           "Then re-run " +
           `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
-          "it attaches to the existing worktree and retries the claim commit.",
+          "it attaches to the existing worktree and retries the claim commit. " +
+          strictRefusal,
         "strict gate-bin gate refused",
       )
     }
@@ -3736,11 +3747,22 @@ async function nativeStartBody(
       progress.preparation?.steps ?? [],
     )
     if (refusal !== null) {
+      // ORDER IS LOAD-BEARING, same contract the strict worktree-write gate
+      // above documents: `startFailure` clips the composed message HEAD-first
+      // at MAX_NATIVE_ERROR_CHARS (2048), and the worst case is the named-bin
+      // list at full length (`freshWorktreeInstallRefusal` puts that list —
+      // evidence, not instruction — last, so only it clipped). Advice
+      // APPENDED after the kernel refusal is the first thing the clip eats,
+      // so every remedy goes FIRST (the worktree-kept note + the attach
+      // re-run) and the kernel refusal — its lead sentence, the preparation
+      // log and the `npm ci` fix — tells the rest, exactly the ordering #579
+      // landed for strict worktree-write gate.
       return failBeforeClaim(
-        `${refusal} The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
+        `The worktree was kept at ${worktreePath} (nothing was rolled back). ` +
           "Then re-run " +
           `tools.arggon.start({ id: ${JSON.stringify(id)}, assignee: ${JSON.stringify(assignee)} }) — ` +
-          "it attaches to the existing worktree and retries the claim commit.",
+          "it attaches to the existing worktree and retries the claim commit. " +
+          refusal,
         "fresh-worktree install gate refused",
       )
     }

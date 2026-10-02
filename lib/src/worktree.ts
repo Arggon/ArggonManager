@@ -942,6 +942,15 @@ export function strictGateBinFailure(
  * mode uses — the flag changes the consequence, never the observation), the
  * preparation log that produced the state, and the exact fix.
  *
+ * ORDERING is load-bearing (bug-native-refusal-advice-clipped-by-head-clip):
+ * the named-bin list goes LAST, because the human and native channels clip a
+ * composite error head-kept, and a worst-case named list would otherwise push
+ * the remedies — the only actionable part — off the clipped tail (the native
+ * seam also composes its own advice ahead of this kernel text, and both are
+ * clipped head-first at MAX_NATIVE_ERROR_CHARS). Every remedy therefore
+ * leads; the bin list is evidence to scroll back for, never the instruction.
+ * Same ordering #573's round 2 landed for strictWorktreeWriteFailure.
+ *
  * Default-on for fresh worktrees — no flag required: a start that created the
  * worktree vouches for its install, and must not hand the worker a broken one.
  * Attach re-runs are NOT covered here (their report-only receipt — or the
@@ -973,11 +982,11 @@ export function freshWorktreeInstallRefusal(
           .join(", ")}.`
       : "";
   return (
-    `refusing the claim commit — a fresh worktree must leave a gate-usable install, and ` +
-    `these gate binaries do not resolve inside it: ${named}.${prep} ` +
+    `refusing the claim commit — a fresh worktree must leave a gate-usable install.${prep} ` +
     `Fix: run \`npm ci\` in ${worktreePath} for a worktree-local install ` +
     `(or \`npm install\` in the primary checkout if its install is stale or missing), ` +
-    `then re-run start --worktree to attach.`
+    `then re-run start --worktree to attach. ` +
+    `These gate binaries do not resolve inside it: ${named}.`
   );
 }
 
