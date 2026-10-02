@@ -17,7 +17,12 @@ inline. Trivial items (one-line fixes, doc tweaks) stay inline. Full rules:
   stamp, creates `../<repo>-<id>`, pre-builds the packages that copy owns and
   records `branch` + `worktree_path`. Never hand-roll `git worktree add` for a
   claim, never dispatch a worker as the first claimant, never claim an item you
-  are not dispatching (unclaim it instead), and read a start **refusal** as evidence,
+  are not dispatching (unclaim it **and release it** —
+  `tools.arggon.cleanup({ release: id })` / `arggon cleanup --release <id>`: the
+  unclaim clears the assignee but leaves the claim's worktree, `.arggon.env` and
+  claim stamp behind, and `--prune` cannot reap a `todo` item; the unclaim's own
+  `claimFootprint` receipt names the release command), and read a start **refusal**
+  as evidence,
   not a retry — `start` has no `--force`, and no refusal is a licence to route
   around it by hand.
 - **Per-item worktrees:** one subagent per item, each in its own worktree — the

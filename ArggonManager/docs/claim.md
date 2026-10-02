@@ -37,16 +37,38 @@ Resulting semantics for simultaneous `arggon start` processes on one item:
   and fail with the claim-conflict `START_FAILED`. The claim is never silently
   replaced (no last-write-wins).
 
-
 ## Unclaim recovery
 
-v0 unclaim: `in_progress` → `todo` clears `assignee` (CLI `update` default).
+v0 unclaim: `in_progress` → `todo` clears `assignee` (CLI `update` default), and
+it clears the recorded `branch` with it.
 
 ```bash
 arggon update <id> --status todo
 # then
 arggon update <id> --status in_progress --assignee <you>
 ```
+
+**An unclaim releases nothing but the claim.** A claim taken through
+`start --worktree` also owns a worktree at `../<repo>-<id>`, its `.arggon.env`
+and its `arggon-claim.json` stamp, and none of those die with the assignee:
+`worktree_path` stays recorded (only `assignee`, `branch` and the `claimed_at`
+lease go), `update` is a frontmatter-only operation — it is the very call
+`cleanup` uses to CLEAR such a record — and `cleanup --prune` reaps only FINISHED
+work (terminal item + merged branch), so an item back in `todo` is invisible to
+it (bug-unclaim-leaves-worktree-record-without-reaper). So the unclaim reports
+what it left behind: the additive `claimFootprint` receipt
+(`{ worktreePath, release: { cli, native } }`, printed on stdout as
+`⚠ claim dropped: …`) names the release path, and the release itself is
+`arggon cleanup --release <id>` (native `tools.arggon.cleanup({ release })`) —
+the inverse of `start --worktree`, refused while the item is still claimed or
+while another session's live writer holds the worktree
+([agents.md](./agents.md) §Cleanup).
+
+The receipt is **unclaim-only** on purpose. A `→ done` flip leaves the same
+footprint, but its remedy is `cleanup --prune` — whose merge gate protects a
+branch that still carries unmerged work — so no release is named there; a
+blocked item keeps its assignee as context rather than as a lease, so it is not
+an abandoned claim and gets no receipt either.
 
 ## Stale claims (claim leases)
 
@@ -69,6 +91,7 @@ The flow (both gates are required):
 1. **Arm the repo once**: `x-tracker.allow-steal: true` in the tracker `.convention.yml` (default when absent: steal is refused with `steal is disabled in this repo (x-tracker.allow-steal: true in the tracker .convention.yml arms it)`).
 2. **A human runs it in their terminal**: `--steal` requires an interactive stdin — scripts, CI, and agents (non-TTY) are refused with `--steal requires an interactive terminal (agents must not steal claims — `ArggonManager/docs/agents.md`)`, even with the repo armed and even with `y` piped in. In a TTY, the CLI asks `Steal '<id>' from '<current-assignee>'? [y/N]` and aborts on anything but y/yes. There is no `--yes` override — the prompt is the point.
 3. As before: a non-empty `--reason` (recorded in the item body as a dated note) and `--assignee <you>` are required.
+
 - Agents are refused (same playbook rule as `--force`) — they unclaim-and-reclaim through coordination instead, or pick another item.
 
 ## Claiming (playbook)
@@ -76,7 +99,7 @@ The flow (both gates are required):
 Agents and humans follow the same rules:
 
 1. Claim before starting (`--status in_progress --assignee <you>`).
-2. Do not steal; unclaim or use `--force` only when coordinated.
+2. Do not steal; unclaim or use `--force` only when coordinated. Unclaiming a claim that created a worktree also releases it (`arggon cleanup --release <id>`) — see §Unclaim recovery.
 3. Unclaim when releasing work (`--status todo`).
 4. Do not reopen `done`/`cancelled` as an agent — enforced: the MCP layer refuses agent callers, and the CLI requires an interactive-terminal y/N confirmation for `--status todo` on a `done`/`cancelled` item (see convention reopen policy).
 

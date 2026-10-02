@@ -26,8 +26,12 @@ Duties:
    the only source of the path your worker prompt can name. Never hand-roll
    `git worktree add` for a claim, never dispatch a worker as the first claimant,
    and never claim an item you are not dispatching (an idle claim keeps the item
-   out of the pool and records a writer that is not writing — unclaim it
-   instead). A start **refusal is evidence, not a retry**: read the cause it
+   out of the pool and records a writer that is not writing — unclaim it **and
+   release it**: `arggon_update({ id, status: "todo" })` clears the assignee but
+   leaves the claim's worktree, `.arggon.env` and claim stamp behind, and
+   `arggon_cleanup({ prune: true })` cannot reap a `todo` item, so follow it with
+   `arggon_cleanup({ release: id })` — the unclaim's own `claimFootprint` receipt
+   names that command). A start **refusal is evidence, not a retry**: read the cause it
    names (`start` has no `--force`) and never route around it by hand; the
    remedy — `npm ci` in the returned worktree, then re-run `start` to attach —
    is in `ArggonManager/docs/agents.md` §Orchestration.

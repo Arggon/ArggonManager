@@ -191,6 +191,36 @@ export type UpdateResult = {
    * number, and `x-github.issue-roundtrip` is enabled. Never blocks the flip.
    */
   issueRoundtrip?: IssueRoundtripResult;
+  /**
+   * Dropped-claim worktree footprint
+   * (bug-unclaim-leaves-worktree-record-without-reaper): present ONLY when THIS
+   * update UNCLAIMED a claimed item (in_progress → todo) while a
+   * `worktree_path` record still stands.
+   *
+   * This is the unclaim contract, surfaced on the call that causes it: the
+   * claim's footprint does NOT die with the assignee. The worktree, its
+   * `.arggon.env` and its `arggon-claim.json` stamp all outlive the claim, and
+   * `update` is a frontmatter-only op with no git lifecycle (it is the very
+   * call `cleanup` uses to CLEAR such a record) — so it reports the footprint
+   * and names the release path instead of reaping the worktree implicitly. Both
+   * release commands are listed because both surfaces have their own spelling;
+   * the rule behind them is one kernel rule (`classifyReleaseEntry`).
+   *
+   * Restricted to the unclaim on purpose (review M1): a terminal flip (`→ done`)
+   * leaves the same footprint, but there `cleanup --prune` is the correct,
+   * merge-gated remedy — naming a release would invite a force-deleted branch
+   * still carrying unmerged work — and a blocked item keeps its assignee, so it
+   * is not an abandoned claim at all.
+   */
+  claimFootprint?: ClaimFootprintReceipt;
+};
+
+/** The dropped claim's surviving worktree footprint + the release paths. */
+export type ClaimFootprintReceipt = {
+  /** Absolute worktree path still recorded on the item. */
+  worktreePath: string;
+  /** The release command per surface — one rule, two spellings. */
+  release: { cli: string; native: string };
 };
 
 /** Shared CSV split (trim parts, drop empties) — also used by create --labels. */
@@ -814,6 +844,34 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
       }
     }
 
+    // Dropped-claim worktree footprint (bug-unclaim-leaves-worktree-record-without-reaper):
+    // the UNCLAIM contract, reported on the call that causes it. Gated on THIS
+    // run UNCLAIMING a claimed item (in_progress → todo) that carries a
+    // `worktree_path` record: the worktree, its `.arggon.env` and its claim
+    // stamp outlive the assignee, and nothing reaps them here —
+    // `cleanup --release <id>` (native `cleanup({ release })`) is the path, and
+    // this receipt is what names it.
+    //
+    // The `newStatus === "todo"` clause is load-bearing (review M1): `isClaimed`
+    // is in_progress-only, so ANY flip out of in_progress would otherwise
+    // qualify — including the ordinary `→ done`, where `cleanup --prune` is the
+    // correct, MERGE-GATED remedy and naming a release would invite an agent to
+    // force-delete a branch that still carries unmerged work. `→ blocked` keeps
+    // the assignee (a blocked item is not an abandoned claim) and gets no
+    // receipt either. The receipt reads the footprint from the item file JUST
+    // written (so a caller that released the record in the same run, like
+    // `cleanup`, never sees a stale claim).
+    const claimFootprint: ClaimFootprintReceipt | undefined =
+      wasClaimed && !willBeClaimed && newStatus === "todo" && updated.worktreePath != null
+        ? {
+            worktreePath: resolve(updated.worktreePath),
+            release: {
+              cli: `arggon cleanup --release ${updated.id}`,
+              native: `tools.arggon.cleanup({ release: ${JSON.stringify(updated.id)} })`,
+            },
+          }
+        : undefined;
+
     return {
       id: updated.id,
       path: targetPath,
@@ -832,6 +890,7 @@ export function runUpdate(opts: UpdateOptions): UpdateResult {
       movedFrom,
       ...(renamedFrom ? { renamedFrom } : {}),
       ...(issueRoundtrip ? { issueRoundtrip } : {}),
+      ...(claimFootprint ? { claimFootprint } : {}),
     };
   };
 

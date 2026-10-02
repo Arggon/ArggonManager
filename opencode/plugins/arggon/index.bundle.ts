@@ -7,6 +7,8 @@ const __arggonNodeRequire = __arggonCreateRequire(import.meta.url)
 const __arggonModules = new Map()
 const __arggonCache = new Map()
 const __arggonEdges = new Map()
+__arggonEdges.set("lib/src/cleanup.ts\u0000./status.js", "lib/src/status.ts")
+__arggonEdges.set("lib/src/cleanup.ts\u0000./worktree.js", "lib/src/worktree.ts")
 __arggonEdges.set("lib/src/comment.ts\u0000./atomic.js", "lib/src/atomic.ts")
 __arggonEdges.set("lib/src/comment.ts\u0000./dates.js", "lib/src/dates.ts")
 __arggonEdges.set("lib/src/comment.ts\u0000./frontmatter.js", "lib/src/frontmatter.ts")
@@ -238,9 +240,15 @@ exports.CLEANUP_TERMINAL_STATUSES = void 0;
 exports.defaultCleanupGit = defaultCleanupGit;
 exports.findMergedPr = findMergedPr;
 exports.classifyCleanupEntry = classifyCleanupEntry;
+exports.worktreeReleaseRefusal = worktreeReleaseRefusal;
+exports.parseRemovalBlockingPaths = parseRemovalBlockingPaths;
+exports.worktreeDirtyRefusal = worktreeDirtyRefusal;
+exports.classifyReleaseEntry = classifyReleaseEntry;
 const node_child_process_1 = require("node:child_process");
 const node_fs_1 = require("node:fs");
 const node_path_1 = require("node:path");
+const status_js_1 = require("./status.js");
+const worktree_js_1 = require("./worktree.js");
 exports.CLEANUP_TERMINAL_STATUSES = new Set(["done", "cancelled"]);
 const defaultExecGh = (file, args, options) => (0, node_child_process_1.execFileSync)(file, args, options);
 function git(args, cwd) {
@@ -317,8 +325,8 @@ function defaultCleanupGit() {
                 return false;
             }
         },
-        removeWorktree(cwd, path) {
-            git(["worktree", "remove", path], cwd);
+        removeWorktree(cwd, path, opts) {
+            git(["worktree", "remove", ...(opts?.force === true ? ["--force"] : []), path], cwd);
         },
         deleteBranch(cwd, branch) {
             git(["branch", "-d", branch], cwd);
@@ -334,6 +342,10 @@ function defaultCleanupGit() {
             catch {
                 return false;
             }
+        },
+        worktreeBranch(cwd, path) {
+            const name = git(["rev-parse", "--abbrev-ref", "HEAD"], path);
+            return name.length > 0 && name !== "HEAD" ? name : null;
         },
     };
 }
@@ -447,6 +459,128 @@ function classifyCleanupEntry(item, root, base, gitRunner, deps = {}) {
         entry.action = "remove worktree and delete the merged branch";
     }
     entry.removable = true;
+    return entry;
+}
+function worktreeReleaseRefusal(item, path, report) {
+    const extra = report.total - report.files.length;
+    const named = report.files.join(", ");
+    return (`refusing to release the worktree of '${item.id}': it is stamped by session ` +
+        `${report.owner} (claimed ${report.claimedAt}) and ${report.total} tracked ` +
+        `file${report.total === 1 ? " was" : "s were"} modified after that claim — another ` +
+        "session may still be writing there. Coordinate with the stamped session first; if that " +
+        "session is gone, confirm no live writer and re-run with the take-over flag " +
+        "(cleanup --release <id> --take-over-worktree; native cleanup({ release, take_over_worktree })); " +
+        "as a last resort remove the stamp by hand " +
+        `(rm "$(git -C ${path} rev-parse --absolute-git-dir)/arggon-claim.json"). ` +
+        `Files modified after that claim: ${named}${extra > 0 ? ` (and ${extra} more)` : ""}.`);
+}
+function parseRemovalBlockingPaths(porcelain) {
+    const paths = [];
+    for (const line of porcelain.split("\n")) {
+        if (line.trim().length === 0)
+            continue;
+        if (line.slice(0, 2) === "!!")
+            continue;
+        let path = line.slice(3).trim();
+        const arrow = path.indexOf(" -> ");
+        if (arrow !== -1)
+            path = path.slice(arrow + 4);
+        path = path.replace(/^"|"$/g, "");
+        if (path.length > 0)
+            paths.push(path);
+    }
+    return paths;
+}
+function worktreeDirtyRefusal(item, paths) {
+    const named = paths.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
+    const extra = paths.length - named.length;
+    return (`refusing to release the worktree of '${item.id}': it has ${paths.length} uncommitted or ` +
+        `untracked file${paths.length === 1 ? "" : "s"}, so 'git worktree remove' would refuse it and a ` +
+        "release would discard the work without removing the worktree. Commit or discard that work " +
+        "first, or — if the stamped owner is dead and the work is disposable — confirm no live writer " +
+        "and re-run with the take-over flag (cleanup --release <id> --take-over-worktree; native " +
+        `cleanup({ release, take_over_worktree })). Blocking paths: ${named.join(", ")}` +
+        `${extra > 0 ? ` (and ${extra} more)` : ""}.`);
+}
+function classifyReleaseEntry(item, root, gitRunner, request) {
+    const path = item.worktreePath ? (0, node_path_1.resolve)(item.worktreePath) : "";
+    const entry = {
+        id: item.id,
+        status: item.status,
+        branch: null,
+        path,
+        releasable: false,
+        reason: null,
+        action: null,
+    };
+    if (path === "") {
+        entry.reason = "no worktree recorded on the item (nothing to release)";
+        return entry;
+    }
+    if ((0, status_js_1.isClaimed)(item.type, item.status, item.assignee)) {
+        entry.reason =
+            `item is still claimed by ${item.assignee} — drop the claim first ` +
+                `(arggon update ${item.id} --status todo), then release the worktree. ` +
+                "This refusal is not overridable: --take-over-worktree is for a " +
+                "presumed-dead stamped owner on an UNCLAIMED item.";
+        return entry;
+    }
+    if (!(0, node_fs_1.existsSync)(path)) {
+        entry.action = "clear stale worktree_path record (path missing on disk)";
+        entry.releasable = true;
+        return entry;
+    }
+    if (!gitRunner
+        .worktreeList(root)
+        .map((p) => (0, node_path_1.resolve)(p))
+        .includes(path)) {
+        entry.reason = "path exists but is not a git worktree of this repo (remove it manually)";
+        return entry;
+    }
+    entry.branch =
+        gitRunner.worktreeBranch === undefined
+            ? (item.branch ?? null)
+            : (gitRunner.worktreeBranch(root, path) ?? null);
+    const porcelain = (request.status ?? worktree_js_1.defaultWorktreeStatus)(path);
+    const stamp = (0, worktree_js_1.readWorktreeClaimStamp)(path, {
+        ...(request.gitDir !== undefined ? { gitDir: request.gitDir } : {}),
+    });
+    if (stamp !== null && stamp.identity !== request.identity && porcelain !== undefined) {
+        const foreignWrites = (0, worktree_js_1.detectWorktreeForeignWrites)(path, stamp, {
+            status: () => porcelain,
+        });
+        if (foreignWrites !== null) {
+            if (request.takeOver !== true) {
+                entry.reason = worktreeReleaseRefusal(item, path, foreignWrites);
+                entry.foreignWrites = foreignWrites;
+                return entry;
+            }
+            entry.takeOver = {
+                replacedIdentity: stamp.identity,
+                replacedClaimedAt: stamp.claimedAt,
+            };
+        }
+    }
+    let forced = false;
+    if (porcelain !== undefined) {
+        const blocking = parseRemovalBlockingPaths(porcelain);
+        if (blocking.length > 0) {
+            if (request.takeOver !== true) {
+                entry.reason = worktreeDirtyRefusal(item, blocking);
+                entry.blockingPaths = blocking.slice(0, worktree_js_1.MAX_CLAIM_WRITE_NAMES);
+                entry.blockingTotal = blocking.length;
+                return entry;
+            }
+            forced = true;
+        }
+    }
+    const disposal = entry.branch === null
+        ? "clear the worktree_path record"
+        : "delete its branch and clear the worktree_path record";
+    entry.action = forced
+        ? `remove the worktree (forced past its uncommitted content), ${disposal}`
+        : `remove the worktree, ${disposal}`;
+    entry.releasable = true;
     return entry;
 }
 })
@@ -2275,9 +2409,9 @@ __arggonModules.set("lib/src/index.ts", (exports, require, module) => {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.repoRootFromTasks = exports.newItemPath = exports.findTrackerLocation = exports.findTasksDir = exports.docsDirForRoot = exports.conventionPathForRoot = exports.conventionPathForLayout = exports.TRACKER_DIR_NAME = exports.LEGACY_TRACKER_DIR_NAME = exports.CONVENTION_FILE_NAME = exports.slugify = exports.itemId = exports.isItemType = exports.innerSlug = exports.firstDuplicateId = exports.assertValidId = exports.assertLabels = exports.assertBranchName = exports.MAX_ID_LENGTH = exports.ITEM_TYPES = exports.BRANCH_PATTERN = exports.expectedParentType = exports.assertParentEdge = exports.PARENT_TYPE = exports.unclaim = exports.isClaimed = exports.isClaimable = exports.canTransition = exports.assertStatus = exports.assertCreatableStatus = exports.assertClaimAndBlocked = exports.assertAssignee = exports.TRANSITIONS = exports.STATUSES = exports.CREATE_STATUSES = exports.CLAIMABLE_TYPES = exports.ASSIGNEE_PATTERN = exports.assertUpdateRules = exports.toContractWorkItem = exports.stringifyFrontmatter = exports.stringField = exports.stringArrayField = exports.parseFrontmatter = exports.numberField = exports.walkTasksTree = exports.tryLoadItem = exports.softTryLoadItem = exports.loadItems = exports.itemsById = exports.acceptanceComplete = void 0;
 exports.compactWorkItem = exports.JSON_SCHEMA_VERSION = exports.visibleItems = exports.treeEntries = exports.statusCounts = exports.sortByPriority = exports.sortByNextRank = exports.sortById = exports.readyTodoCount = exports.priorityTier = exports.priorityCounts = exports.openDependencyIds = exports.matchesSubstringFilter = exports.itemsForStatus = exports.isReadyTodo = exports.hasOpenDependencies = exports.groupItemsBy = exports.buildStatusIndex = exports.applyViewLens = exports.applyViewFilter = exports.runPriorityMigrate = exports.priorityRank = exports.isPriority = exports.assertPriority = exports.PRIORITY_LABEL_PATTERN = exports.PRIORITIES = exports.withItemLock = exports.lockFilePathFor = exports.formatDateTime = exports.formatDate = exports.runNext = exports.openDependencies = exports.isReady = exports.downstreamWeight = exports.unquoteFilterValue = exports.splitFilterTokens = exports.parseFilter = exports.matchesPredicate = exports.buildBlockedByIndex = exports.buildAncestorIndex = exports.FILTER_FIELDS = exports.resolveBranchName = exports.readConventionVersion = exports.readConventionConfig = exports.parseConventionConfig = exports.DEFAULT_BRANCH_PATTERNS = exports.CONVENTION_VERSION_DEFAULT = exports.CONVENTION_VERSION = exports.trackerNonItemDirs = exports.trackerAt = void 0;
-exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = void 0;
-exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkNodeModulesLink = void 0;
-exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = void 0;
+exports.strictGateBinFailure = exports.readWorktreeClaimStamp = exports.prepareWorktreeEnv = exports.prepareWorktreeDependencies = exports.pointWorkspaceAtLocal = exports.parseTrackedModifications = exports.packageEntryPaths = exports.packageEntryExists = exports.packageBuildScript = exports.localWorkspacePackages = exports.linkedWorkspacePackages = exports.linkNodeModulesDetailed = exports.linkNodeModules = exports.inspectGateBinResolution = exports.inspectDeclaredDependencies = exports.freshWorktreeInstallRefusal = exports.detectWorktreeForeignWrites = exports.buildLocalWorkspaces = exports.worktreeReleaseRefusal = exports.findMergedPr = exports.defaultCleanupGit = exports.classifyReleaseEntry = exports.classifyCleanupEntry = exports.CLEANUP_TERMINAL_STATUSES = exports.parseVerdicts = exports.classifyVerdicts = exports.runSync = exports.runHandoff = exports.HANDOFF_SESSION_CAP = exports.HANDOFF_FIELD_CAP = exports.runComment = exports.parseCsvList = exports.maybeCommitUpdate = exports.runUpdate = exports.runValidate = exports.parseOlderThan = exports.parseSince = exports.parseLog = exports.isoWeekKey = exports.runTrend = exports.runReport = exports.completedOf = exports.aggregateReport = exports.showBoundedParts = exports.runShow = exports.runList = exports.runCreate = exports.commitPayload = exports.successEnvelope = exports.failEnvelope = void 0;
+exports.resolveCommonGitDir = exports.resolveAutoCommit = exports.readAutoCommitConfig = exports.formatCommitLine = exports.commitTrackerMutation = exports.updateGeneratedSection = exports.serializeGeneratedSection = exports.readGeneratedState = exports.readGeneratedProjectName = exports.parseGeneratedProjectName = exports.sanitizeHumanValue = exports.sanitizeHumanTextUncapped = exports.sanitizeHumanText = exports.sanitizeHumanError = exports.MAX_HUMAN_VALUE_CHARS = exports.MAX_HUMAN_ERROR_CHARS = exports.writeFileAtomic = exports.validateOperation = exports.updateOperation = exports.syncOperation = exports.showOperation = exports.reportOperation = exports.priorityOperation = exports.nextOperation = exports.listOperation = exports.importIssuesOperation = exports.handoffOperation = exports.createOperation = exports.commentOperation = exports.resolveImportType = exports.normalizeGhLabels = exports.mapIssueState = exports.importedBody = exports.ghIssueListJson = exports.runImportIssues = exports.WORKTREE_ENV_KEYS = exports.MAX_PREP_STEPS = exports.MAX_GATE_BINS = exports.MAX_MISSING_DEPENDENCIES = exports.MAX_CLAIM_TAKEOVERS = exports.worktreeStateBase = exports.worktreeComposeProject = exports.worktreeTakeoverWarning = exports.worktreeForeignWriteWarning = exports.worktreeCacheBase = exports.unlinkWorktreeEnv = exports.unlinkWorktreeClaimStamp = exports.unlinkNodeModulesLink = exports.strictWorktreeWriteFailure = exports.strictGateBinViolations = void 0;
+exports.successJson = exports.jsonEnabled = exports.failJson = exports.emitJson = exports.bindJsonProgram = exports.ghPrListJson = exports.formatValidateHuman = exports.formatTrendTable = exports.formatTrendMarkdown = exports.formatReportTable = exports.formatReportMarkdown = exports.renderShowText = exports.DEFAULT_TAIL_COMMENTS = exports.resolveCurrentLogin = exports.formatListTable = exports.updateCommitMessage = exports.trackerGitLockKey = exports.trackerCommitMessage = void 0;
 var items_js_1 = require("./items.js");
 Object.defineProperty(exports, "acceptanceComplete", { enumerable: true, get: function () { return items_js_1.acceptanceComplete; } });
 Object.defineProperty(exports, "itemsById", { enumerable: true, get: function () { return items_js_1.itemsById; } });
@@ -2437,8 +2571,10 @@ Object.defineProperty(exports, "parseVerdicts", { enumerable: true, get: functio
 var cleanup_js_1 = require("./cleanup.js");
 Object.defineProperty(exports, "CLEANUP_TERMINAL_STATUSES", { enumerable: true, get: function () { return cleanup_js_1.CLEANUP_TERMINAL_STATUSES; } });
 Object.defineProperty(exports, "classifyCleanupEntry", { enumerable: true, get: function () { return cleanup_js_1.classifyCleanupEntry; } });
+Object.defineProperty(exports, "classifyReleaseEntry", { enumerable: true, get: function () { return cleanup_js_1.classifyReleaseEntry; } });
 Object.defineProperty(exports, "defaultCleanupGit", { enumerable: true, get: function () { return cleanup_js_1.defaultCleanupGit; } });
 Object.defineProperty(exports, "findMergedPr", { enumerable: true, get: function () { return cleanup_js_1.findMergedPr; } });
+Object.defineProperty(exports, "worktreeReleaseRefusal", { enumerable: true, get: function () { return cleanup_js_1.worktreeReleaseRefusal; } });
 var worktree_js_1 = require("./worktree.js");
 Object.defineProperty(exports, "buildLocalWorkspaces", { enumerable: true, get: function () { return worktree_js_1.buildLocalWorkspaces; } });
 Object.defineProperty(exports, "detectWorktreeForeignWrites", { enumerable: true, get: function () { return worktree_js_1.detectWorktreeForeignWrites; } });
@@ -2461,6 +2597,7 @@ Object.defineProperty(exports, "strictGateBinFailure", { enumerable: true, get: 
 Object.defineProperty(exports, "strictGateBinViolations", { enumerable: true, get: function () { return worktree_js_1.strictGateBinViolations; } });
 Object.defineProperty(exports, "strictWorktreeWriteFailure", { enumerable: true, get: function () { return worktree_js_1.strictWorktreeWriteFailure; } });
 Object.defineProperty(exports, "unlinkNodeModulesLink", { enumerable: true, get: function () { return worktree_js_1.unlinkNodeModulesLink; } });
+Object.defineProperty(exports, "unlinkWorktreeClaimStamp", { enumerable: true, get: function () { return worktree_js_1.unlinkWorktreeClaimStamp; } });
 Object.defineProperty(exports, "unlinkWorktreeEnv", { enumerable: true, get: function () { return worktree_js_1.unlinkWorktreeEnv; } });
 Object.defineProperty(exports, "worktreeCacheBase", { enumerable: true, get: function () { return worktree_js_1.worktreeCacheBase; } });
 Object.defineProperty(exports, "worktreeForeignWriteWarning", { enumerable: true, get: function () { return worktree_js_1.worktreeForeignWriteWarning; } });
@@ -3460,6 +3597,7 @@ function updateOperation(opts) {
             ...(result.renamedFrom ? { renamedFrom: result.renamedFrom } : {}),
             cascadeSkipped: result.cascadeSkipped,
             ...(result.issueRoundtrip ? { issueRoundtrip: result.issueRoundtrip } : {}),
+            ...(result.claimFootprint ? { claimFootprint: result.claimFootprint } : {}),
             ...(commit ? { commit: (0, tracker_commit_js_1.commitPayload)(commit) } : {}),
         }, (0, convention_js_1.readConventionVersion)(result.root));
     }
@@ -5366,6 +5504,15 @@ function runUpdate(opts) {
                 process.stderr.write(`arggon: warning: issue round-trip skipped: ${(0, sanitize_js_1.sanitizeHumanError)(issueRoundtrip.skipped)}\n`);
             }
         }
+        const claimFootprint = wasClaimed && !willBeClaimed && newStatus === "todo" && updated.worktreePath != null
+            ? {
+                worktreePath: (0, node_path_1.resolve)(updated.worktreePath),
+                release: {
+                    cli: `arggon cleanup --release ${updated.id}`,
+                    native: `tools.arggon.cleanup({ release: ${JSON.stringify(updated.id)} })`,
+                },
+            }
+            : undefined;
         return {
             id: updated.id,
             path: targetPath,
@@ -5384,6 +5531,7 @@ function runUpdate(opts) {
             movedFrom,
             ...(renamedFrom ? { renamedFrom } : {}),
             ...(issueRoundtrip ? { issueRoundtrip } : {}),
+            ...(claimFootprint ? { claimFootprint } : {}),
         };
     };
     return (0, lock_js_1.withItemLock)(peekItem.filePath, apply);
@@ -6136,7 +6284,9 @@ exports.worktreeStateBase = worktreeStateBase;
 exports.worktreeCacheBase = worktreeCacheBase;
 exports.prepareWorktreeEnv = prepareWorktreeEnv;
 exports.unlinkWorktreeEnv = unlinkWorktreeEnv;
+exports.defaultWorktreeStatus = defaultWorktreeStatus;
 exports.readWorktreeClaimStamp = readWorktreeClaimStamp;
+exports.unlinkWorktreeClaimStamp = unlinkWorktreeClaimStamp;
 exports.parseTrackedModifications = parseTrackedModifications;
 exports.detectWorktreeForeignWrites = detectWorktreeForeignWrites;
 exports.worktreeForeignWriteWarning = worktreeForeignWriteWarning;
@@ -6957,6 +7107,20 @@ function parseTakeoverChain(value) {
         entries.push({ at, by, replacedIdentity, replacedClaimedAt });
     }
     return entries.slice(-exports.MAX_CLAIM_TAKEOVERS);
+}
+function unlinkWorktreeClaimStamp(worktreePath, deps = {}) {
+    const path = claimStampPath(worktreePath, deps);
+    if (path === undefined)
+        return false;
+    try {
+        if ((0, node_fs_1.lstatSync)(path).isSymbolicLink())
+            return false;
+        (0, node_fs_1.rmSync)(path);
+        return true;
+    }
+    catch {
+        return false;
+    }
 }
 function writeWorktreeClaimStamp(worktreePath, stamp, deps) {
     const path = claimStampPath(worktreePath, deps);
@@ -9988,7 +10152,7 @@ function nativeComposeDown(project, cwd) {
         child.stdin?.end();
     });
 }
-async function nativeCleanup(kernel, input, options) {
+async function nativeCleanup(kernel, input, options, tool) {
     let root;
     try {
         root = sessionRoot(kernel, options.cwd);
@@ -10013,12 +10177,21 @@ async function nativeCleanup(kernel, input, options) {
     const tracked = [...byId.values()]
         .filter((item) => (item.worktreePath ?? null) !== null)
         .sort((a, b) => a.id.localeCompare(b.id));
+    const releaseId = asString(input.release);
+    if (releaseId !== undefined && input.prune === true) {
+        return worktreeFail(kernel, "cleanup", "CLEANUP_FAILED", "pass either release or prune, not both", version);
+    }
+    if (releaseId === undefined && input.take_over_worktree === true) {
+        return worktreeFail(kernel, "cleanup", "CLEANUP_FAILED", "take_over_worktree requires release (it authorizes a release of a worktree whose stamped owner is presumed dead)", version);
+    }
     const inventory = await domainWorktrees(options);
     const runner = {
         ...git,
         worktreeList: (cwd) => inventory.length > 0 ? inventory : git.worktreeList(cwd),
     };
-    const entries = tracked.map((item) => kernel.classifyCleanupEntry(item, root, base, runner, { noGh: input.no_gh === true }));
+    const entries = releaseId === undefined
+        ? tracked.map((item) => kernel.classifyCleanupEntry(item, root, base, runner, { noGh: input.no_gh === true }))
+        : [];
     const pruned = [];
     const failures = [];
     const clearedPaths = [];
@@ -10127,8 +10300,23 @@ async function nativeCleanup(kernel, input, options) {
             }
         }
     }
-    let commit;
-    if (clearedPaths.length > 0) {
+    const release = releaseId === undefined
+        ? undefined
+        : await nativeRelease(kernel, {
+            id: releaseId,
+            root,
+            byId,
+            git,
+            runner,
+            input,
+            options,
+            sessionID: tool?.sessionID,
+            compose,
+            isComposeUnavailable: () => composeUnavailable,
+            failures,
+        });
+    let commit = release?.commit;
+    if (commit === undefined && clearedPaths.length > 0) {
         commit = kernel.commitTrackerMutation(root, clearedPaths, {
             message: kernel.trackerCommitMessage("pruned", clearedIds),
             commit: kernel.resolveAutoCommit(input.no_commit === true ? false : undefined, kernel.readAutoCommitConfig(root)),
@@ -10140,11 +10328,125 @@ async function nativeCleanup(kernel, input, options) {
             base,
             candidates: entries,
             pruned,
+            ...(release !== undefined ? { release: release.entry, released: release.actions } : {}),
             failures,
             ...(compose !== undefined ? { compose } : {}),
             ...(commit !== undefined ? { commit: kernel.commitPayload(commit) } : {}),
         }, version),
     };
+}
+async function nativeRelease(kernel, run) {
+    const { id, root, byId, git, runner, input, options, failures } = run;
+    const actions = [];
+    const refuse = (reason, entry) => {
+        const message = boundedNativeText(reason, MAX_NATIVE_DETAIL_CHARS);
+        failures.push(`${id}: ${message}`);
+        actions.push({ id, action: "failed", error: message });
+        return { entry: { ...entry, reason: message }, actions };
+    };
+    const item = byId.get(id);
+    if (item === undefined) {
+        const reason = `id '${id}' not found under the tracker`;
+        return refuse(reason, {
+            id,
+            status: "unknown",
+            branch: null,
+            path: "",
+            releasable: false,
+            reason,
+            action: null,
+        });
+    }
+    const identity = sessionToken(run.sessionID) ?? asString(item.assignee) ?? "";
+    const classified = kernel.classifyReleaseEntry(item, root, runner, {
+        identity,
+        ...(input.take_over_worktree === true ? { takeOver: true } : {}),
+    });
+    const entry = classified;
+    if (classified.releasable !== true) {
+        return refuse(asString(classified.reason) ?? "release refused", entry);
+    }
+    const path = classified.path;
+    const gitRoot = (0, node_path_1.resolve)(git.worktreeList(root)[0] ?? root);
+    const recordHome = (0, node_path_1.resolve)(root) !== (0, node_path_1.resolve)(path);
+    try {
+        if (classified.action !== "clear stale worktree_path record (path missing on disk)") {
+            if (run.compose !== undefined && !run.isComposeUnavailable()) {
+                const project = kernel.worktreeComposeProject(run.compose.declared, (0, node_path_1.basename)(path));
+                try {
+                    await nativeComposeDown(project, root);
+                    actions.push({ id, action: `reaped compose project ${project}` });
+                }
+                catch (error) {
+                    if (error?.code !== "ENOENT")
+                        throw error;
+                    run.compose.dockerUnavailable = true;
+                }
+            }
+            kernel.unlinkNodeModulesLink(gitRoot, path);
+            if (gitRoot !== (0, node_path_1.resolve)(root))
+                kernel.unlinkNodeModulesLink(root, path);
+            kernel.unlinkWorktreeEnv(path);
+            const hadStamp = kernel.readWorktreeClaimStamp(path) !== null;
+            const removal = await removeWorktreeObserved(options, path, gitRoot, {
+                force: input.take_over_worktree === true,
+            });
+            if (!removal.removed) {
+                const message = boundedNativeText(removal.errors.join("; "), MAX_NATIVE_DETAIL_CHARS);
+                failures.push(`${id}: ${message}`);
+                actions.push({ id, action: "failed", error: message, leftoverPath: path });
+                return { entry, actions };
+            }
+            actions.push({ id, action: `removed worktree ${path}` });
+            if (kernel.unlinkWorktreeClaimStamp(path)) {
+                actions.push({ id, action: "reaped arggon-claim.json stamp" });
+            }
+            else if (hadStamp) {
+                actions.push({ id, action: "arggon-claim.json stamp gone with the worktree" });
+            }
+            if (classified.branch !== null && git.branchExists(gitRoot, classified.branch)) {
+                try {
+                    git.deleteBranchForce(gitRoot, classified.branch);
+                    actions.push({ id, action: `deleted branch ${classified.branch}` });
+                }
+                catch (error) {
+                    const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS);
+                    failures.push(`${id}: ${message}`);
+                    actions.push({
+                        id,
+                        action: "failed",
+                        error: message,
+                        leftoverBranch: classified.branch,
+                    });
+                }
+            }
+        }
+        if (recordHome) {
+            const cleared = kernel.updateOperation({
+                cwd: root,
+                id,
+                worktreePath: "",
+                commit: false,
+                agent: true,
+            });
+            if (!cleared.ok)
+                throw new Error(kernelError(cleared.envelope));
+            actions.push({ id, action: "cleared worktree_path" });
+            const commit = kernel.commitTrackerMutation(root, [item.filePath], {
+                message: kernel.trackerCommitMessage("released", [id]),
+                commit: kernel.resolveAutoCommit(input.no_commit === true ? false : undefined, kernel.readAutoCommitConfig(root)),
+            });
+            return { entry, actions, commit };
+        }
+        actions.push({ id, action: "disposed worktree_path record with the worktree" });
+        return { entry, actions };
+    }
+    catch (error) {
+        const message = boundedNativeText(detail(error), MAX_NATIVE_DETAIL_CHARS);
+        failures.push(`${id}: ${message}`);
+        actions.push({ id, action: "failed", error: message });
+        return { entry, actions };
+    }
 }
 function kernelError(envelope) {
     const error = envelope.error !== null && typeof envelope.error === "object"
@@ -10189,11 +10491,13 @@ const WORKTREE_TOOL_SPECS = [
     },
     {
         name: "cleanup",
-        description: "List (prune: true removes) worktrees of done/cancelled items whose branches are merged; clears worktree_path.",
+        description: "List (prune: true removes) worktrees of done/cancelled items whose branches are merged; clears worktree_path. release: <id> instead releases one dropped claim (inverse of start).",
         input: {
             type: "object",
             properties: {
                 prune: BOOLEAN,
+                release: ID,
+                take_over_worktree: BOOLEAN,
                 no_gh: {
                     type: "boolean",
                     description: "Ancestry-only (skip the squash-merged PR lookup).",
@@ -10203,7 +10507,7 @@ const WORKTREE_TOOL_SPECS = [
             additionalProperties: false,
         },
         output: OBJECT,
-        run: (kernel, input, options) => guarded(kernel, "cleanup", "CLEANUP_FAILED", () => nativeCleanup(kernel, input, options)),
+        run: (kernel, input, options, tool) => guarded(kernel, "cleanup", "CLEANUP_FAILED", () => nativeCleanup(kernel, input, options, tool)),
     },
 ];
 const ALL_TOOL_SPECS = [...TOOL_SPECS, ...WORKTREE_TOOL_SPECS];

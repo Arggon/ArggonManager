@@ -223,6 +223,7 @@ export { runValidate } from "./validate.js";
 export type { ValidateOptions, ValidateResult } from "./validate.js";
 export { runUpdate, maybeCommitUpdate, parseCsvList } from "./update.js";
 export type { UpdateOptions, UpdateResult } from "./update.js";
+export type { ClaimFootprintReceipt } from "./update.js";
 export { runComment } from "./comment.js";
 export type { CommentOptions, CommentResult } from "./comment.js";
 export { HANDOFF_FIELD_CAP, HANDOFF_SESSION_CAP, runHandoff } from "./handoff.js";
@@ -234,10 +235,19 @@ export type { VerdictComment, VerdictState } from "./verdict.js";
 export {
   CLEANUP_TERMINAL_STATUSES,
   classifyCleanupEntry,
+  classifyReleaseEntry,
   defaultCleanupGit,
   findMergedPr,
+  worktreeReleaseRefusal,
 } from "./cleanup.js";
-export type { ClassifyCleanupDeps, CleanupEntry, CleanupGit, MergedPr } from "./cleanup.js";
+export type {
+  ClassifyCleanupDeps,
+  CleanupEntry,
+  CleanupGit,
+  MergedPr,
+  ReleaseEntry,
+  ReleaseRequest,
+} from "./cleanup.js";
 export {
   buildLocalWorkspaces,
   detectWorktreeForeignWrites,
@@ -260,6 +270,7 @@ export {
   strictGateBinViolations,
   strictWorktreeWriteFailure,
   unlinkNodeModulesLink,
+  unlinkWorktreeClaimStamp,
   unlinkWorktreeEnv,
   worktreeCacheBase,
   worktreeForeignWriteWarning,

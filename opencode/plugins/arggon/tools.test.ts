@@ -3706,6 +3706,331 @@ describe("worktree domain tools (W4)", () => {
 });
 
 /**
+ * Native release of a dropped claim (bug-unclaim-leaves-worktree-record-without-reaper):
+ * the inverse of `start`, the other arm of the worktree domain, sharing the CLI's
+ * kernel rule (`classifyReleaseEntry`) and reporting in its own action family.
+ * `update` cannot release (it is frontmatter-only, and it is the same call that
+ * clears the record), so the native `update` envelope must NAME this path — that
+ * is the parity under test, together with the refusal that protects a live
+ * writer.
+ */
+describe("native release of a dropped claim (bug-unclaim-leaves-worktree-record-without-reaper)", () => {
+  /** A tracked write inside the claimed worktree, newer than the stamp. */
+  function foreignWriteIn(worktreePath: string): void {
+    const itemFile = join(
+      worktreePath,
+      "ArggonManager",
+      "launch-mvp",
+      "auth",
+      "story-login",
+      "task-rate-limit.md",
+    );
+    writeFileSync(itemFile, `${readFileSync(itemFile, "utf8")}\n<!-- foreign edit -->\n`, "utf8");
+    const when = new Date(Date.now() + 60_000);
+    utimesSync(itemFile, when, when);
+  }
+
+  /** Claim with a worktree and merge the claim so the canonical copy sees it. */
+  async function claimedAndMerged(
+    dir: string,
+  ): Promise<{ worktreePath: string; defs: ArgonToolDefinition[]; calls: ReturnType<typeof fakeDomain>["calls"] }> {
+    const { domain, calls } = fakeDomain(dir);
+    const defs = worktreeDefinitions(dir, domain);
+    const started = await tool(defs, "start").execute(
+      { id: "task-rate-limit", assignee: "smoke" },
+      { sessionID: "ses_a" },
+    );
+    const worktreePath = String((started.output as { worktreePath?: unknown }).worktreePath);
+    git(dir, ["merge", "--no-ff", "feat/task-rate-limit", "-m", "Merge claim (stubbed)"]);
+    return { worktreePath, defs, calls };
+  }
+
+  it("release removes the worktree through the domain, reaps the stamp, clears the record", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await claimedAndMerged(dir);
+    const stamp = join(
+      gitOut(worktreePath, ["rev-parse", "--absolute-git-dir"]).trim(),
+      "arggon-claim.json",
+    );
+    expect(existsSync(stamp)).toBe(true);
+
+    // The unclaim goes through the same native `update` any agent would call;
+    // it must report the footprint and name the release tool.
+    const unclaimed = await tool(defs, "update").execute(
+      { id: "task-rate-limit", status: "todo" },
+      { sessionID: "ses_a" },
+    );
+    const footprint = (unclaimed.output as Record<string, unknown>).claimFootprint as
+      | Record<string, unknown>
+      | undefined;
+    expect(footprint).toMatchObject({
+      worktreePath: resolve(worktreePath),
+      release: { native: 'tools.arggon.cleanup({ release: "task-rate-limit" })' },
+    });
+
+    const output = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_a" },
+    );
+    const envelope = output.output as Record<string, unknown>;
+    expect(envelope.failures).toEqual([]);
+    expect(envelope.release).toMatchObject({
+      id: "task-rate-limit",
+      releasable: true,
+      branch: "feat/task-rate-limit",
+    });
+    // The stamp step comes AFTER the observed removal (M2 parity): a failed
+    // removal must leave the single-writer evidence standing. This fixture's
+    // domain removal is a real `git worktree remove`, which takes the worktree's
+    // git dir with it, so the stamp is reported as gone WITH the worktree; the
+    // explicit reap (`reaped arggon-claim.json stamp`) is the domain path that
+    // leaves the admin dir behind.
+    expect(envelope.released).toEqual([
+      { id: "task-rate-limit", action: `removed worktree ${worktreePath}` },
+      { id: "task-rate-limit", action: "arggon-claim.json stamp gone with the worktree" },
+      { id: "task-rate-limit", action: "deleted branch feat/task-rate-limit" },
+      { id: "task-rate-limit", action: "cleared worktree_path" },
+    ]);
+    // Domain removal (never a bare git call in the plugin path), and the
+    // unforced policy: only the take-over hatch forces.
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: false },
+    ]);
+    expect(existsSync(worktreePath)).toBe(false);
+    expect(existsSync(stamp)).toBe(false);
+    expect(gitOut(dir, ["worktree", "list"]).includes("task-rate-limit")).toBe(false);
+    expect(gitOut(dir, ["branch", "--list", "feat/task-rate-limit"])).toBe("");
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+    // A distinct family, never mixed into prune's.
+    expect(envelope.pruned).toEqual([]);
+    expect(envelope.candidates).toEqual([]);
+  });
+
+  it("refuses to release a worktree another live session holds, and takes over only when armed", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await claimedAndMerged(dir);
+    await tool(defs, "update").execute(
+      { id: "task-rate-limit", status: "todo" },
+      { sessionID: "ses_a" },
+    );
+    // A different session's tracked write after the stamp: the F12 signature of
+    // a live writer, which a release must never rob.
+    foreignWriteIn(worktreePath);
+
+    const refused = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_b" },
+    );
+    const envelope = refused.output as Record<string, unknown>;
+    expect((envelope.release as Record<string, unknown>).releasable).toBe(false);
+    expect(String((envelope.release as Record<string, unknown>).reason)).toContain(
+      "refusing to release the worktree",
+    );
+    expect(envelope.failures).toHaveLength(1);
+    expect(calls.remove).toEqual([]);
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBe(worktreePath);
+
+    // The audited hatch for a presumed-dead owner releases it (and forces the
+    // removal, since the dead owner's uncommitted work is the point).
+    const taken = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit", take_over_worktree: true },
+      { sessionID: "ses_b" },
+    );
+    expect((taken.output as Record<string, unknown>).failures).toEqual([]);
+    expect((taken.output as Record<string, unknown>).release).toMatchObject({
+      takeOver: { replacedIdentity: "ses_a" },
+    });
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: true },
+    ]);
+    expect(existsSync(worktreePath)).toBe(false);
+  });
+
+  it("refuses a release under a live claim, and refuses release together with prune", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs } = await claimedAndMerged(dir);
+
+    const refused = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_a" },
+    );
+    expect(String((refused.output.release as Record<string, unknown>).reason)).toContain(
+      "still claimed by smoke",
+    );
+    expect(existsSync(worktreePath)).toBe(true);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "cleanup").execute({ release: "task-rate-limit", prune: true });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    expect((caught as ArgonToolError).code).toBe("CLEANUP_FAILED");
+    expect(String((caught as ArgonToolError).envelope.error.message)).toContain(
+      "either release or prune",
+    );
+  });
+
+  // --- review round 2 ---------------------------------------------------
+  // m6: the still-claimed refusal is unconditional on both surfaces — a
+  // re-claimed item has a live owner and nothing durable records an override.
+  it("m6: take_over_worktree does not bypass the still-claimed refusal", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await claimedAndMerged(dir);
+
+    const refused = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit", take_over_worktree: true },
+      { sessionID: "ses_a" },
+    );
+    expect((refused.output.release as Record<string, unknown>).releasable).toBe(false);
+    expect(String((refused.output.release as Record<string, unknown>).reason)).toContain(
+      "not overridable",
+    );
+    expect(calls.remove).toEqual([]);
+    expect(existsSync(worktreePath)).toBe(true);
+  });
+
+  // m5: the hatch authorizes a release; without one it is a typed refusal, never
+  // a silent no-op (`start` already refuses takeOverWorktree without worktree).
+  it("m5: take_over_worktree without release fails typed", async () => {
+    const dir = seedGitTree();
+    const { defs } = await completedWorktree(dir);
+
+    let caught: unknown;
+    try {
+      await tool(defs, "cleanup").execute({ take_over_worktree: true });
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toBeInstanceOf(ArgonToolError);
+    expect((caught as ArgonToolError).code).toBe("CLEANUP_FAILED");
+    expect(String((caught as ArgonToolError).envelope.error.message)).toContain(
+      "take_over_worktree requires release",
+    );
+  });
+
+  // M2: a dirty worktree is refused during classification, so nothing is
+  // reaped — the claim stamp (the single-writer evidence) and the env file
+  // survive the refused release. Reaping them before the removal is what
+  // disarmed every later attempt.
+  it("M2: a dirty worktree is refused with its stamp + env intact; only the hatch forces it", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs, calls } = await claimedAndMerged(dir);
+    await tool(defs, "update").execute(
+      { id: "task-rate-limit", status: "todo" },
+      { sessionID: "ses_a" },
+    );
+    const stamp = join(
+      gitOut(worktreePath, ["rev-parse", "--absolute-git-dir"]).trim(),
+      "arggon-claim.json",
+    );
+    foreignWriteIn(worktreePath);
+
+    const refused = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_a" },
+    );
+    const release = refused.output.release as Record<string, unknown>;
+    expect(release.releasable).toBe(false);
+    expect(String(release.reason)).toContain("uncommitted or untracked file");
+    expect(release.blockingTotal).toBeGreaterThan(0);
+    expect(calls.remove).toEqual([]);
+    // The evidence and the env contract both survive: nothing was reaped.
+    expect(existsSync(worktreePath)).toBe(true);
+    expect(existsSync(stamp)).toBe(true);
+    expect(existsSync(join(worktreePath, ".arggon.env"))).toBe(true);
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBe(worktreePath);
+
+    const forced = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit", take_over_worktree: true },
+      { sessionID: "ses_a" },
+    );
+    expect((forced.output as Record<string, unknown>).failures).toEqual([]);
+    expect(String((forced.output.release as Record<string, unknown>).action)).toContain(
+      "forced past its uncommitted content",
+    );
+    expect(calls.remove).toEqual([
+      { projectID: "project-id", directory: worktreePath, force: true },
+    ]);
+    expect(existsSync(worktreePath)).toBe(false);
+    expect(existsSync(stamp)).toBe(false);
+  });
+
+  // M3: the release owns its tracker commit and reports it. Committing inside
+  // the release and then letting the run-level commit stage the same path
+  // reported `skipped: "nothing to commit"` for a commit it had just made.
+  it("M3: the native release reports its own commit (never a skipped nothing-to-commit)", async () => {
+    const dir = seedGitTree();
+    const { worktreePath, defs } = await claimedAndMerged(dir);
+    await tool(defs, "update").execute(
+      { id: "task-rate-limit", status: "todo" },
+      { sessionID: "ses_a" },
+    );
+
+    const output = await tool(defs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_a" },
+    );
+    const envelope = output.output as Record<string, unknown>;
+    expect(envelope.commit).toMatchObject({ message: "chore(tasks): released task-rate-limit" });
+    expect((envelope.commit as Record<string, unknown>).hash).toEqual(expect.any(String));
+    expect((envelope.commit as Record<string, unknown>).skipped).toBeUndefined();
+    // The commit really happened: the cleared record is committed on main.
+    expect(gitOut(dir, ["log", "-1", "--format=%s"])).toContain("chore(tasks): released");
+    expect(gitOut(dir, ["status", "--porcelain", "ArggonManager"])).toBe("");
+    expect(itemData(dir, "task-rate-limit").worktree_path).toBeUndefined();
+    expect(existsSync(worktreePath)).toBe(false);
+  });
+
+  // M3 parity: the release envelope must match `cleanup --release --json` on the
+  // same fixture shape (the prune arm's twin at the list-mode parity test).
+  // Only the commit hash differs — two trees, two commits — so it is normalized.
+  it("M3: the release envelope is identical to `cleanup --release <id> --json` (CLI parity)", async () => {
+    const nativeDir = seedGitTree("arggon-relparity-a-");
+    const cliDir = seedGitTree("arggon-relparity-b-");
+    const build = async (dir: string) => {
+      const { domain } = fakeDomain(dir);
+      const defs = worktreeDefinitions(dir, domain);
+      await tool(defs, "start").execute(
+        { id: "task-rate-limit", assignee: "smoke" },
+        { sessionID: "ses_a" },
+      );
+      git(dir, ["merge", "--no-ff", "feat/task-rate-limit", "-m", "Merge claim (stubbed)"]);
+      await tool(defs, "update").execute(
+        { id: "task-rate-limit", status: "todo" },
+        { sessionID: "ses_a" },
+      );
+      return defs;
+    };
+    const nativeDefs = await build(nativeDir);
+    await build(cliDir); // the CLI twin: driven through the spawned CLI below
+    // The CLI resolves its own identity (the fixture's git user.name); both
+    // surfaces run unclaimed with a clean worktree, so the single-writer gate is
+    // not involved on either side.
+    const cliProc = runCli(["cleanup", "--release", "task-rate-limit", "--json", "--no-gh"], cliDir);
+    expect(cliProc.status, cliProc.stderr).toBe(0);
+
+    const native = await tool(nativeDefs, "cleanup").execute(
+      { release: "task-rate-limit" },
+      { sessionID: "ses_a" },
+    );
+    const normalize = (envelope: Record<string, unknown>, dir: string): unknown => {
+      const copy = JSON.parse(
+        JSON.stringify(envelope).split(dir).join("<ROOT>"),
+      ) as Record<string, unknown>;
+      const commit = copy.commit as Record<string, unknown> | undefined;
+      if (commit !== undefined) delete commit.hash; // two trees, two hashes
+      return copy;
+    };
+    expect(normalize(native.output as Record<string, unknown>, nativeDir)).toEqual(
+      normalize(JSON.parse(cliProc.stdout) as Record<string, unknown>, cliDir),
+    );
+  });
+});
+
+/**
  * Native `cleanup` reaps declared per-worktree Compose projects (ADR 0019 layer
  * 2, task-native-cleanup-compose-parity) exactly like `arggon cleanup --prune`
  * (task-cleanup-declared-services, PR #569): one `docker compose -p <project>
