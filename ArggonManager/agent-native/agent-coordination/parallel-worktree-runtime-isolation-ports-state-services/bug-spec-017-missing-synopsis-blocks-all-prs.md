@@ -1,13 +1,17 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-spec-017-missing-synopsis-blocks-all-prs
 title: "spec-methodology-adapters-017.md has no Synopsis/Design section, so the repo-wide spec gate is red on main and blocks every PR"
+assignee: Arggon
+branch: fix/bug-spec-017-missing-synopsis-blocks-all-prs
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [docs, spec]
 priority: p1
 created: "2026-10-02"
 updated: "2026-10-02"
+claimed_at: "2026-10-02T16:33:33.921Z"
+worktree_path: /home/arggon/Projects/ArggonManager-bug-spec-017-missing-synopsis-blocks-all-prs
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-spec-017-missing-synopsis-blocks-all-prs.md
