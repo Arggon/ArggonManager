@@ -7,6 +7,14 @@
 - Numbering note: drafted as 0018; a concurrent update-delivery ADR merged
   first on `main` and took 0018, so this record renumbers to the next free id
   (2026-10-01).
+- Amendment (2026-10-02, PR #568): decision point 4 below adds the
+  single-writer **claim/concurrency** layer (claim stamp + attach-time
+  detection + the `strict-worktree-writes` escalation). It amends this record
+  in the same direction it was accepted in — additive detection, no new
+  dependencies, no platform-specific primitives, kernel stays convention-first
+  — behind a default that is byte-identical to before. `engineering.md`'s
+  "Claim/concurrency model" line is why it lands here and not in
+  `agents.md` alone.
 
 ## Context
 
@@ -55,6 +63,31 @@ be a default assumption of the loop.
    problem mostly made of conventions). Nix/devbox stays an optional,
    per-project complement outside arggon's scope.
 
+4. **Single-writer ownership: a claim stamp plus attach-time detection, by
+   default advisory (layer 0).** `start --worktree` stamps the worktree with
+   its owning session — `arggon-claim.json` in the worktree's **git dir**
+   (`git rev-parse --absolute-git-dir`), never in the work tree, so the stamp
+   cannot dirty `git status`, block `git worktree remove`, or acquire a
+   cleanup step. On an **attach** the previous stamp is read before it is
+   replaced: a different identity plus tracked files modified after that
+   claim is the concurrent-writer signature, reported bounded and named
+   (`claim.foreignWrites`). Detection is report-only by default;
+   `x-tracker.strict-worktree-writes: true` escalates it to an attach refusal
+   before any item mutation.
+
+   > Amendment (2026-10-02, PR #568): exploration-017 finding F12 — a CLAIMED
+   > worktree was written into by a concurrent session mid-task (disclosed on
+   > PR #544) — showed the ownership model was pure convention, and that this
+   > record decided runtime *isolation* without deciding *concurrency*. Two
+   > invariants are part of the decision, not implementation detail: (a) a
+   > fired detection **never re-stamps** the worktree (the anti-unlock rule —
+   > otherwise a refused attach makes its own retry match and claims silently
+   > over the owner's uncommitted work), and (b) recovery from a dead stamped
+   > session is explicit: the refusal names the manual
+   > `rm <git-dir>/arggon-claim.json` step, and a designed take-over hatch is
+   > tracked in `task-strict-attach-dead-owner-hatch`. Detection covers the
+   > uncommitted window only; committed foreign work is history.
+
 Explicit YAGNI: no `arggon compose` wrapper, no global port-allocation
 registry, no Docker detection/installation in the kernel, no unix-socket
 requirement (an optimization where available, never the contract).
@@ -77,6 +110,18 @@ requirement (an optimization where available, never the contract).
 - Follow-up implementation is filed as tasks under
   `parallel-worktree-runtime-isolation-ports-state-services` and follows the
   spec → plan → PR pipeline.
+- The claim/concurrency layer (decision point 4) keeps the kernel
+  dependency-free: the stamp is a JSON file in a directory git already owns,
+  detection is one porcelain read plus one `stat` per dirty path with a 10-name
+  cap, and there is no cleanup surface (git removes the directory with the
+  worktree).
+- Its JSON contract also grows additively (`claim`, `preparation.claim`),
+  `schemaVersion` unchanged, and the default path (no fired detection, flag
+  unset) is byte-identical to pre-PR receipts.
+- Identity is the resolved assignee on the CLI and the calling session id on
+  the native tools, so a mixed CLI-start → native-attach fires exactly one
+  benign warning — which is the F12 signature, i.e. the feature rather than a
+  false accusation. Unifying the two identities is left open deliberately.
 
 ## Alternatives considered
 
@@ -88,3 +133,7 @@ requirement (an optimization where available, never the contract).
 | Nix/devbox per project | Out of scope | cheap reproducible toolchains (store dedupe), but no runtime isolation; a per-project complement, never an arggon requirement. |
 | Kernel-enforced port allocation registry | YAGNI | ports are an app convention; ephemeral binding (`:0`) already exists everywhere and is what `board --serve` does. |
 | `arggon compose` wrapper command | YAGNI | the pattern is a name and a manifest; a wrapper would duplicate Compose badly. |
+| A lockfile the CLI and native tools both honor (decision point 4's concurrency model) | Rejected | it needs a shared lock protocol plus its own dead-holder problem (a crashed holder blocks forever) for strictly less information than the stamp; the stamp is advisory and the refusal explicit. |
+| Commit-log-based concurrent-writer detection | Rejected | committed foreign work is history, not a live second writer — the F12 collision window is the uncommitted one, and scanning history would buy a log read per attach to re-report what the mtime comparison already bounds. |
+| Strict worktree-writes by default | Rejected | a crashed session would deadlock every recovery path on a non-interactive surface; advisory-first keeps the loop recoverable and arming the flag is a one-line convention change. |
+| Auto-takeover after a stale-stamp window | Deferred | a long-but-live session can be stolen silently; an explicit hatch (`task-strict-attach-dead-owner-hatch`) keeps the take-over a deliberate act. |

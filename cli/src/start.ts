@@ -20,6 +20,7 @@ import {
   runUpdate,
   strictGateBinFailure,
   strictWorktreeWriteFailure,
+  worktreeTakeoverWarning,
   unlinkNodeModulesLink,
   withItemLock,
   type GateBinResolution,
@@ -58,6 +59,15 @@ export type StartOptions = {
    * inside the worktree. The main checkout never leaves its current branch.
    */
   worktree?: boolean;
+  /**
+   * Deliberate take-over of a presumed-dead stamped owner
+   * (task-strict-attach-dead-owner-hatch, `start --take-over-worktree`): on
+   * an attach whose single-writer detection fired, record a dated take-over
+   * naming the replaced stamp and re-stamp the worktree with this run's
+   * identity. Default OFF and only meaningful with `worktree` (without a
+   * worktree there is no stamp to take over — the flag is then rejected).
+   */
+  takeOverWorktree?: boolean;
   /**
    * Skip the `x-worktree.post-start` hook for this invocation
    * (task-start-post-hook). The hook only ever runs on new-worktree creation.
@@ -184,7 +194,9 @@ export type StartResult = {
    * Present only with `--worktree` (the stamp is worktree-scoped); a fired
    * `foreignWrites` report is a WARNING by default — with
    * `x-tracker.strict-worktree-writes: true` it refuses the claim before any
-   * item mutation instead.
+   * item mutation instead. A deliberate `--take-over-worktree` moves that
+   * evidence into `takeOver` (task-strict-attach-dead-owner-hatch), so exactly
+   * one of `foreignWrites` / `takeOver` is ever present.
    */
   claim?: WorktreeClaimReceipt;
   /**
@@ -223,6 +235,18 @@ export type PostStartResult = {
 export interface StartGit extends GitRunner {
   /** Non-empty `git status --porcelain` output for one file ("" when clean). */
   fileStatus(cwd: string, file: string): string;
+  /**
+   * RAW `git status --porcelain` for the claim-stamp detection — UNTRIMMED, or
+   * undefined when the probe did not answer.
+   *
+   * NOT `fileStatus` (review on task-strict-attach-dead-owner-hatch): porcelain
+   * is POSITIONAL — the two leading status columns are the parser's input, so a
+   * trimmed ` M src/a.ts` becomes `M src/a.ts` and every path is read one
+   * character off (`EADME.md` in the probe that caught this), which silently
+   * disarmed the CLI's single-writer detection against real git output. Absent
+   * in an injected fake → the kernel runs its own real probe.
+   */
+  statusPorcelain?(cwd: string): string | undefined;
   commitFile(cwd: string, file: string, message: string): void;
   pushBranch(cwd: string, branch: string): void;
   /** Create a draft PR; returns its URL. */
@@ -317,6 +341,16 @@ export function defaultStartGit(): StartGit {
     },
     fileStatus(cwd: string, file: string): string {
       return git(["status", "--porcelain", "--", file], cwd);
+    },
+    statusPorcelain(cwd: string): string | undefined {
+      const result = spawnSync("git", ["status", "--porcelain"], {
+        cwd,
+        encoding: "utf8",
+        timeout: 10_000,
+      });
+      if (result.error !== undefined || result.status !== 0) return undefined;
+      // Returned RAW on purpose (see StartGit.statusPorcelain).
+      return String(result.stdout ?? "");
     },
     commitFile(cwd: string, file: string, message: string): void {
       git(["add", "--", file], cwd);
@@ -532,6 +566,16 @@ export function runStart(opts: StartOptions, deps: StartDeps = {}): StartResult 
   const id = opts.id.trim();
   if (!id) throw new Error("id is required");
 
+  // The take-over flag is worktree-scoped (task-strict-attach-dead-owner-hatch):
+  // without `--worktree` there is no claim stamp to take over, and a silently
+  // ignored flag is how a recovery step gets believed to have happened.
+  if (opts.takeOverWorktree === true && opts.worktree !== true) {
+    throw new Error(
+      "--take-over-worktree requires --worktree (it takes over a claimed worktree's ownership " +
+        "stamp; a plain start writes no stamp)",
+    );
+  }
+
   const gitRunner = deps.git ?? defaultStartGit();
   const tasksDir = findTasksDir(opts.cwd);
   const root = repoRootFromTasks(tasksDir);
@@ -723,6 +767,31 @@ function worktreeRemediation(input: {
 }
 
 /**
+ * The human-channel lines for a deliberate single-writer take-over
+ * (task-strict-attach-dead-owner-hatch): what was overridden, and — when the
+ * stamp could not be written — that it was NOT recorded.
+ *
+ * The second line is load-bearing (review on task-strict-attach-dead-owner-hatch):
+ * an unrecorded take-over persisted nothing, so the previous owner is still
+ * stamped and the next attach re-refuses. Printing only "took over ..." would
+ * read as a completed recovery that did not happen, so the degradation is named
+ * right beside the note. Kept here (not inline in the CLI action) so the human
+ * channel is unit-testable, and so `--json` stays byte-identical: `claim` is
+ * forwarded verbatim either way.
+ */
+export function startTakeoverNotes(claim: WorktreeClaimReceipt | undefined): string[] {
+  if (claim?.takeOver === undefined) return [];
+  const notes = [`note: single-writer take-over — ${worktreeTakeoverWarning(claim.takeOver)}`];
+  if (claim.stamped === false && claim.warning !== undefined) {
+    notes.push(
+      `warning: take-over NOT recorded — ${claim.warning}; the stamp still names the previous ` +
+        "owner, so the next attach re-refuses",
+    );
+  }
+  return notes;
+}
+
+/**
  * Failure report for a start that already created (or attached) the worktree.
  * The worktree is NEVER rolled back (bug-start-worktree-node-modules): the
  * diagnostic context survives, and the message names the failing step, the
@@ -860,14 +929,18 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
         itemId: id,
         branch: name,
         surface: "cli",
+        // Deliberate take-over (task-strict-attach-dead-owner-hatch): only
+        // recorded when a detection FIRES, so passing the flag on a clean
+        // attach is a no-op rather than a re-stamp.
+        ...(opts.takeOverWorktree === true ? { takeOver: true } : {}),
         ...(opts.now !== undefined ? { now: opts.now } : {}),
-        status: (cwd) => {
-          try {
-            return gitRunner.fileStatus(cwd, ".");
-          } catch {
-            return undefined;
-          }
-        },
+        // RAW porcelain (never `fileStatus`, which trims — see
+        // StartGit.statusPorcelain): the injected runner answers when it can
+        // (tests fake the porcelain line), otherwise the kernel's own real
+        // probe runs.
+        ...(gitRunner.statusPorcelain !== undefined
+          ? { status: (cwd: string) => gitRunner.statusPorcelain?.(cwd) }
+          : {}),
       },
     });
     // Single-writer enforcement (task-single-writer-worktree-enforcement):
@@ -878,6 +951,12 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
     // default) keeps the documented report-only behavior byte-identical: the
     // detection rides the receipt (`claim.foreignWrites`) and the claim
     // commit remains authoritative.
+    //
+    // A `--take-over-worktree` run (task-strict-attach-dead-owner-hatch) is
+    // NOT here: the kernel reports the fired evidence as `claim.takeOver`
+    // instead of `claim.foreignWrites`, so this gate — unchanged — treats the
+    // authorized replacement of a presumed-dead stamp as resolved, and the
+    // take-over rides the receipt loudly.
     if (config.tracker.strictWorktreeWrites === true && prepared.claim?.foreignWrites) {
       const refusal = strictWorktreeWriteFailure(prepared.claim.foreignWrites);
       if (refusal !== null) {

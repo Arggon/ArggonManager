@@ -50,7 +50,6 @@
     { "action": "shell", "resource": "git commit --no-verify*", "effect": "deny" },
     { "action": "shell", "resource": "git push --force*", "effect": "deny" },
     { "action": "shell", "resource": "git push -f*", "effect": "deny" },
+    { "action": "shell", "resource": "git push *+*", "effect": "deny" },
   ],
-    { "action": "shell", "resource": "git push *+*", "effect": "deny" }
-  ]
 }
