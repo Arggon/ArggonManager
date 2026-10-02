@@ -1,13 +1,15 @@
 ---
 type: bug
-status: todo
+status: in_progress
 id: bug-unclaim-leaves-worktree-record-without-reaper
 title: "Unclaiming a claimed item (update --status todo) keeps worktree_path + branch + claim stamp, and cleanup never reaps a non-done item"
+assignee: Arggon
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [worktree, tracker]
 priority: p2
 created: "2026-10-02"
 updated: "2026-10-02"
+claimed_at: "2026-10-02T21:53:19.597Z"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-unclaim-leaves-worktree-record-without-reaper.md
