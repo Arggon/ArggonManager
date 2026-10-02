@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-native-cleanup-compose-parity
 title: "Native cleanup parity: the plugin's nativeCleanup prune loop should reap declared Compose projects like the CLI"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [worktree, opencode-seam, parity]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-02"
-claimed_at: "2026-10-02T03:24:40.608Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-native-cleanup-compose-parity
 ---
 <!--
