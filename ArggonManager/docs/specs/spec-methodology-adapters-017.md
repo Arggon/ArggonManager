@@ -17,6 +17,30 @@ adoptable by general (not only software) projects — and make each supported
 agent follow it through that agent's native capabilities, without forking the
 rule logic.
 
+## Synopsis
+
+The methodology becomes a versioned product surface, and each supported agent
+reads it through that agent's own capabilities — with the rule logic living in
+exactly one place.
+
+```text
+ArggonManager methodology (docs/ + CLI)      the product: any project, one rule set
+  └─ adapter per client                       opencode (native tools, today)
+                                               zcode, others (declarative plugin)
+  ├─ carriers declare it                       scope + invariants + version + upgrade channel
+  ├─ init --agents <list>                      installs the chosen adapters, provenance-stamped
+  ├─ capability matrix                         what each client can and cannot enforce natively
+  └─ never-overwrite                           adopter-edited adapter files are skipped, not clobbered
+```
+
+Three things make this a product rather than a feature: the carriers declare
+scope and version so an adopter can tell what they are running; adapter
+selection happens once, at `init`; and every capability the methodology assumes
+is declared per client, with the kernel named as the enforcement of record
+wherever a client hook is only defense-in-depth. Nothing in the chain is
+required — `docs/` plus the CLI remain a complete methodology, and an absent or
+failing adapter degrades to that.
+
 ## Invariants
 
 - **One logic path.** Every adapter mutation of tracker state goes through
