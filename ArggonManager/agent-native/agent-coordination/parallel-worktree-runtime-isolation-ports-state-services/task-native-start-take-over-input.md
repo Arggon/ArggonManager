@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-native-start-take-over-input
 title: "Native tools.arggon.start: accept a take-over input so the dead-owner hatch is reachable from the OpenCode seam"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [worktree, opencode-seam, parity]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-02"
-claimed_at: "2026-10-02T15:36:00.167Z"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-native-start-take-over-input.md
