@@ -3,7 +3,7 @@ type: task
 status: todo
 id: task-decide-codebase-memory-default-discovery
 title: "Decide whether codebase-memory-mcp becomes the default code-discovery aid for agents (exploration 013 rec 3, recorded nowhere)"
-parent: story-adopter-feedback
+parent: methodology-improvements
 labels: [methodology, decision]
 created: "2026-10-02"
 updated: "2026-10-02"
