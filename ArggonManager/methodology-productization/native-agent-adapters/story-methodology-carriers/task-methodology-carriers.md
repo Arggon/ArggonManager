@@ -9,7 +9,6 @@ parent: story-methodology-carriers
 labels: []
 created: "2026-10-02"
 updated: "2026-10-02"
-worktree_path: /home/arggon/Projects/ArggonManager-task-methodology-carriers
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-methodology-carriers/task-methodology-carriers.md

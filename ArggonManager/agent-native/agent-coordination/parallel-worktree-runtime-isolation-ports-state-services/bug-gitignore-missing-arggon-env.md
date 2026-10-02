@@ -10,7 +10,6 @@ labels: [worktree, hygiene]
 priority: p2
 created: "2026-10-02"
 updated: "2026-10-02"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-gitignore-missing-arggon-env
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/bug-gitignore-missing-arggon-env.md

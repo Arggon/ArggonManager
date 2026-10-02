@@ -10,7 +10,6 @@ labels: [docs]
 priority: p2
 created: "2026-10-02"
 updated: "2026-10-02"
-worktree_path: /home/arggon/Projects/ArggonManager-bug-contributing-github-issue-contradiction
 ---
 <!--
   Placement (v0): ArggonManager/adopter-feedback/reverse-feedback-channel/story-adopter-feedback/bug-contributing-github-issue-contradiction.md
