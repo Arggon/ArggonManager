@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-contributing-github-issue-contradiction
 title: "CONTRIBUTING.md contradicts itself on GitHub issues (line 13 'not used' vs line 269 'open an issue')"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [docs]
 priority: p2
 created: "2026-10-02"
 updated: "2026-10-02"
-claimed_at: "2026-10-02T18:59:22.820Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-contributing-github-issue-contradiction
 ---
 <!--
