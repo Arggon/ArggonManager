@@ -32,3 +32,7 @@ Declare scope/invariants/version/upgrade-channel of the methodology in agents.md
 
 ### 2026-10-02 @ses_f02038341ffeqxEIdpXnpaLcf9
 Gates in worktree /home/arggon/Projects/ArggonManager-task-methodology-carriers (branch feat/task-methodology-carriers, commit 548f5aed): npm run build ok; npm test 118 files / 2166 tests passed; npm run lint clean; npm run arggon -- validate ok (0 warnings, convention v5). README.md gained a 'The methodology' section linking agents.md, engineering.md, convention.md and skills/arggon-cli/SKILL.md in one hop plus the adapters epic + spec-methodology-adapters-017; agents.md/engineering.md/convention.md each carry the same scope/invariant-list/version/ADR 0016 upgrade-channel header verbatim. PR #592 states Impact class: Behavioral per agents.md §Changing the methodology itself.
+
+### handoff 2026-10-02 @ses_f02038341ffeqxEIdpXnpaLcf9 (session: ses_f02038341ffeqxEIdpXnpaLcf9) — next: Coordinator reviews PR #592 and merges; item stays in_progress until merge.
+- branch: feat/task-methodology-carriers
+- open questions: None — T1 complete; T2/T3 remain for other tasks.
