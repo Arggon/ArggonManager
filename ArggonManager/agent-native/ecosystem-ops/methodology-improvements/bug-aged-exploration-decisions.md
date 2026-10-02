@@ -221,3 +221,8 @@ Three corrections to my previous comment — the substance of all four findings 
 ### handoff 2026-10-02 @Arggon — next: Coordinator: merge PR #599 (merge, do not squash - branch carries tracker auto-commits), then flip this bug to done. All three doc findings fixed; CI green at head d3640d5d.
 - branch: fix/bug-aged-exploration-decisions
 - open questions: Rec 3 (codebase-memory-mcp) stays open in task-decide-codebase-memory-default-discovery - its placement comment is wrong; fix on claim. Rerun of the pre-merge head stayed red (spawn flake).
+
+### 2026-10-02 @Arggon
+Closing finding 4 with the run ids at the **final** head: the three tracker-comment commits after d3640d5d moved the head to `a68cb529` and re-ran CI — runs **37079240558** and **37079240561**, both **success** (`cli`, `tasks-validate`, `ui-smoke`). So CI is green at the head that will actually merge, and PR #599 reports MERGEABLE. The earlier table stays as recorded: the *pre-merge* head `e1f883da` failed twice with the same spawn/artifact-drift signature (37073594139 attempts 1 and 2), which is the tracked flake class, not this diff.
+
+Also, for the hazard record: `git branch --contains d3640d5d` lists only `fix/bug-aged-exploration-decisions` (checked out in this worktree), so none of my content commits are on `main`; the primary checkout sits at `09bee07b`, another session's tracker commit. Worktree clean, item left `in_progress`.
