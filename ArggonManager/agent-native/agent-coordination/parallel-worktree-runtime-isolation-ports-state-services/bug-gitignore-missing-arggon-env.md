@@ -1,6 +1,6 @@
 ---
 type: bug
-status: in_progress
+status: done
 id: bug-gitignore-missing-arggon-env
 title: "`.gitignore` does not ignore `.arggon.env`, so the 0.5.0 worktree env contract drops an untracked file into every worktree"
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [worktree, hygiene]
 priority: p2
 created: "2026-10-02"
 updated: "2026-10-02"
-claimed_at: "2026-10-02T18:59:12.784Z"
 worktree_path: /home/arggon/Projects/ArggonManager-bug-gitignore-missing-arggon-env
 ---
 <!--
