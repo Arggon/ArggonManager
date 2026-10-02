@@ -4,6 +4,7 @@ status: in_progress
 id: task-prover-agent-reviewer-split
 title: "Split execution evidence out of the reviewer: a shell-capable arggon-prover agent + a read-and-reason reviewer contract"
 assignee: Arggon
+branch: feat/task-prover-agent-reviewer-split
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [opencode-seam, methodology]
 priority: p2
