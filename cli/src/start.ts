@@ -20,6 +20,7 @@ import {
   runUpdate,
   strictGateBinFailure,
   strictWorktreeWriteFailure,
+  worktreeTakeoverWarning,
   unlinkNodeModulesLink,
   withItemLock,
   type GateBinResolution,
@@ -234,6 +235,18 @@ export type PostStartResult = {
 export interface StartGit extends GitRunner {
   /** Non-empty `git status --porcelain` output for one file ("" when clean). */
   fileStatus(cwd: string, file: string): string;
+  /**
+   * RAW `git status --porcelain` for the claim-stamp detection — UNTRIMMED, or
+   * undefined when the probe did not answer.
+   *
+   * NOT `fileStatus` (review on task-strict-attach-dead-owner-hatch): porcelain
+   * is POSITIONAL — the two leading status columns are the parser's input, so a
+   * trimmed ` M src/a.ts` becomes `M src/a.ts` and every path is read one
+   * character off (`EADME.md` in the probe that caught this), which silently
+   * disarmed the CLI's single-writer detection against real git output. Absent
+   * in an injected fake → the kernel runs its own real probe.
+   */
+  statusPorcelain?(cwd: string): string | undefined;
   commitFile(cwd: string, file: string, message: string): void;
   pushBranch(cwd: string, branch: string): void;
   /** Create a draft PR; returns its URL. */
@@ -328,6 +341,16 @@ export function defaultStartGit(): StartGit {
     },
     fileStatus(cwd: string, file: string): string {
       return git(["status", "--porcelain", "--", file], cwd);
+    },
+    statusPorcelain(cwd: string): string | undefined {
+      const result = spawnSync("git", ["status", "--porcelain"], {
+        cwd,
+        encoding: "utf8",
+        timeout: 10_000,
+      });
+      if (result.error !== undefined || result.status !== 0) return undefined;
+      // Returned RAW on purpose (see StartGit.statusPorcelain).
+      return String(result.stdout ?? "");
     },
     commitFile(cwd: string, file: string, message: string): void {
       git(["add", "--", file], cwd);
@@ -744,6 +767,31 @@ function worktreeRemediation(input: {
 }
 
 /**
+ * The human-channel lines for a deliberate single-writer take-over
+ * (task-strict-attach-dead-owner-hatch): what was overridden, and — when the
+ * stamp could not be written — that it was NOT recorded.
+ *
+ * The second line is load-bearing (review on task-strict-attach-dead-owner-hatch):
+ * an unrecorded take-over persisted nothing, so the previous owner is still
+ * stamped and the next attach re-refuses. Printing only "took over ..." would
+ * read as a completed recovery that did not happen, so the degradation is named
+ * right beside the note. Kept here (not inline in the CLI action) so the human
+ * channel is unit-testable, and so `--json` stays byte-identical: `claim` is
+ * forwarded verbatim either way.
+ */
+export function startTakeoverNotes(claim: WorktreeClaimReceipt | undefined): string[] {
+  if (claim?.takeOver === undefined) return [];
+  const notes = [`note: single-writer take-over — ${worktreeTakeoverWarning(claim.takeOver)}`];
+  if (claim.stamped === false && claim.warning !== undefined) {
+    notes.push(
+      `warning: take-over NOT recorded — ${claim.warning}; the stamp still names the previous ` +
+        "owner, so the next attach re-refuses",
+    );
+  }
+  return notes;
+}
+
+/**
  * Failure report for a start that already created (or attached) the worktree.
  * The worktree is NEVER rolled back (bug-start-worktree-node-modules): the
  * diagnostic context survives, and the message names the failing step, the
@@ -886,13 +934,13 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
         // attach is a no-op rather than a re-stamp.
         ...(opts.takeOverWorktree === true ? { takeOver: true } : {}),
         ...(opts.now !== undefined ? { now: opts.now } : {}),
-        status: (cwd) => {
-          try {
-            return gitRunner.fileStatus(cwd, ".");
-          } catch {
-            return undefined;
-          }
-        },
+        // RAW porcelain (never `fileStatus`, which trims — see
+        // StartGit.statusPorcelain): the injected runner answers when it can
+        // (tests fake the porcelain line), otherwise the kernel's own real
+        // probe runs.
+        ...(gitRunner.statusPorcelain !== undefined
+          ? { status: (cwd: string) => gitRunner.statusPorcelain?.(cwd) }
+          : {}),
       },
     });
     // Single-writer enforcement (task-single-writer-worktree-enforcement):

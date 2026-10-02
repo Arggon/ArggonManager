@@ -1722,9 +1722,16 @@ export function worktreeForeignWriteWarning(report: WorktreeForeignWriteReport):
  * The message also names the designed hatch for the DEAD-owner case
  * (`start --take-over-worktree`, task-strict-attach-dead-owner-hatch) and the
  * manual `rm` recovery, in that order: coordinate → audited take-over →
- * manual stamp removal. Both are conditional on the stamped session being
- * gone, so the first (non-destructive, and correct for a live owner) stays the
- * obvious path.
+ * manual stamp removal. Both are conditional on confirming no live writer, so
+ * the first (non-destructive, and correct for a live owner) stays the obvious
+ * path.
+ *
+ * ORDERING is load-bearing (review on task-strict-attach-dead-owner-hatch):
+ * the named-file list goes LAST, because the human channel clips a composite
+ * error line at `MAX_HUMAN_ERROR_CHARS` (2000) and keeps the HEAD. Ten long
+ * paths would otherwise push the remedies — the only actionable part for a
+ * dead owner — off the terminal line. The evidence still rides the `--json`
+ * envelope in full.
  */
 export function strictWorktreeWriteFailure(report: WorktreeForeignWriteReport): string | null {
   if (report.total === 0) return null;
@@ -1733,16 +1740,15 @@ export function strictWorktreeWriteFailure(report: WorktreeForeignWriteReport): 
   return (
     `x-tracker.strict-worktree-writes is set: refusing the claim — the worktree is stamped by ` +
     `session ${report.owner} (claimed ${report.claimedAt}) and ${report.total} tracked ` +
-    `file${report.total === 1 ? " was" : "s were"} modified after that claim: ` +
-    `${named}${extra > 0 ? ` (and ${extra} more)` : ""}. ` +
+    `file${report.total === 1 ? " was" : "s were"} modified after that claim. ` +
     "Another session may be writing here; coordinate with the stamped session (or have it " +
     "re-attach to refresh the stamp), then re-run start --worktree to attach. This refusal " +
     "never re-stamps the worktree, so a retry re-detects the same evidence. If the stamped " +
-    "session is gone (crashed), two recovery paths exist, both requiring that confirmation " +
-    "first: re-run with the take-over flag (start --worktree --take-over-worktree), which " +
-    "re-stamps the worktree and records a dated take-over naming the replaced stamp, or remove " +
-    "the stamp by hand " +
-    '(rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json").'
+    "session is gone (crashed): confirm no live writer, then re-run with the take-over flag " +
+    "(start --worktree --take-over-worktree) — it re-stamps the worktree and records a dated " +
+    "take-over naming the replaced stamp — or remove the stamp by hand " +
+    '(rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json"). ' +
+    `Files modified after that claim: ${named}${extra > 0 ? ` (and ${extra} more)` : ""}.`
   );
 }
 

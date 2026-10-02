@@ -1,4 +1,5 @@
 import {
+  chmodSync,
   cpSync,
   existsSync,
   lstatSync,
@@ -21,6 +22,7 @@ import {
   linkNodeModules,
   linkedWorkspacePackages,
   runStart,
+  startTakeoverNotes,
   unlinkNodeModulesLink,
   type StartGit,
 } from "./start.js";
@@ -78,6 +80,10 @@ function fakeGit(overrides: Partial<StartGit> = {}): StartGit & { calls: Call[] 
     },
     // Tree root reads clean; the claimed item file reads dirty after the claim write.
     fileStatus: (_cwd, file) => (file === "." ? "" : ` M ${file}`),
+    // Raw porcelain for the claim detection: untrimmed by contract (see
+    // StartGit.statusPorcelain), and it mirrors whatever this fake's
+    // `fileStatus` reports for the tree root so every fixture stays hermetic.
+    statusPorcelain: (cwd) => overrides.fileStatus?.(cwd, ".") ?? "",
     commitFile: (_cwd, _file, message) => {
       calls.push({ op: "commit", arg: message });
     },
@@ -1159,6 +1165,36 @@ describe("start --worktree claim stamp: single-writer detection (task-single-wri
     expect(result.claim).toBeUndefined();
   });
 
+  it("reads RAW porcelain for the detection: a trimmed status line must not silently disarm the gate", () => {
+    const { dir, id, worktreePath, stampPath, createGit } = primedWriterTask(true);
+    runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW }, { git: createGit });
+    stampAsForeignSession(stampPath, id, "feat/task-rate-limit", NOW);
+    foreignWrite(worktreePath, "src/wip.ts", NOW);
+    // A runner whose `fileStatus` TRIMS (the shape that made the CLI's
+    // detection inert against real git: porcelain is positional, so ` M x`
+    // becomes `M x` and every path is read one character off) while its
+    // `statusPorcelain` answers raw. The claim MUST still see the write — the
+    // detection reads the raw probe, never `fileStatus`.
+    const git = fakeGit({
+      worktreeList: () => [worktreePath],
+      fileStatus: (cwd, file) => {
+        if (file !== ".") return ` M ${file}`;
+        return cwd === worktreePath ? "M src/wip.ts" : ""; // trimmed: " M src/wip.ts"
+      },
+      statusPorcelain: (cwd) => (cwd === worktreePath ? " M src/wip.ts\n" : ""),
+    });
+    let message = "";
+    try {
+      runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: LATER }, { git });
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).toContain("refusing the claim");
+    expect(message).toContain("src/wip.ts");
+    // Proof the raw probe (not the trimmed one) is what the gate consumed.
+    expect(message).not.toContain("Eip.ts");
+  });
+
   it("refuses --take-over-worktree without --worktree (a flag that cannot act is never ignored)", () => {
     const { dir, id } = primedTask();
     const git = fakeGit();
@@ -1237,6 +1273,72 @@ describe("start --worktree claim stamp: single-writer detection (task-single-wri
         },
       ],
     });
+  });
+
+  it("prints that an UNRECORDED take-over was not recorded (the human channel must not read it as taken-over)", () => {
+    const { dir, id, worktreePath, stampPath, createGit } = primedWriterTask(true);
+    runStart({ cwd: dir, id, assignee: "arggon", worktree: true, now: NOW }, { git: createGit });
+    stampAsForeignSession(stampPath, id, "feat/task-rate-limit", NOW);
+    foreignWrite(worktreePath, "src/wip.ts", NOW);
+    const git = writerGit(worktreePath, ["src/wip.ts"]);
+    // A read-only git dir: the stamp is still READABLE (the detection fires) but
+    // the atomic write cannot land, so the take-over persists nothing. The git
+    // runner is faked, so nothing else needs that directory.
+    chmodSync(join(worktreePath, ".git"), 0o500);
+    let result: ReturnType<typeof runStart>;
+    try {
+      result = runStart(
+        { cwd: dir, id, assignee: "arggon", worktree: true, now: LATER, takeOverWorktree: true },
+        { git },
+      );
+    } finally {
+      chmodSync(join(worktreePath, ".git"), 0o755);
+    }
+    // The receipt is honest about it: the take-over is there, unrecorded.
+    expect(result.claim?.takeOver?.replacedIdentity).toBe(FOREIGN_SESSION);
+    expect(result.claim?.stamped).toBe(false);
+    expect(result.claim?.warning).toBe("could not write the claim stamp");
+    // ...and the human channel says so BESIDE the note (review finding 2):
+    // "took over ..." alone would read as a completed recovery that did not
+    // happen, while the next attach re-refuses.
+    const notes = startTakeoverNotes(result.claim);
+    expect(notes).toHaveLength(2);
+    expect(notes[0]).toContain("note: single-writer take-over — took over the worktree from");
+    expect(notes[0]).toContain(FOREIGN_SESSION);
+    expect(notes[1]).toContain("take-over NOT recorded");
+    expect(notes[1]).toContain("could not write the claim stamp");
+    expect(notes[1]).toContain("next attach re-refuses");
+    // Nothing was persisted: the previous owner is still stamped.
+    expect(JSON.parse(readFileSync(stampPath, "utf8")).identity).toBe(FOREIGN_SESSION);
+  });
+
+  it("prints only the note for a RECORDED take-over, and nothing without one", () => {
+    expect(startTakeoverNotes(undefined)).toEqual([]);
+    expect(startTakeoverNotes({ stamped: true })).toEqual([]);
+    expect(
+      startTakeoverNotes({
+        stamped: true,
+        takeOver: {
+          at: LATER.toISOString(),
+          by: "arggon",
+          replacedIdentity: FOREIGN_SESSION,
+          replacedClaimedAt: NOW.toISOString(),
+          replaced: {
+            identity: FOREIGN_SESSION,
+            item: "task-x",
+            branch: "feat/x",
+            claimedAt: NOW.toISOString(),
+          },
+          files: ["src/wip.ts"],
+          total: 1,
+        },
+      }),
+    ).toEqual([
+      `note: single-writer take-over — took over the worktree from ${FOREIGN_SESSION} ` +
+        `(claimed ${NOW.toISOString()}) at ${LATER.toISOString()} as arggon: 1 tracked file was ` +
+        "modified after that claim: src/wip.ts — the stamped session was presumed dead; confirm " +
+        "that before writing here",
+    ]);
   });
 
   it("is a no-op on a clean attach: no chain entry, no receipt change", () => {

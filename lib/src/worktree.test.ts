@@ -1228,13 +1228,43 @@ describe("claim stamp: single-writer detection (task-single-writer-worktree-enfo
     expect(refusal).toContain("coordinate with the stamped session");
     expect(refusal).toContain("have it re-attach to refresh the stamp");
     expect(refusal).toContain("never re-stamps the worktree");
-    // The dead-owner path gains a designed hatch BEFORE the manual `rm`, and
-    // the manual recovery itself is still named (invariant from #568).
+    // The dead-owner path gains a designed hatch BEFORE the manual `rm`, the
+    // manual recovery itself is still named (invariant from #568), and the
+    // docs' literal phrase is restored.
     expect(refusal).toContain("--take-over-worktree");
+    expect(refusal).toContain("confirm no live writer");
     expect(refusal).toContain(
       'rm "$(git -C <worktree> rev-parse --absolute-git-dir)/arggon-claim.json"',
     );
     expect(refusal.indexOf("--take-over-worktree")).toBeLessThan(refusal.indexOf('rm "$(git -C'));
+  });
+
+  it("puts every remedy BEFORE the named-file list, so the 2000-char human clip cannot cut them", () => {
+    // Worst case the receipt can carry: the cap's 10 names, each long enough
+    // that the list alone would blow the human line budget (review on
+    // task-strict-attach-dead-owner-hatch).
+    const files = Array.from(
+      { length: MAX_CLAIM_WRITE_NAMES },
+      (_, i) =>
+        `src/very/deeply/nested/module/path/that/keeps/going/component-${i}-with-a-long-name.ts`,
+    );
+    const refusal =
+      strictWorktreeWriteFailure({
+        owner: "ses_a",
+        claimedAt: NOW_ISO,
+        files,
+        total: 24,
+      }) ?? "";
+    // Remedies first: both must precede the FIRST named path, not merely the
+    // last one.
+    const firstFile = refusal.indexOf(files[0]!);
+    expect(firstFile).toBeGreaterThan(0);
+    expect(refusal.indexOf("--take-over-worktree")).toBeLessThan(firstFile);
+    expect(refusal.indexOf("confirm no live writer")).toBeLessThan(firstFile);
+    expect(refusal.indexOf('rm "$(git -C')).toBeLessThan(firstFile);
+    // The evidence is still all there, last.
+    expect(refusal).toContain("(and 14 more)");
+    expect(refusal).toContain(`Files modified after that claim: ${files.join(", ")}`);
   });
 });
 

@@ -55,11 +55,10 @@ import {
   updateOperation,
   validateOperation,
   worktreeForeignWriteWarning,
-  worktreeTakeoverWarning,
   type TrendResult,
 } from "@arggondev/lib";
 
-import { runStart } from "./start.js";
+import { runStart, startTakeoverNotes } from "./start.js";
 import { runCleanup } from "./cleanup.js";
 
 import { runDoctor, formatDoctorReport, measureBudgetForDoctor } from "./doctor.js";
@@ -2372,13 +2371,13 @@ program
               `  note: single-writer check — ${sanitizeHumanError(worktreeForeignWriteWarning(result.claim.foreignWrites))}`,
             );
           }
-          if (result.claim?.takeOver !== undefined) {
-            // Deliberate take-over (task-strict-attach-dead-owner-hatch): the
-            // one place the single-writer gate is overridden on purpose, so it
-            // prints what it overrode — the replaced stamp and the evidence.
-            console.log(
-              `  note: single-writer take-over — ${sanitizeHumanError(worktreeTakeoverWarning(result.claim.takeOver))}`,
-            );
+          // Deliberate take-over (task-strict-attach-dead-owner-hatch): the one
+          // place the single-writer gate is overridden on purpose, so the human
+          // channel says what it overrode — and, when the stamp could not be
+          // written, that the take-over was NOT recorded (the formatter owns
+          // that rule; `--json` keeps forwarding `claim` verbatim).
+          for (const note of startTakeoverNotes(result.claim)) {
+            console.log(`  ${sanitizeHumanError(note)}`);
           }
           if (result.manifestCoverage === "stale") {
             // A mirrored install is only as current as the primary's: name what
