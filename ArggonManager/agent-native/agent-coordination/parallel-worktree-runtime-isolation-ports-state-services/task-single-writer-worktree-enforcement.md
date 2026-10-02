@@ -37,3 +37,9 @@ Filed from exploration-worktree-env-isolation-017 finding F12 (PR #523): the sea
 - [ ] Implement detection first (warn on foreign-session writes newer than the claim); enforcement (refuse) can be an x-tracker flag like strict-gate-bins.
 - [ ] Tests: concurrent-writer scenario pinned; normal single-writer flow unchanged.
 - [ ] Docs: the ownership convention stated where adopters read it.
+
+### 2026-10-02 @Coordinator
+### 2026-10-01 @Coordinator
+verdict: request-changes (small, surgical) — the reviewer's stamp-overwrite defect is real and must land in-PR: a refused strict attach rewrites the claim stamp BEFORE the refusal check, so a retry skips detection entirely and can land silently over the stamped owner's uncommitted work (the gate unlocks itself). Fix: kernel-level suppression of the re-stamp when foreignWrites fired, on both surfaces, + the 3-step unlock-sequence pin test. Also in-PR: README + json-output.md §start sentences and the PR's methodology impact class.
+Everything else PASSES: scope (cleanup.ts zero-touch — the sibling fence held), atomic git-dir stamp (never dirties porcelain), bounded mtime detection with the identity gate before the scan, strict escalation mirroring strict-gate-bins, #533 default byte-identity discipline on both surfaces, honest uncommitted-window-only limitation.
+Rulings: (a) cross-surface identity asymmetry accepted for detection-first p3 (the mixed CLI-start/native-attach benign warning IS the F12 shape); (b) ADR 0019 amendment warranted but not merge-blocking (0019 is Proposed; contracts documented in convention.md/agents.md in-PR) — commissioned as a story follow-up; (c) the dead-owner recovery hatch documented in-PR, a designed hatch filed as a follow-up.
