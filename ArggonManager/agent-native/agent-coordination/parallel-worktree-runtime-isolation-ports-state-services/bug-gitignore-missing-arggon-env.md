@@ -58,3 +58,22 @@ env file of the exact contract shape, so removal is not the risk — visibility 
       `.gitignore` (report-only, never a silent rewrite), or is a documented hand-step enough? Any
       follow-up item is filed here.
 - [x] Evidence: the receipt line and the clean status pasted on the item.
+
+### 2026-10-02 @ses_f01ff0880ffeUkY0YiMsq3V3QC
+## Evidence (2026-10-02, fix/bug-gitignore-missing-arggon-env)
+
+Fix: repo-root `.gitignore` gains `.arggon.env` with a comment naming spec worktree-env-contract-016 (commit on fix/bug-gitignore-missing-arggon-env).
+
+Fresh `start --worktree` receipt (scratch item task-scratch-verify-env-gitignored-receipt, now cancelled), run from the fix branch so the worktree base carried the gitignore entry:
+
+```json
+"env":{"written":true,"path":".../ArggonManager-bug-gitignore-missing-arggon-env-task-scratch-verify-env-gitignored-receipt/.arggon.env","keys":["ARGON_ITEM","ARGGON_WORKTREE_ID","ARGGON_WORKTREE_PATH","ARGGON_WORKTREE_BRANCH","ARGGON_STATE_DIR","ARGGON_CACHE_DIR"],"gitignored":true}
+```
+
+```$ git status --porcelain   # in the fresh worktree
+exit=0   # (empty output — clean)
+$ git check-ignore -v .arggon.env
+.gitignore:48:.arggon.env	.arggon.env
+```
+
+Decision (acceptance #3): `init`/`adopt` must never silently rewrite an adopter's `.gitignore`; a documented hand-step alone already proved insufficient for this repo, so the new item task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters files a report-only `init`/`adopt`/`doctor` hint (stdout + --json note) when `.arggon.env` is missing from the tracked `.gitignore`, never a write.
