@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-cleanup-declared-services
 title: cleanup --prune reaps per-worktree Compose projects only when the repo declares them
 assignee: Arggon
@@ -8,8 +8,7 @@ branch: feat/task-cleanup-declared-services
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [cleanup, worktree]
 created: "2026-10-01"
-updated: "2026-10-01"
-claimed_at: "2026-10-01T23:52:12.615Z"
+updated: "2026-10-02"
 depends_on: [task-env-contract-start]
 worktree_path: /home/arggon/Projects/ArggonManager-task-cleanup-declared-services
 ---
