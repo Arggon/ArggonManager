@@ -80,6 +80,17 @@ export type TrackerConfig = {
    * flavor included).
    */
   strictGateBins: boolean | null;
+  /**
+   * Strict worktree-write gate from `x-tracker.strict-worktree-writes`
+   * (task-single-writer-worktree-enforcement). `null` (unset) and `false` both
+   * keep start's single-writer detection REPORT-ONLY: an attach to a worktree
+   * stamped by a DIFFERENT session, with tracked files modified after that
+   * claim stamp, is carried as a named warning in the receipt
+   * (`claim.foreignWrites`). An explicit `true` additionally HARD-FAILS the
+   * claim (before the claim update, the item file unmutated) on the same
+   * observation, mirroring `strict-gate-bins`.
+   */
+  strictWorktreeWrites: boolean | null;
 };
 
 /** `x-import` namespaced extension options (task-import-type-mapping). */
@@ -296,7 +307,12 @@ export function parseConventionConfig(
   const branchPatterns: Record<ItemType, string> = { ...DEFAULT_BRANCH_PATTERNS };
   const views: Record<string, string> = {};
   const playbooks: PlaybooksConfig = { maxAgeDays: null };
-  const tracker: TrackerConfig = { autoCommit: null, allowSteal: null, strictGateBins: null };
+  const tracker: TrackerConfig = {
+    autoCommit: null,
+    allowSteal: null,
+    strictGateBins: null,
+    strictWorktreeWrites: null,
+  };
   const generated: Record<string, GeneratedEntry> = {};
   let generatedProjectName: string | null = null;
   const importLabelTypes: Record<string, ItemType> = {};
@@ -421,8 +437,10 @@ export function parseConventionConfig(
     if (section === "x-tracker") {
       // Namespaced extension: unknown nested keys are ignored (ignore-unknown),
       // the official options are `auto-commit` (tracker hygiene), `allow-steal`
-      // (claim-steal arming, bug-cli-steal-not-gated), and `strict-gate-bins`
-      // (strict start gate, task-start-gate-strict-mode).
+      // (claim-steal arming, bug-cli-steal-not-gated), `strict-gate-bins`
+      // (strict start gate, task-start-gate-strict-mode), and
+      // `strict-worktree-writes` (single-writer enforcement,
+      // task-single-writer-worktree-enforcement).
       if (key === "allow-steal") {
         if (value !== "true" && value !== "false") {
           throw new Error(
@@ -439,6 +457,15 @@ export function parseConventionConfig(
           );
         }
         tracker.strictGateBins = value === "true";
+        continue;
+      }
+      if (key === "strict-worktree-writes") {
+        if (value !== "true" && value !== "false") {
+          throw new Error(
+            `${sourcePath}: 'strict-worktree-writes' must be a boolean (got ${JSON.stringify(value)})`,
+          );
+        }
+        tracker.strictWorktreeWrites = value === "true";
         continue;
       }
       if (key !== "auto-commit") continue;
@@ -591,7 +618,12 @@ export function readConventionConfig(dir: string): ConventionConfig {
       branchPatterns: { ...DEFAULT_BRANCH_PATTERNS },
       views: {},
       playbooks: { maxAgeDays: null },
-      tracker: { autoCommit: null, allowSteal: null, strictGateBins: null },
+      tracker: {
+        autoCommit: null,
+        allowSteal: null,
+        strictGateBins: null,
+        strictWorktreeWrites: null,
+      },
       import: { labelTypes: null },
       worktree: { postStart: null, postStartShell: null, env: null },
       github: { issueRoundtrip: false },

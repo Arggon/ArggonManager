@@ -14,6 +14,7 @@ import {
   readFileSync,
   rmSync,
   symlinkSync,
+  utimesSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -26,14 +27,20 @@ import {
   MAX_MISSING_DEPENDENCIES,
   MAX_GATE_BINS,
   MAX_PREP_STEPS,
+  parseTrackedModifications,
   prepareWorktreeDependencies,
   prepareWorktreeEnv,
+  readWorktreeClaimStamp,
   strictGateBinFailure,
   strictGateBinViolations,
+  strictWorktreeWriteFailure,
   unlinkWorktreeEnv,
   worktreeCacheBase,
+  worktreeForeignWriteWarning,
   worktreeStateBase,
   WORKTREE_ENV_KEYS,
+  detectWorktreeForeignWrites,
+  MAX_CLAIM_WRITE_NAMES,
 } from "./worktree.js";
 
 const roots: string[] = [];
@@ -926,5 +933,277 @@ describe("prepareWorktreeEnv (spec worktree-env-contract-016)", () => {
       expect(unlinkWorktreeEnv(f.worktree)).toBe(false);
       expect(lstatSync(join(f.worktree, ".arggon.env")).isSymbolicLink()).toBe(true);
     });
+  });
+});
+
+describe("claim stamp: single-writer detection (task-single-writer-worktree-enforcement)", () => {
+  const NOW = new Date("2026-10-01T10:00:00Z");
+  const NOW_ISO = "2026-10-01T10:00:00.000Z";
+  const LATER = new Date("2026-10-01T11:00:00Z");
+
+  /**
+   * Like `fixture`, but the worktree carries a real `.git` directory so the
+   * kernel's git-dir probe resolves and the stamp is actually written. The
+   * porcelain probe stays injected: detection tests fake `git status` output
+   * while the files it names are real, with mtimes set explicitly.
+   */
+  function stampedFixture(): { primary: string; worktree: string; gitDir: string } {
+    const f = fixture();
+    const gitDir = join(f.worktree, ".git");
+    mkdirSync(gitDir, { recursive: true });
+    return { primary: f.primary, worktree: f.worktree, gitDir };
+  }
+
+  /** Write a dirty-tracked line set with one real file per path. */
+  function dirtyStatus(worktree: string, paths: string[], mtime: Date): () => string {
+    for (const rel of paths) {
+      const file = join(worktree, rel);
+      mkdirSync(dirname(file), { recursive: true });
+      writeFileSync(file, "content", "utf8");
+      utimesSync(file, mtime, mtime);
+    }
+    return () => paths.map((rel) => ` M ${rel}`).join("\n");
+  }
+
+  it("stamps a claimed worktree and reads the rolling ownership record back", () => {
+    const { primary, worktree, gitDir } = stampedFixture();
+    const claim = prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_a",
+        assignee: "smoke",
+        itemId: "task-x",
+        branch: "feat/x",
+        surface: "native",
+        now: NOW,
+        gitDir: () => gitDir,
+        status: () => "",
+      },
+    }).claim;
+    expect(claim).toMatchObject({ stamped: true });
+    expect(claim?.foreignWrites).toBeUndefined();
+    expect(readWorktreeClaimStamp(worktree, { gitDir: () => gitDir })).toEqual({
+      identity: "ses_a",
+      item: "task-x",
+      branch: "feat/x",
+      claimedAt: NOW_ISO,
+      assignee: "smoke",
+      surface: "native",
+    });
+  });
+
+  it("fires on a foreign attach whose tracked files are newer than the claim, then re-stamps", () => {
+    const { primary, worktree, gitDir } = stampedFixture();
+    const probes = { gitDir: () => gitDir };
+    prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_a",
+        itemId: "task-x",
+        branch: "feat/x",
+        now: NOW,
+        ...probes,
+        status: () => "",
+      },
+    });
+    const status = dirtyStatus(worktree, ["src/foreign.ts"], new Date(NOW.getTime() + 60_000));
+    const claim = prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_b",
+        itemId: "task-x",
+        branch: "feat/x",
+        now: LATER,
+        ...probes,
+        status,
+      },
+    }).claim;
+    expect(claim?.foreignWrites).toEqual({
+      owner: "ses_a",
+      claimedAt: NOW_ISO,
+      files: ["src/foreign.ts"],
+      total: 1,
+    });
+    // The rolling record: the attach re-stamps with the new identity, so the
+    // NEXT attach detects that window.
+    expect(readWorktreeClaimStamp(worktree, probes)?.identity).toBe("ses_b");
+  });
+
+  it("stays silent when the attaching identity matches the stamp (the owner's own re-attach)", () => {
+    const { primary, worktree, gitDir } = stampedFixture();
+    const probes = { gitDir: () => gitDir };
+    prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_a",
+        itemId: "task-x",
+        branch: "feat/x",
+        now: NOW,
+        ...probes,
+        status: () => "",
+      },
+    });
+    const status = dirtyStatus(worktree, ["wip.ts"], new Date(NOW.getTime() + 60_000));
+    const claim = prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_a",
+        itemId: "task-x",
+        branch: "feat/x",
+        now: LATER,
+        ...probes,
+        status,
+      },
+    }).claim;
+    expect(claim?.stamped).toBe(true);
+    expect(claim?.foreignWrites).toBeUndefined();
+  });
+
+  it("stays silent when every tracked write predates the stamped claim", () => {
+    const { primary, worktree, gitDir } = stampedFixture();
+    const probes = { gitDir: () => gitDir };
+    prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_a",
+        itemId: "task-x",
+        branch: "feat/x",
+        now: NOW,
+        ...probes,
+        status: () => "",
+      },
+    });
+    const status = dirtyStatus(worktree, ["old.ts"], new Date(NOW.getTime() - 60_000));
+    const claim = prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_b",
+        itemId: "task-x",
+        branch: "feat/x",
+        now: LATER,
+        ...probes,
+        status,
+      },
+    }).claim;
+    expect(claim?.foreignWrites).toBeUndefined();
+  });
+
+  it("stays silent without a prior stamp (pre-feature worktrees), then stamps", () => {
+    const { primary, worktree, gitDir } = stampedFixture();
+    const probes = { gitDir: () => gitDir };
+    const status = dirtyStatus(worktree, ["untracked-history.ts"], new Date());
+    const claim = prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_b",
+        itemId: "task-x",
+        branch: "feat/x",
+        now: NOW,
+        ...probes,
+        status,
+      },
+    }).claim;
+    expect(claim?.stamped).toBe(true);
+    expect(claim?.foreignWrites).toBeUndefined();
+  });
+
+  it("names at most MAX_CLAIM_WRITE_NAMES files while keeping the exact total", () => {
+    const { primary, worktree, gitDir } = stampedFixture();
+    const probes = { gitDir: () => gitDir };
+    prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_a",
+        itemId: "task-x",
+        branch: "feat/x",
+        now: NOW,
+        ...probes,
+        status: () => "",
+      },
+    });
+    const paths = Array.from({ length: MAX_CLAIM_WRITE_NAMES + 2 }, (_, i) => `f${i}.ts`);
+    const status = dirtyStatus(worktree, paths, new Date(NOW.getTime() + 60_000));
+    const claim = prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_b",
+        itemId: "task-x",
+        branch: "feat/x",
+        now: LATER,
+        ...probes,
+        status,
+      },
+    }).claim;
+    expect(claim?.foreignWrites?.files).toEqual(paths.slice(0, MAX_CLAIM_WRITE_NAMES));
+    expect(claim?.foreignWrites?.total).toBe(MAX_CLAIM_WRITE_NAMES + 2);
+  });
+
+  it("degrades to unstamped with a receipt warning when the git dir is unavailable", () => {
+    const { primary, worktree } = fixture();
+    const claim = prepareWorktreeDependencies(primary, worktree, {
+      claim: {
+        identity: "ses_a",
+        itemId: "task-x",
+        branch: "feat/x",
+        now: NOW,
+        gitDir: () => undefined,
+        status: () => "",
+      },
+    }).claim;
+    expect(claim).toEqual({
+      stamped: false,
+      warning: "could not write the claim stamp",
+    });
+  });
+
+  it("keeps the legacy preparation receipt shape without deps.claim", () => {
+    const { primary, worktree } = fixture();
+    const preparation = prepareWorktreeDependencies(primary, worktree);
+    expect(preparation.claim).toBeUndefined();
+    expect(Object.keys(preparation)).not.toContain("claim");
+  });
+
+  it("parses tracked modifications out of porcelain output (untracked/ignored excluded, renames resolved)", () => {
+    expect(
+      parseTrackedModifications(
+        [
+          " M a.ts",
+          "?? b.ts",
+          "A  c.ts",
+          "R  old-d.ts -> e.ts",
+          "!! ignored",
+          "",
+          ' M "quoted f.ts"',
+        ].join("\n"),
+      ),
+    ).toEqual(["a.ts", "c.ts", "e.ts", "quoted f.ts"]);
+  });
+
+  it("detects nothing when the probe does not answer or the stamp timestamp is unparsable", () => {
+    expect(
+      detectWorktreeForeignWrites(
+        "/anywhere",
+        { identity: "ses_a", item: "t", branch: "b", claimedAt: "not-a-date" },
+        { status: () => " M a.ts\n" },
+      ),
+    ).toBeNull();
+    const { worktree, gitDir } = stampedFixture();
+    expect(
+      detectWorktreeForeignWrites(
+        worktree,
+        { identity: "ses_a", item: "t", branch: "b", claimedAt: NOW_ISO },
+        { status: () => undefined },
+      ),
+    ).toBeNull();
+    expect(gitDir).toBeDefined();
+  });
+
+  it("renders the bounded warning and the strict refusal from one observation", () => {
+    const report = {
+      owner: "ses_a",
+      claimedAt: NOW_ISO,
+      files: ["a.ts", "b.ts"],
+      total: 3,
+    };
+    const warning = worktreeForeignWriteWarning(report);
+    expect(warning).toContain("ses_a");
+    expect(warning).toContain(NOW_ISO);
+    expect(warning).toContain("3 tracked files were modified after that claim");
+    expect(warning).toContain("(and 1 more)");
+    const refusal = strictWorktreeWriteFailure(report);
+    expect(refusal).toContain("x-tracker.strict-worktree-writes is set");
+    expect(refusal).toContain("refusing the claim");
+    expect(refusal).toContain("a.ts, b.ts");
+    expect(strictWorktreeWriteFailure({ ...report, files: [], total: 0 })).toBeNull();
   });
 });

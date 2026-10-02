@@ -19,11 +19,13 @@ import {
   resolveCurrentLogin,
   runUpdate,
   strictGateBinFailure,
+  strictWorktreeWriteFailure,
   unlinkNodeModulesLink,
   withItemLock,
   type GateBinResolution,
   type ManifestCoverage,
   type WorkItem,
+  type WorktreeClaimReceipt,
   type WorktreeEnvReceipt,
   type WorktreePrepStep,
 } from "@arggondev/lib";
@@ -176,6 +178,15 @@ export type StartResult = {
    * reports that.
    */
   env: WorktreeEnvReceipt;
+  /**
+   * The claim-stamp receipt (task-single-writer-worktree-enforcement): the
+   * worktree's ownership stamp state plus any fired attach-time detection.
+   * Present only with `--worktree` (the stamp is worktree-scoped); a fired
+   * `foreignWrites` report is a WARNING by default — with
+   * `x-tracker.strict-worktree-writes: true` it refuses the claim before any
+   * item mutation instead.
+   */
+  claim?: WorktreeClaimReceipt;
   /**
    * Outcome of re-linking the start-owned install after a
    * `x-worktree.post-start` hook that left the worktree without one
@@ -838,7 +849,42 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
         identity: { itemId: id, branch: name },
         enabled: config.worktree.env !== false,
       },
+      // Claim stamp (task-single-writer-worktree-enforcement): runs first in
+      // the kernel prep, before any write of this run. Identity is the
+      // resolved assignee — the CLI has no session id. The porcelain probe
+      // rides the injected git runner so tests stay hermetic and a fake
+      // runner answers consistently with the rest of the flow.
+      claim: {
+        identity: assignee,
+        assignee,
+        itemId: id,
+        branch: name,
+        surface: "cli",
+        ...(opts.now !== undefined ? { now: opts.now } : {}),
+        status: (cwd) => {
+          try {
+            return gitRunner.fileStatus(cwd, ".");
+          } catch {
+            return undefined;
+          }
+        },
+      },
     });
+    // Single-writer enforcement (task-single-writer-worktree-enforcement):
+    // with `x-tracker.strict-worktree-writes: true` a fired attach-time
+    // detection — the worktree stamped by a DIFFERENT session, with tracked
+    // files modified after that claim — refuses the claim BEFORE any item
+    // mutation, naming the stamped owner and the newer files. Unset (the
+    // default) keeps the documented report-only behavior byte-identical: the
+    // detection rides the receipt (`claim.foreignWrites`) and the claim
+    // commit remains authoritative.
+    if (config.tracker.strictWorktreeWrites === true && prepared.claim?.foreignWrites) {
+      const refusal = strictWorktreeWriteFailure(prepared.claim.foreignWrites);
+      if (refusal !== null) {
+        step = "enforcing x-tracker.strict-worktree-writes";
+        throw new Error(refusal);
+      }
+    }
     env = prepared.env ?? env;
     linkedNodeModules = prepared.linkedNodeModules;
     builtWorkspaces = prepared.builtWorkspaces;
@@ -1029,6 +1075,7 @@ function startInWorktree(input: WorktreeStartInput): StartResult {
       gateBins,
       prepSteps,
       env,
+      ...(prepared.claim !== undefined ? { claim: prepared.claim } : {}),
       ...(postStartRelink !== undefined ? { postStartRelink } : {}),
       postStart,
       item: finalItem,
