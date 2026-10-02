@@ -81,3 +81,16 @@ Decision (acceptance #3): `init`/`adopt` must never silently rewrite an adopter'
 ### handoff 2026-10-02 @ses_f01ff0880ffeUkY0YiMsq3V3QC (session: ses_f01ff0880ffeUkY0YiMsq3V3QC) — next: Coordinator review: merge PR #593 after verifying the env.gitignored receipt evidence on the item; follow-up task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters tracks the init/adopt rep…
 - branch: fix/bug-gitignore-missing-arggon-env
 - open questions: Native start claim commit did not land the in_progress stamp on origin/main (bug-native-tools-commit-to-primary-checkout related); scratch verification item was cancelled and its worktree/branch remo…
+
+### 2026-10-02 @ses_f01ef470dffew1ASvaqD58EW6k
+verdict: approve
+
+Reviewed PR #593 (branch fix/bug-gitignore-missing-arggon-env) against docs/engineering.md:
+
+- Scope: diff is exactly two files — repo-root `.gitignore` and this item md. No unrelated changes.
+- `.gitignore` gains `.arggon.env` (line 48 per the pasted check-ignore evidence) with a comment naming spec worktree-env-contract-016 — matches the spec's Gitignore probe section (start never edits .gitignore; init's generated template carries the entry). Shape matches the spec.
+- Acceptance #3 decision recorded on the item: init/adopt must never silently rewrite an adopter's .gitignore; report-only hint, not a silent write.
+- Follow-up task filed: task-initadopt-report-only-arggonenv-gitignore-hint-for-adopters (status todo, correct parent story).
+- Evidence on the item: env receipt with "gitignored":true, clean `git status --porcelain`, `git check-ignore -v` pointing at .gitignore:48 — consistent with the claim.
+
+Minor, non-blocking: the branch's copy of the item md still carries status in_progress/assignee/claimed_at from the claim; main has since moved the body forward (ticked boxes, evidence comments present). Merge mechanics should ensure the claim frontmatter doesn't clobber main's state — coordinator note.
