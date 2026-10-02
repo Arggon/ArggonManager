@@ -10,7 +10,7 @@
  * --open-pr). The CLI runs from source via tsx, like cli.test.ts.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -206,6 +206,188 @@ describe("concurrent claim starts (bug-claim-race-no-lock)", () => {
         const data = itemData(wtPath, "task-race");
         expect(data.status).toBe("in_progress");
         expect(data.assignee).toBe(claimants[0]);
+      } finally {
+        removeFixtureTree(dir);
+      }
+    },
+    TIMEOUT_MS,
+  );
+});
+
+/**
+ * Real-CLI single-writer detection and the dead-owner take-over
+ * (task-strict-attach-dead-owner-hatch; review smoke probe).
+ *
+ * Everything here drives the REAL `arggon` binary over REAL git — which is the
+ * point: the #568 unit tests inject a fake porcelain probe, and the fake was
+ * faithful while the production probe was NOT. `StartGit.fileStatus` trims, and
+ * porcelain is positional (` M x` → `M x`, path read one character off), so the
+ * CLI's detection never fired against real git output and the strict gate was
+ * inert in production. This file is the regression that pins the raw probe.
+ */
+describe("real CLI: single-writer detection + dead-owner take-over", () => {
+  const FOREIGN_SESSION = "ses_deadbeef";
+
+  /** Run the real CLI, resolving with its parsed `--json` envelope. */
+  function runStartCli(
+    dir: string,
+    args: string[],
+  ): Promise<Record<string, unknown> & { ok: boolean }> {
+    return new Promise((resolvePromise) => {
+      const child = spawnNodeCli([...args, "--json"], {
+        cwd: dir,
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      let out = "";
+      let err = "";
+      child.stdout.on("data", (chunk: string) => (out += chunk));
+      child.stderr.on("data", (chunk: string) => (err += chunk));
+      child.on("close", () => {
+        const trimmed = out.trim();
+        const parsed = trimmed ? (JSON.parse(trimmed.split("\n").pop() ?? trimmed) as never) : null;
+        resolvePromise(
+          (parsed ?? {
+            ok: false,
+            error: { code: "NO_JSON", message: err || "no output" },
+          }) as never,
+        );
+      });
+    });
+  }
+
+  type ClaimEnvelope = {
+    ok: boolean;
+    worktreePath?: string;
+    claim?: {
+      stamped: boolean;
+      foreignWrites?: { owner: string; files: string[]; total: number };
+      takeOver?: { by: string; replacedIdentity: string; replaced: { identity: string } };
+    };
+    error?: { code: string; message: string };
+  };
+
+  it(
+    "strict gate refuses a foreign stamp over newer tracked writes, then --take-over-worktree recovers it (real git)",
+    async () => {
+      const dir = initRepoWithRemote("single-writer");
+      try {
+        // Arm the strict single-writer gate and commit it: start refuses a dirty tree.
+        appendFileSync(
+          join(dir, "ArggonManager", ".convention.yml"),
+          "x-tracker:\n  strict-worktree-writes: true\n",
+        );
+        commitAllIfDirty(dir, "arm the strict worktree-write gate");
+
+        // 1. The owner claims the worktree.
+        const first = (await runStartCli(dir, [
+          "start",
+          "task-race",
+          "--assignee",
+          "arggon",
+          "--worktree",
+        ])) as ClaimEnvelope;
+        expect(first.ok).toBe(true);
+        const worktreePath = first.worktreePath ?? "";
+        expect(worktreePath).not.toBe("");
+        const stampPath = join(
+          git(["rev-parse", "--absolute-git-dir"], worktreePath),
+          "arggon-claim.json",
+        );
+
+        // 2. A NATIVE session stamps the worktree and DIES mid-task: its stamp
+        //    stays, and the tracked file it was editing stays newer than that
+        //    stamp (the uncommitted collision window the gate observes).
+        writeFileSync(
+          stampPath,
+          `${JSON.stringify(
+            {
+              identity: FOREIGN_SESSION,
+              assignee: "arggon",
+              item: "task-race",
+              branch: "feat/task-race",
+              claimedAt: "2026-09-13T12:00:00.000Z",
+              surface: "native",
+            },
+            null,
+            2,
+          )}\n`,
+          "utf8",
+        );
+        writeFileSync(join(worktreePath, "README.md"), "half-done\n", "utf8");
+        commitAllIfDirty(worktreePath, "owner: commit the work in progress");
+        appendFileSync(join(worktreePath, "README.md"), "// one more line\n");
+        // Raw, on purpose: the leading status column is what the detection parses
+        // (the `git` helper above trims — the very defect this file pins).
+        expect(
+          spawnSync("git", ["status", "--porcelain"], { cwd: worktreePath, encoding: "utf8" })
+            .stdout,
+        ).toBe(" M README.md\n");
+
+        // 3. The plain re-attach is REFUSED, naming the designed hatch. This is
+        //    the leg that could not fire before the raw-porcelain fix.
+        const refused = (await runStartCli(dir, [
+          "start",
+          "task-race",
+          "--assignee",
+          "arggon",
+          "--worktree",
+        ])) as ClaimEnvelope;
+        expect(refused.ok).toBe(false);
+        expect(refused.error?.code).toBe("START_FAILED");
+        const message = refused.error?.message ?? "";
+        expect(message).toContain("x-tracker.strict-worktree-writes is set");
+        expect(message).toContain("--take-over-worktree");
+        expect(message).toContain("confirm no live writer");
+        expect(message).toContain(FOREIGN_SESSION);
+        expect(message).toContain("README.md");
+        // Refused BEFORE the claim: the dead owner's stamp still stands.
+        expect(JSON.parse(readFileSync(stampPath, "utf8")).identity).toBe(FOREIGN_SESSION);
+
+        // 4. The deliberate take-over recovers it, and the audit trail persists.
+        const taken = (await runStartCli(dir, [
+          "start",
+          "task-race",
+          "--assignee",
+          "arggon",
+          "--worktree",
+          "--take-over-worktree",
+        ])) as ClaimEnvelope;
+        expect(taken.ok).toBe(true);
+        expect(taken.claim?.takeOver?.replacedIdentity).toBe(FOREIGN_SESSION);
+        expect(taken.claim?.takeOver?.by).toBe("arggon");
+        expect(taken.claim?.takeOver?.replaced.identity).toBe(FOREIGN_SESSION);
+        // The armed strict gate saw no violation: exactly one of the two fields.
+        expect(taken.claim?.foreignWrites).toBeUndefined();
+        const stamp = JSON.parse(readFileSync(stampPath, "utf8")) as {
+          identity: string;
+          takeovers?: { by: string; replacedIdentity: string }[];
+        };
+        expect(stamp.identity).toBe("arggon");
+        expect(stamp.takeovers).toEqual([
+          expect.objectContaining({ by: "arggon", replacedIdentity: FOREIGN_SESSION }),
+        ]);
+      } finally {
+        removeFixtureTree(dir);
+      }
+    },
+    TIMEOUT_MS,
+  );
+
+  it(
+    "the take-over flag without --worktree fails fast (START_FAILED)",
+    async () => {
+      const dir = initRepoWithRemote("takeover-guard");
+      try {
+        const refused = (await runStartCli(dir, [
+          "start",
+          "task-race",
+          "--assignee",
+          "arggon",
+          "--take-over-worktree",
+        ])) as ClaimEnvelope;
+        expect(refused.ok).toBe(false);
+        expect(refused.error?.code).toBe("START_FAILED");
+        expect(refused.error?.message).toContain("--take-over-worktree requires --worktree");
       } finally {
         removeFixtureTree(dir);
       }

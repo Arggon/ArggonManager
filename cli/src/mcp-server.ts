@@ -481,6 +481,12 @@ const TOOLS: ToolDefinition[] = [
           description: "skip the x-worktree.post-start hook (it only runs when a new worktree is created)",
           default: false,
         },
+        take_over_worktree: {
+          type: "boolean",
+          description:
+            "take over a worktree whose stamped owner session is dead: records a dated take-over naming the replaced stamp and re-stamps the worktree (only when the single-writer detection fired; requires worktree)",
+          default: false,
+        },
         post_start_shell: {
           type: "string",
           enum: ["inherit", "login"],
@@ -752,6 +758,7 @@ export function runMcpServer(opts: McpServerOptions): void {
           ...(args.open_pr === true ? ["--open-pr"] : []),
           ...(args.worktree === true ? ["--worktree"] : []),
           ...(args.no_hook === true ? ["--no-hook"] : []),
+          ...(args.take_over_worktree === true ? ["--take-over-worktree"] : []),
           ...(typeof args.post_start_shell === "string"
             ? ["--post-start-shell", args.post_start_shell]
             : []),
