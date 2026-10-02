@@ -1608,6 +1608,32 @@ function parseTakeoverChain(value: unknown): WorktreeClaimTakeoverRecord[] {
 }
 
 /**
+ * Remove a worktree's claim stamp (best-effort; never throws), returning true
+ * only when a stamp file was actually removed. The release path
+ * (bug-unclaim-leaves-worktree-record-without-reaper) calls it explicitly so
+ * reaping the stamp does not depend on git's worktree-removal internals
+ * (a domain-based removal never touches `.git/worktrees/<name>`) and so the
+ * step is OBSERVABLE in the action list instead of being an accident of the
+ * removal. Ownership is the stamp's own file and nothing else — never a
+ * symlinked git dir, never the work tree. An absent stamp (pre-feature
+ * worktrees, an already-released one) is a benign `false`.
+ */
+export function unlinkWorktreeClaimStamp(
+  worktreePath: string,
+  deps: { gitDir?: GitDirRunner } = {},
+): boolean {
+  const path = claimStampPath(worktreePath, deps);
+  if (path === undefined) return false;
+  try {
+    if (lstatSync(path).isSymbolicLink()) return false; // never follow or remove a link
+    rmSync(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Write a worktree's claim stamp (atomically: temp file + rename), best-effort
  * — a stamp that cannot be written only costs detection coverage on the next
  * attach, so the write never blocks the claim. Returns true when written.

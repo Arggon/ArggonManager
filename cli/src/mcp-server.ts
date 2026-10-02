@@ -478,7 +478,8 @@ const TOOLS: ToolDefinition[] = [
         },
         no_hook: {
           type: "boolean",
-          description: "skip the x-worktree.post-start hook (it only runs when a new worktree is created)",
+          description:
+            "skip the x-worktree.post-start hook (it only runs when a new worktree is created)",
           default: false,
         },
         take_over_worktree: {
@@ -490,7 +491,8 @@ const TOOLS: ToolDefinition[] = [
         post_start_shell: {
           type: "string",
           enum: ["inherit", "login"],
-          description: 'shell for the x-worktree.post-start hook: "inherit" (default) or "login" ($SHELL -lc; overrides x-worktree.post-start-shell)',
+          description:
+            'shell for the x-worktree.post-start hook: "inherit" (default) or "login" ($SHELL -lc; overrides x-worktree.post-start-shell)',
         },
       },
       required: ["id"],
@@ -513,7 +515,7 @@ const TOOLS: ToolDefinition[] = [
   {
     name: "arggon_cleanup",
     description:
-      "List worktrees of done/cancelled items whose branches are merged (`prune: true` removes them, deletes their merged branches, and clears the worktree_path records; when the repo declares `x-worktree.services`, each removable worktree's Compose project is torn down first). Spawns the arggon CLI. Returns the arggon `cleanup --json` envelope: {ok, schemaVersion, conventionVersion, command, base, candidates, pruned, failures[, compose][, commit]}.",
+      "List worktrees of done/cancelled items whose branches are merged (`prune: true` removes them, deletes their merged branches, and clears the worktree_path records; when the repo declares `x-worktree.services`, each removable worktree's Compose project is torn down first). `release` instead reaps one dropped claim's worktree. Spawns the arggon CLI. Returns the arggon `cleanup --json` envelope: {ok, schemaVersion, conventionVersion, command, base, candidates, pruned, failures[, release, released][, compose][, commit]}.",
     inputSchema: {
       type: "object",
       properties: {
@@ -523,6 +525,11 @@ const TOOLS: ToolDefinition[] = [
             "remove removable worktrees (git worktree remove), delete their merged branches, and clear the worktree_path records",
           default: false,
         },
+        // Lean by design (ADR 0006/0014 schema budget): the release contract is
+        // named in the tool description and documented in
+        // ArggonManager/docs/agents.md §Worktrees — the properties stay bare.
+        release: { type: "string" },
+        take_over_worktree: { type: "boolean", default: false },
         no_commit: {
           type: "boolean",
           description:
@@ -772,6 +779,8 @@ export function runMcpServer(opts: McpServerOptions): void {
       return toolResult(
         spawnedOutcome(opts, "cleanup", [
           ...(args.prune === true ? ["--prune"] : []),
+          ...(typeof args.release === "string" ? ["--release", args.release] : []),
+          ...(args.take_over_worktree === true ? ["--take-over-worktree"] : []),
           ...(args.no_commit === true ? ["--no-commit"] : []),
           ...(args.no_gh === true ? ["--no-gh"] : []),
         ]),
@@ -926,7 +935,11 @@ function spawnedOutcome(
   }
   const ok = (envelope as { ok?: unknown }).ok === true;
   if (ok) return { ok: true, envelope, exitCode: 0 } as CommandOutcome;
-  return { ok: false, envelope, exitCode: proc.status === 0 ? 1 : (proc.status ?? 1) } as CommandOutcome;
+  return {
+    ok: false,
+    envelope,
+    exitCode: proc.status === 0 ? 1 : (proc.status ?? 1),
+  } as CommandOutcome;
 }
 
 /**

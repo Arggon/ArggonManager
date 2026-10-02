@@ -43,6 +43,7 @@ export {
   linkNodeModules,
   linkedWorkspacePackages,
   unlinkNodeModulesLink,
+  unlinkWorktreeClaimStamp,
   unlinkWorktreeEnv,
 } from "@arggondev/lib";
 import { runBranch, type GitRunner } from "./branch.js";

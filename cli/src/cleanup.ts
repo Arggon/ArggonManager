@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { basename, resolve } from "node:path";
 import {
   classifyCleanupEntry,
+  classifyReleaseEntry,
   commitTrackerMutation,
   defaultCleanupGit,
   findTasksDir,
@@ -9,18 +10,22 @@ import {
   loadItems,
   readAutoCommitConfig,
   readConventionConfig,
+  readConventionVersion,
   repoRootFromTasks,
   resolveAutoCommit,
+  resolveCurrentLogin,
   runUpdate,
   trackerCommitMessage,
   worktreeComposeProject,
   type CleanupEntry,
   type CleanupGit,
   type GhExecutor,
+  type ReleaseEntry,
   type TrackerCommitResult,
+  type WorkItem,
 } from "@arggondev/lib";
 
-import { unlinkNodeModulesLink, unlinkWorktreeEnv } from "./start.js";
+import { unlinkNodeModulesLink, unlinkWorktreeClaimStamp, unlinkWorktreeEnv } from "./start.js";
 
 /**
  * Cleanup classification and git plumbing are shared kernel rules since W4
@@ -31,12 +36,14 @@ import { unlinkNodeModulesLink, unlinkWorktreeEnv } from "./start.js";
  */
 export {
   classifyCleanupEntry,
+  classifyReleaseEntry,
   defaultCleanupGit,
   findMergedPr,
   type CleanupEntry,
   type CleanupGit,
   type GhExecutor,
   type MergedPr,
+  type ReleaseEntry,
 } from "@arggondev/lib";
 
 /**
@@ -74,16 +81,12 @@ export const COMPOSE_DOWN_TIMEOUT_MS = 120_000;
 
 function defaultComposeDown(project: string, cwd: string): void {
   try {
-    execFileSync(
-      "docker",
-      ["compose", "-p", project, "down", "-v", "--remove-orphans"],
-      {
-        cwd,
-        encoding: "utf8",
-        stdio: ["ignore", "pipe", "pipe"],
-        timeout: COMPOSE_DOWN_TIMEOUT_MS,
-      },
-    );
+    execFileSync("docker", ["compose", "-p", project, "down", "-v", "--remove-orphans"], {
+      cwd,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: COMPOSE_DOWN_TIMEOUT_MS,
+    });
   } catch (err) {
     // Absent docker CLI: rethrow untouched — the ENOENT `code` IS the
     // report-only signal the runCleanup reap step keys on.
@@ -136,9 +139,32 @@ export type CleanupOptions = {
    * ancestry-only classification, current behavior — for offline/CI use.
    */
   noGh?: boolean;
+  /**
+   * Release the named item's claim footprint (bug-unclaim-leaves-worktree-record-without-reaper):
+   * remove the recorded worktree, delete its branch, reap the start-created
+   * `.arggon.env` + `arggon-claim.json` stamp and clear the `worktree_path`
+   * record — the inverse of `start --worktree`, for an item whose claim was
+   * dropped. Mutually exclusive with `prune` (two different reapers; never one
+   * item in one run). Reported as `release` + `released`, never as `pruned`.
+   */
+  release?: string;
+  /**
+   * Deliberate release of a worktree whose stamped owner is presumed dead
+   * (mirrors `start --take-over-worktree`, task-strict-attach-dead-owner-hatch).
+   * Default OFF: a fired single-writer detection is then refused, because it is
+   * the evidence of a live second writer. Armed, it releases anyway and reports
+   * the replaced stamp. Never inferred — only the caller's flag releases.
+   */
+  releaseTakeOverWorktree?: boolean;
+  /**
+   * Release identity override (the resolved assignee by default, exactly what
+   * `start` stamped). Tests inject a fixed identity; both surfaces pass their
+   * own (native: the session id).
+   */
+  releaseIdentity?: string;
 };
 
-/** One completed prune action. */
+/** One completed prune/release action. */
 export type CleanupAction = {
   id: string;
   action: string;
@@ -153,17 +179,47 @@ export type CleanupAction = {
   via?: string;
 };
 
+/**
+ * The release run's outcome (bug-unclaim-leaves-worktree-record-without-reaper):
+ * a DISTINCT action family from `pruned`, never mixed into it, so a caller can
+ * read "this claim was released" separately from "this finished work was
+ * reaped". Present only when a release was requested.
+ */
+export type CleanupRelease = {
+  /** The kernel classification ({ releasable, reason, action, … }). */
+  entry: ReleaseEntry;
+  /** Actions performed (empty when the release was refused). */
+  actions: CleanupAction[];
+  /**
+   * The cleared-record commit, when the record outlived the removal. Absent when
+   * the record lived inside the removed worktree (nothing to write — the whole
+   * copy went with it) and when the release was refused.
+   */
+  commit?: TrackerCommitResult;
+};
+
 export type CleanupResult = {
   /** Repo root (parent of the tracker dir; the git cwd). */
   root: string;
   /** Branch merge safety is checked against this ref (e.g. origin/main). */
   base: string;
+  /**
+   * The tree's convention version, read before the run could remove its own
+   * working directory (a release may run from inside the worktree it reaps).
+   */
+  conventionVersion: number;
   /** Every tracked worktree with its classification. */
   entries: CleanupEntry[];
   /** Actions performed (only with prune: true). */
   pruned: CleanupAction[];
   /** Per-item failures during prune (removal/branch-delete/compose-reap errors). */
   failures: string[];
+  /**
+   * The release outcome for `opts.release` — a distinct action family from
+   * `pruned` (bug-unclaim-leaves-worktree-record-without-reaper). Absent without
+   * a release request, so the default listing/prune envelope is unchanged.
+   */
+  release?: CleanupRelease;
   /**
    * Compose reaping report (ADR 0019 layer 2, task-cleanup-declared-services),
    * present only when the repo's convention declares services
@@ -208,16 +264,30 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
   if (!gitRunner.isRepo(root)) {
     throw new Error(`not a git repository (${root}); arggon cleanup needs git`);
   }
+  if (opts.release !== undefined && opts.prune) {
+    // Two reapers, one item: a release abandons a claim and prune reaps
+    // finished work. Refusing the combination keeps each run's item set
+    // single-purpose instead of letting both mutate one worktree.
+    throw new Error("pass either --release <id> or --prune, not both");
+  }
   const base = gitRunner.defaultBranch(root);
+  // Captured before any release can remove this run's own working directory.
+  const conventionVersionAtStart = readConventionVersion(root);
 
   const byId = itemsById(loadItems(tasksDir));
   const tracked = [...byId.values()]
     .filter((item) => (item.worktreePath ?? null) !== null)
     .sort((a, b) => a.id.localeCompare(b.id));
 
-  const entries = tracked.map((item) =>
-    classifyCleanupEntry(item, root, base, gitRunner, { noGh: opts.noGh, gh: deps.gh }),
-  );
+  // A release run classifies ONE item (the named one) — the survey path stays
+  // out of it entirely, so an abandoned claim's worktree is released on its own
+  // evidence and the `candidates` list keeps meaning "prunable work".
+  const entries =
+    opts.release === undefined
+      ? tracked.map((item) =>
+          classifyCleanupEntry(item, root, base, gitRunner, { noGh: opts.noGh, gh: deps.gh }),
+        )
+      : [];
 
   const pruned: CleanupAction[] = [];
   const failures: string[] = [];
@@ -233,9 +303,7 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
   } catch {
     services = null;
   }
-  const compose: CleanupComposeReport | undefined = services
-    ? { declared: services }
-    : undefined;
+  const compose: CleanupComposeReport | undefined = services ? { declared: services } : undefined;
   let composeUnavailable = false;
   if (opts.prune) {
     for (const entry of entries.filter((e) => e.removable)) {
@@ -370,12 +438,217 @@ export function runCleanup(opts: CleanupOptions, deps: CleanupDeps = {}): Cleanu
   // surgically by path, so unrelated dirty state stays untouched. Skipped
   // when nothing was cleared; never fails the command.
   const commit: TrackerCommitResult | undefined =
-    opts.prune && clearedPaths.length > 0
+    clearedPaths.length > 0
       ? commitTrackerMutation(root, clearedPaths, {
           message: trackerCommitMessage("pruned", clearedIds),
           commit: resolveAutoCommit(opts.commit, readAutoCommitConfig(root)),
         })
       : undefined;
 
-  return { root, base, entries, pruned, failures, ...(compose ? { compose } : {}), commit };
+  // The release path (bug-unclaim-leaves-worktree-record-without-reaper): the
+  // inverse of `start --worktree`, for an item whose claim was dropped. It
+  // shares the Compose reap and the cleared-record commit with prune and
+  // NOTHING else — different premise (an ABANDONED claim, not finished work),
+  // different safety (the single-writer gate, never the merge check),
+  // different envelope family (`released`, never mixed into `pruned`).
+  //
+  // It runs AFTER prune's own commit: one run never asks for both, so the
+  // release commits its own cleared record as `chore(tasks): released <id>`.
+  const release =
+    opts.release === undefined
+      ? undefined
+      : releaseClaimedWorktree({
+          id: opts.release,
+          root,
+          byId,
+          gitRunner,
+          opts,
+          deps,
+          compose,
+          isComposeUnavailable: () => composeUnavailable,
+          failures,
+        });
+
+  return {
+    root,
+    base,
+    // Read while the tree is still there: a release can remove the very
+    // directory this run was invoked from (the claiming session works INSIDE
+    // the worktree it releases), and a post-hoc read would degrade to 0.
+    conventionVersion: conventionVersionAtStart,
+    entries,
+    pruned,
+    failures,
+    ...(release !== undefined ? { release } : {}),
+    ...(compose ? { compose } : {}),
+    ...((release?.commit ?? commit) !== undefined ? { commit: (release?.commit ?? commit)! } : {}),
+  };
+}
+
+/** What the release needs from the run it hangs off. */
+type ReleaseRun = {
+  id: string;
+  root: string;
+  byId: Map<string, WorkItem>;
+  gitRunner: CleanupGit;
+  opts: CleanupOptions;
+  deps: CleanupDeps;
+  compose: CleanupComposeReport | undefined;
+  isComposeUnavailable: () => boolean;
+  /** Shared with the run: a refusal or a failed step is a run failure too. */
+  failures: string[];
+};
+
+/**
+ * Release one item's claim footprint (bug-unclaim-leaves-worktree-record-without-reaper) —
+ * the inverse of `start --worktree`.
+ *
+ * Why `update` does not do this: `update` is a frontmatter-only kernel op with
+ * no git lifecycle — it is the very call that CLEARS a `worktree_path` record —
+ * so it cannot remove a worktree, and destroying a working tree on a status
+ * flip would be a data-loss surprise no caller asked for. The contract is
+ * therefore split: `update` REPORTS the dropped claim's footprint on the very
+ * call that drops it (its `claimFootprint` receipt), and the release — the one
+ * destructive operation — is an EXPLICIT command in the worktree domain, gated by
+ * the kernel rule both surfaces share (`classifyReleaseEntry`).
+ *
+ * WHERE the record lives decides the record's fate (a claim made through
+ * `start --worktree` is recorded in the WORKTREE copy, so that is where a
+ * release normally runs — from the claiming session, inside the worktree it
+ * reaps):
+ *
+ *   - the run's root is the worktree being released → the record's home is the
+ *     directory being deleted, so the record is DISPOSED with it: no tracker
+ *     write, no commit (nothing would outlive the removal), reported as
+ *     `disposed worktree_path record with the worktree`;
+ *   - the record lives in a checkout that OUTLIVES the worktree → prune's
+ *     order, unchanged: remove, then clear, then commit — so a failed removal
+ *     keeps the record that makes the worktree reapable.
+ *
+ * All git calls run from the canonical (first) worktree, never from a directory
+ * this run is about to delete.
+ */
+function releaseClaimedWorktree(run: ReleaseRun): CleanupRelease {
+  const { id, root, byId, gitRunner, opts, failures } = run;
+  const actions: CleanupAction[] = [];
+  const refuse = (reason: string, entry: ReleaseEntry): CleanupRelease => {
+    // A refusal is never a silent no-op: it lands in the action list AND in the
+    // flat `failures` (the both-surfaces discipline prune uses for a failed
+    // step), so the human path exits non-zero and a `--json` consumer reads it
+    // in the payload.
+    failures.push(`${id}: ${reason}`);
+    actions.push({ id, action: "failed", error: reason });
+    return { entry, actions };
+  };
+  const item = byId.get(id);
+  if (item === undefined) {
+    const reason = `id '${id}' not found under the tracker`;
+    return refuse(reason, {
+      id,
+      status: "unknown",
+      branch: null,
+      path: "",
+      releasable: false,
+      reason,
+      action: null,
+    });
+  }
+  // Identity: the caller passes it explicitly (native: its session id); the CLI
+  // resolves the same login `start` stamped, so the ordinary path — the
+  // claiming session releasing its own abandoned claim — is never refused.
+  const identity = opts.releaseIdentity ?? resolveCurrentLogin() ?? "";
+  const entry = classifyReleaseEntry(item, root, gitRunner, {
+    identity,
+    ...(opts.releaseTakeOverWorktree === true ? { takeOver: true } : {}),
+  });
+  if (!entry.releasable) {
+    return refuse(entry.reason ?? "release refused", entry);
+  }
+  // Every git call below runs from the canonical (main) worktree: `git worktree
+  // list` puts it first, and this run may be invoked from inside the worktree it
+  // is about to delete.
+  const gitRoot = resolve(gitRunner.worktreeList(root)[0] ?? root);
+  // The record outlives the removal exactly when this run's tracker copy is not
+  // the worktree being released (the claim made through `start --worktree` is
+  // recorded IN that worktree copy, so releasing it disposes the record with the
+  // directory — nothing to write, nothing a commit could outlive).
+  const recordHome = resolve(root) !== resolve(entry.path);
+  // Uncommitted work is never discarded silently: the removal stays unforced
+  // unless the caller armed the take-over hatch — their explicit "that owner is
+  // dead and that work is disposable" call, the same one that lets a release
+  // past a fired single-writer detection. Otherwise git refuses the dirty
+  // worktree and git's own message (which names --force) is reported verbatim.
+  const forceArmed = opts.releaseTakeOverWorktree === true;
+
+  try {
+    // Stale-record clause: the worktree is already gone, so the record is the
+    // only thing left. No Compose project, no stamp, no branch — nothing the
+    // removal does not already own.
+    if (entry.action !== "clear stale worktree_path record (path missing on disk)") {
+      // Compose first, before the worktree removal (ADR 0019 layer 2,
+      // exploration 017 F8): the stack that lives only for the run dies with
+      // the worktree. Only a repo whose convention declares services ever
+      // reaches Docker, and an absent docker CLI degrades this run to the same
+      // report-only path prune uses.
+      if (run.compose !== undefined && !run.isComposeUnavailable()) {
+        const project = worktreeComposeProject(run.compose.declared, basename(entry.path));
+        try {
+          (run.deps.compose ?? defaultComposeDown)(project, root);
+          actions.push({ id, action: `reaped compose project ${project}` });
+        } catch (err) {
+          if ((err as NodeJS.ErrnoException | null)?.code !== "ENOENT") throw err;
+          run.compose.dockerUnavailable = true;
+        }
+      }
+      // Ownership, not blanket deletion: only a start-created install link (a
+      // symlink to the canonical checkout's install) and a start-shaped
+      // `.arggon.env` are removed — an adopter's own file is left for git to
+      // report. The link's owner is resolved exactly as in prune: when the run
+      // happens from a LINKED worktree, the link points at the MAIN checkout.
+      unlinkNodeModulesLink(gitRoot, entry.path);
+      if (gitRoot !== resolve(root)) unlinkNodeModulesLink(root, entry.path);
+      unlinkWorktreeEnv(entry.path);
+      // The claim stamp is reaped explicitly rather than left to `git worktree
+      // remove`'s bookkeeping: it is the single-writer evidence, and its removal
+      // is an OBSERVABLE step, not an accident of git's internals.
+      if (unlinkWorktreeClaimStamp(entry.path)) {
+        actions.push({ id, action: "reaped arggon-claim.json stamp" });
+      }
+      gitRunner.removeWorktree(gitRoot, entry.path, { force: forceArmed });
+      actions.push({ id, action: `removed worktree ${entry.path}` });
+      if (entry.branch !== null && gitRunner.branchExists(gitRoot, entry.branch)) {
+        // Force, never the safe delete: an abandoned claim's branch is by
+        // definition NOT provably merged into the base (that is what prune's
+        // eligibility means), and the release is already an explicit,
+        // refusal-gated discard of that work.
+        gitRunner.deleteBranchForce(gitRoot, entry.branch);
+        actions.push({ id, action: `deleted branch ${entry.branch}` });
+      }
+    }
+    if (recordHome) {
+      // The record outlives the removal here, so it is cleared AFTER the
+      // worktree is observably gone — prune's invariant (a surviving worktree
+      // keeps the record that makes it reapable) — and rides one commit.
+      runUpdate({ cwd: root, id, worktreePath: "" });
+      actions.push({ id, action: "cleared worktree_path" });
+      const cleared = commitTrackerMutation(root, [item.filePath], {
+        message: trackerCommitMessage("released", [id]),
+        commit: resolveAutoCommit(opts.commit, readAutoCommitConfig(root)),
+      });
+      return { entry, actions, commit: cleared };
+    }
+    actions.push({ id, action: "disposed worktree_path record with the worktree" });
+    return { entry, actions };
+  } catch (err) {
+    // Per-candidate failure, prune's discipline exactly: reported on both
+    // surfaces, never fatal. The record left standing (when it outlives the
+    // removal) is what makes the leftover reapable.
+    const message = boundedEnvelopeText(
+      err instanceof Error ? err.message : String(err),
+      MAX_ENVELOPE_DETAIL_CHARS,
+    );
+    failures.push(`${id}: ${message}`);
+    actions.push({ id, action: "failed", error: message });
+    return { entry, actions };
+  }
 }

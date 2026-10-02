@@ -125,6 +125,17 @@ namespace:
   preserved so the next `cleanup` can retry. Per-candidate failures never abort
   the run and the cleared records still share ONE tracker commit.
 
+  `cleanup({ release: "<id>" })` is the other arm of the same domain — the
+  inverse of `start` for a claim that was dropped
+  (bug-unclaim-leaves-worktree-record-without-reaper), refusing while another
+  session's live writer holds the worktree (`take_over_worktree` is the audited
+  hatch for a presumed-dead owner, and the only thing that forces the removal).
+  `update` cannot release — it is frontmatter-only, and it is the same call that
+  CLEARS a `worktree_path` record — so the native `update` payload carries the
+  additive `claimFootprint` receipt naming this call instead. See
+  [`json-output.md`](./json-output.md) §`cleanup` and
+  [`agents.md`](./agents.md) §Unclaim.
+
   Every pre-commit `start` failure carries `claimCommitted: false` and a
   `claimCommit.status: "not-attempted"` receipt (with preparation/rollback
   context when known). `rollback` reports observed `preparationRemoved`,

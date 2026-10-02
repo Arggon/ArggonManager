@@ -3,6 +3,15 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import type { GhExecutor } from "./import-issues.js";
 import type { WorkItem } from "./items.js";
+import { isClaimed } from "./status.js";
+import {
+  detectWorktreeForeignWrites,
+  readWorktreeClaimStamp,
+  type GitDirRunner,
+  type WorktreeClaimStamp,
+  type WorktreeForeignWriteReport,
+  type WorktreeStatusRunner,
+} from "./worktree.js";
 
 /**
  * Worktree-cleanup classification, shared by every surface (W4,
@@ -61,8 +70,12 @@ export type CleanupGit = {
   isAncestor(cwd: string, branch: string, base: string): boolean;
   /** True when a remote-tracking branch `origin/<branch>` exists. */
   remoteBranchExists(cwd: string, branch: string): boolean;
-  /** `git worktree remove <path>` (refuses dirty worktrees). */
-  removeWorktree(cwd: string, path: string): void;
+  /**
+   * `git worktree remove <path>` (refuses dirty worktrees). `opts.force` adds
+   * `--force`: only the release path passes it, and only when the caller armed
+   * the take-over hatch — prune never forces.
+   */
+  removeWorktree(cwd: string, path: string, opts?: { force?: boolean }): void;
   /** Safe `git branch -d <branch>` (only succeeds for merged branches). */
   deleteBranch(cwd: string, branch: string): void;
   /**
@@ -71,6 +84,14 @@ export type CleanupGit = {
    */
   deleteBranchForce(cwd: string, branch: string): void;
   branchExists(cwd: string, name: string): boolean;
+  /**
+   * The branch a worktree currently has checked out (`null` for a detached
+   * HEAD or a probe that did not answer). OPTIONAL: release reads the branch
+   * from the worktree itself (the recorded `branch` field is cleared by the
+   * very unclaim that asks for the release), and a runner without it falls back
+   * to the item's recorded branch.
+   */
+  worktreeBranch?(cwd: string, path: string): string | null;
 };
 
 /** Default gh executor bound for use as a default value (get-open-prs pattern). */
@@ -157,8 +178,8 @@ export function defaultCleanupGit(): CleanupGit {
         return false;
       }
     },
-    removeWorktree(cwd: string, path: string): void {
-      git(["worktree", "remove", path], cwd);
+    removeWorktree(cwd: string, path: string, opts?: { force?: boolean }): void {
+      git(["worktree", "remove", ...(opts?.force === true ? ["--force"] : []), path], cwd);
     },
     deleteBranch(cwd: string, branch: string): void {
       git(["branch", "-d", branch], cwd);
@@ -173,6 +194,13 @@ export function defaultCleanupGit(): CleanupGit {
       } catch {
         return false;
       }
+    },
+    worktreeBranch(cwd: string, path: string): string | null {
+      // Read from the WORKTREE, never from the item: the recorded branch is
+      // cleared by the unclaim that asks for this release, so the item is not a
+      // source here. A detached HEAD (`HEAD`) means no branch to delete.
+      const name = git(["rev-parse", "--abbrev-ref", "HEAD"], path);
+      return name.length > 0 && name !== "HEAD" ? name : null;
     },
   };
 }
@@ -329,5 +357,200 @@ export function classifyCleanupEntry(
     entry.action = "remove worktree and delete the merged branch";
   }
   entry.removable = true;
+  return entry;
+}
+
+/**
+ * Claim RELEASE (bug-unclaim-leaves-worktree-record-without-reaper) — the
+ * release path, the inverse of `start --worktree`, and the half of the unclaim
+ * contract that `update` deliberately does not own.
+ *
+ * Why it is not `update`: `update` is a frontmatter-only kernel op with no git
+ * lifecycle (it is the very call `cleanup` uses to CLEAR a `worktree_path`
+ * record), so it cannot remove a worktree — and silently destroying a working
+ * tree on a status flip would be the wrong default anyway. What `update` does
+ * instead is report the dropped claim's footprint (its `claimFootprint`
+ * receipt) naming this path, so the consequence is visible on the same call
+ * that causes it. The release itself — worktree, branch, `worktree_path`,
+ * `.arggon.env`, claim stamp — lives here, in the worktree domain, with CLI and
+ * native parity by construction (both surfaces call this rule).
+ *
+ * It is deliberately NOT the prune classifier: prune reaps worktrees of FINISHED
+ * work whose branch is integrated into the base (terminal status + merge), while
+ * a release reaps an ABANDONED claim (any status, branch merged or not). The
+ * two never compete for one item in one run — the CLI refuses `--release`
+ * together with `--prune`.
+ */
+export type ReleaseRequest = {
+  /**
+   * Identity asking for the release: the calling session id on the native
+   * surface, the resolved assignee on the CLI — the same value `start` stamped.
+   */
+  identity: string;
+  /**
+   * Deliberate take-over of a presumed-dead stamped owner
+   * (task-strict-attach-dead-owner-hatch; CLI `--take-over-worktree`). Default
+   * OFF, and then the flag changes NOTHING about a clean release: a fired
+   * single-writer detection keeps its refusal, because that is the evidence of
+   * a live second writer. Armed, it releases anyway and records the replaced
+   * stamp on the entry — the caller owns the judgement, the kernel only
+   * reports it.
+   */
+  takeOver?: boolean;
+  /** Porcelain-probe override (tests); defaults to a real `git status`. */
+  status?: WorktreeStatusRunner;
+  /** Git-dir-probe override (tests); defaults to a real `git rev-parse`. */
+  gitDir?: GitDirRunner;
+};
+
+/** One item classified for release, with the refusal evidence when it refused. */
+export type ReleaseEntry = {
+  id: string;
+  status: string;
+  /** Branch the release deletes (the worktree's own HEAD, else the recorded one). */
+  branch: string | null;
+  /** Absolute worktree path as recorded on the item ("" when none is). */
+  path: string;
+  /** True when the release may proceed. */
+  releasable: boolean;
+  /** Why the release is refused (null when releasable). */
+  reason: string | null;
+  /** What the release does (null when refused). */
+  action: string | null;
+  /**
+   * The fired single-writer detection behind a refusal — a stamp held by a
+   * DIFFERENT identity plus tracked files modified after that claim, i.e. the
+   * F12 signature of a live writer. Present only on that refusal.
+   */
+  foreignWrites?: WorktreeForeignWriteReport;
+  /** The stamp an armed take-over replaced (task-strict-attach-dead-owner-hatch). */
+  takeOver?: { replacedIdentity: string; replacedClaimedAt: string };
+};
+
+/**
+ * The refusal sentence for a release whose single-writer detection FIRED
+ * (exploration 017 F12): the same evidence and the same remedy ORDER as the
+ * attach-time strict gate (`strictWorktreeWriteFailure`) — coordinate with the
+ * stamped session first (non-destructive, and the correct read for a live
+ * owner), then the audited take-over for a presumed-dead owner, then the
+ * documented manual stamp removal. The named-file list goes LAST for the same
+ * reason there: the human channel clips a long line at its HEAD, and the
+ * remedies are the actionable part.
+ */
+export function worktreeReleaseRefusal(
+  item: WorkItem,
+  path: string,
+  report: WorktreeForeignWriteReport,
+): string {
+  const extra = report.total - report.files.length;
+  const named = report.files.join(", ");
+  return (
+    `refusing to release the worktree of '${item.id}': it is stamped by session ` +
+    `${report.owner} (claimed ${report.claimedAt}) and ${report.total} tracked ` +
+    `file${report.total === 1 ? " was" : "s were"} modified after that claim — another ` +
+    "session may still be writing there. Coordinate with the stamped session first; if that " +
+    "session is gone, confirm no live writer and re-run with the take-over flag " +
+    "(cleanup --release <id> --take-over-worktree; native cleanup({ release, take_over_worktree })); " +
+    "as a last resort remove the stamp by hand " +
+    `(rm "$(git -C ${path} rev-parse --absolute-git-dir)/arggon-claim.json"). ` +
+    `Files modified after that claim: ${named}${extra > 0 ? ` (and ${extra} more)` : ""}.`
+  );
+}
+
+/**
+ * Classify ONE item for release. The order is the contract: recorded path →
+ * still claimed (an abandoned claim is the premise; a live one must be dropped
+ * or taken over first) → filesystem state → branch → single-writer gate. Every
+ * refusal carries a `reason`; every releasable entry carries the `action` the
+ * surface performs.
+ *
+ * The single-writer gate reuses the attach-time detection verbatim: the stamp
+ * must name a DIFFERENT identity than the requester, and tracked files must
+ * have moved after that stamp. Its bound is the documented one (one porcelain
+ * read plus one `stat` per dirty path, no full-tree walk) and its degradation
+ * is the same — a missing or corrupt stamp, or a probe that does not answer,
+ * yields no detection and never a false accusation. An armed `takeOver` is the
+ * only sanctioned way past a fired detection, exactly like `start`'s.
+ */
+export function classifyReleaseEntry(
+  item: WorkItem,
+  root: string,
+  gitRunner: CleanupGit,
+  request: ReleaseRequest,
+): ReleaseEntry {
+  const path = item.worktreePath ? resolve(item.worktreePath) : "";
+  const entry: ReleaseEntry = {
+    id: item.id,
+    status: item.status,
+    branch: null,
+    path,
+    releasable: false,
+    reason: null,
+    action: null,
+  };
+  if (path === "") {
+    entry.reason = "no worktree recorded on the item (nothing to release)";
+    return entry;
+  }
+  if (isClaimed(item.type, item.status, item.assignee) && request.takeOver !== true) {
+    // The release exists for an ABANDONED claim. Releasing a worktree under a
+    // live claim would hand a live writer a destroyed tree — so the premise is
+    // checked, and the audited take-over flag is the way past a presumed-dead
+    // owner (the same hatch `start` has).
+    entry.reason =
+      `item is still claimed by ${item.assignee} — drop the claim first ` +
+      `(arggon update ${item.id} --status todo), then release the worktree ` +
+      "(or pass --take-over-worktree for a presumed-dead owner)";
+    return entry;
+  }
+  if (!existsSync(path)) {
+    // Same stale-record clause as prune: the worktree is already gone, so the
+    // record is the only thing left to clear.
+    entry.action = "clear stale worktree_path record (path missing on disk)";
+    entry.releasable = true;
+    return entry;
+  }
+  if (
+    !gitRunner
+      .worktreeList(root)
+      .map((p) => resolve(p))
+      .includes(path)
+  ) {
+    entry.reason = "path exists but is not a git worktree of this repo (remove it manually)";
+    return entry;
+  }
+  // Branch: the WORKTREE is the source of truth (the recorded field is cleared
+  // by the unclaim that asks for this release, and a detached worktree has no
+  // branch to delete). A runner without the optional probe falls back to the
+  // recorded branch.
+  entry.branch =
+    gitRunner.worktreeBranch === undefined
+      ? (item.branch ?? null)
+      : (gitRunner.worktreeBranch(root, path) ?? null);
+
+  const stamp: WorktreeClaimStamp | null = readWorktreeClaimStamp(path, {
+    ...(request.gitDir !== undefined ? { gitDir: request.gitDir } : {}),
+  });
+  if (stamp !== null && stamp.identity !== request.identity) {
+    const foreignWrites = detectWorktreeForeignWrites(path, stamp, {
+      ...(request.status !== undefined ? { status: request.status } : {}),
+    });
+    if (foreignWrites !== null && request.takeOver !== true) {
+      entry.reason = worktreeReleaseRefusal(item, path, foreignWrites);
+      entry.foreignWrites = foreignWrites;
+      return entry;
+    }
+    if (foreignWrites !== null) {
+      entry.takeOver = {
+        replacedIdentity: stamp.identity,
+        replacedClaimedAt: stamp.claimedAt,
+      };
+    }
+  }
+  entry.action =
+    entry.branch === null
+      ? "remove the worktree and clear the worktree_path record"
+      : "remove the worktree, delete its branch and clear the worktree_path record";
+  entry.releasable = true;
   return entry;
 }
