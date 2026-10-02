@@ -19,10 +19,12 @@ updated: "2026-10-02"
 
 ## Context
 
-<!-- Why this task exists. -->
+Found while reviewing PR #598: `ArggonManager/docs/adr/README.md` has no row for ADR 0020 (Methodology-first productization with per-agent native adapters), which is Accepted on main. The index therefore disagrees with the ADR directory.
 
 ## Acceptance
 
-<!-- The real acceptance criteria; tick each box when met. -->
+- [ ] README.md lists ADR 0020 with its title and status
+- [ ] Every ADR file in the directory has an index row (sweep the whole dir, not just 0020)
+- [ ] A test asserts index/directory parity so a new ADR cannot ship unindexed
 
 ## Notes
