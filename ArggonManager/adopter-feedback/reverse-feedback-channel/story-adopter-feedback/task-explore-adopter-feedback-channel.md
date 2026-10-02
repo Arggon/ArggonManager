@@ -131,9 +131,8 @@ before the spec exists and `arggon spec analyze` reports no NEW findings.**
       change (**behavioral** impact class per `docs/agents.md` §Changing the
       methodology itself), opt-out semantics, and the explicit non-goal of
       automatic publication
-- [ ] **Spec + plan written** from the edge-case table, then `arggon spec
-  analyze` reports no NEW findings — the gate that releases implementation
-      tasks
+- [ ] **Spec + plan written** from the edge-case table, then a clean
+      `spec analyze` run — the gate that releases implementation tasks
 
 ## Notes
 
