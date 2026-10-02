@@ -58,3 +58,7 @@ Implemented; PR #569 (feat/task-cleanup-declared-services, not merged — coordi
 **Commands run / expected vs observed:** npm test → 2081 passed (9 new compose tests + convention/lib units; daemon-free, CI-safe); npm run lint → 0; npm run build → green; npm run check:plugin → green AFTER the prescribed separate "chore: regen plugin bundle" commit (kernel modules are inlined into the vendored bundle, so lib changes drifted it — expected, recorded as its own commit 00df6ad1); npm run smoke:native-start-cold → passed (all legs incl. "checkout unchanged"); npm run arggon -- validate → ok:true. One initial red herring: headless-ci failed until the worktree's root `npm run build` produced dist artifacts (the suite asserts them) — environment, not code.
 
 **Finding (follow-up for coordinator):** the OpenCode plugin's nativeCleanup keeps its own prune loop and does NOT reap Compose (safe by construction — report-only). MCP arggon_cleanup spawns the CLI and reaps. Native parity is unfiled per the no-self-filing rule; worktreeComposeProject is kernel-exported so the plugin can adopt it trivially.
+
+### handoff 2026-10-02 @ses_f061e465effeTJZ6pCepJBk192 (session: ses_f061e465effeTJZ6pCepJBk192) — next: Review + merge PR #569 (do not merge before review); file the nativeCleanup Compose parity follow-up
+- branch: feat/task-cleanup-declared-services
+- open questions: Native plugin cleanup parity (compose reaping in nativeCleanup) — follow-up filed by coordinator?; bundle regen commit 00df6ad1 must ride the same merge
