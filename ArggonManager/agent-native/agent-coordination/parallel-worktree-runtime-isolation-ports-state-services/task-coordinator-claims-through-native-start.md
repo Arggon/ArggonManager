@@ -1,6 +1,6 @@
 ---
 type: task
-status: in_progress
+status: done
 id: task-coordinator-claims-through-native-start
 title: The coordinator contract never tells the coordinator to claim through `tools.arggon.start` — live worktrees on items that are still `todo`/unclaimed
 assignee: Arggon
@@ -10,7 +10,6 @@ labels: [opencode-seam, methodology, worktree]
 priority: p1
 created: "2026-10-02"
 updated: "2026-10-02"
-claimed_at: "2026-10-02T15:37:33.470Z"
 worktree_path: /home/arggon/Projects/ArggonManager-task-coordinator-claims-through-native-start
 ---
 <!--
