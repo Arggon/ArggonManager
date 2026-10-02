@@ -1,13 +1,17 @@
 ---
 type: task
-status: todo
+status: in_progress
 id: task-zcode-goal-mode
 title: ZCode goal-mode template from item checklist (plan T5)
+assignee: Arggon
+branch: feat/task-zcode-goal-mode
 parent: story-zcode-adapter
 labels: []
 created: "2026-10-02"
 updated: "2026-10-02"
+claimed_at: "2026-10-02T23:58:06.586Z"
 depends_on: [task-adapter-selection-flags, task-capability-matrix]
+worktree_path: /home/arggon/Projects/ArggonManager-task-zcode-goal-mode
 ---
 <!--
   Placement (v0): ArggonManager/methodology-productization/native-agent-adapters/story-zcode-adapter/task-zcode-goal-mode.md
