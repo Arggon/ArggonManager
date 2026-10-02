@@ -10,7 +10,6 @@ labels: [worktree, opencode-seam]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-02"
-worktree_path: /home/arggon/Projects/ArggonManager-task-strict-attach-dead-owner-hatch
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-strict-attach-dead-owner-hatch.md

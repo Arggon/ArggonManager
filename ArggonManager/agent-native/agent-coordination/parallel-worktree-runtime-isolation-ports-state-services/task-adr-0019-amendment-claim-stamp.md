@@ -10,7 +10,6 @@ labels: [worktree, docs]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-02"
-worktree_path: /home/arggon/Projects/ArggonManager-task-adr-0019-amendment-claim-stamp
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-adr-0019-amendment-claim-stamp.md

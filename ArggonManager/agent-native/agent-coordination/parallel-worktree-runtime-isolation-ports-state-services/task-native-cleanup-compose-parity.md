@@ -10,7 +10,6 @@ labels: [worktree, opencode-seam, parity]
 priority: p3
 created: "2026-10-02"
 updated: "2026-10-02"
-worktree_path: /home/arggon/Projects/ArggonManager-task-native-cleanup-compose-parity
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-native-cleanup-compose-parity.md

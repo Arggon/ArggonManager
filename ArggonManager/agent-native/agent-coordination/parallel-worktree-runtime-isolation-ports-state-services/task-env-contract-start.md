@@ -8,8 +8,7 @@ branch: feat/task-env-contract-start
 parent: parallel-worktree-runtime-isolation-ports-state-services
 labels: [kernel, cli, worktree]
 created: "2026-10-01"
-updated: "2026-10-01"
-worktree_path: /home/arggon/Projects/ArggonManager-task-env-contract-start
+updated: "2026-10-02"
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-env-contract-start.md

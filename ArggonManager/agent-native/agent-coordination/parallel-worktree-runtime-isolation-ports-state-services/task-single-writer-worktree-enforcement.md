@@ -10,7 +10,6 @@ labels: [worktree, devex]
 priority: p3
 created: "2026-10-01"
 updated: "2026-10-02"
-worktree_path: /home/arggon/Projects/ArggonManager-task-single-writer-worktree-enforcement
 ---
 <!--
   Placement (v0): ArggonManager/agent-native/agent-coordination/parallel-worktree-runtime-isolation-ports-state-services/task-single-writer-worktree-enforcement.md
