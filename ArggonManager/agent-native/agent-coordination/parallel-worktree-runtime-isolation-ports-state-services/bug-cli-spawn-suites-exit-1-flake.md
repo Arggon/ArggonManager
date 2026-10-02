@@ -27,3 +27,16 @@ updated: "2026-10-02"
 <!-- The real acceptance criteria; tick each box when met. -->
 
 ## Notes
+
+### 2026-10-02 @Coordinator
+### 2026-10-02 @Coordinator
+Two CI instances, both rerun-green, both in suites that SPAWN the real CLI:
+1. PR #571 (docs-only), run 36960202458: `cli/src/handoff.test.ts > handoff CLI > passes --session through the CLI flag into the heading (provenance)` → `expected 1 to be +0` with a stderr trace at `lib/dist/create.js:9 import { ... } from "./relations.js"` — the spawned process died loading the kernel's built output, not an assertion mismatch.
+2. PR #576 (config+test only), first `cli` run: `cli/src/row-table-stdout.test.ts > row/table stdout: adopt --ack > keeps the raw doc path in the --json envelope` → `AssertionError: expected 1 to be +0` (child exit 1).
+CI order is `npm ci` → `npm run build` → `check:plugin` → `npm run test`, so the kernel dist is built before the suite; a mid-write dist does not fit. Resource exhaustion on the runner (parallel vitest workers each spawning tsx CLIs) is the more plausible root cause and would explain both.
+
+## Acceptance
+- [ ] Reproduce by running the spawn-heavy suites repeatedly at CI parallelism on a loaded machine; identify the failing spawn (ECONNREFUSED/EPIPE/EMFILE/OOM/timeout).
+- [ ] Fix at the spawn/runner level — bounded concurrency, or a serial lane for process-spawning suites, or retry-on-spawn-failure — NOT per test.
+- [ ] Scope: every suite that spawns the CLI (handoff, row-table-stdout, board/tui, comment-race, headless), not the two observed files.
+- [ ] Keep the existing dry-run/ordering discipline: a spawn failure must be distinguishable from a real assertion failure in the test output.
