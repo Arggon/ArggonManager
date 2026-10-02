@@ -27,10 +27,10 @@ Declare scope/invariants/version/upgrade-channel of the methodology in agents.md
 
 ## Acceptance
 
-- [ ] `README.md` links every carrier in one hop
-- [ ] carriers carry the same invariant list verbatim
-- [ ] PR states impact class (Behavioral) per agents.md §Changing the methodology itself
-- [ ] `arggon validate` green
+- [x] `README.md` links every carrier in one hop
+- [x] carriers carry the same invariant list verbatim
+- [x] PR states impact class (Behavioral) per agents.md §Changing the methodology itself
+- [x] `arggon validate` green
 
 ## Notes
 
