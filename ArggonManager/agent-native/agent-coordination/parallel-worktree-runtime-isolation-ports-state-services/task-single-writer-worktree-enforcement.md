@@ -67,3 +67,7 @@ Implementation complete on branch feat/task-single-writer-worktree-enforcement �
 1. Detection covers the UNCOMMITTED collision window; foreign work already committed is history (documented). Commit-log-based detection was deliberately out of scope.
 2. Cross-surface identity asymmetry: a native-stamped (ses_x) worktree attached via CLI (identity=assignee) fires detection when newer writes exist — accepted (warning only by default); a CLI->session-id passthrough env could make identities uniform later if wanted.
 3. ADR 0019 (Proposed) doesn't cover the claim stamp; convention.md + agents.md now do. Say the word if you want an ADR amendment.
+
+### handoff 2026-10-02 @ses_f061e465dffe8vBlyjt8OkhAgz (session: ses_f061e465dffe8vBlyjt8OkhAgz) — next: Review PR #568 (draft): mechanism, strict-flag shape vs strict-gate-bins, default-identity tests; merge is the completion step.
+- branch: feat/task-single-writer-worktree-enforcement
+- open questions: Commit-log detection for already-committed foreign work?; CLI session-id passthrough for uniform identities?; ADR 0019 amendment for the claim stamp?
